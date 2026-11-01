@@ -304,6 +304,26 @@ impl DrawingEditor {
         cx.notify();
     }
 
+    /// A title block field's cell (sheet mm) and text height on the built sheet.
+    fn title_cell(&self, key: &str) -> Option<([f64; 4], f64)> {
+        let b = self.built.as_ref()?;
+        let target = noshape_model::drawing::build::PickTarget::TitleField(key.to_string());
+        let &(pick, r) = b.title_cells.iter().find(|(p, _)| b.picks.get(*p as usize) == Some(&target))?;
+        Some((r, b.geometry.texts.iter().find(|t| t.pick == pick).map(|t| t.height).unwrap_or(self.drawing.props.ann_text_height)))
+    }
+
+    /// A title block field made a note of its own, then `then` on it, one
+    /// undo step (drawing.md S18: Explode note, Move to, Bring to front …).
+    pub fn with_field_note(&mut self, key: &str, description: &str, cx: &mut Context<Self>, then: impl FnOnce(&mut Sheet, u64)) -> Option<u64> {
+        let (cell, h) = self.title_cell(key)?;
+        let mut id = 0;
+        self.edit_sheet(description, cx, |s| {
+            id = noshape_scene::drawing_tools::promote_title_field(s, key, cell, h);
+            then(s, id);
+        });
+        Some(id)
+    }
+
     /// Title block field › Copy: a note with the field's text (its property
     /// codes) and height at the cell, on the clipboard like a copied note.
     pub fn copy_title_field(&mut self, key: &str, cx: &mut Context<Self>) {

@@ -1521,10 +1521,15 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     // Field cells stay editable notes under Formats › Locked.
     let title_cells: Vec<(u32, [f64; 4])> = std::mem::take(&mut g.title_cells)
         .into_iter()
-        .map(|(key, r, texts)| {
+        .filter_map(|(key, r, texts)| {
+            // A field made a note (S18): the note draws it.
+            if sheet.title_field_note(&key).is_some() {
+                g.texts[texts].iter_mut().for_each(|t| t.text.clear());
+                return None;
+            }
             let id = picks.id(PickTarget::TitleField(key));
             g.texts[texts].iter_mut().for_each(|t| t.pick = id);
-            (id, r)
+            Some((id, r))
         })
         .collect();
 
@@ -2478,7 +2483,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         t.pick = remap.get(&t.pick).copied().unwrap_or(0);
     }
     // Annotations moved to a format layer take its color and lock with the
-    // format (Formats › Locked).
+    // format (Formats › Locked); title block fields made notes stay
+    // editable, as the fields are.
+    let field_notes: std::collections::HashSet<u32> = resolved.annotations.iter().filter(|a| a.title_field.is_some()).map(|a| picks.id(PickTarget::Annotation(a.id))).collect();
     let moved: Vec<LayerSpan> = g.layers.iter().filter(|s| s.lines.start >= ml && s.texts.start >= mt).cloned().collect();
     for s in moved {
         if let Some(rgb) = s.layer.color(&drawing.props) {
@@ -2486,8 +2493,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         }
         format_layer_pens(&mut g, s.lines.clone(), s.layer, &drawing.props);
         if drawing.props.formats_locked {
-            g.lines[s.lines.clone()].iter_mut().for_each(|l| l.pick = 0);
-            g.texts[s.texts.clone()].iter_mut().for_each(|t| t.pick = 0);
+            g.lines[s.lines.clone()].iter_mut().filter(|l| !field_notes.contains(&l.pick)).for_each(|l| l.pick = 0);
+            g.texts[s.texts.clone()].iter_mut().filter(|t| !field_notes.contains(&t.pick)).for_each(|t| t.pick = 0);
         }
     }
     for gr in &mut g.grips[mg..] {

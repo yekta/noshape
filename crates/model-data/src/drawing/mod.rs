@@ -2017,6 +2017,11 @@ pub struct Annotation {
     /// An MBD annotation of a Part Studio shown in a view ([`mbd`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<mbd::ModelRef>,
+    /// A title block field made a note of its own (Explode note, Add
+    /// leader, Move to …; drawing.md S18): the field's key. The format no
+    /// longer draws the field; reading and setting it go through this note.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title_field: Option<String>,
 }
 
 /// See [`Annotation::sketch_dim`].
@@ -2386,7 +2391,7 @@ impl AnnotationKind {
 
 impl Default for Annotation {
     fn default() -> Self {
-        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, text_along: None, loose: false, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None, style: None, hole: None, target: None, sketch_dim: None, model: None }
+        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, text_along: None, loose: false, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None, style: None, hole: None, target: None, sketch_dim: None, model: None, title_field: None }
     }
 }
 
@@ -2931,7 +2936,16 @@ impl Sheet {
 
     /// Value of a title block field.
     pub fn title_field(&self, key: &str) -> Option<&str> {
+        // A field made a note: the note's text.
+        if let Some(AnnotationKind::Note { text, .. }) = self.title_field_note(key).map(|a| &a.kind) {
+            return Some(text.as_str());
+        }
         self.title_block.fields.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+    }
+
+    /// The note a title block field was made into, if any.
+    pub fn title_field_note(&self, key: &str) -> Option<&Annotation> {
+        self.annotations.iter().find(|a| a.title_field.as_deref() == Some(key))
     }
 }
 

@@ -1889,15 +1889,57 @@ impl DrawingEditor {
             (None, Some(v), ..) => self.detail_circle_entries(v, cx),
             (None, None, Some(v), _) => self.section_line_entries(v, cx),
             (None, None, None, Some(key)) => {
-                let (k2, k3) = (key.clone(), key.clone());
+                let (k2, k3, k4, k5, k6, k7) = (key.clone(), key.clone(), key.clone(), key.clone(), key.clone(), key.clone());
+                // Live 1992: a field is a note, with the note's menu. Copy is
+                // a note with the field's text; Delete leaves the cell empty;
+                // Explode note, Add leader, Move to and the order make the
+                // field a note of its own first (S18).
+                let layers: Vec<MenuEntry> = noshape_model::drawing::SheetLayer::FORMAT
+                    .into_iter()
+                    .filter(|l| *l != noshape_model::drawing::SheetLayer::TitleBlock)
+                    .chain([noshape_model::drawing::SheetLayer::Drawing])
+                    .map(|l| {
+                        let k = key.clone();
+                        MenuEntry::item(l.name(), move |t, _, cx| {
+                            t.with_field_note(&k, "Move to", cx, |s, id| s.annotations.iter_mut().filter(|a| a.id == id).for_each(|a| a.layer = l));
+                        })
+                    })
+                    .collect();
                 vec![
                     MenuEntry::item("Edit note...", move |t, w, cx| t.open_title_field(key.clone(), w, cx)),
+                    MenuEntry::item("Explode note", move |t, _, cx| {
+                        t.with_field_note(&k4, "Explode note", cx, |s, id| {
+                            if let Some(AnnotationKind::Note { style, .. }) = s.annotations.iter_mut().find(|a| a.id == id).map(|a| &mut a.kind) {
+                                style.explode = true;
+                            }
+                        });
+                    }),
                     crate::drawing_props::paste_always(),
-                    // Live 1992: Copy (a note with the field's text, to paste
-                    // anywhere) and Delete (the cell left empty).
                     MenuEntry::item("Copy", move |t, _, cx| t.copy_title_field(&k2, cx)),
                     MenuEntry::item("Paste as table", |t, _, cx| {
                         t.paste_as_table(cx);
+                    }),
+                    MenuEntry::item("Add leader", move |t, _, cx| {
+                        if let Some(id) = t.with_field_note(&k5, "Edit note", cx, |_, _| {}) {
+                            t.note_add_leader(id, cx);
+                        }
+                    }),
+                    MenuEntry::Submenu("Move to".into(), layers),
+                    MenuEntry::item("Bring to front", move |t, _, cx| {
+                        t.with_field_note(&k6, "Bring to front", cx, |s, id| {
+                            if let Some(i) = s.annotations.iter().position(|a| a.id == id) {
+                                let a = s.annotations.remove(i);
+                                s.annotations.push(a);
+                            }
+                        });
+                    }),
+                    MenuEntry::item("Send to back", move |t, _, cx| {
+                        t.with_field_note(&k7, "Send to back", cx, |s, id| {
+                            if let Some(i) = s.annotations.iter().position(|a| a.id == id) {
+                                let a = s.annotations.remove(i);
+                                s.annotations.insert(0, a);
+                            }
+                        });
                     }),
                     MenuEntry::Separator,
                     MenuEntry::item("Clear selection", |t, _, cx| {

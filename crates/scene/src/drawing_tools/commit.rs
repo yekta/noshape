@@ -684,10 +684,46 @@ pub fn keep_boundary(sheet: &mut Sheet, pl: &ViewPlacement, b: Boundary) {
 /// A title block field's text (its cell edited as a note); a key the
 /// layout lacks is added.
 pub fn set_title_field(sheet: &mut Sheet, key: &str, text: &str) {
+    // A field made a note: its text.
+    if let Some(AnnotationKind::Note { text: t, .. }) = sheet.annotations.iter_mut().find(|a| a.title_field.as_deref() == Some(key)).map(|a| &mut a.kind) {
+        *t = text.to_string();
+        return;
+    }
     match sheet.title_block.fields.iter_mut().find(|(k, _)| k == key) {
         Some((_, v)) => *v = text.to_string(),
         None => sheet.title_block.fields.push((key.to_string(), text.to_string())),
     }
+}
+
+/// A title block field made a note of its own (live: every field is a note;
+/// Explode note, Add leader, Move to, Bring to front act on it): a note with
+/// the field's text and text height `h`, centred in its `cell` (sheet mm,
+/// [x0, y0, x1, y1]) on the Title block layer. The field's own value moves
+/// into the note. Returns the note (the existing one when made before).
+pub fn promote_title_field(sheet: &mut Sheet, key: &str, cell: [f64; 4], h: f64) -> u64 {
+    if let Some(a) = sheet.title_field_note(key) {
+        return a.id;
+    }
+    let text = match sheet.title_field(key).unwrap_or("") {
+        // The format's automatic values, as fields.
+        "" if key == "Scale" => "{sheet.scale}".to_string(),
+        "" if key == "Size" => sheet.size.label().to_string(),
+        v => v.to_string(),
+    };
+    if let Some((_, v)) = sheet.title_block.fields.iter_mut().find(|(k, _)| k == key) {
+        v.clear();
+    }
+    let id = sheet.next_annotation_id();
+    let style = note::NoteStyle { width: Some((cell[2] - cell[0] - 2.0).max(h)), align: note::NoteAlign::Center, valign: note::NoteVAlign::Middle, ..Default::default() };
+    sheet.annotations.push(Annotation {
+        id,
+        kind: AnnotationKind::Note { text, height_mm: h, style },
+        position: [cell[0] + 1.0, (cell[1] + cell[3]) / 2.0],
+        layer: SheetLayer::TitleBlock,
+        title_field: Some(key.to_string()),
+        ..Default::default()
+    });
+    id
 }
 
 /// Remove crop: the view uncropped, its boundary kept as a sketch entity.
@@ -1231,4 +1267,40 @@ pub fn delete_selection(s: &mut Sheet, sel: &[super::Sel]) {
         }
     }
     let _ = s.sketch.sketch.solve();
+}
+
+#[cfg(test)]
+mod title_field_tests {
+    use noshape_model::drawing::build::{PickTarget, render_sheet};
+    use noshape_model::drawing::views::{Sources, ViewCache};
+    use noshape_model::drawing::*;
+
+    /// A title block field made a note (S18): the value moves into the
+    /// note, setting the field edits the note, the format no longer draws or
+    /// picks the field, and the note stays pickable with the formats locked.
+    #[test]
+    fn title_field_becomes_a_note() {
+        let mut d = Drawing::default();
+        super::set_title_field(&mut d.sheets[0], "Title", "BRACKET");
+        let (sources, cache) = (Sources::new(), ViewCache::new());
+        let b = render_sheet(&d, 0, &sources, &cache, false).unwrap();
+        let (pick, cell) = *b.title_cells.iter().find(|(p, _)| b.picks[*p as usize] == PickTarget::TitleField("Title".into())).unwrap();
+        let h = b.geometry.texts.iter().find(|t| t.pick == pick).unwrap().height;
+        let id = super::promote_title_field(&mut d.sheets[0], "Title", cell, h);
+        assert_eq!(super::promote_title_field(&mut d.sheets[0], "Title", cell, h), id, "made once");
+        assert_eq!(d.sheets[0].title_field("Title"), Some("BRACKET"));
+        assert!(d.sheets[0].title_block.fields.iter().any(|(k, v)| k == "Title" && v.is_empty()));
+        super::set_title_field(&mut d.sheets[0], "Title", "PLATE");
+        assert!(matches!(&d.sheets[0].annotations[0].kind, AnnotationKind::Note { text, .. } if text == "PLATE"));
+        d.props.formats_locked = true;
+        let b = render_sheet(&d, 0, &sources, &cache, false).unwrap();
+        assert!(!b.picks.contains(&PickTarget::TitleField("Title".into())), "no field pick");
+        let texts: Vec<&str> = b.geometry.texts.iter().filter(|t| t.text == "PLATE").map(|t| t.text.as_str()).collect();
+        assert_eq!(texts.len(), 1, "drawn once, by the note");
+        let note_pick = b.picks.iter().position(|p| *p == PickTarget::Annotation(id)).unwrap() as u32;
+        assert!(b.geometry.texts.iter().any(|t| t.text == "PLATE" && t.pick == note_pick), "editable while locked");
+        // Delete (the note gone): the field is empty.
+        d.sheets[0].annotations.clear();
+        assert_eq!(d.sheets[0].title_field("Title"), Some(""));
+    }
 }
