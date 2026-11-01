@@ -203,3 +203,42 @@ fn the_instance_and_top_row_menus_are_lives(cx: &mut TestAppContext) {
     })
     .unwrap();
 }
+
+/// Live 1723: a Linear pattern's row and its copy's row (less "Add comment",
+/// cloud, and the pattern's Dynamic suppression, which patterns don't have
+/// here yet).
+#[gpui::test]
+fn the_pattern_and_copy_row_menus_are_lives(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "pattern-menus");
+    let sep = "—";
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let pat = v.assembly(cx).unwrap().patterns[0].id;
+            assert_eq!(
+                labels(&v.pattern_menu(pat, cx)),
+                [
+                    "Rename", "Edit…", "Hide", "Hide other instances", "Hide all instances", "Isolate…", "Make transparent…", "Suppress", sep,
+                    "Move to new subassembly", "Release…", sep,
+                    "Zoom to selection", sep,
+                    "Add selection to folder…", "Expand ▸", "Collapse ▸", sep,
+                    "Delete",
+                ]
+            );
+            let copy = instance(v, "Part 2 <2>", cx);
+            v.selected.clear();
+            assert_eq!(
+                labels(&v.instance_menu(copy, false, cx)),
+                [
+                    "Properties…", "Instance properties…", sep,
+                    "Hide", "Hide other instances", "Hide all instances", "Isolate…", "Make transparent…", "Suppress", "Fix", "Use best available tessellation", sep,
+                    "Add mate connector to instance origin…", "Switch to Part Studio 1", sep,
+                    "Copy Part 2 <2>", sep,
+                    "Export…", "Release…", sep,
+                    "Zoom to selection", sep,
+                    "Create Drawing of Part 2…",
+                ]
+            );
+        })
+    })
+    .unwrap();
+}

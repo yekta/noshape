@@ -924,24 +924,11 @@ impl AssemblyView {
                 this.refresh_scene(false, cx);
                 cx.notify();
             }));
+        // Live 1723: the pattern / mirror / replicate row's menu.
         let view = cx.entity();
-        row.os_context_menu(move |menu, _, _| {
-            let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
-            menu.item(OsMenuItem::new("Edit…").on_click(move |_, window, cx| v1.update(cx, |t, cx| t.edit_mate(id, window, cx))))
-                .item(OsMenuItem::new(if suppressed { "Unsuppress" } else { "Suppress" }).on_click(move |_, _, cx| {
-                    v2.update(cx, |t, cx| {
-                        t.edit("Suppress pattern", cx, |a| {
-                            if let Some(p) = a.patterns.iter_mut().find(|p| p.id == id) {
-                                p.suppressed = !p.suppressed;
-                            }
-                        });
-                    })
-                }))
-                .item(OsMenuItem::new("Dissolve").on_click(move |_, _, cx| v3.update(cx, |t, cx| {
-                    t.edit("Dissolve pattern", cx, |a| a.dissolve_pattern(id));
-                })))
-                .separator()
-                .item(OsMenuItem::new("Delete").on_click(move |_, _, cx| v4.update(cx, |t, cx| t.delete_mate(id, cx))))
+        row.os_context_menu(move |menu, window, cx| {
+            let entries = view.read(cx).pattern_menu(id, cx);
+            fill_menu(menu, entries, view.clone(), window, cx)
         })
         .into_any_element()
     }

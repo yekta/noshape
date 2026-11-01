@@ -11,9 +11,9 @@ Priorities: P1 a missing tool, option or menu command; P2 a missing indicator or
 
 | | |
 |---|---|
-| Surfaces audited | 18 |
-| Gaps found | 19 |
-| Gaps fixed | 19 |
+| Surfaces audited | 19 |
+| Gaps found | 28 |
+| Gaps fixed | 25 |
 
 ## Surfaces
 
@@ -37,6 +37,7 @@ Priorities: P1 a missing tool, option or menu command; P2 a missing indicator or
 | S16 | Every sketch tool's option UI (value boxes, dialogs, flyouts; live 1715) | dom/sk-tool-*.txt | G11, G12, G13, G17 |
 | S17 | Profile inspector and Constraint manager | sk-tool-profile-inspector-and-constraint-manager.txt | G14, G15 |
 | S18 | Assembly error tooltips, mate HUD, standard content, interference, mass | asm-E15-tooltips.json, mate-hud.txt, dialog-insert-standard-content.txt, dialog-interference-assembly-*.txt, dialog-mass-assembly-*.txt | 0 |
+| S19 | Remaining assembly menus (live 1723): pattern / mirror / replicate rows and copies, mate connector row and glyph, relation, mate folder, mate indicators, nested rows, headers | dom/skasm-asm-menus-*.txt, behaviours "remaining assembly right-click menus" | G20–G28 |
 
 Live requests answered: 1715 (tool options), 1716 (Flow), 1720 (exploded views / named positions menus, subassembly fix icons).
 
@@ -63,3 +64,12 @@ Live requests answered: 1715 (tool options), 1716 (Flow), 1720 (exploded views /
 | G17 | P2 | Text tool | no option UI before its box is drawn (live 1715: no tool shows an option box) | a floating "Text / Height (click)" box while the tool was active | fixed (11-01) |
 | G18 | P3 | Instances list | parts fixed inside a subassembly show no fix icon in the parent (live 1720) | the nested rows showed it | fixed (11-01) |
 | G19 | P3 | Tool search (sketch) | "Sketch flow" finds nothing though the toolbar has Flow (ui-e-search-live-sketch-retry) | Flow was searchable | fixed (11-01) |
+| G20 | P1 | Pattern / Mirror / Replicate rows | Rename · Edit… · Hide · Hide other / all instances (Mirror: · Show center of mass) · Isolate… · Make transparent… · Suppress · Dynamic suppression ▸ | Move to new subassembly (Replicate: Dissolve <name>; Mirror: none) · Release… | Zoom to selection | Add selection to folder… · Expand ▸ · Collapse ▸ | Delete | Edit… · Suppress · Dissolve | Delete | fixed (11-01; UI test the_pattern_and_copy_row_menus_are_lives), but Dynamic suppression (G27) |
+| G21 | P2 | A pattern's copy row | the instance menu without center of mass, dynamic suppression, mates, in-context, replace, subassembly, version, folder and Delete items | the full instance menu | fixed (11-01) |
+| G22 | P1 | Assembly mate connector | row: Create Part Studio in context… · Rename · Edit… | Hide · Hide other / all mate connectors · Isolate… · Make transparent… · Section view… · Suppress | Add selection to folder… | Delete; glyph: Create Part Studio in context… | Edit <name>… | … · Suppress <name> | Create Drawing of <asm>… | Find in instance list | Select other… | Zoom to fit · View normal to | Delete <name> | Rename · Edit… | Hide · Hide other · Show all · Suppress | Delete, and the mate menu on the glyph | fixed (11-01), but Dynamic suppression (G27) |
+| G23 | P3 | Relation row (Gear 1) | Rename · Edit… | Suppress · Dynamic suppression ▸ | Add selection to folder… | Delete | also Isolate…, Make transparent…, Expand ▸, Collapse ▸ | fixed (11-01), but Dynamic suppression (G27) |
+| G24 | P1 | Mate indicator in the graphics | Edit <mate>… | Hide · Hide other mates · Hide all mates · Isolate… · Make transparent… · Edit named position driver mate… · Suppress <mate> | Animate <mate>… | Reset | Create Drawing of <asm>… | Find in instance list | Select other… | Zoom to fit | Delete <mate>; a replicate's mate without Edit / Delete | the list row's menu | fixed (11-01) |
+| G25 | P3 | Mate folder row | Rename | Hide · Hide other mates · Hide all mates · Isolate… · Make transparent… · Suppress · Dynamic suppression ▸ | Add selection to folder… · Expand ▸ · Collapse ▸ | Delete · Unpack folder | Hide and Show, "… mate connectors and mates", no Dynamic suppression, Expand / Collapse as plain items | fixed (11-01) |
+| G26 | P2 | Nested instance row (inside an expanded subassembly) | Properties… | Hide · Hide other / all instances · Isolate… · Make transparent… · Fix · Use best available tessellation | Edit in context · Add mate connector to instance origin… · Switch to … | Copy | Move to new subassembly · Export… · Release… | Zoom to selection | Create Drawing of … | Create empty subassembly | no menu | open: our hide / isolate / fix act on top-level instances only |
+| G27 | P2 | Dynamic suppression ▸ on patterns, relations and assembly mate connectors | offered | not modelled (instances, mates and folders only) | open |
+| G28 | P3 | Two mates selected | Reset | Show · Show all mates · Isolate… · Make transparent… · Edit named position driver mate… · Suppress · Dynamic suppression ▸ | Clear selection | Add selection to folder… · Expand ▸ · Collapse ▸ | Delete | the clicked mate's menu | open |

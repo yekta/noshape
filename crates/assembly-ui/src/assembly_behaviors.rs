@@ -993,6 +993,38 @@ impl AssemblyView {
     /// menu, or (`graphics`) the menu of the selected instances in the
     /// graphics area (live Onshape, 2026-10-18).
     pub(super) fn instance_menu(&self, top: InstanceId, graphics: bool, cx: &App) -> Vec<MenuEntry> {
+        let m = self.full_instance_menu(top, graphics, cx);
+        // Live 1723: a pattern's copy row has a cut-down menu: no center of
+        // mass, dynamic suppression, mates, in-context, replace, subassembly,
+        // version, folder or Delete items.
+        if graphics || self.assembly(cx).is_none_or(|a| a.generated_by(top).is_none()) {
+            return m;
+        }
+        const NOT_ON_COPIES: [&str; 13] = [
+            "Show center of mass",
+            "Hide center of mass",
+            "Show mates",
+            "Hide mates",
+            "Edit in context",
+            "Replace instances…",
+            "Move to new subassembly",
+            "Change to version…",
+            "Add selection to folder…",
+            "Create empty subassembly",
+            "Delete",
+            "Check interference…",
+            "Configure suppression",
+        ];
+        m.into_iter()
+            .filter(|e| match e {
+                MenuEntry::Item { label, .. } => !NOT_ON_COPIES.contains(&label.as_str()),
+                MenuEntry::Sub { label, .. } => !matches!(label.as_str(), "Dynamic suppression" | "Edit in context" | "Update context" | "Set as primary instance"),
+                MenuEntry::Sep => true,
+            })
+            .collect()
+    }
+
+    fn full_instance_menu(&self, top: InstanceId, graphics: bool, cx: &App) -> Vec<MenuEntry> {
         let Some(asm) = self.assembly(cx) else { return vec![] };
         let Some(inst) = asm.instance(top).cloned() else { return vec![] };
         let targets = self.targets(Some(top));
@@ -1590,15 +1622,18 @@ impl AssemblyView {
         let Some(f) = self.assembly(cx).and_then(|a| a.folders.iter().find(|f| f.id == id).cloned()) else { return vec![] };
         let mut m = vec![item("Rename", move |t, w, cx| t.start_row_rename(RenameRow::Feature(id), w, cx)), MenuEntry::Sep];
         if f.is_mate_folder() {
+            // Live 1723: Rename | Hide · Hide other mates · Hide all mates ·
+            // Isolate… · Make transparent… · Suppress · Dynamic suppression ▸ |
+            // Add selection to folder… · Expand ▸ · Collapse ▸ | Delete ·
+            // Unpack folder ("Hide" whatever its mates' state).
             let feats = f.features.clone();
-            let (f1, f2, f3) = (feats.clone(), feats.clone(), feats.clone());
+            let (f1, f3) = (feats.clone(), feats.clone());
             m.push(icon_item("Hide", "eye-off", move |t, _, cx| t.set_mates_hidden(f1.clone(), true, cx)));
-            m.push(item("Show", move |t, _, cx| t.set_mates_hidden(f2.clone(), false, cx)));
-            m.push(item("Hide other mate connectors and mates", move |t, _, cx| {
-                t.edit("Hide other mate connectors and mates", cx, |a| a.hide_other_mates(&f3));
+            m.push(item("Hide other mates", move |t, _, cx| {
+                t.edit("Hide other mates", cx, |a| a.hide_other_mates(&f3));
             }));
-            m.push(item("Hide all mate connectors and mates", |t, _, cx| {
-                t.edit("Hide all mate connectors and mates", cx, |a| a.hide_other_mates(&[]));
+            m.push(item("Hide all mates", |t, _, cx| {
+                t.edit("Hide all mates", cx, |a| a.hide_other_mates(&[]));
             }));
             let insts: Vec<InstanceId> = {
                 let mut v = Vec::new();
@@ -1615,36 +1650,60 @@ impl AssemblyView {
             m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, insts.clone(), cx)));
             m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, i2.clone(), cx)));
             let f4 = feats.clone();
-            m.push(item("Suppress", move |t, _, cx| {
-                t.edit("Suppress", cx, |a| {
-                    for x in &f4 {
-                        if let Some(mm) = a.mates.iter_mut().find(|mm| mm.id == *x) {
-                            mm.suppressed = true;
-                        }
-                    }
-                });
-            }));
-            m.push(MenuEntry::Sep);
-            if let Some(sel) = self.selected_mate.filter(|s| !feats.contains(s)) {
-                m.push(item("Add selection to folder…", move |t, _, cx| {
-                    t.edit("Add selection to folder", cx, |a| {
-                        for x in &mut a.folders {
-                            x.features.retain(|y| *y != sel);
-                        }
-                        if let Some(x) = a.folders.iter_mut().find(|x| x.id == id) {
-                            x.features.push(sel);
+            if f.unsuppressed_if.is_some() {
+                m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Folder(id), true));
+            } else {
+                m.push(item("Suppress", move |t, _, cx| {
+                    t.edit("Suppress", cx, |a| {
+                        for x in &f4 {
+                            if let Some(mm) = a.mates.iter_mut().find(|mm| mm.id == *x) {
+                                mm.suppressed = true;
+                            }
                         }
                     });
                 }));
+                m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Folder(id), false));
             }
-            m.push(item("Expand", move |t, _, cx| {
-                t.ui.expanded_mates.insert(id);
-                cx.notify();
+            m.push(MenuEntry::Sep);
+            let sel = self.selected_mate.filter(|s| !feats.contains(s));
+            m.push(item("Add selection to folder…", move |t, _, cx| {
+                let Some(sel) = sel else { return };
+                t.edit("Add selection to folder", cx, |a| {
+                    for x in &mut a.folders {
+                        x.features.retain(|y| *y != sel);
+                    }
+                    if let Some(x) = a.folders.iter_mut().find(|x| x.id == id) {
+                        x.features.push(sel);
+                    }
+                });
             }));
-            m.push(item("Collapse", move |t, _, cx| {
-                t.ui.expanded_mates.remove(&id);
-                cx.notify();
-            }));
+            m.push(MenuEntry::Sub {
+                label: "Expand".into(),
+                children: vec![
+                    item("Expand selected", move |t, _, cx| {
+                        t.ui.expanded_mates.insert(id);
+                        cx.notify();
+                    }),
+                    item("Expand all", |t, _, cx| {
+                        let ids: Vec<MateId> = t.assembly(cx).map(|a| a.folders.iter().map(|f| f.id).collect()).unwrap_or_default();
+                        t.ui.expanded_mates.extend(ids);
+                        cx.notify();
+                    }),
+                ],
+            });
+            m.push(MenuEntry::Sub {
+                label: "Collapse".into(),
+                children: vec![
+                    item("Collapse selected", move |t, _, cx| {
+                        t.ui.expanded_mates.remove(&id);
+                        cx.notify();
+                    }),
+                    item("Collapse all", |t, _, cx| {
+                        t.ui.expanded_mates.clear();
+                        cx.notify();
+                    }),
+                ],
+            });
         } else {
             let insts = f.instances.clone();
             let (a1, a2, a3, a4, a5) = (insts.clone(), insts.clone(), insts.clone(), insts.clone(), insts.clone());
@@ -1973,10 +2032,17 @@ impl AssemblyView {
                 m.push(icon_item("Hide", "eye-off", move |t, _, cx| t.set_mates_hidden(vec![id], true, cx)));
             }
         }
-        let ids = self.mate_instances(id, cx);
-        let ids2 = ids.clone();
-        m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, ids.clone(), cx)));
-        m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, ids2.clone(), cx)));
+        // Live 1723: a relation (Gear 1) has no indicator or children: Rename
+        // · Edit… | Suppress | Add selection to folder… | Delete.
+        let relation = asm.relations.iter().any(|r| r.id == id);
+        if relation {
+            m.push(MenuEntry::Sep);
+        } else {
+            let ids = self.mate_instances(id, cx);
+            let ids2 = ids.clone();
+            m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, ids.clone(), cx)));
+            m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, ids2.clone(), cx)));
+        }
         // Named-position editing mode: no driver, suppression or Animate
         // items (live 152).
         // Live (dom/context-menus-assembly-revolute.txt; ASM-MATE-MENU-SEPARATORS):
@@ -2005,33 +2071,35 @@ impl AssemblyView {
         m.push(MenuEntry::Sep);
         m.push(item("Add selection to folder…", move |t, w, cx| t.folder_from_features(vec![id], w, cx)));
         // Expand ▸ / Collapse ▸: the mate rows' connector children (live mate menu).
-        m.push(MenuEntry::Sub {
-            label: "Expand".into(),
-            children: vec![
-                item("Expand selected", move |t, _, cx| {
-                    t.ui.expanded_mates.insert(id);
-                    cx.notify();
-                }),
-                item("Expand all", |t, _, cx| {
-                    let ids: Vec<MateId> = t.assembly(cx).map(|a| a.mates.iter().map(|m| m.id).collect()).unwrap_or_default();
-                    t.ui.expanded_mates.extend(ids);
-                    cx.notify();
-                }),
-            ],
-        });
-        m.push(MenuEntry::Sub {
-            label: "Collapse".into(),
-            children: vec![
-                item("Collapse selected", move |t, _, cx| {
-                    t.ui.expanded_mates.remove(&id);
-                    cx.notify();
-                }),
-                item("Collapse all", |t, _, cx| {
-                    t.ui.expanded_mates.clear();
-                    cx.notify();
-                }),
-            ],
-        });
+        if !relation {
+            m.push(MenuEntry::Sub {
+                label: "Expand".into(),
+                children: vec![
+                    item("Expand selected", move |t, _, cx| {
+                        t.ui.expanded_mates.insert(id);
+                        cx.notify();
+                    }),
+                    item("Expand all", |t, _, cx| {
+                        let ids: Vec<MateId> = t.assembly(cx).map(|a| a.mates.iter().map(|m| m.id).collect()).unwrap_or_default();
+                        t.ui.expanded_mates.extend(ids);
+                        cx.notify();
+                    }),
+                ],
+            });
+            m.push(MenuEntry::Sub {
+                label: "Collapse".into(),
+                children: vec![
+                    item("Collapse selected", move |t, _, cx| {
+                        t.ui.expanded_mates.remove(&id);
+                        cx.notify();
+                    }),
+                    item("Collapse all", |t, _, cx| {
+                        t.ui.expanded_mates.clear();
+                        cx.notify();
+                    }),
+                ],
+            });
+        }
         // Named-position editing mode: no Delete either (qa5 NP1, live 152).
         if !np_editing {
             m.push(MenuEntry::Sep);
@@ -2042,33 +2110,251 @@ impl AssemblyView {
 
     /// Assembly mate connector context menu.
     pub(super) fn connector_menu(&self, id: MateId, cx: &App) -> Vec<MenuEntry> {
-        let Some(c) = self.assembly(cx).and_then(|a| a.connector(id).cloned()) else { return vec![] };
-        let hidden = c.hidden;
-        vec![
+        self.connector_menu_at(id, false, cx)
+    }
+
+    /// "Create Drawing of <assembly>…" of the graphics menus.
+    fn create_assembly_drawing_item(&self, cx: &App) -> MenuEntry {
+        let tab = self.tab;
+        let aname = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+        icon_item(format!("Create Drawing of {aname}…"), "menu-create-drawing", move |_, w, cx| {
+            let source = Some(noshape_model::drawing::create::DrawingSource { tab, part: None, config: ConfigValues::default(), sketch: None, flat: false });
+            crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(aname.clone()) }, w, cx);
+        })
+    }
+
+    /// A pattern, mirror or replicate row (live 1723): Rename · Edit… · Hide
+    /// · Hide other instances · Hide all instances (a Mirror: · Show center
+    /// of mass) · Isolate… · Make transparent… · Suppress | Move to new
+    /// subassembly (a Replicate: Dissolve <name>; a Mirror: neither) ·
+    /// Release… | Zoom to selection | Add selection to folder… · Expand ▸ ·
+    /// Collapse ▸ | Delete. Its instances are the generated copies.
+    pub(super) fn pattern_menu(&self, id: MateId, cx: &App) -> Vec<MenuEntry> {
+        let Some(asm) = self.assembly(cx) else { return vec![] };
+        let Some(p) = asm.patterns.iter().find(|p| p.id == id).cloned() else { return vec![] };
+        let copies: Vec<InstanceId> = p.generated.iter().map(|g| g.instance).collect();
+        let hidden = !copies.is_empty() && copies.iter().all(|i| asm.instance(*i).is_some_and(|x| x.hidden));
+        let mirror = matches!(p.kind, PatternKind::Mirror { .. });
+        let replicate = matches!(p.kind, PatternKind::Replicate { .. });
+        let parts = copies.iter().any(|i| asm.instance(*i).is_some_and(|x| matches!(x.source, InstanceSource::Part { .. })));
+        let suppressed = p.suppressed;
+        let mut m = vec![
             item("Rename", move |t, w, cx| t.start_row_rename(RenameRow::Feature(id), w, cx)),
-            icon_item("Edit…", "edit", move |t, w, cx| t.edit_mate(id, w, cx)),
-            MenuEntry::Sep,
-            icon_item(if hidden { "Show" } else { "Hide" }, "eye-off", move |t, _, cx| {
-                t.edit(if hidden { "Show mate connector" } else { "Hide mate connector" }, cx, |a| a.set_mates_hidden(&[id], !hidden));
-            }),
-            item("Hide other mate connectors", move |t, _, cx| {
+            item("Edit…", move |t, w, cx| t.edit_mate(id, w, cx)),
+        ];
+        let tg = copies.clone();
+        m.push(icon_item(if hidden { "Show" } else { "Hide" }, "eye-off", move |t, _, cx| t.set_hidden(tg.clone(), !hidden, cx)));
+        let tg = copies.clone();
+        m.push(item(crate::i18n::template("Hide other __label__", &[("label", "instances")]), move |t, _, cx| t.hide_other_instances(tg.clone(), cx)));
+        m.push(item(crate::i18n::template("Hide all __label__", &[("label", "instances")]), |t, _, cx| t.hide_all_instances(cx)));
+        if mirror {
+            let tg = copies.clone();
+            let com_on = self.ui.com.as_ref().is_some_and(|(c, _)| *c == copies);
+            m.push(icon_item(if com_on { "Hide center of mass" } else { "Show center of mass" }, "com-indicator", move |t, _, cx| t.toggle_center_of_mass(tg.clone(), cx)));
+        }
+        let tg = copies.clone();
+        m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, tg.clone(), cx)));
+        let tg = copies.clone();
+        m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, tg.clone(), cx)));
+        m.push(item(if suppressed { "Unsuppress" } else { "Suppress" }, move |t, _, cx| {
+            t.edit("Suppress pattern", cx, |a| {
+                if let Some(p) = a.patterns.iter_mut().find(|p| p.id == id) {
+                    p.suppressed = !p.suppressed;
+                }
+            });
+        }));
+        m.push(MenuEntry::Sep);
+        if replicate {
+            m.push(item(format!("Dissolve {}", p.name), move |t, _, cx| {
+                t.edit("Dissolve pattern", cx, |a| a.dissolve_pattern(id));
+            }));
+        } else if !mirror {
+            let tg = copies.clone();
+            m.push(item("Move to new subassembly", move |t, w, cx| t.move_to_new_subassembly(tg.clone(), w, cx)));
+        }
+        if parts {
+            let tg = copies.clone();
+            m.push(item("Release…", move |t, w, cx| t.release_instances(tg.clone(), w, cx)));
+        }
+        m.push(MenuEntry::Sep);
+        let tg = copies;
+        m.push(item("Zoom to selection", move |t, _, cx| t.zoom_to_instances(tg.clone(), cx)));
+        m.push(MenuEntry::Sep);
+        m.push(item("Add selection to folder…", move |t, w, cx| t.folder_from_features(vec![id], w, cx)));
+        let key = vec![InstanceId(id.0)];
+        let k2 = key.clone();
+        m.push(MenuEntry::Sub {
+            label: "Expand".into(),
+            children: vec![
+                item("Expand selected", move |t, _, cx| {
+                    t.expanded.insert(key.clone());
+                    cx.notify();
+                }),
+                item("Expand all", |t, _, cx| t.expand_all(true, cx)),
+            ],
+        });
+        m.push(MenuEntry::Sub {
+            label: "Collapse".into(),
+            children: vec![
+                item("Collapse selected", move |t, _, cx| {
+                    t.expanded.remove(&k2);
+                    cx.notify();
+                }),
+                item("Collapse all", |t, _, cx| t.expand_all(false, cx)),
+            ],
+        });
+        m.push(MenuEntry::Sep);
+        m.push(icon_item("Delete", "delete", move |t, _, cx| t.delete_mate(id, cx)));
+        m
+    }
+
+    /// A mate's indicator in the graphics (live 1723): Edit <mate>… | Hide ·
+    /// Hide other mates · Hide all mates · Isolate… · Make transparent… ·
+    /// Edit named position driver mate… · Suppress <mate> | Animate <mate>… |
+    /// Reset | Create Drawing of <assembly>… | Find in instance list | Select
+    /// other… | Zoom to fit | Delete <mate>. A pattern's (replicate's) mate
+    /// can't be edited or deleted.
+    pub(super) fn mate_graphics_menu(&self, id: MateId, cx: &App) -> Vec<MenuEntry> {
+        let Some(asm) = self.assembly(cx) else { return vec![] };
+        let Some(mt) = asm.mate(id).cloned() else { return self.mate_menu(id, cx) };
+        let generated = asm.mate_generated_by(id).is_some();
+        let name = mt.name.clone();
+        let movable = mt.mate_type.dof() > 0 && !matches!(mt.mate_type, MateType::Tangent | MateType::Width);
+        let mut m = Vec::new();
+        if !generated {
+            m.push(item(format!("Edit {name}…"), move |t, w, cx| t.edit_mate(id, w, cx)));
+            m.push(MenuEntry::Sep);
+        }
+        m.push(icon_item("Hide", "eye-off", move |t, _, cx| t.set_mates_hidden(vec![id], true, cx)));
+        m.push(item("Hide other mates", move |t, _, cx| {
+            t.edit("Hide other mates", cx, |a| a.hide_other_mates(&[id]));
+            t.refresh_scene(false, cx);
+        }));
+        m.push(item("Hide all mates", |t, _, cx| {
+            let ids: Vec<MateId> = t.assembly(cx).map(|a| a.mates.iter().map(|m| m.id).chain(a.groups.iter().map(|g| g.id)).collect()).unwrap_or_default();
+            t.set_mates_hidden(ids, true, cx);
+        }));
+        let ids = self.mate_instances(id, cx);
+        let ids2 = ids.clone();
+        m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, ids.clone(), cx)));
+        m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, ids2.clone(), cx)));
+        if movable {
+            m.push(item("Edit named position driver mate…", move |t, _, cx| t.open_np_driver(id, cx)));
+        }
+        m.push(item(format!("{} {name}", if mt.suppressed { "Unsuppress" } else { "Suppress" }), move |t, _, cx| t.toggle_mate_suppressed(id, cx)));
+        if movable && mt.mate_type != MateType::Ball {
+            m.push(MenuEntry::Sep);
+            m.push(item(format!("Animate {name}…"), move |t, w, cx| {
+                t.selected_mate = Some(id);
+                t.start_animation(w, cx);
+            }));
+            m.push(MenuEntry::Sep);
+            m.push(item("Reset", move |t, _, cx| t.reset_mate(id, cx)));
+        }
+        m.push(MenuEntry::Sep);
+        m.push(self.create_assembly_drawing_item(cx));
+        m.push(MenuEntry::Sep);
+        m.push(item("Find in instance list", move |t, _, cx| {
+            t.selected_mate = Some(id);
+            t.ui.scroll_to_selection = true;
+            t.refresh_scene(false, cx);
+        }));
+        m.push(MenuEntry::Sep);
+        m.push(item("Select other…", |t, _, cx| t.select_other(false, cx)));
+        m.push(MenuEntry::Sep);
+        m.push(item("Zoom to fit", |t, _, cx| t.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx))));
+        if !generated {
+            m.push(MenuEntry::Sep);
+            m.push(icon_item(format!("Delete {name}"), "delete", move |t, _, cx| t.delete_mate(id, cx)));
+        }
+        m
+    }
+
+    /// An assembly mate connector, its list row or (`graphics`) its glyph
+    /// (live 1723): Create Part Studio in context… · Rename · Edit… | Hide ·
+    /// Hide other mate connectors · Hide all mate connectors · Isolate… ·
+    /// Make transparent… · Section view… · Suppress | Add selection to
+    /// folder… | Delete. The glyph's: Create Part Studio in context… | Edit
+    /// <name>… | the Hide … Suppress <name> group | Create Drawing of
+    /// <assembly>… | Find in instance list | Select other… | Zoom to fit ·
+    /// View normal to | Delete <name>.
+    pub(super) fn connector_menu_at(&self, id: MateId, graphics: bool, cx: &App) -> Vec<MenuEntry> {
+        let Some(c) = self.assembly(cx).and_then(|a| a.connector(id).cloned()) else { return vec![] };
+        let (hidden, name) = (c.hidden, c.name.clone());
+        let mut m = vec![item("Create Part Studio in context…", move |t, _, cx| {
+            t.ui.ps_in_context = Some(PsOrigin::Connector(id));
+            cx.notify();
+        })];
+        if graphics {
+            m.push(MenuEntry::Sep);
+            m.push(icon_item(format!("Edit {name}…"), "edit", move |t, w, cx| t.edit_mate(id, w, cx)));
+        } else {
+            m.push(item("Rename", move |t, w, cx| t.start_row_rename(RenameRow::Feature(id), w, cx)));
+            m.push(icon_item("Edit…", "edit", move |t, w, cx| t.edit_mate(id, w, cx)));
+        }
+        m.push(MenuEntry::Sep);
+        m.push(icon_item(if hidden { "Show" } else { "Hide" }, if hidden { "eye" } else { "eye-off" }, move |t, _, cx| {
+            t.edit(if hidden { "Show mate connector" } else { "Hide mate connector" }, cx, |a| a.set_mates_hidden(&[id], !hidden));
+        }));
+        // Hidden, as a hidden mate: Show · Show all mate connectors.
+        if hidden {
+            m.push(item("Show all mate connectors", |t, _, cx| t.show_all_connectors(cx)));
+        } else {
+            m.push(item("Hide other mate connectors", move |t, _, cx| {
                 t.edit("Hide other mate connectors", cx, |a| {
                     for x in &mut a.connectors {
                         x.hidden = x.id != id;
                     }
                 });
-            }),
-            item("Show all mate connectors", |t, _, cx| t.show_all_connectors(cx)),
-            item(if c.suppressed { "Unsuppress" } else { "Suppress" }, move |t, _, cx| {
-                t.edit("Suppress mate connector", cx, |a| {
-                    if let Some(x) = a.connectors.iter_mut().find(|x| x.id == id) {
-                        x.suppressed = !x.suppressed;
+            }));
+            m.push(item("Hide all mate connectors", |t, _, cx| {
+                t.edit("Hide all mate connectors", cx, |a| {
+                    for x in &mut a.connectors {
+                        x.hidden = true;
                     }
                 });
-            }),
-            MenuEntry::Sep,
-            icon_item("Delete", "delete", move |t, _, cx| t.delete_mate(id, cx)),
-        ]
+            }));
+        }
+        let owner: Vec<InstanceId> = (!c.on.is_origin()).then_some(c.on.instance).into_iter().collect();
+        let o2 = owner.clone();
+        m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, owner.clone(), cx)));
+        m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, o2.clone(), cx)));
+        m.push(icon_item("Section view…", "section-view-3d", |t, w, cx| t.toggle_section(w, cx)));
+        let sup = if c.suppressed { "Unsuppress" } else { "Suppress" };
+        m.push(item(if graphics { format!("{sup} {name}") } else { sup.to_string() }, move |t, _, cx| {
+            t.edit("Suppress mate connector", cx, |a| {
+                if let Some(x) = a.connectors.iter_mut().find(|x| x.id == id) {
+                    x.suppressed = !x.suppressed;
+                }
+            });
+        }));
+        m.push(MenuEntry::Sep);
+        if graphics {
+            m.push(self.create_assembly_drawing_item(cx));
+            m.push(MenuEntry::Sep);
+            m.push(item("Find in instance list", move |t, _, cx| {
+                t.selected_mate = Some(id);
+                t.ui.scroll_to_selection = true;
+                t.refresh_scene(false, cx);
+            }));
+            m.push(MenuEntry::Sep);
+            m.push(item("Select other…", |t, _, cx| t.select_other(false, cx)));
+            m.push(MenuEntry::Sep);
+            m.push(item("Zoom to fit", |t, _, cx| t.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx))));
+            m.push(item("View normal to", move |t, _, cx| {
+                if let Some(f) = t.result.connector_frame(id) {
+                    let (z, y) = (f.rotation * glam::DVec3::Z, f.rotation * glam::DVec3::Y);
+                    t.viewport.update(cx, |vp, cx| vp.animate_to_direction(-z, y, cx));
+                }
+            }));
+            m.push(MenuEntry::Sep);
+            m.push(icon_item(format!("Delete {name}"), "delete", move |t, _, cx| t.delete_mate(id, cx)));
+        } else {
+            m.push(item("Add selection to folder…", move |t, w, cx| t.folder_from_features(vec![id], w, cx)));
+            m.push(MenuEntry::Sep);
+            m.push(icon_item("Delete", "delete", move |t, _, cx| t.delete_mate(id, cx)));
+        }
+        m
     }
 
     /// Graphics area context menu (instance under the cursor, or the
@@ -2133,7 +2419,8 @@ impl AssemblyView {
 
     /// Mate indicator context menu in the graphics area.
     pub(super) fn open_mate_menu(&mut self, id: MateId, position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
-        let entries = self.mate_menu(id, cx);
+        // Live 1723: the graphics menus of a mate indicator and a connector glyph.
+        let entries = if self.assembly(cx).is_some_and(|a| a.connector(id).is_some()) { self.connector_menu_at(id, true, cx) } else { self.mate_graphics_menu(id, cx) };
         let view = cx.entity();
         let menu = OsMenu::build(window, cx, move |m, window, cx| fill_menu(m, entries.clone(), view.clone(), window, cx));
         let sub = cx.subscribe(&menu, |this: &mut Self, _, _: &DismissEvent, cx| {
