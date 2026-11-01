@@ -473,6 +473,52 @@ re-queues everything after it). Waiting: live request 13:45
 - D2 fixed later with ops' `drawing::old_state`, and so was D15 (the Workspace protection notice).
 - Later: D12 tab out-of-date icon; D13 the search box takes the query as text (`type:part name:pvz`). Audit at 25 surfaces, 15 gaps, 15 fixed (live 1738 answered: D16 Tab › Properties… per kind, D17 Document details…, D18 the copy dialogs; landed 61ef991d 17:25). The three P3s left after it are done too (Part Studio Properties card, Create version's drawing links, the Documents panel's Search history ▾).
 
+## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
+Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
+sketch: `-p noshape-scene --test all sketch_perf::s300 -- --ignored --nocapture`):
+- **a200**: 195 instances (420 occurrences), 378 mates. 8 stacks of 15 pins (Planar on the one below, Parallel to the
+  base and to the one below); 20 instances of a flexible subassembly "Sub" (10 pins, 9 Planar) each Fastened on its own
+  fixed pin; 30 standard content bolts Fastened on stack pins; a linear pattern of Sub <1> × 6.
+- **a1000**: 1009 instances (1630 occurrences), 2380 mates: 40 stacks of 20, 60 Subs, 80 bolts, pattern × 10.
+- **S300**: 80 corner rectangles (4 × 20, 10 × 6 mm, 15 mm pitch), width and height dimensioned: 640 entities, 480
+  constraints.
+- Steps as the app runs them: open (load, first evaluation from the saved solved positions, scene), evaluate again,
+  regenerate (the pin's Extrude depth edited, then the assembly), add a mate (Parallel between two stack tops), drag a
+  stack's top pin (solve + scene retransform per pointer move), insert a pin; sketch: open for edit (solve with DOF,
+  regions, regeneration), change a dimension, drag a corner, add a dimension.
+
+Numbers on vibe3 (release, 3 runs, medians), before → after:
+| | a200 | a1000 |
+|---|---|---|
+| open: first evaluation | 105 → 96 ms | 327 → 310 ms |
+| evaluate again | 32 ms | 103 ms |
+| regenerate | **621 → 241 ms** | **3693 → 1310 ms** |
+| add a mate | 42 ms | 120 ms |
+| drag frame | 2.0 ms (490 fps) | 20.7 ms (48 fps) |
+| insert a pin | 33 ms | 106 ms |
+S300 (vibe4, loaded): open for edit 4.4 ms, change a dimension 3.5 ms, drag step 3.2 ms (≈ 300 fps), add a dimension 3.4 ms.
+Live: asked (REQUESTS 18:30, scripting allowed); the old figures (request 1501): an assembly drag step ≈ 1.2 s at 200
+instances, insert 1.3–2.2 s, sketch drag ≈ 400 ms a step at 188 entities.
+
+Fixes so far (5bde395b / 34aa527a):
+1. Profile (perf on vibe4/vibe5, sudo): ~70 % of an evaluation was dense SVD / symmetric eigendecomposition in the
+   solver's `least_change`, group after group on one thread.
+2. Groups solved and DOF-analysed in parallel (rayon; groups share no free body, so bit for bit the same results).
+3. Groups already solved (residual < 1e-10, where LM stops without a move) skipped before copying the poses.
+4. `least_change` stops at the finite-difference noise floor (step < 1e-12 instead of 1e-15; the rounds after the
+   first moved ~1e-13 back and forth). Live oracle (oracle_asm, T2) and the assembly unit tests unchanged.
+5. A subassembly's preparation and solve shared by all its instances within one evaluation (same tab, configuration,
+   lock and stored positions).
+6. The bench folds nested positions as the app does (`ops::assembly::fold_solved`); without it every evaluation
+   re-solved each flexible subassembly from its unsolved start.
+Tried and dropped: one SVD instead of the eigendecomposition + SVD per `least_change` round (changes which directions
+count as free near the threshold: the live oracle failed).
+
+Next (biggest first): a1000's regenerate (1.3 s) is now `least_change` converging slowly (×0.66 a round, all 12
+rounds) on the 40 stack groups after their heights change; its drag frame (20 ms on vibe3) is the per-step whole-assembly
+work (stays for every body, all 2380 mates' residuals and status) plus the dragged group's Jacobian; the first
+evaluation (310 ms). Live's numbers decide which matters most.
+
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
 (standard content) → mates/assembly workflow gaps (all ✅, UNCONFIRMED all answered 10-27) → standard content.
