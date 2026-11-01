@@ -7,8 +7,8 @@
 # the change at fault, which is reported; the others land). Batches form only from what waits: none waits to fill one.
 # Pushes go through tools/tiers/land-relay.sh on the agents' machine (vibe4 has no GitHub credentials), which also
 # brings the results back to /tmp/lead/land-results/<worktree>.log.
-# State is on disk (LAND_DIR, default ~/land): jobs/, queue/ (arrival order), splits/ (halves of red batches and
-# re-tests, first), run/<batch>/ (claimed: jobs, pid, state, check.log), results/<worktree>.log and results.tsv,
+# State is on disk (LAND_DIR, default ~/land): jobs/, pending/ (arrival order; ~/land/queue is slots.sh's file),
+# splits/ (halves of red batches and re-tests, first), run/<batch>/ (claimed: jobs, pid, state, check.log), results/<worktree>.log and results.tsv,
 # history.tsv (timings of each check). Restart it any time; checks in flight carry on. When idle it follows
 # origin/main's version of itself. Stop: touch $LAND_DIR/stop.
 # Start: setsid -f bash ~/land/bin/land-daemon.sh >> ~/land/daemon.log 2>&1 (land.sh starts it when it isn't running)
@@ -23,7 +23,7 @@ inst=$(basename "$LD")   # refs/landq/<inst>/… in the shared repo
 export LAND_SLOTS=$(( $(nproc) / 5 > 2 ? $(nproc) / 5 : 2 ))
 export CARGO_BUILD_JOBS=$(( $(nproc) / LAND_SLOTS + 1 ))
 export GIT_COMMITTER_NAME=yekta GIT_COMMITTER_EMAIL=ngyekta@gmail.com
-mkdir -p "$LD"/{jobs,queue,splits,run,results,outbox,done,bin}
+mkdir -p "$LD"/{jobs,pending,splits,run,results,outbox,done,bin} || { echo "land-daemon: can't make its dirs in $LD"; exit 1; }
 log() { echo "$(date -u '+%F %T') $*"; }
 alive() { [ -n "$1" ] && kill -0 "$1" 2>/dev/null; }
 field() { local f="$LD/jobs/$2.job"; [ -f "$f" ] || f="$LD/done/$2.job"; sed -n "s/^$1=//p" "$f" 2>/dev/null | head -1; }
@@ -201,11 +201,11 @@ worker() {
     if [ -n "$b" ]; then
       bid="$(date -u +%m%d-%H%M%S)-$BASHPID"; mkdir -p "$LD/run/$bid"; echo "$BASHPID" > "$LD/run/$bid/pid"; mv "$b" "$LD/run/$bid/jobs"
     else
-      mapfile -t ks < <(ls "$LD/queue" | head -"$MAXB")
+      mapfile -t ks < <(ls "$LD/pending" | head -"$MAXB")
       if [ ${#ks[@]} -gt 0 ]; then
         bid="$(date -u +%m%d-%H%M%S)-$BASHPID"; mkdir -p "$LD/run/$bid"; echo "$BASHPID" > "$LD/run/$bid/pid"
         { echo kind=batch; printf '%s\n' "${ks[@]}"; } > "$LD/run/$bid/jobs"
-        for k in "${ks[@]}"; do rm -f "$LD/queue/$k"; done
+        for k in "${ks[@]}"; do rm -f "$LD/pending/$k"; done
       fi
     fi
   } 5>"$LD/claim.lock"
@@ -252,7 +252,7 @@ while [ ! -e "$LD/stop" ]; do
       fi
     fi
   fi
-  if [ $waiting = 0 ] && [ $busy -lt "$LAND_SLOTS" ] && { ls "$LD"/splits/*.batch > /dev/null 2>&1 || [ -n "$(ls "$LD/queue")" ]; }; then
+  if [ $waiting = 0 ] && [ $busy -lt "$LAND_SLOTS" ] && { ls "$LD"/splits/*.batch > /dev/null 2>&1 || [ -n "$(ls "$LD/pending")" ]; }; then
     tok="$LD/waiting.$(date +%s%N)"; : > "$tok"
     ( exec 9>&-; worker "$tok" ) >> "$LD/daemon.log" 2>&1 &
     echo $! > "$tok"

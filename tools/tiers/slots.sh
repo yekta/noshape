@@ -9,7 +9,8 @@ take_slots() {
   local want=$1 q="$HOME/land/queue" me first i fd n=${LAND_SLOTS:-2} held=()
   SLOT_FDS=()
   [ "$want" = all ] && want=$n
-  me="$(date +%s%N) $$"; SLOT_WAITED=0
+  # (BASHPID: the land daemon's workers are subshells; with $$ their entries died with a restarted daemon, 11-01.)
+  me="$(date +%s%N) ${BASHPID:-$$}"; SLOT_WAITED=0
   mkdir -p "$HOME/land"; touch "$q"
   { flock 4; echo "$me" >> "$q"; } 4>"$q.lock"
   # Gone from the queue however this script ends (a killed waiter's entry is also dropped below: its pid is dead).

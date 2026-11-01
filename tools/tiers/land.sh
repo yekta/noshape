@@ -32,8 +32,8 @@ for r in run/*/; do
   for k in $(grep -v '^kind=' "$r/jobs"); do [ "$(f name "$k")" = "$me" ] && line "CHECKING ($(cat "$r/state" 2>/dev/null), in a batch of $n since $(date -u -r "$r/jobs" +%H:%M))" "$k"; done
 done
 for b in splits/*.batch; do [ -f "$b" ] || continue; for k in $(grep -v '^kind=' "$b"); do [ "$(f name "$k")" = "$me" ] && line "QUEUED (next: re-checked apart from a red batch)" "$k"; done; done
-pos=0; for k in $(ls queue); do pos=$((pos + 1)); [ "$(f name "$k")" = "$me" ] && line "QUEUED (#$pos)" "$k"; done
-echo "==results=="; tail -n 25 "results/$me.log" 2>/dev/null
+pos=0; for k in $(ls pending); do pos=$((pos + 1)); [ "$(f name "$k")" = "$me" ] && line "QUEUED (#$pos)" "$k"; done
+echo "==results=="; tail -n 25 "results/$me.log" 2>/dev/null; exit 0
 R
 if [ $mode = status ]; then
   if out=$("${SSH[@]}" "$qhost" "bash -c $(printf %q "$STATUS") _ $qdir $name" 2>/dev/null); then
@@ -98,13 +98,13 @@ if [ $mode = queue ]; then
   read -r -d '' REG <<'R'
 LD=~/$1; key=$2; target=$3
 ls "$LD/jobs/"*"-${key#*-}.job" > /dev/null 2>&1 && { cat > /dev/null; echo "(already queued: nothing new)"; exit 0; }
-mkdir -p "$LD/jobs" "$LD/queue" "$LD/bin" && cat > "$LD/jobs/.$key" && mv "$LD/jobs/.$key" "$LD/jobs/$key.job" && : > "$LD/queue/$key" || exit 1
+mkdir -p "$LD/jobs" "$LD/pending" "$LD/bin" && cat > "$LD/jobs/.$key" && mv "$LD/jobs/.$key" "$LD/jobs/$key.job" && : > "$LD/pending/$key" || exit 1
 if ! { [ -f "$LD/daemon.pid" ] && kill -0 "$(cat "$LD/daemon.pid")" 2>/dev/null; }; then
   cd ~/projects/noshape && git fetch -q origin "$target" && git show "origin/$target:tools/tiers/land-daemon.sh" > "$LD/bin/land-daemon.sh.new" 2>/dev/null \
     && git show "origin/$target:tools/tiers/slots.sh" > "$LD/bin/slots.sh" && mv "$LD/bin/land-daemon.sh.new" "$LD/bin/land-daemon.sh" \
     && LAND_DIR=$LD LAND_TARGET=$target setsid -f bash "$LD/bin/land-daemon.sh" >> "$LD/daemon.log" 2>&1 < /dev/null && echo "(started the land daemon on $(hostname -s))"
 fi
-echo "$(( $(ls "$LD/queue" | wc -l) - 1 )) queued before it, $(ls -d "$LD"/run/*/ 2>/dev/null | wc -l) batch(es) being checked"
+echo "$(( $(ls "$LD/pending" | wc -l) - 1 )) queued before it, $(ls -d "$LD"/run/*/ 2>/dev/null | wc -l) batch(es) being checked"
 R
   info=$(printf 'name=%s\nsha=%s\nbase=%s\nref=%s\npkgs=%s\nqueued=%s\nsubject=%s\n--\n%s\n' "$name" "$sha" "$(git rev-parse "origin/$target")" \
     "$ref" "$pkgs" "$(date +%s)" "$(git log -1 --format=%s | tr -d '\t')" "$changed" \
