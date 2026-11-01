@@ -497,6 +497,12 @@ impl PartStudioView {
                 let dir = if p.bool("oppositeDirection") { -out } else { out };
                 Some(Arrow { base, dir, length: value("extendDistance")?, param: "extendDistance", flip: Some("oppositeDirection"), secondary: false })
             }
+            // moveCurveBoundary.fs (Extend, Blind, with a help point): from
+            // the first curve's end that grows, along its tangent.
+            "trimCurve" => {
+                let (base, dir) = noshape_model::interaction::move_curve_boundary_anchor(ctx, p, &units)?;
+                Some(Arrow { base, dir, length: value("extensionDistance")?, param: "extensionDistance", flip: None, secondary: false })
+            }
             // splitpart.fs addKeepSideManipulator (Part, not Keep both
             // sides): a flip arrow on the tool where it is nearest the parts
             // (here: the parts' box centre dropped onto the tool's plane),
@@ -652,6 +658,11 @@ impl PartStudioView {
                     len *= 2.0;
                 }
                 let flip = len < 0.0 && a.flip.is_some();
+                // Move curve boundary's past its end stays at the least (std's
+                // extendCurveManipulatorChange: MIN_EXTEND_VALUE).
+                if a.param == "extensionDistance" {
+                    len = len.max(0.0);
+                }
                 // Live (dialogs/extrude-06, the triad and section arrows): a
                 // dragged length moves in 0.1 mm steps ("13.9 mm", "2.6 mm"),
                 // or 0.01 in in imperial units ("2.06 in", "1.76 in").

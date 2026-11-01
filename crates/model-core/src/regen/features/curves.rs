@@ -593,6 +593,32 @@ fn chain_end(chain: &[(Shape, bool)], at_end: bool) -> FResult<(DVec3, DVec3, Sh
     Ok((p, t, e))
 }
 
+/// Move curve boundary › Extend: the end of a wire's chain that grows (the one nearer the help point, the other with
+/// Opposite direction; the chain's last without a help point), whether it is the chain's last, and its point, outward
+/// tangent and edge.
+fn extended_end(chain: &[(Shape, bool)], help: Option<DVec3>, flip: bool) -> FResult<(bool, (DVec3, DVec3, Shape))> {
+    let (ps, ..) = chain_end(chain, false)?;
+    let (pe, ..) = chain_end(chain, true)?;
+    let at_end = match help {
+        Some(h) => (h - pe).length() <= (h - ps).length(),
+        None => true,
+    } != flip;
+    Ok((at_end, chain_end(chain, at_end)?))
+}
+
+/// Move curve boundary's distance arrow (moveCurveBoundary.fs addExtendCurveManipulator: Extend, Blind, with a help
+/// point; the first curve): the original end that grows and its outward tangent.
+pub(crate) fn extend_curve_anchor(ev: &EvalCtx) -> Option<(DVec3, DVec3)> {
+    if !ev.is("moveBoundaryType", "EXTEND") || !ev.is("endCondition", "BLIND") {
+        return None;
+    }
+    let help = ev.resolve_vertex_point(ev.query("helpPoint").first()?)?;
+    let bi = *wire_body_indices(ev).ok()?.first()?;
+    let chain = order_chain(&ev.ctx.bodies[bi].shape.edges(), 1e-6).ok()?;
+    let (_, (p, t, _)) = extended_end(&chain, Some(help), ev.bool("flipHeuristics")).ok()?;
+    Some((p, t))
+}
+
 fn wire_body_indices(ev: &EvalCtx) -> FResult<Vec<usize>> {
     let refs = ev.query("wires");
     let idx: Vec<usize> = ev.resolve_bodies(refs).into_iter().filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Wire).collect();
@@ -641,16 +667,7 @@ pub fn trim_curve(ev: &mut EvalCtx) -> FResult<()> {
         for bi in bodies {
             let edges = ev.ctx.bodies[bi].shape.edges();
             let chain = order_chain(&edges, 1e-6)?;
-            let (ps, ..) = chain_end(&chain, false)?;
-            let (pe, ..) = chain_end(&chain, true)?;
-            let mut at_end = match help {
-                Some(h) => (h - pe).length() <= (h - ps).length(),
-                None => true,
-            };
-            if flip {
-                at_end = !at_end;
-            }
-            let (p, t, end_edge) = chain_end(&chain, at_end)?;
+            let (at_end, (p, t, end_edge)) = extended_end(&chain, help, flip)?;
             let dist = if ev.is("endCondition", "UP_TO_ENTITY") {
                 let mut best = f64::INFINITY;
                 for r in ev.query("extendTo") {

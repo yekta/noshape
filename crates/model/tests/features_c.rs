@@ -2941,3 +2941,40 @@ fn helix_turns_and_pitch_flip_as_std() {
     let [(_, M::Flip { base, direction, flipped, .. })] = m.as_slice() else { panic!("{m:?}") };
     assert!((*base - DVec3::new(0.0, 0.0, mm(-20.0))).length() < 1e-9 && direction.z > 0.999 && *flipped, "{m:?}");
 }
+
+/// Move curve boundary's distance arrow (audit-part-studio M10; moveCurveBoundary.fs addExtendCurveManipulator):
+/// a composite curve from (0, 30) to (20, 30) to (20, 50) mm on Top, the help point at (40, 0) nearest its start:
+/// the arrow starts there pointing −X, so its tip at 10 mm is the extended end (std's arrow base); Opposite
+/// direction moves it to the other end, pointing +Y; none without a help point.
+#[test]
+fn move_curve_boundary_arrow_at_the_growing_end() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let c = sk.add_point(DVec2::new(0.04, 0.0));
+    let l0 = sk.add_line(DVec2::new(0.0, 0.03), DVec2::new(0.02, 0.03)).0;
+    let l1 = sk.add_line(DVec2::new(0.02, 0.03), DVec2::new(0.02, 0.05)).0;
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let se = |e: u32| Reference::SketchEntity { sketch: sid, entity: e };
+    let comp = s.add("compositeCurve", |p| p.set("edges", ParamValue::Query(vec![se(l0), se(l1)])));
+    let r = s.ok();
+    s.add("trimCurve", |p| {
+        p.set("moveBoundaryType", en("EXTEND"));
+        p.set("wires", ParamValue::Query(vec![Reference::Body(noshape_model::reference::BodyId { feature: comp, index: 0 })]));
+        p.set("extensionDistance", expr("10 mm"));
+        p.set("helpPoint", ParamValue::Query(vec![se(c.0)]));
+    });
+    let mut params = s.ps.features.last().unwrap().params.clone();
+    let units = s.units;
+    let anchor = |params: &ParamValues| noshape_model::interaction::move_curve_boundary_anchor(&r.context, params, &units);
+    let (base, dir) = anchor(&params).expect("an arrow");
+    assert!((base - DVec3::new(0.0, mm(30.0), 0.0)).length() < 1e-9 && dir.x < -0.999, "{base} {dir}");
+    let after = s.ok();
+    let tip = base + dir * mm(10.0);
+    let body = after.context.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Wire && b.shape.vertices().iter().any(|v| v.vertex_point().is_ok_and(|q| (q - tip).length() < 1e-9)));
+    assert!(body.is_some(), "the tip is the extended end");
+    params.set("flipHeuristics", ParamValue::Bool(true));
+    let (base, dir) = anchor(&params).expect("an arrow");
+    assert!((base - DVec3::new(mm(20.0), mm(50.0), 0.0)).length() < 1e-9 && dir.y > 0.999, "{base} {dir}");
+    params.set("helpPoint", ParamValue::Query(Vec::new()));
+    assert!(anchor(&params).is_none());
+}

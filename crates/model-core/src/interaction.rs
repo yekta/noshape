@@ -816,6 +816,15 @@ pub fn helix_manipulators(ctx: &crate::regen::context::Context, params: &ParamVa
     vec![("heightManipulator".to_string(), M::Linear { base: start, direction: axis, offset: if opposite { -height } else { height }, min: -500.0, max: 500.0, secondary: false, primary: Some("height".into()) })]
 }
 
+/// Move curve boundary's distance arrow (moveCurveBoundary.fs: Extend, Blind, with a help point): the first
+/// curve's end that grows and its outward tangent there, the distance measured from it (std's arrow, at the
+/// extended end with no offset, its tip in the same place).
+pub fn move_curve_boundary_anchor(ctx: &crate::regen::context::Context, params: &ParamValues, units: &noshape_units::UnitPrefs) -> Option<(DVec3, DVec3)> {
+    let vars = std::collections::BTreeMap::new();
+    let ev = crate::regen::eval::EvalCtx::new(FeatureId(0), "", params, units, ctx.clone(), &vars);
+    crate::regen::features::curves::extend_curve_anchor(&ev)
+}
+
 /// A partial fillet's bound manipulators as std's fillet.fs adds them
 /// (addPartialFilletManipulators), keyed as std keys them for its
 /// filletManipulatorChange: for each Position or Offset bound, an arrow
