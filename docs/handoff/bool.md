@@ -1079,6 +1079,19 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## RUST-SM-CUT-VOLUME fixed (11-01 08:30 UTC; skasm via lead): a face on a trimmed left-handed cylinder the other way round
+- qa4_s1_enclosure_as_live cut 7 mm³ more than live with noshape's Boolean on. The cause, found by recording the
+  test's Booleans with OCCT (NOSHAPE_BOOL_RUST=0) and replaying them with ours: one of 17, the fuse of the
+  flanges, bends and hem (02215ef9a303de5c). Ours was invalid with +7.004 mm³: a bend face on a
+  Geom_RectangularTrimmedSurface over a left-handed cylinder came out reversed. to_body reads a trimmed surface's
+  basis (and so the left-handed frame's inward normal); the result's build took the trimmed surface's own type, so
+  not round, and so no flip. Its orientation now goes by the basis, as to_body's.
+- T1: bool_patterns::a_sheet_metal_enclosure_fuse_as_occt (the recorded fuse: valid, OCCT's volume and counts,
+  0.1 s); sheetmetal_std::qa4_s1_enclosure_as_live is T1 now (2.7 s in the dev profile). Replays why31: 0 differ.
+- Note for the lead: ours returned an invalid solid without a check. A validity check on every result of noshape's
+  Boolean would have caught this, falling back to OCCT. It costs about BRepCheck's time (the knurl's: about 2 s of
+  26). Not added; say if wanted.
+
 ## Edges ending inside a face: INTERNAL edges in our result (11-01 07:07 UTC, lead)
 - OCCT's builder leaves an edge that ends inside a face (a tool's edge touching another's face) in that face as an
   INTERNAL edge. Ours now does the same:

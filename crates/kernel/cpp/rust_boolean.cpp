@@ -1207,8 +1207,15 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     const bool                                 round = !cs.IsNull() || !cn.IsNull();
     const gp_Ax3 frame = !cs.IsNull() ? cs->Position().Transformed(loc.Transformation()) : !cn.IsNull() ? cn->Position().Transformed(loc.Transformation()) : gp_Ax3();
     // The face's way round against its surface's normal (to_body: a left-handed cylinder's or cone's is
-    // inward).
-    const bool rev = b.reversed[i] != (round && !frame.Direct());
+    // inward), by its surface's own kind under a trim as to_body reads it (a sheet metal flange's bend on a
+    // trimmed left-handed cylinder came out the other way round: RUST-SM-CUT-VOLUME).
+    occ::handle<Geom_Surface> base = s;
+    while (const occ::handle<Geom_RectangularTrimmedSurface> tr = occ::down_cast<Geom_RectangularTrimmedSurface>(base))
+      base = tr->BasisSurface();
+    const occ::handle<Geom_CylindricalSurface> bcs = occ::down_cast<Geom_CylindricalSurface>(base);
+    const occ::handle<Geom_ConicalSurface>     bcn = occ::down_cast<Geom_ConicalSurface>(base);
+    const bool left = !bcs.IsNull() ? !bcs->Position().Transformed(loc.Transformation()).Direct() : !bcn.IsNull() && !bcn->Position().Transformed(loc.Transformation()).Direct();
+    const bool rev  = b.reversed[i] != left;
     const bool inner_loop = i < r.face_inner.size() && r.face_inner[i] != 0;
     if (kind == 0)
     {

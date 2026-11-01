@@ -910,7 +910,6 @@ fn a_cut_after_flanges_keeps_the_bends() {
 /// Front at (50, 1.5) cut through all both ways slots the plate and both
 /// long bends: 20805.4123, 61.
 #[test]
-#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn qa4_s1_enclosure_as_live() {
     let mut s = Studio::new();
     let region = s.rectangle(100.0, 60.0);
