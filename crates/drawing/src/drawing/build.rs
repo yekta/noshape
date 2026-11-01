@@ -1355,6 +1355,15 @@ impl AnnotationEnv for Env<'_> {
     fn weld_ansi(&self) -> bool {
         self.drawing.weld_ansi()
     }
+    fn trailing_zeros(&self) -> bool {
+        self.drawing.props.trailing_zeros
+    }
+    fn on_model(&self, view: ViewId, p: [f64; 2]) -> bool {
+        match (self.views.get(&view).and_then(|g| g.frame), views::view_source(self.sheet, view).and_then(|(key, _)| self.sources.get(&key))) {
+            (Some(frame), Some(src)) => views::body_under(src, &frame, p, 1e-5).is_some(),
+            _ => true,
+        }
+    }
     fn chamfer_style(&self) -> super::sheet::ChamferStyle {
         let p = &self.drawing.props;
         super::sheet::ChamferStyle { dim45: p.chamfer_45_dimension, content45: p.chamfer_45_content, dim: p.chamfer_dimension, content: p.chamfer_content, length_precision: p.chamfer_length_precision, angle_precision: p.chamfer_angle_precision }

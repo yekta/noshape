@@ -2228,9 +2228,21 @@ impl SheetGeometry {
                     }
                     for (i, t) in turns.iter().enumerate() {
                         let (pi, ci) = (turn(p, *t), turn(a.position, *t));
+                        let (l0, t0, f0) = (self.lines.len(), self.texts.len(), self.fills.len());
                         self.target_symbol(area, pi, k, rot, pick);
                         let li = if i == 0 { label.clone() } else { super::DatumTargetOpts::instance_label(label, i) };
                         self.target_callout(ci, pi, &li, &size, opts.style, pick);
+                        // An instance off the model is red on its own (live
+                        // 1699; the first target's own check reddens it all).
+                        if i > 0
+                            && let Some(o) = opts.origin
+                            && !env.on_model(*view, {
+                                let r = rotate2([anchor[0] - o[0], anchor[1] - o[1]], *t);
+                                [o[0] + r[0], o[1] + r[1]]
+                            })
+                        {
+                            self.colors.push(ColorSpan { lines: l0..self.lines.len(), texts: t0..self.texts.len(), fills: f0..self.fills.len(), rgb: OFF_MODEL_RED });
+                        }
                     }
                     // Radial lines from the origin to each target.
                     if let (Some(o), true, true) = (os, opts.angular, opts.radial_lines) {
@@ -2238,7 +2250,11 @@ impl SheetGeometry {
                             self.lines.push(Polyline2 { points: vec![o, turn(p, *t)], style: LineStyle::Thin, closed: false, pick });
                         }
                     }
-                    let basic = |v: f64, angular: bool, symbol: &str| DimText { boxed: true, ..env.text(a, v, angular, symbol) };
+                    let basic = |v: f64, angular: bool, symbol: &str| {
+                        let t = env.text(a, v, angular, symbol);
+                        let main = if angular && !env.trailing_zeros() { strip_angle_zeros(&t.main) } else { t.main.clone() };
+                        DimText { boxed: true, main, ..t }
+                    };
                     match (opts.origin, os, opts.hide_dims) {
                         // Angle (live 1699): a dashed circle through the
                         // target, its diameter across it through the target,
@@ -2265,7 +2281,10 @@ impl SheetGeometry {
                                 self.target_angle(os, ra, from, to, &basic(opts.measured_angle(*anchor, o), true, ""), pick);
                                 if turns.len() > 1 {
                                     let step = std::f64::consts::TAU / turns.len() as f64;
-                                    let one = env.text(a, step, true, "");
+                                    let mut one = env.text(a, step, true, "");
+                                    if !env.trailing_zeros() {
+                                        one.main = strip_angle_zeros(&one.main);
+                                    }
                                     let t = DimText { main: format!("{} X {}", turns.len(), one.main), boxed: true, ..one };
                                     let t1 = to + turns[1];
                                     self.target_angle(os, r * 0.85, to.min(t1), to.max(t1), &t, pick);
@@ -3214,6 +3233,17 @@ pub trait AnnotationEnv {
     fn stacked_text(&self, _a: &Annotation, st: &super::StackedCallout) -> String {
         if st.text.trim().is_empty() { "----".into() } else { st.text.clone() }
     }
+    /// Drawing properties › Length trailing zeros (datum target angles
+    /// follow it: live request 1699's "36.9°", "4 X 90°" in a drawing
+    /// without them).
+    fn trailing_zeros(&self) -> bool {
+        true
+    }
+    /// Whether a view point (meters) lands on the model (a datum target
+    /// instance off it is drawn red, live 1699).
+    fn on_model(&self, _view: ViewId, _p: [f64; 2]) -> bool {
+        true
+    }
     /// Drawing-wide dimension / annotation style.
     fn sheet_style(&self) -> SheetStyle {
         SheetStyle::default()
@@ -3252,6 +3282,9 @@ pub struct PlainEnv<'a> {
 }
 
 impl AnnotationEnv for PlainEnv<'_> {
+    fn trailing_zeros(&self) -> bool {
+        self.drawing.props.trailing_zeros
+    }
     fn chamfer_style(&self) -> ChamferStyle {
         let p = &self.drawing.props;
         ChamferStyle { dim45: p.chamfer_45_dimension, content45: p.chamfer_45_content, dim: p.chamfer_dimension, content: p.chamfer_content, length_precision: p.chamfer_length_precision, angle_precision: p.chamfer_angle_precision }
@@ -3277,6 +3310,22 @@ impl AnnotationEnv for PlainEnv<'_> {
     fn balloon_text(&self, _: &Annotation, text: &str) -> String {
         text.to_string()
     }
+}
+
+/// Live's orange-red for what lost its model reference (#DD5228).
+pub const OFF_MODEL_RED: [u8; 3] = [0xdd, 0x52, 0x28];
+
+/// "90.0°" → "90°", "36.90°" → "36.9°" (either decimal separator).
+pub fn strip_angle_zeros(s: &str) -> String {
+    let Some(deg) = s.find('°') else { return s.to_string() };
+    let head = &s[..deg];
+    let start = head.rfind(|c: char| !(c.is_ascii_digit() || c == '.' || c == ',')).map_or(0, |i| i + head[i..].chars().next().map_or(1, char::len_utf8));
+    let num = &head[start..];
+    if !num.contains(['.', ',']) {
+        return s.to_string();
+    }
+    let trimmed = num.trim_end_matches('0').trim_end_matches(['.', ',']);
+    format!("{}{trimmed}{}", &head[..start], &s[deg..])
 }
 
 /// Rotate a 2D vector counter-clockwise by `a` radians.

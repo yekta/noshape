@@ -2851,6 +2851,13 @@ fn datum_target_angle_mode() {
     let pick = built.picks.iter().position(|p| *p == PickTarget::Annotation(1)).unwrap() as u32;
     let labels: Vec<&str> = built.geometry.texts.iter().filter(|x| x.pick == pick && x.text.starts_with('A')).map(|x| x.text.as_str()).collect();
     assert_eq!(labels, ["A1", "A2", "A3", "A4"]);
+    // The instance spacing follows Length trailing zeros (live 1699: "4 X
+    // 90°" in a drawing without them).
+    for (tz, want) in [(false, "4 X 90°"), (true, "4 X 90.0°")] {
+        drawing.props.trailing_zeros = tz;
+        let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+        assert!(built.geometry.texts.iter().any(|x| x.pick == pick && x.text == want), "{want}: {:?}", built.geometry.texts.iter().filter(|x| x.pick == pick).map(|x| &x.text).collect::<Vec<_>>());
+    }
 }
 
 /// Hole callout Override precision/tolerance is per value (live 1707): a
@@ -4573,4 +4580,47 @@ fn mbd_characteristic_cells() {
     assert_eq!(mbd::characteristic_cells(&dim(Measure::Radius, Default::default()), Some(3.0)).unwrap(), ["Fillet radius", "3.000", "--", "--", "--"]);
     let dev = crate::fits::Tolerance { kind: "Deviation".into(), upper: "0.2".into(), lower: "0.05".into(), precision: Some(2), fit: None };
     assert_eq!(mbd::characteristic_cells(&dim(Measure::Distance, dev), Some(10.0)).unwrap(), ["Distance", "10.00", "+0.20 / -0.05", "10.20", "9.95"]);
+}
+
+/// Datum target instances (live 1699): one that doesn't land on the model is
+/// drawn orange-red on its own, the others black.
+#[test]
+fn datum_target_instance_off_the_model_is_red_alone() {
+    use super::format::DimText;
+    /// The model: x ≥ 0.1 (the origin's x) only.
+    struct Right<'a>(sheet::PlainEnv<'a>);
+    impl sheet::AnnotationEnv for Right<'_> {
+        fn to_sheet(&self, v: ViewId, p: [f64; 2]) -> [f64; 2] {
+            self.0.to_sheet(v, p)
+        }
+        fn scale(&self, v: ViewId) -> f64 {
+            self.0.scale(v)
+        }
+        fn rotation(&self, v: ViewId) -> f64 {
+            self.0.rotation(v)
+        }
+        fn text(&self, a: &Annotation, value: f64, angular: bool, symbol: &str) -> DimText {
+            self.0.text(a, value, angular, symbol)
+        }
+        fn expand(&self, s: &str) -> String {
+            self.0.expand(s)
+        }
+        fn balloon_text(&self, a: &Annotation, t: &str) -> String {
+            self.0.balloon_text(a, t)
+        }
+        fn on_model(&self, _: ViewId, p: [f64; 2]) -> bool {
+            p[0] > 0.1 - 1e-6
+        }
+    }
+    let drawing = Drawing::default();
+    let env = Right(sheet::PlainEnv { drawing: &drawing, scale: 1000.0 });
+    // Origin (0.1, 0.1), the target 0.02 to its right: instances at 90°,
+    // 180°, 270° (A2 above, A3 left: off the model, A4 below).
+    let opts = DatumTargetOpts { angular: true, origin: Some([0.1, 0.1]), instances: 4, hide_dims: true, ..Default::default() };
+    let mut s = Sheet::default();
+    s.annotations.push(Annotation { id: 1, kind: AnnotationKind::DatumTarget { view: ViewId(1), anchor: [0.12, 0.1], label: "A1".into(), area: DatumTargetArea::Point }, position: [140.0, 110.0], target: Some(Box::new(opts)), ..Default::default() });
+    let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+    g.add_annotations(&s, &env);
+    let red_texts: Vec<&str> = g.colors.iter().filter(|c| c.rgb == sheet::OFF_MODEL_RED).flat_map(|c| g.texts[c.texts.clone()].iter().map(|t| t.text.as_str())).collect();
+    assert_eq!(red_texts, ["A3"], "only the instance left of the origin is off the model");
 }
