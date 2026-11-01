@@ -2474,7 +2474,7 @@ impl Ctx<'_> {
             }
             if off <= r {
                 on.push((t, w));
-            } else if off <= GREY * r {
+            } else if off <= GREY * r && std::env::var_os("NOSHAPE_X_NOBAND").is_none() {
                 return Err(Decline("a vertex nearly on an edge"));
             }
         }
