@@ -1225,6 +1225,8 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   core 10-31 20:05, on main with 108cdf21: the fuse of all 18 now declines "a vertex inside coincident edges of two
   other arguments", the common still "a non-manifold result" (read with a print of rust_last_decline() after
   quick_boolean's rust_boolean, not landed); Shell 2.8 / 4.3 s here (fuse 2.2-2.9 s, common 0.8 s).
+  core 11-01 03:20, on main with 2afca924 / ba2b4db3: the 18-slab fuse now declines "a non-manifold result" (t 1 mm)
+  and "coincident pieces differ" (t 2 mm); the common still "a non-manifold result". 3.4-5.7 s here (loaded).
 - Done (core 2c6e89c2; the knurl's cut taken 10-31): core (10-30 23:45 UTC): op_boolean's CutByFaces build (a cut by 8+ tools in 2+ disjoint groups) leaves the
   target's solid without a record (history: Deleted), where every other path (OCCT's usual build, its fallback when
   CutByFaces fails, noshape's Boolean) says Modified into the result's solid. Could CutByFaces record the target's
