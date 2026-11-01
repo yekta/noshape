@@ -18,12 +18,12 @@ message, P3 tooltip / prompt / look. Status: ✗ open, ✅ fixed (commit), – a
 | Drawing right-click menus per entity type (25 types) | context-menus-drawing*.txt, behaviours (menu lines) | in the app 11-01 (w3/menus.noshape, a d6 copy with every annotation type; crops in dx-scratch/audit/rmb): **= live** (Add comment is cloud-only; Paste shows while something is copied, as live): empty sheet, view (projected, detail, section label: Copy on top), extension line, linear dimension, ordinate value, note, callout, hole callout, datum, centermark, surface finish (edge-attached), table, sketch line, section cut line. From live 1736 (11-01, app check): weld (M2), GD&T frame and leader, 2 point centerline (Paste | Clear selection · Zoom to fit · Delete, fixed), datum target (ours adds Show dimensions ▸ from A35), note leader line (Remove leaders · Add node) **= live**; empty space inside a view's frame = the view menu (= live; Replicate annotations now enabled as live's); Paste listed in every menu, clipboard or not (fixed: it showed only with copied drawing content); revision table n/a on live's Free account. **Differs**: M1 | M1, M2 |
 | Notifications panel | behaviours (EX11 request 1544, import flow) | compared with live's description | N… |
 
-**Counts (11-01 17:33 UTC):** surfaces audited 4 of 4 (dialogs and panels with dumps 55, import / export dialogs 16,
+**Counts (11-01 17:35 UTC):** surfaces audited 4 of 4 (dialogs and panels with dumps 55, import / export dialogs 16,
 right-click menus 25 entity types in the app, Notifications). 2918 live texts and options scanned, 2544 found as is.
-Gap rows 24: fixed 18 (P1 3, P2 8, P3 7), same as live after asking 4 (P1 D3, D4, D5; P2 D17), open 2 (P2: M1 format lines
-not selectable; P3: D15), plus partial leftovers noted in fixed rows (D8 error tooltip, D10 "Datum style", D11
-«Varies», D14 Show Onshape drawing templates, D18 End type as a select, X1 subassemblies split into documents). P0:
-none found.
+Gap rows 24: fixed 18 (P1 3, P2 8, P3 7), same as live after asking 4 (P1 D3, D4, D5; P2 D17), already ours 1 (P3
+D15), open 1 (P2: M1 format lines not selectable), plus partial leftovers noted in fixed rows (D8 error tooltip, D10
+"Datum style", D11 «Varies», D14 Show Onshape drawing templates, D18 End type as a select, X1 subassemblies split
+into documents). P0: none found.
 
 ## Gaps
 
@@ -43,7 +43,7 @@ none found.
 | D12 | Hatch region dialog | list rows | P3 | live: rows "Hatch 1" with tooltip "Delete hatch 1", the field tooltip "Select or create closed profile for hatch region" | ✅ "Delete hatch N" and the list's tooltip |
 | D13 | Detail view / Replicate region / Adjust linestyle | prompts | P3 | "Create closed profile for detail view boundary", "No closed profile selected", "Select required edges to change their style" | ✅ the three fields' tooltips |
 | D14 | Create Drawing | options and texts | P2 | live: the options' tooltips ("Drawing will automatically have recommended views", "Drawing will be empty, ready for views to be added manually"), ☐ Show Onshape drawing templates, "Creating drawing…" while it works, and "Suggested views provide only necessary views when MBD data is present." | ✅ the options' tooltips and the MBD note (shown for a Part Studio with Model definitions; app check 11-01 on mbd); – "Creating drawing…" (ours creates at once); ✗ ☐ Show Onshape drawing templates (P3) |
-| D15 | Note editor | font list | P3 | live labels the style's font "Noto Sans ( Note )" | ✗ |
+| D15 | Note editor | font list | P3 | live labels the style's font "Noto Sans ( Note )" | – already ours since 10-27 (drawing_note.rs's font list, also in the title field editor, which is the note panel): a false positive of the string scan |
 | D16 | Shortcut toolbar (s) | empty state | P3 | live "No tools added" | ✅ "No tools added" in an emptied shortcut toolbar |
 | D17 | Hole cell (double-click) | Formulas | P2 | live's cell editor offers "Formulas" | – live 1735: no Formulas in the hole table's Cell panel or menus: as ours |
 | X1 | Import to Onshape (documents page) | tiles | P2 | live: "Import to a single document" / "Split into multiple documents" ("Groups subassemblies with their parts in the same document") / Combine to a single Part Studio; ours the import options without the three tiles on the start page | ✅ Create › Import files… takes several files and opens live's 590 px modal with the three tiles and the format's options (the in-document dialog's, via a start hook); Import makes one document named after the first file (models first, then CAD Imports), a document per file, or one combined Part Studio; app check 11-01 (block.step + extrude.step single and split; a STEP zip reports live's "not translated" reason); ✗ Split doesn't yet put an assembly's subassemblies in documents of their own (a file is one document) |
