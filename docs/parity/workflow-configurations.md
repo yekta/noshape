@@ -20,7 +20,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 | 1.5 | Value "30" Enter | "30 mm" | "30 mm" | ✅ | a6c56638 10-28 |
 | 1.6 | Type list | Length, Angle, Number, Any, Measured, From import | same | ✅ | a6c56638 10-28 |
 | 1.7 | Value "#h * 3" (h from a Variable Studio) | accepted | accepted; list "#w = #h * 3" | ✅ (list "#w = #h * 3"; live label not captured) | a6c56638 10-28 |
-| 1.8 | Double-click Extrude 1 **while the Variable table panel is open** | edit dialog opens | **row only selected, no dialog**; the keys typed next went to the viewport ("#" = Shift+3 → Left view) | ✅ later (C4 fixed, pass 3: the edit dialog opens) | a6c56638 10-28 |  |
+| 1.8 | Double-click Extrude 1 **while the Variable table panel is open** | edit dialog opens | **row only selected, no dialog**; the keys typed next went to the viewport ("#" = Shift+3 → Left view) | ✅ later (C4 fixed, pass 3: the edit dialog opens) | a6c56638 10-28 |
 
 ## 2. Create variable popup, configuration variable
 
@@ -88,7 +88,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified.
 
 | # | Row | Ours | Status | Verified |
 |---|---|---|---|---|
-| 1.4 / 3.7 | Info bubble "Renamed some new variables…" | **auto-dismisses now (<12 s)**, but still centred over the graphics and **clipped under the open right panel** ("Renamed some" visible); the configure toast is clipped the same way | ✅ later (C5: window top centre, over the panel, auto-dismisses; pass 6 and 88fbf8f5) |  |
+| 1.4 / 3.7 | Info bubble "Renamed some new variables…" | **auto-dismisses now (<12 s)**, but still centred over the graphics and **clipped under the open right panel** ("Renamed some" visible); the configure toast is clipped the same way | ✅ later (C5: window top centre, over the panel, auto-dismisses; pass 6 and 88fbf8f5) | 88fbf8f5 (pass 6) |
 | 1.8 | Double-click Extrude 1 with the Variable table open | edit dialog opens | ✅ C4 fixed | a6c56638 10-28 |
 | 2.4 | "25" Enter | "25 mm" | ✅ C8 fixed | a6c56638 10-28 |
 | 3.1 | New List inputs (doc already has "List 2") | next one "Configuration" ✅, the one after **"List 4"** (live "List input 1") | ✅ later (C1 fixed, pass 7: "Configuration", then "List input 1") ✅ (C1 fixed: "Configuration") |

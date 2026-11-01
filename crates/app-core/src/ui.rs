@@ -1251,6 +1251,12 @@ pub fn col_grip(table: &str, col: &str, default: f32) -> Stateful<Div> {
 /// dragged element was grabbed (GPUI draws the drag view at the pointer less
 /// it, at its least size: pad it back).
 pub fn name_pill(name: SharedString, offset: Point<Pixels>) -> Div {
+    name_pill_on(name, offset, gpui_kit::rgb(0x1651b0))
+}
+
+/// [`name_pill`] on the colour `bg` (live cursors/672: an inserted Variable
+/// Studio table's pill is `#1651b0` at 60 %, its text still white).
+pub fn name_pill_on(name: SharedString, offset: Point<Pixels>, bg: Rgba) -> Div {
     div()
         .pl(offset.x)
         .pt(offset.y)
@@ -1262,7 +1268,7 @@ pub fn name_pill(name: SharedString, offset: Point<Pixels>) -> Div {
                 .flex()
                 .items_center()
                 .rounded(px(15.5))
-                .bg(gpui_kit::rgb(0x1651b0))
+                .bg(bg)
                 .text_size(px(14.))
                 .font_weight(FontWeight::BOLD)
                 .text_color(gpui_kit::rgb_static(0xffffff))

@@ -2864,33 +2864,28 @@ impl PartStudioView {
     }
 }
 
-/// A Variable Studio table being dragged by its header (live psb 10-20 t):
-/// the ghost is a dark-blue pill with the table name, and the pointer shows
-/// `grabbing` meanwhile.
+/// A Variable Studio table being dragged by its header (live psb 10-20 t,
+/// cursors/672): the ghost is the reorder pill with the table name, lighter
+/// than the Configurations panel's (`#1651b0` at 60 %, the table showing
+/// through), and the pointer shows `grabbing` meanwhile.
 #[derive(Clone)]
 struct VarTableDrag {
     studio: noshape_model::document::TabId,
     name: SharedString,
+    /// Where the header was grabbed: the pill sits at the pointer instead.
+    offset: Point<Pixels>,
 }
 
 impl Render for VarTableDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .px(px(10.))
-            .py(px(3.))
-            .rounded_full()
-            .bg(gpui_kit::rgb(0x0b3d78))
-            .text_size(px(13.))
-            .text_color(gpui_kit::rgb_static(0xffffff))
-            .child(crate::ui::user_text(self.name.clone()))
-            .child(canvas(|_, _, _| {}, |_, _, window, _| window.set_window_cursor_style(CursorStyle::ClosedHand)).absolute().size_0())
+        crate::ui::name_pill_on(self.name.clone(), self.offset, gpui_kit::rgba(0x1651b099))
     }
 }
 
 /// Make `el` (over an inserted table's header) the drag handle for
 /// reordering.
 fn var_table_drag_source<E: StatefulInteractiveElement>(el: E, studio: noshape_model::document::TabId, name: SharedString) -> E {
-    el.on_drag(VarTableDrag { studio, name }, |d, _, _, cx| cx.new(|_| d.clone()))
+    el.on_drag(VarTableDrag { studio, name, offset: Point::default() }, |d, offset, _, cx| cx.new(|_| VarTableDrag { offset, ..d.clone() }))
 }
 
 /// `text` with the workspace unit when it is a plain number for a field of dimension `dim` ("40" → "40 mm"); any

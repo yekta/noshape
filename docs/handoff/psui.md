@@ -332,10 +332,13 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
-N10. (10-31 20:36) Dark-mode sheet: every row checked (dk-994 on ctab.noshape, 11-01); residual: the Variable type ▾ 2 px narrower (the Flange dialog's Partial flange
-     groups done 11-01 as live request 1685). Every row of core-workflow 8, keyboard-mouse,
-     chrome-sweep, configurations, large-models, part-studio, interaction and cursors is checked; no live request
-     of mine is open.
+N10. (11-01 01:13) Unchecked rows (user 11-01): keyboard-mouse a / q / k, Ctrl+M, w and the empty Verified cells done;
+     cursors 53 (count cursor with a dialog), 70 (Isolate / Replace instance / Interference titles), 78, 81, 82 ✅,
+     74 ✅ (the Variable Studio pill is live's 60 % #1651b0 with white text, ui::name_pill_on); 46 waits on my live request (when the
+     SnapMate cursor shows). large-models 24: qa5's "Point" was our midpoint target of a full circle, at its seam;
+     live request open (does Onshape offer a midpoint on a closed circular edge?). If not, edge_midpoint should
+     return None for closed edges (behaviors.rs). part-studio 1.26 ✅ (env maps accepted as ours), 1.28 n/a.
+     Dark-mode residual: the Variable type ▾ 2 px narrower.
 
 N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes bounded by lines; crates/brep
      `mesh`, cpp/mesh_rust.cpp after core's cache, NOSHAPE_MESH_RUST=0 off); step 2 (this commit): circles split as
@@ -615,6 +618,13 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 5. p1-dialogs: checkbox label widths differ by font (Flama vs Roboto); nothing to do short of a font change.
 
 ## Requests to the lead
+- (11-01 01:13) For skasm (assembly): (1) with a new Mate connector (Ctrl+M) or mate dialog open, live lists the in-progress
+  feature as a red "Mate connector 1" row under Mate features (live 20891, 1693); ours shows no row until ✓.
+  (2) The instance list's right-click on 2 selected instances (live behaviours "Multi-select (2 fixed instances) in
+  the list", assembly/533) reads "Replace instances…" and ends "… Create empty subassembly · Clear selection ·
+  Delete"; ours says "Replace 2 instances…" (live's graphics menu says that) and has no Clear selection.
+- (11-01 01:13) land72 (eb3aeaba, the cancel gap) was SIGTERMed during clippy on vibe3 after waiting 645 s for a slot; I
+  re-ran it with the cursor / sheet commit on top. If that was the slot ordering, nothing is needed from you.
 - (10-31 20:12) vibe3 land slots, again: land/psui-ca9568fe waited 3465 s (58 min) while lands started after it (cliapp,
   core) took the slots: the 5 s `flock -n` poll has no queue order, and a perf baseline job (remote-baseline.sh) holds
   slot 1's fd for its whole run. A FIFO (ticket file / flock on a queue) would stop the starvation.

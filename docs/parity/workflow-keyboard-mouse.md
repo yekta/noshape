@@ -18,10 +18,10 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified / live data mi
 | Ctrl+C / Ctrl+V | copy / paste | part copy → paste opens Derived (DOC3) | ✅ (CTRL-C-PART fixed) | 77870dd4 10-28 (menu Copy Part + Ctrl+V ✅; Ctrl+C on a selected part copies nothing) · verified 3f4e10d9 10-28 (TICKETS CTRL-C-PART) → corrected by live (behaviours "skasm (2026-10-31, P3 workflow-derived rows 29 / 30)" (b)): a part's Ctrl+V in a Part Studio does nothing, in an Assembly inserts it; ours the same since skasm 10-31 ✅ |
 | Shift+C | Curve/surface analysis | opens (re-uses the last entity "Face of Fillet 1") | ✅ / ? | 0.4.10+ / dd1b5037 10-27 |
 | Shift+D | Dihedral analysis | opens | ✅ | 0.4.10+ / dd1b5037 10-27 |
-| Ctrl+Shift+F, Ctrl+U | FeatureScript search, Report a bug | not tested (cloud/FS) | – |  |
-| a / q / k | Flip primary axis / Reorient secondary / Hide-show mate connectors (assembly) | not tested | ? |  |
+| Ctrl+Shift+F, Ctrl+U | FeatureScript search, Report a bug | not offered (cloud/FS) | – | n/a: cloud (psui 11-01) |
+| a / q / k | Flip primary axis / Reorient secondary / Hide-show mate connectors (assembly) | in the Revolute dialog a flips the mated part (the pin goes through the plate), a again flips it back; q reorients the secondary axis by 90° (no visible change on a pin, the same action as the dialog's Reorient button); k hides / shows the mate connectors (handler checked) | ✅ | psui 11-01 (:102 asm5, Revolute 1 edit) |
 | Shift+N | Rename selection | feature row and part row: inline rename, the name selected | ✅ (KB1 fixed, pass 7) | psui 042e254a 10-31 (blk, Parts › Part 1, Shift+N → inline field, "Part 1" selected) |
-| Ctrl+M | Mate connector | not tested in assembly | ? |  |
+| Ctrl+M | Mate connector | opens the Mate connector dialog in the Part Studio and in the assembly, fields as live | ✅ (the assembly list lacks live's red in-progress "Mate connector 1" row under Mate features while the dialog is open: skasm, handoff request) | psui 11-01 (:102 blk, kasm1) |
 | [ | Measure | opens the Measure panel | ✅ | 0.4.10+ / dd1b5037 10-27 (measure panel, workflow-analysis row 4) |
 | Ctrl+Space | Quick tab switching | the switcher card while Ctrl is held (MRU thumbnails, first Space = previous tab, wraps, hover selects, Ctrl release / click switches; live spec "Ctrl+Space quick tab switcher") | ✅ | psui 10-31 (:102 cm3; T1 ctrl_space_walks_the_recent_tabs) |
 | Ctrl+Y / Ctrl+Z | redo / undo | ✅ (earlier workflows) | ✅ | 0.4.10+ / dd1b5037 10-27 |
@@ -52,7 +52,7 @@ Status: ✅ matches live, ✗ differs (finding #), ? not verified / live data mi
 | n | view normal to; second n flips | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | z / Shift+Z | zoom out / in about the view centre | ✅ | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | f | zoom to fit | ✅ (a press during a view animation is ignored: workflow-surfaces) | ✅ / ? | 0.4.10+ / dd1b5037 10-27 |
-| w | zoom to window | not tested | ? |  |
+| w | zoom to window | drag a box, the view frames it (live spec "W (zoom window)") | ✅ | psui 11-01 (:102) |
 
 ## Sketch (all checked by the highlighted tool)
 
@@ -77,7 +77,7 @@ d / n (workflow 3) ✅; p Projected view ✅; Shift+D, Shift+R, Ctrl+M, Shift+H 
 
 | Action | Live | Ours | Status | Verified |
 |---|---|---|---|---|
-| Right-drag 100 px left from Front | rotates about 55° (≈0.55°/px), Right face comes in | 50 px → ~45°, 100 px → 90°: **≈0.9°/px** | ✅ KB4 settled (perf 10-21 17:57: Onshape's rate per canvas diagonal, 55.8° at live's canvas; the 0.9°/px was the smaller window) |  |
+| Right-drag 100 px left from Front | rotates about 55° (≈0.55°/px), Right face comes in | 50 px → ~45°, 100 px → 90°: **≈0.9°/px** | ✅ KB4 settled (perf 10-21 17:57: Onshape's rate per canvas diagonal, 55.8° at live's canvas; the 0.9°/px was the smaller window) | perf 10-21 17:57 (rate per canvas diagonal) |
 | Middle-drag | pan | pan | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | Ctrl+right-drag | pan | pan | ✅ | 0.4.10+ / dd1b5037 10-27 |
 | View cube face hover | light-blue fill | ✅ | ✅ | 77870dd4 10-28 |
@@ -103,9 +103,9 @@ d / n (workflow 3) ✅; p Projected view ✅; Shift+D, Shift+R, Ctrl+M, Shift+H 
 
 | Key | Ours | Status | Verified |
 |---|---|---|---|
-| Shift+N on a part row | nothing (feature rows rename inline ✅) | ✅ later (pass 7; psui 10-31) |  |
-| Shift+I | Isolate dialog; planes stay fully visible | ✅ later (pass 13; psui 10-31) |  |
-| Right-drag 100 px left from Front (Shift+1) | ends ≈ 85° (view cube almost Right) vs live ≈ 55° | ✅ later (KB4 settled 17:57) |  |
+| Shift+N on a part row | nothing (feature rows rename inline ✅) | ✅ later (pass 7; psui 10-31) | psui 042e254a 10-31 (row Shift+N above) |
+| Shift+I | Isolate dialog; planes stay fully visible | ✅ later (pass 13; psui 10-31) | psui 10-31 (row Shift+I above) |
+| Right-drag 100 px left from Front (Shift+1) | ends ≈ 85° (view cube almost Right) vs live ≈ 55° | ✅ later (KB4 settled 17:57) | perf 10-21 17:57 (KB4) |
 
 ## Re-run on integration 5d28447 (2026-10-21 17:05–17:20, /tmp/qa5/noshape-1659 = /root/target-lead/debug/noshape 16:59; no CLI built from 5d28447 yet, so CLI-only geometry rows stay on the 14:36 CLI result)
 | KB1 Shift+N part row | nothing | ✅ later (pass 7) |
@@ -124,8 +124,8 @@ below 20 fps (`DETAIL_REDUCTION_THRESHOLD_FPS`), perf implementing.
 | Row | Ours | Status | Verified |
 |---|---|---|---|
 | KB1 Shift+N on a part row | inline rename with the name selected | ✅ **fixed** | 0.4.10+ / dd1b5037 10-27 |
-| KB3 Isolate | planes now hidden (live hides them too, ui/pn-900); **other parts stay fully opaque** (live: translucent); **Default geometry rows not greyed** (live grey) | ✅ later (pass 13: other parts translucent) |  |
-| KB4 orbit rate | settled by perf 17:57 (rate = Onshape's per canvas diagonal) | ✅ |  |
+| KB3 Isolate | planes now hidden (live hides them too, ui/pn-900); **other parts stay fully opaque** (live: translucent); **Default geometry rows not greyed** (live grey) | ✅ later (pass 13: other parts translucent) | psui 10-31 (row Shift+I above) |
+| KB4 orbit rate | settled by perf 17:57 (rate = Onshape's per canvas diagonal) | ✅ | perf 10-21 17:57 |
 
 ## Re-run pass 8 on main 5bd50b2 (2026-10-21 23:13–00:10, app /tmp/qa5/noshape-2256 = /root/target-lead/debug/noshape 22:56; no newer CLI than target-engine 18:09, so CLI-only rows stay on pass 7; geometry rows re-read in the app where possible)
 | KB3 Isolate | Default geometry rows greyed ✅; other parts stay opaque | ✅ later (pass 13; psui 10-31: Shift+I on blk Part 1 → Isolate dialog, planes faded, Default geometry rows grey) |
