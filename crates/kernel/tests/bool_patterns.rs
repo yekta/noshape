@@ -191,6 +191,23 @@ fn placed_records(r: &k::OpResult) -> std::collections::BTreeMap<String, Vec<Vec
     out
 }
 
+/// The B94.6 knurl's patterned cut is taken by noshape's Boolean alone, as recorded (a decline fails here instead of
+/// running OCCT: 2afca924 made the grooves' faces on one surface coincident, read a point past a neighbour's patch as
+/// on its edge and declined, and the knurl ran OCCT's path, 16 s → 138 s, unseen until vibe3's hourly times, 11-01).
+#[test]
+fn the_b94_knurl_is_cut_by_noshapes_boolean() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/patterns");
+    let c = k::bool_corpus::load(&dir, "d14b48a8ddf91647").expect("the recorded knurl");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined the knurl: {why} ({e})"));
+    assert_eq!(r.shape.count(k::ShapeType::Face), c.summary.faces);
+    assert!(r.shape.is_valid());
+}
+
 /// The B94.6 knurl's cut through noshape's Boolean (its grooves' end caps share the cylinder's end planes and each
 /// other's: a piece on the object and a tool, or on two tools, taken), as OCCT's: faces, edges, vertices, validity,
 /// every history record (each output where OCCT's is, within 2 µm; an edge's ends within 20 µm, below), the volume

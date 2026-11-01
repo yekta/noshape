@@ -1079,6 +1079,18 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## The knurl back on OCCT's path, fixed (11-01 01:44 UTC; lead's P0)
+- vibe3's hourly baseline: knurl_feature_b94_on_a_cylinder 16.07 s at d7df1ce4, 138.2 s at 6628462c. Reproduced on
+  vibe2 at 6628462c: noshape's Boolean ran 8.1 s, then declined "a piece's point near a coincident face's boundary",
+  and OCCT took 157 s. The cause was mine, 2afca924: faces on one free-form surface count as coincident there. The
+  knurl's grooves have such faces, each groove its own part of the surface, and a piece's point past a neighbour's
+  patch has its parameters clamped onto that patch's edge (distance 0 to its boundary). Fixed: a free-form face the
+  point is off by more than the tolerance isn't one it lies on. The recorded case has the same hash as before, so
+  skasm's FORWARD edges (4e9b054e), core's 66658482 / cfb21072 and psui's 66cf2194 changed nothing there.
+- T1 bool_patterns::the_b94_knurl_is_cut_by_noshapes_boolean: the recorded knurl cut (tests/data/patterns
+  d14b48a8ddf91647) by noshape's Boolean alone (set_rust_boolean_only: a decline fails), its face count as recorded,
+  valid. 26 s in the dev profile on vibe2; fails without the fix.
+
 ## The goal from 10-31 19:00 (user): noshape's Boolean takes every case; OCCT only a temporary fallback
 Work the declines by OCCT time, biggest first: implement OCCT's rule where it's definite (per-vertex tolerances,
 the pave filler's same-domain handling); where OCCT's choice is arbitrary rounding, match within tolerance (same
