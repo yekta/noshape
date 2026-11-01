@@ -529,6 +529,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Go to assembly", Op("context_go_to_assembly")),
     ("partStudio:Hide all planes", Op("feature_set_visibility")),
     ("partStudio:Hide all sketches", Op("feature_set_visibility")),
+    ("partStudio:Show all sketches", Op("feature_set_visibility")),
     ("partStudio:Hide other planes", Op("feature_set_visibility")),
     ("partStudio:Hide other sketches", Op("feature_set_visibility")),
     ("partStudio:Hide", Op("feature_set_visibility")),

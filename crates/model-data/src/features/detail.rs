@@ -81,7 +81,7 @@ pub fn face_blend() -> FeatureType {
         ParamSpec::num("secondRadius", "Second radius", BLEND_BOUNDS).hints(rem).visible(move |v| v.bool("asymmetric") && radius(v)),
         ParamSpec::num("widthRatio", "Ratio", NumSpec::real(1.0, 1e-4, 1e4)).hints(rem).visible(move |v| v.bool("asymmetric") && !radius(v)),
         ParamSpec::flip("switchAsymmetric", "Switch side").visible(|v| v.bool("asymmetric")),
-        ParamSpec::enum_("crossSectionShape", "Control", &[("CIRCULAR", "Circular"), ("CONIC", "Conic"), ("CURVATURE", "Curvature"), ("CHAMFER", "Chamfer")])
+        ParamSpec::enum_("crossSectionShape", "Control", &[("CIRCULAR", "Circular"), ("CONIC", "Conic"), ("CURVATURE", "Curvature"), ("CHAMFER", "Chamfer")]).describe("Cross sectional control")
             .hints(Hints::SHOW_LABEL | rem),
         ParamSpec::num("rho", "Rho", NumSpec::real(0.5, 0.0, 0.99999)).visible(|v| v.is("crossSectionShape", "CONIC")),
         ParamSpec::num("magnitude", "Magnitude", NumSpec::real(0.5, 0.0, 0.99999)).visible(|v| v.is("crossSectionShape", "CURVATURE")),

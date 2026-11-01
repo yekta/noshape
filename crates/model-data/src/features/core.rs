@@ -289,7 +289,7 @@ pub fn variable() -> FeatureType {
         ParamSpec::query("initEntities", "Entities", QueryFilter::ANY_FACE | QueryFilter::ANY_EDGE | QueryFilter::VERTEX | QueryFilter::BODY | QueryFilter::MATE_CONNECTOR).hints(Hints::ALWAYS_HIDDEN),
         ParamSpec::enum_("mode", "Mode", MODES).hints(Hints::HORIZONTAL_ENUM),
         ParamSpec::enum_("variableType", "Variable type", KINDS).hints(Hints::HORIZONTAL_ENUM | Hints::UNCONFIGURABLE).visible(assigned),
-        ParamSpec::enum_("measurementMode", "Measurement", MEASURE).hints(Hints::HORIZONTAL_ENUM).visible(|v| v.is("mode", "MEASURED")),
+        ParamSpec::enum_("measurementMode", "Measurement", MEASURE).describe("Select distance to measure the linear distance between two entities./nSelect length to measure the total length of the selected entities.").hints(Hints::HORIZONTAL_ENUM).visible(|v| v.is("mode", "MEASURED")),
         ParamSpec::text("name", "Name", "").hints(Hints::UNCONFIGURABLE | Hints::INITIAL_FOCUS),
         ParamSpec::num("lengthValue", "Value", zero).visible(move |v| assigned(v) && v.is("variableType", "LENGTH")),
         ParamSpec::angle("angleValue", "Value", 0.0).visible(move |v| assigned(v) && v.is("variableType", "ANGLE")),
@@ -321,9 +321,9 @@ pub fn variable() -> FeatureType {
         // Measured.
         // std variable.fs: two picks (then the focus moves on).
         query_n("entityCouple", "Entities to measure between", QueryFilter::ANY_FACE | QueryFilter::ANY_EDGE | QueryFilter::POINT_LIKE | QueryFilter::BODY | QueryFilter::PLANE, 2).visible(distance),
-        ParamSpec::enum_("minmax", "Minimum/Maximum", MINMAX).hints(Hints::HORIZONTAL_ENUM).visible(distance),
-        ParamSpec::bool("extendEntities", "Extend entities", false).visible(move |v| distance(v) && !v.is("minmax", "MAXIMUM")),
-        ParamSpec::bool("measureFromAxis", "Use axis", false).visible(move |v| distance(v) && !v.is("minmax", "MAXIMUM")),
+        ParamSpec::enum_("minmax", "Minimum/Maximum", MINMAX).describe("Choose to measure minimum or maximum distance between entities").visible(distance),
+        ParamSpec::bool("extendEntities", "Extend entities", false).describe("Measure to infinitely extended lines, arcs, cylinders, etc.").visible(move |v| distance(v) && !v.is("minmax", "MAXIMUM")),
+        ParamSpec::bool("measureFromAxis", "Use axis", false).describe("Measure to axis of cylinders, circles, arcs, or revolved surfaces").visible(move |v| distance(v) && !v.is("minmax", "MAXIMUM")),
         ParamSpec::bool("axisMeasurementsGroup", "Axis measurements", false).hints(Hints::GROUP_HEADER | Hints::GROUP_LABEL | Hints::UNCONFIGURABLE).visible(distance),
         ParamSpec::num("distance", "Distance", zero).hints(Hints::READ_ONLY).visible(move |v| distance(v) && v.bool("axisMeasurementsGroup")),
         ParamSpec::num("xOffset", "Along X", zero).hints(Hints::READ_ONLY).visible(move |v| distance(v) && v.bool("axisMeasurementsGroup")),

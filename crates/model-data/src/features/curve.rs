@@ -327,7 +327,7 @@ pub fn edit_curve() -> FeatureType {
         .item_template("#index: #x;#y;#z")
         .hints(Hints::COLLAPSE_ARRAY_ITEMS)
         .visible(cps),
-        ParamSpec::bool("showDetails", "Show details", true),
+        ParamSpec::bool("showDetails", "Show details", true).hints(Hints::GROUP_HEADER),
         ParamSpec::num("curveDegree", "Degree", NumSpec::integer(3, 0, 1000))
             .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)
             .visible(|v| v.bool("showDetails")),
@@ -382,7 +382,7 @@ pub fn routing_curve() -> FeatureType {
         ParamSpec::enum_("csvUnit", "Unit", CSV_UNIT_NAMES).default_enum("Meter").hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CSV")),
         ParamSpec::bool("overwritePoints", "Overwrite points", true).hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CURVE") || input(v, "CSV")),
         ParamSpec::bool("isPeriodic", "Closed", false).visible(points),
-        ParamSpec::query1("curveBaseCSys", "Curve reference", QueryFilter::POINT_LIKE).visible(points),
+        ParamSpec::query1("curveBaseCSys", "Curve reference", QueryFilter::POINT_LIKE).describe("Point or mate connector used as reference for the curve. Defaults to origin.").visible(points),
         ParamSpec::enum_("pointsEditType", "Point edit type", &[("SINGLE", "Single"), ("MULTI", "Multiple")]).hints(Hints::HORIZONTAL_ENUM).visible(points),
         ParamSpec::query1("multiEditReference", "Edit reference", QueryFilter::POINT_LIKE).visible(move |v| points(v) && !single(v)),
         ParamSpec::array("selectedIndices", "Selected points", "Point", vec![ParamSpec::num("indexValue", "Point index", NumSpec::integer(0, 0, 10_000))])
@@ -421,8 +421,8 @@ pub fn routing_curve() -> FeatureType {
         )
         .visible(single),
         ParamSpec::bool("addPointOnAxisDrag", "Add point on axis drag", false).visible(single),
-        ParamSpec::bool("showCSys", "Show reference coordinate system", true).visible(points),
-        ParamSpec::bool("keepPoints", "Keep points", false).visible(points),
+        ParamSpec::bool("showCSys", "Show reference coordinate system", true).describe("Show coordinate system of the reference used by the current vertex.").visible(points),
+        ParamSpec::bool("keepPoints", "Keep points", false).describe("Create points in addition to the curve.").visible(points),
         // Segments step.
         hidden(ParamSpec::num("segmentIndex", "Segment index", NumSpec::integer(-1, -1, 10_000))),
         ParamSpec::enum_("segmentEditType", "Segment edit type", &[("ADD", "Add points"), ("ORTHOGONAL", "Orthogonal path")]).visible(segments),

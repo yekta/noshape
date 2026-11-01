@@ -146,13 +146,13 @@ fn sm_extrude_direction(second: bool) -> Vec<ParamSpec> {
     vec![
         ParamSpec::enum_(bound, "End type", SM_BOUNDS).visible(gate),
         flip_spec,
-        ParamSpec::length(depth, "Depth", 25.0, 1.0).hints(Hints::CAN_BE_TOLERANT).visible(move |v| gate(v) && v.is(bound, "BLIND")),
+        ParamSpec::length(depth, "Depth", 25.0, 1.0).hints(if second { Hints::NONE } else { Hints::CAN_BE_TOLERANT }).visible(move |v| gate(v) && v.is(bound, "BLIND")),
         ParamSpec::query1(face, "Up to face", QueryFilter::ANY_FACE | QueryFilter::PLANE | QueryFilter::MATE_CONNECTOR)
             .visible(move |v| gate(v) && v.is(bound, "UP_TO_SURFACE")),
         ParamSpec::query1(body, "Up to surface or part", QueryFilter::BODY).visible(move |v| gate(v) && v.is(bound, "UP_TO_BODY")),
         ParamSpec::query1(vertex, "Up to vertex or mate connector", QueryFilter::POINT_LIKE).visible(move |v| gate(v) && v.is(bound, "UP_TO_VERTEX")),
         ParamSpec::bool(has_off, "Offset distance", false).hints(Hints::DISPLAY_SHORT | Hints::FIRST_IN_ROW).visible(up_to),
-        ParamSpec::length(off, "Offset distance", 25.0, 1.0).hints(Hints::DISPLAY_SHORT).visible(move |v| up_to(v) && v.bool(has_off)),
+        ParamSpec::length(off, "Offset distance", 25.0, 1.0).hints(Hints::DISPLAY_SHORT | Hints::CAN_BE_TOLERANT).visible(move |v| up_to(v) && v.bool(has_off)),
         ParamSpec::flip(off_flip, "Opposite direction").visible(move |v| up_to(v) && v.bool(has_off)),
     ]
 }
@@ -228,7 +228,7 @@ fn start_selections() -> Vec<ParamSpec> {
         ParamSpec::bool("tangentPropagation", "Tangent propagation", false).visible(move |v| pr(v, "THICKEN")),
         ParamSpec::query("bends", "Edges or cylinders to bend", QueryFilter::LINEAR_EDGE | QueryFilter::CYLINDRICAL_FACE).visible(conv_or_thick),
         ParamSpec::num("clearance", "Clearance from input", NONNEGATIVE_ZERO_DEFAULT).visible(conv_or_thick),
-        ParamSpec::bool("bendsIncluded", "Include bends", false).visible(conv_or_thick),
+        ParamSpec::bool("bendsIncluded", "Include bends", false).describe("Check to include the clearance for bends").visible(conv_or_thick),
         ParamSpec::bool("keepInputParts", "Keep input parts", false).visible(move |v| pr(v, "CONVERT")),
     ]);
     p.extend(group("selectionsGroup", "Selections", true, sel));
@@ -585,11 +585,16 @@ pub fn corner_break() -> FeatureType {
         ParamSpec::query("entities", "Entities to fillet or chamfer", SM_CORNER).hints(Hints::INITIAL_FOCUS),
     ];
     p.extend(chamfer_options(chamfer));
+    // std sheetMetalCornerBreak.fs: its distances and angle aren't tolerant
+    // (Chamfer's are).
+    for s in p.iter_mut().filter(|s| matches!(s.id, "width" | "width1" | "width2" | "angle")) {
+        s.hints = Hints(s.hints.0 & !Hints::CAN_BE_TOLERANT.0);
+    }
     p.extend([
         ParamSpec::enum_("blendControlType", "Measurement", &[("RADIUS", "Radius"), ("WIDTH", "Width")])
             .hints(Hints::SHOW_LABEL | Hints::REMEMBER_PREVIOUS_VALUE)
             .visible(fillet),
-        ParamSpec::enum_("crossSection", "Control", &[("CIRCULAR", "Distance"), ("CONIC", "Conic"), ("CURVATURE", "Curvature")])
+        ParamSpec::enum_("crossSection", "Control", &[("CIRCULAR", "Distance"), ("CONIC", "Conic"), ("CURVATURE", "Curvature")]).describe("Cross sectional control")
             .hints(Hints::SHOW_LABEL | Hints::REMEMBER_PREVIOUS_VALUE)
             .visible(fillet),
         ParamSpec::num("radius", "Radius", BLEND_BOUNDS).hints(Hints::REMEMBER_PREVIOUS_VALUE).visible(radius),

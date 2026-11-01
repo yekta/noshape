@@ -12,7 +12,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 |---|---|---|---|
 | Toolbar, every group and overflow (75 tools + Add custom features) | behaviours "Toolbar" (Customize toolbar list), dom/toolbar-partstudio.txt | every live tool in live's group, in order (Move boundary = extendSurface) | 0 |
 | Toolbar right-click, Customize toolbar, narrow-window collapse | behaviours "Toolbar", "Narrow window" | checked earlier (cursors 81, part-studio 4.x, chrome-sweep) | 0 |
-| Feature dialogs, fields and options (75 toolbar features) | std preconditions via std_oracle::print_all | 48 same as std now (37 at first); 27 differ | rows below |
+| Feature dialogs, fields and options (75 toolbar features) | std preconditions via std_oracle::print_all | 50 same as std now (37 at first); 25 differ | rows below |
 | Keyboard shortcuts (live's Shift+/ list, 121 entries) | dom/keyboard-shortcuts.txt | every applicable entry in workflow-keyboard-mouse.md, all ✅ (11-01) | 0 |
 | View menu (camera / render ▾) | dom/menu-camera-render.txt | 16 items = live (part-studio 9.8) | 0 |
 | Context menus: face, edge, vertex, empty space, part, plane, origin, mate connector, sketch region / curve, feature rows (sketch, extrude, fillet, multi), parts-list part, tabs, Select ▸ submenus | dom/context-menus-partstudio.txt, -ps-*.txt | compared in core-workflow §8 and chrome-sweep CM1–CM5 (✅) | 0 |
@@ -22,7 +22,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 | Render Studio / Display states (1713) | live | live: no Display states in a Part Studio; Render Studio only as an Upgrade-gated tab type (cloud plan) | 0 |
 | View cube (right-click, arrows, hover) | live 1714 | every face / edge / corner / arrow gives the empty-space menu, no tooltips: = ours | 0 |
 
-**Counts (11-01, audit 4):** surfaces audited 9 of 9. Dialogs: 199 field rows + 52 visibility states found; fixed 79 rows and 39 states; accepted 7; open 113 rows + 13 states; 48 of 75 dialogs equal std (37 at first). Found outside the oracle (A rows): 14; fixed 9 (A2–A7, A9, A11, A13), partly 2 (A8, A12), open 3 (A1, A10 core, A14 asked).
+**Counts (11-01, audit 5):** surfaces audited 9 of 9. Dialogs: 199 field rows + 52 visibility states found; fixed 111 rows and 39 states; accepted 7; open 81 rows + 13 states; 50 of 75 dialogs equal std (37 at first). Found outside the oracle (A rows): 14; fixed 9, partly 2 (A8, A12), open 3 (A1, A10 core, A14 asked).
 
 ## Found outside the oracle (in the app, std's code, live)
 
@@ -51,7 +51,7 @@ which fields show); P3: internal (option ids under the same labels, configurabil
 oracle reads std's annotations, not its feature defaults map: a default std sets there (Ruled surface's cubic interpolation)
 is checked by hand.
 
-Field rows: 199 (fixed 79, accepted 7, open 113); visibility states differing now: 13.
+Field rows: 199 (fixed 111, accepted 7, open 81); visibility states differing now: 13.
 
 | # | Feature | Field | P | Difference (std = live) | Status |
 |---|---|---|---|---|---|
@@ -73,7 +73,7 @@ Field rows: 199 (fixed 79, accepted 7, open 113); visibility states differing no
 | D16 | assignVariable | axisMeasurementsGroup | P2 | missing: std has "Axis measurements" (a group) | ✅ (audit 2, 11-01) |
 | D17 | assignVariable | columnGroup | P2 | missing: std has "Column" (a group) | ✅ (audit 2, 11-01) |
 | D18 | assignVariable | conversionFactor | P2 | extra: ours has "Conversion factor", std has no `conversionFactor` | – std has it (`isAnything`, variable.fs); the oracle's extraction skips isAnything fields |
-| D19 | assignVariable | minmax | P2 | hints: std adds [], ours adds ['HORIZONTAL_ENUM'] | ✗ |
+| D19 | assignVariable | minmax | P2 | hints: std adds [], ours adds ['HORIZONTAL_ENUM'] | ✅ (audit 5, 11-01) |
 | D20 | assignVariable | rowGroup | P2 | missing: std has "Row" (a group) | ✅ (audit 2, 11-01) |
 | D21 | bridgingCurve | match1 | P2 | options: std ['Match position', 'Match tangent', 'Match curvature', 'Match flow (G3)'] / ours ['Match position', 'Match tangent', 'Match curvature', 'Match flow'] | ✅ (audit 2, 11-01) |
 | D22 | bridgingCurve | match2 | P2 | options: std ['Match position', 'Match tangent', 'Match curvature', 'Match flow (G3)'] / ours ['Match position', 'Match tangent', 'Match curvature', 'Match flow'] | ✅ (audit 2, 11-01) |
@@ -84,7 +84,7 @@ Field rows: 199 (fixed 79, accepted 7, open 113); visibility states differing no
 | D27 | editCurve | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
 | D28 | editCurve | controlPointEdits | P2 | array row label: std Some("#index: #x;#y;#z"), ours None | ✅ (audit 2, 11-01) |
 | D29 | editCurve | selectedIndices | P2 | array row label: std Some("Control point index #indexValue"), ours None | ✅ (audit 2, 11-01) |
-| D30 | editCurve | showDetails | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✗ |
+| D30 | editCurve | showDetails | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 5, 11-01) |
 | D31 | faceBlend | caps | P2 | array row label: std Some("#entity"), ours None | ✅ (audit 2, 11-01) |
 | D32 | faceBlend | edgeLimits | P2 | array row label: std Some("#edge"), ours None | ✅ (audit 2, 11-01) |
 | D33 | fill | addGuides | P2 | hints: std adds [], ours adds ['GROUP_HEADER'] | ✅ (audit 2, 11-01) |
@@ -92,7 +92,7 @@ Field rows: 199 (fixed 79, accepted 7, open 113); visibility states differing no
 | D35 | fitSpline | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
 | D36 | frame | cornerOverrides | P2 | array item fields differ: std [vertex "Vertex" query max Some(1) hints 0x8000 "" None, cornerType "Corner type" enum[("MITER", "Miter"), ("B… ours [vertex "Vertex" query max Some(1) hints 0x0 "" None, cornerType "Corner type" enum[("MITER", "Miter"), ("BUTT… | ✗ |
 | D37 | frame | cornerOverrides | P2 | array row label: std Some("#vertex [#cornerType]"), ours None | ✅ (audit 2, 11-01) |
-| D38 | frame | selections | P2 | hints: std adds [], ours adds ['ALLOW_QUERY_ORDER'] | ✗ |
+| D38 | frame | selections | P2 | hints: std adds [], ours adds ['ALLOW_QUERY_ORDER'] | ✅ (audit 5, 11-01) |
 | D39 | frameTrim | frameGroups | P2 | array item fields differ: std [frames "Frames" query max None hints 0x0 "Frame segments are trimmed against preceding groups and are used as… ours [frames "Frames" query max None hints 0x0 "" None]… | ✗ |
 | D40 | frameTrim | frameGroups | P2 | array row label: std Some("#frames"), ours None | ✅ (audit 2, 11-01) |
 | D41 | gusset | chamfer | P2 | hints: std adds [], ours adds ['FIRST_IN_ROW'] | ✗ |
@@ -106,9 +106,9 @@ Field rows: 199 (fixed 79, accepted 7, open 113); visibility states differing no
 | D49 | mutualTrim | body2 | P2 | label: std "Second set of surfaces", ours "Second surface" | ✅ (audit 3, 11-01) |
 | D50 | offsetCurveOnFace | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
 | D51 | pcbStart | hasSecondDirection | P2 | hints: std adds [], ours adds ['GROUP_HEADER'] | ✅ (audit 2, 11-01) |
-| D52 | pcbStart | offsetDistance | P2 | hints: std adds ['CAN_BE_TOLERANT'], ours adds [] | ✗ |
-| D53 | pcbStart | secondDirectionDepth | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✗ |
-| D54 | pcbStart | secondDirectionOffsetDistance | P2 | hints: std adds ['CAN_BE_TOLERANT'], ours adds [] | ✗ |
+| D52 | pcbStart | offsetDistance | P2 | hints: std adds ['CAN_BE_TOLERANT'], ours adds [] | ✅ (audit 5, 11-01) |
+| D53 | pcbStart | secondDirectionDepth | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✅ (audit 5, 11-01) |
+| D54 | pcbStart | secondDirectionOffsetDistance | P2 | hints: std adds ['CAN_BE_TOLERANT'], ours adds [] | ✅ (audit 5, 11-01) |
 | D55 | projectCurves | approximationShowDeviation | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
 | D56 | queryVariable | additionalQueries | P2 | array item fields differ: std [booleanOperation "Boolean operation" enum[("UNION", "Union"), ("SUBTRACTION", "Subtract"), ("INTERSECTION", "… ours [booleanOperation "Boolean operation" enum[("UNION", "Union"), ("SUBTRACTION", "Subtract"), ("INTERSECTION", "… | ✅ (audit 3, 11-01) |
 | D57 | queryVariable | additionalQueries | P2 | array row label: std Some("#booleanOperation of #addQlowercaseSelectionType"), ours None | ✅ (audit 3, 11-01) |
@@ -127,10 +127,10 @@ Field rows: 199 (fixed 79, accepted 7, open 113); visibility states differing no
 | D70 | sheetMetalBendRelief | bendReliefStyle | P2 | hints: std adds ['SHOW_LABEL'], ours adds [] | ✅ (audit 2, 11-01) |
 | D71 | sheetMetalCorner | cornerStyle | P2 | hints: std adds ['SHOW_LABEL'], ours adds [] | ✅ (audit 2, 11-01) |
 | D72 | sheetMetalCornerBreak | allowEdgeOverflow | P2 | hints: std adds ['GROUP_HEADER'], ours adds [] | ✅ (audit 2, 11-01) |
-| D73 | sheetMetalCornerBreak | angle | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✗ |
-| D74 | sheetMetalCornerBreak | width | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✗ |
-| D75 | sheetMetalCornerBreak | width1 | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✗ |
-| D76 | sheetMetalCornerBreak | width2 | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✗ |
+| D73 | sheetMetalCornerBreak | angle | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✅ (audit 5, 11-01) |
+| D74 | sheetMetalCornerBreak | width | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✅ (audit 5, 11-01) |
+| D75 | sheetMetalCornerBreak | width1 | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✅ (audit 5, 11-01) |
+| D76 | sheetMetalCornerBreak | width2 | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✅ (audit 5, 11-01) |
 | D77 | sheetMetalFlange | angleFromDirectionOppositeAngle | P2 | hints: std adds ['OPPOSITE_DIRECTION'], ours adds ['OPPOSITE_DIRECTION_CIRCULAR'] | ✅ (audit 2, 11-01) |
 | D78 | sheetMetalFlange | endConditionsGroup | P2 | missing: std has "End conditions" (a group) | ✅ (audit 1, 11-01) |
 | D79 | sheetMetalFlange | overallParametersGroup | P2 | missing: std has "Overall parameters" (a group) | ✅ (audit 1, 11-01) |
@@ -142,9 +142,9 @@ Field rows: 199 (fixed 79, accepted 7, open 113); visibility states differing no
 | D85 | sheetMetalLoft | connections | P2 | array item fields differ: std [connectionEntities "Vertices or edges" query max None hints 0x0 "" None, isRip "Rip" bool=false hints 0x0 "" … ours [connectionEntities "Vertices or edges" query max None hints 0x0 "" None, isRip "Rip" bool=false hints 0x0 "" … | ✗ |
 | D86 | sheetMetalLoft | connections | P2 | array row label: std Some("#connectionEntities"), ours None | ✅ (audit 2, 11-01) |
 | D87 | sheetMetalStart | hasSecondDirection | P2 | hints: std adds [], ours adds ['GROUP_HEADER'] | ✅ (audit 2, 11-01) |
-| D88 | sheetMetalStart | offsetDistance | P2 | hints: std adds ['CAN_BE_TOLERANT'], ours adds [] | ✗ |
-| D89 | sheetMetalStart | secondDirectionDepth | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✗ |
-| D90 | sheetMetalStart | secondDirectionOffsetDistance | P2 | hints: std adds ['CAN_BE_TOLERANT'], ours adds [] | ✗ |
+| D88 | sheetMetalStart | offsetDistance | P2 | hints: std adds ['CAN_BE_TOLERANT'], ours adds [] | ✅ (audit 5, 11-01) |
+| D89 | sheetMetalStart | secondDirectionDepth | P2 | hints: std adds [], ours adds ['CAN_BE_TOLERANT'] | ✅ (audit 5, 11-01) |
+| D90 | sheetMetalStart | secondDirectionOffsetDistance | P2 | hints: std adds ['CAN_BE_TOLERANT'], ours adds [] | ✅ (audit 5, 11-01) |
 | D91 | tag | additionalAlignmentPointsGroup | P2 | missing: std has "Additional alignment points" (a group) | ✅ (audit 1, 11-01) |
 | D92 | tag | additionalColumns | P2 | array row label: std Some("#header = #value"), ours None | ✅ (audit 1, 11-01) |
 | D93 | assignVariable | angleValue | P3 | hints: std adds ['INITIAL_FOCUS_ON_EDIT'], ours adds [] | ✗ |
@@ -157,11 +157,11 @@ Field rows: 199 (fixed 79, accepted 7, open 113); visibility states differing no
 | D100 | assignVariable | csv | P3 | kind: std `reference Csv` / ours `text=""` (our own picker) | ✗ |
 | D101 | assignVariable | customOffset | P3 | value: std `Length 0..500 =0.000000000000 / 0.000000000000` / ours `Length -500..500 =0.000000000000 / 0.000000000000` | ✗ |
 | D102 | assignVariable | distance | P3 | value: std `Length 0..500 =0.000000000000 / 0.000000000000` / ours `Length -500..500 =0.000000000000 / 0.000000000000` | ✗ |
-| D103 | assignVariable | extendEntities | P3 | tooltip: std "Measure to infinitely extended lines, arcs, cylinders, etc.", ours "" | ✗ |
+| D103 | assignVariable | extendEntities | P3 | tooltip: std "Measure to infinitely extended lines, arcs, cylinders, etc.", ours "" | ✅ (audit 5, 11-01) |
 | D104 | assignVariable | lengthValue | P3 | hints: std adds ['INITIAL_FOCUS_ON_EDIT'], ours adds [] | ✗ |
-| D105 | assignVariable | measureFromAxis | P3 | tooltip: std "Measure to axis of cylinders, circles, arcs, or revolved surfaces", ours "" | ✗ |
-| D106 | assignVariable | measurementMode | P3 | tooltip: std "Select distance to measure the linear distance between two entities./nSelect len", ours "" | ✗ |
-| D107 | assignVariable | minmax | P3 | tooltip: std "Choose to measure minimum or maximum distance between entities", ours "" | ✗ |
+| D105 | assignVariable | measureFromAxis | P3 | tooltip: std "Measure to axis of cylinders, circles, arcs, or revolved surfaces", ours "" | ✅ (audit 5, 11-01) |
+| D106 | assignVariable | measurementMode | P3 | tooltip: std "Select distance to measure the linear distance between two entities./nSelect len", ours "" | ✅ (audit 5, 11-01) |
+| D107 | assignVariable | minmax | P3 | tooltip: std "Choose to measure minimum or maximum distance between entities", ours "" | ✅ (audit 5, 11-01) |
 | D108 | assignVariable | numberValue | P3 | hints: std adds ['INITIAL_FOCUS_ON_EDIT'], ours adds [] | ✗ |
 | D109 | assignVariable | rowIndex | P3 | value: std `Integer 0..100000 =0.000000000000 / 0.000000000000` / ours `Integer 0..1000000 =0.000000000000 / 0.000000000000` | ✗ |
 | D110 | assignVariable | rowLabelIndex | P3 | value: std `Integer 0..100000 =0.000000000000 / 0.000000000000` / ours `Integer 0..1000000 =0.000000000000 / 0.000000000000` | ✗ |
@@ -184,19 +184,19 @@ Field rows: 199 (fixed 79, accepted 7, open 113); visibility states differing no
 | D127 | endcap | cornerDistance | P3 | hints: std adds ['REMEMBER_PREVIOUS_VALUE'], ours adds [] | ✗ |
 | D128 | endcap | cornerRadius | P3 | hints: std adds ['REMEMBER_PREVIOUS_VALUE'], ours adds [] | ✗ |
 | D129 | faceBlend | caps | P3 | array item "cap" (std) vs "Cap" (ours) | ✗ |
-| D130 | faceBlend | crossSectionShape | P3 | tooltip: std "Cross sectional control", ours "" | ✗ |
+| D130 | faceBlend | crossSectionShape | P3 | tooltip: std "Cross sectional control", ours "" | ✅ (audit 5, 11-01) |
 | D131 | faceBlend | edgeLimits | P3 | array item "edge limit" (std) vs "Edge limit" (ours) | ✗ |
 | D132 | fill | edges | P3 | array item "edge" (std) vs "Edge" (ours) | ✗ |
 | D133 | frame | cornerOverrides | P3 | array item "vertex" (std) vs "Corner" (ours) | ✗ |
 | D134 | frame | profileSketch | P3 | kind: std `reference PartStudio` / ours `text=""` (our own picker) | ✗ |
-| D135 | frame | selections | P3 | tooltip: std "Faces, edges, and vertices that define sweep paths", ours "" | ✗ |
-| D136 | frame | trimBodies | P3 | tooltip: std "Parts to use as trim tools", ours "" | ✗ |
-| D137 | frame | trimPlanes | P3 | tooltip: std "Planes and planar faces to use as trim tools", ours "" | ✗ |
+| D135 | frame | selections | P3 | tooltip: std "Faces, edges, and vertices that define sweep paths", ours "" | ✅ (audit 5, 11-01) |
+| D136 | frame | trimBodies | P3 | tooltip: std "Parts to use as trim tools", ours "" | ✅ (audit 5, 11-01) |
+| D137 | frame | trimPlanes | P3 | tooltip: std "Planes and planar faces to use as trim tools", ours "" | ✅ (audit 5, 11-01) |
 | D138 | frameTrim | frameGroups | P3 | array item "group" (std) vs "Group" (ours) | ✗ |
-| D139 | frameTrim | frameGroups | P3 | tooltip: std "Frame segments in earlier groups are used as tools for later groups", ours "" | ✗ |
-| D140 | frameTrim | targets | P3 | tooltip: std "Parts to trim using trim tool", ours "" | ✗ |
-| D141 | frameTrim | tool | P3 | tooltip: std "Face, plane, mate connector, or planar face to use as trim tool", ours "" | ✗ |
-| D142 | gusset | edges | P3 | tooltip: std "Edges that define the bases of the gussets", ours "" | ✗ |
+| D139 | frameTrim | frameGroups | P3 | tooltip: std "Frame segments in earlier groups are used as tools for later groups", ours "" | ✅ (audit 5, 11-01) |
+| D140 | frameTrim | targets | P3 | tooltip: std "Parts to trim using trim tool", ours "" | ✅ (audit 5, 11-01) |
+| D141 | frameTrim | tool | P3 | tooltip: std "Face, plane, mate connector, or planar face to use as trim tool", ours "" | ✅ (audit 5, 11-01) |
+| D142 | gusset | edges | P3 | tooltip: std "Edges that define the bases of the gussets", ours "" | ✅ (audit 5, 11-01) |
 | D143 | helix | actualPitch | P3 | value: std `Length 0.00001..500 =0.025000000000 / 0.025400000000` / ours `Length 0..500 =0.025000000000 / 0.025400000000` | ✗ |
 | D144 | helix | actualRevolutions | P3 | value: std `Real 0.00001..1000 =4.000000000000 / 4.000000000000` / ours `Real 0..1000000000 =4.000000000000 / 4.000000000000` | ✗ |
 | D145 | importDerived | partStudio | P3 | kind: std `reference PartStudio` / ours `text=""` (our own picker) | ✗ |
@@ -204,19 +204,19 @@ Field rows: 199 (fixed 79, accepted 7, open 113); visibility states differing no
 | D147 | mateConnector | originAdditionalQuery | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
 | D148 | offsetCurveOnFace | scope | P3 | option ids: std ['OFFSET', 'OFFSET_AND_EXTEND', 'OFFSET_EXTEND_AND_SPLIT'] / ours ['OFFSET', 'OFFSET_EXTEND', 'OFFSET_EXTEND_SPLIT'] | ✅ (audit 1, 11-01) |
 | D149 | pcbEnd | entitiesToUnfold | P3 | hints: std adds ['FOCUS_ON_VISIBLE'], ours adds [] | ✗ |
-| D150 | pcbStart | bendsIncluded | P3 | tooltip: std "Check to include the clearance for bends", ours "" | ✗ |
+| D150 | pcbStart | bendsIncluded | P3 | tooltip: std "Check to include the clearance for bends", ours "" | ✅ (audit 5, 11-01) |
 | D151 | queryVariable | additionalQueries | P3 | array item "additional query" (std) vs "Additional query" (ours) | ✗ |
 | D152 | queryVariable | edgeAdjacentEntityType | P3 | option ids: std ['ALL', 'EDGE', 'FACE'] / ours ['EDGES_AND_FACES', 'EDGES', 'FACES'] | ✅ (audit 1, 11-01) |
 | D153 | queryVariable | vertexAdjacentEntityType | P3 | option ids: std ['ALL', 'EDGE', 'VERTEX', 'FACE'] / ours ['ALL', 'EDGES', 'VERTICES', 'FACES'] | ✅ (audit 1, 11-01) |
 | D154 | routingCurve | addPointOnAxisDrag | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
 | D155 | routingCurve | csvUnit | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
 | D156 | routingCurve | csvUnit | P3 | option ids: std ['Centimeter', 'Foot', 'Inch', 'Millimeter', 'Meter', 'Yard'] / ours ['Meter', 'Centimeter', 'Millimeter', 'Inch', 'Foot', 'Yard'] | ✅ (audit 1, 11-01) |
-| D157 | routingCurve | curveBaseCSys | P3 | tooltip: std "Point or mate connector used as reference for the curve. Defaults to origin.", ours "" | ✗ |
+| D157 | routingCurve | curveBaseCSys | P3 | tooltip: std "Point or mate connector used as reference for the curve. Defaults to origin.", ours "" | ✅ (audit 5, 11-01) |
 | D158 | routingCurve | inputCurve | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
 | D159 | routingCurve | inputData | P3 | kind: std `reference Csv` / ours `text=""` (our own picker) | ✗ |
 | D160 | routingCurve | inputType | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
 | D161 | routingCurve | inputVertices | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
-| D162 | routingCurve | keepPoints | P3 | tooltip: std "Create points in addition to the curve.", ours "" | ✗ |
+| D162 | routingCurve | keepPoints | P3 | tooltip: std "Create points in addition to the curve.", ours "" | ✅ (audit 5, 11-01) |
 | D163 | routingCurve | numPointsToAdd | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
 | D164 | routingCurve | orthoCsys | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
 | D165 | routingCurve | orthoCsysMate | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
@@ -230,13 +230,13 @@ Field rows: 199 (fixed 79, accepted 7, open 113); visibility states differing no
 | D173 | routingCurve | segmentEditType | P3 | option ids: std ['ADD', 'ORTHOGONAL'] / ours ['ADD_POINTS', 'ORTHOGONAL_PATH'] | ✅ (audit 1, 11-01) |
 | D174 | routingCurve | selectedIndices | P3 | array item "index" (std) vs "Point" (ours) | ✗ |
 | D175 | routingCurve | selectedIndices | P3 | hints: std adds ['PREVENT_ARRAY_REORDER', 'X25'], ours adds [] | ✗ |
-| D176 | routingCurve | showCSys | P3 | tooltip: std "Show coordinate system of the reference used by the current vertex.", ours "" | ✗ |
+| D176 | routingCurve | showCSys | P3 | tooltip: std "Show coordinate system of the reference used by the current vertex.", ours "" | ✅ (audit 5, 11-01) |
 | D177 | routingCurve | startColumn | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 2, 11-01) |
 | D178 | routingCurve | targetLength | P3 | value: std `Length -500..500 =0.025000000000 / 0.025400000000` / ours `Length 0.00001..500 =0.025000000000 / 0.025400000000` | ✗ |
 | D179 | ruledSurface | cornerType | P3 | option ids: std ['SPUN', 'EXTENDED', 'LOFTED', 'NO_CORNER'] / ours ['SPUN', 'EXTENDED', 'LOFTED', 'NONE'] | ✅ (audit 1, 11-01) |
 | D180 | ruledSurface | vertexOverrides | P3 | array item "arrayItem" (std) vs "Vertex" (ours) | ✗ |
 | D181 | sheetMetalCorner | cornerReliefScale | P3 | hints: std adds [], ours adds ['REMEMBER_PREVIOUS_VALUE'] | ✗ |
-| D182 | sheetMetalCornerBreak | crossSection | P3 | tooltip: std "Cross sectional control", ours "" | ✗ |
+| D182 | sheetMetalCornerBreak | crossSection | P3 | tooltip: std "Cross sectional control", ours "" | ✅ (audit 5, 11-01) |
 | D183 | sheetMetalCornerBreak | filletWidth | P3 | hints: std adds ['REMEMBER_PREVIOUS_VALUE'], ours adds [] | ✗ |
 | D184 | sheetMetalCornerBreak | otherRadius | P3 | hints: std adds ['REMEMBER_PREVIOUS_VALUE'], ours adds [] | ✗ |
 | D185 | sheetMetalFlange | partialEndGroup | P3 | extra: ours has "End conditions", std has no `partialEndGroup` | ✅ (audit 1, 11-01) |
@@ -251,9 +251,9 @@ Field rows: 199 (fixed 79, accepted 7, open 113); visibility states differing no
 | D194 | sheetMetalJog | bendAngle | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✗ |
 | D195 | sheetMetalJog | bendAngle | P3 | value: std `Angle 0.017453292519943295..6.281439977927592 =1.570796326795 / 1.570796326795` / ours `Angle 0.017453292519943295..3.12413936106985 =1.570796326795 / 1.570796326795` | ✗ |
 | D196 | sheetMetalLoft | connections | P3 | array item "connection" (std) vs "Connection" (ours) | ✗ |
-| D197 | sheetMetalStart | bendsIncluded | P3 | tooltip: std "Check to include the clearance for bends", ours "" | ✗ |
+| D197 | sheetMetalStart | bendsIncluded | P3 | tooltip: std "Check to include the clearance for bends", ours "" | ✅ (audit 5, 11-01) |
 | D198 | tag | additionalColumns | P3 | hints: std adds ['PREVENT_ARRAY_REORDER'], ours adds ['UNCONFIGURABLE'] | ✅ (audit 1, 11-01) |
-| D199 | tag | cSysMateConnector | P3 | tooltip: std "If none selected, this feature will create one at Origin", ours "" | ✗ |
+| D199 | tag | cSysMateConnector | P3 | tooltip: std "If none selected, this feature will create one at Origin", ours "" | ✅ (audit 5, 11-01) |
 
 New rows since the first run:
 

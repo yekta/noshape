@@ -24,8 +24,8 @@ pub fn frame() -> FeatureType {
     let p = vec![
         // PartStudioData reference to a profile sketch (document/library + configuration).
         ParamSpec::text("profileSketch", "Sketch profile", "").hints(Hints::REMEMBER_PREVIOUS_VALUE),
-        ParamSpec::query("selections", "Selections", QueryFilter::ANY_FACE | QueryFilter::ANY_EDGE | QueryFilter::VERTEX | QueryFilter::WIRE_BODY)
-            .hints(Hints::INITIAL_FOCUS | Hints::ALLOW_QUERY_ORDER),
+        ParamSpec::query("selections", "Selections", QueryFilter::ANY_FACE | QueryFilter::ANY_EDGE | QueryFilter::VERTEX | QueryFilter::WIRE_BODY).describe("Faces, edges, and vertices that define sweep paths")
+            .hints(Hints::INITIAL_FOCUS),
         ParamSpec::bool("lockProfile", "Lock profile faces", false).hints(Hints::GROUP_HEADER),
         ParamSpec::query("profileLockFaces", "Faces to lock", QueryFilter::ANY_FACE).visible(|v| v.bool("lockProfile")),
         ParamSpec::bool("mergeTangentSegments", "Merge tangent segments", true),
@@ -46,8 +46,8 @@ pub fn frame() -> FeatureType {
         )
         .item_template("#vertex [#cornerType]"),
         ParamSpec::bool("trim", "Limit frame ends", false).hints(Hints::GROUP_HEADER),
-        ParamSpec::query("trimPlanes", "Faces to trim to", QueryFilter::PLANAR_FACE | QueryFilter::PLANE).visible(|v| v.bool("trim")),
-        ParamSpec::query("trimBodies", "Parts to trim to", QueryFilter::SOLID_BODY).visible(|v| v.bool("trim")),
+        ParamSpec::query("trimPlanes", "Faces to trim to", QueryFilter::PLANAR_FACE | QueryFilter::PLANE).describe("Planes and planar faces to use as trim tools").visible(|v| v.bool("trim")),
+        ParamSpec::query("trimBodies", "Parts to trim to", QueryFilter::SOLID_BODY).describe("Parts to use as trim tools").visible(|v| v.bool("trim")),
         hidden(ParamSpec::num("index", "Index", NumSpec::integer(4, 0, 100))),
     ];
     FeatureType::new("frame", "Frame", Category::Frame, p).describe("Sweep a profile sketch along edges to create frame segments")
@@ -58,12 +58,12 @@ pub fn frame_trim() -> FeatureType {
     let p = vec![
         ParamSpec::enum_("trimType", "Trim Type", &[("GROUP", "Ordered groups"), ("FACE", "Face")])
             .hints(Hints::HORIZONTAL_ENUM | Hints::REMEMBER_PREVIOUS_VALUE),
-        ParamSpec::array("frameGroups", "Frame groups", "Group", vec![ParamSpec::query("frames", "Frames", QueryFilter::SOLID_BODY)])
+        ParamSpec::array("frameGroups", "Frame groups", "Group", vec![ParamSpec::query("frames", "Frames", QueryFilter::SOLID_BODY)]).describe("Frame segments in earlier groups are used as tools for later groups")
         .item_template("#frames")
             .hints(Hints::COLLAPSE_ARRAY_ITEMS)
             .visible(move |v| !face(v)),
-        ParamSpec::query("targets", "Parts to trim", QueryFilter::SOLID_BODY).visible(face),
-        ParamSpec::query1("tool", "Face to trim to", QueryFilter::ANY_FACE | QueryFilter::SHEET_BODY | QueryFilter::PLANE | QueryFilter::MATE_CONNECTOR)
+        ParamSpec::query("targets", "Parts to trim", QueryFilter::SOLID_BODY).describe("Parts to trim using trim tool").visible(face),
+        ParamSpec::query1("tool", "Face to trim to", QueryFilter::ANY_FACE | QueryFilter::SHEET_BODY | QueryFilter::PLANE | QueryFilter::MATE_CONNECTOR).describe("Face, plane, mate connector, or planar face to use as trim tool")
             .visible(face),
         ParamSpec::flip("flipTrim", "Opposite side").visible(face),
         ParamSpec::bool("useToolExtents", "Trim to face boundaries", false).visible(face),
@@ -76,7 +76,7 @@ pub fn gusset() -> FeatureType {
     let rect = |v: &ParamValues| v.is("gussetType", "RECTANGLE");
     let aligned = |v: &ParamValues| v.is("gussetPosition", "ALIGNED");
     let p = vec![
-        ParamSpec::query("edges", "Edges", QueryFilter::LINEAR_EDGE).hints(Hints::INITIAL_FOCUS),
+        ParamSpec::query("edges", "Edges", QueryFilter::LINEAR_EDGE).describe("Edges that define the bases of the gussets").hints(Hints::INITIAL_FOCUS),
         ParamSpec::enum_("gussetType", "Gusset type", &[("TRIANGLE", "Triangle"), ("RECTANGLE", "Rectangle")]).hints(rem | Hints::SHOW_LABEL),
         ParamSpec::num("length", "Length", NONNEGATIVE_LENGTH).hints(rem),
         ParamSpec::flip("shouldFlipBaseSides", "Flip base sides").visible(rect),
@@ -173,7 +173,7 @@ pub fn tag() -> FeatureType {
         ParamSpec::query1("positivePart", "Part to add", QueryFilter::SOLID_BODY).visible(form),
         ParamSpec::query1("negativePart", "Part to remove", QueryFilter::SOLID_BODY).visible(form),
         ParamSpec::query1("flatFormSketch", "Sketch for flat view", QueryFilter::FEATURE | QueryFilter::SKETCH).visible(form),
-        ParamSpec::query1("cSysMateConnector", "Form origin mate connector", QueryFilter::MATE_CONNECTOR).visible(form),
+        ParamSpec::query1("cSysMateConnector", "Form origin mate connector", QueryFilter::MATE_CONNECTOR).describe("If none selected, this feature will create one at Origin").visible(form),
         // PCB holes (std definePcbHolesTagParams; std runs Tag).
         ParamSpec::enum_("pcbEntityType", "PCB entity type", &[("HOLE", "Holes"), ("CUTOUT", "Cutouts")]).hints(Hints::SHOW_LABEL).visible(pcb),
         ParamSpec::bool("plated", "Plated", false).visible(pcb),
