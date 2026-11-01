@@ -216,6 +216,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tan overlay) and two of one hole read the designation "M6x1" (`format.value` set in `resolve_annotations`). Also
   fixed in model-core hole.rs: HoleRecord.thread was "M6x1.00 mm (Coarse)" (the pitch option's label), now
   "M6x1.00" / "1/4-20" as live's feature titles and hole tables. App test doc: w3/d6.noshape.
+- Drawing sources (11-01 02:20): `views::regenerate_source` regenerated a Part Studio without its Variable Studio
+  values or Derived provider, so a drawing of a Part Studio using #names drew empty 10×10 boxes (CLI repro
+  w3/vsd.noshape). Now: the evaluator's studio options (`AssemblyEvaluator::studio_options_for`; ops' cached_sources
+  uses `derived::assembly_evaluator`), `element_variables`, and the source hash covers them. The assembly
+  evaluator's Part Studios get their document variables too. V55 decals then worked with the face names in the
+  shaded job (app-checked w3/dcl.noshape).
 - Slip 10-31 ~21:40: committed during a running land (SK12); caught before the push, the commit was saved as a
   patch, the branch reset to the tested commit, and the patch re-applied after the land.
 - Left in drawing.md 🔧 (as of 10-31 evening): MBD dimensions (CR5 / CR18 / V5, need Part Studio MBD dims), V1
