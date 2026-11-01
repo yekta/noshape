@@ -22,7 +22,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 | Render Studio / Display states (1713) | live | live: no Display states in a Part Studio; Render Studio only as an Upgrade-gated tab type (cloud plan) | 0 |
 | View cube (right-click, arrows, hover) | live 1714 | every face / edge / corner / arrow gives the empty-space menu, no tooltips: = ours | 0 |
 
-**Counts (11-01, audit 9):** surfaces audited 9 of 9. Dialogs: 199 field rows + 52 visibility states; fixed 182 rows and 39 states; accepted 12 rows and 13 states (fields std declares `isAnything`, which the oracle cannot read); open 5 rows (the reference pickers: Variable CSV, Frame profile, Derived, Routing CSV, Form); 64 of 75 dialogs equal std (37 at first). Editing logic: 48 std functions, 36 run std's, 10 native, 1 no-op, 1 open (Unfold). Found outside the oracle (A rows): 18; fixed 16, = live 1 (A1), open 1 (A10 core).
+**Counts (11-01, audit 10):** surfaces audited 9 of 9. Dialogs: 199 field rows + 52 visibility states; fixed 183 rows and 39 states; accepted 14 rows and 13 states (fields std declares `isAnything`, which the oracle cannot read); open 2 rows (Frame's profile and Routing curve's CSV input pickers); 64 of 75 dialogs equal std (37 at first). Editing logic: 48 std functions, 36 run std's, 10 native, 1 no-op, 1 open (Unfold). Found outside the oracle (A rows): 19; fixed 17, = live 1 (A1), open 1 (A10 core).
 
 ## Found outside the oracle (in the app, std's code, live)
 
@@ -46,6 +46,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 | A16 | Configuration panel | configured parameter column headers | P2 | std names 99 parameters differently in the configuration table ("Column Name": the second direction's Depth is "Second depth", Variable's row Index "Row index (0-based)"); ours showed the dialog label, so two "Depth" columns; the oracle didn't read it | ✅ (audit 8): `features::columns` holds std's 99, the table header uses them, custom features read "Column Name", the oracle compares them; the Configure toast keeps the label until live answers (REQUESTS psui A16) |
 | A17 | Routing curve dialog (live 1722) | points list | P2 | live opens with "Point 0" at the origin; Single mode shows only the active point's row (click a point to switch); a new point copies the active one's coordinates; the title carries the length ("Routing curve (61.825 mm)"); under two points the error ("Create at least two non-coincident points.") is on the title and the Points label. Ours: no point at first, every row shown, new points at the origin, plain title, the error on Vertices. Rows are titled "Point N" as live (audit 9) | ✅ (audit 9): std's editing logic runs (Point 0 to start, a new point copies the active one, std's error on Points); the name \"Routing curve (30 mm)\"; Single mode shows the active point's row only, with the triad on that point (dragging sets its offsets) and a click on another point making it active |
 | A18 | Feature dialogs (live 1722) | a length / real value out of range | P2 | live: the field turns pink with no tooltip, ✓ stays enabled, the title reads "…properly:  A parameter value is not valid." (the feature's message, then the text); ours: "Enter a valid expression." on the field, ✓ disabled. Integers out of range stay a validation error (DIALOG-OK-STATE: ✓ disabled, "Enter an integer value between …") | ✅ (audit 9) |
+| A19 | Variable dialog | From import (CSV) | P1 | ours failed every From import variable ("Importing variables from a table is not available yet") and its CSV file was a plain text field | ✅ (audit 10): std's variable.fs runs the From import mode (rows / columns by index, range or label, conversion factor) on the CSV tab; std features read reference parameters through the document; the CSV file is a reference field with live's picker (test custom_features::variable_from_import_reads_the_csv_tab) |
 
 ## Editing logic (std's dialog reactions)
 
@@ -112,7 +113,7 @@ which fields show); P3: internal (option ids under the same labels, configurabil
 oracle reads std's annotations, not its feature defaults map: a default std sets there (Ruled surface's cubic interpolation)
 is checked by hand.
 
-Field rows: 199 (fixed 182, accepted 12, open 5); visibility states differing now: 13.
+Field rows: 199 (fixed 183, accepted 14, open 2); visibility states differing now: 13.
 
 | # | Feature | Field | P | Difference (std = live) | Status |
 |---|---|---|---|---|---|
@@ -215,7 +216,7 @@ Field rows: 199 (fixed 182, accepted 12, open 5); visibility states differing no
 | D97 | assignVariable | columnLabelIndex | P3 | value: std `Integer 0..100000 =0.000000000000 / 0.000000000000` / ours `Integer 0..1000000 =0.000000000000 / 0.000000000000` | ✅ (audit 6) |
 | D98 | assignVariable | columnMaxIndex | P3 | value: std `Integer 0..100000 =0.000000000000 / 0.000000000000` / ours `Integer 0..1000000 =0.000000000000 / 0.000000000000` | ✅ (audit 6) |
 | D99 | assignVariable | columnMinIndex | P3 | value: std `Integer 0..100000 =0.000000000000 / 0.000000000000` / ours `Integer 0..1000000 =0.000000000000 / 0.000000000000` | ✅ (audit 6) |
-| D100 | assignVariable | csv | P3 | kind: std `reference Csv` / ours `text=""` (our own picker) | ✗ |
+| D100 | assignVariable | csv | P3 | kind: std `reference Csv` / ours `text=""` (our own picker) | ✅ (audit 10) |
 | D101 | assignVariable | customOffset | P3 | value: std `Length 0..500 =0.000000000000 / 0.000000000000` / ours `Length -500..500 =0.000000000000 / 0.000000000000` | ✅ (audit 6) |
 | D102 | assignVariable | distance | P3 | value: std `Length 0..500 =0.000000000000 / 0.000000000000` / ours `Length -500..500 =0.000000000000 / 0.000000000000` | ✅ (audit 6) |
 | D103 | assignVariable | extendEntities | P3 | tooltip: std "Measure to infinitely extended lines, arcs, cylinders, etc.", ours "" | ✅ (audit 5, 11-01) |
@@ -260,7 +261,7 @@ Field rows: 199 (fixed 182, accepted 12, open 5); visibility states differing no
 | D142 | gusset | edges | P3 | tooltip: std "Edges that define the bases of the gussets", ours "" | ✅ (audit 5, 11-01) |
 | D143 | helix | actualPitch | P3 | value: std `Length 0.00001..500 =0.025000000000 / 0.025400000000` / ours `Length 0..500 =0.025000000000 / 0.025400000000` | ✅ (audit 6) |
 | D144 | helix | actualRevolutions | P3 | value: std `Real 0.00001..1000 =4.000000000000 / 4.000000000000` / ours `Real 0..1000000000 =4.000000000000 / 4.000000000000` | ✅ (audit 6) |
-| D145 | importDerived | partStudio | P3 | kind: std `reference PartStudio` / ours `text=""` (our own picker) | ✗ |
+| D145 | importDerived | partStudio | P3 | kind: std `reference PartStudio` / ours `text=""` (our own picker) | – drawn by the same reference field live's reference parameters use (`render_reference_field`: type icon, "Select Part Studio…", the 300 px picker); the value is the tab id as a reference's is |
 | D146 | isoparametricCurve | directionType | P3 | option ids: std ['U_DIRECTION', 'V_DIRECTION'] / ours ['U', 'V'] | ✅ (audit 1, 11-01) |
 | D147 | mateConnector | originAdditionalQuery | P3 | hints: std adds ['UNCONFIGURABLE'], ours adds [] | ✅ (audit 6) |
 | D148 | offsetCurveOnFace | scope | P3 | option ids: std ['OFFSET', 'OFFSET_AND_EXTEND', 'OFFSET_EXTEND_AND_SPLIT'] / ours ['OFFSET', 'OFFSET_EXTEND', 'OFFSET_EXTEND_SPLIT'] | ✅ (audit 1, 11-01) |
@@ -302,7 +303,7 @@ Field rows: 199 (fixed 182, accepted 12, open 5); visibility states differing no
 | D184 | sheetMetalCornerBreak | otherRadius | P3 | hints: std adds ['REMEMBER_PREVIOUS_VALUE'], ours adds [] | ✅ (audit 6) |
 | D185 | sheetMetalFlange | partialEndGroup | P3 | extra: ours has "End conditions", std has no `partialEndGroup` | ✅ (audit 1, 11-01) |
 | D186 | sheetMetalFlange | partialOverallGroup | P3 | extra: ours has "Overall parameters", std has no `partialOverallGroup` | ✅ (audit 1, 11-01) |
-| D187 | sheetMetalFormed | formPartStudio | P3 | kind: std `reference PartStudio` / ours `text=""` (our own picker) | ✗ |
+| D187 | sheetMetalFormed | formPartStudio | P3 | kind: std `reference PartStudio` / ours `text=""` (our own picker) | – drawn by the same reference field live's reference parameters use (`render_reference_field`: type icon, "Select Part Studio…", the 300 px picker); the value is the tab id as a reference's is |
 | D188 | sheetMetalHem | angle | P3 | hints: std adds ['REMEMBER_PREVIOUS_VALUE'], ours adds [] | ✅ (audit 6) |
 | D189 | sheetMetalHem | innerRadius | P3 | hints: std adds ['REMEMBER_PREVIOUS_VALUE'], ours adds [] | ✅ (audit 6) |
 | D190 | sheetMetalHem | length | P3 | hints: std adds ['REMEMBER_PREVIOUS_VALUE'], ours adds [] | ✅ (audit 6) |

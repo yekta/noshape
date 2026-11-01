@@ -158,8 +158,10 @@ pub fn variable(ev: &mut EvalCtx) -> FResult<()> {
         ev.computed.push(("measuredValue".into(), crate::display::ComputedValue::Length(value)));
         return Ok(());
     }
+    // From import: std's variable.fs reads the CSV tab (rows / columns by
+    // index, range or label, the conversion factor).
     if ev.is("mode", "TABLE") {
-        return err("Importing variables from a table is not available yet");
+        return crate::regen::custom_features::evaluate_std(ev, "variable.fs", "assignVariable");
     }
     let q = match ev.enum_("variableType") {
         "LENGTH" => noshape_units::Quantity::new(ev.length("lengthValue")?, Dim::LENGTH),

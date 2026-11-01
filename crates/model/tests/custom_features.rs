@@ -1418,6 +1418,28 @@ fn std_features_run_in_custom_features_2() {
     assert!(bad.is_empty(), "{}\n{}", out.output, notices.join("\n"));
 }
 
+/// Variable › From import: std's variable.fs reads the CSV tab (a cell by
+/// row and column index).
+#[test]
+fn variable_from_import_reads_the_csv_tab() {
+    let mut fx = Fixture::new(&studio(""));
+    let csv = fx.doc.add_tab("sizes.csv", TabContent::File(noshape_model::file_tab::FileTab::new("sizes.csv", b"name,width\nsmall,10\nlarge,25\n", 0)));
+    let mut ps = PartStudio::new();
+    let mut f = ps.new_feature("assignVariable", &fx.units).unwrap();
+    f.params.set("name", ParamValue::Text("w".into()));
+    f.params.set("mode", ParamValue::Enum("TABLE".into()));
+    f.params.set("variableType", ParamValue::Enum("NUMBER".into()));
+    f.params.set("csv", ParamValue::Text(csv.to_string()));
+    f.params.set("rowIndex", ParamValue::Expr(noshape_units::ExprValue::new("2")));
+    f.params.set("columnIndex", ParamValue::Expr(noshape_units::ExprValue::new("1")));
+    ps.features.push(f);
+    let opts = RegenOptions { custom_features: Some(DocumentScripts::from_document(&fx.doc)), ..Default::default() };
+    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &fx.units, &opts);
+    assert_ok(&r);
+    let w = r.context.variables.get("w").unwrap_or_else(|| panic!("{:?}", r.context.variables));
+    assert!((w.value - 25.0).abs() < 1e-9, "{w:?}");
+}
+
 /// Reference parameters (live dom/fs-refparams.txt): CSV / image / JSON file
 /// tabs as TableData / ImageData / JSONData; an unset one is `{}`.
 #[test]

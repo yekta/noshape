@@ -298,7 +298,7 @@ pub fn variable() -> FeatureType {
         ParamSpec::num("numberValue", "Value", NumSpec::real(0.0, -1e12, 1e12)).hints(Hints::INITIAL_FOCUS_ON_EDIT).visible(move |v| assigned(v) && v.is("variableType", "NUMBER")),
         ParamSpec::text("anyValue", "Value", "0").visible(move |v| assigned(v) && v.is("variableType", "ANY")),
         // From import: a CSV file tab and which cells to read.
-        ParamSpec::text("csv", "CSV file", "").visible(table),
+        ParamSpec::reference("csv", "CSV file", crate::params::ReferenceKind::Csv).visible(table),
         // std variable.fs: Group "Row", then Group "Column", both open.
         ParamSpec::bool("rowGroup", "Row", true).hints(Hints::GROUP_HEADER | Hints::GROUP_LABEL | Hints::UNCONFIGURABLE).visible(table),
         ParamSpec::enum_("rowAccessType", "Access type", ACCESS).visible(row),

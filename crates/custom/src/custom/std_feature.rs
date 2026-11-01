@@ -98,7 +98,9 @@ fn load(module: &str, name: &str) -> Option<Arc<StdFeature>> {
 pub fn evaluate(ev: &mut EvalCtx, module: &'static str, name: &'static str) -> FResult<()> {
     super::host::register();
     let Some(f) = loaded(module, name) else { return err(format!("The standard library has no feature {name}")) };
-    super::run::run_feature(ev, &f.cell, &f.params, &f.specs, name.to_string(), None)
+    // The document's tabs, for reference parameters (Variable's CSV file).
+    let provider = ev.custom.clone().unwrap_or_else(super::fallback_provider);
+    super::run::run_feature(ev, &f.cell, &f.params, &f.specs, name.to_string(), Some(&*provider))
 }
 
 /// The std evaluator of a built-in feature type, if std runs it; std's module and feature of one (the routing is
