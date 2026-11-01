@@ -533,3 +533,30 @@ fn edges_run_their_curves_way() {
         }
     }
 }
+
+/// Mass properties › Show calculation variance (skasm audit G31): every value gets an error bound from a second,
+/// coarser integration. A block's (exact) and a holed cylinder's (OCCT's adaptive integrator) are tiny next to the
+/// values; a cut by a tilted cylinder (the segmented Gauss path's B-spline-free mix) too; none negative.
+#[test]
+fn mass_property_bounds_are_small_and_cover_every_value() {
+    let block = make_box_corners(DVec3::ZERO, DVec3::new(0.06, 0.04, 0.02)).unwrap();
+    let rod = make_cylinder(&Plane::new(DVec3::new(0.03, 0.02, -0.01), DVec3::new(0.3, 0.0, 1.0).normalize(), DVec3::Y), 0.005, 0.05, std::f64::consts::TAU).unwrap();
+    let holed = cut(&block, &rod).unwrap().shape;
+    for (name, s) in [("block", &block), ("holed", &holed)] {
+        for kind in [PropsKind::Volume, PropsKind::Surface] {
+            let p = if kind == PropsKind::Volume { mass_properties(s).unwrap() } else { surface_properties(s).unwrap() };
+            let b = mass_property_bounds(s, kind).unwrap();
+            assert!(b.mass >= 0.0 && b.mass <= 1e-6 * p.mass, "{name} {kind:?}: ±{} of {}", b.mass, p.mass);
+            for i in 0..3 {
+                assert!(b.center[i] >= 0.0 && b.center[i] <= 1e-6 * 0.08, "{name} {kind:?}: centre ±{:?}", b.center);
+            }
+            let imax = p.inertia.to_cols_array().iter().fold(0.0f64, |m, v| m.max(v.abs()));
+            for v in b.inertia.to_cols_array() {
+                assert!(v > 0.0 && v <= 1e-6 * imax, "{name} {kind:?}: inertia ±{v} of {imax}");
+            }
+        }
+    }
+    let edges = block.edges();
+    let b = mass_property_bounds(&edges[0], PropsKind::Linear).unwrap();
+    assert!(b.mass >= 0.0 && b.mass < 1e-12, "a line's length ±{}", b.mass);
+}

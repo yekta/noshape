@@ -616,6 +616,35 @@ pub fn mass_properties(ctx: &Context, bodies: &[crate::reference::BodyId], densi
     })
 }
 
+/// Mass properties › Show calculation variance (skasm audit G31): a bound on each value of [`mass_properties`]
+/// (`mass` when every part has a density), from each part's kernel bounds ([`k::mass_property_bounds`]) carried
+/// through the combination: summed, the centre's moved by its parts' mass bounds, the inertia's by the
+/// parallel-axis terms. About two more integrations a part.
+pub fn mass_property_variance(ctx: &Context, bodies: &[crate::reference::BodyId], densities: &dyn Fn(&crate::reference::BodyId) -> Option<f64>) -> Option<MassProperties> {
+    let whole = mass_properties(ctx, bodies, densities)?;
+    let total = whole.mass.unwrap_or(whole.volume).max(f64::MIN_POSITIVE);
+    let (mut volume, mut area, mut mass) = (0.0, 0.0, 0.0);
+    let mut com = DVec3::ZERO;
+    let mut inertia = glam::DMat3::ZERO;
+    for b in ctx.bodies.iter().filter(|b| b.kind == crate::display::BodyKind::Solid && (bodies.is_empty() || bodies.contains(&b.id))) {
+        let (Ok(p), Ok(pb), Ok(sb)) = (k::mass_properties(&b.shape), k::mass_property_bounds(&b.shape, k::PropsKind::Volume), k::mass_property_bounds(&b.shape, k::PropsKind::Surface)) else { continue };
+        let rho = if whole.mass.is_some() { densities(&b.id).unwrap_or(1.0) } else { 1.0 };
+        let (w, dw) = (p.mass * rho, pb.mass * rho);
+        volume += pb.mass;
+        area += sb.mass;
+        mass += dw;
+        // c = Σ w_i c_i / Σ w: each part's centre and weight bounds.
+        let d = p.center - whole.center_of_mass;
+        com += (pb.center * w + d.abs() * dw) / total;
+        // I = Σ (I_i + w_i (|d|² E − d dᵀ)): each part's inertia and weight bounds.
+        let outer = glam::DMat3::from_cols(d * d.x, d * d.y, d * d.z);
+        let shift = glam::DMat3::IDENTITY * d.length_squared() - outer;
+        let abs = |m: glam::DMat3| glam::DMat3::from_cols(m.x_axis.abs(), m.y_axis.abs(), m.z_axis.abs());
+        inertia += abs(pb.inertia * rho) + abs(shift) * dw;
+    }
+    Some(MassProperties { volume, surface_area: area, density: None, mass: whole.mass.map(|_| mass), center_of_mass: com, inertia })
+}
+
 /// Inertia tensors of parts (each about its own center of mass, the
 /// kernel's convention: off-diagonals are the negated products) moved to
 /// the common center `com` by the parallel-axis theorem and summed:
@@ -738,6 +767,19 @@ mod tests {
         // One part alone: its own inertia (no shift).
         let one = mass_properties(&ctx, &[BodyId { feature: FeatureId(1), index: 0 }], &|_| None).unwrap();
         assert!((one.inertia.y_axis.y - 160.0).abs() < 1e-6);
+    }
+
+    /// Show calculation variance (G31): the two boxes' values each get a bound, small beside them, none negative.
+    #[test]
+    fn mass_property_variance_bounds_every_value() {
+        let a = k::make_box(&k::Plane::xy(), 2.0, 4.0, 6.0).unwrap();
+        let b = k::make_box(&k::Plane::new(DVec3::new(10.0, 0.0, 0.0), DVec3::Z, DVec3::X), 2.0, 4.0, 6.0).unwrap();
+        let ctx = Context { bodies: vec![body(0, a), body(1, b)], ..Default::default() };
+        let v = mass_property_variance(&ctx, &[], &|_| None).unwrap();
+        assert!(v.volume > 0.0 && v.volume < 1e-6 * 96.0 && v.surface_area > 0.0 && v.surface_area < 1e-6 * 208.0, "{v:?}");
+        assert!(v.mass.is_none());
+        assert!((0..3).all(|i| v.center_of_mass[i] >= 0.0 && v.center_of_mass[i] < 1e-6), "{:?}", v.center_of_mass);
+        assert!(v.inertia.to_cols_array().iter().all(|x| *x >= 0.0 && *x < 1e-6 * 2720.0), "{:?}", v.inertia);
     }
 
     /// MEASURE-MAX-DIST (qa 10-27): Max dist between two Ø40 × 30 cylinders 50 apart is exact, from the rims:

@@ -703,3 +703,13 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
   - "Copy Part N" / Ctrl+C on a part copy silently (no "Copied …" toast).
   - The Assembly's Ctrl+V inserts the copied part at once (assembly side, mine).
   - workflow-keyboard-mouse.md row "Ctrl+C / Ctrl+V" is updated.
+
+## From core (11-01 16:00): Mass properties › Show calculation variance (skasm audit G31)
+- model-core `regen::measure::mass_property_variance(ctx, bodies, densities)` returns a `MassProperties` of bounds
+  (± per value: volume, surface area, mass when every part has a density, centre x / y / z, each inertia entry), next
+  to `mass_properties`; kernel `mass_property_bounds(shape, PropsKind::{Volume, Surface, Linear})` for faces / edges.
+  About two more integrations a part: call it only while the box is ticked.
+- The bounds come from a second, coarser integration (at least 1e-12 of each value's scale): on everyday parts they
+  sit at that floor. Live's format and magnitude are asked in REQUESTS (core 2026-11-01 15:30, G31); I'll tune the
+  scale to live's numbers when they come. The checkbox in part-studio-ui menus.rs / assembly_mass.rs is yours to
+  wire: append " ± <bound>" in the dialog's units as live shows it.

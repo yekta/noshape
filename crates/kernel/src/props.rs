@@ -45,6 +45,24 @@ pub fn surface_properties(shape: &Shape) -> Result<MassProperties> {
     Ok(conv(ck(ffi::props_surface(shape.raw()))?))
 }
 
+/// Which mass properties [`mass_property_bounds`] bounds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PropsKind {
+    /// [`mass_properties`] (solids: volume).
+    Volume = 0,
+    /// [`surface_properties`] (area).
+    Surface = 1,
+    /// [`linear_properties`] (length).
+    Linear = 2,
+}
+
+/// The calculation variance of the mass properties of `kind` (Mass properties › Show calculation variance): for each
+/// value (mass, centre components, inertia entries) a bound on its error, from a second, coarser integration.
+/// Costs about two integrations.
+pub fn mass_property_bounds(shape: &Shape, kind: PropsKind) -> Result<MassProperties> {
+    Ok(conv(ck(ffi::props_bounds(shape.raw(), kind as u8))?))
+}
+
 /// Linear properties (mass = length) of edges/wires.
 pub fn linear_properties(shape: &Shape) -> Result<MassProperties> {
     Ok(conv(ck(ffi::props_linear(shape.raw()))?))

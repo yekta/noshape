@@ -709,6 +709,7 @@ double                   set_blend_budget(double seconds);
 PropsF                   props_volume_precise(const OcShape& s);
 PropsF                   props_surface(const OcShape& s);
 PropsF                   props_linear(const OcShape& s);
+PropsF                   props_bounds(const OcShape& s, uint8_t kind);
 DistanceF                min_distance(const OcShape& a, const OcShape& b);
 double                   angle_between(const OcShape& a, const OcShape& b);
 int8_t                   classify_point(const OcShape& solid, P3 p, double tol);

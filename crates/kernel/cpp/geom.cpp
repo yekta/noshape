@@ -850,6 +850,69 @@ PropsF props_linear(const OcShape& s)
   return to_props(g);
 }
 
+extern thread_local bool t_props_coarse;
+
+// Bounds of the mass properties of `kind` (0 the volume's as shown (precise), 1 the surface's, 2 the length's): each
+// value's difference from a second, coarser integration (segments twice as long, OCCT's adaptive tolerance 1000
+// times looser; lengths: against GCPnts' adaptive length to 1e-6, the centre and inertia by the same share), at
+// least 1e-12 of the value's scale. The integrands are smooth, so the values shown are well within.
+PropsF props_bounds(const OcShape& s, uint8_t kind)
+{
+  require_non_null(s.shape, "shape");
+  Bnd_Box box;
+  BRepBndLib::Add(s.shape, box);
+  const double size = box.IsVoid() ? 1.0 : std::sqrt(box.SquareExtent());
+  PropsF       fine, coarse;
+  if (kind == 2)
+  {
+    GProp_GProps g;
+    BRepGProp::LinearProperties(s.shape, g, true);
+    fine       = to_props(g);
+    double len = 0;
+    for (TopExp_Explorer x(s.shape, TopAbs_EDGE); x.More(); x.Next())
+      if (!BRep_Tool::Degenerated(TopoDS::Edge(x.Current())))
+      {
+        BRepAdaptor_Curve c(TopoDS::Edge(x.Current()));
+        len += GCPnts_AbscissaPoint::Length(c, 1e-6);
+      }
+    const double share = fine.mass > 0 ? std::abs(len - fine.mass) / fine.mass : 0;
+    coarse             = fine;
+    coarse.mass        = len;
+    coarse.center.x += share * size;
+    coarse.center.y += share * size;
+    coarse.center.z += share * size;
+    for (double& v : coarse.inertia)
+      v *= 1 + share;
+  }
+  else
+  {
+    auto run = [&] { return to_props(kind == 0 ? volume_props_precise(s.shape) : surface_props(s.shape)); };
+    fine           = run();
+    t_props_coarse = true;
+    try
+    {
+      coarse = run();
+    }
+    catch (...)
+    {
+      t_props_coarse = false;
+      throw;
+    }
+    t_props_coarse = false;
+  }
+  PropsF b{};
+  b.mass     = std::max(std::abs(fine.mass - coarse.mass), 1e-12 * std::abs(fine.mass));
+  b.center.x = std::max(std::abs(fine.center.x - coarse.center.x), 1e-12 * size);
+  b.center.y = std::max(std::abs(fine.center.y - coarse.center.y), 1e-12 * size);
+  b.center.z = std::max(std::abs(fine.center.z - coarse.center.z), 1e-12 * size);
+  double imax = 0;
+  for (double v : fine.inertia)
+    imax = std::max(imax, std::abs(v));
+  for (int i = 0; i < 9; ++i)
+    b.inertia[i] = std::max(std::abs(fine.inertia[i] - coarse.inertia[i]), 1e-12 * imax);
+  return b;
+}
+
 DistanceF min_distance(const OcShape& a, const OcShape& b)
 {
   require_non_null(a.shape, "first shape");

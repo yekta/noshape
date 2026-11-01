@@ -25,6 +25,8 @@ clifuzz_time.py / nscli.py with paths moved; NSCLI_ERR=<file> keeps the CLI's st
 jumps; run1052.sh / mem1002.sh / run979.sh as examples; CLIs built in ~/agents/core/target-fuzz from rb.sh's synced
 src: don't rb.sh while one builds). Next: thin loft inward walls (live request 11-01 13:45), noshape's blends for
 the R-over-Rc vertex corners (the 12 "an arc the blend closes up" corpus cases; OCCT + exact_vertex_blends today).
+G31 (skasm audit, 16:00): kernel `mass_property_bounds` (props_bounds: fine vs coarse integration, t_props_coarse /
+props_eps), model `mass_property_variance`; live's format requested (REQUESTS core 15:30); psui wires the checkbox.
 **Sheet metal moved to skasm (lead 10-29 19:40):** model-core's sheet metal (crates/model-core/src/sheetmetal,
 regen/features/sheetmetal*.rs, the FS host's custom/host/sheetmetal.rs) and its Part Studio dialogs / table are
 skasm's now; see docs/handoff/skasm.md. skasm 10-30, touching core's files for sheet metal: Extrude / Revolve /

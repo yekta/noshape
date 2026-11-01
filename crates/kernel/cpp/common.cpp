@@ -989,6 +989,9 @@ bool is_valid(const OcShape& s)
   return a.IsValid();
 }
 
+// Props' second, coarser run (props_bounds): segments twice as long, OCCT's adaptive integrator 1000 times looser.
+thread_local bool t_props_coarse = false;
+
 namespace {
 
 // ---- integrals over faces that wrap a periodic surface more than once
@@ -1153,6 +1156,11 @@ std::vector<std::pair<gp_Pnt2d, gp_Pnt2d>> uv_gaps(const TopoDS_Face& face)
 // The face's moments by Green's formula: ∬ g du dv = ∮ G dv, G(u, v) = ∫ g du
 // from the face's lowest u (on a u-periodic surface whole periods once, then
 // the remainder). Segments: a sixteenth of a period, or half a knot span.
+double props_eps(double eps)
+{
+  return t_props_coarse ? eps * 1e3 : eps;
+}
+
 Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_XYZ())
 {
   const TopoDS_Face   f = TopoDS::Face(face.Oriented(TopAbs_FORWARD));
@@ -1170,8 +1178,9 @@ Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_
   const int    nvs = s.GetType() == GeomAbs_BSplineSurface ? s.NbVIntervals(GeomAbs_C2) : 4;
   const double ustep = step(uper, period, nus, s.FirstUParameter(), s.LastUParameter());
   const double vstep = step(vper, vper ? s.VPeriod() : 0, nvs, s.FirstVParameter(), s.LastVParameter());
-  const double ust   = std::min(ustep, std::max(u1 - u0, 1e-300) / 4) / 2; // halved: converged to 1e-7 relative on a threaded screw
-  const double vst   = std::min(vstep, std::max(v1 - v0, 1e-300) / 4) / 2;
+  const double coarse = t_props_coarse ? 2.0 : 1.0;
+  const double ust    = coarse * std::min(ustep, std::max(u1 - u0, 1e-300) / 4) / 2; // halved: converged to 1e-7 relative on a threaded screw
+  const double vst    = coarse * std::min(vstep, std::max(v1 - v0, 1e-300) / 4) / 2;
   const std::vector<double> ubreaks = surface_breaks(s, true), vbreaks = surface_breaks(s, false);
   const auto G = [&](double u, double v) {
     const double turns = uper ? std::floor((u - u0) / period) : 0;
@@ -1409,7 +1418,7 @@ GProp_GProps volume_props(const TopoDS_Shape& s)
   }
   // Analytic faces only: the adaptive integrator, whose error is controlled
   // there (a Ø6 hole through a Ø40 cylinder: plain Gauss −0.41 mm³).
-  BRepGProp::VolumeProperties(s, out, 1e-7, true);
+  BRepGProp::VolumeProperties(s, out, props_eps(1e-7), true);
   return out;
 }
 
@@ -1428,7 +1437,7 @@ GProp_GProps volume_props_precise(const TopoDS_Shape& s)
   for (TopExp_Explorer e(s, TopAbs_FACE); e.More(); e.Next())
     ++faces;
   GProp_GProps out;
-  BRepGProp::VolumeProperties(s, out, faces <= 1000 ? 1e-12 : 1e-10, true);
+  BRepGProp::VolumeProperties(s, out, props_eps(faces <= 1000 ? 1e-12 : 1e-10), true);
   return out;
 }
 
@@ -1457,7 +1466,7 @@ GProp_GProps surface_props(const TopoDS_Shape& s)
       wrapping.push_back(TopoDS::Face(it.Value()));
   out = GProp_GProps(gp::Origin());
   if (analytic.NbChildren())
-    BRepGProp::SurfaceProperties(analytic, out, 1e-7, true);
+    BRepGProp::SurfaceProperties(analytic, out, props_eps(1e-7), true);
   for (const TopoDS_Face& f : wrapping)
     out.Add(MomentProps(face_moments(f, false)));
   return out;
