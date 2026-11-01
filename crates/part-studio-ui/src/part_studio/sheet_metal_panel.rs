@@ -790,7 +790,9 @@ impl PartStudioView {
         let col_head = |t: u8, c: usize| if hover.is_some_and(|h| h.0 == t && h.2 == c && c > 0) { gpui_kit::rgb(0xd7d7d7) } else { head };
         let bend_head = h_flex().border_l_1().border_color(grid).children(bend_cols.iter().enumerate().map(|(c, (n, w))| {
             let label: SharedString = if *n == "Radius" { format!("Radius({unit})").into() } else { (*n).into() };
-            cell(*w, col_head(0, c), true, label, None)
+            // Live (qa5-sm-091): the header's tooltip spaces the unit out.
+            let tip = if *n == "Radius" { format!("Radius ({unit})") } else { n.replace("(deg)", " (deg)") };
+            cell(*w, col_head(0, c), true, label, None).tooltip(crate::ui::tooltip(tip))
         }));
         // Radius and K Factor: a double-click edits the value in place (live
         // (6): a 2 px #1651b0 outline, the number selected, no unit); Enter
@@ -890,7 +892,12 @@ impl PartStudioView {
                 .child(div().flex_1().truncate().child(text))
                 .child(crate::ui::glyph("ui-select-caret", 7., gpui_kit::rgb(0x333333)))
         };
-        let joint_head = h_flex().border_l_1().border_color(grid).child(cell(140., head, true, "Name".into(), None)).child(cell(140., col_head(1, 1), true, "Type".into(), None)).child(cell(140., col_head(1, 2), true, "Style".into(), None));
+        let joint_head = h_flex()
+            .border_l_1()
+            .border_color(grid)
+            .child(cell(140., head, true, "Name".into(), None).tooltip(crate::ui::tooltip("Name")))
+            .child(cell(140., col_head(1, 1), true, "Type".into(), None).tooltip(crate::ui::tooltip("Type")))
+            .child(cell(140., col_head(1, 2), true, "Style".into(), None).tooltip(crate::ui::tooltip("Style")));
         // Live (5e, 5f): custom lists, Type Bend | Rip, Style Edge joint |
         // Butt joint - Direction 1 | 2, the current one highlighted; a pick
         // is a Modify joint of the rip.

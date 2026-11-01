@@ -3774,6 +3774,8 @@ impl AssemblyView {
             .border_b_1()
             .border_color(pal.border)
             .cursor_pointer()
+            // Live (explode-step-dialog-edit).
+            .tooltip(crate::ui::tooltip("Explode step type"))
             .child(h_flex().w_full().child(div().flex_1().text_size(px(14.)).child(if rotation { "Rotation" } else { "Translation" })).child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., rgb(0x333333))))
             .os_dropdown_menu("se-kind-dd", true, move |mut menu, _, _| {
                 for (label, rot) in [("Translation", false), ("Rotation", true)] {

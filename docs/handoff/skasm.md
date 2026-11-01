@@ -415,6 +415,13 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   the Hem at ~1.1 s "at a88e8c29" most likely built stale sources (see the perf.sh request below): locally the same
   dev build gives the Hem 465 ms alone and 472–528 ms after the big fixtures, so no fixture effect.
 
+## 11-01 morning: SNAP-INSERT-FACE landed b311fa26; the whole-surface audit (user 11-01)
+docs/parity/audit-sketch-assembly.md: every live surface of sketch / assembly / sheet metal against ours (14 surfaces,
+9 gaps, 7 fixed in one commit: tooltips, the top row's fix-within texts). Tools: /root/skasm-scratch/audit/extract.py
+<dump> lists a dump's labels missing from our sources. Waiting on live: REQUESTS "sketch tool options whole dump"
+(then ask the exploded-views / named-positions menus per state for G6). Next: the sketch tool options once answered,
+a UI test pinning the assembly menus to live's dumps, G7 (vendor input clear-button tooltip).
+
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
 (standard content) → mates/assembly workflow gaps (all ✅, UNCONFIRMED all answered 10-27) → standard content.

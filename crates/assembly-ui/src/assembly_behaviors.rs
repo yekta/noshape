@@ -2341,7 +2341,7 @@ impl AssemblyView {
             .gap(px(12.))
             .child(
                 // Live assembly/752: the funnel turns blue while the filter has text.
-                Button::new("asm-filter-cmds").ghost().child(crate::assets::icon(if current.is_empty() { "filter" } else { "filter-active" }, 20., cx)).w(px(22.)).h(px(26.)).p_0().tooltip("Filter").os_dropdown_menu("asm-filter-cmds-dd", false, move |mut menu, _, _| {
+                Button::new("asm-filter-cmds").ghost().child(crate::assets::icon(if current.is_empty() { "filter" } else { "filter-active" }, 20., cx)).w(px(22.)).h(px(26.)).p_0().tooltip("Filter assembly contents").os_dropdown_menu("asm-filter-cmds-dd", false, move |mut menu, _, _| {
                     for c in FilterCommand::ALL {
                         let v = view.clone();
                         let current = current.clone();
@@ -2363,6 +2363,7 @@ impl AssemblyView {
             )
             .child(
                 div()
+                    .id("asm-filter-box")
                     .w(px(122.))
                     .flex_none()
                     .relative()
@@ -2373,6 +2374,8 @@ impl AssemblyView {
                     .border_1()
                     .border_color(gpui_kit::rgb(0xaaaaaa))
                     .rounded(px(3.))
+                    // Live (dom/assembly-lists): the box has the funnel's tooltip.
+                    .tooltip(crate::ui::tooltip("Filter assembly contents"))
                     .child(crate::ui::input_with_placeholder(&st, "Filter by name", cx).appearance(false).text_size(px(13.33)).pl(px(5.)))
                     .when(self.ui.filter_focused && self.ui.filter.is_empty(), |d| d.child(div().absolute().top(px(31.)).left_0().child(deferred(anchored().child(filter_help())).with_priority(2)))),
             )

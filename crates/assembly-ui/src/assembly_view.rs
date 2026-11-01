@@ -3827,7 +3827,19 @@ impl AssemblyView {
         // Live (A15): the root row highlights when it was clicked, not
         // whenever every instance happens to be selected.
         let all_selected = self.ui.root_selected && self.assembly(cx).is_some_and(|a| !a.instances.is_empty() && a.instances.iter().all(|i| self.selected.contains(&i.id)));
-        let grounded = self.assembly(cx).is_some_and(|a| !a.fixed_instances().is_empty());
+        // Live (behaviours 1222, 13414; locale table): the fix-within icon
+        // on the top row while something at this level is fixed.
+        let grounded = self.assembly(cx).and_then(|a| {
+            let fixed = a.fixed_instances().len();
+            let to_origin = a.mates.iter().any(|m| !m.suppressed && m.mate_type == MateType::Fastened && (m.a.is_origin() || m.b.is_origin()));
+            (fixed > 0).then_some(if fixed > 1 {
+                "More than one part inside is fixed"
+            } else if to_origin {
+                "Contains both fixed part(s) and part(s) fastened to origin"
+            } else {
+                "Part(s) inside are fixed"
+            })
+        });
         // Live (qa5 A19): the root row carries an error badge while a feature
         // (or the pattern being defined) is in error.
         let has_error = self.result.has_errors()
@@ -3861,7 +3873,7 @@ impl AssemblyView {
                 None => div().min_w_0().truncate().child(crate::ui::user_text(name)).into_any_element(),
             })
             // Grounded: something in the assembly is fixed (Onshape's arrow onto ground).
-            .when(grounded, |d| d.child(div().id("asm-grounded").flex_none().child(crate::assets::icon(&icon_path("list-grounded"), 20., cx)).tooltip(|w, cx| gpui_kit::component::tooltip::Tooltip::new("Assembly is grounded").build(w, cx))))
+            .when_some(grounded, |d, tip| d.child(div().id("asm-grounded").flex_none().child(crate::assets::icon(&icon_path("list-grounded"), 20., cx)).tooltip(crate::ui::tooltip(tip))))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.selected = this.assembly(cx).map(|a| a.instances.iter().filter(|i| a.generated_by(i.id).is_none()).map(|i| i.id).collect()).unwrap_or_default();
                 this.selected_mate = None;
@@ -4334,7 +4346,7 @@ impl AssemblyView {
                     h_flex()
                         .gap_1()
                         // New folder (around the selection, or empty).
-                        .child(Button::new("asm-new-folder").child(crate::assets::icon("new-folder", 20., cx)).ghost().w(px(24.)).h(px(24.)).p_0().tooltip("New folder").on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                        .child(Button::new("asm-new-folder").child(crate::assets::icon("new-folder", 20., cx)).ghost().w(px(24.)).h(px(24.)).p_0().tooltip("Create new folder").on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             let ids = this.selected.clone();
                             this.folder_from_instances(ids, window, cx);
                         }))),

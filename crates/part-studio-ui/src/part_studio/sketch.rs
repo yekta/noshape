@@ -1744,7 +1744,7 @@ impl PartStudioView {
                 .rounded(px(3.5))
                 .border_color(pal.border_strong)
                 .selected(cm_open || pi_open)
-                .tooltip("Sketch diagnostics tools")
+                .tooltip("Show sketch diagnostics tools")
                 .dropdown_menu(move |m, _, _| {
                     let (v1, v2) = (view.clone(), view.clone());
                     m.item(PopupMenuItem::new(if pi_open { "Turn profile inspector off" } else { "Profile inspector…" }).on_click(move |_, _, cx| v1.update(cx, |this, cx| this.toggle_profile_inspector(cx))))

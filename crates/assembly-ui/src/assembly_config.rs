@@ -263,6 +263,8 @@ impl AssemblyView {
             .hover(|d| d.bg(pal.panel_hover))
             .child(crate::assets::icon("cfg-filter-list", 20., cx))
             .child(div().text_size(px(14.)).text_color(pal.text).child("Configure Assembly"))
+            // Live (dom/assembly-panel-configuration).
+            .tooltip(crate::ui::tooltip("Add configuration input to create multiple variants of this assembly"))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_asm_config_input("List", cx)));
         let caret = div()
             .id("acfg-configure-more")
