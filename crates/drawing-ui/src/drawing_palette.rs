@@ -494,7 +494,8 @@ impl DrawingEditor {
                 .gap(px(4.))
                 .h(px(54.))
                 .child(field(&d.prefix, Some(80.), 54.))
-                .child(menu_tall("dp-count", small(format!("{n}{}", self.drawing.props.hole_indicator)), 104., counts))
+                // Live drawing-hole-callout-panel: "Count type: <type>".
+                .child(div().id("dp-count-tip").tooltip(crate::ui::tooltip(format!("Count type: {}", opts.count.name()))).child(menu_tall("dp-count", small(format!("{n}{}", self.drawing.props.hole_indicator)), 104., counts)))
                 .child(v_flex().w(px(145.)).h(px(54.)).px(px(10.)).justify_center().rounded(px(2.)).bg(gpui_kit::rgb(0xe8e8e8)).text_size(px(12.)).text_color(gpui_kit::rgb(0x8a8a8a)).children(preview))
                 .child(menu_tall("dp-units", small(unit_label), 58., unit_items))
                 .child(field(&d.suffix, Some(80.), 54.))
@@ -519,7 +520,8 @@ impl DrawingEditor {
                 .h(px(32.))
                 .child(field(&d.prefix, Some(80.), 30.))
                 .child(value_combo)
-                .child(pbutton("dp-tol", tol_icon, 45., tol_items.clone(), false))
+                // Live drawing-hole-callout-panel: "Tolerance: <type>".
+                .child(div().id("dp-tol-tip").tooltip(crate::ui::tooltip(format!("Tolerance: {tol}"))).child(pbutton("dp-tol", tol_icon, 45., tol_items.clone(), false)))
                 .child(pbutton("dp-units", div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(ink).child(unit_label).into_any_element(), 60., unit_items, false))
                 .child(field(&d.suffix, Some(80.), 30.))
         };

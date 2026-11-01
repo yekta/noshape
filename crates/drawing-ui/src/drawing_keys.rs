@@ -210,6 +210,10 @@ impl DrawingEditor {
         let at = self.shortcut_toolbar?;
         let shown = noshape_ops::prefs::ToolbarPrefs::load().drawing_shortcut_tools(&DEFAULT_SHORTCUT_TOOLS);
         let mut row = gpui_kit::component::h_flex().w(px(175.)).flex_wrap().px(px(2.));
+        // Live drawing-shortcut-toolbar: an emptied toolbar says so.
+        if !SHORTCUT_CATALOGUE.iter().any(|t| shown.iter().any(|n| n == t.0)) {
+            row = row.child(div().p(px(8.)).text_size(px(12.)).text_color(rgb(0x888888)).child("No tools added"));
+        }
         for &(name, icon, act) in SHORTCUT_CATALOGUE.iter().filter(|t| shown.iter().any(|n| n == t.0)) {
             row = row.child(
                 div()
