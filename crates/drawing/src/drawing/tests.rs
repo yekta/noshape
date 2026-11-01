@@ -4561,3 +4561,16 @@ fn sketch_driven_dimensions_take_their_color() {
     let ti = built.geometry.texts.iter().position(|t| t.pick == p).expect("its value");
     assert!(built.geometry.colors.iter().any(|c| c.texts.contains(&ti) && c.rgb == [10, 200, 30]), "{:?}", built.geometry.colors);
 }
+
+/// MBD status › Characteristics (live request 1721): a missing dimension's
+/// Type, Nominal Value, Tolerance and limits; "--" without a tolerance.
+#[test]
+fn mbd_characteristic_cells() {
+    use crate::annotations::{Annotation as ModelAnnotation, AnnotationKind as ModelKind, Measure};
+    let dim = |measure, tolerance| ModelAnnotation { id: 1, kind: ModelKind::Dimension { measure, refs: vec![], tolerance }, face: crate::reference::Reference::Origin, at: [0.0; 3], normal: [0.0, 0.0, 1.0], up: [0.0, 1.0, 0.0], offset: None };
+    let sym = crate::fits::Tolerance { kind: "Symmetrical".into(), upper: "0.1 mm".into(), lower: "0.1 mm".into(), precision: Some(1), fit: None };
+    assert_eq!(mbd::characteristic_cells(&dim(Measure::Distance, sym), Some(30.0)).unwrap(), ["Distance", "30.0", "±0.1", "30.1", "29.9"]);
+    assert_eq!(mbd::characteristic_cells(&dim(Measure::Radius, Default::default()), Some(3.0)).unwrap(), ["Fillet radius", "3.000", "--", "--", "--"]);
+    let dev = crate::fits::Tolerance { kind: "Deviation".into(), upper: "0.2".into(), lower: "0.05".into(), precision: Some(2), fit: None };
+    assert_eq!(mbd::characteristic_cells(&dim(Measure::Distance, dev), Some(10.0)).unwrap(), ["Distance", "10.00", "+0.20 / -0.05", "10.20", "9.95"]);
+}

@@ -64,6 +64,19 @@ impl DrawingEditor {
         }
     }
 
+    /// A missing MBD dimension's Characteristics cells, its nominal value
+    /// measured on a source of its Part Studio (shown in some view).
+    pub fn mbd_characteristic(&self, r: &mbd::MbdRow, cx: &App) -> Option<[String; 5]> {
+        let doc = &self.doc.read(cx).session.doc;
+        let Some(noshape_model::document::TabContent::PartStudio(ps)) = doc.tab(r.tab).map(|t| &t.content) else { return None };
+        let m = ps.annotations.iter().find(|m| m.id == r.id)?;
+        let value = self.sources.iter().find(|(k, _)| k.tab == r.tab && k.version.is_none()).and_then(|(_, s)| mbd::measure(&s.context, m)).map(|(_, v)| match &m.kind {
+            noshape_model::annotations::AnnotationKind::Dimension { measure: noshape_model::annotations::Measure::Angle, .. } => v.to_degrees(),
+            _ => v * 1000.0,
+        });
+        mbd::characteristic_cells(m, value)
+    }
+
     /// The MBD status icon's badge (live drawing/1079, 1081): a green ✓ when
     /// every requirement is shown, a red "!" when some aren't; none without
     /// MBD requirements.

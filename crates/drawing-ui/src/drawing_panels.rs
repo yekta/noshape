@@ -346,31 +346,39 @@ impl DrawingEditor {
         let header = |cells: &[&'static str]| {
             h_flex().h(px(30.)).bg(gpui_kit::rgb(0xf5f5f5)).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).children(cells.iter().map(|c| div().w(px(140.)).px(px(3.)).text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x333333)).child(*c)))
         };
+        // Missing datums in Datums (Name), missing dimensions in
+        // Characteristics (Type, Nominal Value, Tolerance, Upper / Lower
+        // Limit; live request 1721), each grey with right-click › Show.
         let mut datums = v_flex().child(header(&["Name"]));
+        let mut chars = v_flex().child(header(&["Type", "Nominal Value", "Tolerance", "Upper Limit", "Lower Limit"]));
         for r in &missing {
             let (tab, id) = (r.tab, r.id);
-            datums = datums.child(
-                h_flex()
-                    .id(SharedString::from(format!("mbd-row-{}-{id}", tab.0)))
-                    .h(px(34.))
-                    .px(px(3.))
-                    .border_b_1()
-                    .border_color(gpui_kit::rgb(0xeeeeee))
-                    .text_size(px(13.))
-                    .text_color(gpui_kit::rgb(0x999999))
-                    .hover(|d| d.bg(gpui_kit::rgb(0xf0f0f0)))
-                    .child(crate::ui::user_text(r.name.clone()))
-                    .on_mouse_down(
-                        MouseButton::Right,
-                        cx.listener(move |_, e: &MouseDownEvent, window, cx| {
-                            cx.stop_propagation();
-                            let ed = cx.entity();
-                            let entries = vec![MenuEntry::item("Show", move |t, _, cx| t.show_model_annotation(tab, id, cx))];
-                            let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
-                            crate::os_menu::open(e.position, menu, window, cx);
-                        }),
-                    ),
-            );
+            let cells: Vec<String> = if r.dimension { self.mbd_characteristic(r, cx).map(Vec::from).unwrap_or_else(|| vec![r.name.clone()]) } else { vec![r.name.clone()] };
+            let row = h_flex()
+                .id(SharedString::from(format!("mbd-row-{}-{id}", tab.0)))
+                .h(px(34.))
+                .px(px(3.))
+                .border_b_1()
+                .border_color(gpui_kit::rgb(0xeeeeee))
+                .text_size(px(13.))
+                .text_color(gpui_kit::rgb(0x999999))
+                .hover(|d| d.bg(gpui_kit::rgb(0xf0f0f0)))
+                .children(cells.into_iter().map(|c| div().w(px(140.)).px(px(3.)).child(crate::ui::user_text(c))))
+                .on_mouse_down(
+                    MouseButton::Right,
+                    cx.listener(move |_, e: &MouseDownEvent, window, cx| {
+                        cx.stop_propagation();
+                        let ed = cx.entity();
+                        let entries = vec![MenuEntry::item("Show", move |t, _, cx| t.show_model_annotation(tab, id, cx))];
+                        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
+                        crate::os_menu::open(e.position, menu, window, cx);
+                    }),
+                );
+            if r.dimension {
+                chars = chars.child(row);
+            } else {
+                datums = datums.child(row);
+            }
         }
         let message: (&str, Option<&str>) = if rows.is_empty() {
             ("Add dimensions and annotations to build an MBD status table.", Some("An MBD status table reveals all the MBD requirements within the document."))
@@ -387,7 +395,7 @@ impl DrawingEditor {
             .child(section("Datums").mt(px(5.)))
             .when(!rows.is_empty(), |d| d.child(datums))
             .child(section("Characteristics").mt(px(5.)))
-            .when(!rows.is_empty(), |d| d.child(header(&["Type", "Nominal Value", "Tolerance", "Upper Limit", "Lower Limit"])))
+            .when(!rows.is_empty(), |d| d.child(chars))
             .child(
                 v_flex()
                     .m(px(5.))

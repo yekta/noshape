@@ -414,6 +414,28 @@ pub struct MbdRow {
     pub name: String,
     /// Shown in some view of the drawing.
     pub visible: bool,
+    /// A dimension (the Characteristics table), else a datum (Datums).
+    pub dimension: bool,
+}
+
+/// An MBD dimension's Characteristics cells: Type, Nominal Value,
+/// Tolerance, Upper Limit, Lower Limit (`value` in mm or degrees; live
+/// request 1721: "Distance 30.0 · ±0.1 · 30.1 · 29.9", "Radius 3.000 · --
+/// · -- · --").
+pub fn characteristic_cells(m: &ModelAnnotation, value: Option<f64>) -> Option<[String; 5]> {
+    let ModelKind::Dimension { measure, tolerance: t, .. } = &m.kind else { return None };
+    let places = t.precision.map_or(3, usize::from);
+    let num = |x: f64| format!("{x:.places$}");
+    let dev = |s: &str| s.trim().trim_end_matches("mm").trim_end_matches("deg").trim_end_matches('°').trim().parse::<f64>().unwrap_or(0.0);
+    let (u, l) = (dev(&t.upper), dev(&t.lower));
+    let none = || "--".to_string();
+    let (tol, upper, lower) = match (t.kind.as_str(), value) {
+        ("Symmetrical", Some(v)) => (format!("±{}", num(u)), num(v + u), num(v - u)),
+        ("Deviation" | "Limits", Some(v)) => (format!("+{} / -{}", num(u), num(l)), num(v + u), num(v - l)),
+        ("Min" | "Max" | "Basic", _) => (t.kind.clone(), none(), none()),
+        _ => (none(), none(), none()),
+    };
+    Some([measure.label().to_string(), value.map_or_else(none, num), tol, upper, lower])
 }
 
 /// The MBD datums of the Part Studios the drawing's views show (all sheets,
@@ -443,7 +465,7 @@ pub fn mbd_rows(drawing: &Drawing, doc: &Document, sheet: Option<usize>) -> Vec<
             let visible = drawing.sheets.iter().any(|s| {
                 s.annotations.iter().any(|a| a.model.as_ref().is_some_and(|r| r.tab == tab && r.id == m.id && !r.hidden && s.view(r.view).is_some_and(|v| v.model_annotations)))
             });
-            out.push(MbdRow { tab, id: m.id, name, visible });
+            out.push(MbdRow { tab, id: m.id, name, visible, dimension: matches!(m.kind, ModelKind::Dimension { .. }) });
         }
     }
     out
