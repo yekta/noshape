@@ -1079,6 +1079,19 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## RUST-MIRROR-GPF-DELTA looked at (11-01 17:10 UTC)
+- qa's tickets/cli-shell-gpf.noshape recorded with OCCT and replayed through ours (vibe4 bool-corpora gpf): the
+  Part mirror's fuse (49eaef95) is where the volume parts: ours 3.252513298621e-5 m³, OCCT's 3.252511742304e-5
+  (+0.0156 mm³, qa's delta), same 26 faces. The one face that differs is the overlap's face at y = -1 mm: OCCT's result
+  isn't symmetric (that face 1.362608e-3 m² on one side, its mirror image 1.362611e-3 on the other: the curve on it of
+  a tolerant arc edge (4.6e-5) ends 2 um off at one side only); ours is 1.362611e-3 on both sides. So the volume delta is
+  OCCT's asymmetry; ours is the symmetric result. The face count qa saw downstream (24 against 26) comes from a Shell
+  slab fuse (ba295710) that unify merges further on ours (26 / 65 against 29 / 69 before the mirror): no live value for
+  this fuzz document to say which is right; left.
+- Also taken earlier the same way: the RUST-SHELL-2AFC and fuzz-1144 cases below. For qa: re-run seeds 979, 1036,
+  1112 (clean here, no panics, on a CLI of 52fc54ec + the shell fix), 1144 (still dies: op_prism, below) and the
+  Shell 6 ticket on the next green.
+
 ## Fuzz seed 1144: two invalid results of ours (11-01 16:40 UTC)
 - Seed 1144 (qa's CLI fuzz) dies at step 51 with noshape's Boolean on (stack smashing on vibe4, a segfault in OCCT's
   BOPAlgo_PaveFiller::UpdateExistingPaveBlocks inside a Shell's slab Boolean under gdb), clean with it off. Its
@@ -1502,6 +1515,12 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   other threads (FreeIfCancelled, kernel Shape drops): nothing changes unless the thread is cancelled.
 
 ## Requests
+- core (11-01 17:10 UTC): fuzz seed 1144 dies at step 51 (a suppress) with noshape's Boolean on, after every recorded
+  Boolean of ours in the run is valid: "stack smashing detected" in op_prism (features.cpp, a sheet metal extrude's
+  prism during the regeneration), trace on vibe4 ~/bool-fuzz/cli/err-1144tr.log (NOSHAPE_GUARD_TRACE=1), binary
+  ~/bool-fuzz/noshape-cli-fix3 (symbols), runner ~/bool-fuzz/clifuzz_time.py (`python3 clifuzz_time.py 1144 62` with
+  NSCLI set). Clean with NOSHAPE_BOOL_RUST=0. Its profile likely comes from a result of ours that is valid but
+  differs from OCCT's (b997c4c3, 0.036 % in volume); the stack smash itself is in OCCT's prism code.
 - core (10-31 16:40 UTC, P0 SHELL-SLOW): Shell's slab union is OCCT's for concave parts, 1.5-2.3 s of a 2.6-3.4 s
   Shell: a 60 x 40 x 20 block, a 40 x 20 x 10 pocket from the top with R2 on its 4 floor edges, shell with the
   bottom removed, 1 / 2 mm (18 slabs: planes' boxes, the fillets' cylinder shells, filler prisms at the concave
