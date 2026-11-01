@@ -125,6 +125,12 @@ deadlock in malloc).
   the 90° creases); ~0.3 s (the split 0.15 s). Next: (b) Trim ends ☐: live's 8 ruled caps (neighbouring outer faces
   must end at one mitre point per end: fix the rows at the profiles there); inward (concave mitres).
 - History: parked branches wip/core-thinloft / wip/core-thinloft2 (Boolean versions: 6 s) can go.
+- (b) 11-01 10:30: `trim_ends` false: rows w 0 … 1 (no plane cut), per face and profile a cap BRepFill::Face(the
+  face's iso at the profile's ruling, the outer face's end row), sewn with the loft and outer faces: 1368.493 vs live
+  1368.571, 16 faces, live's top and box. The profile curve from the face's iso, not the edge: the scaled sheet's
+  edges keep the scale in their location, which OCCT applies to the curve but not to its parameter range (a 13 mm
+  side of the 20 mm square). Tangent continuation past the creases tried: (a) +0.046 against −0.021; kept the
+  polynomial.
 
 ## THIN-LOFT-TRIM-ENDS (P2), parked 11-01 02:40 (branch wip/core-thinloft2, local only)
 - Live (a) (Trim ends, outward 1 mm, square 20 → Ø16): the loft sheet offset along its normals, the offset faces

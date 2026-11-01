@@ -209,6 +209,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the profile planes, built directly (kernel thicken_loft_out, ~0.3 s; OCCT Booleans of the offset faces took 6 s):
   1370.084 mm³ (live 1370.105), 10 faces, live's box. T1 engine::thin_loft_square_to_circle_is_the_offset_surface_as_
   live. Left: (b) Trim ends ☐ (live's 8 ruled end caps), (c) / (d), inward walls: the profiles' offsets lofted as before.
+  core 11-01 10:30: (b) Trim ends ☐ built the same way, the outer faces ending at the profiles' rulings and each end
+  a cap ruled from the profile edge to its offset row: 1368.493 mm³ (live 1368.571), 16 faces, z 0 … 20.293575 (live
+  20.293574), x / y ±10.995037 (live 10.994825); caps 20.9736 / 13.3413 (live 20.9704 / 13.3412), outer faces 359.650
+  (live 359.707: Parasolid continues the faces past the creases between our polynomial and tangent continuations).
+  T1 engine::thin_loft_square_to_circle_is_the_offset_surface_as_live covers both. Left: (c) Thickness 2, (d) three
+  profiles, inward walls.
   thinLoft thickens with the first / last profiles' planes as the side faces (opThicken sideGeometryRule SUPPLIED), so
   the wall ends lie on those planes. Ours thickens the sheet with ends normal to it: the ADV2 square → Ø16 loft, Thin 1 mm
   runs z 0 … 20.29 and falls short of z 0 on its other side (main CLI, skasm-scratch/feat/thinloft.py). Two kernel

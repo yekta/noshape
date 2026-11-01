@@ -484,19 +484,24 @@ fn thin_loft_square_to_circle_is_the_offset_surface_as_live() {
         v.set("wireProfileEntities", q(vec![Reference::Sketch(s)]));
         v
     };
-    let mut t = T::new();
-    let a = t.sketch(Reference::Plane(DatumPlane::Top), rect(-0.01, -0.01, 0.01, 0.01));
-    let p20 = t.top_plane("20 mm");
-    let b2 = t.sketch(Reference::FeaturePlane(p20), circle(DVec2::ZERO, 0.008));
-    t.add("loft", &[("bodyType", en("THIN")), ("wireProfilesArray", ParamValue::Array(vec![item(a), item(b2)])), ("thickness1", e("1 mm"))]);
-    let res = t.ok();
-    let body = res.context.bodies.iter().find(|b| b.kind == BodyKind::Solid).unwrap();
-    let v = total_volume(&res.context) * 1e9;
-    let bb = body.shape.bounding_box(true).unwrap();
-    assert!((v - 1370.1046656).abs() < 0.03, "{v} mm³");
-    assert_eq!(body.shape.faces().len(), 10);
-    assert!(bb.min.z.abs() < 1e-7 && (bb.max.z - 0.02).abs() < 1e-7, "{bb:?}");
-    assert!((bb.max.x - 0.011028116).abs() < 2e-6 && (bb.max.y - 0.011028116).abs() < 2e-6, "{bb:?}");
+    // (Trim ends, live volume and our band, faces, top, x / y extent): (a) cut by the profile planes; (b) ruled
+    // end caps, the top past its plane (1368.493: its outer faces 359.650 against live's 359.707 each, Parasolid
+    // continuing the faces past the creases differently, its caps 20.9736 / 13.3413 against 20.9704 / 13.3412).
+    for (trim, want, band, faces, top, xy) in [(true, 1370.1046656, 0.03, 10, 0.02, 0.011028116), (false, 1368.5713598, 0.1, 16, 0.020293574, 0.010994825)] {
+        let mut t = T::new();
+        let a = t.sketch(Reference::Plane(DatumPlane::Top), rect(-0.01, -0.01, 0.01, 0.01));
+        let p20 = t.top_plane("20 mm");
+        let b2 = t.sketch(Reference::FeaturePlane(p20), circle(DVec2::ZERO, 0.008));
+        t.add("loft", &[("bodyType", en("THIN")), ("wireProfilesArray", ParamValue::Array(vec![item(a), item(b2)])), ("thickness1", e("1 mm")), ("trimEnds", ParamValue::Bool(trim))]);
+        let res = t.ok();
+        let body = res.context.bodies.iter().find(|b| b.kind == BodyKind::Solid).unwrap();
+        let v = total_volume(&res.context) * 1e9;
+        let bb = body.shape.bounding_box(true).unwrap();
+        assert!((v - want).abs() < band, "trim {trim}: {v} mm³");
+        assert_eq!(body.shape.faces().len(), faces, "trim {trim}");
+        assert!(bb.min.z.abs() < 1e-7 && (bb.max.z - top).abs() < 2e-6, "trim {trim}: {bb:?}");
+        assert!((bb.max.x - xy).abs() < 2e-6 && (bb.max.y - xy).abs() < 2e-6, "trim {trim}: {bb:?}");
+    }
 }
 
 /// A thin loft between two open L-shaped chains (10 + 10 mm legs, 20 mm

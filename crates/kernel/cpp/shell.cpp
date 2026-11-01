@@ -3169,6 +3169,8 @@ void ruled_d1(const RuledFace& f, double s, double w, gp_Pnt& P, gp_Vec& Ds, gp_
 {
   const double ss  = f.flip_s ? 1 - s : s;
   const double prm = f.p0 + (f.p1 - f.p0) * ss;
+  // (Past the face's ends: the end spans' polynomials continued. Along the end tangents instead, live (a) came
+  // out 0.046 mm³ over, against 0.021 under: Parasolid continues them between the two.)
   gp_Pnt       A, B;
   gp_Vec       Ap, Ar, Bp, Br;
   if (f.ruling_in_v)
@@ -3214,9 +3216,11 @@ bool ruled_normal(const RuledFace& f, double s, double w, gp_Vec& n)
 // offsets lofted were 0.15 % over). Built directly (OCCT's Booleans of the offset faces took 6 s): each ruled loft
 // face's offset, continued past its rulings in its tangent plane to the mitre with its neighbour's (exact for
 // planes), as a B-spline through rows of its points past both planes (neighbours share their mitre columns), cut by
-// the planes; the planar rings and the loft's faces close it. Two-profile ruled lofts whose faces turn outward
-// about the profiles' axis only; an error otherwise.
-OpOut op_thicken_loft_out(const OcShape& sheet_in, double t_in, const PlaneF& p0, const PlaneF& p1)
+// the planes; the planar rings and the loft's faces close it. Without Trim ends (live (b): 16 faces) the offsets
+// end at the profiles' rulings and each end is a cap ruled from the profile edge to its offset row (the wall's end
+// normal to it, the top past its plane). Two-profile ruled lofts whose faces turn outward about the profiles' axis
+// only; an error otherwise.
+OpOut op_thicken_loft_out(const OcShape& sheet_in, double t_in, const PlaneF& p0, const PlaneF& p1, bool trim_ends)
 {
   require_non_null(sheet_in.shape, "sheet");
   if (!(t_in > 0))
@@ -3375,7 +3379,7 @@ OpOut op_thicken_loft_out(const OcShape& sheet_in, double t_in, const PlaneF& p0
   // points keep the iso-parametric interpolation from waving; the fit is checked below).
   const int J = 24, N = 40, K = 6 * N;
   const double margin = 2 * t / c0.Distance(c1) + 0.02;
-  const double wlo = -margin, whi = 1 + margin;
+  const double wlo = trim_ends ? -margin : 0.0, whi = trim_ends ? 1 + margin : 1.0;
   // Where the faces' offsets, continued past their rulings (the profile curves' end spans continued), meet: for
   // face `f`'s row w, its s there and the other face's (s, w) (Newton from the tangent planes' mitre); faces
   // tangent at the crease meet on its offset.
@@ -3501,6 +3505,67 @@ OpOut op_thicken_loft_out(const OcShape& sheet_in, double t_in, const PlaneF& p0
     outer.push_back(BRepBuilderAPI_MakeFace(fit.Surface(), tol).Face());
   }
   lap("outer faces");
+  if (!trim_ends)
+  {
+    // The ends: per face and profile, ruled from the profile edge to the outer face's row there (their starts
+    // matched); neighbouring caps meet on the line from the profile's vertex to the mitre point.
+    BRepBuilderAPI_Sewing sew(1e-5);
+    for (int i = 0; i < nf; ++i)
+    {
+      const RuledFace& f = fs[order[i]];
+      sew.Add(f.face);
+      sew.Add(outer[(size_t)i]);
+      const occ::handle<Geom_Surface> os = BRep_Tool::Surface(outer[(size_t)i]);
+      double                          ou0, ou1, ov0, ov1;
+      os->Bounds(ou0, ou1, ov0, ov1);
+      for (const auto& [r, v] : {std::pair{f.r0, ov0}, std::pair{f.r1, ov1}})
+      {
+        // The profile edge: the face's iso at the profile's ruling parameter (the edges' own curves carry the
+        // working scale in their location, which OCCT applies to the curve but not to its parameters).
+        occ::handle<Geom_Curve> pc  = new Geom_TrimmedCurve(f.ruling_in_v ? f.s->VIso(r) : f.s->UIso(r), f.p0, f.p1);
+        occ::handle<Geom_Curve> row = new Geom_TrimmedCurve(os->VIso(v), ou0, ou1);
+        if (pc->Value(pc->FirstParameter()).Distance(row->Value(ou0)) > pc->Value(pc->LastParameter()).Distance(row->Value(ou0)))
+          pc = pc->Reversed();
+        const TopoDS_Face cap = BRepFill::Face(BRepBuilderAPI_MakeEdge(pc).Edge(), BRepBuilderAPI_MakeEdge(row).Edge());
+        if (cap.IsNull())
+          fail_op("thicken loft: an end cap failed");
+        sew.Add(cap);
+      }
+    }
+    sew.Perform();
+    lap("sewn");
+    TopoDS_Shell shell;
+    int          shells = 0;
+    for (TopExp_Explorer x(sew.SewedShape(), TopAbs_SHELL); x.More(); x.Next(), ++shells)
+      shell = TopoDS::Shell(x.Current());
+    if (dbg)
+      std::fprintf(stderr, "thicken loft: %d shells, closed %d, free edges %d\n", shells, shells == 1 && BRep_Tool::IsClosed(shell), sew.NbFreeEdges());
+    if (shells != 1 || !BRep_Tool::IsClosed(shell))
+      fail_op("thicken loft: the wall not closed");
+    BRepBuilderAPI_MakeSolid ms(shell);
+    TopoDS_Solid             r = TopoDS::Solid(ms.Shape());
+    BRepLib::OrientClosedSolid(r);
+    if (dbg)
+    {
+      BRepCheck_Analyzer an(r);
+      std::fprintf(stderr, "thicken loft: valid %d, volume %g\n", an.IsValid(), volume_of(r));
+      for (TopExp_Explorer x(r, TopAbs_FACE); x.More(); x.Next())
+      {
+        GProp_GProps g;
+        BRepGProp::SurfaceProperties(x.Current(), g);
+        Bnd_Box bb;
+        BRepBndLib::AddOptimal(x.Current(), bb, false, false);
+        double x0, y0, z0, x1, y1, z1;
+        bb.Get(x0, y0, z0, x1, y1, z1);
+        std::fprintf(stderr, "  face area %.7f box (%.6f %.6f %.6f)-(%.6f %.6f %.6f)\n", g.Mass(), x0, y0, z0, x1, y1, z1);
+      }
+    }
+    if (!BRepCheck_Analyzer(r).IsValid())
+      fail_op("thicken loft: the wall came out invalid");
+    lap("solid");
+    HHist h;
+    return make_result({sheet_in.shape}, sc.unscale(r, h), nullptr);
+  }
   // The outer faces cut by the planes: the pieces between.
   BRepBuilderAPI_Sewing tube_sew(1e-5);
   for (const TopoDS_Face& f : outer)
