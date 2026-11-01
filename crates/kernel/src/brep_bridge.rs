@@ -365,7 +365,15 @@ pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: b
 }
 
 /// `r` for the C++ side.
-fn fill_result(r: noshape_brep::Output, out: &mut BrepResult) {
+fn fill_result(mut r: noshape_brep::Output, out: &mut BrepResult) {
+    // (A face's edges inside it: one more loop of them, its last, said so.)
+    out.face_inner = vec![0; r.body.faces.len()];
+    for (f, inner) in std::mem::take(&mut r.face_internal).into_iter().enumerate() {
+        if !inner.is_empty() {
+            r.body.faces[f].loops.push(inner);
+            out.face_inner[f] = 1;
+        }
+    }
     flat(&r.body, &mut out.body);
     out.vertex_origin = origins(&r.vertex_origin);
     out.edge_origin = origins(&r.edge_origin);

@@ -357,6 +357,8 @@ pub(crate) mod ffi {
         ellipse_faces: Vec<u32>,
         /// Per edge, the section (`brep_occt_sections`' id) it is a piece of; u32::MAX: none.
         edge_section: Vec<u32>,
+        /// Per face, 1 where its last loop is the edges inside it (OCCT's INTERNAL edges), not a boundary.
+        face_inner: Vec<u8>,
         history: Vec<u32>,
     }
 

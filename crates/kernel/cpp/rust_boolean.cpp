@@ -1204,8 +1204,11 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     // The face's way round against its surface's normal (to_body: a left-handed cylinder's or cone's is
     // inward).
     const bool rev = b.reversed[i] != (round && !frame.Direct());
+    const bool inner_loop = i < r.face_inner.size() && r.face_inner[i] != 0;
     if (kind == 0)
     {
+      if (inner_loop)
+        return "an edge inside an unchanged face";
       // A cut's tool face is the result's the other way round.
       fs[i] = (src.Orientation() == TopAbs_REVERSED) == rev ? src : TopoDS::Face(src.Reversed());
       continue;
@@ -1426,6 +1429,14 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       TopoDS_Wire w;
       bb.MakeWire(w);
       const uint32_t u0 = b.loop_uses[l], u1 = b.loop_uses[l + 1];
+      // (The edges inside it: INTERNAL, as OCCT's builder leaves an edge ending inside a face.)
+      if (inner_loop && l + 1 == b.face_loops[i + 1])
+      {
+        for (uint32_t k = u0; k < u1; ++k)
+          bb.Add(w, es[b.uses[k] / 2].Oriented(TopAbs_INTERNAL));
+        bb.Add(f, w);
+        continue;
+      }
       // (A loop through one vertex twice, no edge twice (a hole touching the boundary at a point): on a reversed
       // face its edges in the other order too, so that each starts where the one before ends, as OCCT's; a
       // simple loop either way.)

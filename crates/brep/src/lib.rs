@@ -274,6 +274,9 @@ pub struct Output {
     /// Per degenerate edge that is a piece of a cone's apex, its angles about the cone's axis (as its face's
     /// parameter plane has them: `face_u0`'s); empty, or NaN for any other edge.
     pub edge_apex: Vec<[f64; 2]>,
+    /// Per face, the edges inside it (ending inside it, material both sides: OCCT's INTERNAL edges); empty, or empty
+    /// for each face, where none is.
+    pub face_internal: Vec<Vec<Use>>,
     pub history: Vec<Record>,
 }
 

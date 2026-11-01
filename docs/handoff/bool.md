@@ -1079,6 +1079,24 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Edges ending inside a face: INTERNAL edges in our result (11-01 07:07 UTC, lead)
+- OCCT's builder leaves an edge that ends inside a face (a tool's edge touching another's face) in that face as an
+  INTERNAL edge. Ours now does the same:
+  - the arrangement's regions record such curves (`Region::inner`, those with the region on both sides);
+  - a piece keeps them (`Piece::inner`); they come out of its loops into `Output::face_internal`;
+  - the bridge passes them as each face's last loop, flagged (`BrepResult::face_inner`);
+  - the C++ builder adds them to the face as INTERNAL edges, their curves on it made as for the face's other edges.
+  - They don't count as boundary uses in the manifold checks.
+  - Coincident pieces with them: the kept one's (both split alike).
+- T1 bool_patterns::edges_ending_inside_a_face_stay_in_it (tests/data/booleans/5fc0970a688d0fb9, 12 slabs fused on
+  a plate): taken, OCCT's faces and edges, an INTERNAL edge.
+- Replays why30 (with the tooth-15° rule): 3 more taken in every set but the main corpus (30afb30c, 5fc0970a,
+  b96876ba), all equivalent, 0 differ. Their face records are OCCT's. Open: 80–116 vertex records differ. OCCT says
+  the slabs' corner vertices are Deleted, ours Modified (to a vertex at the same place); to look at.
+- Still "an edge ends inside a face" before, now "a non-manifold result" (12 cases): near-tangent geometry where a
+  tilted plane's ellipse meets a cylinder's end circle (a 2.7 µm arc used on one side only), and a 1.5 µm edge at a
+  chamfer corner. Not the internal edges.
+
 ## The user's P0: the B94.6 Diamond knurl at 45° / 45° (11-01 02:25 UTC)
 - Live (request 1687): OK, 95473.389 mm³, 17762 faces, 114 s. Ours failed "non-manifold": noshape's Boolean declined
   (a non-manifold result) and OCCT's path took 324–391 s and came out non-manifold on the user's machine.
@@ -1159,6 +1177,7 @@ NOSHAPE_BREP_WHY="" replay of every set: /root/bool-scratch/why2N.sh).
 | three arguments' coincident edges (why21, 18:16) | 80.7 % | 54.0 % | 89.6 % | 16–48 % |
 | coincident pieces, curves along boundaries, equivalents (why22, 20:36; tolerances not in it) | 82.5 % | 70.9 % | 89.8 % | 50–70 % |
 | per-vertex and per-edge tolerances (why23, 21:17) | 82.8 % | 71.3 % | 89.8 % | 51–72 % |
+| knurl paves and slivers (OCCT's vertex rule), INTERNAL edges (why30, 11-01 07:00) | 83.3 % | 73.6 % | 89.8 % | 51–73 % |
 
 ## Coincident pieces OCCT's way; tolerant vertices; curves along a boundary (10-31 20:59 UTC)
 - A vertex inside coincident edges of two other arguments no longer declines where nothing is exact: Modified as

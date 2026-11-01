@@ -208,6 +208,24 @@ fn the_b94_knurl_is_cut_by_noshapes_boolean() {
     assert!(r.shape.is_valid());
 }
 
+/// A fuse whose tools' edges end inside a face (12 slabs on a plate, recorded): noshape's Boolean takes it, the
+/// edges in the result's faces as OCCT's builder leaves them (INTERNAL), its faces and edges as OCCT's.
+#[test]
+fn edges_ending_inside_a_face_stay_in_it() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "5fc0970a688d0fb9").expect("the recorded fuse");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert_eq!((r.shape.count(k::ShapeType::Face), r.shape.count(k::ShapeType::Edge)), (c.summary.faces, c.summary.edges));
+    assert!(r.shape.is_valid());
+    let inner = r.shape.sub_shapes(k::ShapeType::Face).iter().flat_map(|f| f.children()).flat_map(|w| w.children()).filter(|e| matches!(e.orientation(), k::Orientation::Internal)).count();
+    assert!(inner > 0, "no INTERNAL edge");
+}
+
 /// The B94.6 knurl's cut through noshape's Boolean (its grooves' end caps share the cylinder's end planes and each
 /// other's: a piece on the object and a tool, or on two tools, taken), as OCCT's: faces, edges, vertices, validity,
 /// every history record (each output where OCCT's is, within 2 µm; an edge's ends within 20 µm, below), the volume
