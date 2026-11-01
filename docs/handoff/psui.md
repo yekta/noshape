@@ -334,8 +334,8 @@ that touches the model: ~12 min.
 
 N10. (11-01 01:13) Unchecked rows (user 11-01): keyboard-mouse a / q / k, Ctrl+M, w and the empty Verified cells done;
      cursors 53 (count cursor with a dialog), 70 (Isolate / Replace instance / Interference titles), 78, 81, 82 ✅,
-     74 ✅ (the Variable Studio pill is live's 60 % #1651b0 with white text, ui::name_pill_on); 46 waits on my live request (when the
-     SnapMate cursor shows). large-models 24: qa5's "Point" was our midpoint target of a full circle, at its seam;
+     74 ✅ (the Variable Studio pill is live's 60 % #1651b0 with white text, ui::name_pill_on); 46 ✅ (live 1697 + Onshape's bundle: only
+     while snapped to a target, as ours). large-models 24: qa5's "Point" was our midpoint target of a full circle, at its seam;
      live request open (does Onshape offer a midpoint on a closed circular edge?). If not, edge_midpoint should
      return None for closed edges (behaviors.rs). part-studio 1.26 ✅ (env maps accepted as ours), 1.28 n/a.
      Dark-mode residual closed 11-01: the Variable type ▾ is live's 8 x 4 caret (os_ui::GLYPH_CARET), checked in both themes.
