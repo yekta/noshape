@@ -332,6 +332,10 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
   b.face_loops.push_back(0);
   b.loop_uses.push_back(0);
   std::vector<int> seen(em.Extent() + 1, 0);
+  // (A body with internal faces: their edges inside its boundary faces (INTERNAL there) bound nothing either.)
+  bool any_internal = false;
+  for (int i = 1; i <= fm.Extent(); ++i)
+    any_internal = any_internal || (fm(i).Orientation() != TopAbs_FORWARD && fm(i).Orientation() != TopAbs_REVERSED);
   for (int i = 1; i <= fm.Extent(); ++i)
   {
     const TopoDS_Face&                    f = TopoDS::Face(fm(i));
@@ -451,7 +455,10 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
       {
         const TopoDS_Shape& e = ei.Value();
         const int           k = em.FindIndex(e);
-        if (k <= 0 || (e.Orientation() != TopAbs_FORWARD && e.Orientation() != TopAbs_REVERSED))
+        const bool          inner = e.Orientation() != TopAbs_FORWARD && e.Orientation() != TopAbs_REVERSED;
+        if (k > 0 && inner && any_internal)
+          continue;
+        if (k <= 0 || inner)
           return "an internal edge";
         // A seam (twice in a cylinder's or cone's face) once each way.
         if (seen[k] == i && ((cyl.IsNull() && con.IsNull() && !free) || BRep_Tool::IsClosed(TopoDS::Edge(e), f) == false))
@@ -459,7 +466,9 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
         seen[k] = i;
         b.uses.push_back(static_cast<uint32_t>(2 * (k - 1) + (e.Orientation() == TopAbs_REVERSED ? 1 : 0)));
       }
-      b.loop_uses.push_back(static_cast<uint32_t>(b.uses.size()));
+      // (A wire of internal edges only: no loop.)
+      if (b.loop_uses.empty() || b.loop_uses.back() != static_cast<uint32_t>(b.uses.size()))
+        b.loop_uses.push_back(static_cast<uint32_t>(b.uses.size()));
     }
     b.face_loops.push_back(static_cast<uint32_t>(b.loop_uses.size() - 1));
     if (free)
