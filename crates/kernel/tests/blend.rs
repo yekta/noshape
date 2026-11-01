@@ -716,3 +716,42 @@ fn rust_blends_round_a_drafted_boss_are_occts() {
         }
     }
 }
+
+/// Live 1686 (b): R4 on a block's vertical edges and R2 round its top, as two fillets. Live's result is the same
+/// in either order (each corner the torus of the R2 round the R4 arc, 8759.36625936351 mm³, 18 faces); OCCT's
+/// R4 after the R2 failed. The R2 blends are taken off, the R4 made, the R2 made again; each R2 face taken off is
+/// Modified to the R2 faces made again. One vertical edge: the same as with it first.
+#[test]
+fn a_fillet_over_smaller_blends_is_as_with_it_first() {
+    setup();
+    let b = bx([0.0; 3], [45.0, 20.0, 10.0]);
+    let vert = |s: &Shape| edges_where(s, |i| (i.start.z - i.end.z).abs() > 1e-9 && (i.start.x - i.end.x).abs() < 1e-9 && (i.start.y - i.end.y).abs() < 1e-9);
+    let top = |s: &Shape| edges_where(s, |i| i.start.z > 9.99 * MM && i.end.z > 9.99 * MM);
+    let corner = |s: &Shape| -> Vec<Shape> { vert(s).into_iter().filter(|e| e.edge_info().map(|i| i.start.x > 44.0 * MM && i.start.y > 19.0 * MM).unwrap_or(false)).collect() };
+    let first = |pick: &dyn Fn(&Shape) -> Vec<Shape>| {
+        let s = fillet_checked(&b, &pick(&b), &[4.0 * MM]).unwrap().shape;
+        fillet_checked(&s, &top(&s), &[2.0 * MM]).unwrap().shape
+    };
+    let all: &dyn Fn(&Shape) -> Vec<Shape> = &vert;
+    let one: &dyn Fn(&Shape) -> Vec<Shape> = &corner;
+    for (name, pick, want) in [("all four", all, Some(8759.36625936351)), ("one", one, None)] {
+        let s = fillet_checked(&b, &top(&b), &[2.0 * MM]).unwrap().shape;
+        let edges = pick(&s);
+        let res = fillet_checked(&s, &edges, &[4.0 * MM]).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert!(res.shape.is_valid(), "{name}");
+        let like = first(pick);
+        let v = vol_mm3(&res.shape);
+        assert!((v - vol_mm3(&like)).abs() < 1e-6, "{name}: {v} vs {}", vol_mm3(&like));
+        assert_eq!(res.shape.faces().len(), like.faces().len(), "{name}");
+        if let Some(w) = want {
+            assert!((v - w).abs() < 1e-3, "{name}: {v}");
+            assert_eq!(res.shape.faces().len(), 18);
+        }
+        // The R2 faces live on as the R2 faces made again.
+        for (i, f) in s.faces().iter().enumerate() {
+            if format!("{:?}", f.face_surface().unwrap()).starts_with("Cylinder") {
+                assert!(!res.history.modified(0, ShapeType::Face, i as u32).is_empty(), "{name}: R2 face {i}");
+            }
+        }
+    }
+}
