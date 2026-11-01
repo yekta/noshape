@@ -301,8 +301,8 @@ fn cell_div() -> Div {
     div().w(px(COL_W)).h(px(ROW_H)).flex_none().flex().items_center().bg(p().bg_senary).border_r_1().border_b_1().border_color(rgb(RULE))
 }
 
-/// A variable table's "Variable type" cell: the type 7 px in, a black ▾ at
-/// the right and Onshape's select list under the cell. Every variable table
+/// A variable table's "Variable type" cell: the type 7 px in, a ▾ in the text
+/// colour at the right and Onshape's select list under the cell. Every variable table
 /// draws it alike, a Variable Studio's or a Part Studio's own (live psb/t-807).
 pub fn type_cell(id: impl Into<ElementId>, options: Vec<String>, current: usize, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Div {
     let pal = p();
@@ -314,7 +314,9 @@ pub fn type_cell(id: impl Into<ElementId>, options: Vec<String>, current: usize,
         .relative()
         // The cell's painted bounds place the select list under it.
         .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
-        .child(div().absolute().right(px(6.)).top(px(11.)).child(crate::ui::glyph("ui-caret-down", 12., pal.text)))
+        // Live (psb/t-807, dark/dk-961): an 8 x 4 solid ▾, 16 px under the
+        // row's top rule, its right end 6 px from the cell's right rule.
+        .child(div().absolute().right(px(5.)).top(px(13.)).child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., pal.text)))
         .child(
             // A plain cell (a kit Button centres its label): text 7 px in, as live.
             div()

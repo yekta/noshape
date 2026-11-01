@@ -338,7 +338,7 @@ N10. (11-01 01:13) Unchecked rows (user 11-01): keyboard-mouse a / q / k, Ctrl+M
      SnapMate cursor shows). large-models 24: qa5's "Point" was our midpoint target of a full circle, at its seam;
      live request open (does Onshape offer a midpoint on a closed circular edge?). If not, edge_midpoint should
      return None for closed edges (behaviors.rs). part-studio 1.26 ✅ (env maps accepted as ours), 1.28 n/a.
-     Dark-mode residual: the Variable type ▾ 2 px narrower.
+     Dark-mode residual closed 11-01: the Variable type ▾ is live's 8 x 4 caret (os_ui::GLYPH_CARET), checked in both themes.
 
 N06. 10-29 own display mesher (lead 10-28 21:05): step 1 landed 020fd2e7 (planes bounded by lines; crates/brep
      `mesh`, cpp/mesh_rust.cpp after core's cache, NOSHAPE_MESH_RUST=0 off); step 2 (this commit): circles split as
