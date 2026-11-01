@@ -334,8 +334,8 @@ pub struct HistoryRow {
     /// The graph's lane: the workspace it was made in (Main is 0).
     pub lane: usize,
     /// Its changes since the version before it, newest first (Show
-    /// changes…): description, author, time.
-    pub changes: Vec<(String, String, i64)>,
+    /// changes…): description, author, time, a merge.
+    pub changes: Vec<(String, String, i64, bool)>,
     /// A workspace made from a version: that version's row (the graph
     /// draws the branch from it).
     pub from: Option<usize>,
@@ -375,7 +375,7 @@ pub fn doc_details(path: &Path) -> anyhow::Result<DocDetails> {
             if ((m.id != mv || !version) && marks.contains(&m.id)) || m.parents.is_empty() || out.len() >= 200 {
                 break;
             }
-            out.push((m.description.clone(), m.author.clone(), m.created));
+            out.push((m.description.clone(), m.author.clone(), m.created, m.is_merge()));
             cur = m.parents.first().copied();
         }
         out

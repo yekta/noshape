@@ -278,6 +278,11 @@ pub struct StartView {
     /// changes…" is open, of the document shown.
     history_sel: Option<(PathBuf, usize)>,
     history_open: std::collections::HashSet<(PathBuf, usize)>,
+    /// Its "Search history" box and the Hide merges / Hide automatic
+    /// versions toggles (on by default, live documents/118).
+    history_search: Entity<InputState>,
+    history_hide_merges: bool,
+    history_hide_auto: bool,
     /// The "Folders" section of "Owned by me" is expanded.
     folders_open: bool,
     /// "Last opened by me" is expanded.
@@ -336,9 +341,15 @@ impl StartView {
     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search documents"));
         let label_search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search labels"));
+        let history_search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search history"));
         let col_search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search..."));
         let subs = vec![
             cx.subscribe(&col_search, |_, _, ev: &InputEvent, cx| {
+                if let InputEvent::Change = ev {
+                    cx.notify();
+                }
+            }),
+            cx.subscribe(&history_search, |_, _, ev: &InputEvent, cx| {
                 if let InputEvent::Change = ev {
                     cx.notify();
                 }
@@ -442,6 +453,9 @@ impl StartView {
             details: None,
             history_sel: None,
             history_open: Default::default(),
+            history_search: history_search.clone(),
+            history_hide_merges: true,
+            history_hide_auto: true,
             folders_open: false,
             recent_open: true,
             sub_open: true,
@@ -1534,6 +1548,46 @@ impl StartView {
                 .child(section("Last modified by", vec![who(&d.modified_by), lib::format_onshape_time(d.modified)]))
                 .into_any_element(),
             (Some(_), Some(d)) => v_flex()
+                .size_full()
+                // Live documents/116: the name, "Search history" with its 🔍,
+                // the Hide merges / Hide automatic versions toggles.
+                .child(name_row(d.name.clone()))
+                .child(
+                    h_flex()
+                        .mx(px(12.))
+                        .mt(px(8.))
+                        .h(px(30.))
+                        .child(div().flex_1().h_full().border_1().border_color(rgb(0xaaaaaa)).rounded_l(px(4.)).child(Input::new(&self.history_search).appearance(false).cleanable(true).text_size(px(14.)).h(px(28.)).px(px(6.))))
+                        .child(div().size(px(30.)).flex().items_center().justify_center().border_1().border_l_0().border_color(rgb(0xaaaaaa)).rounded_r(px(4.)).child(crate::assets::icon("search", 20., cx))),
+                )
+                .child({
+                    let toggle = |id: &'static str, icon: &'static str, on: bool, tip: &'static str, cx: &mut Context<Self>| {
+                        div()
+                            .id(id)
+                            .size(px(30.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded(px(3.))
+                            .cursor_pointer()
+                            .when(on, |d| d.bg(rgb(0xeaeaea)))
+                            .when(!on, |d| d.hover(|d| d.bg(rgb(0xeaeaea))))
+                            .tooltip(crate::ui::tooltip(tip))
+                            .child(crate::assets::icon(icon, 20., cx))
+                    };
+                    h_flex()
+                        .px(px(12.))
+                        .pt(px(6.))
+                        .gap(px(6.))
+                        .child(toggle("vh-merges", "hide-merges", self.history_hide_merges, if self.history_hide_merges { "Hide merges" } else { "Show merges" }, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.history_hide_merges = !this.history_hide_merges;
+                            cx.notify();
+                        })))
+                        .child(toggle("vh-auto", "hide-auto-versions", self.history_hide_auto, if self.history_hide_auto { "Hide automatic versions" } else { "Show automatic versions" }, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            this.history_hide_auto = !this.history_hide_auto;
+                            cx.notify();
+                        })))
+                })
                 .child(
                     h_flex()
                         .h(px(38.))
@@ -1546,13 +1600,31 @@ impl StartView {
                         .child(div().w(px(120.)).flex_none().child("Name"))
                         .child(div().child("Modified")),
                 )
-                .children({
+                .child(div().id("vh-rows").flex_1().min_h_0().overflow_y_scroll().child(v_flex().children({
                     // Live documents-versions-history-panel: a 140 px graph
                     // column (the workspace a white ring, versions blue
                     // dots, 16 px down, a line through each workspace's
                     // rows), then Name and Modified, 50 px rows.
                     let path = entry.as_ref().map(|e| e.path.clone()).unwrap_or_default();
-                    let rows = &d.history;
+                    // Search history: rows whose name or description holds the text.
+                    let needle = self.history_search.read(cx).value().trim().to_lowercase();
+                    let shown: Vec<lib::HistoryRow> = d
+                        .history
+                        .iter()
+                        .filter(|r| needle.is_empty() || r.name.to_lowercase().contains(&needle) || r.description.to_lowercase().contains(&needle))
+                        .map(|r| {
+                            let mut r = r.clone();
+                            if self.history_hide_merges {
+                                r.changes.retain(|c| !c.3);
+                            }
+                            // A filtered list has other row numbers.
+                            if !needle.is_empty() {
+                                r.from = None;
+                            }
+                            r
+                        })
+                        .collect();
+                    let rows = &shown;
                     let lanes = rows.iter().map(|r| r.lane).max().unwrap_or(0) + 1;
                     // A lane runs from its first row to its last, or on to
                     // the row it branched from.
@@ -1615,7 +1687,7 @@ impl StartView {
                                 }))
                         });
                         let changes = open.then(|| {
-                            v_flex().pt(px(4.)).gap(px(2.)).text_size(px(12.)).children(r.changes.iter().map(|(desc, author, t)| {
+                            v_flex().pt(px(4.)).gap(px(2.)).text_size(px(12.)).children(r.changes.iter().map(|(desc, author, t, _)| {
                                 h_flex().gap(px(6.)).child(div().w(px(150.)).flex_none().truncate().text_color(pal.text).child(desc.clone())).child(div().truncate().child(format!("{} · {}", who(author), lib::format_onshape_time(*t))))
                             }))
                         });
@@ -1648,6 +1720,18 @@ impl StartView {
                             ));
                     }
                     out
+                })))
+                // The legend (live documents/116, as the document's panel).
+                .child({
+                    let item = |icon: &'static str, label: &'static str, faint: bool, cx: &mut Context<Self>| h_flex().gap(px(4.)).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(if faint { pal.text_faint } else { pal.text }).child(crate::assets::icon(icon, 20., cx)).child(label);
+                    v_flex()
+                        .flex_none()
+                        .items_center()
+                        .gap(px(10.))
+                        .py(px(14.))
+                        .child(h_flex().gap(px(30.)).child(item("legend-workspace", "Workspace", false, cx)).child(item("legend-version", "Version", false, cx)).child(item("legend-change", "Change", true, cx)))
+                        .child(h_flex().gap(px(30.)).child(item("legend-release-candidate", "Release candidate", false, cx)).child(item("legend-release", "Release", false, cx)))
+                        .child(h_flex().gap(px(30.)).child(item("legend-obsoletion", "Contains obsoletion", false, cx)))
                 })
                 .into_any_element(),
             // A folder (live documents/47): name, Owner, Created by, Last modified by.
