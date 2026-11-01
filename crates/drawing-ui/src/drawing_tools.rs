@@ -429,6 +429,7 @@ impl DrawingEditor {
             v.flip = d.flip;
             v.cut_only = d.cut_only;
             v.exclude_from_cut = d.exclude.clone();
+            v.cut_from_section = d.cut_from;
         }
         Some(v)
     }

@@ -1018,6 +1018,17 @@ fn section_of_a_section_cuts_from_the_section() {
     // The parent's removed side is gone: a smaller view.
     let size = |g: &views::ViewGeometry| (g.max[0] - g.min[0]) * (g.max[1] - g.min[1]);
     assert!(size(&cut) < size(&base) - 1e-5, "{} vs {}", size(&cut), size(&base));
+    // An aligned section of the section view too (V27).
+    let al = ViewId(79);
+    drawing.sheets[0].views.push(DrawingView { id: al, kind: ViewKind::AlignedSection { parent: ViewId(5), center: [0.0, 0.0], a: [0.0, -0.02], b: [0.02, 0.01], label: "Y".into() }, position: [pos[0] + 80.0, pos[1] - 60.0], ..Default::default() });
+    let whole = compute_view(&drawing, &drawing.sheets[0], al, &sources, &cache, false);
+    assert!(whole.error.is_none(), "{:?}", whole.error);
+    drawing.sheets[0].view_mut(al).unwrap().cut_from_section = true;
+    assert_eq!(views::pre_cut(&drawing.sheets[0], al), Some(ViewId(5)));
+    let pre = compute_view(&drawing, &drawing.sheets[0], al, &sources, &cache, false);
+    assert!(pre.error.is_none(), "{:?}", pre.error);
+    assert!(!pre.section_segments.is_empty());
+    assert!(size(&pre) < size(&whole) - 1e-5, "{} vs {}", size(&pre), size(&whole));
 }
 
 #[test]
