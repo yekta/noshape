@@ -1706,7 +1706,7 @@ impl DrawingEditor {
                     });
                 }
             }
-            Sel::Break(..) | Sel::Sketch(_) | Sel::Hatch(_) | Sel::Image(_) | Sel::AutoCentermark(..) | Sel::ViewLabel(_) | Sel::AuxIndicator(_) | Sel::HoleAxis(_) => {}
+            Sel::Break(..) | Sel::Sketch(_) | Sel::Hatch(_) | Sel::Image(_) | Sel::AutoCentermark(..) | Sel::ViewLabel(_) | Sel::AuxIndicator(_) | Sel::HoleAxis(_) | Sel::FormatLine(_) => {}
         }
     }
 
@@ -1784,7 +1784,7 @@ impl DrawingEditor {
             },
             Sel::ViewLabel(v) => self.label_drag(v, start),
             // Dragging the indicator's line (off its dots) does nothing (live u-914).
-            Sel::Table(_) | Sel::Break(..) | Sel::Hatch(_) | Sel::AutoCentermark(..) | Sel::AuxIndicator(_) | Sel::HoleAxis(_) => Drag::None,
+            Sel::Table(_) | Sel::Break(..) | Sel::Hatch(_) | Sel::AutoCentermark(..) | Sel::AuxIndicator(_) | Sel::HoleAxis(_) | Sel::FormatLine(_) => Drag::None,
         }
     }
 
@@ -2017,6 +2017,42 @@ impl DrawingEditor {
             MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)),
             MenuEntry::item("Delete", |t, _, cx| t.delete_selection(cx)),
         ]);
+        out
+    }
+
+    /// A format line (live behaviours "Hole table cell / title block clicks"
+    /// (2)): Paste · Copy · Paste as table · Move to ▸ | Clear selection ·
+    /// Zoom to fit · Delete. Copy puts it on the clipboard as a sketch line;
+    /// Move to ▸ the other format layers.
+    fn format_line_entries(&self, k: [i64; 4]) -> Vec<MenuEntry> {
+        let current = self.built.as_ref().and_then(|b| {
+            let pick = b.picks.iter().position(|t| *t == PickTarget::FormatLine(k))?;
+            let line = b.geometry.lines.iter().position(|l| l.pick as usize == pick)?;
+            b.geometry.layers.iter().find(|s| s.lines.contains(&line)).map(|s| s.layer)
+        });
+        let layers = SheetLayer::FORMAT
+            .iter()
+            .copied()
+            .filter(|l| Some(*l) != current)
+            .map(|l| MenuEntry::item(l.name(), move |t, _, cx| t.edit_sheet("Move to", cx, |s| s.edit_format_line(k, |e| e.layer = Some(l)))))
+            .collect();
+        let mut out = vec![
+            crate::drawing_props::paste_always(),
+            MenuEntry::item("Copy", move |t, _, cx| {
+                let mut d = t.drawing.clone();
+                let s = &mut d.sheets[t.sheet];
+                let p = |i: usize| noshape_sketch::DVec2::new(k[i] as f64 / 100.0, k[i + 1] as f64 / 100.0);
+                let e = s.sketch.sketch.add_line(p(0), p(2));
+                if let Ok(c) = d.copy_selection(t.sheet, &[], &[], &[e.0], &[]) {
+                    cx.write_to_clipboard(ClipboardItem::new_string(c.to_json()));
+                }
+            }),
+            MenuEntry::item("Paste as table", |t, _, cx| {
+                t.paste_as_table(cx);
+            }),
+            MenuEntry::Submenu("Move to".into(), layers),
+        ];
+        out.extend(Self::selection_tail());
         out
     }
 
@@ -2344,6 +2380,7 @@ impl DrawingEditor {
                 }));
             }
             Some(Sel::Table(id)) => out.extend(self.table_entries(id, cx)),
+            Some(Sel::FormatLine(k)) => return self.format_line_entries(k),
             Some(Sel::Sketch(id)) => out.extend(self.sketch_entries(id)),
             Some(Sel::Image(id)) => out.extend(self.image_entries(id, cx)),
             // Live 483–493, ~1490: an automatic centermark's menu.

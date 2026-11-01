@@ -682,7 +682,9 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                 .collect()
         })
         .unwrap_or_default();
-    json!({ "sheet": sheet.name, "size_mm": [r3(w), r3(h)], "views": views, "annotations": annotations, "tables": tables, "hatches": hatches, "images": images, "sketch_entities": sketch_entities, "title_fields": title_fields })
+    // Format lines deleted or moved to another layer (drawing_format_line).
+    let format_edits: Vec<Value> = sheet.format_edits.iter().map(|e| json!({ "a": [e.key[0] as f64 / 100.0, e.key[1] as f64 / 100.0], "b": [e.key[2] as f64 / 100.0, e.key[3] as f64 / 100.0], "deleted": e.deleted, "layer": e.layer.map(|l| l.name()) })).collect();
+    json!({ "sheet": sheet.name, "size_mm": [r3(w), r3(h)], "views": views, "annotations": annotations, "tables": tables, "hatches": hatches, "images": images, "sketch_entities": sketch_entities, "title_fields": title_fields, "format_edits": format_edits })
 }
 
 pub(super) fn reply(od: &mut OpenDoc, tab: TabId, sheet: usize, edges: bool) -> Result<Value, OpError> {

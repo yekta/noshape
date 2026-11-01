@@ -180,6 +180,7 @@ impl<'a> SheetPick<'a> {
                 (Sel::Image(a), PickTarget::Image(b)) => a == *b,
                 (Sel::AutoCentermark(v, c), PickTarget::AutoCentermark { view, center }) => v == *view && c == *center,
                 (Sel::ViewLabel(v), PickTarget::ViewLabel(w)) | (Sel::AuxIndicator(v), PickTarget::AuxIndicator(w)) => v == *w,
+                (Sel::FormatLine(a), PickTarget::FormatLine(b)) => a == *b,
                 _ => false,
             })
             .map(|(i, _)| i as u32)
@@ -200,6 +201,7 @@ impl<'a> SheetPick<'a> {
             PickTarget::AuxIndicator(v) => Some(Sel::AuxIndicator(*v)),
             PickTarget::ViewLabel(v) => Some(Sel::ViewLabel(*v)),
             PickTarget::AutoCentermark { view, center } => Some(Sel::AutoCentermark(*view, *center)),
+            PickTarget::FormatLine(k) => Some(Sel::FormatLine(*k)),
             _ => None,
         }
     }

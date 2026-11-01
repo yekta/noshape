@@ -225,6 +225,8 @@ pub enum Sel {
     AuxIndicator(ViewId),
     /// A hole table's tag axis (its own menu: Hole table properties, flips).
     HoleAxis(u64),
+    /// A single format line (`build::PickTarget::FormatLine`).
+    FormatLine([i64; 4]),
 }
 
 #[derive(Clone, Debug)]

@@ -752,6 +752,7 @@ impl DrawingEditor {
             Sel::Image(i) => sheet.images.iter().any(|x| x.id == *i),
             Sel::AutoCentermark(v, c) => sheet.view(*v).is_some_and(|v| !v.deleted_centermarks.contains(c)),
             Sel::ViewLabel(v) | Sel::AuxIndicator(v) => sheet.view(*v).is_some(),
+            Sel::FormatLine(k) => !sheet.format_edit(*k).is_some_and(|e| e.deleted),
         });
         self.ensure_sources(false, cx);
         self.refresh(cx);

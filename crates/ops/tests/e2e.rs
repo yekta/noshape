@@ -2067,6 +2067,16 @@ fn drawing_title_block_fields() {
     let t = title(&mut ctx);
     let cell: Vec<f64> = t["cell"].as_array().unwrap().iter().map(num).collect();
     assert!(cell[2] - cell[0] > 20.0 && cell[3] - cell[1] > 5.0, "{cell:?}");
+    // The cell's left line is a format line of its own (M1): Move to, then Delete.
+    let on = json!([cell[0], (cell[1] + cell[3]) / 2.0]);
+    call(&mut ctx, "drawing_format_line", json!({ "drawing": tab, "point": on, "layer": "Border zones" }));
+    assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Move to"));
+    call(&mut ctx, "drawing_format_line", json!({ "drawing": tab, "point": on, "delete": true }));
+    let edits = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["format_edits"].clone();
+    assert_eq!(edits.as_array().map(|a| a.len()), Some(1), "{edits}");
+    assert_eq!((edits[0]["deleted"].clone(), edits[0]["layer"].clone()), (json!(true), json!("Border zones")));
+    let e = try_call(&mut ctx, "drawing_format_line", json!({ "drawing": tab, "point": [140, 108], "delete": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("point"), "no format line mid-sheet {e:?}");
     let value = t["value"].as_str().unwrap().to_string();
     let lines: Vec<&str> = value.split('\n').collect();
     assert_eq!(lines.len(), 3, "three property fields: {value}");

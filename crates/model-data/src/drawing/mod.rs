@@ -2736,6 +2736,31 @@ pub struct Sheet {
     /// block's SCALE shows it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scale_text: Option<String>,
+    /// Format lines edited on this sheet (live behaviours "Hole table cell /
+    /// title block clicks" (2): the format is single lines, each selectable
+    /// with Paste · Copy · Paste as table · Move to ▸ · Delete). The lines
+    /// stay generated from the template; these edits apply to the line with
+    /// that key ([`format_line_key`]) while the template still draws it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub format_edits: Vec<FormatLineEdit>,
+}
+
+/// An edit of one format line: deleted, or moved to another format layer.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FormatLineEdit {
+    pub key: [i64; 4],
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub deleted: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layer: Option<SheetLayer>,
+}
+
+/// A format line's key: its ends (sheet mm, to 0.01 mm), the lower one first.
+pub fn format_line_key(a: [f64; 2], b: [f64; 2]) -> [i64; 4] {
+    let q = |p: [f64; 2]| [(p[0] * 100.0).round() as i64, (p[1] * 100.0).round() as i64];
+    let (a, b) = (q(a), q(b));
+    let (a, b) = if a <= b { (a, b) } else { (b, a) };
+    [a[0], a[1], b[0], b[1]]
 }
 
 /// Where zone labelling starts (Custom template › Start zones): numbers
@@ -2789,6 +2814,23 @@ pub struct SheetImage {
 }
 
 impl Sheet {
+    /// The edit of format line `key`, if any.
+    pub fn format_edit(&self, key: [i64; 4]) -> Option<&FormatLineEdit> {
+        self.format_edits.iter().find(|e| e.key == key)
+    }
+
+    /// Edit format line `key` (its entry made on first use).
+    pub fn edit_format_line(&mut self, key: [i64; 4], f: impl FnOnce(&mut FormatLineEdit)) {
+        let i = match self.format_edits.iter().position(|e| e.key == key) {
+            Some(i) => i,
+            None => {
+                self.format_edits.push(FormatLineEdit { key, deleted: false, layer: None });
+                self.format_edits.len() - 1
+            }
+        };
+        f(&mut self.format_edits[i]);
+    }
+
     pub fn view(&self, id: ViewId) -> Option<&DrawingView> {
         self.views.iter().find(|v| v.id == id)
     }
@@ -2997,7 +3039,7 @@ impl Sheet {
 
 impl Default for Sheet {
     fn default() -> Self {
-        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple, sketch: Default::default(), images: vec![], format: SheetFormat::default(), title_language: Default::default(), imported: None, sketch_dim_constraints: vec![], uid: 0, dwt: None, scale_shown: false, scale_text: None }
+        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple, sketch: Default::default(), images: vec![], format: SheetFormat::default(), title_language: Default::default(), imported: None, sketch_dim_constraints: vec![], uid: 0, dwt: None, scale_shown: false, scale_text: None, format_edits: vec![] }
     }
 }
 

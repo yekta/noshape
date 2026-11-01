@@ -56,6 +56,9 @@ pub enum PickTarget {
     /// An automatic centermark of a view, keyed by its circle's center
     /// ([`centermark_key`]).
     AutoCentermark { view: ViewId, center: [i64; 2] },
+    /// A single line of the format (frame, zone divider, title block line;
+    /// [`super::format_line_key`]).
+    FormatLine([i64; 4]),
 }
 
 /// Key of an automatic centermark: its center in view units (meters), to
@@ -264,7 +267,7 @@ impl BuiltSheet {
             }
             let bias = match self.picks.get(pick as usize) {
                 Some(PickTarget::Annotation(_) | PickTarget::Inspection(_)) => -tol * 0.5,
-                Some(PickTarget::TitleBlock) => tol * 0.25,
+                Some(PickTarget::TitleBlock | PickTarget::FormatLine(_)) => tol * 0.25,
                 _ => 0.0,
             };
             let d = d + bias;
@@ -1482,18 +1485,53 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     let tb_rect = title_rect.unwrap_or([0.0; 4]);
     let in_tb = |p: &[f64; 2]| p[0] >= tb_rect[0] - 0.01 && p[1] <= tb_rect[3] + 0.01 && p[0] <= tb_rect[2] + 0.01 && p[1] >= tb_rect[1] - 0.01;
     // Formats › Locked: the title block can't be picked.
-    let tb = if drawing.props.formats_locked { 0 } else { picks.id(PickTarget::TitleBlock) };
+    let locked = drawing.props.formats_locked;
+    let tb = if locked { 0 } else { picks.id(PickTarget::TitleBlock) };
     let fp = &drawing.props;
+    // A template's format is single lines (live: each frame, zone or title
+    // block line is selected alone): rectangles split into their sides,
+    // which run on half the pen width past the corners so they stay closed.
+    // The sheet's edits (Delete, Move to) apply by each line's key.
+    let mut keys: Vec<Option<([i64; 4], bool)>> = Vec::new();
+    if sheet.imported.is_none() {
+        let lines: Vec<Polyline2> = g.lines.drain(mark_l..).collect();
+        for l in lines {
+            let n = l.points.len();
+            let segs = if l.closed { n } else { n.saturating_sub(1) };
+            let joined = segs > 1;
+            for i in 0..segs {
+                let (a, b) = (l.points[i], l.points[(i + 1) % n]);
+                let key = super::format_line_key(a, b);
+                if sheet.format_edit(key).is_some_and(|e| e.deleted) {
+                    continue;
+                }
+                g.lines.push(Polyline2 { points: vec![a, b], style: l.style, closed: false, pick: 0 });
+                keys.push(Some((key, joined)));
+            }
+        }
+    }
     let (end_l, end_t) = (g.lines.len(), g.texts.len());
     for i in mark_l..end_l {
+        let key = keys.get(i - mark_l).copied().flatten();
         let l = &mut g.lines[i];
         let in_block = l.points.iter().all(in_tb) && l.style != LineStyle::Border;
-        if in_block {
-            l.pick = tb;
+        match key {
+            Some((k, _)) => l.pick = if locked { 0 } else { picks.id(PickTarget::FormatLine(k)) },
+            None if in_block => l.pick = tb,
+            None => {}
         }
         // Formats layers and colors: border frame, zones (dividers), title
-        // block.
-        let layer = if in_block { SheetLayer::TitleBlock } else if l.style == LineStyle::Border { SheetLayer::BorderFrame } else { SheetLayer::BorderZones };
+        // block; a line moved to another layer takes that one's.
+        let own = if in_block { SheetLayer::TitleBlock } else if l.style == LineStyle::Border { SheetLayer::BorderFrame } else { SheetLayer::BorderZones };
+        let layer = key.and_then(|(k, _)| sheet.format_edit(k)).and_then(|e| e.layer).unwrap_or(own);
+        if let (Some((_, true)), Some(w)) = (key, layer.thickness(fp)) {
+            let (a, b) = (l.points[0], l.points[1]);
+            let len = ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2)).sqrt();
+            if len > 1e-9 {
+                let u = [(b[0] - a[0]) / len * w / 2.0, (b[1] - a[1]) / len * w / 2.0];
+                l.points = vec![[a[0] - u[0], a[1] - u[1]], [b[0] + u[0], b[1] + u[1]]];
+            }
+        }
         g.layers.push(LayerSpan { lines: i..i + 1, texts: 0..0, fills: 0..0, layer });
         if let Some(rgb) = layer.color(fp) {
             g.colors.push(super::sheet::ColorSpan { lines: i..i + 1, texts: 0..0, fills: 0..0, rgb });

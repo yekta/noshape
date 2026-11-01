@@ -1472,6 +1472,42 @@ fn move_views_between_sheets() {
     assert!((a[0] - b[0]).abs() < 1e-6 && (a[1] - b[1]).abs() < 1e-6, "{a:?} vs {b:?}");
 }
 
+/// The format is single lines (M1, live behaviours "Hole table cell /
+/// title block clicks" (2)): a frame side is picked alone, Delete leaves it
+/// out of the sheet, Move to puts it on another layer, and Formats › Locked
+/// makes none pickable.
+#[test]
+fn format_lines_are_picked_deleted_and_moved_alone() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    templates::apply_template(&mut drawing, 0, &templates::template_by_name("ISO A3").unwrap());
+    drawing.props.formats_locked = false;
+    let [fx0, fy0, _, fy1] = drawing.sheets[0].size.frame_rect();
+    let left = format_line_key([fx0, fy0], [fx0, fy1]);
+    let at = [fx0, (fy0 + fy1) / 2.0];
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let hit = built.hit(at, 1.0).and_then(|h| built.picks.get(h as usize).cloned());
+    assert_eq!(hit, Some(PickTarget::FormatLine(left)), "the frame's left side alone");
+    let side = |b: &build::BuiltSheet| b.geometry.lines.iter().position(|l| b.picks.get(l.pick as usize) == Some(&PickTarget::FormatLine(left)));
+    let i = side(&built).expect("drawn");
+    let layer_of = |b: &build::BuiltSheet, i: usize| b.geometry.layers.iter().find(|s| s.lines.contains(&i)).map(|s| s.layer);
+    assert_eq!(layer_of(&built, i), Some(SheetLayer::BorderFrame));
+    // Its ends run past the corners by half the pen (closed corners).
+    let l = &built.geometry.lines[i];
+    assert!(l.points.iter().any(|p| p[1] < fy0) && l.points.iter().any(|p| p[1] > fy1), "{:?}", l.points);
+    drawing.sheets[0].edit_format_line(left, |e| e.layer = Some(SheetLayer::TitleBlock));
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert_eq!(layer_of(&built, side(&built).unwrap()), Some(SheetLayer::TitleBlock));
+    drawing.sheets[0].edit_format_line(left, |e| e.deleted = true);
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(side(&built).is_none(), "deleted");
+    assert!(!built.geometry.lines.iter().any(|l| l.points.iter().all(|p| (p[0] - fx0).abs() < 1.0)), "nothing drawn there");
+    drawing.props.formats_locked = true;
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert!(!built.picks.iter().any(|t| matches!(t, PickTarget::FormatLine(_))));
+}
+
 #[test]
 fn templates_and_title_blocks() {
     let names: Vec<&str> = templates::standard_templates().iter().map(|t| t.name).collect();

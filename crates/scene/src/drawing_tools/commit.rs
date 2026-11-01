@@ -1264,6 +1264,8 @@ pub fn delete_selection(s: &mut Sheet, sel: &[super::Sel]) {
                 }
             }
             Sel::Break(..) => {}
+            // A format line: left out while the template draws it.
+            Sel::FormatLine(k) => s.edit_format_line(*k, |e| e.deleted = true),
         }
     }
     let _ = s.sketch.sketch.solve();
