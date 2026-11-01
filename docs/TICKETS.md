@@ -6,6 +6,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## Release blockers for the 2026-11-01 05:00 release (qa final list 03:50, newest green 90f9c7d0; early notes below)
+- **qa 04:20 (last check before the cut, green e6042a48 — has bool's 45 / 45 knurl fix): unchanged.** RUST-SHELL-2AFC Shell 6 still Error, RUST-MIRROR-NEGATIVE still −3451.7544 mm³, CRASH-957's mirror still 0.0 mm³. The hold / Rust-off suggestion stands.
 - **qa 03:50, final: one hold reason, P1 RUST-SHELL-2AFC — or ship with the Rust Boolean off by default.** Checked on green 90f9c7d0 as CLI: RUST-SHELL-2AFC still fails (Shell 6 Error, new since v0.4.17), RUST-MIRROR-NEGATIVE still −3451.7544 mm³, CRASH-957's mirror still 0.0 mm³ — all three right with NOSHAPE_BOOL_RUST=0. With the Rust Boolean on, the cut ships one new regression (2AFC) and keeps v0.4.17's two crash paths plus RUST-BOOL-CLAMP-ABORT (in v0.4.16 too) and skasm's RUST-SM-CUT-VOLUME (7 mm³ over live).
 - **qa 03:59: a fourth Rust-Boolean crash path, P1 CRASH-1013** (seed 1013: heap corruption on v0.4.17, an OCCT fillet segfault on main 90f9c7d0; fine with NOSHAPE_BOOL_RUST=0) — 4 of the 73 v0.4.17 fuzz seeds 941–1013 killed the process, all with the Rust Boolean on.
 - **Memory: P1 MEM-RUNAWAY-508 not closed.** Fuzz seed 1002 OOMs at the 10 GB cap on v0.4.17 **and on main** (green 1cda24b8): budget jumps in Extrema_GenExtPS::BuildGrid (a Boolean's edge / face projection) leak ~2 GB each; seed 685's six jumps stay in BoundedArc after patches 0010 / 0011. Not new for this cut.
