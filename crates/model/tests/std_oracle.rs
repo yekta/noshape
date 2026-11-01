@@ -23,7 +23,7 @@ const STRICT: &[&str] = &[
 /// Hints only built-in dialogs carry (UI behaviour the std expresses
 /// elsewhere, e.g. `GROUP_LABEL` for std's collapsible groups).
 /// `INITIAL_FOCUS`: Onshape focuses the first selection field by itself.
-const BUILTIN_ONLY_HINTS: Hints = Hints(Hints::GROUP_LABEL.0 | Hints::DRIVEN_QUERY.0 | Hints::NO_MATE_CONNECTOR_BUTTON.0 | Hints::INITIAL_FOCUS.0);
+const BUILTIN_ONLY_HINTS: Hints = Hints(Hints::GROUP_LABEL.0 | Hints::NO_MATE_CONNECTOR_BUTTON.0 | Hints::INITIAL_FOCUS.0);
 
 /// Built-in features std doesn't run here, with the std module defining each
 /// (the audit of every dialog: `print_all`).

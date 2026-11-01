@@ -492,6 +492,7 @@ pub fn sheet_metal_loft() -> FeatureType {
             vec![ParamSpec::query("connectionEntities", "Vertices or edges", QueryFilter::EDGE | QueryFilter::VERTEX), ParamSpec::bool("isRip", "Rip", false)],
         )
         .item_template("#connectionEntities")
+        .hints(Hints::DRIVEN_QUERY)
         .visible(|v| v.bool("matchConnections")),
         ParamSpec::num("chordalTolerance", "Chordal tolerance", NumSpec::positive_length(1.0, 0.05).bounded(1e-5, 0.1)),
         ParamSpec::query("booleanScope", "Merge scope", QueryFilter::SOLID_BODY).visible(move |v| !new(v)),

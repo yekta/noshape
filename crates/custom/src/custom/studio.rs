@@ -361,7 +361,8 @@ fn collect_in(module: &Arc<CompiledModule>, s: &ast::Stmt, conds: &[Arc<Compiled
                         label: a.str("Name").unwrap_or(&id).to_string(),
                         id,
                         kind: ParamKindFs::Array { item_label: a.str("Item name").unwrap_or("").to_string(), template: a.str("Item label template").map(str::to_string), items },
-                        hints: hints(&a),
+                        // "Driven query": one selection field, a pick per item.
+                        hints: if a.str("Driven query").is_some() { hints(&a) | Hints::DRIVEN_QUERY } else { hints(&a) },
                         description: a.str("Description").unwrap_or("").to_string(),
                         conditions: conds.to_vec(),
                     });

@@ -62,7 +62,7 @@ pub fn frame_trim() -> FeatureType {
             .hints(Hints::HORIZONTAL_ENUM | Hints::REMEMBER_PREVIOUS_VALUE),
         ParamSpec::array("frameGroups", "Frame groups", "Group", vec![ParamSpec::query("frames", "Frames", QueryFilter::SOLID_BODY).describe("Frame segments are trimmed against preceding groups and are used as tools for later groups")]).describe("Frame segments in earlier groups are used as tools for later groups")
         .item_template("#frames")
-            .hints(Hints::COLLAPSE_ARRAY_ITEMS)
+            .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::DRIVEN_QUERY)
             .visible(move |v| !face(v)),
         ParamSpec::query("targets", "Parts to trim", QueryFilter::SOLID_BODY).describe("Parts to trim using trim tool").visible(face),
         ParamSpec::query1("tool", "Face to trim to", QueryFilter::ANY_FACE | QueryFilter::SHEET_BODY | QueryFilter::PLANE | QueryFilter::MATE_CONNECTOR).describe("Face, plane, mate connector, or planar face to use as trim tool")

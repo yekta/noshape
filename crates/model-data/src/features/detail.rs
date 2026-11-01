@@ -103,6 +103,7 @@ pub fn face_blend() -> FeatureType {
             vec![ParamSpec::query1("entity", "Cap entity", QueryFilter::ANY_FACE | QueryFilter::PLANE), ParamSpec::flip("capFlip", "Flip cap")],
         )
         .item_template("#entity")
+        .hints(Hints::DRIVEN_QUERY)
         .visible(|v| v.bool("hasCaps")),
         ParamSpec::bool("hasLimits", "Limits", false),
         ParamSpec::query1("limitPlane1", "Plane limit", QueryFilter::PLANE | QueryFilter::PLANAR_FACE).visible(|v| v.bool("hasLimits")),
@@ -117,6 +118,7 @@ pub fn face_blend() -> FeatureType {
             vec![ParamSpec::query1("edge", "Edge limit", QueryFilter::ANY_EDGE), ParamSpec::query1("edgeLimitSide", "Side", QueryFilter::ANY_FACE)],
         )
         .item_template("#edge")
+        .hints(Hints::DRIVEN_QUERY)
         .visible(|v| v.bool("hasLimits")),
         ParamSpec::bool("hasHelpPoint", "Help point", false),
         ParamSpec::query1("helpPoint", "Help point", QueryFilter::VERTEX | QueryFilter::MATE_CONNECTOR).visible(|v| v.bool("hasHelpPoint")),

@@ -169,7 +169,8 @@ pub fn ruled_surface() -> FeatureType {
                 ParamSpec::flip("oppositeDirectionOverride", "Opposite direction").visible(move |v| !ovr(v, "UP_TO_VERTEX")),
             ],
         )
-        .item_template("#vertex"),
+        .item_template("#vertex")
+        .hints(Hints::DRIVEN_QUERY),
         ParamSpec::bool("useCubicInterpolation", "Use cubic interpolation", true),
         ParamSpec::bool("showRuledLines", "Show ruled lines", false),
         ParamSpec::num("ruledLineCount", "Count", NumSpec::integer(40, 1, 100)).visible(|v| v.bool("showRuledLines")),
@@ -208,7 +209,7 @@ pub fn constrained_surface() -> FeatureType {
             ],
         )
         .item_template("#vertex")
-        .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::INITIAL_FOCUS | Hints::PREVENT_ARRAY_REORDER)
+        .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::INITIAL_FOCUS | Hints::PREVENT_ARRAY_REORDER | Hints::DRIVEN_QUERY)
         .visible(|v| v.is("csType", "POINTS")),
         ParamSpec::query("meshes", "Mesh bodies or faces", QueryFilter::ANY_FACE | QueryFilter::BODY).visible(|v| v.is("csType", "MESH")),
         ParamSpec::num("tolerance", "Tolerance", TOLERANCE_BOUND),
