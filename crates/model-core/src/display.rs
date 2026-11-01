@@ -361,6 +361,25 @@ pub struct FeatureState {
     /// A pattern's instance points while Skip instances is on (FeatureScript
     /// `TOGGLE_POINTS` manipulator): clicked to skip or keep an instance.
     pub toggle_points: Vec<TogglePoint>,
+    /// The manipulators FeatureScript's `addManipulators` added (std's
+    /// sheet metal features, custom features), by key: drawn while the
+    /// feature is edited, a drag runs its "Manipulator Change Function".
+    pub manipulators: Vec<(String, FeatureManipulator)>,
+}
+
+/// A manipulator of FeatureScript's `addManipulators` (std manipulator.fs),
+/// lengths in metres, angles in radians.
+#[derive(Clone, Debug, PartialEq)]
+pub enum FeatureManipulator {
+    /// `linearManipulator`: dragged along `direction` from `base`.
+    Linear { base: DVec3, direction: DVec3, offset: f64, min: f64, max: f64, secondary: bool, primary: Option<String> },
+    /// `angularManipulator`: turned about the axis from `rotation_origin`.
+    Angular { axis_origin: DVec3, axis_direction: DVec3, rotation_origin: DVec3, angle: f64, min: f64, max: f64, secondary: bool, primary: Option<String> },
+    /// `flipManipulator`: an arrow along `direction` (flipped: the other
+    /// way, or `other_direction`), a click flips it.
+    Flip { base: DVec3, direction: DVec3, flipped: bool, other_direction: Option<DVec3>, secondary: bool },
+    /// `pointsManipulator`: points, one of them selected.
+    Points { points: Vec<DVec3>, index: usize },
 }
 
 /// One point of a `TOGGLE_POINTS` manipulator.

@@ -671,3 +671,11 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   `assembly_mass_properties_combine_parts_where_they_sit`; assembly-ui assembly_mass.rs: the checkbox toggles
   `AsmMassUi::variance`, the bounds are cached per selection and result, values read "41032.079 mm³ ± 2.100e+0 mm³"
   (live G31), the inertia cells without a unit, none on an overridden mass.
+
+## From psui (11-01 17:00): sheet metal face order seen through std's manipulators
+- std's `addManipulators` now reaches the dialog (audit-part-studio M15). Sheet metal model by Thicken: std's
+  addFlipDirectionUpManipulator puts its flip arrow on `qNthElement(qOwnedByBody(sheetBodies, FACE), 0)`; on our
+  60 × 40 plate that first face is the x = 0 side (base (0, 20, 1) mm, direction +X), so the arrow lies sideways
+  at the edge. Live would have the sheet's own face first (arrow along the normal). If our definition sheet body
+  lists its faces in another order than Parasolid's (or has side faces live's has not), that's yours; the T1
+  `sheetmetal_std::sheet_metal_model_adds_std_s_flip_manipulator` notes it.

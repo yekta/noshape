@@ -74,7 +74,7 @@ drawn natively (part_studio/manipulators.rs, triad.rs, section_manip.rs): our Fe
 | M12 | Loft, Wrap, Ruled surface, Bridging curve, Fit spline, Edit curve, Offset curve on face | lengths / angles / points | none | P3 | ✗ |
 | M13 | Routing curve | full triads, points | triad, points | – | = std (audit 9) |
 | M14 | Linear / Circular / Curve pattern | instance points (Skip instances) | points | – | = std (p1 dialogs) |
-| M15 | Sheet metal: Flange (length), Sheet metal model (flip), Corner break; End cap, Gusset, Frame, Decal, Derived (points) | std's | none | P3 | ✗ (std runs the sheet metal ones: catching std's `addManipulators` would draw them as std adds them) |
+| M15 | Sheet metal: Flange (length), Sheet metal model (flip), Corner break; End cap, Gusset, Frame, Decal, Derived (points) | std's | none | P3 | ✅ (audit 11) for every feature FeatureScript runs (std's sheet metal, Tag, PCB): the host keeps `addManipulators` (FeatureState::manipulators), the dialog draws lengths / flips as arrows and angles as arcs, and a drag or a click runs the feature's own "Manipulator Change Function" (std_feature::manipulator_change_in); checked on :102 (Sheet metal model's flip ticks Flip direction up). ✗ points manipulators, custom features' change functions, the native ones (End cap, Gusset, Frame, Decal, Derived) |
 
 ## Editing logic (std's dialog reactions)
 

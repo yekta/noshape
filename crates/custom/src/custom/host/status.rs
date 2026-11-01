@@ -22,6 +22,7 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("functionGetFeatureStatus", get_status),
     ("clearFeatureStatus", clear_status),
     ("setFeatureComputedParameter", set_feature_computed_parameter),
+    ("addManipulators", add_manipulators),
     ("setFeatureHiddenParameters", noop),
     ("recordQuery", noop),
     ("setExternalDisambiguation", noop),
@@ -30,7 +31,6 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("setHighlightedEntities", noop),
     ("transferSubfeatureErrorDisplay", noop),
     ("setDimensionedEntities", noop),
-    ("addManipulators", noop),
     ("addAuxiliaryEntities", noop),
     ("addReferenceCSysFrame", noop),
     ("setPatternData", noop),
@@ -362,6 +362,119 @@ fn quantity_value(q: &Quantity) -> Value {
     } else {
         Value::num(q.value)
     }
+}
+
+/// `@addManipulators(context, id, { key: Manipulator })` (std manipulator.fs):
+/// the feature's manipulators, kept by key (a later call with a key replaces
+/// it). Triads stay native (Transform, Routing curve).
+fn add_manipulators(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    use crate::display::FeatureManipulator as M;
+    let cx = context_arg(i, &a)?;
+    let def = def_arg(i, &a, 2)?;
+    let Some(map) = def.as_map() else { return Ok(Value::Undefined) };
+    let member = |v: &Value| match v {
+        Value::Enum(t, o) => noshape_featurescript::value::type_info(*t).members.get(*o as usize).map(|m| m.to_string()),
+        _ => None,
+    };
+    let mut out = Vec::new();
+    for (k, m) in map.iter() {
+        let (Some(key), Some(kind)) = (k.as_str(), member(m.get("manipulatorType"))) else { continue };
+        let secondary = member(m.get("style")).as_deref() == Some("SECONDARY");
+        let primary = m.get("primaryParameterId").as_str().map(|s| s.to_string());
+        let manip = match kind.as_str() {
+            "LINEAR_1D" => (|| {
+                Some(M::Linear {
+                    base: vec3_of(m.get("base"))?,
+                    direction: vec3_of(m.get("direction"))?.normalize_or_zero(),
+                    offset: length_of(m.get("offset"))?,
+                    min: length_of(m.get("minValue")).unwrap_or(-500.0),
+                    max: length_of(m.get("maxValue")).unwrap_or(500.0),
+                    secondary,
+                    primary: primary.clone(),
+                })
+            })(),
+            "ANGULAR" => (|| {
+                Some(M::Angular {
+                    axis_origin: vec3_of(m.get("axisOrigin"))?,
+                    axis_direction: vec3_of(m.get("axisDirection"))?.normalize_or_zero(),
+                    rotation_origin: vec3_of(m.get("rotationOrigin"))?,
+                    angle: angle_of(m.get("angle"))?,
+                    min: angle_of(m.get("minValue")).unwrap_or(-std::f64::consts::PI),
+                    max: angle_of(m.get("maxValue")).unwrap_or(std::f64::consts::PI),
+                    secondary,
+                    primary: primary.clone(),
+                })
+            })(),
+            "FLIP" => (|| Some(M::Flip { base: vec3_of(m.get("base"))?, direction: vec3_of(m.get("direction"))?.normalize_or_zero(), flipped: m.get("flipped").as_bool()?, other_direction: vec3_of(m.get("otherDirection")).map(|d| d.normalize_or_zero()), secondary }))(),
+            "POINTS" => (|| Some(M::Points { points: m.get("points").as_array()?.iter().filter_map(vec3_of).collect(), index: m.get("index").as_number()? as usize }))(),
+            _ => None,
+        };
+        if let Some(manip) = manip {
+            out.push((key.to_string(), manip));
+        }
+    }
+    let mut st = cx.state.lock();
+    for (k, v) in out {
+        st.manipulators.retain(|(x, _)| *x != k);
+        st.manipulators.push((k, v));
+    }
+    Ok(Value::Undefined)
+}
+
+/// A manipulator as FeatureScript's `Manipulator` (what `addManipulators`
+/// took, with its current offset / angle / flip / index): the
+/// `newManipulators` entry a manipulator change function reads.
+pub fn manipulator_value(m: &crate::display::FeatureManipulator) -> Option<Value> {
+    use crate::display::FeatureManipulator as M;
+    let ty = |member: &str| super::std_enum("manipulatortype.gen.fs", "ManipulatorType", member);
+    let style = |secondary: bool| super::std_enum("manipulatorstyleenum.gen.fs", "ManipulatorStyleEnum", if secondary { "SECONDARY" } else { "DEFAULT" });
+    let mut out = Map::new();
+    let mut put = |k: &str, v: Value| {
+        out.insert(Value::str(k), v);
+    };
+    match m {
+        M::Linear { base, direction, offset, min, max, secondary, primary } => {
+            put("manipulatorType", ty("LINEAR_1D")?);
+            put("base", point_value(*base));
+            put("direction", dir_value(*direction));
+            put("offset", length_value(*offset));
+            put("minValue", length_value(*min));
+            put("maxValue", length_value(*max));
+            put("style", style(*secondary)?);
+            if let Some(p) = primary {
+                put("primaryParameterId", Value::str(p.as_str()));
+            }
+        }
+        M::Angular { axis_origin, axis_direction, rotation_origin, angle, min, max, secondary, primary } => {
+            put("manipulatorType", ty("ANGULAR")?);
+            put("axisOrigin", point_value(*axis_origin));
+            put("axisDirection", dir_value(*axis_direction));
+            put("rotationOrigin", point_value(*rotation_origin));
+            put("angle", angle_value(*angle));
+            put("minValue", angle_value(*min));
+            put("maxValue", angle_value(*max));
+            put("style", style(*secondary)?);
+            if let Some(p) = primary {
+                put("primaryParameterId", Value::str(p.as_str()));
+            }
+        }
+        M::Flip { base, direction, flipped, other_direction, secondary } => {
+            put("manipulatorType", ty("FLIP")?);
+            put("base", point_value(*base));
+            put("direction", dir_value(*direction));
+            put("flipped", Value::bool(*flipped));
+            if let Some(d) = other_direction {
+                put("otherDirection", dir_value(*d));
+            }
+            put("style", style(*secondary)?);
+        }
+        M::Points { points, index } => {
+            put("manipulatorType", ty("POINTS")?);
+            put("points", Value::array(points.iter().map(|p| point_value(*p)).collect()));
+            put("index", Value::num(*index as f64));
+        }
+    }
+    Some(Value::Map(std::sync::Arc::new(out), super::std_tag("manipulator.fs", "Manipulator")))
 }
 
 /// `setFeatureComputedParameter(context, id, { name, value })`: a value the

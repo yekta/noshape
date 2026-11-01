@@ -272,6 +272,8 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
     let top = vec![Arc::<str>::from(ev.feature.to_string())];
     let status = st.status.get(&top).cloned();
     let debug = std::mem::take(&mut st.debug_entities);
+    // std's addManipulators (Flange's length, custom features' handles).
+    ev.manipulators = std::mem::take(&mut st.manipulators);
     // std's setFeatureComputedParameter values (Jog's bend angle).
     for (k, v) in std::mem::take(&mut st.computed) {
         ev.computed.retain(|(c, _)| *c != k);
@@ -363,6 +365,48 @@ pub(crate) fn run_editing_logic(
             _ => query_of_refs(&cx, &hidden),
         });
     }
+    call_and_diff(f, args, name, units, decls, &new_def, &news, &cx)
+}
+
+/// Run a "Manipulator Change Function" (std's `flangeManipulatorChange`, a
+/// custom feature's) as Onshape does when a manipulator is dragged or
+/// clicked: `f(context, definition, newManipulators)` in `ctx`, the Part
+/// Studio just before the feature, `newManipulators` holding the moved
+/// manipulator under its key. Returns the parameters it changed; `None` if
+/// it failed.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn run_manipulator_change(
+    ctx: crate::regen::context::Context,
+    feature: FeatureId,
+    name: &str,
+    units: &noshape_units::UnitPrefs,
+    f: &Arc<noshape_featurescript::ir::OverloadSet>,
+    decls: &[ParamDecl],
+    specs: &[crate::params::ParamSpec],
+    values: &ParamValues,
+    key: &str,
+    manipulator: &crate::display::FeatureManipulator,
+) -> Option<ParamValues> {
+    host::register();
+    let mut news = values.clone();
+    fill_defaults(specs, &mut news, units);
+    let outer = std::collections::BTreeMap::new();
+    let ev = EvalCtx::new(feature, name, &news, units, Default::default(), &outer);
+    let cx = FsContext::new(ctx, feature, name.to_string(), *units, outer.clone(), None);
+    let provider = super::fallback_provider();
+    let new_def = definition(&cx, decls, &news, &ev, Some(&*provider)).ok()?;
+    let mut moved = Map::new();
+    moved.insert(Value::str(key), host::manipulator_value(manipulator)?);
+    let args = vec![cx.value(), new_def.clone(), Value::map(moved)];
+    call_and_diff(f, args, name, units, decls, &new_def, &news, &cx)
+}
+
+/// Call `f` with `args` (a dialog's FeatureScript function: editing logic, a
+/// manipulator change function) on its own thread under the time limit, and
+/// return the parameters whose values differ from `new_def` in what it
+/// returns.
+#[allow(clippy::too_many_arguments)]
+fn call_and_diff(f: &Arc<noshape_featurescript::ir::OverloadSet>, args: Vec<Value>, name: &str, units: &noshape_units::UnitPrefs, decls: &[ParamDecl], new_def: &Value, news: &ParamValues, cx: &Arc<FsContext>) -> Option<ParamValues> {
     let func = Value::Function(noshape_featurescript::value::Shared::new(noshape_featurescript::value::Func::Overloads(f.clone())));
     let units = *units;
     std::thread::scope(|s| {
@@ -396,7 +440,7 @@ pub(crate) fn run_editing_logic(
                     if v.is_undefined() || v == was {
                         continue;
                     }
-                    if let Some(pv) = editing_value(&mut i, &cx, d, v, &units, &news) {
+                    if let Some(pv) = editing_value(&mut i, cx, d, v, &units, news) {
                         changed.set(&d.id, pv);
                     }
                 }

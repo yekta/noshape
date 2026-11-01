@@ -80,6 +80,11 @@ pub(super) enum Manip {
 pub(super) enum Handle {
     Arrow(Arrow),
     Arc(ArcHandle),
+    /// A FeatureScript manipulator (`addManipulators`, its index in the
+    /// feature state): a length or flip arrow, or an angle arc, whose moves
+    /// go through the feature's "Manipulator Change Function".
+    StdArrow(Arrow, usize),
+    StdArc(ArcHandle, usize),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -112,7 +117,8 @@ impl PartStudioView {
             "draft" => self.draft_arc(cx).map(|h| Manip::Handles(Handle::Arc(h), None)),
             "transform" => self.current_triad(cx).map(Manip::Triad).or_else(|| self.transform_handle(cx)),
             "routingCurve" => self.routing_triad(cx).map(Manip::Triad),
-            _ => None,
+            // Features FeatureScript runs (std's sheet metal, custom features): their own addManipulators.
+            _ => self.std_handles(cx),
         }
     }
 
@@ -535,8 +541,8 @@ impl PartStudioView {
                 .into_iter()
                 .flatten()
                 .map(|h| match h {
-                    Handle::Arrow(a) => arrow(&a),
-                    Handle::Arc(h) => arc(&h),
+                    Handle::Arrow(a) | Handle::StdArrow(a, _) => arrow(&a),
+                    Handle::Arc(h) | Handle::StdArc(h, _) => arc(&h),
                 })
                 .collect(),
             Some(Manip::Triad(t)) => {
@@ -599,6 +605,8 @@ impl PartStudioView {
             Some(Manip::Handles(a, b)) => match (b.filter(|_| which == 1).unwrap_or(a), if b.is_some() { which } else { 0 }) {
                 (Handle::Arrow(a), _) => a,
                 (Handle::Arc(h), which) => return self.arc_event(h, which, ev, window, cx),
+                (Handle::StdArrow(a, i), which) => return self.std_arrow_event(a, i, which, ev, window, cx),
+                (Handle::StdArc(h, i), which) => return self.std_arc_event(h, i, which, ev, window, cx),
             },
             Some(Manip::Triad(t)) => return self.triad_event(t, ev, window, cx),
             // Rings and the base circle first; the arrow as any other.
@@ -765,6 +773,200 @@ impl PartStudioView {
     }
 }
 
+impl PartStudioView {
+    /// The edited feature's FeatureScript manipulators (`addManipulators`,
+    /// from its last preview; the one being dragged where it is now), the
+    /// first two drawable: lengths and flips as arrows, angles as arcs.
+    fn std_handles(&self, cx: &App) -> Option<Manip> {
+        let id = self.edit.as_ref()?.dialog.read(cx).feature.id;
+        let state = self.display.feature_state(id)?;
+        let mut handles = state.manipulators.iter().enumerate().filter_map(|(i, (_, m))| {
+            let m = match &self.ui.std_manip_live {
+                Some((j, live)) if *j == i => live,
+                _ => m,
+            };
+            std_handle(m, i)
+        });
+        Some(Manip::Handles(handles.next()?, handles.next()))
+    }
+
+    /// The FeatureScript manipulator `i` as it stands (dragged or as the preview added it), with its key.
+    fn std_manipulator(&self, i: usize, cx: &App) -> Option<(String, noshape_model::display::FeatureManipulator)> {
+        let id = self.edit.as_ref()?.dialog.read(cx).feature.id;
+        let (key, m) = self.display.feature_state(id)?.manipulators.get(i)?.clone();
+        Some((key, self.ui.std_manip_live.as_ref().filter(|(j, _)| *j == i).map_or(m, |(_, live)| live.clone())))
+    }
+
+    /// Manipulator `i` moved to `moved`: shown there at once; the feature's
+    /// "Manipulator Change Function" runs in the background on the model
+    /// before it and its parameter changes go to the dialog (a result for
+    /// values changed since is dropped).
+    fn std_manip_change(&mut self, i: usize, moved: noshape_model::display::FeatureManipulator, cx: &mut Context<Self>) {
+        let Some((key, _)) = self.std_manipulator(i, cx) else { return };
+        let Some(ctx) = self.ui.before_context.clone() else { return };
+        let Some(dialog) = self.edit.as_ref().map(|e| e.dialog.clone()) else { return };
+        let (ty, id, name, params) = {
+            let d = dialog.read(cx);
+            (d.feature.type_id.clone(), d.feature.id, d.feature.name.clone(), d.feature.params.clone())
+        };
+        self.ui.std_manip_live = Some((i, moved.clone()));
+        self.refresh_scene(false, cx);
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let sent = params.clone();
+        self.ui.std_manip_task = Some(cx.spawn(async move |this, cx| {
+            let changed = cx.background_spawn(async move { noshape_model::custom::std_feature::manipulator_change_in((*ctx).clone(), &ty, id, &name, &units, &sent, &key, &moved) }).await;
+            let Some(changed) = changed else { return };
+            let _ = this.update(cx, |this: &mut Self, cx| {
+                if dialog.read(cx).feature.params != params {
+                    return;
+                }
+                let changes: Vec<(String, ParamValue)> = changed.0.into_iter().filter(|(k, v)| params.get(k) != Some(v)).collect();
+                if changes.is_empty() {
+                    return;
+                }
+                let mut next = params;
+                for (k, v) in &changes {
+                    next.set(k, v.clone());
+                }
+                this.ui.std_edit_old = Some(next);
+                dialog.update(cx, |d, cx| {
+                    for (k, v) in changes {
+                        d.set_value_logic(&k, v, cx);
+                    }
+                });
+            });
+        }));
+    }
+
+    /// End of a FeatureScript manipulator's drag: the drawn one follows the
+    /// preview again; its primaryParameterId's field shows the value
+    /// selected (manipulator.fs: the dialog focus moves there).
+    fn std_manip_end(&mut self, primary: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
+        self.manip_drag = None;
+        self.ui.std_manip_live = None;
+        if let (Some(p), Some(e)) = (primary, &self.edit) {
+            e.dialog.update(cx, |dlg, cx| dlg.focus_field_selected(&p, window, cx));
+        }
+    }
+
+    /// A FeatureScript length or flip arrow: a drag moves a length along
+    /// its direction (signed, within its min / max, 0.1 mm steps as ours);
+    /// a click on a flip arrow flips it.
+    fn std_arrow_event(&mut self, a: Arrow, i: usize, which: usize, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        use noshape_model::display::FeatureManipulator as M;
+        let Some((_, m)) = self.std_manipulator(i, cx) else { return false };
+        let ray = |this: &Self, p: DVec2, cx: &App| this.viewport.read(cx).ray(p);
+        match ev {
+            ViewportEvent::ToolDown { position, .. } => {
+                let (o, d) = ray(self, *position, cx);
+                let t = Self::axis_param(&a, o, d).unwrap_or(a.length);
+                self.manip_drag = Some(ManipDrag { grab_offset: t - a.length, which, delta: 0.0 });
+                true
+            }
+            ViewportEvent::ToolDrag { position, .. } => {
+                let Some(md) = self.manip_drag else { return false };
+                self.manip_drag = Some(ManipDrag { delta: 1.0, ..md });
+                let M::Linear { min, max, .. } = m else { return true };
+                let (o, d) = ray(self, *position, cx);
+                let Some(t) = Self::axis_param(&a, o, d) else { return true };
+                let units = self.doc.read(cx).session.doc.settings.units;
+                let imperial = matches!(units.length, noshape_units::LengthUnit::Inch | noshape_units::LengthUnit::Foot | noshape_units::LengthUnit::Yard);
+                let step = if imperial { 0.000254 } else { 0.0001 };
+                let value = (((t - md.grab_offset) / step).round() * step).clamp(min, max);
+                let mut moved = m.clone();
+                if let M::Linear { offset, .. } = &mut moved {
+                    *offset = value;
+                }
+                self.std_manip_change(i, moved, cx);
+                true
+            }
+            ViewportEvent::ToolUp { .. } => {
+                let clicked = self.manip_drag.is_some_and(|d| d.delta == 0.0);
+                let primary = match &m {
+                    M::Linear { primary, .. } => primary.clone(),
+                    _ => None,
+                };
+                if clicked && let M::Flip { flipped, .. } = &m {
+                    let mut moved = m.clone();
+                    if let M::Flip { flipped: f, .. } = &mut moved {
+                        *f = !*flipped;
+                    }
+                    self.std_manip_change(i, moved, cx);
+                }
+                self.std_manip_end(primary.filter(|_| !clicked), window, cx);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// A FeatureScript angle arc: dragged about its axis (signed, within
+    /// its min / max, snapping as Revolve's).
+    fn std_arc_event(&mut self, h: ArcHandle, i: usize, which: usize, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        use noshape_model::display::FeatureManipulator as M;
+        let Some((_, m)) = self.std_manipulator(i, cx) else { return false };
+        let M::Angular { min, max, ref primary, .. } = m else { return false };
+        let angle_at = |this: &Self, p: DVec2, cx: &App| -> Option<f64> {
+            let (o, d) = this.viewport.read(cx).ray(p);
+            let denom = d.dot(h.axis);
+            if denom.abs() < 1e-6 {
+                return None;
+            }
+            let v = o + d * ((h.origin - o).dot(h.axis) / denom) - h.origin;
+            let (x, y) = (h.radial.normalize(), h.axis.cross(h.radial).normalize());
+            Some(v.dot(y).atan2(v.dot(x)))
+        };
+        let (pi, tau) = (std::f64::consts::PI, std::f64::consts::TAU);
+        match ev {
+            ViewportEvent::ToolDown { position, .. } => {
+                let a0 = angle_at(self, *position, cx).map_or(h.angle, |raw| h.angle + (raw - h.angle + pi).rem_euclid(tau) - pi);
+                self.manip_drag = Some(ManipDrag { grab_offset: a0, which, delta: a0 - h.angle });
+                true
+            }
+            ViewportEvent::ToolDrag { position, .. } => {
+                let Some(md) = self.manip_drag else { return false };
+                let Some(raw) = angle_at(self, *position, cx) else { return true };
+                let a = md.grab_offset + (raw - md.grab_offset + pi).rem_euclid(tau) - pi;
+                self.manip_drag = Some(ManipDrag { grab_offset: a, ..md });
+                let value = a - md.delta;
+                let value = (snap_degrees(value.abs().to_degrees()).to_radians() * value.signum()).clamp(min, max);
+                let mut moved = m.clone();
+                if let M::Angular { angle, .. } = &mut moved {
+                    *angle = value;
+                }
+                self.std_manip_change(i, moved, cx);
+                true
+            }
+            ViewportEvent::ToolUp { .. } => {
+                self.std_manip_end(primary.clone(), window, cx);
+                true
+            }
+            _ => false,
+        }
+    }
+}
+
+/// A FeatureScript manipulator as one of our handles (`i`: its index).
+fn std_handle(m: &noshape_model::display::FeatureManipulator, i: usize) -> Option<Handle> {
+    use noshape_model::display::FeatureManipulator as M;
+    Some(match m {
+        M::Linear { base, direction, offset, secondary, .. } => Handle::StdArrow(Arrow { base: *base, dir: *direction, length: *offset, param: "", flip: None, secondary: *secondary }, i),
+        M::Flip { base, direction, flipped, other_direction, secondary } => {
+            let dir = if *flipped { other_direction.unwrap_or(-*direction) } else { *direction };
+            Handle::StdArrow(Arrow { base: *base, dir, length: 0.0, param: "", flip: None, secondary: *secondary }, i)
+        }
+        M::Angular { axis_origin, axis_direction, rotation_origin, angle, min, max, secondary, .. } => {
+            let rel = *rotation_origin - *axis_origin;
+            let radial = rel - *axis_direction * axis_direction.dot(rel);
+            if radial.length() < 1e-12 {
+                return None;
+            }
+            Handle::StdArc(ArcHandle { origin: *axis_origin + *axis_direction * axis_direction.dot(rel), axis: *axis_direction, radial, angle: *angle, param: "", flip: None, secondary: *secondary, max: max.abs().max(min.abs()) }, i)
+        }
+        M::Points { .. } => return None,
+    })
+}
+
 /// A dragged angle (degrees, ≥ 0) as live sets it: a multiple of 5° within
 /// 2° of one, else as dragged; at most a whole turn.
 pub(super) fn snap_degrees(deg: f64) -> f64 {
@@ -823,8 +1025,8 @@ impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
         match self.manip {
             // The hovered or dragged handle drawn last: Revolve's start angle arc runs over the first's.
             Manip::Handles(a, b) => self.lit_last([Some(a), b], |h, hover, drag| match h {
-                Handle::Arrow(a) => arrow_glyph(a, hover, drag, view, up),
-                Handle::Arc(h) => arc_glyph(h, hover, drag, view, up),
+                Handle::Arrow(a) | Handle::StdArrow(a, _) => arrow_glyph(a, hover, drag, view, up),
+                Handle::Arc(h) | Handle::StdArc(h, _) => arc_glyph(h, hover, drag, view, up),
             }),
             Manip::Triad(t) => super::triad::triad_glyph(&t, self.triad_hover, self.triad_dragging, view, up),
             Manip::Section(s) => {

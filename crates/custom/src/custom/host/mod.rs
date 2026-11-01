@@ -30,7 +30,7 @@ mod pattern;
 pub mod query;
 mod sketch;
 mod status;
-pub(crate) use status::quantity_of;
+pub(crate) use status::{manipulator_value, quantity_of};
 
 pub use convert::*;
 pub use query::{Ent, entity_type_of};
@@ -134,6 +134,9 @@ pub struct CtxState {
     /// `setFeatureComputedParameter`: values the dialog shows (Jog's
     /// computed bend angle), handed to the regeneration's feature state.
     pub computed: Vec<(String, crate::display::ComputedValue)>,
+    /// `addManipulators`: the feature's manipulators by key, handed to the
+    /// regeneration's feature state (drawn while it is edited).
+    pub manipulators: Vec<(String, crate::display::FeatureManipulator)>,
     /// Sketches being built (`newSketch` .. `skSolve`), by sketch id.
     pub sketches: HashMap<FsId, sketch::SketchBuild>,
     /// String entity ids of FeatureScript sketches.
@@ -230,6 +233,7 @@ impl FsContext {
                 attributes,
                 debug_entities: Vec::new(),
                 computed: Vec::new(),
+                manipulators: Vec::new(),
                 sketches: HashMap::new(),
                 sketch_names: HashMap::new(),
                 hidden,

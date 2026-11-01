@@ -1496,3 +1496,32 @@ fn two_thickened_walls_name_their_parts_apart() {
     let st = r.display.features.last().unwrap();
     assert_eq!(st.message.as_deref(), Some("Cannot add joint joining selected entities."), "{:?}", st.status);
 }
+
+/// std's `addManipulators` reaches the feature state (audit-part-studio M15): Sheet metal model by Thicken adds its
+/// "flip direction up" arrow (std addFlipDirectionUpManipulator: on the sheet's first face, unflipped), and a
+/// click on it runs std's sheetMetalStartManipulatorChange, which sets Flip direction up.
+#[test]
+fn sheet_metal_model_adds_std_s_flip_manipulator() {
+    let mut s = Studio::new();
+    let region = s.rectangle(60.0, 40.0);
+    let start = s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    let r = s.ok();
+    let state = r.display.feature_state(start).expect("state");
+    let [(key, m)] = state.manipulators.as_slice() else { panic!("one manipulator: {:?}", state.manipulators) };
+    // (On the sheet's first face: ours is a side face, live's the sheet's own face; skasm.md "From psui" 11-01.)
+    let noshape_model::display::FeatureManipulator::Flip { flipped, .. } = m else { panic!("a flip arrow: {m:?}") };
+    assert!(!flipped, "{m:?}");
+    let mut moved = m.clone();
+    if let noshape_model::display::FeatureManipulator::Flip { flipped, .. } = &mut moved {
+        *flipped = true;
+    }
+    let f = s.ps.features.iter().find(|f| f.id == start).unwrap();
+    let before = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions { upto: Some(s.ps.features.len() - 1), ..Default::default() }).context;
+    let changed = noshape_model::custom::std_feature::manipulator_change_in((*before).clone(), &f.type_id, f.id, &f.name, &s.units, &f.params, key, &moved).expect("std's change function ran");
+    assert_eq!(changed.get("flipDirectionUp"), Some(&ParamValue::Bool(true)), "{changed:?}");
+}

@@ -23,6 +23,8 @@ struct StdFeature {
     specs: Vec<crate::params::ParamSpec>,
     /// Its "Editing Logic Function" (e.g. sheetMetalTabEditingLogic).
     editing: Option<Arc<noshape_featurescript::ir::OverloadSet>>,
+    /// Its "Manipulator Change Function" (e.g. flangeManipulatorChange).
+    manipulator_change: Option<Arc<noshape_featurescript::ir::OverloadSet>>,
 }
 
 /// Loaded std features by name (`None`: not found).
@@ -74,12 +76,9 @@ fn load(module: &str, name: &str) -> Option<Arc<StdFeature>> {
     let DeclKind::Const(cell) = &decl.kind else { return None };
     let item = m.ast.items.iter().find(|it| matches!(&it.kind, TopKind::Const { name: n, .. } if &**n == name))?;
     let TopKind::Const { init, .. } = &item.kind else { return None };
-    let editing = item
-        .annotation
-        .as_ref()
-        .map(|a| noshape_featurescript::annot::eval(&m, a))
-        .and_then(|ann| ann.str("Editing Logic Function").map(str::to_string))
-        .and_then(|f| m.functions(&f));
+    let ann = item.annotation.as_ref().map(|a| noshape_featurescript::annot::eval(&m, a));
+    let function = |key: &str| ann.as_ref().and_then(|ann| ann.str(key).map(str::to_string)).and_then(|f| m.functions(&f));
+    let (editing, manipulator_change) = (function("Editing Logic Function"), function("Manipulator Change Function"));
     let lambda = defined_lambda(init, "defineSheetMetalFeature").or_else(|| defined_lambda(init, "defineFeature"))?;
     let mut params = Vec::new();
     if let Some(p) = &lambda.precondition {
@@ -90,7 +89,7 @@ fn load(module: &str, name: &str) -> Option<Arc<StdFeature>> {
     let mut specs = crate::features::get(ty).map(|t| t.params.clone()).unwrap_or_default();
     let extra: Vec<_> = super::studio::param_specs(&params).into_iter().filter(|s| !specs.iter().any(|b| b.id == s.id)).collect();
     specs.extend(extra);
-    Some(Arc::new(StdFeature { cell: cell.clone(), params, specs, editing }))
+    Some(Arc::new(StdFeature { cell: cell.clone(), params, specs, editing, manipulator_change }))
 }
 
 /// Evaluate the current feature with std's `name` from `module` (e.g.
@@ -221,6 +220,28 @@ pub fn editing_logic_in_clicked(
     let f = loaded(module, std)?;
     let editing = f.editing.as_ref()?;
     super::run::run_editing_logic(ctx, feature, name, units, editing, &f.params, &f.specs, old, new, specified, creating, clicked)
+}
+
+/// Std's "Manipulator Change Function" of built-in feature `type_id` after
+/// its manipulator `key` moved to `manipulator` (a drag, a click on a flip
+/// arrow), run in `ctx`, the Part Studio just before the feature, on the
+/// dialog's `values`: the parameters it changes. `None`: no such function,
+/// or it failed.
+#[allow(clippy::too_many_arguments)]
+pub fn manipulator_change_in(
+    ctx: crate::regen::context::Context,
+    type_id: &str,
+    feature: crate::reference::FeatureId,
+    name: &str,
+    units: &noshape_units::UnitPrefs,
+    values: &crate::params::ParamValues,
+    key: &str,
+    manipulator: &crate::display::FeatureManipulator,
+) -> Option<crate::params::ParamValues> {
+    let (module, std) = logic_std_name(type_id)?;
+    let f = loaded(module, std)?;
+    let change = f.manipulator_change.as_ref()?;
+    super::run::run_manipulator_change(ctx, feature, name, units, change, &f.params, &f.specs, values, key, manipulator)
 }
 
 /// The dialog std's precondition declares for built-in feature `type_id`

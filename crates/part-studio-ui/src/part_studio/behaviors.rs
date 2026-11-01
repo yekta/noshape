@@ -371,6 +371,11 @@ pub struct UiState {
     /// std's editing logic running off the UI thread (std Extrude runs a
     /// whole trial extrude for its boolean heuristics).
     pub std_edit_task: Option<Task<()>>,
+    /// A FeatureScript manipulator being dragged (its index in the feature
+    /// state's `manipulators`, where it is now: drawn there until the
+    /// preview catches up), and the run of its change function.
+    pub std_manip_live: Option<(usize, noshape_model::display::FeatureManipulator)>,
+    pub std_manip_task: Option<Task<()>>,
     /// The Decal dialog's face and image when they last were both set
     /// (onDecalFeatureChange sizes the decal when they first are).
     pub decal_sized: Option<(noshape_model::reference::FeatureId, String)>,
@@ -662,6 +667,8 @@ impl UiState {
             decal_sized: None,
             std_edit_old: None,
             std_edit_task: None,
+            std_manip_live: None,
+            std_manip_task: None,
             preview_task: None,
             preview_tool: None,
             preview_tool_adds: false,
