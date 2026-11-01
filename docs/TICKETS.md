@@ -1580,6 +1580,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   transient ids are interned per Reference (custom host mod.rs `transient`), so the two sheets' edges most likely
   share a persistent name from the Thicken: every attribute std attaches to one lands on both. Next: query the two
   sheets' edge names after the Thicken; the fix is in naming (core) or in sheetMetalStart's per-region sheets.
+  Second probe (all definition-sheet edges): every definition edge carries **two** association attributes (e.g. the
+  junction edge [JAG, JAN]), where std's assignSMAssociationAttributes gives each entity one; the second is the
+  other sheet's. Suspect: std's assign-to-new-or-split pass sees the entities as new again (our qAttributeQuery /
+  qSubtraction of already-associated entities) and assigns a second id. Check that pass next.
 - [x] verified 131b6f34 (qa 10-31 20:12, green a2c5b09f as CLI (`noshape mcp`, /tmp/qa-smbutt2.py): smdocs/g34 + Corner CLOSED at (2, 2, 2) → 8535.161626 / 23 faces (live 8535.0418; the +0.12 is SM3's residual), then sheetmetal_edit_joint Joint C **Butt joint - Direction 1 → 8601.815265 / 23 faces**, **Direction 2 → 8601.815679 / 23** (live evVolume HIGH 8601.820762 / 8601.821483, 23 faces: −0.0055 mm³, 6e-7; was 8599.80); the joint adds +66.654 here vs live's +66.779) P3 SM-CLOSED-BUTT a Joint › Rip › Butt joint on the corner rip of a Closed corner (G34 b; workflow-sheet-metal-joints
   row 5): ours runs the right wall through (992 / 672 mm² faces as live) but keeps the Closed corner's bend ends, 8599.80
   mm³ vs live 8601.722190 (Direction 1), 1.92 mm³ short. Live re-closes both bends against the through wall: plate ends
