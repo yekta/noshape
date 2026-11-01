@@ -435,6 +435,11 @@ Duplicate), G18 no fix icon on parts inside subassemblies, G11 Insert DXF or DWG
 select-item dialog (ReferenceKind::Drawing2d; SelectItemPanel gained `ok` (✓) and `title`). Open: G7 (vendor input's
 clear-button tooltip), G13 Libraries tab (no image library), Flow glyph position, "In context" constraint mode.
 Landing now queues (land.sh returns QUEUED; `land.sh --status`); while iterating run single tests only.
+Later 11-01: queued 17a951a9 (Flow glyph two-thirds along), f9137d7b (G7 Clear search, vendor input), 3be177d6
+(Constraint manager In context mode). Audit: 18 surfaces, 18 gaps, 18 fixed (G13 Libraries open). Waiting on live
+request "remaining assembly right-click menus" (REQUESTS 12:30): connector / relation / pattern / mirror / replicate
+rows, mate folders, graphics mate indicators, nested rows, empty list space. Then: whether live's Customize shortcuts
+and Shortcut toolbars lists now include Flow.
 
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
