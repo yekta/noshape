@@ -4811,6 +4811,21 @@ static OpOut op_draft_unbudgeted(const OcShape& s, const OcShapeList& faces, P3 
     return sloped();
   HHist        h = modifier_history(s.shape, mk);
   TopoDS_Shape r = mk.Shape();
+  // A vertex or edge left with a tolerance past a hundredth of the part's size (OCCT's draft gave one 1.3e154 on a
+  // valid part, its result still "valid"; every later Boolean's classification on it ground for minutes and an
+  // extrude failed: RUST-EXTRUDE-SCOPE-SLOW): failed, so the caller's fallback (the wedge draft) builds it.
+  {
+    Bnd_Box box;
+    BRepBndLib::Add(s.shape, box);
+    const double size = box.IsVoid() ? 0.0 : std::sqrt(box.SquareExtent());
+    for (const TopAbs_ShapeEnum t : {TopAbs_VERTEX, TopAbs_EDGE})
+      for (TopExp_Explorer x(r, t); x.More(); x.Next())
+      {
+        const double tol = t == TopAbs_VERTEX ? BRep_Tool::Tolerance(TopoDS::Vertex(x.Current())) : BRep_Tool::Tolerance(TopoDS::Edge(x.Current()));
+        if (!(tol <= 0.01 * size))
+          fail_op("draft left a tolerance past a hundredth of the part");
+      }
+  }
   if (faces.items.size() == 1)
     r = end_cone_at_apex(s.shape, TopoDS::Face(faces.items[0]), r, pln, h);
   return make_result(args, r, h.get());

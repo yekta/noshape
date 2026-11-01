@@ -132,3 +132,19 @@ fn draft_wedges_of_a_chamfer_sliver_are_the_same_on_both_inputs() {
     assert!((got[0].0 - got[1].0).abs() < 1e-6 && (got[0].0 - 1.6629).abs() < 1e-3, "{got:?}");
     assert_eq!((got[0].1, got[1].1), (25, 25));
 }
+
+/// Fuzz seed 1151's Draft (RUST-EXTRUDE-SCOPE-SLOW): OCCT's draft of this valid part left a vertex of tolerance
+/// 1.3e154 in a result its checker called valid, and every later Boolean's classification on it ground for minutes
+/// (an extrude's collision check: 7 min, then the extrude failed). The draft fails on it now, and the wedge draft
+/// (draft_robust's fallback) builds it.
+#[test]
+fn a_draft_leaving_a_huge_tolerance_fails_and_the_wedges_build_it() {
+    let _ = set_working_scale(1000.0);
+    let (s, subs, p) = load("draft-huge-tolerance");
+    let plane = Plane::new(v3(&after(&p, "origin", 3)), v3(&after(&p, "normal", 3)), v3(&after(&p, "xdir", 3)));
+    let (pull, angle) = (v3(&after(&p, "pull", 3)), after(&p, "angle", 1)[0]);
+    let e = draft(&s, &subs, pull, &plane, angle).expect_err("OCCT's draft taken with its huge tolerance");
+    assert!(e.to_string().contains("tolerance"), "{e}");
+    let r = draft_wedges(&s, &subs, pull, &plane, angle).expect("the wedge draft");
+    assert!(r.shape.is_valid());
+}

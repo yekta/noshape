@@ -1109,6 +1109,20 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## RUST-EXTRUDE-SCOPE-SLOW fixed (11-01 20:40 UTC)
+- psui's repro (qa's slow1151rep.py on tickets/slow1151-pre.noshape): the extrude's collision check took 237–435 s
+  and the extrude failed with noshape's Boolean on. Its two commons (the extrude's tool against a part) went to OCCT
+  (ours declined "a point near two vertices") and took 154 s each: the part had two vertices of tolerance 1.34e154.
+  Found with a temporary tolerance watch on every op's result: OCCT's own draft (BRepOffsetAPI_DraftAngle, a
+  Draft's face on a part built through our Booleans, its input clean at 5.5e-7) returned that, and BRepCheck still
+  called it valid. op_draft (features.cpp) now fails a result with a vertex or edge tolerance past a hundredth of
+  the part's size, so draft_robust's fallback (the wedge draft) builds it.
+- The repro on a CLI of this change: 1.1 s, "No merge scope selected." (as with NOSHAPE_BOOL_RUST=0, 3.2 s). T1
+  crash_inputs::a_draft_leaving_a_huge_tolerance_fails_and_the_wedges_build_it (the dumped draft input). Why OCCT's
+  draft does that on this input (ours is valid) is open.
+- Next (lead 11-01): Shell's slab fuses at the top of the decline list ("an offset face", "a tolerant input"), then
+  fins-400's plate fuse with 399 fins.
+
 ## Coplanar sheets in a common (11-01 19:40 UTC)
 - A common of two sheets (faces, no solids) whose faces pairwise cross or lie on one plane within the tolerance (or
   apart past the grey band) goes through the Boolean instead of declining: each face split by the other's edges on
