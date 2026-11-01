@@ -31,6 +31,10 @@ corner's box: its R reach overstated sideways); rust_blend.cpp `nurbs_surface` (
 `nurbs_pcurves` (sides: degree-1 lines in the ellipse's angle; the wall arc: v from the angle in closed form; the
 degenerate edge between its neighbours, the loop backwards on a flipped face). A C1 Hermite surface first: its 128
 spans made the volume integral 63 s (C2 intervals); OCCT projections made the conversion 60 ms.
+20:40: knurl helix sweep exact (live's isn't, bool.md); remaining blend declines re-ranked by OCCT time today
+(after patch 0014): 2.6 s over 77 corpus cases, mostly face-consuming (exact-fit / overflow) blends that OCCT and
+merge_full_rounds build as live: not ported. Numerical audit started: docs/parity/audit-feature-results.md
+(oracle_p1 91 / 91; live batches 11-13 asked); ~/agents/audit_run.sh on vibe4 runs the oracle suites.
 G31 tuned to live 1731 (19:00): measure.rs LIVE_* floors (Parasolid's magnitudes from the block, its ×10 copy and its
 top face; freeform bounds live are ~20× those: its loft volume is 11 mm³ off, ours exact, so ours stay at the floors);
 face_property_variance for the Face tab. Inch units and REST /massproperties still to compare when live's REST is back.
