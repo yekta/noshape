@@ -717,75 +717,124 @@ impl StartView {
         }
     }
 
-    /// Create ▾ › Import files…: a noshape document opens; a CAD or mesh file
-    /// becomes a new document named after it, with the file translated into a
-    /// Part Studio (Onshape's import from the documents page).
+    /// Create ▾ › Import files…: noshape documents open; CAD files go
+    /// through live's "Import to Onshape" modal (the app's import dialog:
+    /// one document, a document each, or one combined Part Studio, named
+    /// after the first file, the files in "CAD Imports"); a DXF / DWG becomes
+    /// a document with its drawing and the file, other files a document with
+    /// the file tab (Onshape's import from the documents page).
     fn import_files(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let view = cx.entity();
         let handle = window.window_handle();
         let place = self.current_place();
-        // Onshape's picker takes any file: CAD files become a Part Studio (and
-        // the file in "CAD Imports"), DXF / DWG a drawing plus the file, others
-        // a file tab.
-        crate::file_dialogs::request_open_path("Import files", "All files", &["*"], window, cx, move |path, cx| {
+        crate::file_dialogs::request_open_paths("Import files", "All files", &["*"], window, cx, move |paths, cx| {
             let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
-            let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
-            let file = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-            let result = if ext == lib::EXT {
-                crate::start_hooks::open_document_window(path, None, gpu, cx)
-            } else {
-                (|| {
-                    let mut doc = crate::user_units::new_document();
-                    let units = doc.settings.units;
-                    let (name, file) = noshape_ops::import::import_names(&path);
-                    let bytes = std::fs::read(&path)?;
-                    let stored = noshape_model::file_tab::FileTab::new(&file, &bytes, noshape_model::file_tab::now());
-                    doc.tabs.clear();
-                    doc.settings.tab_order.clear();
-                    match stored.kind() {
-                        noshape_model::file_tab::FileKind::Cad => {
-                            let foreign = noshape_ops::import::read_foreign(&path, &units)?;
-                            let mut ps = noshape_model::PartStudio::new();
-                            noshape_ops::import::add_import_feature(&mut ps, &file, foreign, &units);
-                            doc.add_tab(&name, noshape_model::TabContent::PartStudio(ps));
-                            let folder = crate::file_tab_view::cad_imports_folder(&mut doc);
-                            crate::file_tab_view::add_file_tab(&mut doc, stored, Some(folder), None);
-                        }
-                        noshape_model::file_tab::FileKind::Drawing2d => {
-                            let f = crate::file_tab_view::add_file_tab(&mut doc, stored, None, None);
-                            let dr = crate::file_tab_view::drawing_from_cad(&bytes).map_err(|e| anyhow::anyhow!(e))?;
-                            let id = doc.add_tab(&name, noshape_model::TabContent::Drawing(dr));
-                            noshape_ops::docedit::place_after(&mut doc, id, Some(f));
-                        }
-                        _ => {
-                            crate::file_tab_view::add_file_tab(&mut doc, stored, None, None);
-                        }
-                    }
-                    let clean = lib::sanitize_name(&name);
-                    let mut target = place.join(format!("{clean}.{}", lib::EXT));
-                    let mut n = 2;
-                    while target.exists() {
-                        target = place.join(format!("{clean} ({n}).{}", lib::EXT));
-                        n += 1;
-                    }
-                    crate::start_hooks::open_document_window(target, Some(doc), gpu, cx)
-                })()
-            };
-            // Live: the import's result in the Notifications bell (EX11).
-            if ext != lib::EXT {
-                match &result {
-                    Ok(_) => crate::notifications::push(cx, format!("Import {file}"), format!("Uploaded · Translated · Post-processing done · Created {file}"), false),
-                    Err(e) => crate::notifications::push(cx, format!("Import {file} failed"), format!("{e:#}"), true),
-                }
+            let ext = |p: &PathBuf| p.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+            let (cad, rest): (Vec<PathBuf>, Vec<PathBuf>) = paths.into_iter().partition(|p| noshape_ops::import::IMPORT_EXTS.contains(&ext(p).as_str()));
+            for path in rest {
+                let result = if ext(&path) == lib::EXT { crate::start_hooks::open_document_window(path.clone(), None, gpu.clone(), cx) } else { Self::import_file(&path, &place, gpu.clone(), cx) };
+                Self::report_import(&[path], result, handle, cx);
             }
-            if let Err(e) = result {
-                let msg = format!("Import failed: {e:#}");
+            if !cad.is_empty() {
+                let view = view.clone();
                 cx.defer(move |cx| {
-                    let _ = handle.update(cx, |_, window, cx| Self::notify(window, cx, AlertKind::Error, msg));
+                    let _ = handle.update(cx, |_, window, cx| {
+                        let files = cad.clone();
+                        let on_import = move |choice: noshape_ops::import::ImportChoice, split: bool, _: &mut Window, cx: &mut App| {
+                            // Split: a document each (a native assembly zip keeps its
+                            // subassemblies and parts together).
+                            let groups: Vec<Vec<PathBuf>> = if split { files.iter().map(|p| vec![p.clone()]).collect() } else { vec![files.clone()] };
+                            for g in groups {
+                                let result = Self::import_cad(&g, &choice, &place, gpu.clone(), cx);
+                                Self::report_import(&g, result, handle, cx);
+                            }
+                            view.update(cx, |this, cx| this.force_rescan(cx));
+                        };
+                        crate::start_hooks::import_dialog(cad, Box::new(on_import), window, cx);
+                    });
                 });
             }
             view.update(cx, |this, cx| this.force_rescan(cx));
         });
+    }
+
+    /// A new document for CAD files with the modal's options, named after the
+    /// first file: its Part Studios / Assemblies first, then "CAD Imports".
+    fn import_cad(paths: &[PathBuf], choice: &noshape_ops::import::ImportChoice, place: &Path, gpu: crate::gpu::Gpu, cx: &mut App) -> anyhow::Result<()> {
+        use noshape_ops::import as imp;
+        let mut doc = crate::user_units::new_document();
+        let units = doc.settings.units;
+        doc.tabs.clear();
+        doc.settings.tab_order.clear();
+        let (inputs, mut errors) = imp::read_inputs(paths, choice, true, &units);
+        let (_, failed) = imp::apply(&mut doc, inputs, choice, None, &units);
+        errors.extend(failed);
+        if !doc.tabs.iter().any(|t| !matches!(t.content, noshape_model::TabContent::File(_))) {
+            anyhow::bail!("{}", errors.join("\n"));
+        }
+        let models: Vec<_> = doc.ordered_tabs().iter().filter(|t| !matches!(t.content, noshape_model::TabContent::File(_))).map(|t| t.id).collect();
+        let rest: Vec<_> = doc.settings.tab_order.iter().copied().filter(|id| !models.contains(id)).collect();
+        doc.settings.tab_order = models.into_iter().chain(rest).collect();
+        let (name, _) = imp::import_names(&paths[0]);
+        crate::start_hooks::open_document_window(Self::free_target(place, &name), Some(doc), gpu, cx)?;
+        // A file that didn't translate next to ones that did: the reason.
+        if !errors.is_empty() {
+            anyhow::bail!("{}", errors.join("\n"));
+        }
+        Ok(())
+    }
+
+    /// A new document for a file that isn't CAD: DXF / DWG the file and a
+    /// drawing of it, any other file its file tab.
+    fn import_file(path: &Path, place: &Path, gpu: crate::gpu::Gpu, cx: &mut App) -> anyhow::Result<()> {
+        let mut doc = crate::user_units::new_document();
+        let (name, file) = noshape_ops::import::import_names(path);
+        let bytes = std::fs::read(path)?;
+        let stored = noshape_model::file_tab::FileTab::new(&file, &bytes, noshape_model::file_tab::now());
+        doc.tabs.clear();
+        doc.settings.tab_order.clear();
+        if stored.kind() == noshape_model::file_tab::FileKind::Drawing2d {
+            let f = crate::file_tab_view::add_file_tab(&mut doc, stored, None, None);
+            let dr = crate::file_tab_view::drawing_from_cad(&bytes).map_err(|e| anyhow::anyhow!(e))?;
+            let id = doc.add_tab(&name, noshape_model::TabContent::Drawing(dr));
+            noshape_ops::docedit::place_after(&mut doc, id, Some(f));
+        } else {
+            crate::file_tab_view::add_file_tab(&mut doc, stored, None, None);
+        }
+        crate::start_hooks::open_document_window(Self::free_target(place, &name), Some(doc), gpu, cx)
+    }
+
+    /// "<name>.noshape" in `place`, else "<name> (2).noshape", ….
+    fn free_target(place: &Path, name: &str) -> PathBuf {
+        let clean = lib::sanitize_name(name);
+        let mut target = place.join(format!("{clean}.{}", lib::EXT));
+        let mut n = 2;
+        while target.exists() {
+            target = place.join(format!("{clean} ({n}).{}", lib::EXT));
+            n += 1;
+        }
+        target
+    }
+
+    /// An import's result in the Notifications bell (live EX11), and a failure's alert.
+    fn report_import(paths: &[PathBuf], result: anyhow::Result<()>, handle: AnyWindowHandle, cx: &mut App) {
+        let names: Vec<String> = paths.iter().map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()).collect();
+        if paths.iter().any(|p| p.extension().is_none_or(|e| e.to_string_lossy().to_lowercase() != lib::EXT)) {
+            match &result {
+                Ok(_) => {
+                    for file in &names {
+                        crate::notifications::push(cx, format!("Import {file}"), format!("Uploaded · Translated · Post-processing done · Created {file}"), false);
+                    }
+                }
+                Err(e) => crate::notifications::push(cx, format!("Import {} failed", names.join(", ")), format!("{e:#}"), true),
+            }
+        }
+        if let Err(e) = result {
+            let msg = format!("Import failed: {e:#}");
+            cx.defer(move |cx| {
+                let _ = handle.update(cx, |_, window, cx| Self::notify(window, cx, AlertKind::Error, msg));
+            });
+        }
     }
 
     /// Create ▾ › Folder…: a new folder in the current place.

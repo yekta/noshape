@@ -40,6 +40,14 @@ struct Choice {
     unit: usize,
     composite: bool,
     join: bool,
+    /// The documents page's "Split into multiple documents".
+    split: bool,
+}
+
+impl Choice {
+    fn ops(self) -> noshape_ops::import::ImportChoice {
+        noshape_ops::import::ImportChoice { combine: self.combine, appearances: self.appearances, density: self.density, y_up: self.y_up, unit: self.unit, composite: self.composite, join: self.join }
+    }
 }
 
 /// Show the modal for `paths`; Import adds the tabs (after `after`) and
@@ -47,6 +55,30 @@ struct Choice {
 /// `keep_files`: also keep each file as a file tab in "CAD Imports" (Import;
 /// not when translating an existing file tab).
 pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, keep_files: bool, opened: impl Fn(TabId, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+    let doc_unit = doc.read(cx).session.doc.settings.units.length;
+    let ok_paths = paths.clone();
+    let on_ok = move |c: Choice, window: &mut Window, cx: &mut App| {
+        if let Some(first) = import(&doc, &ok_paths, c, after, keep_files, cx) {
+            opened(first, window, cx);
+        }
+    };
+    show(paths, doc_unit, false, Rc::new(on_ok), window, cx);
+}
+
+/// The documents page's Import files… (live dom/dialog-import-to-onshape.txt):
+/// the 590 px modal with three tiles, "Import to a single document", "Split
+/// into multiple documents" (each file its own document) and "Combine to a
+/// single Part Studio"; Import calls `on_import` with the options and
+/// whether to split. The start window builds the documents (start hooks).
+pub fn open_for_page(paths: Vec<PathBuf>, on_import: noshape_start_ui::start_hooks::ImportCallback, window: &mut Window, cx: &mut App) {
+    let unit = noshape_app_core::user_units::current().units.length;
+    show(paths, unit, true, Rc::new(move |c: Choice, window: &mut Window, cx: &mut App| on_import(c.ops(), c.split, window, cx)), window, cx);
+}
+
+/// What Import does with the options.
+type OnOk = Rc<dyn Fn(Choice, &mut Window, &mut App)>;
+
+fn show(paths: Vec<PathBuf>, doc_unit: noshape_units::LengthUnit, page: bool, on_ok: OnOk, window: &mut Window, cx: &mut App) {
     // Native part files get Onshape's five-checkbox variant, mesh files
     // theirs (see the module docs).
     let all_of = |kinds: &[&str]| !paths.is_empty() && paths.iter().all(|p| p.extension().is_some_and(|e| kinds.contains(&e.to_string_lossy().to_lowercase().as_str())));
@@ -58,16 +90,14 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
     // is one (not STEP, SAT or PVZ; qa4 IMP-DENS).
     let density = noshape_ops::import::offers_material_density(&paths);
     let zip = all_of(&["zip"]);
-    let doc_unit = doc.read(cx).session.doc.settings.units.length;
     let default_unit = if obj { noshape_units::LengthUnit::Meter } else { doc_unit };
     let unit = MESH_UNITS.iter().position(|(_, u)| *u == default_unit).unwrap_or(4);
     let choice = Rc::new(Cell::new(Choice { appearances: true, unit, ..Default::default() }));
-    let opened = Rc::new(opened);
     window.open_dialog(cx, move |dialog, window, cx| {
         let pal = p();
         let c = choice.get();
         let (text_system, label_font) = (cx.text_system().clone(), Font { weight: FontWeight::SEMIBOLD, ..window.text_style().font() });
-        let tile = |id: &'static str, selected: bool, title: &'static str, note: Option<&'static str>, both: bool, combine: bool, choice: Rc<Cell<Choice>>| {
+        let tile = |id: &'static str, selected: bool, title: &'static str, note: Option<&'static str>, icon: &'static str, (combine, split): (bool, bool), choice: Rc<Cell<Choice>>| {
             // Live (dom/dialog-import-*.txt): each tile shows one 150 px
             // picture (a file, an arrow, the Part Studio and Assembly tab
             // icons in a box), centred under the 2 px border; our own drawing.
@@ -75,7 +105,7 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
                 .h(px(150.))
                 .flex_none()
                 .justify_center()
-                .child(crate::assets::icon(if both { "import-tile-single" } else { "import-tile-combine" }, 150., cx));
+                .child(crate::assets::icon(icon, 150., cx));
             v_flex()
                 .id(id)
                 .w(px(180.))
@@ -90,7 +120,7 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
                 .child(div().px(px(4.)).text_center().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(title))
                 .children(note.map(|n| div().text_center().text_size(px(10.)).text_color(pal.text).child(n)))
                 .on_click(move |_, window, _| {
-                    choice.set(Choice { combine, ..choice.get() });
+                    choice.set(Choice { combine, split, ..choice.get() });
                     window.refresh();
                 })
         };
@@ -147,8 +177,9 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
                     window.refresh();
                 })
         };
-        let (doc, paths, ch, opened) = (doc.clone(), paths.clone(), choice.clone(), opened.clone());
-        os::modal(dialog, "Import to Onshape", 400.)
+        let (ch, on_ok) = (choice.clone(), on_ok.clone());
+        // Live: the documents page's modal is Bootstrap's modal-lg (590 px).
+        os::modal(dialog, "Import to Onshape", if page { 590. } else { 400. })
             .child(
                 // Live document/77: the tiles 12 px under the header.
                 // Live: the footer rule 27 px under the last checkbox row's text.
@@ -156,7 +187,15 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
                     .pt(px(4.))
                     .pb(px(16.))
                     .gap(px(8.))
-                    .when(!native && !stl, |d| d.child(h_flex().gap(px(14.)).child(tile("imp-single", !c.combine, "Import to this document", None, true, false, choice.clone())).child(tile("imp-flatten", c.combine, "Combine to a single Part Studio", Some("Use with small assemblies"), false, true, choice.clone()))))
+                    .when(!native && !stl, |d| {
+                        d.child(
+                            h_flex()
+                                .gap(px(14.))
+                                .child(tile("imp-single", !c.combine && !c.split, if page { "Import to a single document" } else { "Import to this document" }, None, "import-tile-single", (false, false), choice.clone()))
+                                .when(page, |d| d.child(tile("imp-multi", c.split, "Split into multiple documents", Some("Groups subassemblies with their parts in the same document"), "import-tile-multi", (false, true), choice.clone())))
+                                .child(tile("imp-flatten", c.combine, "Combine to a single Part Studio", Some("Use with small assemblies"), "import-tile-combine", (true, false), choice.clone())),
+                        )
+                    })
                     // Live document/77: the checkbox rows are 34 px apart.
                     .child(v_flex().gap(px(13.)).when(!stl, |d| d.child(check("imp-app", "Import appearances", "Appearances defined on models will be imported.", c.appearances, |c, v| c.appearances = v, choice.clone())))
                     .when(density, |d| d.child(check("imp-dens", "Import material density", "Material density defined on models will be imported.", c.density, |c, v| c.density = v, choice.clone())))
@@ -180,12 +219,8 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
             // Live document/77: 13 px over the buttons, 10 under them.
             .footer(os::modal_footer().pb(px(10.)).child(os::modal_ok(os::primary_button("ok", "Import"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
             .on_ok(move |_, window, cx| {
-                let (doc, paths, c, opened) = (doc.clone(), paths.clone(), ch.get(), opened.clone());
-                window.defer(cx, move |window, cx| {
-                    if let Some(first) = import(&doc, &paths, c, after, keep_files, cx) {
-                        opened(first, window, cx);
-                    }
-                });
+                let (c, on_ok) = (ch.get(), on_ok.clone());
+                window.defer(cx, move |window, cx| on_ok(c, window, cx));
                 true
             })
     });
@@ -216,7 +251,7 @@ fn wrapped_lines(label: &str, breaks: &[usize]) -> Vec<String> {
 fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after: Option<TabId>, keep_files: bool, cx: &mut App) -> Option<TabId> {
     use noshape_ops::import as imp;
     let units = doc.read(cx).session.doc.settings.units;
-    let choice = imp::ImportChoice { combine: c.combine, appearances: c.appearances, density: c.density, y_up: c.y_up, unit: c.unit, composite: c.composite, join: c.join };
+    let choice = c.ops();
     let (inputs, errors) = imp::read_inputs(paths, &choice, keep_files, &units);
     for e in errors {
         // The toast, and the reason in the Notifications bell (live IM3).

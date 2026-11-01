@@ -18,11 +18,11 @@ message, P3 tooltip / prompt / look. Status: ✗ open, ✅ fixed (commit), – a
 | Drawing right-click menus per entity type (25 types) | context-menus-drawing*.txt, behaviours (menu lines) | in the app 11-01 (w3/menus.noshape, a d6 copy with every annotation type; crops in dx-scratch/audit/rmb): **= live** (Add comment is cloud-only; Paste shows while something is copied, as live): empty sheet, view (projected, detail, section label: Copy on top), extension line, linear dimension, ordinate value, note, callout, hole callout, datum, centermark, surface finish (edge-attached), table, sketch line, section cut line. **Live unknown, asked**: weld, geometric tolerance, centerline, revision table, datum target, note leader line. **Differs**: M1 | M1, M2 |
 | Notifications panel | behaviours (EX11 request 1544, import flow) | compared with live's description | N… |
 
-**Counts (11-01 16:36 UTC):** surfaces audited 4 of 4 (dialogs and panels with dumps 55, import / export dialogs 16,
+**Counts (11-01 16:50 UTC):** surfaces audited 4 of 4 (dialogs and panels with dumps 55, import / export dialogs 16,
 right-click menus 22 entity types in the app, Notifications). 2918 live texts and options scanned, 2544 found as is.
-Gap rows 24: fixed 12 (P1 1, P2 5, P3 6), asked of live 9 (P1 5, P2 3, P3 1), open 3 (P2: M1 format lines not
-selectable, X1 start page import modal; P3: D15), plus partial leftovers noted in fixed rows (D8 error tooltip, D10
-"Datum style", D11 «Varies», D14 Show Onshape drawing templates). P0: none found.
+Gap rows 24: fixed 13 (P1 1, P2 6, P3 6), asked of live 9 (P1 5, P2 3, P3 1), open 2 (P2: M1 format lines not
+selectable; P3: D15), plus partial leftovers noted in fixed rows (D8 error tooltip, D10 "Datum style", D11 «Varies»,
+D14 Show Onshape drawing templates, X1 subassemblies split into documents). P0: none found.
 
 ## Gaps
 
@@ -45,7 +45,7 @@ selectable, X1 start page import modal; P3: D15), plus partial leftovers noted i
 | D15 | Note editor | font list | P3 | live labels the style's font "Noto Sans ( Note )" | ✗ |
 | D16 | Shortcut toolbar (s) | empty state | P3 | live "No tools added" | ✅ "No tools added" in an emptied shortcut toolbar |
 | D17 | Hole cell (double-click) | Formulas | P2 | live's cell editor offers "Formulas" | ? |
-| X1 | Import to Onshape (documents page) | tiles | P2 | live: "Import to a single document" / "Split into multiple documents" ("Groups subassemblies with their parts in the same document") / Combine to a single Part Studio; ours the import options without the three tiles on the start page | ✗ the start page imports one file straight away, without live's modal (its result now goes to the bell) |
+| X1 | Import to Onshape (documents page) | tiles | P2 | live: "Import to a single document" / "Split into multiple documents" ("Groups subassemblies with their parts in the same document") / Combine to a single Part Studio; ours the import options without the three tiles on the start page | ✅ Create › Import files… takes several files and opens live's 590 px modal with the three tiles and the format's options (the in-document dialog's, via a start hook); Import makes one document named after the first file (models first, then CAD Imports), a document per file, or one combined Part Studio; app check 11-01 (block.step + extrude.step single and split; a STEP zip reports live's "not translated" reason); ✗ Split doesn't yet put an assembly's subassemblies in documents of their own (a file is one document) |
 | N1 | Notifications panel | ⋯ menu | P2 | live's header has a ⋯ menu (items not recorded); ours none | ? |
 | N2 | Notifications panel | import entry | P2 | live: an import's steps as green ✓ rows (Uploaded, Translated, Post-processing done, Created link to <file>, the link opening it); ours one line | ✅ an import's steps as ✓ rows (app check 11-01: g37-block.x_t, "Import g37-block.x_t" with Uploaded / Translated / Post-processing done / Created); the start page's imports report there too; the link to the file is plain text |
 | M1 | Right-click menus | frame / zone / title block line | P2 | live: a format line is selectable alone (orange, end / mid grips) with Paste · Copy · Paste as table · Move to ▸ · Clear selection · Zoom to fit · Delete (behaviours 1993); ours: format lines aren't picks (the empty-sheet menu; only the title block region opens its fields) | ✗ |
