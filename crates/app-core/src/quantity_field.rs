@@ -130,6 +130,7 @@ pub fn invalid_field(el: gpui_kit::Stateful<gpui_kit::Div>, invalid: bool) -> gp
 /// [`invalid_field`] with the hover text of why the value doesn't evaluate
 /// ([`eval_message`]).
 pub fn invalid_field_tip(el: gpui_kit::Stateful<gpui_kit::Div>, invalid: bool, tip: String) -> gpui_kit::Stateful<gpui_kit::Div> {
+    use gpui_kit::prelude::FluentBuilder as _;
     use gpui_kit::{ParentElement as _, StatefulInteractiveElement as _, Styled as _, div, px};
     if !invalid {
         return el;
@@ -140,7 +141,8 @@ pub fn invalid_field_tip(el: gpui_kit::Stateful<gpui_kit::Div>, invalid: bool, t
         .border_b_1()
         .border_color(pal.error)
         .child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.error))
-        .tooltip(crate::ui::tooltip(tip))
+        // An empty tip: no tooltip (live 1722: a length or real out of range).
+        .when(!tip.is_empty(), |d| d.tooltip(crate::ui::tooltip(tip)))
 }
 
 /// Live's hover text for a value that doesn't evaluate as `expected` (ui

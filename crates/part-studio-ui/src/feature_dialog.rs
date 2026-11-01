@@ -1794,19 +1794,20 @@ impl FeatureDialog {
             }
             match noshape_units::evaluate_as(&text, n.kind.dim(), &self.units, &self.variables) {
                 Err(err) => Some((s.id, crate::quantity_field::eval_message(&err))),
-                // Live (behaviours "psui (2026-10-27, P1) DIALOG-OK-STATE"): out of range is a parameter error too.
-                Ok(_) if self.out_of_range(s.id, &text) => Some((s.id, self.range_message(s.id, &text))),
+                // Live (behaviours "psui (2026-10-27, P1) DIALOG-OK-STATE"): an integer out of range is a parameter
+                // error too; a length or real out of range isn't (live 1722: ✓ stays enabled, `range_invalid`).
+                Ok(_) if n.kind == noshape_model::params::NumKind::Integer && self.out_of_range(s.id, &text) => Some((s.id, self.range_message(s.id, &text))),
                 Ok(_) => None,
             }
         })
     }
 
     /// The hover text of a value out of its field's range. Live: a count reads "Enter an integer value between 1 and
-    /// 2500. Current value is 0."; other quantities the generic text.
+    /// 2500. Current value is 0."; other quantities have none (live 1722: Helix's Target revolutions or Height 0).
     fn range_message(&self, path: &str, text: &str) -> String {
         let Some(ParamKind::Num(n)) = self.spec_for_path(path).map(|s| &s.kind) else { return crate::quantity_field::INVALID_TIP.to_string() };
         if n.kind != noshape_model::params::NumKind::Integer {
-            return crate::quantity_field::INVALID_TIP.to_string();
+            return String::new();
         }
         let v = noshape_units::evaluate_as(text, noshape_units::Dim::UNITLESS, &self.units, &self.variables).map(|q| q.value).unwrap_or(0.0);
         let shown = if v.fract() == 0.0 { format!("{}", v as i64) } else { noshape_units::format_number(v, 3) };
@@ -3655,7 +3656,22 @@ impl Render for FeatureDialog {
             }
         }
         let value_invalid = self.applied_value_error().is_some();
-        let status = if value_invalid { Some((FeatureStatus::Error, VALUE_NOT_VALID.to_string())) } else { status };
+        // A length or real out of range (live 1722, L55): ✓ stays enabled; the
+        // title appends " A parameter value is not valid." to its message
+        // ("…properly:  A parameter value is not valid." with none).
+        let range_invalid = !value_invalid
+            && self.ty.params.iter().filter(|s| s.is_visible(&self.feature.params)).any(|s| {
+                matches!(&s.kind, ParamKind::Num(n) if n.kind != noshape_model::params::NumKind::Integer)
+                    && matches!(self.feature.params.get(s.id), Some(ParamValue::Expr(e)) if { let t = self.applied_text(s.id, &e.text); !t.trim().is_empty() && self.out_of_range(s.id, &t) })
+            });
+        let status = if value_invalid {
+            Some((FeatureStatus::Error, VALUE_NOT_VALID.to_string()))
+        } else if range_invalid {
+            let base = status.as_ref().map(|s| s.1.clone()).filter(|m| m != VALUE_NOT_VALID).unwrap_or_default();
+            Some((FeatureStatus::Error, format!("{base} {VALUE_NOT_VALID}")))
+        } else {
+            status
+        };
         let invalid = matches!(status.as_ref().map(|s| s.0), Some(FeatureStatus::Error | FeatureStatus::Warning));
         // Live (`canSubmit`, woolsthorpe): ✓ waits for the dialog to be
         // dirty (an edit, or a regeneration without an error) and for every
