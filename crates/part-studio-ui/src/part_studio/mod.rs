@@ -255,10 +255,12 @@ type MeasureCache = (Vec<Reference>, Vec<(String, noshape_model::regen::measure:
 
 /// What a new folder from the "Folder name" popup wraps: features (Add
 /// selection to folder…, the header's New folder) or a folder (its row's
-/// Add selection to folder…, live ui 10-25 b (2)).
+/// Add selection to folder…, live ui 10-25 b (2)). The same popup titled
+/// "Rename" renames a part from its Appearances row (live 1717).
 enum FolderTarget {
     Features(Vec<FeatureId>),
     Folder(u32),
+    Part(noshape_model::BodyId),
 }
 
 pub struct PartStudioView {
@@ -2951,12 +2953,12 @@ impl PartStudioView {
         // the rollback bar (live 586, 589).
         let prompt_anchor = self.folder_prompt.as_ref().and_then(|(_, t, _)| match t {
             FolderTarget::Features(ids) => Some(ids.first().copied()),
-            FolderTarget::Folder(_) => None,
+            FolderTarget::Folder(_) | FolderTarget::Part(_) => None,
         });
         // Wrapping a folder: the popup sits under the folder's row.
         let prompt_folder = self.folder_prompt.as_ref().and_then(|(_, t, _)| match t {
             FolderTarget::Folder(f) => Some(*f),
-            FolderTarget::Features(_) => None,
+            FolderTarget::Features(_) | FolderTarget::Part(_) => None,
         });
         let mut items: Vec<ListItem> = Vec::new();
         let mut open_folder: Vec<u32> = Vec::new();
@@ -3952,7 +3954,11 @@ impl PartStudioView {
     }
 
     fn open_folder_prompt_for(&mut self, target: FolderTarget, window: &mut Window, cx: &mut Context<Self>) {
-        let st = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).default_value(noshape_ops::studio::NEW_FOLDER_NAME));
+        let name = match &target {
+            FolderTarget::Part(b) => self.display.body(b).map(|b| b.name.clone()).unwrap_or_default(),
+            _ => noshape_ops::studio::NEW_FOLDER_NAME.to_string(),
+        };
+        let st = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).default_value(name));
         st.update(cx, |s, cx| {
             s.focus(window, cx);
             s.select_all(window, cx);
@@ -3970,6 +3976,18 @@ impl PartStudioView {
     fn commit_folder_prompt(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some((st, target, _)) = self.folder_prompt.take() else { return };
         let name = st.read(cx).value().to_string();
+        if let FolderTarget::Part(b) = &target {
+            let text = name.trim();
+            if !text.is_empty() && self.display.body(b).is_some_and(|x| x.name != text) {
+                self.doc.update(cx, |doc, cx| {
+                    doc.edit_studio(self.tab, &noshape_ops::studio::rename_part_description(text), cx, |ps| noshape_ops::studio::rename_part(ps, b, text));
+                });
+            }
+            let fh = self.focus.clone();
+            window.focus(&fh, cx);
+            cx.notify();
+            return;
+        }
         let made = self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, noshape_ops::studio::ADD_FOLDER_DESCRIPTION, cx, |ps| match &target {
                 FolderTarget::Features(ids) => Some(noshape_ops::studio::add_folder(ps, ids, &name)),
@@ -3977,6 +3995,7 @@ impl PartStudioView {
                     let name = name.trim();
                     ps.wrap_folder(*f, if name.is_empty() { noshape_ops::studio::NEW_FOLDER_NAME } else { name }.to_string())
                 }
+                FolderTarget::Part(_) => None,
             })
         });
         // Live (ui 10-25 b (1)): the new folder's row replaces the selection,
@@ -3992,8 +4011,16 @@ impl PartStudioView {
     /// The 220 px "Folder name" ✓ ✕ popup right of the list, level with the
     /// row above it (live 586, 589).
     fn render_folder_prompt(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let Some(popup) = self.name_prompt(cx) else { return div().into_any_element() };
+        // A zero-height box under the anchor row; the popup rises beside it.
+        div().relative().w_full().h_0().child(div().absolute().left_full().top(px(-26.)).size_0().child(deferred(anchored().snap_to_window().child(popup)).with_priority(5))).into_any_element()
+    }
+
+    /// The popup itself: "Folder name", or "Rename" for a part.
+    fn name_prompt(&mut self, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
         let pal = p();
-        let Some((st, _, _)) = &self.folder_prompt else { return div().into_any_element() };
+        let (st, target, _) = self.folder_prompt.as_ref()?;
+        let title = if matches!(target, FolderTarget::Part(_)) { "Rename" } else { "Folder name" };
         let popup = v_flex()
             .id("folder-prompt")
             .occlude()
@@ -4014,7 +4041,7 @@ impl PartStudioView {
                     .h(px(29.))
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xd7d7d7))
-                    .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("Folder name"))
+                    .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(title))
                     .child(div().id("folder-ok").size(px(28.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009400)).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::rgb_static(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.commit_folder_prompt(window, cx))))
                     .child(div().id("folder-cancel").size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., gpui_kit::rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                         this.folder_prompt = None;
@@ -4024,8 +4051,7 @@ impl PartStudioView {
                     }))),
             )
             .child(div().m(px(6.)).border_1().border_color(pal.accent).child(gpui_kit::component::input::Input::new(st).small().appearance(false).text_size(px(13.33)).text_color(gpui_kit::rgb(0x000000)).pl(px(6.))));
-        // A zero-height box under the anchor row; the popup rises beside it.
-        div().relative().w_full().h_0().child(div().absolute().left_full().top(px(-26.)).size_0().child(deferred(anchored().snap_to_window().child(popup)).with_priority(5))).into_any_element()
+        Some(popup)
     }
 
     /// A sketch listed under its Derived row (live part-studio/1582): the
@@ -4869,6 +4895,11 @@ impl PartStudioView {
             }
             let rename = item("Rename", Box::new(move |this, w, cx| this.start_rename(id, w, cx)));
             let mut m = menu.item(rename).separator().item(item("Edit…", Box::new(move |this, w, cx| this.edit_feature(id, w, cx))));
+            // Live 1714 / 1717: a failed feature adds Edit healthy moment of
+            // <feature>…, which opens its normal edit dialog.
+            if errored {
+                m = m.item(item(&format!("Edit healthy moment of {feature_name}…"), Box::new(move |this, w, cx| this.edit_feature(id, w, cx))));
+            }
             if let Some((sid, sname)) = source_sketch.clone() {
                 // Live (de-sc-4): „Sketch 1 [Skizze]“ bearbeiten …, the sketch's
                 // type in brackets unless its name contains it (in the UI

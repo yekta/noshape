@@ -298,6 +298,25 @@ fn configurations() {
     let default_id = list["inputs"].as_array().unwrap().iter().find(|i| i["id"] == size).unwrap()["configurations"][0]["id"].as_str().unwrap().to_string();
     assert_eq!(depth["values"][&default_id], "10 mm", "{list}");
     assert_eq!(list["active"][&w], "50 mm", "{list}");
+    // The row menu (live 1717): Duplicate row puts "Copy of Large" right
+    // under Large with its value; Set as default; Move up.
+    let d = call(&mut ctx, "config_edit_option", json!({ "input": "Size", "option": "Large", "duplicate": true }));
+    let copy = d["option"].as_str().unwrap().to_string();
+    let list = call(&mut ctx, "config_list", json!({}));
+    let rows = list["inputs"].as_array().unwrap().iter().find(|i| i["id"] == size).unwrap()["configurations"].clone();
+    assert_eq!(rows[2]["name"], "Copy of Large", "{list}");
+    let depth = list["configured"].as_array().unwrap().iter().find(|c| c["param"] == "depth").unwrap().clone();
+    assert_eq!(depth["values"][&copy], "25 mm", "{list}");
+    call(&mut ctx, "config_edit_option", json!({ "input": "Size", "option": copy, "set_default": true }));
+    let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
+    assert_eq!(hist["history"][0]["description"], "Part Studio 1 :: Set default configuration");
+    call(&mut ctx, "config_edit_option", json!({ "input": "Size", "option": copy, "move": -1 }));
+    let list = call(&mut ctx, "config_list", json!({}));
+    let size_input = list["inputs"].as_array().unwrap().iter().find(|i| i["id"] == size).unwrap().clone();
+    assert_eq!(size_input["default"], copy.as_str(), "{list}");
+    assert_eq!(size_input["configurations"][1]["name"], "Copy of Large", "{list}");
+    call(&mut ctx, "config_edit_option", json!({ "input": "Size", "option": default_id, "set_default": true }));
+    call(&mut ctx, "config_edit_option", json!({ "input": "Size", "option": copy, "delete": true }));
 
     // A Checkbox suppressing the extrude.
     let c = call(&mut ctx, "config_add_input", json!({ "kind": "checkbox", "name": "Hide block", "default": false }));
@@ -4014,6 +4033,13 @@ fn assembly_and_part_studio_menu_gaps() {
     assert_eq!(last(&mut ctx), "Delete configured properties table");
     let e = try_call(&mut ctx, "part_configured_properties", json!({ "tab": "Part Studio 1", "part": part, "action": "delete_table" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("part"), "{e:?}");
+    // Configure appearance: a row for every configuration of the first list.
+    let cfg = call(&mut ctx, "config_list", json!({ "tab": "Part Studio 1" }));
+    let options = cfg["inputs"].as_array().unwrap().iter().find(|i| i["kind"] == "list").map_or(1, |i| i["configurations"].as_array().unwrap().len());
+    let t = call(&mut ctx, "part_configured_properties", json!({ "tab": "Part Studio 1", "part": part, "action": "configure_property", "property": "Appearance" }));
+    assert_eq!(t["table"]["properties"], json!(["Appearance"]), "{t}");
+    assert_eq!(t["table"]["rows"].as_array().unwrap().len(), options, "{t}");
+    call(&mut ctx, "part_configured_properties", json!({ "tab": "Part Studio 1", "part": part, "action": "delete_table" }));
 
     // Datum annotations.
     let top = call(&mut ctx, "query_entities", json!({ "tab": "Part Studio 1", "kind": "faces", "surface": "plane", "normal": [0, 0, 1] }))["faces"][0]["id"].as_str().unwrap().to_string();

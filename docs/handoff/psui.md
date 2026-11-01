@@ -339,7 +339,9 @@ N12. (11-01) Part Studio audit (user 11-01): docs/parity/audit-part-studio.md. D
      `print_all` diffs every toolbar feature with std (STD_MODULES maps the rest to their std files;
      custom::std_feature::std_dialog_of); /root/psui-scratch/audit_gen.py + audit_doc.py turn its output into the D
      rows (base_rows.json = first run, keep D numbers). Six live requests for whole-surface dumps (panels, menus).
-     Next: open P1 (Mutual trim sets, evaluator), then P2 groups / labels / option labels / hints.
+     10:19 audit 5: A rows 12 of 14 fixed (live 1717: config row menus, Variable Configure gating, Edit healthy
+     moment, Appearances row menu); open A1 (Tag base plane) and A10 (core ticket). Next: A1, then the open P2 D rows
+     (array item names, routing points), helix rows (need live in Axis mode).
 
 N11. (11-01 04:54) Drawing sheets taken from dx (user 11-01): docs/parity/workflow-drawing.md and
      workflow-drawing-sheet-metal.md. dx keeps drawing.md and the import sheets; notes to dx in docs/handoff/dx.md

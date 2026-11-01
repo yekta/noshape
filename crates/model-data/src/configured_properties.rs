@@ -159,6 +159,34 @@ pub fn add_property(ps: &mut PartStudio, part: &BodyId, prop: &str, active: &Con
     }
 }
 
+/// Appearances › Configure appearance (live 1717): unlike Add property, a
+/// new table gets a row for every configuration of the first List input
+/// (the other inputs as active), then the property's column.
+pub fn configure_property(ps: &mut PartStudio, part: &BodyId, prop: &str, active: &ConfigValues, part_name: &str) {
+    if table(ps, part).is_none() {
+        let (_, effective) = ps.configuration.visibility(active);
+        let columns = input_columns(&ps.configuration);
+        let config = ConfigValues(columns.iter().map(|i| (i.id.clone(), effective.0.get(&i.id).cloned().unwrap_or_else(|| input_default(i)))).collect());
+        let list = columns.iter().find_map(|i| match &i.kind {
+            ConfigInputKind::List { options, .. } => Some((i.id.clone(), options.iter().map(|o| o.id.clone()).collect::<Vec<_>>())),
+            _ => None,
+        });
+        let rows = match list {
+            Some((id, options)) => options
+                .into_iter()
+                .map(|o| {
+                    let mut c = config.clone();
+                    c.0.insert(id.clone(), o);
+                    PropertyRow { config: c, values: BTreeMap::new() }
+                })
+                .collect(),
+            None => vec![PropertyRow { config, values: BTreeMap::new() }],
+        };
+        ps.property_tables.push(PropertyTable { part: part.clone(), properties: Vec::new(), rows });
+    }
+    add_property(ps, part, prop, active, part_name);
+}
+
 /// Right-click › Delete column.
 pub fn delete_column(ps: &mut PartStudio, part: &BodyId, prop: &str) {
     if let Some(t) = table_mut(ps, part) {

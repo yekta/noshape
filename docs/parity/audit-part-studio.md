@@ -22,7 +22,7 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 | Render Studio / Display states (1713) | live | live: no Display states in a Part Studio; Render Studio only as an Upgrade-gated tab type (cloud plan) | 0 |
 | View cube (right-click, arrows, hover) | live 1714 | every face / edge / corner / arrow gives the empty-space menu, no tooltips: = ours | 0 |
 
-**Counts (11-01, audit 5):** surfaces audited 9 of 9. Dialogs: 199 field rows + 52 visibility states found; fixed 111 rows and 39 states; accepted 7; open 81 rows + 13 states; 50 of 75 dialogs equal std (37 at first). Found outside the oracle (A rows): 14; fixed 9, partly 2 (A8, A12), open 3 (A1, A10 core, A14 asked).
+**Counts (11-01, audit 5):** surfaces audited 9 of 9. Dialogs: 199 field rows + 52 visibility states found; fixed 111 rows and 39 states; accepted 7; open 81 rows + 13 states; 50 of 75 dialogs equal std (37 at first). Found outside the oracle (A rows): 14; fixed 12, open 2 (A1, A10 core).
 
 ## Found outside the oracle (in the app, std's code, live)
 
@@ -35,13 +35,13 @@ precondition in every visibility state). Status: ✗ gap open, ✅ fixed (commit
 | A5 | Parts list rows (live 1714) | composite / surface / curve rows | P2 | ours added Copy <name>, Hide other parts, Hide all parts (and Export… on a curve); live: none on these rows | ✅ (audit 4) |
 | A6 | Graphics menu (live 1714) | surface face | P2 | ours added Hide other parts / Hide all parts after Hide Surface 1 (live: only on solid parts) | ✅ (audit 4) |
 | A7 | Feature list (live 1714) | hidden sketch row | P2 | missing Show all sketches (after Show) and Section view… (before Suppress) | ✅ (audit 4): Show all sketches while other sketches are hidden, Section view… before Suppress |
-| A8 | Feature list (live 1714) | failed feature row | P2 | missing "Edit healthy moment of <feature>…" (after Edit…); ours adds Zoom to selection | ◐ (audit 4): Zoom to selection dropped; Edit healthy moment asked (REQUESTS psui 11-01 follow-ups (c)) |
+| A8 | Feature list (live 1714) | failed feature row | P2 | missing "Edit healthy moment of <feature>…" (after Edit…); ours adds Zoom to selection | ✅ (audit 5): Zoom to selection dropped; Edit healthy moment of <feature>… after Edit… opens the normal edit dialog (live 1717 (c)) |
 | A9 | Feature list (live 1714) | folder row, selected | P3 | live adds Clear selection (own group after Dynamic suppression) when the folder row is selected | ✅ (audit 4) |
 | A10 | Model (core) | composite part with later features | P1 | in kinds.noshape (mkkinds + Fillet on a Part 1 edge + 100 mm Chamfer) the composite lists under Parts, and the Fillet adds a stray "Part 3" (4000 mm³, Fillet 1's body .20000); without the later features the Composite parts section is right | ✗ core (TICKETS) |
 | A11 | Configuration panel (live 1712) | filter button | P2 | live's filter button opens a menu (:name, :featurescriptid, :featurename, :part, :hasvisibilitycondition, :excludedfromproperties); ours opens nothing | ✅ (audit 4): the six commands, each puts its prefix in the box; the box filters by them |
-| A12 | Configuration panel (live 1712) | row right-click | P2 | live (first row): Duplicate row · Move down; ours: Delete only | ◐ (audit 4): Move up / Move down, Delete on the non-default rows; Duplicate row asked (follow-ups (a)) |
-| A13 | Variable table (live 1712) | row right-click | P2 | live: Filter feature list · Delete · Move down · Configure; ours lacks Configure | ✅ (audit 4): Configure adds the value to the first List / Checkbox input (as a dialog parameter); without an input, asked (b) |
-| A14 | Appearances (live 1712) | part row right-click | P2 | live: Rename… · Edit appearance… · Configure appearance; ours has no menu on part rows | ✗ asked (follow-ups (d)) |
+| A12 | Configuration panel (live 1712) | row right-click | P2 | live (first row): Duplicate row · Move down; ours: Delete only | ✅ (audit 5): by position as live 1717 (a): Switch to "X" (not current) · Set as default (not default; the current configuration stays) · Duplicate row ("Copy of X" under it, values copied) · Move up · Move down · Delete row (not default); `config_edit_option` set_default / move / duplicate in Part Studios |
+| A13 | Variable table (live 1712) | row right-click | P2 | live: Filter feature list · Delete · Move down · Configure; ours lacks Configure | ✅ (audit 4–5): Configure adds the value to the first List / Checkbox input (as a dialog parameter); absent without one (live 1717 (b)) |
+| A14 | Appearances (live 1712) | part row right-click | P2 | live: Rename… · Edit appearance… · Configure appearance; ours has no menu on part rows | ✅ (audit 5): Rename… (the small "Rename" ✓ ✕ popup beside the row) · Edit appearance… · Configure appearance (Configured properties for the part, a row per configuration and an Appearance column; offered with configuration inputs); Remove appearance stays after them on a part with its own |
 
 ## Feature dialogs against std
 

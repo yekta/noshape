@@ -407,6 +407,8 @@ impl PartStudioView {
         // Only the variables before the rollback bar (live 10-20 o).
         let var_rows = self.studio(cx).map(noshape_model::variable_table::active_rows).unwrap_or_default();
         let count = var_rows.len();
+        // Configure is offered only with a List or Checkbox input (live 1717).
+        let configurable = self.studio(cx).is_some_and(|s| s.configuration.inputs.iter().any(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })));
         let input_cell_filled = move |st: &Entity<InputState>, size: f32, fill: Rgba| gpui_kit::base::input::input_frame(div().w(px(140.)).h(px(34.)).flex_none().flex().items_center().px(px(2.)).bg(fill).border_r_1().border_b_1().border_color(grid).child(Input::new(st).appearance(false).text_size(px(size)).pl(px(4.))));
         let input_cell_sized = move |st: &Entity<InputState>, size: f32| input_cell_filled(st, size, crate::theme::p().bg_senary);
         let input_cell = move |st: &Entity<InputState>| input_cell_sized(st, 13.33);
@@ -512,7 +514,7 @@ impl PartStudioView {
                             .child(name_cell(&name_st, cx))
                             .child(kind_select)
                             .child(value_cell)
-                            .os_context_menu_over_inputs(move |menu, _, _| var_row_menu(menu, view.clone(), fid, &n2, k, count)),
+                            .os_context_menu_over_inputs(move |menu, _, _| var_row_menu(menu, view.clone(), fid, &n2, k, count, configurable)),
                     )
                     // Right-clicking the Description adds Copy | Convert to
                     // expression (or text) (live 563, 652–656).
@@ -525,7 +527,7 @@ impl PartStudioView {
                             .when_some(tip, |d, t| d.tooltip(crate::ui::tooltip(t)))
                             .os_context_menu_over_inputs(move |menu, _, _| {
                                 let (text, v) = (text.clone(), view.clone());
-                                var_row_menu(menu, view.clone(), fid, &name, k, count)
+                                var_row_menu(menu, view.clone(), fid, &name, k, count, configurable)
                                     .item(crate::os_menu::OsMenuItem::new("Copy").on_click(move |_, _, cx| cx.write_to_clipboard(ClipboardItem::new_string(text.clone()))))
                                     .item(crate::os_menu::OsMenuItem::new(if expr { "Convert to text" } else { "Convert to expression" }).on_click(move |_, _, cx| {
                                         v.update(cx, |this, cx| {
@@ -1348,12 +1350,23 @@ impl PartStudioView {
                             }
                         }))
                         .when(matches!(input.kind, ConfigInputKind::List { .. }), |d| {
-                            // Live 1712 (the default, first row): Move down; the
-                            // other rows Move up / down and Delete.
+                            // Live 1717: Switch to "X" (not the current row), Set
+                            // as default (not the default), Duplicate row, Move up /
+                            // down by position, Delete row (not the default).
                             let ri = rows.iter().position(|(k, _)| k == rk).unwrap_or(0);
                             let n = rows.len();
                             let is_default = matches!(&input.kind, ConfigInputKind::List { default, .. } if default == rk);
+                            let row_name = rname.clone();
+                            let current = current.clone();
                             d.os_context_menu(move |m, _, _| {
+                                type OptEdit = fn(&mut noshape_model::partstudio::PartStudio, &str, &str);
+                                let op = |label: String, undo: &'static str, f: OptEdit| {
+                                    let (v, a, b) = (vr.clone(), da.clone(), db.clone());
+                                    crate::os_menu::OsMenuItem::new(label).on_click(move |_, _, cx| {
+                                        let (a, b) = (a.clone(), b.clone());
+                                        v.update(cx, |this, cx| this.edit_config(undo, cx, |ps| f(ps, &a, &b)));
+                                    })
+                                };
                                 let mv = |label: &str, by: isize| {
                                     let (v, a, b) = (vr.clone(), da.clone(), db.clone());
                                     crate::os_menu::OsMenuItem::new(label.to_string()).on_click(move |_, _, cx| {
@@ -1361,17 +1374,31 @@ impl PartStudioView {
                                         v.update(cx, |this, cx| this.edit_config(noshape_ops::config::MOVE_OPTION, cx, |ps| noshape_ops::config::move_option(ps, &a, &b, by)));
                                     })
                                 };
-                                let (v, a, b) = (vr.clone(), da.clone(), db.clone());
-                                m.when(ri > 0, |m| m.item(mv("Move up", -1)))
-                                    .when(ri + 1 < n, |m| m.item(mv("Move down", 1)))
-                                    .when(!is_default, |m| {
-                                        m.item(crate::os_menu::OsMenuItem::new("Delete").icon_name("menu-delete").on_click(move |_, _, cx| {
-                                            let (a, b) = (a.clone(), b.clone());
-                                            v.update(cx, |this, cx| {
-                                                this.edit_config(noshape_ops::config::DELETE_OPTION, cx, |ps| noshape_ops::config::delete_option(ps, &a, &b));
-                                            })
-                                        }))
-                                    })
+                                let (vs, sa, sb) = (vr.clone(), da.clone(), db.clone());
+                                m.when(!active, |m| {
+                                    m.item(crate::os_menu::OsMenuItem::new(format!("Switch to \"{row_name}\"")).on_click(move |_, w, cx| {
+                                        let (a, b) = (sa.clone(), sb.clone());
+                                        vs.update(cx, |this, cx| this.set_config_value(&a, b, w, cx));
+                                    }))
+                                })
+                                // The current configuration stays (an unset value
+                                // follows the default, so it is pinned first).
+                                .when(!is_default, |m| {
+                                    let (v, a, b, cur) = (vr.clone(), da.clone(), db.clone(), current.clone());
+                                    m.item(crate::os_menu::OsMenuItem::new("Set as default").on_click(move |_, _, cx| {
+                                        let (a, b, cur) = (a.clone(), b.clone(), cur.clone());
+                                        v.update(cx, |this, cx| {
+                                            this.config_values.0.entry(a.clone()).or_insert(cur);
+                                            this.edit_config(noshape_ops::config::SET_DEFAULT_OPTION, cx, |ps| noshape_ops::config::set_default_option(ps, &a, &b));
+                                        })
+                                    }))
+                                })
+                                .item(op("Duplicate row".into(), noshape_ops::config::DUPLICATE_OPTION, |ps, a, b| {
+                                    noshape_ops::config::duplicate_option(ps, a, b);
+                                }))
+                                .when(ri > 0, |m| m.item(mv("Move up", -1)))
+                                .when(ri + 1 < n, |m| m.item(mv("Move down", 1)))
+                                .when(!is_default, |m| m.item(op("Delete row".into(), noshape_ops::config::DELETE_OPTION, noshape_ops::config::delete_option).icon_name("menu-delete")))
                             })
                         });
                     for (q, (ci, c)) in columns.iter().enumerate() {
@@ -2806,7 +2833,7 @@ fn valid_variable_name(v: &str) -> bool {
 /// A Variable table row's right-click menu (live part-studio/561): Filter
 /// feature list | Delete | Move up (not the first row) | Move down (not the
 /// last).
-fn var_row_menu(menu: crate::os_menu::OsMenu, view: Entity<PartStudioView>, fid: noshape_model::FeatureId, name: &str, k: usize, count: usize) -> crate::os_menu::OsMenu {
+fn var_row_menu(menu: crate::os_menu::OsMenu, view: Entity<PartStudioView>, fid: noshape_model::FeatureId, name: &str, k: usize, count: usize, configurable: bool) -> crate::os_menu::OsMenu {
     type RowEdit = fn(&mut noshape_model::partstudio::PartStudio, noshape_model::FeatureId);
     let edit = |label: &'static str, undo: &'static str, f: RowEdit| {
         let view = view.clone();
@@ -2829,10 +2856,11 @@ fn var_row_menu(menu: crate::os_menu::OsMenu, view: Entity<PartStudioView>, fid:
     if k + 1 < count {
         menu = menu.item(edit("Move down", "Move variable", |ps, fid| noshape_model::variable_table::move_row(ps, fid, 1)));
     }
-    // Live 1712: Configure (the variable's value joins the configuration
-    // table, as a dialog parameter's Configure does).
+    // Live 1712 / 1717: Configure (the variable's value joins the
+    // configuration table, as a dialog parameter's Configure does), only
+    // while the studio has a List or Checkbox input.
     let v = view.clone();
-    menu.item(crate::os_menu::OsMenuItem::new("Configure").on_click(move |_, _, cx| v.update(cx, |this, cx| this.configure_variable(fid, cx))))
+    menu.when(configurable, |m| m.item(crate::os_menu::OsMenuItem::new("Configure").on_click(move |_, _, cx| v.update(cx, |this, cx| this.configure_variable(fid, cx)))))
 }
 
 impl PartStudioView {
@@ -2843,7 +2871,7 @@ impl PartStudioView {
         let Some(ps) = self.studio(cx) else { return };
         let Some(f) = ps.feature(fid).cloned() else { return };
         // Without an input there is nothing to configure by (what live does
-        // then is asked, REQUESTS psui 11-01 audit A13).
+        // then: Configure is not offered, live 1717).
         let Some((input, input_name)) = ps.configuration.inputs.iter().find(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })).map(|i| (i.id.clone(), i.name.clone())) else {
             return;
         };

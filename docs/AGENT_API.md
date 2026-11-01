@@ -2028,7 +2028,7 @@ Examples:
 
 Rename or delete a configuration of a List input (edits the document (one undoable history entry)).
 
-A List keeps at least one configuration. A Variable Studio's row menu also has Set as default, Move up / down and Duplicate row (one edit each).
+A List keeps at least one configuration. The row menu's Set as default, Move up / down and Duplicate row (one edit each) work in Part Studios and Variable Studios.
 
 Examples:
 
@@ -2045,9 +2045,9 @@ Examples:
 | `option` | string | required | Configuration id or name. |
 | `name` | string |  | New name. |
 | `delete` | boolean |  | Delete it. |
-| `set_default` | boolean |  | Variable Studio: Set as default. |
-| `move` | one of -1, 1 |  | Variable Studio: Move up (-1) / down (1). |
-| `duplicate` | boolean |  | Variable Studio: Duplicate row ("<name> copy" under it, with its values). |
+| `set_default` | boolean |  | Set as default. |
+| `move` | one of -1, 1 |  | Move up (-1) / down (1). |
+| `duplicate` | boolean |  | Duplicate row under it, with its values ("Copy of <name>" in a Part Studio, "<name> copy" in a Variable Studio). |
 
 #### config_configure
 
@@ -5475,7 +5475,7 @@ Examples:
 
 Configured part properties: add a property column, set a value, delete a column or the table (edits the document (one undoable history entry)).
 
-The Configuration panel's configured properties table of a part (Configure part properties): without `action`, replies with the table (`properties`, `rows`: each row's configuration and values). `add_property` adds a column ("Add configured property"; the first one creates the table with a row for the active configuration; values start from the part's own); `set` sets `property` to `value` in the row of the active configuration (or `configuration`: {input: value}), adding that row when missing ("Edit configured properties"); `delete_column` is a column's right-click › Delete column ("Delete configured property"); `delete_table` is ⋯ › Delete table ("Delete configured properties table").
+The Configuration panel's configured properties table of a part (Configure part properties): without `action`, replies with the table (`properties`, `rows`: each row's configuration and values). `add_property` adds a column ("Add configured property"; the first one creates the table with a row for the active configuration; values start from the part's own); `configure_property` is the Appearances row's Configure appearance (the same, but a new table gets a row for every configuration of the first List input); `set` sets `property` to `value` in the row of the active configuration (or `configuration`: {input: value}), adding that row when missing ("Edit configured properties"); `delete_column` is a column's right-click › Delete column ("Delete configured property"); `delete_table` is ⋯ › Delete table ("Delete configured properties table").
 
 Examples:
 
@@ -5489,7 +5489,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `part` | string | required | Part id (`body:…`) or name. |
-| `action` | one of `add_property`, `set`, `delete_column`, `delete_table` |  | What to do (default: read the table). |
+| `action` | one of `add_property`, `configure_property`, `set`, `delete_column`, `delete_table` |  | What to do (default: read the table). |
 | `property` | one of `Appearance`, `Name`, `Description`, `Part number`, `Revision`, `Vendor`, `Project`, `Product line`, `Material`, `Title 1`, `Title 2`, `Title 3`, `Not revision managed`, `Exclude from all BOMs`, `Unit of measure`, `Mass`, `Tessellation quality` |  | The property (column). |
 | `value` | string |  | set: the value ("true" / "false" for checkboxes). |
 | `configuration` | object |  | set: the row's configuration, input id → value (default: the active one). |

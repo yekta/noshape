@@ -49,12 +49,12 @@ pub fn ops() -> Vec<Op> {
             group: "part",
             verb: "configured_properties",
             summary: "Configured part properties: add a property column, set a value, delete a column or the table",
-            description: "The Configuration panel's configured properties table of a part (Configure part properties): without `action`, replies with the table (`properties`, `rows`: each row's configuration and values). `add_property` adds a column (\"Add configured property\"; the first one creates the table with a row for the active configuration; values start from the part's own); `set` sets `property` to `value` in the row of the active configuration (or `configuration`: {input: value}), adding that row when missing (\"Edit configured properties\"); `delete_column` is a column's right-click › Delete column (\"Delete configured property\"); `delete_table` is ⋯ › Delete table (\"Delete configured properties table\").",
+            description: "The Configuration panel's configured properties table of a part (Configure part properties): without `action`, replies with the table (`properties`, `rows`: each row's configuration and values). `add_property` adds a column (\"Add configured property\"; the first one creates the table with a row for the active configuration; values start from the part's own); `configure_property` is the Appearances row's Configure appearance (the same, but a new table gets a row for every configuration of the first List input); `set` sets `property` to `value` in the row of the active configuration (or `configuration`: {input: value}), adding that row when missing (\"Edit configured properties\"); `delete_column` is a column's right-click › Delete column (\"Delete configured property\"); `delete_table` is ⋯ › Delete table (\"Delete configured properties table\").",
             fields: vec![
                 doc_field(),
                 tab_field(),
                 req("part", s(), "Part id (`body:…`) or name."),
-                opt("action", json!({ "type": "string", "enum": ["add_property", "set", "delete_column", "delete_table"] }), "What to do (default: read the table)."),
+                opt("action", json!({ "type": "string", "enum": ["add_property", "configure_property", "set", "delete_column", "delete_table"] }), "What to do (default: read the table)."),
                 opt("property", json!({ "type": "string", "enum": noshape_model::configured_properties::PROPERTIES }), "The property (column)."),
                 opt("value", s(), "set: the value (\"true\" / \"false\" for checkboxes)."),
                 opt("configuration", json!({ "type": "object" }), "set: the row's configuration, input id → value (default: the active one)."),
@@ -195,14 +195,18 @@ fn configured_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let in_table = |p: &str| cp::table(&ps, &body).is_some_and(|t| t.properties.iter().any(|x| x == p));
     match a.opt_str("action")? {
         None => {}
-        Some("add_property") => {
+        Some(action @ ("add_property" | "configure_property")) => {
             let p = prop()?;
             if in_table(p) {
                 return Err(OpError::param("property", "already a column"));
             }
             let active = od.current_config(tab)?;
             edit_studio(od, tab, "Add configured property", |ps| {
-                cp::add_property(ps, &body, p, &active, &part_name);
+                if action == "add_property" {
+                    cp::add_property(ps, &body, p, &active, &part_name);
+                } else {
+                    cp::configure_property(ps, &body, p, &active, &part_name);
+                }
                 Ok(())
             })?;
         }
@@ -239,7 +243,7 @@ fn configured_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 Ok(())
             })?;
         }
-        Some(_) => return Err(OpError::param("action", "add_property, set, delete_column or delete_table")),
+        Some(_) => return Err(OpError::param("action", "add_property, configure_property, set, delete_column or delete_table")),
     }
     let ps = crate::doc::studio(od.doc(), tab)?;
     Ok(json!({ "part": refs::body_id(&body), "table": table_json(ps, &body) }).into())

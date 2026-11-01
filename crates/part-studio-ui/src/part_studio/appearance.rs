@@ -361,6 +361,23 @@ impl PartStudioView {
         });
     }
 
+    /// Appearances › Configure appearance: the Configuration panel's
+    /// Configured properties for the part, with an Appearance column (live
+    /// 1717; no dialog).
+    fn configure_appearance(&mut self, b: BodyId, cx: &mut Context<Self>) {
+        let has = self.studio(cx).and_then(|s| noshape_model::configured_properties::table(s, &b)).is_some_and(|t| t.columns().contains(&"Appearance"));
+        if !has {
+            let active = self.config_values.clone();
+            let name = self.display.body(&b).map(|x| x.name.clone()).unwrap_or_default();
+            self.edit_config("Add configured property", cx, |ps| noshape_model::configured_properties::configure_property(ps, &b, "Appearance", &active, &name));
+            self.config_dirty(cx);
+        }
+        self.ui.cp_part = Some(b);
+        self.ui.cfg_properties_tab = true;
+        self.right_panel = Some(super::config_panel::RightPanel::Configurations);
+        cx.notify();
+    }
+
     fn reset_part_appearance(&mut self, b: BodyId, cx: &mut Context<Self>) {
         self.edit_part_appearance(&b, cx, |p| {
             p.appearance = None;
@@ -747,6 +764,14 @@ impl PartStudioView {
                 .child(swatch(color, selected))
         };
         let mut rows: Vec<AnyElement> = Vec::new();
+        // Configured properties exist once the studio has an input.
+        let configurable = !studio.configuration.inputs.is_empty();
+        // The part being renamed from its row, and its popup.
+        let rename_part = match &self.folder_prompt {
+            Some((_, super::FolderTarget::Part(b), _)) => Some(b.clone()),
+            _ => None,
+        };
+        let mut rename_popup = if rename_part.is_some() { self.name_prompt(cx) } else { None };
         if !sketches_tab {
             for body in self.display.bodies.iter().filter(|b| b.kind != noshape_model::display::BodyKind::Wire) {
                 let props = studio.part_properties.get(&body.id);
@@ -754,6 +779,7 @@ impl PartStudioView {
                 let (b1, b2) = (body.id.clone(), body.id.clone());
                 let custom = props.is_some_and(|p| p.appearance.is_some());
                 let view = cx.entity();
+                let rename_popup = if rename_part.as_ref() == Some(&body.id) { rename_popup.take() } else { None };
                 rows.push(
                     row(SharedString::from(format!("ap-part-{}", body.id)), color, body.name.clone(), false, self.selection.contains(&Reference::Body(body.id.clone())))
                         // Live: a click selects the part (row and part
@@ -765,13 +791,22 @@ impl PartStudioView {
                                 this.pick_body(b1.clone(), cx);
                             }
                         }))
-                        .when(custom, |d| {
-                            d.os_context_menu(move |m, _, _| {
+                        // Live 1712 / 1717: Rename… (the small "Rename"
+                        // popup) · Edit appearance… · Configure appearance
+                        // (with configuration inputs).
+                        .os_context_menu(move |m, _, _| {
+                            let item = |label: &str, f: super::ViewAction| {
                                 let v = view.clone();
-                                let b = b2.clone();
-                                m.item(crate::os_menu::OsMenuItem::new("Remove appearance").on_click(move |_, _, cx| v.update(cx, |this, cx| this.reset_part_appearance(b.clone(), cx))))
-                            })
+                                crate::os_menu::OsMenuItem::new(label).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
+                            };
+                            let (r, e, c, d) = (b2.clone(), b2.clone(), b2.clone(), b2.clone());
+                            m.item(item("Rename…", Box::new(move |this, w, cx| this.open_folder_prompt_for(super::FolderTarget::Part(r.clone()), w, cx))))
+                                .item(item("Edit appearance…", Box::new(move |this, w, cx| this.edit_appearance(EditTarget::Parts(vec![e.clone()]), w, cx))))
+                                .when(configurable, |m| m.item(item("Configure appearance", Box::new(move |this, _, cx| this.configure_appearance(c.clone(), cx)))))
+                                .when(custom, |m| m.separator().item(item("Remove appearance", Box::new(move |this, _, cx| this.reset_part_appearance(d.clone(), cx)))))
                         })
+                        // The popup beside the row, left of the panel.
+                        .when_some(rename_popup, |d, popup| d.relative().child(div().absolute().top_0().left_0().size_0().child(deferred(anchored().anchor(Anchor::TopRight).snap_to_window().child(popup)).with_priority(5))))
                         .into_any_element(),
                 );
             }

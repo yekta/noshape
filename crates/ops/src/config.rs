@@ -163,6 +163,37 @@ pub fn delete_option(ps: &mut PartStudio, input: &str, option: &str) {
     }
 }
 
+pub const SET_DEFAULT_OPTION: &str = "Set default configuration";
+
+/// Make `option` its List input's default (live 1717's row menu "Set as default").
+pub fn set_default_option(ps: &mut PartStudio, input: &str, option: &str) {
+    if let Some(ConfigInput { kind: ConfigInputKind::List { options, default }, .. }) = ps.configuration.inputs.iter_mut().find(|i| i.id == input)
+        && options.iter().any(|o| o.id == option)
+    {
+        *default = option.to_string();
+    }
+}
+
+pub const DUPLICATE_OPTION: &str = "Duplicate configuration";
+
+/// Duplicate a List input's configuration (live 1717 "Duplicate row"):
+/// "Copy of <name>" right below it, with its configured values. Returns
+/// the new configuration's id.
+pub fn duplicate_option(ps: &mut PartStudio, input: &str, option: &str) -> Option<String> {
+    let Some(ConfigInput { kind: ConfigInputKind::List { options, .. }, .. }) = ps.configuration.inputs.iter_mut().find(|i| i.id == input) else { return None };
+    let at = options.iter().position(|o| o.id == option)?;
+    let name = format!("Copy of {}", options[at].name);
+    let taken: Vec<String> = options.iter().map(|o| o.id.clone()).collect();
+    let id = fs_identifier(&name, &taken);
+    options.insert(at + 1, ListOption { id: id.clone(), name });
+    for c in ps.configuration.configured.iter_mut().filter(|c| c.input == input) {
+        if let Some(v) = c.values.get(option).cloned() {
+            c.values.insert(id.clone(), v);
+        }
+    }
+    Some(id)
+}
+
 pub const MOVE_OPTION: &str = "Move configuration";
 
 /// Move a List input's configuration `by` rows (-1 up, 1 down; live 1712's

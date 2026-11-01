@@ -90,7 +90,7 @@ pub fn ops() -> Vec<Op> {
             group: "config",
             verb: "edit_option",
             summary: "Rename or delete a configuration of a List input",
-            description: "A List keeps at least one configuration. A Variable Studio's row menu also has Set as default, Move up / down and Duplicate row (one edit each).",
+            description: "A List keeps at least one configuration. The row menu's Set as default, Move up / down and Duplicate row (one edit each) work in Part Studios and Variable Studios.",
             fields: vec![
                 doc_field(),
                 cfg_tab_field(),
@@ -98,9 +98,9 @@ pub fn ops() -> Vec<Op> {
                 req("option", s(), "Configuration id or name."),
                 opt("name", s(), "New name."),
                 opt("delete", json!({ "type": "boolean" }), "Delete it."),
-                opt("set_default", json!({ "type": "boolean" }), "Variable Studio: Set as default."),
-                opt("move", json!({ "type": "integer", "enum": [-1, 1] }), "Variable Studio: Move up (-1) / down (1)."),
-                opt("duplicate", json!({ "type": "boolean" }), "Variable Studio: Duplicate row (\"<name> copy\" under it, with its values)."),
+                opt("set_default", json!({ "type": "boolean" }), "Set as default."),
+                opt("move", json!({ "type": "integer", "enum": [-1, 1] }), "Move up (-1) / down (1)."),
+                opt("duplicate", json!({ "type": "boolean" }), "Duplicate row under it, with its values (\"Copy of <name>\" in a Part Studio, \"<name> copy\" in a Variable Studio)."),
             ],
             mutates: true,
             destructive: false,
@@ -545,16 +545,32 @@ fn edit_option(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if vs::is_vs(ctx, a)? {
         return vs::edit_option(ctx, a);
     }
-    if let Some(k) = ["set_default", "move", "duplicate"].into_iter().find(|k| a.get(k).is_some()) {
-        return Err(OpError::param(k, "Variable Studios only"));
-    }
     if asm::is_assembly(ctx, a)? {
+        if let Some(k) = ["set_default", "move", "duplicate"].into_iter().find(|k| a.get(k).is_some()) {
+            return Err(OpError::param(k, "Part Studios and Variable Studios only"));
+        }
         return asm::edit_option(ctx, a);
     }
     let (od, tab) = studio_target(ctx, a)?;
     let ps = doc::studio(od.doc(), tab)?;
     let input = find_input(ps, a.str("input")?, "input")?;
     let option = find_option(ps, &input, a.str("option")?)?;
+    // The row menu of the Configuration panel (live 1717).
+    if a.bool_or("set_default", false)? {
+        return edit(od, tab, config::SET_DEFAULT_OPTION, |ps| {
+            config::set_default_option(ps, &input, &option);
+            Ok(json!({ "default": option }))
+        });
+    }
+    if let Some(by) = a.get("move").and_then(|v| v.as_i64()) {
+        return edit(od, tab, config::MOVE_OPTION, |ps| {
+            config::move_option(ps, &input, &option, by as isize);
+            Ok(json!({ "moved": option }))
+        });
+    }
+    if a.bool_or("duplicate", false)? {
+        return edit(od, tab, config::DUPLICATE_OPTION, |ps| config::duplicate_option(ps, &input, &option).map(|o| json!({ "option": o })).ok_or_else(|| OpError::param("option", "not found")));
+    }
     if a.bool_or("delete", false)? {
         return edit(od, tab, config::DELETE_OPTION, |ps| {
             config::delete_option(ps, &input, &option);
