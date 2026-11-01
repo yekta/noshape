@@ -146,79 +146,67 @@ fn nurbs_edge_nodes(c: &NurbsCurve, a: DVec3, b: DVec3, t0: f64, t1: f64, defl: 
     if !(t0.is_finite() && t1.is_finite()) || t0.min(t1) < lo - 1e-9 * (hi - lo).abs().max(1.0) || t0.max(t1) > hi + 1e-9 * (hi - lo).abs().max(1.0) || (t1 - t0).abs() <= 0.0 {
         return None;
     }
+    // BRepMesh's split (BRepMesh_CurveTessellator, GCPnts_TangentialDeflection): half the deflections, a step turning
+    // at most that angle and its middle within that of the chord.
     let (lin, ang) = (0.5 * defl.linear, 0.5 * defl.angular);
-    // Breaks: the ends and the knots between them.
-    let mut breaks = vec![t0];
     let (s0, s1) = (t0.min(t1), t0.max(t1));
-    let mut inner: Vec<f64> = c.knots.iter().copied().filter(|&k| k > s0 + 1e-12 * (s1 - s0) && k < s1 - 1e-12 * (s1 - s0)).collect();
-    inner.dedup_by(|x, y| (*x - *y).abs() <= 1e-12 * (s1 - s0));
+    let span = s1 - s0;
+    // Breaks: the ends and the knots where the curve may kink (as often as the degree).
+    let mut breaks = vec![t0];
+    let mut kinks: Vec<f64> = c.knots.chunk_by(|x, y| x == y).filter(|k| k.len() >= c.degree.max(1)).map(|k| k[0]).filter(|&k| k > s0 + 1e-12 * span && k < s1 - 1e-12 * span).collect();
     if t1 < t0 {
-        inner.reverse();
+        kinks.reverse();
     }
-    breaks.extend(inner);
+    breaks.extend(kinks);
     breaks.push(t1);
+    // Marched from each node: the step its turn rate (|C' × C''| / |C'|², radians a parameter) and its sag
+    // (curvature |C' × C''| / |C'|³, chord L sags L² κ / 8) allow, checked by the tangents' turn, the middle's offset
+    // from the chord and the middle's tangent against it; shortened until it passes.
+    let fits = |x: f64, y: f64| -> bool {
+        let (px, py, pm) = (c.derivs(x), c.derivs(y), c.derivs(0.5 * (x + y)));
+        let chord = py[0] - px[0];
+        let turn = px[1].angle_between(py[1]);
+        let off = (pm[0] - 0.5 * (px[0] + py[0])).length();
+        let skew = pm[1].angle_between(chord);
+        off <= lin && (turn.is_nan() || turn <= ang) && (skew.is_nan() || skew.min(std::f64::consts::PI - skew) <= 0.5 * ang)
+    };
     let mut params = vec![t0];
     let mut points = vec![a];
-    let ok = |x: f64, y: f64| -> bool {
-        let (px, py, pm) = (c.derivs(x), c.derivs(y), c.at(0.5 * (x + y)));
-        let chord = (pm - 0.5 * (px[0] + py[0])).length();
-        let turn = px[1].angle_between(py[1]);
-        chord <= lin && (turn.is_nan() || turn <= ang)
-    };
     for w in breaks.windows(2) {
-        // Depth-first halving, at least two pieces a span of a curved (degree > 1) curve.
-        let mut stack = vec![(w[0], w[1], 0u32)];
-        while let Some((x, y, depth)) = stack.pop() {
-            if depth < 30 && ((depth == 0 && c.degree > 1) || !ok(x, y)) {
-                let m = 0.5 * (x + y);
-                stack.push((m, y, depth + 1));
-                stack.push((x, m, depth + 1));
-                continue;
+        let (from, to) = (w[0], w[1]);
+        let dir = (to - from).signum();
+        let mut u = from;
+        let most = (to - from).abs();
+        while (to - u) * dir > 1e-12 * span {
+            let d = c.derivs(u);
+            let speed = d[1].length();
+            let bend = d[1].cross(d[2]).length();
+            let mut h = most;
+            if speed > 0.0 && bend > 0.0 {
+                h = h.min(ang * speed * speed / bend);
+                h = h.min((8.0 * lin * speed / bend).sqrt());
             }
-            params.push(y);
-            points.push(c.at(y));
+            let left = (to - u).abs();
+            // No sliver at the end: the rest in one step, or two equal ones.
+            if h >= left {
+                h = left;
+            } else if h > 0.5 * left {
+                h = 0.5 * left;
+            }
+            h = h.max(span * 1e-9);
+            let mut tries = 0;
+            while !fits(u, u + dir * h) && tries < 40 {
+                h *= 0.7;
+                tries += 1;
+            }
+            u = if (to - (u + dir * h)) * dir <= 1e-12 * span { to } else { u + dir * h };
+            params.push(u);
+            points.push(c.at(u));
             if params.len() > 100_000 {
                 return None;
             }
         }
     }
-    // Merged where the deflections allow (a curve fitted through many knots splits each span in two above, far
-    // finer than it needs): from each kept node as far on as every node and mid-span point skipped stays within
-    // the chord deflection of the chord, and every tangent there within half the angle of it (the turn along
-    // it within the angle, as the halving's). A knot where the curve may kink (as often as the degree) is kept.
-    let kinks: Vec<f64> = c.knots.chunk_by(|x, y| x == y).filter(|k| k.len() >= c.degree.max(1)).map(|k| k[0]).collect();
-    let mids: Vec<DVec3> = params.windows(2).map(|w| c.at(0.5 * (w[0] + w[1]))).collect();
-    let tangents: Vec<DVec3> = params.iter().map(|&t| c.derivs(t)[1]).collect();
-    let fits = |i: usize, k: usize| -> bool {
-        let (p, q) = (points[i], points[k]);
-        let d = q - p;
-        let len2 = d.length_squared();
-        if len2 <= 0.0 {
-            return false;
-        }
-        let off = |x: DVec3| (x - p - d * ((x - p).dot(d) / len2).clamp(0.0, 1.0)).length();
-        let skew = |t: DVec3| {
-            let a = t.angle_between(d);
-            // The curve may run either way along its edge.
-            a.is_nan() || a.min(std::f64::consts::PI - a) <= 0.5 * ang
-        };
-        (i + 1..k).all(|m| off(points[m]) <= lin && skew(tangents[m]) && !kinks.iter().any(|&kn| (kn - params[m]).abs() <= 1e-12 * (s1 - s0)))
-            && (i..k).all(|m| off(mids[m]) <= lin)
-            && skew(tangents[i])
-            && skew(tangents[k])
-    };
-    let mut keep = vec![0];
-    let mut i = 0;
-    while i + 1 < params.len() {
-        let mut k = i + 1;
-        while k + 1 < params.len() && k + 1 - i <= 64 && fits(i, k + 1) {
-            k += 1;
-        }
-        keep.push(k);
-        i = k;
-    }
-    let mut points: Vec<DVec3> = keep.iter().map(|&k| points[k]).collect();
-    let params: Vec<f64> = keep.iter().map(|&k| params[k]).collect();
     // The ends are the vertices (within the edge's tolerance of the curve's).
     *points.last_mut()? = b;
     Some(EdgeNodes { points, params })

@@ -204,8 +204,9 @@ document's display mesh is under 0.5 s.
 11-02: queued e75450f5 (Variable table pass, A24; its MENUS line for "Collapse all tables" came in the next commit:
 e75450f5 alone fails ops coverage), the planes P1 part 1 (FS host Ent::PlaneBody) and part 2 (A25: a feature's
 planes as `Reference::ConstructionPlane`, listed under it with eyes; live 11-02 on "psui planes 1102 ps" in the mm
-test doc). Mesher WIP uncommitted: brep nurbs_edge_nodes marching (NIST 909k -> 989k triangles, 486 ms; knurl doubled
-to 121k: drop the forced two steps a stretch), and a NOSHAPE_MESH_FACES debug block in mesh.cpp (not to land).
+test doc). Mesher (queued after them): B-spline edges marched as GCPnts does instead of halved and merged (NIST 1.11M -> 989k
+triangles against BRepMesh's 909k, regeneration 343 ms against 616 ms with BRepMesh; knurl 50k against 64k; the
+4096 px NIST render within 10% but for 598 px of tangent-edge dashes).
 Open from these passes: inserted Variable Studio tables keep 140 px columns (live shares the widths); a child plane's
 eye while its feature is hidden (live unchecked).
 
