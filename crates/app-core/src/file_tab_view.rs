@@ -11,6 +11,7 @@ use gpui_kit::component::button::Button;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::document::{Document, TabContent, TabId};
 use noshape_model::file_tab::{FileKind, FileTab};
@@ -178,36 +179,138 @@ impl Render for FileTabView {
     }
 }
 
+/// The insert-from-file dialog's state: Current document / Other
+/// documents, the library's documents (read once) and the opened one's
+/// files.
+#[derive(Default)]
+struct PickState {
+    other: bool,
+    docs: Option<Vec<crate::library::DocEntry>>,
+    opened: Option<(String, Vec<(String, FileTab)>)>,
+}
+
 /// Onshape's insert-from-file dialog (Insert image, Insert DXF or DWG,
 /// Select a DWT): search the document's file tabs of `kinds`, click one to
 /// insert it; "Import" brings a local file into the document (as a file
-/// tab) and inserts it.
+/// tab) and inserts it. "Other documents" lists the library's documents;
+/// open one to pick from its files (live: Insert image / Select a DWT
+/// have Current document | Other documents, drawing.md EX17, S13).
 pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [FileKind], exts: &'static [&'static str], window: &mut Window, cx: &mut App, on_pick: impl Fn(FileTab, &mut Window, &mut App) + 'static) {
     let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search files"));
+    let state = cx.new(|_| PickState::default());
     let on_pick = std::rc::Rc::new(on_pick);
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
         let q = search.read(cx).value().to_lowercase();
-        let files: Vec<(TabId, String, FileTab)> = doc
-            .read(cx)
-            .session
-            .doc
-            .tabs
-            .iter()
-            .filter_map(|t| match &t.content {
-                TabContent::File(f) if kinds.contains(&f.kind()) && t.name.to_lowercase().contains(&q) => Some((t.id, t.name.clone(), f.clone())),
-                _ => None,
-            })
-            .collect();
+        let st = state.read(cx);
+        let other = st.other;
+        let tab = |id: &'static str, label: &'static str, on: bool, to_other: bool| {
+            let state = state.clone();
+            div()
+                .id(id)
+                .px(px(12.))
+                .py(px(6.))
+                .text_size(px(13.))
+                .cursor_pointer()
+                .when(on, |d| d.border_b_2().border_color(gpui_kit::rgb(0x1d6bd6)).text_color(gpui_kit::rgb(0x1d6bd6)))
+                .child(label)
+                .on_click(move |_, _, cx| {
+                    let here = state.clone();
+                    let load = state.update(cx, |s, cx| {
+                        s.other = to_other;
+                        cx.notify();
+                        to_other && s.docs.is_none()
+                    });
+                    if load {
+                        here.update(cx, |s, _| s.docs = Some(Vec::new()));
+                        cx.spawn(async move |cx| {
+                            let docs = cx.background_spawn(async { crate::start_library::Library::default().scan(&crate::start_library::ScanInput::current()).docs }).await;
+                            here.update(cx, |s, cx| {
+                                s.docs = Some(docs);
+                                cx.notify();
+                            });
+                        })
+                        .detach();
+                    }
+                })
+        };
+        let tabs = h_flex().gap(px(4.)).border_b_1().border_color(gpui_kit::rgb(0xd3d7d9)).child(tab("pick-tab-current", "Current document", !other, false)).child(tab("pick-tab-other", "Other documents", other, true));
         let mut list = v_flex().id("pick-file-list").h(px(240.)).overflow_y_scroll().border_1().border_color(gpui_kit::rgb(0xd3d7d9));
-        if files.is_empty() {
+        let row = |id: SharedString| h_flex().id(id).h(px(32.)).px(px(8.)).gap(px(8.)).text_size(px(13.)).cursor_pointer().hover(|d| d.bg(gpui_kit::rgb(0xdef1fb)));
+        let files: Vec<(TabId, String, FileTab)> = if other {
+            match &st.opened {
+                // An opened other document: ‹ back, then its files.
+                Some((name, files)) => {
+                    let (back, search) = (state.clone(), search.clone());
+                    list = list.child(row("pick-back".into()).child(div().child("‹")).child(div().flex_1().truncate().font_weight(FontWeight::SEMIBOLD).child(crate::ui::user_text(name.clone()))).on_click(move |_, window, cx| {
+                        search.update(cx, |s, cx| s.set_value("", window, cx));
+                        back.update(cx, |s, cx| {
+                            s.opened = None;
+                            cx.notify();
+                        })
+                    }));
+                    files.iter().filter(|(n, _)| n.to_lowercase().contains(&q)).map(|(n, f)| (TabId(0), n.clone(), f.clone())).collect()
+                }
+                None => {
+                    let here = doc.read(cx).session.path.clone();
+                    let docs: Vec<_> = st.docs.iter().flatten().filter(|d| !d.broken && !d.trashed && d.path != here && d.name.to_lowercase().contains(&q)).cloned().collect();
+                    if st.docs.as_ref().is_some_and(|d| d.is_empty()) {
+                        list = list.child(div().p(px(12.)).text_size(px(13.)).text_color(pal.text_muted).child("Loading documents…"));
+                    }
+                    for (i, d) in docs.into_iter().enumerate() {
+                        let (open, search) = (state.clone(), search.clone());
+                        list = list.child(
+                            row(SharedString::from(format!("pick-doc-{i}")))
+                                .child(crate::assets::icon("document", 18., cx))
+                                .child(div().flex_1().truncate().child(crate::ui::user_text(d.name.clone())))
+                                .child(div().text_size(px(12.)).text_color(pal.text_muted).child(d.owner.clone()))
+                                .on_click(move |_, window, cx| {
+                                    // The search then filters its files.
+                                    search.update(cx, |s, cx| s.set_value("", window, cx));
+                                    // Its workspace as it is now: the files of `kinds`.
+                                    let files: Vec<(String, FileTab)> = (|| {
+                                        let store = noshape_store::Document::open_read_only(&d.path).ok()?;
+                                        let head = store.head(store.default_branch().ok()?).ok()?;
+                                        let snap = crate::derived::external_snapshot(&d.path, head).ok()?;
+                                        Some(snap.ordered_tabs().into_iter().filter_map(|t| match &t.content {
+                                            TabContent::File(f) if kinds.contains(&f.kind()) => Some((t.name.clone(), f.clone())),
+                                            _ => None,
+                                        }).collect())
+                                    })()
+                                    .unwrap_or_default();
+                                    open.update(cx, |s, cx| {
+                                        s.opened = Some((d.name.clone(), files));
+                                        cx.notify();
+                                    });
+                                }),
+                        );
+                    }
+                    Vec::new()
+                }
+            }
+        } else {
+            doc.read(cx)
+                .session
+                .doc
+                .tabs
+                .iter()
+                .filter_map(|t| match &t.content {
+                    TabContent::File(f) if kinds.contains(&f.kind()) && t.name.to_lowercase().contains(&q) => Some((t.id, t.name.clone(), f.clone())),
+                    _ => None,
+                })
+                .collect()
+        };
+        if files.is_empty() && !other {
             list = list.child(div().p(px(12.)).text_size(px(13.)).text_color(pal.text_muted).child("No files in this document. Use Import to add one."));
         }
-        for (id, name, f) in files {
+        if files.is_empty() && other && st.opened.is_some() {
+            list = list.child(div().p(px(12.)).text_size(px(13.)).text_color(pal.text_muted).child("No files of this type in this document."));
+        }
+        for (k, (id, name, f)) in files.into_iter().enumerate() {
             let (pick, f2) = (on_pick.clone(), f.clone());
             list = list.child(
                 h_flex()
-                    .id(SharedString::from(format!("pick-{id}")))
+                    .id(SharedString::from(format!("pick-{id}-{k}")))
                     .h(px(32.))
                     .px(px(8.))
                     .gap(px(8.))
@@ -225,7 +328,7 @@ pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [Fi
         }
         let (doc2, pick2) = (doc.clone(), on_pick.clone());
         crate::os_ui::modal(dialog, title, 560.)
-            .child(crate::os_ui::modal_body().gap(px(8.)).child(Input::new(&search).h(px(30.)).text_size(px(13.))).child(list))
+            .child(crate::os_ui::modal_body().gap(px(8.)).child(tabs).child(Input::new(&search).h(px(30.)).text_size(px(13.))).child(list))
             .footer(
                 crate::os_ui::modal_footer()
                     .child(

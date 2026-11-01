@@ -11,6 +11,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## vibe4 builds (lead, 11-01)
+
+- Builds and tests go through `tools/tiers/rb.sh` (GUI: `rb.sh --get noshape cargo build -p noshape`). A fetched debug
+  binary reads its assets (rust-embed, debug) from the vibe4 path /home/ngyekta/agents/dx/src/crates/app/assets, and
+  rust-embed doesn't follow symlinks: here that path is a real copy of crates/app/assets (refresh it after icon
+  changes). Without it every icon is blank ("could not find asset" in the log).
+
 ## Split with psui (lead, 11-01 04:39)
 
 - psui takes docs/parity/workflow-drawing.md and workflow-drawing-sheet-metal.md and may touch drawing-ui / drawing
