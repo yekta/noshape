@@ -2374,7 +2374,9 @@ impl PartStudioView {
                 except: String::new(),
                 gpu: None,
                 value: String::new(),
-                libraries: false,
+                // Live 1726: Insert image's Libraries (Onshape images ›
+                // Environment maps).
+                libraries: image,
             };
             let panel = cx.new(|cx| {
                 let mut p = crate::select_item::SelectItemPanel::new(setup, window, cx);
@@ -2404,6 +2406,7 @@ impl PartStudioView {
                             this.insert_file_tab(&v, window, cx);
                         }
                     }
+                    E::LibraryImage(name) => this.insert_library_image(name, cx),
                     E::Close => this.set_tool(Tool::Select, cx),
                     E::ImportFile => this.import_insert_file(image, window, cx),
                     E::CreateVersion(None) => crate::part_studio_hooks::create_version(this.doc.clone(), window, cx),
@@ -2479,6 +2482,17 @@ impl PartStudioView {
             self.load_image_bytes(f.file_name.clone(), bytes, cx);
         } else {
             self.insert_dxf_bytes(&f.file_name, &bytes, window, cx);
+        }
+    }
+
+    /// Libraries › Environment maps › [Done]: the image goes to "Draw image
+    /// rectangle." as a file's would; no tab is added (live 1726).
+    fn insert_library_image(&mut self, name: &str, cx: &mut Context<Self>) {
+        let Some(img) = crate::part_studio::environment_maps::generate(name) else { return };
+        let Some(buf) = image::RgbaImage::from_raw(img.width, img.height, img.rgba) else { return };
+        let mut png = Vec::new();
+        if buf.write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).is_ok() {
+            self.load_image_bytes(format!("{name}.png"), png, cx);
         }
     }
 

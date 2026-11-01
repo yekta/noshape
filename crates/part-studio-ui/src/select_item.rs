@@ -39,6 +39,9 @@ pub enum SelectItemEvent {
     ImportFile,
     /// The header's ✓ (a panel with [`SelectItemPanel::ok`]).
     Confirm,
+    /// Libraries › Onshape images › Environment maps: [Done] on this image
+    /// (the sketch's Insert image, live 1726).
+    LibraryImage(&'static str),
 }
 
 impl EventEmitter<SelectItemEvent> for SelectItemPanel {}
@@ -147,6 +150,11 @@ pub struct SelectItemPanel {
     /// A library form's values as last Generate preview'ed (Select takes
     /// them only then, live request 1622 (d)).
     lib_generated: HashMap<String, ConfigValues>,
+    /// Insert image's library: the chosen environment map, its Image ▾ and
+    /// its thumbnail.
+    lib_image: &'static str,
+    lib_image_select: Option<(Entity<crate::os_select::OsSelect>, Subscription)>,
+    lib_image_thumb: Option<(&'static str, Arc<RenderImage>)>,
     _subs: Vec<Subscription>,
 }
 
@@ -260,6 +268,9 @@ impl SelectItemPanel {
             lib_form: None,
             lib_select: None,
             lib_generated: HashMap::new(),
+            lib_image: noshape_scene::environment_maps::NAMES[0],
+            lib_image_select: None,
+            lib_image_thumb: None,
             _subs: subs,
         }
     }
@@ -534,6 +545,83 @@ impl SelectItemPanel {
     /// (a stored 240 × 136 thumbnail: Generate doesn't redraw it), and
     /// [Select] at the bottom, off while there are values not yet
     /// previewed; it sets the field.
+    /// Insert image › Libraries (live 1726): Library [Onshape images],
+    /// Type [Environment maps], Image ▾ (11, the first by default), its
+    /// 240 × 136 thumbnail and an outline [Done] at the bottom centre.
+    fn render_library_images(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        use noshape_scene::environment_maps as env;
+        let pal = p();
+        let select = match &self.lib_image_select {
+            Some((s, _)) => s.clone(),
+            None => {
+                let s = cx.new(|_| crate::os_select::OsSelect::new("sel-lib-image"));
+                let sub = cx.subscribe(&s, |this: &mut Self, _, ev: &crate::os_select::OsSelectEvent, cx| {
+                    let crate::os_select::OsSelectEvent::Picked(id) = ev;
+                    if let Some(n) = env::NAMES.iter().find(|n| **n == &**id) {
+                        this.lib_image = n;
+                    }
+                    cx.notify();
+                });
+                self.lib_image_select = Some((s.clone(), sub));
+                s
+            }
+        };
+        let items: Vec<(SharedString, SharedString)> = env::NAMES.iter().map(|n| (SharedString::from(*n), SharedString::from(*n))).collect();
+        let chosen = self.lib_image;
+        select.update(cx, |s, _| s.set_items(items, chosen.to_string()));
+        if self.lib_image_thumb.as_ref().is_none_or(|(n, _)| *n != chosen)
+            && let Some(img) = env::generate(chosen)
+            && let Some(mut buf) = image::RgbaImage::from_raw(img.width, img.height, img.rgba)
+        {
+            // GPUI images are BGRA.
+            for px in buf.as_chunks_mut::<4>().0 {
+                px.swap(0, 2);
+            }
+            self.lib_image_thumb = Some((chosen, Arc::new(RenderImage::new(vec![image::Frame::new(buf)]))));
+        }
+        let row = |label: &'static str, control: AnyElement| {
+            h_flex().h(px(30.)).px(px(6.)).gap(px(6.)).child(div().w(px(56.)).flex_none().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child(label)).child(div().flex_1().child(control))
+        };
+        let fixed = |value: &'static str| {
+            h_flex()
+                .h(px(26.))
+                .px(px(6.))
+                .rounded(px(3.))
+                .border_1()
+                .border_color(gpui_kit::rgb(0xcccccc))
+                .text_size(px(12.))
+                .child(div().flex_1().truncate().child(value))
+                .child(crate::ui::glyph("expander-down", 8., pal.text))
+                .into_any_element()
+        };
+        let mut col = v_flex()
+            .flex_1()
+            .min_h_0()
+            .pt(px(6.))
+            .gap(px(2.))
+            .child(row("Library", fixed("Onshape images")))
+            .child(row("Type", fixed("Environment maps")))
+            .child(row("Image", select.into_any_element()));
+        if let Some((_, img)) = &self.lib_image_thumb {
+            col = col.child(div().pl(px(30.)).pt(px(6.)).child(gpui_kit::img(img.clone()).w(px(240.)).h(px(136.)).object_fit(ObjectFit::Contain)));
+        }
+        let done = div()
+            .id("sel-lib-image-done")
+            .h(px(30.))
+            .px(px(16.))
+            .flex()
+            .items_center()
+            .rounded(px(3.))
+            .border_1()
+            .border_color(gpui_kit::rgb(0xaaaaaa))
+            .text_size(px(14.))
+            .cursor_pointer()
+            .hover(|d| d.bg(pal.panel_hover))
+            .child("Done")
+            .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| cx.emit(SelectItemEvent::LibraryImage(chosen))));
+        v_flex().flex_1().min_h_0().child(col).child(h_flex().flex_none().justify_center().p(px(8.)).child(done)).into_any_element()
+    }
+
     fn render_library_form(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         use noshape_model::sheetmetal::forms;
         let pal = p();
@@ -1147,7 +1235,9 @@ impl Render for SelectItemPanel {
         let mut body = v_flex().flex_1().min_h_0();
         let shown = if other { self.other.as_ref() } else { self.current.as_ref() };
         let in_libraries = self.in_libraries;
-        if in_libraries {
+        if in_libraries && mode == PanelMode::Reference(ReferenceKind::Image) {
+            body = body.child(self.render_library_images(cx));
+        } else if in_libraries {
             // Library ▾ / Type ▾ (one each), then the forms (live f-2, f-3).
             let pick_row = |label: &'static str, value: &'static str| {
                 h_flex()
@@ -1293,7 +1383,8 @@ impl Render for SelectItemPanel {
                     .when(self.libraries, |d| d.child(tab("sel-libraries", "Libraries", in_libraries, cx))),
             )
             .child(body)
-            .when(import_file, |d| {
+            // Live 1726: no Import… on the Libraries tab.
+            .when(import_file && !self.in_libraries, |d| {
                 d.child(
                     h_flex()
                         .id("sel-import-file")

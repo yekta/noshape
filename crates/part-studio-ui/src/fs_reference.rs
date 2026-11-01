@@ -242,7 +242,7 @@ impl FeatureDialog {
             }
             SelectItemEvent::CreateVersion(p) => cx.emit(DialogEvent::CreateVersion(p.clone())),
             SelectItemEvent::ImportFile => this.ref_import = Some(kind),
-            SelectItemEvent::Confirm => {}
+            SelectItemEvent::Confirm | SelectItemEvent::LibraryImage(_) => {}
         });
         self.ref_picker = Some(RefPicker { path, panel, _sub: sub });
     }
