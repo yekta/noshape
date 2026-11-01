@@ -47,6 +47,7 @@
 #include <gp_Pln.hxx>
 #include <TopTools_HSequenceOfShape.hxx>
 #include <ShapeAnalysis_FreeBounds.hxx>
+#include <ShapeFix_Face.hxx>
 #include <BRepAlgoAPI_Section.hxx>
 #include <BRepOffsetAPI_MakeThickSolid.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
@@ -2671,6 +2672,64 @@ struct Scaled
 using MakeBuild = std::function<BlendBuild(const Scaled& sc)>;
 
 
+// Round blends that met across the face between them (live W1: R2 on both top edges of a 4 mm rib "consumes the
+// rib top": one half-cylinder, 10 faces): OCCT's (made a hair smaller, the face between removed) are two cylinders
+// whose axes are 1e-7 apart; such neighbours, one radius on one axis, merged into one face. Only the edges between
+// them go: every other edge is kept.
+void merge_full_rounds(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
+{
+  ShapeAncMap ef;
+  TopExp::MapShapesAndAncestors(r, TopAbs_EDGE, TopAbs_FACE, ef);
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape();
+  ShapeIMap                      done;
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const ShapeList& fs = ef(i);
+    if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()) || done.Contains(fs.First()) || done.Contains(fs.Last()))
+      continue;
+    const TopoDS_Face   fa = TopoDS::Face(fs.First()), fb = TopoDS::Face(fs.Last());
+    BRepAdaptor_Surface a(fa), b(fb);
+    if (a.GetType() != GeomAbs_Cylinder || b.GetType() != GeomAbs_Cylinder)
+      continue;
+    const gp_Cylinder ca = a.Cylinder(), cb = b.Cylinder();
+    const double      ra = ca.Radius();
+    if (std::abs(ra - cb.Radius()) > 1e-6 * ra || !ca.Axis().IsParallel(cb.Axis(), 1e-9) || gp_Lin(ca.Axis()).Distance(cb.Location()) > 1e-6 * ra)
+      continue;
+    // One face on a's cylinder bounded by both faces' other edges.
+    occ::handle<NCollection_HSequence<TopoDS_Shape>> es = new NCollection_HSequence<TopoDS_Shape>(), ws;
+    for (const TopoDS_Face& f : {fa, fb})
+      for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+        if (!x.Current().IsSame(ef.FindKey(i)))
+          es->Append(x.Current());
+    ShapeAnalysis_FreeBounds::ConnectEdgesToWires(es, 1e-6 * ra, false, ws);
+    if (ws->Length() != 1)
+      continue;
+    BRepBuilderAPI_MakeFace mf(BRep_Tool::Surface(fa), TopoDS::Wire(ws->Value(1)), true);
+    if (!mf.IsDone())
+      continue;
+    ShapeFix_Face fix(mf.Face());
+    fix.FixOrientation();
+    fix.Perform();
+    TopoDS_Face merged = fix.Face();
+    merged.Orientation(fa.Orientation());
+    rs->Replace(fa, merged);
+    rs->Remove(fb);
+    done.Add(fa);
+    done.Add(fb);
+  }
+  if (done.IsEmpty())
+    return;
+  const TopoDS_Shape out = rs->Apply(r);
+  if (!valid_shape(out))
+    return;
+  HHist step = rs->History();
+  // (Each removed face lives on in the merged one.)
+  for (int i = 1; i <= done.Extent(); i += 2)
+    step->AddModified(done(i + 1), rs->Value(done(i)));
+  r = out;
+  h = compose(input, h, step);
+}
+
 OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const char* what,
                    const MakeBuild& make)
 {
@@ -2696,12 +2755,15 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
     if (valid)
     {
       const KernelTimer timer("blend.finish");
+      merge_full_rounds(input, r, h);
       return as_is.finish(r, h);
     }
   }
   const KernelTimer timer("blend.scaled");
   const Scaled sc(input, checked ? working_scale() : 1.0);
   auto [r, h] = checked_blend(sc.shape, make(sc), checked, size * sc.factor, what);
+  if (checked)
+    merge_full_rounds(sc.shape, r, h);
   return sc.finish(r, h);
 }
 

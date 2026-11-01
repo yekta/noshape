@@ -797,3 +797,22 @@ fn rust_blends_close_but_apart_are_occts() {
     let d = bool_corpus::Summary::of(&ours).differences(&bool_corpus::Summary::of(&occt));
     assert!(d.is_empty(), "{}", d.join(", "));
 }
+
+/// Live "kern f2 W1": a 60 x 40 x 20 block with a 4 x 40 x 5 rib on top, R2 on both of the rib's top edges: a full
+/// round, one half-cylinder (48731.32741228718 mm³, 10 faces: 9 planes, 1 cylinder). OCCT's (a hair smaller, the
+/// rib top removed) is two cylinders on one axis, merged. R2.5 (past half the rib): two cylinders, as live.
+#[test]
+fn a_full_round_is_one_face_as_lives() {
+    setup();
+    let rib = unify_same_domain(&fuse(&bx([0.0; 3], [60.0, 40.0, 20.0]), &bx([28.0, 0.0, 20.0], [32.0, 40.0, 25.0])).unwrap().shape).unwrap().shape;
+    assert_eq!(rib.faces().len(), 10);
+    let top = edges_where(&rib, |i| i.start.z > 24.99 * MM && i.end.z > 24.99 * MM && (i.start.y - i.end.y).abs() > 1.0 * MM);
+    assert_eq!(top.len(), 2);
+    let cylinders = |s: &Shape| s.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { .. }))).count();
+    for (r, want, faces, cyl) in [(2.0, 48731.32741228718, 10, 1), (2.5, 48693.369806645474, 11, 2)] {
+        let res = fillet_checked(&rib, &top, &[r * MM]).unwrap_or_else(|e| panic!("R{r}: {e}"));
+        assert!(res.shape.is_valid(), "R{r}");
+        assert!((vol_mm3(&res.shape) - want).abs() < 1e-3, "R{r}: {}", vol_mm3(&res.shape));
+        assert_eq!((res.shape.faces().len(), cylinders(&res.shape)), (faces, cyl), "R{r}");
+    }
+}
