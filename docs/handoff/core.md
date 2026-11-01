@@ -837,6 +837,25 @@ Knurl Phase 1 stopped at 246 s (its steps left are 10–40 s each); REGEN-SPEED 
 - kernel C++ .cpp edit → `cargo test -p noshape-kernel --test all <file>::`: ~25 s (ccache); a header edit ~3–10 min.
 - core edit → `cargo test -p noshape-model --test all`: ~1–2 min at load 30; ops test binary rebuild ~2–6 min.
 
+## From bool (11-01 05:16 UTC): request: opSweep of a planar profile along a helix differs from Parasolid's (knurl volumes)
+- The user's B94.6 Diamond knurl (tests/fs/knurl_b94.fs; T2 custom_features::knurl_feature_b94_tooth_and_helix_angles):
+  every face count matches live's, but at a 45° helix the knurled part's volume is 2.2–5.9 mm³ under live's (30/45 −2.19,
+  45/45 −3.45 = −3.6e-5, 60/45 −4.6, 80/45 −5.85 mm³; helix 15° and 30° within 1e-5). noshape's Boolean and OCCT's give the
+  same part (2.3e-8 apart), so the difference is in the groove tools.
+- One tool alone (the feature with booleanBodies commented out; live request 1696, behaviours "bool (2026-11-01, P1,
+  follow-up to 1687)", HIGH): `cut1` = opSweep of the diamond profile (a sketch region in the plane normal to the
+  cylinder's axis at the helix's start) along the helix.
+  - 45/45: ours 44.730284 mm³ / 269.369138 mm², live 44.733402 / 269.373070. Volume −0.003118 mm³ (−7.0e-5), area
+    −0.0039 mm².
+  - 80/30: ours 77.025838 / 271.927565, live 77.024781 / 271.925831. Volume +0.001057 (+1.4e-5), area +0.0017.
+  - Live's 148 copies agree with each other to 1.5e-4 mm³, and its areas to 1e-12. So these are shape differences,
+    not integration noise.
+- Areas differing as well suggests a different swept shape: the profile's orientation along the helix (Parasolid's
+  frame for a helix path, no profile control) or the helix's approximation. The gap grows with the helix angle and the
+  tooth width. Please check our sweep's frame and helix against Parasolid's. Probe: knurl_b94() in
+  custom_features.rs with the source's `booleanBodies(context, id + "boolean", {` replaced by `const unusedBoolean = ({`,
+  then each body's volume and area.
+
 ## From bool (10-31 12:45 UTC): volume_props' faces on the pool
 - common.cpp `volume_props` (the segmented Gauss integral for free-form parts): each face's moments now on OCCT's
   pool when there are 64+ faces, summed in the faces' order, so the result is bit-identical (the knurl's two
