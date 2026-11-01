@@ -32,6 +32,7 @@ for r in run/*/; do
   for k in $(grep -v '^kind=' "$r/jobs"); do [ "$(f name "$k")" = "$me" ] && line "CHECKING ($(cat "$r/state" 2>/dev/null), in a batch of $n since $(date -u -r "$r/jobs" +%H:%M))" "$k"; done
 done
 for b in splits/*.batch; do [ -f "$b" ] || continue; for k in $(grep -v '^kind=' "$b"); do [ "$(f name "$k")" = "$me" ] && line "QUEUED (next: re-checked apart from a red batch)" "$k"; done; done
+for c in jobs/*.carry; do [ -f "$c" ] || continue; for k in $(cat "$c"); do [ "$(f name "$k")" = "$me" ] && line "QUEUED (carried by your later $(basename "$c" .carry | sed 's/.*-//'))" "$k"; done; done
 pos=0; for k in $(ls pending); do pos=$((pos + 1)); [ "$(f name "$k")" = "$me" ] && line "QUEUED (#$pos)" "$k"; done
 echo "==results=="; tail -n 25 "results/$me.log" 2>/dev/null; exit 0
 R
@@ -98,9 +99,19 @@ if [ $mode = queue ]; then
   fi
   # The job (arrival order = its name), then the daemon if it isn't running (origin's version).
   read -r -d '' REG <<'R'
-LD=~/$1; key=$2; target=$3
+LD=~/$1; key=$2; target=$3; name=${key#*-}; name=${name%-*}
 ls "$LD/jobs/"*"-${key#*-}.job" > /dev/null 2>&1 && { cat > /dev/null; echo ALREADY; exit 0; }
-mkdir -p "$LD/jobs" "$LD/pending" "$LD/bin" && cat > "$LD/jobs/.$key" && mv "$LD/jobs/.$key" "$LD/jobs/$key.job" && : > "$LD/pending/$key" || exit 1
+mkdir -p "$LD/jobs" "$LD/pending" "$LD/bin" && cat > "$LD/jobs/.$key" && mv "$LD/jobs/.$key" "$LD/jobs/$key.job" || exit 1
+# This worktree's changes still waiting to be claimed are in this one (it queues everything not on main): it carries
+# them, so one agent's run of lands takes one place in a batch and one result (11-01: skasm's four took a batch and
+# three rounds of bisection). The daemon checks they really are in it.
+exec 5>"$LD/claim.lock"; flock 5; carried=0
+for p in $(ls "$LD/pending"); do
+  [ "$(sed -n 's/^name=//p' "$LD/jobs/$p.job" 2>/dev/null)" = "$name" ] || continue
+  rm -f "$LD/pending/$p"; { echo "$p"; cat "$LD/jobs/$p.carry" 2>/dev/null; } >> "$LD/jobs/$key.carry"; rm -f "$LD/jobs/$p.carry"; carried=$((carried + 1))
+done
+: > "$LD/pending/$key"; exec 5>&-
+[ $carried = 0 ] || echo "(it carries your $carried earlier queued change(s): one result for all)"
 if ! { [ -f "$LD/daemon.pid" ] && kill -0 "$(cat "$LD/daemon.pid")" 2>/dev/null; }; then
   cd ~/projects/noshape && git fetch -q origin "$target" && git show "origin/$target:tools/tiers/land-daemon.sh" > "$LD/bin/land-daemon.sh.new" 2>/dev/null \
     && git show "origin/$target:tools/tiers/slots.sh" > "$LD/bin/slots.sh" && mv "$LD/bin/land-daemon.sh.new" "$LD/bin/land-daemon.sh" \

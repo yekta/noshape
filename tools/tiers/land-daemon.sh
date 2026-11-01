@@ -59,6 +59,8 @@ result() {   # result <key> LANDED <main sha> | FAILED <reason>  (detail lines i
   { echo "$(date -u '+%F %T') $line"; [ "$st" = FAILED ] && [ -s "$d/detail" ] && sed 's/^/    | /' "$d/detail"; } >> "$LD/results/$name.log"
   [ "$st" = FAILED ] && [ -s "$d/detail" ] && cp "$d/detail" "$LD/results/$key.out"
   log "$bid: $name $line"
+  # The worktree's earlier queued changes this one carries (land.sh: queued again before they were claimed) get its result.
+  local c; for c in $(cat "$LD/jobs/$key.carry" 2>/dev/null); do result "$c" "$st" "$what"; done; rm -f "$LD/jobs/$key.carry"
   relay delete "$(field ref "$key")"; git -C "$repo" update-ref -d "refs/landq/$inst/job/$key" 2>/dev/null
   mv "$LD/jobs/$key.job" "$LD/done/" 2>/dev/null
 }
@@ -165,7 +167,20 @@ run_batch() {
     for key in "${keys[@]}"; do git -C "$repo" fetch -q origin "+refs/heads/$(field ref "$key"):refs/landq/$inst/job/$key" 2>/dev/null \
       || { : > "$d/detail"; result "$key" FAILED "queue branch $(field ref "$key") is gone: re-run land.sh"; }; done
   }
-  [ -d "$wt" ] || git -C "$repo" worktree add -q --detach "$wt" "refs/landq/$inst/target"
+  # A carried change must be in the one carrying it (its commits, by content), else it is queued on its own again.
+  local o keep
+  for key in "${keys[@]}"; do
+    [ -s "$LD/jobs/$key.carry" ] || continue
+    keep=()
+    for o in $(cat "$LD/jobs/$key.carry"); do
+      if git -C "$repo" fetch -q origin "+refs/heads/$(field ref "$o"):refs/landq/$inst/job/$o" 2>/dev/null \
+          && [ -z "$(git -C "$repo" rev-list --cherry-pick --right-only "refs/landq/$inst/job/$key...refs/landq/$inst/job/$o")" ]; then keep+=("$o")
+      else : > "$LD/pending/$o"; log "$bid: $(field name "$o") ${o##*-} isn't in ${key##*-}: queued on its own again"; fi
+    done
+    if [ ${#keep[@]} -gt 0 ]; then printf '%s\n' "${keep[@]}" > "$LD/jobs/$key.carry"; else rm -f "$LD/jobs/$key.carry"; fi
+  done
+  # (A slot checkout deleted by hand stays registered: prune it, then add it again.)
+  [ -d "$wt" ] || { git -C "$repo" worktree prune; git -C "$repo" worktree add -q --detach "$wt" "refs/landq/$inst/target"; }
   # (A slot's checkout may be left mid cherry-pick or rebase by a killed batch.)
   cd "$wt" || { log "$bid: no checkout $wt"; sleep 30; front resume "${keys[@]}"; return; }
   { git cherry-pick --quit; git rebase --quit; } 2>/dev/null
@@ -225,6 +240,11 @@ run_batch() {
   LAND_TIMES="$d/times" timeout 90m ${LAND_CHECKS:-tools/tiers/land-checks.sh} "$pkgs" "$d/changed" > "$d/check.log" 2>&1; rc=$?
   local t_check=$(( $(date +%s) - s )) t_push=0 depres=landed
   [ $rc -eq 0 ] || rm -f "$d/stack"   # (red: nothing stacks on it any more)
+  # Red, and the error is certainly its own (not the batch under it): no waiting for that one (11-01: a409fa87 waited
+  # 24 min behind a batch of 4 that then failed, and was checked again).
+  if [ $rc -ne 0 ] && [ -n "$dep" ] && [ -n "$(blame "$(sed -n 's/^LAND FAILED: //p' "$d/check.log" | tail -1)" "$d/check.log" "$d/dep.changed" "${applied[@]}" 2>>"$LD/daemon.log")" ]; then
+    log "$bid: red, from the error its own: not waiting for $dep"; dep=""
+  fi
   if [ -n "$dep" ]; then
     # Green, it can land only once the batch under it has (its commits are in this stack); red, it is only to blame
     # if that one landed (else its bad change may be what failed here).
@@ -372,7 +392,9 @@ while [ ! -e "$LD/stop" ]; do
       fi
     fi
   fi
-  if [ $waiting = 0 ] && [ $busy -lt "$LAND_SLOTS" ] && { ls "$LD"/splits/*.batch > /dev/null 2>&1 || [ -n "$(ls "$LD/pending")" ]; }; then
+  # A waiter (in the slots' queue) per thing to claim: each front batch, and what is queued; up to the free slots.
+  units=$(( $(ls "$LD"/splits/*.batch 2>/dev/null | wc -l) + $( [ -n "$(ls "$LD/pending")" ] && echo 1 || echo 0) ))
+  if [ $waiting -lt $units ] && [ $(( busy + waiting )) -lt "$LAND_SLOTS" ]; then
     tok="$LD/waiting.$(date +%s%N)"; : > "$tok"
     ( exec 9>&-; worker "$tok" ) >> "$LD/daemon.log" 2>&1 &
     echo $! > "$tok"
