@@ -4225,6 +4225,7 @@ bool volume_possible(uint8_t op, const std::vector<TopoDS_Shape>& a, const std::
   double va = 0, vt = 0, big = 0;
   for (const TopoDS_Shape& x : a)
   {
+    fail_if_cancelled();
     const double v = volume_of(x);
     va += v;
     big = std::max(big, v);
@@ -4259,11 +4260,19 @@ bool all_solids(const std::vector<TopoDS_Shape>& l)
 // union of their volume together, a cut of the target's, an empty common.
 bool no_interaction(uint8_t op, const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS_Shape>& t, const TopoDS_Shape& r)
 {
+  // (Volumes of big parts take seconds: a cancel is looked at between them.)
   double va = 0, vt = 0;
   for (const TopoDS_Shape& x : a)
+  {
+    fail_if_cancelled();
     va += volume_of(x);
+  }
   for (const TopoDS_Shape& x : t)
+  {
+    fail_if_cancelled();
     vt += volume_of(x);
+  }
+  fail_if_cancelled();
   const double v = volume_of(r), tol = 1e-9 * std::max(va + vt, 1e-12);
   switch (op)
   {
@@ -4287,6 +4296,8 @@ bool tools_reach_in(const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS
     const double eps = 1e-6 * std::sqrt(bx.SquareExtent());
     for (TopExp_Explorer fx(x, TopAbs_FACE); fx.More(); fx.Next())
     {
+      // (Each face classifies against whole solids: seconds on a knurl's 10k faces, so a cancel looks here.)
+      fail_if_cancelled();
       const TopoDS_Face& f = TopoDS::Face(fx.Current());
       double             u0, u1, v0, v1;
       BRepTools::UVBounds(f, u0, u1, v0, v1);

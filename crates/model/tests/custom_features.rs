@@ -2282,16 +2282,60 @@ fn dump_stacks() {
         fn signal(sig: i32, handler: usize) -> usize;
         fn syscall(n: i64, ...) -> i64;
         fn getpid() -> i32;
+        fn backtrace(buf: *mut *mut std::ffi::c_void, size: i32) -> i32;
+        fn write(fd: i32, buf: *const u8, n: usize) -> isize;
     }
+    // Raw frame addresses only, written without allocating (a thread stopped inside malloc deadlocked the formatted
+    // backtrace); symbolize with addr2line -e <exe> against the BASE line.
     extern "C" fn on_signal(_: i32) {
-        let bt = std::backtrace::Backtrace::force_capture().to_string();
-        let keep: Vec<&str> = bt.lines().filter(|l| l.trim_start().chars().next().is_some_and(|c| c.is_ascii_digit()) && !l.contains("std::") && !l.contains("core::") && !l.contains("backtrace") && !l.contains("on_signal") && !l.contains("__restore_rt")).take(18).collect();
-        let tid = unsafe { syscall(186) };
-        if keep.iter().any(|l| !l.contains("__GI___") && !l.contains("syscall") && !l.contains("futex") && !l.contains("pthread_cond") && !l.contains("park")) {
-            eprintln!("thread {tid}:\n{}", keep.join("\n"));
+        let mut frames = [std::ptr::null_mut(); 40];
+        let n = unsafe { backtrace(frames.as_mut_ptr(), 40) }.max(0) as usize;
+        let mut buf = [0u8; 40 * 20 + 40];
+        let mut k = 0;
+        let mut put = |b: u8| {
+            if k < buf.len() {
+                buf[k] = b;
+                k += 1;
+            }
+        };
+        let tid = unsafe { syscall(186) } as u64;
+        for b in b"T " {
+            put(*b);
         }
+        let mut digits = [0u8; 20];
+        let (mut d, mut v) = (0, tid);
+        loop {
+            digits[d] = b'0' + (v % 10) as u8;
+            d += 1;
+            v /= 10;
+            if v == 0 {
+                break;
+            }
+        }
+        while d > 0 {
+            d -= 1;
+            put(digits[d]);
+        }
+        put(b':');
+        for f in frames.iter().take(n) {
+            put(b' ');
+            let a = *f as u64;
+            for sh in (0..16).rev() {
+                put(b"0123456789abcdef"[((a >> (sh * 4)) & 15) as usize]);
+            }
+        }
+        put(b'\n');
+        unsafe { write(2, buf.as_ptr(), k) };
     }
     unsafe {
+        // (backtrace's first call loads libgcc: done here, not in the handler.)
+        let mut warm = [std::ptr::null_mut(); 4];
+        backtrace(warm.as_mut_ptr(), 4);
+        let exe = std::fs::read_link("/proc/self/exe").unwrap_or_default();
+        let maps = std::fs::read_to_string("/proc/self/maps").unwrap_or_default();
+        if let Some(l) = maps.lines().find(|l| l.ends_with(&*exe.to_string_lossy())) {
+            eprintln!("BASE {} {}", l.split('-').next().unwrap_or("0"), exe.display());
+        }
         signal(12, on_signal as *const () as usize);
         let pid = getpid();
         for e in std::fs::read_dir("/proc/self/task").unwrap().flatten() {

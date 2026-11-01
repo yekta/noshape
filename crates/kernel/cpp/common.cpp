@@ -1374,7 +1374,12 @@ GProp_GProps volume_props(const TopoDS_Shape& s)
     for (TopExp_Explorer e(s, TopAbs_FACE); e.More(); e.Next())
       fs.push_back(TopoDS::Face(e.Current()));
     std::vector<Moments> each(fs.size());
-    OSD_Parallel::For(0, (int)fs.size(), [&](int i) { each[(size_t)i] = face_moments(fs[(size_t)i], true, o); }, fs.size() < 64);
+    // (A cancelled regeneration's: the faces left skipped, then stopped; seconds on a knurl's.)
+    const std::atomic<bool>* cancel = thread_cancel_flag();
+    auto stop = [&] { return cancel != nullptr && cancel->load(std::memory_order_relaxed); };
+    OSD_Parallel::For(0, (int)fs.size(), [&](int i) { if (!stop()) each[(size_t)i] = face_moments(fs[(size_t)i], true, o); }, fs.size() < 64);
+    if (stop())
+      fail_op("cancelled");
     Moments m{};
     for (const Moments& f : each)
       for (int j = 0; j < 10; ++j)
