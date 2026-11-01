@@ -3110,7 +3110,14 @@ impl FeatureDialog {
                     .border_1()
                     .border_color(pal.border)
                     .child(div().px(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x555555)).child(crate::ui::spec_text(s.label)));
+                // Routing curve, Single mode (live 1722): only the active
+                // point's row; a click on a point in the graphics switches it.
+                let only: Option<usize> = (self.feature.type_id == "routingCurve" && arr_id == "points" && self.feature.params.is("pointsEditType", "SINGLE"))
+                    .then(|| self.feature.params.expr("pointIndex").and_then(|x| x.cached.map(|q| q.value).or_else(|| x.text.trim().parse().ok())).map_or(0, |v| (v.max(0.0) as usize).min(items.saturating_sub(1))));
                 for k in 0..items {
+                    if only.is_some_and(|o| o != k) {
+                        continue;
+                    }
                     let inner = self.render_params(item_specs, Some((arr_id, k)), window, cx);
                     col = col.child(
                         v_flex()

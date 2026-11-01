@@ -78,6 +78,7 @@ impl PartStudioView {
             "cPlane" | "shell" | "fillet" | "chamfer" | "moveFace" => self.param_arrow(cx).map(Manip::Arrow),
             "revolve" => self.current_arc(cx).map(Manip::Arc),
             "transform" => self.current_triad(cx).map(Manip::Triad),
+            "routingCurve" => self.routing_triad(cx).map(Manip::Triad),
             _ => None,
         }
     }
@@ -281,7 +282,12 @@ impl PartStudioView {
             }
             // The handle end of the arc (last few degrees) is grabbable.
             Some(Manip::Arc(h)) => vec![(h.point(h.angle * 0.85), h.point(h.angle), 0.0)],
-            Some(Manip::Triad(t)) => self.triad_hit_segments(&t, cx),
+            Some(Manip::Triad(t)) => {
+                // Routing curve's other points can be clicked (made active).
+                let mut h = self.triad_hit_segments(&t, cx);
+                h.extend(self.routing_points(cx).into_iter().map(|(_, p)| (p, p + DVec3::X * 1e-6, 0.0)));
+                h
+            }
             Some(Manip::Section(s)) => self.section_hit_segments(&s, cx),
             None => Vec::new(),
         };

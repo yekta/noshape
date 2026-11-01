@@ -161,7 +161,7 @@ impl PartStudioView {
         noshape_model::flatten::placed_sheet(f, &noshape_model::flatten::SheetPlacement { connector, angle: s.angle_deg.to_radians(), offset: s.offset, origin_vertex })
     }
 
-    fn vertex_position(&self, r: &Reference) -> Option<DVec3> {
+    pub(super) fn vertex_position(&self, r: &Reference) -> Option<DVec3> {
         self.display.bodies.iter().find_map(|b| b.vertex_refs.iter().position(|x| x == r).and_then(|i| b.mesh.vertices.get(i)).map(|p| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)))
     }
 

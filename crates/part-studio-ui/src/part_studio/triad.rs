@@ -3,13 +3,16 @@
 //! the world axes with hollow heads, and three small planar handles between
 //! them, at the centre of the entities' bounding box moved by the current
 //! translation. Dragging an arrow sets its X / Y / Z translation, dragging a
-//! planar handle the two in its plane.
+//! planar handle the two in its plane. Routing curve's Single mode puts it on
+//! the active point (live 1722), whose offsets it drags; clicking another
+//! point makes that one active.
 
 use super::PartStudioView;
 use super::manipulators::Manip;
 use crate::viewport::ViewportEvent;
 use glam::{DVec2, DVec3};
 use gpui_kit::*;
+use noshape_model::params::ParamValue;
 use noshape_model::reference::Reference;
 use noshape_render::{Drawable, Instance, LineData, LineSegment};
 use noshape_units::{Dim, Quantity};
@@ -28,6 +31,18 @@ pub(super) struct Triad {
     pub origin: DVec3,
     /// The current (dx, dy, dz) in meters.
     pub offset: DVec3,
+    /// The array item whose dx / dy / dz it sets (Routing curve's point).
+    pub item: Option<(&'static str, usize)>,
+}
+
+impl Triad {
+    /// The field axis `i` drags.
+    fn path(&self, i: usize) -> String {
+        match self.item {
+            Some((arr, k)) => format!("{arr}.{k}.{}", PARAMS[i]),
+            None => PARAMS[i].to_string(),
+        }
+    }
 }
 
 /// A handle: 0–2 = the X / Y / Z arrows, 3–5 = the YZ / XZ / XY planes.
@@ -37,6 +52,7 @@ pub(super) struct TriadDrag {
     /// The offset and the grabbed point when the drag started.
     pub start: DVec3,
     pub grab: DVec3,
+    pub item: Option<(&'static str, usize)>,
 }
 
 fn axis(i: usize) -> DVec3 {
@@ -77,7 +93,61 @@ impl PartStudioView {
         let offset = DVec3::new(value("dx"), value("dy"), value("dz"));
         // Live (part-studio/440): at the centre of the part's top face.
         let c = (lo + hi) * 0.5;
-        Some(Triad { origin: DVec3::new(c.x, c.y, hi.z) + offset, offset })
+        Some(Triad { origin: DVec3::new(c.x, c.y, hi.z) + offset, offset, item: None })
+    }
+
+    /// Routing curve's points (index, position) whose reference ours can
+    /// place: the origin, or a vertex (`curveBaseCSys` unset).
+    pub(super) fn routing_points(&self, cx: &App) -> Vec<(usize, DVec3)> {
+        let Some(e) = self.edit.as_ref() else { return Vec::new() };
+        let d = e.dialog.read(cx);
+        let p = &d.feature.params;
+        if d.feature.type_id != "routingCurve" || !p.is("pointsEditType", "SINGLE") || !p.query("curveBaseCSys").is_empty() {
+            return Vec::new();
+        }
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let num = |it: &noshape_model::params::ParamValues, id: &str| {
+            it.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok().map(|q| q.value))).unwrap_or(0.0)
+        };
+        p.array("points")
+            .iter()
+            .enumerate()
+            .filter_map(|(k, it)| {
+                let base = match it.enum_("referenceType") {
+                    "ORIGIN" | "" => DVec3::ZERO,
+                    "VERTEX" => self.vertex_position(it.query("vertex").first()?)?,
+                    _ => return None,
+                };
+                Some((k, base + DVec3::new(num(it, "dx"), num(it, "dy"), num(it, "dz"))))
+            })
+            .collect()
+    }
+
+    /// The active point of a routing curve in Single mode (`pointIndex`).
+    fn routing_active(&self, cx: &App) -> usize {
+        let Some(e) = self.edit.as_ref() else { return 0 };
+        e.dialog.read(cx).feature.params.expr("pointIndex").and_then(|x| x.cached.map(|q| q.value).or_else(|| x.text.trim().parse().ok())).map_or(0, |v| v.max(0.0) as usize)
+    }
+
+    /// Routing curve, Single mode: the triad on the active point.
+    pub(super) fn routing_triad(&self, cx: &App) -> Option<Triad> {
+        let pts = self.routing_points(cx);
+        let k = self.routing_active(cx);
+        let &(_, at) = pts.iter().find(|(i, _)| *i == k)?;
+        let e = self.edit.as_ref()?;
+        let it = e.dialog.read(cx).feature.params.array("points").get(k)?.clone();
+        let base = match it.enum_("referenceType") {
+            "VERTEX" => self.vertex_position(it.query("vertex").first()?)?,
+            _ => DVec3::ZERO,
+        };
+        Some(Triad { origin: at, offset: at - base, item: Some(("points", k)) })
+    }
+
+    /// Routing curve: the point (other than the active one) under the cursor.
+    fn routing_point_at(&self, p: DVec2, cx: &App) -> Option<usize> {
+        let k = self.routing_active(cx);
+        let vp = self.viewport.read(cx);
+        self.routing_points(cx).into_iter().filter(|(i, _)| *i != k).filter_map(|(i, w)| Some((i, (vp.project(w)? - p).length()))).filter(|(_, d)| *d < 8.0).min_by(|a, b| a.1.total_cmp(&b.1)).map(|(i, _)| i)
     }
 
     /// World length of a screen pixel at the triad.
@@ -153,9 +223,17 @@ impl PartStudioView {
     pub(super) fn triad_event(&mut self, t: Triad, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
         match ev {
             ViewportEvent::ToolDown { position, .. } => {
+                // Routing curve: a click on another point makes it the active one.
+                if let Some(k) = self.routing_point_at(*position, cx) {
+                    if let Some(e) = &self.edit {
+                        e.dialog.update(cx, |dlg, cx| dlg.set_value("pointIndex", ParamValue::Expr(noshape_units::ExprValue::new(&k.to_string())), cx));
+                    }
+                    self.rebuild_scene(cx);
+                    return true;
+                }
                 let Some(handle) = self.triad_handle_at(&t, *position, cx) else { return false };
                 let Some(grab) = self.triad_point(t.origin, handle, *position, cx) else { return false };
-                self.ui.triad_drag = Some(TriadDrag { handle, start: t.offset, grab });
+                self.ui.triad_drag = Some(TriadDrag { handle, start: t.offset, grab, item: t.item });
                 true
             }
             ViewportEvent::ToolDrag { position, .. } => {
@@ -174,7 +252,7 @@ impl PartStudioView {
                             let unit = units.si_factor(Dim::LENGTH);
                             let v = ((d.start[i] + delta[i]) / unit * 10.0).round() / 10.0 * unit;
                             let text = noshape_units::format_quantity_with(Quantity::new(v, Dim::LENGTH), &units, 1);
-                            dlg.set_expr_text(PARAMS[i], &text, window, cx);
+                            dlg.set_expr_text(&t.path(i), &text, window, cx);
                         }
                     });
                 }
@@ -182,9 +260,10 @@ impl PartStudioView {
             }
             ViewportEvent::ToolUp { .. } => {
                 let Some(d) = self.ui.triad_drag.take() else { return false };
-                let field = if d.handle < 3 { PARAMS[d.handle] } else { PARAMS[plane_axes(d.handle).0] };
+                let i = if d.handle < 3 { d.handle } else { plane_axes(d.handle).0 };
+                let field = Triad { item: d.item, ..t }.path(i);
                 if let Some(e) = &self.edit {
-                    e.dialog.update(cx, |dlg, cx| dlg.focus_field_selected(field, window, cx));
+                    e.dialog.update(cx, |dlg, cx| dlg.focus_field_selected(&field, window, cx));
                 }
                 // The triad turns white again.
                 self.rebuild_scene(cx);
