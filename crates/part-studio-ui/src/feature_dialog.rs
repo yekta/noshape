@@ -202,6 +202,9 @@ pub struct FeatureDialog {
     /// Parameters the user changed in this session (automatic choices such
     /// as Extrude's Add/Remove direction leave them alone).
     pub user_set: std::collections::HashSet<String>,
+    /// A std button (`Hints::BUTTON`) just clicked: the editing logic's
+    /// `clickedButton`, taken by the next run.
+    pub clicked_button: Option<String>,
     /// Variables visible to the feature (evaluated value hints and wheel
     /// nudging of expressions).
     pub variables: std::collections::BTreeMap<String, noshape_units::Quantity>,
@@ -374,6 +377,7 @@ impl FeatureDialog {
             ext_info: None,
             ext_task: None,
             user_set: Default::default(),
+            clicked_button: None,
             variables: Default::default(),
             final_available: true,
             show_help: false,
@@ -2255,6 +2259,35 @@ impl FeatureDialog {
                             })
                         }))
                     })
+                    .into_any_element()
+            }
+            // std `isButton` (Routing curve's Process, Reset triad): a button
+            // like an array's Add; a click runs the editing logic with it.
+            ParamKind::Bool { .. } if s.hints.has(Hints::BUTTON) => {
+                let pal = crate::theme::p();
+                let id = s.id.to_string();
+                div()
+                    .id(SharedString::from(format!("btn-{path}")))
+                    .w_full()
+                    .h(px(30.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(3.))
+                    .border_1()
+                    .border_color(gpui_kit::rgb(0xaaaaaa))
+                    .bg(pal.panel)
+                    .hover(|d| d.bg(pal.panel_hover))
+                    .cursor_pointer()
+                    .text_size(px(14.))
+                    .text_color(pal.text)
+                    .child(crate::ui::spec_text(s.label))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        this.clicked_button = Some(id.clone());
+                        this.dirty = true;
+                        cx.emit(DialogEvent::Changed);
+                        cx.notify();
+                    }))
                     .into_any_element()
             }
             ParamKind::Bool { .. } if s.hints.has(Hints::GROUP_LABEL) => {

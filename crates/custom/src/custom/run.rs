@@ -141,8 +141,8 @@ fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev
                 };
                 super::reference::reference_value(*kind, file.as_ref())
             }
-            // A group title is not a parameter.
-            ParamKindFs::Group { .. } => Value::Undefined,
+            // A group title is not a parameter; a button is undefined (std isButton).
+            ParamKindFs::Group { .. } | ParamKindFs::Button => Value::Undefined,
             ParamKindFs::Anything => match values.get(&d.id) {
                 Some(ParamValue::Text(s)) => Value::str(s.as_str()),
                 _ => Value::Undefined,
@@ -323,6 +323,7 @@ pub(crate) fn run_editing_logic(
     new: &ParamValues,
     specified: &[String],
     creating: bool,
+    clicked: &str,
 ) -> Option<ParamValues> {
     host::register();
     let (mut olds, mut news) = (old.clone(), new.clone());
@@ -334,8 +335,10 @@ pub(crate) fn run_editing_logic(
     let cx = FsContext::new(ctx, feature, name.to_string(), *units, outer.clone(), None);
     // No previous values: Onshape's first call on a new feature passes {}
     // (std cPlaneLogic and holeEditLogic act on preselection only then).
-    let old_def = if old.0.is_empty() { Value::map(Map::new()) } else { definition(&cx, decls, &olds, &ev, None).ok()? };
-    let new_def = definition(&cx, decls, &news, &ev, None).ok()?;
+    // Reference parameters read the document's tabs (Routing curve's CSV).
+    let provider = super::fallback_provider();
+    let old_def = if old.0.is_empty() { Value::map(Map::new()) } else { definition(&cx, decls, &olds, &ev, Some(&*provider)).ok()? };
+    let new_def = definition(&cx, decls, &news, &ev, Some(&*provider)).ok()?;
     let mut flags = Map::new();
     for d in decls {
         flags.insert(Value::str(d.id.as_str()), Value::bool(specified.contains(&d.id)));
@@ -350,8 +353,8 @@ pub(crate) fn run_editing_logic(
         args.push(match t {
             Some(noshape_featurescript::ir::TypeRef::Std(noshape_featurescript::value::StdType::Boolean)) => Value::bool(creating),
             Some(noshape_featurescript::ir::TypeRef::Std(noshape_featurescript::value::StdType::Map)) => Value::map(flags.clone()),
-            // `clickedButton` (std Routing curve): no dialog button clicked.
-            Some(noshape_featurescript::ir::TypeRef::Std(noshape_featurescript::value::StdType::String)) => Value::str(""),
+            // `clickedButton` (std Routing curve): the button clicked, or "".
+            Some(noshape_featurescript::ir::TypeRef::Std(noshape_featurescript::value::StdType::String)) => Value::str(clicked),
             _ => query_of_refs(&cx, &hidden),
         });
     }

@@ -375,10 +375,12 @@ pub fn routing_curve() -> FeatureType {
         ParamSpec::query("inputVertices", "Vertices", QueryFilter::POINT_LIKE).hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "VERTEX")),
         ParamSpec::query("inputCurve", "Edges", CURVES).hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CURVE")),
         ParamSpec::num("samples", "Number of samples", NumSpec::integer(5, 2, 50)).hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CURVE")),
-        ParamSpec::text("inputData", "Table", "").hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CSV")),
+        ParamSpec::reference("inputData", "Table", crate::params::ReferenceKind::Csv).hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CSV")),
         ParamSpec::num("startColumn", "Data start column (0,1,2,.)", NumSpec::integer(0, 0, 100_000)).hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CSV")),
         ParamSpec::enum_("csvUnit", "Unit", CSV_UNIT_NAMES).default_enum("Meter").hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CSV")),
         ParamSpec::bool("overwritePoints", "Overwrite points", true).hints(Hints::UNCONFIGURABLE).visible(move |v| input(v, "CURVE") || input(v, "CSV")),
+        // std's buttons: a click runs its editing logic (`clickedButton`).
+        ParamSpec::bool("processInputs", "Process", false).hints(Hints::BUTTON | Hints::UNCONFIGURABLE).visible(move |v| input(v, "CURVE") || input(v, "CSV")),
         ParamSpec::bool("isPeriodic", "Closed", false).visible(points),
         ParamSpec::query1("curveBaseCSys", "Curve reference", QueryFilter::POINT_LIKE).describe("Point or mate connector used as reference for the curve. Defaults to origin.").visible(points),
         ParamSpec::enum_("pointsEditType", "Point edit type", &[("SINGLE", "Single"), ("MULTI", "Multiple")]).hints(Hints::HORIZONTAL_ENUM | Hints::UNCONFIGURABLE).visible(points),
@@ -426,6 +428,7 @@ pub fn routing_curve() -> FeatureType {
         .item_template("Point #index")
         .hints(Hints::PREVENT_ARRAY_REORDER)
         .visible(single),
+        ParamSpec::bool("resetTriad", "Reset triad", false).hints(Hints::BUTTON | Hints::UNCONFIGURABLE).visible(points),
         ParamSpec::bool("addPointOnAxisDrag", "Add point on axis drag", false).hints(Hints::UNCONFIGURABLE).visible(single),
         ParamSpec::bool("showCSys", "Show reference coordinate system", true).describe("Show coordinate system of the reference used by the current vertex.").visible(points),
         ParamSpec::bool("keepPoints", "Keep points", false).describe("Create points in addition to the curve.").visible(points),
@@ -439,6 +442,9 @@ pub fn routing_curve() -> FeatureType {
         ParamSpec::query1("orthoCsysMate", "Orthogonal path coordinate system", QueryFilter::POINT_LIKE)
             .hints(Hints::UNCONFIGURABLE)
             .visible(move |v| ortho(v) && v.is("orthoCsys", "OTHER")),
+        ParamSpec::bool("orthoPrevious", "Previous", false).hints(Hints::BUTTON | Hints::UNCONFIGURABLE | Hints::DISPLAY_SHORT | Hints::FIRST_IN_ROW).visible(ortho),
+        ParamSpec::bool("orthoNext", "Next", false).hints(Hints::BUTTON | Hints::UNCONFIGURABLE | Hints::DISPLAY_SHORT).visible(ortho),
+        ParamSpec::bool("confirmOrthoPath", "Confirm", false).hints(Hints::BUTTON | Hints::UNCONFIGURABLE).visible(ortho),
         hidden(ParamSpec::num("solutionIndex", "Solution index", NumSpec::integer(0, 0, 5))),
     ];
     FeatureType::new("routingCurve", "Routing curve", Category::Curve, p).describe("Build a 3D spline or polyline path from placed points")

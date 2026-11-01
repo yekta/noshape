@@ -1440,6 +1440,30 @@ fn variable_from_import_reads_the_csv_tab() {
     assert!((w.value - 25.0).abs() < 1e-9, "{w:?}");
 }
 
+/// Routing curve › Input type CSV › Process: std's editing logic reads the
+/// CSV tab's rows into points (`clickedButton` = "processInputs").
+#[test]
+fn routing_curve_process_reads_csv_points() {
+    let mut fx = Fixture::new(&studio(""));
+    let csv = fx.doc.add_tab("path.csv", TabContent::File(noshape_model::file_tab::FileTab::new("path.csv", b"0,0,0\n0.03,0,0\n0.03,0.03,0\n", 0)));
+    let _ = DocumentScripts::from_document(&fx.doc);
+    let ps = PartStudio::new();
+    let ctx = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &fx.units, &RegenOptions::default()).context;
+    let mut f = PartStudio::new().new_feature("routingCurve", &fx.units).unwrap();
+    f.params.set("inputType", ParamValue::Enum("CSV".into()));
+    f.params.set("inputData", ParamValue::Text(csv.to_string()));
+    // Opening the dialog seeds "Point 0" (the first run, old = {}).
+    let mut p = f.params.clone();
+    let seeded = custom::std_feature::editing_logic_in((*ctx).clone(), "routingCurve", f.id, &f.name, &fx.units, &noshape_model::params::ParamValues::default(), &p, &[], true).expect("editing logic ran");
+    for (k, v) in seeded.0 {
+        p.set(&k, v);
+    }
+    let changed = custom::std_feature::editing_logic_in_clicked((*ctx).clone(), "routingCurve", f.id, &f.name, &fx.units, &p, &p, &[], false, "processInputs").expect("editing logic ran");
+    let points = changed.array("points");
+    assert_eq!(points.len(), 3, "{changed:?}");
+    assert!(matches!(points[1].get("dx"), Some(ParamValue::Expr(e)) if e.text.contains("30")), "{:?}", points[1]);
+}
+
 /// Reference parameters (live dom/fs-refparams.txt): CSV / image / JSON file
 /// tabs as TableData / ImageData / JSONData; an unset one is `{}`.
 #[test]

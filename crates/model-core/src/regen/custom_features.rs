@@ -60,6 +60,9 @@ pub enum ParamKindFs {
     Reference { kind: crate::params::ReferenceKind },
     /// `isAnything(definition.x)` and other parameters without a UI.
     Anything,
+    /// `isButton(definition.x)`: a dialog button (undefined in the
+    /// definition); a click runs the editing logic with `clickedButton`.
+    Button,
     /// A parameter group (`annotation { "Group Name" : "Position" } { ... }`):
     /// its title, unfolded unless "Collapsed By Default". Not in the
     /// definition; the group's parameters show only while it is unfolded.

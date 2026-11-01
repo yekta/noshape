@@ -199,10 +199,28 @@ pub fn editing_logic_in(
     specified: &[String],
     creating: bool,
 ) -> Option<crate::params::ParamValues> {
+    editing_logic_in_clicked(ctx, type_id, feature, name, units, old, new, specified, creating, "")
+}
+
+/// [`editing_logic_in`] after a click on the dialog's button `clicked`
+/// (std's `clickedButton`: Routing curve's "processInputs", "resetTriad").
+#[allow(clippy::too_many_arguments)]
+pub fn editing_logic_in_clicked(
+    ctx: crate::regen::context::Context,
+    type_id: &str,
+    feature: crate::reference::FeatureId,
+    name: &str,
+    units: &noshape_units::UnitPrefs,
+    old: &crate::params::ParamValues,
+    new: &crate::params::ParamValues,
+    specified: &[String],
+    creating: bool,
+    clicked: &str,
+) -> Option<crate::params::ParamValues> {
     let (module, std) = logic_std_name(type_id)?;
     let f = loaded(module, std)?;
     let editing = f.editing.as_ref()?;
-    super::run::run_editing_logic(ctx, feature, name, units, editing, &f.params, &f.specs, old, new, specified, creating)
+    super::run::run_editing_logic(ctx, feature, name, units, editing, &f.params, &f.specs, old, new, specified, creating, clicked)
 }
 
 /// The dialog std's precondition declares for built-in feature `type_id`

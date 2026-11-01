@@ -668,6 +668,7 @@ fn param_decl(module: &Arc<CompiledModule>, e: &ast::Expr, a: &Ann, ann_expr: &a
                 "isAngle" => NumKind::Angle,
                 "isInteger" => NumKind::Integer,
                 "isReal" => NumKind::Real,
+                "isButton" => return Some(ParamDecl { label: a.str("Name").unwrap_or(&id).to_string(), id, kind: ParamKindFs::Button, hints: hints(a), description: a.str("Description").unwrap_or("").to_string(), column: String::new(), conditions: Vec::new() }),
                 "isAnything" => return Some(ParamDecl { label: a.str("Name").unwrap_or(&id).to_string(), id, kind: ParamKindFs::Anything, hints: hints(a), description: String::new(), column: a.str("Column Name").unwrap_or("").to_string(), conditions: Vec::new() }),
                 _ => return None,
             };
@@ -853,6 +854,7 @@ fn param_spec(d: &ParamDecl, siblings: Arc<Vec<ParamDecl>>) -> ParamSpec {
         ParamKindFs::Lookup { table } => ParamSpec::lookup(id, label, table),
         ParamKindFs::Reference { kind } => ParamSpec::reference(id, label, *kind),
         ParamKindFs::Anything => ParamSpec::text(id, label, "").hints(Hints::ALWAYS_HIDDEN),
+        ParamKindFs::Button => ParamSpec::bool(id, label, false).hints(Hints::BUTTON | Hints::UNCONFIGURABLE),
         ParamKindFs::Group { open } => ParamSpec::bool(id, label, *open),
     };
     let h = spec.hints | d.hints;

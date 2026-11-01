@@ -266,6 +266,10 @@ impl Hints {
     pub const ALLOW_ARRAY_FOCUS: Self = Self(1 << 25);
     /// FeatureScript `UIHint.PREVENT_ARRAY_REORDER`: no reorder button.
     pub const PREVENT_ARRAY_REORDER: Self = Self(1 << 26);
+    /// FeatureScript `isButton`: a boolean drawn as a button; a click runs
+    /// the feature's editing logic with `clickedButton` = its id (Routing
+    /// curve's Process, Reset triad).
+    pub const BUTTON: Self = Self(1 << 27);
 
     pub const fn or(self, other: Self) -> Self {
         Self(self.0 | other.0)
