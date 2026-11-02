@@ -20,3 +20,4 @@ mod regen_profile;
 mod smoke;
 mod spawn_guard;
 mod symmetric_mirror;
+mod twisted_vase;
