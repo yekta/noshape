@@ -3122,3 +3122,48 @@ fn union_of_boxes_touching_along_an_edge_leaves_two_parts() {
         assert!((vols[0].0 - 1084.0).abs() < 1e-6 && vols[0].1 == 11 && (vols[1].0 - 4000.0).abs() < 1e-6, "{label}: {vols:?}");
     }
 }
+
+/// A 40 mm cube shelled with walls near and past half its size (live 1765): inward with the top removed, 20 mm and
+/// more fail ("Could not shell part with selections.", the cube unchanged), 19.9 mm leaves a 0.2 mm pocket; outward
+/// has no limit; Hollow doesn't fail (inward past half: the inverted offset, a 10 mm void at 25 mm).
+#[test]
+fn shell_walls_past_half_the_part_as_live() {
+    // (thickness, outward, hollow, live's volume and faces or its failure, tolerance)
+    type Case = (&'static str, bool, bool, Result<(f64, usize), ()>, f64);
+    let cases: &[Case] = &[
+        ("25 mm", false, false, Err(()), 0.0),
+        ("20 mm", false, false, Err(()), 0.0),
+        ("20.1 mm", false, false, Err(()), 0.0),
+        ("19.9 mm", false, false, Ok((63999.196, 11)), 1e-3),
+        ("25 mm", true, false, Ok((462500.0, 11)), 1e-3),
+        ("25 mm", false, true, Ok((63000.0, 12)), 1e-3),
+        ("25 mm", true, true, Ok((665000.0, 12)), 1e-3),
+        ("19.9 mm", false, true, Ok((63999.992, 12)), 1e-3),
+    ];
+    let mut report = String::new();
+    for &(th, outward, hollow, want, tol) in cases {
+        let mut t = T::new();
+        t.block(40.0, 40.0, 40.0);
+        let s = if hollow {
+            let body = t.regen().context.bodies[0].id.clone();
+            t.add("shell", &[("isHollow", ParamValue::Bool(true)), ("parts", q(vec![Reference::Body(body)])), ("thickness", e(th)), ("oppositeDirection", ParamValue::Bool(outward))])
+        } else {
+            let top = t.faces_where(|c| c.z > 39.999);
+            let s = t.shell(top, th);
+            t.set(s, "oppositeDirection", ParamValue::Bool(outward));
+            s
+        };
+        let r = t.regen();
+        let st = r.display.features.iter().find(|x| x.id == s).unwrap();
+        let got = if st.status == FeatureStatus::Ok { Ok((volume(&r), r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face))) } else { Err(()) };
+        let ok = match (&got, &want) {
+            (Ok((v, f)), Ok((wv, wf))) => (v - wv).abs() <= tol && f == wf,
+            (Err(()), Err(())) => st.message.as_deref() == Some("Could not shell part with selections.") && (volume(&r) - 64000.0).abs() < 1e-6,
+            _ => false,
+        };
+        if !ok {
+            report += &format!("{th} outward {outward} hollow {hollow}: {:?} {:?}, live {want:?}\n", got, st.message);
+        }
+    }
+    assert!(report.is_empty(), "{report}");
+}

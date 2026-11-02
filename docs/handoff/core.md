@@ -8,6 +8,14 @@ Builds and tests (11-01): on vibe4 only, `tools/tiers/rb.sh <cmd>` from the work
 (land.sh runs the full set); long probes detached on vibe4 with a log. OCCT patches build on vibe4 in
 ~/agents/core-occt (`build.sh TK...`); a private root ~/agents/occt-priv; libs go to /root/occt (synced everywhere).
 
+**Shell past half the part (live 1765, 11-02 08:40):** a 40 mm cube, top removed, inward 20 / 20.1 / 25 mm fails
+("Could not shell part with selections.", unchanged), 19.9 mm leaves a 0.2 mm pocket, outward has no limit, Hollow
+never fails (inward past half: the offset turned inside out, a 10 mm void at 25 mm, 63000 mm³). Native kept the cube
+with OK; std's opShell went through OCCT's offset shell first and gave a 0 mm³ body at 20 mm, 53332 mm³ at 19.9:
+both now call `detail::shell_part` (shell_solid Auto, the broken-part checks, the half-the-part rule), and the
+kernel's `by_inversion` builds the inverted void (planar parts, every vertex of three faces, every offset edge
+reversed). T1 kernel_robustness::shell_walls_past_half_the_part_as_live; std_oracle::shell_regenerates_as_std has
+the three new cases (the T2 G46 known difference is unchanged).
 **FS speed (user 11-02 05:20), state 07:20.** Measured with model `fs_bench::fs_regenerations` (perf.sh on vibe3)
 and samples (tests/sampler.rs: every running thread every ms; `custom_features::fs_cold_start_profile` /
 `fs_warm_profile`, `sheetmetal_std::fs_sheet_metal_profile`, NOSHAPE_SAMPLE_OUT; ~/agents/profile.py and

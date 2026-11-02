@@ -758,20 +758,8 @@ fn op_shell(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let body = ev.ctx.bodies[bi].clone();
             let removed: Vec<Shape> = faces.iter().filter(|f| f.0 == bi).filter_map(|f| body.shape.sub_shape(ShapeType::Face, f.1).ok()).collect();
             let side = if t < 0.0 { k::ShellSide::Inside } else { k::ShellSide::Outside };
-            // Outward as the Shell feature: sharp outer corners (live S3);
-            // inward the offset shell (std_reference shellTop matches live).
-            // An offset shell that comes back unchanged gets the Shell
-            // feature's method; still unchanged (a wall too thick for the
-            // part): Onshape's SHELL_FAILED.
-            let volume = |s: &Shape| s.volume().unwrap_or(0.0);
-            let unchanged = |r: &k::OpResult| (volume(&r.shape) - volume(&body.shape)).abs() <= 1e-12 * volume(&body.shape).abs().max(1e-12);
-            let mut res = if side == k::ShellSide::Outside { k::shell_solid(&body.shape, &removed, t.abs(), side, k::ShellMethod::Auto)? } else { k::shell(&body.shape, &removed, t.abs(), side, k::JoinType::default())? };
-            if unchanged(&res) && side == k::ShellSide::Inside {
-                res = k::shell_solid(&body.shape, &removed, t.abs(), side, k::ShellMethod::Auto).map_err(|_| fe("Could not shell part with selections."))?;
-            }
-            if unchanged(&res) {
-                return err("Could not shell part with selections.");
-            }
+            // As the Shell feature (live 1765: std's own opShell is what the feature calls).
+            let res = crate::regen::features::detail::shell_part(&body.shape, &removed, t.abs(), side)?;
             let names = body.shape_names();
             let offset = |n: &Name| Role::Offset(n.clone());
             let new = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&offset));

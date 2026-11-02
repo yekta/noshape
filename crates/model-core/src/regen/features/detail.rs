@@ -700,20 +700,31 @@ pub fn shell(ev: &mut EvalCtx) -> FResult<()> {
     for (bi, faces) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let shapes: Vec<k::Shape> = faces.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
-        // Like Parasolid: offsets extend until they meet, vanishing faces
-        // disappear and overlapping walls merge (crates/kernel/cpp/shell.cpp).
-        let res = k::shell_solid(&body.shape, &shapes, t, side, k::ShellMethod::Auto).map_err(|e| blend_failed("Could not shell part with selections.", e))?;
-        // Live (qa5 P1-5): a shell that breaks the part into pieces fails
-        // (and leaves the part as it was), it never returns the slivers.
-        if res.shape.count(ShapeType::Solid) > body.shape.count(ShapeType::Solid).max(1) || !shell_is_whole(&body.shape, &shapes, &res.shape, t) {
-            return err("Could not shell part with selections.");
-        }
+        let res = shell_part(&body.shape, &shapes, t, side)?;
         let names = body.shape_names();
         let offset_role = |n: &Name| Role::Offset(n.clone());
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&offset_role));
         ev.replace_body(bi, res.shape, face_names);
     }
     Ok(())
+}
+
+/// Shell `part` (faces `removed`; none: hollow), as Shell and std's opShell do: offsets extend until they meet,
+/// vanishing faces disappear and overlapping walls merge (crates/kernel/cpp/shell.cpp); "Could not shell part with
+/// selections." when it fails, breaks the part (live qa5 P1-5: never the slivers) or, inward with faces removed, its
+/// walls reach half the part or more and nothing is removed (live 1765: a 40 mm cube at 20 / 20.1 / 25 mm; 19.9 mm
+/// leaves a 0.2 mm pocket).
+pub fn shell_part(part: &k::Shape, removed: &[k::Shape], t: f64, side: k::ShellSide) -> Result<k::OpResult, crate::regen::eval::FeatureError> {
+    let failed = || crate::regen::eval::FeatureError::new("Could not shell part with selections.");
+    let res = k::shell_solid(part, removed, t, side, k::ShellMethod::Auto).map_err(|e| blend_failed("Could not shell part with selections.", e))?;
+    if res.shape.count(ShapeType::Solid) > part.count(ShapeType::Solid).max(1) || !shell_is_whole(part, removed, &res.shape, t) {
+        return Err(failed());
+    }
+    let volume = |s: &k::Shape| k::volume_properties(s).map_or(0.0, |p| p.mass);
+    if side == k::ShellSide::Inside && !removed.is_empty() && volume(&res.shape) >= volume(part) * (1.0 - 1e-9) {
+        return Err(failed());
+    }
+    Ok(res)
 }
 
 /// Whether a shell result is the whole shelled part, not what is left of a

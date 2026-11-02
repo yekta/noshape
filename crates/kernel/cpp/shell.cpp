@@ -4143,6 +4143,100 @@ void compare_with_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shap
   }
 }
 
+// A hollow (no face removed) inward past the part's half (live 1765: a 40 mm cube hollowed 25 mm leaves 63000 mm³,
+// a 10 mm void): Parasolid offsets every face and the offset body comes back turned inside out, every edge reversed;
+// that inverted polytope is taken out as a void. Planar parts with every vertex of three faces, the inversion complete
+// (every offset edge reversed); else not this case.
+bool by_inversion(const TopoDS_Shape& solid, double t, Built& out)
+{
+  ShapeIMap faces, verts, edges;
+  TopExp::MapShapes(solid, TopAbs_FACE, faces);
+  TopExp::MapShapes(solid, TopAbs_VERTEX, verts);
+  TopExp::MapShapes(solid, TopAbs_EDGE, edges);
+  std::vector<gp_Pln> off(faces.Extent() + 1);
+  for (int i = 1; i <= faces.Extent(); ++i)
+  {
+    const TopoDS_Face& f = TopoDS::Face(faces(i));
+    BRepAdaptor_Surface s(f);
+    if (s.GetType() != GeomAbs_Plane)
+      return false;
+    int wires = 0;
+    for (TopoDS_Iterator w(f); w.More(); w.Next())
+      ++wires;
+    if (wires != 1)
+      return false;
+    gp_Pln pl = s.Plane();
+    gp_Dir n  = pl.Axis().Direction();
+    if (f.Orientation() == TopAbs_REVERSED)
+      n.Reverse();
+    off[(size_t)i] = gp_Pln(pl.Location().Translated(gp_Vec(n) * -t), n);
+  }
+  ShapeAncMap vf;
+  TopExp::MapShapesAndUniqueAncestors(solid, TopAbs_VERTEX, TopAbs_FACE, vf);
+  std::vector<gp_Pnt> p(verts.Extent() + 1);
+  for (int i = 1; i <= verts.Extent(); ++i)
+  {
+    const ShapeList& fl = vf.FindFromKey(verts(i));
+    if (fl.Extent() != 3)
+      return false;
+    gp_Mat m;
+    gp_XYZ rhs;
+    int    r = 1;
+    for (ShapeList::Iterator it(fl); it.More(); it.Next(), ++r)
+    {
+      const gp_Pln& q = off[(size_t)faces.FindIndex(it.Value())];
+      const gp_XYZ  n = q.Axis().Direction().XYZ();
+      m.SetRow(r, n);
+      rhs.SetCoord(r, n.Dot(q.Location().XYZ()));
+    }
+    if (std::abs(m.Determinant()) < 1e-12)
+      return false;
+    p[(size_t)i] = gp_Pnt(m.Inverted() * rhs);
+  }
+  for (int i = 1; i <= edges.Extent(); ++i)
+  {
+    TopoDS_Vertex a, b;
+    TopExp::Vertices(TopoDS::Edge(edges(i)), a, b);
+    const gp_Vec d0(BRep_Tool::Pnt(a), BRep_Tool::Pnt(b)), d1(p[(size_t)verts.FindIndex(a)], p[(size_t)verts.FindIndex(b)]);
+    if (!(d0.Dot(d1) < 0) || d1.Magnitude() < 1e-9)
+      return false;
+  }
+  // The inverted polytope: each face's polygon on its offset plane, sewn.
+  BRepBuilderAPI_Sewing sew(1e-7);
+  for (int i = 1; i <= faces.Extent(); ++i)
+  {
+    BRepBuilderAPI_MakePolygon poly;
+    for (BRepTools_WireExplorer w(BRepTools::OuterWire(TopoDS::Face(faces(i))), TopoDS::Face(faces(i))); w.More(); w.Next())
+      poly.Add(p[(size_t)verts.FindIndex(w.CurrentVertex())]);
+    poly.Close();
+    if (!poly.IsDone())
+      return false;
+    BRepBuilderAPI_MakeFace mf(off[(size_t)i], poly.Wire(), true);
+    if (!mf.IsDone())
+      return false;
+    sew.Add(mf.Face());
+  }
+  sew.Perform();
+  TopoDS_Shell sh;
+  for (TopExp_Explorer x(sew.SewedShape(), TopAbs_SHELL); x.More(); x.Next())
+    sh = TopoDS::Shell(x.Current());
+  if (sh.IsNull() || !BRep_Tool::IsClosed(sh))
+    return false;
+  TopoDS_Solid inv = BRepBuilderAPI_MakeSolid(sh).Solid();
+  BRepLib::OrientClosedSolid(inv);
+  if (!BRepCheck_Analyzer(inv).IsValid() || !(volume_of(inv) > 0))
+    return false;
+  BRepAlgoAPI_Cut cut(solid, inv);
+  if (!cut.IsDone() || cut.HasErrors())
+    return false;
+  const TopoDS_Shape r = cut.Shape();
+  if (std::abs(volume_of(r) - (volume_of(solid) - volume_of(inv))) > 1e-9 * volume_of(solid) || !BRepCheck_Analyzer(r).IsValid())
+    return false;
+  out.result  = r;
+  out.history = cut.History();
+  return true;
+}
+
 OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, double thickness, bool outward,
                                 uint8_t method)
 {
@@ -4219,7 +4313,8 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
                    std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
     return ok;
   };
-  const bool done = (method == 0 && timed("regions", [&] { return by_regions(solid.shape, removed, thickness, sign, b); })) ||
+  const bool done = (method == 0 && removed.empty() && !outward && timed("inversion", [&] { return by_inversion(solid.shape, thickness, b); })) ||
+                    (method == 0 && timed("regions", [&] { return by_regions(solid.shape, removed, thickness, sign, b); })) ||
                     ((method == 0 || method == 1) && (offset_ok || method == 1) && timed("offset", [&] { return by_offset(solid.shape, removed, thickness, sign, b); })) ||
                     ((method == 0 || method == 3) && !std::getenv("NOSHAPE_SHELL_NO_PLANES") && timed("planes", [&] {
                        const bool ok = by_planes(solid.shape, removed, thickness, sign, b);

@@ -1339,6 +1339,20 @@ fn shell_regenerates_as_std() {
                 p.set("entities", q(face_at(r, TOP_FACE)));
                 p.set("thickness", expr("25 mm"));
             }),
+            // Live 1765: half the cube fails, just under leaves a pocket, Hollow past half a 10 mm void.
+            on_the_cube("shell", "half the part", |p, r| {
+                p.set("entities", q(face_at(r, TOP_FACE)));
+                p.set("thickness", expr("20 mm"));
+            }),
+            on_the_cube("shell", "just under half", |p, r| {
+                p.set("entities", q(face_at(r, TOP_FACE)));
+                p.set("thickness", expr("19.9 mm"));
+            }),
+            on_the_cube("shell", "hollow past half", |p, r| {
+                p.set("isHollow", ParamValue::Bool(true));
+                p.set("parts", q(body_ref(r, 0)));
+                p.set("thickness", expr("25 mm"));
+            }),
         ],
     );
 }
