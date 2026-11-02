@@ -1549,6 +1549,34 @@ TopoDS_Shape revolved_slab(const TopoDS_Face& f, double d)
   return r;
 }
 
+// Slab `r` without INTERNAL faces (a prism of a face with an internal edge sweeps it into an internal face, which
+// the slab fuse then can't take; the caps keep the edge, as INTERNAL edges noshape's Boolean takes); `r` itself if
+// it has none.
+TopoDS_Shape without_internal_faces(const TopoDS_Shape& r)
+{
+  bool any = false;
+  for (TopExp_Explorer x(r, TopAbs_FACE); x.More() && !any; x.Next())
+    any = x.Current().Orientation() == TopAbs_INTERNAL || x.Current().Orientation() == TopAbs_EXTERNAL;
+  if (!any || r.ShapeType() != TopAbs_SOLID)
+    return r;
+  BRep_Builder bb;
+  TopoDS_Solid so;
+  bb.MakeSolid(so);
+  for (TopoDS_Iterator sh(r); sh.More(); sh.Next())
+  {
+    if (sh.Value().ShapeType() != TopAbs_SHELL)
+      continue;
+    TopoDS_Shell out;
+    bb.MakeShell(out);
+    for (TopoDS_Iterator f(sh.Value()); f.More(); f.Next())
+      if (f.Value().Orientation() == TopAbs_FORWARD || f.Value().Orientation() == TopAbs_REVERSED)
+        bb.Add(out, f.Value());
+    out.Closed(true);
+    bb.Add(so, out);
+  }
+  return BRepCheck_Analyzer(so).IsValid() ? TopoDS_Shape(so) : r;
+}
+
 TopoDS_Shape slab(const TopoDS_Face& f, double d, const TopoDS_Shape& src, SourceMap& sources)
 {
   gp_Pnt p;
@@ -1575,7 +1603,7 @@ TopoDS_Shape slab(const TopoDS_Face& f, double d, const TopoDS_Shape& src, Sourc
     BRepPrimAPI_MakePrism mk(f, gp_Vec(n) * d);
     if (!mk.IsDone())
       return TopoDS_Shape();
-    r = mk.Shape();
+    r = without_internal_faces(mk.Shape());
   }
   else
   {
@@ -1608,6 +1636,9 @@ TopoDS_Shape slab(const TopoDS_Face& f, double d, const TopoDS_Shape& src, Sourc
       BRepClass3d_SolidClassifier cl(c, q, 1e-7);
       if (cl.State() == TopAbs_IN)
       {
+        // (OCCT's simple offset gives its offset face its 1e-4 working tolerance; the face's real one, so the slab
+        // fuse needn't take it as tolerant.)
+        BRepLib::UpdateTolerances(c, true);
         r = c;
         break;
       }

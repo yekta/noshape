@@ -1109,6 +1109,30 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Shell's slab fuses: offset faces; the seeded sections' cost (11-02 03:00 UTC)
+- Offset faces (rust_boolean.cpp to_body): a Geom_OffsetSurface is taken as the elementary surface OCCT keeps as its
+  equivalent (a plane's, cylinder's, cone's offset), else as a B-spline within 1e-7 of it over the face's parameter
+  range (GeomConvert_ApproxSurface, same parameters, so the edges' curves on it stay).
+- shell.cpp: a simple-offset slab (MakeThickSolidBySimple) gets BRepLib::UpdateTolerances: OCCT gives its offset
+  face its 1e-4 working tolerance (the face's real one 1e-7), which made the whole slab fuse "a tolerant input".
+- shell.cpp: a planar slab (a prism) loses the INTERNAL faces its face's internal edges sweep ("an internal face"
+  for the fuse; shell-11's part has two such edges); the caps keep the edges, which noshape's Boolean takes. (Copying
+  the face without them gave an invalid face for one of shell-11's, UnorientableShape, whatever way it was copied.)
+- rust_boolean.cpp: Bézier curves and surfaces taken as the B-splines they are (GeomConvert, same parameters; some
+  slabs have Bézier edges: "a curved edge").
+- Core's repro dumps now: shell-10's fuse (26 shapes) declines "an edge without its curve on a free-form face" (an
+  edge of one slab on another's B-spline face without its curve there); shell-11's (93) "a tolerant input": three
+  slabs (all planes, or planes and an extrusion) come out with faces, edges and vertices at 1.5e-3, half the 3 mm
+  wall (UpdateTolerances takes the faces to 1e-7, not the edges): which slab construction sets that is next. No T1
+  for these (their inputs are Shell's own slabs); Shell's tests pass. Repro: bool-a's scratch example
+  (crates/kernel/examples/bool_shell.rs, not landed: SHELLDUMP=<dump without .brep>, NOSHAPE_SHELL_DEBUG=1); the
+  slab fuses' inputs: vibe4 /tmp/rb10-26.brep, /tmp/rb11-93.brep (local /root/bool-scratch/kh/).
+- The seeded sections' alternating projection built a fresh GeomAPI_ProjectPointOnSurf each step (a grid over the
+  whole surface each time): most of a Ø10 knurl's Boolean. Now ShapeAnalysis_Surface: one search, then local steps.
+  Ø10 × 50 CP12 45/45 35.5 → 20.8 s, Ø10 × 33 CP30 45/30 97.8 → 16.0 s (loaded vibe4), same results.
+  (NOSHAPE_KERNEL_PROFILE's boolean.rust.sections, 18 of the 34 s, counts the seeded calls too; gdb samples on a
+  local copy of the test binary found the projections.)
+
 ## Knurl sweep: tilted caps, slivers between caps (11-02 02:00 UTC)
 - A tool's plane face 1e-9 to 1e-4 rad off an object's plane face, its edges within the tolerance of that plane, is
   put on it before the pairing (boolean.rs, before `symmetry`): the knurl tools' end caps are 2.3e-8 to 2.8e-5 rad

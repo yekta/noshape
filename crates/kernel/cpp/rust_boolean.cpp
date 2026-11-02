@@ -16,7 +16,7 @@
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepLib.hxx>
 #include <BRepBndLib.hxx>
-#include <GeomAPI_ProjectPointOnSurf.hxx>
+#include <ShapeAnalysis_Surface.hxx>
 #include <IntSurf_PntOn2S.hxx>
 #include <NCollection_List.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
@@ -34,6 +34,11 @@
 #include <Geom_Parabola.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
+#include <GeomConvert.hxx>
+#include <Geom_BezierSurface.hxx>
+#include <Geom_BezierCurve.hxx>
+#include <Geom_OffsetSurface.hxx>
+#include <GeomConvert_ApproxSurface.hxx>
 #include <Geom_ToroidalSurface.hxx>
 #include <Geom_RectangularTrimmedSurface.hxx>
 #include <Geom_SphericalSurface.hxx>
@@ -241,6 +246,28 @@ double push_nurbs_surface(rust::Vec<double>& out, const occ::handle<Geom_BSpline
   return at;
 }
 
+// Offset surface `off` (a B-spline's) as a B-spline within 1e-7 of it over face `f`'s parameter range (grown by a
+// thousandth, within the surface's), on the same parameters; null where OCCT's approximation doesn't get there.
+static occ::handle<Geom_BSplineSurface> offset_as_bspline(const occ::handle<Geom_OffsetSurface>& off, const TopoDS_Face& f)
+{
+  double u0, u1, v0, v1, a0, a1, b0, b1;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  off->Bounds(a0, a1, b0, b1);
+  const double du = 1e-3 * (u1 - u0), dv = 1e-3 * (v1 - v0);
+  try
+  {
+    const occ::handle<Geom_RectangularTrimmedSurface> part = new Geom_RectangularTrimmedSurface(off, std::max(a0, u0 - du), std::min(a1, u1 + du), std::max(b0, v0 - dv), std::min(b1, v1 + dv));
+    GeomConvert_ApproxSurface fit(part, 1e-7, GeomAbs_C1, GeomAbs_C1, 9, 9, 200, 0);
+    if (fit.IsDone() && fit.HasResult() && fit.MaxError() <= 1e-7)
+      return fit.Surface();
+  }
+  catch (const Standard_Failure&)
+  {
+  }
+  return occ::handle<Geom_BSplineSurface>();
+}
+
+// `s` as a flat body (its maps' indices are the body's), or why not.
 // `s` as a flat body (its maps' indices are the body's), or why not.
 const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
 {
@@ -288,7 +315,9 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
       return "an edge without a curve";
     const occ::handle<Geom_Curve>        bc   = basis_of(c);
     const occ::handle<Geom_Circle>       circ = occ::down_cast<Geom_Circle>(bc);
-    const occ::handle<Geom_BSplineCurve> bsc  = occ::down_cast<Geom_BSplineCurve>(bc);
+    // (A Bézier curve (Shell's slabs of B-spline faces have them): as the B-spline it is, the same parameters.)
+    const occ::handle<Geom_BezierCurve>  bzc  = occ::down_cast<Geom_BezierCurve>(bc);
+    const occ::handle<Geom_BSplineCurve> bsc  = bzc.IsNull() ? occ::down_cast<Geom_BSplineCurve>(bc) : GeomConvert::CurveToBSplineCurve(bzc);
     const occ::handle<Geom_Ellipse>      ell  = occ::down_cast<Geom_Ellipse>(bc);
     if (occ::down_cast<Geom_Line>(bc).IsNull() && circ.IsNull() && bsc.IsNull() && ell.IsNull())
       return !occ::down_cast<Geom_Ellipse>(bc).IsNull() ? "an ellipse edge" : !occ::down_cast<Geom_Conic>(bc).IsNull() ? "a conic edge" : "a curved edge";
@@ -349,10 +378,20 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     // (A trimmed surface's own: the same parameters.)
     while (const occ::handle<Geom_RectangularTrimmedSurface> tr = occ::down_cast<Geom_RectangularTrimmedSurface>(surf))
       surf = tr->BasisSurface();
+    // (An offset surface (Shell's slabs): the plane, cylinder, cone, ... OCCT keeps as its equivalent; else a
+    // B-spline within 1e-7 of it over the face's parameters (the same parameters, so its curves on it stay).)
+    if (const occ::handle<Geom_OffsetSurface> off = occ::down_cast<Geom_OffsetSurface>(surf))
+    {
+      if (const occ::handle<Geom_Surface> eq = off->Surface(); !eq.IsNull())
+        surf = eq;
+      else if (const occ::handle<Geom_BSplineSurface> fit = offset_as_bspline(off, f); !fit.IsNull())
+        surf = fit;
+    }
     const occ::handle<Geom_Plane>         pl   = occ::down_cast<Geom_Plane>(surf);
     const occ::handle<Geom_CylindricalSurface> cyl = occ::down_cast<Geom_CylindricalSurface>(surf);
     const occ::handle<Geom_ConicalSurface>     con = occ::down_cast<Geom_ConicalSurface>(surf);
-    const occ::handle<Geom_BSplineSurface>     bss = occ::down_cast<Geom_BSplineSurface>(surf);
+    const occ::handle<Geom_BezierSurface>      bzs = occ::down_cast<Geom_BezierSurface>(surf);
+    const occ::handle<Geom_BSplineSurface>     bss = bzs.IsNull() ? occ::down_cast<Geom_BSplineSurface>(surf) : GeomConvert::SurfaceToBSplineSurface(bzs);
     const occ::handle<Geom_ToroidalSurface>    tor = occ::down_cast<Geom_ToroidalSurface>(surf);
     const occ::handle<Geom_SphericalSurface>   sph = occ::down_cast<Geom_SphericalSurface>(surf);
     const occ::handle<Geom_SurfaceOfLinearExtrusion> ext = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(surf);
@@ -1875,30 +1914,29 @@ static std::vector<IntTools_Curve> seeded_sections(const TopoDS_Face& fa, const 
 {
   std::vector<IntTools_Curve> out;
   const occ::handle<Geom_Surface> sa = BRep_Tool::Surface(fa), sb = BRep_Tool::Surface(fb);
+  // (The first projection a search over each surface, then steps from the parameters before (a fresh search each
+  // step was most of a small knurl's Boolean).)
+  const occ::handle<ShapeAnalysis_Surface> qa = new ShapeAnalysis_Surface(sa), qb = new ShapeAnalysis_Surface(sb);
   NCollection_List<IntSurf_PntOn2S> seeds;
   const size_t                      n = ends.size() / 3;
   for (size_t i = 0; i < n; ++i)
     for (size_t j = i + 1; j < n; ++j)
     {
-      gp_Pnt m((ends[3 * i] + ends[3 * j]) / 2, (ends[3 * i + 1] + ends[3 * j + 1]) / 2, (ends[3 * i + 2] + ends[3 * j + 2]) / 2);
-      double ua = 0, va = 0, ub = 0, vb = 0, gap = 1;
+      gp_Pnt   m((ends[3 * i] + ends[3 * j]) / 2, (ends[3 * i + 1] + ends[3 * j + 1]) / 2, (ends[3 * i + 2] + ends[3 * j + 2]) / 2);
+      gp_Pnt2d ua = qa->ValueOfUV(m, 1e-9), ub = qb->ValueOfUV(sa->Value(ua.X(), ua.Y()), 1e-9);
+      double   gap = 1;
       for (int k = 0; k < 50 && gap > 1e-9; ++k)
       {
-        GeomAPI_ProjectPointOnSurf pa(m, sa);
-        if (pa.NbPoints() == 0)
-          break;
-        pa.LowerDistanceParameters(ua, va);
-        GeomAPI_ProjectPointOnSurf pb(pa.NearestPoint(), sb);
-        if (pb.NbPoints() == 0)
-          break;
-        pb.LowerDistanceParameters(ub, vb);
-        gap = pa.NearestPoint().Distance(pb.NearestPoint());
-        m   = gp_Pnt((pa.NearestPoint().XYZ() + pb.NearestPoint().XYZ()) / 2);
+        const gp_Pnt pa = sa->Value(ua.X(), ua.Y()), pb = sb->Value(ub.X(), ub.Y());
+        gap = pa.Distance(pb);
+        m   = gp_Pnt((pa.XYZ() + pb.XYZ()) / 2);
+        ua  = qa->NextValueOfUV(ua, m, 1e-10);
+        ub  = qb->NextValueOfUV(ub, m, 1e-10);
       }
       if (gap > 1e-7)
         continue;
       IntSurf_PntOn2S p;
-      p.SetValue(m, ua, va, ub, vb);
+      p.SetValue(m, ua.X(), ua.Y(), ub.X(), ub.Y());
       seeds.Append(p);
     }
   if (seeds.IsEmpty())
