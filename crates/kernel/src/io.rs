@@ -237,9 +237,17 @@ pub fn read_step_pmi(path: &Path) -> Result<Vec<String>> {
 
 /// [`write_step`] with the schema and the file's length unit.
 pub fn write_step_with(path: &Path, shapes: &[ExportShape], unit: LengthUnit, opts: &StepOptions) -> Result<()> {
+    let t = std::time::Instant::now();
     let parts = step_parts(shapes, unit, opts)?;
+    if std::env::var_os("NOSHAPE_EXPORT_TIMING").is_some() {
+        eprintln!("export stage step: OCCT per part {:.1} ms", t.elapsed().as_secs_f64() * 1000.0);
+    }
     let file_name = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    let t = std::time::Instant::now();
     let text = crate::step_out::write(&parts, &file_name, &step_timestamp(), step_schema(opts))?;
+    if std::env::var_os("NOSHAPE_EXPORT_TIMING").is_some() {
+        eprintln!("export stage step: layout {:.1} ms", t.elapsed().as_secs_f64() * 1000.0);
+    }
     std::fs::write(path, text).map_err(|e| KernelError::Io(format!("could not write STEP file {}: {e}", path.display())))
 }
 
@@ -312,13 +320,47 @@ fn step_parts(shapes: &[ExportShape], unit: LengthUnit, opts: &StepOptions) -> R
     // (Onshape's unit without custom units), the file is rebuilt from those.
     let file_unit = if file_unit == 0 { 6 } else { file_unit };
     static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-    let mut parts = Vec::with_capacity(v.len());
+    let tmp_file = || std::env::temp_dir().join(format!("noshape-step-{}-{}.step", std::process::id(), SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed)));
+    // OCCT's text read back (NOSHAPE_STEP_KEEP_OCCT=1 keeps its file:
+    // debugging the relayout).
+    let read_back = |tmp: &Path, written: Result<()>| -> Result<std::rc::Rc<crate::step_out::Occt>> {
+        let text = written.and_then(|_| std::fs::read_to_string(tmp).map_err(|e| KernelError::Io(e.to_string())));
+        if std::env::var_os("NOSHAPE_STEP_KEEP_OCCT").is_none() {
+            let _ = std::fs::remove_file(tmp);
+        }
+        crate::step_out::Occt::parse(&text?)
+    };
+    let pmi_of = |i: usize| opts.pmi.get(i).cloned().flatten().filter(|_| opts.schema != StepSchema::Ap214 && opts.schema != StepSchema::Ap203);
+    let name_of = |i: usize| shapes[i].name.clone().filter(|n| !n.is_empty()).unwrap_or_else(|| format!("Part {}", i + 1));
+    let mut parts: Vec<Option<crate::step_out::Part>> = (0..v.len()).map(|_| None).collect();
+    // The parts without model definitions in one OCCT call (a call per part
+    // cost 0.7 ms each: 1.4 s of 2.0 s writing 2000 parts), each its own
+    // product named by its index.
+    let plain: Vec<usize> = (0..v.len()).filter(|&i| pmi_of(i).is_none()).collect();
+    if !plain.is_empty() {
+        let tmp = tmp_file();
+        let shapes_l: Vec<Shape> = plain.iter().map(|&i| v[i].clone()).collect();
+        let tokens: Vec<String> = plain.iter().map(|i| format!("noshape-part-{i}")).collect();
+        let occt = read_back(&tmp, ck(ffi::write_step(&vec_to_list(&shapes_l), &tokens, &[], &[], path_str(&tmp)?, schema, file_unit)))?;
+        let sdrs = occt.sdrs_by_product();
+        for (&i, t) in plain.iter().zip(&tokens) {
+            // A shape OCCT merged with another (the same shape twice) is
+            // written on its own below.
+            if let Some(&sdr) = sdrs.get(t) {
+                parts[i] = Some(crate::step_out::Part { name: name_of(i), color: shapes[i].color, occt: occt.clone(), sdr, pmi: false });
+            }
+        }
+    }
     for (i, sh) in v.iter().enumerate() {
-        let n = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let tmp = std::env::temp_dir().join(format!("noshape-step-{}-{n}.step", std::process::id()));
+        if parts[i].is_some() {
+            continue;
+        }
+        let tmp = tmp_file();
         // The part's MBD in the file's unit (OCCT writes the values as given)
         // and degrees.
-        let written = match opts.pmi.get(i).cloned().flatten().filter(|_| opts.schema != StepSchema::Ap214 && opts.schema != StepSchema::Ap203) {
+        let pmi = pmi_of(i);
+        let has_pmi = pmi.is_some();
+        let written = match pmi {
             Some(p) => {
                 let per_unit = match file_unit {
                     1 => 0.0254,
@@ -354,15 +396,11 @@ fn step_parts(shapes: &[ExportShape], unit: LengthUnit, opts: &StepOptions) -> R
             }
             None => ck(ffi::write_step(&vec_to_list(std::slice::from_ref(sh)), &[], &[], &[], path_str(&tmp)?, schema, file_unit)),
         };
-        let text = written.and_then(|_| std::fs::read_to_string(&tmp).map_err(|e| KernelError::Io(e.to_string())));
-        // NOSHAPE_STEP_KEEP_OCCT=1 keeps OCCT's per-part file (debugging the relayout).
-        if std::env::var_os("NOSHAPE_STEP_KEEP_OCCT").is_none() {
-            let _ = std::fs::remove_file(&tmp);
-        }
-        let name = shapes[i].name.clone().filter(|n| !n.is_empty()).unwrap_or_else(|| format!("Part {}", i + 1));
-        parts.push(crate::step_out::Part { name, color: shapes[i].color, occt: text? });
+        let occt = read_back(&tmp, written)?;
+        let sdr = occt.sdr()?;
+        parts[i] = Some(crate::step_out::Part { name: name_of(i), color: shapes[i].color, occt, sdr, pmi: has_pmi });
     }
-    Ok(parts)
+    Ok(parts.into_iter().flatten().collect())
 }
 
 /// Convenience: write plain shapes to STEP.

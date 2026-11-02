@@ -55,4 +55,22 @@ plain text), 2 need libraries (⊘: PDF, video).
 
 ## Speed on big files (see docs/handoff/dx.md for the history)
 
-To be filled from `tools/tiers/perf.sh` (vibe3, release) with live's own timings (live request 2026-11-02 01:57).
+Release timings from `tools/tiers/perf.sh` on vibe3 (`dx_perf::timed_nist_import`, `dx_perf::timed_big_part_imports`; vibe3 was shared with another perf run, so read them as upper bounds). Live's timings for the same files are pending (live request 2026-11-02 01:57); its NIST times come from the earlier import audit.
+
+| File | Before (10-31) | Now | Live |
+|---|---|---|---|
+| NIST CTC assembly, STEP (8 parts) | 12.2 s | 8.0 s | 38.7 s |
+| NIST CTC assembly, Parasolid | 7.4 s | 3.9 s | 24.5 s |
+| 1000-part pattern, STEP import | | 1.6 s (1000 parts, volume exact) | pending |
+| 1000-part pattern, Parasolid import | | 1.0 s | pending |
+| 1000-part pattern, IGES import | | 1.4 s | pending |
+| 1000-part pattern, STEP / x_t / IGES export | | 1.4 / 0.19 / 0.51 s | pending |
+
+What changed (dev build timings on vibe5, 2000 parts):
+
+- STEP import: face colours were looked up by a document-wide search per face (quadratic). They're now read from each part's sub-shape labels: collect went from 2920 ms to 3 ms, and the whole import from 4.6 s to 1.6 s.
+- STEP / Parasolid assembly import: each part's body follows from the Import feature's numbering, with no probe regeneration. NIST apply went from 2.15 s to 0.1 s. `NOSHAPE_IMPORT_CHECK=1` compares the result with the probe.
+- STEP export: all parts without model definitions go through one OCCT call, then are split by product. It took 2.0 s and now takes 1.15 s (OCCT 1404 → 752 ms, layout 582 → 337 ms).
+- What's left on NIST import is OCCT's reading (about 1.8 s dev) and the display meshing after regeneration (about 1.85 s, the Part Studio display).
+
+`NOSHAPE_IMPORT_TIMING=1` and `NOSHAPE_EXPORT_TIMING=1` print the stages.

@@ -7,6 +7,7 @@
 //! wrapping.
 
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use crate::error::{KernelError, Result};
 
@@ -347,12 +348,48 @@ impl Out {
     }
 }
 
-/// One part to write: OCCT's single-part STEP text and Onshape's part data.
+/// A STEP file OCCT wrote, parsed: one part or many (one product each).
+pub(crate) struct Occt(HashMap<u32, Ent>);
+
+impl Occt {
+    pub fn parse(text: &str) -> Result<Rc<Occt>> {
+        Ok(Rc::new(Occt(parse(text)?)))
+    }
+    /// The (first) shape definition representation: a single part's.
+    pub fn sdr(&self) -> Result<u32> {
+        self.0.iter().filter(|(_, e)| e.ty() == "SHAPE_DEFINITION_REPRESENTATION").map(|(id, _)| *id).min().ok_or_else(|| bad("no shape representation"))
+    }
+    /// Each product's shape definition representation by the product's name.
+    pub fn sdrs_by_product(&self) -> HashMap<String, u32> {
+        let arg = |id: &V, k: usize| match id {
+            V::Ref(r) => self.0.get(r).and_then(|e| e.args().get(k)),
+            _ => None,
+        };
+        let mut out = HashMap::new();
+        for (id, e) in &self.0 {
+            if e.ty() != "SHAPE_DEFINITION_REPRESENTATION" {
+                continue;
+            }
+            // SDR -> PRODUCT_DEFINITION_SHAPE -> PRODUCT_DEFINITION -> FORMATION -> PRODUCT.
+            let product = e.args().first().and_then(|pds| arg(pds, 2)).and_then(|pd| arg(pd, 2)).and_then(|pdf| arg(pdf, 2)).and_then(|prod| arg(prod, 0));
+            if let Some(V::Str(n)) = product {
+                out.insert(n.clone(), *id);
+            }
+        }
+        out
+    }
+}
+
+/// One part to write: OCCT's text holding it (its shape definition
+/// representation `sdr`) and Onshape's part data.
 pub(crate) struct Part {
     pub name: String,
     /// sRGB 0..1.
     pub color: Option<[f32; 3]>,
-    pub occt: String,
+    pub occt: Rc<Occt>,
+    pub sdr: u32,
+    /// Written with its model definitions (AP242 PMI, in its own text).
+    pub pmi: bool,
 }
 
 /// The application protocol, with Onshape's header and context strings for it
@@ -518,10 +555,10 @@ pub(crate) fn write(parts: &[Part], file_name: &str, timestamp: &str, schema: Sc
     let mut last = None;
     // Onshape writes the last part first.
     for part in parts.iter().rev() {
-        let src = parse(&part.occt)?;
+        let src = &part.occt.0;
         let get = |id: u32| src.get(&id).ok_or_else(|| bad(&format!("missing #{id}")));
         // OCCT's representation of the part and its context.
-        let sdr = src.values().find(|e| e.ty() == "SHAPE_DEFINITION_REPRESENTATION").ok_or_else(|| bad("no shape representation"))?;
+        let sdr = get(part.sdr)?;
         let Some(V::Ref(rep_id)) = sdr.args().get(1) else { return Err(bad("shape representation")) };
         let rep = get(*rep_id)?;
         let (Some(V::List(items)), Some(V::Ref(ctx_id))) = (rep.args().get(1), rep.args().get(2)) else { return Err(bad("representation items")) };
@@ -531,7 +568,7 @@ pub(crate) fn write(parts: &[Part], file_name: &str, timestamp: &str, schema: Sc
             _ => return Err(bad("units")),
         };
         let name = s(&part.name);
-        let mut cp = Copier { src: &src, map: HashMap::new() };
+        let mut cp = Copier { src, map: HashMap::new() };
 
         // Product data.
         let ac = b.add(Ent::simple("APPLICATION_CONTEXT", vec![s(app_context)]));
@@ -617,7 +654,7 @@ pub(crate) fn write(parts: &[Part], file_name: &str, timestamp: &str, schema: Sc
         // AP242 semantic PMI (CAx-IF recommended practices for PMI
         // representation, as OCCT's XDE writes it): datums, dimensions and
         // tolerances, moved onto this product, representation and faces.
-        if schema == Schema::Ap242 {
+        if schema == Schema::Ap242 && part.pmi {
             if let Some(V::Ref(src_pds)) = sdr.args().first() {
                 cp.map.insert(*src_pds, pds);
             }
@@ -663,8 +700,8 @@ pub(crate) struct AsmInstance {
 pub(crate) fn write_assembly(root: &str, parts: &[Part], instances: &[AsmInstance], file_name: &str, timestamp: &str, schema: Schema) -> Result<String> {
     let mut b = Builder::default();
     let (app_context, protocol, year) = schema.application();
-    let srcs: Vec<HashMap<u32, Ent>> = parts.iter().map(|p| parse(&p.occt)).collect::<Result<_>>()?;
-    let first = srcs.first().ok_or_else(|| bad("no parts"))?;
+    let first_part = parts.first().ok_or_else(|| bad("no parts"))?;
+    let first = &first_part.occt.0;
     let ac = b.add(Ent::simple("APPLICATION_CONTEXT", vec![s(app_context)]));
     b.add(Ent::simple("APPLICATION_PROTOCOL_DEFINITION", vec![s("international standard"), s(protocol), V::Int(year.into()), V::Ref(ac)]));
     // Product data: the root, then each part in the order instances use them,
@@ -702,8 +739,8 @@ pub(crate) fn write_assembly(root: &str, parts: &[Part], instances: &[AsmInstanc
 
     // Units (OCCT's, from the first part), one uncertainty and context per product.
     // A part's representation (its id) and its solids.
-    let rep_items = |src: &HashMap<u32, Ent>| -> Result<(Vec<u32>, u32)> {
-        let sdr = src.values().find(|e| e.ty() == "SHAPE_DEFINITION_REPRESENTATION").ok_or_else(|| bad("no shape representation"))?;
+    let rep_items = |src: &HashMap<u32, Ent>, sdr: u32| -> Result<(Vec<u32>, u32)> {
+        let sdr = src.get(&sdr).ok_or_else(|| bad("no shape representation"))?;
         let Some(V::Ref(rep_id)) = sdr.args().get(1) else { return Err(bad("shape representation")) };
         let rep = src.get(rep_id).ok_or_else(|| bad("representation"))?;
         let Some(V::List(items)) = rep.args().get(1) else { return Err(bad("representation items")) };
@@ -711,7 +748,7 @@ pub(crate) fn write_assembly(root: &str, parts: &[Part], instances: &[AsmInstanc
         Ok((items, *rep_id))
     };
     let units: Vec<u32> = {
-        let sdr = first.values().find(|e| e.ty() == "SHAPE_DEFINITION_REPRESENTATION").ok_or_else(|| bad("no shape representation"))?;
+        let sdr = first.get(&first_part.sdr).ok_or_else(|| bad("no shape representation"))?;
         let Some(V::Ref(rep_id)) = sdr.args().get(1) else { return Err(bad("shape representation")) };
         let Some(V::Ref(ctx_id)) = first.get(rep_id).and_then(|r| r.args().get(2)) else { return Err(bad("context")) };
         match first.get(ctx_id).and_then(|c| c.rec("GLOBAL_UNIT_ASSIGNED_CONTEXT")).and_then(|a| a.first()) {
@@ -775,8 +812,8 @@ pub(crate) fn write_assembly(root: &str, parts: &[Part], instances: &[AsmInstanc
     let mut styled = Vec::new();
     let mut placements: Vec<u32> = vec![0; instances.len()];
     for &p in &order {
-        let src = &srcs[p];
-        let (items, rep_id) = rep_items(src)?;
+        let src = &parts[p].occt.0;
+        let (items, rep_id) = rep_items(src, parts[p].sdr)?;
         let rep = src.get(&rep_id).ok_or_else(|| bad("representation"))?.clone();
         let mut cp = if p == 0 { Copier { src, map: cp0.map.clone() } } else { Copier { src, map: HashMap::new() } };
         let rgb: Option<Vec<V>> = parts[p].color.map(|c| std::iter::once(s("")).chain(c.iter().map(|&x| V::Real((f64::from(x.clamp(0.0, 1.0)) * 255.0).round() / 255.0))).collect());
