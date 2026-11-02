@@ -858,6 +858,47 @@ fn probes2() -> Vec<(String, Case)> {
     out
 }
 
+/// Third probes (fuzz s115: a rectangle with its bottom and right side
+/// dimensioned kept its top-right corner, not the lower left): rectangles with
+/// one or two sides changed, growing and shrinking, dimensioned on either
+/// side, drawn from another corner.
+fn probes3() -> Vec<(String, Case)> {
+    let v = DVec2::new;
+    let mut out = Vec::new();
+    // A rectangle drawn from `p0` counter-clockwise (or clockwise), H / V on
+    // its sides, the given lengths on sides (index, mm).
+    let rect = |c: &mut Case, corners: [DVec2; 4], dims: &[(usize, f64)]| {
+        let l: Vec<String> = (0..4).map(|i| c.line(corners[i], corners[(i + 1) % 4])).collect();
+        for i in 0..4 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+        }
+        for (i, x) in l.iter().enumerate() {
+            let d = corners[(i + 1) % 4] - corners[i];
+            c.hv(d.y.abs() < 1e-9, x);
+        }
+        for (i, mm) in dims {
+            c.length(&l[*i], *mm);
+        }
+    };
+    let ccw = [v(0.0, 0.0), v(20.0, 0.0), v(20.0, 10.0), v(0.0, 10.0)];
+    let mut add = |name: &str, f: &dyn Fn(&mut Case)| {
+        let mut c = Case::new();
+        f(&mut c);
+        out.push((name.to_string(), c));
+    };
+    add("r1 rectangle (0,0) 20 x 10, bottom 25 and right side 12", &|c| rect(c, ccw, &[(0, 25.0), (1, 12.0)]));
+    add("r2 rectangle, right side 10 -> 12 only", &|c| rect(c, ccw, &[(1, 12.0)]));
+    add("r3 rectangle, bottom 20 -> 15 (shrink)", &|c| rect(c, ccw, &[(0, 15.0)]));
+    add("r4 rectangle, bottom 15 and right side 8 (both shrink)", &|c| rect(c, ccw, &[(0, 15.0), (1, 8.0)]));
+    add("r5 rectangle, top 25 (the side drawn right to left)", &|c| rect(c, ccw, &[(2, 25.0)]));
+    add("r6 rectangle, left side 12 (drawn top to bottom)", &|c| rect(c, ccw, &[(3, 12.0)]));
+    add("r7 rectangle drawn from the top-left corner clockwise, bottom 25", &|c| rect(c, [v(0.0, 10.0), v(20.0, 10.0), v(20.0, 0.0), v(0.0, 0.0)], &[(2, 25.0)]));
+    add("r8 rectangle at (100,50), bottom 25 and right side 12", &|c| rect(c, ccw.map(|p| p + v(100.0, 50.0)), &[(0, 25.0), (1, 12.0)]));
+    add("r9 as fuzz s115: (64.3,2.3) 38.5 x 23.1, bottom 36.4 (shrink) and right side 23.5 (grow)", &|c| rect(c, [v(64.324, 2.308), v(102.868, 2.308), v(102.868, 25.372), v(64.324, 25.372)], &[(1, 23.517), (0, 36.392)]));
+    add("r10 as r9, the dimensions added the other order", &|c| rect(c, [v(64.324, 2.308), v(102.868, 2.308), v(102.868, 25.372), v(64.324, 25.372)], &[(0, 36.392), (1, 23.517)]));
+    out
+}
+
 fn probe_batch(list: Vec<(String, Case)>) -> Value {
     let cases: Vec<Value> = list.into_iter().map(|(name, mut c)| {
         let ours = ours(&mut c);
@@ -872,7 +913,7 @@ fn probe_batch(list: Vec<(String, Case)>) -> Value {
 #[test]
 #[ignore = "T2: live fuzz least-change probes"]
 fn probe_matches() {
-    for (n, list) in [(1, probes()), (2, probes2())] {
+    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3())] {
         let b = probe_batch(list);
         let path = fixture(&format!("sketch-probe-{n}.json"));
         if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == format!("probe-{n}")) {

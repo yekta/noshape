@@ -201,7 +201,11 @@ impl Sketch {
             let held: BTreeSet<EntityId> = neighbours.iter().copied().filter(|v| cons.iter().any(|(_, us)| us.contains(v) && !us.contains(&u))).collect();
             let anchor = self.anchor(u);
             let mut done = None;
-            'attempts: for (hold_neighbours, keep_size) in [(true, true), (true, false), (false, true), (false, false)] {
+            // Least change in its own terms: its length and direction kept,
+            // then its length only (Parallel turns it, probe p11), then
+            // neither; tied neighbours held first, released after (fuzz s5:
+            // a side carried by a distance translates, it doesn't tilt).
+            'attempts: for (hold_neighbours, shape) in [(true, 2), (true, 1), (true, 0), (false, 2), (false, 1), (false, 0)] {
                 let mut fixed = placed.clone();
                 if hold_neighbours {
                     fixed.extend(held.iter().copied());
@@ -210,7 +214,10 @@ impl Sketch {
                 with.insert(u);
                 let keep = |c: crate::ids::ConstraintId, us: &[EntityId]| us.contains(&u) && us.iter().all(|x| with.contains(x)) && (us.iter().all(|x| *x == u || placed.contains(x)) || self.connective(c));
                 let Some(mut sub) = self.sub_sketch_by(cons, &keep, &fixed) else { return false };
-                if keep_size && !self.hold_size(&mut sub, u) {
+                if shape >= 1 && !self.hold_size(&mut sub, u) {
+                    continue;
+                }
+                if shape >= 2 && !self.hold_direction(&mut sub, u) {
                     continue;
                 }
                 let opts = SolveOptions { light: vec![u], still: anchor.into_iter().collect(), analyze: false, constructive: false, ..Default::default() };
@@ -265,6 +272,17 @@ impl Sketch {
         }
         self.touch();
         true
+    }
+
+    /// Holds a line's direction in `sub` (parallel to a fixed construction
+    /// line along it); false for other curves.
+    fn hold_direction(&self, sub: &mut Sketch, u: EntityId) -> bool {
+        let Some(d) = self.placing_line_dir(u).filter(|d| d.length() > 0.0) else { return false };
+        let Some((s0, _)) = self.endpoints(u) else { return false };
+        let Some(a) = self.point(s0) else { return false };
+        let r = sub.add_line(a, a + d);
+        let _ = sub.set_construction(r, true);
+        sub.add_constraint(ConstraintKind::Fix { entity: r }).is_ok() && sub.add_constraint(ConstraintKind::Parallel { a: u, b: r }).is_ok()
     }
 
     /// Holds `u`'s size in `sub` (a line's length, a circle's or arc's
