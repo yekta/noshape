@@ -273,7 +273,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P2 FILL-G1-DOME (core 11-02, live 1739 FI2): a Fill G1 to a shelled box's outer side faces builds in live with the
   warning "Could not meet tangency constraints at highlighted points." (a dome to z 42.97, 4327.5641 mm²: the corners
   can't be tangent to two perpendicular walls); ours fails ("Cannot create fill surface…"): OCCT's plate throws for
-  these constraints at any tolerance. Needs our own G1 patch (or plate) that relaxes the corners.
+  these constraints at any tolerance. Needs our own G1 patch (or plate) that relaxes the corners. core 11-02 17:30: the
+  G1 call throws Standard_NoSuchObject inside BRepOffsetAPI_MakeFilling (edges with their own support faces); a retry
+  with the edges at position and G1 point constraints (Add(u, v, face, G1)) at nine interior points of each edge didn't
+  converge ("fill surface failed"). Next: find the NoSuchObject (edge / face instances as MakeFilling maps them).
 - [x] P1 LOFT-ONE-FACE (core 11-02, live 1782 / 1784): live lofts tangent-continuous sections (hexagons with R5 sketch
   fillets: 6 lines + 6 arcs) into **one** B-spline side face (3 faces, 24 edges, 437833.229 mm³); ours gave a face per
   section edge (14 faces, 437876.286). Now: through three or more sections, or sections of different topology, side
