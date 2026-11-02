@@ -1159,6 +1159,82 @@ impl Sketch {
         opts
     }
 
+    /// A length or distance typed in the editor scales the free geometry it
+    /// belongs to uniformly onto the new value, about its centre, or about
+    /// the one point of it fixed to the Origin (live 1785: a corner
+    /// rectangle's width 40 -> 50 scales it ×1.25, height too; 1775: a lone
+    /// line grows about its midpoint). Not a radius (live SK5: a fillet's
+    /// new radius moves the edges beside it, the rectangle keeps its size).
+    /// Only when nothing else there is dimensioned or fixed; returns whether
+    /// it scaled (the solve after then finds everything held).
+    pub fn scale_for_edit(&mut self, cid: ConstraintId) -> bool {
+        let Some(c) = self.constraint(cid).filter(|c| c.driving).cloned() else { return false };
+        let (ConstraintKind::Length { value, .. } | ConstraintKind::Distance { value, .. }) = c.kind else { return false };
+        let Some(now) = self.measure_new(&c.kind).filter(|m| *m > 1e-12) else { return false };
+        let k = value / now;
+        if !k.is_finite() || k <= 0.0 || (k - 1.0).abs() < 1e-12 {
+            return false;
+        }
+        // The geometry joined to the dimension's (constraints, shared
+        // points, curves' own points).
+        let mut set: HashSet<EntityId> = HashSet::new();
+        let mut todo: Vec<EntityId> = c.kind.entities().into_iter().collect();
+        while let Some(e) = todo.pop() {
+            if !set.insert(e) {
+                continue;
+            }
+            if let Some(x) = self.entity(e) {
+                todo.extend(x.point_refs());
+            }
+            todo.extend(self.entities().filter(|x| x.point_refs().contains(&e)).map(|x| x.id));
+            for k in self.constraints().filter(|k| k.driving && k.kind.entities().contains(&e)) {
+                todo.extend(k.kind.entities());
+            }
+        }
+        let others_fix = self.constraints().filter(|k| k.driving && k.id != cid && k.kind.entities().iter().any(|e| set.contains(e))).any(|k| k.kind.is_dimension() || matches!(k.kind, ConstraintKind::Fix { .. }));
+        if others_fix {
+            return false;
+        }
+        let external: Vec<EntityId> = set.iter().copied().filter(|e| self.entity(*e).is_some_and(|x| x.external)).collect();
+        if external.iter().any(|e| self.kind(*e) != Some(EntityKind::Point)) || external.len() > 1 {
+            return false;
+        }
+        let pts: Vec<EntityId> = set.iter().copied().filter(|e| self.kind(*e) == Some(EntityKind::Point) && !external.contains(e)).collect();
+        let pivot = match external.first().and_then(|e| self.point(*e)) {
+            Some(p) => p,
+            None => {
+                let (mut lo, mut hi) = (DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY));
+                for p in pts.iter().filter_map(|p| self.point(*p)) {
+                    lo = lo.min(p);
+                    hi = hi.max(p);
+                }
+                if !lo.is_finite() {
+                    return false;
+                }
+                (lo + hi) * 0.5
+            }
+        };
+        for p in &pts {
+            if let Some(x) = self.point(*p) {
+                let _ = self.set_point(*p, pivot + (x - pivot) * k);
+            }
+        }
+        for e in &set {
+            if let Some(x) = self.entity_mut_silent(*e) {
+                match &mut x.geometry {
+                    Geometry::Circle { radius, .. } => *radius *= k,
+                    Geometry::Ellipse { major, minor, .. } | Geometry::EllipticalArc { major, minor, .. } => {
+                        *major *= k;
+                        *minor *= k;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        self.touch();
+        true
+    }
+
     /// Solves all driving constraints, warm-started from the current geometry.
     pub fn solve(&mut self) -> SolveReport {
         self.solve_with(&SolveOptions::default())

@@ -4288,6 +4288,8 @@ impl SketchEditor {
             // `display_scale`), with its unit.
             data.dimension_exprs.insert(cid.0, ExprValue::new(text));
         }
+        // Live 1785: the free geometry scales onto the new value.
+        data.sketch.scale_for_edit(cid);
         let opts = data.sketch.dimension_edit_options(cid);
         let report = data.sketch.solve_with(&opts);
         // The next fillet defaults to the radius just typed (live, 568).

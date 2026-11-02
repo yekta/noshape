@@ -63,6 +63,9 @@ fn length_edit_moves_both_ends_equally() {
             let d = sk.add_constraint(ConstraintKind::Length { curve: l, value: 10.0 }).unwrap();
             assert!(sk.solve().is_solved());
             sk.set_dimension_value(d, 20.0).unwrap();
+            if !regen {
+                sk.scale_for_edit(d);
+            }
             let opts = SolveOptions { constructive: regen, ..sk.dimension_edit_options(d) };
             assert!(sk.solve_with(&opts).is_solved());
             let c = sk.curve(l).unwrap();
@@ -468,23 +471,36 @@ fn corner_rectangle_width_edit_keeps_its_height() {
     // The corner rectangle's own constraints (Perpendicular top / left,
     // Parallel pairs, Horizontal top), as ops' e2e configurations drives it.
     // Regenerated with the new width (live probes 3, r1–r10, posted): it
-    // keeps its lower-left corner and its other sides. Edited in the editor
-    // (live 1775 for a lone line): the width grows about its middle; the
-    // height stays either way.
-    for constructive in [false, true] {
+    // keeps its lower-left corner and its height. Typed in the editor (live
+    // 1785): the whole rectangle scales ×1.25 about its centre, or about its
+    // corner Coincident with the Origin.
+    for (constructive, origin) in [(true, false), (false, false), (false, true)] {
         let mut sk = Sketch::new();
         let r = sk.corner_rectangle(v(0.0, 0.0), v(40.0, 20.0));
+        if origin {
+            let o = sk.add_point(v(0.0, 0.0));
+            sk.set_external(o, true).unwrap();
+            sk.add_constraint(ConstraintKind::Coincident { a: r.points[0], b: o }).unwrap();
+        }
         let bottom = r.curves[0];
         let d = sk.add_constraint(ConstraintKind::Length { curve: bottom, value: 40.0 }).unwrap();
         assert!(sk.solve().is_solved());
         sk.set_dimension_value(d, 50.0).unwrap();
-        let opts = if constructive { SolveOptions { constructive: true, ..Default::default() } } else { sk.dimension_edit_options(d) };
+        let opts = if constructive {
+            SolveOptions { constructive: true, ..Default::default() }
+        } else {
+            assert!(sk.scale_for_edit(d));
+            sk.dimension_edit_options(d)
+        };
         assert!(sk.solve_with(&opts).is_solved());
         let at: Vec<DVec2> = r.points.iter().map(|p| sk.point(*p).unwrap()).collect();
-        let x0 = if constructive { 0.0 } else { -5.0 };
-        let want = [v(x0, 0.0), v(x0 + 50.0, 0.0), v(x0 + 50.0, 20.0), v(x0, 20.0)];
+        let want = match (constructive, origin) {
+            (true, _) => [v(0.0, 0.0), v(50.0, 0.0), v(50.0, 20.0), v(0.0, 20.0)],
+            (false, false) => [v(-5.0, -2.5), v(45.0, -2.5), v(45.0, 22.5), v(-5.0, 22.5)],
+            (false, true) => [v(0.0, 0.0), v(50.0, 0.0), v(50.0, 25.0), v(0.0, 25.0)],
+        };
         for (a, b) in at.iter().zip(want) {
-            assert!((*a - b).length() < 1e-6, "constructive {constructive}: {at:?}");
+            assert!((*a - b).length() < 1e-6, "constructive {constructive} origin {origin}: {at:?}");
         }
     }
 }
