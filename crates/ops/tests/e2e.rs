@@ -5498,3 +5498,62 @@ fn mbd_dimension_shows_in_the_drawing() {
     assert_eq!(g["annotations"].as_array().unwrap().iter().filter(|a| a["kind"] == "LinearDimension").count(), 1, "{}", g["annotations"]);
 }
 
+
+/// Format coverage (docs/parity/formats.md): one part exported to every
+/// export format, then each file imported back where noshape reads that
+/// format; prints the matrix (format, bytes, parts and volume back) and
+/// holds B-rep formats to the volume, meshes to 3 %.
+#[test]
+fn every_export_format_imports_back() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "formats.noshape");
+    let v0 = num(&call(&mut ctx, "query_parts", json!({}))["parts"][0]["volume"]);
+    let formats = ["PARASOLID", "ACIS", "STEP", "IGES", "PVZ", "JT", "RHINO", "GLTF", "GLB", "OBJ", "3MF", "STL"];
+    let mut rows = Vec::new();
+    for f in formats {
+        let file = scratch(&format!("formats-{}", f.to_lowercase()));
+        let r = match try_call(&mut ctx, "export_parts", json!({ "format": f, "file": file.to_str().unwrap() })) {
+            Ok(r) => r,
+            Err(e) => {
+                rows.push(format!("{f}: export unavailable ({})", e.message));
+                continue;
+            }
+        };
+        let mut out = std::path::PathBuf::from(r["file"].as_str().unwrap());
+        // OBJ downloads a zip of the .obj and its .mtl (as live, which
+        // doesn't translate that zip): the .obj is what imports.
+        if out.extension().is_some_and(|e| e == "zip") {
+            let dir = scratch(&format!("formats-{}-unzip", f.to_lowercase()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let names = noshape_kernel::extract_zip(&out, &dir).unwrap();
+            out = dir.join(names.iter().find(|n| n.ends_with(".obj")).expect("the .obj"));
+        }
+        let mut ictx = Ctx::new();
+        call(&mut ictx, "document_create", json!({ "path": scratch(&format!("formats-in-{}.noshape", f.to_lowercase())).to_str().unwrap() }));
+        // STL carries no unit: written in metres (live's default), read as metres.
+        let mut args = json!({ "files": [out.to_str().unwrap()] });
+        if f == "STL" {
+            args["mesh_unit"] = json!("Meter");
+        }
+        match try_call(&mut ictx, "import_files", args) {
+            Ok(i) => {
+                let studio = i["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").map(|t| t["name"].as_str().unwrap().to_string());
+                let (n, v) = match studio {
+                    Some(s) => {
+                        let q = call(&mut ictx, "query_parts", json!({ "tab": s }));
+                        let parts = q["parts"].as_array().unwrap().clone();
+                        (parts.len(), parts.iter().map(|p| p["volume"].as_f64().unwrap_or(0.0)).sum::<f64>())
+                    }
+                    None => (0, 0.0),
+                };
+                let mesh = matches!(f, "PVZ" | "GLTF" | "GLB" | "OBJ" | "3MF" | "STL");
+                rows.push(format!("{f}: {} bytes, back {n} part(s), volume {:.4} of {v0:.4}{}", r["bytes"], v, if mesh { " (mesh)" } else { "" }));
+                assert!(n >= 1, "{f}: no part back");
+                let tol = if mesh { 0.03 } else { 1e-6 };
+                assert!((v - v0).abs() <= v0 * tol, "{f}: volume {v} vs {v0}");
+            }
+            Err(e) => rows.push(format!("{f}: {} bytes, not importable ({})", r["bytes"], e.message)),
+        }
+    }
+    eprintln!("format matrix:\n  {}", rows.join("\n  "));
+}

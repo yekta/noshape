@@ -76,12 +76,65 @@ pub fn drawing_from_cad(bytes: &[u8]) -> Result<noshape_model::drawing::Drawing,
 pub struct FileTabView {
     doc: Entity<DocModel>,
     tab: TabId,
+    /// The file's view (decoded once per file data).
+    preview: Option<(std::sync::Arc<str>, std::rc::Rc<Preview>)>,
+}
+
+/// What a file tab shows (Onshape views images, text, Markdown, CSV and
+/// JSON; help "Supported File Formats", Non-CAD files): the picture, the
+/// text, else the file's card. PDF and video need libraries
+/// (docs/parity/formats.md).
+enum Preview {
+    Image(std::sync::Arc<gpui_kit::Image>),
+    Text(String),
+    Card,
+}
+
+/// Text read at most, and lines shown (a larger file shows its start).
+const TEXT_LIMIT: usize = 1 << 20;
+const LINE_LIMIT: usize = 5000;
+
+fn preview_of(f: &FileTab) -> Preview {
+    let ext = f.ext();
+    let image = match ext.as_str() {
+        "png" => Some(ImageFormat::Png),
+        "jpg" | "jpeg" => Some(ImageFormat::Jpeg),
+        "gif" => Some(ImageFormat::Gif),
+        "svg" => Some(ImageFormat::Svg),
+        "bmp" => Some(ImageFormat::Bmp),
+        "tif" | "tiff" => Some(ImageFormat::Tiff),
+        "webp" => Some(ImageFormat::Webp),
+        _ => None,
+    };
+    let text = matches!(ext.as_str(), "txt" | "md" | "csv" | "json");
+    if image.is_none() && !text {
+        return Preview::Card;
+    }
+    let Some(bytes) = f.bytes() else { return Preview::Card };
+    if let Some(format) = image {
+        return Preview::Image(std::sync::Arc::new(gpui_kit::Image::from_bytes(format, bytes)));
+    }
+    let raw = String::from_utf8_lossy(&bytes[..bytes.len().min(TEXT_LIMIT)]).into_owned();
+    // JSON pretty-printed (as it reads best); anything else as it is.
+    let shown = if ext == "json" { serde_json::from_str::<serde_json::Value>(&raw).ok().and_then(|v| serde_json::to_string_pretty(&v).ok()).unwrap_or(raw) } else { raw };
+    Preview::Text(shown)
 }
 
 impl FileTabView {
     pub fn new(doc: Entity<DocModel>, tab: TabId, cx: &mut Context<Self>) -> Self {
         cx.observe(&doc, |_, _, cx| cx.notify()).detach();
-        Self { doc, tab }
+        Self { doc, tab, preview: None }
+    }
+
+    fn preview(&mut self, f: &FileTab) -> std::rc::Rc<Preview> {
+        match &self.preview {
+            Some((data, p)) if std::sync::Arc::ptr_eq(data, &f.data_base64) => p.clone(),
+            _ => {
+                let p = std::rc::Rc::new(preview_of(f));
+                self.preview = Some((f.data_base64.clone(), p.clone()));
+                p
+            }
+        }
     }
 
     fn file(&self, cx: &App) -> Option<FileTab> {
@@ -144,6 +197,45 @@ impl Render for FileTabView {
         let Some(f) = self.file(cx) else { return div().size_full().into_any_element() };
         let (doc, tab) = (self.doc.clone(), self.tab);
         let doc2 = doc.clone();
+        let preview = self.preview(&f);
+        if !matches!(*preview, Preview::Card) {
+            // A viewable file: a slim bar with its name, size and actions,
+            // the picture or the text under it.
+            let bar = gpui_kit::component::h_flex()
+                .h(px(40.))
+                .flex_none()
+                .px(px(12.))
+                .gap(px(10.))
+                .bg(pal.panel)
+                .border_b_1()
+                .border_color(gpui_kit::rgb(0xd3d7d9))
+                .text_color(pal.text)
+                .child(crate::assets::icon(file_icon(&f), 20., cx))
+                .child(div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).child(crate::ui::user_text(f.file_name.clone())))
+                .child(div().text_size(px(12.)).text_color(pal.text_muted).child(format!("{} · {}", f.type_label(), f.size_label())))
+                .child(div().flex_1())
+                .child(Button::new("file-update").label("Update…").outline().small().on_click(move |_, w, cx| update(&doc, tab, w, cx)))
+                .child(Button::new("file-download").label("Download").outline().small().on_click(move |_, w, cx| download(&doc2, tab, w, cx)));
+            let body = match &*preview {
+                Preview::Image(image) => div().flex_1().min_h_0().p(px(16.)).bg(gpui_kit::rgb(0x999999)).child(img(image.clone()).size_full().object_fit(ObjectFit::ScaleDown)).into_any_element(),
+                Preview::Text(text) => div()
+                    .id("file-text")
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .p(px(16.))
+                    .bg(pal.panel)
+                    .font_family("Inconsolata")
+                    .text_size(px(13.))
+                    .text_color(pal.text)
+                    .whitespace_normal()
+                    .children(text.lines().take(LINE_LIMIT).map(|l| div().min_h(px(17.)).child(crate::ui::user_text(l.to_string()))))
+                    .when(text.lines().count() > LINE_LIMIT, |d| d.child(div().pt(px(8.)).text_color(pal.text_muted).child(format!("… {} more lines (Download for the whole file)", text.lines().count() - LINE_LIMIT))))
+                    .into_any_element(),
+                Preview::Card => div().into_any_element(),
+            };
+            return gpui_kit::component::v_flex().size_full().child(bar).child(body).into_any_element();
+        }
         div()
             .size_full()
             .flex()
