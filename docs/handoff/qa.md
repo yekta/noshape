@@ -9,6 +9,17 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 7 (qa, pinned account, from 11-02 22:40; greens bc7d7e9f → 6b4704f2)
 
+- **11-02 23:54 — focus gotcha (cost one wrong ticket note):** under Xvfb (no WM) the app window has no X focus
+  after xdotool clicks; then number fields put the caret at the click instead of selecting all and no caret / selection
+  is drawn. **Before any UI-behaviour check: `bin/app.sh <binary> <doc> <tag>` then `bin/appfocus.sh <tag>`** (kill with
+  `bin/app.sh kill <tag>`; never `pkill -f` / `pgrep -f … | kill` with a pattern in your own command line: it kills the
+  shell, exit 144). VAR-AUTOCOMPLETE-ENTER does NOT reproduce on Linux focused (green and v0.4.22): macOS-only, ticket
+  says so. Live checks are cheap from qa's own tab: `cd /root/live-pw; node rqa.mjs <script>` attaches in ~12 s;
+  helpers in qa-scratch/livek/lib.js (pos / undo / act / dlg / rows / menu / clickRow / dblRow / depth), Part Studio
+  "qa parity vars" (element 28fa1edaa4c58a87bbcc71d1 in "noshape mm test"; REST builder livek/vars.js via kern/nrun.mjs).
+  Filed from live checks: P2 ROLLBACK-BAR-UNDO-STEP, P2 FEATURE-RCLICK-WITH-SELECTION, P2 SKETCH-UNDO-REDO-STATE, P3
+  FEATURE-ROW-ENTER-EDITS. Scenarios: 113 (bin/mkscen.py). Loops now on green e18f898a: /tmp/qa-nfloop21.sh (1801–1820),
+  /tmp/qa-gfloop7.sh (1821–1840); v22 release /tmp/qa-cfloop66.sh (1781–1800).
 - **11-02 23:25 state.** Watch re-armed (`bash /tmp/qa-watch.sh`, run_in_background; it now also stops on **GUIFUZZ** — a
   fz*-result.txt with DIED / NOAPP). **The GUI fuzz on :110 / :131 had run with no app since 11-01 11:05**: the
   noshape-green-new / -cur symlinks pointed at a deleted green copy and fuzz.py printed "alive" anyway. Fixed: fuzz.py
