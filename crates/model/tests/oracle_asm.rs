@@ -464,8 +464,9 @@ fn fuzz_case(parts: &Parts, seed: u64) -> (Assembly, serde_json::Value) {
     for _ in 0..4 {
         r.next();
     }
-    let n = 2 + r.below(3);
-    let names = ["A", "B", "C", "D"];
+    // Batch 2 on (seeds from 21): 3–5 instances.
+    let n = if seed > 20 { 3 + r.below(3) } else { 2 + r.below(3) };
+    let names = ["A", "B", "C", "D", "E"];
     let mut asm = Assembly::default();
     let mut kinds = Vec::new();
     let mut spec_inst = Vec::new();
@@ -524,19 +525,24 @@ fn fuzz_fixture(name: &str) -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/live_fuzz").join(name)
 }
 
-/// Batch 1 (seeds 1–20) with ours' answers; written when LIVE_FUZZ_WRITE is
-/// set, else checked unchanged (the generator is deterministic).
+/// The assembly batches: (number, seeds).
+const ASM_BATCHES: [(usize, std::ops::RangeInclusive<u64>); 2] = [(1, 1..=20), (2, 21..=50)];
+
+/// The batches with ours' answers; batch n written when LIVE_FUZZ_WRITE is
+/// asm-<n>, else checked unchanged (the generator is deterministic).
 #[test]
 #[ignore = "T2: live fuzz batch (assemblies)"]
 fn asm_fuzz_write_batch() {
     let mut parts = parts();
-    let mut cases = Vec::new();
-    for seed in 1..=20 {
-        let (asm, mut spec) = fuzz_case(&parts, seed);
-        spec["ours"] = fuzz_ours(&mut parts, &asm);
-        cases.push(spec);
+    for (n, seeds) in ASM_BATCHES {
+        let mut cases = Vec::new();
+        for seed in seeds {
+            let (asm, mut spec) = fuzz_case(&parts, seed);
+            spec["ours"] = fuzz_ours(&mut parts, &asm);
+            cases.push(spec);
+        }
+        finish_batch(n, cases);
     }
-    finish_batch(cases);
 }
 
 /// Ours for a fuzz case: mates added one at a time, each solve stored (as
@@ -566,11 +572,11 @@ fn fuzz_ours(parts: &mut Parts, asm: &Assembly) -> serde_json::Value {
     }
 }
 
-fn finish_batch(cases: Vec<serde_json::Value>) {
+fn finish_batch(n: usize, cases: Vec<serde_json::Value>) {
     use serde_json::json;
     let b = json!({"parts": "live/fs-oracle-asm CASES.md parts (BLOCK, PLATE, PIN, one Part Studio)", "method": "CASES.md method: insert in order, fix A, POST the start transform (rotate about +z, then translate), add the mates with implicit connectors (the entity through `at_mm` on that instance's part, the inference)", "cases": cases});
-    let path = fuzz_fixture("asm-1.json");
-    if std::env::var("LIVE_FUZZ_WRITE").is_ok() {
+    let path = fuzz_fixture(&format!("asm-{n}.json"));
+    if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == format!("asm-{n}")) {
         std::fs::write(&path, serde_json::to_string_pretty(&b).unwrap()).unwrap();
     }
     let stored: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
@@ -578,7 +584,7 @@ fn finish_batch(cases: Vec<serde_json::Value>) {
         assert_eq!((&x["instances"], &x["mates"]), (&y["instances"], &y["mates"]), "{}: the generator changed", x["case"]);
     }
     let errs = b["cases"].as_array().unwrap().iter().filter(|c| c["ours"]["status"].as_object().unwrap().values().any(|v| v != "OK")).count();
-    println!("asm batch 1: {} cases, {errs} with a mate in error (ours)", cases_len(&b));
+    println!("asm batch {n}: {} cases, {errs} with a mate in error (ours)", cases_len(&b));
 }
 
 fn cases_len(b: &serde_json::Value) -> usize {

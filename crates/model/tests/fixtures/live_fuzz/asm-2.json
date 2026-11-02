@@ -1,0 +1,6841 @@
+{
+  "parts": "live/fs-oracle-asm CASES.md parts (BLOCK, PLATE, PIN, one Part Studio)",
+  "method": "CASES.md method: insert in order, fix A, POST the start transform (rotate about +z, then translate), add the mates with implicit connectors (the entity through `at_mm` on that instance's part, the inference)",
+  "cases": [
+    {
+      "case": "f21",
+      "instances": [
+        {
+          "name": "A",
+          "part": "BLOCK",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 314.6,
+            "translate_mm": [
+              95.0,
+              73.0,
+              39.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 270.0,
+            "translate_mm": [
+              -85.0,
+              -42.0,
+              21.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 170.9,
+            "translate_mm": [
+              45.0,
+              -68.0,
+              17.0
+            ]
+          }
+        },
+        {
+          "name": "E",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 321.2,
+            "translate_mm": [
+              1.0,
+              -1.0,
+              28.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Fastened",
+          "first": {
+            "instance": "B",
+            "entity": "face",
+            "what": "front face",
+            "at_mm": [
+              20.0,
+              0.0,
+              5.0
+            ],
+            "inference": "CENTROID"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "top back edge",
+            "at_mm": [
+              20.0,
+              20.0,
+              10.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "flip_primary": true,
+          "name": "Fastened 1"
+        },
+        {
+          "type": "Parallel",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "bottom front edge",
+            "at_mm": [
+              20.0,
+              0.0,
+              0.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "flip_primary": false,
+          "name": "Parallel 1"
+        },
+        {
+          "type": "Cylindrical",
+          "first": {
+            "instance": "D",
+            "entity": "vertex",
+            "what": "vertex (40,20,10)",
+            "at_mm": [
+              40.0,
+              20.0,
+              10.0
+            ],
+            "inference": "POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "top back edge",
+            "at_mm": [
+              20.0,
+              20.0,
+              10.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "flip_primary": false,
+          "name": "Cylindrical 1"
+        },
+        {
+          "type": "Planar",
+          "first": {
+            "instance": "E",
+            "entity": "face",
+            "what": "hole cylinder",
+            "at_mm": [
+              135.0,
+              20.0,
+              5.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "second": {
+            "instance": "C",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "flip_primary": false,
+          "name": "Planar 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Cylindrical 1": "OK",
+          "Fastened 1": "OK",
+          "Parallel 1": "OK",
+          "Planar 1": "OK"
+        },
+        "text": {
+          "Cylindrical 1": "",
+          "Fastened 1": "",
+          "Parallel 1": "",
+          "Planar 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            -2.220446049250313e-16,
+            1.0,
+            -9.642977752420298e-17,
+            20.000000000000004,
+            1.0,
+            2.220446049250313e-16,
+            -1.2502147852206082e-17,
+            2.481589464227468e-15,
+            -1.2502147852206064e-17,
+            -9.642977752420298e-17,
+            -1.0,
+            15.000000000000002,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            0.0,
+            -2.220446049250313e-16,
+            1.0,
+            -85.00000000000004,
+            -1.0,
+            -2.220446049250313e-16,
+            0.0,
+            -42.000000000000036,
+            2.220446049250313e-16,
+            -1.0,
+            -2.220446049250313e-16,
+            20.99999999999996,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            -2.220446049250313e-16,
+            -1.3877787807814457e-17,
+            1.0000000000000002,
+            -7.659711831238499,
+            0.15815804699852198,
+            -0.9874138099953911,
+            -1.3877787807814457e-17,
+            33.42195431996687,
+            0.9874138099953909,
+            0.15815804699852198,
+            -2.220446049250313e-16,
+            -32.65971333978606,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "E": [
+            1.1102230246251565e-16,
+            1.6653345369377348e-16,
+            -1.0,
+            -64.99999999999957,
+            -0.6266037616640225,
+            0.7793380048916496,
+            5.551115123125783e-17,
+            -1.0000072602604793,
+            0.7793380048916497,
+            0.6266037616640225,
+            1.1102230246251565e-16,
+            -80.8460158691951,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 0,
+          "C": 4,
+          "D": 2,
+          "E": 4
+        }
+      }
+    },
+    {
+      "case": "f22",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PIN",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 119.1,
+            "translate_mm": [
+              1.0,
+              -84.0,
+              28.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 23.0,
+            "translate_mm": [
+              -3.0,
+              19.0,
+              33.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 255.1,
+            "translate_mm": [
+              9.0,
+              -15.0,
+              45.0
+            ]
+          }
+        },
+        {
+          "name": "E",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 160.7,
+            "translate_mm": [
+              -25.0,
+              -2.0,
+              30.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Slider",
+          "first": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "hole bottom edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Slider 1"
+        },
+        {
+          "type": "Planar",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "face",
+            "what": "top face",
+            "at_mm": [
+              110.0,
+              5.0,
+              10.0
+            ],
+            "inference": "CENTROID"
+          },
+          "flip_primary": false,
+          "name": "Planar 1"
+        },
+        {
+          "type": "Fastened",
+          "first": {
+            "instance": "D",
+            "entity": "edge",
+            "what": "hole bottom edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "C",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "flip_primary": true,
+          "name": "Fastened 1"
+        },
+        {
+          "type": "Parallel",
+          "first": {
+            "instance": "E",
+            "entity": "vertex",
+            "what": "vertex (40,20,10)",
+            "at_mm": [
+              40.0,
+              20.0,
+              10.0
+            ],
+            "inference": "POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "flip_primary": false,
+          "name": "Parallel 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Fastened 1": "OK",
+          "Parallel 1": "OK",
+          "Planar 1": "OK",
+          "Slider 1": "OK"
+        },
+        "text": {
+          "Fastened 1": "",
+          "Parallel 1": "",
+          "Planar 1": "",
+          "Slider 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            1.0,
+            4.70530555595609e-16,
+            -1.7533629208780382e-16,
+            70.00000000000001,
+            4.70530555595609e-16,
+            -1.0,
+            2.476900497022293e-16,
+            19.999999999999996,
+            -1.7533629208780372e-16,
+            -2.476900497022294e-16,
+            -1.0,
+            27.999999999999915,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            0.9205048579269837,
+            -0.3907311179479102,
+            1.7533629220588402e-16,
+            -3.0000008949087222,
+            0.3907311179479102,
+            0.9205048579269837,
+            -3.70154728358187e-16,
+            19.000002108272735,
+            -1.6766937921321965e-17,
+            4.0923857110880063e-16,
+            1.0,
+            -11.999999999999991,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            0.9205048579269837,
+            -0.3907311179479101,
+            1.7533629220491872e-16,
+            69.24996151893838,
+            0.3907311179479101,
+            0.9205048579269837,
+            -3.701547283572074e-16,
+            27.941083206086795,
+            -1.676693792081617e-17,
+            4.092385711075218e-16,
+            1.0,
+            3.0000000000000018,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "E": [
+            -0.9438009515832295,
+            -0.3305143927132231,
+            0.0,
+            -25.0,
+            0.3305143927132231,
+            -0.9438009515832295,
+            0.0,
+            -2.0,
+            0.0,
+            0.0,
+            1.0,
+            30.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 1,
+          "C": 4,
+          "D": 4,
+          "E": 4
+        }
+      }
+    },
+    {
+      "case": "f23",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PIN",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 15.1,
+            "translate_mm": [
+              70.0,
+              -35.0,
+              23.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 276.6,
+            "translate_mm": [
+              -73.0,
+              74.0,
+              56.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 21.4,
+            "translate_mm": [
+              -91.0,
+              65.0,
+              42.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Planar",
+          "first": {
+            "instance": "B",
+            "entity": "face",
+            "what": "bottom face",
+            "at_mm": [
+              20.0,
+              10.0,
+              0.0
+            ],
+            "inference": "CENTROID"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Planar 1"
+        },
+        {
+          "type": "Fastened",
+          "first": {
+            "instance": "C",
+            "entity": "face",
+            "what": "top face",
+            "at_mm": [
+              20.0,
+              10.0,
+              10.0
+            ],
+            "inference": "CENTROID"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "face",
+            "what": "right face",
+            "at_mm": [
+              40.0,
+              10.0,
+              5.0
+            ],
+            "inference": "CENTROID"
+          },
+          "flip_primary": true,
+          "name": "Fastened 1"
+        },
+        {
+          "type": "Planar",
+          "first": {
+            "instance": "D",
+            "entity": "edge",
+            "what": "bottom front edge",
+            "at_mm": [
+              20.0,
+              0.0,
+              0.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Planar 2"
+        },
+        {
+          "type": "Parallel",
+          "first": {
+            "instance": "C",
+            "entity": "vertex",
+            "what": "vertex (0,0,0)",
+            "at_mm": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "inference": "POINT"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "top back edge",
+            "at_mm": [
+              20.0,
+              20.0,
+              10.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "flip_primary": false,
+          "name": "Parallel 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Fastened 1": "OK",
+          "Parallel 1": "OK",
+          "Planar 1": "OK",
+          "Planar 2": "OK"
+        },
+        "text": {
+          "Fastened 1": "",
+          "Parallel 1": "",
+          "Planar 1": "",
+          "Planar 2": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            -0.9916201166183836,
+            -0.12918801925002177,
+            -4.394162749476964e-23,
+            107.82869005600848,
+            -0.12918801925002177,
+            0.9916201166183832,
+            1.224646601052424e-16,
+            -27.467624299543377,
+            -1.5820923293721645e-17,
+            1.2143842621192296e-16,
+            -1.0000000000000004,
+            -3.3906876010109926e-15,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            -0.12918801925002188,
+            -1.6653345369377348e-16,
+            -0.9916201166183833,
+            79.3719667499572,
+            0.9916201166183833,
+            0.0,
+            -0.12918801925002182,
+            -41.25946604322786,
+            1.6653345369377348e-16,
+            -1.0,
+            0.0,
+            4.999999999999993,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            1.1102230246251565e-16,
+            -0.3648767827983637,
+            0.9310558164657562,
+            -72.37888368272299,
+            1.1102230246251565e-16,
+            0.9310558164657561,
+            0.3648767827983637,
+            72.29753568674538,
+            -1.0,
+            5.551115123125783e-17,
+            1.1102230246251565e-16,
+            50.00000000000002,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 3,
+          "C": 3,
+          "D": 3
+        }
+      }
+    },
+    {
+      "case": "f24",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PIN",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 61.0,
+            "translate_mm": [
+              -65.0,
+              76.0,
+              49.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 296.5,
+            "translate_mm": [
+              5.0,
+              -32.0,
+              53.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 229.4,
+            "translate_mm": [
+              58.0,
+              2.0,
+              57.0
+            ]
+          }
+        },
+        {
+          "name": "E",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 15.3,
+            "translate_mm": [
+              -1.0,
+              -48.0,
+              49.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Ball",
+          "first": {
+            "instance": "B",
+            "entity": "face",
+            "what": "hole cylinder",
+            "at_mm": [
+              135.0,
+              20.0,
+              5.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": true,
+          "name": "Ball 1"
+        },
+        {
+          "type": "Fastened",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "hole top edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              10.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "face",
+            "what": "bottom face",
+            "at_mm": [
+              110.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTROID"
+          },
+          "flip_primary": true,
+          "name": "Fastened 1"
+        },
+        {
+          "type": "Planar",
+          "first": {
+            "instance": "D",
+            "entity": "edge",
+            "what": "hole bottom edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Planar 1"
+        },
+        {
+          "type": "Planar",
+          "first": {
+            "instance": "E",
+            "entity": "edge",
+            "what": "bottom front edge",
+            "at_mm": [
+              20.0,
+              0.0,
+              0.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Planar 2"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Ball 1": "OK",
+          "Fastened 1": "OK",
+          "Planar 1": "OK",
+          "Planar 2": "OK"
+        },
+        "text": {
+          "Ball 1": "",
+          "Fastened 1": "",
+          "Planar 1": "",
+          "Planar 2": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            0.48480950855654237,
+            -0.8746197690500468,
+            8.324509378203617e-8,
+            154.46715885241974,
+            0.8746197690500399,
+            0.48480950855651916,
+            -2.033489661802781e-7,
+            -123.39675913089366,
+            1.3749501283095027e-7,
+            1.7139331705753497e-7,
+            0.9999999999999759,
+            24.999978697780882,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            0.48480950855654237,
+            0.8746197690500468,
+            -8.324509378203615e-8,
+            119.48236892286889,
+            0.8746197690500399,
+            -0.4848095085565196,
+            2.0334896618027808e-7,
+            -104.00438082212249,
+            1.3749501283095025e-7,
+            -1.7139331705753494e-7,
+            -0.9999999999999765,
+            34.999985553513326,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            0.8919765011846083,
+            -0.4520817639923828,
+            6.884350610509346e-23,
+            -118.33053197246072,
+            -0.4520817639923828,
+            -0.8919765011846084,
+            1.2246407302774442e-16,
+            -33.11059495619591,
+            -5.536371275328498e-17,
+            -1.0923510650299751e-16,
+            -1.0,
+            -9.75115941719469e-15,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "E": [
+            1.1102230246251565e-16,
+            -0.2638730419469101,
+            -0.9645574206514012,
+            18.29114836915596,
+            -3.0531133177191805e-16,
+            0.9645574206514013,
+            -0.2638730419469101,
+            -42.7225390006926,
+            1.0,
+            3.0531133177191805e-16,
+            0.0,
+            -19.999999999999975,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 3,
+          "C": 3,
+          "D": 3,
+          "E": 3
+        }
+      }
+    },
+    {
+      "case": "f25",
+      "instances": [
+        {
+          "name": "A",
+          "part": "BLOCK",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 195.3,
+            "translate_mm": [
+              18.0,
+              -12.0,
+              5.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 120.0,
+            "translate_mm": [
+              59.0,
+              -58.0,
+              19.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Ball",
+          "first": {
+            "instance": "B",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "vertex",
+            "what": "vertex (0,0,0)",
+            "at_mm": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "inference": "POINT"
+          },
+          "flip_primary": false,
+          "name": "Ball 1"
+        },
+        {
+          "type": "Parallel",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "hole top edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              10.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Parallel 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Ball 1": "OK",
+          "Parallel 1": "OK"
+        },
+        "text": {
+          "Ball 1": "",
+          "Parallel 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            -0.9645574643474104,
+            0.2638728822211339,
+            -8.369362849719379e-8,
+            192.91149412488238,
+            -0.2638728822211339,
+            -0.964557464347414,
+            -1.1517595701845114e-8,
+            52.77457661699047,
+            -8.376649525939127e-8,
+            1.0975096069548995e-8,
+            0.9999999999999964,
+            -14.999983246699488,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            -0.49999999999999845,
+            -0.8660254037844355,
+            -8.369362852950889e-8,
+            59.00000083693605,
+            0.866025403784439,
+            -0.49999999999999933,
+            -1.1517595583720888e-8,
+            -57.99999988482408,
+            -3.187228389873667e-8,
+            -7.82396062333132e-8,
+            0.9999999999999964,
+            19.000005708189068,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 3,
+          "C": 6
+        }
+      }
+    },
+    {
+      "case": "f26",
+      "instances": [
+        {
+          "name": "A",
+          "part": "BLOCK",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 271.9,
+            "translate_mm": [
+              89.0,
+              11.0,
+              41.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 260.1,
+            "translate_mm": [
+              47.0,
+              28.0,
+              40.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 250.4,
+            "translate_mm": [
+              93.0,
+              -0.0,
+              18.0
+            ]
+          }
+        },
+        {
+          "name": "E",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 238.4,
+            "translate_mm": [
+              14.0,
+              -28.0,
+              7.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Planar",
+          "first": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "bottom front edge",
+            "at_mm": [
+              20.0,
+              0.0,
+              0.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "flip_primary": true,
+          "name": "Planar 1"
+        },
+        {
+          "type": "Fastened",
+          "first": {
+            "instance": "C",
+            "entity": "face",
+            "what": "bottom face",
+            "at_mm": [
+              20.0,
+              10.0,
+              0.0
+            ],
+            "inference": "CENTROID"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Fastened 1"
+        },
+        {
+          "type": "Fastened",
+          "first": {
+            "instance": "D",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Fastened 2"
+        },
+        {
+          "type": "Planar",
+          "first": {
+            "instance": "E",
+            "entity": "edge",
+            "what": "top back edge",
+            "at_mm": [
+              20.0,
+              20.0,
+              10.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "second": {
+            "instance": "D",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "flip_primary": false,
+          "name": "Planar 2"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Fastened 1": "OK",
+          "Fastened 2": "OK",
+          "Planar 1": "OK",
+          "Planar 2": "OK"
+        },
+        "text": {
+          "Fastened 1": "",
+          "Fastened 2": "",
+          "Planar 1": "",
+          "Planar 2": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            0.0,
+            -5.551115123125783e-17,
+            -1.0,
+            20.00000000000263,
+            -0.9994502141729418,
+            0.03315523170875134,
+            -5.551115123125783e-17,
+            10.999994398280297,
+            0.03315523170875134,
+            0.9994502141729418,
+            0.0,
+            34.36895365824967,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            0.0,
+            -3.3306690738754696e-16,
+            -1.0,
+            -9.999999999997328,
+            -0.9994502141729418,
+            0.033155231708751454,
+            -1.1102230246251565e-16,
+            -169.23259646993668,
+            0.03315523170875151,
+            0.9994502141729418,
+            -4.440892098500626e-16,
+            30.342393224095538,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            0.0,
+            1.1102230246251565e-16,
+            1.0,
+            20.000000000002654,
+            -0.9994502141729418,
+            -0.03315523170875134,
+            1.1102230246251565e-16,
+            10.999994398280366,
+            0.03315523170875129,
+            -0.9994502141729418,
+            0.0,
+            34.36895365824966,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "E": [
+            -1.0000000000000004,
+            2.6880258953912432e-14,
+            1.3701700293876037e-14,
+            54.999999999992966,
+            -2.6880257391145506e-14,
+            -0.9999999999999938,
+            1.1405641017772953e-7,
+            -35.51425843844866,
+            1.3701703359741789e-14,
+            1.1405641017772953e-7,
+            0.9999999999999934,
+            6.99999771887133,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 3,
+          "C": 3,
+          "D": 3,
+          "E": 3
+        }
+      }
+    },
+    {
+      "case": "f27",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PIN",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 178.0,
+            "translate_mm": [
+              -24.0,
+              86.0,
+              54.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 38.5,
+            "translate_mm": [
+              91.0,
+              16.0,
+              58.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 294.3,
+            "translate_mm": [
+              28.0,
+              88.0,
+              11.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Ball",
+          "first": {
+            "instance": "B",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Ball 1"
+        },
+        {
+          "type": "Cylindrical",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "top back edge",
+            "at_mm": [
+              20.0,
+              20.0,
+              10.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Cylindrical 1"
+        },
+        {
+          "type": "Cylindrical",
+          "first": {
+            "instance": "D",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "flip_primary": false,
+          "name": "Cylindrical 2"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Ball 1": "OK",
+          "Cylindrical 1": "OK",
+          "Cylindrical 2": "OK"
+        },
+        "text": {
+          "Ball 1": "",
+          "Cylindrical 1": "",
+          "Cylindrical 2": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            -0.9993908188030585,
+            -0.03489973197803593,
+            -1.2280648980872024e-7,
+            399.87816560302156,
+            0.0348997319779672,
+            -0.9993908188029315,
+            5.23255477084353e-7,
+            -6.9799542444292975,
+            -1.409931543105339e-7,
+            5.18650806107037e-7,
+            0.9999999999998556,
+            -14.99997180142801,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            0.0,
+            -0.6225146422881684,
+            0.7826081523577646,
+            204.6242113221857,
+            1.6653345369377348e-16,
+            0.7826081523577645,
+            0.6225146422881684,
+            -21.877309470036902,
+            -1.0000000000000002,
+            5.551115123125783e-17,
+            0.0,
+            88.00000000000004,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            -0.031015268215508707,
+            -0.9995189108453653,
+            1.2280648980444638e-7,
+            206.20304860834696,
+            -0.999518910845238,
+            0.031015268215440095,
+            -5.232554772067409e-7,
+            199.90380362250045,
+            5.191948684516718e-7,
+            -1.3897631790486798e-7,
+            -0.9999999999998559,
+            40.99985793917968,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 3,
+          "C": 2,
+          "D": 4
+        }
+      }
+    },
+    {
+      "case": "f28",
+      "instances": [
+        {
+          "name": "A",
+          "part": "BLOCK",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 301.8,
+            "translate_mm": [
+              -29.0,
+              -66.0,
+              2.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 328.1,
+            "translate_mm": [
+              -10.0,
+              -2.0,
+              15.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Ball",
+          "first": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "hole bottom edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "vertex",
+            "what": "vertex (0,0,0)",
+            "at_mm": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "inference": "POINT"
+          },
+          "flip_primary": false,
+          "name": "Ball 1"
+        },
+        {
+          "type": "Planar",
+          "first": {
+            "instance": "C",
+            "entity": "vertex",
+            "what": "vertex (0,0,0)",
+            "at_mm": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "inference": "POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "front face",
+            "at_mm": [
+              20.0,
+              0.0,
+              5.0
+            ],
+            "inference": "CENTROID"
+          },
+          "flip_primary": true,
+          "name": "Planar 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Ball 1": "OK",
+          "Planar 1": "OK"
+        },
+        "text": {
+          "Ball 1": "",
+          "Planar 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            0.5269554569187394,
+            0.849892902913985,
+            4.989666736980475e-8,
+            -85.50206745772104,
+            -0.8498929029139857,
+            0.5269554569187405,
+            -1.3288080666322738e-8,
+            99.94696824043572,
+            -3.7586766604234105e-8,
+            -3.540459685756172e-8,
+            0.9999999999999987,
+            5.594371916526256e-6,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            0.8489716876821298,
+            0.5284383346372179,
+            -5.551115123125783e-17,
+            -10.0,
+            5.551115123125783e-17,
+            -4.440892098500626e-16,
+            -1.0000000000000002,
+            -1.017977515447233e-15,
+            -0.5284383346372179,
+            0.84897168768213,
+            -4.440892098500626e-16,
+            15.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 3,
+          "C": 3
+        }
+      }
+    },
+    {
+      "case": "f29",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PIN",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 316.2,
+            "translate_mm": [
+              -20.0,
+              79.0,
+              58.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 231.5,
+            "translate_mm": [
+              89.0,
+              31.0,
+              18.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Ball",
+          "first": {
+            "instance": "B",
+            "entity": "vertex",
+            "what": "vertex (0,0,0)",
+            "at_mm": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "inference": "POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "flip_primary": true,
+          "name": "Ball 1"
+        },
+        {
+          "type": "Slider",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "hole bottom edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "face",
+            "what": "front face",
+            "at_mm": [
+              20.0,
+              0.0,
+              5.0
+            ],
+            "inference": "CENTROID"
+          },
+          "flip_primary": false,
+          "name": "Slider 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Ball 1": "OK",
+          "Slider 1": "OK"
+        },
+        "text": {
+          "Ball 1": "",
+          "Slider 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            0.7217602268148529,
+            0.6921431752088381,
+            1.8543981579774634e-9,
+            200.0,
+            -0.6921431752088381,
+            0.7217602268148529,
+            1.854398211549977e-9,
+            -6.422640865778918e-15,
+            -5.492176886306783e-11,
+            -2.6219399029373106e-9,
+            1.0,
+            15.000000000000032,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            0.721760226814853,
+            1.8543981350482852e-9,
+            -0.692143175208838,
+            -4.014081732640244,
+            -0.6921431752088378,
+            1.8543979685148315e-9,
+            -0.7217602268148531,
+            -53.81726099185947,
+            -5.4921844849786794e-11,
+            1.0,
+            2.6219396653814897e-9,
+            4.78121623739702e-7,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 3,
+          "C": 4
+        }
+      }
+    },
+    {
+      "case": "f30",
+      "instances": [
+        {
+          "name": "A",
+          "part": "BLOCK",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 106.6,
+            "translate_mm": [
+              -75.0,
+              91.0,
+              45.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 30.5,
+            "translate_mm": [
+              -87.0,
+              4.0,
+              19.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Fastened",
+          "first": {
+            "instance": "B",
+            "entity": "face",
+            "what": "bottom face",
+            "at_mm": [
+              20.0,
+              10.0,
+              0.0
+            ],
+            "inference": "CENTROID"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "top face",
+            "at_mm": [
+              20.0,
+              10.0,
+              10.0
+            ],
+            "inference": "CENTROID"
+          },
+          "flip_primary": false,
+          "name": "Fastened 1"
+        },
+        {
+          "type": "Planar",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "top back edge",
+            "at_mm": [
+              20.0,
+              20.0,
+              10.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "face",
+            "what": "bottom face",
+            "at_mm": [
+              20.0,
+              10.0,
+              0.0
+            ],
+            "inference": "CENTROID"
+          },
+          "flip_primary": false,
+          "name": "Planar 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Fastened 1": "OK",
+          "Planar 1": "OK"
+        },
+        "text": {
+          "Fastened 1": "",
+          "Planar 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            1.0,
+            -5.774461826217809e-28,
+            -4.763386350369827e-27,
+            -1.5925581154522006e-15,
+            5.774461826217804e-28,
+            1.0,
+            -1.2246467991737665e-16,
+            3.1841560455694037e-16,
+            4.763386350369827e-27,
+            1.2246467991737665e-16,
+            1.0,
+            10.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            -2.220446049250313e-16,
+            -0.5075383627582712,
+            0.8616291605607682,
+            -78.38370840082582,
+            0.0,
+            0.8616291605607679,
+            0.5075383627582712,
+            9.07538362924653,
+            -1.0000000000000002,
+            0.0,
+            -2.220446049250313e-16,
+            30.000000000000007,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 0,
+          "C": 3
+        }
+      }
+    },
+    {
+      "case": "f31",
+      "instances": [
+        {
+          "name": "A",
+          "part": "BLOCK",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 237.5,
+            "translate_mm": [
+              -7.0,
+              78.0,
+              15.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 59.1,
+            "translate_mm": [
+              -7.0,
+              2.0,
+              59.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 350.0,
+            "translate_mm": [
+              62.0,
+              -8.0,
+              39.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Fastened",
+          "first": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "vertex",
+            "what": "vertex (40,20,10)",
+            "at_mm": [
+              40.0,
+              20.0,
+              10.0
+            ],
+            "inference": "POINT"
+          },
+          "flip_primary": false,
+          "name": "Fastened 1"
+        },
+        {
+          "type": "Fastened",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "hole top edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              10.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "vertex",
+            "what": "vertex (0,0,0)",
+            "at_mm": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "inference": "POINT"
+          },
+          "flip_primary": true,
+          "name": "Fastened 2"
+        },
+        {
+          "type": "Ball",
+          "first": {
+            "instance": "D",
+            "entity": "vertex",
+            "what": "vertex (40,20,10)",
+            "at_mm": [
+              40.0,
+              20.0,
+              10.0
+            ],
+            "inference": "POINT"
+          },
+          "second": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "hole bottom edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Ball 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Ball 1": "OK",
+          "Fastened 1": "OK",
+          "Fastened 2": "OK"
+        },
+        "text": {
+          "Ball 1": "",
+          "Fastened 1": "",
+          "Fastened 2": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            1.0,
+            1.9721522630525295e-30,
+            -5.990660670675609e-31,
+            -160.0,
+            1.9721522630525295e-30,
+            -1.0,
+            1.2246467991473382e-16,
+            19.999999999999996,
+            -5.990660670675607e-31,
+            -1.2246467991473382e-16,
+            -1.0,
+            40.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            1.0,
+            -5.679798517591285e-29,
+            -2.0283414120847804e-28,
+            -130.0,
+            5.679798517591285e-29,
+            1.0,
+            -7.494178599595066e-30,
+            -20.0,
+            2.0283414120847804e-28,
+            7.494178599595066e-30,
+            1.0,
+            -10.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            0.9848077505725286,
+            0.17364819150303945,
+            1.4512289657193892e-8,
+            -42.86527399808479,
+            -0.17364819150303923,
+            0.9848077505725286,
+            -1.5469507386422622e-8,
+            -12.750227196633753,
+            -1.6978067314053287e-8,
+            1.2714457918147996e-8,
+            0.9999999999999998,
+            -19.999999575166395,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 0,
+          "C": 0,
+          "D": 3
+        }
+      }
+    },
+    {
+      "case": "f32",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PLATE",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 212.1,
+            "translate_mm": [
+              95.0,
+              87.0,
+              52.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 308.0,
+            "translate_mm": [
+              -74.0,
+              47.0,
+              51.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Ball",
+          "first": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "hole top edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              10.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Ball 1"
+        },
+        {
+          "type": "Parallel",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "bottom face",
+            "at_mm": [
+              110.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTROID"
+          },
+          "flip_primary": false,
+          "name": "Parallel 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Ball 1": "OK",
+          "Parallel 1": "OK"
+        },
+        "text": {
+          "Ball 1": "",
+          "Parallel 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            -0.8471219056527821,
+            0.5313986045928017,
+            1.5170153127352844e-7,
+            299.4243765795049,
+            -0.5313986045928093,
+            -0.847121905652791,
+            -1.1058184990222111e-8,
+            126.27972125030801,
+            1.2263338618974473e-7,
+            -8.998161277532336e-8,
+            0.9999999999999885,
+            -20.000024526683703,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            0.6156614753256585,
+            0.7880107536067218,
+            0.0,
+            -74.0,
+            -0.7880107536067218,
+            0.6156614753256585,
+            0.0,
+            47.0,
+            0.0,
+            0.0,
+            1.0,
+            51.00000000000001,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 3,
+          "C": 4
+        }
+      }
+    },
+    {
+      "case": "f33",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PIN",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 13.8,
+            "translate_mm": [
+              19.0,
+              97.0,
+              2.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 90.5,
+            "translate_mm": [
+              33.0,
+              68.0,
+              57.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 83.5,
+            "translate_mm": [
+              5.0,
+              27.0,
+              38.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Cylindrical",
+          "first": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Cylindrical 1"
+        },
+        {
+          "type": "Planar",
+          "first": {
+            "instance": "C",
+            "entity": "face",
+            "what": "right face",
+            "at_mm": [
+              40.0,
+              10.0,
+              5.0
+            ],
+            "inference": "CENTROID"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": true,
+          "name": "Planar 1"
+        },
+        {
+          "type": "Slider",
+          "first": {
+            "instance": "D",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "second": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "bottom front edge",
+            "at_mm": [
+              20.0,
+              0.0,
+              0.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "flip_primary": false,
+          "name": "Slider 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Cylindrical 1": "OK",
+          "Planar 1": "OK",
+          "Slider 1": "OK"
+        },
+        "text": {
+          "Cylindrical 1": "",
+          "Planar 1": "",
+          "Slider 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            0.9711342702158214,
+            -0.23853349704472085,
+            -1.3945025832831882e-23,
+            5.7731459568359345,
+            0.23853349704472085,
+            0.9711342702158214,
+            -1.2246468040836856e-16,
+            -47.706699408943514,
+            2.921194202476475e-17,
+            1.1892964470923904e-16,
+            1.0,
+            2.0000000000000893,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            -2.220446049250313e-16,
+            -0.9999619230757664,
+            0.008726534169741507,
+            32.60730590933228,
+            2.7755575615628914e-16,
+            -0.008726534169741784,
+            -0.9999619230757664,
+            112.99828652465929,
+            1.0000000000000002,
+            5.551115123125783e-17,
+            0.0,
+            -7.999999999999901,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            -0.9999619230757659,
+            0.008726534169741479,
+            -2.0371171715445025e-18,
+            232.59969052448554,
+            -0.008726534169741479,
+            -0.9999619230757659,
+            3.444981534948518e-16,
+            114.74359335860761,
+            9.69235303497363e-19,
+            3.445028130373677e-16,
+            1.0,
+            37.9999999999989,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 2,
+          "C": 4,
+          "D": 4
+        }
+      }
+    },
+    {
+      "case": "f34",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PIN",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 224.8,
+            "translate_mm": [
+              -26.0,
+              -63.0,
+              56.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 335.5,
+            "translate_mm": [
+              -63.0,
+              12.0,
+              49.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 156.0,
+            "translate_mm": [
+              75.0,
+              -50.0,
+              20.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Cylindrical",
+          "first": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": true,
+          "name": "Cylindrical 1"
+        },
+        {
+          "type": "Planar",
+          "first": {
+            "instance": "C",
+            "entity": "face",
+            "what": "top face",
+            "at_mm": [
+              110.0,
+              5.0,
+              10.0
+            ],
+            "inference": "CENTROID"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "flip_primary": false,
+          "name": "Planar 1"
+        },
+        {
+          "type": "Cylindrical",
+          "first": {
+            "instance": "D",
+            "entity": "vertex",
+            "what": "vertex (0,0,0)",
+            "at_mm": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "inference": "POINT"
+          },
+          "second": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "hole bottom edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Cylindrical 2"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Cylindrical 1": "OK",
+          "Cylindrical 2": "OK",
+          "Planar 1": "OK"
+        },
+        "text": {
+          "Cylindrical 1": "",
+          "Cylindrical 2": "",
+          "Planar 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            -0.7095709168726423,
+            0.704634028364028,
+            1.2220612294801718e-24,
+            341.9141833745391,
+            -0.704634028364028,
+            -0.7095709168726423,
+            -6.372942090118691e-23,
+            140.92680567282534,
+            -4.403877946783326e-23,
+            -4.6081649547653834e-23,
+            1.0,
+            55.999999999999545,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            0.9099612713290415,
+            0.4146932416633224,
+            3.4820905839158555e-27,
+            -63.00000003896647,
+            -0.4146932416633224,
+            0.9099612713290415,
+            -1.2246467983691685e-16,
+            11.99999986187083,
+            -5.078527507400052e-17,
+            1.114381157558609e-16,
+            1.0,
+            5.000000000000001,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            -0.9135454567905796,
+            -0.40673664498947115,
+            -5.078527713250544e-17,
+            63.588830067075456,
+            0.40673664498947115,
+            -0.9135454567905796,
+            -2.3390279662484033e-16,
+            -23.710896127780266,
+            4.8742179556591306e-17,
+            -2.3433707042296963e-16,
+            1.0,
+            20.000000000000004,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 2,
+          "C": 3,
+          "D": 4
+        }
+      }
+    },
+    {
+      "case": "f35",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PIN",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 51.2,
+            "translate_mm": [
+              -86.0,
+              -11.0,
+              31.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 83.9,
+            "translate_mm": [
+              -44.0,
+              87.0,
+              39.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 234.4,
+            "translate_mm": [
+              47.0,
+              -49.0,
+              23.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Fastened",
+          "first": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "flip_primary": false,
+          "name": "Fastened 1"
+        },
+        {
+          "type": "Slider",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": true,
+          "name": "Slider 1"
+        },
+        {
+          "type": "Cylindrical",
+          "first": {
+            "instance": "D",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "flip_primary": false,
+          "name": "Cylindrical 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Cylindrical 1": "OK",
+          "Fastened 1": "OK",
+          "Slider 1": "OK"
+        },
+        "text": {
+          "Cylindrical 1": "",
+          "Fastened 1": "",
+          "Slider 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            1.0,
+            1.4051584874249273e-29,
+            -8.309055072246486e-30,
+            -8.599035239574254e-15,
+            1.4051584874249273e-29,
+            -1.0,
+            1.224646799147423e-16,
+            7.888609052210118e-28,
+            -8.309055072246483e-30,
+            -1.224646799147423e-16,
+            -1.0,
+            15.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            1.0,
+            -1.829085430624613e-21,
+            8.08147645132901e-29,
+            1.1500536905825027e-14,
+            1.829085430624613e-21,
+            1.0,
+            -1.2251050190015825e-16,
+            -2.877021155904773e-15,
+            -8.081476428920793e-29,
+            1.2251050190015825e-16,
+            1.0,
+            39.00000000000559,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            -0.5821232161033398,
+            0.8131005849668936,
+            -3.3336618649505316e-23,
+            316.4246432207192,
+            -0.8131005849668936,
+            -0.5821232161033398,
+            -1.2246467418916248e-16,
+            162.62011699342497,
+            -9.957611762700771e-17,
+            -7.12895028920188e-17,
+            1.0,
+            22.99999999999969,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 0,
+          "C": 1,
+          "D": 2
+        }
+      }
+    },
+    {
+      "case": "f36",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PLATE",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 118.7,
+            "translate_mm": [
+              49.0,
+              -65.0,
+              40.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 8.5,
+            "translate_mm": [
+              17.0,
+              42.0,
+              37.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Parallel",
+          "first": {
+            "instance": "B",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "bottom face",
+            "at_mm": [
+              110.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTROID"
+          },
+          "flip_primary": false,
+          "name": "Parallel 1"
+        },
+        {
+          "type": "Fastened",
+          "first": {
+            "instance": "C",
+            "entity": "vertex",
+            "what": "vertex (0,0,0)",
+            "at_mm": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "inference": "POINT"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Fastened 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Fastened 1": "OK",
+          "Parallel 1": "OK"
+        },
+        "text": {
+          "Fastened 1": "",
+          "Parallel 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            0.10760593316366551,
+            0.9941936245762076,
+            -1.201068257676475e-16,
+            -68.5658861213709,
+            0.9941936245762076,
+            -0.10760593316366607,
+            -2.3915439168841424e-17,
+            -88.40949217412367,
+            -3.670078421665578e-17,
+            -1.1683599729749842e-16,
+            -1.0000000000000004,
+            70.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            0.10760593316366551,
+            0.9941936245762076,
+            5.059024912429291e-17,
+            -47.04469948863775,
+            0.9941936245762076,
+            -0.10760593316366607,
+            -2.915665341383804e-16,
+            110.42923274111786,
+            -2.84429778414157e-16,
+            8.16707921303503e-17,
+            -1.0000000000000004,
+            69.99999999999999,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 4,
+          "C": 4
+        }
+      }
+    },
+    {
+      "case": "f37",
+      "instances": [
+        {
+          "name": "A",
+          "part": "BLOCK",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 273.3,
+            "translate_mm": [
+              96.0,
+              16.0,
+              6.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 259.2,
+            "translate_mm": [
+              98.0,
+              67.0,
+              19.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Cylindrical",
+          "first": {
+            "instance": "B",
+            "entity": "face",
+            "what": "bottom face",
+            "at_mm": [
+              20.0,
+              10.0,
+              0.0
+            ],
+            "inference": "CENTROID"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "bottom front edge",
+            "at_mm": [
+              20.0,
+              0.0,
+              0.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "flip_primary": false,
+          "name": "Cylindrical 1"
+        },
+        {
+          "type": "Revolute",
+          "first": {
+            "instance": "C",
+            "entity": "vertex",
+            "what": "vertex (40,20,10)",
+            "at_mm": [
+              40.0,
+              20.0,
+              10.0
+            ],
+            "inference": "POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "right face",
+            "at_mm": [
+              40.0,
+              10.0,
+              5.0
+            ],
+            "inference": "CENTROID"
+          },
+          "flip_primary": true,
+          "name": "Revolute 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Cylindrical 1": "OK",
+          "Revolute 1": "OK"
+        },
+        "text": {
+          "Cylindrical 1": "",
+          "Revolute 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            0.0,
+            0.0,
+            1.0,
+            107.13469834834306,
+            -0.998341816653927,
+            0.057564026267601154,
+            0.0,
+            19.391196070402522,
+            -0.057564026267601265,
+            -0.998341816653927,
+            0.0,
+            11.134698691891304,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            -2.220446049250313e-16,
+            0.0,
+            1.0000000000000002,
+            29.999999999999947,
+            -0.982287241406232,
+            -0.18738136345574885,
+            0.0,
+            53.03911692536426,
+            0.18738136345574863,
+            -0.982287241406232,
+            -2.220446049250313e-16,
+            17.150490289894577,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 2,
+          "C": 1
+        }
+      }
+    },
+    {
+      "case": "f38",
+      "instances": [
+        {
+          "name": "A",
+          "part": "BLOCK",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 83.3,
+            "translate_mm": [
+              -1.0,
+              -43.0,
+              22.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 341.0,
+            "translate_mm": [
+              10.0,
+              -82.0,
+              55.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 340.8,
+            "translate_mm": [
+              80.0,
+              2.0,
+              30.0
+            ]
+          }
+        },
+        {
+          "name": "E",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 216.6,
+            "translate_mm": [
+              -91.0,
+              37.0,
+              45.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Ball",
+          "first": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "hole bottom edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "vertex",
+            "what": "vertex (40,20,10)",
+            "at_mm": [
+              40.0,
+              20.0,
+              10.0
+            ],
+            "inference": "POINT"
+          },
+          "flip_primary": true,
+          "name": "Ball 1"
+        },
+        {
+          "type": "Slider",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "top back edge",
+            "at_mm": [
+              20.0,
+              20.0,
+              10.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "hole top edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              10.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Slider 1"
+        },
+        {
+          "type": "Revolute",
+          "first": {
+            "instance": "D",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "C",
+            "entity": "face",
+            "what": "top face",
+            "at_mm": [
+              20.0,
+              10.0,
+              10.0
+            ],
+            "inference": "CENTROID"
+          },
+          "flip_primary": true,
+          "name": "Revolute 1"
+        },
+        {
+          "type": "Ball",
+          "first": {
+            "instance": "E",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "second": {
+            "instance": "C",
+            "entity": "vertex",
+            "what": "vertex (0,0,0)",
+            "at_mm": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "inference": "POINT"
+          },
+          "flip_primary": true,
+          "name": "Ball 2"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Ball 1": "OK",
+          "Ball 2": "OK",
+          "Revolute 1": "OK",
+          "Slider 1": "OK"
+        },
+        "text": {
+          "Ball 1": "",
+          "Ball 2": "",
+          "Revolute 1": "",
+          "Slider 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            0.11667083068474715,
+            -0.9931706385447218,
+            2.5215341414589928e-8,
+            44.69620478187398,
+            0.9931706385447215,
+            0.11667083068474604,
+            -3.91363908945905e-8,
+            -111.44559962450852,
+            3.592721950627659e-8,
+            2.9609211969526284e-8,
+            0.9999999999999989,
+            9.999994737276507,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            2.5215341148410175e-8,
+            0.11667083068474714,
+            -0.9931706385447221,
+            47.59829128067863,
+            -3.91363909058029e-8,
+            0.9931706385447214,
+            0.1166708306847461,
+            -1.0301234197618552,
+            0.9999999999999991,
+            3.592721951189981e-8,
+            2.9609211749104247e-8,
+            69.84239361810229,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            -0.02525221339948369,
+            0.11390526085785788,
+            0.9931706385447219,
+            43.88373638628327,
+            -0.21496142482301653,
+            0.9696285387226337,
+            -0.11667083068474665,
+            53.06057545440829,
+            -0.9762960163579926,
+            -0.21643957226790472,
+            -2.9609210860925828e-8,
+            285.10159754506566,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "E": [
+            -0.8028174294686783,
+            0.5962249365309235,
+            5.566451560643379e-10,
+            208.1617771660654,
+            -0.5962249365309235,
+            -0.8028174294686783,
+            1.3559323514348893e-10,
+            118.21486388438879,
+            5.277285013352122e-10,
+            -2.23029110353468e-10,
+            1.0,
+            54.84239351255682,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 3,
+          "C": 4,
+          "D": 5,
+          "E": 6
+        }
+      }
+    },
+    {
+      "case": "f39",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PLATE",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 177.6,
+            "translate_mm": [
+              -7.0,
+              39.0,
+              35.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 211.1,
+            "translate_mm": [
+              81.0,
+              -55.0,
+              28.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 6.5,
+            "translate_mm": [
+              -51.0,
+              -58.0,
+              11.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Fastened",
+          "first": {
+            "instance": "B",
+            "entity": "face",
+            "what": "top face",
+            "at_mm": [
+              110.0,
+              5.0,
+              10.0
+            ],
+            "inference": "CENTROID"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "hole top edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              10.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Fastened 1"
+        },
+        {
+          "type": "Ball",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "face",
+            "what": "hole cylinder",
+            "at_mm": [
+              135.0,
+              20.0,
+              5.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "flip_primary": true,
+          "name": "Ball 1"
+        },
+        {
+          "type": "Fastened",
+          "first": {
+            "instance": "D",
+            "entity": "face",
+            "what": "bottom face",
+            "at_mm": [
+              110.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTROID"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "hole cylinder",
+            "at_mm": [
+              135.0,
+              20.0,
+              5.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "flip_primary": false,
+          "name": "Fastened 2"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Ball 1": "OK",
+          "Fastened 1": "OK",
+          "Fastened 2": "OK"
+        },
+        "text": {
+          "Ball 1": "",
+          "Fastened 1": "",
+          "Fastened 2": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            1.0,
+            -3.559734834809816e-29,
+            2.708543729370078e-29,
+            1.0782132457197348e-14,
+            -3.559734834809816e-29,
+            -1.0,
+            1.2246467991453714e-16,
+            40.0,
+            2.708543729370078e-29,
+            -1.2246467991453714e-16,
+            -1.0,
+            20.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            -0.8562671986944319,
+            0.5165331397306292,
+            9.765713985433666e-8,
+            301.2534368091628,
+            -0.5165331397306094,
+            -0.8562671986944317,
+            1.731497526143282e-7,
+            123.30662275163476,
+            1.7305819093704382e-7,
+            9.78193045596329e-8,
+            0.9999999999999802,
+            -15.00003461164032,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            1.0,
+            1.1107161545511846e-27,
+            -8.073288783929592e-28,
+            -1.3875118511034231e-14,
+            1.1107161545511846e-27,
+            -1.0,
+            1.2246467991450796e-16,
+            40.0,
+            -8.07328878392959e-28,
+            -1.2246467991450796e-16,
+            -1.0,
+            5.000000000000003,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 0,
+          "C": 3,
+          "D": 0
+        }
+      }
+    },
+    {
+      "case": "f40",
+      "instances": [
+        {
+          "name": "A",
+          "part": "BLOCK",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 67.4,
+            "translate_mm": [
+              -22.0,
+              -46.0,
+              35.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 56.8,
+            "translate_mm": [
+              79.0,
+              87.0,
+              16.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 227.9,
+            "translate_mm": [
+              87.0,
+              -46.0,
+              39.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Slider",
+          "first": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "bottom front edge",
+            "at_mm": [
+              20.0,
+              0.0,
+              0.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "top back edge",
+            "at_mm": [
+              20.0,
+              20.0,
+              10.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "flip_primary": false,
+          "name": "Slider 1"
+        },
+        {
+          "type": "Cylindrical",
+          "first": {
+            "instance": "C",
+            "entity": "vertex",
+            "what": "vertex (0,0,0)",
+            "at_mm": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "inference": "POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "right face",
+            "at_mm": [
+              40.0,
+              10.0,
+              5.0
+            ],
+            "inference": "CENTROID"
+          },
+          "flip_primary": false,
+          "name": "Cylindrical 1"
+        },
+        {
+          "type": "Cylindrical",
+          "first": {
+            "instance": "D",
+            "entity": "vertex",
+            "what": "vertex (0,0,0)",
+            "at_mm": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "inference": "POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "front face",
+            "at_mm": [
+              20.0,
+              0.0,
+              5.0
+            ],
+            "inference": "CENTROID"
+          },
+          "flip_primary": false,
+          "name": "Cylindrical 2"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Cylindrical 1": "OK",
+          "Cylindrical 2": "OK",
+          "Slider 1": "OK"
+        },
+        "text": {
+          "Cylindrical 1": "",
+          "Cylindrical 2": "",
+          "Slider 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            1.0,
+            3.2403923468422974e-17,
+            8.07339402395186e-17,
+            -34.31409354680393,
+            -3.2403923468422986e-17,
+            1.0,
+            1.47658920899325e-16,
+            20.000000000000014,
+            -8.07339402395186e-17,
+            -1.47658920899325e-16,
+            1.0,
+            10.000000000000007,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            -7.771561172376096e-15,
+            -2.4980018054066022e-15,
+            -1.0000000000000004,
+            78.99999807174119,
+            0.8367643758096048,
+            0.5475631282107685,
+            -7.716050021144838e-15,
+            10.00000000000327,
+            0.5475631282107688,
+            -0.8367643758096048,
+            -2.220446049250313e-15,
+            4.999999999999214,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            -0.670426573513397,
+            0.7419758820386861,
+            0.0,
+            20.000000000000018,
+            0.0,
+            -2.220446049250313e-16,
+            1.0000000000000002,
+            -45.99999999999999,
+            0.7419758820386861,
+            0.6704265735133969,
+            -2.220446049250313e-16,
+            5.000000000000023,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 1,
+          "C": 2,
+          "D": 2
+        }
+      }
+    },
+    {
+      "case": "f41",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PIN",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 21.3,
+            "translate_mm": [
+              87.0,
+              -13.0,
+              57.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 359.2,
+            "translate_mm": [
+              -53.0,
+              83.0,
+              5.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 114.1,
+            "translate_mm": [
+              -9.0,
+              87.0,
+              48.0
+            ]
+          }
+        },
+        {
+          "name": "E",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 138.8,
+            "translate_mm": [
+              8.0,
+              86.0,
+              37.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Fastened",
+          "first": {
+            "instance": "B",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Fastened 1"
+        },
+        {
+          "type": "Fastened",
+          "first": {
+            "instance": "C",
+            "entity": "face",
+            "what": "hole cylinder",
+            "at_mm": [
+              135.0,
+              20.0,
+              5.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": true,
+          "name": "Fastened 2"
+        },
+        {
+          "type": "Revolute",
+          "first": {
+            "instance": "D",
+            "entity": "vertex",
+            "what": "vertex (0,0,0)",
+            "at_mm": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "inference": "POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Revolute 1"
+        },
+        {
+          "type": "Slider",
+          "first": {
+            "instance": "E",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "hole top edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              10.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Slider 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Fastened 1": "OK",
+          "Fastened 2": "OK",
+          "Revolute 1": "OK",
+          "Slider 1": "OK"
+        },
+        "text": {
+          "Fastened 1": "",
+          "Fastened 2": "",
+          "Revolute 1": "",
+          "Slider 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            1.0,
+            1.3732490638087374e-26,
+            5.8699681533556026e-27,
+            -1.296045075789654e-14,
+            1.3732490638087374e-26,
+            -1.0,
+            1.2246467991284188e-16,
+            -1.83697019872103e-15,
+            5.869968153355604e-27,
+            -1.2246467991284188e-16,
+            -1.0,
+            15.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            1.0,
+            -2.6969529381342057e-43,
+            -4.404458396184864e-27,
+            70.00000000000001,
+            -2.6969529381342057e-43,
+            1.0,
+            -1.2246467990117936e-16,
+            -19.999999999999996,
+            4.404458396184864e-27,
+            1.2246467990117936e-16,
+            1.0,
+            -20.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            -0.4083304603813849,
+            -0.9128341772330427,
+            1.0569947269056337e-26,
+            199.99999999999997,
+            0.9128341772330427,
+            -0.4083304603813849,
+            -1.2246467991473537e-16,
+            -8.986748484470965e-15,
+            1.1178994533439143e-16,
+            -5.000605912039423e-17,
+            1.0,
+            -5.692469273318401e-24,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "E": [
+            1.0,
+            1.164376191147825e-20,
+            -5.371670999147596e-27,
+            -5.9460708276704415e-15,
+            -1.164376191147825e-20,
+            1.0,
+            -2.449401997553943e-16,
+            -8.310587797886326e-15,
+            5.37167099629557e-27,
+            2.449401997553943e-16,
+            1.0,
+            37.000000000021785,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 0,
+          "C": 0,
+          "D": 1,
+          "E": 1
+        }
+      }
+    },
+    {
+      "case": "f42",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PLATE",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 185.9,
+            "translate_mm": [
+              -8.0,
+              90.0,
+              43.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 123.0,
+            "translate_mm": [
+              79.0,
+              -67.0,
+              26.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Ball",
+          "first": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "hole cylinder",
+            "at_mm": [
+              135.0,
+              20.0,
+              5.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "flip_primary": true,
+          "name": "Ball 1"
+        },
+        {
+          "type": "Cylindrical",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "hole bottom edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Cylindrical 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Ball 1": "OK",
+          "Cylindrical 1": "OK"
+        },
+        "text": {
+          "Ball 1": "",
+          "Cylindrical 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            -0.9947028169756458,
+            0.10279253815675657,
+            -8.124724414713384e-8,
+            328.9405633951306,
+            -0.10279253815675751,
+            -0.9947028169756491,
+            7.58295874120023e-9,
+            40.55850763135121,
+            -8.003739104891641e-8,
+            1.5894400865007617e-8,
+            0.9999999999999967,
+            5.000016007478232,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            0.18184640958528753,
+            0.9833269463006392,
+            4.141132051927299e-24,
+            93.63071808294,
+            0.9833269463006392,
+            -0.18184640958528808,
+            1.2246467805781333e-16,
+            -176.66538926013286,
+            1.2042281865733044e-16,
+            -2.2269757933744793e-17,
+            -1.0000000000000004,
+            25.999999999999908,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 3,
+          "C": 2
+        }
+      }
+    },
+    {
+      "case": "f43",
+      "instances": [
+        {
+          "name": "A",
+          "part": "BLOCK",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 116.7,
+            "translate_mm": [
+              47.0,
+              57.0,
+              37.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 312.6,
+            "translate_mm": [
+              8.0,
+              -11.0,
+              29.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Revolute",
+          "first": {
+            "instance": "B",
+            "entity": "face",
+            "what": "front face",
+            "at_mm": [
+              20.0,
+              0.0,
+              5.0
+            ],
+            "inference": "CENTROID"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "bottom front edge",
+            "at_mm": [
+              20.0,
+              0.0,
+              0.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "flip_primary": false,
+          "name": "Revolute 1"
+        },
+        {
+          "type": "Parallel",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "vertex",
+            "what": "vertex (40,20,10)",
+            "at_mm": [
+              40.0,
+              20.0,
+              10.0
+            ],
+            "inference": "POINT"
+          },
+          "flip_primary": true,
+          "name": "Parallel 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Parallel 1": "OK",
+          "Revolute 1": "OK"
+        },
+        "text": {
+          "Parallel 1": "",
+          "Revolute 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            0.0,
+            1.0,
+            -7.38184945280162e-17,
+            20.0,
+            0.9999999999999996,
+            0.0,
+            3.022728660999217e-8,
+            -20.00000015113622,
+            3.022728660999217e-8,
+            -7.38184945280162e-17,
+            -0.9999999999999996,
+            4.9999993954541635,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            0.6768759696826612,
+            0.736097087119734,
+            0.0,
+            8.0,
+            -0.736097087119734,
+            0.6768759696826612,
+            0.0,
+            -11.0,
+            0.0,
+            0.0,
+            1.0,
+            29.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 1,
+          "C": 4
+        }
+      }
+    },
+    {
+      "case": "f44",
+      "instances": [
+        {
+          "name": "A",
+          "part": "BLOCK",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 64.3,
+            "translate_mm": [
+              96.0,
+              -63.0,
+              58.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 104.0,
+            "translate_mm": [
+              5.0,
+              -86.0,
+              26.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 332.4,
+            "translate_mm": [
+              0.0,
+              88.0,
+              53.0
+            ]
+          }
+        },
+        {
+          "name": "E",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 118.0,
+            "translate_mm": [
+              33.0,
+              66.0,
+              11.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Revolute",
+          "first": {
+            "instance": "B",
+            "entity": "face",
+            "what": "hole cylinder",
+            "at_mm": [
+              135.0,
+              20.0,
+              5.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "top back edge",
+            "at_mm": [
+              20.0,
+              20.0,
+              10.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "flip_primary": true,
+          "name": "Revolute 1"
+        },
+        {
+          "type": "Parallel",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "vertex",
+            "what": "vertex (40,20,10)",
+            "at_mm": [
+              40.0,
+              20.0,
+              10.0
+            ],
+            "inference": "POINT"
+          },
+          "flip_primary": false,
+          "name": "Parallel 1"
+        },
+        {
+          "type": "Fastened",
+          "first": {
+            "instance": "D",
+            "entity": "face",
+            "what": "bottom face",
+            "at_mm": [
+              110.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTROID"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "vertex",
+            "what": "vertex (40,20,10)",
+            "at_mm": [
+              40.0,
+              20.0,
+              10.0
+            ],
+            "inference": "POINT"
+          },
+          "flip_primary": false,
+          "name": "Fastened 1"
+        },
+        {
+          "type": "Revolute",
+          "first": {
+            "instance": "E",
+            "entity": "edge",
+            "what": "hole top edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              10.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "vertex",
+            "what": "vertex (0,0,0)",
+            "at_mm": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "inference": "POINT"
+          },
+          "flip_primary": false,
+          "name": "Revolute 2"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Fastened 1": "OK",
+          "Parallel 1": "OK",
+          "Revolute 1": "OK",
+          "Revolute 2": "OK"
+        },
+        "text": {
+          "Fastened 1": "",
+          "Parallel 1": "",
+          "Revolute 1": "",
+          "Revolute 2": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            0.0,
+            0.0,
+            1.0,
+            15.000000000001188,
+            0.9010770143534825,
+            0.4336590990672441,
+            0.0,
+            -105.81319384729832,
+            -0.43365909906724404,
+            0.9010770143534825,
+            0.0,
+            48.35414259167055,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            -0.2419218955996678,
+            -0.9702957262759966,
+            0.0,
+            5.0,
+            0.9702957262759966,
+            -0.2419218955996678,
+            0.0,
+            -86.0,
+            0.0,
+            0.0,
+            1.0,
+            26.000000000000004,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            1.0,
+            1.3568407569801403e-28,
+            -1.3272280318547308e-29,
+            -90.00000000000001,
+            -1.3568407569801403e-28,
+            1.0,
+            -1.224646799147166e-16,
+            -1.2708947657074784e-15,
+            1.3272280318547291e-29,
+            1.224646799147166e-16,
+            1.0,
+            9.999999999999998,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "E": [
+            0.09545179938831316,
+            0.9954340530610419,
+            -1.4570506452388838e-24,
+            -32.317414981701745,
+            0.9954340530610419,
+            -0.09545179938831305,
+            1.224646781283046e-16,
+            -127.49739091016951,
+            1.2190551076699608e-16,
+            -1.1689475339255093e-17,
+            -1.0,
+            9.999999999999984,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 1,
+          "C": 4,
+          "D": 0,
+          "E": 1
+        }
+      }
+    },
+    {
+      "case": "f45",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PIN",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 304.0,
+            "translate_mm": [
+              -11.0,
+              77.0,
+              9.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 310.5,
+            "translate_mm": [
+              -50.0,
+              27.0,
+              26.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 64.5,
+            "translate_mm": [
+              18.0,
+              -68.0,
+              30.0
+            ]
+          }
+        },
+        {
+          "name": "E",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 99.4,
+            "translate_mm": [
+              -4.0,
+              -30.0,
+              56.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Revolute",
+          "first": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "top back edge",
+            "at_mm": [
+              20.0,
+              20.0,
+              10.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": true,
+          "name": "Revolute 1"
+        },
+        {
+          "type": "Ball",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "hole bottom edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Ball 1"
+        },
+        {
+          "type": "Cylindrical",
+          "first": {
+            "instance": "D",
+            "entity": "edge",
+            "what": "bottom front edge",
+            "at_mm": [
+              20.0,
+              0.0,
+              0.0
+            ],
+            "inference": "MID_POINT"
+          },
+          "second": {
+            "instance": "C",
+            "entity": "face",
+            "what": "hole cylinder",
+            "at_mm": [
+              135.0,
+              20.0,
+              5.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "flip_primary": false,
+          "name": "Cylindrical 1"
+        },
+        {
+          "type": "Ball",
+          "first": {
+            "instance": "E",
+            "entity": "vertex",
+            "what": "vertex (40,20,10)",
+            "at_mm": [
+              40.0,
+              20.0,
+              10.0
+            ],
+            "inference": "POINT"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "vertex",
+            "what": "vertex (40,20,10)",
+            "at_mm": [
+              40.0,
+              20.0,
+              10.0
+            ],
+            "inference": "POINT"
+          },
+          "flip_primary": false,
+          "name": "Ball 2"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Ball 1": "OK",
+          "Ball 2": "OK",
+          "Cylindrical 1": "OK",
+          "Revolute 1": "OK"
+        },
+        "text": {
+          "Ball 1": "",
+          "Ball 2": "",
+          "Cylindrical 1": "",
+          "Revolute 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            -2.220446049250313e-16,
+            0.8290376521226122,
+            0.5591927855069548,
+            177.82731910247392,
+            0.0,
+            0.5591927855069545,
+            -0.8290376521226122,
+            -2.893479188913182,
+            -1.0000000000000002,
+            0.0,
+            -2.220446049250313e-16,
+            49.999999999998664,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            0.6494483157732744,
+            0.7604057371819702,
+            4.1090970974796834e-8,
+            100.3636042057616,
+            -0.7604057371819094,
+            0.6494483157732422,
+            -3.6885661966757345e-7,
+            85.86377951822645,
+            -3.071671516858398e-7,
+            2.0830750032931807e-7,
+            0.9999999999999312,
+            30.000035765584272,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            4.109095907978144e-8,
+            -0.9025852961427713,
+            -0.43051107208394074,
+            199.99999917809455,
+            -3.688566156956341e-7,
+            0.43051107208389816,
+            -0.9025852961427172,
+            7.377167026006859e-6,
+            0.9999999999999312,
+            1.9588495248079596e-7,
+            -3.1523444476988516e-7,
+            10.00002255256307,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "E": [
+            -0.16332621633951883,
+            -0.986572119541302,
+            -8.520594631539888e-9,
+            226.2644911296017,
+            0.986572119541278,
+            -0.16332621633951283,
+            -2.2168734843153267e-7,
+            -36.19635823798983,
+            2.1731892073545612e-7,
+            -4.461353693505309e-8,
+            0.9999999999999754,
+            -7.800487553537028e-6,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 1,
+          "C": 3,
+          "D": 4,
+          "E": 3
+        }
+      }
+    },
+    {
+      "case": "f46",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PLATE",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 189.9,
+            "translate_mm": [
+              91.0,
+              -16.0,
+              48.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 252.7,
+            "translate_mm": [
+              -37.0,
+              -93.0,
+              58.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 258.1,
+            "translate_mm": [
+              -83.0,
+              11.0,
+              0.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Parallel",
+          "first": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "bottom face",
+            "at_mm": [
+              110.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTROID"
+          },
+          "flip_primary": false,
+          "name": "Parallel 1"
+        },
+        {
+          "type": "Parallel",
+          "first": {
+            "instance": "C",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "bottom face",
+            "at_mm": [
+              110.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTROID"
+          },
+          "flip_primary": false,
+          "name": "Parallel 2"
+        },
+        {
+          "type": "Planar",
+          "first": {
+            "instance": "D",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "hole top edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              10.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Planar 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Parallel 1": "OK",
+          "Parallel 2": "OK",
+          "Planar 1": "OK"
+        },
+        "text": {
+          "Parallel 1": "",
+          "Parallel 2": "",
+          "Planar 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            -0.9851093261547739,
+            0.17192910027940977,
+            0.0,
+            91.0,
+            -0.17192910027940977,
+            -0.9851093261547739,
+            0.0,
+            -16.0,
+            0.0,
+            0.0,
+            1.0,
+            48.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            0.6404136812174168,
+            -0.7680301536460382,
+            -1.201068257676475e-16,
+            -224.55771105904057,
+            -0.7680301536460382,
+            -0.6404136812174173,
+            -2.3915439168841393e-17,
+            -130.34612917135192,
+            -5.85502760098403e-17,
+            1.0756143828431315e-16,
+            -1.0000000000000004,
+            88.00000000000003,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            -0.20620418539662944,
+            0.9785089851017785,
+            8.00693818799327e-28,
+            -83.00000000000065,
+            -0.9785089851017785,
+            -0.20620418539662944,
+            -1.224646799349004e-16,
+            11.000000000000007,
+            -1.1983278967374844e-16,
+            -2.5252729566618547e-17,
+            1.0,
+            -5.000000000000005,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 4,
+          "C": 4,
+          "D": 3
+        }
+      }
+    },
+    {
+      "case": "f47",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PIN",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 124.3,
+            "translate_mm": [
+              10.0,
+              -18.0,
+              31.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 160.9,
+            "translate_mm": [
+              -42.0,
+              56.0,
+              31.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "BLOCK",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 230.1,
+            "translate_mm": [
+              25.0,
+              75.0,
+              57.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Ball",
+          "first": {
+            "instance": "B",
+            "entity": "vertex",
+            "what": "vertex (40,20,10)",
+            "at_mm": [
+              40.0,
+              20.0,
+              10.0
+            ],
+            "inference": "POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": true,
+          "name": "Ball 1"
+        },
+        {
+          "type": "Ball",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "hole bottom edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "vertex",
+            "what": "vertex (40,20,10)",
+            "at_mm": [
+              40.0,
+              20.0,
+              10.0
+            ],
+            "inference": "POINT"
+          },
+          "flip_primary": false,
+          "name": "Ball 2"
+        },
+        {
+          "type": "Ball",
+          "first": {
+            "instance": "D",
+            "entity": "vertex",
+            "what": "vertex (0,0,0)",
+            "at_mm": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "inference": "POINT"
+          },
+          "second": {
+            "instance": "C",
+            "entity": "face",
+            "what": "hole cylinder",
+            "at_mm": [
+              135.0,
+              20.0,
+              5.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "flip_primary": false,
+          "name": "Ball 3"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Ball 1": "OK",
+          "Ball 2": "OK",
+          "Ball 3": "OK"
+        },
+        "text": {
+          "Ball 1": "",
+          "Ball 2": "",
+          "Ball 3": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            -0.5635264467797223,
+            -0.8260980231060219,
+            3.79748100858774e-7,
+            239.06301453573428,
+            0.8260980231059455,
+            -0.5635264467798404,
+            -3.702945884994897e-7,
+            -21.773388285725304,
+            5.198977254746235e-7,
+            1.050383616787936e-7,
+            0.9999999999998593,
+            -10.000022896681465,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            -0.9449487947670843,
+            -0.32721823798222915,
+            -2.0007150828645633e-7,
+            329.38770807925954,
+            0.32721823798223615,
+            -0.9449487947671029,
+            -2.5541439045553784e-9,
+            -23.639395042371536,
+            -1.882215681545217e-7,
+            -6.78805816162139e-8,
+            0.99999999999998,
+            0.00002582641186662256,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            -0.6414496315691585,
+            0.7671651518152995,
+            -1.3925825634212232e-8,
+            199.99999899953676,
+            -0.7671651518152995,
+            -0.6414496315691585,
+            1.757769943798035e-16,
+            -1.2793343603006707e-8,
+            -8.93271558751179e-9,
+            1.0683408249575904e-8,
+            0.9999999999999999,
+            4.999999999996274,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 3,
+          "C": 3,
+          "D": 5
+        }
+      }
+    },
+    {
+      "case": "f48",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PIN",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 36.1,
+            "translate_mm": [
+              -7.0,
+              2.0,
+              17.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 289.3,
+            "translate_mm": [
+              90.0,
+              38.0,
+              7.0
+            ]
+          }
+        },
+        {
+          "name": "D",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 354.3,
+            "translate_mm": [
+              -32.0,
+              13.0,
+              5.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Cylindrical",
+          "first": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "hole bottom edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": true,
+          "name": "Cylindrical 1"
+        },
+        {
+          "type": "Planar",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "face",
+            "what": "bottom face",
+            "at_mm": [
+              110.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTROID"
+          },
+          "flip_primary": false,
+          "name": "Planar 1"
+        },
+        {
+          "type": "Cylindrical",
+          "first": {
+            "instance": "D",
+            "entity": "edge",
+            "what": "hole top edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              10.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "hole top edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              10.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Cylindrical 2"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Cylindrical 1": "OK",
+          "Cylindrical 2": "OK",
+          "Planar 1": "OK"
+        },
+        "text": {
+          "Cylindrical 1": "",
+          "Cylindrical 2": "",
+          "Planar 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            -0.972053931427999,
+            0.23475765034471416,
+            -3.859634086771609e-23,
+            321.6718580787337,
+            0.23475765034471416,
+            0.972053931427999,
+            -4.612707861674516e-23,
+            -49.959573173366984,
+            2.6689040285865563e-23,
+            -5.389879440870421e-23,
+            -1.0,
+            17.000000000000018,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            0.33051439271322336,
+            0.9438009515832293,
+            2.874957529291946e-17,
+            90.00000000000003,
+            -0.9438009515832293,
+            0.33051439271322336,
+            1.190423652351295e-16,
+            37.99999999999999,
+            1.028501491689312e-16,
+            -6.647909157190565e-17,
+            1.0,
+            17.000000000000018,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "D": [
+            0.9950555695793388,
+            0.09931975356965794,
+            2.87495638612495e-17,
+            68.65638088328048,
+            -0.09931975356965794,
+            0.9950555695793388,
+            1.19042317492509e-16,
+            -6.9895434275255806,
+            -1.6784160005396223e-17,
+            -1.2130912063448749e-16,
+            1.0,
+            5.000000000000007,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 2,
+          "C": 4,
+          "D": 2
+        }
+      }
+    },
+    {
+      "case": "f49",
+      "instances": [
+        {
+          "name": "A",
+          "part": "BLOCK",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 304.8,
+            "translate_mm": [
+              33.0,
+              -48.0,
+              60.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 304.6,
+            "translate_mm": [
+              -59.0,
+              80.0,
+              35.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Slider",
+          "first": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "front face",
+            "at_mm": [
+              20.0,
+              0.0,
+              5.0
+            ],
+            "inference": "CENTROID"
+          },
+          "flip_primary": false,
+          "name": "Slider 1"
+        },
+        {
+          "type": "Cylindrical",
+          "first": {
+            "instance": "C",
+            "entity": "face",
+            "what": "cylinder",
+            "at_mm": [
+              205.0,
+              0.0,
+              15.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "second": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "bottom edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Cylindrical 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Cylindrical 1": "OK",
+          "Slider 1": "OK"
+        },
+        "text": {
+          "Cylindrical 1": "",
+          "Slider 1": ""
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            1.0,
+            4.5412072745964565e-21,
+            9.40784180060833e-22,
+            -180.00000000000003,
+            9.40784180060833e-22,
+            -2.220446049250313e-16,
+            -1.0000000000000002,
+            -267.22984182673963,
+            -4.5412072745964565e-21,
+            1.0000000000000002,
+            -2.220446049250313e-16,
+            4.999999999999968,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            0.5678436972478533,
+            0.8231364015130714,
+            -4.718447854656915e-15,
+            -93.56873944956598,
+            4.884981308350689e-15,
+            2.4424906541753444e-15,
+            1.0,
+            -99.6272712037617,
+            0.8231364015130715,
+            -0.5678436972478533,
+            -2.6645352591003757e-15,
+            -159.62728030260578,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 1,
+          "C": 2
+        }
+      }
+    },
+    {
+      "case": "f50",
+      "instances": [
+        {
+          "name": "A",
+          "part": "PLATE",
+          "fixed": true,
+          "start": {
+            "rotate_z_deg": 0.0,
+            "translate_mm": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        },
+        {
+          "name": "B",
+          "part": "PLATE",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 137.7,
+            "translate_mm": [
+              75.0,
+              53.0,
+              35.0
+            ]
+          }
+        },
+        {
+          "name": "C",
+          "part": "PIN",
+          "fixed": false,
+          "start": {
+            "rotate_z_deg": 101.3,
+            "translate_mm": [
+              -51.0,
+              100.0,
+              9.0
+            ]
+          }
+        }
+      ],
+      "mates": [
+        {
+          "type": "Cylindrical",
+          "first": {
+            "instance": "B",
+            "entity": "face",
+            "what": "hole cylinder",
+            "at_mm": [
+              135.0,
+              20.0,
+              5.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "face",
+            "what": "hole cylinder",
+            "at_mm": [
+              135.0,
+              20.0,
+              5.0
+            ],
+            "inference": "MID_AXIS_POINT"
+          },
+          "flip_primary": false,
+          "name": "Cylindrical 1"
+        },
+        {
+          "type": "Ball",
+          "first": {
+            "instance": "C",
+            "entity": "edge",
+            "what": "top edge",
+            "at_mm": [
+              200.0,
+              5.0,
+              30.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "hole bottom edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Ball 1"
+        },
+        {
+          "type": "Revolute",
+          "first": {
+            "instance": "B",
+            "entity": "edge",
+            "what": "hole top edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              10.0
+            ],
+            "inference": "CENTER"
+          },
+          "second": {
+            "instance": "A",
+            "entity": "edge",
+            "what": "hole bottom edge",
+            "at_mm": [
+              130.0,
+              25.0,
+              0.0
+            ],
+            "inference": "CENTER"
+          },
+          "flip_primary": false,
+          "name": "Revolute 1"
+        }
+      ],
+      "ours": {
+        "status": {
+          "Ball 1": "OK",
+          "Cylindrical 1": "ERROR",
+          "Revolute 1": "ERROR"
+        },
+        "text": {
+          "Ball 1": "",
+          "Cylindrical 1": "Mate overdefines the assembly.",
+          "Revolute 1": "Mate overdefines the assembly."
+        },
+        "transforms_mm": {
+          "A": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "B": [
+            0.4254216809255976,
+            0.9049952449590213,
+            9.50824976019018e-25,
+            56.59527658048264,
+            0.9049952449590213,
+            -0.4254216809255975,
+            1.2246466000817578e-16,
+            -89.14094822616147,
+            1.1082993538742387e-16,
+            -5.209912065416786e-17,
+            -1.0,
+            44.9999999999998,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "C": [
+            -0.19594801471905265,
+            -0.9806142847865752,
+            4.185412026895008e-7,
+            169.18959038741272,
+            0.9806142847866296,
+            -0.19594801471914192,
+            -1.8350898202772767e-7,
+            -176.1228514520489,
+            2.6196384690820236e-7,
+            3.744692614176531e-7,
+            0.9999999999998955,
+            -30.000052392698944,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "dof": {
+          "A": 0,
+          "B": 0,
+          "C": 3
+        }
+      }
+    }
+  ]
+}
