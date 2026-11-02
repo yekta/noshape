@@ -16,6 +16,31 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-02 22:35 (handover to a new account).**
+- Landed today after 21:00: Offset curve's Offset and extend + Trim (c9b6e80c), SHELL-HANG-5 pocket (487086f6) and
+  opening clip (178cc0b7, within 0.02 % of live), corpus probes (89d35c07), mixed-radius corner probes + ticket
+  BLEND-DRAFT-CORNER-FACES (c492b719).
+- **Queued (checking at 22:25): 29463975** loft connections add no vertex / edge / face (live 1810): connected lofts
+  run merge_tangent_sides and a USD edge merge; one connection matched where it is (connect_sections) instead of
+  snapped, except with a point profile (`snap_one`). Check `tools/tiers/land.sh --status`; fix forward if it fails.
+- **WIP committed locally, NOT landed (top of agent/core): Offset curve as live 1813** (curves.rs `offset_curve`):
+  with target faces, Flip off offsets a boundary edge away from the face (live: warning "The highlighted chains did
+  not produce any offset with the given parameters.", nothing created), Flip on onto it; the offset clipped to the
+  face (k::common; live (b) 2.5 .. 37.5); each extension its own edge (live: 3 edges). Not built or tested yet. Next:
+  rewrite T1 features_b::offset_curve_extends_to_the_face_boundary to live 1813's table (behaviours.md "core
+  (2026-11-02, P2 OFFSET-CURVE-EXTEND)": (a) Flip on: Offset 0..40 1 edge, extend -2.5..42.5 3 edges, Trim 3 mm
+  0.5..42.5 2 edges; Flip off: the warning; (b) leaning-in sides: 2.5..37.5 for both scopes), run features_b and
+  ops, then land. Then "Offset, extend and split" (live: no wire body, the 3 edges imprinted, the top face split
+  212.5 + 787.5 mm²; ours still refuses).
+- Open with live: REQUESTS 22:00 (corpus case 32fd: is the opening-plane rule general? ours 6572.867 with it,
+  6599.239 without; 7 of 211 corpus shells change with it, no time cost). If live says without, switch
+  `clip_behind_openings` off (NOSHAPE_SHELL_NO_OPENING_CLIP shows the other) and re-check Shell 5.
+- No detached jobs running (corpus A/B finished: /root/core-scratch/corpus-{clip,noclip}.txt).
+- Next, in order: the Offset curve WIP above; the 04:00 UTC workflow walk on /root/green/noshape (area's workflows,
+  regressions into TICKETS); SHELL-HANG-5 leftovers (holes' walls into the pocket, the 18 mm³ corner, faces 76 vs 52,
+  7 s vs live 0.3 s: the fuse falls to OCCT on bool's declines); BLEND-DRAFT-CORNER-FACES; the vase's small volume
+  differences (smooth loft 43 mm³, smooth outward Shell +2.4 mm³).
+
 **State 11-02 21:50.** SHELL-HANG-5 builds (487086f6: a removed face with nothing a wall behind it stays a face when
 another opens; past 112 slabs the cavity is grown from the openings, `by_slabs` "pocket"), and within 0.02 % of live
 (queued: a kept face meeting a removed planar face at a concave edge loses its slab a wall behind the opening and a
