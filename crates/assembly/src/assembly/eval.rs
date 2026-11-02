@@ -1011,6 +1011,12 @@ pub struct AssemblyEvaluator {
     /// subassembly reuses them (26 instances of one sub re-solved the same
     /// mates 26 times). Empty outside `evaluate`.
     subs_done: HashMap<u64, SubassemblyDone>,
+    /// A subassembly's degrees of freedom in this evaluation, by tab,
+    /// configuration, lock and the assemblies above (not the stored
+    /// positions): analysed for its first instance, the same for the others
+    /// (a1000's 69 instances of one Sub each ran the analysis after a
+    /// regeneration). Empty outside `evaluate`.
+    subs_dof: HashMap<u64, (usize, HashMap<InstanceId, usize>)>,
     /// Mate connector frames of parts (see [`ConnectorMemo`]).
     connectors: ConnectorMemo,
 }
@@ -2051,11 +2057,13 @@ impl AssemblyEvaluator {
         self.evaluating = true;
         self.studios_checked.clear();
         self.subs_done.clear();
+        self.subs_dof.clear();
         self.connectors.prune(&doc.settings.units);
         let (leaves, nodes, prepared) = self.prepare_inner(doc, assembly, &mut visited);
         self.evaluating = false;
         self.studios_checked.clear();
         self.subs_done.clear();
+        self.subs_dof.clear();
         let solved = prepared.solve(opts);
         let mut occurrences = Vec::new();
         let best: std::collections::HashSet<InstanceId> = assembly.instances.iter().filter(|i| i.best_tessellation).map(|i| i.id).collect();
@@ -2198,7 +2206,7 @@ impl AssemblyEvaluator {
         // Another instance of the same subassembly (tab, configuration,
         // lock, stored positions) in this evaluation: the same preparation
         // and solve.
-        let key = self.evaluating.then(|| {
+        let key_of = |with_positions: bool| {
             use std::hash::{Hash, Hasher};
             let mut h = std::collections::hash_map::DefaultHasher::new();
             visit.hash(&mut h);
@@ -2206,9 +2214,15 @@ impl AssemblyEvaluator {
             if let super::InstanceSource::Assembly { config, .. } = &inst.source {
                 format!("{config:?}").hash(&mut h);
             }
-            format!("{:?}{:?}", inst.lock, inst.nested).hash(&mut h);
+            format!("{:?}", inst.lock).hash(&mut h);
+            if with_positions {
+                format!("{:?}", inst.nested).hash(&mut h);
+            }
             h.finish()
-        });
+        };
+        let key = self.evaluating.then(|| key_of(true));
+        let dof_key = self.evaluating.then(|| key_of(false));
+        let known_dof = dof_key.and_then(|k| self.subs_dof.get(&k).cloned());
         let done = match key.and_then(|k| self.subs_done.get(&k).cloned()) {
             Some(done) => done,
             None => {
@@ -2219,13 +2233,25 @@ impl AssemblyEvaluator {
                 // (Lock/follow position to), else solved from the positions
                 // stored in this assembly for them.
                 let start: HashMap<InstanceId, Placement> = sub_prep.instances.iter().map(|(id, p)| (*id, inst.nested.iter().find(|(c, _)| c == id).map(|(_, q)| *q).unwrap_or(*p))).collect();
-                let solved = match &inst.lock {
+                let skip_dof = known_dof.is_some();
+                let mut solved = match &inst.lock {
                     super::SubassemblyLock::Named(n) => match sub.named_positions.iter().find(|np| &np.name == n) {
                         Some(np) => sub_prep.solve_named_position(np),
-                        None => sub_prep.solve(&SolveOptions { start: Some(start), ..Default::default() }),
+                        None => sub_prep.solve(&SolveOptions { start: Some(start), skip_dof, ..Default::default() }),
                     },
-                    _ => sub_prep.solve(&SolveOptions { start: Some(start), ..Default::default() }),
+                    _ => sub_prep.solve(&SolveOptions { start: Some(start), skip_dof, ..Default::default() }),
                 };
+                match known_dof {
+                    Some((d, per)) => {
+                        solved.dof = d;
+                        solved.instance_dof = per;
+                    }
+                    None => {
+                        if let Some(k) = dof_key {
+                            self.subs_dof.insert(k, (solved.dof, solved.instance_dof.clone()));
+                        }
+                    }
+                }
                 let done = Arc::new((sub_leaves, sub_nodes, sub_prep, solved));
                 if let Some(k) = key {
                     self.subs_done.insert(k, done.clone());

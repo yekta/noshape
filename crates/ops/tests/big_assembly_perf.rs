@@ -253,3 +253,14 @@ fn big_assembly_1000_open_profile() {
     let firsts: Vec<Duration> = (0..20).map(|_| open(&b.path).1).collect();
     println!("a1000 open, first evaluation: median {:.1} ms", ms(stats(firsts).median));
 }
+
+/// A1000 regenerated again and again (the pin's depth toggled; to profile a
+/// regeneration: `perf record` this test).
+#[test]
+#[ignore]
+fn big_assembly_1000_regenerate_profile() {
+    let mut b = build(A1000);
+    fold_solved(&mut b.ctx, &b.path);
+    let times: Vec<Duration> = (0..12).map(|i| regenerate(&mut b.ctx, &b.path, if i % 2 == 0 { "12 mm" } else { "10 mm" })).collect();
+    println!("a1000 regenerate: median {:.1} ms", ms(stats(times).median));
+}
