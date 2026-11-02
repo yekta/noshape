@@ -4640,6 +4640,9 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     for (TopoDS_Shape& x : t)
       x = scaled->scale(x);
   }
+  // (The tree below fuses the tools one by one: OCCT's fuses of the groups two at a time lost a tool's volume (Shell's
+  // 47 slabs, bf976715: 5.755e-5 m³ against 6.154e-5); the groups speed up one Boolean of them all.)
+  const std::vector<TopoDS_Shape> each = t;
   if (opts.glue != 3 && facets.source.empty())
     t = group_disjoint(t);
   b->SetArguments(to_list(a));
@@ -4685,7 +4688,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   if (op == 0 && first.glue == 0 && facets.source.empty() && t.size() >= 3 && heavy() && std::getenv("NOSHAPE_BOOL_NO_TREE") == nullptr)
   {
     // At the working scale (in metres OCCT's fuses of those parts failed).
-    std::vector<TopoDS_Shape>     all = concat(a, t);
+    std::vector<TopoDS_Shape>     all = concat(a, each);
     std::unique_ptr<ScaledInputs> sc;
     if (!scaled && working_scale() != 1.0 && std::getenv("NOSHAPE_BOOL_NO_SCALE") == nullptr)
     {

@@ -687,3 +687,18 @@ fn hyperbola_edges_and_a_face_extruded_from_one() {
 fn a_tolerant_vertex_off_its_faces_plane() {
     valid_as_occt("f2a83857d9152ede", 1e-9);
 }
+
+/// Shell's fuse of a part with 47 slabs (recorded; free-form faces among them: op_boolean's tree of fuses two at a
+/// time): OCCT's path keeps every tool's volume, the union's 6.1536e-5 m³ (the tree's leaves were group_disjoint's
+/// compounds of tools apart, and OCCT's fuses of those lost a slab's: 5.755e-5).
+#[test]
+fn occts_tree_of_fuses_keeps_every_tool() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "bf976715f0288163").expect("the recorded case");
+    k::set_rust_boolean(Some(false));
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's Boolean");
+    k::set_rust_boolean(None);
+    let v = r.shape.volume().unwrap();
+    assert!((v - c.summary.volume).abs() <= 1e-9 * c.summary.volume, "volume {v} against the union's {}", c.summary.volume);
+}

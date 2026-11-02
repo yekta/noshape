@@ -1124,6 +1124,19 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## op_boolean's tree of fuses lost a tool (user's P1, 11-02 09:00 UTC)
+- bf976715 (Shell's fuse of a part with 47 slabs) through op_boolean: 5.755e-5 m³, the union is 6.154e-5 (plain
+  OCCT, ours). The step: fuse_tree (many tools with free-form faces: a balanced tree of OCCT fuses two at a time)
+  took group_disjoint's compounds of tools as its leaves, and OCCT's fuses of those multi-solid compounds lost a
+  slab's 3.8 cm³ (the groups are right: the tools in them are millimetres apart). The tree now takes the tools one
+  by one (the groups still speed up op_boolean's one Boolean). T1 occts_tree_of_fuses_keeps_every_tool (fails
+  without it: 5.755e-5). MIRROR-HANG-402's T2 (11 overlapping free-form parts) still live's solid, 6.3 s.
+- The replay runs OCCT without the tree (NOSHAPE_BOOL_NO_TREE) for cases recorded on the direct path (the app ran
+  them as one OCCT Boolean in quick_boolean): 8e44ad9c, whose tree history says other things than one fuse's, is
+  then exactly OCCT's.
+- Live asked (REQUESTS.md, bool 08:40) for the face counts of the seams-apart cases' plate (a hole through a boss in
+  a mirrored plate): ours unified 12 / 16 where OCCT's are 10 / 14; I expect live to merge each hole's wall too.
+
 ## Shell's slab fuses: conic edges, extruded conics, tolerant vertices off planes (11-02 08:00 UTC)
 - Shell's recorded fuzz Booleans (vibe5 ~/agents/bool-corpora/shfall, 194 OCCT-built): 13 -> 25 taken, 0 differ
   (4 equivalent: the recorded result differs from OCCT's now, ours is the live one's).

@@ -186,9 +186,18 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         kernel_profile_mark(&name);
         ms = ms.min(t.elapsed().as_secs_f64() * 1e3);
         set_rust_boolean(Some(false));
+        // (A case the app ran outside op_boolean (quick_boolean: Shell's slabs, OCCT's one Boolean of them all): OCCT
+        // that way, without op_boolean's tree of fuses for many free-form tools, whose history says other things.)
+        let direct = c.path.starts_with("direct");
+        if direct {
+            unsafe { std::env::set_var("NOSHAPE_BOOL_NO_TREE", "1") };
+        }
         let t = Instant::now();
         let o = boolean(c.op, &c.objects, &c.tools, &c.opts);
         let occt_ms = t.elapsed().as_secs_f64() * 1e3;
+        if direct {
+            unsafe { std::env::remove_var("NOSHAPE_BOOL_NO_TREE") };
+        }
         set_rust_boolean(None);
         // (A corpus recorded with this Boolean on: against OCCT run here.)
         let mut d = match (&o, std::env::var_os("NOSHAPE_BREP_VS_OCCT")) {
