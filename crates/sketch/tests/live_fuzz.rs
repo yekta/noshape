@@ -409,7 +409,8 @@ fn generate(seed: u64, rich: bool) -> Case {
 /// Ours: the solve's status, each constraint's state, DOF, each curve's
 /// state (Onshape's black / blue / red), the solved points and radii (mm).
 fn ours(c: &mut Case) -> Value {
-    let rep = c.sk.solve();
+    // As a regeneration solves a sketch (live posts it whole).
+    let rep = c.sk.solve_with(&SolveOptions { constructive: true, ..Default::default() });
     let name_of = |id: ConstraintId| c.cons.iter().find(|(_, o)| *o == Some(id)).map(|(n, _)| n.clone());
     let conflicting: Vec<String> = rep.conflicting().iter().filter_map(|id| name_of(*id)).collect();
     let redundant: Vec<String> = rep.redundant.iter().filter_map(|id| name_of(*id)).collect();
@@ -547,7 +548,7 @@ fn drag_differences(seed: u64, rich: bool, case: &Value, live: &Value) -> Vec<St
     let (Some(name), Some(ld)) = (case["drag"]["point"].as_str(), live["drag"].as_object()) else { return Vec::new() };
     let Some(to) = ld.get(name) else { return Vec::new() };
     let mut c = generate(seed, rich);
-    c.sk.solve();
+    c.sk.solve_with(&SolveOptions { constructive: true, ..Default::default() });
     let target = DVec2::new(to[0].as_f64().unwrap(), to[1].as_f64().unwrap()) * MM;
     c.sk.drag(&[(DragHandle::Point(c.point(name)), target)]);
     let after = ours_points(&c);
@@ -588,7 +589,7 @@ fn live_matches() {
             if d.is_empty() {
                 exact += 1;
             } else {
-                positions.push(format!("{name}: {}", d.join("; ")));
+                positions.push(format!("{name} ({} differ{}): {}", d.len(), if l["solved"] == false { ", live unsolved" } else { "" }, d.join("; ")));
             }
         }
     }

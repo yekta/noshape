@@ -109,11 +109,17 @@ pub struct SolveOptions {
     /// to 0). Off, a solve collapsing a line is refused (CON-HV-COLLAPSE:
     /// Vertical added to a Horizontal line).
     pub allow_collapse: bool,
+    /// Geometry the constraints don't hold yet is first placed the way live
+    /// does (`Sketch::place_constructively`, fuzz probes 1–2): a
+    /// regeneration's solve and a dimension edit. Off for the tools, which
+    /// rely on the solve to pull new geometry onto its inferences (live
+    /// places it there exactly), and for that pass's own solves.
+    pub constructive: bool,
 }
 
 impl Default for SolveOptions {
     fn default() -> Self {
-        SolveOptions { tolerance: 1e-10, max_iterations: 100, analyze: true, light: Vec::new(), still: Vec::new(), allow_collapse: false }
+        SolveOptions { tolerance: 1e-10, max_iterations: 100, analyze: true, light: Vec::new(), still: Vec::new(), allow_collapse: false, constructive: false }
     }
 }
 
@@ -1086,6 +1092,32 @@ fn analyze(sk: &Sketch, sys: &mut System, out: &Outcome, conflicting: &[Constrai
 }
 
 impl Sketch {
+    /// Driving constraints that don't hold as the geometry stands (within
+    /// `tol`): the equations' residuals, and coincident points / concentric
+    /// centers apart (one unknown in the solve, so no equation shows them).
+    pub(crate) fn unheld_constraints(&self, tol: f64) -> HashSet<ConstraintId> {
+        let sys = System::build(self, &HashSet::new(), &[]);
+        let mut out = HashSet::new();
+        let mut buf: SmallVec<[f64; 16]> = SmallVec::new();
+        for (i, eq) in sys.eqs.iter().enumerate() {
+            sys.gather(eq, &mut buf);
+            if let Src::Constraint(c) = sys.src[i]
+                && eq.eval(&buf).abs().partial_cmp(&tol) != Some(std::cmp::Ordering::Less)
+            {
+                out.insert(c);
+            }
+        }
+        for c in self.constraints().filter(|c| c.driving) {
+            if let Some((a, b)) = alias_pair(self, &c.kind)
+                && let (Some(pa), Some(pb)) = (self.point(a), self.point(b))
+                && (pa - pb).length() > tol
+            {
+                out.insert(c.id);
+            }
+        }
+        out
+    }
+
     /// Options for solving after dimension `cid` got a new value: the
     /// geometry that takes the change (`SolveOptions::light`).
     ///
@@ -1095,7 +1127,7 @@ impl Sketch {
     /// length; the line at the arc's start moves with it, along with points
     /// on it (the virtual sharp).
     pub fn dimension_edit_options(&self, cid: ConstraintId) -> SolveOptions {
-        let mut opts = SolveOptions { allow_collapse: true, ..Default::default() };
+        let mut opts = SolveOptions { allow_collapse: true, constructive: true, ..Default::default() };
         let Some(c) = self.constraint(cid) else { return opts };
         let (ConstraintKind::Radius { curve, .. } | ConstraintKind::Diameter { curve, .. }) = c.kind else { return opts };
         let Some(Geometry::Arc { start, end, .. }) = self.entity(curve).map(|e| &e.geometry) else { return opts };
@@ -1129,7 +1161,26 @@ impl Sketch {
 
     pub fn solve_with(&mut self, opts: &SolveOptions) -> SolveReport {
         let snapshot = self.clone();
-        let rep = self.solve_inner(opts);
+        // Live's least change first (constructive.rs); kept only when the
+        // solve then finds every constraint held where it put things.
+        let unheld = if opts.constructive && opts.light.is_empty() && opts.still.is_empty() { self.unheld_constraints(1e-9) } else { HashSet::new() };
+        let rep = if !unheld.is_empty() {
+            let placed = self.place_constructively(&unheld);
+            let at = self.clone();
+            let rep = self.solve_inner(opts);
+            let moved = || self.entities().any(|e| at.entity(e.id).is_none_or(|a| match (&a.geometry, &e.geometry) {
+                (Geometry::Point { pos: p }, Geometry::Point { pos: q }) => (*p - *q).length() > 1e-9,
+                _ => false,
+            }));
+            if placed && rep.is_solved() && !moved() {
+                rep
+            } else {
+                *self = snapshot.clone();
+                self.solve_inner(opts)
+            }
+        } else {
+            self.solve_inner(opts)
+        };
         // Live (qa4 round 5 v3 s6, CON-HV-COLLAPSE): constraints that
         // collapse a line to a point (Vertical on a Horizontal line) don't
         // solve: the line stays, its constraints are the conflicting ones

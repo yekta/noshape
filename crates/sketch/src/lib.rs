@@ -19,6 +19,7 @@
 //! All quantities are SI (meters, radians) in `f64`.
 
 pub mod constraints;
+mod constructive;
 mod dof;
 mod dual;
 pub mod entities;

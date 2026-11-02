@@ -205,8 +205,9 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         // The DOF analysis (fully / under defined) depends on the
         // constraints, not on where a drag moved the geometry: the sketch's
         // cached one is reused while nothing else changed.
-        _ if sk.analysis_current() => sk.solve_with(&noshape_sketch::SolveOptions { analyze: false, ..Default::default() }),
-        _ => sk.solve(),
+        // New values place what they move as live does (constructive).
+        _ if sk.analysis_current() => sk.solve_with(&noshape_sketch::SolveOptions { analyze: false, constructive: true, ..Default::default() }),
+        _ => sk.solve_with(&noshape_sketch::SolveOptions { constructive: true, ..Default::default() }),
     };
     // Live (qa4 DIM-UNSOLVED-GEOM): a sketch that can't be solved keeps its
     // last solved shape, not the rest solved around the conflict.

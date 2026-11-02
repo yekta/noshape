@@ -50,18 +50,19 @@ fn centerline_dimension_is_twice_the_distance() {
 }
 
 #[test]
-fn length_edit_moves_both_ends_equally() {
-    // Onshape: a new dimension value moves both dimensioned sides by half.
+fn length_edit_moves_the_far_end() {
+    // Live (fuzz probes p1 / p2 / q1–q3): a new length moves the line's end
+    // with the larger x; the other stays (not both ends by half).
     let mut sk = Sketch::new();
     let l = sk.add_line(v(0.0, 0.0), v(10.0, 0.0));
     sk.add_constraint(ConstraintKind::Horizontal { a: l, b: None }).unwrap();
     let d = sk.add_constraint(ConstraintKind::Length { curve: l, value: 10.0 }).unwrap();
     assert!(sk.solve().is_solved());
     sk.set_dimension_value(d, 20.0).unwrap();
-    assert!(sk.solve().is_solved());
+    assert!(sk.solve_with(&sk.dimension_edit_options(d)).is_solved());
     let c = sk.curve(l).unwrap();
-    assert!((c.start_point().x + 5.0).abs() < 1e-6, "{c:?}");
-    assert!((c.end_point().x - 15.0).abs() < 1e-6, "{c:?}");
+    assert!(c.start_point().x.abs() < 1e-6, "{c:?}");
+    assert!((c.end_point().x - 20.0).abs() < 1e-6, "{c:?}");
 }
 
 #[test]
