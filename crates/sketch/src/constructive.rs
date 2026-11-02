@@ -392,6 +392,11 @@ impl Sketch {
                 // Ties: the member a relation keeps, else the lower one
                 // (probe t4: a rectangle's bottom before its right side).
                 let tied: Vec<EntityId> = open.iter().copied().filter(|u| rank(*u) == best).collect();
+                // One joined to placed geometry before one that isn't (live
+                // fuzz s11: the quad's side at the kept side's corner grows
+                // to its Equal before the side Equal to the triangle).
+                let touching: Vec<EntityId> = tied.iter().copied().filter(|u| cons.iter().any(|(c, us)| us.contains(u) && self.connective(*c) && us.iter().any(|x| placed.contains(x)))).collect();
+                let tied = if !touching.is_empty() && touching.len() < tied.len() { touching } else { tied };
                 // One that can be placed keeping its whole shape goes first
                 // (fuzz s336: an L-bracket's riser shifts whole before the
                 // inner side, which then shortens).
@@ -452,7 +457,14 @@ impl Sketch {
             let round = matches!(self.kind(u), Some(EntityKind::Arc | EntityKind::Circle));
             let lower_held = if round { self.lower_shared(u, &held) } else { None };
             // (neighbours held: 0 none, 1 all, 2 the lower one; shape)
-            let ladder: &[(u8, u8)] = if lower_held.is_some() {
+            // A line carried at its end that its Equal chain resizes keeps
+            // its direction, its free start taking the change (live fuzz
+            // s11: the quad's side follows its moved corner whole and grows
+            // to the triangle's side).
+            let resized = chained.as_ref().is_some_and(|k| (k.value().unwrap_or(0.0) - self.size(u)).abs() > 1e-9);
+            let ladder: &[(u8, u8)] = if end_carried && resized {
+                &[(1, 1), (0, 1), (1, 2), (1, 0), (0, 2), (0, 0)]
+            } else if lower_held.is_some() {
                 &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (2, 1), (2, 0), (0, 2), (0, 1), (0, 0)]
             } else {
                 &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (0, 2), (0, 1), (0, 0)]
@@ -520,7 +532,12 @@ impl Sketch {
             let mut group = vec![u];
             if done.is_none() {
                 let pin = self.lowest_point(cons.iter().filter(|(c, us)| us.contains(&u) && !holds[c]).filter_map(|(c, _)| self.constraint(*c)).flat_map(|c| c.kind.entities()));
-                let all_neighbours: Vec<EntityId> = cons.iter().filter(|(_, us)| us.contains(&u)).flat_map(|(_, us)| us.iter().copied()).filter(|x| *x != u).collect();
+                // An unplaced Equal partner stays out: it comes later, its
+                // size from the group's (live fuzz s11: the triangle side
+                // Equal to the quad's l7 closes the triangle; l7 is carried
+                // by the quad's corner afterwards).
+                let size_only = |c: crate::ids::ConstraintId, us: &[EntityId]| matches!(self.constraint(c).map(|k| &k.kind), Some(ConstraintKind::Equal { .. })) && us.iter().any(|x| *x != u && !placed.contains(x));
+                let all_neighbours: Vec<EntityId> = cons.iter().filter(|(c, us)| us.contains(&u) && !size_only(*c, us)).flat_map(|(_, us)| us.iter().copied()).filter(|x| *x != u).collect();
                 // Placed neighbours without constraints of their own go
                 // before the rest (live fuzz s11: an equilateral triangle
                 // keeps its dimensioned side and closes on the other two).

@@ -682,3 +682,39 @@ fn a_dragged_slot_keeps_its_horizontal_bottom_level() {
     }
     assert!((sk.point(grab).unwrap() - v(34.0, 9.0)).length() < 1e-6);
 }
+
+#[test]
+fn a_quad_side_equal_to_a_triangle_side_follows_its_corner_whole() {
+    // Live fuzz s11, posted unsolved: an equilateral triangle (l1 20.621,
+    // l2 = l1 = l3) and a quad whose l5 = l4 and l7 = l2. Live keeps l5, l4
+    // grows along itself from their corner, l7 follows l4's moved end whole
+    // and grows at its free start, l6 takes up the rest.
+    let mut sk = Sketch::new();
+    let pts = [
+        (v(15.5648, 4.2244), v(-6.1147, 17.6617)),
+        (v(-6.1147, 17.6617), v(-6.9141, -7.6995)),
+        (v(-6.9141, -7.6995), v(15.5648, 4.2244)),
+        (v(78.2501, 5.4463), v(66.0524, 13.3535)),
+        (v(66.0524, 13.3535), v(52.3390, 3.5232)),
+        (v(52.3390, 3.5232), v(63.7027, -9.1384)),
+        (v(63.7027, -9.1384), v(78.2501, 5.4463)),
+    ];
+    let l: Vec<EntityId> = pts.iter().map(|(a, b)| sk.add_line(*a, *b)).collect();
+    let ends = |sk: &Sketch, i: usize| sk.endpoints(l[i]).unwrap();
+    for (a, b) in [(0, 1), (1, 2), (2, 0), (3, 4), (4, 5), (5, 6), (6, 3)] {
+        let (e, s) = (ends(&sk, a).1, ends(&sk, b).0);
+        sk.add_constraint(ConstraintKind::Coincident { a: e, b: s }).unwrap();
+    }
+    for (a, b) in [(0, 1), (2, 0), (1, 6), (4, 3)] {
+        sk.add_constraint(ConstraintKind::Equal { a: l[a], b: l[b] }).unwrap();
+    }
+    let l3_start = ends(&sk, 2).0;
+    sk.add_constraint(ConstraintKind::Coincident { a: l3_start, b: l[1] }).unwrap();
+    sk.add_constraint(ConstraintKind::Length { curve: l[0], value: 20.621 }).unwrap();
+    assert!(sk.solve_with(&SolveOptions { constructive: true, ..Default::default() }).is_solved());
+    let got = [ends(&sk, 3).0, ends(&sk, 3).1, ends(&sk, 4).1, ends(&sk, 6).0].map(|p| sk.point(p).unwrap());
+    let live = [v(80.2106, 4.1755), v(66.0524, 13.3535), v(52.3390, 3.5232), v(65.6481, -10.4245)];
+    for (p, q) in got.iter().zip(&live) {
+        assert!((*p - *q).length() < 2e-3, "ours {got:?} live {live:?}");
+    }
+}
