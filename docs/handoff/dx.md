@@ -40,8 +40,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - XT-PERIODIC-SPLINE-FACE is fixed: the reader honours periodic B-surfaces (live's smooth vase reads right).
   - T2 `export::parasolid_round_trip` was red on main: our writer splits a face closed on a B-surface it writes as
     non-periodic, and after core's loft changes our loft has one. The test now expects the split for the loft.
-  - Follow-up: write periodic B-surfaces (Parasolid's periodic knot form, which live's file shows: unclamped knots,
-    no repeated poles). Verify against live before landing.
+  - Follow-up: write periodic B-surfaces (not done: the form isn't settled). Live's vase file
+    (crates/kernel/tests/data/shell/vase-smooth-live-loft.x_t) shows u_periodic T, cubic, 206 u poles, double knots
+    over [0, 1] extended by one period at each end (-0.1418 … 1.00155). Its wrap-around poles are close but not
+    equal (row 3 vs 206: 1.1e-4; rows 1-2 vs 204-205: 1e-2). So it isn't the "first degree poles repeated" form
+    our curve reader assumes. Write one and have live import it before landing.
 
 ## 11-02 (to 03:17 UTC): user's order: X2 / X3, then big-file import / export speed, then format coverage
 - X2 export Resolution › Custom (defaults from Onshape's help, pending live 18:13) and X3 STEP AP242 semantic PMI
