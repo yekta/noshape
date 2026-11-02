@@ -774,6 +774,40 @@ fn escape_cancels_the_appearance_editor(cx: &mut TestAppContext) {
     assert!(cx.update(|cx| view.read(cx).ui.appearance_edit.is_none()), "Esc closed the editor");
 }
 
+/// Live (behaviours "Appearance editor R / G / B / A / hex"): Tab goes A → # → R → G → B, a field emptied shows its
+/// value again when left, Enter accepts and closes the editor.
+#[gpui::test]
+fn the_appearance_editors_fields_tab_and_enter_as_live(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "appearance-tab");
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_appearance(super::super::appearance::EditTarget::Faces(vec![], None), w, cx))).unwrap();
+    draw(cx, window);
+    let focused = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| {
+            let e = view.read(cx).ui.appearance_edit.as_ref().unwrap();
+            [&e.alpha, &e.hex, &e.channels[0], &e.channels[1], &e.channels[2]].iter().position(|f| f.read(cx).focus_handle(cx).is_focused(w))
+        })
+        .unwrap()
+    };
+    assert_eq!(focused(cx), Some(1), "the hex field first");
+    keys(cx, window, &["tab"]);
+    assert_eq!(focused(cx), Some(2), "Tab: R");
+    keys(cx, window, &["1", "2", "tab"]);
+    assert_eq!(focused(cx), Some(3), "Tab: G");
+    keys(cx, window, &["tab", "tab"]);
+    assert_eq!(focused(cx), Some(0), "after B, A");
+    keys(cx, window, &["shift-tab", "shift-tab", "shift-tab"]);
+    assert_eq!(focused(cx), Some(2), "Shift+Tab back to R");
+    keys(cx, window, &["backspace", "backspace", "tab"]);
+    let r = cx.update(|cx| {
+        let e = view.read(cx).ui.appearance_edit.as_ref().unwrap();
+        (e.rgb[0], e.channels[0].read(cx).value().to_string())
+    });
+    assert_eq!(r, (12, "12".to_string()), "R emptied keeps 12");
+    keys(cx, window, &["enter"]);
+    assert!(cx.update(|cx| view.read(cx).ui.appearance_edit.is_none()), "Enter closed the editor");
+}
+
 /// core-workflow 8.2.11: Extrude 1 › Add appearance to feature… opens "Face appearance 1" with "Extrude 1" in its
 /// Faces or features field, black, the focus on the body; Sketch 1's editor is "Appearance" at #999 (live 1663).
 #[gpui::test]

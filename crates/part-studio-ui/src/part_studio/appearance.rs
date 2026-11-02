@@ -17,6 +17,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 pub use crate::scene_builder::VertexColors;
+use crate::actions::{AppearanceNextField, AppearancePrevField};
 
 /// The Appearance editor's Palette tab (live dom/dialog-appearance-editor.txt):
 /// a top row of black / blue / red, then the 8 default part colours; under
@@ -72,8 +73,8 @@ pub struct AppearanceEdit {
     initial: ([u8; 3], f32, TessQuality),
     pub(super) hex: Entity<InputState>,
     /// R, G, B.
-    channels: [Entity<InputState>; 3],
-    alpha: Entity<InputState>,
+    pub(super) channels: [Entity<InputState>; 3],
+    pub(super) alpha: Entity<InputState>,
     _subs: Vec<Subscription>,
 }
 
@@ -243,9 +244,19 @@ impl PartStudioView {
             if let Some(rgb) = parse_hex(&text).filter(|_| text.len() == 6) {
                 this.set_edit_color_from(rgb, Some(ColorField::Hex), window, cx);
             }
+            this.appearance_enter(ev, cx);
         })];
         for (i, ch) in channels.iter().enumerate() {
             subs.push(cx.subscribe_in(ch, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
+                // Left empty, it shows its value again (live: emptied, then Tab).
+                if let InputEvent::Blur = ev
+                    && st.read(cx).value().is_empty()
+                    && let Some(e) = &this.ui.appearance_edit
+                {
+                    let v = e.rgb[i].to_string();
+                    st.update(cx, |s, cx| s.set_value(v, window, cx));
+                    return;
+                }
                 if !matches!(ev, InputEvent::Change | InputEvent::PressEnter { .. }) {
                     return;
                 }
@@ -256,9 +267,18 @@ impl PartStudioView {
                     rgb[i] = v;
                     this.set_edit_color_from(rgb, Some(ColorField::Channel(i)), window, cx);
                 }
+                this.appearance_enter(ev, cx);
             }));
         }
         subs.push(cx.subscribe_in(&alpha, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
+            if let InputEvent::Blur = ev
+                && st.read(cx).value().is_empty()
+                && let Some(e) = &this.ui.appearance_edit
+            {
+                let v = noshape_units::to_fixed(f64::from(1.0 - e.transparency), 2);
+                st.update(cx, |s, cx| s.set_value(v, window, cx));
+                return;
+            }
             if !matches!(ev, InputEvent::Change | InputEvent::PressEnter { .. }) {
                 return;
             }
@@ -269,6 +289,7 @@ impl PartStudioView {
                 e.transparency = 1.0 - v.clamp(0.0, 1.0);
                 cx.notify();
             }
+            this.appearance_enter(ev, cx);
         }));
         // Live 173: the hex field has the focus, its text selected; a
         // feature's face appearance leaves it on the body (request 1663).
@@ -281,6 +302,31 @@ impl PartStudioView {
             });
         }
         self.ui.appearance_edit = Some(AppearanceEdit { target, rgb, transparency, tessellation: tess, mixer: false, mix: crate::color_mixer::MixerState::from_rgb(rgb), alpha_drag: false, initial: (rgb, transparency, tess), hex, channels, alpha, _subs: subs });
+        cx.notify();
+    }
+
+    /// Enter in a field accepts and closes the editor, as ✓ (live behaviours "Appearance editor R / G / B / A / hex").
+    fn appearance_enter(&mut self, ev: &InputEvent, cx: &mut Context<Self>) {
+        let InputEvent::PressEnter { .. } = ev else { return };
+        let Some(e) = &self.ui.appearance_edit else { return };
+        if e.initial != (e.rgb, e.transparency, e.tessellation) {
+            self.accept_appearance(cx);
+        } else {
+            self.ui.appearance_edit = None;
+        }
+        cx.notify();
+    }
+
+    /// Tab / Shift+Tab: the next or previous field, A → # → R → G → B (live), its text selected.
+    fn appearance_tab(&mut self, step: isize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(e) = &self.ui.appearance_edit else { return };
+        let fields = [e.alpha.clone(), e.hex.clone(), e.channels[0].clone(), e.channels[1].clone(), e.channels[2].clone()];
+        let at = fields.iter().position(|f| f.read(cx).focus_handle(cx).is_focused(window)).unwrap_or(0);
+        let next = &fields[(at as isize + step).rem_euclid(fields.len() as isize) as usize];
+        next.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
         cx.notify();
     }
 
@@ -619,6 +665,8 @@ impl PartStudioView {
                 .id("appearance-editor")
                 // Esc in its fields cancels it (actions.rs).
                 .key_context("AppearanceEditor")
+                .on_action(cx.listener(|this, _: &AppearanceNextField, window, cx| this.appearance_tab(1, window, cx)))
+                .on_action(cx.listener(|this, _: &AppearancePrevField, window, cx| this.appearance_tab(-1, window, cx)))
                 .occlude()
                 .child(crate::ui::panel_probe("ps-appearance"))
                 .absolute()

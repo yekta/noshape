@@ -8,6 +8,9 @@ actions!(
     [
         // General
         Undo,
+        // The appearance editor's Tab / Shift+Tab.
+        AppearanceNextField,
+        AppearancePrevField,
         Redo,
         Copy,
         Paste,
@@ -179,6 +182,9 @@ pub fn default_key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new("escape", Cancel, Some("FeatureDialog > Input")),
         // And typing in the appearance editor's fields (live request 1663 (a)).
         KeyBinding::new("escape", Cancel, Some("AppearanceEditor > Input")),
+        // Its colour fields in live's order, A → # → R → G → B.
+        KeyBinding::new("tab", AppearanceNextField, Some("AppearanceEditor > Input")),
+        KeyBinding::new("shift-tab", AppearancePrevField, Some("AppearanceEditor > Input")),
         KeyBinding::new("tab", DialogTab, Some("FeatureDialog")),
         KeyBinding::new("shift-tab", DialogTabPrev, Some("FeatureDialog")),
         KeyBinding::new("shift-tab", StudioTabPrev, Some("PartStudio")),
