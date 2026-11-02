@@ -23,6 +23,14 @@ jobs:
   bundle:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    # Apple Developer ID signing and notarization (macOS) when these secrets exist; else the ad-hoc signature.
+    env:
+      APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+      APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
     timeout-minutes: 240
     strategy:
       fail-fast: false
@@ -95,6 +103,27 @@ jobs:
         # noshape.com, the console launcher terminals run for `noshape`.
         run: cargo build --release --locked -p noshape -p noshape-cli -p noshape-launcher
 
+      # A temporary keychain with the Developer ID Application certificate (APPLE_CERT_P12, base64).
+      - name: Apple signing identity (macOS)
+        if: runner.os == 'macOS' && env.APPLE_CERT_P12 != ''
+        run: |
+          kc="$RUNNER_TEMP/signing.keychain-db"; pw=$(openssl rand -hex 16)
+          echo "$APPLE_CERT_P12" | base64 -d > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$pw" "$kc"
+          security set-keychain-settings -lut 21600 "$kc"
+          security unlock-keychain -p "$pw" "$kc"
+          security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$APPLE_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pw" "$kc" >/dev/null
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/cert.p12"
+          id=$(security find-identity -v -p codesigning "$kc" | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p' | head -1)
+          [ -n "$id" ] || { echo "no Developer ID Application identity in APPLE_CERT_P12"; exit 1; }
+          echo "APPLE_SIGN_ID=$id" >> "$GITHUB_ENV"
+          if [ -n "$APPLE_API_KEY_P8" ]; then
+            echo "$APPLE_API_KEY_P8" | base64 -d > "$RUNNER_TEMP/AuthKey.p8"
+            echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+          fi
+
       - name: Bundle (macOS .app in .dmg)
         if: runner.os == 'macOS'
         run: |
@@ -107,13 +136,32 @@ jobs:
           sed "s/@VERSION@/$VERSION/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
           plutil -lint "$app/Contents/Info.plist"
           strip -x "$app/Contents/MacOS/noshape"
-          # Ad-hoc signature so Apple Silicon will launch it (not notarized).
-          codesign --force --deep --sign - "$app"
+          # Notarize what's given (a zip or a dmg) and wait for Apple's answer.
+          notarize() { xcrun notarytool submit "$1" --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID" --wait; }
+          if [ -n "${APPLE_SIGN_ID:-}" ]; then
+            # Developer ID with the hardened runtime and a timestamp, notarized and stapled when the API key is set.
+            codesign --force --deep --options runtime --timestamp --sign "$APPLE_SIGN_ID" "$app"
+            if [ -n "${APPLE_API_KEY_PATH:-}" ]; then
+              ditto -c -k --keepParent "$app" "$RUNNER_TEMP/notarize.zip"
+              notarize "$RUNNER_TEMP/notarize.zip"
+              xcrun stapler staple "$app"
+            fi
+          else
+            # Ad-hoc signature so Apple Silicon will launch it (not notarized).
+            codesign --force --deep --sign - "$app"
+          fi
+          # The app alone, for in-app updates (the bundle is swapped in place; a download inside the app has no
+          # quarantine flag).
+          ditto -c -k --keepParent "$app" "out/noshape-$VERSION-${{ matrix.asset }}.app.zip"
           ln -s /Applications dist/Applications
           # hdiutil underestimates the image size for large binaries; size it explicitly.
           size_mb=$(( $(du -sm dist | cut -f1) * 2 + 64 ))
-          hdiutil create -volname noshape -srcfolder dist -ov -fs HFS+ -size "${size_mb}m" -format UDZO \
-            "out/noshape-$VERSION-${{ matrix.asset }}.dmg"
+          dmg="out/noshape-$VERSION-${{ matrix.asset }}.dmg"
+          hdiutil create -volname noshape -srcfolder dist -ov -fs HFS+ -size "${size_mb}m" -format UDZO "$dmg"
+          if [ -n "${APPLE_SIGN_ID:-}" ]; then
+            codesign --force --timestamp --sign "$APPLE_SIGN_ID" "$dmg"
+            if [ -n "${APPLE_API_KEY_PATH:-}" ]; then notarize "$dmg" && xcrun stapler staple "$dmg"; fi
+          fi
 
       - name: Bundle (Linux tar.gz and .deb)
         if: runner.os == 'Linux'
@@ -165,7 +213,8 @@ jobs:
               cp target/release/noshape-cli.exe "$c/"
               pwsh -NoProfile -Command "Compress-Archive -Path '$c' -DestinationPath 'out/$c.zip'" ;;
             macOS)
-              cp target/release/noshape-cli "$c/" && strip -x "$c/noshape-cli" && codesign --force --sign - "$c/noshape-cli"
+              cp target/release/noshape-cli "$c/" && strip -x "$c/noshape-cli"
+              if [ -n "${APPLE_SIGN_ID:-}" ]; then codesign --force --options runtime --timestamp --sign "$APPLE_SIGN_ID" "$c/noshape-cli"; else codesign --force --sign - "$c/noshape-cli"; fi
               tar czf "out/$c.tar.gz" "$c" ;;
             Linux)
               cp target/release/noshape-cli "$c/" && strip "$c/noshape-cli"
@@ -177,6 +226,41 @@ jobs:
         with:
           name: ${{ matrix.asset }}
           path: out/*
+          if-no-files-found: error
+
+  # Every download signed with noshape's update key (minisign, ed25519; the app embeds the public key and refuses an
+  # update whose signature or checksum doesn't verify): SHA256SUMS over all of them, and a .minisig per file whose
+  # signed comment names the version and the file (no asset can stand in for another's or an older one's).
+  sign:
+    needs: bundle
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: '*-*64'
+          path: dist
+          merge-multiple: true
+      - name: Sign
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          [ -n "$UPDATE_SIGNING_KEY" ] || { echo "::error::the UPDATE_SIGNING_KEY secret is missing"; exit 1; }
+          v="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF_TYPE" == tag ]] || v="0.0.0-${GITHUB_SHA::7}"
+          sudo apt-get install -y -q minisign >/dev/null
+          key="$RUNNER_TEMP/update.key"
+          ( umask 077; printf '%s\n' "$UPDATE_SIGNING_KEY" > "$key" )
+          cd dist
+          sha256sum -- * > SHA256SUMS
+          for f in *; do
+            minisign -S -s "$key" -m "$f" -t "noshape $v file:$f" < /dev/null > /dev/null
+          done
+          rm -f "$key"
+          ls -la
+      - uses: actions/upload-artifact@v7
+        with:
+          name: signed
+          path: dist/*
           if-no-files-found: error
 
   # Every platform's downloads on a fresh runner: installed as a user would, then `noshape --version` and
@@ -331,14 +415,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "CLI check failed" }
 
   publish:
-    needs: [bundle, verify]
+    needs: [bundle, sign, verify]
     if: github.ref_type == 'tag' && !inputs.dry_run
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v8
         with:
+          name: signed
           path: dist
-          merge-multiple: true
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
