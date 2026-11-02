@@ -61,6 +61,17 @@ fn tub() -> Shape {
     fillet(&p, &es, 3.0).unwrap().shape
 }
 
+/// A block whose three edges at the origin are filleted R2 / R3 / R4 in one feature: a free-form (B-spline) corner.
+fn mixed_corner() -> Shape {
+    let p = bx([0.0; 3], [40.0, 20.0, 10.0]);
+    // The three edges at the origin, R2 / R3 / R4 in one fillet: a free-form corner patch.
+    let at0 = |i: &EdgeInfo| i.start.length() < 1e-9 || i.end.length() < 1e-9;
+    let es: Vec<Shape> = edges_where(&p, at0);
+    assert_eq!(es.len(), 3);
+    let rs: Vec<f64> = es.iter().map(|e| { let i = e.edge_info().unwrap(); let d = (i.end - i.start).abs(); if d.x > 1e-9 { 2.0 } else if d.y > 1e-9 { 3.0 } else { 4.0 } }).collect();
+    fillet_checked(&p, &es, &rs).unwrap().shape
+}
+
 /// A pocket with R3 vertical corners and an R2 floor fillet (tori where the floor fillet turns the corners).
 fn round_pocket() -> Shape {
     let p = unify_same_domain(&cut(&bx([0.0; 3], [60.0, 40.0, 20.0]), &bx([20.0, 10.0, 10.0], [40.0, 30.0, 21.0])).unwrap().shape).unwrap().shape;
@@ -621,7 +632,7 @@ fn quadrics_and_slabs_agree() {
     };
     // A block with a blind Ø10 hole 10 deep from the top (its floor edge concave).
     let blind = unified(cut(&bx([0.0; 3], [60.0, 40.0, 20.0]), &cyl_z(30.0, 20.0, 10.0, 5.0, 11.0)).unwrap().shape);
-    let (tub, round_pocket) = (tub(), round_pocket());
+    let (tub, round_pocket, mixed) = (tub(), round_pocket(), mixed_corner());
     // A block whose top is a vault (an R50 cylinder along x, 15 mm high in the middle); a slot cut in its floor.
     let vault = {
         let c = make_cylinder(&Plane::from_normal(DVec3::new(-1.0, 10.0, -35.0), DVec3::X), 50.0, 42.0, std::f64::consts::TAU).unwrap();
@@ -641,6 +652,7 @@ fn quadrics_and_slabs_agree() {
         ("a blind hole, bottom removed (a concave cylinder-plane edge)", blind.clone(), bottom(&blind), 2.0),
         ("rounded bottom corners (spheres), top removed", tub.clone(), top(&tub, 10.0), 1.0),
         ("a rounded pocket (tori at its floor corners), bottom removed", round_pocket.clone(), bottom(&round_pocket), 1.0),
+        ("a free-form corner (R2 / R3 / R4 at one vertex), top removed", mixed.clone(), top(&mixed, 10.0), 1.0),
         ("a vaulted top removed (a curved opening)", vault.clone(), faces_where(&vault, |c| c.z > 12.0), 1.0),
         ("a hole's wall removed (a closed curved opening)", plate_hole.clone(), plate_hole.faces().into_iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { .. }))).collect(), 2.0),
         ("qa plate R2, top removed, 1.5", qa_plate.clone(), top(&qa_plate, 10.0), 1.5),
@@ -781,12 +793,17 @@ fn a_removed_fillet_opening_is_lives() {
     assert_eq!(r.shape.count(ShapeType::Face), 16);
 }
 
-/// Spheres and tori taken directly: the tub's and the rounded pocket's Shell by each path, best of 5.
+/// Spheres, tori and free-form faces taken directly: the tub's, the rounded pocket's and the free-form corner's Shell
+/// by each path, best of 5.
 #[test]
 #[ignore = "T2 bench: tools/tiers/perf.sh"]
-fn spheres_and_tori_shell_time() {
-    let (t, p) = (tub(), round_pocket());
-    for (name, s, rm) in [("tub, top removed, 1 mm", &t, top(&t, 10.0)), ("rounded pocket, bottom removed, 1 mm", &p, faces_where(&p, |c| c.z.abs() < 1e-9))] {
+fn direct_shell_time() {
+    let (t, p, m) = (tub(), round_pocket(), mixed_corner());
+    for (name, s, rm) in [
+        ("tub, top removed, 1 mm", &t, top(&t, 10.0)),
+        ("rounded pocket, bottom removed, 1 mm", &p, faces_where(&p, |c| c.z.abs() < 1e-9)),
+        ("free-form corner, top removed, 1 mm", &m, top(&m, 10.0)),
+    ] {
         let best = |m: ShellMethod| {
             (0..5)
                 .map(|_| {

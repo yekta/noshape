@@ -99,6 +99,9 @@
 #include <cmath>
 #include <map>
 #include <GC_MakeCircle.hxx>
+#include <Geom_OffsetSurface.hxx>
+#include <GeomAPI_PointsToBSpline.hxx>
+#include <ShapeAnalysis_Surface.hxx>
 #include <Geom_ToroidalSurface.hxx>
 #include <Geom_SphericalSurface.hxx>
 #include <functional>
@@ -2621,6 +2624,14 @@ struct Surf
   double                    ang = 0; // a cone's semi-angle / a torus's major radius
   gp_XYZ                    n;      // planes: outward normal, n.x = c
   double                    c = 0;
+  // Free-form faces (B-spline, ...): the face's own surface, its offset distance along the natural normal (0 for a
+  // removed face) and the foot point of the last point evaluated (the next projection starts there).
+  bool                                  general = false;
+  occ::handle<Geom_Surface>             base;
+  occ::handle<ShapeAnalysis_Surface>    sas;
+  double                                d = 0;
+  mutable gp_Pnt2d                      hint;
+  mutable bool                          has_hint = false;
 };
 
 // Signed distance-like value of x from s's offset (zero on it).
@@ -2628,6 +2639,22 @@ double eval(const Surf& s, const gp_XYZ& x)
 {
   if (s.kind == GeomAbs_Plane)
     return s.n.Dot(x) - s.c;
+  if (s.general)
+  {
+    // The distance from the foot point on the face's surface along its natural normal, less the offset's.
+    const gp_Pnt   P(x);
+    const gp_Pnt2d uv = s.has_hint ? s.sas->NextValueOfUV(s.hint, P, 1e-12, 1e-9) : s.sas->ValueOfUV(P, 1e-12);
+    s.hint            = uv;
+    s.has_hint        = true;
+    gp_Pnt S;
+    gp_Vec Du, Dv;
+    s.base->D1(uv.X(), uv.Y(), S, Du, Dv);
+    const gp_Vec N = Du.Crossed(Dv);
+    const double m = N.Magnitude();
+    if (m < 1e-300)
+      return 1e300;
+    return gp_Vec(S, P).Dot(N) / m - s.d;
+  }
   const gp_XYZ w   = x - s.ax.Location().XYZ();
   const double h   = w.Dot(s.ax.Direction().XYZ());
   const double rho = (w - s.ax.Direction().XYZ() * h).Modulus();
@@ -2866,7 +2893,35 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       continue;
     }
     if (q.kind != GeomAbs_Cylinder && q.kind != GeomAbs_Cone)
-      return no("a face neither a plane, a cylinder, a cone, a sphere nor a torus");
+    {
+      // A free-form face: its exact offset (Geom_OffsetSurface), where the face is smooth and nowhere curved
+      // tighter than the wall (there the offset would fold).
+      q.general = true;
+      q.base    = BRep_Tool::Surface(f);
+      q.sas     = new ShapeAnalysis_Surface(q.base);
+      if (!kept[(size_t)i])
+      {
+        q.off = q.base;
+        continue;
+      }
+      if (!q.base->IsCNu(1) || !q.base->IsCNv(1))
+        return no("a free-form face not smooth");
+      double u0, u1, v0, v1;
+      BRepTools::UVBounds(f, u0, u1, v0, v1);
+      const int n = 12;
+      for (int a = 0; a <= n; ++a)
+        for (int b = 0; b <= n; ++b)
+        {
+          GeomLProp_SLProps lp(q.base, u0 + (u1 - u0) * a / n, v0 + (v1 - v0) * b / n, 2, 1e-12);
+          if (!lp.IsNormalDefined())
+            return no("a free-form face's normal undefined");
+          if (lp.IsCurvatureDefined() && std::max(std::abs(lp.MaxCurvature()), std::abs(lp.MinCurvature())) * t > 0.9)
+            return no("a free-form face's offset folds");
+        }
+      q.d   = d;
+      q.off = new Geom_OffsetSurface(q.base, d);
+      continue;
+    }
     if (!kept[(size_t)i])
     {
       // A removed cylinder or cone stays: the rim lies on it.
@@ -2954,8 +3009,6 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       return no("a kept face tangent to a removed one");
     if (na.Dot(nb) > 1 - 1e-9)
     {
-      if (c.GetType() != GeomAbs_Line && c.GetType() != GeomAbs_Circle)
-        return no("faces tangent along a curve neither a line nor a circle");
       tangent[(size_t)i] = 1;
     }
   }
@@ -3234,7 +3287,9 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     const int fa = group[(size_t)i] != 0 ? across[(size_t)group[(size_t)i]][0] : efi[(size_t)i][0];
     const int fb = group[(size_t)i] != 0 ? across[(size_t)group[(size_t)i]][1] : efi[(size_t)i][1];
     const bool tangent_circle = tangent[(size_t)i] && group[(size_t)i] == 0 && oc.GetType() == GeomAbs_Circle;
-    if (!tangent_circle && (seam[(size_t)i] || (tangent[(size_t)i] && group[(size_t)i] == 0) || (sf[(size_t)fa].kind == GeomAbs_Plane && sf[(size_t)fb].kind == GeomAbs_Plane)))
+    // (Tangent along another curve: its points moved along the faces' common normal, fitted.)
+    const bool tangent_free = tangent[(size_t)i] && group[(size_t)i] == 0 && oc.GetType() != GeomAbs_Circle && oc.GetType() != GeomAbs_Line;
+    if (!tangent_circle && !tangent_free && (seam[(size_t)i] || (tangent[(size_t)i] && group[(size_t)i] == 0) || (sf[(size_t)fa].kind == GeomAbs_Plane && sf[(size_t)fb].kind == GeomAbs_Plane)))
     {
       if (A.Distance(B) <= 10 * tol || gp_Vec(A, B).Dot(t0) <= 0)
       {
@@ -3265,6 +3320,23 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         if (!mc.IsDone())
           return no("a tangent circle's offset failed");
         cands.push_back(mc.Value());
+      }
+      else if (tangent_free)
+      {
+        const double               a0 = oc.FirstParameter(), a1 = oc.LastParameter();
+        const int                  n  = 32;
+        NCollection_Array1<gp_Pnt> q(1, n + 1);
+        for (int k = 0; k <= n; ++k)
+        {
+          const gp_Pnt p = oc.Value(a0 + (a1 - a0) * k / n);
+          q(k + 1)       = p.Translated(gp_Vec(normal_at(TopoDS::Face(faces(fa)), p)) * -t);
+        }
+        q(1)     = A;
+        q(n + 1) = B;
+        GeomAPI_PointsToBSpline fit(q, 3, 8, GeomAbs_C2, 1e-7 * size);
+        if (!fit.IsDone())
+          return no("a tangent curve's offset failed");
+        cands.push_back(fit.Curve());
       }
       else
       {

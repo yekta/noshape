@@ -136,6 +136,15 @@ spheres / tori, next with the planar strips); on those two shapes OCCT's offset 
 change; where the offset fails, the direct construction replaces the slabs. vibe3 (perf.sh 43e955ad, best of 3 × 5):
 tub direct 177.7 ms / OCCT's offset 86.7 / slabs 378.1; rounded pocket 190.7 / 237.4 / 486.4. (Direct is twice the
 offset on the tub: its checks, likely the self-interference analysis; to look at.)
+Step 3 (11-02): free-form faces (B-spline and other surfaces): the exact offset (Geom_OffsetSurface) where the face
+is C1 and nowhere curved tighter than 0.9 / t (sampled 13 × 13), its implicit value the distance from the foot point
+(ShapeAnalysis_Surface, from the last foot point) along the natural normal less the offset; edges where faces are
+tangent along any curve: its points moved in along the common normal and fitted (GeomAPI_PointsToBSpline, 1e-7 of
+the size). T1 quadrics_and_slabs_agree: a block whose three edges at a corner are filleted R2 / R3 / R4 in one
+feature (a B-spline corner patch), top removed: 1780.411506 mm³ / 19 faces as the slabs' (1780.411505). Share:
+corpus still 1 of 134: the fuzz B-spline faces now stop further on (10 fold: radii under the 3-20 mm walls; 4 a
+degenerate corner's undefined normal; 6 a periodic free-form face's curved seam: next, with planar strips). vibe3
+(perf.sh 94de99fc, best of 3 × 5): the free-form corner direct 552.9 ms / OCCT's offset 258.6 / slabs 1850.7 (Auto: offset).
 Live's answers (11-02 03:00-03:40): **1752** the removed R5 fillet is the slabs' (2175.269908 mm³, 16 faces: the kept
 walls end in flat rims normal to them): the decline stays, T1 `shell::a_removed_fillet_opening_is_lives` (building
 those rims directly would take the corpus's 13 "kept face tangent to a removed one" cases: speed only). **1753 /
