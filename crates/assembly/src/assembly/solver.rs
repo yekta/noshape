@@ -1219,7 +1219,27 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) -> Vec<us
             continue;
         }
         let z_rel = (relative(&poses, m).rotation * DVec3::Z).z;
-        if z_rel >= 0.0 {
+        if z_rel >= 1e-6 {
+            continue;
+        }
+        // Perpendicular axes (a part inserted square to its mate: a pin's
+        // axis onto a block's side face): the residual is as flat towards
+        // the alignment as against it, so the solve would end either way
+        // round (fuzz f11: a Parallel came out reversed). The moving part is
+        // turned the shortest way onto the alignment first.
+        if z_rel > -1e-6 {
+            let (fa, fb) = (poses[m.a].mul(&m.a_local), poses[m.b].mul(&m.b_local));
+            let (za, zb) = (fa.rotation * DVec3::Z, fb.rotation * (base_rotation(m.flip_primary, m.reorient).inverse() * DVec3::Z));
+            let (moving, c, turn) = if !bodies[m.a].fixed {
+                (m.a, fa.origin, DQuat::from_rotation_arc(za, zb))
+            } else if !bodies[m.b].fixed {
+                (m.b, fb.origin, DQuat::from_rotation_arc(zb, za))
+            } else {
+                continue;
+            };
+            let p = bodies[moving].pose;
+            bodies[moving].pose = Frame { origin: c + turn * (p.origin - c), rotation: (turn * p.rotation).normalize() };
+            poses[moving] = bodies[moving].pose;
             continue;
         }
         let exact = z_rel < -1.0 + 1e-9;
@@ -2025,6 +2045,27 @@ mod tests {
         let want = [start[0], start[1], start[2] - c, start[3]];
         for (b, w) in bodies.iter().zip(want) {
             assert!((b.pose.origin - w).length() < 1e-9 && b.pose.rotation.angle_between(DQuat::IDENTITY) < 1e-9, "{:?} vs {w:?}", b.pose);
+        }
+    }
+
+    /// Fuzz f11 / f8 / f19: an axial mate whose connectors start exactly
+    /// perpendicular ends aligned as the mate says, not reversed (the
+    /// residual is flat both ways there), with no conflict.
+    #[test]
+    fn a_perpendicular_start_ends_aligned() {
+        for kind in [MateType::Parallel, MateType::Revolute, MateType::Planar, MateType::Cylindrical] {
+            for flip in [false, true] {
+                let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::new(0.05, 0.02, 0.01), false)];
+                let la = Frame::from_axes(DVec3::new(0.0, 0.01, 0.005), DVec3::X, DVec3::Y);
+                let lb = Frame::from_axes(DVec3::new(0.04, 0.02, 0.01), DVec3::Z, DVec3::X);
+                let mut m = mate(kind, 0, la, 1, lb);
+                m.flip_primary = flip;
+                let mates = vec![m];
+                let r = solve(&mut bodies, &mates, &[], &[]);
+                let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+                assert!(r.converged && r.mate_ok[0], "{kind:?} flip {flip}: {r:?}");
+                assert!(!axis_disagrees(&poses, &mates[0]), "{kind:?} flip {flip}: reversed");
+            }
         }
     }
 

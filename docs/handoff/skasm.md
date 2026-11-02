@@ -473,6 +473,23 @@ re-queues everything after it). Waiting: live request 13:45
 - D2 fixed later with ops' `drawing::old_state`, and so was D15 (the Workspace protection notice).
 - Later: D12 tab out-of-date icon; D13 the search box takes the query as text (`type:part name:pvz`). Audit at 25 surfaces, 15 gaps, 15 fixed (live 1738 answered: D16 Tab › Properties… per kind, D17 Document details…, D18 the copy dialogs; landed 61ef991d 17:25). The three P3s left after it are done too (Part Studio Properties card, Create version's drawing links, the Documents panel's Search history ▾).
 
+## Solver fuzz against live (user 11-02 09:40): counts
+Cases, generators and live's answers are T2 tests: sketches `-p noshape-sketch --test all live_fuzz:: -- --ignored`
+(fixtures/live_fuzz/sketch-N.json: ready-to-post BTMSketch JSON + ours; sketch-N.live.json: live's answers),
+assemblies `-p noshape-model --test all oracle_asm::asm_fuzz -- --ignored` (fixtures/live_fuzz/asm-N.json in the
+fs-oracle-asm vocabulary, mates added one at a time as live does; asm-N.live.jsonl: live's lines);
+`oracle_asm::asm_fuzz_trace` (FUZZ_CASE=<seed>) prints one case mate by mate.
+| batch | cases | sent to live | answered | match | differences fixed |
+|---|---|---|---|---|---|
+| sketch 1 (lines, arcs, circles; 11 drags) | 20 | REQUESTS 09:45 | – | – | – |
+| asm 1 (BLOCK / PLATE / PIN, 1–4 mates) | 20 | REQUESTS 10:05 | – | – | 1 before live: f8 / f11 / f19 |
+Fixed before live answered: an axial mate whose connectors start exactly perpendicular (a part inserted square to its
+mate) could solve reversed: the residual is as flat both ways, the orientation pass only turned parts more than 90°
+off. The old code accepted the reversed pose as OK; the 11-02 conflict rule then flagged it. Now the moving part is
+turned the shortest way onto the alignment first (T1 a_perpendicular_start_ends_aligned); asm batch 1's mates in error
+went 9 → 5 (the rest are deliberate conflicts).
+Next batches: splines / conics / angles (once live confirms their REST form), assemblies with drags and patterns.
+
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
 sketch: `-p noshape-scene --test all sketch_perf::s300 -- --ignored --nocapture`):

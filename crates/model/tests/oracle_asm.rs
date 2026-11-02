@@ -389,3 +389,258 @@ fn assemblies_match_live() {
     }
     assert!(report.is_empty(), "differences from live:\n{report}");
 }
+
+// ---------------------------------------------------------------- fuzz
+// Assembly solver fuzz against live (user 11-02): random small assemblies of
+// the oracle's parts (BLOCK, PLATE, PIN) with random start poses and random
+// mates between their connectors, in the oracle's vocabulary (an entity
+// through a point of the part + Onshape's inference), so live's oracle
+// pipeline (live/fs-oracle-asm) can build them. `fixtures/live_fuzz/asm-N.json`
+// holds the cases and ours' answers; live's come back as `asm-N.live.jsonl`
+// (its results-N.jsonl lines).
+
+struct FuzzRng(u64);
+impl FuzzRng {
+    fn next(&mut self) -> f64 {
+        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        ((self.0 >> 11) as f64) / ((1u64 << 53) as f64)
+    }
+    fn below(&mut self, n: usize) -> usize {
+        ((self.next() * n as f64) as usize).min(n - 1)
+    }
+    fn range(&mut self, a: f64, b: f64) -> f64 {
+        a + (b - a) * self.next()
+    }
+}
+
+const PART_NAMES: [&str; 3] = ["BLOCK", "PLATE", "PIN"];
+
+/// A part's connectors: (name, entity kind, point on it in part mm, inference, axial).
+fn connectors(p: usize) -> Vec<(&'static str, &'static str, [f64; 3], Inference, bool)> {
+    use Inference::*;
+    match p {
+        BLOCK => vec![
+            ("top face", "face", [20.0, 10.0, 10.0], Centroid, false),
+            ("bottom face", "face", [20.0, 10.0, 0.0], Centroid, false),
+            ("front face", "face", [20.0, 0.0, 5.0], Centroid, false),
+            ("right face", "face", [40.0, 10.0, 5.0], Centroid, false),
+            ("vertex (0,0,0)", "vertex", [0.0, 0.0, 0.0], Vertex, false),
+            ("vertex (40,20,10)", "vertex", [40.0, 20.0, 10.0], Vertex, false),
+            ("bottom front edge", "edge", [20.0, 0.0, 0.0], Midpoint, false),
+            ("top back edge", "edge", [20.0, 20.0, 10.0], Midpoint, false),
+        ],
+        PLATE => vec![
+            ("top face", "face", [110.0, 5.0, 10.0], Centroid, false),
+            ("bottom face", "face", [110.0, 5.0, 0.0], Centroid, false),
+            ("hole top edge", "edge", [130.0, 25.0, 10.0], Center, true),
+            ("hole bottom edge", "edge", [130.0, 25.0, 0.0], Center, true),
+            ("hole cylinder", "face", [135.0, 20.0, 5.0], MidAxis, true),
+        ],
+        _ => vec![
+            ("top edge", "edge", [200.0, 5.0, 30.0], Center, true),
+            ("bottom edge", "edge", [200.0, 5.0, 0.0], Center, true),
+            ("cylinder", "face", [205.0, 0.0, 15.0], MidAxis, true),
+        ],
+    }
+}
+
+fn onshape_inference(i: Inference) -> &'static str {
+    match i {
+        Inference::Centroid => "CENTROID",
+        Inference::Vertex => "POINT",
+        Inference::Midpoint => "MID_POINT",
+        Inference::Center => "CENTER",
+        Inference::MidAxis => "MID_AXIS_POINT",
+        Inference::TopAxis => "TOP_AXIS_POINT",
+        Inference::BottomAxis => "BOTTOM_AXIS_POINT",
+        Inference::Origin => "ORIGIN",
+    }
+}
+
+/// A random case: the assembly and its spec for live.
+fn fuzz_case(parts: &Parts, seed: u64) -> (Assembly, serde_json::Value) {
+    use serde_json::json;
+    let mut r = FuzzRng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0x5851_F42D_4C95_7F2D);
+    for _ in 0..4 {
+        r.next();
+    }
+    let n = 2 + r.below(3);
+    let names = ["A", "B", "C", "D"];
+    let mut asm = Assembly::default();
+    let mut kinds = Vec::new();
+    let mut spec_inst = Vec::new();
+    for (k, name) in names.iter().enumerate().take(n) {
+        let p = r.below(3);
+        let (deg, t) = if k == 0 { (0.0, (0.0, 0.0, 0.0)) } else { ((r.range(0.0, 360.0) * 10.0).round() / 10.0, ((r.range(-100.0, 100.0)).round(), (r.range(-100.0, 100.0)).round(), (r.range(0.0, 60.0)).round())) };
+        asm.instances.push(instance(parts, k as u64 + 1, name, p, pose(deg, t), k == 0));
+        kinds.push(p);
+        spec_inst.push(json!({"name": name, "part": PART_NAMES[p], "fixed": k == 0, "start": {"rotate_z_deg": deg, "translate_mm": [t.0, t.1, t.2]}}));
+    }
+    let types = [MateType::Fastened, MateType::Revolute, MateType::Slider, MateType::Cylindrical, MateType::Planar, MateType::Ball, MateType::Parallel];
+    let mut spec_mates = Vec::new();
+    let mut pairs: Vec<(usize, usize)> = (1..n).map(|k| (k, r.below(k))).collect();
+    if r.next() < 0.3 {
+        let k = 1 + r.below(n - 1);
+        pairs.push((k, r.below(k)));
+    }
+    for (moving, onto) in pairs {
+        let t = types[r.below(types.len())];
+        let axial = matches!(t, MateType::Revolute | MateType::Slider | MateType::Cylindrical);
+        let pick = |r: &mut FuzzRng, p: usize| {
+            let cs = connectors(p);
+            let pool: Vec<_> = cs.iter().filter(|c| match t {
+                MateType::Ball => c.1 == "vertex" || c.4,
+                _ if axial && cs.iter().any(|c| c.4) => c.4,
+                _ => true,
+            }).cloned().collect();
+            let pool = if pool.is_empty() { cs } else { pool };
+            pool[r.below(pool.len())]
+        };
+        let (ca, cb) = (pick(&mut r, kinds[moving]), pick(&mut r, kinds[onto]));
+        let refer = |p: usize, c: &(&str, &str, [f64; 3], Inference, bool)| match c.1 {
+            "face" => face(parts, p, c.2[0], c.2[1], c.2[2]),
+            "edge" => edge(parts, p, c.2[0], c.2[1], c.2[2]),
+            _ => vertex(parts, p, c.2[0], c.2[1], c.2[2]),
+        };
+        let id = 10 + asm.mates.len() as u64;
+        let mut m = mate(id, t, conn(moving as u64 + 1, refer(kinds[moving], &ca), ca.3), conn(onto as u64 + 1, refer(kinds[onto], &cb), cb.3));
+        m.flip_primary = r.next() < 0.2;
+        asm.mates.push(m);
+        let c = |inst: usize, c: &(&str, &str, [f64; 3], Inference, bool)| json!({"instance": names[inst], "entity": c.1, "what": c.0, "at_mm": c.2, "inference": onshape_inference(c.3)});
+        spec_mates.push(json!({"type": t.name(), "first": c(moving, &ca), "second": c(onto, &cb), "flip_primary": asm.mates.last().unwrap().flip_primary}));
+    }
+    // Named per type, as live does (Revolute 1, Revolute 2).
+    let mut count = std::collections::HashMap::new();
+    for (m, s) in asm.mates.iter_mut().zip(spec_mates.iter_mut()) {
+        let k = count.entry(m.mate_type.name()).or_insert(0);
+        *k += 1;
+        m.name = format!("{} {k}", m.mate_type.name());
+        s["name"] = json!(m.name);
+    }
+    (asm, json!({"case": format!("f{seed}"), "instances": spec_inst, "mates": spec_mates}))
+}
+
+fn fuzz_fixture(name: &str) -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/live_fuzz").join(name)
+}
+
+/// Batch 1 (seeds 1–20) with ours' answers; written when LIVE_FUZZ_WRITE is
+/// set, else checked unchanged (the generator is deterministic).
+#[test]
+#[ignore = "T2: live fuzz batch (assemblies)"]
+fn asm_fuzz_write_batch() {
+    use serde_json::json;
+    let mut parts = parts();
+    let mut cases = Vec::new();
+    for seed in 1..=20 {
+        let (asm, mut spec) = fuzz_case(&parts, seed);
+        // Mates added one at a time, each solve stored (as live builds it):
+        // a later conflicting mate meets the earlier ones' solved state.
+        let mut built = asm.clone();
+        built.mates.clear();
+        let mut res = parts.ev.evaluate(&parts.doc, &built, &SolveOptions::default(), None);
+        for m in &asm.mates {
+            built.mates.push(m.clone());
+            res = parts.ev.evaluate(&parts.doc, &built, &SolveOptions::default(), None);
+            for (id, p) in &res.solved.placements {
+                if let Some(i) = built.instances.iter_mut().find(|i| i.id == *id) {
+                    i.placement = *p;
+                }
+            }
+        }
+        let got = outcome(&built, &res);
+        spec["ours"] = json!({
+            "status": got.mates.iter().map(|m| (m.0.clone(), if m.1 { "OK" } else { "ERROR" })).collect::<std::collections::BTreeMap<_, _>>(),
+            "text": got.mates.iter().map(|m| (m.0.clone(), m.2.clone())).collect::<std::collections::BTreeMap<_, _>>(),
+            "transforms_mm": got.instances.iter().map(|i| (i.0.clone(), i.1.to_vec())).collect::<std::collections::BTreeMap<_, _>>(),
+            "dof": got.instances.iter().map(|i| (i.0.clone(), i.2)).collect::<std::collections::BTreeMap<_, _>>(),
+        });
+        cases.push(spec);
+    }
+    let b = json!({"parts": "live/fs-oracle-asm CASES.md parts (BLOCK, PLATE, PIN, one Part Studio)", "method": "CASES.md method: insert in order, fix A, POST the start transform (rotate about +z, then translate), add the mates with implicit connectors (the entity through `at_mm` on that instance's part, the inference)", "cases": cases});
+    let path = fuzz_fixture("asm-1.json");
+    if std::env::var("LIVE_FUZZ_WRITE").is_ok() {
+        std::fs::write(&path, serde_json::to_string_pretty(&b).unwrap()).unwrap();
+    }
+    let stored: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    for (x, y) in b["cases"].as_array().unwrap().iter().zip(stored["cases"].as_array().unwrap()) {
+        assert_eq!((&x["instances"], &x["mates"]), (&y["instances"], &y["mates"]), "{}: the generator changed", x["case"]);
+    }
+    let errs = b["cases"].as_array().unwrap().iter().filter(|c| c["ours"]["status"].as_object().unwrap().values().any(|v| v != "OK")).count();
+    println!("asm batch 1: {} cases, {errs} with a mate in error (ours)", cases_len(&b));
+}
+
+fn cases_len(b: &serde_json::Value) -> usize {
+    b["cases"].as_array().map_or(0, |a| a.len())
+}
+
+/// Ours against live's lines (`asm-N.live.jsonl`: live's results format):
+/// each mate's status and text, each instance's transform (1e-4 mm and
+/// 1e-7 in the rotation).
+#[test]
+#[ignore = "T2: live fuzz batch vs live (assemblies)"]
+fn asm_fuzz_live_matches() {
+    const KNOWN: &[&str] = &[];
+    let (mut answered, mut matches, mut report) = (0, 0, Vec::new());
+    for n in 1.. {
+        let p = fuzz_fixture(&format!("asm-{n}.json"));
+        if !p.exists() {
+            break;
+        }
+        let Ok(live) = std::fs::read_to_string(fuzz_fixture(&format!("asm-{n}.live.jsonl"))) else { continue };
+        let ours: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&p).unwrap()).unwrap();
+        for line in live.lines().filter(|l| !l.trim().is_empty()) {
+            let l: serde_json::Value = serde_json::from_str(line).unwrap();
+            let Some(case) = ours["cases"].as_array().unwrap().iter().find(|c| c["case"] == l["case"]) else { continue };
+            answered += 1;
+            let mut d = Vec::new();
+            for (m, st) in l["status"].as_object().into_iter().flatten() {
+                let ok = st == "OK" || st == "INFO";
+                if (case["ours"]["status"][m] == "OK") != ok || case["ours"]["text"][m] != l["text"][m] {
+                    d.push(format!("{m}: ours {} {}, live {st} {}", case["ours"]["status"][m], case["ours"]["text"][m], l["text"][m]));
+                }
+            }
+            for (inst, t) in l["transforms"].as_object().into_iter().flatten() {
+                let o = &case["ours"]["transforms_mm"][inst];
+                let off = (0..16).any(|k| {
+                    let (a, b) = (o[k].as_f64().unwrap_or(f64::NAN), t[k].as_f64().unwrap() * if [3, 7, 11].contains(&k) { 1e3 } else { 1.0 });
+                    (a - b).abs() > if [3, 7, 11].contains(&k) { 1e-4 } else { 1e-7 }
+                });
+                if off {
+                    d.push(format!("{inst}: ours {o}, live {t}"));
+                }
+            }
+            let name = l["case"].as_str().unwrap_or("?");
+            if d.is_empty() {
+                matches += 1;
+            } else if !KNOWN.contains(&name) {
+                report.push(format!("{name}: {}", d.join("; ")));
+            }
+        }
+    }
+    println!("live fuzz (assemblies): {answered} cases answered, {matches} match");
+    assert!(report.is_empty(), "{}", report.join("\n"));
+}
+
+/// One fuzz case mate by mate (FUZZ_CASE=<seed>): each step's statuses.
+#[test]
+#[ignore = "debug: one fuzz case"]
+fn asm_fuzz_trace() {
+    let Ok(seed) = std::env::var("FUZZ_CASE").map(|s| s.parse::<u64>().unwrap()) else { return };
+    let mut parts = parts();
+    let (asm, spec) = fuzz_case(&parts, seed);
+    println!("{}", serde_json::to_string(&spec["mates"]).unwrap());
+    let mut built = asm.clone();
+    built.mates.clear();
+    for m in &asm.mates {
+        built.mates.push(m.clone());
+        let res = parts.ev.evaluate(&parts.doc, &built, &SolveOptions::default(), None);
+        println!("+ {}: {:?}", m.name, res.mates.iter().map(|s| (s.ok, s.message.clone(), s.values)).collect::<Vec<_>>());
+        println!("  converged {} placements {:?}", res.solved.converged, res.solved.placements);
+        for (id, p) in &res.solved.placements {
+            if let Some(i) = built.instances.iter_mut().find(|i| i.id == *id) {
+                i.placement = *p;
+            }
+        }
+    }
+}
