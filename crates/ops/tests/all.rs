@@ -19,5 +19,6 @@ mod mesh_pixels;
 mod regen_profile;
 mod smoke;
 mod spawn_guard;
+mod sketch_recursion;
 mod symmetric_mirror;
 mod twisted_vase;

@@ -487,3 +487,47 @@ fn curvature_to_an_arc_solves_at_sketch_size() {
         assert!(r.is_solved(), "scale {scale}: {r:?}");
     }
 }
+
+/// qa SKETCH-CONSTRUCTIVE-RECURSION (P0): a closed spline lists its first
+/// point twice; the constructive solve's shared-point split took that for a
+/// point shared by two curves and called itself on the copy without end
+/// (a stack overflow opening the document). It solves now.
+#[test]
+fn a_closed_spline_beside_a_new_dimension_solves() {
+    let mut sk = Sketch::new();
+    sk.add_closed_fit_spline(&[v(0.0, 0.0), v(10.0, 0.0), v(10.0, 10.0), v(0.0, 10.0), v(0.0, 0.0)]).unwrap();
+    let l = sk.add_line(v(20.0, 0.0), v(30.0, 0.0));
+    sk.add_constraint(ConstraintKind::Length { curve: l, value: 12.0 }).unwrap();
+    let r = sk.solve_with(&SolveOptions { constructive: true, ..Default::default() });
+    assert!(r.is_solved(), "{r:?}");
+    let (a, b) = sk.endpoints(l).unwrap();
+    assert!(((sk.point(b).unwrap() - sk.point(a).unwrap()).length() - 12.0).abs() < 1e-9);
+}
+
+/// Thousands of curves in one chain, joined by shared points and by
+/// Coincidents, with a dimension that doesn't hold yet: the constructive
+/// solve neither overflows nor stalls (such components keep the old solve).
+#[test]
+fn a_chain_of_thousands_of_curves_solves() {
+    const N: usize = 4000;
+    // Shared point entities (a polyline as the tools draw it).
+    let mut sk = Sketch::new();
+    let pts: Vec<_> = (0..=N).map(|i| sk.add_point(v(i as f64, (i % 2) as f64))).collect();
+    let lines: Vec<_> = (0..N).map(|i| sk.add_entity(Geometry::Line { start: pts[i], end: pts[i + 1] }, false, false).unwrap()).collect();
+    sk.add_constraint(ConstraintKind::Length { curve: lines[0], value: 3.0 }).unwrap();
+    assert!(sk.solve_with(&SolveOptions { constructive: true, analyze: false, ..Default::default() }).is_solved());
+    // Separate points joined by Coincidents, closed round.
+    let mut sk = Sketch::new();
+    let lines: Vec<_> = (0..N).map(|i| {
+        let a = DVec2::from_angle(i as f64 / N as f64 * std::f64::consts::TAU) * 500.0;
+        let b = DVec2::from_angle((i + 1) as f64 / N as f64 * std::f64::consts::TAU) * 500.0;
+        sk.add_line(a, b)
+    }).collect();
+    for i in 0..N {
+        let (_, e) = sk.endpoints(lines[i]).unwrap();
+        let (s, _) = sk.endpoints(lines[(i + 1) % N]).unwrap();
+        sk.add_constraint(ConstraintKind::Coincident { a: e, b: s }).unwrap();
+    }
+    sk.add_constraint(ConstraintKind::Length { curve: lines[0], value: 1.0 }).unwrap();
+    assert!(sk.solve_with(&SolveOptions { constructive: true, analyze: false, ..Default::default() }).is_solved());
+}

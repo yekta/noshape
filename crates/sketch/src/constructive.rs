@@ -37,9 +37,11 @@ impl Sketch {
         // are placed as if joined by a Coincident: on a copy whose shared
         // points are split, the positions copied back (a rectangle drawn
         // with the tool keeps its lower-left corner as one posted does).
+        // (Placed directly: no second split, so no recursion, whatever the
+        // copy still shares; qa SKETCH-CONSTRUCTIVE-RECURSION.)
         if let Some(mut split) = self.split_shared_points() {
             let unheld = split.unheld_constraints(1e-9);
-            if !split.place_constructively(&unheld) {
+            if !split.place_split(&unheld) {
                 return false;
             }
             for e in self.entities().map(|e| e.id).collect::<Vec<_>>() {
@@ -66,7 +68,12 @@ impl Sketch {
         let mut users: HashMap<EntityId, Vec<EntityId>> = HashMap::new();
         for e in self.entities().filter(|e| e.kind() != EntityKind::Point) {
             for p in e.point_refs() {
-                users.entry(p).or_default().push(e.id);
+                // Each curve once (a closed spline lists its first point
+                // again: not shared, and its swap would move both).
+                let us = users.entry(p).or_default();
+                if !us.contains(&e.id) {
+                    us.push(e.id);
+                }
             }
         }
         let shared: Vec<(EntityId, Vec<EntityId>)> = users.into_iter().filter(|(_, us)| us.len() > 1).collect();
