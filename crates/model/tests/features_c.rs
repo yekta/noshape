@@ -2301,6 +2301,38 @@ fn fill_tangency_on_curves_is_a_warning() {
     assert_eq!(r.context.bodies.len(), 1);
 }
 
+/// Live 1762: a Fill of a planar loop held at position is a plane (a 60 × 40 rectangle 2400 mm², a D of two lines
+/// and an arc 1879.5595 mm²), not a plate B-spline.
+#[test]
+fn fill_of_a_planar_loop_is_a_plane() {
+    let rect = |sk: &mut noshape_sketch::Sketch| polyline(sk, &[(0.0, 0.0), (60.0, 0.0), (60.0, 40.0), (0.0, 40.0)], true);
+    let d = |sk: &mut noshape_sketch::Sketch| {
+        let p: Vec<_> = [(0.0, 0.0), (40.0, 0.0), (40.0, 40.0), (0.0, 40.0), (25.0, 20.0)].iter().map(|&(x, y)| sk.add_point(DVec2::new(mm(x), mm(y)))).collect();
+        vec![
+            sk.add_line_between(p[0], p[1]).unwrap().0,
+            sk.add_arc_between(p[4], p[1], p[2]).unwrap().0,
+            sk.add_line_between(p[2], p[3]).unwrap().0,
+            sk.add_line_between(p[3], p[0]).unwrap().0,
+        ]
+    };
+    for (draw, live) in [(&rect as &dyn Fn(&mut noshape_sketch::Sketch) -> Vec<u32>, 2400.0), (&d, 1879.5595)] {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let ids = draw(&mut sk);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let mut row = ParamValues::default();
+        row.set("entities", entities(sid, &ids));
+        s.add("fill", move |p| p.set("edges", ParamValue::Array(vec![row])));
+        let r = s.ok();
+        let b = &r.context.bodies[0];
+        let faces = b.shape.faces();
+        assert_eq!(faces.len(), 1);
+        assert!(matches!(faces[0].face_surface(), Ok(noshape_kernel::Surface::Plane(_))), "{:?}", faces[0].face_surface());
+        let area = b.shape.area().unwrap() * 1e6;
+        assert!((area - live).abs() < 1e-3, "{area} mm², live {live}");
+    }
+}
+
 /// Live L38 ("psb L37-39 mate connector"): on a block's top face, reorient
 /// "+Y" turns X to −Y; a move goes along the reoriented/flipped frame; the
 /// rotation comes last and doesn't change the move. L37: no owner fails.

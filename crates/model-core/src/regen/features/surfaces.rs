@@ -247,6 +247,17 @@ pub fn fill(ev: &mut EvalCtx) -> FResult<()> {
             curves = guides;
         }
     }
+    // Live 1762: a planar boundary held at position fills with a plane (exact; OCCT's plate took ~150 ms in qa's
+    // documents and gave a B-spline).
+    if points.is_empty()
+        && curves.is_empty()
+        && boundary.iter().all(|b| b.continuity == k::Continuity::Position)
+        && let [w] = wires.as_slice()
+        && let Ok(face) = k::make_face_from_wire(w, true)
+    {
+        let names = new_face_names(ev, &face);
+        return surface_result(ev, NamedShape::new(face, names));
+    }
     // Onshape's FILL_SURFACE_FAIL text, not the kernel's (qa5 SF5).
     let res = k::fill_surface_guided(&boundary, &points, &curves).map_err(|_| FeatureError::new(crate::regen::custom_features::error_text("FILL_SURFACE_FAIL")))?;
     let names = new_face_names(ev, &res.shape);
