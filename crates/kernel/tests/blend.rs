@@ -874,3 +874,30 @@ fn rust_rolling_ball_corners_are_occts() {
         }
     }
 }
+
+/// A drafted pocket's floor loop R2 over its slanted corner rounds R3 (the concave form of 1686 (c)): one face per
+/// corner, valid, no degenerated edge.
+#[test]
+#[ignore = "T2: probe (live's figures not asked yet)"]
+fn drafted_pocket_floor_loop_probe() {
+    setup();
+    let b = bx([0.0; 3], [60.0, 40.0, 20.0]);
+    let p = cut(&b, &bx([15.0, 10.0, 8.0], [45.0, 30.0, 21.0])).unwrap().shape;
+    let walls: Vec<Shape> = p.faces().into_iter().filter(|f| f.bounding_box(false).is_ok_and(|bb| bb.min.z > 7.9 * MM && bb.max.z - bb.min.z > 1.0 * MM && bb.min.x > 14.9 * MM && bb.max.x < 45.1 * MM && bb.min.y > 9.9 * MM && bb.max.y < 30.1 * MM)).collect();
+    assert_eq!(walls.len(), 4);
+    let d = draft(&p, &walls, DVec3::Z, &Plane::new(DVec3::new(0.0, 0.0, 8.0 * MM), DVec3::Z, DVec3::X), 5f64.to_radians()).unwrap().shape;
+    let slanted = edges_where(&d, |i| (i.start.z - i.end.z).abs() > 1.0 * MM && i.start.z > 7.9 * MM && i.end.z > 7.9 * MM && i.start.x > 10.0 * MM && i.start.x < 50.0 * MM && i.start.y > 5.0 * MM && i.start.y < 35.0 * MM);
+    assert_eq!(slanted.len(), 4);
+    let d = fillet_checked(&d, &slanted, &[3.0 * MM; 4]).unwrap().shape;
+    let floor = edges_where(&d, |i| (i.start.z - 8.0 * MM).abs() < 1e-6 * MM && (i.end.z - 8.0 * MM).abs() < 1e-6 * MM);
+    println!("floor loop {} edges", floor.len());
+    let r = fillet_checked(&d, &floor, &vec![2.0 * MM; floor.len()]).unwrap().shape;
+    let degenerate = r.edges().iter().filter(|e| e.edge_info().unwrap().degenerated).count();
+    println!("valid {}, {} faces, {} degenerated edges, {:.6} mm3", r.is_valid(), r.faces().len(), degenerate, vol_mm3(&r));
+    for f in r.faces() {
+        let bb = f.bounding_box(true).unwrap();
+        if bb.min.x > 40.0 * MM && bb.min.y > 25.0 * MM && bb.max.z < 11.0 * MM {
+            println!("  {} area {:.7} box {:.5?} .. {:.5?}", format!("{:?}", f.face_surface().ok()).chars().take(30).collect::<String>(), f.area().unwrap() / (MM * MM), bb.min / MM, bb.max / MM);
+        }
+    }
+}

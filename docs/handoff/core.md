@@ -16,6 +16,26 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-03 00:55.**
+- Landed since 22:35: Loft connections (6a3297ac), Offset curve with targets (47c75914) and Offset, extend and split
+  (73396503: the extended offset imprinted on the face's body, live 1813's 212.5 + 787.5 mm²), psui's
+  p_toggles_every_plane race (88c37bf6: two tests shared one scratch document), Shell pocket timings (14afdf69) and
+  its region rule (34d5b585: a region is open only when a piece of a removed face bounds it; Shell 5's 18 mm³ corner
+  solid as live, 72 faces). Queued: BLEND-DRAFT-CORNER-FACES fixed (vertex_blend.cpp `Rolling`: OCCT's two patches
+  per drafted corner, their shared vertex 0.9 mm off the top, become live's one rolling-ball face; 18 faces, corner
+  area to 1e-7).
+- Shell 5 left (ticket): live bounds the pocket's front by the opening's plane up to the ceiling and carries the
+  holes' offset walls up into it (offset surfaces extended until they meet; our slabs end with their faces); the
+  77-slab fuse ~11 s (bool asked, Requests). corpus-32fd's corner faces: REQUESTS 23:25 (live's .x_t after ~04:10, or
+  the faces with one face removed at a time): the 45° case wants the clip t / sin(angle) past the shared edge, but
+  the 3.5° corner shows live clips less there, so no rule until live's answer.
+- Everyday concave shells (a step, a pocket with or without R3 corners, a boss, a rounded step) are 9-27 ms by OCCT's
+  offset (T2 shell::everyday_concave_shell_times_probe): SHELL-SLOW's "pockets, steps still slabs" no longer holds
+  for plain parts.
+- Next: the 04:00 workflow walk on /root/green/noshape; the vase's small volume differences; a concave drafted
+  corner (a drafted pocket's floor loop over its corner rounds) through the same `Rolling` path (convex only checked
+  against live so far).
+
 **State 11-02 22:35 (handover to a new account).**
 - Landed today after 21:00: Offset curve's Offset and extend + Trim (c9b6e80c), SHELL-HANG-5 pocket (487086f6) and
   opening clip (178cc0b7, within 0.02 % of live), corpus probes (89d35c07), mixed-radius corner probes + ticket

@@ -276,7 +276,7 @@ struct Rolling
   gp_Vec x, y;  // square to the axis, x towards the first end's centre
   gp_Vec d, np; // S's axis, P's outward normal
   double rs = 0, R = 0, D = 0, sweep = 0;
-  bool   convex = true;
+  double sp = 1, ss = 1; // +1: the ball inside the part (a convex edge), -1 in the air; S's normal from its axis or to it
 
   gp_Pnt centre(double phi) const
   {
@@ -289,7 +289,7 @@ struct Rolling
   {
     const double phi    = sweep * t;
     const gp_Vec radial = x * std::cos(phi) + y * std::sin(phi);
-    return section_between(centre(phi), np, convex ? radial : -radial, R);
+    return section_between(centre(phi), np * sp, radial * (sp * ss), R);
   }
 };
 
@@ -387,8 +387,8 @@ bool rolling_pair(const TopoDS_Edge& dg, const ShapeAncMap& e2f, double tol, Rol
   k.np       = outward(r.p);
   if (k.np.Magnitude() < 0.5)
     return false;
-  k.D = k.np.Dot(gp_Vec(BRepAdaptor_Surface(r.p, false).Plane().Location().XYZ())) - k.R;
-  k.d = gp_Vec(s.axis.Direction());
+  const double p0 = k.np.Dot(gp_Vec(BRepAdaptor_Surface(r.p, false).Plane().Location().XYZ()));
+  k.d             = gp_Vec(s.axis.Direction());
   k.o = s.axis.Location();
   if (std::abs(k.np.Dot(k.d)) < 1e-3)
     return no("S along P");
@@ -399,11 +399,8 @@ bool rolling_pair(const TopoDS_Edge& dg, const ShapeAncMap& e2f, double tol, Rol
   {
     BRepAdaptor_Surface sa(r.s);
     const gp_Pnt        q = sa.Value(0.5 * (sa.FirstUParameter() + sa.LastUParameter()), 0.5 * (sa.FirstVParameter() + sa.LastVParameter()));
-    k.convex              = outward(r.s).Dot(radial(q)) > 0;
+    k.ss                  = outward(r.s).Dot(radial(q)) > 0 ? 1 : -1;
   }
-  k.rs = k.convex ? s.radius - k.R : s.radius + k.R;
-  if (!(k.rs > 0))
-    return no("S's offset");
   // The ball's centres at the ends: on the end cylinders' axes, under their end arcs.
   auto centre_of = [](const TopoDS_Edge& arc, const Cyl& c) {
     BRepAdaptor_Curve ac(arc);
@@ -412,6 +409,11 @@ bool rolling_pair(const TopoDS_Edge& dg, const ShapeAncMap& e2f, double tol, Rol
     return c.axis.Location().Translated(d * am.Dot(d));
   };
   const gp_Pnt q0 = centre_of(r.e1c, c1), q1 = centre_of(r.e2c, c2);
+  k.sp            = k.np.Dot(gp_Vec(q0.XYZ())) < p0 ? 1 : -1;
+  k.D             = p0 - k.sp * k.R;
+  k.rs            = s.radius - k.sp * k.ss * k.R;
+  if (!(k.rs > 0))
+    return no("S's offset");
   const gp_Vec r0 = radial(q0), r1 = radial(q1);
   if (std::abs(r0.Magnitude() - k.rs) > tol || std::abs(r1.Magnitude() - k.rs) > tol)
   {
@@ -645,7 +647,8 @@ TopoDS_Shape exact_vertex_blends(const TopoDS_Shape& s, occ::handle<BRepTools_Hi
         gp_Vec nn = du.Crossed(dv);
         if (nf.Orientation() == TopAbs_REVERSED)
           nn.Reverse();
-        if (nn.Dot(gp_Vec(k.centre(k.sweep / 2), p)) < 0)
+        // Outward: away from the ball's centre, or towards it where the ball is in the air.
+        if (k.sp * nn.Dot(gp_Vec(k.centre(k.sweep / 2), p)) < 0)
           nf.Reverse();
       }
       // The end arcs replace OCCT's; the edge on P replaces its two there (and the edge on S S's two), the second
