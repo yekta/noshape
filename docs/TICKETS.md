@@ -285,7 +285,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   a removed planar face at a concave edge loses its wall a wall's depth behind the opening and a wall past their shared
   edge. Left (51 / 20 mm³): live extends the holes' cylinder walls up into the pocket (slabs end with their faces), an
   18 mm³ corner below the opening's end that live keeps, 76 faces to live's 52, live's 0.3 s.
-- [x] (core 11-02 19:40, our own four-sided G1 Coons fill; three-edge fills still take OCCT's flat ConstrainedFilling) P2 FILL-G1-DOME (core 11-02, live 1739 FI2): a Fill G1 to a shelled box's outer side faces builds in live with the
+- [x] verified bc7d7e9f (qa 11-02 23:20, qa-scratch/bin/fillg1.py, live 1805's FI2 on the green as CLI: Fill 1 Warning "Could not meet tangency constraints at highlighted points." as live, Part 1 11712 mm³ = live; the sheet 4302.286 mm² (live 4327.564, −0.6 %), z 20…42.615 (live 20…42.969: live's dome peaks 6.5 mm off centre at 42.964, its centre 42.615 = our symmetric peak)) (core 11-02 19:40, our own four-sided G1 Coons fill; three-edge fills still take OCCT's flat ConstrainedFilling) P2 FILL-G1-DOME (core 11-02, live 1739 FI2): a Fill G1 to a shelled box's outer side faces builds in live with the
   warning "Could not meet tangency constraints at highlighted points." (a dome to z 42.97, 4327.5641 mm²: the corners
   can't be tangent to two perpendicular walls); ours fails ("Cannot create fill surface…"): OCCT's plate throws for
   these constraints at any tolerance. Needs our own G1 patch (or plate) that relaxes the corners. core 11-02 17:30: the
