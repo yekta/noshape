@@ -519,24 +519,34 @@ pub fn measure_shapes(shapes: &[Vec<Shape>]) -> Vec<(String, Measurement)> {
         // (5) a straight edge and a planar face.
         (Geo::Line { origin: o, dir: d }, Geo::Plane { origin: p, normal: n }) | (Geo::Plane { origin: p, normal: n }, Geo::Line { origin: o, dir: d }) => {
             if d.dot(n).abs() < 1e-9 {
-                // Parallel (not captured live): their distance first.
+                // Live 1709: their distance first; in the face's plane, its curvature deviation next.
                 out.push(dist_row("Parallel dist", DVec3::ZERO, n * (o - p).dot(n)));
-                out.extend(min());
-                out.extend(face_area());
-                out.extend(max());
+                if touching() {
+                    out.push(("Curvature deviation".into(), Measurement::Percent(0.0)));
+                    out.extend(face_area());
+                    out.extend(min());
+                    out.extend(max());
+                } else {
+                    out.extend(max());
+                    out.extend(face_area());
+                    out.extend(min());
+                }
             } else {
                 let t = angle.unwrap_or_else(|| std::f64::consts::FRAC_PI_2 - d.angle_between(n).min(std::f64::consts::PI - d.angle_between(n)));
                 if is_right_angle(t) {
                     out.push(("Perp line and plane angle".into(), Measurement::Angle(t)));
-                    // Live: only where the line meets the face (AN1 c: a vertical edge standing on Top; psb measure
-                    // 5a: a vertical edge 7.07 mm off the top face reads no Curvature deviation).
-                    let rows: Vec<(String, Measurement)> = min().collect();
-                    if rows.iter().any(|(_, m)| matches!(m, Measurement::Distance { distance, .. } if distance.abs() < 1e-9)) {
+                    // Live: Curvature deviation only where the line meets the face, then Area · Max · Min (AN1 c, 1709:
+                    // a vertical edge standing on Top; psb measure 5a: a vertical edge 7.07 mm off the top face).
+                    if touching() {
                         out.push(("Curvature deviation".into(), Measurement::Percent(0.0)));
+                        out.extend(face_area());
+                        out.extend(max());
+                        out.extend(min());
+                    } else {
+                        out.extend(min());
+                        out.extend(face_area());
+                        out.extend(max());
                     }
-                    out.extend(rows);
-                    out.extend(face_area());
-                    out.extend(max());
                 } else {
                     out.push(("Angle".into(), Measurement::Angle(t)));
                     // Live: "Curvature deviation: 0.00 %" (a line against a plane).
@@ -582,6 +592,15 @@ pub fn measure_shapes(shapes: &[Vec<Shape>]) -> Vec<(String, Measurement)> {
             let n = d1.cross(d2).normalize();
             out.push(dist_row("Center axes dist", DVec3::ZERO, n * (o2 - o1).dot(n)));
             out.extend(max());
+            out.extend(edge_length());
+        }
+        // Live 1709: a straight edge along a cylinder's axis.
+        (Geo::Line { origin: o1, dir: d1 }, Geo::Axis { origin: o2, dir: d2 }) | (Geo::Axis { origin: o2, dir: d2 }, Geo::Line { origin: o1, dir: d1 }) if parallel(d1, d2) => {
+            out.extend(min());
+            out.extend(max());
+            out.extend(face_area());
+            let v = o1 - o2;
+            out.push(dist_row("Center axes dist", DVec3::ZERO, v - d2 * v.dot(d2)));
             out.extend(edge_length());
         }
         // Live 1709: a vertex and a cylinder.
@@ -1186,5 +1205,15 @@ mod tests {
         assert_eq!(labels(&r), ["Min dist", "Max dist", "Center dist", "Length"]);
         assert!((dist(&r, "Center dist") - 0.015811).abs() < 1e-6);
         assert!(matches!(r[3].1, Measurement::Length(l) if (l - 0.090265).abs() < 1e-6));
+        let upright = block.edges().into_iter().find(|e| matches!(e.edge_curve(), Ok(k::Curve::Line { origin, direction }) if direction.z.abs() > 0.9 && origin.truncate().distance(glam::DVec2::new(0.04, 0.03)) < 1e-9)).unwrap();
+        let right = plane_at(&block, DVec3::X, 0.04);
+        assert_eq!(labels(&rows(&upright, &top)), ["Perp line and plane angle", "Curvature deviation", "Area", "Max dist", "Min dist", "Length"]);
+        assert_eq!(labels(&rows(&upright, &right)), ["Parallel dist", "Curvature deviation", "Area", "Min dist", "Max dist", "Length"]);
+        let r = rows(&upright, &front);
+        assert_eq!(labels(&r), ["Parallel dist", "Max dist", "Area", "Min dist", "Length"]);
+        assert!((dist(&r, "Parallel dist") - 0.03).abs() < 1e-9);
+        let r = rows(&upright, &wall);
+        assert_eq!(labels(&r), ["Min dist", "Max dist", "Area", "Center axes dist", "Length"]);
+        assert!((dist(&r, "Center axes dist") - 0.015f64.hypot(0.03)).abs() < 1e-9);
     }
 }
