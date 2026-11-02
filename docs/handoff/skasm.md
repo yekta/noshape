@@ -483,6 +483,7 @@ fs-oracle-asm vocabulary, mates added one at a time as live does; asm-N.live.jso
 |---|---|---|---|---|---|
 | sketch 1 (lines, arcs, circles; 11 drags) | 20 | REQUESTS 09:45 | – | – | – |
 | asm 1 (BLOCK / PLATE / PIN, 1–4 mates) | 20 | REQUESTS 10:05 | – | – | 1 before live: f8 / f11 / f19 |
+| sketch 2 (+ fit splines, conics, angles) | 20 | REQUESTS 10:40 | – | – | – |
 Fixed before live answered: an axial mate whose connectors start exactly perpendicular (a part inserted square to its
 mate) could solve reversed: the residual is as flat both ways, the orientation pass only turned parts more than 90°
 off. The old code accepted the reversed pose as OK; the 11-02 conflict rule then flagged it. Now the moving part is
