@@ -300,7 +300,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   from the flat Coons patch projected onto the supports, nothing against walls square to the opening. The dome needs a
   Hermite Coons patch with our own cross-boundary derivatives (in each support, square to the edge). T1
   oracle_p1::fill_tangent_to_four_walls_builds_with_a_warning_as_live (status and message).
-- [x] P1 LOFT-ONE-FACE (core 11-02, live 1782 / 1784): live lofts tangent-continuous sections (hexagons with R5 sketch
+- [x] verified bc7d7e9f (qa 11-02 23:10, bin/vase.py on the green as CLI: the 5-section loft is 3 faces / 24 edges, 437876.300 mm³ (live 437833.229, 1e-4); Shells 1.6 in 47331.776, 2 in 58694.861 (live 58695.052), 2 out 63464.509 (live 63461.624), 5 faces each) P1 LOFT-ONE-FACE (core 11-02, live 1782 / 1784): live lofts tangent-continuous sections (hexagons with R5 sketch
   fillets: 6 lines + 6 arcs) into **one** B-spline side face (3 faces, 24 edges, 437833.229 mm³); ours gave a face per
   section edge (14 faces, 437876.286). Now: through three or more sections, or sections of different topology, side
   faces meeting smoothly at the sections are one face (two matching sections: a face per segment, as live); ours has a
