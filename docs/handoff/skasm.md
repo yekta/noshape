@@ -720,6 +720,15 @@ Slider, Planar, a two-link arm, Cylindrical, Ball); T2 oracle_asm::asm_drag_prob
 answer (`asm-drag-1.live.jsonl`; cases built from live's own input by `spec_assembly`, 25-step view-plane drags,
 positions within 0.3 mm for the pointer's landing). Tried for f53: half-turning about the Ball's point: no change
 (live's half-turn AXIS differs: about world y there).
+17:48: assembly drag probes (live 1802): a drag moves only along the dragged part's own freedom (Planar follows,
+Revolute turns to the pointer's angle, a Slider / radial pull on a Cylindrical do ~nothing, a Ball pivots, a two-link
+arm turns only the dragged link). In (queued a7d3bf69): `solve_dragged_only` keeps a dragged part that moved alone
+(its group moves only when it can't, a linkage); the pointer is a ray (`DragTarget::along`, eval
+`SolveOptions::drag_view`, set by assembly_view from the drag plane's normal = camera forward). The two solver tests
+that assumed whole-chain following now assert d4's rule (the iteration budget measured on its own following copy).
+T2 asm_drag_probes_match_live: 2/6 within 0.3 mm (d2, d3); d1 / d5 / d6 differ by live's pointer lag (1–2°), d4's
+small turn size. Asked live for drag probes 2 (a tangential pull on the arm, a Fastened link, a four-bar) to confirm
+the own-freedom rule beyond a radial pull.
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
