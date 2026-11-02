@@ -71,6 +71,31 @@ impl OpenDoc {
         self.regenerate_with(tab, config, |_| ())
     }
 
+    /// A drawing's Part Studio sources in the configuration their tabs show,
+    /// regenerated with the tabs' own regenerations (incremental: no work
+    /// when nothing changed), which the drawing's views then reuse
+    /// (`views::regenerate_source` keeps them by content hash) instead of
+    /// regenerating the studio afresh.
+    pub fn prime_drawing_sources(&mut self, drawing: &noshape_model::drawing::Drawing) {
+        self.prime_sources(noshape_model::drawing::views::referenced_sources(drawing));
+    }
+
+    /// [`OpenDoc::prime_drawing_sources`] for these sources.
+    pub fn prime_sources(&mut self, keys: impl IntoIterator<Item = noshape_model::drawing::views::SourceKey>) {
+        use noshape_model::drawing::views;
+        let keys: Vec<views::SourceKey> = keys
+            .into_iter()
+            .filter(|k| k.version.is_none() && studio(&self.session.doc, k.tab).is_ok_and(|ps| self.current_config(k.tab).is_ok_and(|c| crate::config::current(ps, &k.config) == c)))
+            .collect();
+        if keys.is_empty() {
+            return;
+        }
+        let mut assemblies = crate::derived::assembly_evaluator(Default::default());
+        for key in keys {
+            views::regenerate_source(&self.session.doc, &key, self.regens.entry(key.tab).or_default(), &mut assemblies);
+        }
+    }
+
     /// [`OpenDoc::regenerate`] with adjusted options (`upto` and
     /// `editing_sketch` while a sketch is edited, as the sketch mode does).
     pub fn regenerate_with(&mut self, tab: TabId, config: Option<&ConfigValues>, adjust: impl FnOnce(&mut RegenOptions)) -> Result<RegenResult, OpError> {

@@ -697,7 +697,7 @@ fn view_show_hide(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             mv.hidden_edges = edges.clone();
             mv.editing_edges = true;
         }
-        let m = SheetModel::build(&od.session, t.tab, marked, t.sheet, &[]);
+        let m = SheetModel::build(od, t.tab, marked, t.sheet, &[]);
         for (i, p) in toggles.iter().enumerate() {
             let field = format!("toggle_edges[{i}]");
             let p = super::drawing::point_value(p, &field)?;

@@ -221,7 +221,8 @@ fn fill_kit_theme(cx: &mut App) {
 }
 
 /// What the Drawing studio (noshape-drawing-ui) needs of the app: the workspace, other documents' windows, file tabs,
-/// the release log, the documents library, Create version, the export rules link, a preference.
+/// the release log, the documents library, Create version, the export rules link, a preference, the Part Studios'
+/// regenerations.
 fn register_drawing_hooks() {
     noshape_drawing_ui::drawing_hooks::register(noshape_drawing_ui::drawing_hooks::Hooks {
         import: workspace::request_import,
@@ -233,6 +234,7 @@ fn register_drawing_hooks() {
         create_version: history_panel::open_create_version_in,
         export_rules_link: preferences_window::export_rules_link,
         light_model_space: || preferences_window::ListPrefs::load().drawing_light_model_space,
+        studio_context: part_studio::committed_context,
     });
 }
 

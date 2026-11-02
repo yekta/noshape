@@ -915,6 +915,7 @@ impl DrawingEditor {
                 keys.remove(i);
                 Some(d.clone())
             });
+            let from_old = old.is_some();
             let doc = match (&key.version, old) {
                 (Some(v), _) => match self.version_doc(v, cx) {
                     Some(d) => d,
@@ -926,12 +927,21 @@ impl DrawingEditor {
             if doc.tab(key.tab).is_none() {
                 continue;
             }
+            // A Part Studio its tab shows regenerated as the document is now.
+            let shown = if key.version.is_none() && !from_old { crate::drawing_hooks::studio_context(&self.doc, key.tab, &key.config, cx) } else { None };
             let regen = self.regens.entry(key.clone()).or_insert_with(|| Arc::new(Mutex::new(Regenerator::new()))).clone();
             let assemblies = self.assemblies.clone();
             self.regenerating.insert(key.clone());
             cx.spawn(async move |this, cx| {
                 let k2 = key.clone();
-                let src = cx.background_spawn(async move { views::regenerate_source(&doc, &k2, &mut regen.lock(), &mut assemblies.lock()) }).await;
+                let src = cx
+                    .background_spawn(async move {
+                        match shown {
+                            Some(context) => views::studio_source(&doc, &k2, context),
+                            None => views::regenerate_source(&doc, &k2, &mut regen.lock(), &mut assemblies.lock()),
+                        }
+                    })
+                    .await;
                 this.update(cx, |this, cx| {
                     this.regenerating.remove(&key);
                     match src {

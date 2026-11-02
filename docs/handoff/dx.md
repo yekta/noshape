@@ -23,8 +23,16 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   - Views of 64+ bodies are always exact (`always_exact`): the polygonal pass took as long, so the app drew twice.
   - `regenerate_source` keeps the last 4 sources by key and content hash: Create Drawing's layout bounds and the
     views share one assembly evaluation.
-  - Open: a Part Studio drawing regenerates the studio again in its own Regenerator (live's 1000-part FeatureScript
-    studio: 17 s, so its drawing took 16.6 s and Update 12 s; live 3.7-4 s per view, Update 6.4 s).
+  - A Part Studio drawing no longer regenerates the studio again: ops regenerates a drawing's current-config Part
+    Studio sources with the document's own Regenerator first (`OpenDoc::prime_sources`, incremental), the app's
+    drawing view takes the result the Part Studio view shows when it is current (`part_studio::committed_context`,
+    drawing hook `studio_context`: no regeneration pending, same studio, configuration and variables). Live's
+    1000-part FeatureScript studio: drawing 16.6 s -> 0.84 s for four views (live 3.7-4 s per view), Update after
+    Columns 40 -> 39 12 s -> 1 s (live 6.4 s); in the app (debug) the Insert view preview follows the cursor in
+    about 2 s (was a 50 s regeneration; live 10.5 s). The studio's own regeneration: ours 6.5 s, Columns change
+    9.9 s (live 11 s preview / 5 s commit, 13.9 s).
+  - Found: our first inserted view keeps the template's 1:1 where live auto-scales it (1:8 here = Create Drawing's
+    suggested scale); live asked for the rule (REQUESTS P2 "first view's auto scale").
 - Parasolid export writes a face going round a periodic B-surface (or one closed with a tangent seam) as one
   periodic face, as Onshape does: live imports our re-exported vase identical to its own (1808). Our loft sample
   was 1000x small (the test wrote metres as millimetres); rewritten, re-import asked (REQUESTS P3 follow-up).

@@ -190,6 +190,24 @@ struct ShownResult {
     config: noshape_model::configuration::ConfigValues,
     display: Arc<StudioDisplay>,
     context: Option<Arc<noshape_model::regen::context::Context>>,
+    /// A full regeneration (no rollback, no sketch edited): its document
+    /// variables.
+    full: Option<std::collections::BTreeMap<String, noshape_units::Quantity>>,
+}
+
+thread_local! {
+    /// The Part Studio views, by document and tab ([`committed_context`]).
+    static OPEN_VIEWS: std::cell::RefCell<std::collections::HashMap<(EntityId, TabId), WeakEntity<PartStudioView>>> = Default::default();
+}
+
+/// The regenerated Part Studio `tab` of `doc` shows, when it is current in
+/// configuration `config` (a drawing of it uses that instead of
+/// regenerating the studio again).
+pub fn committed_context(doc: &Entity<DocModel>, tab: TabId, config: &noshape_model::configuration::ConfigValues, cx: &App) -> Option<Arc<noshape_model::regen::context::Context>> {
+    let view = OPEN_VIEWS.with(|m| m.borrow().get(&(doc.entity_id(), tab)).and_then(|v| v.upgrade()))?;
+    let d = &doc.read(cx).session.doc;
+    let Some(noshape_model::TabContent::PartStudio(studio)) = d.tab(tab).map(|t| &t.content) else { return None };
+    view.read(cx).committed_context(studio, &noshape_model::variables::element_variables(d, tab), config)
 }
 
 struct EditSession {
@@ -376,6 +394,7 @@ impl PartStudioView {
     }
 
     pub fn new(doc: Entity<DocModel>, tab: TabId, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        OPEN_VIEWS.with(|m| m.borrow_mut().insert((doc.entity_id(), tab), cx.entity().downgrade()));
         let viewport = cx.new(|cx| Viewport::new(gpu.clone(), window, cx));
         let mut subs = Vec::new();
         subs.push(cx.subscribe_in(&viewport, window, |this, vp, ev, window, cx| {
@@ -591,6 +610,7 @@ impl PartStudioView {
             log::info!(target: "perf", "schedule_regen #{seq} from {caller} (upto {upto:?}, {} features)", studio.features.len());
         }
         let editing_sketch = self.sketch.as_ref().map(|s| s.feature).or_else(|| self.editing_sketch_id(cx));
+        let full = (upto.is_none() && editing_sketch.is_none()).then(|| doc_vars.clone());
         // The studio's head as the document thumbnail draws it.
         let head = upto.is_none() && editing_sketch.is_none() && config == studio.configuration.defaults();
         let shown_vars = doc_vars.clone();
@@ -664,7 +684,7 @@ impl PartStudioView {
                     crate::start_thumbnail::regen_done(&path, this.tab, made, cx);
                 }
                 this.apply_display(display, window, cx);
-                this.note_done(done_studio, upto, done_config);
+                this.note_done(done_studio, upto, done_config, full.clone());
                 this.perf_script_note("display applied");
                 if !refine {
                     this.perf_script_step(cx);
@@ -696,7 +716,7 @@ impl PartStudioView {
                     let display = Arc::new(fine.display);
                     crate::start_thumbnail::regen_done(&path, this.tab, head.then(|| (studio.clone(), shown_vars, display.clone())), cx);
                     this.apply_display(display, window, cx);
-                    this.note_done(studio, upto, config);
+                    this.note_done(studio, upto, config, full);
                     this.perf_script_step(cx);
                 });
             }
@@ -706,10 +726,29 @@ impl PartStudioView {
 
     /// A result just shown: with no dialog open it is the committed
     /// document's, what a later cancel goes back to (`last_done`).
-    fn note_done(&mut self, studio: Arc<PartStudio>, upto: Option<usize>, config: noshape_model::configuration::ConfigValues) {
+    fn note_done(&mut self, studio: Arc<PartStudio>, upto: Option<usize>, config: noshape_model::configuration::ConfigValues, full: Option<std::collections::BTreeMap<String, noshape_units::Quantity>>) {
         if self.edit.is_none() {
-            self.last_done = Some(ShownResult { studio, upto, config, display: self.display.clone(), context: self.context.clone() });
+            self.last_done = Some(ShownResult { studio, upto, config, display: self.display.clone(), context: self.context.clone(), full });
         }
+    }
+
+    /// The regenerated studio this tab shows, when it is the whole studio as
+    /// the document has it now (`studio`, its document variables `vars`; no
+    /// regeneration pending: the view regenerates on every change that
+    /// reaches it) in configuration `config`: a drawing of the Part Studio
+    /// shows it instead of regenerating it again.
+    pub fn committed_context(&self, studio: &PartStudio, vars: &std::collections::BTreeMap<String, noshape_units::Quantity>, config: &noshape_model::configuration::ConfigValues) -> Option<Arc<noshape_model::regen::context::Context>> {
+        let d = self.last_done.as_ref()?;
+        if self.pending.is_some() || self.edit.is_some() || d.full.as_ref() != Some(vars) || *d.studio != *studio {
+            return None;
+        }
+        let mut values = d.studio.configuration.defaults();
+        for (k, v) in &config.0 {
+            if values.0.contains_key(k) {
+                values.0.insert(k.clone(), v.clone());
+            }
+        }
+        (d.config == values).then(|| d.context.clone()).flatten()
     }
 
     /// Configuration values to evaluate: defaults overridden by the user's choice.

@@ -2398,10 +2398,15 @@ impl Workspace {
     fn create_drawing_tab(&mut self, name: String, template: (noshape_model::drawing::templates::DrawingTemplate, Option<crate::drawing_create::DwtTab>), source: Option<noshape_model::drawing::create::DrawingSource>, suggested: bool, window: &mut Window, cx: &mut Context<Self>) {
         let (template, dwt) = template;
         let doc = self.doc.read(cx).session.doc.clone();
+        // A Part Studio source its tab shows regenerated: laid out (and drawn) from that.
+        let shown = source.as_ref().filter(|_| suggested).and_then(|s| Some((noshape_model::drawing::views::SourceKey { config: s.config.clone(), ..noshape_model::drawing::views::SourceKey::studio(s.tab) }, crate::part_studio::committed_context(&self.doc, s.tab, &s.config, cx)?)));
         cx.spawn_in(window, async move |this, cx| {
             let src = source.clone();
             let drawing = cx
                 .background_spawn(async move {
+                    if let Some((key, context)) = shown {
+                        noshape_model::drawing::views::studio_source(&doc, &key, context);
+                    }
                     let bounds = if suggested { src.as_ref().and_then(|s| noshape_model::drawing::create::source_bounds(&doc, s)) } else { None };
                     // Sketch sources face the sketch plane.
                     let frame = src.as_ref().and_then(|s| noshape_model::drawing::create::source_frame(&doc, s));

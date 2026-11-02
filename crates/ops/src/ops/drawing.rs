@@ -690,7 +690,7 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
 
 pub(super) fn reply(od: &mut OpenDoc, tab: TabId, sheet: usize, edges: bool) -> Result<Value, OpError> {
     let d = dr::drawing_of(od.doc(), tab).cloned().ok_or_else(|| OpError::not_found("the drawing tab is gone"))?;
-    let m = SheetModel::build(&od.session, tab, d.clone(), sheet, &[]);
+    let m = SheetModel::build(od, tab, d.clone(), sheet, &[]);
     let mut v = sheet_json(&m, edges);
     v["drawing"] = json!(od.doc().tab(tab).map(|t| t.name.clone()));
     v["tab"] = json!(tab.to_string());
@@ -758,6 +758,9 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(n) => n.trim().to_string(),
         None => od.doc().next_tab_name(&base),
     };
+    if let Some(s) = &source {
+        od.prime_sources([noshape_model::drawing::views::SourceKey { tab: s.tab, config: s.config.clone(), explode: None, version: None, position: None, display: None }]);
+    }
     let mut drawing = dr::new_drawing(od.doc(), &template, source.as_ref(), a.bool_or("suggested_views", false)?);
     // The views are made from the document as it is now (see `old_state`).
     drawing.sources_at = od.session.head().ok().map(|m| m.to_string());
@@ -851,7 +854,7 @@ fn place_view(od: &mut OpenDoc, a: &Args, tool: Tool, opts: ViewOptions, extra: 
     let d = dr::drawing_of(od.doc(), tab).cloned().expect("drawing");
     let sheet = sheet_index(&d, a)?;
     let pos = point_value(a.get("position").expect("required"), "position")?;
-    let m = SheetModel::build(&od.session, tab, d.clone(), sheet, extra);
+    let m = SheetModel::build(od, tab, d.clone(), sheet, extra);
     let v = m.pick(&tool, &[], pos).pending_view(&opts).ok_or_else(|| OpError::param("position", "the view can't be placed there (a projected view goes at least 15 mm from its parent)"))?;
     let id = v.id;
     let mut d = d;
@@ -969,7 +972,7 @@ fn dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let clicks = a.array("picks")?.iter().enumerate().map(|(i, p)| point_value(p, &format!("picks[{i}]"))).collect::<Result<Vec<_>, _>>()?;
     let place = point_value(a.get("place").expect("required"), "place")?;
     let mid_quad = a.bool_or("mid_quad", false)?;
-    let m = SheetModel::build(&od.session, tab, d.clone(), sheet, &[]);
+    let m = SheetModel::build(od, tab, d.clone(), sheet, &[]);
     let mut picks: Vec<Pick> = Vec::new();
     for (i, c) in clicks.iter().enumerate() {
         let tool = Tool::Dimension { kind, picks: picks.clone() };
@@ -995,7 +998,7 @@ fn dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut out = reply(od, tab, sheet, false)?;
     out["annotation"] = json!(id);
     // The value as the sheet shows it.
-    let m = SheetModel::build(&od.session, tab, dr::drawing_of(od.doc(), tab).cloned().expect("drawing"), sheet, &[]);
+    let m = SheetModel::build(od, tab, dr::drawing_of(od.doc(), tab).cloned().expect("drawing"), sheet, &[]);
     if let Some(b) = &m.built {
         let texts: Vec<String> = b.geometry.texts.iter().filter(|t| matches!(b.picks.get(t.pick as usize), Some(noshape_model::drawing::build::PickTarget::Annotation(x)) if *x == id)).map(|t| t.text.clone()).collect();
         out["text"] = json!(texts.join(" "));

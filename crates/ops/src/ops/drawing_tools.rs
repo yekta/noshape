@@ -818,7 +818,7 @@ pub(super) fn target(od: &mut OpenDoc, a: &Args) -> Result<Target, OpError> {
     let tab = drawing_tab(od, a)?;
     let d = dr::drawing_of(od.doc(), tab).cloned().expect("drawing");
     let sheet = sheet_index(&d, a)?;
-    let m = SheetModel::build(&od.session, tab, d.clone(), sheet, &[]);
+    let m = SheetModel::build(od, tab, d.clone(), sheet, &[]);
     Ok(Target { tab, sheet, d, m })
 }
 

@@ -1,6 +1,6 @@
 //! What the Drawing studio asks of the app above it (docs/CRATES.md rule 3: upward calls are hooks, not
 //! dependencies): the workspace's Import, opening another document's window, the document's file tabs, the release
-//! log and the drawing watermark, the documents library, Create version, the export rules link and a preference.
+//! log and the drawing watermark, the documents library, Create version, the export rules link, a preference and the Part Studios' regenerations.
 //! The `noshape` binary registers them once at startup (main.rs), before the first window opens.
 
 use crate::doc_model::DocModel;
@@ -39,7 +39,14 @@ pub struct Hooks {
     pub export_rules_link: fn(&'static str) -> Stateful<Div>,
     /// Preferences › Drawings › Background color of model space: Light.
     pub light_model_space: fn() -> bool,
+    /// The regenerated Part Studio a tab already shows, when it is the
+    /// document's current state in that configuration (a drawing of it then
+    /// doesn't regenerate it again).
+    pub studio_context: StudioContext,
 }
+
+/// [`Hooks::studio_context`]: the document, the Part Studio tab, the configuration.
+pub type StudioContext = fn(&Entity<DocModel>, TabId, &noshape_model::configuration::ConfigValues, &App) -> Option<std::sync::Arc<noshape_model::regen::context::Context>>;
 
 static HOOKS: OnceLock<Hooks> = OnceLock::new();
 
@@ -86,4 +93,8 @@ pub fn export_rules_link(id: &'static str) -> Stateful<Div> {
 
 pub fn light_model_space() -> bool {
     (hooks().light_model_space)()
+}
+
+pub fn studio_context(doc: &Entity<DocModel>, tab: TabId, config: &noshape_model::configuration::ConfigValues, cx: &App) -> Option<std::sync::Arc<noshape_model::regen::context::Context>> {
+    (hooks().studio_context)(doc, tab, config, cx)
 }

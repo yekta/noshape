@@ -389,6 +389,35 @@ pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerato
     Some(m)
 }
 
+/// A Part Studio source from its regenerated context.
+fn studio_model(ps: &PartStudio, name: &str, hash: u64, context: Arc<Context>) -> SourceModel {
+    let parts = context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| part_info(ps, b)).collect();
+    let sketch_colors = ps
+        .appearances
+        .iter()
+        .filter_map(|a| match &a.target {
+            crate::partstudio::AppearanceTarget::Feature(f) => Some((*f, [0, 1, 2].map(|i| lin_to_srgb(a.color[i])))),
+            _ => None,
+        })
+        .collect();
+    SourceModel { hash, context, name: name.to_string(), assembly: false, parts, bom: vec![], bom_structured: vec![], bom_columns: vec![], bom_cells: vec![], model_annotations: ps.annotations.clone(), own: None, sketch_colors, explode_trails: Vec::new(), designators: HashMap::new() }
+}
+
+/// A Part Studio source of `doc` from the regeneration its tab already shows
+/// (`context`, made from this document state in the key's configuration).
+pub fn studio_source(doc: &Document, key: &SourceKey, context: Arc<Context>) -> Option<SourceModel> {
+    let tab = doc.tab(key.tab)?;
+    let TabContent::PartStudio(ps) = &tab.content else { return None };
+    let hash = source_hash(doc, key)?;
+    let m = studio_model(ps, &tab.name, hash, context);
+    let mut recent = RECENT_SOURCES.lock();
+    if recent.len() >= 4 {
+        recent.pop_front();
+    }
+    recent.push_back((key.clone(), hash, m.clone()));
+    Some(m)
+}
+
 fn evaluate_source(doc: &Document, key: &SourceKey, hash: u64, regen: &mut Regenerator, assemblies: &mut AssemblyEvaluator) -> Option<SourceModel> {
     let tab = doc.tab(key.tab)?;
     match &tab.content {
@@ -404,16 +433,7 @@ fn evaluate_source(doc: &Document, key: &SourceKey, hash: u64, regen: &mut Regen
             }
             opts.document_variables = crate::variables::element_variables(doc, key.tab);
             let r = regen.regenerate(ps, &key.config, &doc.settings.units, &opts);
-            let parts = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| part_info(ps, b)).collect();
-            let sketch_colors = ps
-                .appearances
-                .iter()
-                .filter_map(|a| match &a.target {
-                    crate::partstudio::AppearanceTarget::Feature(f) => Some((*f, [0, 1, 2].map(|i| lin_to_srgb(a.color[i])))),
-                    _ => None,
-                })
-                .collect();
-            Some(SourceModel { hash, context: r.context, name: tab.name.clone(), assembly: false, parts, bom: vec![], bom_structured: vec![], bom_columns: vec![], bom_cells: vec![], model_annotations: ps.annotations.clone(), own: None, sketch_colors, explode_trails: Vec::new(), designators: HashMap::new() })
+            Some(studio_model(ps, &tab.name, hash, r.context))
         }
         TabContent::Assembly(asm) => {
             // A named position: its placements and mate values; a display

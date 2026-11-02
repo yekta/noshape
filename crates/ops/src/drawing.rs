@@ -98,7 +98,9 @@ impl SheetModel {
     /// Build sheet `sheet` of drawing `drawing` (the tab's, or an edited
     /// copy) in `doc`: its sources (plus `extra`, e.g. what Insert view
     /// places), exact view geometry and the assembled sheet.
-    pub fn build(session: &crate::session::Session, tab: TabId, drawing: Drawing, sheet: usize, extra: &[SourceKey]) -> Self {
+    pub fn build(od: &mut crate::OpenDoc, tab: TabId, drawing: Drawing, sheet: usize, extra: &[SourceKey]) -> Self {
+        od.prime_drawing_sources(&drawing);
+        let session = &od.session;
         let doc = &session.doc;
         let versions = |id: &str| session.document_at_version(id).ok().flatten();
         let mut sources = cached_sources(doc, &drawing, &versions);
