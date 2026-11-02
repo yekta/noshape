@@ -16,8 +16,9 @@ as its seam; history: merged faces Modified to it, inner edges removed. Applies 
 different topology (live 1784); NOSHAPE_LOFT_NO_MERGE off. T1 kernel features::loft_side_faces_as_live (live 1784's
 counts and volumes), shell::a_smooth_twisted_vase_shells (now 3 faces, Shells 5 faces). Tried and dropped: each
 section concatenated to one C1 curve first (BRepAlgo::ConcatenateWire): the vase 212 mm³ under live (ours +43): live
-matches joints. Open: (d) rect -> circle 1.5 % off live (1788 asked for its split points), 2-section line pairs as
-PLANE (live), the direct Shell path declines B-spline seams (OCCT's offset takes these).
+matches joints. Then (14:30) `planar_sides`: loft faces lying in a plane are planes (live 1784's line pairs;
+NOSHAPE_LOFT_NO_PLANES off). Open: (d) rect -> circle 1.5 % off live (1788 asked for its split points), the direct
+Shell path declines B-spline seams (OCCT's offset takes these).
 **P1 smooth twisted vase (11-02 afternoon).** The vase with R5-rounded hexagons (12 side faces): every Shell failed
 after 30 s. Fixed (landing with this note): natural_loft gave each side face its own chord-length parameters (now one
 set over all faces) and moved nothing to keep line and arc faces tangent (now a line face's rows are reparametrized so

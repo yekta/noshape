@@ -2542,6 +2542,57 @@ static bool merge_tangent_sides(const TopoDS_Shape& loft, TopoDS_Shape& result, 
   return true;
 }
 
+// Loft faces lying in a plane made planes (live 1784: two rounded rectangles lofted, each pair of straight segments a
+// PLANE face; ours were the ruled surface's B-spline). `hist`: each such face Modified to its plane face.
+static bool planar_sides(const TopoDS_Shape& loft, TopoDS_Shape& result, HHist& hist)
+{
+  Bnd_Box box;
+  BRepBndLib::Add(loft, box);
+  if (box.IsVoid())
+    return false;
+  const double      tol = 1e-7 * std::sqrt(box.SquareExtent());
+  BRepTools_ReShape rs;
+  bool              any = false;
+  hist                  = new BRepTools_History();
+  for (TopExp_Explorer x(loft, TopAbs_FACE); x.More(); x.Next())
+  {
+    const TopoDS_Face f = TopoDS::Face(x.Current());
+    if (BRepAdaptor_Surface(f).GetType() == GeomAbs_Plane)
+      continue;
+    BRepLib_FindSurface fs(f, tol, true, false);
+    if (!fs.Found() || fs.ToleranceReached() > tol)
+      continue;
+    occ::handle<Geom_Plane> pl = occ::down_cast<Geom_Plane>(fs.Surface());
+    if (pl.IsNull() || !fs.Location().IsIdentity())
+      continue;
+    // The plane's normal the face's own (its natural normal, before the face's orientation).
+    BRepAdaptor_Surface sa(TopoDS::Face(f.Oriented(TopAbs_FORWARD)));
+    gp_Pnt              p;
+    gp_Vec              du, dv;
+    sa.D1(0.5 * (sa.FirstUParameter() + sa.LastUParameter()), 0.5 * (sa.FirstVParameter() + sa.LastVParameter()), p, du, dv);
+    gp_Pln pln = pl->Pln();
+    if (gp_Vec(pln.Axis().Direction()).Dot(du.Crossed(dv)) < 0)
+      pln.SetAxis(pln.Axis().Reversed());
+    BRep_Builder bld;
+    TopoDS_Face  nf;
+    bld.MakeFace(nf, new Geom_Plane(pln), BRep_Tool::Tolerance(f));
+    for (TopoDS_Iterator w(TopoDS::Face(f.Oriented(TopAbs_FORWARD)), false); w.More(); w.Next())
+      bld.Add(nf, w.Value());
+    const TopoDS_Face placed = TopoDS::Face(nf.Oriented(f.Orientation()));
+    rs.Replace(f, placed);
+    hist->AddModified(f, placed);
+    any = true;
+  }
+  if (!any)
+    return false;
+  TopoDS_Shape r = rs.Apply(loft);
+  BRepLib::SameParameter(r, tol, true);
+  if (!BRepCheck_Analyzer(r).IsValid())
+    return false;
+  result = r;
+  return true;
+}
+
 static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool closed,
                        rust::Slice<const double> start_points, const LoftEnds& ends, bool allow_natural,
                        const TopoDS_Shape& path = TopoDS_Shape(), int path_count = 0)
@@ -2681,6 +2732,11 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
     HHist        mh;
     TopoDS_Shape m;
     if (!ruled && !closed && !points && (real >= 3 || circles || counts) && !std::getenv("NOSHAPE_LOFT_NO_MERGE") && merge_tangent_sides(out, m, mh))
+    {
+      h   = compose(compound_of(args), h, mh);
+      out = m;
+    }
+    if (!std::getenv("NOSHAPE_LOFT_NO_PLANES") && planar_sides(out, m, mh))
     {
       h   = compose(compound_of(args), h, mh);
       out = m;

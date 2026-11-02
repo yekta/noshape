@@ -259,8 +259,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   section edge (14 faces, 437876.286). Now: through three or more sections, or sections of different topology, side
   faces meeting smoothly at the sections are one face (two matching sections: a face per segment, as live); ours has a
   seam edge more (OCCT). The vase's Shells: 5 faces as live, 0.9-1.1 s by OCCT's offset, within 0.7-2.4 mm³ of live.
-  Open: (d) rounded rectangle to circle is 1.5 % off live (where the circle is split: live 1788 asked); live's
-  2-section line pairs are PLANE faces (ours extrusion / B-spline).
+  Open: (d) rounded rectangle to circle is 1.5 % off live (where the circle is split: live 1788 asked). Loft faces
+  lying in a plane are planes (live's 2-section line pairs: PLANE).
 - [ ] P1 COMPOSITE-LATER-FEATURE (psui 11-01 09:27, audit-part-studio A10) a composite part breaks when a later feature edits a
   member: /root/psui-scratch/tickets/composite-fillet-stray-part.noshape (qa5's mkkinds.py: Part 1, Part 2, Composite part
   1 of both, Surface 1, Curve 1; then a 1 mm Fillet on a Part 1 edge and a failing 100 mm Chamfer). query_parts: Part 1
