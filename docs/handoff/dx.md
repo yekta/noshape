@@ -728,3 +728,24 @@ workflow-undo.md UNDO3 / behaviours "qa5 undo across tabs".
 - Ours removes it in one step.
 
 Live's note creation seems to be two history entries (place, then the text edit). Yours if you want to match it; I didn't touch the drawing code.
+
+## From skasm (11-02 20:49): X1 (B) unblocked: other documents' assemblies (27549ea9)
+- Already there (evaluator): an Assembly of another document instanced at a version is
+  `InstanceSource::External { key, body: None, config }` with `key = derived::ExternalRef { path, microversion, tab }.key()`
+  where `tab` is that document's Assembly tab. `AssemblyEvaluator::external_assembly` reads it through the
+  `ExternalStudios` provider (ops' `derived::ExternalDocs`, set in `OpenDoc::evaluate_assembly`), re-points its
+  instances to the same pinned version of that document (its own Part Studios / subassemblies, via `sibling`) and
+  evaluates it as a subassembly (`InstanceNode::linked`); BOM, Reference manager and Change to version / Update
+  workspace already handle it.
+- New: `assembly_insert` with `document` + `version` (a named version) inserts another document's Part Studio, one
+  `part` of it, or its Assembly as one subassembly ("Insert : <tab> (other document)"), as Insert › Other documents;
+  `derived::named_version(path, version)` gives (path, version, snapshot). The instance list's tip reads
+  "Versioned assembly from other document" for an assembly (live 1742 (B)). e2e
+  `assembly_inserts_another_documents_assembly_at_a_version` (a library document's Assembly with its own Part
+  Studio's two parts, at V1, instanced whole; its BOM lists both parts).
+- For Split (B): make each subassembly's document first (its Assembly tab instancing its own Part Studios, one per part),
+  create its V1 (`Session::create_version` / history_create_version), then in the top document push
+  `Instance::new(id, "<Sub> <1>", InstanceSource::External { key: ExternalRef { path: sub_path, microversion: v1, tab:
+  sub_assembly_tab.to_string() }.key(), body: None, config: Default::default() }, placement)` (or call
+  assembly_insert with document + version). A nested subassembly: the same one level down (its document first).
+  Ask me if an instance needs anything else (configurations of another document's assembly aren't offered yet).

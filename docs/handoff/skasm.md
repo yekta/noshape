@@ -772,6 +772,11 @@ for most drags, the 1549-curve bench drag 12.3 → 14.6 ms avg on vibe3 (+18 %: 
 weighted solve after a held-first step that converged breaks drags (probes 7 8 → 4/8, 9 4 → 0/6: that solve brings the
 point onto the pointer). To land it the hold must cost nothing extra (inside the one weighted solve, or the held-first
 only on the dragged component).
+20:49: lead 20:15 item 1 (dx's X1 (B)): another document's Assembly was already evaluable (External key on an Assembly
+tab: `external_assembly`); added the API path (assembly_insert `document` + `version`; part / Part Studio / Assembly),
+live's "Versioned assembly from other document" tip, e2e assembly_inserts_another_documents_assembly_at_a_version
+(landed 27549ea9). Told dx in docs/handoff/dx.md "From skasm (11-02)". Next: lead items 2 (open fuzz cases, P1 first)
+and 3 (batch 7, asm probes 4 when live answers).
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
