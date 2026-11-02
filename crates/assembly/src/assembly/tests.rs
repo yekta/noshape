@@ -5922,3 +5922,99 @@ fn the_mate_memo_changes_nothing() {
         start = memo.placements.iter().cloned().collect();
     }
 }
+
+/// Live 1754: a patterned flexible subassembly's copies have no freedom of
+/// their own. Their children keep the seed's positions (dragging a copy's
+/// turning block turns every one, the seed's too), a mate on a copy's child
+/// is solved by moving the seed's child (and so all copies), and with the
+/// seed free to slide (Planar) a mate on a copy slides the whole pattern.
+#[test]
+fn a_patterned_flexible_subassembly_follows_its_seed() {
+    let mut f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (top, bottom) = (face_with(&r, "CapEnd"), face_with(&r, "CapStart"));
+    let b = &r.context.bodies[0];
+    let face_along = |n: DVec3| {
+        b.faces
+            .iter()
+            .enumerate()
+            .find_map(|(i, name)| match b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok()?.face_surface().ok()? {
+                noshape_kernel::Surface::Plane(p) if p.normal.dot(n).abs() > 0.999 => Some(Reference::Face((**name).clone())),
+                _ => None,
+            })
+            .unwrap()
+    };
+    let x_edge = b
+        .edges
+        .iter()
+        .enumerate()
+        .find_map(|(i, n)| match b.shape.sub_shape(noshape_kernel::ShapeType::Edge, i).ok()?.edge_info().ok()?.curve {
+            noshape_kernel::Curve::Line { direction, .. } if direction.x.abs() > 0.99 => Some(Reference::Edge((**n).clone())),
+            _ => None,
+        })
+        .unwrap();
+    let centroid = |on: &Reference| Reference::Implicit { on: Box::new(on.clone()), inference: Inference::Centroid };
+    // Sub: block 2 turns on block 1 (fixed) about their common Z.
+    let sub = Assembly {
+        instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.0, 0.0, 0.01), false)],
+        mates: vec![mate(10, MateType::Revolute, conn(1, top.clone(), Inference::Centroid), conn(2, bottom.clone(), Inference::Centroid))],
+        ..Default::default()
+    };
+    let sub_tab = f.doc.add_tab("Sub", TabContent::Assembly(Box::new(sub)));
+    let mut sub_inst = Instance::new(InstanceId(5), "Sub <1>".into(), InstanceSource::Assembly { assembly: sub_tab, config: ConfigValues::default() }, Placement { translation: [0.0, 0.0, 0.01], rotation: [0.0, 0.0, 0.0, 1.0] });
+    sub_inst.lock = SubassemblyLock::Flexible;
+    // Top: the base fixed, the Sub on it (Fastened, or Planar for (D)), a
+    // linear pattern of the Sub along the base's X edge, 3 instances 50 mm apart.
+    let build = |seed_mate: MateType| {
+        let mut asm = Assembly {
+            instances: vec![part_instance(1, "Base <1>", f.studios[0], body.clone(), DVec3::ZERO, true), sub_inst.clone()],
+            mates: vec![mate(20, seed_mate, conn(1, top.clone(), Inference::Centroid), MateConnectorRef::on(InstanceId(5), vec![InstanceId(1)], centroid(&bottom)))],
+            ..Default::default()
+        };
+        asm.patterns.push(InstancePattern {
+            id: MateId(70),
+            name: "Linear pattern 1".into(),
+            kind: PatternKind::Linear { direction: conn(1, x_edge.clone(), Inference::Midpoint).linear_direction(), distance: ExprValue::new("50 mm"), count: 3, opposite: false, equal_spacing: false, second: None, centered: false },
+            seeds: vec![InstanceId(5)],
+            generated: vec![],
+            suppressed: false,
+        });
+        let copies = asm.sync_pattern(MateId(70));
+        (asm, copies)
+    };
+    let (asm, copies) = build(MateType::Fastened);
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.mates.iter().all(|m| m.ok), "{:?}", res.mates);
+    let turn = |s: &eval::Solved, sub: InstanceId| {
+        let q = s.nested.get(&(sub, InstanceId(2))).unwrap().rotation;
+        (DQuat::from_xyzw(q[0], q[1], q[2], q[3]) * DVec3::X).truncate().angle_to(glam::DVec2::X)
+    };
+    let all = |s: &eval::Solved| [InstanceId(5), copies[0], copies[1]].map(|id| turn(s, id));
+    // Drag a corner of copy 3's turning block round: every block 2 turns alike.
+    let s = res.prepared.solve(&SolveOptions { nested_drags: vec![((copies[1], InstanceId(2)), DVec3::new(0.04, 0.02, 0.01), DVec3::new(0.1, 0.06, 0.03))], ..Default::default() });
+    let t = all(&s);
+    assert!(t[0].abs() > 0.05, "the seed's block turned: {t:?}");
+    assert!((t[0] - t[1]).abs() < 1e-6 && (t[0] - t[2]).abs() < 1e-6, "every copy turned with it: {t:?}");
+    // (A) Parallel: copy 3's block 2's X face to the base's Y face: all turn 90°.
+    let mut a = asm.clone();
+    a.mates.push(mate(30, MateType::Parallel, MateConnectorRef::on(copies[1], vec![InstanceId(2)], centroid(&face_along(DVec3::X))), conn(1, face_along(DVec3::Y), Inference::Centroid)));
+    let res_a = ev.evaluate(&f.doc, &a, &SolveOptions::default(), None);
+    assert!(res_a.mates.iter().all(|m| m.ok), "{:?}", res_a.mates);
+    let t = all(&res_a.solved);
+    assert!((t[0].abs() - std::f64::consts::FRAC_PI_2).abs() < 1e-6, "the seed's block turned 90°: {t:?}");
+    assert!((t[0] - t[1]).abs() < 1e-6 && (t[0] - t[2]).abs() < 1e-6, "and every copy's: {t:?}");
+    // (D) The seed on a Planar; copy 3's block 1 Fastened on a second base
+    // 30 mm further in X: the whole pattern slides 30 mm.
+    let (mut d, copies_d) = build(MateType::Planar);
+    d.instances.push(part_instance(9, "Base <2>", f.studios[0], body.clone(), DVec3::new(0.13, 0.0, 0.0), true));
+    d.mates.push(mate(40, MateType::Fastened, MateConnectorRef::on(copies_d[1], vec![InstanceId(1)], centroid(&bottom)), conn(9, top.clone(), Inference::Centroid)));
+    let res_d = ev.evaluate(&f.doc, &d, &SolveOptions::default(), None);
+    assert!(res_d.mates.iter().all(|m| m.ok), "{:?}", res_d.mates);
+    let at = |id: InstanceId| DVec3::from(res_d.solved.placement(id).unwrap().translation);
+    let (seed, c2, c3) = (at(InstanceId(5)), at(copies_d[0]), at(copies_d[1]));
+    assert!((c3.x - 0.13).abs() < 1e-6 && c3.y.abs() < 1e-6, "copy 3 on base 2: {c3:?}");
+    assert!((seed.x - 0.03).abs() < 1e-6 && ((c2 - seed).x - 0.05).abs() < 1e-6 && ((c3 - seed).x - 0.1).abs() < 1e-6, "the seed and the pattern slid with it: {seed:?} {c2:?} {c3:?}");
+    // The copies have no degrees of freedom of their own.
+    assert_eq!(res.solved.instance_dof.get(&copies[1]).copied(), Some(0), "{:?}", res.solved.instance_dof);
+}

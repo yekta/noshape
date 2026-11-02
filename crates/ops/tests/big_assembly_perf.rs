@@ -138,6 +138,8 @@ fn build(case: Case) -> Built {
 /// first evaluation (the Part Studio regenerated, the solve from the saved
 /// placements) and the scene; each step's time.
 fn open(path: &str) -> (Duration, Duration, Option<Duration>) {
+    // As a fresh app process: no DOF analysis cached.
+    noshape_model::assembly::solver::clear_dof_cache();
     let mut ctx = Ctx::new();
     let t = Instant::now();
     call(&mut ctx, "document_open", json!({ "path": path }));

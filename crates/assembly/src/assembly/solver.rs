@@ -674,6 +674,8 @@ pub struct Problem<'a> {
     pub mates: &'a [SolverMate],
     pub relations: &'a [SolverRelation],
     pub drags: &'a [DragTarget],
+    /// Pattern copies placed from their seeds (not unknowns).
+    driven: &'a Driven,
     /// The residual terms solved together (one group of connected bodies).
     terms: Vec<Term>,
     /// Characteristic length (rotation residuals in length units).
@@ -749,6 +751,118 @@ fn term_residuals(p: &Problem, poses: &[Frame], t: Term, out: &mut Vec<f64>) {
     }
 }
 
+/// Pattern copies (live 1754): a follower mate's second body has no freedom
+/// of its own: its pose follows from its seed's and the pattern axis'
+/// (copies of a flexible subassembly: each child from the seed's child).
+/// Copies aren't unknowns of the solve: their poses are set from their
+/// drivers wherever poses change, and their mates constrain the drivers (a
+/// mate on a copy moves the seed and the whole pattern; the a1000 pattern's
+/// 600 unknowns are the seed's 60).
+#[derive(Default)]
+struct Driven {
+    /// (copy body, follower mate), drivers before the bodies they drive.
+    order: Vec<(usize, usize)>,
+    is_driven: Vec<bool>,
+    /// The follower mate placing each driven body.
+    placer: Vec<Option<usize>>,
+    /// Each driven body's free drivers, transitively (the bodies it moves with).
+    roots: Vec<Vec<usize>>,
+    /// Each free body's copies (the driven bodies it moves).
+    dependents: Vec<Vec<usize>>,
+}
+
+impl Driven {
+    fn new(bodies: &[SolverBody], mates: &[SolverMate]) -> Self {
+        let n = bodies.len();
+        let mut d = Driven { order: Vec::new(), is_driven: vec![false; n], placer: vec![None; n], roots: vec![Vec::new(); n], dependents: vec![Vec::new(); n] };
+        let pending: Vec<usize> = (0..mates.len()).filter(|&i| mates[i].follow.is_some() && !bodies[mates[i].b].fixed && mates[i].a != mates[i].b).collect();
+        // A body driven twice keeps its first follower (the rest stay mates).
+        let mut by_body: HashMap<usize, usize> = HashMap::new();
+        for &i in &pending {
+            by_body.entry(mates[i].b).or_insert(i);
+        }
+        for &b in by_body.keys() {
+            d.is_driven[b] = true;
+        }
+        // Order drivers first; a loop of followers leaves its members as mates.
+        let mut placed = vec![false; n];
+        let mut left: Vec<(usize, usize)> = by_body.into_iter().collect();
+        left.sort_unstable();
+        loop {
+            let before = left.len();
+            left.retain(|&(b, i)| {
+                let m = &mates[i];
+                let inputs = [m.a, m.follow.map(|f| f.axis_body).unwrap_or(m.a)];
+                if inputs.iter().any(|&x| d.is_driven[x] && !placed[x]) {
+                    return true;
+                }
+                let mut roots = Vec::new();
+                for x in inputs {
+                    if d.is_driven[x] {
+                        roots.extend(d.roots[x].iter().copied());
+                    } else if !bodies[x].fixed {
+                        roots.push(x);
+                    }
+                }
+                roots.sort_unstable();
+                roots.dedup();
+                d.roots[b] = roots;
+                d.order.push((b, i));
+                placed[b] = true;
+                false
+            });
+            if left.is_empty() || left.len() == before {
+                break;
+            }
+        }
+        for (b, _) in left {
+            d.is_driven[b] = false;
+        }
+        for &(b, i) in &d.order {
+            d.placer[b] = Some(i);
+            for &r in &d.roots[b] {
+                d.dependents[r].push(b);
+            }
+        }
+        d
+    }
+
+    /// Whether mate `i` is the follower placing its copy.
+    fn places(&self, mates: &[SolverMate], i: usize) -> bool {
+        self.placer.get(mates[i].b).copied().flatten() == Some(i)
+    }
+
+    /// The free bodies `b` stands for: itself, or a copy's drivers.
+    fn free_roots(&self, bodies: &[SolverBody], b: usize) -> Vec<usize> {
+        let mut out = Vec::new();
+        self.push_free_roots(bodies, b, &mut out);
+        out
+    }
+
+    /// [`Driven::free_roots`] appended to `out`.
+    fn push_free_roots(&self, bodies: &[SolverBody], b: usize, out: &mut Vec<usize>) {
+        if self.is_driven.get(b).copied().unwrap_or(false) {
+            out.extend_from_slice(&self.roots[b]);
+        } else if !bodies[b].fixed {
+            out.push(b);
+        }
+    }
+
+    /// Place every copy from its drivers (`only`: the copies of that body).
+    fn place(&self, mates: &[SolverMate], poses: &mut [Frame], only: Option<usize>) {
+        for &(b, i) in &self.order {
+            if only.is_some_and(|o| !self.roots[b].contains(&o)) {
+                continue;
+            }
+            let m = &mates[i];
+            let Some(f) = &m.follow else { continue };
+            let seed = poses[m.a].mul(&m.a_local);
+            let e = f.expected(poses, &seed);
+            poses[b] = e.mul(&m.b_local.inverse());
+        }
+    }
+}
+
 fn residuals(p: &Problem, poses: &[Frame], out: &mut Vec<f64>) {
     out.clear();
     for t in terms(p) {
@@ -770,10 +884,14 @@ fn jacobian(p: &Problem, poses: &[Frame], free: &[usize], r: &[f64], scale: f64,
         spans.push((t, row, buf.len()));
         row += buf.len();
         for b in term_bodies(p, t) {
-            if let Some(v) = by_body.get_mut(b)
-                && v.last() != Some(&ti)
-            {
-                v.push(ti);
+            // A copy's terms move with its drivers.
+            let readers: Vec<usize> = if p.driven.is_driven.get(b).copied().unwrap_or(false) { p.driven.roots[b].clone() } else { vec![b] };
+            for x in readers {
+                if let Some(v) = by_body.get_mut(x)
+                    && v.last() != Some(&ti)
+                {
+                    v.push(ti);
+                }
             }
         }
     }
@@ -785,6 +903,10 @@ fn jacobian(p: &Problem, poses: &[Frame], free: &[usize], r: &[f64], scale: f64,
             let mut d = [0.0; 6];
             d[j] = if j < 3 { eps * scale } else { eps };
             work[bi] = apply_delta(&poses[bi], &d);
+            let copies = &p.driven.dependents[bi];
+            if !copies.is_empty() {
+                p.driven.place(p.mates, &mut work, Some(bi));
+            }
             for &ti in &by_body[bi] {
                 let (t, start, len) = spans[ti];
                 buf.clear();
@@ -799,6 +921,9 @@ fn jacobian(p: &Problem, poses: &[Frame], free: &[usize], r: &[f64], scale: f64,
                 }
             }
             work[bi] = poses[bi];
+            for &c in copies {
+                work[c] = poses[c];
+            }
         }
     }
     jac
@@ -888,17 +1013,22 @@ pub fn solve_with(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
 /// [`solve_with`] reusing (and keeping) mates' residuals in `memo`; `mates`
 /// must be the list the memo was kept for.
 pub fn solve_with_memo(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool, memo: Option<&std::cell::RefCell<MateMemo>>) -> SolveResult {
-    // Followers (pattern / mirror copies) start at their expected pose.
-    for _ in 0..2 {
-        for m in mates {
-            let Some(f) = &m.follow else { continue };
-            if bodies[m.b].fixed {
-                continue;
+    // Followers (pattern / mirror copies) start at their expected pose (one
+    // list of poses kept in step: a copy per follower was most of an a1000
+    // drag step once a flexible copy's children follow too).
+    if mates.iter().any(|m| m.follow.is_some()) {
+        let mut poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+        for _ in 0..2 {
+            for m in mates {
+                let Some(f) = &m.follow else { continue };
+                if bodies[m.b].fixed {
+                    continue;
+                }
+                let seed = poses[m.a].mul(&m.a_local);
+                let e = f.expected(&poses, &seed);
+                bodies[m.b].pose = e.mul(&m.b_local.inverse());
+                poses[m.b] = bodies[m.b].pose;
             }
-            let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
-            let seed = poses[m.a].mul(&m.a_local);
-            let e = f.expected(&poses, &seed);
-            bodies[m.b].pose = e.mul(&m.b_local.inverse());
         }
     }
     let stays = orient_axial_mates(bodies, mates);
@@ -958,17 +1088,22 @@ pub fn solve_placed(bodies: &mut [SolverBody], mates: &[SolverMate], relations: 
 /// held. Taken when the mates hold and the drag points reach their targets;
 /// otherwise (a linkage the drag has to move) the whole group is solved.
 fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool, memo: Option<&std::cell::RefCell<MateMemo>>) -> Option<SolveResult> {
-    let moving: Vec<usize> = drags.iter().map(|d| d.body).filter(|&b| !bodies[b].fixed).collect();
+    // A dragged copy moves its seed (live 1754); copies of what moves follow.
+    let driven = Driven::new(bodies, mates);
+    let mut moving: Vec<usize> = drags.iter().flat_map(|d| driven.free_roots(bodies, d.body)).collect();
+    moving.sort_unstable();
+    moving.dedup();
     if moving.is_empty() {
         return None;
     }
-    let mut trial: Vec<SolverBody> = bodies.iter().enumerate().map(|(i, b)| SolverBody { pose: b.pose, fixed: b.fixed || !moving.contains(&i) }).collect();
+    let follows: Vec<usize> = moving.iter().flat_map(|&b| driven.dependents[b].iter().copied()).collect();
+    let mut trial: Vec<SolverBody> = bodies.iter().enumerate().map(|(i, b)| SolverBody { pose: b.pose, fixed: b.fixed || !(moving.contains(&i) || follows.contains(&i)) }).collect();
     solve_inner(&mut trial, mates, relations, drags, false, false, None);
     let r = solve_inner(&mut trial, mates, relations, &[], false, true, memo);
     let reached = drags.iter().all(|d| trial[d.body].pose.transform_point(d.local_point).distance(d.target) < 1e-7);
     // The dragged bodies' mates must hold (a failing mate elsewhere isn't
     // this step's business); with relations, everything must.
-    let held = if relations.is_empty() { mates.iter().enumerate().filter(|(_, m)| mate_bodies(m).any(|b| moving.contains(&b))).all(|(i, _)| r.mate_ok[i]) } else { r.converged };
+    let held = if relations.is_empty() { mates.iter().enumerate().filter(|(_, m)| mate_bodies(m).any(|b| moving.contains(&b) || follows.contains(&b))).all(|(i, _)| r.mate_ok[i]) } else { r.converged };
     if !held {
         return None;
     }
@@ -980,9 +1115,9 @@ fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations
         let poses: Vec<Frame> = trial.iter().map(|b| b.pose).collect();
         let scale = characteristic_length(&poses, mates).max(1e-3);
         let held_bodies: &[SolverBody] = bodies;
-        let (groups, _) = group_terms(held_bodies, mates, relations, drags, false);
+        let (groups, _) = group_terms(held_bodies, mates, relations, drags, false, &driven);
         for (free, terms) in groups.iter().filter(|(_, ts)| ts.iter().any(|t| matches!(t, Term::Drag(_)))) {
-            let problem = Problem { bodies: held_bodies, mates, relations, drags, terms: terms.clone(), scale };
+            let problem = Problem { bodies: held_bodies, mates, relations, drags, driven: &driven, terms: terms.clone(), scale };
             let mut res = Vec::new();
             residuals(&problem, &poses, &mut res);
             // The mates near rigid (the drag rows a further 1000× softer: a
@@ -1136,7 +1271,7 @@ fn seat_cone_limits(bodies: &mut [SolverBody], mates: &[SolverMate]) {
 /// A group: its free bodies and its terms.
 type Group = (Vec<usize>, Vec<Term>);
 
-fn group_terms(bodies: &[SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], stays: bool) -> (Vec<Group>, Vec<usize>) {
+fn group_terms(bodies: &[SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], stays: bool, driven: &Driven) -> (Vec<Group>, Vec<usize>) {
     let mut parent: Vec<usize> = (0..bodies.len()).collect();
     fn root(parent: &mut [usize], mut i: usize) -> usize {
         while parent[i] != i {
@@ -1145,12 +1280,23 @@ fn group_terms(bodies: &[SolverBody], mates: &[SolverMate], relations: &[SolverR
         }
         i
     }
-    let probe = Problem { bodies, mates, relations, drags, terms: Vec::new(), scale: 1.0 };
+    let probe = Problem { bodies, mates, relations, drags, driven, terms: Vec::new(), scale: 1.0 };
     let mut groups: Vec<Group> = Vec::new();
     let mut term_root: Vec<(Term, Option<usize>)> = Vec::new();
-    let stay_terms: Vec<Term> = if stays && !drags.is_empty() { (0..bodies.len()).filter(|&b| !bodies[b].fixed && !drags.iter().any(|d| d.body == b)).map(Term::Stay).collect() } else { Vec::new() };
+    let stay_terms: Vec<Term> = if stays && !drags.is_empty() { (0..bodies.len()).filter(|&b| !bodies[b].fixed && !driven.is_driven[b] && !drags.iter().any(|d| d.body == b)).map(Term::Stay).collect() } else { Vec::new() };
     for t in all_terms(mates, relations, drags).chain(stay_terms) {
-        let free: Vec<usize> = term_bodies(&probe, t).into_iter().filter(|&b| !bodies[b].fixed).collect();
+        // A copy's placing follower holds by construction; its other terms
+        // belong to its drivers.
+        if let Term::Mate(i) = t
+            && driven.places(mates, i)
+        {
+            continue;
+        }
+        let mut free: Vec<usize> = Vec::new();
+        for b in term_bodies(&probe, t) {
+            driven.push_free_roots(bodies, b, &mut free);
+        }
+        free.dedup();
         for w in free.windows(2) {
             let (a, b) = (root(&mut parent, w[0]), root(&mut parent, w[1]));
             parent[a] = b;
@@ -1168,7 +1314,7 @@ fn group_terms(bodies: &[SolverBody], mates: &[SolverMate], relations: &[SolverR
     }
     let mut loose = Vec::new();
     for (i, b) in bodies.iter().enumerate() {
-        if b.fixed {
+        if b.fixed || driven.is_driven[i] {
             continue;
         }
         match group_of.get(&root(&mut parent, i)) {
@@ -1181,9 +1327,11 @@ fn group_terms(bodies: &[SolverBody], mates: &[SolverMate], relations: &[SolverR
 
 fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool, status: bool, memo: Option<&std::cell::RefCell<MateMemo>>) -> SolveResult {
     let mut poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+    let driven = Driven::new(bodies, mates);
+    driven.place(mates, &mut poses, None);
     let scale = characteristic_length(&poses, mates).max(1e-3);
     let mut result = SolveResult { mate_ok: vec![false; mates.len()], body_dof: vec![0; bodies.len()], ..Default::default() };
-    let (groups, loose) = group_terms(bodies, mates, relations, drags, true);
+    let (groups, loose) = group_terms(bodies, mates, relations, drags, true, &driven);
     if dof {
         // Unconstrained and not dragged: free in all 6 directions.
         for i in loose {
@@ -1202,7 +1350,7 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
         let solved: Vec<(Vec<(usize, Frame)>, usize)> = groups
             .par_iter()
             .filter_map(|(free, terms)| {
-                let problem = Problem { bodies, mates, relations, drags, terms: terms.clone(), scale };
+                let problem = Problem { bodies, mates, relations, drags, driven: &driven, terms: terms.clone(), scale };
                 let dragged = terms.iter().any(|t| matches!(t, Term::Drag(_)));
                 // Already solved (a drag's untouched groups, held by their
                 // stays): Levenberg-Marquardt would stop at once without a
@@ -1227,6 +1375,8 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
             result.iterations = result.iterations.max(iterations);
         }
     }
+    // The copies from their solved drivers.
+    driven.place(mates, &mut poses, None);
 
     // Mate residuals only (exclude drag terms) decide convergence, and each
     // mate's status (one residual pass for both). Not wanted (`status`
@@ -1263,7 +1413,7 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
             .par_iter()
             .filter(|_| dof)
             .map(|(free, terms)| {
-                let mut nodrag = Problem { bodies, mates, relations, drags, terms: terms.iter().copied().filter(|t| !matches!(t, Term::Drag(_) | Term::Stay(_))).collect(), scale };
+                let mut nodrag = Problem { bodies, mates, relations, drags, driven: &driven, terms: terms.iter().copied().filter(|t| !matches!(t, Term::Drag(_) | Term::Stay(_))).collect(), scale };
                 // The group's own length scale, so the analysis (and its cache key)
                 // doesn't change when an instance far away is inserted or moved.
                 nodrag.scale = group_length(&nodrag, poses);
@@ -1333,6 +1483,14 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
 /// of eigen-decompositions on every evaluation).
 type DofCache = std::sync::Mutex<HashMap<u64, (usize, Vec<usize>)>>;
 static DOF_CACHE: std::sync::OnceLock<DofCache> = std::sync::OnceLock::new();
+
+/// Forget every cached DOF analysis (a process starting afresh: benches
+/// timing a document's first open).
+pub fn clear_dof_cache() {
+    if let Ok(mut c) = DOF_CACHE.get_or_init(Default::default).lock() {
+        c.clear();
+    }
+}
 
 /// The group's terms (every field of their mates and relations), the poses
 /// of the bodies they read and which are fixed, the free bodies and the
@@ -1435,6 +1593,7 @@ fn levenberg_marquardt(problem: &Problem, poses: &mut Vec<Frame>, free: &[usize]
                 }
                 trial[bi] = apply_delta(&poses[bi], &d);
             }
+            problem.driven.place(problem.mates, &mut trial, None);
             residuals(problem, &trial, &mut r2);
             let c2: f64 = r2.iter().map(|v| v * v).sum();
             if c2 < cost {
@@ -1536,6 +1695,7 @@ fn least_change(problem: &Problem, poses: &mut [Frame], free: &[usize], scale: f
             let d: Vec<f64> = (0..6).map(|j| delta[k * 6 + j] * if j < 3 { scale } else { 1.0 }).collect();
             trial[bi] = apply_delta(&trial[bi], &d);
         }
+        problem.driven.place(problem.mates, &mut trial, None);
         residuals(problem, &trial, &mut r);
         // The finite-difference Jacobian's noise floor: rounds after the
         // first move ~1e-13 back and forth (200-instance bench: 4–12 rounds

@@ -3014,6 +3014,18 @@ impl AssemblyEvaluator {
                 let Some((axis_body, axis_local, xform)) = make(g.index, g.seed, g.instance) else { continue };
                 let sm = SolverMate { a: sb, a_local: soff, b: gb, b_local: goff, follow: Some(Follow { axis_body, axis_local, xform }), ..Default::default() };
                 prepared.mates.push((MateId(u64::MAX - prepared.mates.len() as u64), MateType::Fastened, sm));
+                // A flexible subassembly's copy: each child with a body of its
+                // own follows the seed's same child (live 1754: the copies
+                // keep the seed's positions inside; any copy's Arm turns them all).
+                let children: Vec<(InstanceId, (usize, Frame))> = prepared.nested_body_of.iter().filter(|((sid, _), _)| *sid == g.seed).map(|((_, c), v)| (*c, *v)).collect();
+                for (child, (scb, scoff)) in children {
+                    let Some(&(gcb, gcoff)) = prepared.nested_body_of.get(&(g.instance, child)) else { continue };
+                    if gcb == gb || scb == gcb {
+                        continue;
+                    }
+                    let cm = SolverMate { a: scb, a_local: scoff, b: gcb, b_local: gcoff, follow: Some(Follow { axis_body, axis_local, xform }), ..Default::default() };
+                    prepared.mates.push((MateId(u64::MAX - prepared.mates.len() as u64), MateType::Fastened, cm));
+                }
             }
         }
 
