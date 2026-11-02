@@ -393,6 +393,28 @@ fn part_bodies_named(file: &PartFile, wire_name: Option<&str>, at: Option<&glam:
 /// its index (body ids don't depend on names), so parts that share a name
 /// (STEP's "Part", "Body", "SOLID") each get their own body. The first body
 /// of each part whose kind `want` takes.
+/// The solid body of each part of an Import feature from the parts' shapes
+/// (solids, shells, faces, edges), as `importing::import_foreign` numbers
+/// them: one body per solid (else per shell, else one surface or one wire),
+/// `BodyId { index: 64 × the tools and wires before it }`; None for a part
+/// without a solid.
+pub fn bodies_by_order(feature: crate::reference::FeatureId, shapes: &[[usize; 4]]) -> Vec<Option<BodyId>> {
+    let mut next = 0u32;
+    shapes
+        .iter()
+        .map(|&[solids, shells, faces, edges]| {
+            if solids > 0 {
+                let id = BodyId { feature, index: next * 64 };
+                next += solids as u32;
+                Some(id)
+            } else {
+                next += if shells > 0 { shells as u32 } else { u32::from(faces > 0 || edges > 0) };
+                None
+            }
+        })
+        .collect()
+}
+
 fn bodies_of_parts(ps: &PartStudio, units: &UnitPrefs, want: impl Fn(crate::display::BodyKind) -> bool) -> Vec<Option<BodyId>> {
     const TOKEN: &str = "\u{1}part ";
     let mut probe = ps.clone();
@@ -402,7 +424,11 @@ fn bodies_of_parts(ps: &PartStudio, units: &UnitPrefs, want: impl Fn(crate::disp
         p.name = Some(format!("{TOKEN}{i}"));
     }
     f.params.set("partInfo", ParamValue::Text(serde_json::to_string(&info).unwrap_or_default()));
+    let t = std::time::Instant::now();
     let regen = Regenerator::new().regenerate(&probe, &ConfigValues::default(), units, &RegenOptions::default());
+    if std::env::var_os("NOSHAPE_IMPORT_TIMING").is_some() {
+        eprintln!("import stage bodies_of_parts regeneration: {:.1} ms", t.elapsed().as_secs_f64() * 1000.0);
+    }
     let mut out = vec![None; info.len()];
     for b in regen.context.bodies.iter().filter(|b| want(b.kind)) {
         if let Some(i) = b.name.strip_prefix(TOKEN).and_then(|r| r.parse::<usize>().ok())
@@ -448,6 +474,10 @@ pub struct PvzImport {
     /// A STEP assembly's subassemblies (live request 1742): each its own
     /// Assembly tab, instanced where used.
     pub nesting: Option<k::StepNesting>,
+    /// Each part's (solids, shells, faces, edges) when known (STEP /
+    /// Parasolid): its body follows from the Import feature's numbering
+    /// ([`bodies_by_order`]) without regenerating the Part Studio.
+    pub part_shapes: Option<Vec<[usize; 4]>>,
 }
 
 /// A PVZ (Creo View) file of several part instances, as Onshape imports it
@@ -459,7 +489,7 @@ pub struct PvzImport {
 /// Assembly tab comes first. `brep` / `info` are the Import feature's data
 /// (the parts in their own coordinates, see `noshape_kernel::read_pvz_parts`).
 pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) -> Result<(TabId, TabId), String> {
-    let PvzImport { stem, root, brep, info, foreign_id, instances, names: _, step, options, nesting } = pvz;
+    let PvzImport { stem, root, brep, info, foreign_id, instances, names: _, step, options, nesting, part_shapes } = pvz;
     let (brep, info) = (brep.clone(), info.clone());
     let mut ps = PartStudio::new();
     let mut f = ps.new_feature("importForeign", units).ok_or("no Import feature")?;
@@ -471,8 +501,22 @@ pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) 
     for (k, v) in options {
         f.params.set(k, ParamValue::Bool(*v));
     }
+    let feature = f.id;
     ps.insert_at_rollback(f);
-    let bodies = bodies_of_parts(&ps, units, |k| k == crate::display::BodyKind::Solid);
+    // The parts' solids: from the Import feature's numbering when the shapes
+    // are known and nothing joins them (a probe regeneration was 2 of the
+    // 6 s importing the NIST assembly), else from a probe.
+    let join = options.iter().any(|(k, v)| *k == "joinAdjacentSurfaces" && *v);
+    let bodies = match part_shapes.as_ref().filter(|_| !join) {
+        Some(shapes) => {
+            let b = bodies_by_order(feature, shapes);
+            if std::env::var_os("NOSHAPE_IMPORT_CHECK").is_some() {
+                assert_eq!(b, bodies_of_parts(&ps, units, |k| k == crate::display::BodyKind::Solid), "bodies_by_order vs a probe");
+            }
+            b
+        }
+        None => bodies_of_parts(&ps, units, |k| k == crate::display::BodyKind::Solid),
+    };
     // An occurrence without a name (our own Parasolid export writes none;
     // ASM-XT-ROUNDTRIP-NAMES: they came in as "<1>", "<2>") takes its
     // part's name in the new Part Studio ("Part 1 <1>").

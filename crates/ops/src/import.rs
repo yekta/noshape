@@ -185,6 +185,8 @@ struct PvzAssembly {
     nesting: Option<noshape_kernel::StepNesting>,
     /// The file's part index of each part here (`pvz_of_tree`'s order).
     order: Vec<usize>,
+    /// Each part's (solids, shells, faces, edges), STEP / Parasolid.
+    part_shapes: Option<Vec<[usize; 4]>>,
 }
 
 /// Read a .pvz of several instances for [`PvzAssembly`]; `None` for one
@@ -201,7 +203,7 @@ fn read_pvz_assembly(path: &Path) -> anyhow::Result<Option<PvzAssembly>> {
     let shape = k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>());
     let foreign = Foreign { brep: String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string(), parts: serde_json::to_string(&info)? };
     let (name, file) = import_names(path);
-    Ok(Some(PvzAssembly { name, file, root: if root.is_empty() { "RootAssembly".into() } else { root }, foreign, names, instances, step: false, nesting: None, order: Vec::new() }))
+    Ok(Some(PvzAssembly { name, file, root: if root.is_empty() { "RootAssembly".into() } else { root }, foreign, names, instances, step: false, nesting: None, order: Vec::new(), part_shapes: None }))
 }
 
 /// A STEP file whose root product is an assembly: an Assembly named after
@@ -263,10 +265,11 @@ fn pvz_of_tree(path: &Path, (root, parts, mut instances): noshape_kernel::StepAs
 
     let info: Vec<noshape_model::features::importing::ImportPartInfo> = parts.iter().map(|p| noshape_model::features::importing::ImportPartInfo { name: p.name.clone(), color: p.color, opacity: p.opacity, faces: p.face_colors.clone() }).collect();
     let names = parts.iter().map(|p| p.name.clone()).collect();
+    let part_shapes = parts.iter().map(|p| [k::ShapeType::Solid, k::ShapeType::Shell, k::ShapeType::Face, k::ShapeType::Edge].map(|t| p.shape.count(t))).collect();
     let shape = k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>());
     let foreign = Foreign { brep: String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string(), parts: serde_json::to_string(&info)? };
     let (name, file) = import_names(path);
-    Ok(PvzAssembly { name, file, root, foreign, names, instances, step: true, nesting: None, order })
+    Ok(PvzAssembly { name, file, root, foreign, names, instances, step: true, nesting: None, order, part_shapes: Some(part_shapes) })
 }
 
 /// Files read for an import (before the document edit).
@@ -398,7 +401,7 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
         if p.step {
             options.push(("joinAdjacentSurfaces", c.join));
         }
-        let pvz = noshape_model::native_assembly::PvzImport { stem: p.name.clone(), root: p.root.clone(), brep: p.foreign.brep.clone(), info: p.foreign.parts.clone(), foreign_id: p.file.clone(), instances: p.instances.clone(), names: p.names.clone(), step: p.step, options, nesting: p.nesting.clone() };
+        let pvz = noshape_model::native_assembly::PvzImport { stem: p.name.clone(), root: p.root.clone(), brep: p.foreign.brep.clone(), info: p.foreign.parts.clone(), foreign_id: p.file.clone(), instances: p.instances.clone(), names: p.names.clone(), step: p.step, options, nesting: p.nesting.clone(), part_shapes: p.part_shapes.clone() };
         match noshape_model::native_assembly::add_pvz_assembly(d, &pvz, units) {
             Ok((studio, assembly)) => {
                 crate::docedit::place_after(d, assembly, at);

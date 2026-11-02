@@ -88,6 +88,10 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     for t in studios {
         let r = od.regenerate(t, None)?;
         stage("regenerate", t2);
+        if timing {
+            let features: f32 = r.display.features.iter().map(|s| s.time_ms).sum();
+            eprintln!("import stage regenerate: features {features:.1} ms, regen total {:.1} ms", r.display.regen_ms);
+        }
         let name = od.doc().tab(t).map(|x| x.name.clone()).unwrap_or_default();
         for b in &r.display.bodies {
             parts.push(json!({ "tab": name, "id": crate::refs::body_id(&b.id), "name": b.name }));
