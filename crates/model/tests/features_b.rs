@@ -846,7 +846,7 @@ fn boundary_routing_edit_isoparametric() {
 
 /// Offset curve on a trapezoid's top face (live 1813): its front edge 5 mm in (Flip on; Flip off goes off the face:
 /// live's warning, nothing made). Sides leaning out: Offset 0 .. 40 (1 edge), Offset and extend -2.5 .. 42.5 (3 edges),
-/// Trim 3 mm 0.5 .. 42.5 (2 edges) with std's arrows; sides leaning in: 2.5 .. 37.5 (1 edge) for both scopes.
+/// Trim 3 mm 0.5 .. 42.5 (2 edges) with std's arrows, Offset, extend and split the top face in two; sides leaning in: 2.5 .. 37.5 (1 edge) for both scopes.
 #[test]
 fn offset_curve_extends_to_the_face_boundary() {
     let trapezoid = |pts: [(f64, f64); 4]| {
@@ -919,6 +919,15 @@ fn offset_curve_extends_to_the_face_boundary() {
     use noshape_model::display::FeatureManipulator as M;
     let keys: Vec<(&str, DVec3)> = arrows[2].iter().filter_map(|(k, m)| if let M::Linear { base, .. } = m { Some((k.as_str(), *base)) } else { None }).collect();
     assert!(keys.len() == 2 && keys[0].0 == "startTrimManipulator" && vnear(keys[0].1, DVec3::new(0.0005, 0.005, 0.01)) && vnear(keys[1].1, DVec3::new(0.0425, 0.005, 0.01)), "{keys:?}");
+    // Offset, extend and split: no wire body, the top face split 212.5 + 787.5 mm² (6 -> 7 faces).
+    let f = add(&mut s, &edge, &top, "OFFSET_EXTEND_AND_SPLIT", true, false);
+    let r = s.ok();
+    assert!(!r.context.bodies.iter().any(|b| b.id.feature == f) && r.context.bodies.len() == 1);
+    let faces = r.context.bodies[0].shape.faces();
+    let mut tops: Vec<f64> = faces.iter().filter(|x| x.centroid().is_ok_and(|c| near(c.z, 0.01, 1e-9))).map(|x| x.area().unwrap() * 1e6).collect();
+    tops.sort_by(f64::total_cmp);
+    assert!(faces.len() == 7 && tops.len() == 2 && near(tops[0], 212.5, 1e-6) && near(tops[1], 787.5, 1e-6), "{} {tops:?}", faces.len());
+    s.ps.features.retain(|x| x.id != f);
 
     let (mut s, edge, top) = trapezoid([(0.0, 0.0), (0.04, 0.0), (0.03, 0.02), (0.01, 0.02)]);
     for scope in ["OFFSET", "OFFSET_AND_EXTEND"] {

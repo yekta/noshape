@@ -5,11 +5,13 @@
 
 use super::bshared::{add_wire_bodies, canonical_x, chain_wires, curve_edges, extent_along, face_shapes, order_chain, replace_wire_body, sample_chain, sketch_edge};
 use crate::display::BodyKind;
+use crate::naming::ShapeNames;
 use crate::reference::Reference;
 use crate::regen::eval::{EvalCtx, FResult, FeatureError, err, err_at};
 use glam::{DQuat, DVec3};
 use noshape_kernel as k;
 use noshape_kernel::{Shape, ShapeType};
+use std::collections::BTreeMap;
 use std::f64::consts::{PI, TAU};
 
 // ------------------------------------------------------------------ helix
@@ -818,7 +820,7 @@ fn chain_split_pieces(split: &Shape, tools: &[Shape]) -> FResult<Vec<Shape>> {
             }
         }
     }
-    let mut groups: std::collections::BTreeMap<usize, Vec<Shape>> = std::collections::BTreeMap::new();
+    let mut groups: BTreeMap<usize, Vec<Shape>> = BTreeMap::new();
     for (i, e) in edges.iter().enumerate() {
         let r = find(&mut parent, i);
         groups.entry(r).or_default().push(e.clone());
@@ -836,10 +838,8 @@ fn chain_split_pieces(split: &Shape, tools: &[Shape]) -> FResult<Vec<Shape>> {
 
 /// Offset curve on planar faces (geodesic = Euclidean on a plane).
 pub fn offset_curve(ev: &mut EvalCtx) -> FResult<()> {
-    if ev.is("scope", "OFFSET_EXTEND_AND_SPLIT") {
-        return err("Offset curve doesn't support Offset, extend and split yet");
-    }
-    let extend = ev.is("scope", "OFFSET_AND_EXTEND");
+    let split = ev.is("scope", "OFFSET_EXTEND_AND_SPLIT");
+    let extend = split || ev.is("scope", "OFFSET_AND_EXTEND");
     let refs = ev.query("edges");
     if refs.is_empty() {
         return err("Select edges to offset");
@@ -943,9 +943,24 @@ pub fn offset_curve(ev: &mut EvalCtx) -> FResult<()> {
     if extend {
         extend_to_face_boundary(&mut new_edges, &face, ev.model_extent())?;
     }
+    if split {
+        return split_by_offset(ev, &face, &new_edges);
+    }
     let wire = k::make_wire(&new_edges)?;
     let wire = if extend && ev.bool("trim") { trim_offset(ev, &wire, &new_edges)? } else { wire };
     add_wire_bodies(ev, vec![wire])
+}
+
+/// Offset, extend and split (live 1813): the offset's edges imprinted on the face's body, no wire body.
+fn split_by_offset(ev: &mut EvalCtx, face: &Shape, edges: &[Shape]) -> FResult<()> {
+    let Some(bi) = ev.ctx.bodies.iter().position(|b| b.shape.index_of(face, ShapeType::Face).is_some()) else {
+        return err("Select target faces");
+    };
+    let body = ev.ctx.bodies[bi].clone();
+    let res = k::imprint(&body.shape, edges).map_err(|e| FeatureError::new(format!("The faces could not be split: {e}")))?;
+    let names = ev.name_result(&[&body.shape_names(), &ShapeNames::default()], &res.history, &res.shape, &BTreeMap::new(), None);
+    ev.replace_body(bi, res.shape, names);
+    Ok(())
 }
 
 /// The point and unit tangent at arc length `s` along a chain of forward edges.
