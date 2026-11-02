@@ -41,6 +41,25 @@ Fusing the slabs yours takes first and adding the offset ones after doesn't help
 next reasons: 3.9 → 5.9 s on a dump); one OCCT common of the solid with all slabs as one tool group changes results.
 Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scratch SHELLDUMP=<path without .brep>).
 
+## The knurl sweep's regression: sections' tolerance off at crossings again (11-02 22:00 UTC)
+- The size × TPI × angle sweep (346 cases, vibe5 ~/agents/sweep/final.txt, model test binary per commit, fallback
+  off; ksweep.sh; compare with /root/bool-scratch/kcmp.py) on main a4fe7543: 214 taken. Against 1d4f8171's parent
+  (229 of the cases run): 169 -> 132 of the same 233. Bisected (kbis4.sh / kbisA.sh / kbisAS.sh, vibe4): two rules,
+  1d4f8171's "a crossing within a section's tolerance of its end is that end" and step 1's "a crossing on a section
+  has the section's tolerance" (e9346814). Each splits curves within 5 um of the point that the faces on either side
+  don't split alike: Ø63 and Ø100 at 20 and 30 TPI came out non-manifold or "two edges leave a vertex". Keeping the
+  match but not growing the tolerance doesn't help; nor did merging grown vertices into groups, one edge for two
+  short pieces between one pair of vertices, or arcs by their ends' tolerance (tried, wip-kf branch: 215).
+- Now both rules are gone; a crossing on another argument's edge lying in the face keeps that edge's tolerance (step
+  3). Sweep with both off: the first 240 cases level with 1d4f8171's parent (121 vs 120 of the first 157; main 103).
+  Lost: the Ø10 × 10 CP12 45/45 knurl (step 1's gain) and 1d4f8171's grooves at the seam, both "an invalid result"
+  now, to OCCT (whose one cut of the Ø10 is invalid, 1.16e-6 against 6.78e-7 groove by groove): T1s
+  a_ten_millimetre_knurl_declines, grooves_crossing_at_the_seam_declines. The 30 TPI knurl is back to its 12432 open
+  edges. Corpora decline as before, 0 differ; Shell's recordings 45 taken, the same 3 differ.
+- Next for these: OCCT's rule is consistent because every interference reads the same tolerances; ours gives them to
+  some points only. A section's tolerance has to reach the splits of every curve near the point on both faces, or
+  none.
+
 ## Coincidence step 3: edges' own tolerances at their points; parallel curves at a merged vertex (11-02 21:30 UTC)
 - Shell's "two edges leave a vertex in one direction" (20, ~15 s of OCCT time), by cause: tolerant slab corners
   (7: another argument's edge leaving a face across its 0.1 mm edge, its point with no tolerance, 0.1 mm from a vertex

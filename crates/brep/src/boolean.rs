@@ -4011,39 +4011,16 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         };
     }
     let all_crossings: Vec<R<Crossings>> = full;
-    // (A crossing within a section's own tolerance of that section's end: the end, its tolerance grown to reach the
-    // point, as OCCT's pave on the section (a knurl groove's flank's section with another groove's flank ends on a
-    // corner edge 3 um outside the cylinder; the cylinder's section crosses it 3.9 um from there, in the flank's
-    // plane; split there on the cylinder's section, merged into the end on the other, the two crossed without a
-    // vertex).)
-    let sec_tol = |cx: &Ctx, s: &Seg| match s.g {
-        Geo::Nurbs { id, .. } if cx.ncurves[id as usize].sec.is_some() => cx.ncurves[id as usize].tol,
-        _ => 0.0,
-    };
+    // (A crossing on another argument's edge lying in the face has that edge's tolerance (OCCT's pave tolerance):
+    // within the sum of its and another vertex's, it is that vertex, OCCT's rule; else a new vertex of it. Not a
+    // section's: a crossing given the section's 5 um, and a section's end taken for crossings within it, split
+    // curves within 5 um of them that the faces on either side didn't split alike (the knurl sweep: Ø63 and Ø100 at
+    // 20 and 30 TPI non-manifold).)
     for (f, crossings) in all_crossings.into_iter().enumerate() {
         let segs = cx.face_segs[f].clone();
-        'cross: for (i, j, t, u) in crossings? {
+        for (i, j, t, _) in crossings? {
             let p = cx.seg_at(&segs[i], t);
-            for (k, x) in [(j, u), (i, t)] {
-                let st = sec_tol(&cx, &segs[k]);
-                if st <= tol {
-                    continue;
-                }
-                let len = cx.seg_length(&segs[k]);
-                let end = if x * len <= st { Some(segs[k].v[0]) } else if (1.0 - x) * len <= st { Some(segs[k].v[1]) } else { None };
-                if let Some(w) = end {
-                    let d = (cx.p(w) - p).length();
-                    if d <= st {
-                        cx.pool.grow(w, d);
-                        continue 'cross;
-                    }
-                }
-            }
-            // (A point on a section, or on another argument's edge lying in the face, has its tolerance (OCCT's pave
-            // tolerance: a section edge's vertices have its tolerance; an edge's own): within the sum of its and another vertex's, it is that vertex, OCCT's rule; else a
-            // new vertex of that tolerance, so the curves near it are split there too (a knurl's flank, another
-            // tool's cap and the cylinder: their three sections miss each other by 3 um, one place within 5 um).)
-            let reach = sec_tol(&cx, &segs[i]).max(sec_tol(&cx, &segs[j])).max(cx.seg_edge_tol[f][i]).max(cx.seg_edge_tol[f][j]);
+            let reach = cx.seg_edge_tol[f][i].max(cx.seg_edge_tol[f][j]);
             if reach > tol {
                 match cx.pool.find_tol(p, reach)? {
                     Some(w) => cx.pool.grow(w, reach),

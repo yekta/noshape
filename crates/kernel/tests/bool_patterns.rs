@@ -436,6 +436,17 @@ fn halves_of_a_closed_edge_on_a_torus() {
 
 /// noshape's Boolean alone on a recorded case (recorded with it on: its summary is ours then), its result valid and
 /// against OCCT's on the same inputs now: the same counts, its volume within `rel`.
+fn declines_as(name: &str, reason: &str) {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, name).expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    assert!(r.is_err() && why == reason, "taken, or declined otherwise: {why}");
+}
+
 fn valid_as_occt(name: &str, rel: f64) {
     let _ = k::set_working_scale(1000.0);
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
@@ -545,11 +556,12 @@ fn an_arc_tangent_to_an_edge_at_a_vertex() {
 }
 
 /// Two knurl grooves crossing at the cylinder's seam 0.8 mm above its end (recorded: the Ø25 × 24 knurl at 45° /
-/// 30°, its tools 13 and 50): micrometre junctions where sections cross within their tolerance of a section's end,
-/// tiny pieces mapped as rulings, short pieces off their curves' ends ("an invalid result" before).
+/// 30°, its tools 13 and 50): sections crossing within their tolerance of a section's end. Taken while such a
+/// crossing was the end (11-02 05:10); that rule, with a crossing given its section's tolerance, cost the knurl sweep
+/// 37 cases (Ø63 and Ø100 at 20 and 30 TPI non-manifold), so this one declines to OCCT ("an invalid result").
 #[test]
-fn grooves_crossing_at_the_seam() {
-    valid_as_occt("13187a9d1dd709bc", 1e-9);
+fn grooves_crossing_at_the_seam_declines() {
+    declines_as("13187a9d1dd709bc", "an invalid result");
 }
 
 /// A Shell common whose part has a face of nominal tolerance 1e-5 (its real one 1e-7) and many vertices and edges of
@@ -864,21 +876,10 @@ fn ellipse_edges_after_a_cones_apex() {
     valid_as_occt("b200c5bfa89fcb3d", 1e-9);
 }
 
-/// A Ø10 × 10 diamond knurl, 12 TPI 45° / 45° (recorded; 30 grooves): where its sections meet within OCCT's own
-/// tolerance of them (5 um: a crossing on a section has it, section pieces and the curves they run along within it are
-/// one), the pieces at the grooves' crossings come out consistent (it declined "an invalid result"). Valid, and the
-/// volume of OCCT's cut groove by groove (6.77883e-7 m³; its one cut of all of them is invalid, 1.16e-6).
+/// A Ø10 × 10 diamond knurl, 12 TPI 45° / 45° (recorded; 30 grooves; OCCT's one cut of them is invalid, 1.16e-6 m³
+/// against 6.77883e-7 groove by groove). Taken while a crossing on a section had the section's 5 um tolerance (11-02
+/// 14:46); that cost the knurl sweep 37 cases, so this one declines again ("an invalid result").
 #[test]
-fn a_ten_millimetre_knurl_by_its_sections_tolerance() {
-    let _ = k::set_working_scale(1000.0);
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
-    let c = k::bool_corpus::load(&dir, "5099e897b3caf1fa").expect("the recorded case");
-    k::set_rust_boolean_only(true);
-    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
-    let why = k::last_rust_decline();
-    k::set_rust_boolean_only(false);
-    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
-    assert!(r.shape.is_valid());
-    let v = r.shape.volume().unwrap();
-    assert!((v - 6.77883072e-7).abs() <= 1e-5 * 6.77883072e-7, "volume {v}");
+fn a_ten_millimetre_knurl_declines() {
+    declines_as("5099e897b3caf1fa", "an invalid result");
 }
