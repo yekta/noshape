@@ -1691,10 +1691,11 @@ TopoDS_Shape merge_cylinder_bands(const TopoDS_Shape& s, HHist& hist)
 }
 
 // Faces on one cylinder whose frames differ (seams apart, either hand: a hole through a boss in a mirrored plate,
-// the plate's two half walls and the boss's) sharing edges, the group's edges used once two closed chains round it:
-// OCCT's unify merges them by the first face's frame and leaves an open wire (38b2cd00) or stops at two faces
-// (live 1767: each hole's wall one face). Merged here, on a copy: one face on the first one's surface, its curves
-// on it the chains' (projected, a turn from the seam), one new seam where both chains have a vertex at one angle.
+// the plate's two half walls and the boss's) sharing edges, the group's edges used once two closed chains round it
+// or one loop on a part of it: OCCT's unify merges them by the first face's frame and leaves an open wire (38b2cd00)
+// or stops at two faces (live 1767: each hole's wall one face). Merged here, on a copy: one face on the first one's
+// surface, its curves on it the boundary's (projected, a turn from the seam), round it one new seam where both chains
+// have a vertex at one angle.
 // The shape unchanged where there's no such group or the merge doesn't come out valid with the same volume.
 TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist)
 {
@@ -1710,6 +1711,21 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist)
     const double r = a.Radius();
     return a.Axis().Direction().IsParallel(b.Axis().Direction(), 1e-12) && std::abs(a.Radius() - b.Radius()) <= 1e-9 * r
            && gp_Lin(a.Axis()).Distance(b.Location()) <= 1e-9 * (1 + r);
+  };
+  // An edge's curve on a group's first surface `ga` (its range within a bounded curve's: a B-spline edge can reach a
+  // rounding past its curve's end, and a trimmed curve there throws).
+  occ::handle<Geom_Surface> ga;
+  auto                      project = [&ga](const occ::handle<Geom_Curve>& c3, double f, double l) -> occ::handle<Geom2d_Curve> {
+    if (c3.IsNull())
+      return nullptr;
+    if (!c3->IsPeriodic())
+    {
+      f = std::max(f, c3->FirstParameter());
+      l = std::min(l, c3->LastParameter());
+    }
+    if (!(l > f))
+      return nullptr;
+    return GeomProjLib::Curve2d(new Geom_TrimmedCurve(c3, f, l), f, l, ga);
   };
   auto same_frame = [](const gp_Cylinder& a, const gp_Cylinder& b) {
     const gp_Ax3 &x = a.Position(), &y = b.Position();
@@ -1829,8 +1845,131 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist)
         closed = closed && end.IsSame(v0);
         chains.push_back(ch);
       }
-      if (!closed || chains.size() != 2)
+      if (!closed || chains.empty() || chains.size() > 2)
         continue;
+      TopLoc_Location la;
+      ga         = BRep_Tool::Surface(a, la);
+      double tol = 1e-7;
+      for (const TopoDS_Edge& e : bnd)
+        tol = std::max(tol, BRep_Tool::Tolerance(e));
+      // The merged face in place of the group's, kept where valid with the same volume.
+      auto replace_by = [&](const TopoDS_Face& F) {
+        if (!BRepCheck_Analyzer(F).IsValid())
+          return false;
+        occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+        rs->Replace(a.Oriented(TopAbs_FORWARD), F);
+        for (size_t k = 1; k < g.size(); ++k)
+          rs->Remove(fm(g[k]));
+        const TopoDS_Shape out = rs->Apply(s);
+        if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+          return false;
+        GProp_GProps g0, g1;
+        BRepGProp::VolumeProperties(s, g0);
+        BRepGProp::VolumeProperties(out, g1);
+        if (std::abs(g1.Mass() - g0.Mass()) > 1e-9 * std::abs(g0.Mass()))
+          return false;
+        HHist h = rs->History();
+        if (h.IsNull())
+          h = new BRepTools_History();
+        for (size_t k = 1; k < g.size(); ++k)
+          h->AddModified(fm(g[k]), F);
+        local->Merge(h);
+        s = out;
+        return true;
+      };
+      if (chains.size() == 1)
+      {
+        // One loop: a part of the cylinder (a half hole's wall in two inputs' faces). Its curves with u continuous
+        // round it, counter-clockwise; none where it goes round the cylinder.
+        std::vector<TopoDS_Edge> loop;
+        {
+          const std::vector<int>& ch = chains[0];
+          std::vector<char>       done(ch.size(), 0);
+          TopoDS_Vertex           v0, at;
+          ends(bnd[(size_t)ch[0]], v0, at);
+          loop.push_back(bnd[(size_t)ch[0]]);
+          done[0] = 1;
+          for (size_t n = 1; n < ch.size(); ++n)
+            for (size_t k = 0; k < ch.size(); ++k)
+            {
+              if (done[k])
+                continue;
+              TopoDS_Vertex p, q;
+              ends(bnd[(size_t)ch[k]], p, q);
+              if (p.IsSame(at) || q.IsSame(at))
+              {
+                loop.push_back(TopoDS::Edge(bnd[(size_t)ch[k]].Oriented(p.IsSame(at) ? TopAbs_FORWARD : TopAbs_REVERSED)));
+                at      = p.IsSame(at) ? q : p;
+                done[k] = 1;
+                break;
+              }
+            }
+          if (loop.size() != ch.size())
+            continue;
+        }
+        std::map<const void*, occ::handle<Geom2d_Curve>> pc;
+        gp_Pnt2d                                         prev, first;
+        bool                                             ok = true;
+        for (size_t n = 0; n < loop.size() && ok; ++n)
+        {
+          const TopoDS_Edge             e = TopoDS::Edge(loop[n].Oriented(TopAbs_FORWARD));
+          double                        f, l;
+          const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(e, f, l);
+          occ::handle<Geom2d_Curve>     c2 = project(c3, f, l);
+          if (c2.IsNull())
+          {
+            ok = false;
+            break;
+          }
+          const bool fwd = loop[n].Orientation() != TopAbs_REVERSED;
+          if (n > 0)
+          {
+            const double k = std::round((prev.X() - c2->Value(fwd ? f : l).X()) / (2 * M_PI));
+            if (k != 0)
+              c2->Translate(gp_Vec2d(k * 2 * M_PI, 0));
+            ok = c2->Value(fwd ? f : l).Distance(prev) <= 1e-6;
+          }
+          else
+            first = c2->Value(fwd ? f : l);
+          prev                 = c2->Value(fwd ? l : f);
+          pc[e.TShape().get()] = c2;
+        }
+        if (!ok || first.Distance(prev) > 1e-6)
+          continue;
+        // Its area's sign in (u, v): counter-clockwise for a face on the surface's side.
+        double area = 0;
+        for (const TopoDS_Edge& e : loop)
+        {
+          double f, l;
+          BRep_Tool::Range(e, f, l);
+          const occ::handle<Geom2d_Curve>& c2 = pc[e.TShape().get()];
+          for (int k = 0; k < 32; ++k)
+          {
+            const bool     fwd = e.Orientation() != TopAbs_REVERSED;
+            const double   t0 = fwd ? f + (l - f) * k / 32 : l - (l - f) * k / 32, t1 = fwd ? f + (l - f) * (k + 1) / 32 : l - (l - f) * (k + 1) / 32;
+            const gp_Pnt2d p = c2->Value(t0), q = c2->Value(t1);
+            area += p.X() * q.Y() - q.X() * p.Y();
+          }
+        }
+        BRep_Builder B;
+        TopoDS_Face  F;
+        B.MakeFace(F, ga, la, BRep_Tool::Tolerance(a));
+        for (const TopoDS_Edge& e : loop)
+          B.UpdateEdge(TopoDS::Edge(e.Oriented(TopAbs_FORWARD)), pc[e.TShape().get()], F, tol);
+        TopoDS_Wire W;
+        B.MakeWire(W);
+        if (area > 0)
+          for (const TopoDS_Edge& e : loop)
+            B.Add(W, e);
+        else
+          for (auto it = loop.rbegin(); it != loop.rend(); ++it)
+            B.Add(W, it->Reversed());
+        B.Add(F, W);
+        if (!replace_by(F))
+          continue;
+        merged = any = true;
+        break;
+      }
       auto uv = [&](const gp_Pnt& p) {
         double u, v;
         ElSLib::Parameters(C, p, u, v);
@@ -1867,12 +2006,7 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist)
         std::swap(vb, vt);
         std::swap(qb, qt);
       }
-      const double                    u0 = qb.X();
-      TopLoc_Location                 la;
-      const occ::handle<Geom_Surface> ga  = BRep_Tool::Surface(a, la);
-      double                          tol = 1e-7;
-      for (const TopoDS_Edge& e : bnd)
-        tol = std::max(tol, BRep_Tool::Tolerance(e));
+      const double u0 = qb.X();
       // Each boundary edge's curve on the new face, its u within a turn from the seam by its middle, its ends checked.
       std::map<const void*, occ::handle<Geom2d_Curve>> pc;
       bool                                             projected = true;
@@ -1880,7 +2014,7 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist)
       {
         double                        f, l;
         const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(e, f, l);
-        occ::handle<Geom2d_Curve>     c2 = c3.IsNull() ? nullptr : GeomProjLib::Curve2d(new Geom_TrimmedCurve(c3, f, l), f, l, ga);
+        occ::handle<Geom2d_Curve>     c2 = project(c3, f, l);
         if (c2.IsNull())
         {
           projected = false;
@@ -2001,27 +2135,8 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist)
         B.Add(W, e);
       B.Add(W, seam.Oriented(TopAbs_REVERSED));
       B.Add(F, W);
-      if (!BRepCheck_Analyzer(F).IsValid())
+      if (!replace_by(F))
         continue;
-      occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
-      rs->Replace(a.Oriented(TopAbs_FORWARD), F);
-      for (size_t k = 1; k < g.size(); ++k)
-        rs->Remove(fm(g[k]));
-      const TopoDS_Shape out = rs->Apply(s);
-      if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
-        continue;
-      GProp_GProps g0, g1;
-      BRepGProp::VolumeProperties(s, g0);
-      BRepGProp::VolumeProperties(out, g1);
-      if (std::abs(g1.Mass() - g0.Mass()) > 1e-9 * std::abs(g0.Mass()))
-        continue;
-      HHist h = rs->History();
-      if (h.IsNull())
-        h = new BRepTools_History();
-      for (size_t k = 1; k < g.size(); ++k)
-        h->AddModified(fm(g[k]), F);
-      local->Merge(h);
-      s      = out;
       merged = any = true;
       break;
     }
@@ -2500,7 +2615,17 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
   }
   fail_if_cancelled();
   lap = std::make_unique<KernelTimer>("unify.bands");
-  const TopoDS_Shape s1 = merge_apex_cones(merge_cylinder_bands(merge_cylinder_groups(s, hist), hist), hist);
+  // (A failure inside it (OCCT's projection): the shape as it was; its history is merged only at its end.)
+  TopoDS_Shape groups = s;
+  try
+  {
+    groups = merge_cylinder_groups(s, hist);
+  }
+  catch (const Standard_Failure&)
+  {
+    groups = s;
+  }
+  const TopoDS_Shape s1 = merge_apex_cones(merge_cylinder_bands(groups, hist), hist);
   fail_if_cancelled();
   lap                   = std::make_unique<KernelTimer>("unify.usd");
   if (TopExp_Explorer(s1, TopAbs_SOLID).More() && round_candidates(s1, sc != nullptr ? &next : nullptr))

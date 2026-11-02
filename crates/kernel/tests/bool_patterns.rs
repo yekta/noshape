@@ -721,3 +721,28 @@ fn holes_through_a_boss_in_a_mirrored_plate_unify_as_live() {
         assert!((u.volume().unwrap() - c.summary.volume).abs() <= 1e-9 * c.summary.volume, "{name}: volume");
     }
 }
+
+/// Shell's fuse of 35 slabs (6e9bc680), our result (tests/data/unify): a part of a cylinder's wall in faces of two
+/// inputs whose frames differ, one loop round them. The model's unify gives OCCT's counts (14 faces, 30 edges), valid
+/// (it stopped at 15 faces, 39 edges on ours).
+#[test]
+fn a_part_of_a_wall_in_two_inputs_faces_unifies_as_occts() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/unify/half-wall-in-two-inputs.brep");
+    let ours = k::read_brep(&path).expect("our result");
+    let u = k::unify_same_domain(&ours).expect("unified").shape;
+    assert!(u.is_valid(), "unified invalid");
+    assert_eq!((u.count(k::ShapeType::Face), u.count(k::ShapeType::Edge)), (14, 30));
+}
+
+/// Shell's fuse of 38 slabs (37e806ac), our result (tests/data/unify): faces on one cylinder whose frames differ, a
+/// B-spline edge of their boundary a rounding past its curve's end. The model's unify doesn't fail (the merge's
+/// projection of that edge threw: unify_same_domain failed), valid, the volume kept.
+#[test]
+fn a_b_spline_edge_past_its_curves_end_unifies() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/unify/b-spline-edge-past-its-curve.brep");
+    let ours = k::read_brep(&path).expect("our result");
+    let u = k::unify_same_domain(&ours).expect("unified").shape;
+    assert!(u.is_valid(), "unified invalid");
+    let (v, w) = (u.volume().unwrap(), ours.volume().unwrap());
+    assert!((v - w).abs() <= 1e-9 * w.abs(), "volume {v} against {w}");
+}

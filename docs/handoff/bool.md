@@ -1140,6 +1140,14 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
   in volume (1.4e-7 relative; 570dfc37 a vertex fewer). The decline stays until those are understood (next).
 - T1 holes_through_a_boss_in_a_mirrored_plate_unify_as_live (OCCT's results: 9 and 12 faces, live's; OCCT's unify
   alone 14 for the second). Model T1 293 passed; corpora unchanged with the decline, 0 differ.
+- Then (11-02 11:40): the group's boundary one loop (a part of a cylinder's wall in two inputs' faces) merged too:
+  its curves with u continuous round it, counter-clockwise. T1 a_part_of_a_wall_in_two_inputs_faces_unifies_as_occts
+  (our 6e9bc680 result: 14 faces, 30 edges as OCCT's; it stopped at 15 / 39). Of shfall's 6 differing without the
+  decline, 6e9bc680 and 8b25831a are equivalent now; left: 1b121fc3 (unified one face more than OCCT's), bf976715
+  (two edges more), 570dfc37 (the Boolean's result a vertex fewer). 37e806ac: the merge's projection of a B-spline
+  edge a rounding past its curve's end threw (Geom_TrimmedCurve out of range: unify_same_domain failed); now its
+  range is kept within a bounded curve's and a failure inside the merge leaves the shape as it was. T1
+  a_b_spline_edge_past_its_curves_end_unifies.
 
 ## Knurls: lenses and the corner-edge class are most of what's left (11-02 09:40 UTC)
 - The sweep's 72 declined cases rerun (vibe5 ~/agents/sweep/bad7.tsv): 9 taken, 37 two edges leave a vertex in one
