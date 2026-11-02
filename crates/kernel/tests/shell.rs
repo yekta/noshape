@@ -975,3 +975,18 @@ fn smooth_vase_loft_probe() {
     let s = smooth_vase();
     println!("smooth vase loft: {} faces, {} edges, {:.4} mm3 (live 437833.2291, {:+.4}), valid {}", s.count(ShapeType::Face), s.count(ShapeType::Edge), vol(&s), vol(&s) - 437833.2291, s.is_valid());
 }
+
+/// shell-hang's Shell 3 (live 1761: 177929.974087 mm³, 42 faces, one shell, no face meeting itself).
+#[test]
+#[ignore = "T2: probe"]
+fn shellhang_shell3_probe() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_step(&dir.join("shellhang-shell3-input.step"), LengthUnit::Millimeter).unwrap().remove(0).shape;
+    let rm = faces_where(&s, |c| (c - DVec3::new(0.5316, 24.7526, -20.0)).length() < 0.01);
+    println!("input {:.6} mm3, {} faces; removing {}", vol(&s), s.count(ShapeType::Face), rm.len());
+    let t0 = std::time::Instant::now();
+    let r = shell_solid(&s, &rm, 5.0, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+    let ef = r.edge_faces().unwrap();
+    let slits: Vec<usize> = (0..ef.len()).filter(|&i| ef[i].len() == 2 && ef[i][0] == ef[i][1] && matches!(r.faces()[ef[i][0] as usize].face_surface(), Ok(Surface::Plane(_)))).collect();
+    println!("{:.6} mm3 (live 177929.974087), {} faces, {} shells, valid {}, {:.0} ms via {}; slit edges {:?}", vol(&r), r.count(ShapeType::Face), r.count(ShapeType::Shell), r.is_valid(), t0.elapsed().as_secs_f64() * 1e3, last_shell_path(), slits);
+}

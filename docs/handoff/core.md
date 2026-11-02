@@ -16,8 +16,12 @@ loft tangency, direct Shell path for curved tangent edges and outward walls), in
 patch 0018 (patches/occt/0018-wire-explorer-steps.patch: BRepTools_WireExplorer's GetNextParamOnPC stepped forever
 when its step was below the parameter's resolution; valid_shape's BudgetHold kept the budget from stopping it);
 libTKBRep.a built on vibe4 (~/agents/core-occt, ~/agents/occt-priv), verified with seed 1212 (NOSHAPE_BOOL_FALLBACK=0,
-clifuzz_nf.py 1212 60: unpatched hangs at step 58, patched 0.4 s), in /root/occt, sync asked. Next: live 1788 ((d) rect -> circle split points), the
-direct Shell path's speed on free-form faces (its self-interference check), finer reads for reuse (qa5's Fill).
+clifuzz_nf.py 1212 60: unpatched hangs at step 58, patched 0.4 s), in /root/occt, sync asked. Then: COMPOSITE-LATER-FEATURE (75d20033: lookups skip open composites, which are made again of their members after
+each feature), loft rect -> circle split in equal arcs (80b0d015, live 1788: 0.2 % under live, which lofts cubic fits).
+shell-hang now: Shell 3's pinch is gone (177929.9737 / live .9741, 42 faces, 1 shell, 0.75 s by slabs: kernel T2
+shell::shellhang_shell3_probe), the document 15.3 s, of it Shell 5 14.5 s then failing (live not asked for Shell 5).
+Asked live: 1794 (SHELL-INNER-OFFSET-DELTA's part). Next: the direct Shell path's speed on free-form faces (its
+self-interference check), finer reads for reuse (qa5's Fill), shell-hang's Shell 5.
 
 **LOFT-ONE-FACE (11-02 14:10, landing with this note).** features.cpp `merge_tangent_sides`: after the loft, chains of
 side faces meeting smoothly at the sections (normals equal at both ends of the edge between them, u order face to
