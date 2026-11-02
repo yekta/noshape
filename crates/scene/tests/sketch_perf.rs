@@ -423,3 +423,156 @@ fn s300_rectangle_grid() {
     println!("  add a dimension: median {:.2} ms, worst {:.2} ms", ms(add.median), ms(add.worst));
     assert!(drag.median < FRAME, "drag step median {:?}", drag.median);
 }
+
+/// S300 mixed: 120 cells (30 × 4, 15 mm pitch) of straight slots (radius
+/// dimensioned), concentric circle pairs (two diameters), fit splines with
+/// handles closed by a horizontal dimensioned line, and conics (Rho) closed
+/// the same way: 300 curves. Steps as S300's, then the Part Studio
+/// regeneration with every region extruded: a dimension changed outside the
+/// sketch (the sketch and the 120 extrusions rebuilt).
+#[test]
+#[ignore]
+fn s300_mixed_curves() {
+    let ms = |d: Duration| d.as_secs_f64() * 1e3;
+    let mut sk = Sketch::new();
+    let mut dims = Vec::new();
+    let mut corners = Vec::new();
+    for i in 0..30 {
+        for j in 0..4 {
+            let (x, y) = (i as f64 * 0.015, j as f64 * 0.015);
+            match (i + j) % 4 {
+                0 => {
+                    let s = sk.straight_slot(v(x + 0.002, y + 0.003), v(x + 0.010, y + 0.003), 0.004).unwrap();
+                    let arc = *s.curves.iter().find(|c| sk.entity(**c).is_some_and(|e| e.kind() == noshape_sketch::EntityKind::Arc)).unwrap();
+                    dims.push(sk.add_constraint(ConstraintKind::Radius { curve: arc, value: 0.002 }).unwrap());
+                    corners.push(s.points[0]);
+                }
+                1 => {
+                    let a = sk.add_circle(v(x + 0.005, y + 0.005), 0.004);
+                    let b = sk.add_circle(v(x + 0.005, y + 0.005), 0.002);
+                    sk.add_constraint(ConstraintKind::Concentric { a, b }).unwrap();
+                    dims.push(sk.add_constraint(ConstraintKind::Diameter { curve: a, value: 0.008 }).unwrap());
+                    sk.add_constraint(ConstraintKind::Diameter { curve: b, value: 0.004 }).unwrap();
+                }
+                k => {
+                    let curve = if k == 2 {
+                        sk.add_fit_spline_with_handles(&[v(x, y), v(x + 0.003, y + 0.006), v(x + 0.007, y + 0.004), v(x + 0.010, y)]).unwrap()
+                    } else {
+                        let c = sk.add_conic(v(x, y), v(x + 0.005, y + 0.008), v(x + 0.010, y), 0.5).unwrap();
+                        sk.add_constraint(ConstraintKind::Rho { conic: c, value: 0.5 }).unwrap();
+                        c
+                    };
+                    let (p0, p1) = sk.endpoints(curve).unwrap();
+                    let l = sk.add_line_between(p1, p0).unwrap();
+                    sk.add_constraint(ConstraintKind::Horizontal { a: l, b: None }).unwrap();
+                    dims.push(sk.add_constraint(ConstraintKind::Length { curve: l, value: 0.010 }).unwrap());
+                    corners.push(p1);
+                }
+            }
+        }
+    }
+    let curves = sk.entities().filter(|e| e.kind() != noshape_sketch::EntityKind::Point).count();
+    assert!(sk.solve().is_solved());
+    println!("S300 mixed: {} entities ({curves} curves), {} constraints", sk.entity_count(), sk.constraint_count());
+    assert!(curves >= 300);
+    let mut data = SketchData { sketch: sk, ..Default::default() };
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let mut f = ps.new_feature("sketch", &units).unwrap();
+    f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    f.params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+    let fid = f.id;
+    ps.features.push(f);
+    let opts = RegenOptions { editing_sketch: Some(fid), ..Default::default() };
+    let open = stats((0..5).map(|_| {
+        let mut regen = Regenerator::new();
+        let mut sk = data.sketch.clone();
+        let t = Instant::now();
+        sk.solve();
+        let _ = sk.regions();
+        regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        t.elapsed()
+    }).collect());
+    println!("  open for edit (solve with DOF, regions, regeneration): median {:.2} ms, worst {:.2} ms", ms(open.median), ms(open.worst));
+    let mut regen = Regenerator::new();
+    regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+    let change = stats((0..9).map(|k| {
+        let t = Instant::now();
+        data.sketch.set_dimension_value(dims[9], 0.008 + 0.0005 * (k % 3) as f64).unwrap();
+        data.sketch.solve();
+        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        t.elapsed()
+    }).collect());
+    println!("  change a dimension: median {:.2} ms, worst {:.2} ms", ms(change.median), ms(change.worst));
+    let corner = corners[17];
+    let mut ed = editor();
+    ed.set_tool(Tool::Select);
+    let from = data.sketch.point(corner).unwrap();
+    ed.hover = Some(corner);
+    ed.pointer_move(&mut data, from, false, false);
+    ed.tool_down(&mut data, from, Some(corner), false, false);
+    let mut steps = Vec::new();
+    for i in 1..=100 {
+        let a = i as f64 * 0.05;
+        let p = from + v(0.002 * a.cos(), 0.002 * a.sin());
+        let t = Instant::now();
+        ed.pointer_move(&mut data, p, false, false);
+        ed.tool_drag(&mut data, p);
+        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        steps.push(t.elapsed());
+    }
+    ed.tool_up(&mut data, from);
+    let drag = stats(steps);
+    println!("  drag a point: step median {:.2} ms = {:.0} fps, worst {:.2} ms", ms(drag.median), 1.0 / drag.median.as_secs_f64(), ms(drag.worst));
+    // The step's parts, timed apart.
+    let (mut solve, mut regions, mut regenerate) = (Vec::new(), Vec::new(), Vec::new());
+    for i in 1..=40 {
+        let p = from + v(0.00002 * (i % 20) as f64, 0.00001 * (i % 20) as f64);
+        let t = Instant::now();
+        data.sketch.drag(&[(noshape_sketch::DragHandle::Point(corner), p)]);
+        solve.push(t.elapsed());
+        let t = Instant::now();
+        let _ = data.sketch.regions();
+        regions.push(t.elapsed());
+        let t = Instant::now();
+        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        regenerate.push(t.elapsed());
+    }
+    println!("    (solve {:.2} ms, regions {:.2} ms, regeneration {:.2} ms)", ms(stats(solve).median), ms(stats(regions).median), ms(stats(regenerate).median));
+    let add = stats((0..9).map(|k| {
+        let mut d = data.clone();
+        let t = Instant::now();
+        d.sketch.add_constraint(ConstraintKind::HorizontalDistance { a: corners[k], b: corners[k + 4], value: 0.015 }).unwrap();
+        d.sketch.solve();
+        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(d.clone())));
+        regen.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        t.elapsed()
+    }).collect());
+    println!("  add a dimension: median {:.2} ms, worst {:.2} ms", ms(add.median), ms(add.worst));
+    // Every region extruded 5 mm, out of the sketch: change a dimension, the
+    // Part Studio rebuilt (sketch + extrude).
+    let plain = RegenOptions::default();
+    let mut regen = Regenerator::new();
+    let r = regen.regenerate(&ps, &ConfigValues::default(), &units, &plain);
+    let regions: Vec<Reference> = r.display.sketches[0].regions.iter().map(|g| Reference::SketchRegion { sketch: fid, key: g.key.clone() }).collect();
+    let mut ex = ps.new_feature("extrude", &units).unwrap();
+    ex.params.set("entities", ParamValue::Query(regions.clone()));
+    ex.params.set("depth", ParamValue::Expr(noshape_units::ExprValue::new("5 mm")));
+    ps.features.push(ex);
+    let t = Instant::now();
+    let r = regen.regenerate(&ps, &ConfigValues::default(), &units, &plain);
+    let first = t.elapsed();
+    let parts = r.context.bodies.len();
+    let rebuild = stats((0..5).map(|k| {
+        data.sketch.set_dimension_value(dims[9], 0.008 + 0.0005 * ((k + 1) % 3) as f64).unwrap();
+        data.sketch.solve();
+        ps.features[0].params.set("sketch", ParamValue::Sketch(Box::new(data.clone())));
+        let t = Instant::now();
+        regen.regenerate(&ps, &ConfigValues::default(), &units, &plain);
+        t.elapsed()
+    }).collect());
+    println!("  Part Studio: {} regions extruded into {parts} parts in {:.1} ms; a dimension changed: regeneration median {:.1} ms, worst {:.1} ms", regions.len(), ms(first), ms(rebuild.median), ms(rebuild.worst));
+}

@@ -6,7 +6,7 @@
 //! components become holes of the smallest face that contains them.
 
 use crate::entities::EntityKind;
-use crate::geom::{BBox, Curve2};
+use crate::geom::{curve_key, BBox, Curve2, ExactMemo};
 use crate::ids::EntityId;
 use crate::intersect::{intersect_prepared, Prepared};
 use crate::nurbs::Nurbs;
@@ -469,21 +469,55 @@ fn merge_points(pts: &[DVec2], tol: f64) -> (Vec<usize>, Vec<DVec2>) {
     (cluster, pos)
 }
 
+/// Curve pairs' crossings `(t1, t2)` by (tolerance, the two curves' exact
+/// values) ([`build_edges`]).
+static CROSSINGS: ExactMemo<Vec<(f64, f64)>> = std::sync::LazyLock::new(Default::default);
+/// Pairs kept at most (cleared when full).
+const CROSSINGS_KEPT: usize = 200_000;
+
 fn build_edges(curves: &[(EntityId, Curve2)], boxes: &[BBox], tol: f64) -> (Vec<Edge>, Vec<DVec2>) {
     let n = curves.len();
     let prep: Vec<Prepared> = curves.iter().zip(boxes).map(|((_, c), b)| Prepared::with_bbox(c, *b)).collect();
     let bbs: Vec<BBox> = prep.iter().map(|g| g.bbox.expanded(tol)).collect();
     let mut splits: Vec<Vec<f64>> = vec![Vec::new(); n];
-    for i in 0..n {
-        for j in i + 1..n {
-            if !bbs[i].intersects(&bbs[j]) {
-                continue;
+    // Each pair's crossings, kept between calls by the curves' exact values:
+    // a drag step recomputes only the pairs of the curves that moved (a
+    // 300-curve sketch of splines and conics spent most of a step here).
+    let keys: Vec<Vec<u64>> = curves.iter().map(|(_, c)| curve_key(c)).collect();
+    let pairs: Vec<(usize, usize)> = (0..n).flat_map(|i| (i + 1..n).map(move |j| (i, j))).filter(|&(i, j)| bbs[i].intersects(&bbs[j])).collect();
+    let pair_key = |i: usize, j: usize| {
+        let mut k = Vec::with_capacity(keys[i].len() + keys[j].len() + 2);
+        k.push(tol.to_bits());
+        k.extend_from_slice(&keys[i]);
+        k.push(u64::MAX);
+        k.extend_from_slice(&keys[j]);
+        k
+    };
+    let found: Vec<Option<Vec<(f64, f64)>>> = {
+        let memo = CROSSINGS.lock().unwrap_or_else(|e| e.into_inner());
+        pairs.iter().map(|&(i, j)| memo.get(&pair_key(i, j)).cloned()).collect()
+    };
+    let mut fresh = Vec::new();
+    for (&(i, j), hit) in pairs.iter().zip(found) {
+        let xs = match hit {
+            Some(xs) => xs,
+            None => {
+                let xs: Vec<(f64, f64)> = intersect_prepared(&prep[i], &prep[j], tol).into_iter().map(|x| (x.t1, x.t2)).collect();
+                fresh.push((pair_key(i, j), xs.clone()));
+                xs
             }
-            for x in intersect_prepared(&prep[i], &prep[j], tol) {
-                splits[i].push(x.t1);
-                splits[j].push(x.t2);
-            }
+        };
+        for (t1, t2) in xs {
+            splits[i].push(t1);
+            splits[j].push(t2);
         }
+    }
+    if !fresh.is_empty() {
+        let mut memo = CROSSINGS.lock().unwrap_or_else(|e| e.into_inner());
+        if memo.len() + fresh.len() > CROSSINGS_KEPT {
+            memo.clear();
+        }
+        memo.extend(fresh);
     }
     // raw edges
     let mut raw: Vec<(usize, f64, f64)> = Vec::new();

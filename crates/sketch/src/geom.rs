@@ -69,6 +69,60 @@ pub enum Curve2 {
     Nurbs(Nurbs),
 }
 
+/// Values kept by exact keys ([`curve_key`]s), shared by threads.
+pub(crate) type ExactMemo<T> = std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<Vec<u64>, T>>>;
+
+/// NURBS curves' boxes by their exact values ([`Curve2::bbox`]).
+static NURBS_BOXES: ExactMemo<BBox> = std::sync::LazyLock::new(Default::default);
+/// Boxes kept at most (cleared when full).
+const NURBS_BOXES_KEPT: usize = 50_000;
+
+/// A curve's kind and exact values, as bits.
+pub(crate) fn curve_key(c: &Curve2) -> Vec<u64> {
+    let mut k = Vec::new();
+    let mut f = |x: f64| k.push(x.to_bits());
+    match c {
+        Curve2::Line { a, b } => {
+            f(0.0);
+            [a.x, a.y, b.x, b.y].into_iter().for_each(&mut f);
+        }
+        Curve2::Circle { center, radius } => {
+            f(1.0);
+            [center.x, center.y, *radius].into_iter().for_each(&mut f);
+        }
+        Curve2::Arc { center, radius, start_angle, end_angle } => {
+            f(2.0);
+            [center.x, center.y, *radius, *start_angle, *end_angle].into_iter().for_each(&mut f);
+        }
+        Curve2::Ellipse { center, major, minor } => {
+            f(3.0);
+            [center.x, center.y, major.x, major.y, *minor].into_iter().for_each(&mut f);
+        }
+        Curve2::EllipticalArc { center, major, minor, start_param, end_param } => {
+            f(4.0);
+            [center.x, center.y, major.x, major.y, *minor, *start_param, *end_param].into_iter().for_each(&mut f);
+        }
+        Curve2::Nurbs(nb) => {
+            f(5.0);
+            f(nb.degree as f64);
+            f(nb.knots.len() as f64);
+            nb.knots.iter().for_each(|x| f(*x));
+            nb.ctrl.iter().for_each(|p| {
+                f(p.x);
+                f(p.y);
+            });
+            match &nb.weights {
+                Some(w) => {
+                    f(1.0);
+                    w.iter().for_each(|x| f(*x));
+                }
+                None => f(0.0),
+            }
+        }
+    }
+    k
+}
+
 /// Normalizes an angle into `[0, 2pi)`.
 pub fn norm_angle(a: f64) -> f64 {
     let r = a.rem_euclid(TAU);
@@ -359,8 +413,21 @@ impl Curve2 {
                 b
             }
             Curve2::Nurbs(nb) => {
+                // A tessellation's box, kept by the curve's exact values: the
+                // regions of a sketch with 60 splines and conics spent 2–3 ms
+                // a drag step on these.
+                let key = curve_key(self);
+                if let Some(b) = NURBS_BOXES.lock().unwrap_or_else(|e| e.into_inner()).get(&key) {
+                    return *b;
+                }
                 let size = BBox::from_points(nb.ctrl.iter().copied()).size().max_element();
-                BBox::from_points(self.tessellate(size * 1e-4 + 1e-12))
+                let b = BBox::from_points(self.tessellate(size * 1e-4 + 1e-12));
+                let mut memo = NURBS_BOXES.lock().unwrap_or_else(|e| e.into_inner());
+                if memo.len() >= NURBS_BOXES_KEPT {
+                    memo.clear();
+                }
+                memo.insert(key, b);
+                b
             }
         }
     }
