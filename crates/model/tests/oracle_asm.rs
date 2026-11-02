@@ -529,13 +529,21 @@ fn fuzz_fixture(name: &str) -> std::path::PathBuf {
 #[test]
 #[ignore = "T2: live fuzz batch (assemblies)"]
 fn asm_fuzz_write_batch() {
-    use serde_json::json;
     let mut parts = parts();
     let mut cases = Vec::new();
     for seed in 1..=20 {
         let (asm, mut spec) = fuzz_case(&parts, seed);
-        // Mates added one at a time, each solve stored (as live builds it):
-        // a later conflicting mate meets the earlier ones' solved state.
+        spec["ours"] = fuzz_ours(&mut parts, &asm);
+        cases.push(spec);
+    }
+    finish_batch(cases);
+}
+
+/// Ours for a fuzz case: mates added one at a time, each solve stored (as
+/// live builds it), so a later conflicting mate meets the earlier ones'
+/// solved state.
+fn fuzz_ours(parts: &mut Parts, asm: &Assembly) -> serde_json::Value {
+    {
         let mut built = asm.clone();
         built.mates.clear();
         let mut res = parts.ev.evaluate(&parts.doc, &built, &SolveOptions::default(), None);
@@ -549,14 +557,17 @@ fn asm_fuzz_write_batch() {
             }
         }
         let got = outcome(&built, &res);
-        spec["ours"] = json!({
+        serde_json::json!({
             "status": got.mates.iter().map(|m| (m.0.clone(), if m.1 { "OK" } else { "ERROR" })).collect::<std::collections::BTreeMap<_, _>>(),
             "text": got.mates.iter().map(|m| (m.0.clone(), m.2.clone())).collect::<std::collections::BTreeMap<_, _>>(),
             "transforms_mm": got.instances.iter().map(|i| (i.0.clone(), i.1.to_vec())).collect::<std::collections::BTreeMap<_, _>>(),
             "dof": got.instances.iter().map(|i| (i.0.clone(), i.2)).collect::<std::collections::BTreeMap<_, _>>(),
-        });
-        cases.push(spec);
+        })
     }
+}
+
+fn finish_batch(cases: Vec<serde_json::Value>) {
+    use serde_json::json;
     let b = json!({"parts": "live/fs-oracle-asm CASES.md parts (BLOCK, PLATE, PIN, one Part Studio)", "method": "CASES.md method: insert in order, fix A, POST the start transform (rotate about +z, then translate), add the mates with implicit connectors (the entity through `at_mm` on that instance's part, the inference)", "cases": cases});
     let path = fuzz_fixture("asm-1.json");
     if std::env::var("LIVE_FUZZ_WRITE").is_ok() {
@@ -586,7 +597,8 @@ fn asm_fuzz_live_matches() {
     // free value after a large reorientation (live 44 / 47 / 33 mm further
     // along the axis: least change measured about another pivot); f16 live
     // leaves a Parallel of the conflicting loop OK.
-    const KNOWN: &[&str] = &["f1", "f7", "f8", "f12", "f16"];
+    const KNOWN: &[&str] = &["f16"];
+    let mut parts = parts();
     let (mut answered, mut matches, mut report) = (0, 0, Vec::new());
     for n in 1.. {
         let p = fuzz_fixture(&format!("asm-{n}.json"));
@@ -594,11 +606,35 @@ fn asm_fuzz_live_matches() {
             break;
         }
         let Ok(live) = std::fs::read_to_string(fuzz_fixture(&format!("asm-{n}.live.jsonl"))) else { continue };
-        let ours: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&p).unwrap()).unwrap();
+        let mut ours: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&p).unwrap()).unwrap();
+        // Ours as the solver stands now (the batch file keeps ours as sent).
+        for case in ours["cases"].as_array_mut().unwrap() {
+            let seed = case["case"].as_str().unwrap().trim_start_matches('f').parse::<u64>().unwrap();
+            let (asm, _) = fuzz_case(&parts, seed);
+            case["ours"] = fuzz_ours(&mut parts, &asm);
+        }
         for line in live.lines().filter(|l| !l.trim().is_empty()) {
             let l: serde_json::Value = serde_json::from_str(line).unwrap();
             let Some(case) = ours["cases"].as_array().unwrap().iter().find(|c| c["case"] == l["case"]) else { continue };
             answered += 1;
+            let d = fuzz_differences(case, &l);
+            let name = l["case"].as_str().unwrap_or("?");
+            if d.is_empty() {
+                matches += 1;
+            } else if !KNOWN.contains(&name) {
+                report.push(format!("{name}: {}", d.join("; ")));
+            }
+        }
+    }
+    println!("live fuzz (assemblies): {answered} cases answered, {matches} match");
+    assert!(report.is_empty(), "{}", report.join("\n"));
+}
+
+/// Ours (`case["ours"]`) against one of live's result lines: each mate's
+/// status and text, each instance's transform (1e-3 mm, 1e-6).
+fn fuzz_differences(case: &serde_json::Value, l: &serde_json::Value) -> Vec<String> {
+    {
+        {
             let mut d = Vec::new();
             for (m, st) in l["status"].as_object().into_iter().flatten() {
                 let ok = st == "OK" || st == "INFO";
@@ -620,15 +656,75 @@ fn asm_fuzz_live_matches() {
                     d.push(format!("{inst}: ours {o}, live {t}"));
                 }
             }
-            let name = l["case"].as_str().unwrap_or("?");
-            if d.is_empty() {
-                matches += 1;
-            } else if !KNOWN.contains(&name) {
-                report.push(format!("{name}: {}", d.join("; ")));
-            }
+            d
         }
     }
-    println!("live fuzz (assemblies): {answered} cases answered, {matches} match");
+}
+
+/// Live's assembly probes (request 1776): (a) which message a Fastened
+/// that can't hold gets, (b) where a Slider leaves a part turned onto it.
+fn asm_probes(parts: &Parts) -> Vec<(&'static str, Assembly)> {
+    let top = |p: &Parts| face(p, BLOCK, 20.0, 10.0, 10.0);
+    let bottom = |p: &Parts| face(p, BLOCK, 20.0, 10.0, 0.0);
+    let mut out = Vec::new();
+    let named = |mut asm: Assembly| {
+        let mut n = std::collections::HashMap::new();
+        for m in &mut asm.mates {
+            let k = n.entry(m.mate_type.name()).or_insert(0);
+            *k += 1;
+            m.name = format!("{} {k}", m.mate_type.name());
+        }
+        asm
+    };
+    let blocks = |n: usize| Assembly { instances: ["A", "B", "C"].iter().take(n).enumerate().map(|(k, name)| instance(parts, k as u64 + 1, name, BLOCK, Placement::default(), k == 0)).collect(), ..Default::default() };
+    // a1: B Planar on A, then Fastened on the same faces 10 mm up.
+    let mut a = blocks(2);
+    a.mates.push(mate(10, MateType::Planar, conn(2, bottom(parts), Inference::Centroid), conn(1, top(parts), Inference::Centroid)));
+    let mut f = mate(11, MateType::Fastened, conn(2, bottom(parts), Inference::Centroid), conn(1, top(parts), Inference::Centroid));
+    f.offset_z = Some(ExprValue::new("10 mm"));
+    a.mates.push(f);
+    out.push(("a1", named(a)));
+    // a2: B Fastened on A, then front face on front face 5 mm along X.
+    let mut a = blocks(2);
+    a.mates.push(mate(10, MateType::Fastened, conn(2, bottom(parts), Inference::Centroid), conn(1, top(parts), Inference::Centroid)));
+    let mut f = mate(11, MateType::Fastened, conn(2, face(parts, BLOCK, 20.0, 0.0, 5.0), Inference::Centroid), conn(1, face(parts, BLOCK, 20.0, 0.0, 5.0), Inference::Centroid));
+    f.offset_x = Some(ExprValue::new("5 mm"));
+    a.mates.push(f);
+    out.push(("a2", named(a)));
+    // a4: B Planar on A, C Planar on B, then C Fastened on A 10 mm up.
+    let mut a = blocks(3);
+    a.mates.push(mate(10, MateType::Planar, conn(2, bottom(parts), Inference::Centroid), conn(1, top(parts), Inference::Centroid)));
+    a.mates.push(mate(11, MateType::Planar, conn(3, bottom(parts), Inference::Centroid), conn(2, top(parts), Inference::Centroid)));
+    let mut f = mate(12, MateType::Fastened, conn(3, bottom(parts), Inference::Centroid), conn(1, top(parts), Inference::Centroid));
+    f.offset_z = Some(ExprValue::new("10 mm"));
+    a.mates.push(f);
+    out.push(("a4", named(a)));
+    // b1–b5: a plate's hole on A's front face by a Slider, turned from its start.
+    for (name, deg, t) in [("b1", 0.0, (88.0, 66.0, 49.0)), ("b2", 90.0, (88.0, 66.0, 49.0)), ("b3", 180.0, (88.0, 66.0, 49.0)), ("b4", 302.0, (88.0, 66.0, 49.0)), ("b5", 302.0, (0.0, 0.0, 0.0))] {
+        let mut a = two(parts, BLOCK, PLATE, pose(deg, t));
+        a.mates.push(mate(10, MateType::Slider, conn(2, edge(parts, PLATE, 130.0, 25.0, 0.0), Inference::Center), conn(1, face(parts, BLOCK, 20.0, 0.0, 5.0), Inference::Centroid)));
+        out.push((name, named(a)));
+    }
+    out
+}
+
+#[test]
+#[ignore = "T2: live's assembly probes (request 1776)"]
+fn asm_probes_match_live() {
+    let mut parts = parts();
+    let live = std::fs::read_to_string(fuzz_fixture("asm-probe-1.live.jsonl")).unwrap();
+    let mut report = Vec::new();
+    let mut n = 0;
+    for (name, asm) in asm_probes(&parts) {
+        let Some(l) = live.lines().filter(|l| !l.trim().is_empty()).map(|l| serde_json::from_str::<serde_json::Value>(l).unwrap()).find(|l| l["case"] == name) else { continue };
+        n += 1;
+        let case = serde_json::json!({"ours": fuzz_ours(&mut parts, &asm)});
+        let d = fuzz_differences(&case, &l);
+        if !d.is_empty() {
+            report.push(format!("{name}: {}", d.join("; ")));
+        }
+    }
+    println!("live assembly probes: {n} compared, {} differ", report.len());
     assert!(report.is_empty(), "{}", report.join("\n"));
 }
 

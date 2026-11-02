@@ -450,6 +450,45 @@ fn quarter_rot(k: u8) -> DQuat {
 }
 
 impl Prepared {
+    /// Rigid pieces the failing mates around `fastened` span: the bodies of
+    /// the failing mates joined to it through shared bodies, with bodies a
+    /// failing Fastened other than it joins counted as one, fixed ones as
+    /// one (ground).
+    fn conflict_pieces(&self, solved: &Solved, fastened: MateId) -> usize {
+        let failing: Vec<&(MateId, MateType, SolverMate)> = self.mates.iter().filter(|(id, _, _)| solved.mate_ok.get(id) == Some(&false)).collect();
+        let Some(start) = failing.iter().find(|(id, _, _)| *id == fastened) else { return 0 };
+        let ground = usize::MAX;
+        let body = |b: usize| if self.fixed.get(b).copied().unwrap_or(false) { ground } else { b };
+        let mut loop_bodies: HashSet<usize> = [body(start.2.a), body(start.2.b)].into();
+        let mut members: Vec<&(MateId, MateType, SolverMate)> = vec![*start];
+        loop {
+            let before = members.len();
+            for m in &failing {
+                if !members.iter().any(|x| x.0 == m.0) && (loop_bodies.contains(&body(m.2.a)) || loop_bodies.contains(&body(m.2.b))) {
+                    loop_bodies.insert(body(m.2.a));
+                    loop_bodies.insert(body(m.2.b));
+                    members.push(*m);
+                }
+            }
+            if members.len() == before {
+                break;
+            }
+        }
+        let mut parent: HashMap<usize, usize> = loop_bodies.iter().map(|b| (*b, *b)).collect();
+        fn root(p: &mut HashMap<usize, usize>, mut x: usize) -> usize {
+            while p[&x] != x {
+                x = p[&x];
+            }
+            x
+        }
+        for m in members.iter().filter(|m| m.1 == MateType::Fastened && m.0 != fastened) {
+            let (a, b) = (root(&mut parent, body(m.2.a)), root(&mut parent, body(m.2.b)));
+            parent.insert(a, b);
+        }
+        let roots: HashSet<usize> = loop_bodies.iter().map(|b| root(&mut parent, *b)).collect();
+        roots.len()
+    }
+
     pub fn has_instance(&self, id: InstanceId) -> bool {
         self.body_of.contains_key(&id)
     }
@@ -2144,10 +2183,12 @@ impl AssemblyEvaluator {
                 (!m.suppressed && instance_off).then(|| "One or more instances is suppressed".to_string())
             } else if let Some(f) = failed {
                 Some(f)
-            } else if !ok && m.mate_type == MateType::Fastened && solved.mate_unheld.contains(&m.id) {
-                // Live 1764 (5): a Fastened its chain can't reach (it failed
-                // before the solve) "Mate is not consistent."; the mates it
-                // fights "Mate overdefines the assembly.".
+            } else if !ok && m.mate_type == MateType::Fastened && solved.mate_unheld.contains(&m.id) && prepared.conflict_pieces(&solved, m.id) >= 3 {
+                // Live 1764 (5), probes a1–a6: a Fastened the assembly can't
+                // take reads "Mate is not consistent." when the mates it
+                // fights span three rigid pieces or more (a chain of Planars
+                // back to ground); over two (a second mate on the same pair,
+                // a part Fastened to ground) "Mate overdefines the assembly.".
                 Some("Mate is not consistent.".into())
             } else if !ok {
                 // Live (request 1559): "Revolute 1 has error: Mate overdefines the assembly.".

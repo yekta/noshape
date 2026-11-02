@@ -484,7 +484,8 @@ fs-oracle-asm vocabulary, mates added one at a time as live does; asm-N.live.jso
 | sketch 1 (lines, arcs, circles; 11 drags) | 20 | REQUESTS 09:45 | 20 + drags + curve colours | solvability 19 → 20; positions 0–1 (least change) | 1: a redundant dimension |
 | least-change probes 1 | 14 | REQUESTS 11:30 | 14 | 4 → 14 | the least-change rule |
 | least-change probes 2 | 10 | REQUESTS 12:15 | 10 | 0 → 10 | the least-change rule |
-| asm 1 (BLOCK / PLATE / PIN, 1–4 mates) | 20 | REQUESTS 10:05 | 20 | 15 | 1 before live (perpendicular start) |
+| asm 1 (BLOCK / PLATE / PIN, 1–4 mates) | 20 | REQUESTS 10:05 | 20 | 15 → 19 | perpendicular start; Slider pivot; "not consistent" rule |
+| asm probes (1776: a1–a6, b1–b5) | 11 | REQUESTS 14:00 | 11 | 8/8 encoded | – |
 | sketch 2 (+ fit splines, conics, angles) | 20 | REQUESTS 10:40 | 10 (10 spline cases refused: our spline JSON form, live reposts) | solvability 10/10 | – |
 Fixed before live answered: an axial mate whose connectors start exactly perpendicular (a part inserted square to its
 mate) could solve reversed: the residual is as flat both ways, the orientation pass only turned parts more than 90°
@@ -567,6 +568,15 @@ orientation-holds refinement didn't separate them (one live data point for "not 
 a Slider's free value after a large reorientation lands 44 / 47 / 33 mm further along its axis in live (ours keeps the
 connector's start position along the axis): live measures that least change about another pivot. f16: live leaves a
 Parallel of the conflicting loop OK.
+Assembly probes (live 1776, 11-02 11:20) settled two rules, both now ours (T2 oracle_asm::asm_probes_match_live, 8
+probes; asm batch 1 15 → 19/20, f16 left): (a) a Fastened that can't hold reads "Mate is not consistent." only when
+the failing mates around it span three rigid pieces or more (bodies a failing Fastened joins count as one, ground as
+one: a4 / 1764 (5), a chain of Planars back to ground); otherwise every mate in the conflict "overdefines" (a1 a second
+mate on the pair, a6 through a fastened intermediate, fuzz f1 / f7). (b) A Slider started perpendicular turns the part
+about its connector's foot on the other connector's axis line, then slides it onto the axis (b1–b5: the slide value is
+the start position along the axis less the connector's drop onto it); the Slider joins the orientation pass for that
+(its residual holds the whole turn, so it never needed it otherwise). A Cylindrical keeps turning about its connector
+(f2 / f3 / f4 / f9 match that way; the foot there broke them).
 Next batches: splines / conics / angles (once live confirms their REST form), assemblies with drags and patterns.
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches

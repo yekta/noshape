@@ -1215,11 +1215,16 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) -> Vec<us
     // was 5 ms of every a1000 drag step).
     let mut poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
     for m in mates {
-        if m.follow.is_some() || !matches!(m.kind, MateType::Revolute | MateType::Cylindrical | MateType::PinSlot | MateType::Planar | MateType::Parallel) {
+        if m.follow.is_some() || !matches!(m.kind, MateType::Revolute | MateType::Cylindrical | MateType::PinSlot | MateType::Planar | MateType::Parallel | MateType::Slider) {
             continue;
         }
         let z_rel = (relative(&poses, m).rotation * DVec3::Z).z;
         if z_rel >= 1e-6 {
+            continue;
+        }
+        // A Slider's residual holds its whole turn: only a perpendicular
+        // start is turned here (about its foot on the axis, below).
+        if m.kind == MateType::Slider && z_rel <= -1e-6 {
             continue;
         }
         // Perpendicular axes (a part inserted square to its mate: a pin's
@@ -1236,6 +1241,17 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) -> Vec<us
                 (m.b, fb.origin, DQuat::from_rotation_arc(zb, za))
             } else {
                 continue;
+            };
+            // A Slider turns the part about its connector's foot on the other
+            // connector's axis line (live probes b1–b5: the slide value after
+            // a quarter turn is the connector's start position along that
+            // axis less its drop onto it); a Cylindrical, about the connector
+            // (fuzz f2 / f3 / f4 / f9 match that way).
+            let c = if m.kind == MateType::Slider {
+                let (o, axis) = if moving == m.a { (fb.origin, zb) } else { (fa.origin, za) };
+                o + axis * (c - o).dot(axis)
+            } else {
+                c
             };
             let p = bodies[moving].pose;
             bodies[moving].pose = Frame { origin: c + turn * (p.origin - c), rotation: (turn * p.rotation).normalize() };
