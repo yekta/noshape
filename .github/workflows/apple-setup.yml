@@ -1,0 +1,130 @@
+name: Apple signing setup
+
+# One-off (lead, 11-02): creates the app.noshape App ID, the signing certificates and the App Store profiles through
+# the App Store Connect API, entirely on the runner. Each certificate's private key is generated here and never leaves
+# the runner unencrypted: every result is sealed to the repo's Actions secret key (passed in as an input, public) and
+# uploaded as an artifact the lead stores with `gh secret set`-equivalent API calls. Nothing secret reaches the lead's
+# servers. Needs the repo secrets ASC_KEY_P8 (base64 .p8), ASC_KEY_ID, ASC_ISSUER_ID.
+on:
+  workflow_dispatch:
+    inputs:
+      repo_key:
+        description: "The repo's Actions secrets public key (base64; gh api repos/{repo}/actions/secrets/public-key)"
+        required: true
+      repo_key_id:
+        description: "Its key_id"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Create App ID, certificates and profiles
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          REPO_KEY: ${{ inputs.repo_key }}
+          REPO_KEY_ID: ${{ inputs.repo_key_id }}
+        run: |
+          set -euo pipefail
+          pip install --quiet pyjwt cryptography pynacl requests
+          umask 077
+          W=$(mktemp -d)
+          cd "$W"
+          cat > setup.py <<'PY'
+          import base64, json, os, secrets, subprocess, sys, time
+          import jwt, requests
+          from nacl import encoding, public
+
+          key = base64.b64decode(os.environ["ASC_KEY_P8"]).decode()
+          def token():
+              now = int(time.time())
+              return jwt.encode({"iss": os.environ["ASC_ISSUER_ID"], "iat": now, "exp": now + 1100, "aud": "appstoreconnect-v1"},
+                                key, algorithm="ES256", headers={"kid": os.environ["ASC_KEY_ID"], "typ": "JWT"})
+          API = "https://api.appstoreconnect.apple.com/v1"
+          def call(method, path, body=None, params=None):
+              r = requests.request(method, API + path, json=body, params=params, timeout=60,
+                                   headers={"Authorization": "Bearer " + token(), "Content-Type": "application/json"})
+              if r.status_code >= 300:
+                  errs = r.json().get("errors", [{}]) if r.content else [{}]
+                  raise RuntimeError(f"{method} {path}: {r.status_code} " + "; ".join(e.get("detail", e.get("title", "")) for e in errs))
+              return r.json() if r.content else {}
+
+          box = public.SealedBox(public.PublicKey(os.environ["REPO_KEY"].encode(), encoding.Base64Encoder()))
+          sealed = {}
+          def store(name, value):
+              sealed[name] = base64.b64encode(box.encrypt(value.encode())).decode()
+          report = []
+
+          # The App ID.
+          found = call("GET", "/bundleIds", params={"filter[identifier]": "app.noshape"})["data"]
+          if found:
+              bid = found[0]["id"]; report.append(f"App ID app.noshape: exists ({found[0]['attributes']['platform']})")
+          else:
+              bid = None
+              for platform in ("UNIVERSAL", "IOS"):
+                  try:
+                      bid = call("POST", "/bundleIds", {"data": {"type": "bundleIds", "attributes": {
+                          "identifier": "app.noshape", "name": "noshape", "platform": platform}}})["data"]["id"]
+                      report.append(f"App ID app.noshape: created ({platform})"); break
+                  except RuntimeError as e:
+                      report.append(f"App ID as {platform}: {e}")
+
+          password = secrets.token_urlsafe(24)
+          store("APPLE_CERT_PASSWORD", password)
+          certs = {}
+          # (secret name, certificate types to try in order)
+          wanted = [("APPLE_CERT_P12", ["DEVELOPER_ID_APPLICATION_G2", "DEVELOPER_ID_APPLICATION"]),
+                    ("APPLE_INSTALLER_CERT_P12", ["DEVELOPER_ID_INSTALLER"]),
+                    ("APPLE_DIST_CERT_P12", ["DISTRIBUTION"]),
+                    ("APPLE_MAC_INSTALLER_DIST_CERT_P12", ["MAC_INSTALLER_DISTRIBUTION"])]
+          for name, types in wanted:
+              subprocess.run(["openssl", "req", "-new", "-newkey", "rsa:2048", "-nodes", "-keyout", f"{name}.key",
+                              "-out", f"{name}.csr", "-subj", f"/CN=noshape {name}"], check=True, capture_output=True)
+              csr = open(f"{name}.csr").read()
+              for t in types:
+                  try:
+                      d = call("POST", "/certificates", {"data": {"type": "certificates", "attributes": {
+                          "certificateType": t, "csrContent": csr}}})["data"]
+                  except RuntimeError as e:
+                      report.append(f"{name} as {t}: {e}"); continue
+                  open(f"{name}.cer", "wb").write(base64.b64decode(d["attributes"]["certificateContent"]))
+                  subprocess.run(["openssl", "x509", "-inform", "DER", "-in", f"{name}.cer", "-out", f"{name}.pem"], check=True)
+                  subprocess.run(["openssl", "pkcs12", "-export", "-inkey", f"{name}.key", "-in", f"{name}.pem",
+                                  "-name", f"noshape {t}", "-out", f"{name}.p12", "-passout", f"pass:{password}",
+                                  "-certpbe", "PBE-SHA1-3DES", "-keypbe", "PBE-SHA1-3DES", "-macalg", "sha1"], check=True)
+                  store(name, base64.b64encode(open(f"{name}.p12", "rb").read()).decode())
+                  certs[name] = d["id"]
+                  report.append(f"{name}: created {t}, expires {d['attributes'].get('expirationDate', '?')}")
+                  break
+              os.remove(f"{name}.key")
+
+          # App Store provisioning profiles (Apple Distribution certificate).
+          if bid and "APPLE_DIST_CERT_P12" in certs:
+              for secret, ptype, label in (("APPLE_MAC_APPSTORE_PROFILE", "MAC_APP_STORE", "noshape Mac App Store"),
+                                           ("APPLE_IOS_APPSTORE_PROFILE", "IOS_APP_STORE", "noshape iOS App Store")):
+                  try:
+                      d = call("POST", "/profiles", {"data": {"type": "profiles", "attributes": {"name": label, "profileType": ptype},
+                               "relationships": {"bundleId": {"data": {"type": "bundleIds", "id": bid}},
+                                                 "certificates": {"data": [{"type": "certificates", "id": certs["APPLE_DIST_CERT_P12"]}]}}}})["data"]
+                      store(secret, d["attributes"]["profileContent"])
+                      report.append(f"{secret}: created {ptype}")
+                  except RuntimeError as e:
+                      report.append(f"{secret}: {e}")
+
+          json.dump({"key_id": os.environ["REPO_KEY_ID"], "secrets": sealed}, open(os.environ["OUT"], "w"))
+          print("\n".join(report))
+          print("sealed secrets:", ", ".join(sorted(sealed)))
+          PY
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          OUT="$GITHUB_WORKSPACE/out/sealed.json" python3 setup.py
+          rm -rf "$W"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apple-sealed-secrets
+          path: out/sealed.json
+          retention-days: 1
