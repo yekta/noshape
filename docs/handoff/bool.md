@@ -41,6 +41,14 @@ Fusing the slabs yours takes first and adding the offset ones after doesn't help
 next reasons: 3.9 → 5.9 s on a dump); one OCCT common of the solid with all slabs as one tool group changes results.
 Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scratch SHELLDUMP=<path without .brep>).
 
+## Seams apart: the decline is gone (11-02 13:20 UTC)
+- With the unify's cylinder-wall merges (frames apart, after USD, one loop; volume on the changed faces), the
+  Boolean's "one cylinder in faces of two inputs, their seams apart" decline is removed: corpora +16 taken, 0
+  differ; shfall 22 -> 37 taken, 3 differing from OCCT, each where OCCT is the odd one: 8b25831a (our unify merges one
+  more wall: live's rule, 1767 / 1781), 570dfc37 (OCCT's result keeps an input vertex of tolerance 1e-4 with no edge,
+  ours doesn't), 37e806ac (two edges more after unify, the same faces). T1 holes_through_a_boss_in_a_mirrored_plate_
+  unify_as_live checks ours too again. Model T1 294 passed.
+
 ## Shell's declines by OCCT time; a plane along a cylinder but for rounding; a vertex in a face (11-02 12:40 UTC)
 - Shell's fuzz recordings (shfall, 194) on main by OCCT time declined: a face's vertex off its plane 63 s (19,
   tolerant: the rule taking them broke cli-shell-gpf), a point near two vertices 40 s (16, mostly absurd tolerances),
