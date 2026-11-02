@@ -3672,12 +3672,35 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
       catch (const Standard_Failure&)
       {
       }
-      // A slab that can't be built is a convex blend thinner than the wall:
-      // its neighbours' slabs cover it.
+      // A piece of a split closed face can come out invalid (82ac: a sunk boss's half, its split edge's curve out
+      // of range: OCCT's simple offset throws), and then had no slab, the wall left out (live keeps it): fixed, again.
+      if (s.IsNull() && closed && !BRepCheck_Analyzer(p).IsValid() && !std::getenv("NOSHAPE_SHELL_NO_PIECE_FIX"))
+      {
+        if (std::getenv("NOSHAPE_SHELL_DEBUG"))
+          std::fprintf(stderr, "slabs: an invalid piece of a closed face fixed\n");
+        try
+        {
+          ShapeFix_Shape fx(p);
+          fx.Perform();
+          if (fx.Shape().ShapeType() == TopAbs_FACE && BRepCheck_Analyzer(fx.Shape()).IsValid())
+            s = slab(TopoDS::Face(fx.Shape()), d, f, sources);
+        }
+        catch (const Standard_Failure&)
+        {
+        }
+      }
+      // A slab that can't be built otherwise is a convex blend thinner than the wall: its neighbours' slabs cover it.
       if (!s.IsNull())
         tools.Append(s);
       else if (std::getenv("NOSHAPE_SHELL_DEBUG"))
+      {
         std::fprintf(stderr, "slabs: no slab for a face of type %d (area %.6g)\n", (int)BRepAdaptor_Surface(p).GetType(), [&] { GProp_GProps g; BRepGProp::SurfaceProperties(p, g); return g.Mass(); }());
+        if (const char* dir = std::getenv("NOSHAPE_SHELL_DUMP_TOOLS"))
+        {
+          static std::atomic<int> nf{0};
+          BRepTools::Write(p, (std::string(dir) + "/noslab" + std::to_string(nf++) + ".brep").c_str());
+        }
+      }
     }
     if (collapsing_blend(f, d))
     {
@@ -3895,6 +3918,8 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     {
       const bool   ok = BRepCheck_Analyzer(it.Value()).IsValid();
       const double v  = volume_of(it.Value());
+      if (std::getenv("NOSHAPE_SHELL_DUMP_TOOLS"))
+        BRepTools::Write(it.Value(), (std::string(std::getenv("NOSHAPE_SHELL_DUMP_TOOLS")) + "/tool" + std::to_string(k) + ".brep").c_str());
       if (!ok || v <= 0)
       {
         std::fprintf(stderr, "slabs: tool %d valid %d volume %.6g\n", k, ok, v);
@@ -4017,6 +4042,25 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
   // (RUST-SHELL-2AFC).)
   if (!(vr > 0) || (sign < 0 && !(vr <= vs * (1 + 1e-9))))
     return false;
+  // Inward, every kept face stays whole: the result's area is at least theirs (82ac's sibling ca43c447: only four
+  // pieces of tube walls came out of the fuse, 258 mm³ of a 0.1 mm skin over 32000 mm²).
+  if (sign < 0)
+  {
+    auto area = [](const TopoDS_Shape& x) {
+      GProp_GProps g;
+      BRepGProp::SurfaceProperties(x, g);
+      return g.Mass();
+    };
+    double kept = area(solid);
+    for (const TopoDS_Shape& f : removed)
+      kept -= area(f);
+    if (area(r) < kept * (1 - 1e-6))
+    {
+      if (std::getenv("NOSHAPE_SHELL_DEBUG"))
+        std::fprintf(stderr, "slabs: result area %.9g under the kept faces' %.9g\n", area(r), kept);
+      return false;
+    }
+  }
   out.result = r;
   out.history = shell_history(solid, r, {hb, hs}, {hu, hb, hs}, sources, removed);
   return true;

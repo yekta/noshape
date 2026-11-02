@@ -819,3 +819,29 @@ fn direct_shell_time() {
         println!("timing {name}: direct {direct:.1} ms, OCCT's offset {offset:.1} ms, slabs {slabs:.1} ms; Auto ({path}) {auto:.1} ms");
     }
 }
+
+/// CLI fuzz part 82ac (metres), shelled 0.5 mm inward with its top and one sloped face removed, against live's body
+/// (live 1758 / 1759, its Parasolid export): its r 6 / r 7 tubes are 2t walls, a boss half sunk in the part; one half
+/// of the boss's split cylinder came out invalid, had no slab, and the slabs hollowed that half of the wall (570.5 mm³
+/// short). Now the same solid as live's both ways, 70 faces, the two sliver voids live has too.
+#[test]
+fn a_sunk_boss_keeps_its_wall_as_live() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_brep(&dir.join("82ac-input.brep")).unwrap();
+    let rm: Vec<Shape> = s
+        .faces()
+        .into_iter()
+        .filter(|f| {
+            let c = f.centroid().unwrap() * 1e3;
+            let a = f.area().unwrap() * 1e6;
+            ((c.z - 20.0).abs() < 1e-6 && (a - 4781.6514).abs() < 1e-3) || ((c - DVec3::new(34.378, 38.044, 17.870)).length() < 1e-2 && (a - 222.2683).abs() < 1e-3)
+        })
+        .collect();
+    assert_eq!(rm.len(), 2);
+    let r = shell_solid(&s, &rm, 0.5e-3, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+    let live = read_parasolid(&dir.join("82ac-live-shelled.x_t"), LengthUnit::Meter).unwrap();
+    let (a, b) = (vol(&cut(&live, &r).unwrap().shape) * 1e9, vol(&cut(&r, &live).unwrap().shape) * 1e9);
+    assert!(a < 1e-3 && b < 1e-3, "live - ours {a} mm³, ours - live {b} mm³ (ours {} mm³)", vol(&r) * 1e9);
+    assert_eq!(r.count(ShapeType::Face), 70);
+    assert_eq!(r.solids()[0].count(ShapeType::Shell), 3);
+}

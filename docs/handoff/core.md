@@ -174,7 +174,15 @@ four 142.63 mm³ pieces (570.5), each the outer half (r 6.5…7, ~150°, z ±2.9
 hole in an r 7 boss along z, so the wall is exactly 2t (t 0.5) and both inner offsets are r 6.5; live keeps it
 solid, our slabs hollow its outer half where the boss is half sunk in the body (between the z ±19 ceilings and a
 sloped plane). A plain exact-2t fin or tube on a plate is right both ways (2244 / 1799.919 mm³, the wall kept): the
-embedding matters; a small repro for live is next.
+embedding matters. **Fixed (11-02 05:30):** the boss (r 7) is a closed cylinder, split at its seam for slabs
+(ShapeUpgrade_ShapeDivideClosed); one half came out invalid (its split edge's curve out of range: OCCT's simple
+offset threw), so it had no slab and the code took it for a blend thinner than the wall: such a piece is now
+ShapeFix'ed and its slab built (NOSHAPE_SHELL_NO_PIECE_FIX off). 82ac = live both ways (13318.857114 mm³, 70 faces,
+3 shells; the 0.05 mm³ to live's figure is in the input already); T1 `shell::a_sunk_boss_keeps_its_wall_as_live`
+(the input and live's .x_t in tests/data/shell). And a slab result whose area is under the kept faces' (each stays
+whole inward) fails: ca43c447 (same part, 0.1 mm) would otherwise give four 2-face tube pieces. Corpus otherwise:
+13655d43 / 5e01d142 gave a 0 mm³ 2-face body, now fail; the rest as before. The direct path declines 82ac (two
+removed faces meet).
 shell-hang's Shell 5 (30 s, then fails) runs on Shell 3's slab result, which has a pinch: the x −60 plane meets itself
 along 5 mm edges (ops `regen_profile::non_manifold_origin` now flags a plane using an edge on both sides too: first
 after Shell 3); Shell 3's input asked of live as STEP (REQUESTS 04:58). Parked: planar strips whose offset vanishes
