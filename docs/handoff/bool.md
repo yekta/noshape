@@ -1123,9 +1123,26 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
 - Fixed: "sheets that meet" for two sheets on one cylinder (a hole's wall in pieces, 12 calls of seed 1192):
   coaxial cylinders with one radius go as coplanar sheets do, apart past the grey band as crossing ones. T1
   a_common_of_two_sheets_on_one_cylinder (OCCT's result).
-- Next, "coincident pieces differ" (smallest: nfall/a0c5604f279369fa, a common of two coplanar sheets: a face of
-  two arcs (two discs' union) and a whole circle 1 mm off one of them, its seam vertex inside the face; only the
-  face's piece was found on the circle's).
+- Fixed: an arc tangent to a line at a vertex a tolerance off the tangent point (two coplanar sheets, seed 1195):
+  the two leave the vertex 2e-5 apart in angle, past arrange's 1e-9 for one direction, so they were ordered the
+  wrong way round it and the face's main piece was lost ("coincident pieces differ"). Directions within
+  1e-9 + 1e-6 (|k1| + |k2|) are one now, ordered by turn. T1 an_arc_tangent_to_an_edge_at_a_vertex. Corpora: +16
+  taken (bool-corpus 822, corpus5 803, ...), 0 differ. nfall: 25 of
+  155 taken now (all OCCT's results exactly); left: coincident pieces differ 28, a closed edge 26, an invalid result
+  13, two edges leave a vertex in one direction 10, a plane nearly along a cylinder 9, sheets that meet 8, a piece
+  across its surface's seam angle 7, a conic edge 6, and 1-3 each. Many of the rest are one fuzz model (seed 1208's)
+  whose vertices carry 1.34 mm tolerances.
+- Next, "coincident pieces differ" (smallest: nfall/a0c5604f279369fa, a common of two coplanar sheets on y = 40: a
+  face of two arcs, arc0 on the circle about (-34.897, 22.584) and arc1 about (-18.897, 22.584), r 14.069 both
+  (two discs' union), against a whole circle about (-34.897, 23.584), r 14.069, its seam vertex (-34.897, 9.515)
+  inside the face; x, z in mm). Found: the circle is split where it crosses arc1 at D (-26.176, 34.623) on the
+  face's arrangement (D is on both circles) but at E (-26.408, 34.803) on the circle's own face (E is on the circle
+  only, 0.25 mm from D), and arc1 isn't split at D at all; so neither face's loops close (the face's piece A-B-C-D
+  has no D-A, the circle's piece is A-B-E) and only one piece is on the other. Cause: the face's vertex A
+  (-26.897, 34.157), where arc0 and arc1 meet, has tolerance 1.34 mm (the fuzz part's); E is A projected onto the
+  circle (A 0.81 mm off it: on it by OCCT's rule, so the circle is split there on its own face), while D, 0.86 mm
+  from A, wasn't merged into A on the face's arrangement. With a vertex that tolerant every crossing within its
+  tolerance has to become it (as OCCT's paves do), on both faces alike. NOSHAPE_X_ALLP in bool-a prints every piece.
 - Knurl grid at the end of this round (vibe4 ~/agents/sweep/final.tsv, all of today's fixes, 126 of 356 done): 107
   taken; declining: non-manifold at Ø10 (heights 50-100, CP12-30, 30° helix) and CP30 at Ø25 (heights 10-17), one
   each at Ø25 × 71 CP12 45/30 and Ø63 × 17 CP12 45/45, Ø25 × 10 CP20 80/30 (the seam crossing), "two edges leave a

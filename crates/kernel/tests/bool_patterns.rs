@@ -534,6 +534,15 @@ fn a_ray_crossing_a_twisted_flank_twice() {
     valid_as_occt("5074542e7423ed66", 1e-8);
 }
 
+/// Two coplanar sheets overlapping in a strip, one's arc tangent to the other's edge at a vertex 0.4 µm off the
+/// tangent point (recorded, fuzz seed 1195): the two leave the vertex 2e-5 apart in angle, which ordered them the
+/// wrong way round it and lost the face's main piece ("coincident pieces differ"); within a micrometre over their
+/// radii they leave it as one, ordered by how they turn.
+#[test]
+fn an_arc_tangent_to_an_edge_at_a_vertex() {
+    valid_as_occt("c8f89e0180653cee", 1e-9);
+}
+
 /// Two sheets on one cylinder (a hole's wall in two pieces; recorded, fuzz seed 1192's mirror: model-core asks
 /// whether faces overlap by their common): taken as two coplanar sheets are ("sheets that meet").
 #[test]

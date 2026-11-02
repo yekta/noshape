@@ -39,10 +39,12 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
     }
     let mut pos = vec![0usize; n_h];
     for list in &mut out {
-        // Directions a rounding apart are one (a curve leaving along a side, tangent to it), ordered by turn.
+        // Directions a rounding apart are one (a curve leaving along a side, tangent to it), ordered by turn. (An
+        // arc tangent to a line at a vertex a tolerance off the tangent point leaves it that far over its radius
+        // apart in angle (2e-5 for 0.4 um on an 18 mm arc): a micrometre over the curves' radii.)
         list.sort_by(|a, b| a.0.total_cmp(&b.0));
         for i in 1..list.len() {
-            if list[i].0 - list[i - 1].0 < 1e-9 {
+            if list[i].0 - list[i - 1].0 < 1e-9 + 1e-6 * (list[i].1.abs() + list[i - 1].1.abs()) {
                 list[i].0 = list[i - 1].0;
             }
         }
