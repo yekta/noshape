@@ -272,8 +272,142 @@ impl Case {
     }
 }
 
+/// Batch 4 on (seeds 301 on): everyday profiles as a regeneration meets
+/// them after a dimension's new value (a variable, a configuration): a
+/// dimensioned corner rectangle, a filleted rectangle, a slot, an L-bracket,
+/// a bolt circle; each drawn solved, then one or two of its dimensions set
+/// 0.75–1.35 times what the drawing measures.
+fn everyday(seed: u64) -> Case {
+    use std::f64::consts::{FRAC_PI_2, PI};
+    let mut r = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0xD1B5_4A32_D192_ED03);
+    for _ in 0..4 {
+        r.next();
+    }
+    let mut c = Case::new();
+    c.v2 = true;
+    let v = DVec2::new;
+    let shapes = 1 + r.below(2);
+    for k in 0..shapes {
+        let o = v(k as f64 * 80.0 + r.range(-10.0, 10.0), r.range(-10.0, 10.0));
+        // Each dimension at the drawing's value, or changed.
+        let mut changes = 1 + r.below(2);
+        let mut f = |r: &mut Rng| if changes > 0 && r.chance(0.6) {
+            changes -= 1;
+            r.range(0.75, 1.35)
+        } else {
+            1.0
+        };
+        match r.below(5) {
+            // Corner rectangle (live's tool constraints), width and height.
+            0 => {
+                let (w, h) = (r.range(15.0, 50.0), r.range(10.0, 35.0));
+                let p = [o, o + v(w, 0.0), o + v(w, h), o + v(0.0, h)];
+                let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+                for i in 0..4 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+                }
+                c.pair("PERPENDICULAR", &l[2], &l[3]);
+                c.pair("PARALLEL", &l[0], &l[2]);
+                c.pair("PARALLEL", &l[3], &l[1]);
+                c.hv(true, &l[2]);
+                let (fw, fh) = (f(&mut r), f(&mut r));
+                c.length(&l[0], w * fw);
+                if r.chance(0.8) {
+                    c.length(&l[1], h * fh);
+                }
+            }
+            // Rectangle with its four corners filleted (Equal arcs).
+            1 => {
+                let (w, h, rad) = (r.range(25.0, 50.0), r.range(18.0, 35.0), r.range(2.0, 6.0));
+                let corners = [o + v(w, 0.0), o + v(w, h), o + v(0.0, h), o];
+                let mut lines = Vec::new();
+                let mut arcs = Vec::new();
+                let pts = [(o + v(rad, 0.0), o + v(w - rad, 0.0)), (o + v(w, rad), o + v(w, h - rad)), (o + v(w - rad, h), o + v(rad, h)), (o + v(0.0, h - rad), o + v(0.0, rad))];
+                for i in 0..4 {
+                    lines.push(c.line(pts[i].0, pts[i].1));
+                    let cc = corners[i] + match i { 0 => v(-rad, rad), 1 => v(-rad, -rad), 2 => v(rad, -rad), _ => v(rad, rad) };
+                    let a0 = -FRAC_PI_2 + i as f64 * FRAC_PI_2;
+                    arcs.push(c.arc(cc, rad, a0, a0 + FRAC_PI_2));
+                }
+                for i in 0..4 {
+                    c.coincident(&format!("{}.end", lines[i]), &format!("{}.start", arcs[i]));
+                    c.coincident(&format!("{}.end", arcs[i]), &format!("{}.start", lines[(i + 1) % 4]));
+                    c.pair("TANGENT", &lines[i], &arcs[i]);
+                    c.pair("TANGENT", &arcs[i], &lines[(i + 1) % 4]);
+                    c.hv(i % 2 == 0, &lines[i]);
+                }
+                for i in 1..4 {
+                    c.pair("EQUAL", &arcs[0], &arcs[i]);
+                }
+                let fr = f(&mut r);
+                c.radius(&arcs[0], rad * fr, false);
+                if r.chance(0.7) {
+                    let fw = f(&mut r);
+                    c.length(&lines[0], (w - 2.0 * rad) * fw);
+                }
+            }
+            // Slot: two arcs, two lines; centre distance and radius.
+            2 => {
+                let (len, rad) = (r.range(15.0, 40.0), r.range(3.0, 9.0));
+                let l1 = c.line(o + v(0.0, -rad), o + v(len, -rad));
+                let a2 = c.arc(o + v(len, 0.0), rad, -FRAC_PI_2, FRAC_PI_2);
+                let l3 = c.line(o + v(len, rad), o + v(0.0, rad));
+                let a4 = c.arc(o, rad, FRAC_PI_2, 3.0 * FRAC_PI_2);
+                c.coincident(&format!("{l1}.end"), &format!("{a2}.start"));
+                c.coincident(&format!("{a2}.end"), &format!("{l3}.start"));
+                c.coincident(&format!("{l3}.end"), &format!("{a4}.start"));
+                c.coincident(&format!("{a4}.end"), &format!("{l1}.start"));
+                for (a, b) in [(&l1, &a2), (&a2, &l3), (&l3, &a4), (&a4, &l1)] {
+                    c.pair("TANGENT", a, b);
+                }
+                c.pair("EQUAL", &a2, &a4);
+                c.hv(true, &l1);
+                let (fl, fr) = (f(&mut r), f(&mut r));
+                c.distance(&format!("{a4}.center"), &format!("{a2}.center"), len * fl);
+                c.radius(&a2, rad * fr, false);
+            }
+            // L-bracket: six H / V lines, four lengths.
+            3 => {
+                let (w, h, t1, t2) = (r.range(25.0, 50.0), r.range(20.0, 40.0), r.range(4.0, 10.0), r.range(4.0, 10.0));
+                let p = [o, o + v(w, 0.0), o + v(w, t1), o + v(t2, t1), o + v(t2, h), o + v(0.0, h)];
+                let l: Vec<String> = (0..6).map(|i| c.line(p[i], p[(i + 1) % 6])).collect();
+                for i in 0..6 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 6]));
+                    c.hv(i % 2 == 0, &l[i]);
+                }
+                let fs: Vec<f64> = (0..4).map(|_| f(&mut r)).collect();
+                c.length(&l[0], w * fs[0]);
+                c.length(&l[5], h * fs[1]);
+                c.length(&l[1], t1 * fs[2]);
+                c.length(&l[4], (h - t1) * fs[3]);
+            }
+            // Bolt circle: a big circle, three or four equal holes at a
+            // distance from its centre.
+            _ => {
+                let (big, rad, n) = (r.range(15.0, 30.0), r.range(1.5, 4.0), 3 + r.below(2));
+                let pcd = big * r.range(0.55, 0.75);
+                let cb = c.circle(o, big);
+                let holes: Vec<String> = (0..n).map(|i| c.circle(o + DVec2::from_angle(PI / 2.0 + i as f64 * 2.0 * PI / n as f64) * pcd, rad)).collect();
+                for hh in &holes[1..] {
+                    c.pair("EQUAL", &holes[0], hh);
+                }
+                let (fb, fp, fr) = (f(&mut r), f(&mut r), f(&mut r));
+                c.radius(&cb, big * fb, true);
+                c.radius(&holes[0], rad * fr, true);
+                for hh in &holes {
+                    c.distance(&format!("{cb}.center"), &format!("{hh}.center"), pcd * fp);
+                }
+            }
+        }
+    }
+    c
+}
+
 /// A random plausible sketch; `rich` adds splines, conics and angles (batch 2 on).
 fn generate(seed: u64, rich: bool) -> Case {
+    if seed >= 301 {
+        return everyday(seed);
+    }
     let mut r = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0xD1B5_4A32_D192_ED03);
     for _ in 0..4 {
         r.next();
@@ -554,7 +688,7 @@ fn write_batch() {
 }
 
 /// The batches: (number, first seed, rich).
-const BATCHES: [(usize, u64, bool); 3] = [(1, 1, false), (2, 101, true), (3, 201, true)];
+const BATCHES: [(usize, u64, bool); 4] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true)];
 
 /// Cases in batch `n` (batch 3 on: 40, where positions match least).
 fn batch_size(n: usize) -> usize {
