@@ -211,6 +211,7 @@ impl Sketch {
         let orig = self.clone();
         let unheld = self.unheld_constraints(1e-9);
         let mut holds: HashMap<crate::ids::ConstraintId, bool> = cons.iter().map(|(c, _)| (*c, !unheld.contains(c))).collect();
+        self.shift_loops_for_distances(cons, &placed);
         while placed.len() < comp.len() {
             // Next: a unit with a constraint to placed units (or of its own)
             // that doesn't hold, the one with most of them; with none, a
@@ -390,6 +391,7 @@ impl Sketch {
                 }
                 placed.insert(g);
             }
+            self.shift_loops_for_distances(cons, &placed);
             let unheld = self.unheld_constraints(1e-9);
             for (c, _) in cons {
                 holds.insert(*c, !unheld.contains(c));
@@ -746,6 +748,32 @@ impl Sketch {
             if fa != fb {
                 return if fa { a } else { b };
             }
+            // A distance between points of two separate loops: the loop
+            // with more points stays; between equal ones, the one at the
+            // smaller coordinate along the distance (live probes 6 w1–w10:
+            // a lone line moves before a square on either side, the right /
+            // upper of two squares moves; fuzz s226, s236, s215).
+            if let ConstraintKind::Distance { a: pa, b: pb, .. } = c.kind
+                && self.kind(pa) == Some(EntityKind::Point)
+                && self.kind(pb) == Some(EntityKind::Point)
+                && !self.joined_by_points(a, b, cons)
+                && let (Some(qa), Some(qb)) = (self.point(pa), self.point(pb))
+            {
+                let owns = |u: EntityId, p: EntityId| self.entity(u).is_some_and(|e| e.point_refs().contains(&p)) || self.coincident_with(p).iter().any(|q| self.entity(u).is_some_and(|e| e.point_refs().contains(q)));
+                if owns(a, pa) != owns(a, pb) {
+                    let (na, nb) = (self.loop_points(a, cons), self.loop_points(b, cons));
+                    if na != nb {
+                        return if na > nb { a } else { b };
+                    }
+                    // Along the distance: a's point against b's.
+                    let (qa_own, qb_own) = if owns(a, pa) { (qa, qb) } else { (qb, qa) };
+                    let d = qb_own - qa_own;
+                    let along = if d.x.abs() >= d.y.abs() { d.x } else { d.y };
+                    if along.abs() > 1e-12 {
+                        return if along > 0.0 { a } else { b };
+                    }
+                }
+            }
             // Structure first: the member with more of its points tied to
             // other geometry stays (fuzz s1: a rectangle's side kept, the lone
             // line with a free end lengthened to it).
@@ -840,6 +868,97 @@ impl Sketch {
             Some(EntityKind::Line) => self.entity(u).map_or(f64::NAN, |e| e.point_refs().iter().filter_map(|p| self.point(*p)).map(|q| q.x).fold(f64::NEG_INFINITY, f64::max)),
             _ => self.size(u),
         }
+    }
+
+    /// A distance between points of two separate loops that doesn't hold
+    /// moves the loop `kept_first` doesn't keep, whole, along the distance
+    /// (live probes 6: the upper square shifts up, it doesn't stretch; w6:
+    /// shifted first, its own new size after). Not a loop with fixed or
+    /// external geometry, nor one other distances tie elsewhere. Called
+    /// before and after each placement (`placed`).
+    fn shift_loops_for_distances(&mut self, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)], placed: &BTreeSet<EntityId>) {
+        let unheld = self.unheld_constraints(1e-9);
+        for (cid, us) in cons {
+            let [a, b] = us.as_slice() else { continue };
+            if !unheld.contains(cid) {
+                continue;
+            }
+            let Some(ConstraintKind::Distance { a: pa, b: pb, value, .. }) = self.constraint(*cid).map(|c| c.kind.clone()) else { continue };
+            if self.kind(pa) != Some(EntityKind::Point) || self.kind(pb) != Some(EntityKind::Point) || self.joined_by_points(*a, *b, cons) {
+                continue;
+            }
+            let kept = self.kept_first(&[*a, *b], cons);
+            let moving = if kept == *a { *b } else { *a };
+            let group = self.loop_of(moving, cons);
+            // Once the kept loop is settled (all placed, or nothing in it
+            // to change) and before any of the moving one is placed (live
+            // probes 6 w7: the left square grows first, the right one then
+            // shifts to the distance from its new corner).
+            let kept_loop = self.loop_of(kept, cons);
+            let settled = kept_loop.iter().all(|u| placed.contains(u)) || !cons.iter().any(|(x, xs)| x != cid && unheld.contains(x) && xs.iter().any(|u| kept_loop.contains(u)));
+            if !(settled || placed.is_empty()) || group.iter().any(|u| placed.contains(u)) {
+                continue;
+            }
+            let owns = |s: &Sketch, p: EntityId| group.iter().any(|u| s.entity(*u).is_some_and(|e| e.point_refs().contains(&p)) || s.coincident_with(p).iter().any(|q| s.entity(*u).is_some_and(|e| e.point_refs().contains(q))));
+            let (mine, theirs) = if owns(self, pa) && !owns(self, pb) { (pa, pb) } else if owns(self, pb) && !owns(self, pa) { (pb, pa) } else { continue };
+            // Nothing fixed in it, no other distance out of it.
+            let fixed = self.constraints().filter(|c| c.driving).any(|c| {
+                let touches = c.kind.entities().iter().any(|e| owns(self, *e) || group.contains(e));
+                touches && (matches!(c.kind, ConstraintKind::Fix { .. }) || (c.id != *cid && matches!(c.kind, ConstraintKind::Distance { .. } | ConstraintKind::HorizontalDistance { .. } | ConstraintKind::VerticalDistance { .. }) && !c.kind.entities().iter().all(|e| owns(self, *e) || group.contains(e))))
+            });
+            if fixed || group.iter().any(|u| self.entity(*u).is_some_and(|e| e.external)) {
+                continue;
+            }
+            let (Some(m), Some(t)) = (self.point(mine), self.point(theirs)) else { continue };
+            let d = m - t;
+            if d.length() < 1e-12 || value <= 0.0 {
+                continue;
+            }
+            let shift = d.normalize() * (value - d.length());
+            let pts: BTreeSet<EntityId> = group.iter().flat_map(|u| {
+                let mut ps: Vec<EntityId> = self.entity(*u).map(|e| e.point_refs().into_iter().collect()).unwrap_or_default();
+                if ps.is_empty() {
+                    ps.push(*u);
+                }
+                ps
+            }).collect();
+            for p in pts {
+                if let Some(x) = self.point(p) {
+                    let _ = self.set_point(p, x + shift);
+                }
+            }
+        }
+    }
+
+    /// Whether units `a` and `b` are in one loop / chain of shared points
+    /// (joined through joining constraints within `cons`).
+    fn joined_by_points(&self, a: EntityId, b: EntityId, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)]) -> bool {
+        self.loop_of(a, cons).contains(&b)
+    }
+
+    /// The units joined to `u` by shared points (joining constraints).
+    fn loop_of(&self, u: EntityId, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)]) -> BTreeSet<EntityId> {
+        let mut seen: BTreeSet<EntityId> = BTreeSet::from([u]);
+        let mut todo = vec![u];
+        while let Some(x) = todo.pop() {
+            for (c, us) in cons {
+                if us.contains(&x) && self.connective(*c) {
+                    for v in us {
+                        if seen.insert(*v) {
+                            todo.push(*v);
+                        }
+                    }
+                }
+            }
+        }
+        seen
+    }
+
+    /// How many vertices the loop of `u` has (each curve's ends, a circle
+    /// or point one; a spline's fit points don't count: fuzz s210's spline
+    /// loop moves before a quad).
+    fn loop_points(&self, u: EntityId, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)]) -> usize {
+        self.loop_of(u, cons).iter().map(|v| if self.endpoints(*v).is_some() { 2 } else { 1 }).sum()
     }
 
     /// The points a driving Coincident joins to point `p`.
