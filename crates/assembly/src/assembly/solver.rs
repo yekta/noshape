@@ -840,7 +840,7 @@ pub fn solve_with(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
     // keeps its transform exactly. Solve with it held first.
     if !stays.is_empty() && drags.is_empty() {
         let mut trial: Vec<SolverBody> = bodies.iter().enumerate().map(|(i, b)| SolverBody { pose: b.pose, fixed: b.fixed || stays.contains(&i) }).collect();
-        let r = solve_inner(&mut trial, mates, relations, &[], false);
+        let r = solve_inner(&mut trial, mates, relations, &[], false, true);
         if r.converged && r.mate_ok.iter().all(|ok| *ok) {
             for (b, t) in bodies.iter_mut().zip(&trial) {
                 b.pose = t.pose;
@@ -856,10 +856,10 @@ pub fn solve_with(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
         // Phase 1: follow the drag (soft); phase 2: project back onto the
         // constraint manifold exactly, starting from the dragged pose.
         // Phase 1 needs no DOF analysis (phase 2 does it at the final poses).
-        solve_inner(bodies, mates, relations, drags, false);
-        return solve_inner(bodies, mates, relations, &[], dof);
+        solve_inner(bodies, mates, relations, drags, false, false);
+        return solve_inner(bodies, mates, relations, &[], dof, true);
     }
-    solve_inner(bodies, mates, relations, drags, dof)
+    solve_inner(bodies, mates, relations, drags, dof, true)
 }
 
 /// Bodies set to a requested pose (`placed`: Transform's typed values, the
@@ -895,8 +895,8 @@ fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations
         return None;
     }
     let mut trial: Vec<SolverBody> = bodies.iter().enumerate().map(|(i, b)| SolverBody { pose: b.pose, fixed: b.fixed || !moving.contains(&i) }).collect();
-    solve_inner(&mut trial, mates, relations, drags, false);
-    let r = solve_inner(&mut trial, mates, relations, &[], false);
+    solve_inner(&mut trial, mates, relations, drags, false, false);
+    let r = solve_inner(&mut trial, mates, relations, &[], false, true);
     let reached = drags.iter().all(|d| trial[d.body].pose.transform_point(d.local_point).distance(d.target) < 1e-7);
     // The dragged bodies' mates must hold (a failing mate elsewhere isn't
     // this step's business); with relations, everything must.
@@ -957,7 +957,7 @@ fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations
         }
     }
     // The degrees of freedom are the whole assembly's (nothing held).
-    Some(if dof { solve_inner(bodies, mates, relations, &[], true) } else { r })
+    Some(if dof { solve_inner(bodies, mates, relations, &[], true, true) } else { r })
 }
 
 /// Mates that align the Z axes only as lines (Revolute, Cylindrical, Pin
@@ -1111,11 +1111,10 @@ fn group_terms(bodies: &[SolverBody], mates: &[SolverMate], relations: &[SolverR
     (groups, loose)
 }
 
-fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool) -> SolveResult {
+fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool, status: bool) -> SolveResult {
     let mut poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
     let scale = characteristic_length(&poses, mates).max(1e-3);
     let mut result = SolveResult { mate_ok: vec![false; mates.len()], body_dof: vec![0; bodies.len()], ..Default::default() };
-    let probe = Problem { bodies, mates, relations, drags, terms: Vec::new(), scale };
     let (groups, loose) = group_terms(bodies, mates, relations, drags, true);
     if dof {
         // Unconstrained and not dragged: free in all 6 directions.
@@ -1161,17 +1160,25 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
         }
     }
 
-    // Mate residuals only (exclude drag terms) decide convergence.
-    let mut mate_r = Vec::new();
-    for m in mates {
-        mate_residuals(&poses, m, &mut mate_r);
+    // Mate residuals only (exclude drag terms) decide convergence, and each
+    // mate's status (one residual pass for both). Not wanted (`status`
+    // false): a drag's first phase, whose result is set aside.
+    if status {
+        let status_scale = characteristic_length(&poses, mates).max(1e-3);
+        let mut max_r = 0.0f64;
+        let mut r = Vec::new();
+        for (i, m) in mates.iter().enumerate() {
+            r.clear();
+            mate_residuals(&poses, m, &mut r);
+            max_r = r.iter().fold(max_r, |a, v| a.max(v.abs()));
+            result.mate_ok[i] = r.iter().all(|v| v.abs() < 1e-5 * status_scale.max(1.0));
+        }
+        for rel in relations {
+            max_r = max_r.max(relation_residual(&poses, mates, rel).abs());
+        }
+        result.max_residual = max_r;
+        result.converged = result.max_residual < 1e-6 * scale.max(1.0);
     }
-    for rel in relations {
-        mate_r.push(relation_residual(&poses, mates, rel));
-    }
-    result.max_residual = mate_r.iter().fold(0.0f64, |a, v| a.max(v.abs()));
-    result.converged = result.max_residual < 1e-6 * scale.max(1.0);
-    fill_mate_status(&probe, &poses, &mut result);
 
     // DOF analysis on each group's constraint Jacobian (without drag rows),
     // evaluated at the final poses: null space of JᵀJ via a symmetric
@@ -1496,14 +1503,6 @@ fn anchor(p: &Problem, body: usize) -> DVec3 {
     if n > 0.0 { sum / n } else { DVec3::ZERO }
 }
 
-fn fill_mate_status(p: &Problem, poses: &[Frame], result: &mut SolveResult) {
-    let scale = characteristic_length(poses, p.mates).max(1e-3);
-    for (i, m) in p.mates.iter().enumerate() {
-        let mut r = Vec::new();
-        mate_residuals(poses, m, &mut r);
-        result.mate_ok[i] = r.iter().all(|v| v.abs() < 1e-5 * scale.max(1.0));
-    }
-}
 
 /// [`characteristic_length`] of one group: the poses of the bodies its terms
 /// read and the frames of its mates.
@@ -1790,7 +1789,7 @@ mod tests {
         for _ in 0..5 {
             let target = bodies[19].pose.transform_point(lp) + DVec3::new(-0.002, 0.001, 0.0);
             let drags = vec![DragTarget { body: 19, local_point: lp, target }];
-            iterations += solve_inner(&mut bodies.clone(), &mates, &[], &drags, false).iterations;
+            iterations += solve_inner(&mut bodies.clone(), &mates, &[], &drags, false, false).iterations;
             let r = solve(&mut bodies, &mates, &[], &drags);
             assert!(r.converged);
             assert_eq!(r.dof, 19);
