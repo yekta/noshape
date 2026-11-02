@@ -14,6 +14,9 @@ Shell's no-cavity rule (bc497e6a, live 1794), Fill's per-edge adjacent faces, FL
 their own polynomials (live 1799), the feature audit's table. Checked and not a gap: a box on a thin flange shells by
 slabs in 40 ms (thin regions kept solid as live). Open: shell-hang Shell 5 (live builds; ours fails in 17 s: OCCT's
 offset modes all give no solid), FI2 (G1 Fill dome: OCCT's plate throws), the working-scale Shell (6 tests moved).
+Reuse safety (17:30): bench_edit_latency_reuse over qa's ticket documents (vibe5 ~/agents/qadocs, 44; the 12 biggest
+fuzz ones take hours: ~/agents/qadocs-small has the other 32): the first 29 document tabs equal to full regenerations
+before the run was stopped; the 32-document run follows (/root/core-scratch/reuse-qa2.log).
 perf.sh bench_edit_latency_reuse on vibe3 (6e9ebca4, tests/perf documents only, reuse on): live-30-features depth
 76.3 ms (21 of 30 features ran), fillet radius 41.2, suppress 39.1 (budget 200); big-plate depth 83.5, suppress 1.2;
 fins-400 depth 4589 / suppress 771 (the 400-fin pattern's Boolean: bool); the Ø25 knurl depth 8860 ms (bool).
