@@ -68,8 +68,10 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
   it declined "a plane through a cone's apex": 6 shfall cases); on a plane or cylinder an edge past OCCT's threshold is
   off ("an edge nearly on another argument's face" was 19 cases, 120 s of shfall's OCCT time). Checked so far:
   clippy clean; shfall with the face tolerances (before the last two) 45 taken, the same 3 differ, the 6 "tolerant
-  input" cases move on (nearly on, a point near two vertices, a section's end is unclear, a tiny arc). Not yet run:
-  shfall with all of it, corpora, bool_patterns, the sweep gate, qa's shellmatrix / boolmatrix / cli-shell-gpf.
+  input" cases move on (nearly on, a point near two vertices, a section's end is unclear, a tiny arc); shfall with all
+  of it: 45 taken, the same 45, the same 3 differ ("nearly on" gone from the top; now a point near two vertices 14, a
+  non-manifold result 14, two edges 11, an edge off a plane past its tolerance 11). Not yet run: corpora,
+  bool_patterns, the sweep gate, qa's shellmatrix / boolmatrix / cli-shell-gpf.
 - Next, in order: (1) gate bool-wip-facetol (bool_patterns + brep lib on vibe4, corpora `bin/whyall.sh <tag>` and
   shfall `bin/why.sh shfall ""` on vibe5, sweep >= 258, qa's Shell checks with a CLI of it); land it if green, else
   narrow. (2) Shell's tolerant inputs past it: the 6 "tolerant input" cases' next declines; 0e5bf892 (an arc leaving a
