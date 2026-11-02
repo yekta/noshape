@@ -242,6 +242,35 @@ fn iges_header() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// Parts' names and colours in IGES as Onshape writes them (live
+/// qa5-iges-header.igs: the name in the solid's, edge list's and vertex
+/// list's labels, the colour a Color Definition the solid and its faces
+/// point to), read back; an unnamed solid has no name (qa
+/// IGES-IMPORT-NAME-SOLID: XDE named it "SOLID").
+#[test]
+fn iges_part_names_and_colours() {
+    let dir = std::env::temp_dir().join(format!("noshape-igs-names-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let parts: Vec<ExportShape> = xt_parts().into_iter().take(3).enumerate().map(|(i, p)| ExportShape { shape: p.1, name: (i != 2).then(|| format!("Part {}", i + 1)), color: (i != 1).then_some([0.2, 0.4, 0.6]) }).collect();
+    let path = dir.join("named.igs");
+    write_iges_parts(&path, &parts, LengthUnit::Meter).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let dir_lines: Vec<&str> = text.lines().filter(|l| &l[72..73] == "D").collect();
+    let labelled = |t: &str| dir_lines.chunks(2).filter(|d| d[1][..8].trim() == t && d[1][56..64].trim() == "Part 1").count();
+    assert_eq!((labelled("186"), labelled("504"), labelled("502")), (1, 1, 1), "Part 1's labels");
+    assert_eq!(dir_lines.chunks(2).filter(|d| d[0][..8].trim() == "314").count(), 1, "one Color Definition per colour");
+    let colour = text.lines().find(|l| l.starts_with("314,") && &l[72..73] == "P").unwrap_or_default();
+    let rgb: Vec<f64> = colour.split(',').skip(1).take(3).map(|v| v.parse().unwrap()).collect();
+    assert!(rgb.iter().zip([20.0, 40.0, 60.0]).all(|(a, b)| (a - b).abs() < 1e-4) && colour.contains(",5HCOLOR;"), "the colour in percent: {colour}");
+    // Back-pointers right-aligned as Onshape's ("      1P", not "0000001P").
+    assert!(colour[64..72].starts_with(' '), "{colour}");
+    let back = read_iges_parts(&path, LengthUnit::Meter).unwrap();
+    let names: Vec<Option<&str>> = back.iter().map(|p| p.name.as_deref()).collect();
+    assert_eq!(names, [Some("Part 1"), Some("Part 2"), None]);
+    assert!(back[0].color.is_some_and(|c| (c[1] - 0.4).abs() < 1e-3) && back[1].color.is_none() && back[2].color.is_some(), "{:?}", back.iter().map(|p| p.color).collect::<Vec<_>>());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// ACIS import: our own .sat of every test part back with its volume, and
 /// Onshape's SAT exports (outside the repo; skipped when absent).
 #[test]

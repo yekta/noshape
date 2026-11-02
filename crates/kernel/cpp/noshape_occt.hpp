@@ -877,7 +877,10 @@ void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names
 rust::Vec<rust::String> read_step_pmi(rust::Str path);
 std::unique_ptr<OcShape> read_iges(rust::Str path);
 std::unique_ptr<OcShape> read_mesh(rust::Str path, uint32_t merge_limit);
-void                     write_iges(const OcShapeList& shapes, rust::Str path, rust::Str system, rust::Str version);
+void                     write_iges(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Slice<const double> colours, rust::Str path,
+                                    rust::Str system, rust::Str version);
+// Shape `i`'s name and colour from the FFI lists (null colour: none).
+std::pair<std::string, const double*> name_colour(rust::Slice<const rust::String> names, rust::Slice<const double> colours, size_t i);
 void write_parasolid(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Slice<const double> colours, rust::Str path, bool binary,
                      rust::Str version, rust::Str application);
 void write_parasolid_assembly(const OcShapeList& parts, rust::Slice<const rust::String> names, rust::Slice<const double> colours, rust::Str root_name,

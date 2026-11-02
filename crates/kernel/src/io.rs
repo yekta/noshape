@@ -444,10 +444,18 @@ pub fn read_mesh(path: &Path, file_unit: LengthUnit, merge_limit: u32) -> Result
 
 /// Write shapes to an IGES (BRep mode) file in millimeters.
 pub fn write_iges(path: &Path, shapes: &[Shape], unit: LengthUnit) -> Result<()> {
+    let parts: Vec<ExportShape> = shapes.iter().map(|s| ExportShape { shape: s.clone(), name: None, color: None }).collect();
+    write_iges_parts(path, &parts, unit)
+}
+
+/// Write parts to an IGES (BRep mode) file in millimeters, named and
+/// coloured as Onshape's (entity labels, Color Definitions).
+pub fn write_iges_parts(path: &Path, parts: &[ExportShape], unit: LengthUnit) -> Result<()> {
     let f = unit.mm_per_unit();
-    let v = shapes.iter().map(|s| scaled(s, f)).collect::<Result<Vec<_>>>()?;
+    let v = parts.iter().map(|p| scaled(&p.shape, f)).collect::<Result<Vec<_>>>()?;
     let l = vec_to_list(&v);
-    ck(ffi::write_iges(&l, path_str(path)?, "NOSHAPE", crate::VERSION))
+    let (names, colours) = names_colours(parts);
+    ck(ffi::write_iges(&l, &names, &colours, path_str(path)?, "NOSHAPE", crate::VERSION))
 }
 
 /// The Parasolid versions the Export dialog offers, newest first (Onshape's

@@ -1197,6 +1197,23 @@ fn import_step_round_trip() {
     assert_eq!(e.param.as_deref(), Some("files[0]"));
 }
 
+/// An IGES round trip keeps the part's name and colour (qa
+/// IGES-IMPORT-NAME-SOLID: it came back as "SOLID", uncoloured).
+#[test]
+fn import_iges_round_trip_keeps_names_and_colours() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "import-igs.noshape");
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "part_set_appearance", json!({ "parts": [part], "color": "#e51919" }));
+    let igs = scratch("block.igs");
+    call(&mut ctx, "export_parts", json!({ "format": "IGES", "file": igs.to_str().unwrap() }));
+    let r = call(&mut ctx, "import_files", json!({ "files": [igs.to_str().unwrap()] }));
+    assert_eq!(r["parts"].as_array().unwrap().len(), 1, "{r}");
+    let back = &call(&mut ctx, "query_parts", json!({ "tab": "block" }))["parts"][0];
+    assert_eq!(back["name"], "Part 1", "{back}");
+    assert_eq!(back["color"], "#e51919", "{back}");
+}
+
 #[test]
 fn materials_and_appearances() {
     let mut ctx = Ctx::new();

@@ -529,7 +529,7 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
             let shapes: Vec<k::ExportShape> = parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect();
             k::write_step_with(path, &shapes, k::LengthUnit::Meter, &step_options(s))?;
         }
-        PartFormat::Iges => k::write_iges(path, &parts.iter().map(|p| p.1.clone()).collect::<Vec<_>>(), k::LengthUnit::Meter)?,
+        PartFormat::Iges => k::write_iges_parts(path, &parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect::<Vec<_>>(), k::LengthUnit::Meter)?,
         // Text transmit file in the chosen version (live G36: the body in that
         // version's layouts; "Use latest version" = 38.1).
         // Named and coloured as Onshape's (TYSA_NAME / TYSA_COLOUR_2).

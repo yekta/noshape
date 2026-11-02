@@ -82,6 +82,21 @@ Kernel test: `imported_nist_parts_write_to_rhino_and_pvz`, `parasolid_writes_an_
 | Text, Markdown, CSV, JSON | .txt .md .csv .json | viewed | ✅ | as live 1756: TXT and Markdown raw in monospace (live doesn't render Markdown); CSV a grid with column and row numbers, every line a row (a final line break gives an empty row); JSON as written, in a code view with line numbers and colours. The first 5000 lines |
 | Programming files, MOV, Word | .py .java .js .mov .doc .docx | stored, not viewable | ✅ | stored as file tabs |
 
+## Drawings of big models (live 1809, 1817; `dx_perf::timed_big_drawings`)
+
+Live's "dx big asm" Assembly 1 (2000 instances) drawing: four views at 1:12 and the 1000-row BOM. Ours: dev on vibe5.
+
+| Step | Ours | Live |
+|---|---|---|
+| Create Drawing with the suggested views | 1.3–2 s | 19.7 s |
+| BOM table | 0.15 s | 13.1 s |
+| Export PDF | 0.38 s (3.1 MB) | 7.2–11.6 s (499 KB) |
+| Export DWG | 0.14 s (1.8 MB) | 13.9–16.0 s (1.35 MB) |
+| Export DXF | 0.14 s (7.2 MB) | 17.6–18.3 s (18.7 MB) |
+| Export PNG | 1.6 s | 9.4–9.6 s (3300 × 2550) |
+
+Live shows a blue banner "<drawing> is being prepared for export. You will receive a notification with its status." for about 5 s, then the browser download.
+
 ## Speed on big files (see docs/handoff/dx.md for the history)
 
 Release timings from `tools/tiers/perf.sh` on vibe3 (`dx_perf::timed_nist_import`, `dx_perf::timed_big_part_imports`; vibe3 was shared with another perf run, so read them as upper bounds). Live's timings for the same files are pending (live request 2026-11-02 01:57); its NIST times come from the earlier import audit.
