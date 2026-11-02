@@ -782,6 +782,10 @@ width: left side kept, right side moves, the free centre line by half, as ours).
 Midpoint `localEntity1` / `localEntity2` (the generator writes those now; sketch-7.json rewritten, same cases). Open
 P1: drag probes g4 (parked, speed) and g6 (live keeps the lower-left hole, moves the centre on its circle, projects the
 free hole radially: a constructive drag, not least norm; the constructive-drag try broke probes 7 before).
+Drag rule, second try (not landed): no held-first for undimensioned drags, the levels weighed 1e5 in the one solve:
+g4's bottom 8e-6 off, but probes 7 8 → 7/8 and 9 4 → 3/6, and the bench (dimensioned) stays slow: its extra cost is
+the held-first step with the levels fixed too (it fails more often and the weighted solve runs after it). A free
+version must not add coordinates to the held-first step of dimensioned drags.
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
