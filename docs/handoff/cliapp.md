@@ -169,3 +169,10 @@ signed. Without the certificate it falls back to the ad-hoc signature (a notice)
 (packaging/macos/Info.plist). The App Store profiles (APPLE_MAC_APPSTORE_PROFILE, APPLE_IOS_APPSTORE_PROFILE) are only
 read to print their application identifier, team and expiry (a warning when they don't name the bundle ID). The
 verify job checks the signature's identifier, `spctl` and both staples.
+
+Dry runs of the update cycle: 41441100003 (macOS signed, notarized, stapled; every install verified the update, then:
+Linux and macOS waited on the old app as a zombie, fixed 2654a117; the check script reused a folder), 41459697171
+(Windows portable: `\\?\` paths broke the helper's Copy-Item, fixed c0b067d1; `sign` failed twice on GitHub's OIDC
+token endpoint, transient: re-run), 41469689688 green on all three (installed, portable, .app, install.sh; tampered
+and other-signer refused). Windows CI 41453979037: the fixtures are `-text` in .gitattributes (CRLF broke the signed
+SHA256SUMS, dc2e9f46).
