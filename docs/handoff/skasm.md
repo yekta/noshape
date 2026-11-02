@@ -1,5 +1,28 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-02 22:28 UTC, account move)
+State: worktree clean, nothing uncommitted, nothing queued; everything landed (last: 0d2e9aff, asm least-change cut).
+No detached jobs of mine running (the only one was a watch loop for live's answers, gone with the session).
+Parked, NOT to land as is: branch `skasm-drag-across` (f1a81069, sketch drag rule `SolveOptions::still_across`): it
+slows the 1549-curve bench drag 12.3 → 14.6 ms avg on vibe3; the lead's limit is ≤ 12.3 ms (`tools/tiers/perf.sh -p
+noshape-sketch --test all -- bench::bench_drag --ignored --nocapture --test-threads=1`). Details under 21:0x below.
+Lead's list (20:15), in order:
+1. Done: dx's X1 (B), other documents' assemblies (27549ea9; note to dx in docs/handoff/dx.md "From skasm (11-02)").
+   If dx asks for more (configurations of another document's assembly aren't offered), that comes first.
+2. Open sketch-fuzz cases, P1 first. P1: drag probes g4 (parked, speed) and g6 (live keeps the lower-left hole and
+   moves the centre on its circle: a constructive drag; must stay within the bench budget). P2 (random batches 1–3,
+   sums in /root/skasm-scratch/fz/*.k; `fz/runall.sh <tag> [ENV=..]` runs all, `fz/cmp.sh <batch> <seed>` one case,
+   `fz/tr.sh <seed|probe>` traces the pass): s6 170 mm, s218 95, s236 81, s102 79, s226 58, s209 43, s11 10.
+   Asm known: f50 f53 f54 f55 f64 (f64: live turns C 93.9° where the smallest turn, ours, is 90°: no rule yet).
+3. With live (REQUESTS.md, not yet answered at this time): sketch batch 8 (1809-ish line "sketch batch 8",
+   fuzz/skasm-sketch-8.json → .live.json: copy to crates/sketch/tests/fixtures/live_fuzz/sketch-8.live.json and run
+   live_fuzz::live_matches), sketch probes 11 (leave-one-out of s218 / s236 / s226 → sketch-probe-11.live.json,
+   compared by live_fuzz::probe_matches; per-case errors via fz/p10.sh-style parsing), asm probes 4 (c1–c7, f54's
+   redundant coaxial loop reads "overdefines" in live → asm-probe-4.live.jsonl; no T2 reader yet: add one to
+   oracle_asm like asm_probes_match_live).
+4. End of day (~04:00 UTC): GUI walk of sketch + assembly workflows in /root/green/noshape against live; regressions
+   to docs/TICKETS.md.
+
 Area (PLAN 2.3): crates/sketch, crates/scene/src/sketch_mode.rs, sketch behaviour in the app (part_studio/sketch.rs),
 crates/app/src/assembly_*.rs + assembly_view.rs, crates/model/src/assembly, standard content, and since 10-29 19:40
 (lead) **sheet metal end to end**: model-core's crates/model-core/src/sheetmetal + regen/features/sheetmetal*.rs, the
