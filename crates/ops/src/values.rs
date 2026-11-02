@@ -237,9 +237,34 @@ fn filter_names(f: QueryFilter) -> Vec<&'static str> {
 fn visibility_note(s: &ParamSpec, all: &[ParamSpec], defaults: Option<&ParamValues>) -> String {
     let Some(defaults) = defaults else { return " (shown only for some values of the other parameters; ignored while hidden)".into() };
     let shown = s.is_visible(defaults);
+    let when = flips(s, all, defaults);
+    match (shown, when.is_empty()) {
+        (true, true) => " (shown with the defaults; hidden for some other combinations of the other parameters, and ignored while hidden)".into(),
+        (true, false) => format!(" (shown with the defaults; hidden, and ignored, when {when})"),
+        (false, true) => " (hidden with the defaults, and ignored while hidden; shown only for some combinations of the other parameters)".into(),
+        (false, false) => format!(" (hidden with the defaults, and ignored while hidden; shown when {when})"),
+    }
+}
+
+/// The given parameters the dialog hides with `values`, which the feature
+/// ignores (qa AGENT-HIDDEN-PARAMS-SILENT): each with what would show it.
+pub fn ignored_params(specs: &[ParamSpec], values: &ParamValues, given: &serde_json::Map<String, Value>) -> Vec<Value> {
+    let mut out = Vec::new();
+    for s in specs.iter().filter(|s| given.contains_key(s.id) && !s.is_visible(values)) {
+        let when = flips(s, specs, values);
+        let why = if when.is_empty() { format!("{}: hidden in the dialog with these values, so it is ignored", s.id) } else { format!("{}: hidden in the dialog with these values, so it is ignored (shown when {when})", s.id) };
+        out.push(json!({ "param": s.id, "message": why }));
+    }
+    out
+}
+
+/// Which single enum / boolean change from `values` shows or hides `s`
+/// ("endStyleV2 is THROUGH, or when …"; empty when none does).
+fn flips(s: &ParamSpec, all: &[ParamSpec], values: &ParamValues) -> String {
+    let shown = s.is_visible(values);
     let mut flips: Vec<(&str, Vec<String>)> = Vec::new();
     for p in all.iter().filter(|p| p.id != s.id) {
-        let alternatives: Vec<(String, ParamValue)> = match (&p.kind, defaults.get(p.id)) {
+        let alternatives: Vec<(String, ParamValue)> = match (&p.kind, values.get(p.id)) {
             (ParamKind::Enum { options, .. }, Some(ParamValue::Enum(cur))) => options.iter().filter(|(id, _)| id != cur).map(|(id, _)| (id.to_string(), ParamValue::Enum(id.to_string()))).collect(),
             (ParamKind::Bool { .. }, Some(ParamValue::Bool(b))) => vec![((!b).to_string(), ParamValue::Bool(!b))],
             _ => continue,
@@ -247,7 +272,7 @@ fn visibility_note(s: &ParamSpec, all: &[ParamSpec], defaults: Option<&ParamValu
         let changed: Vec<String> = alternatives
             .into_iter()
             .filter(|(_, v)| {
-                let mut probe = defaults.clone();
+                let mut probe = values.clone();
                 probe.set(p.id, v.clone());
                 s.is_visible(&probe) != shown
             })
@@ -257,13 +282,7 @@ fn visibility_note(s: &ParamSpec, all: &[ParamSpec], defaults: Option<&ParamValu
             flips.push((p.id, changed));
         }
     }
-    let when = flips.iter().map(|(id, vs)| format!("{id} is {}", vs.join(" or "))).collect::<Vec<_>>().join(", or when ");
-    match (shown, when.is_empty()) {
-        (true, true) => " (shown with the defaults; hidden for some other combinations of the other parameters, and ignored while hidden)".into(),
-        (true, false) => format!(" (shown with the defaults; hidden, and ignored, when {when})"),
-        (false, true) => " (hidden with the defaults, and ignored while hidden; shown only for some combinations of the other parameters)".into(),
-        (false, false) => format!(" (hidden with the defaults, and ignored while hidden; shown when {when})"),
-    }
+    flips.iter().map(|(id, vs)| format!("{id} is {}", vs.join(" or "))).collect::<Vec<_>>().join(", or when ")
 }
 
 /// JSON schema of one parameter (`all` and `defaults`: its feature's

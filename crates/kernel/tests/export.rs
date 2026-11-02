@@ -256,7 +256,7 @@ fn iges_part_names_and_colours() {
     write_iges_parts(&path, &parts, LengthUnit::Meter).unwrap();
     let text = std::fs::read_to_string(&path).unwrap();
     let dir_lines: Vec<&str> = text.lines().filter(|l| &l[72..73] == "D").collect();
-    let labelled = |t: &str| dir_lines.chunks(2).filter(|d| d[1][..8].trim() == t && d[1][56..64].trim() == "Part 1").count();
+    let labelled = |t: &str| dir_lines.chunks(2).filter(|d| d[1][..8].trim() == t && &d[1][56..72] == "  Part 1       0").count();
     assert_eq!((labelled("186"), labelled("504"), labelled("502")), (1, 1, 1), "Part 1's labels");
     assert_eq!(dir_lines.chunks(2).filter(|d| d[0][..8].trim() == "314").count(), 1, "one Color Definition per colour");
     let colour = text.lines().find(|l| l.starts_with("314,") && &l[72..73] == "P").unwrap_or_default();

@@ -41,7 +41,7 @@ pub fn ops() -> Vec<Op> {
             group: "feature",
             verb: "add",
             summary: "Add a feature to a Part Studio (what accepting its dialog does)",
-            description: "Creates the feature with the dialog's defaults, applies `params`, makes the dialog's own choices for the fields not given (Extrude / Revolve / Sweep / Loft: Add into the one part the new body touches, with that part as merge scope, else New; a Remove / Intersect Extrude gets the open dialog's direction (std extrudeEditLogic, as live's dialog: a profile on a part's face points into the part; one on a plane may point away from the part behind it, the result then \"Selected tools and targets do not intersect.\"), so give `oppositeDirection` to choose the side yourself, its merge scope the parts it cuts; Thicken from the faces' parts; Hole: merge scope = the parts it reaches, flipped when more lie behind; a Standard (e.g. `isoHoleTableEx` [\"Tapped\", \"Straight tap\", \"M6\"]) picks its Units tab and fills the sizes not given, the path completed with each level's default; a tapped hole's linked depths), inserts it at the rollback bar (or `index`) and regenerates. A selection may be given as a query instead of ids: `{\"query\": {query_entities arguments}}` (e.g. `\"entities\": {\"query\": {\"kind\": \"edges\", \"direction\": [0, 0, 1]}}`), alone or among ids in a list. A pattern's `entities` that are all features (`feature:…`) or faces make it a Feature or Face pattern. As in Onshape, a feature that fails is still added and shown with its error: check `feature_status` and `failed` in the reply. Sketches are made with `sketch_create`.",
+            description: "Creates the feature with the dialog's defaults, applies `params`, makes the dialog's own choices for the fields not given (Extrude / Revolve / Sweep / Loft: Add into the one part the new body touches, with that part as merge scope, else New; a Remove / Intersect Extrude gets the open dialog's direction (std extrudeEditLogic, as live's dialog: a profile on a part's face points into the part; one on a plane may point away from the part behind it, the result then \"Selected tools and targets do not intersect.\"), so give `oppositeDirection` to choose the side yourself, its merge scope the parts it cuts; Thicken from the faces' parts; Hole: merge scope = the parts it reaches, flipped when more lie behind; a Standard (e.g. `isoHoleTableEx` [\"Tapped\", \"Straight tap\", \"M6\"]) picks its Units tab and fills the sizes not given, the path completed with each level's default; a tapped hole's linked depths), inserts it at the rollback bar (or `index`) and regenerates. A selection may be given as a query instead of ids: `{\"query\": {query_entities arguments}}` (e.g. `\"entities\": {\"query\": {\"kind\": \"edges\", \"direction\": [0, 0, 1]}}`), alone or among ids in a list. A pattern's `entities` that are all features (`feature:…`) or faces make it a Feature or Face pattern. As in Onshape, a feature that fails is still added and shown with its error: check `feature_status` and `failed` in the reply. Given parameters the dialog hides with the resulting values (e.g. extrude `hasOffset` with a Blind end) are ignored, as in the dialog, and listed in `ignored` with what would show them. Sketches are made with `sketch_create`.",
             fields: vec![
                 doc_field(),
                 tab_field(),
@@ -58,7 +58,7 @@ pub fn ops() -> Vec<Op> {
             group: "feature",
             verb: "edit",
             summary: "Change a feature's parameters or name (what Edit and accepting its dialog does)",
-            description: "Only the given parameters change. Configured parameters go to the active configuration's value (config_activate), as in the dialog.",
+            description: "Only the given parameters change. Configured parameters go to the active configuration's value (config_activate), as in the dialog. Given parameters the dialog then hides are ignored and listed in `ignored`, as in feature_add.",
             fields: vec![doc_field(), tab_field(), req("feature", s(), "Feature id or name."), opt("params", json!({ "type": "object" }), PARAMS_DOC), opt("name", s(), "New name.")],
             mutates: true,
             destructive: false,
@@ -553,11 +553,16 @@ fn add(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         None => ps.rollback_index(),
     };
     dialog_logic(od, tab, &mut feature, index, &params)?;
+    let ignored = values::ignored_params(&ty.params, &feature.params, &params);
     let (id, name) = (feature.id, feature.name.clone());
     edit_studio(od, tab, &studio::insert_description(&name), |ps| Ok(studio::insert_feature(ps, feature, index)))?;
     let report = super::regen_report_with(od, tab, &[id])?;
     let st = this_feature_status(&report, &id.to_string());
-    Ok(json!({ "feature": id.to_string(), "name": name, "feature_status": st, "regeneration": report }).into())
+    let mut out = json!({ "feature": id.to_string(), "name": name, "feature_status": st, "regeneration": report });
+    if !ignored.is_empty() {
+        out["ignored"] = json!(ignored);
+    }
+    Ok(out.into())
 }
 
 fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
@@ -573,6 +578,7 @@ fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut feature = ps.configuration.for_editing(&ps.features[index], &config);
     load_custom_types(od, &feature.type_id);
     let ty = feature.feature_type().ok_or_else(|| OpError::invalid(format!("feature type `{}` is not available", feature.type_id)))?;
+    let mut ignored = Vec::new();
     if let Some(params) = resolved.as_ref() {
         if feature.type_id == "sketch" && params.contains_key("sketch") {
             return Err(OpError::param("params.sketch", "edit sketch geometry with the sketch tools"));
@@ -582,6 +588,7 @@ fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         if feature.type_id == "hole" {
             hole_standard(&mut feature, &|k| params.contains_key(k));
         }
+        ignored = values::ignored_params(&ty.params, &feature.params, &params);
     }
     if let Some(n) = a.opt_str("name")? {
         feature.name = n.trim().to_string();
@@ -594,7 +601,11 @@ fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     })?;
     let report = super::regen_report_with(od, tab, &[id])?;
     let st = this_feature_status(&report, &id.to_string());
-    Ok(json!({ "feature": id.to_string(), "name": name, "feature_status": st, "regeneration": report }).into())
+    let mut out = json!({ "feature": id.to_string(), "name": name, "feature_status": st, "regeneration": report });
+    if !ignored.is_empty() {
+        out["ignored"] = json!(ignored);
+    }
+    Ok(out.into())
 }
 
 fn get(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

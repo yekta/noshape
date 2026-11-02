@@ -469,6 +469,25 @@ pub fn write_parasolid(path: &Path, shapes: &[Shape], unit: LengthUnit, binary: 
     write_parasolid_version(path, shapes, unit, binary, PARASOLID_VERSIONS[0])
 }
 
+/// Write an assembly as IGES the way Onshape exports one (live 1755): each
+/// part once (named and coloured, in its own coordinates, `unit`) as a
+/// subfigure definition, placed by a subfigure instance per instance.
+pub fn write_iges_assembly(path: &Path, parts: &[ExportShape], instances: &[StepInstance], unit: LengthUnit) -> Result<()> {
+    let f = unit.mm_per_unit();
+    let v = parts.iter().map(|p| scaled(&p.shape, f)).collect::<Result<Vec<_>>>()?;
+    let (names, colours) = names_colours(parts);
+    let l = vec_to_list(&v);
+    let part: Vec<u32> = instances.iter().map(|i| i.part as u32).collect();
+    let tf: Vec<f64> = instances
+        .iter()
+        .flat_map(|i| {
+            let m = i.transform;
+            (0..3).flat_map(move |r| [m.x_axis[r], m.y_axis[r], m.z_axis[r], m.w_axis[r] * f])
+        })
+        .collect();
+    ck(ffi::write_iges_assembly(&l, &names, &colours, &part, &tf, path_str(path)?, "NOSHAPE", crate::VERSION))
+}
+
 /// Write an assembly as a Parasolid text file the way Onshape exports an
 /// Assembly (live samples/dx-nist-assembly.x_t, dx-asm-xt-<v>.x_t): the
 /// root named `root`, each part once in its own coordinates (`unit`, with

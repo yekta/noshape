@@ -11,6 +11,22 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-02 23:30 UTC (new account; read first)
+- Landed: 6b4704f2 = the first inserted view auto-scaled (request 1812; checked in the app: big1755 Part Studio 1 at
+  1:8 in View scale and the title block) + psui's flaky `p_toggles_every_plane` (shared its scratch name with another
+  test in the same process: "unknown branch" on land servers).
+- Queued / landing: IGES names and colours as live's files (186 / 504 / 502 labels, 314 Color Definitions; reader
+  without XDE auto-naming): ticket IGES-IMPORT-NAME-SOLID. Asked live (REQUESTS 11-02 23:20) about names over 8
+  characters and an unlabelled solid's name; samples in live/samples/dx-iges-names/.
+- In progress: (a) Assembly IGES export as live's (each part once: its 186 in a 308 subfigure definition, both
+  dependent; each instance a 408 placed by a 124; kernel `write_iges_assembly`, ops `write_assembly_export`; e2e
+  iges_assembly_export_and_import_round_trip). (b) AGENT-HIDDEN-PARAMS-SILENT: feature_add / feature_edit list given
+  parameters the dialog hides in `ignored` (values::ignored_params, with what would show them); e2e
+  hidden_parameters_are_reported_as_ignored.
+- Live 1817 answered: drawing exports PDF 7-12 s, DWG 14-16 s, DXF 18 s, PNG 9.5 s (ours 0.14-1.6 s): in formats.md.
+  The PNG item is dropped (already 6x faster than live).
+- Next: land (a) + (b); then the agent API list (docs/TICKETS.md agent rows, agent-api.md), drawings P2 rows.
+
 ## 11-02 22:27 UTC: state at the move to the new account (read first)
 - First inserted view auto-scaled as live (behaviours request 1812): `create::first_view_scale` (largest list scale
   whose Front view fits 30 % of the border frame), `create::push_inserted_view` (the first view's scale becomes the

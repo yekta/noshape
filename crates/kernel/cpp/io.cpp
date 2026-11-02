@@ -28,10 +28,18 @@
 #include <Message_PrinterOStream.hxx>
 #include <IGESControl_Reader.hxx>
 #include <IGESCAFControl_Reader.hxx>
+#include <Transfer_Binder.hxx>
+#include <Transfer_TransientProcess.hxx>
+#include <XSControl_TransferReader.hxx>
 #include <XSControl_WorkSession.hxx>
 #include <IGESControl_Writer.hxx>
 #include <IGESData_GlobalSection.hxx>
+#include <IGESData_IGESEntity.hxx>
+#include <Interface_InterfaceModel.hxx>
 #include <IGESData_IGESModel.hxx>
+#include <IGESBasic_SingularSubfigure.hxx>
+#include <IGESBasic_SubfigureDef.hxx>
+#include <IGESGeom_TransformationMatrix.hxx>
 #include <IGESGraph_Color.hxx>
 #include <IGESSolid_EdgeList.hxx>
 #include <IGESSolid_Face.hxx>
@@ -1072,19 +1080,36 @@ StepTree read_iges_tree(rust::Str path)
   r.SetColorMode(true);
   r.SetNameMode(true);
   r.SetLayerMode(false);
-  // Names only from the file: XDE would name an unlabelled solid "SOLID"
-  // (qa IGES-IMPORT-NAME-SOLID).
-  struct NoAutoNaming
-  {
-    const bool was = XCAFDoc_ShapeTool::AutoNaming();
-    NoAutoNaming() { XCAFDoc_ShapeTool::SetAutoNaming(false); }
-    ~NoAutoNaming() { XCAFDoc_ShapeTool::SetAutoNaming(was); }
-  } no_auto_naming;
-  if (r.ReadFile(p.c_str()) != IFSelect_RetDone || !r.Transfer(doc))
+  if (r.ReadFile(p.c_str()) != IFSelect_RetDone)
   {
     app->Close(doc);
     fail_io("could not read IGES file " + p);
   }
+  // Onshape's (HOOPS) labels carry subscript 0, which OCCT would append
+  // ("B17-29(0)"); live names the part "B17-29".
+  const occ::handle<Interface_InterfaceModel> read = r.Model();
+  for (int i = 1; !read.IsNull() && i <= read->NbEntities(); ++i)
+    if (const occ::handle<IGESData_IGESEntity> e = occ::down_cast<IGESData_IGESEntity>(read->Value(i)); !e.IsNull() && e->HasShortLabel() && e->SubScriptNumber() == 0)
+      e->SetLabel(e->ShortLabel(), -1);
+  if (!r.Transfer(doc))
+  {
+    app->Close(doc);
+    fail_io("could not read IGES file " + p);
+  }
+  // Each labelled solid's name by its transferred shape (XDE leaves an
+  // instanced one unnamed: live's assembly IGES, 1755).
+  std::map<const TopoDS_TShape*, std::string> labelled;
+  const occ::handle<Transfer_TransientProcess>& tp = r.WS()->TransferReader()->TransientProcess();
+  for (int i = 1; !read.IsNull() && i <= read->NbEntities(); ++i)
+    if (const occ::handle<IGESSolid_ManifoldSolid> e = occ::down_cast<IGESSolid_ManifoldSolid>(read->Value(i)); !e.IsNull() && e->HasShortLabel())
+      if (const occ::handle<Transfer_Binder> b = tp->Find(e); !b.IsNull())
+        if (const TopoDS_Shape sh = TransferBRep::ShapeResult(b); !sh.IsNull())
+        {
+          TCollection_AsciiString n = e->ShortLabel()->String();
+          n.LeftAdjust();
+          n.RightAdjust();
+          labelled[sh.TShape().get()] = n.ToCString();
+        }
   occ::handle<XCAFDoc_ShapeTool>  st = XCAFDoc_DocumentTool::ShapeTool(doc->Main());
   occ::handle<XCAFDoc_ColorTool>  ct = XCAFDoc_DocumentTool::ColorTool(doc->Main());
   NCollection_Sequence<TDF_Label> roots;
@@ -1116,7 +1141,9 @@ StepTree read_iges_tree(rust::Str path)
       seen[(size_t)k] = true;
       Leaf& leaf      = parts[(size_t)k];
       leaf.shape      = protos(k + 1);
-      leaf.name       = label_name(roots(i));
+      // The solid's own label (an instance's is XDE's link, "=>[0:1:1:4]").
+      TDF_Label ref;
+      leaf.name = XCAFDoc_ShapeTool::GetReferredShape(roots(i), ref) ? label_name(ref) : label_name(roots(i));
       leaf.hasColor   = label_color(ct, roots(i), TopoDS_Shape(), leaf.color);
       // Else its solid's (an IGES solid points to its colour definition).
       for (TopExp_Explorer ex(leaf.shape, TopAbs_SOLID); ex.More() && !leaf.hasColor; ex.Next())
@@ -1141,8 +1168,24 @@ StepTree read_iges_tree(rust::Str path)
     inst.root = rust::String(root);
   for (const auto& l : parts)
   {
+    // XDE names a solid without a label after its type ("SOLID"; qa
+    // IGES-IMPORT-NAME-SOLID) or its link ("=>[0:1:1:4]"): no name.
+    bool made_up = false;
+    for (const char* t : {"COMPOUND", "COMPSOLID", "SOLID", "SHELL", "FACE", "WIRE", "EDGE", "VERTEX", "SHAPE"})
+      made_up = made_up || l.name == t || l.name.rfind("=>", 0) == 0;
+    std::string name = made_up ? std::string() : l.name;
+    for (TopExp_Explorer ex(l.shape, TopAbs_SOLID); name.empty() && !labelled.empty(); )
+    {
+      // The part itself, else its (first) solid: a subfigure is a compound.
+      const TopoDS_Shape& sh = ex.More() ? ex.Current() : l.shape;
+      if (const auto at = labelled.find(l.shape.TShape().get()); at != labelled.end())
+        name = at->second;
+      else if (const auto at2 = labelled.find(sh.TShape().get()); at2 != labelled.end())
+        name = at2->second;
+      break;
+    }
     out.parts.shapes->items.push_back(l.shape);
-    out.parts.names.push_back(rust::String(l.name));
+    out.parts.names.push_back(rust::String(name));
     double r_, g_, b_;
     l.color.Values(r_, g_, b_, Quantity_TOC_sRGB);
     out.parts.colors.push_back((float)r_);
@@ -1169,27 +1212,33 @@ StepTree read_iges_tree(rust::Str path)
 // its manifold solid (186), edge list (504) and vertex list (502), which
 // readers take as the part's name; its colour a Color Definition (314,
 // "COLOR", RGB in percent) the solid and its faces point to, one per colour.
-void name_iges_solids(IGESControl_Writer& w, const std::vector<TopoDS_Shape>& shapes, rust::Slice<const rust::String> names, rust::Slice<const double> colours)
+// Returns each part's top entity (null where it has none).
+std::vector<occ::handle<IGESData_IGESEntity>> name_iges_solids(IGESControl_Writer& w, const std::vector<TopoDS_Shape>& shapes, rust::Slice<const rust::String> names,
+                                                              rust::Slice<const double> colours)
 {
   const occ::handle<Transfer_FinderProcess>& fp = w.TransferProcess();
   std::map<std::array<double, 3>, occ::handle<IGESGraph_Color>> defined;
+  std::vector<occ::handle<IGESData_IGESEntity>>                 out;
   for (size_t i = 0; i < shapes.size(); ++i)
   {
     const auto [name, rgb] = name_colour(names, colours, i);
-    const occ::handle<IGESSolid_ManifoldSolid> solid = occ::down_cast<IGESSolid_ManifoldSolid>(fp->FindTransient(TransferBRep::ShapeMapper(fp, shapes[i])));
+    out.push_back(occ::down_cast<IGESData_IGESEntity>(fp->FindTransient(TransferBRep::ShapeMapper(fp, shapes[i]))));
+    const occ::handle<IGESSolid_ManifoldSolid> solid = occ::down_cast<IGESSolid_ManifoldSolid>(out.back());
     if (solid.IsNull())
       continue;
     const occ::handle<IGESSolid_Shell> shell = solid->Shell();
     if (!name.empty())
     {
-      const occ::handle<TCollection_HAsciiString> label = new TCollection_HAsciiString(name.substr(0, 8).c_str());
-      solid->SetLabel(label);
+      // Right-aligned, subscript 0, as live's ("  Part 1       0").
+      const std::string                           cut   = name.substr(0, 8);
+      const occ::handle<TCollection_HAsciiString> label = new TCollection_HAsciiString((std::string(8 - cut.size(), ' ') + cut).c_str());
+      solid->SetLabel(label, 0);
       if (!shell.IsNull() && shell->NbFaces() > 0 && shell->Face(1)->NbLoops() > 0 && shell->Face(1)->Loop(1)->NbEdges() > 0)
         if (const occ::handle<IGESSolid_EdgeList> edges = occ::down_cast<IGESSolid_EdgeList>(shell->Face(1)->Loop(1)->Edge(1)); !edges.IsNull())
         {
-          edges->SetLabel(label);
+          edges->SetLabel(label, 0);
           if (!edges->StartVertexList(1).IsNull())
-            edges->StartVertexList(1)->SetLabel(label);
+            edges->StartVertexList(1)->SetLabel(label, 0);
         }
     }
     if (!rgb)
@@ -1206,6 +1255,24 @@ void name_iges_solids(IGESControl_Writer& w, const std::vector<TopoDS_Shape>& sh
     for (int f = 1; !shell.IsNull() && f <= shell->NbFaces(); ++f)
       shell->Face(f)->InitColor(colour);
   }
+  return out;
+}
+
+// The parts to an IGES writer in BRep mode, each with its long splines cut
+// to the parts its edges use; the shapes written.
+std::vector<TopoDS_Shape> add_iges_parts(IGESControl_Writer& w, const OcShapeList& shapes)
+{
+  if (shapes.items.empty())
+    fail_invalid("nothing to export");
+  std::vector<TopoDS_Shape> written;
+  for (const auto& s : shapes.items)
+  {
+    require_non_null(s, "exported shape");
+    written.push_back(compact_bspline_edges(s));
+    w.AddShape(written.back());
+  }
+  w.ComputeModel();
+  return written;
 }
 
 // IGES 5.1 laid out as Onshape's (HOOPS Exchange) export (live "qa5 iges
@@ -1215,25 +1282,8 @@ void name_iges_solids(IGESControl_Writer& w, const std::vector<TopoDS_Shape>& sh
 // weights 1000 / 1., dates YYMMDD.HHMMSS (UTC), resolution 1e-5, max
 // coordinate 1e6, no author or organization; sequence numbers right-aligned
 // ("S      1", not "S0000001").
-void write_iges(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Slice<const double> colours, rust::Str path, rust::Str system,
-                rust::Str version)
+void write_iges_file(IGESControl_Writer& w, const std::string& p, rust::Str system, rust::Str version)
 {
-  const LockedSection locked_section_600;
-  std::lock_guard<std::mutex> lock(xde_mutex());
-  quiet_messenger();
-  const std::string           p = path_str(path);
-  if (shapes.items.empty())
-    fail_invalid("nothing to export");
-  IGESControl_Writer        w("MM", 1);
-  std::vector<TopoDS_Shape> written;
-  for (const auto& s : shapes.items)
-  {
-    require_non_null(s, "exported shape");
-    written.push_back(compact_bspline_edges(s));
-    w.AddShape(written.back());
-  }
-  w.ComputeModel();
-  name_iges_solids(w, written, names, colours);
   const std::string sys(system.data(), system.size()), ver(version.data(), version.size());
   std::string       file = p.substr(p.find_last_of("/\\") == std::string::npos ? 0 : p.find_last_of("/\\") + 1);
   const std::string stem = file.substr(0, file.rfind('.') == std::string::npos ? file.size() : file.rfind('.'));
@@ -1337,6 +1387,67 @@ void write_iges(const OcShapeList& shapes, rust::Slice<const rust::String> names
   f << out;
   if (!f)
     fail_io("could not write IGES file " + p);
+}
+
+void write_iges(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Slice<const double> colours, rust::Str path, rust::Str system,
+                rust::Str version)
+{
+  const LockedSection locked_section_600;
+  std::lock_guard<std::mutex> lock(xde_mutex());
+  quiet_messenger();
+  IGESControl_Writer w("MM", 1);
+  name_iges_solids(w, add_iges_parts(w, shapes), names, colours);
+  write_iges_file(w, path_str(path), system, version);
+}
+
+// An assembly as Onshape's IGES export writes one (live 1755
+// dx-big-asm.igs): each part once, its solid in a Subfigure Definition (308)
+// with both marked dependent, and each instance a Singular Subfigure
+// Instance (408) placed by a Transformation Matrix (124). `tf`: 12 numbers an
+// instance (3 rows of rotation and translation, mm).
+void write_iges_assembly(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Slice<const double> colours, rust::Slice<const uint32_t> part,
+                         rust::Slice<const double> tf, rust::Str path, rust::Str system, rust::Str version)
+{
+  const LockedSection locked_section_iges_asm;
+  std::lock_guard<std::mutex> lock(xde_mutex());
+  quiet_messenger();
+  IGESControl_Writer                                   w("MM", 1);
+  const occ::handle<IGESData_IGESModel>&               model = w.Model();
+  std::vector<occ::handle<IGESBasic_SubfigureDef>>     defs;
+  for (const occ::handle<IGESData_IGESEntity>& e : name_iges_solids(w, add_iges_parts(w, shapes), names, colours))
+  {
+    if (e.IsNull())
+      fail_io("could not write a part to IGES");
+    e->InitStatus(0, 2, 2, 1);
+    occ::handle<NCollection_HArray1<occ::handle<IGESData_IGESEntity>>> members = new NCollection_HArray1<occ::handle<IGESData_IGESEntity>>(1, 1);
+    members->SetValue(1, e);
+    occ::handle<IGESBasic_SubfigureDef> def = new IGESBasic_SubfigureDef();
+    def->Init(1, occ::handle<TCollection_HAsciiString>(), members);
+    def->InitStatus(0, 2, 2, 1);
+    model->AddEntity(def);
+    defs.push_back(def);
+  }
+  if (tf.size() != 12 * part.size())
+    fail_invalid("instance transforms");
+  for (size_t i = 0; i < part.size(); ++i)
+  {
+    if (part[i] >= defs.size())
+      fail_invalid("instance part");
+    occ::handle<NCollection_HArray2<double>> m = new NCollection_HArray2<double>(1, 3, 1, 4);
+    for (int r = 0; r < 3; ++r)
+      for (int c = 0; c < 4; ++c)
+        m->SetValue(r + 1, c + 1, tf[12 * i + 4 * (size_t)r + (size_t)c]);
+    occ::handle<IGESGeom_TransformationMatrix> place = new IGESGeom_TransformationMatrix();
+    place->Init(m);
+    place->InitStatus(0, 1, 2, 0);
+    model->AddEntity(place);
+    occ::handle<IGESBasic_SingularSubfigure> inst = new IGESBasic_SingularSubfigure();
+    inst->Init(defs[part[i]], gp_XYZ(0., 0., 0.), true, 1.);
+    inst->InitTransf(place);
+    inst->InitStatus(0, 0, 0, 1);
+    model->AddEntity(inst);
+  }
+  write_iges_file(w, path_str(path), system, version);
 }
 
 } // namespace noshape

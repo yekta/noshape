@@ -582,6 +582,28 @@ fn block_with_hole(ctx: &mut Ctx, file: &str) {
     assert_eq!(ex["feature_status"]["status"], "Ok", "{ex}");
 }
 
+/// Parameters the dialog hides with the given values are ignored, as in the
+/// dialog, and the reply says so (qa AGENT-HIDDEN-PARAMS-SILENT: an offset
+/// given with a Blind end was dropped without a word).
+#[test]
+fn hidden_parameters_are_reported_as_ignored() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "ignored.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[-40, -20], [40, 20]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    let ex = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm", "hasOffset": true, "offsetDistance": "5 mm" } }));
+    assert_eq!(ex["feature_status"]["status"], "Ok", "{ex}");
+    let ignored: Vec<&str> = ex["ignored"].as_array().unwrap_or_else(|| panic!("ignored: {ex}")).iter().map(|i| i["param"].as_str().unwrap()).collect();
+    assert!(ignored.contains(&"hasOffset") && !ignored.contains(&"depth"), "{ex}");
+    let why = ex["ignored"][0]["message"].as_str().unwrap();
+    assert!(why.contains("ignored") && why.contains("endBound is"), "says what shows it: {why}");
+    // Shown (and used) with an Up to end: nothing ignored.
+    let ok = call(&mut ctx, "feature_edit", json!({ "feature": "Extrude 1", "params": { "endBound": "UP_TO_NEXT", "hasOffset": true } }));
+    assert!(ok.get("ignored").is_none(), "{ok}");
+    let back = call(&mut ctx, "feature_edit", json!({ "feature": "Extrude 1", "params": { "endBound": "BLIND", "hasOffset": true } }));
+    assert_eq!(back["ignored"][0]["param"], "hasOffset", "{back}");
+}
+
 /// Variable Studio tables in a Part Studio's Variable table: create, insert,
 /// reorder (the later table's variable wins), remove, settings.
 #[test]
@@ -4500,6 +4522,40 @@ fn parasolid_assembly_export_and_import_round_trip() {
     let mut names: Vec<&str> = inst.iter().map(|i| i["name"].as_str().unwrap()).collect();
     names.sort();
     assert_eq!(names, ["Part 1 <1>", "Part 2 <1>"], "{inst:?}");
+}
+
+/// An Assembly exported as IGES keeps its structure as live's does (1755:
+/// each part once as a subfigure, placed by its instances; it re-imports as
+/// an Assembly and a "<file> parts" Part Studio).
+#[test]
+fn iges_assembly_export_and_import_round_trip() {
+    let mut ctx = Ctx::new();
+    let (_, pin) = two_part_assembly(&mut ctx, "igs_asm.noshape");
+    let pin_part = call(&mut ctx, "query_parts", json!({}))["parts"][1]["id"].clone();
+    let pin2 = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": pin_part }))["instance"].as_str().unwrap().to_string();
+    call(&mut ctx, "assembly_transform", json!({ "instance": pin2, "translation": [0, 0, 30], "axis": [0, 0, 1], "angle": "90 deg" }));
+    let list = call(&mut ctx, "assembly_list", json!({}));
+    let before: Vec<Value> = list["instances"].as_array().unwrap().iter().filter(|i| i["id"] == pin || i["id"] == pin2).cloned().collect();
+    let file = scratch("igs_asm_out.igs");
+    let e = call(&mut ctx, "export_parts", json!({ "tab": "Assembly 1", "format": "IGES", "file": file.to_str().unwrap() }));
+    assert_eq!(e["parts"], 3, "{e}");
+    let text = std::fs::read_to_string(&file).unwrap();
+    let count = |t: &str| text.lines().filter(|l| &l[72..73] == "D" && l[..8].trim() == t).count() / 2;
+    assert_eq!((count("186"), count("308"), count("408")), (2, 2, 3), "each part once, each instance a 408");
+    let r = call(&mut ctx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
+    let tabs: Vec<(String, String)> = r["tabs"].as_array().unwrap().iter().filter(|t| t["kind"] != "File").map(|t| (t["name"].as_str().unwrap().to_string(), t["kind"].as_str().unwrap().to_string())).collect();
+    let asm = tabs.iter().find(|t| t.1 == "Assembly").unwrap_or_else(|| panic!("an Assembly: {r}")).0.clone();
+    assert!(tabs.contains(&("igs_asm_out parts".to_string(), "Part Studio".to_string())), "{r}");
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": "igs_asm_out parts" }));
+    let mut names: Vec<&str> = parts["parts"].as_array().unwrap().iter().map(|p| p["name"].as_str().unwrap()).collect();
+    names.sort();
+    assert_eq!(names, ["Part 1", "Part 2"], "{parts}");
+    let inst = call(&mut ctx, "assembly_list", json!({ "tab": asm }))["instances"].as_array().unwrap().clone();
+    assert_eq!(inst.len(), 3, "{inst:?}");
+    for b in &before {
+        let at = |i: &Value| (0..3).all(|k| (num(&i["translation"][k]) - num(&b["translation"][k])).abs() < 1e-6);
+        assert!(inst.iter().any(at), "a pin where the assembly had it: {inst:?} vs {b}");
+    }
 }
 
 /// Live's own STEP assembly (qa4 r4 s5): the tabs, parts and placements live makes.

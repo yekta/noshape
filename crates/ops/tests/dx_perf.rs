@@ -342,6 +342,12 @@ fn timed_live_big_samples() {
         for p in &solids {
             *colours.entry(p["color"].as_str().unwrap_or("?").to_string()).or_default() += 1;
         }
+        // Live names them "B<row>-<col>" (IGES: not "B17-29(0)").
+        if f.starts_with("dx-big") {
+            let live_name = |n: &&str| n.strip_prefix('B').and_then(|r| r.split_once('-')).is_some_and(|(a, b)| a.parse::<u32>().is_ok() && b.parse::<u32>().is_ok());
+            let odd: Vec<&&str> = names.iter().filter(|n| !live_name(n)).collect();
+            assert!(odd.is_empty(), "{f}: {} not as live, e.g. {:?}", odd.len(), &odd[..odd.len().min(5)]);
+        }
         let volume: f64 = solids.iter().map(|p| p["volume"].as_f64().unwrap_or(0.0)).sum();
         let instances = tab("Assembly").map_or(0, |a| call(&mut ctx, "assembly_list", json!({ "tab": a }))["instances"].as_array().unwrap().len());
         report(&format!("live big: {f}: {} solids ({} names), colours {colours:?}, {volume:.6} mm3, {instances} instances", solids.len(), names.len()), vec![ms]);

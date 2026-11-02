@@ -434,8 +434,8 @@ impl AssemblyExport {
     }
 }
 
-/// Write an Assembly's export: STEP keeps the assembly (Onshape: the root
-/// product with each part once, placed by its instances); the other formats
+/// Write an Assembly's export: STEP, Parasolid and IGES keep the assembly
+/// (Onshape: each part once, placed by its instances); the other formats
 /// and individual files get the placed parts.
 pub fn write_assembly_export(s: &ExportSettings, path: &std::path::Path, a: &AssemblyExport) -> anyhow::Result<std::path::PathBuf> {
     anyhow::ensure!(!a.instances.is_empty(), "There are no parts to export");
@@ -446,6 +446,11 @@ pub fn write_assembly_export(s: &ExportSettings, path: &std::path::Path, a: &Ass
     // Assembly; qa ASM-PARASOLID-FLAT), in every version.
     if s.format == PartFormat::Parasolid && !s.individual {
         k::write_parasolid_assembly(path, &a.root, &a.parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect::<Vec<_>>(), &instances, k::LengthUnit::Meter, parasolid_version(s))?;
+        return Ok(path.to_path_buf());
+    }
+    // IGES as subfigure instances (live 1755: re-imports as an Assembly).
+    if s.format == PartFormat::Iges && !s.individual {
+        k::write_iges_assembly(path, &a.parts.iter().map(|(n, sh, c)| step_shape(n, sh, c)).collect::<Vec<_>>(), &instances, k::LengthUnit::Meter)?;
         return Ok(path.to_path_buf());
     }
     if s.format != PartFormat::Step || s.individual {
