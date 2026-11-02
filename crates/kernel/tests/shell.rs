@@ -845,3 +845,38 @@ fn a_sunk_boss_keeps_its_wall_as_live() {
     assert_eq!(r.count(ShapeType::Face), 70);
     assert_eq!(r.solids()[0].count(ShapeType::Shell), 3);
 }
+
+/// A user's twisted hexagon vase (11-02): a loft through five regular hexagons on parallel planes, circumradii
+/// 35 / 45 / 40 / 28 / 35 mm at z 0 / 30 / 60 / 90 / 120, each turned 15° more; six B-spline sides with sharp edges
+/// between them, the two hexagon caps.
+fn vase() -> Shape {
+    let sections: Vec<Shape> = [(0.0, 35.0), (30.0, 45.0), (60.0, 40.0), (90.0, 28.0), (120.0, 35.0)]
+        .iter()
+        .enumerate()
+        .map(|(k, &(z, r))| {
+            let pts: Vec<DVec3> = (0..6).map(|i| {
+                let a = (15.0 * k as f64 + 60.0 * i as f64).to_radians();
+                DVec3::new(r * a.cos(), r * a.sin(), z)
+            }).collect();
+            make_polyline(&pts, true).unwrap()
+        })
+        .collect();
+    loft(&sections, &LoftOptions { solid: true, ruled: false, closed: false, ..Default::default() }).unwrap().shape
+}
+
+/// A user's twisted hexagon vase (11-02), every Shell failing: our loft left ThruSections' 3.1 mm tolerances on its
+/// side edges (their old curves on the replaced surfaces) and triple knots at the sections (C0 to OCCT though the
+/// spline is C2). Live's loft (.x_t) shelled 1.6 mm, top removed, is live's shell both ways (live 1769: 47868.386 mm³,
+/// 15 faces); ours shells outward (2 mm, the case that ran for minutes), 15 faces.
+#[test]
+fn a_twisted_vase_shells_as_live() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_parasolid(&dir.join("vase-live-loft.x_t"), LengthUnit::Millimeter).unwrap();
+    let live = read_parasolid(&dir.join("vase-live-shelled.x_t"), LengthUnit::Millimeter).unwrap();
+    let r = shell_solid(&s, &top(&s, 120.0), 1.6, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+    let (a, b) = (vol(&cut(&live, &r).unwrap().shape), vol(&cut(&r, &live).unwrap().shape));
+    assert!(a < 1e-3 && b < 1e-3 && r.count(ShapeType::Face) == 15, "live - ours {a}, ours - live {b}, {} mm³, {} faces", vol(&r), r.count(ShapeType::Face));
+    let v = vase();
+    let r = shell_solid(&v, &top(&v, 120.0), 2.0, ShellSide::Outside, ShellMethod::Auto).unwrap_or_else(|e| panic!("2 mm outward: {e}")).shape;
+    assert!(r.is_valid() && r.count(ShapeType::Face) == 15, "2 mm outward");
+}

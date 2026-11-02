@@ -8,6 +8,16 @@ Builds and tests (11-01): on vibe4 only, `tools/tiers/rb.sh <cmd>` from the work
 (land.sh runs the full set); long probes detached on vibe4 with a log. OCCT patches build on vibe4 in
 ~/agents/core-occt (`build.sh TK...`); a private root ~/agents/occt-priv; libs go to /root/occt (synced everywhere).
 
+**P1 twisted vase (user 11-02 12:13):** a loft through five twisted hexagons, every Shell failing (offset, then the
+slabs for minutes, the direct path refusing "not smooth"). The loft was the cause: natural_loft rebuilt the side
+surfaces but each edge kept its pcurve on ThruSections' old surface, so SameParameter gave the side edges 3.1 mm
+tolerances; and its C2 spline was stored as Bezier pieces (triple knots at the sections: C0 to OCCT). Now the old
+pcurves go, tolerances restart at the minimum, the knots are simple. Live 1769 (its loft and shell as .x_t): our
+shell of live's loft is live's both ways (OCCT offset 47868.365946 / live 47868.365302 mm³, 15 faces; Auto takes
+the offset, 3.5 s; the direct path 47868.377 in 1.5 s, its free-form pcurves now ShapeConstruct projections keeping
+the edge's parameter). Ours: inward 1.6 / 2 mm and outward 2 mm build (3-6 s); our loft is 21.6 mm³ (5e-5) off
+live's (interpolation through the sections: a loft parity item). T1 shell::a_twisted_vase_shells_as_live. Open:
+the smooth (rounded-corner) variant (asked of live), the direct path's speed (71 % its self-interference check).
 **Shell past half the part (live 1765, 11-02 08:40):** a 40 mm cube, top removed, inward 20 / 20.1 / 25 mm fails
 ("Could not shell part with selections.", unchanged), 19.9 mm leaves a 0.2 mm pocket, outward has no limit, Hollow
 never fails (inward past half: the offset turned inside out, a 10 mm void at 25 mm, 63000 mm³). Native kept the cube

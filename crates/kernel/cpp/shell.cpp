@@ -21,6 +21,7 @@
 #include "internal.hpp"
 #include <chrono>
 #include <ShapeFix_Shape.hxx>
+#include <ShapeConstruct_ProjectCurveOnSurface.hxx>
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
@@ -2760,7 +2761,18 @@ bool add_pcurve(const TopoDS_Edge& ne, const TopoDS_Face& nf, const TopoDS_Edge&
   auto one = [&](TopAbs_Orientation o) -> occ::handle<Geom2d_Curve> {
     double                           f0, f1;
     const occ::handle<Geom2d_Curve>  co = BRep_Tool::CurveOnSurface(TopoDS::Edge(oe.Oriented(o)), of, f0, f1);
-    occ::handle<Geom2d_Curve>        cn = GeomProjLib::Curve2d(c3, a, b, sn);
+    occ::handle<Geom2d_Curve>        cn;
+    // A free-form (offset) surface: projected keeping the edge's own parameter (an intersection curve's pcurves
+    // from GeomProjLib ran 1.6 µm off it along a vase's sharp edges: no SameParameter at the wall's tolerance).
+    if (GeomAdaptor_Surface(sn).GetType() == GeomAbs_BSplineSurface || GeomAdaptor_Surface(sn).GetType() == GeomAbs_OffsetSurface)
+    {
+      ShapeConstruct_ProjectCurveOnSurface pcs;
+      pcs.Init(sn, Precision::Confusion());
+      if (!pcs.Perform(c3, a, b, cn))
+        cn.Nullify();
+    }
+    else
+      cn = GeomProjLib::Curve2d(c3, a, b, sn);
     if (co.IsNull() || cn.IsNull())
       return nullptr;
     if (per || sn->IsVPeriodic())

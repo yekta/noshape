@@ -51,6 +51,8 @@
 #include <BRepAlgoAPI_Section.hxx>
 #include <BRepOffsetAPI_MakeThickSolid.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
+#include <ShapeFix_ShapeTolerance.hxx>
+#include <ShapeBuild_Edge.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepExtrema_DistShapeShape.hxx>
 #include <Geom2d_Line.hxx>
@@ -1376,6 +1378,11 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
                                             rows[0]->Degree(), 3)
                   : new Geom_BSplineSurface(poles, rows[0]->Knots(), vknots, rows[0]->Multiplicities(), vmults,
                                             rows[0]->Degree(), 3);
+    // The spline is C2 through the sections; built as Bezier pieces, its knots there are triple (C0 to OCCT: offsets,
+    // shells and the free-form checks refused it). Reduced to simple knots: the same surface (within 1e-9 of the size).
+    for (int k = 2; k < n; ++k)
+      if (!ns->RemoveVKnot(k, 1, 1e-9 * size))
+        ns->RemoveVKnot(k, 2, 1e-9 * size);
     faces.push_back({f, ns});
     // Seams (u = const, parameter v): their curves become the new surface's iso-lines.
     for (TopExp_Explorer ee(f, TopAbs_EDGE); ee.More(); ee.Next())
@@ -1421,6 +1428,11 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
     }
   }
   BRep_Builder B;
+  // (The old surfaces: the edges' curves on them go once the new ones are on, or SameParameter measures the new
+  // edge curves against them: a twisted loft's side edges got 3.1 mm tolerances.)
+  std::vector<occ::handle<Geom_Surface>> old_surfaces;
+  for (const auto& u : faces)
+    old_surfaces.push_back(BRep_Tool::Surface(u.face));
   for (const auto& u : faces)
     B.UpdateFace(u.face, u.surface, TopLoc_Location(), BRep_Tool::Tolerance(u.face));
   for (const auto& p : pcurves)
@@ -1430,8 +1442,29 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
       B.UpdateEdge(p.edge, p.forward, p.reversed, p.face, BRep_Tool::Tolerance(p.edge));
   for (const auto& [e, c] : seams)
     B.UpdateEdge(e, c, BRep_Tool::Tolerance(e));
+  for (const auto& p : pcurves)
+    for (const auto& old : old_surfaces)
+      ShapeBuild_Edge().RemovePCurve(p.edge, old, TopLoc_Location());
+  // ThruSections' tolerances were for its own surfaces (a twisted loft's side edges 3.1 mm off them): from the
+  // smallest again, raised only where the new surfaces need it.
+  auto maxtol = [&] {
+    double m = 0;
+    for (TopExp_Explorer x(loft, TopAbs_EDGE); x.More(); x.Next())
+      m = std::max(m, BRep_Tool::Tolerance(TopoDS::Edge(x.Current())));
+    return m;
+  };
+  const bool dbg = std::getenv("NOSHAPE_LOFT_DEBUG") != nullptr;
+  if (dbg)
+    std::fprintf(stderr, "natural_loft: edge tolerance %g before\n", maxtol());
+  ShapeFix_ShapeTolerance().SetTolerance(loft, Precision::Confusion(), TopAbs_SHAPE);
+  if (dbg)
+    std::fprintf(stderr, "natural_loft: %g after the reset\n", maxtol());
   BRepLib::SameParameter(loft, tol, true);
+  if (dbg)
+    std::fprintf(stderr, "natural_loft: %g after SameParameter (tol %g)\n", maxtol(), tol);
   BRepLib::UpdateTolerances(loft, false);
+  if (dbg)
+    std::fprintf(stderr, "natural_loft: %g at the end\n", maxtol());
   return true;
 }
 
