@@ -755,6 +755,12 @@ open. d9 (four-bar) didn't close in live with vertex connectors (not a probe).
 18:37: the keep step no longer keeps a unit with an unheld relation to placed geometry (s218's l10, its end due on
 the kept l2, was kept by its Angle and the pass couldn't close): batches 1–6 1262 → 1223 mm (s215 40 → 16, s219 35 →
 13, s218 90 → 95: now placed, but live keeps neither l8 nor l9, see the trace). Probes / drags / edits unchanged.
+18:42: sent live sketch batch 7 (s421–s460: everyday kinds plus a rectangle Symmetric about a Vertical construction
+line, a triangle with an Angle, a plate with a hole at a construction diagonal's Midpoint; generator kinds 8–10 from
+seed 421, `Case::construction / symmetric / midpoint`) and asm probes 4 (c1–c7: f54's consistent coaxial loop reads
+Cylindrical 1 and 3 "overdefines" in live, all OK in ours, while 1764's consistent Planar / Parallel loops were OK).
+Tried for g4 (drag): only the dragged point's curves light in an undimensioned sketch: no change (the bottom line and
+the far arc weigh the same; live's answer needs the H bottom kept, as the constructive `lower_shared`).
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
