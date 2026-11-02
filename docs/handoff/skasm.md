@@ -545,13 +545,13 @@ Also landed: one residual pass for status and convergence (99588045), the drag s
 vibe3, before (16c76701, benches open with no DOF cached) → after (e37a02d0):
 | | a200 | a1000 |
 |---|---|---|
-| open: first evaluation | 77 → 47 ms | 258 → 102 ms |
+| open: first evaluation | 77 → 47 → 39 ms | 258 → 102 → 78 ms (a216a0b9: a Sub's DOF analysed once per evaluation) |
 | regenerate | 179 → 70 ms | 852 → 403 ms |
 | drag frame | 0.73 → 0.75 ms | 4.1 → 4.7 ms (211 fps; ~0.5 ms of per-step follower work left) |
 | evaluate again / add a mate / insert | 6 / 15 / 6 ms | 24 / 38 / 24 ms |
 Against the start (2f715f2d): a1000 regenerate 3693 → 403 ms, first evaluation 327 → 102 ms, drag 20.7 → 4.7 ms.
 
-Next: the remaining drag work (Driven built three times a step), live's A200 / A1000 timings (1741, after its REST
+Next: a1000's regenerate (392 ms): the 40 stacks' least change (two decompositions a round; cheaper maths, an SVD-free fix or one SVD, failed the live oracle by ~2e-6 mm) and each Sub instance's own solve from its stored positions; the remaining drag work, live's A200 / A1000 timings (1741, after its REST
 limit), the overdefinition messages of live 1754 (C).
 
 ## Next, in order
