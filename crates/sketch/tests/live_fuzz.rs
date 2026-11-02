@@ -1470,8 +1470,18 @@ fn drag_probes() -> Vec<(String, Case, String, DVec2)> {
 /// least-change fallback in ours): each case again with one of its
 /// relations left out, to see which relation moves what in live.
 fn probes10() -> Vec<(String, Case)> {
+    leave_one_out(&[6, 102])
+}
+
+/// Probes 11: the same for batch 3's largest left (s218, s236, s226).
+fn probes11() -> Vec<(String, Case)> {
+    leave_one_out(&[218, 236, 226])
+}
+
+/// Each case of `seeds` again with one of its relations left out.
+fn leave_one_out(seeds: &[u64]) -> Vec<(String, Case)> {
     let mut out = Vec::new();
-    for seed in [6, 102] {
+    for &seed in seeds {
         let c = generate(seed, seed > 100);
         let names: Vec<(String, String)> = c.spec.iter().filter(|k| k["type"] != "COINCIDENT" || !k["second"].as_str().unwrap_or(".").contains('.')).map(|k| (k["id"].as_str().unwrap().to_string(), k["type"].as_str().unwrap().to_string())).collect();
         for (k, kind) in names {
@@ -1786,7 +1796,7 @@ fn probe_batch(list: Vec<(String, Case)>) -> Value {
 #[test]
 #[ignore = "T2: live fuzz least-change probes"]
 fn probe_matches() {
-    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10())] {
+    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11())] {
         let b = probe_batch(list);
         let path = fixture(&format!("sketch-probe-{n}.json"));
         if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == format!("probe-{n}")) {
@@ -1815,7 +1825,7 @@ fn probe_matches() {
 #[ignore = "T2: one live fuzz case"]
 fn one_case() {
     let probe = std::env::var("FUZZ_PROBE").ok();
-    let Some(mut c) = probe.as_ref().and_then(|p| [probes(), probes2(), probes3(), probes4(), probes5(), probes6(), probes10()].into_iter().flatten().find(|(n, _)| n.split(' ').next() == Some(p.as_str())).map(|(_, c)| c)).or_else(|| {
+    let Some(mut c) = probe.as_ref().and_then(|p| [probes(), probes2(), probes3(), probes4(), probes5(), probes6(), probes10(), probes11()].into_iter().flatten().find(|(n, _)| n.split(' ').next() == Some(p.as_str())).map(|(_, c)| c)).or_else(|| {
         let seed: u64 = std::env::var("FUZZ_SEED").ok()?.parse().ok()?;
         Some(generate(seed, seed > 100))
     }) else {
