@@ -224,7 +224,11 @@ impl Sketch {
             // that doesn't hold, the one with most of them; with none, a
             // unit of a constraint that doesn't hold (the member it keeps
             // first); with none at all, everything left stays.
-            let pending = |u: EntityId| cons.iter().filter(|(c, us)| us.contains(&u) && us.iter().all(|x| *x == u || placed.contains(x)) && !holds[c]).count();
+            // (An own Horizontal / Vertical reads unheld when a shared end
+            // moved, through the solver's aliasing: not a reason of its own,
+            // fuzz s343.)
+            let own_relation = |c: crate::ids::ConstraintId, us: &[EntityId]| us.len() == 1 && self.constraint(c).is_some_and(|k| !k.kind.is_dimension());
+            let pending = |u: EntityId| cons.iter().filter(|(c, us)| us.contains(&u) && us.iter().all(|x| *x == u || placed.contains(x)) && !holds[c] && !own_relation(*c, us)).count();
             let open: Vec<EntityId> = comp.iter().copied().filter(|u| !placed.contains(u)).collect();
             // Then the unit most joined (shared points, its own
             // constraints; relations to others don't count: probe t4, a
@@ -258,7 +262,14 @@ impl Sketch {
                 // (fuzz s336: an L-bracket's riser shifts whole before the
                 // inner side, which then shortens).
                 let whole: Vec<EntityId> = if tied.len() > 1 { tied.iter().copied().filter(|u| self.can_keep_shape(*u, &placed, cons, unit_of)).collect() } else { Vec::new() };
-                if !whole.is_empty() && whole.len() < tied.len() { self.kept_first(&whole, cons) } else { self.kept_first(&tied, cons) }
+                let pick: Vec<EntityId> = if !whole.is_empty() && whole.len() < tied.len() { whole } else { tied };
+                // Then the one placed geometry pulls furthest (fuzz s343: an
+                // L-bracket's riser, its top carried 23 mm out, before the
+                // inner side its short leg lifts 0.08 mm).
+                let pull = |u: EntityId| self.pulled_by(u, &placed, unit_of);
+                let far = pick.iter().map(|u| pull(*u)).fold(0.0, f64::max);
+                let pick: Vec<EntityId> = if far > 1e-9 && pick.len() > 1 { pick.iter().copied().filter(|u| (pull(*u) - far).abs() <= 1e-9).collect() } else { pick };
+                self.kept_first(&pick, cons)
             } else {
                 let broken: Vec<EntityId> = open.iter().copied().filter(|u| cons.iter().any(|(c, us)| us.contains(u) && !holds[c])).collect();
                 if broken.is_empty() {
@@ -425,6 +436,23 @@ impl Sketch {
         }
         self.touch();
         true
+    }
+
+    /// How far a placed unit's shared point is from `u`'s (the move
+    /// carrying `u` onto placed geometry would take).
+    fn pulled_by(&self, u: EntityId, placed: &BTreeSet<EntityId>, unit_of: &HashMap<EntityId, EntityId>) -> f64 {
+        let Some(own) = self.entity(u).map(|e| e.point_refs()) else { return 0.0 };
+        let mut far: f64 = 0.0;
+        for &p in own.iter() {
+            for q in self.coincident_with(p) {
+                if unit_of.get(&q).is_some_and(|x| placed.contains(x))
+                    && let (Some(a), Some(b)) = (self.point(p), self.point(q))
+                {
+                    far = far.max((a - b).length());
+                }
+            }
+        }
+        far
     }
 
     /// Whether `u` could be placed now carried whole (its size and
