@@ -255,10 +255,15 @@ pub fn fill(ev: &mut EvalCtx) -> FResult<()> {
         && curves.is_empty()
         && boundary.iter().all(|b| b.continuity == k::Continuity::Position)
         && let [w] = wires.as_slice()
-        && let Ok(face) = k::make_face_from_wire(w, true)
     {
-        let names = new_face_names(ev, &face);
-        return surface_result(ev, NamedShape::new(face, names));
+        // A plane, or the analytic surface the edges already lie on (live 1762 FP3: a block's cylindrical top's loop
+        // fills with that cylinder).
+        let analytic = |f: &Shape| matches!(f.faces().first().map(|x| x.face_surface()), Some(Ok(k::Surface::Cylinder { .. } | k::Surface::Cone { .. } | k::Surface::Sphere { .. } | k::Surface::Torus { .. })));
+        let face = k::make_face_from_wire(w, true).ok().or_else(|| k::make_face_from_wire(w, false).ok().filter(|f| analytic(f) && f.is_valid() && f.area().is_ok_and(|a| a > 0.0)));
+        if let Some(face) = face {
+            let names = new_face_names(ev, &face);
+            return surface_result(ev, NamedShape::new(face, names));
+        }
     }
     // Onshape's FILL_SURFACE_FAIL text, not the kernel's (qa5 SF5).
     let res = k::fill_surface_guided(&boundary, &points, &curves).map_err(|_| FeatureError::new(crate::regen::custom_features::error_text("FILL_SURFACE_FAIL")))?;

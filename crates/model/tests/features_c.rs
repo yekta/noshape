@@ -2333,6 +2333,40 @@ fn fill_of_a_planar_loop_is_a_plane() {
     }
 }
 
+/// Live 1762 FP3: a Fill of the top loop of a block whose top is a cylinder (a Front profile with an arc rising 5 mm
+/// through (0, 20), (30, 25), (60, 20), extruded 40) is that cylinder, 2444.2004 mm².
+#[test]
+fn fill_of_a_loop_on_a_cylinder_is_the_cylinder() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p: Vec<_> = [(0.0, 0.0), (60.0, 0.0), (60.0, 20.0), (0.0, 20.0)].iter().map(|&(x, y)| sk.add_point(DVec2::new(mm(x), mm(y)))).collect();
+    sk.add_line_between(p[0], p[1]).unwrap();
+    sk.add_line_between(p[1], p[2]).unwrap();
+    // The arc's centre: (30, 25 - 92.5).
+    let c = sk.add_point(DVec2::new(mm(30.0), mm(25.0 - 92.5)));
+    sk.add_arc_between(c, p[2], p[3]).unwrap();
+    sk.add_line_between(p[3], p[0]).unwrap();
+    let sid = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("40 mm"));
+    });
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let top: Vec<Reference> = b.shape.edges().iter().enumerate().filter(|(_, e)| e.endpoints().is_ok_and(|(a, z)| a.z > mm(19.99) && z.z > mm(19.99))).map(|(i, _)| Reference::Edge((*b.edges[i]).clone())).collect();
+    assert_eq!(top.len(), 4);
+    let mut row = ParamValues::default();
+    row.set("entities", ParamValue::Query(top));
+    s.add("fill", move |p| p.set("edges", ParamValue::Array(vec![row])));
+    let r = s.ok();
+    let sheet = r.context.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Surface).expect("a fill sheet");
+    let faces = sheet.shape.faces();
+    assert!(matches!(faces[0].face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. })), "{:?}", faces[0].face_surface());
+    let area = sheet.shape.area().unwrap() * 1e6;
+    assert!((area - 2444.2004).abs() < 1e-3, "{area} mm²");
+}
+
 /// Live L38 ("psb L37-39 mate connector"): on a block's top face, reorient
 /// "+Y" turns X to −Y; a move goes along the reoriented/flipped frame; the
 /// rotation comes last and doesn't change the move. L37: no owner fails.
