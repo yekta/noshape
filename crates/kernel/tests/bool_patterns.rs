@@ -543,6 +543,22 @@ fn an_arc_tangent_to_an_edge_at_a_vertex() {
     valid_as_occt("c8f89e0180653cee", 1e-9);
 }
 
+/// Two coplanar sheets, a vertex of one of tolerance 1e-4 lying 1e-4 from the other's edge (recorded, fuzz seed
+/// 1195's mirror): on that edge by the sum of the two's tolerances, while the edges' crossing there, a new point,
+/// wasn't merged into it (the sum with a new point's tolerance, its curves', is that reach too): "coincident pieces
+/// differ".
+#[test]
+fn a_tolerant_vertex_at_its_reach_from_an_edge() {
+    valid_as_occt("760ca2f4c60b4f9a", 1e-9);
+}
+
+/// Two sheets on one torus, its axis one way for one and the other way for the other (recorded, fuzz seed 1203's
+/// mirror asking whether two fillet faces overlap): taken as two coplanar sheets are ("sheets that meet").
+#[test]
+fn a_common_of_two_sheets_on_one_torus() {
+    valid_as_occt("1fcd43055b140300", 1e-9);
+}
+
 /// Two sheets on one cylinder (a hole's wall in two pieces; recorded, fuzz seed 1192's mirror: model-core asks
 /// whether faces overlap by their common): taken as two coplanar sheets are ("sheets that meet").
 #[test]

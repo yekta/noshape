@@ -1109,6 +1109,39 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Fuzz declines: sheets on one torus; a tolerant vertex at its reach (11-02 06:30 UTC)
+- "sheets that meet": all 8 left were two sheets on one torus (fillet faces, mirror's overlap tests; one pair
+  with the axis reversed): taken as coplanar ones (T1 a_common_of_two_sheets_on_one_torus).
+- "coincident pieces differ" (2 of seed 1195's): a vertex of tolerance 1e-4 lies 1e-4 from the other sheet's edge
+  (on it by the sum with the edge's tolerance) while the edges' crossing beside it, a new point counted with
+  tolerance 0, rounded just past 1e-4 and stayed its own vertex. Pool::find now gives a new point half the
+  Boolean's tolerance (the inputs' largest, its curves'), OCCT's new vertex's (T1
+  a_tolerant_vertex_at_its_reach_from_an_edge). Two others of these now build but fail the validity check.
+- nfall: 35 of 155 taken (OCCT's results). Corpora unchanged, 0 differ (both).
+- "two edges leave a vertex in one direction" (knurl Ø10 × 10 45/45, vibe5 kg-10-10-CP12-45-45): on the cylinder,
+  six rotated pairs of new vertices 0.64 um apart (1712-1717 vs 1727-1732, z 20 um) whose curves' ends in the
+  cylinder's plane are 4e-14 apart: one of each pair's curves doesn't end at its own vertex in 2D. Likely the
+  pieces turned from the first period (sym); not fixed. The fuzz ones are mostly seed 1208's 1.34 mm vertices.
+- Shell: shell-11's slabs of 1.5e-3 come from faces whose vertices already have it; the part has 6.9e-4 on
+  entry to op_shell (the dump file 1e-4), so not Shell's methods. Re-measuring the slab fuses over core's 30 seeds
+  with this build (vibe5 ~/bool-fuzz/shrun.sh, logs ~/bool-fuzz/sh/err-<seed>.txt).
+
+## The knurls' corner-edge non-manifold class, narrowed (11-02 05:30 UTC)
+- Ø25 × 10 CP30 45/30 (vibe5 ~/agents/bool-corpora/kg-25-10-CP30-45-30): at 30 TPI a groove's side corner edges
+  (flank 0 / 1, flank 2 / 3) run 3 um outside the cylinder (r 12.503). Where two grooves cross (their sections
+  coincide at the crossing height z_c), their corner edges cross each other at P (r 12.503, z_c ± 0.28 mm), where
+  the two flanks' section (e.g. 84:0 × 185:0, from the V-bottoms' crossing at z_c up to P) ends. The cylinder's
+  section with the flank runs 3.2 um inside the corner edge (OCCT tol 2e-8, ours 5e-6 as the pave filler's) and
+  crosses that flank-flank section at X, 2.4 um from P. On the flank the crossing is split into the cylinder's
+  section at X, but the flank-flank section's crossing is merged into its end P (within its 5 um), so the two cross
+  without a vertex: the cylinder's section is a slit in one piece (both ways in its loop), the strip between it
+  and the corner edge (outside the cylinder) joins the kept piece, and the corner edge piece is used once.
+- Tried, not landed: a section's crossing snapped to a vertex within the section's tolerance (X onto P): the
+  cylinder's section then disappears from the flank's piece instead (likely merged with the corner edge piece
+  between the same two vertices). Nor did merging sections into edges within the section's tolerance. Next: make
+  the flank-flank section split at X too (don't merge a crossing into a curve's end when the other curve is split
+  there), or treat P's neighbourhood as one vertex on all curves alike.
+
 ## qa's NOSHAPE_BOOL_FALLBACK=0 fuzz again; sheets on one cylinder (11-02 04:30 UTC)
 - qa's 29 BOOL-DECLINE tickets (seeds 1191-1210 on 45424566: 755 declined calls). The same seeds with a CLI of this
   worktree (vibe4 ~/bool-fuzz/nfrun.sh: clifuzz_nf.py, NOSHAPE_RECORD_FAILED; cases in
@@ -1143,7 +1176,8 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
   circle (A 0.81 mm off it: on it by OCCT's rule, so the circle is split there on its own face), while D, 0.86 mm
   from A, wasn't merged into A on the face's arrangement. With a vertex that tolerant every crossing within its
   tolerance has to become it (as OCCT's paves do), on both faces alike. NOSHAPE_X_ALLP in bool-a prints every piece.
-- Knurl grid at the end of this round (vibe4 ~/agents/sweep/final.tsv, all of today's fixes, 126 of 356 done): 107
+- Knurl grid at the end of this round (vibe4 ~/agents/sweep/final.tsv, stopped at 188 of 356 (vibe4 is the land server:
+  sweeps, corpora and fuzz now run on vibe5 at nice 19, 8 cores; corpora copied to vibe5 ~/agents/bool-corpora), all of today's fixes, 126 of 356 done): 107
   taken; declining: non-manifold at Ø10 (heights 50-100, CP12-30, 30° helix) and CP30 at Ø25 (heights 10-17), one
   each at Ø25 × 71 CP12 45/30 and Ø63 × 17 CP12 45/45, Ø25 × 10 CP20 80/30 (the seam crossing), "two edges leave a
   vertex in one direction" Ø10 × 10 45/45 (pool vertices 4e-14 apart), "an edge against its curve" Ø25 × 25 CP20

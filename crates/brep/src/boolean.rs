@@ -460,9 +460,11 @@ impl Pool {
         ((p.x / self.cell).floor() as i64, (p.y / self.cell).floor() as i64, (p.z / self.cell).floor() as i64)
     }
 
-    /// The vertex within `tol` of `p`, if any.
+    /// The vertex within `tol` of `p`, if any. (A new point has its curves' tolerance, the inputs' at most half the
+    /// Boolean's, OCCT's new vertex's: against a tolerant vertex the reach is the two's sum (two coplanar sheets' edges
+    /// crossing 1e-4 from the other's vertex of tolerance 1e-4, which was on that edge by the sum with the edge's).)
     fn find(&self, p: DVec3) -> R<Option<u32>> {
-        self.find_tol(p, 0.0)
+        self.find_tol(p, 0.5 * self.tol)
     }
 
     /// The vertex `p` (its own tolerance `tp`) is: one within the Boolean's tolerance, or within the sum of the
@@ -2911,6 +2913,13 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             }
             _ => None,
         };
+        // (Two faces on one torus (a fillet's face in pieces), its axis either way.)
+        let one_torus = |f: &Face, g: &Face| match (f.surface, g.surface) {
+            (Surface::Torus { origin: o1, zdir: z1, major: a1, minor: b1, .. }, Surface::Torus { origin: o2, zdir: z2, major: a2, minor: b2, .. }) => {
+                (o1 - o2).length() <= tol && z1.cross(z2).length() <= 1e-9 && (a1 - a2).abs() <= tol && (b1 - b2).abs() <= tol
+            }
+            _ => false,
+        };
         let crossing = args[0].faces.iter().all(|f| {
             args[1].faces.iter().all(|g| match (plane(f), plane(g)) {
                 (Some((o1, n1)), Some((o2, n2))) => n1.cross(n2).length() > 1e-9 || (o2 - o1).dot(n1).abs() > GREY * tol,
@@ -2934,11 +2943,12 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         };
         let ((l0, h0), (l1, h1)) = (bx(args[0]), bx(args[1]));
         // (Every pair of faces on planes that cross, or on one plane within the tolerance, or apart past the grey band.)
-        // (Or on one cylinder (a hole's wall in pieces), or on cylinders about one axis apart past the grey band.)
+        // (Or on one cylinder (a hole's wall in pieces), or on cylinders about one axis apart past the grey band, or
+        // on one torus.)
         let planar = args[0].faces.iter().all(|f| {
             args[1].faces.iter().all(|g| match (plane(f), plane(g)) {
                 (Some((o1, n1)), Some((o2, n2))) => n1.cross(n2).length() > 1e-9 || (o2 - o1).dot(n1).abs() <= tol || (o2 - o1).dot(n1).abs() > GREY * tol,
-                _ => coaxial(f, g).is_some_and(|dr| dr <= tol || dr > GREY * tol),
+                _ => coaxial(f, g).is_some_and(|dr| dr <= tol || dr > GREY * tol) || one_torus(f, g),
             })
         });
         if !crossing && boxes_meet(l0, h0, l1, h1, GREY * tol) && !planar {
