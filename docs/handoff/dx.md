@@ -11,6 +11,20 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-02 afternoon (to 17:13 UTC): X2 / X3 to live's answers
+- X2 (live 1745):
+  - absolute presets (Medium 0.12 mm / 6.25°);
+  - Custom pre-filled from the preset chosen before it; STL lengths in its units;
+  - bad values revert on blur, text disables Export;
+  - sticky mesh options (config `export_mesh.json`).
+- X3 (live 1746 samples):
+  - AP242 PMI written in Onshape's layout by step_out.rs, with tessellated presentation. OCCT's XDE writer is
+    gone; XDE stays our independent reader and reads our files as it reads live's.
+  - "Annotations text height (millimeter)" with live's validation.
+  - Open: inch documents' PMI unit; the exact placement of radial / angular text.
+- T2 `export::parasolid_round_trip` is red on main: xt_parts' loft (now one periodic B-spline side face after
+  core's loft changes) reads back as 4 faces instead of 3. That is ticket XT-PERIODIC-SPLINE-FACE (dx); next.
+
 ## 11-02 (to 03:17 UTC): user's order: X2 / X3, then big-file import / export speed, then format coverage
 - X2 export Resolution › Custom (defaults from Onshape's help, pending live 18:13) and X3 STEP AP242 semantic PMI
   through OCCT's XDE, round-tripped with XDE in tests (pending live's samples 18:18): landed (b9feffeb).

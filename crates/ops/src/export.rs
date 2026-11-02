@@ -102,6 +102,8 @@ pub struct ExportSettings {
     pub custom_units: bool,
     pub derived_tolerances: bool,
     pub mbd_text_height: bool,
+    /// "Annotations text height (millimeter)" (live 1746: default 4, 0.0001 to 50).
+    pub mbd_text_mm: f64,
     pub iges_compat: bool,
     pub pvz_group: bool,
     pub resolution: usize,
@@ -122,14 +124,12 @@ pub struct ExportSettings {
     pub pmi: Vec<Option<k::PartPmi>>,
 }
 
-/// Resolution › Custom (live dom g39-export-ps-step.html): STL's Chordal
-/// tolerance (mm) · Angular deviation (deg) · Minimum facet width (mm); the
-/// other tessellated formats' Distance tolerance (m) · Angular tolerance
-/// (deg) · Maximum chord length (m). Defaults are a reading of Onshape's
-/// help (pending live request 18:13 for the dialog's own). Our mesher takes
-/// the tolerance and the angle; the facet width and chord length limits are
-/// kept but not applied.
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// Resolution › Custom (live 1745): STL's Chordal tolerance · Angular
+/// deviation (deg) · Minimum facet width, in the STL units (stored here in
+/// mm); OBJ / 3MF / glTF / GLB's Distance tolerance (m) · Angular tolerance
+/// (deg) · Maximum chord length (m). Our mesher takes the tolerance and the
+/// angle; the facet width and chord length are kept but not applied.
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CustomResolution {
     pub chordal_mm: f64,
     pub angular_deg: f64,
@@ -139,10 +139,71 @@ pub struct CustomResolution {
     pub max_chord_m: f64,
 }
 
+/// Coarse, Medium and Fine (live 1745: the values Custom is pre-filled
+/// with): chordal tolerance (mm), angular deviation (deg), minimum facet
+/// width (mm); the other formats' distance tolerance is the same length, the
+/// maximum chord length 10 m.
+pub const PRESETS: [(f64, f64, f64); 3] = [(0.24, 12.5, 0.635), (0.12, 6.25, 0.254), (0.06, 2.5, 0.0254)];
+
+impl CustomResolution {
+    /// Custom pre-filled from a preset (index into [`PRESETS`]).
+    pub fn preset(i: usize) -> Self {
+        let (chordal, angle, facet) = PRESETS[i.min(2)];
+        Self { chordal_mm: chordal, angular_deg: angle, min_facet_mm: facet, distance_m: chordal / 1000.0, angular_tol_deg: angle, max_chord_m: 10.0 }
+    }
+}
+
+/// Live's first-time Custom: Medium's values.
 impl Default for CustomResolution {
     fn default() -> Self {
-        Self { chordal_mm: 0.06, angular_deg: 2.5, min_facet_mm: 0.0254, distance_m: 0.00006, angular_tol_deg: 2.5, max_chord_m: 0.01 }
+        Self::preset(1)
     }
+}
+
+/// The mesh options the Export dialog opens with: the last export's (live
+/// 1745: Onshape keeps them as the `exportSolidOptions` user setting).
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct MeshExportPrefs {
+    pub resolution: usize,
+    pub custom: CustomResolution,
+    pub stl_text: bool,
+    pub units: usize,
+}
+
+impl MeshExportPrefs {
+    fn path() -> std::path::PathBuf {
+        noshape_scene::config_dir().join("export_mesh.json")
+    }
+
+    pub fn load() -> Option<Self> {
+        std::fs::read(Self::path()).ok().and_then(|b| serde_json::from_slice(&b).ok())
+    }
+
+    pub fn save(&self) {
+        let p = Self::path();
+        if let Some(dir) = p.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        if let Ok(t) = serde_json::to_vec_pretty(self) {
+            let _ = std::fs::write(p, t);
+        }
+    }
+
+    pub fn of(s: &ExportSettings) -> Self {
+        Self { resolution: s.resolution, custom: s.custom, stl_text: s.stl_text, units: s.units }
+    }
+
+    pub fn apply(&self, s: &mut ExportSettings) {
+        s.resolution = self.resolution.min(CUSTOM_RESOLUTION);
+        s.custom = self.custom;
+        s.stl_text = self.stl_text;
+        s.units = self.units.min(UNITS.len() - 1);
+    }
+}
+
+/// A unit's short name in Custom's labels (live: "Chordal tolerance (in)").
+pub fn unit_abbreviation(i: usize) -> &'static str {
+    ["cm", "ft", "in", "m", "mm", "yd"][i.min(5)]
 }
 
 /// Index of "Custom" in [`RESOLUTIONS`].
@@ -168,6 +229,7 @@ impl Default for ExportSettings {
             custom_units: false,
             derived_tolerances: false,
             mbd_text_height: false,
+            mbd_text_mm: MBD_TEXT_MM,
             iges_compat: false,
             pvz_group: false,
             resolution: 1,
@@ -254,7 +316,7 @@ pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(Stri
     // OBJ: a zip of `<name>.obj` and its `<name>.mtl`, as live downloads it.
     if s.format == PartFormat::Obj {
         let stem = path.file_stem().map(|x| x.to_string_lossy().to_string()).unwrap_or_else(|| "part".into());
-        let (defl, ang) = mesh_params(s, &parts);
+        let (defl, ang) = mesh_params(s);
         let meshes: Vec<(String, k::Tessellation, [f32; 4])> = parts.iter().map(|(n, sh, c)| Ok((n.clone(), k::tessellate(sh, defl, ang, true)?, *c))).collect::<anyhow::Result<_>>()?;
         let (obj, mtl) = obj_and_mtl(&meshes, &stem);
         let (on, mn) = (format!("{stem}.obj"), format!("{stem}.mtl"));
@@ -452,25 +514,13 @@ fn sanitize(name: &str) -> String {
 /// The mesher's linear (meters) and angular (radians) deflection: Custom's
 /// fields (STL's chordal tolerance / angular deviation, the others' distance
 /// / angular tolerance), else the preset's.
-fn mesh_params(s: &ExportSettings, parts: &[(String, k::Shape, [f32; 4])]) -> (f64, f64) {
-    if s.resolution == CUSTOM_RESOLUTION {
-        let c = &s.custom;
-        let stl = s.format == PartFormat::Stl || (s.format == PartFormat::Urdf && URDF_GEOMETRY[s.urdf_geometry.min(3)] == PartFormat::Stl);
-        let (lin, ang) = if stl { (c.chordal_mm / 1000.0, c.angular_deg) } else { (c.distance_m, c.angular_tol_deg) };
-        return (lin.max(1e-7), ang.to_radians().clamp(1e-3, 1.5));
-    }
-    (deflection(s, parts), 0.35)
-}
-
-/// Chord tolerance (meters) of a mesh resolution, from the parts' size.
-fn deflection(s: &ExportSettings, parts: &[(String, k::Shape, [f32; 4])]) -> f64 {
-    let diag = parts.iter().filter_map(|p| p.1.bounding_box(false).ok()).map(|b| b.diagonal()).fold(0.0f64, f64::max).max(1e-3);
-    let rel = match s.resolution {
-        0 => 1e-3,
-        2 | 3 => 5e-5,
-        _ => 2e-4,
-    };
-    diag * rel
+/// The mesher's chord tolerance (m) and angle (rad): the preset's (live
+/// 1745: absolute, Medium 0.12 mm and 6.25°) or Custom's.
+fn mesh_params(s: &ExportSettings) -> (f64, f64) {
+    let c = if s.resolution == CUSTOM_RESOLUTION { s.custom } else { CustomResolution::preset(s.resolution) };
+    let stl = s.format == PartFormat::Stl || (s.format == PartFormat::Urdf && URDF_GEOMETRY[s.urdf_geometry.min(3)] == PartFormat::Stl);
+    let (lin, ang) = if stl { (c.chordal_mm / 1000.0, c.angular_deg) } else { (c.distance_m, c.angular_tol_deg) };
+    (lin.max(1e-7), ang.to_radians().clamp(1e-3, 1.5))
 }
 
 fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::Shape, [f32; 4])]) -> anyhow::Result<()> {
@@ -499,7 +549,7 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
             k::write_rhino(path, &shapes, k::LengthUnit::Meter, version)?;
         }
         f if f.mesh() => {
-            let (defl, ang) = mesh_params(s, parts);
+            let (defl, ang) = mesh_params(s);
             let meshes: Vec<(String, k::Tessellation, [f32; 4])> = parts.iter().map(|(n, sh, c)| Ok((n.clone(), k::tessellate(sh, defl, ang, true)?, *c))).collect::<anyhow::Result<_>>()?;
             match f {
                 PartFormat::Stl | PartFormat::Obj => {
@@ -753,13 +803,25 @@ pub fn store_description(file_name: &str) -> String {
     format!("Store {file_name}")
 }
 
-/// The MBD of a Part Studio's `bodies` for STEP AP242 (Model definitions):
-/// datums on their faces, and dimensions whose references are faces of the
-/// same body, valued from the model (`mbd::measure`), with their
-/// Symmetrical / Deviation / Limits tolerances (typed in the document's
-/// unit); one entry per body, None without any.
-pub fn studio_pmi(ps: &noshape_model::PartStudio, ctx: &noshape_model::regen::context::Context, bodies: &[noshape_model::BodyId], units: &noshape_units::UnitPrefs) -> Vec<Option<k::PartPmi>> {
+/// MBD text height in STEP (live 1746: Onshape's default, 4 mm).
+pub const MBD_TEXT_MM: f64 = 4.0;
+
+impl ExportSettings {
+    /// The MBD text height written to STEP (mm).
+    pub fn mbd_text(&self) -> f64 {
+        if self.mbd_text_height { self.mbd_text_mm } else { MBD_TEXT_MM }
+    }
+}
+
+/// The MBD of a Part Studio's `bodies` for STEP AP242 (Model definitions,
+/// live 1746): datums on their faces and dimensions whose references are
+/// faces of the same body, valued from the model (`mbd::measure`), with
+/// their Symmetrical / Deviation / Limits tolerances (typed in the
+/// document's unit), each drawn in its plane with `text_mm` high text; one
+/// entry per body, None without any.
+pub fn studio_pmi(ps: &noshape_model::PartStudio, ctx: &noshape_model::regen::context::Context, bodies: &[noshape_model::BodyId], units: &noshape_units::UnitPrefs, text_mm: f64) -> Vec<Option<k::PartPmi>> {
     use noshape_model::annotations::{AnnotationKind, Measure};
+    use noshape_model::drawing::mbd::MbdShape;
     use noshape_model::Reference;
     bodies
         .iter()
@@ -771,13 +833,16 @@ pub fn studio_pmi(ps: &noshape_model::PartStudio, ctx: &noshape_model::regen::co
                     _ => Vec::new(),
                 }
             };
+            let shapes = body.shape.faces();
+            let cylinder = |f: &[u32]| f.first().and_then(|&i| shapes.get(i as usize - 1)).and_then(|s| s.face_surface().ok()).is_some_and(|s| matches!(s, k::Surface::Cylinder { .. }));
             let mut pmi = k::PartPmi::default();
             for a in &ps.annotations {
+                let frame = Frame::new(a.at, a.normal, a.up);
                 match &a.kind {
                     AnnotationKind::Datum { letter } => {
                         let f = faces(&a.face);
                         if !f.is_empty() {
-                            pmi.datums.push((f, letter.clone()));
+                            pmi.datums.push(k::PmiDatum { faces: f, letter: letter.clone(), presentation: Some(datum_look(a, letter, text_mm)) });
                         }
                     }
                     AnnotationKind::Dimension { measure, refs, tolerance } => {
@@ -786,12 +851,13 @@ pub fn studio_pmi(ps: &noshape_model::PartStudio, ctx: &noshape_model::regen::co
                         let kind = match measure {
                             Measure::Angle => k::PmiKind::Angle,
                             Measure::Radius => k::PmiKind::Radius,
+                            _ if cylinder(&fa) && cylinder(&fb) => k::PmiKind::AxisDistance,
                             _ => k::PmiKind::Distance,
                         };
                         if fa.is_empty() || (kind != k::PmiKind::Radius && fb.is_empty()) {
                             continue;
                         }
-                        let Some((_, value)) = noshape_model::drawing::mbd::measure(ctx, a) else { continue };
+                        let Some((shape, value)) = noshape_model::drawing::mbd::measure(ctx, a) else { continue };
                         let angle = kind == k::PmiKind::Angle;
                         // Deviations typed in the document unit (degrees for angles).
                         let unit = if angle { std::f64::consts::PI / 180.0 } else { units.length.meters() };
@@ -803,13 +869,205 @@ pub fn studio_pmi(ps: &noshape_model::PartStudio, ctx: &noshape_model::regen::co
                             "Deviation" | "Limits" => Some((-l, u)),
                             _ => None,
                         };
-                        pmi.dims.push(k::PmiDimension { kind, a: fa, b: fb, value, tolerance: tol });
+                        let prefix = match kind {
+                            k::PmiKind::Angle => "ANGLE",
+                            k::PmiKind::Radius => "RADIUS",
+                            k::PmiKind::Diameter => "DIAMETER",
+                            k::PmiKind::AxisDistance => "AXIS_DISTANCE",
+                            k::PmiKind::Distance => "DISTANCE",
+                        };
+                        let text = dimension_text(kind, value, tol);
+                        let look = match shape {
+                            MbdShape::Linear { a: p, b: q } => frame.linear(p, q, &text, text_mm),
+                            MbdShape::Radius { center, radius, .. } => frame.radial(center, radius, &text, text_mm),
+                            MbdShape::Angle { vertex, a: p, b: q } => frame.angular(vertex, p, q, &text, text_mm),
+                        };
+                        pmi.dims.push(k::PmiDimension { kind, a: fa, b: fb, value, tolerance: tol, name: format!("{prefix}.noshape{}", a.id), precision: 3, presentation: Some(look) });
                     }
                 }
             }
             (pmi != k::PartPmi::default()).then_some(pmi)
         })
         .collect()
+}
+
+/// A dimension's text as the presentation shows it: "30±0.1", "R3",
+/// "90°", "+0.1/-0.05" deviations.
+fn dimension_text(kind: k::PmiKind, value: f64, tol: Option<(f64, f64)>) -> String {
+    let angle = kind == k::PmiKind::Angle;
+    let shown = |v: f64| {
+        let v = if angle { v.to_degrees() } else { v * 1000.0 };
+        let t = format!("{v:.3}");
+        let t = t.trim_end_matches('0').trim_end_matches('.').to_string();
+        if t == "-0" { "0".into() } else { t }
+    };
+    let deg = if angle { "°" } else { "" };
+    let mut t = format!("{}{}{deg}", if kind == k::PmiKind::Radius { "R" } else { "" }, shown(value));
+    match tol {
+        Some((l, u)) if (l + u).abs() < 1e-12 => t.push_str(&format!("±{}{deg}", shown(u))),
+        Some((l, u)) => t.push_str(&format!(" +{}{deg}/{}{deg}", shown(u), shown(l))),
+        None => {}
+    }
+    t
+}
+
+/// An annotation's plane (live 1746: through its text position, its normal
+/// and in-plane up): 2D points in mm map to 3D metres.
+struct Frame {
+    origin: glam::DVec3,
+    x: glam::DVec3,
+    y: glam::DVec3,
+    z: glam::DVec3,
+}
+
+/// Arrowheads as live draws them: 3 mm sides at 45°, 2.12 mm long and 1.41 mm wide.
+const ARROW: (f64, f64) = (3.0 * std::f64::consts::FRAC_1_SQRT_2, std::f64::consts::FRAC_1_SQRT_2);
+
+impl Frame {
+    fn new(at: [f64; 3], normal: [f64; 3], up: [f64; 3]) -> Self {
+        let z = glam::DVec3::from_array(normal).try_normalize().unwrap_or(glam::DVec3::Z);
+        let up = glam::DVec3::from_array(up);
+        let y = (up - z * up.dot(z)).try_normalize().unwrap_or_else(|| z.any_orthonormal_vector());
+        Self { origin: glam::DVec3::from_array(at), x: y.cross(z), y, z }
+    }
+    /// A point's 2D coordinates (mm) in the plane.
+    fn uv(&self, p: glam::DVec3) -> glam::DVec2 {
+        let d = (p - self.origin) * 1000.0;
+        glam::DVec2::new(d.dot(self.x), d.dot(self.y))
+    }
+    fn at(&self, p: glam::DVec2) -> [f64; 3] {
+        (self.origin + (self.x * p.x + self.y * p.y) / 1000.0).to_array()
+    }
+    fn look(&self, label: &str, g: Look) -> k::PmiPresentation {
+        k::PmiPresentation {
+            label: label.into(),
+            origin: self.origin.to_array(),
+            normal: self.z.to_array(),
+            x: self.x.to_array(),
+            triangles: g.tris.iter().flatten().map(|p| self.at(*p)).collect(),
+            lines: g.lines.iter().flatten().map(|p| self.at(*p)).collect(),
+        }
+    }
+    /// A linear dimension: extension lines from the measured points to a
+    /// dimension line through the text, arrows at its ends, broken for the
+    /// text.
+    fn linear(&self, p: glam::DVec3, q: glam::DVec3, text: &str, h: f64) -> k::PmiPresentation {
+        let (p, q) = (self.uv(p), self.uv(q));
+        let d = (q - p).try_normalize().unwrap_or(glam::DVec2::X);
+        let n = d.perp();
+        let (pa, qa) = (p + n * -p.dot(n), q + n * -q.dot(n));
+        let mut g = Look::default();
+        g.lines.push([p, pa]);
+        g.lines.push([q, qa]);
+        // The dimension line (through the text, along `d`), broken for it.
+        let half = 0.5 * noshape_model::drawing::font::text_width(text, h) + 0.5 * h;
+        let (s, e) = (pa.dot(d), qa.dot(d));
+        let (lo, hi) = (s.min(e), s.max(e));
+        if -half > lo {
+            g.lines.push([d * lo, d * -half]);
+        }
+        if half < hi {
+            g.lines.push([d * half, d * hi]);
+        }
+        // Outward at both ends (live: tips on the extension lines).
+        g.arrow(pa, (pa - qa).try_normalize().unwrap_or(-d));
+        g.arrow(qa, (qa - pa).try_normalize().unwrap_or(d));
+        g.text(text, glam::DVec2::ZERO, upright(d), h);
+        self.look("linear dimension", g)
+    }
+    /// A radius: a leader from the arc to the text, its arrow on the arc.
+    fn radial(&self, center: glam::DVec3, r: f64, text: &str, h: f64) -> k::PmiPresentation {
+        let c = self.uv(center);
+        let dir = (-c).try_normalize().unwrap_or(glam::DVec2::X);
+        let on_arc = c + dir * (r * 1000.0);
+        let half = 0.5 * noshape_model::drawing::font::text_width(text, h) + 0.5 * h;
+        let end = -dir * half;
+        let mut g = Look::default();
+        g.lines.push([on_arc, end]);
+        g.arrow(on_arc, (on_arc - end).try_normalize().unwrap_or(-dir));
+        g.text(text, glam::DVec2::ZERO, upright(dir), h);
+        self.look("radial dimension", g)
+    }
+    /// An angle: an arc through the text between the legs, arrows at its ends.
+    fn angular(&self, vertex: glam::DVec3, a: glam::DVec3, b: glam::DVec3, text: &str, h: f64) -> k::PmiPresentation {
+        let v = self.uv(vertex);
+        let (a, b) = (self.uv(a) - v, self.uv(b) - v);
+        let r = (-v).length().max(8.0);
+        let (t0, mut t1) = (a.y.atan2(a.x), b.y.atan2(b.x));
+        if t1 < t0 {
+            t1 += std::f64::consts::TAU;
+        }
+        if t1 - t0 > std::f64::consts::PI {
+            t1 -= std::f64::consts::TAU;
+        }
+        let steps = 24;
+        let pt = |t: f64| v + glam::DVec2::new(t.cos(), t.sin()) * r;
+        let mut g = Look::default();
+        for k in 0..steps {
+            let (s0, s1) = (t0 + (t1 - t0) * k as f64 / steps as f64, t0 + (t1 - t0) * (k + 1) as f64 / steps as f64);
+            g.lines.push([pt(s0), pt(s1)]);
+        }
+        let sense = (t1 - t0).signum();
+        let tangent = |t: f64| glam::DVec2::new(-t.sin(), t.cos()) * sense;
+        g.arrow(pt(t0), -tangent(t0));
+        g.arrow(pt(t1), tangent(t1));
+        let mid = (t0 + t1) * 0.5;
+        g.text(text, pt(mid) + glam::DVec2::new(mid.cos(), mid.sin()) * h, upright(tangent(mid)), h);
+        self.look("angular dimension", g)
+    }
+}
+
+/// A datum's symbol (live 1746 "datum"): a filled triangle on the face, a
+/// stem out along its normal to a box with the letter.
+fn datum_look(a: &noshape_model::annotations::Annotation, letter: &str, h: f64) -> k::PmiPresentation {
+    let n = glam::DVec3::from_array(a.normal);
+    let up = glam::DVec3::from_array(a.up);
+    // The symbol's plane holds the face normal: its "up" is the normal.
+    let side = up.cross(n).try_normalize().unwrap_or_else(|| n.any_orthonormal_vector());
+    let frame = Frame::new(a.at, side.cross(n).to_array(), n.to_array());
+    let mut g = Look::default();
+    let (w, t) = (1.5 * h / 4.0 * 2.0, 2.6 * h / 4.0);
+    g.tris.push([glam::DVec2::new(-w / 2.0, 0.0), glam::DVec2::new(w / 2.0, 0.0), glam::DVec2::new(0.0, t)]);
+    let (stem, size) = (2.0 * h, 1.6 * h);
+    g.lines.push([glam::DVec2::new(0.0, t), glam::DVec2::new(0.0, t + stem)]);
+    let (x0, x1, y0, y1) = (-size / 2.0, size / 2.0, t + stem, t + stem + size);
+    for [p, q] in [[(x0, y0), (x1, y0)], [(x1, y0), (x1, y1)], [(x1, y1), (x0, y1)], [(x0, y1), (x0, y0)]] {
+        g.lines.push([glam::DVec2::new(p.0, p.1), glam::DVec2::new(q.0, q.1)]);
+    }
+    g.text(letter, glam::DVec2::new(0.0, (y0 + y1) / 2.0), 0.0, h);
+    frame.look("datum", g)
+}
+
+/// Text along `d` reads left to right or bottom to top.
+fn upright(d: glam::DVec2) -> f64 {
+    let a = d.y.atan2(d.x);
+    if a > std::f64::consts::FRAC_PI_2 + 1e-9 || a <= -std::f64::consts::FRAC_PI_2 + 1e-9 { a + std::f64::consts::PI } else { a }
+}
+
+/// An annotation's drawing in its plane (mm).
+#[derive(Default)]
+struct Look {
+    tris: Vec<[glam::DVec2; 3]>,
+    lines: Vec<[glam::DVec2; 2]>,
+}
+
+impl Look {
+    /// A filled arrowhead with its tip at `tip`, pointing along `dir`.
+    fn arrow(&mut self, tip: glam::DVec2, dir: glam::DVec2) {
+        let back = tip - dir * ARROW.0;
+        let n = dir.perp() * ARROW.1;
+        self.tris.push([back + n, tip, back - n]);
+    }
+    /// Text centred on `at`, `h` mm high, as filled glyphs (the drawing
+    /// font, as the drawing's PDF outlines it).
+    fn text(&mut self, text: &str, at: glam::DVec2, angle: f64, h: f64) {
+        use noshape_model::drawing::sheet::{Anchor, Text2};
+        let t = Text2 { pos: at.to_array(), height: h, text: text.into(), angle, anchor: Anchor::Center, pick: 0 };
+        let (pts, idx) = noshape_model::drawing::font::text_fill_font(&t, None);
+        for tri in idx.chunks(3).filter(|c| c.len() == 3) {
+            self.tris.push([0, 1, 2].map(|j| glam::DVec2::from_array(pts[tri[j] as usize])));
+        }
+    }
 }
 
 #[cfg(test)]

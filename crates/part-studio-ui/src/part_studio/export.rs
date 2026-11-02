@@ -7,7 +7,7 @@
 //! individual files, ☐ Include hidden instances in export; Export | Cancel.
 
 use super::PartStudioView;
-use gpui_kit::component::{WindowExt as _, h_flex};
+use gpui_kit::component::{Disableable as _, WindowExt as _, h_flex};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -68,7 +68,7 @@ impl PartStudioView {
                 .filter(|b| !(self.display.body(&b.id).is_some_and(|d| d.hidden) && !s.hidden && bodies.is_empty()))
                 .map(|b| b.id.clone())
                 .collect();
-            s.pmi = noshape_ops::export::studio_pmi(ps, ctx, &ids, &self.doc.read(cx).session.doc.settings.units);
+            s.pmi = noshape_ops::export::studio_pmi(ps, ctx, &ids, &self.doc.read(cx).session.doc.settings.units, s.mbd_text());
         }
         let name = if name.is_empty() { self.studio_name(cx) } else { name };
         // The saved file's own extension (OBJ downloads a .zip, as live).
@@ -138,40 +138,86 @@ pub fn open_export_modal(base: String, assembly: bool, run: RunExport, window: &
 /// vs -jt-tab.txt).
 pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, run: RunExport, window: &mut Window, cx: &mut App) {
     let file = cx.new(|cx| InputState::new(window, cx).default_value(base));
-    let st = Rc::new(RefCell::new(ExportSettings::default()));
-    // Resolution › Custom's fields (live dom g39-export-ps-step: STL's three,
-    // the other tessellated formats' three), kept while the dialog is open.
-    type SetCustom = fn(&mut noshape_ops::export::CustomResolution, f64);
-    let c0 = noshape_ops::export::CustomResolution::default();
-    let fields: [(&'static str, &'static str, f64, SetCustom); 6] = [
-        ("ex-chordal", "Chordal tolerance (mm)", c0.chordal_mm, |c, v| c.chordal_mm = v),
-        ("ex-angdev", "Angular deviation (deg)", c0.angular_deg, |c, v| c.angular_deg = v),
-        ("ex-minfacet", "Minimum facet width (mm)", c0.min_facet_mm, |c, v| c.min_facet_mm = v),
-        ("ex-distance", "Distance tolerance (m)", c0.distance_m, |c, v| c.distance_m = v),
-        ("ex-angtol", "Angular tolerance (deg)", c0.angular_tol_deg, |c, v| c.angular_tol_deg = v),
-        ("ex-maxchord", "Maximum chord length (m)", c0.max_chord_m, |c, v| c.max_chord_m = v),
-    ];
-    let custom: Rc<Vec<(&'static str, &'static str, Entity<InputState>)>> = Rc::new(
-        fields
-            .iter()
-            .map(|&(id, label, v, set)| {
-                let input = cx.new(|cx| InputState::new(window, cx).default_value(noshape_model::drawing::format::format_number(v, None, 6)));
-                let st = st.clone();
-                cx.subscribe(&input, move |input, ev: &InputEvent, cx| {
-                    if matches!(ev, InputEvent::Change)
-                        && let Ok(v) = input.read(cx).value().trim().parse::<f64>()
-                        && v.is_finite()
-                        && v >= 0.0
-                    {
-                        set(&mut st.borrow_mut().custom, v);
+    // The mesh options the last export used (live 1745: sticky).
+    let st = Rc::new(RefCell::new({
+        let mut s = ExportSettings::default();
+        if let Some(p) = noshape_ops::export::MeshExportPrefs::load() {
+            p.apply(&mut s);
+        }
+        s
+    }));
+    // Resolution › Custom's fields (live 1745): STL's three, their lengths
+    // in the STL units, then the other mesh formats' three.
+    let custom: Rc<Vec<(&'static str, Entity<InputState>)>> = Rc::new(CUSTOM_FIELDS.iter().map(|f| (f.id, cx.new(|cx| InputState::new(window, cx).default_value(custom_text(&st.borrow(), f))))).collect());
+    // A field that isn't a number disables Export (live: no message).
+    let invalid = Rc::new(std::cell::Cell::new(false));
+    for (f, (_, input)) in CUSTOM_FIELDS.iter().zip(custom.iter()) {
+        let (st, invalid) = (st.clone(), invalid.clone());
+        window
+            .subscribe(input, cx, move |input, ev: &InputEvent, window, cx| {
+                let text = input.read(cx).value().trim().to_string();
+                let v = text.parse::<f64>().ok().filter(|v| v.is_finite());
+                match ev {
+                    InputEvent::Change => {
+                        invalid.set(v.is_none() && !text.is_empty());
+                        if let Some(v) = v.filter(|v| *v > 0.0) {
+                            let scale = if f.stl_length { stl_mm(&st.borrow()) } else { 1.0 };
+                            (f.set)(&mut st.borrow_mut().custom, v * scale);
+                        }
+                        window.refresh();
                     }
-                })
-                .detach();
-                (id, label, input)
+                    // Live: 0, -1, empty or text go back to the last value.
+                    InputEvent::Blur if v.is_none_or(|v| v <= 0.0) => {
+                        invalid.set(false);
+                        let shown = custom_text(&st.borrow(), f);
+                        input.update(cx, |i, cx| i.set_value(shown, window, cx));
+                    }
+                    _ => {}
+                }
             })
-            .collect(),
-    );
-    window.open_dialog(cx, move |dialog, _, cx| {
+            .detach();
+    }
+    // STEP › "Annotations text height (millimeter)" (live 1746): 0.0001 to 50,
+    // else a message and Export disabled.
+    let mbd_input = cx.new(|cx| InputState::new(window, cx).default_value(noshape_model::drawing::format::format_number(st.borrow().mbd_text_mm, None, 4)));
+    let mbd_bad = Rc::new(std::cell::Cell::new(false));
+    {
+        let (st, mbd_bad) = (st.clone(), mbd_bad.clone());
+        window
+            .subscribe(&mbd_input, cx, move |input, ev: &InputEvent, window, cx| {
+                if !matches!(ev, InputEvent::Change) {
+                    return;
+                }
+                match input.read(cx).value().trim().parse::<f64>().ok().filter(|v| (0.0001..=50.0).contains(v)) {
+                    Some(v) => {
+                        st.borrow_mut().mbd_text_mm = v;
+                        mbd_bad.set(false);
+                    }
+                    None => mbd_bad.set(true),
+                }
+                window.refresh();
+            })
+            .detach();
+    }
+    // Custom is pre-filled from the preset chosen before it; STL's lengths
+    // follow its units.
+    let shown_as = Rc::new(std::cell::Cell::new((st.borrow().resolution, st.borrow().units)));
+    window.open_dialog(cx, move |dialog, window, cx| {
+        {
+            let (res, units) = shown_as.get();
+            let mut s = st.borrow_mut();
+            let prefill = s.resolution == noshape_ops::export::CUSTOM_RESOLUTION && res != noshape_ops::export::CUSTOM_RESOLUTION;
+            if prefill {
+                s.custom = noshape_ops::export::CustomResolution::preset(res);
+            }
+            shown_as.set((s.resolution, s.units));
+            if prefill || units != s.units {
+                let s = s.clone();
+                for (f, (_, input)) in CUSTOM_FIELDS.iter().zip(custom.iter()) {
+                    input.update(cx, |i, cx| i.set_value(custom_text(&s, f), window, cx));
+                }
+            }
+        }
         let s = st.borrow().clone();
         let f = s.format;
         let pal = crate::theme::p();
@@ -182,7 +228,7 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
         enum Row {
             Select { id: &'static str, label: &'static str, opts: Vec<String>, cur: usize, disabled: bool, set: fn(&mut ExportSettings, usize) },
             Check { id: &'static str, label: &'static str, on: bool, set: fn(&mut ExportSettings, bool) },
-            Number { label: &'static str, input: Entity<InputState> },
+            Number { label: String, input: Entity<InputState>, error: Option<&'static str> },
         }
         let sel = |id, label, opts: &[&str], cur, disabled, set| Row::Select { id, label, opts: opts.iter().map(|o| o.to_string()).collect(), cur, disabled, set };
         let chk = |id, label, on, set| Row::Check { id, label, on, set };
@@ -209,6 +255,10 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
                 }
                 rows.push(chk("ex-tol", "Include derived tolerances in export", s.derived_tolerances, |s, v| s.derived_tolerances = v));
                 rows.push(chk("ex-mbd", "Use custom annotation text height for MBD export", s.mbd_text_height, |s, v| s.mbd_text_height = v));
+                if s.mbd_text_height {
+                    let error = mbd_bad.get().then_some("Valid annotations text height in range from 0.0001 to 50 is required.");
+                    rows.push(Row::Number { label: "Annotations text height (millimeter)".into(), input: mbd_input.clone(), error });
+                }
             }
             PartFormat::Iges => rows.push(chk("ex-iges", "Use compatibility mode for surfaces and curves", s.iges_compat, |s, v| s.iges_compat = v)),
             PartFormat::Pvz => rows.push(chk("ex-pvz", "Group composite parts into a single part file", s.pvz_group, |s, v| s.pvz_group = v)),
@@ -242,9 +292,11 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
             && let Some(at) = rows.iter().position(|r| matches!(r, Row::Select { id: "ex-res", .. }))
         {
             let stl = f == PartFormat::Stl || (f == PartFormat::Urdf && URDF_GEOMETRY[s.urdf_geometry.min(3)] == PartFormat::Stl);
-            let set = if stl { &custom[..3] } else { &custom[3..] };
-            for (k, (_, label, input)) in set.iter().enumerate() {
-                rows.insert(at + 1 + k, Row::Number { label, input: input.clone() });
+            let range = if stl { 0..3 } else { 3..6 };
+            for (k, i) in range.enumerate() {
+                let f = &CUSTOM_FIELDS[i];
+                let label = if f.stl_length { format!("{} ({})", f.label, noshape_ops::export::unit_abbreviation(s.units)) } else { f.label.to_string() };
+                rows.insert(at + 1 + k, Row::Number { label, input: custom[i].1.clone(), error: None });
             }
         }
         rows.push(sel("ex-options", "Options", &OPTIONS, s.options, false, |s, i| s.options = i));
@@ -307,13 +359,16 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
                         ),
                     )
                 }
-                Row::Number { label, input } => {
+                Row::Number { label, input, error } => {
                     let mt = if prev_check { LABEL_MT - LABEL_AFTER_CHECK } else { LABEL_MT };
                     prev_check = false;
+                    let border = if error.is_some() { 0xdc3545 } else { 0xaaaaaa };
                     body.child(
-                        div().mt(px(mt)).child(crate::os_ui::field_label(label)).child(
-                            div().mt(px(FIELD_MT)).h(px(34.)).px(px(1.)).flex().items_center().border_1().border_color(gpui_kit::rgb(0xaaaaaa)).rounded(px(4.)).bg(pal.panel).child(Input::new(&input).appearance(false).text_size(px(14.))),
-                        ),
+                        div()
+                            .mt(px(mt))
+                            .child(crate::os_ui::field_label(label))
+                            .child(div().mt(px(FIELD_MT)).h(px(34.)).px(px(1.)).flex().items_center().border_1().border_color(gpui_kit::rgb(border)).rounded(px(4.)).bg(pal.panel).child(Input::new(&input).appearance(false).text_size(px(14.))))
+                            .when_some(error, |d, e| d.child(div().mt(px(4.)).text_size(px(12.)).text_color(gpui_kit::rgb(0xdc3545)).child(e))),
                     )
                 }
                 Row::Check { id, label, on, set } => {
@@ -326,16 +381,17 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
                 }
             };
         }
-        let (st2, file2, run2) = (st.clone(), file.clone(), run.clone());
+        let (st2, file2, run2, invalid2, mbd_bad2) = (st.clone(), file.clone(), run.clone(), invalid.clone(), mbd_bad.clone());
         crate::os_ui::modal(dialog, "Export", 600.)
             .child(body)
-            .footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Export"))).child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))))
+            .footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Export").disabled(invalid.get() || (s.format == PartFormat::Step && s.mbd_text_height && mbd_bad.get())))).child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))))
             .on_ok(move |_, window, cx| {
                 let s = st2.borrow().clone();
                 let name = file2.read(cx).value().trim().to_string();
-                if name.is_empty() {
+                if name.is_empty() || invalid2.get() || (s.format == PartFormat::Step && s.mbd_text_height && mbd_bad2.get()) {
                     return false;
                 }
+                noshape_ops::export::MeshExportPrefs::of(&s).save();
                 let run = run2.clone();
                 window.defer(cx, move |window, cx| run(s, name, window, cx));
                 true
@@ -343,6 +399,36 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
     });
 }
 
+
+/// One of Resolution › Custom's fields (live 1745).
+struct CustomField {
+    id: &'static str,
+    label: &'static str,
+    /// STL's chordal tolerance and facet width: shown in the STL units.
+    stl_length: bool,
+    get: fn(&noshape_ops::export::CustomResolution) -> f64,
+    set: fn(&mut noshape_ops::export::CustomResolution, f64),
+}
+
+const CUSTOM_FIELDS: [CustomField; 6] = [
+    CustomField { id: "ex-chordal", label: "Chordal tolerance", stl_length: true, get: |c| c.chordal_mm, set: |c, v| c.chordal_mm = v },
+    CustomField { id: "ex-angdev", label: "Angular deviation (deg)", stl_length: false, get: |c| c.angular_deg, set: |c, v| c.angular_deg = v },
+    CustomField { id: "ex-minfacet", label: "Minimum facet width", stl_length: true, get: |c| c.min_facet_mm, set: |c, v| c.min_facet_mm = v },
+    CustomField { id: "ex-distance", label: "Distance tolerance (m)", stl_length: false, get: |c| c.distance_m, set: |c, v| c.distance_m = v },
+    CustomField { id: "ex-angtol", label: "Angular tolerance (deg)", stl_length: false, get: |c| c.angular_tol_deg, set: |c, v| c.angular_tol_deg = v },
+    CustomField { id: "ex-maxchord", label: "Maximum chord length (m)", stl_length: false, get: |c| c.max_chord_m, set: |c, v| c.max_chord_m = v },
+];
+
+/// Millimetres per STL unit.
+fn stl_mm(s: &ExportSettings) -> f64 {
+    noshape_ops::export::UNITS[s.units].1 * 1000.0
+}
+
+/// A Custom field's text (live: 1 mm at Inch shows 0.03937).
+fn custom_text(s: &ExportSettings, f: &CustomField) -> String {
+    let v = (f.get)(&s.custom) / if f.stl_length { stl_mm(s) } else { 1.0 };
+    noshape_model::drawing::format::format_number(v, None, 6)
+}
 
 /// A Bootstrap modal checkbox (live document/80): a 14 px box (1 px gray,
 /// radius 3; checked blue with a white check), 8 px gap, 14 px `#333` label.

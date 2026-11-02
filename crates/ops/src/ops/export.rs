@@ -12,7 +12,7 @@ pub fn ops() -> Vec<Op> {
         group: "export",
         verb: "parts",
         summary: "Export a Part Studio's parts or an Assembly to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino)",
-        description: "Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`; with `tab` an Assembly, its visible instances (or `parts`: instance ids or names) — STEP and Parasolid keep the assembly (the root product / ASSEMBLY, each part once, placed by its instances), the other formats get the placed parts. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine/custom for mesh formats; Custom's fields: STL `chordal_tolerance` mm / `angular_deviation` deg / `min_facet_width` mm, the other mesh formats `distance_tolerance` m / `angular_tolerance` deg / `max_chord_length` m), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.",
+        description: "Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`; with `tab` an Assembly, its visible instances (or `parts`: instance ids or names) — STEP and Parasolid keep the assembly (the root product / ASSEMBLY, each part once, placed by its instances), the other formats get the placed parts. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine/custom for mesh formats; Coarse / Medium / Fine are chordal 0.24 / 0.12 / 0.06 mm at 12.5 / 6.25 / 2.5°; Custom's fields: STL `chordal_tolerance` / `angular_deviation` deg / `min_facet_width` in the STL `units` (default mm), the other mesh formats `distance_tolerance` m / `angular_tolerance` deg / `max_chord_length` m; unset fields keep Medium's values), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.",
         fields: vec![
             doc_field(),
             tab_field(),
@@ -35,7 +35,7 @@ pub fn ops() -> Vec<Op> {
             opt("include_hidden", json!({ "type": "boolean" }), "Include hidden parts."),
             opt("preprocessing", json!({ "type": "string", "enum": crate::export::STEP_PREPROCESSING }), "STEP: Preprocessing (default None)."),
             opt("derived_tolerances", json!({ "type": "boolean" }), "STEP: Include derived tolerances in export."),
-            opt("mbd_text_height", json!({ "type": "boolean" }), "STEP: Use custom annotation text height for MBD export."),
+            opt("mbd_text_height", json!({ "type": "number", "minimum": 0.0001, "maximum": 50 }), "STEP: Use custom annotation text height for MBD export: the annotations' text height in mm (default 4)."),
             opt("iges_compatibility", json!({ "type": "boolean" }), "IGES: Use compatibility mode for surfaces and curves."),
             opt("group_composites", json!({ "type": "boolean" }), "PVZ: Group composite parts into a single part file."),
             opt("compress", json!({ "type": "boolean" }), "glTF / GLB: Compress."),
@@ -60,15 +60,12 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     s.individual = a.bool_or("individual", false)?;
     s.hidden = a.bool_or("include_hidden", false)?;
     s.derived_tolerances = a.bool_or("derived_tolerances", false)?;
-    s.mbd_text_height = a.bool_or("mbd_text_height", false)?;
-    let c = &mut s.custom;
-    for (k, v) in [("chordal_tolerance", &mut c.chordal_mm), ("angular_deviation", &mut c.angular_deg), ("min_facet_width", &mut c.min_facet_mm), ("distance_tolerance", &mut c.distance_m), ("angular_tolerance", &mut c.angular_tol_deg), ("max_chord_length", &mut c.max_chord_m)] {
-        if let Some(x) = a.opt_f64(k)? {
-            if !x.is_finite() || x < 0.0 {
-                return Err(OpError::param(k, "a positive number"));
-            }
-            *v = x;
+    if let Some(h) = a.opt_f64("mbd_text_height")? {
+        if !(0.0001..=50.0).contains(&h) {
+            return Err(OpError::param("mbd_text_height", "Valid annotations text height in range from 0.0001 to 50 is required."));
         }
+        s.mbd_text_height = true;
+        s.mbd_text_mm = h;
     }
     s.iges_compat = a.bool_or("iges_compatibility", false)?;
     s.pvz_group = a.bool_or("group_composites", false)?;
@@ -85,6 +82,17 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     if let Some(r) = a.opt_str("resolution")? {
         s.resolution = ["coarse", "medium", "fine", "custom"].iter().position(|x| x.eq_ignore_ascii_case(r)).ok_or_else(|| OpError::param("resolution", "Coarse, Medium, Fine or Custom"))?;
+    }
+    // Custom's fields; STL's lengths in its units (live 1745), the others' in metres.
+    let stl_mm = UNITS[s.units].1 * 1000.0;
+    let c = &mut s.custom;
+    for (k, v, scale) in [("chordal_tolerance", &mut c.chordal_mm, stl_mm), ("angular_deviation", &mut c.angular_deg, 1.0), ("min_facet_width", &mut c.min_facet_mm, stl_mm), ("distance_tolerance", &mut c.distance_m, 1.0), ("angular_tolerance", &mut c.angular_tol_deg, 1.0), ("max_chord_length", &mut c.max_chord_m, 1.0)] {
+        if let Some(x) = a.opt_f64(k)? {
+            if !x.is_finite() || x <= 0.0 {
+                return Err(OpError::param(k, "a positive number"));
+            }
+            *v = x * scale;
+        }
     }
     if let Some(v) = a.opt_str("version")? {
         let list: &[&str] = match format {
@@ -143,7 +151,7 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         .map(|b| b.id.clone())
         .collect();
     if let Some(noshape_model::TabContent::PartStudio(ps)) = od.doc().tab(tab).map(|t| &t.content) {
-        s.pmi = crate::export::studio_pmi(ps, &r.context, &ids, &od.doc().settings.units);
+        s.pmi = crate::export::studio_pmi(ps, &r.context, &ids, &od.doc().settings.units, s.mbd_text());
     }
     let n = list.len();
     write_out(od, tab, a, format, n, |file| crate::export::write_export(&s, file, list))

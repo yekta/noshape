@@ -260,32 +260,6 @@ pub(crate) mod ffi {
         nest: Vec<StepChild>,
     }
 
-    /// MBD for a STEP part (AP242 semantic PMI through OCCT's XDE): datums
-    /// and dimensions on its faces (1-based indices in `TopExp::MapShapes`
-    /// face order).
-    struct StepPmi {
-        datums: Vec<PmiDatum>,
-        dims: Vec<PmiDim>,
-    }
-
-    struct PmiDatum {
-        faces: Vec<u32>,
-        name: String,
-    }
-
-    /// `kind`: 0 linear distance between `a` and `b`, 1 angle between them,
-    /// 2 radius of `a`, 3 diameter of `a`; `value` in millimetres or
-    /// degrees; the tolerance's lower / upper deviations when `toleranced`.
-    struct PmiDim {
-        kind: u8,
-        a: Vec<u32>,
-        b: Vec<u32>,
-        value: f64,
-        lower: f64,
-        upper: f64,
-        toleranced: bool,
-    }
-
     /// A direct child in a STEP assembly tree: a part (`part` ≥ 0) or a
     /// subassembly (`sub` ≥ 0), placed in its owner (row-major 3 x 4,
     /// metres).
@@ -790,7 +764,6 @@ pub(crate) mod ffi {
             file_unit: u8,
         ) -> Result<()>;
         /// [`write_step`] of one part with its MBD as AP242 semantic PMI.
-        fn write_step_pmi(shapes: &OcShapeList, names: &[String], colors: &[f32], has_color: &[bool], path: &str, schema: u8, file_unit: u8, pmi: &StepPmi) -> Result<()>;
         /// A STEP file's semantic PMI as OCCT's XDE reads it: one line per
         /// datum ("datum A faces 1") and dimension ("dim <type> <value> tol
         /// <lower> <upper> faces <n>+<m>").

@@ -6319,7 +6319,7 @@ Examples:
 
 Export a Part Studio's parts or an Assembly to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino) (edits the document (one undoable history entry)).
 
-Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`; with `tab` an Assembly, its visible instances (or `parts`: instance ids or names) — STEP and Parasolid keep the assembly (the root product / ASSEMBLY, each part once, placed by its instances), the other formats get the placed parts. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine/custom for mesh formats; Custom's fields: STL `chordal_tolerance` mm / `angular_deviation` deg / `min_facet_width` mm, the other mesh formats `distance_tolerance` m / `angular_tolerance` deg / `max_chord_length` m), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.
+Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`; with `tab` an Assembly, its visible instances (or `parts`: instance ids or names) — STEP and Parasolid keep the assembly (the root product / ASSEMBLY, each part once, placed by its instances), the other formats get the placed parts. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine/custom for mesh formats; Coarse / Medium / Fine are chordal 0.24 / 0.12 / 0.06 mm at 12.5 / 6.25 / 2.5°; Custom's fields: STL `chordal_tolerance` / `angular_deviation` deg / `min_facet_width` in the STL `units` (default mm), the other mesh formats `distance_tolerance` m / `angular_tolerance` deg / `max_chord_length` m; unset fields keep Medium's values), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.
 
 Examples:
 
@@ -6352,7 +6352,7 @@ Examples:
 | `include_hidden` | boolean |  | Include hidden parts. |
 | `preprocessing` | one of `None`, `Automatic`, `Remove small entities only (advanced)`, `Remove small entities only (basic)`, `Remove small entities only (advanced) and convert all surfaces to b-surfaces` |  | STEP: Preprocessing (default None). |
 | `derived_tolerances` | boolean |  | STEP: Include derived tolerances in export. |
-| `mbd_text_height` | boolean |  | STEP: Use custom annotation text height for MBD export. |
+| `mbd_text_height` | number |  | STEP: Use custom annotation text height for MBD export: the annotations' text height in mm (default 4). |
 | `iges_compatibility` | boolean |  | IGES: Use compatibility mode for surfaces and curves. |
 | `group_composites` | boolean |  | PVZ: Group composite parts into a single part file. |
 | `compress` | boolean |  | glTF / GLB: Compress. |

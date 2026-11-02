@@ -872,10 +872,6 @@ StepTree                 read_step_tree(rust::Str path);
 void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names,
                 rust::Slice<const float> colors, rust::Slice<const bool> has_color,
                 rust::Str path, uint8_t schema, uint8_t file_unit);
-struct StepPmi;
-void write_step_pmi(const OcShapeList& shapes, rust::Slice<const rust::String> names,
-                    rust::Slice<const float> colors, rust::Slice<const bool> has_color,
-                    rust::Str path, uint8_t schema, uint8_t file_unit, const StepPmi& pmi);
 rust::Vec<rust::String> read_step_pmi(rust::Str path);
 std::unique_ptr<OcShape> read_iges(rust::Str path);
 std::unique_ptr<OcShape> read_mesh(rust::Str path, uint32_t merge_limit);

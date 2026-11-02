@@ -203,27 +203,39 @@ pub struct StepOptions {
     pub pmi: Vec<Option<PartPmi>>,
 }
 
-/// A part's MBD for STEP (AP242 semantic PMI, CAx-IF recommended practices):
-/// datums and dimensions on its faces (1-based `TopExp::MapShapes` face
-/// indices of the shape as given).
+/// A part's MBD for STEP AP242 as Onshape writes it (live 1746: CAx-IF
+/// semantic PMI with tessellated presentation): datums and dimensions on its
+/// faces (1-based face indices of the shape as given, `TopExp::MapShapes`
+/// order).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PartPmi {
-    pub datums: Vec<(Vec<u32>, String)>,
+    pub datums: Vec<PmiDatum>,
     pub dims: Vec<PmiDimension>,
+}
+
+/// A datum: its faces and letter.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PmiDatum {
+    pub faces: Vec<u32>,
+    pub letter: String,
+    pub presentation: Option<PmiPresentation>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PmiKind {
     /// Distance between `a` and `b`.
     Distance,
+    /// Distance between two axes ("linear distance centre").
+    AxisDistance,
     /// Angle between `a` and `b`.
     Angle,
     Radius,
     Diameter,
 }
 
-/// A dimension: its faces, value (metres, or radians for angles) and the
-/// tolerance's lower / upper deviations (same units).
+/// A dimension: its faces, value (metres, or radians for angles), the
+/// tolerance's lower / upper deviations (same units, signed), the decimal
+/// places shown, and `name` (Onshape's "RADIUS.<id>").
 #[derive(Clone, Debug, PartialEq)]
 pub struct PmiDimension {
     pub kind: PmiKind,
@@ -231,6 +243,23 @@ pub struct PmiDimension {
     pub b: Vec<u32>,
     pub value: f64,
     pub tolerance: Option<(f64, f64)>,
+    pub name: String,
+    pub precision: u32,
+    pub presentation: Option<PmiPresentation>,
+}
+
+/// How an annotation is drawn (metres): its plane (origin, normal, x
+/// direction), filled triangles (text, arrowheads; 3 points each) and line
+/// segments (2 points each); `label` is Onshape's ("linear dimension",
+/// "radial dimension", "angular dimension", "datum").
+#[derive(Clone, Debug, PartialEq)]
+pub struct PmiPresentation {
+    pub label: String,
+    pub origin: [f64; 3],
+    pub normal: [f64; 3],
+    pub x: [f64; 3],
+    pub triangles: Vec<[f64; 3]>,
+    pub lines: Vec<[f64; 3]>,
 }
 
 /// A STEP file's semantic PMI as OCCT's XDE reads it back (an independent
@@ -335,25 +364,22 @@ fn step_parts(shapes: &[ExportShape], unit: LengthUnit, opts: &StepOptions) -> R
         }
         crate::step_out::Occt::parse(&text?)
     };
+    // MBD: AP242 only (AP214 / AP203 carry none, live 1746), written by the
+    // layout rewrite (step_out.rs).
     let pmi_of = |i: usize| opts.pmi.get(i).cloned().flatten().filter(|_| opts.schema != StepSchema::Ap214 && opts.schema != StepSchema::Ap203);
     let name_of = |i: usize| shapes[i].name.clone().filter(|n| !n.is_empty()).unwrap_or_else(|| format!("Part {}", i + 1));
     let mut parts: Vec<Option<crate::step_out::Part>> = (0..v.len()).map(|_| None).collect();
-    // The parts without model definitions in one OCCT call (a call per part
-    // cost 0.7 ms each: 1.4 s of 2.0 s writing 2000 parts), each its own
-    // product named by its index.
-    let plain: Vec<usize> = (0..v.len()).filter(|&i| pmi_of(i).is_none()).collect();
-    if !plain.is_empty() {
-        let tmp = tmp_file();
-        let shapes_l: Vec<Shape> = plain.iter().map(|&i| v[i].clone()).collect();
-        let tokens: Vec<String> = plain.iter().map(|i| format!("noshape-part-{i}")).collect();
-        let occt = read_back(&tmp, ck(ffi::write_step(&vec_to_list(&shapes_l), &tokens, &[], &[], path_str(&tmp)?, schema, file_unit)))?;
-        let sdrs = occt.sdrs_by_product();
-        for (&i, t) in plain.iter().zip(&tokens) {
-            // A shape OCCT merged with another (the same shape twice) is
-            // written on its own below.
-            if let Some(&sdr) = sdrs.get(t) {
-                parts[i] = Some(crate::step_out::Part { name: name_of(i), color: shapes[i].color, occt: occt.clone(), sdr, pmi: false });
-            }
+    // All parts in one OCCT call (a call per part cost 0.7 ms each: 1.4 s of
+    // 2.0 s writing 2000 parts), each its own product named by its index.
+    let tmp = tmp_file();
+    let tokens: Vec<String> = (0..v.len()).map(|i| format!("noshape-part-{i}")).collect();
+    let occt = read_back(&tmp, ck(ffi::write_step(&vec_to_list(&v), &tokens, &[], &[], path_str(&tmp)?, schema, file_unit)))?;
+    let sdrs = occt.sdrs_by_product();
+    for (i, t) in tokens.iter().enumerate() {
+        // A shape OCCT merged with another (the same shape twice) is written
+        // on its own below.
+        if let Some(&sdr) = sdrs.get(t) {
+            parts[i] = Some(crate::step_out::Part { name: name_of(i), color: shapes[i].color, occt: occt.clone(), sdr, pmi: pmi_of(i) });
         }
     }
     for (i, sh) in v.iter().enumerate() {
@@ -361,49 +387,9 @@ fn step_parts(shapes: &[ExportShape], unit: LengthUnit, opts: &StepOptions) -> R
             continue;
         }
         let tmp = tmp_file();
-        // The part's MBD in the file's unit (OCCT writes the values as given)
-        // and degrees.
-        let pmi = pmi_of(i);
-        let has_pmi = pmi.is_some();
-        let written = match pmi {
-            Some(p) => {
-                let per_unit = match file_unit {
-                    1 => 0.0254,
-                    2 => 0.001,
-                    4 => 0.3048,
-                    10 => 0.01,
-                    100 => 0.9144,
-                    _ => 1.0,
-                };
-                let mm = |v: f64, k: PmiKind| if k == PmiKind::Angle { v.to_degrees() } else { v / per_unit };
-                let pmi = ffi::StepPmi {
-                    datums: p.datums.iter().map(|(f, n)| ffi::PmiDatum { faces: f.clone(), name: n.clone() }).collect(),
-                    dims: p
-                        .dims
-                        .iter()
-                        .map(|d| ffi::PmiDim {
-                            kind: match d.kind {
-                                PmiKind::Distance => 0,
-                                PmiKind::Angle => 1,
-                                PmiKind::Radius => 2,
-                                PmiKind::Diameter => 3,
-                            },
-                            a: d.a.clone(),
-                            b: d.b.clone(),
-                            value: mm(d.value, d.kind),
-                            lower: d.tolerance.map_or(0.0, |t| mm(t.0, d.kind)),
-                            upper: d.tolerance.map_or(0.0, |t| mm(t.1, d.kind)),
-                            toleranced: d.tolerance.is_some(),
-                        })
-                        .collect(),
-                };
-                ck(ffi::write_step_pmi(&vec_to_list(std::slice::from_ref(sh)), &[], &[], &[], path_str(&tmp)?, schema, file_unit, &pmi))
-            }
-            None => ck(ffi::write_step(&vec_to_list(std::slice::from_ref(sh)), &[], &[], &[], path_str(&tmp)?, schema, file_unit)),
-        };
-        let occt = read_back(&tmp, written)?;
+        let occt = read_back(&tmp, ck(ffi::write_step(&vec_to_list(std::slice::from_ref(sh)), &[], &[], &[], path_str(&tmp)?, schema, file_unit)))?;
         let sdr = occt.sdr()?;
-        parts[i] = Some(crate::step_out::Part { name: name_of(i), color: shapes[i].color, occt, sdr, pmi: has_pmi });
+        parts[i] = Some(crate::step_out::Part { name: name_of(i), color: shapes[i].color, occt, sdr, pmi: pmi_of(i) });
     }
     Ok(parts.into_iter().flatten().collect())
 }

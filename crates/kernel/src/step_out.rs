@@ -388,8 +388,8 @@ pub(crate) struct Part {
     pub color: Option<[f32; 3]>,
     pub occt: Rc<Occt>,
     pub sdr: u32,
-    /// Written with its model definitions (AP242 PMI, in its own text).
-    pub pmi: bool,
+    /// Its model definitions (AP242 only).
+    pub pmi: Option<crate::io::PartPmi>,
 }
 
 /// The application protocol, with Onshape's header and context strings for it
@@ -430,11 +430,20 @@ impl Schema {
 #[derive(Default)]
 struct Builder {
     ents: Vec<Ent>,
+    /// Entities numbered after the grouped ones, in creation order (MBD,
+    /// as Onshape appends it).
+    tail: Vec<bool>,
 }
 
 impl Builder {
     fn add(&mut self, e: Ent) -> u32 {
         self.ents.push(e);
+        self.tail.push(false);
+        (self.ents.len() - 1) as u32
+    }
+    fn add_tail(&mut self, e: Ent) -> u32 {
+        self.ents.push(e);
+        self.tail.push(true);
         (self.ents.len() - 1) as u32
     }
     fn reserve(&mut self) -> u32 {
@@ -525,28 +534,6 @@ impl Copier<'_> {
     }
 }
 
-/// The semantic PMI entities copied from OCCT's output (with what they
-/// reference): datum features and datums, shape aspects on faces,
-/// dimensions with their values, tolerances.
-const PMI_TYPES: &[&str] = &[
-    "DATUM_FEATURE",
-    "DATUM",
-    "DATUM_TARGET",
-    "DATUM_SYSTEM",
-    "DATUM_REFERENCE_COMPARTMENT",
-    "SHAPE_ASPECT",
-    "SHAPE_ASPECT_RELATIONSHIP",
-    "GEOMETRIC_ITEM_SPECIFIC_USAGE",
-    "DIMENSIONAL_SIZE",
-    "ANGULAR_SIZE",
-    "DIMENSIONAL_LOCATION",
-    "ANGULAR_LOCATION",
-    "DIMENSIONAL_CHARACTERISTIC_REPRESENTATION",
-    "PLUS_MINUS_TOLERANCE",
-    "LIMITS_AND_FITS",
-    "TOLERANCE_ZONE",
-    "GEOMETRIC_TOLERANCE",
-];
 
 /// The uncertainty OCCT wrote in a representation context: its shape's
 /// greatest tolerance (the writer's Greatest precision mode), in the file's
@@ -681,20 +668,13 @@ pub(crate) fn write(parts: &[Part], file_name: &str, timestamp: &str, schema: Sc
         if let Some(m) = mdgpr {
             b.set(m, Ent::simple("MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION", vec![s(""), list(&styled), V::Ref(ctx)]));
         }
-        // AP242 semantic PMI (CAx-IF recommended practices for PMI
-        // representation, as OCCT's XDE writes it): datums, dimensions and
-        // tolerances, moved onto this product, representation and faces.
-        if schema == Schema::Ap242 && part.pmi {
-            if let Some(V::Ref(src_pds)) = sdr.args().first() {
-                cp.map.insert(*src_pds, pds);
-            }
-            cp.map.insert(*rep_id, absr);
-            cp.map.insert(*ctx_id, ctx);
-            let mut roots: Vec<u32> = src.iter().filter(|(id, e)| !cp.map.contains_key(id) && PMI_TYPES.iter().any(|t| e.recs.iter().any(|r| r.0 == *t))).map(|(id, _)| *id).collect();
-            roots.sort_unstable();
-            for r in roots {
-                cp.visit(&mut b, r, &mut |_, _| {})?;
-            }
+        // AP242 MBD (live 1746): semantic PMI on this product's faces, with
+        // its tessellated presentation.
+        if schema == Schema::Ap242
+            && let Some(pmi) = &part.pmi
+        {
+            let faces: Vec<u32> = items.iter().flat_map(|&it| face_order(src, it)).filter_map(|f| cp.map.get(&f).copied()).collect();
+            write_pmi(&mut b, pmi, &Pmi { pds, absr, ctx, solids: &solids, faces: &faces, metres });
         }
         last = Some((pds, ctx));
     }
@@ -711,6 +691,187 @@ pub(crate) fn write(parts: &[Part], file_name: &str, timestamp: &str, schema: Sc
     }
 
     Ok(numbered(&b, file_name, timestamp, schema))
+}
+
+/// A solid's faces in OCCT's order (its shells', the outer first): the
+/// order of `TopExp::MapShapes`, which PMI face indices use.
+fn face_order(src: &HashMap<u32, Ent>, item: u32) -> Vec<u32> {
+    let refs_of = |v: Option<&V>| -> Vec<u32> {
+        match v {
+            Some(V::List(l)) => l.iter().filter_map(|x| if let V::Ref(r) = x { Some(*r) } else { None }).collect(),
+            Some(V::Ref(r)) => vec![*r],
+            _ => Vec::new(),
+        }
+    };
+    let shell_faces = |id: u32| -> Vec<u32> {
+        let Some(e) = src.get(&id) else { return Vec::new() };
+        match e.ty() {
+            "ORIENTED_CLOSED_SHELL" | "ORIENTED_OPEN_SHELL" => refs_of(e.args().get(2)).into_iter().flat_map(|sh| src.get(&sh).map(|x| refs_of(x.args().get(1))).unwrap_or_default()).collect(),
+            _ => refs_of(e.args().get(1)),
+        }
+    };
+    let Some(e) = src.get(&item) else { return Vec::new() };
+    match e.ty() {
+        "MANIFOLD_SOLID_BREP" => refs_of(e.args().get(1)).into_iter().flat_map(shell_faces).collect(),
+        "BREP_WITH_VOIDS" => refs_of(e.args().get(1)).into_iter().chain(refs_of(e.args().get(2))).flat_map(shell_faces).collect(),
+        "SHELL_BASED_SURFACE_MODEL" => refs_of(e.args().get(1)).into_iter().flat_map(shell_faces).collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// Where a part's MBD goes: its product definition shape, B-rep
+/// representation and context, solids, faces (by 0-based index) and the
+/// file's metres per unit.
+struct Pmi<'a> {
+    pds: u32,
+    absr: u32,
+    ctx: u32,
+    solids: &'a [u32],
+    faces: &'a [u32],
+    metres: f64,
+}
+
+/// A part's MBD in Onshape's layout (live 1746, CAx-IF recommended practices
+/// for PMI representation and presentation): per datum DATUM, DATUM_FEATURE
+/// and its face; per dimension SHAPE_ASPECTs on its faces, the
+/// DIMENSIONAL_LOCATION / _SIZE or ANGULAR_LOCATION with its value (mm or
+/// degrees, with its precision) and PLUS_MINUS_TOLERANCE; each drawn as a
+/// DRAUGHTING_CALLOUT of tessellated text, arrowheads and lines in its
+/// ANNOTATION_PLANE, all in one DRAUGHTING_MODEL.
+fn write_pmi(b: &mut Builder, pmi: &crate::io::PartPmi, at: &Pmi) {
+    use crate::io::PmiKind;
+    let mut model_items: Vec<u32> = Vec::new();
+    let mut model: Option<u32> = None;
+    // An aspect on faces (1-based indices), each face by its own usage.
+    let aspect = |b: &mut Builder, name: &str, faces: &[u32]| -> u32 {
+        let a = b.add_tail(Ent::simple("SHAPE_ASPECT", vec![s(name), V::Dollar, V::Ref(at.pds), V::Enum("T".into())]));
+        for f in faces.iter().filter_map(|&f| at.faces.get((f as usize).wrapping_sub(1))) {
+            b.add_tail(Ent::simple("GEOMETRIC_ITEM_SPECIFIC_USAGE", vec![s(""), s(""), V::Ref(a), V::Ref(at.absr), V::Ref(*f)]));
+        }
+        a
+    };
+    let mm = |b: &mut Builder| b.add_tail(Ent { recs: vec![("LENGTH_UNIT".into(), vec![]), ("NAMED_UNIT".into(), vec![V::Star]), ("SI_UNIT".into(), vec![V::Enum("MILLI".into()), V::Enum("METRE".into())])], complex: true });
+    let degree = |b: &mut Builder| {
+        let rad = b.add_tail(Ent { recs: vec![("NAMED_UNIT".into(), vec![V::Star]), ("PLANE_ANGLE_UNIT".into(), vec![]), ("SI_UNIT".into(), vec![V::Dollar, V::Enum("RADIAN".into())])], complex: true });
+        let factor = b.add_tail(Ent::simple("LENGTH_MEASURE_WITH_UNIT", vec![V::Typed("LENGTH_MEASURE".into(), vec![V::Real(180.0 / std::f64::consts::PI)]), V::Ref(rad)]));
+        b.add_tail(Ent { recs: vec![("CONVERSION_BASED_UNIT".into(), vec![s("degree"), V::Ref(factor)]), ("NAMED_UNIT".into(), vec![V::Dollar]), ("PLANE_ANGLE_UNIT".into(), vec![])], complex: true })
+    };
+    for d in &pmi.datums {
+        let name = s(&format!("Datum {}", d.letter));
+        let datum = b.add_tail(Ent::simple("DATUM", vec![name.clone(), name, V::Ref(at.pds), V::Enum("F".into()), s(&d.letter)]));
+        let fname = s(&format!("Datum_feature {}", d.letter));
+        let feature = b.add_tail(Ent::simple("DATUM_FEATURE", vec![fname.clone(), fname, V::Ref(at.pds), V::Enum("T".into())]));
+        b.add_tail(Ent::simple("SHAPE_ASPECT_RELATIONSHIP", vec![s(""), s(""), V::Ref(feature), V::Ref(datum)]));
+        for f in d.faces.iter().filter_map(|&f| at.faces.get((f as usize).wrapping_sub(1))) {
+            b.add_tail(Ent::simple("GEOMETRIC_ITEM_SPECIFIC_USAGE", vec![s(""), s(""), V::Ref(feature), V::Ref(at.absr), V::Ref(*f)]));
+        }
+        if let Some(p) = &d.presentation {
+            let callout = present(b, at, p, &mut model_items, &mut model);
+            b.add_tail(Ent::simple("DRAUGHTING_MODEL_ITEM_ASSOCIATION", vec![s(""), s(""), V::Ref(feature), V::Ref(model.unwrap_or(0)), V::Ref(callout)]));
+        }
+    }
+    for d in &pmi.dims {
+        let angle = d.kind == PmiKind::Angle;
+        let (dim, aspects) = match d.kind {
+            PmiKind::Radius | PmiKind::Diameter => {
+                let a = aspect(b, &d.name, &d.a);
+                let what = if d.kind == PmiKind::Radius { "radius" } else { "diameter" };
+                (b.add_tail(Ent::simple("DIMENSIONAL_SIZE", vec![V::Ref(a), s(what)])), vec![a])
+            }
+            _ => {
+                let a = aspect(b, &d.name, &d.a);
+                let c = aspect(b, &d.name, &d.b);
+                let e = match d.kind {
+                    PmiKind::Angle => Ent::simple("ANGULAR_LOCATION", vec![s("angle"), s(&d.name), V::Ref(a), V::Ref(c), V::Enum("EQUAL".into())]),
+                    PmiKind::AxisDistance => Ent::simple("DIMENSIONAL_LOCATION", vec![s("linear distance centre"), s(&d.name), V::Ref(a), V::Ref(c)]),
+                    _ => Ent::simple("DIMENSIONAL_LOCATION", vec![s("linear distance"), s(&d.name), V::Ref(a), V::Ref(c)]),
+                };
+                (b.add_tail(e), vec![a, c])
+            }
+        };
+        // Values in mm or degrees.
+        let shown = |v: f64| if angle { v.to_degrees() } else { v * 1000.0 };
+        if let Some((lower, upper)) = d.tolerance {
+            let (u, ty, measure) = if angle { (degree(b), "PLANE_ANGLE_MEASURE_WITH_UNIT", "PLANE_ANGLE_MEASURE") } else { (mm(b), "MEASURE_WITH_UNIT", "LENGTH_MEASURE") };
+            let l = b.add_tail(Ent::simple(ty, vec![V::Typed(measure.into(), vec![V::Real(shown(lower))]), V::Ref(u)]));
+            let h = b.add_tail(Ent::simple(ty, vec![V::Typed(measure.into(), vec![V::Real(shown(upper))]), V::Ref(u)]));
+            let tv = b.add_tail(Ent::simple("TOLERANCE_VALUE", vec![V::Ref(l), V::Ref(h)]));
+            b.add_tail(Ent::simple("PLUS_MINUS_TOLERANCE", vec![V::Ref(tv), V::Ref(dim)]));
+        }
+        let u = if angle { degree(b) } else { mm(b) };
+        let q = b.add_tail(Ent::simple("PRECISION_QUALIFIER", vec![V::Int(d.precision.to_string())]));
+        let value = if angle {
+            Ent { recs: vec![("MEASURE_REPRESENTATION_ITEM".into(), vec![]), ("MEASURE_WITH_UNIT".into(), vec![V::Typed("PLANE_ANGLE_MEASURE".into(), vec![V::Real(shown(d.value))]), V::Ref(u)]), ("PLANE_ANGLE_MEASURE_WITH_UNIT".into(), vec![]), ("QUALIFIED_REPRESENTATION_ITEM".into(), vec![list(&[q])]), ("REPRESENTATION_ITEM".into(), vec![s("nominal value")])], complex: true }
+        } else {
+            Ent { recs: vec![("LENGTH_MEASURE_WITH_UNIT".into(), vec![]), ("MEASURE_REPRESENTATION_ITEM".into(), vec![]), ("MEASURE_WITH_UNIT".into(), vec![V::Typed("POSITIVE_LENGTH_MEASURE".into(), vec![V::Real(shown(d.value))]), V::Ref(u)]), ("QUALIFIED_REPRESENTATION_ITEM".into(), vec![list(&[q])]), ("REPRESENTATION_ITEM".into(), vec![s("nominal value")])], complex: true }
+        };
+        let value = b.add_tail(value);
+        let sdr = b.add_tail(Ent::simple("SHAPE_DIMENSION_REPRESENTATION", vec![s(""), list(&[value]), V::Ref(at.ctx)]));
+        b.add_tail(Ent::simple("DIMENSIONAL_CHARACTERISTIC_REPRESENTATION", vec![V::Ref(dim), V::Ref(sdr)]));
+        if let Some(p) = &d.presentation {
+            let callout = present(b, at, p, &mut model_items, &mut model);
+            for item in aspects.iter().chain(std::iter::once(&dim)) {
+                b.add_tail(Ent::simple("DRAUGHTING_MODEL_ITEM_ASSOCIATION", vec![s(""), s(""), V::Ref(*item), V::Ref(model.unwrap_or(0)), V::Ref(callout)]));
+            }
+        }
+    }
+    if let Some(m) = model {
+        b.set(m, Ent::simple("DRAUGHTING_MODEL", vec![s(""), list(&model_items), V::Ref(at.ctx)]));
+    }
+}
+
+/// An annotation's callout and its plane (live 1746's layout); its items go
+/// into the part's DRAUGHTING_MODEL (`model`, made at the first).
+fn present(b: &mut Builder, at: &Pmi, p: &crate::io::PmiPresentation, model_items: &mut Vec<u32>, model: &mut Option<u32>) -> u32 {
+    let null_style = |b: &mut Builder| b.add_tail(Ent::simple("PRESENTATION_STYLE_ASSIGNMENT", vec![V::List(vec![V::Typed("NULL_STYLE".into(), vec![V::Enum("NULL".into())])])]));
+    let point = |p: [f64; 3], scale: f64| V::List(p.iter().map(|x| V::Real(x / scale)).collect());
+    let style = null_style(b);
+    let o = b.add_tail(Ent::simple("CARTESIAN_POINT", vec![s(""), point(p.origin, at.metres)]));
+    let z = b.add_tail(Ent::simple("DIRECTION", vec![s(""), point(p.normal, 1.0)]));
+    let x = b.add_tail(Ent::simple("DIRECTION", vec![s(""), point(p.x, 1.0)]));
+    let ax = b.add_tail(Ent::simple("AXIS2_PLACEMENT_3D", vec![s(""), V::Ref(o), V::Ref(z), V::Ref(x)]));
+    let plane = b.add_tail(Ent::simple("PLANE", vec![s(""), V::Ref(ax)]));
+    let ap = b.add_tail(Ent::simple("", vec![]));
+    let identity = |b: &mut Builder| {
+        let o = b.add_tail(Ent::simple("CARTESIAN_POINT", vec![s(""), V::List(vec![V::Real(0.0); 3])]));
+        let z = b.add_tail(Ent::simple("DIRECTION", vec![s(""), V::List(vec![V::Real(0.0), V::Real(0.0), V::Real(1.0)])]));
+        let x = b.add_tail(Ent::simple("DIRECTION", vec![s(""), V::List(vec![V::Real(1.0), V::Real(0.0), V::Real(0.0)])]));
+        b.add_tail(Ent::simple("AXIS2_PLACEMENT_3D", vec![s(""), V::Ref(o), V::Ref(z), V::Ref(x)]))
+    };
+    let (ax1, ax2) = (identity(b), identity(b));
+    let items: Vec<V> = std::iter::once(V::Ref(ax2)).chain(at.solids.iter().map(|&i| V::Ref(i))).collect();
+    let sr = b.add_tail(Ent::simple("SHAPE_REPRESENTATION", vec![s(""), V::List(items), V::Ref(at.ctx)]));
+    let map = b.add_tail(Ent::simple("REPRESENTATION_MAP", vec![V::Ref(ax1), V::Ref(sr)]));
+    let mapped = b.add_tail(Ent::simple("MAPPED_ITEM", vec![s(""), V::Ref(map), V::Ref(ax1)]));
+    let null = null_style(b);
+    let styled = b.add_tail(Ent::simple("STYLED_ITEM", vec![s(""), list(&[null]), V::Ref(mapped)]));
+    model_items.extend([ap, ax1, mapped, styled]);
+    if model.is_none() {
+        *model = Some(b.add_tail(Ent::simple("", vec![])));
+    }
+    let font = b.add_tail(Ent::simple("DRAUGHTING_PRE_DEFINED_CURVE_FONT", vec![s("continuous")]));
+    let black = b.add_tail(Ent::simple("COLOUR_RGB", vec![s(""), V::Real(0.0), V::Real(0.0), V::Real(0.0)]));
+    let curve = b.add_tail(Ent::simple("CURVE_STYLE", vec![s(""), V::Ref(font), V::Typed("POSITIVE_LENGTH_MEASURE".into(), vec![V::Real(0.02)]), V::Ref(black)]));
+    let line_style = b.add_tail(Ent::simple("PRESENTATION_STYLE_ASSIGNMENT", vec![list(&[curve])]));
+    let coords = |b: &mut Builder, pts: &[[f64; 3]]| b.add_tail(Ent::simple("COORDINATES_LIST", vec![s("coordinates"), V::Int(pts.len().to_string()), V::List(pts.iter().map(|q| point(*q, at.metres)).collect())]));
+    let mut occurrences = Vec::new();
+    if p.triangles.len() >= 3 {
+        let c = coords(b, &p.triangles);
+        let n = p.triangles.len() / 3;
+        let tris = V::List((0..n).map(|k| V::List((1..=3).map(|j| V::Int((3 * k + j).to_string())).collect())).collect());
+        let set = b.add_tail(Ent::simple("COMPLEX_TRIANGULATED_SURFACE_SET", vec![s("surface set"), V::Ref(c), V::Int(p.triangles.len().to_string()), V::List(vec![]), V::List(vec![]), V::List(vec![]), tris]));
+        occurrences.push(b.add_tail(Ent::simple("TESSELLATED_GEOMETRIC_SET", vec![s(&p.label), list(&[set])])));
+    }
+    if p.lines.len() >= 2 {
+        let c = coords(b, &p.lines);
+        let segs = V::List((0..p.lines.len() / 2).map(|k| V::List(vec![V::Int((2 * k + 1).to_string()), V::Int((2 * k + 2).to_string())])).collect());
+        let set = b.add_tail(Ent::simple("TESSELLATED_CURVE_SET", vec![s("curve set"), V::Ref(c), segs]));
+        occurrences.push(b.add_tail(Ent::simple("TESSELLATED_GEOMETRIC_SET", vec![s(&p.label), list(&[set])])));
+    }
+    let occurrences: Vec<u32> = occurrences.into_iter().map(|g| b.add_tail(Ent::simple("TESSELLATED_ANNOTATION_OCCURRENCE", vec![s(&p.label), list(&[line_style]), V::Ref(g)]))).collect();
+    let callout = b.add_tail(Ent::simple("DRAUGHTING_CALLOUT", vec![s(&p.label), list(&occurrences)]));
+    b.set(ap, Ent::simple("ANNOTATION_PLANE", vec![s(""), list(&[style]), V::Ref(plane), list(&[callout])]));
+    callout
 }
 
 /// One placed part of an assembly: the index of its part and its placement
@@ -936,8 +1097,9 @@ fn numbered(b: &Builder, file_name: &str, timestamp: &str, schema: Schema) -> St
     for (i, k) in keys.iter().enumerate() {
         first.entry(k.as_str()).or_insert(i);
     }
-    let mut idx: Vec<usize> = (0..b.ents.len()).collect();
+    let mut idx: Vec<usize> = (0..b.ents.len()).filter(|&i| !b.tail[i]).collect();
     idx.sort_by_key(|&i| (std::cmp::Reverse(first[keys[i].as_str()]), i));
+    idx.extend((0..b.ents.len()).filter(|&i| b.tail[i]));
     let mut num = vec![0u32; b.ents.len()];
     for (n, &i) in idx.iter().enumerate() {
         num[i] = 10 + n as u32;

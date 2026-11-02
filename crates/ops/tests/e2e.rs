@@ -1428,8 +1428,10 @@ fn import_every_format() {
     }
 }
 
-/// Export Resolution › Custom (audit X2): STL's chordal tolerance and
-/// angular deviation drive the mesh (a finer one has more triangles).
+/// Export Resolution (audit X2, live 1745): STL's chordal tolerance and
+/// angular deviation drive the mesh (a finer one has more triangles); the
+/// presets are absolute (Medium = 0.12 mm / 6.25°, Custom's first values);
+/// STL's lengths are in its units.
 #[test]
 fn export_custom_resolution_drives_the_mesh() {
     let mut ctx = Ctx::new();
@@ -1445,8 +1447,16 @@ fn export_custom_resolution_drives_the_mesh() {
     let coarse = triangles(&mut ctx, "custom_coarse.stl", json!({ "chordal_tolerance": 1.0, "angular_deviation": 30 }));
     let fine = triangles(&mut ctx, "custom_fine.stl", json!({ "chordal_tolerance": 0.005, "angular_deviation": 2 }));
     assert!(fine > coarse * 2, "{fine} vs {coarse}");
-    let e = try_call(&mut ctx, "export_parts", json!({ "format": "STL", "file": scratch("bad.stl").to_str().unwrap(), "resolution": "Custom", "chordal_tolerance": -1 })).unwrap_err();
-    assert_eq!(e.param.as_deref(), Some("chordal_tolerance"), "{e:?}");
+    let medium = triangles(&mut ctx, "preset_medium.stl", json!({ "resolution": "Medium" }));
+    assert_eq!(triangles(&mut ctx, "custom_default.stl", json!({})), medium, "Custom starts at Medium's values");
+    assert_eq!(triangles(&mut ctx, "custom_medium.stl", json!({ "chordal_tolerance": 0.12, "angular_deviation": 6.25 })), medium);
+    assert!(triangles(&mut ctx, "preset_fine.stl", json!({ "resolution": "Fine" })) > medium);
+    // 0.12 mm in inches (and the file in inches).
+    assert_eq!(triangles(&mut ctx, "custom_inch.stl", json!({ "units": "Inch", "chordal_tolerance": 0.12 / 25.4, "angular_deviation": 6.25 })), medium);
+    for bad in [-1.0, 0.0] {
+        let e = try_call(&mut ctx, "export_parts", json!({ "format": "STL", "file": scratch("bad.stl").to_str().unwrap(), "resolution": "Custom", "chordal_tolerance": bad })).unwrap_err();
+        assert_eq!(e.param.as_deref(), Some("chordal_tolerance"), "{e:?}");
+    }
 }
 
 /// Import options: combine into one Part Studio, no file tabs, mesh units;
@@ -5541,9 +5551,21 @@ fn mbd_dimension_shows_in_the_drawing() {
     let step = scratch("mbd-pmi.step");
     call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "STEP", "file": step.to_str().unwrap() }));
     let pmi = noshape_kernel::read_step_pmi(&step).unwrap();
-    assert!(pmi.iter().any(|l| l == "dim 2 30 tol 0.1 0.1 faces 1+1"), "{pmi:?}");
+    // Between the holes' axes: a centre distance (type 0), as XDE reads
+    // live's own file (live 1746).
+    assert!(pmi.iter().any(|l| l == "dim 0 30 tol 0.1 0.1 faces 1+1"), "{pmi:?}");
     let text = std::fs::read_to_string(&step).unwrap();
-    assert!(text.contains("=DATUM_FEATURE(") && text.contains(",.F.,'A');"), "the datum");
+    assert!(text.contains("=DATUM_FEATURE('Datum_feature A',") && text.contains("=DATUM('Datum A','Datum A',"), "the datum");
+    assert!(text.contains("=DIMENSIONAL_LOCATION('linear distance centre',") && text.contains("=SHAPE_ASPECT('AXIS_DISTANCE."), "{text}");
+    // Drawn as live draws it: a callout of tessellated text, arrows and lines.
+    assert_eq!(text.matches("=DRAUGHTING_CALLOUT(").count(), 2, "the dimension and the datum");
+    assert!(text.contains("=TESSELLATED_ANNOTATION_OCCURRENCE('linear dimension',"));
+    // A custom text height scales only the text (live: ×1.25 at 5 mm).
+    let tall = scratch("mbd-pmi-5.step");
+    call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "STEP", "file": tall.to_str().unwrap(), "mbd_text_height": 5 }));
+    assert_ne!(std::fs::read_to_string(&tall).unwrap(), text);
+    let e = try_call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "STEP", "file": tall.to_str().unwrap(), "mbd_text_height": 60 })).unwrap_err();
+    assert_eq!(e.message, "Valid annotations text height in range from 0.0001 to 50 is required.", "{e:?}");
     let top = g["views"].as_array().unwrap().iter().find(|v| v["orientation"] == "top").expect("a Top view");
     assert_eq!(dims[0]["view"], top["id"], "{g}");
     // A second drawing without views: a Top view inserted later gets it.

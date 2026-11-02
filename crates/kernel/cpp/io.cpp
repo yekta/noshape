@@ -787,87 +787,16 @@ StepTree read_step_tree(rust::Str path)
 
 namespace
 {
-// MBD of the first part as XDE dimensions and datums on its faces (AP242
-// semantic PMI when written).
-void add_pmi(const occ::handle<TDocStd_Document>& doc, const occ::handle<XCAFDoc_ShapeTool>& st, const TDF_Label& part,
-             const TopoDS_Shape& s, const StepPmi& pmi)
-{
-  occ::handle<XCAFDoc_DimTolTool> dt = XCAFDoc_DocumentTool::DimTolTool(doc->Main());
-  ShapeIMap faces;
-  TopExp::MapShapes(s, TopAbs_FACE, faces);
-  auto labels = [&](const rust::Vec<uint32_t>& idx) {
-    NCollection_Sequence<TDF_Label> out;
-    for (uint32_t i : idx)
-      if (i >= 1 && (int)i <= faces.Extent())
-      {
-        TDF_Label l = st->AddSubShape(part, faces((int)i));
-        if (!l.IsNull())
-          out.Append(l);
-      }
-    return out;
-  };
-  for (const auto& d : pmi.datums)
-  {
-    NCollection_Sequence<TDF_Label> on = labels(d.faces);
-    if (on.IsEmpty())
-      continue;
-    TDF_Label                                l   = dt->AddDatum();
-    occ::handle<XCAFDoc_Datum>               a   = XCAFDoc_Datum::Set(l);
-    occ::handle<XCAFDimTolObjects_DatumObject> obj = new XCAFDimTolObjects_DatumObject();
-    obj->SetName(new TCollection_HAsciiString(std::string(d.name).c_str()));
-    a->SetObject(obj);
-    dt->SetDatum(on, l);
-  }
-  for (const auto& d : pmi.dims)
-  {
-    NCollection_Sequence<TDF_Label> first = labels(d.a), second = labels(d.b);
-    if (first.IsEmpty())
-      continue;
-    TDF_Label                                     l   = dt->AddDimension();
-    occ::handle<XCAFDoc_Dimension>                a   = XCAFDoc_Dimension::Set(l);
-    occ::handle<XCAFDimTolObjects_DimensionObject> obj = new XCAFDimTolObjects_DimensionObject();
-    switch (d.kind)
-    {
-      case 1:
-        obj->SetType(XCAFDimTolObjects_DimensionType_Location_Angular);
-        break;
-      case 2:
-        obj->SetType(XCAFDimTolObjects_DimensionType_Size_Radius);
-        break;
-      case 3:
-        obj->SetType(XCAFDimTolObjects_DimensionType_Size_Diameter);
-        break;
-      default:
-        obj->SetType(XCAFDimTolObjects_DimensionType_Location_LinearDistance);
-    }
-    obj->SetValue(d.value);
-    if (d.toleranced)
-    {
-      obj->SetLowerTolValue(d.lower);
-      obj->SetUpperTolValue(d.upper);
-    }
-    a->SetObject(obj);
-    dt->SetDimension(first, second, l);
-  }
-}
-
 void write_step_impl(const OcShapeList& shapes, rust::Slice<const rust::String> names,
                      rust::Slice<const float> colors, rust::Slice<const bool> has_color,
-                     rust::Str path, uint8_t schema, uint8_t file_unit, const StepPmi* pmi);
+                     rust::Str path, uint8_t schema, uint8_t file_unit);
 } // namespace
 
 void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names,
                 rust::Slice<const float> colors, rust::Slice<const bool> has_color,
                 rust::Str path, uint8_t schema, uint8_t file_unit)
 {
-  write_step_impl(shapes, names, colors, has_color, path, schema, file_unit, nullptr);
-}
-
-void write_step_pmi(const OcShapeList& shapes, rust::Slice<const rust::String> names,
-                    rust::Slice<const float> colors, rust::Slice<const bool> has_color,
-                    rust::Str path, uint8_t schema, uint8_t file_unit, const StepPmi& pmi)
-{
-  write_step_impl(shapes, names, colors, has_color, path, schema, file_unit, &pmi);
+  write_step_impl(shapes, names, colors, has_color, path, schema, file_unit);
 }
 
 rust::Vec<rust::String> read_step_pmi(rust::Str path)
@@ -995,7 +924,7 @@ namespace
 {
 void write_step_impl(const OcShapeList& shapes, rust::Slice<const rust::String> names,
                      rust::Slice<const float> colors, rust::Slice<const bool> has_color,
-                     rust::Str path, uint8_t schema, uint8_t file_unit, const StepPmi* pmi)
+                     rust::Str path, uint8_t schema, uint8_t file_unit)
 {
   const LockedSection locked_section_487;
   std::lock_guard<std::mutex> lock(xde_mutex());
@@ -1027,8 +956,6 @@ void write_step_impl(const OcShapeList& shapes, rust::Slice<const rust::String> 
       s = BRepBuilderAPI_Transform(s, third, true).Shape();
     s = compact_bspline_edges(s);
     TDF_Label l = st->AddShape(s, false);
-    if (pmi && i == 0)
-      add_pmi(doc, st, l, s, *pmi);
     if (i < names.size() && !names[i].empty())
     {
       std::string n(names[i].data(), names[i].size());
@@ -1043,7 +970,6 @@ void write_step_impl(const OcShapeList& shapes, rust::Slice<const rust::String> 
   STEPCAFControl_Writer w;
   w.SetColorMode(true);
   w.SetNameMode(true);
-  w.SetDimTolMode(pmi != nullptr);
   // Shapes are in millimetres here (see io.rs); the file unit and schema are the user's.
   DESTEP_Parameters params;
   params.InitFromStatic();

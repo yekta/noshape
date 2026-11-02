@@ -1057,13 +1057,18 @@ fn pvz_of_a_hole_cut_by_the_rust_boolean() {
     let _ = std::fs::remove_file(&path);
 }
 
-/// MBD in STEP AP242 as semantic PMI (CAx-IF recommended practices), read
-/// back by an independent reader (OCCT's XDE): a datum on a face and a
-/// toleranced distance between two faces of a 10 × 20 × 30 mm block.
+/// MBD in STEP AP242 as Onshape writes it (live 1746, CAx-IF practices),
+/// read back by an independent reader (OCCT's XDE): a datum on a face and a
+/// toleranced distance between two faces of a 10 × 20 × 30 mm block, each
+/// with its tessellated presentation.
 #[test]
 fn step_ap242_pmi_round_trips() {
     let block = make_box_corners(DVec3::ZERO, DVec3::new(0.01, 0.02, 0.03)).unwrap();
-    let pmi = PartPmi { datums: vec![(vec![5], "A".into())], dims: vec![PmiDimension { kind: PmiKind::Distance, a: vec![1], b: vec![2], value: 0.01, tolerance: Some((-0.0001, 0.0001)) }] };
+    let look = |label: &str| Some(PmiPresentation { label: label.into(), origin: [0.005, 0.01, 0.03], normal: [0.0, 0.0, 1.0], x: [1.0, 0.0, 0.0], triangles: vec![[0.0, 0.0, 0.03], [0.002, 0.0, 0.03], [0.001, 0.001, 0.03]], lines: vec![[0.0, 0.0, 0.03], [0.01, 0.0, 0.03]] });
+    let pmi = PartPmi {
+        datums: vec![PmiDatum { faces: vec![5], letter: "A".into(), presentation: look("datum") }],
+        dims: vec![PmiDimension { kind: PmiKind::Distance, a: vec![1], b: vec![2], value: 0.01, tolerance: Some((-0.0001, 0.0001)), name: "DISTANCE.1".into(), precision: 3, presentation: look("linear dimension") }],
+    };
     let dir = std::env::temp_dir().join(format!("noshape-pmi-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("pmi block.step");
@@ -1071,21 +1076,40 @@ fn step_ap242_pmi_round_trips() {
     let lines = read_step_pmi(&path).unwrap();
     let text = std::fs::read_to_string(&path).unwrap();
     // The distance as XDE reads it: a linear distance (type 2) of 10 mm
-    // between one face and another, ±0.1 (OCCT keeps the lower deviation's
+    // between one face and another, ±0.1 (XDE keeps the lower deviation's
     // size).
     let dim = lines.iter().find(|l| l.starts_with("dim ")).unwrap_or_else(|| panic!("{lines:?}\n{text}"));
     assert_eq!(dim, "dim 2 10 tol 0.1 0.1 faces 1+1");
-    for e in ["DIMENSIONAL_LOCATION('linear distance'", "DIMENSIONAL_CHARACTERISTIC_REPRESENTATION(", "PLUS_MINUS_TOLERANCE(", "TOLERANCE_VALUE("] {
-        assert!(text.contains(e), "{e}");
+    for e in [
+        "=SHAPE_ASPECT('DISTANCE.1',$,",
+        "=DIMENSIONAL_LOCATION('linear distance','DISTANCE.1',",
+        "=MEASURE_WITH_UNIT(LENGTH_MEASURE(-0.1),",
+        "SI_UNIT(.MILLI.,.METRE.)",
+        "POSITIVE_LENGTH_MEASURE(10.)",
+        "=PRECISION_QUALIFIER(3);",
+        "=TESSELLATED_ANNOTATION_OCCURRENCE('linear dimension',",
+        "=DRAUGHTING_CALLOUT('linear dimension',",
+        "=COMPLEX_TRIANGULATED_SURFACE_SET('surface set',",
+        "=TESSELLATED_CURVE_SET('curve set',",
+        "=DATUM('Datum A','Datum A',",
+        "=DATUM_FEATURE('Datum_feature A','Datum_feature A',",
+        "=DRAUGHTING_CALLOUT('datum',",
+    ] {
+        assert!(text.contains(e), "{e}\n{text}");
     }
-    // XDE reads a datum only with a tolerance using it: its structure as the
-    // recommended practices have it, on one face of this product.
+    assert_eq!(text.matches("=DRAUGHTING_MODEL(").count(), 1);
+    assert_eq!(text.matches("=DRAUGHTING_MODEL_ITEM_ASSOCIATION(").count(), 4, "the datum feature; the dimension and its two aspects");
+    // The datum feature on one face of this product, related to its datum.
     let ids = |pat: &str| text.lines().filter(|l| l.contains(pat)).filter_map(|l| l.split('=').next()).map(str::to_string).collect::<Vec<_>>();
     let (feature, datum) = (ids("=DATUM_FEATURE("), ids("=DATUM('"));
-    assert_eq!((feature.len(), datum.len()), (1, 1), "{text}");
-    assert!(text.contains(&format!("=SHAPE_ASPECT_RELATIONSHIP('',$,{},{})", feature[0], datum[0])), "{text}");
+    assert!(text.contains(&format!("=SHAPE_ASPECT_RELATIONSHIP('','',{},{})", feature[0], datum[0])), "{text}");
     assert!(text.lines().any(|l| l.contains("=GEOMETRIC_ITEM_SPECIFIC_USAGE(") && l.contains(&format!(",{},", feature[0]))), "{text}");
-    assert!(text.contains(",.F.,'A');"), "{text}");
+    // AP214 carries none (live 1746).
+    let ap214 = dir.join("pmi block 214.step");
+    let block = make_box_corners(DVec3::ZERO, DVec3::new(0.01, 0.02, 0.03)).unwrap();
+    let pmi = PartPmi { datums: vec![PmiDatum { faces: vec![5], letter: "A".into(), presentation: None }], dims: Vec::new() };
+    write_step_with(&ap214, &[ExportShape { shape: block, name: Some("Block".into()), color: None }], LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap214, file_unit: None, pmi: vec![Some(pmi)] }).unwrap();
+    assert!(!std::fs::read_to_string(&ap214).unwrap().contains("DATUM"));
 }
 
 /// Debug aid: the PMI OCCT's XDE reads from `NOSHAPE_PMI_READ`.
