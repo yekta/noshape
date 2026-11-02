@@ -921,9 +921,10 @@ pub(crate) fn run_ext(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget],
     let mut excluded: HashSet<ConstraintId> = HashSet::new();
     let mut conflicting: Vec<ConstraintId> = Vec::new();
     let mut attempt = 0;
-    if !opts.light.is_empty() && drag.is_empty() {
-        // First try to move `light` alone (everything else held); the
-        // weighted solve below then only analyses the result.
+    if !opts.light.is_empty() {
+        // First try to move `light` alone (everything else held; a drag's
+        // dimensioned geometry, `Sketch::drag_weights`); the weighted solve
+        // below then only analyses the result.
         let mut sys = System::build(sk, &excluded, drag);
         for i in sys.still_reps(sk, opts) {
             sys.p.fixed[i] = true;
@@ -1292,7 +1293,10 @@ impl Sketch {
     pub fn drag(&mut self, handles: &[(DragHandle, DVec2)]) -> SolveReport {
         // Well-posed drag steps converge in a few iterations; a step that
         // doesn't converge soon sits at a limit of the constraints.
-        let opts = SolveOptions { analyze: false, max_iterations: 8, ..SolveOptions::default() };
+        let mut opts = SolveOptions { analyze: false, max_iterations: 8, ..SolveOptions::default() };
+        let (light, still) = self.drag_weights(handles);
+        opts.light = light;
+        opts.still = still;
         let targets = self.drag_targets(handles);
         let start = self.clone();
         let report = run(self, &opts, &targets);
@@ -1342,6 +1346,40 @@ impl Sketch {
                 report
             }
         }
+    }
+
+    /// A drag's `light` / `still`: dimensioned curves (a Length, Radius or
+    /// Diameter of their own) hold their points, the rest takes the move
+    /// (live fuzz s3: a dimensioned line stays put while the arc and the
+    /// free line beside it change size). Empty when nothing is dimensioned.
+    fn drag_weights(&self, handles: &[(DragHandle, DVec2)]) -> (Vec<EntityId>, Vec<EntityId>) {
+        let dragged: Vec<EntityId> = handles.iter().map(|(h, _)| match *h {
+            DragHandle::Point(id) => id,
+            DragHandle::Entity { id, .. } => id,
+        }).collect();
+        let sized: HashSet<EntityId> = self.constraints().filter(|c| c.driving).filter_map(|c| match c.kind {
+            ConstraintKind::Length { curve, .. } | ConstraintKind::Radius { curve, .. } | ConstraintKind::Diameter { curve, .. } => Some(curve),
+            _ => None,
+        }).collect();
+        if sized.is_empty() {
+            return (Vec::new(), Vec::new());
+        }
+        let dimensioned = |e: EntityId| sized.contains(&e);
+        let (mut light, mut still) = (Vec::new(), Vec::new());
+        for e in self.entities().filter(|e| e.kind() != EntityKind::Point && !e.external) {
+            let pts = e.point_refs();
+            if dimensioned(e.id) && !dragged.contains(&e.id) && !pts.iter().any(|p| dragged.contains(p)) {
+                still.extend(pts.iter().copied());
+            } else {
+                light.push(e.id);
+            }
+        }
+        if still.is_empty() {
+            return (Vec::new(), Vec::new());
+        }
+        let held: HashSet<EntityId> = still.iter().copied().collect();
+        light.extend(self.entities().filter(|e| e.kind() == EntityKind::Point).map(|e| e.id).filter(|p| !held.contains(p)));
+        (light, still)
     }
 
     fn drag_targets(&self, handles: &[(DragHandle, DVec2)]) -> Vec<DragTarget> {

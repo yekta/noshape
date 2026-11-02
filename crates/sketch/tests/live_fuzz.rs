@@ -638,7 +638,12 @@ fn drag_differences(seed: u64, rich: bool, case: &Value, live: &Value) -> Vec<St
     let mut c = generate(seed, rich);
     c.sk.solve_with(&SolveOptions { constructive: true, ..Default::default() });
     let target = DVec2::new(to[0].as_f64().unwrap(), to[1].as_f64().unwrap()) * MM;
-    c.sk.drag(&[(DragHandle::Point(c.point(name)), target)]);
+    // In 25 pointer steps, as live's UI drag (and the editor's drags).
+    let from = c.sk.point(c.point(name)).unwrap();
+    for k in 1..=25 {
+        let at = from + (target - from) * (k as f64 / 25.0);
+        c.sk.drag(&[(DragHandle::Point(c.point(name)), at)]);
+    }
     let after = ours_points(&c);
     ld.iter()
         .filter(|(n, p)| after.get(*n).is_none_or(|o| (o[0] - p[0].as_f64().unwrap()).hypot(o[1] - p[1].as_f64().unwrap()) >= 1e-3))
