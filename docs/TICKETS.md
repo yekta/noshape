@@ -6,6 +6,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## From the user, 2026-11-02 (v0.4.19, macOS)
+- [ ] P1 VAR-AUTOCOMPLETE-ENTER (psui, user 11-02 23:30, v0.4.2x on macOS) in a dialog's number field, typing
+  `#wall` then Enter doesn't take the first match `#wall_thickness`; live highlights the first match as you type and
+  Enter inserts it. Reproduce side by side with live (which field, what Enter does in ours), fix, and make it the
+  first scenario of the interaction suite (docs/PARITY-SUITES.md).
 - [ ] MACOS-GUARD-LOCK (core, CI 41351354303 on agent/ci2 76a61696, macOS arm64 Test, once): the model tests' `all`
   ended with "noshape: the kernel crashed holding a lock; not recoverable" (SIGSEGV) in the custom-feature tests,
   just after `a_cancelled_custom_feature_stops_soon_and_the_studio_is_as_before`. In flight then:
