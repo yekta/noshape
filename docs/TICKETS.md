@@ -6,6 +6,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## From the user, 2026-11-02 (v0.4.19, macOS)
+- [x] P0 SHELL-VOIDS-WINDOWS (core, CI a8c535aa / 67e44bb7): `shell::a_void_waits_for_live` failed on Windows only.
+  Cause: the test switched the void gate on with `std::env::set_var`, which on Windows changes the process
+  environment but not the MSVC CRT's copy that the kernel's C++ `getenv` reads (taken at start-up); Linux / macOS
+  share one. The gate is now a switch (`noshape_kernel::set_shell_voids`, thread-local, NOSHAPE_SHELL_VOIDS read
+  once as its default) the C++ side asks through the bridge; the test uses it. Default (off) unchanged everywhere.
+  Same pattern, not failing today (owners note): kernel tests boolean_budget.rs / bool_patterns.rs (NOSHAPE_BOOLEAN_
+  MEMORY_MB, NOSHAPE_BOP_PARALLEL, NOSHAPE_KERNEL_PROFILE, NOSHAPE_BOOL_NO_SCALE), band_mesh.rs, rust_mesh.rs.
 - [x] verified 7b11ede71 (qa 11-02 00:52, qa-scratch/bin/splitnames.py: a Ø20 × 30 cylinder split by Right then Front into 4 quarters, Chamfer 0.8 mm of one quarter's x = 0 cut face: **v0.4.19 chamfers two parts** (Part 1 and Part 3, both 2331.1635 / 9 faces), **green 4a0fc474 only Part 1** (2331.1635 / 9; the other three 2356.1945 / 5)) P0 SPLIT-PIECE-NAMES (core): a revolved body split by two planes into 3 parts; Chamfer "Face of Split 1" (one
   face picked on one part, 0.8 mm, tangent propagation) chamfered the matching face of all three. Cause: OCCT's
   splitter leaves a cut face shared by the two pieces (one face in both solids), so both pieces' faces got one name and

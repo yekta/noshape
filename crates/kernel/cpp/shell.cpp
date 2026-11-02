@@ -2806,9 +2806,9 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   }
   if (outer < 0)
     return no("no face removed");
-  // Voids: built (each void's wall a solid of its own) only with NOSHAPE_SHELL_VOIDS until live says which of ours
-  // and the slabs' is Parasolid's (REQUESTS 11-02 04:00).
-  if (olds.size() > 1 && std::getenv("NOSHAPE_SHELL_VOIDS") == nullptr)
+  // Voids: built (each void's wall a solid of its own) only when switched on (set_shell_voids, NOSHAPE_SHELL_VOIDS)
+  // until live says which of ours and the slabs' is Parasolid's (REQUESTS 11-02 04:00).
+  if (olds.size() > 1 && !shell_voids_enabled())
     return no("a void (live asked)");
   old_shell = olds[(size_t)outer];
   Bnd_Box bb;
