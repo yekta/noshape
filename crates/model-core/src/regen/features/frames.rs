@@ -858,6 +858,21 @@ pub fn gusset(ev: &mut EvalCtx) -> FResult<()> {
             s0 = if ev.bool("shouldFlipAlignment") { s_al - th } else { s_al };
         }
         let base: Vec<DVec3> = pts.iter().map(|x| *x + e * (s0 + off)).collect();
+        // std's createMidpointManipulator / createLengthManipulator, on the last edge picked: the offset along the
+        // edge from the gusset's place before it, and the size from the plate's middle across to its far side.
+        if count == 0 {
+            use crate::display::FeatureManipulator as M;
+            let flip = ev.bool("shouldFlipOffset");
+            let mid = e * (th * 0.5);
+            ev.manipulators.push(("Offset manipulator".into(), M::Linear { base: m + e * (s0 + th * 0.5), direction: -e, offset: if flip { off.abs() } else { -off.abs() }, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: Some("offset".into()) }));
+            let (from, dir) = if ev.is("gussetType", "RECTANGLE") {
+                let c = if ev.bool("chamfer") { ev.length("chamferSize").unwrap_or(0.0) } else { 0.0 };
+                (base[0] + d1 * (len - c) * 0.5, d2)
+            } else {
+                (base[0], d1)
+            };
+            ev.manipulators.push(("Length manipulator".into(), M::Linear { base: from + mid, direction: dir, offset: len, min: 0.0, max: f64::INFINITY, secondary: false, primary: Some("length".into()) }));
+        }
         let wire = k::make_polyline(&base, true)?;
         let fshape = k::make_face_from_wire(&wire, true)?;
         let n_edges = fshape.count(ShapeType::Edge);
@@ -894,6 +909,8 @@ pub fn end_cap(ev: &mut EvalCtx) -> FResult<()> {
         let frame_plane = k::Plane::new(f.centroid()?, n, pl.unit_x());
         let wires = f.wires();
         let outer = outer_wire(&f).ok_or_else(|| fe("The face has no boundary"))?;
+        // Where the cap's side starts before its offset: a boundary edge's middle and the way out of the profile.
+        let mut side: Option<(DVec3, DVec3)> = None;
         let (profile_face, start_shift, dir) = match ptype.as_str() {
             "INTERNAL" => {
                 if wires.len() != 2 {
@@ -939,6 +956,15 @@ pub fn end_cap(ev: &mut EvalCtx) -> FResult<()> {
                     }
                     _ => k::make_face_from_wire(&outer, true)?,
                 };
+                if let Some(e) = fc.edges().first()
+                    && let Ok(info) = e.edge_info()
+                {
+                    let mid = (info.first_param + info.last_param) * 0.5;
+                    if let (Ok(q), Ok(tq)) = (e.point_at(mid), e.tangent_at(mid)) {
+                        let out = tq.cross(n).normalize_or_zero();
+                        side = Some((q, if (q - frame_plane.origin).dot(out) < 0.0 { -out } else { out }));
+                    }
+                }
                 let off = ev.length("offsetDistance").unwrap_or(0.0);
                 if off > 1e-12 {
                     let d = if ev.bool("offsetDirection") { -off } else { off };
@@ -949,6 +975,23 @@ pub fn end_cap(ev: &mut EvalCtx) -> FResult<()> {
                 (fc, DVec3::ZERO, dir)
             }
         };
+        // std's manipulators, on the first face: the thickness from the end face (positive: Opposite direction's
+        // side), the side's offset (positive: inward), or an internal cap's inset.
+        if count == 0 {
+            use crate::display::FeatureManipulator as M;
+            let lin = |base: DVec3, direction: DVec3, offset: f64, min: f64, primary: &str| M::Linear { base, direction, offset, min, max: f64::INFINITY, secondary: false, primary: Some(primary.into()) };
+            let origin = frame_plane.origin;
+            if ptype == "INTERNAL" {
+                ev.manipulators.push(("Inset manipulator".into(), lin(origin, -n, -start_shift.dot(n), 0.0, "internalShiftDistance")));
+            } else {
+                let flip = ev.bool("thicknessDirection");
+                ev.manipulators.push(("Thickness manipulator".into(), lin(origin, -n, if flip { t } else { -t }, f64::NEG_INFINITY, "thickness")));
+                if let Some((q, out)) = side {
+                    let off = ev.length("offsetDistance").unwrap_or(0.0);
+                    ev.manipulators.push(("Offset manipulator".into(), lin(q + dir * t * 0.5, -out, if ev.bool("offsetDirection") { off } else { -off }, f64::NEG_INFINITY, "offsetDistance")));
+                }
+            }
+        }
         let pf = if start_shift.length() > 0.0 { profile_face.translated(start_shift)? } else { profile_face };
         let n_edges = pf.count(ShapeType::Edge);
         let frame = crate::display::PlaneFrame { origin: frame_plane.origin, x: frame_plane.unit_x(), y: frame_plane.unit_y(), normal: n };

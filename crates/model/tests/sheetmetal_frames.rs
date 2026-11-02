@@ -755,6 +755,77 @@ fn frame_rectangle_mitered_cut_list() {
     assert_eq!(s.last_status(), (FeatureStatus::Error, "Select a single sketch feature. The selected feature must create sketch regions.".to_string()));
 }
 
+/// Gusset's manipulators as std's (audit-part-studio M15): in an L of SHS 40x40 butted at (200, 0), a 30 mm
+/// triangular gusset on the inner corner edge: the offset arrow along the edge from where the gusset sits, and the
+/// length arrow across the plate, 30 mm; dragging the length to 45 mm runs std's change function.
+#[test]
+fn gusset_manipulators_as_std() {
+    use noshape_model::display::FeatureManipulator as M;
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let ids = polyline(&mut sk, &[(0.0, 0.0), (200.0, 0.0), (200.0, 100.0)], false);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    frame_on(&mut s, sid, &ids, "SHS 40x40x3", "BUTT");
+    let r = s.ok();
+    let corner_edge = edge_at(&r, 1, DVec3::new(mm(180.0), mm(20.0), 0.0));
+    let g = s.add("gusset", move |p| {
+        p.set("edges", ParamValue::Query(vec![corner_edge]));
+        p.set("length", expr("30 mm"));
+        p.set("thickness", expr("5 mm"));
+    });
+    let r = s.ok();
+    let m = &r.display.feature_state(g).expect("state").manipulators;
+    let Some((_, M::Linear { direction, offset, .. })) = m.iter().find(|(k, _)| k == "Offset manipulator") else { panic!("{m:?}") };
+    assert!(direction.z.abs() > 0.999 && offset.abs() < 1e-12, "along the vertical edge, no offset: {m:?}");
+    let Some((key, length @ M::Linear { offset, .. })) = m.iter().find(|(k, _)| k == "Length manipulator") else { panic!("{m:?}") };
+    assert!(near(*offset, mm(30.0), 1e-12), "{m:?}");
+    let mut moved = length.clone();
+    if let M::Linear { offset, .. } = &mut moved {
+        *offset = mm(45.0);
+    }
+    let f = s.ps.features.iter().find(|f| f.id == g).unwrap().clone();
+    let before = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions { upto: Some(s.ps.features.len() - 1), ..Default::default() }).context;
+    let changed = noshape_model::custom::std_feature::manipulator_change_in((*before).clone(), "gusset", f.id, &f.name, &s.units, &f.params, key, &moved).expect("std's change function ran");
+    let l = noshape_model::regen::eval::EvalCtx::new(f.id, "", &changed, &s.units, (*before).clone(), &std::collections::BTreeMap::new()).length("length").unwrap();
+    assert!(near(l, mm(45.0), 1e-9), "length {l}");
+}
+
+/// End cap's manipulators as std's (audit-part-studio M15): a 5 mm cap on the free end at the origin of an SHS
+/// 40x40 member: the thickness arrow from the end face, its tip on the cap's far face (x = -5 mm), and the side's
+/// offset arrow; dragging the thickness to 8 mm runs std's change function (8 mm, the same side).
+#[test]
+fn end_cap_manipulators_as_std() {
+    use noshape_model::display::FeatureManipulator as M;
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let ids = polyline(&mut sk, &[(0.0, 0.0), (200.0, 0.0)], false);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    frame_on(&mut s, sid, &ids, "SHS 40x40x3", "MITER");
+    let r = s.ok();
+    let end = face_at(&r, 0, DVec3::new(0.0, 0.0, 0.0));
+    let cap = s.add("endcap", move |p| {
+        p.set("faces", ParamValue::Query(vec![end]));
+        p.set("thickness", expr("5 mm"));
+    });
+    let r = s.ok();
+    let m = &r.display.feature_state(cap).expect("state").manipulators;
+    let Some((key, thick @ M::Linear { base, direction, offset, .. })) = m.iter().find(|(k, _)| k == "Thickness manipulator") else { panic!("{m:?}") };
+    let tip = *base + *direction * *offset;
+    assert!(near(tip.x, mm(-5.0), 1e-9), "the tip on the cap's far face: {m:?}");
+    assert!(m.iter().any(|(k, x)| k == "Offset manipulator" && matches!(x, M::Linear { offset, .. } if offset.abs() < 1e-12)), "{m:?}");
+    let mut moved = thick.clone();
+    if let M::Linear { offset, .. } = &mut moved {
+        *offset *= 8.0 / 5.0;
+    }
+    let f = s.ps.features.iter().find(|f| f.id == cap).unwrap().clone();
+    let before = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions { upto: Some(s.ps.features.len() - 1), ..Default::default() }).context;
+    let changed = noshape_model::custom::std_feature::manipulator_change_in((*before).clone(), "endcap", f.id, &f.name, &s.units, &f.params, key, &moved).expect("std's change function ran");
+    let vars = std::collections::BTreeMap::new();
+    let ev = noshape_model::regen::eval::EvalCtx::new(f.id, "", &changed, &s.units, (*before).clone(), &vars);
+    assert!(near(ev.length("thickness").unwrap(), mm(8.0), 1e-9), "{changed:?}");
+    assert!(!ev.bool("thicknessDirection"), "{changed:?}");
+}
+
 #[test]
 #[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn frame_butt_endcap_gusset_and_trim() {
