@@ -734,11 +734,13 @@ fn a_void_waits_for_live() {
     let s = cut(&bx([0.0; 3], [60.0, 40.0, 20.0]), &bx([20.0, 10.0, 6.0], [40.0, 30.0, 14.0])).unwrap().shape;
     assert_eq!(s.solids()[0].count(ShapeType::Shell), 2);
     let rm = top(&s, 20.0);
+    let before = set_shell_voids(Some(false));
     assert!(shell_solid(&s, &rm, 2.0, ShellSide::Inside, ShellMethod::Quadrics).is_err());
-    // SAFETY: this test alone sets the variable, and the kernel reads it per call.
-    unsafe { std::env::set_var("NOSHAPE_SHELL_VOIDS", "1") };
+    set_shell_voids(before);
+    // (The switch, not the environment: on Windows the kernel's C++ getenv never sees a set_var.)
+    let before = set_shell_voids(Some(true));
     let p = shell_solid(&s, &rm, 2.0, ShellSide::Inside, ShellMethod::Quadrics);
-    unsafe { std::env::remove_var("NOSHAPE_SHELL_VOIDS") };
+    set_shell_voids(before);
     let q = shell_solid(&s, &rm, 2.0, ShellSide::Inside, ShellMethod::Slabs).unwrap();
     let p = p.unwrap();
     eprintln!("void: ours {} ({} solids, {} faces), slabs {} ({} solids, {} faces)", vol(&p.shape), p.shape.solids().len(), p.shape.count(ShapeType::Face), vol(&q.shape), q.shape.solids().len(), q.shape.count(ShapeType::Face));
