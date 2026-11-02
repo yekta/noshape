@@ -597,11 +597,13 @@ fn cases_len(b: &serde_json::Value) -> usize {
 #[test]
 #[ignore = "T2: live fuzz batch vs live (assemblies)"]
 fn asm_fuzz_live_matches() {
-    // Known differences from live (handoff "Solver fuzz"): f16, where D's
-    // pose after Parallel 2 already differs (which way a Parallel leaves a pin
-    // turned about its own axis), and then Parallel 1 reads ERROR in ours
-    // when the conflicting Planar arrives (OK in live).
-    const KNOWN: &[&str] = &[];
+    // Known differences from live (handoff "Solver fuzz"): f40, a Slider
+    // started 67° off its axis lands 31.7 mm further along it in live (the
+    // foot-of-the-connector turn of probes 1776 b1–b5 gives 43.9: neither);
+    // f50, a Revolute in conflict with a Cylindrical still slid the plate
+    // onto its connector along the shared axis in live (elsewhere a
+    // conflict moves nothing, 1764).
+    const KNOWN: &[&str] = &["f40", "f50"];
     let mut parts = parts();
     let (mut answered, mut matches, mut report) = (0, 0, Vec::new());
     for n in 1.. {

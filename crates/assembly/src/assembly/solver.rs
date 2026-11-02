@@ -1200,9 +1200,8 @@ fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations
 /// Mates that align the Z axes only as lines (Revolute, Cylindrical, Pin
 /// slot, Planar, Parallel: their residual is Z's x and y, which an opposed Z
 /// meets too) start on the requested side: a moving body whose connector Z
-/// points the wrong way is turned 180° about its connector's X axis (live
-/// behaviours "qa4 round 5 s3 mate flip": Flip primary axis turns the pin
-/// over for Revolute, Cylindrical and Planar). Exactly opposed axes (any
+/// points the wrong way is turned the shortest way onto the alignment (fuzz
+/// f11, f43). Exactly opposed axes (Flip primary axis; any
 /// half-turn would do) turn as live does: about the world axis Z × w, Z the
 /// moving connector's axis, w the constant [`HALF_TURN_W`] (behaviours
 /// "skasm (2026-10-27): oracle_asm R3 rule for a flipped part": the part's
@@ -1232,7 +1231,10 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) -> Vec<us
         // the alignment as against it, so the solve would end either way
         // round (fuzz f11: a Parallel came out reversed). The moving part is
         // turned the shortest way onto the alignment first.
-        if z_rel > -1e-6 {
+        // So does one started more than a quarter turn off, short of an
+        // exact flip (fuzz f43: a block 153° off a Revolute's axis turns
+        // about the vertical and stays upright, not over about its X).
+        if z_rel > -1.0 + 1e-9 {
             let (fa, fb) = (poses[m.a].mul(&m.a_local), poses[m.b].mul(&m.b_local));
             let (za, zb) = (fa.rotation * DVec3::Z, fb.rotation * (base_rotation(m.flip_primary, m.reorient).inverse() * DVec3::Z));
             let (moving, c, turn) = if !bodies[m.a].fixed {
