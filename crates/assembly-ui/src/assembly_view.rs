@@ -187,6 +187,9 @@ struct DragState {
     explode: bool,
     /// Free drag of a part of a flexible subassembly (the subassembly's child).
     nested: Option<InstanceId>,
+    /// The target (and `value`) the last solve was started for: a repeated
+    /// pointer position isn't solved again.
+    solved: Option<(DVec3, f64)>,
 }
 
 /// Snap mode drag: a connector of one instance dragged onto another's.
@@ -2565,6 +2568,7 @@ impl AssemblyView {
                         triad_preview: None,
                         explode: self.explode_edit,
                         nested: None,
+                        solved: None,
                     });
                     return;
                 }
@@ -2627,6 +2631,7 @@ impl AssemblyView {
                     triad_preview: None,
                     explode: false,
                     nested,
+                    solved: None,
                 });
             }
             ViewportEvent::ToolDrag { position, .. } => {
@@ -2942,6 +2947,7 @@ impl AssemblyView {
             triad_preview: None,
             explode: false,
             nested: None,
+            solved: None,
         });
     }
 
@@ -3091,6 +3097,10 @@ impl AssemblyView {
     fn run_drag_solve(&mut self, cx: &mut Context<Self>) {
         let Some(d) = &mut self.drag else { return };
         let Some(target) = d.pending.take() else { return };
+        if d.solved == Some((target, d.value)) {
+            return;
+        }
+        d.solved = Some((target, d.value));
         d.busy = true;
         let prepared = self.result.prepared.clone();
         let start: HashMap<InstanceId, Placement> = self.result.solved.placements.iter().cloned().collect();
