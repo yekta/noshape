@@ -14,6 +14,15 @@
 set -eu
 W=/root/projects/noshape-wt/release; G="git -c user.name=yekta -c user.email=ngyekta@gmail.com"
 cd $W; git fetch -q origin --tags -f
+# qa's hold (11-02: v0.4.19 / v0.4.20 shipped a release-build crash past qa's HOLD): the newest "Release blockers" section
+# of docs/TICKETS.md on origin/main must not say HOLD in its first lines; FORCE=1 overrides (say why in the notes).
+qa_gate() {
+  git -C "$W" fetch -q origin main
+  local top; top=$(git -C "$W" show origin/main:docs/TICKETS.md | awk '/^## Release blockers/{n++} n==1' | head -6)
+  if echo "$top" | grep -q 'HOLD' && [ "${FORCE:-0}" != 1 ]; then
+    echo "qa says HOLD in the newest release blocker list:"; echo "$top" | cut -c1-200; echo "fix it first, or FORCE=1 with a reason"; exit 1
+  fi
+}
 case "$1" in
 branch)
   V=$2; S=$3; shift 3
@@ -37,6 +46,7 @@ P
   echo "pushed release/v$V at $(git rev-parse --short HEAD) (from $S, version $old -> $V)"
   git checkout -q --detach origin/main;;
 tag)
+  qa_gate
   V=$2; git checkout -q --detach origin/release/v$V
   git tag -f v$V; git push -q origin v$V
   echo "tagged v$V at $(git rev-parse --short HEAD); release.yml publishes"
