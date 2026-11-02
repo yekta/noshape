@@ -113,3 +113,59 @@ Connect run in the dialog, each row "installing…" then the path installed to o
 platform, runs on macOS CI too): agent_setup::tests (dialog open before any frame with a 30 s-sleeping `claude` on
 PATH, a never-answering check times out, the menu action opens the dialog: it failed without the deferral).
 
+
+## In-app updates (11-02)
+
+- **What a user sees.** At launch (after 3 s) and every 5 minutes the app asks GitHub's `releases/latest` with the
+  last answer's ETag (a 304 doesn't count against the 60-an-hour limit; the cache is `<config>/updates/feed.json`; a
+  403/429 waits as long as GitHub says). A newer release is downloaded in the background; a banner in a fixed slot
+  (the navbar's middle; on the documents page beside the account menu) says "Update available: v… — downloading n%",
+  then "Updated — restart to finish" with Restart and What's new (the release notes, a link to the release page).
+  Restart lists the open documents (`<config>/updates/reopen.json`), starts the helper and quits; the new version
+  starts with `--reopen <list>`. Preferences › Updates turns it off. Code: crates/update (no GUI), crates/app
+  `updates.rs`.
+- **Trust: keyless Sigstore, no signing key anywhere.** release.yml's `sign` job writes SHA256SUMS over every download
+  and signs it with `cosign sign-blob` (cosign 2.5.2) under the workflow's GitHub OIDC identity:
+  SHA256SUMS.sigstore.json (a Fulcio certificate, a Rekor v1 entry with its signed entry timestamp). The app
+  (crates/update `sigstore.rs`, a small verifier on webpki/ring against Sigstore's trust root embedded as
+  `src/trusted_root.json`) accepts only: a certificate chaining to Fulcio at the time Rekor logged it, for code signing,
+  whose only subject is exactly `https://github.com/yekta/noshape/.github/workflows/release.yml@refs/tags/<the
+  release's own tag>` with GitHub Actions' issuer; the signature over SHA256SUMS; Rekor's promise for this
+  certificate, signature and digest. Then the downloaded file must have its SHA256SUMS checksum, and on macOS the
+  unpacked app must satisfy the Developer ID requirement pinned to team 44R7KF7645 (`codesign --verify -R`). A release
+  without the bundle (older ones) only gets a Download link. Not checked: SCTs, the inclusion proof (cosign's offline
+  verification accepts the signed entry timestamp the same way).
+  - When Sigstore rotates its Fulcio CA or Rekor key, refresh `src/trusted_root.json` (update-test-fixtures.yml saves
+    the one cosign fetched through TUF). When cosign 2.x stops working (Rekor v1 retired), the verifier needs Rekor v2
+    (inclusion proof + checkpoint, a timestamp authority) before release.yml moves to cosign 3.
+- **Applying (crates/update `apply`, a helper script written next to the download, run after the app quits):** macOS
+  swaps noshape.app (the `.app.zip` asset; the system's password prompt when Applications isn't writable) and reopens
+  it with `open -n`; Windows installed runs the new setup.exe with `/VERYSILENT` (elevated; the install folder, its
+  PATH entry and agent connections stay); the portable zip copies noshape.exe and noshape.com over; Linux tar.gz
+  (install.sh) swaps the binary (pkexec when not writable); the .deb runs `pkexec apt-get install` (no pkexec: a
+  Download link).
+- **Tests.** crates/update/tests/update.rs (T1): real Sigstore fixtures (tests/fixtures, made by update-test-fixtures.yml
+  on a runner; `identity.txt` is that run's workflow identity) verify, and a changed SHA256SUMS, signature, digest,
+  certificate, signed entry timestamp or log time, another signer (a release tag's, a fork's, a prefix), a trust root
+  without the CA or the log are each refused; a local server stands in for GitHub (ETag, rate limit, download,
+  tampered download, wrong signer, missing bundle); the Linux helper swaps a binary. crates/app updates_tests: the
+  banner's phases draw; the reopen list is read once.
+- **The release dry run updates every install** (`.github/release/check_update.py` in release.yml's verify jobs, dry
+  runs only: a release build ignores the test feed): the installed app (Linux install.sh under Xvfb, macOS
+  /Applications, Windows installed and portable) started with a document and pointed at a local feed serving this
+  build as a test release (NOSHAPE_UPDATE_FEED / NOSHAPE_UPDATE_SELF_VERSION / NOSHAPE_UPDATE_TEST_IDENTITY /
+  NOSHAPE_UPDATE_AUTORESTART / NOSHAPE_UPDATE_LOG, all ignored by release builds) finds, downloads, verifies,
+  restarts, the helper swaps the install, and the new process reopens the document; then the same release with a
+  changed download and with another expected signer are refused. Not covered there: the .deb (pkexec needs a
+  desktop).
+
+## Apple signing (11-02)
+
+release.yml (macOS bundle job), from repo secrets: APPLE_CERT_P12 (Developer ID Application, base64) with
+APPLE_DEVID_CERT_PASSWORD imported into a temporary keychain (deleted at the end of the job, `always()`); the app
+signed with the hardened runtime and a timestamp, zipped and notarized with `notarytool` and the App Store Connect API
+key (ASC_KEY_P8 / ASC_KEY_ID / ASC_ISSUER_ID), stapled; the dmg signed, notarized and stapled too; the CLI-only binary
+signed. Without the certificate it falls back to the ad-hoc signature (a notice). Bundle ID `app.noshape.noshape`
+(packaging/macos/Info.plist). The App Store profiles (APPLE_MAC_APPSTORE_PROFILE, APPLE_IOS_APPSTORE_PROFILE) are only
+read to print their application identifier, team and expiry (a warning when they don't name the bundle ID). The
+verify job checks the signature's identifier, `spctl` and both staples.

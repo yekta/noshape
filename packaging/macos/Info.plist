@@ -7,7 +7,7 @@
   <key>CFBundleDisplayName</key>
   <string>noshape</string>
   <key>CFBundleIdentifier</key>
-  <string>com.github.yekta.noshape</string>
+  <string>app.noshape.noshape</string>
   <key>CFBundleIconFile</key>
   <string>noshape</string>
   <key>CFBundleExecutable</key>

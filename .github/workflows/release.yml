@@ -95,8 +95,83 @@ jobs:
         # noshape.com, the console launcher terminals run for `noshape`.
         run: cargo build --release --locked -p noshape -p noshape-cli -p noshape-launcher
 
+      # Apple signing (macOS), when the secrets exist (else the ad-hoc signature): the Developer ID Application
+      # certificate (APPLE_CERT_P12, base64; its password in APPLE_DEVID_CERT_PASSWORD, else APPLE_CERT_PASSWORD) in a
+      # temporary keychain deleted at the end of the job, and the App Store Connect API key (ASC_KEY_P8, base64) for
+      # notarization. Secret values are never printed (no `set -x` here).
+      - name: Apple signing identity (macOS)
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+          APPLE_DEVID_CERT_PASSWORD: ${{ secrets.APPLE_DEVID_CERT_PASSWORD }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          pass="${APPLE_DEVID_CERT_PASSWORD:-$APPLE_CERT_PASSWORD}"
+          if [ -z "$APPLE_CERT_P12" ] || [ -z "$pass" ]; then
+            echo "::notice::no Developer ID Application certificate (APPLE_CERT_P12 and its password): ad-hoc signature, not notarized"
+            exit 0
+          fi
+          kc="$RUNNER_TEMP/signing.keychain-db"; kcpw=$(openssl rand -hex 16)
+          echo "APPLE_KEYCHAIN=$kc" >> "$GITHUB_ENV"
+          ( umask 077; printf '%s' "$APPLE_CERT_P12" | base64 -d > "$RUNNER_TEMP/devid.p12" )
+          security create-keychain -p "$kcpw" "$kc"
+          security set-keychain-settings -lut 21600 "$kc"
+          security unlock-keychain -p "$kcpw" "$kc"
+          if ! security import "$RUNNER_TEMP/devid.p12" -k "$kc" -f pkcs12 -P "$pass" -T /usr/bin/codesign > /dev/null; then
+            rm -f "$RUNNER_TEMP/devid.p12"
+            echo "::error::APPLE_CERT_P12 didn't import (wrong password in APPLE_DEVID_CERT_PASSWORD / APPLE_CERT_PASSWORD?)"
+            exit 1
+          fi
+          rm -f "$RUNNER_TEMP/devid.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$kcpw" "$kc" > /dev/null
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          id=$(security find-identity -v -p codesigning "$kc" | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p' | head -1)
+          [ -n "$id" ] || { echo "::error::no Developer ID Application identity in APPLE_CERT_P12"; exit 1; }
+          case "$id" in *"(${APPLE_TEAM_ID:-?})") ;; *) echo "::error::the Developer ID certificate isn't team $APPLE_TEAM_ID's: $id"; exit 1 ;; esac
+          echo "Signing as: $id"
+          echo "APPLE_SIGN_ID=$id" >> "$GITHUB_ENV"
+          if [ -n "$ASC_KEY_P8" ] && [ -n "$ASC_KEY_ID" ] && [ -n "$ASC_ISSUER_ID" ]; then
+            ( umask 077; printf '%s' "$ASC_KEY_P8" | base64 -d > "$RUNNER_TEMP/AuthKey.p8" )
+            echo "ASC_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+          else
+            echo "::warning::no App Store Connect API key (ASC_KEY_P8, ASC_KEY_ID, ASC_ISSUER_ID): signed but not notarized"
+          fi
+
+      # The App Store provisioning profiles (for the later Mac App Store and iOS builds) must name the bundle ID in
+      # Info.plist: their application identifier, team and expiry are public, printed here and compared (a warning:
+      # this build doesn't use them).
+      - name: App Store profiles name the bundle ID (macOS)
+        if: runner.os == 'macOS'
+        env:
+          APPLE_MAC_APPSTORE_PROFILE: ${{ secrets.APPLE_MAC_APPSTORE_PROFILE }}
+          APPLE_IOS_APPSTORE_PROFILE: ${{ secrets.APPLE_IOS_APPSTORE_PROFILE }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' packaging/macos/Info.plist)
+          echo "Info.plist CFBundleIdentifier: $bundle_id"
+          check() { # <name> <base64 profile> <entitlement key>
+            [ -n "$2" ] || { echo "::notice::$1 profile not set"; return; }
+            printf '%s' "$2" | base64 -d > "$RUNNER_TEMP/p.provision"
+            security cms -D -i "$RUNNER_TEMP/p.provision" > "$RUNNER_TEMP/p.plist" 2> /dev/null || { echo "::warning::the $1 profile isn't a provisioning profile"; return; }
+            pb() { /usr/libexec/PlistBuddy -c "Print :$1" "$RUNNER_TEMP/p.plist" 2> /dev/null || true; }
+            appid=$(pb "Entitlements:$3"); team=$(pb 'TeamIdentifier:0')
+            echo "$1 profile \"$(pb Name)\": $3 = $appid, team $team, expires $(pb ExpirationDate)"
+            if [ "$appid" != "$team.$bundle_id" ]; then echo "::warning::the $1 profile is for $appid, Info.plist says $team.$bundle_id"; fi
+            if [ -n "$APPLE_TEAM_ID" ] && [ "$team" != "$APPLE_TEAM_ID" ]; then echo "::warning::the $1 profile is team $team's, APPLE_TEAM_ID is $APPLE_TEAM_ID"; fi
+            rm -f "$RUNNER_TEMP/p.provision" "$RUNNER_TEMP/p.plist"
+          }
+          check "Mac App Store" "$APPLE_MAC_APPSTORE_PROFILE" com.apple.application-identifier
+          check "iOS App Store" "$APPLE_IOS_APPSTORE_PROFILE" application-identifier
+
       - name: Bundle (macOS .app in .dmg)
         if: runner.os == 'macOS'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           mkdir -p out
           app=dist/noshape.app
@@ -107,13 +182,43 @@ jobs:
           sed "s/@VERSION@/$VERSION/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
           plutil -lint "$app/Contents/Info.plist"
           strip -x "$app/Contents/MacOS/noshape"
-          # Ad-hoc signature so Apple Silicon will launch it (not notarized).
-          codesign --force --deep --sign - "$app"
+          # Notarize what's given (a zip or a dmg) with the App Store Connect API key and wait for Apple's answer
+          # (Accepted, else Apple's log of what's wrong).
+          notarize() {
+            xcrun notarytool submit "$1" --key "$ASC_KEY_PATH" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" --wait \
+              --output-format json > "$RUNNER_TEMP/notary.json" || true
+            st=$(plutil -extract status raw -o - "$RUNNER_TEMP/notary.json" 2> /dev/null || echo "no answer")
+            echo "notarization of $(basename "$1"): $st"
+            if [ "$st" != Accepted ]; then
+              sid=$(plutil -extract id raw -o - "$RUNNER_TEMP/notary.json" 2> /dev/null) && \
+                xcrun notarytool log "$sid" --key "$ASC_KEY_PATH" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID"
+              return 1
+            fi
+          }
+          if [ -n "${APPLE_SIGN_ID:-}" ]; then
+            # Developer ID with the hardened runtime and a timestamp, notarized and stapled when the API key is set.
+            codesign --force --deep --options runtime --timestamp --sign "$APPLE_SIGN_ID" "$app"
+            if [ -n "${ASC_KEY_PATH:-}" ]; then
+              ditto -c -k --keepParent "$app" "$RUNNER_TEMP/notarize.zip"
+              notarize "$RUNNER_TEMP/notarize.zip"
+              xcrun stapler staple "$app"
+            fi
+          else
+            # Ad-hoc signature so Apple Silicon will launch it (not notarized).
+            codesign --force --deep --sign - "$app"
+          fi
+          # The app alone, for in-app updates (the bundle is swapped in place; a download inside the app has no
+          # quarantine flag).
+          ditto -c -k --keepParent "$app" "out/noshape-$VERSION-${{ matrix.asset }}.app.zip"
           ln -s /Applications dist/Applications
           # hdiutil underestimates the image size for large binaries; size it explicitly.
           size_mb=$(( $(du -sm dist | cut -f1) * 2 + 64 ))
-          hdiutil create -volname noshape -srcfolder dist -ov -fs HFS+ -size "${size_mb}m" -format UDZO \
-            "out/noshape-$VERSION-${{ matrix.asset }}.dmg"
+          dmg="out/noshape-$VERSION-${{ matrix.asset }}.dmg"
+          hdiutil create -volname noshape -srcfolder dist -ov -fs HFS+ -size "${size_mb}m" -format UDZO "$dmg"
+          if [ -n "${APPLE_SIGN_ID:-}" ]; then
+            codesign --force --timestamp --sign "$APPLE_SIGN_ID" "$dmg"
+            if [ -n "${ASC_KEY_PATH:-}" ]; then notarize "$dmg"; xcrun stapler staple "$dmg"; fi
+          fi
 
       - name: Bundle (Linux tar.gz and .deb)
         if: runner.os == 'Linux'
@@ -165,7 +270,8 @@ jobs:
               cp target/release/noshape-cli.exe "$c/"
               pwsh -NoProfile -Command "Compress-Archive -Path '$c' -DestinationPath 'out/$c.zip'" ;;
             macOS)
-              cp target/release/noshape-cli "$c/" && strip -x "$c/noshape-cli" && codesign --force --sign - "$c/noshape-cli"
+              cp target/release/noshape-cli "$c/" && strip -x "$c/noshape-cli"
+              if [ -n "${APPLE_SIGN_ID:-}" ]; then codesign --force --options runtime --timestamp --sign "$APPLE_SIGN_ID" "$c/noshape-cli"; else codesign --force --sign - "$c/noshape-cli"; fi
               tar czf "out/$c.tar.gz" "$c" ;;
             Linux)
               cp target/release/noshape-cli "$c/" && strip "$c/noshape-cli"
@@ -173,19 +279,69 @@ jobs:
           esac
           ls -la out
 
+      - name: Remove the signing keychain and the API key (macOS)
+        if: always() && runner.os == 'macOS'
+        run: |
+          if [ -n "${APPLE_KEYCHAIN:-}" ]; then security delete-keychain "$APPLE_KEYCHAIN" || true; fi
+          rm -f "$RUNNER_TEMP/AuthKey.p8" "$RUNNER_TEMP/devid.p12"
+
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.asset }}
           path: out/*
           if-no-files-found: error
 
+  # SHA256SUMS over every download, signed keyless with Sigstore: cosign signs it with this workflow's GitHub OIDC
+  # identity (a short-lived Fulcio certificate for ".../release.yml@refs/tags/v…", logged in Rekor) into
+  # SHA256SUMS.sigstore.json. There is no signing key anywhere. The app accepts an update only with a bundle for exactly
+  # release.yml at the release's own tag (crates/update sigstore.rs), and the file's line in SHA256SUMS. cosign stays
+  # on 2.x: its bundles carry Rekor v1's signed entry timestamp, which the app's verifier checks.
+  sign:
+    needs: bundle
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: '*-*64'
+          path: dist
+          merge-multiple: true
+      - uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v2.5.2
+      - name: Sign
+        run: |
+          cd dist
+          sha256sum -- * > SHA256SUMS
+          cat SHA256SUMS
+          cosign sign-blob --yes --new-bundle-format --bundle SHA256SUMS.sigstore.json SHA256SUMS
+          id="https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@$GITHUB_REF"
+          cosign verify-blob --new-bundle-format --bundle SHA256SUMS.sigstore.json --certificate-identity "$id" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com SHA256SUMS
+          mkdir ../sums && cp SHA256SUMS SHA256SUMS.sigstore.json ../sums/ && echo "$id" > ../sums/identity.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: signed
+          path: dist/*
+          if-no-files-found: error
+      # What the verify jobs need to check an update (without every platform's downloads).
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sums
+          path: sums/*
+          if-no-files-found: error
+
   # Every platform's downloads on a fresh runner: installed as a user would, then `noshape --version` and
-  # `noshape mcp` (initialize + tools/list over pipes) through the PATH entry the install made.
+  # `noshape mcp` (initialize + tools/list over pipes) through the PATH entry the install made, and each install
+  # updating itself to this build (.github/release/check_update.py: found, downloaded, verified against the signed
+  # SHA256SUMS, applied, relaunched with its document; a changed download and another signer refused).
   verify:
     name: Check ${{ matrix.name }}
-    needs: bundle
+    needs: [bundle, sign]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -207,6 +363,10 @@ jobs:
         with:
           name: ${{ matrix.asset }}
           path: dl
+      - uses: actions/download-artifact@v8
+        with:
+          name: sums
+          path: sums
 
       - name: Linux (CLI-only, .deb, install.sh)
         if: runner.os == 'Linux'
@@ -239,6 +399,13 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           test "$(command -v noshape)" = "$HOME/.local/bin/noshape"
           python3 $check noshape
+          # It updates itself (the binary swapped) under Xvfb with lavapipe. A dry run only: a release build ignores the
+          # test feed.
+          if [ "$GITHUB_REF_TYPE" != tag ]; then
+            sudo apt-get install -y -q --no-install-recommends xvfb mesa-vulkan-drivers libvulkan1 > /dev/null
+            xvfb-run -a -s "-screen 0 1280x800x24" python3 .github/release/check_update.py "$HOME/.local/bin/noshape" \
+              "$(ls dl/noshape-[0-9]*-linux-x86_64.tar.gz)" sums "$(cat sums/identity.txt)" --inode "$HOME/.local/bin/noshape"
+          fi
           # Uninstalling disconnects the agents from this binary (the fake leaves ~/.claude.json, so the file is edited).
           PATH="$RUNNER_TEMP/fake:$PATH" "$dir/install.sh" --uninstall
           test ! -e "$HOME/.local/bin/noshape"
@@ -256,7 +423,21 @@ jobs:
           hdiutil detach "$RUNNER_TEMP/dmg"
           test "$(ls /Applications/noshape.app/Contents/MacOS)" = noshape
           app=/Applications/noshape.app/Contents/MacOS/noshape
+          # The bundle ID, and a Developer ID build accepted by Gatekeeper with its notarization ticket stapled.
+          codesign -dv /Applications/noshape.app 2> "$RUNNER_TEMP/sig.txt"; cat "$RUNNER_TEMP/sig.txt"
+          grep -qx 'Identifier=app.noshape.noshape' "$RUNNER_TEMP/sig.txt"
+          codesign --verify --strict --deep /Applications/noshape.app
+          if codesign -dvv /Applications/noshape.app 2>&1 | grep -q '^Authority=Developer ID Application'; then
+            spctl -a -vv -t exec /Applications/noshape.app
+            xcrun stapler validate /Applications/noshape.app
+            xcrun stapler validate dl/noshape-*-macos-arm64.dmg
+          fi
           python3 $check "$app"
+          # It updates itself (the bundle swapped; the new one must carry the Developer ID signature). A dry run only.
+          if [ "$GITHUB_REF_TYPE" != tag ]; then
+            python3 .github/release/check_update.py "$app" "$(ls dl/noshape-*-macos-arm64.app.zip)" sums "$(cat sums/identity.txt)" \
+              --inode /Applications/noshape.app
+          fi
           # What Help › Install command line tool… does (the admin prompt aside): /usr/local/bin/noshape → the app.
           sudo mkdir -p /usr/local/bin && sudo chown "$(id -u)" /usr/local/bin
           "$app" cli install --dir /usr/local/bin
@@ -312,6 +493,16 @@ jobs:
           if (-not ((Get-Content "$env:RUNNER_TEMP\v.txt") -match '^noshape ')) { throw "cmd redirect: $(Get-Content "$env:RUNNER_TEMP\v.txt")" }
           $v = noshape --version | Out-String
           if ($v -notmatch '^noshape ') { throw "pipe: $v" }
+          # It updates itself (the new installer run silently; noshape.com, a stub first, is a real file again). A dry
+          # run only: a release build ignores the test feed.
+          $identity = (Get-Content sums\identity.txt -Raw).Trim()
+          if ($env:GITHUB_REF_TYPE -ne 'tag') {
+            python .github/release/check_update.py "$dir\noshape.exe" $setup sums $identity --stub "$dir\noshape.com"
+            if ($LASTEXITCODE -ne 0) { throw "installer update check failed" }
+            if (([Environment]::GetEnvironmentVariable('Path', 'User') -split ';') -notcontains $dir) { throw "the update lost the PATH entry" }
+            $cfg = Get-Content "$claude\claude_desktop_config.json" -Raw | ConvertFrom-Json
+            if ($cfg.mcpServers.noshape.command -ne "$dir\noshape.exe") { throw "the update disconnected Claude Desktop" }
+          }
           # Uninstall: the files and the PATH entry go.
           $u = Start-Process "$dir\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
           if ($u.ExitCode -ne 0) { throw "uninstall exit $($u.ExitCode)" }
@@ -323,22 +514,28 @@ jobs:
           if ($cfg.mcpServers.noshape) { throw "uninstall left Claude Desktop connected" }
           if ($cfg.mcpServers.other.command -ne 'other.exe') { throw "uninstall changed another server" }
           # The portable zip and the CLI-only download.
-          Expand-Archive (Get-ChildItem dl\noshape-[0-9]*-windows-x86_64.zip).FullName -DestinationPath "$env:RUNNER_TEMP\zip"
-          python $check (Get-ChildItem "$env:RUNNER_TEMP\zip\noshape-*\noshape.exe").FullName
+          $zip = (Get-ChildItem dl\noshape-[0-9]*-windows-x86_64.zip).FullName
+          Expand-Archive $zip -DestinationPath "$env:RUNNER_TEMP\zip"
+          $zexe = (Get-ChildItem "$env:RUNNER_TEMP\zip\noshape-*\noshape.exe").FullName
+          python $check $zexe
           if ($LASTEXITCODE -ne 0) { throw "zip check failed" }
+          if ($env:GITHUB_REF_TYPE -ne 'tag') {
+            python .github/release/check_update.py $zexe $zip sums $identity --stub (Join-Path (Split-Path $zexe) 'noshape.com')
+            if ($LASTEXITCODE -ne 0) { throw "portable update check failed" }
+          }
           Expand-Archive (Get-ChildItem dl\noshape-cli-*-windows-x86_64.zip).FullName -DestinationPath "$env:RUNNER_TEMP\cli"
           python $check (Get-ChildItem "$env:RUNNER_TEMP\cli\noshape-cli-*\noshape-cli.exe").FullName noshape-cli
           if ($LASTEXITCODE -ne 0) { throw "CLI check failed" }
 
   publish:
-    needs: [bundle, verify]
+    needs: [bundle, sign, verify]
     if: github.ref_type == 'tag' && !inputs.dry_run
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v8
         with:
+          name: signed
           path: dist
-          merge-multiple: true
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

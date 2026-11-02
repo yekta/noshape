@@ -1,0 +1,42 @@
+name: Update test fixtures
+
+# The signed files crates/update's tests verify (crates/update/tests/fixtures): SHA256SUMS signed keyless with
+# Sigstore (this workflow's GitHub OIDC identity, a Fulcio certificate and a Rekor entry, as release.yml signs a
+# release), the trust root cosign fetched through Sigstore's TUF repository, and the files cosign's own verifier
+# accepts. Run it, then commit the artifact's files.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  fixtures:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v2.5.2
+      - name: Make and sign
+        run: |
+          cosign version
+          mkdir fixtures && cd fixtures
+          d=noshape-0.0.2-linux-x86_64
+          mkdir "$d" && printf '#!/bin/sh\necho "noshape 0.0.2 (test)"\n' > "$d/noshape" && chmod 755 "$d/noshape"
+          tar czf "$d.tar.gz" "$d" && rm -r "$d"
+          sha256sum -- "$d.tar.gz" > SHA256SUMS
+          cosign sign-blob --yes --new-bundle-format --bundle SHA256SUMS.sigstore.json SHA256SUMS
+          # The identity the tests expect (this workflow on this ref), checked by cosign too.
+          id="https://github.com/$GITHUB_REPOSITORY/.github/workflows/update-test-fixtures.yml@$GITHUB_REF"
+          echo "$id" > identity.txt
+          cosign verify-blob --new-bundle-format --bundle SHA256SUMS.sigstore.json --certificate-identity "$id" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com SHA256SUMS
+          cp "$(find ~/.sigstore -name trusted_root.json | head -1)" trusted_root.json
+          ls -la
+          jq . SHA256SUMS.sigstore.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: update-test-fixtures
+          path: fixtures/*
+          if-no-files-found: error

@@ -1,6 +1,6 @@
 name: Apple signing setup
 
-# One-off (lead, 11-02): creates the app.noshape App ID, the signing certificates and the App Store profiles through
+# One-off (lead, 11-02): creates the app.noshape.noshape App ID, the signing certificates and the App Store profiles through
 # the App Store Connect API, entirely on the runner. Each certificate's private key is generated here and never leaves
 # the runner unencrypted: every result is sealed to the repo's Actions secret key (passed in as an input, public) and
 # uploaded as an artifact the lead stores with `gh secret set`-equivalent API calls. Nothing secret reaches the lead's
@@ -61,16 +61,16 @@ jobs:
           report = []
 
           # The App ID.
-          found = call("GET", "/bundleIds", params={"filter[identifier]": "app.noshape"})["data"]
+          found = call("GET", "/bundleIds", params={"filter[identifier]": "app.noshape.noshape"})["data"]
           if found:
-              bid = found[0]["id"]; report.append(f"App ID app.noshape: exists ({found[0]['attributes']['platform']})")
+              bid = found[0]["id"]; report.append(f"App ID app.noshape.noshape: exists ({found[0]['attributes']['platform']})")
           else:
               bid = None
               for platform in ("UNIVERSAL", "IOS"):
                   try:
                       bid = call("POST", "/bundleIds", {"data": {"type": "bundleIds", "attributes": {
-                          "identifier": "app.noshape", "name": "noshape", "platform": platform}}})["data"]["id"]
-                      report.append(f"App ID app.noshape: created ({platform})"); break
+                          "identifier": "app.noshape.noshape", "name": "noshape", "platform": platform}}})["data"]["id"]
+                      report.append(f"App ID app.noshape.noshape: created ({platform})"); break
                   except RuntimeError as e:
                       report.append(f"App ID as {platform}: {e}")
 
