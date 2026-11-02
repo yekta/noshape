@@ -41,6 +41,50 @@ Fusing the slabs yours takes first and adding the offset ones after doesn't help
 next reasons: 3.9 → 5.9 s on a dump); one OCCT common of the solid with all slabs as one tool group changes results.
 Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scratch SHELLDUMP=<path without .brep>).
 
+## State at the move to a new account (11-02 22:40 UTC): in progress, WIP, jobs, next items
+- Landed today, newest first: 86596b72 (the knurl sweep's regression undone: no section tolerance at crossings, no
+  crossing taken for a section's end), a4fe7543 (step 3), b3029580 (pool coarse grid: knurl time back), 463a1666
+  (step 2), e9346814 (step 1). vibe3 at a4fe7543: knurl 16.34 s, knurl_d25_app 22.56 s (baselines 16.45 / 22.4).
+- Gate (lead): the knurl sweep, 346 cases, nothing lands that takes fewer than 258. How: build the model test binary
+  of the commit (`NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh cargo test --release -p noshape-model --test all --no-run`),
+  copy it to vibe5 ~/agents/sweep/model-<tag>, then there `BIN=$HOME/agents/sweep/model-<tag> setsid nohup bash
+  ksweep.sh final.txt <tag>.tsv 4 > sweep-<tag>.log 2>&1 &` (~2-3 h on loaded vibe5); compare with
+  `python3 /root/bool-scratch/kcmp.py /tmp/tog.tsv <new>.tsv` (tog.tsv = 86596b72's run: 258 of 346; copies of the
+  tsvs in vibe5 ~/agents/sweep: s3 = main a4fe7543 214, pre1d = before 1d4f8171 partial 229 rows, kf = tried fixes
+  215, tog = now 258). Ø10 × 10 CP12 and the grooves at the seam decline (T1s *_declines).
+- Shares at 86596b72: corpora 4414 / 5070 cases (87.1 %), 810 / 981 s OCCT time (82.6 %); Shell's fuzz recordings
+  (shfall) 45 / 194 (23.2 %), 10.6 / 269 s (4.0 %), the same 3 differing (OCCT the odd one).
+- Detached job still running: vibe4, `bash bigrun.sh ~/agents/sweep/tog-to.txt ~/agents/sweep/big.txt` (PIDs 1413654
+  and 1494553, the runner; it waits for load < 16 and runs each case with the bool-d model binary of 86596b72,
+  `~/agents/bool-d/target/release/deps/all-868462f5c831b6e0`, 8 threads, 3600 s limit): the 17 sweep cases that timed
+  out at 900 s on loaded vibe5 (13 new). Results in vibe4 ~/agents/sweep/big.txt; so far Ø100 × 100 CP20 45/45 taken
+  in 335 s (195132 faces), and Ø100 × 50 CP30 45/30 taken in 218 s (run by hand). Don't rebuild bool-d on vibe4 until
+  it prints DONE (it reads that binary). Those that come back taken are slow takes, not declines.
+- WIP, committed on branch `bool-wip-facetol` (b6b9e333, in /root/bool-scratch/bool-b; not landed, not gated): faces'
+  own tolerances in the Boolean (Body::face_tol through the bridge; GFace::t; `side`: a vertex on a plane within its
+  and the face's tolerance; coplanar planes within the two faces'; `on_free_surface`: an edge on a face within its and
+  the face's, the grey band the Boolean's; rust_boolean.cpp: tolerant faces up to 0.5 mm no longer decline "a tolerant
+  input"); a plane through a cone's apex steeper than its rulings: its two rulings as sections (plane_cone_hyperbola;
+  it declined "a plane through a cone's apex": 6 shfall cases); on a plane or cylinder an edge past OCCT's threshold is
+  off ("an edge nearly on another argument's face" was 19 cases, 120 s of shfall's OCCT time). Checked so far:
+  clippy clean; shfall with the face tolerances (before the last two) 45 taken, the same 3 differ, the 6 "tolerant
+  input" cases move on (nearly on, a point near two vertices, a section's end is unclear, a tiny arc). Not yet run:
+  shfall with all of it, corpora, bool_patterns, the sweep gate, qa's shellmatrix / boolmatrix / cli-shell-gpf.
+- Next, in order: (1) gate bool-wip-facetol (bool_patterns + brep lib on vibe4, corpora `bin/whyall.sh <tag>` and
+  shfall `bin/why.sh shfall ""` on vibe5, sweep >= 258, qa's Shell checks with a CLI of it); land it if green, else
+  narrow. (2) Shell's tolerant inputs past it: the 6 "tolerant input" cases' next declines; 0e5bf892 (an arc leaving a
+  slab's 0.1 mm edge tangentially counts as on the boundary for 2 mm); b5c954ea / 0acfd0a2 after the apex rulings
+  ("two edges": a 1.26 um boundary piece across a cylinder's seam drawn across the whole face); 9fccb94d (a whole
+  revolution of a periodic B-spline face, its curves a period past the surface's range: uv box clipped). (3) The 30
+  TPI knurl with a tolerance that reaches every curve near the point on both faces or none: giving a section's end
+  its tolerance and matching it with split points on either face's edges takes it from 12432 to 24 open edges but
+  breaks Ø100 × 10 (9783): the end's curve in the plane stops short of or past the matched vertex; the fix is to
+  carry the match into both faces' curves (re-split / re-end the 2D curves at the merged vertex), then gate on the
+  sweep. Tools: bin/why4.sh (single cases on vibe4), kbis4.sh / kbisAS.sh (model-test knurl runs per commit on vibe4),
+  dbgpatch.py prints (NOSHAPE_X_NM, _COINC, _NEARON, _NEAR, _SEGS, _ALLP), shfall copies on vibe4
+  ~/agents/bool-corpora/shfall.
+- Squash only with `git reset --soft $(git merge-base HEAD origin/main)` after a fresh fetch; check `git show --stat`.
+
 ## The knurl sweep's regression: sections' tolerance off at crossings again (11-02 22:00 UTC)
 - The size × TPI × angle sweep (346 cases, vibe5 ~/agents/sweep/final.txt, model test binary per commit, fallback
   off; ksweep.sh; compare with /root/bool-scratch/kcmp.py) on main a4fe7543: 214 taken. Against 1d4f8171's parent
