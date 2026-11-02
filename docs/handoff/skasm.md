@@ -535,6 +535,14 @@ the regular solve then finds everything held where it was put, else today's weig
 24/24 (all of live's answers); batch 1: positions now match in s3 and s12, the solved s1, s5, s6, s8, s10, s11, s14,
 s17 still differ (loops, tangent chains: next, case by case); onshape_ux's "length edit moves both ends by half"
 (never checked against live) now moves the far end as live. S300 timings unchanged on vibe3.
+Batch 1/2 case work (11-02 11:30): positions now match live in s1, s3, s10, s12 (batch 1) and s106, s116 (batch 2);
+s8 is 0.024 mm off (a vertical line's free end). Rules added from them: only joining constraints (shared points,
+tangency, point on curve, concentric) hold neighbours, relations to unplaced geometry (Equal, Parallel…) wait for it
+(s10); a relation keeps its member with more tied points before the size / angle / position key (s1: a rectangle side
+kept, the lone line with a free end lengthened); a broken relation's kept member is settled before single dimensions
+(s8: the dimensioned circle of a concentric pair moves onto the other); conics / splines are placed too, at their
+lowest point (s116). Left among the solved: s5, s6, s11, s14, s17, s102, s104, s115 (loops / tangent chains), the
+curve colours (live shows some lines black that ours calls under defined: s10 l1, s116 l2), the drags.
 UI drags (11 in batch 1) compare ours dragged to where live's pointer ended (live lands within 0.2 mm): s12's differs
 the same way (what follows the dragged point).
 Assembly batch 1 against live (11-02 12:00): 15/20 match (statuses, messages, transforms to 1e-3 mm / 1e-6;
