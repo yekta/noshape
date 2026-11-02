@@ -765,7 +765,7 @@ fn an_escaped_folder_rename_records_nothing(cx: &mut TestAppContext) {
 /// Live 11-02 (qa4's "Plane z10"): p hides every plane, a Plane feature's with the default ones, then shows them all.
 #[gpui::test]
 fn p_toggles_every_plane(cx: &mut TestAppContext) {
-    let (window, view) = part_studio(cx, "p-planes");
+    let (window, view) = part_studio(cx, "p-every-plane");
     cx.update(|cx| {
         view.update(cx, |v, cx| {
             let tab = v.tab;
