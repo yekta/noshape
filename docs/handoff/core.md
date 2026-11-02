@@ -13,6 +13,12 @@ COMPOSITE-LATER-FEATURE (75d20033), loft circle split (466a0805), feature audit 
 (35281650, d09b7b79); queued: planar Fill as a plane (live 1762: qa5-mb / rib23 / surf-main depth edits 110 -> 9.7 ms, vibe5 bench), Shell's no-cavity rule (live 1794). Open with live:
 1796 (FL7's "single chain" rule). Next: FL7's rule when answered, shell-hang Shell 5 (Parasolid leaves thin regions
 solid: an erosion-based shell), FI2 (a G1 Fill that live builds with a warning), BLEND-RUST coverage.
+16:20: the user's smooth vase end to end through the agent API on green d09b7b79 (/root/core-scratch/vase-e2e/vase.py:
+5 offset planes, hexagons as lines + tangent arcs, Loft, Shell top removed): loft 3 faces / 24 edges / 437876.30 (live
+437833.23), Shells 1.6 / 2 in, 2 out OK, 5 faces each, within 0.2-2.9 mm³ of live, 4.5-6 s each in the app (OCCT's
+offset 2.5-3.3 s of it in metres; the kernel test in mm 1.2 s: offset 0.1-0.2, cut 0.4, volumes 0.3 s, NOSHAPE_SHELL_
+DEBUG laps). Tried: the whole Shell at the working scale (mm) like the blends: 6 kernel and 2 model shell tests changed
+results (the constructions' absolute thresholds): reverted; worth doing path by path (offset first) with the corpus.
 
 **State 11-02 14:50 (this session, from 11:55).** Builds / tests on vibe5 (rb-hosts), the profile documents copied
 to vibe5 ~/agents/profdocs, fuzz scripts in vibe5 / vibe4 ~/agents/fuzz/bin. Landed: P1 smooth twisted vase (3c534b35:

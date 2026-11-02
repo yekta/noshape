@@ -348,6 +348,14 @@ bool by_offset(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
       std::fprintf(stderr, "offset: %s\n", why);
     return false;
   };
+  auto t_lap = std::chrono::steady_clock::now();
+  auto lap   = [&](const char* what) {
+    if (!dbg)
+      return;
+    const auto now = std::chrono::steady_clock::now();
+    std::fprintf(stderr, "offset: %s %.0f ms\n", what, std::chrono::duration<double, std::milli>(now - t_lap).count());
+    t_lap = now;
+  };
   TopoDS_Shape offset;
   SourceMap    sources;
   try
@@ -381,6 +389,7 @@ bool by_offset(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
   {
     return no("BRepOffset threw");
   }
+  lap("offset");
   const TopoDS_Shape& outer = sign < 0 ? solid : offset;
   const TopoDS_Shape& inner = sign < 0 ? offset : solid;
   BRepAlgoAPI_Cut     cut;
@@ -388,11 +397,14 @@ bool by_offset(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
   if (cut.HasErrors() || !cut.IsDone())
     return no("cut failed");
   TopoDS_Shape r = cut.Shape();
+  lap("cut");
   if (!valid_solid(r))
     return no("invalid result");
+  lap("valid");
   // A correct offset lies inside the outer solid: the volumes must add up
   // (catches self-intersecting offsets that BRepCheck accepts).
   const double vo = volume_of(outer), vi = volume_of(inner), vr = volume_of(r);
+  lap("volumes");
   if (!(vi > 0 && vr > 0 && vi < vo && std::abs(vo - vi - vr) <= 1e-6 * vo))
     return no("volumes don't add up");
   // The part's own faces that stay (inward: the outside, outward: the
@@ -417,6 +429,7 @@ bool by_offset(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
         return no("a kept face is lost");
     }
   }
+  lap("kept faces");
   // Offsets extended past a face's boundary come out as separate faces on
   // the same surface; merge them so the topology (and the names) match the
   // slab construction's.
@@ -425,6 +438,7 @@ bool by_offset(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
   usd.Build();
   HHist hc = cut.History(), hs = usd.History();
   r = single_solid(usd.Shape());
+  lap("unify");
   out.result = r;
   // The rim is the cut image of the removed faces: no need to search for it.
   out.history = shell_history(solid, r, {hc, hs}, {hc, hs}, sources, {});
