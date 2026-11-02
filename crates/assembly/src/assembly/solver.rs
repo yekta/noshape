@@ -1331,6 +1331,31 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
     solve_driven(bodies, mates, relations, drags, dof, status, memo, &driven)
 }
 
+/// A group's solve: its free bodies' new poses, the iterations, the mates in
+/// error ([`copy_conflict`]).
+type GroupSolved = (Vec<(usize, Frame)>, usize, Vec<usize>);
+
+/// The mates a group's solution fails (`local`), with the follower placing
+/// each copy among their bodies, when one of them is on a pattern copy;
+/// empty otherwise.
+fn copy_conflict(problem: &Problem, local: &[Frame], scale: f64) -> Vec<usize> {
+    let bound = 1e-5 * scale.max(1.0);
+    let mut buf = Vec::new();
+    let failing: Vec<usize> = problem.terms.iter().filter_map(|t| if let Term::Mate(i) = t { Some(*i) } else { None }).filter(|&i| {
+        let (r, nan) = residual_max(local, &problem.mates[i], &mut buf);
+        nan || r >= bound
+    }).collect();
+    let copies: Vec<usize> = failing.iter().flat_map(|&i| mate_bodies(&problem.mates[i])).filter(|&b| problem.driven.is_driven.get(b).copied().unwrap_or(false)).collect();
+    if copies.is_empty() {
+        return Vec::new();
+    }
+    let mut out = failing;
+    out.extend(copies.iter().filter_map(|&b| problem.driven.placer[b]));
+    out.sort_unstable();
+    out.dedup();
+    out
+}
+
 /// [`solve_inner`] with the copies' [`Driven`] already built for `bodies`
 /// (a drag step's two passes share one).
 #[allow(clippy::too_many_arguments)]
@@ -1349,13 +1374,14 @@ fn solve_driven(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[So
     }
 
     let eps = 1e-7;
+    let mut conflicts: Vec<usize> = Vec::new();
     // Groups share no free body (a term's bodies are one group's or fixed),
     // so each is solved on its own copy of the poses, in parallel: the same
     // arithmetic as one after the other, the results bit for bit the same.
     {
         use rayon::prelude::*;
         let start = &poses;
-        let solved: Vec<(Vec<(usize, Frame)>, usize)> = groups
+        let solved: Vec<GroupSolved> = groups
             .par_iter()
             .filter_map(|(free, terms)| {
                 let problem = Problem { bodies, mates, relations, drags, driven, terms: terms.clone(), scale };
@@ -1373,14 +1399,23 @@ fn solve_driven(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[So
                 if !dragged && free.iter().any(|&b| local[b] != bodies[b].pose) {
                     least_change(&problem, &mut local, free, scale);
                 }
-                Some((free.iter().map(|&b| (b, local[b])).collect(), iterations))
+                // A conflict on a pattern copy (live 1754 (C): a Planar
+                // pulling copy 3 off its seed's Fastened place) moves
+                // nothing; the mates it can't hold together and the copy's
+                // pattern are in error.
+                let conflict = if dragged { Vec::new() } else { copy_conflict(&problem, &local, scale) };
+                if !conflict.is_empty() {
+                    return Some((Vec::new(), iterations, conflict));
+                }
+                Some((free.iter().map(|&b| (b, local[b])).collect(), iterations, Vec::new()))
             })
             .collect();
-        for (moved, iterations) in solved {
+        for (moved, iterations, failed) in solved {
             for (b, p) in moved {
                 poses[b] = p;
             }
             result.iterations = result.iterations.max(iterations);
+            conflicts.extend(failed);
         }
     }
     // The copies from their solved drivers.
@@ -1406,7 +1441,10 @@ fn solve_driven(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[So
         for rel in relations {
             max_r = max_r.max(relation_residual(&poses, mates, rel).abs());
         }
-        result.max_residual = max_r;
+        for &i in &conflicts {
+            result.mate_ok[i] = false;
+        }
+        result.max_residual = if conflicts.is_empty() { max_r } else { f64::INFINITY };
         result.converged = result.max_residual < 1e-6 * scale.max(1.0);
     }
 

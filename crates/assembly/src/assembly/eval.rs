@@ -319,6 +319,8 @@ pub struct Prepared {
     /// The mates' residuals and values between solves of this preparation
     /// (each drag step); see [`solver::MateMemo`].
     memo: Arc<std::sync::Mutex<solver::MateMemo>>,
+    /// Pattern followers' (synthetic) mate ids -> their pattern.
+    follower_pattern: HashMap<MateId, MateId>,
 }
 
 #[derive(Clone, Debug)]
@@ -2183,7 +2185,28 @@ impl AssemblyEvaluator {
             let id = n.path[0];
             n.dof = Some(if followers.contains(&id) { 0 } else { solved.instance_dof.get(&id).copied().unwrap_or(0) });
         }
-        let pattern_errors = prepared.failed_patterns.clone();
+        let mut pattern_errors = prepared.failed_patterns.clone();
+        // A copy its mates would pull off the pattern (live 1754 (C)): the
+        // pattern has "Mate overdefines the assembly." and its copies, with
+        // everything under them, are red (no message of their own).
+        let mut overdefined: Vec<MateId> = prepared.follower_pattern.iter().filter(|(fid, _)| solved.mate_ok.get(fid) == Some(&false)).map(|(_, pid)| *pid).collect();
+        overdefined.sort_by_key(|id| id.0);
+        overdefined.dedup();
+        for pid in overdefined {
+            if !pattern_errors.iter().any(|(id, _)| *id == pid) {
+                pattern_errors.push((pid, "Mate overdefines the assembly.".into()));
+            }
+        }
+        for (pid, _) in &pattern_errors {
+            let Some(p) = assembly.patterns.iter().find(|p| p.id == *pid) else { continue };
+            fn flag(n: &mut InstanceNode) {
+                n.error.get_or_insert_with(String::new);
+                n.children.iter_mut().for_each(flag);
+            }
+            for n in nodes.iter_mut().filter(|n| p.generated.iter().any(|g| g.instance == n.path[0])) {
+                flag(n);
+            }
+        }
         let mut result = AssemblyResult { occurrences, nodes, solved: Solved::default(), mates, relations, connectors, pattern_errors, prepared: Arc::new(prepared), eval_ms: 0.0, explode_trails: Vec::new() };
         let ev = explode.and_then(|i| assembly.exploded_views.get(i));
         result.apply_placements(solved, ev);
@@ -3039,7 +3062,9 @@ impl AssemblyEvaluator {
                 }
                 let Some((axis_body, axis_local, xform)) = make(g.index, g.seed, g.instance) else { continue };
                 let sm = SolverMate { a: sb, a_local: soff, b: gb, b_local: goff, follow: Some(Follow { axis_body, axis_local, xform }), ..Default::default() };
-                prepared.mates.push((MateId(u64::MAX - prepared.mates.len() as u64), MateType::Fastened, sm));
+                let fid = MateId(u64::MAX - prepared.mates.len() as u64);
+                prepared.follower_pattern.insert(fid, p.id);
+                prepared.mates.push((fid, MateType::Fastened, sm));
                 // A flexible subassembly's copy: each child with a body of its
                 // own follows the seed's same child (live 1754: the copies
                 // keep the seed's positions inside; any copy's Arm turns them all).
@@ -3050,7 +3075,9 @@ impl AssemblyEvaluator {
                         continue;
                     }
                     let cm = SolverMate { a: scb, a_local: scoff, b: gcb, b_local: gcoff, follow: Some(Follow { axis_body, axis_local, xform }), ..Default::default() };
-                    prepared.mates.push((MateId(u64::MAX - prepared.mates.len() as u64), MateType::Fastened, cm));
+                    let fid = MateId(u64::MAX - prepared.mates.len() as u64);
+                    prepared.follower_pattern.insert(fid, p.id);
+                    prepared.mates.push((fid, MateType::Fastened, cm));
                 }
             }
         }

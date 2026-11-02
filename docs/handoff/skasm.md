@@ -578,6 +578,16 @@ least_change (120 unknowns a stack). The block fix (place a mate tree body by bo
 when a parent's free direction could share a child's correction (global least change splits it); asked live which
 (REQUESTS 07:20, P1 "which instances absorb a regenerate's change along a mate chain").
 
+Parity (11-02, user: correctness before more speed):
+- **Pattern copy conflict = live 1754 (C)** (done): a solve group that can't hold its mates, one of the failing mates on a
+  pattern copy, keeps its start poses (nothing moves); the failing mates (the copy's new mate and the seed's grounding
+  mate, as live) get "Mate overdefines the assembly.", the copy's follower fails, so the pattern row gets the same message
+  and its copies (and all under them) are red with just their name as tooltip; the root badge follows. T1: part (C) of
+  a_patterned_flexible_subassembly_follows_its_seed.
+- **Redundant consistent mates (P1, open):** live's evidence is ambiguous on which mates get the error (Revolute + Slider:
+  both; the stack's Planar + Parallel at k = 1: "on the Planar"); asked live (REQUESTS 07:45, seven small cases) before
+  building the rank test.
+
 Next: that answer, then the tree placement if live moves the child alone; each Sub instance's own solve from its
 stored positions; live's A1000 timings (1741, after its REST limit), the overdefinition messages of live 1754 (C).
 

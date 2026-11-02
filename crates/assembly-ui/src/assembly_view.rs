@@ -823,7 +823,7 @@ impl AssemblyView {
             let id = s.dialog.read(cx).id;
             let msg = self.result.mates.iter().find(|m| m.id == id).filter(|m| !m.ok).and_then(|m| m.message.clone());
             // Instances whose part is gone (live E15).
-            let lost: HashMap<InstanceId, String> = self.result.nodes.iter().filter(|n| n.error.is_some() && n.path.len() == 1).map(|n| (n.path[0], n.name.clone())).collect();
+            let lost: HashMap<InstanceId, String> = self.result.nodes.iter().filter(|n| n.error.as_ref().is_some_and(|e| !e.is_empty()) && n.path.len() == 1).map(|n| (n.path[0], n.name.clone())).collect();
             s.dialog.update(cx, |d, cx| {
                 d.lost = (0..4).filter_map(|i| d.field(i).and_then(|c| lost.get(&c.instance)).map(|n| (i, n.clone()))).collect();
                 if d.a.is_some() && d.b.is_some() {
@@ -3361,7 +3361,8 @@ impl AssemblyView {
         // through, an ƒx glyph in place of the DOF glyph (live assembly/141).
         let dyn_suppressed = suppressed && inst.is_some_and(|i| i.unsuppressed_if.is_some());
         // Live E15: "Part 2 <1> has error: Failed to resolve instance." (the badge repeats it).
-        let row_tip: SharedString = if let Some(e) = &error {
+        // A pattern copy in error (live 1754 (C)) is red with just its name.
+        let row_tip: SharedString = if let Some(e) = error.as_ref().filter(|e| !e.is_empty()) {
             format!("{name} has error: {e}").into()
         } else if dyn_suppressed {
             format!("{name} (Suppressed with expression)").into()
@@ -3478,7 +3479,7 @@ impl AssemblyView {
             // In-context arrows (Assembly contexts of its Part Studio).
             .when(is_top, |d| d.children(self.context_icons(top, cx)))
             .when_some(warning.filter(|_| error.is_none()), |d, w| d.child(div().id(SharedString::from(format!("warn-{}", top.0))).child(crate::assets::icon(&icon_path("warning"), 12., cx)).tooltip(move |win, cx| gpui_kit::component::tooltip::Tooltip::new(w.clone()).build(win, cx))))
-            .when_some(error.clone().map(|e| format!("{name} has error: {e}")), |d, e| d.child(div().id(SharedString::from(format!("err-{}", top.0))).size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx))))
+            .when_some(error.clone().map(|e| if e.is_empty() { name.to_string() } else { format!("{name} has error: {e}") }), |d, e| d.child(div().id(SharedString::from(format!("err-{}", top.0))).size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx))))
             .when_some(versioned.filter(|_| is_top), |d, own| {
                 let tip = if newer_badge {
                     "Versioned part from other document with newer version"

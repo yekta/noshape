@@ -6004,6 +6004,28 @@ fn a_patterned_flexible_subassembly_follows_its_seed() {
     let t = all(&res_a.solved);
     assert!((t[0].abs() - std::f64::consts::FRAC_PI_2).abs() < 1e-6, "the seed's block turned 90°: {t:?}");
     assert!((t[0] - t[1]).abs() < 1e-6 && (t[0] - t[2]).abs() < 1e-6, "and every copy's: {t:?}");
+    // (C) A Planar pulling copy 3's block 1 onto a fixed second base 5 mm
+    // higher, the seed Fastened: nothing moves; the new mate, the seed's
+    // Fastened and the pattern are in error; the copies are red, the seed isn't.
+    let mut c = asm.clone();
+    c.instances.push(part_instance(9, "Base <2>", f.studios[0], body.clone(), DVec3::new(0.13, 0.0, 0.005), true));
+    c.mates.push(mate(50, MateType::Planar, MateConnectorRef::on(copies[1], vec![InstanceId(1)], centroid(&top)), conn(9, top.clone(), Inference::Centroid)));
+    let res_c = ev.evaluate(&f.doc, &c, &SolveOptions::default(), None);
+    for id in [InstanceId(5), copies[0], copies[1]] {
+        assert_eq!(res_c.solved.placement(id), res.solved.placement(id), "{id:?} didn't move");
+    }
+    assert_eq!(all(&res_c.solved), all(&res.solved));
+    let msg = |id: u64| res_c.mates.iter().find(|m| m.id == MateId(id)).map(|m| (m.ok, m.message.clone()));
+    let over = Some((false, Some("Mate overdefines the assembly.".to_string())));
+    assert_eq!((msg(50), msg(20)), (over.clone(), over), "{:?}", res_c.mates);
+    assert_eq!(res_c.pattern_errors, vec![(MateId(70), "Mate overdefines the assembly.".to_string())]);
+    let node = |id: InstanceId| res_c.nodes.iter().find(|n| n.path == [id]).unwrap();
+    assert_eq!(node(InstanceId(5)).error, None);
+    for id in &copies {
+        assert_eq!(node(*id).error.as_deref(), Some(""), "{id:?} red, no message of its own");
+        assert!(node(*id).children.iter().all(|n| n.error.is_some()));
+    }
+    assert!(res_c.has_errors());
     // (D) The seed on a Planar; copy 3's block 1 Fastened on a second base
     // 30 mm further in X: the whole pattern slides 30 mm.
     let (mut d, copies_d) = build(MateType::Planar);
