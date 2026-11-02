@@ -16,6 +16,17 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-02 20:20. The current list (user, 11-02 19:00):** FILL-G1-DOME done (fff177bd: our own four-sided G1
+Coons fill fitted to live 1805's dome); then psui's audit M12 items, biggest impact first: (a) Loft connections take
+each edge's connectionEdgeParameters (727d6aaa queued: std's isAnything values now round-trip through editing logic and
+manipulator changes; sketch-edge connections resolve; std's "i,j" connection manipulators emitted; live asked (REQUESTS 20:10) how
+Parasolid lofts one mid-edge connection: ours snaps a single connection to the nearest vertex); (b) Bridging curve
+run by std's bridgingCurve.fs (real curvature / G3, std's manipulators): in the tree, needs the host fixes it found
+(qAdjacent on sketch edges / vertices, evEdgeCurvatures' frame was tangent-as-X and unitless, EdgeCurvatureResult tag,
+exact derivatives via a new kernel Shape::derivatives_at, evEdgeCurvatureDerivatives per m²); regression run going;
+(c) Edit curve's edits for psui's triad; (d) Offset curve on face's "Offset and extend" scope. Then SHELL-HANG-5, the
+vase's leftovers, the 04:00 workflow walk.
+
 **State 11-02 16:25.** Since 15:50 landed / queued: planar Fill (e1f0fdb8) and Fill on a cylinder (live 1762),
 Shell's no-cavity rule (bc497e6a, live 1794), Fill's per-edge adjacent faces, FL7's single-chain rule (70eb8b23, live
 1796), the direct Shell construction first for sharp free-form edges (99e534b6) and its B-spline faces continued as

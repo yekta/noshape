@@ -512,6 +512,11 @@ fn rough_position(ev: &EvalCtx, refs: &[Reference]) -> Option<DVec3> {
 }
 
 pub fn bridging_curve(ev: &mut EvalCtx) -> FResult<()> {
+    // std's bridgingCurve.fs (computeBridgingControlPoints: real curvature and flow matching, std's control-point
+    // manipulators); natively only without the FeatureScript host.
+    if crate::regen::custom_features::host().is_some() && std::env::var_os("NOSHAPE_BRIDGE_NATIVE").is_none() {
+        return crate::regen::custom_features::evaluate_std(ev, "bridgingCurve.fs", "bridgingCurve");
+    }
     let (q1, q2) = (ev.query("side1"), ev.query("side2"));
     if q1.is_empty() {
         return err("Select the start of the bridging curve");

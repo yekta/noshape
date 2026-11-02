@@ -714,6 +714,7 @@ ProjPoint                face_project_point(const OcShape& face, P3 p);
 rust::Vec<double>        face_uv_bounds(const OcShape& face);
 P3    edge_point_at(const OcShape& edge, double t);
 P3    edge_tangent_at(const OcShape& edge, double t);
+rust::Vec<double> edge_derivatives_at(const OcShape& edge, double t);
 P3    vertex_point(const OcShape& v);
 rust::Vec<double>        bounding_box(const OcShape& s, bool optimal);
 PlaneQ                   find_plane(const OcShape& s, double tolerance);

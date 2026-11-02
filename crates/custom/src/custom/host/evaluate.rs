@@ -783,29 +783,44 @@ fn ev_fillet_radius(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 fn ev_edge_curvatures(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let params: Vec<f64> = field(&a, "parameters").as_array().map(|v| v.iter().filter_map(|x| x.as_number()).collect()).unwrap_or_default();
+    let arc = field(&a, "arcLengthParameterization").as_bool().unwrap_or(true);
     let out = on_first(i, &cx, &a, "edge", "INVALID_INPUT", |q, e| {
         let s = q.shape(e)?;
         let info = s.edge_info().ok()?;
         let mut out = Vec::new();
         for t in &params {
-            let u = edge_param(&s, &info, *t, true);
-            let h = (info.last_param - info.first_param) * 1e-4;
-            let p = s.point_at(u).ok()?;
-            let t0 = s.tangent_at(u).ok()?.normalize_or_zero();
-            let t1 = s.tangent_at(u + h).ok().unwrap_or(t0).normalize_or_zero();
-            let ds = (s.point_at(u + h).ok().unwrap_or(p) - p).length().max(1e-300);
-            let dt = (t1 - t0) / ds;
-            let curv = dt.length();
-            let nrm = if curv > 1e-12 { dt / curv } else { any_perpendicular(t0) };
-            let b = t0.cross(nrm);
-            let frame = coord_system_value(p, t0, b);
-            out.push(Value::map_from([("frame", frame), ("curvature", Value::num(curv).with_tag(noshape_featurescript::value::Tag::NONE))]));
+            let (p, tangent, kappa, _) = curve_frame(&s, edge_param(&s, &info, *t, arc))?;
+            let curv = kappa.length();
+            let nrm = if curv > 1e-12 { kappa / curv } else { any_perpendicular(tangent) };
+            // std's EdgeCurvatureResult: Z the tangent, X the normal, Y the binormal; the curvature per meter.
+            let frame = coord_system_value(p, nrm, tangent);
+            out.push(Value::map_from([("frame", frame), ("curvature", meter_power_value(curv, -1.0))]).with_tag(std_tag("evaluate.fs", "EdgeCurvatureResult")));
         }
         Some(out)
     })?;
     Ok(Value::array(out))
 }
 
+/// At curve parameter `u` of edge `s`, along the edge's direction: the point, the unit tangent, the curvature vector
+/// and its derivative along the arc, from the curve's exact derivatives.
+fn curve_frame(s: &k::Shape, u: f64) -> Option<(DVec3, DVec3, DVec3, DVec3)> {
+    let [p, mut a, b, mut c] = s.derivatives_at(u).ok()?;
+    if s.orientation() == k::Orientation::Reversed {
+        a = -a;
+        c = -c;
+    }
+    let l = a.length_squared();
+    if l < 1e-300 {
+        return None;
+    }
+    let m = a.dot(b);
+    // kappa = (b |a|^2 - a (a . b)) / |a|^4; d kappa / ds = (d kappa / du) / |a|.
+    let n = b * l - a * m;
+    let dn = c * l + b * m - a * (b.dot(b) + a.dot(c));
+    let kappa = n / (l * l);
+    let dk = (dn / (l * l) - n * (4.0 * m) / (l * l * l)) / l.sqrt();
+    Some((p, a / l.sqrt(), kappa, dk))
+}
 fn ev_face_curvatures(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let params: Vec<DVec2> = field(&a, "parameters").as_array().map(|v| v.iter().filter_map(vec2_of).collect()).unwrap_or_default();
@@ -1271,26 +1286,16 @@ fn ev_edge_curvature_derivatives(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let out = on_first(i, &cx, &a, "edge", "NO_TANGENT_LINE", |q, e| {
         let s = q.shape(e)?;
         let info = s.edge_info().ok()?;
-        let h = (info.last_param - info.first_param) * 1e-3;
-        // Curvature vector dT/ds at curve parameter u.
-        let kappa = |u: f64| -> Option<(DVec3, DVec3)> {
-            let (a, b) = (u - h, u + h);
-            let (ta, tb) = (s.tangent_at(a).ok()?.normalize_or_zero(), s.tangent_at(b).ok()?.normalize_or_zero());
-            let ds = (s.point_at(b).ok()? - s.point_at(a).ok()?).length().max(1e-300);
-            Some(((tb - ta) / ds, s.point_at(u).ok()?))
-        };
         let mut out = Vec::new();
         for t in &params {
-            let u = edge_param(&s, &info, *t, arc).clamp(info.first_param + 2.0 * h, info.last_param - 2.0 * h);
-            let ((ka, pa), (kb, pb)) = (kappa(u - h)?, kappa(u + h)?);
-            let d = (kb - ka) / (pb - pa).length().max(1e-300);
-            out.push(dir_value(d));
+            let (.., dk) = curve_frame(&s, edge_param(&s, &info, *t, arc))?;
+            // Per square meter (std Bridging curve's G3 adds |c'|^3 k' to a length).
+            out.push(meter_power_vector(dk, -2.0));
         }
         Some(out)
     })?;
     Ok(Value::array(out))
 }
-
 /// `@evPointsDeviation`: each point's distance to `topologies` (or only
 /// the largest): `{ deviation, pointPoint, topologyPoint }` maps.
 fn ev_points_deviation(i: &mut Interp, a: Vec<Value>) -> R<Value> {

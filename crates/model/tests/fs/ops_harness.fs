@@ -294,7 +294,7 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const circle = qContainsPoint(qCreatedBy(sub + "c", EntityType.EDGE), vector(0, 10, 2600) * mm);
             const d = evEdgeCurvatureDerivative(context, { "edge" : circle, "parameter" : 0.3 });
             const dev = evPointsDeviation(context, { "points" : [vector(0, 0, 2600) * mm, vector(20, 0, 2600) * mm], "topologies" : circle, "allDeviations" : true });
-            check("evEdgeCurvatureDerivative+evPointsDeviation", abs(norm(d) - 10000) < 1 && size(dev) == 2 && abs(dev[1].deviation - 10 * mm) < 1e-9 * meter, [norm(d), dev]);
+            check("evEdgeCurvatureDerivative+evPointsDeviation", abs(norm(d) - 10000 / meter ^ 2) < 1 / meter ^ 2 && size(dev) == 2 && abs(dev[1].deviation - 10 * mm) < 1e-9 * meter, [norm(d), dev]);
         });
         step(context, id, "fullround", function(sub) {
             fCuboid(context, sub + "c", { "corner1" : vector(0, 0, 2700) * mm, "corner2" : vector(4, 20, 2710) * mm });

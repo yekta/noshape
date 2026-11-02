@@ -110,6 +110,16 @@ pub fn point_value(p: DVec3) -> Value {
     Value::Array(Arc::new(vec![length_value(pos0(p.x)), length_value(pos0(p.y)), length_value(pos0(p.z))]), vector_tag())
 }
 
+/// A value in meters to the `power` (curvature: -1).
+pub fn meter_power_value(x: f64, power: f64) -> Value {
+    with_units(x, &[("meter", power)])
+}
+
+/// A Vector of values in meters to the `power` (a curvature's derivative along the arc: -2).
+pub fn meter_power_vector(d: DVec3, power: f64) -> Value {
+    Value::Array(Arc::new(vec![meter_power_value(pos0(d.x), power), meter_power_value(pos0(d.y), power), meter_power_value(pos0(d.z), power)]), vector_tag())
+}
+
 /// A unitless Vector.
 pub fn dir_value(d: DVec3) -> Value {
     Value::Array(Arc::new(vec![Value::num(pos0(d.x)), Value::num(pos0(d.y)), Value::num(pos0(d.z))]), vector_tag())

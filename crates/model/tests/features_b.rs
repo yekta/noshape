@@ -478,6 +478,46 @@ fn sheet_metal_thicken_region() {
     assert!(!st.message.as_deref().unwrap_or("").is_empty(), "{:?}", st.message);
 }
 
+/// Bridging curve by std (bridgingCurve.fs): Match curvature meets each side's curvature, not only its tangent
+/// (ours used to approximate curvature and flow with tangency, with a warning). Two arcs of radius 10 and 20 mm.
+#[test]
+fn bridging_curve_matches_curvature_as_std() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    // A quarter arc about the origin ending at (0, 10) mm going -x, and one about (60, 0) mm, radius 20, from (60, 20).
+    let a1 = sk.add_arc_angles(DVec2::ZERO, 0.01, 0.0, std::f64::consts::FRAC_PI_2).0;
+    let a2 = sk.add_arc_angles(DVec2::new(0.06, 0.0), 0.02, std::f64::consts::FRAC_PI_2, std::f64::consts::PI).0;
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let se = |e: u32| Reference::SketchEntity { sketch: sid, entity: e };
+    for (m, deg) in [("TANGENCY", 3), ("CURVATURE", 5), ("G3", 7)] {
+        let f = s.add("bridgingCurve", |p| {
+            p.set("side1", ParamValue::Query(vec![se(a1)]));
+            p.set("side2", ParamValue::Query(vec![se(a2)]));
+            p.set("match1", ParamValue::Enum(m.into()));
+            p.set("match2", ParamValue::Enum(m.into()));
+        });
+        let r = s.regen();
+        let st = r.display.features.iter().find(|x| x.id == f).unwrap();
+        assert!(st.message.is_none(), "{m}: {:?}", st.message);
+        let body = r.context.bodies.iter().find(|b| b.id.feature == f).expect("the bridge");
+        let e = &body.shape.edges()[0];
+        let b = e.edge_bspline().unwrap();
+        assert_eq!(b.degree, deg, "{m}: {b:?}");
+        // Curvature at each end from the end poles: (n - 1) / n |d1 x d2| / |d1|^3.
+        let n = b.degree as f64;
+        let k = |p0: DVec3, p1: DVec3, p2: DVec3| (n - 1.0) / n * (p1 - p0).cross(p2 - p1).length() / (p1 - p0).length().powi(3);
+        let p = &b.poles;
+        let (k0, k1) = (k(p[0], p[1], p[2]), k(p[p.len() - 1], p[p.len() - 2], p[p.len() - 3]));
+        let ends = [p[0], p[p.len() - 1]];
+        // Which end is on which arc (std joins the arcs' nearest ends, (10, 0) and (40, 0) mm).
+        let (ka, kb) = if (ends[0].length() - 0.01).abs() < 1e-9 { (k0, k1) } else { (k1, k0) };
+        if m != "TANGENCY" {
+            assert!((ka - 100.0).abs() < 1e-6 && (kb - 50.0).abs() < 1e-6, "{m}: {ka} {kb}");
+        }
+        s.ps.features.retain(|x| x.id != f);
+    }
+}
+
 #[test]
 fn curves_from_sketch_and_edges() {
     let mut s = Studio::new();

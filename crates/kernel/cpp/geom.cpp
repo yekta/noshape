@@ -622,6 +622,25 @@ P3 edge_tangent_at(const OcShape& es, double t)
   return from_vec(v);
 }
 
+rust::Vec<double> edge_derivatives_at(const OcShape& es, double t)
+{
+  const TopoDS_Edge& e = as_edge(es.shape, "shape");
+  if (BRep_Tool::Degenerated(e))
+    fail_invalid("edge is degenerated");
+  BRepAdaptor_Curve c(e);
+  gp_Pnt            p;
+  gp_Vec            d1, d2, d3;
+  c.D3(t, p, d1, d2, d3);
+  rust::Vec<double> r;
+  for (const gp_XYZ& x : {p.XYZ(), d1.XYZ(), d2.XYZ(), d3.XYZ()})
+  {
+    r.push_back(x.X());
+    r.push_back(x.Y());
+    r.push_back(x.Z());
+  }
+  return r;
+}
+
 P3 vertex_point(const OcShape& vs)
 {
   const TopoDS_Vertex& v = as_vertex(vs.shape, "shape");

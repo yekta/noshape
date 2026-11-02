@@ -407,6 +407,14 @@ impl Shape {
         Ok(v3(ck(ffi::edge_tangent_at(self.raw(), t))?))
     }
 
+    /// Point and first, second and third derivatives of an edge's curve at curve parameter `t` (the curve's own
+    /// direction, whatever the edge's orientation).
+    pub fn derivatives_at(&self, t: f64) -> Result<[DVec3; 4]> {
+        let v = ck(ffi::edge_derivatives_at(self.raw(), t))?;
+        let d = |i: usize| DVec3::new(v[3 * i], v[3 * i + 1], v[3 * i + 2]);
+        Ok([d(0), d(1), d(2), d(3)])
+    }
+
     /// True if an edge's start and end vertex are the same (closed curve);
     /// for wires, whether the wire is closed.
     pub fn is_closed(&self) -> Result<bool> {

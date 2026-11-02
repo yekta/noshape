@@ -773,6 +773,29 @@ impl<'a> QueryCx<'a> {
             out.retain(|x| x != e);
             return uniq(out);
         }
+        // A sketch curve's vertices are its ends; curves meet at shared ends (std Bridging curve infers a side's
+        // vertex from a picked sketch edge).
+        if let Ent::SketchEdge(s, id) | Ent::SketchVertex(s, id) = e {
+            let sk = &self.st.ctx.sketches[*s];
+            let ends = |c: u32| sk.sketch.endpoints(noshape_sketch::EntityId(c)).map(|(a, b)| [a.0, b.0]);
+            let verts: Vec<u32> = match e {
+                Ent::SketchEdge(..) => ends(*id).map(|v| v.to_vec()).unwrap_or_default(),
+                _ => vec![*id],
+            };
+            let curves = || sk.sketch.entities().filter(|x| x.kind().is_curve()).map(|x| x.id.0).filter(|c| ends(*c).is_some_and(|v| v.iter().any(|p| verts.contains(p))));
+            let mut out: Vec<Ent> = match t {
+                EType::Vertex => verts.iter().map(|v| Ent::SketchVertex(*s, *v)).collect(),
+                EType::Edge if by_vertex || matches!(e, Ent::SketchVertex(..)) => curves().map(|c| Ent::SketchEdge(*s, c)).collect(),
+                EType::Edge => Vec::new(),
+                EType::Face => match e {
+                    Ent::SketchEdge(..) => sk.regions.iter().filter(|r| r.id.entities().iter().any(|x| x.0 == *id)).map(|r| Ent::SketchRegion(*s, encode_region_key(&r.id))).collect(),
+                    _ => Vec::new(),
+                },
+                EType::Body => vec![Ent::SketchBody(*s)],
+            };
+            out.retain(|x| x != e);
+            return uniq(out);
+        }
         let (edges, verts) = self.boundary(e);
         let Some(b) = (match e {
             Ent::Face(b, _) | Ent::Edge(b, _) | Ent::Vertex(b, _) | Ent::Body(b) => Some(*b),
