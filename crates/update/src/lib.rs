@@ -383,16 +383,21 @@ fn unpack(file: &Path, kind: &Kind, to: &Path) -> Result<PathBuf, String> {
     }
     let _ = std::fs::remove_dir_all(to);
     std::fs::create_dir_all(to).map_err(|e| format!("{}: {e}", to.display()))?;
-    let mut c = quiet(match kind {
-        Kind::MacBundle { .. } => "/usr/bin/ditto",
-        Kind::WindowsPortable { .. } => "tar.exe",
-        _ => "/bin/tar",
-    });
-    match kind {
-        Kind::MacBundle { .. } => c.arg("-x").arg("-k").arg(file).arg(to),
-        Kind::WindowsPortable { .. } => c.arg("-xf").arg(file).arg("-C").arg(to),
-        _ => c.arg("-xzf").arg(file).arg("-C").arg(to),
+    // ditto keeps a macOS app's signature; elsewhere the system's tar (Windows' bsdtar reads zips too).
+    let mut c = if matches!(kind, Kind::MacBundle { .. }) {
+        let mut c = quiet("/usr/bin/ditto");
+        c.arg("-x").arg("-k");
+        c
+    } else {
+        let mut c = quiet(if cfg!(windows) { "tar.exe" } else if Path::new("/usr/bin/tar").is_file() { "/usr/bin/tar" } else { "/bin/tar" });
+        c.arg("-xf");
+        c
     };
+    c.arg(file);
+    if !matches!(kind, Kind::MacBundle { .. }) {
+        c.arg("-C");
+    }
+    c.arg(to);
     run(c, "unpacking the update")?;
     let want = match kind {
         Kind::MacBundle { .. } => "noshape.app",
