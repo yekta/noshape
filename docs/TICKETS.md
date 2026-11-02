@@ -6,7 +6,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## From the user, 2026-11-02 (v0.4.19, macOS)
-- [x] P0 SPLIT-PIECE-NAMES (core): a revolved body split by two planes into 3 parts; Chamfer "Face of Split 1" (one
+- [x] verified 7b11ede71 (qa 11-02 00:52, qa-scratch/bin/splitnames.py: a Ø20 × 30 cylinder split by Right then Front into 4 quarters, Chamfer 0.8 mm of one quarter's x = 0 cut face: **v0.4.19 chamfers two parts** (Part 1 and Part 3, both 2331.1635 / 9 faces), **green 4a0fc474 only Part 1** (2331.1635 / 9; the other three 2356.1945 / 5)) P0 SPLIT-PIECE-NAMES (core): a revolved body split by two planes into 3 parts; Chamfer "Face of Split 1" (one
   face picked on one part, 0.8 mm, tangent propagation) chamfered the matching face of all three. Cause: OCCT's
   splitter leaves a cut face shared by the two pieces (one face in both solids), so both pieces' faces got one name and
   the reference resolved on every part carrying it. Fixed: `split_solids(.., apart)` / `name_pieces_apart` name a face
