@@ -1,16 +1,20 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
-## Resume here (2026-11-02 22:28 UTC, account move)
-State: worktree clean, nothing uncommitted, nothing queued; everything landed (last: 0d2e9aff, asm least-change cut).
-No detached jobs of mine running (the only one was a watch loop for live's answers, gone with the session).
-Parked, NOT to land as is: branch `skasm-drag-across` (f1a81069, sketch drag rule `SolveOptions::still_across`): it
-slows the 1549-curve bench drag 12.3 → 14.6 ms avg on vibe3; the lead's limit is ≤ 12.3 ms (`tools/tiers/perf.sh -p
-noshape-sketch --test all -- bench::bench_drag --ignored --nocapture --test-threads=1`). Details under 21:0x below.
+## Resume here (2026-11-02 23:30 UTC)
+State: two sketch drag commits on agent/skasm (f25655fc g6 far hold, e71728e2 g4 levels), landing after vibe3's
+bench numbers (g6 alone: 1549-curve drag 12.0–12.2 ms avg, limit 12.3). Branch `skasm-drag-across` is superseded by
+e71728e2 (the level rule only where no dimension holds and the dragged component has ≤ 60 curves; delete the branch).
+Sketch drags now (crates/sketch/src/drag_hold.rs): the dimension hold first (`drag_weights`, as before); when it
+can't reach the pointer, `keep_far` holds geometry ≥ 2 relations from the dragged one (Equal doesn't count as a
+link), its nearest ring giving way one curve at a time (latest first), what it released placed last by least change
+(`place_released`); with nothing dimensioned, `drag_levels` keeps H / V lines away from the dragged geometry level.
+Both only in dragged components of ≤ 60 curves (`DragGraph`, cached per revision). Probes 7 8/8, probes 9 4/6 over
+25 steps (g4 0.002 mm in x; g6's c4 0.11 mm: path dependence, exact in one step: asked live, REQUESTS "drag probes
+12"), live fuzz 169/230.
 Lead's list (20:15), in order:
 1. Done: dx's X1 (B), other documents' assemblies (27549ea9; note to dx in docs/handoff/dx.md "From skasm (11-02)").
    If dx asks for more (configurations of another document's assembly aren't offered), that comes first.
-2. Open sketch-fuzz cases, P1 first. P1: drag probes g4 (parked, speed) and g6 (live keeps the lower-left hole and
-   moves the centre on its circle: a constructive drag; must stay within the bench budget). P2 (random batches 1–3,
+2. Open sketch-fuzz cases. P1 drag probes g4 / g6: done (above; g6 c4 waits on live's probes 12). P2 (random batches 1–3,
    sums in /root/skasm-scratch/fz/*.k; `fz/runall.sh <tag> [ENV=..]` runs all, `fz/cmp.sh <batch> <seed>` one case,
    `fz/tr.sh <seed|probe>` traces the pass): s6 170 mm, s218 95, s236 81, s102 79, s226 58, s209 43, s11 10.
    Asm known: f50 f53 f54 f55 f64 (f64: live turns C 93.9° where the smallest turn, ours, is 90°: no rule yet).
