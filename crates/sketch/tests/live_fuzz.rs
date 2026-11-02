@@ -51,6 +51,9 @@ struct Case {
     spec: Vec<Value>,
     os_entities: Vec<Value>,
     os_constraints: Vec<Value>,
+    /// Generator version 2 (batch 3 on, seeds from 201): splines in the form
+    /// Onshape solves (live 1772), no relation repeated.
+    v2: bool,
 }
 
 const MM: f64 = 1e-3;
@@ -67,7 +70,7 @@ fn dir(v: &str) -> Value {
 
 impl Case {
     fn new() -> Case {
-        Case { sk: Sketch::new(), points: Vec::new(), curves: Vec::new(), cons: Vec::new(), spec: Vec::new(), os_entities: Vec::new(), os_constraints: Vec::new() }
+        Case { sk: Sketch::new(), points: Vec::new(), curves: Vec::new(), cons: Vec::new(), spec: Vec::new(), os_entities: Vec::new(), os_constraints: Vec::new(), v2: false }
     }
     fn point(&self, name: &str) -> EntityId {
         self.points.iter().find(|(n, _)| n == name).unwrap().1
@@ -115,8 +118,35 @@ impl Case {
         self.points.push((format!("{id}.end"), b));
         self.curves.push((id.clone(), e, Kind::Free));
         let flat: Vec<f64> = mm.iter().flat_map(|p| [p.x, p.y]).collect();
+        if !self.v2 {
+            self.os_entities.push(json!({"btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "startParam": 0.0, "endParam": 1.0,
+                "geometry": {"btType": "BTCurveGeometryInterpolatedSpline-116", "isPeriodic": false, "interpolationPoints": flat, "startDerivativeX": 0.0, "startDerivativeY": 0.0, "endDerivativeX": 0.0, "endDerivativeY": 0.0, "startHandleX": 0.0, "startHandleY": 0.0, "endHandleX": 0.0, "endHandleY": 0.0, "derivatives": {}}}));
+            return id;
+        }
+        // Live 1772's working form: internal point ids, the point count, the
+        // ends tied to the first / last internal points, and real end
+        // derivatives (ours: the natural ends', per unit of a 0–1 parameter).
+        let (d0, d1) = match self.sk.curve(e) {
+            Some(Curve2::Nurbs(nb)) => {
+                let (a, b) = nb.domain();
+                (nb.eval_ders(a)[1] * (b - a), nb.eval_ders(b)[1] * (b - a))
+            }
+            _ => (DVec2::X, DVec2::X),
+        };
+        let n = mm.len();
+        let mut internal: Vec<String> = (0..n).map(|k| format!("{id}.{k}.internal")).collect();
+        internal.push(format!("{id}.startHandle"));
+        internal.push(format!("{id}.endHandle"));
         self.os_entities.push(json!({"btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "startParam": 0.0, "endParam": 1.0,
-            "geometry": {"btType": "BTCurveGeometryInterpolatedSpline-116", "isPeriodic": false, "interpolationPoints": flat, "startDerivativeX": 0.0, "startDerivativeY": 0.0, "endDerivativeX": 0.0, "endDerivativeY": 0.0, "startHandleX": 0.0, "startHandleY": 0.0, "endHandleX": 0.0, "endHandleY": 0.0, "derivatives": {}}}));
+            "internalIds": internal,
+            "parameters": [
+                {"btType": "BTMParameterBoolean-144", "parameterId": "geometryIsPeriodic", "value": false},
+                {"btType": "BTMParameterQuantity-147", "parameterId": "splinePointCount", "expression": format!("{n}.0"), "isInteger": false, "value": 0, "units": ""}
+            ],
+            "geometry": {"btType": "BTCurveGeometryInterpolatedSpline-116", "isPeriodic": false, "interpolationPoints": flat, "startDerivativeX": d0.x, "startDerivativeY": d0.y, "endDerivativeX": d1.x, "endDerivativeY": d1.y, "startHandleX": 0.0, "startHandleY": 0.0, "endHandleX": 0.0, "endHandleY": 0.0, "derivatives": {}}}));
+        for (end, k) in [("start", 0), ("end", n - 1)] {
+            self.os_constraints.push(json!({"btType": "BTMSketchConstraint-2", "constraintType": "COINCIDENT", "entityId": format!("{id}.{end}.tie"), "parameters": [s("localFirst", &format!("{id}.{end}")), s("localSecond", &format!("{id}.{k}.internal"))]}));
+        }
         id
     }
     fn conic(&mut self, a: DVec2, ctrl: DVec2, b: DVec2, rho: f64) -> String {
@@ -160,15 +190,55 @@ impl Case {
         self.spec.push(sp);
         self.os_constraints.push(json!({"btType": "BTMSketchConstraint-2", "constraintType": os_type, "entityId": name, "parameters": params}));
     }
+    /// Removes constraints from the newest back while the sketch is
+    /// over-defined (v2 batches; the shapes' own constraints never are).
+    fn drop_overdefining(&mut self) {
+        loop {
+            let mut probe = self.sk.clone();
+            let rep = probe.solve();
+            let Some(&last) = rep.conflicting().iter().max() else { return };
+            let Some(k) = self.cons.iter().position(|(_, o)| *o == Some(last)) else { return };
+            self.sk.remove_constraint(last).unwrap();
+            self.cons.remove(k);
+            self.spec.remove(k);
+            // Onshape constraints: the spline ties are extra entries; find by id.
+            let name = format!("k{}", k + 1);
+            if let Some(i) = self.os_constraints.iter().position(|x| x["entityId"] == name.as_str()) {
+                self.os_constraints.remove(i);
+            }
+            // Keep the k-numbering dense: rename the later ones.
+            for (j, entry) in self.cons.iter_mut().enumerate().skip(k) {
+                entry.0 = format!("k{}", j + 1);
+            }
+            for (j, sp) in self.spec.iter_mut().enumerate().skip(k) {
+                sp["id"] = json!(format!("k{}", j + 1));
+            }
+            let mut j = 0;
+            for oc in self.os_constraints.iter_mut() {
+                if oc["entityId"].as_str().is_some_and(|x| x.starts_with('k')) {
+                    j += 1;
+                    oc["entityId"] = json!(format!("k{j}"));
+                }
+            }
+        }
+    }
+
     fn coincident(&mut self, a: &str, b: &str) {
         let (x, y) = (self.point(a), self.point(b));
         self.con(ConstraintKind::Coincident { a: x, b: y }, "COINCIDENT", vec![s("localFirst", a), s("localSecond", b)], json!({"first": a, "second": b}));
     }
     fn on_curve(&mut self, p: &str, c: &str) {
+        if self.v2 && self.spec.iter().any(|k| k["type"] == "COINCIDENT" && k["first"] == p && k["second"] == c) {
+            return;
+        }
         let (x, y) = (self.point(p), self.curve(c));
         self.con(ConstraintKind::Coincident { a: x, b: y }, "COINCIDENT", vec![s("localFirst", p), s("localSecond", c)], json!({"first": p, "second": c}));
     }
     fn pair(&mut self, os: &str, a: &str, b: &str) {
+        // v2: a relation already there (either order) isn't added again.
+        if self.v2 && self.spec.iter().any(|k| k["type"] == os && ((k["first"] == a && k["second"] == b) || (k["first"] == b && k["second"] == a))) {
+            return;
+        }
         let (x, y) = (self.curve(a), self.curve(b));
         let kind = match os {
             "PARALLEL" => ConstraintKind::Parallel { a: x, b: y },
@@ -209,6 +279,7 @@ fn generate(seed: u64, rich: bool) -> Case {
         r.next();
     }
     let mut c = Case::new();
+    c.v2 = seed >= 201;
     let shapes = 1 + r.below(3);
     for k in 0..shapes {
         let o = DVec2::new(k as f64 * 60.0 + r.range(-5.0, 5.0), r.range(-5.0, 5.0));
@@ -388,6 +459,11 @@ fn generate(seed: u64, rich: bool) -> Case {
             _ => {}
         }
     }
+    // v2: a relation or random dimension that over-defines is taken back
+    // (the batch measures least change; the deliberate one below stays).
+    if c.v2 {
+        c.drop_overdefining();
+    }
     // One case in four over-defines on purpose: a second dimension on a
     // dimensioned line or curve, at a different value (or the same: redundant).
     if r.chance(0.25) {
@@ -453,7 +529,7 @@ fn batch(n: usize, first_seed: u64, rich: bool) -> Value {
         let drag = (ours["status"] == "solved").then(|| {
             let name = c.points.iter().map(|p| p.0.clone()).find(|n| n.ends_with(".start")).unwrap_or_else(|| c.points[0].0.clone());
             let to = c.pos(&name) / MM + DVec2::new(5.0, 3.0);
-            let mut d = Case { sk: c.sk.clone(), points: c.points.clone(), curves: c.curves.clone(), cons: c.cons.clone(), spec: Vec::new(), os_entities: Vec::new(), os_constraints: Vec::new() };
+            let mut d = Case { sk: c.sk.clone(), points: c.points.clone(), curves: c.curves.clone(), cons: c.cons.clone(), spec: Vec::new(), os_entities: Vec::new(), os_constraints: Vec::new(), v2: c.v2 };
             d.sk.drag(&[(DragHandle::Point(d.point(&name)), to * MM)]);
             let after = ours_points(&d);
             json!({"point": name, "to": [to.x, to.y], "ours": after})
@@ -478,12 +554,17 @@ fn write_batch() {
 }
 
 /// The batches: (number, first seed, rich).
-const BATCHES: [(usize, u64, bool); 2] = [(1, 1, false), (2, 101, true)];
+const BATCHES: [(usize, u64, bool); 3] = [(1, 1, false), (2, 101, true), (3, 201, true)];
+
+/// Cases in batch `n` (batch 3 on: 40, where positions match least).
+fn batch_size(n: usize) -> usize {
+    if n >= 3 { 40 } else { 20 }
+}
 
 /// Batch `n` (20 seeds from `first`): written when LIVE_FUZZ_WRITE is set,
 /// else checked unchanged.
 fn check_batch(n: usize, first: u64, rich: bool) {
-    let b = batch(20, first, rich);
+    let b = batch(batch_size(n), first, rich);
     let path = fixture(&format!("sketch-{n}.json"));
     // LIVE_FUZZ_WRITE=<n>: (re)write batch n only (a batch sent to live stays as sent).
     if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == n.to_string()) {
@@ -575,9 +656,9 @@ fn live_matches() {
         // Ours as the solver stands now (the batch file keeps ours as sent);
         // FUZZ_ONLY=<seed> for one case.
         let ours = match std::env::var("FUZZ_ONLY").ok().and_then(|v| v.parse::<u64>().ok()) {
-            Some(seed) if (first..first + 20).contains(&seed) => batch(1, seed, rich),
+            Some(seed) if (first..first + batch_size(n) as u64).contains(&seed) => batch(1, seed, rich),
             Some(_) => continue,
-            None => batch(20, first, rich),
+            None => batch(batch_size(n), first, rich),
         };
         let live: Value = serde_json::from_str(&live).unwrap();
         for case in ours["cases"].as_array().unwrap() {
