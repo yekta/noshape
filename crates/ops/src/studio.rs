@@ -592,8 +592,8 @@ pub fn frame_of_ref(display: &noshape_model::display::StudioDisplay, ctx: Option
 }
 
 /// A Section view plane for a reference: [`frame_of_ref`]'s, or for a cylinder or cone face the plane through its
-/// axis across its reference direction (live 1709, 11-02: a cylinder extruded from a circle on Top reads "Section
-/// plane 1 (Right)", wherever it is picked).
+/// axis and its reference direction, its normal reference × axis (live 11-02: live-30's bosses, axis -Z and reference
+/// -X in our x_t, read "Section plane 1 (Front)" and lose their front halves, wherever picked).
 pub fn section_frame_of_ref(display: &noshape_model::display::StudioDisplay, ctx: Option<&noshape_model::regen::context::Context>, r: &Reference) -> Option<noshape_model::display::PlaneFrame> {
     if let Some(f) = frame_of_ref(display, ctx, r) {
         return Some(f);
@@ -605,7 +605,8 @@ pub fn section_frame_of_ref(display: &noshape_model::display::StudioDisplay, ctx
             noshape_kernel::Surface::Cylinder { origin, axis, x_dir, .. } | noshape_kernel::Surface::Cone { origin, axis, x_dir, .. } => (origin, axis.normalize(), x_dir.normalize()),
             _ => return None,
         };
-        Some(noshape_model::display::PlaneFrame { origin, x: axis.cross(x_dir), y: axis, normal: x_dir })
+        let normal = x_dir.cross(axis).normalize_or_zero();
+        Some(noshape_model::display::PlaneFrame { origin, x: x_dir, y: normal.cross(x_dir), normal })
     })
 }
 

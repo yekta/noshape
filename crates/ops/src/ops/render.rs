@@ -210,15 +210,7 @@ fn image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             c.distance = v.distance;
             c
         }
-        // As the app's Zoom to fit (Onshape's zoomToFit, padding 1.05).
-        None => {
-            let mut c = noshape_render::Camera::default();
-            if let Some(v) = view {
-                c.set_view(v);
-            }
-            c.fit_box(lo, hi, aspect);
-            c
-        }
+        None => fit_camera(lo, hi, aspect, view),
     };
     let mut camera = camera;
     // View normal to: looking at the plane's front, its y up (the app's).
@@ -291,7 +283,7 @@ fn named_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let r = od.regenerate(tab, None)?;
     let (planes, _) = section_planes(od, &r, a)?;
     let (lo, hi) = r.display.bodies.iter().filter(|b| !b.hidden).filter_map(|b| b.bounds).fold(None, |acc: Option<(glam::DVec3, glam::DVec3)>, (l, h)| Some(acc.map_or((l, h), |(a, b)| (a.min(l), b.max(h))))).unwrap_or((glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05)));
-    let c = noshape_scene::png::fit_camera(lo, hi, 4.0 / 3.0, Some(view));
+    let c = fit_camera(lo, hi, 4.0 / 3.0, Some(view));
     let name = if name.is_empty() {
         let existing: Vec<String> = crate::doc::studio(od.doc(), tab)?.named_views.iter().map(|v| v.name.clone()).collect();
         (1..).map(|n| format!("View {n}")).find(|n| !existing.contains(n)).unwrap_or_default()
@@ -363,7 +355,7 @@ fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, vo: ViewOpti
     let built = asm_scene::build(&result, &opts, &mut AsmGpuCache::default(), &up);
     let (lo, hi) = built.scene.bounds().map(|(l, h)| (l.as_dvec3(), h.as_dvec3())).unwrap_or((glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05)));
     let aspect = width as f64 / height as f64;
-    let mut camera = window.unwrap_or_else(|| noshape_scene::png::fit_camera(lo, hi, aspect, view));
+    let mut camera = window.unwrap_or_else(|| fit_camera(lo, hi, aspect, view));
     if window.is_none() {
         vo.finish_camera(&mut camera, lo, hi, aspect);
     }
@@ -404,6 +396,16 @@ fn window_display_args(ctx: &mut Ctx, a: &Args) -> Result<Option<serde_json::Val
         m.insert("boundary_edges".into(), json!(true));
     }
     Ok(Some(v))
+}
+
+/// A standard view zoomed to fit as the app's F (Onshape's zoomToFit, padding 1.05).
+fn fit_camera(lo: glam::DVec3, hi: glam::DVec3, aspect: f64, view: Option<StandardView>) -> noshape_render::Camera {
+    let mut c = noshape_render::Camera::default();
+    if let Some(v) = view {
+        c.set_view(v);
+    }
+    c.fit_box(lo, hi, aspect);
+    c
 }
 
 /// `view: "window"`: the window's camera for the tab (view_camera).

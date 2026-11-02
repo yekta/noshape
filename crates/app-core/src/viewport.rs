@@ -452,6 +452,10 @@ struct OrbitBench {
     fitted: bool,
     /// When the last tick ran (`v.bench_tick`: the timer's real period).
     last_tick: Option<Instant>,
+    /// Pick: the click being timed (when, and the first frame that can show its selection once the studio's new
+    /// scene came), and the click to highlighted frame times (ms).
+    click: Option<(Instant, Option<u64>)>,
+    click_ms: Vec<f32>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -462,6 +466,9 @@ enum BenchKind {
     /// The tool drags what is under the viewport centre back and forth
     /// (an assembly instance: solve, scene move, frame), as a mouse would.
     Drag,
+    /// Clicks across the model, each timed from the click to the first presented frame with its selection
+    /// (`NOSHAPE_PERF_ORBIT` clicks, at most 60).
+    Pick,
 }
 
 static BENCH_CLAIMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -475,9 +482,10 @@ fn orbit_bench_from_env() -> Option<OrbitBench> {
         Ok("zoom") => BenchKind::Zoom,
         Ok("pan") => BenchKind::Pan,
         Ok("drag") => BenchKind::Drag,
+        Ok("pick") => BenchKind::Pick,
         _ => BenchKind::Orbit,
     };
-    Some(OrbitBench { frames, started: None, frames_at_start: 0, last_present: None, kind, grab: None, hover_wait: 0, ticks: 0, renders: 0, intervals: Vec::new(), ui_cpu: Vec::new(), cpu_at_present: None, window_draw: Vec::new(), drawable_wait: Vec::new(), draw_at_present: None, fitted: false, last_tick: None })
+    Some(OrbitBench { frames, started: None, frames_at_start: 0, last_present: None, kind, grab: None, hover_wait: 0, ticks: 0, renders: 0, intervals: Vec::new(), ui_cpu: Vec::new(), cpu_at_present: None, window_draw: Vec::new(), drawable_wait: Vec::new(), draw_at_present: None, fitted: false, last_tick: None, click: None, click_ms: Vec::new() })
 }
 
 impl EventEmitter<ViewportEvent> for Viewport {}
@@ -648,6 +656,10 @@ impl Viewport {
         let picks_changed = no_pick(&scene) != no_pick(&self.scene);
         self.scene_bounds = scene.bounds();
         self.scene = scene;
+        // Pick bench: the next frame submitted shows the click's selection.
+        if let Some((_, need @ None)) = self.bench.as_mut().and_then(|b| b.click.as_mut()) {
+            *need = Some(self.seq + 1);
+        }
         if geometry_changed || picks_changed {
             self.pick_dirty = true;
         }
@@ -1202,6 +1214,13 @@ impl Viewport {
             return;
         }
         self.last_presented = seq;
+        if let Some(b) = &mut self.bench
+            && let Some((t, Some(need))) = b.click
+            && seq >= need
+        {
+            b.click_ms.push(t.elapsed().as_secs_f32() * 1000.0);
+            b.click = None;
+        }
         match result {
             Ok((frame, image)) => {
                 // Once a frame is up, std's dialog logic loads in the
@@ -1477,12 +1496,15 @@ impl Viewport {
             b.started = Some(Instant::now());
             b.frames_at_start = self.frames_presented;
             match b.kind {
-                BenchKind::Zoom => {}
+                BenchKind::Zoom | BenchKind::Pick => {}
                 BenchKind::Drag => self.drag = Drag::Tool,
                 BenchKind::Orbit | BenchKind::Pan => self.drag = Drag::Nav,
             }
         }
         let Some(b) = &mut self.bench else { return false };
+        if b.kind == BenchKind::Pick {
+            return self.pick_bench_tick(cx);
+        }
         let presented = self.frames_presented - b.frames_at_start;
         if presented >= b.frames {
             let el = b.started.map(|t| t.elapsed().as_secs_f64()).unwrap_or(1.0);
@@ -1514,6 +1536,7 @@ impl Viewport {
                     BenchKind::Zoom => "zoom",
                     BenchKind::Pan => "pan",
                     BenchKind::Drag => "drag",
+                    BenchKind::Pick => "pick",
                 },
                 match (self.shown_texture.is_some(), bench_driven_by_frames()) {
                     (true, false) => "frames on the GPU",
@@ -1559,6 +1582,7 @@ impl Viewport {
             // A drag back and forth that keeps the model in view.
             BenchKind::Pan => self.camera.pan(if (ticks / 30) % 2 == 0 { DVec2::new(6.0, 2.0) } else { DVec2::new(-6.0, -2.0) }, h),
             BenchKind::Orbit => self.camera.orbit(DVec2::new(3.0, 0.75), h),
+            BenchKind::Pick => return true,
             // A triangle wave ±60 px about the grab point; the camera stays.
             BenchKind::Drag => {
                 let phase = (ticks % 120) as f64;
@@ -1568,6 +1592,40 @@ impl Viewport {
             }
         }
         self.camera_changed(cx);
+        true
+    }
+
+    /// The pick benchmark: a click at the next of eight points around the view centre once the last one shows (or
+    /// changed nothing within 2 s), as a mouse click is handled (the pick, the studio's selection, its frame).
+    fn pick_bench_tick(&mut self, cx: &mut Context<Self>) -> bool {
+        let (size, instances) = (self.size(), self.scene.instances.len());
+        let Some(b) = &mut self.bench else { return false };
+        let clicks = b.frames.min(60) as usize;
+        if b.click_ms.len() >= clicks {
+            let n = b.click_ms.len();
+            let st = noshape_render::perf::Stats::of(&mut b.click_ms);
+            log::info!(target: "perf", "BENCH SUMMARY pick: {n} clicks, {instances} instances | click to the frame with its selection mean {:.1} p50 {:.1} p95 {:.1} max {:.1} ms", st.mean, st.p50, st.p95, st.max);
+            noshape_render::perf::flush();
+            self.bench = None;
+            return false;
+        }
+        if let Some((t, _)) = b.click {
+            if t.elapsed() < Duration::from_secs(2) {
+                return true;
+            }
+            // Nothing changed (the same selection): the next point.
+            b.click = None;
+        }
+        // Wait between clicks, so each starts from a settled view.
+        b.ticks += 1;
+        if b.ticks % 25 != 0 {
+            return true;
+        }
+        const AT: [(f64, f64); 8] = [(0.5, 0.5), (0.35, 0.4), (0.65, 0.6), (0.4, 0.65), (0.6, 0.35), (0.45, 0.55), (0.55, 0.45), (0.5, 0.3)];
+        let k = (b.ticks / 25) as usize % AT.len();
+        let p = DVec2::new(size.x * AT[k].0, size.y * AT[k].1);
+        b.click = Some((Instant::now(), None));
+        self.click_at(p, Modifiers::default(), cx);
         true
     }
 

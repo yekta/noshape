@@ -37,6 +37,13 @@ COMPARED = [("fps", "fps", True), ("p95", "frame-interval p95", False), ("cpup95
 MIN_CHANGE = {"fps": 2.0, "p95": 2.0, "cpup95": 0.5, "gpup95": 0.5}
 
 
+# The pick benchmark: clicks across the model, each from the click to the first presented frame with its selection.
+PICK = re.compile(r"BENCH SUMMARY pick: (?P<n>\d+) clicks, (?P<inst>\d+) instances \| click to the frame with its selection mean (?P<mean>[\d.]+) "
+                  r"p50 (?P<p50>[\d.]+) p95 (?P<p95>[\d.]+) max (?P<max>[\d.]+) ms")
+# AGENTS.md: a click gives visible feedback within a frame; reported against two 60 Hz frames (the pick, then the
+# frame drawn), not gated.
+TARGET_PICK_MS = 33.3
+
 # Startup milestones (NOSHAPE_PERF=1 logs), ms from process start; the
 # pipelines' compile time in ms.
 STARTUP = {
@@ -57,6 +64,8 @@ TARGET_OPEN_MS = 500.0
 def runs(out):
     rows = []
     for log in sorted(glob.glob(os.path.join(out, "*-*.log"))):
+        if log.endswith("-pick.log"):
+            continue
         mode = os.path.basename(log).split("-")[0]
         text = open(log, encoding="utf-8", errors="replace").read()
         m = SUMMARY.search(text)
@@ -179,6 +188,15 @@ def main():
         for i, r in enumerate(started):
             lines.append(f"| {'first' if i == 0 and r['log'] == 'texture-orbit.log' else 'later'}: {r['log'][:-4]} | {ms(r.get('window_ms'))} | {ms(r.get('frame_ms'))} | {ms(r.get('pipelines_ms'))} |")
     lines += [""] + speed_targets(rows, started)
+    for log in sorted(glob.glob(os.path.join(args.out, "*-pick.log"))):
+        with open(log, errors="replace") as f:
+            m = PICK.search(f.read())
+        if m:
+            p50, p95 = float(m["p50"]), float(m["p95"])
+            lines.append(f"- selection ({m['n']} clicks, {m['inst']} instances): click to the frame with it p50 {p50:.1f} ms, p95 {p95:.1f} ms, "
+                         f"max {float(m['max']):.1f} ms; target {TARGET_PICK_MS:.0f} ms: {'met' if p95 <= TARGET_PICK_MS else 'not met'}")
+        else:
+            lines.append(f"- selection: no pick BENCH SUMMARY in {os.path.basename(log)}")
     failures = []
     ran = {r["mode"] for r in rows if not r.get("missing")}
     if args.stills and not {"texture", "readback"} <= ran:

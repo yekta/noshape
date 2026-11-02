@@ -41,6 +41,8 @@ wait_for() { # pattern log seconds
 }
 RUNS=()
 for mode in "${MODES[@]}"; do RUNS+=("$mode:orbit:" "$mode:zoom:" "$mode:pan:"); done
+# Selection latency (`NOSHAPE_PERF_BENCH=pick`: clicks across the model, click to the frame with its selection), once.
+[[ ${PICK:-1} == 1 ]] && RUNS+=("${MODES[0]}:pick:")
 # A variant `name@kind:VARS` runs that bench kind (orbit, pan or zoom; default orbit).
 for v in ${VARIANTS:-}; do
   name=${v%%:*}; vkind=orbit

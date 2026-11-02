@@ -201,6 +201,17 @@ document's display mesh is under 0.5 s.
 
 ## In progress
 
+11-02 night (user: "the viewport against live, looks and speed"): docs/parity/audit-viewport.md. Method: the same
+B-rep both sides (our live-30 / knurl exported as x_t into live's "noshape mm test"; live's NIST x_t and 2000-instance
+STEP imported into ours, ~/psui-nistxt.noshape and ~/psui-bigasm.noshape on vibe5), live's `#canvas` at 1673 x 886
+(/root/psui-scratch/live/vp.mjs, modes.mjs) against `noshape-cli render image` at that size (/root/psui-scratch/vpr.sh,
+vpm.sh), `compare -fuzz 6%`. Landed V1-V5 (Onshape's SSAO port, Translucent front faces at 25 %, hidden edges faded
+85 % and only where hidden, render_image framing, Graphics preferences tooltips). Pending: V6 (assembly / named view
+framing), the A30 fix (a cylinder's section plane contains its reference direction), the pick benchmark
+(`NOSHAPE_PERF_BENCH=pick`, bench.sh / analyze.py). Speed: perf.yml on main says NIST at 2x orbit 62-80 fps, GPU p95
+20-32 ms (the v0.4.21 "regression" is runner noise: no render change in v0.4.20..v0.4.21, v0.4.20 alone 56 and 80 fps);
+breakdown run 41527719581 (variants noao / nolines / nosil / msaa1 / nomesh on 6db7d596).
+
 11-02 evening (user: "the audit's remaining items, then Render / appearance, Section view, Measure, menus"): all
 landed or queued, audit-part-studio A26-A30 and M11/M12/M15. Measure: every type against live 1709 (14 pairs; pair
 rules in model-core measure.rs, one type filter measure::row_type for both studios). Section view: several planes

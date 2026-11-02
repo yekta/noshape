@@ -1375,14 +1375,12 @@ impl PartStudioView {
         self.set_visibility(&all, !any_hidden, cx);
     }
 
-    /// p (live request 1673): the default planes' own visibility: all three
-    /// hidden when any is shown, else all shown (the opposite tie-break to
+    /// p (live request 1673, 11-02): every plane's own visibility, the default ones and the features' (a Plane
+    /// feature's "Plane z10" with them): all hidden when any is shown, else all shown (the opposite tie-break to
     /// Shift+H).
     pub(super) fn toggle_default_planes(&mut self, cx: &mut Context<Self>) {
-        use noshape_model::reference::DatumPlane;
-        let planes = [DatumPlane::Top, DatumPlane::Front, DatumPlane::Right].map(Reference::Plane);
-        let hidden = self.studio(cx).map(|s| s.hidden_defaults.clone()).unwrap_or_default();
-        let any_shown = planes.iter().any(|p| !hidden.contains(p));
+        let planes: Vec<Reference> = self.display.planes.iter().map(|p| p.reference.clone()).collect();
+        let any_shown = self.display.planes.iter().any(|p| !p.hidden);
         self.set_visibility(&planes, any_shown, cx);
     }
 

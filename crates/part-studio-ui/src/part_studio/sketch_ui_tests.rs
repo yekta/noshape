@@ -762,6 +762,34 @@ fn an_escaped_folder_rename_records_nothing(cx: &mut TestAppContext) {
     assert_eq!(undo, undo_before, "no rename recorded");
 }
 
+/// Live 11-02 (qa4's "Plane z10"): p hides every plane, a Plane feature's with the default ones, then shows them all.
+#[gpui::test]
+fn p_toggles_every_plane(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "p-planes");
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let tab = v.tab;
+            v.doc.update(cx, |doc, cx| {
+                doc.edit_studio(tab, "Add plane", cx, |ps| {
+                    let mut f = ps.new_feature("cPlane", &noshape_units::UnitPrefs::default()).expect("Plane");
+                    f.params.set("entities", noshape_model::ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+                    f.params.set("offset", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("10 mm")));
+                    ps.features.push(f);
+                })
+            });
+        })
+    });
+    wait_until(cx, window, |cx| view.read(cx).display.planes.len() == 4);
+    let shown = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display.planes.iter().filter(|p| !p.hidden).count());
+    assert_eq!(shown(cx), 4, "the default planes and Plane z10");
+    cx.update(|cx| view.update(cx, |v, cx| v.toggle_default_planes(cx)));
+    wait_until(cx, window, |cx| view.read(cx).display.planes.iter().all(|p| p.hidden));
+    assert_eq!(shown(cx), 0, "p hid every plane");
+    cx.update(|cx| view.update(cx, |v, cx| v.toggle_default_planes(cx)));
+    wait_until(cx, window, |cx| view.read(cx).display.planes.iter().all(|p| !p.hidden));
+    assert_eq!(shown(cx), 4, "p again showed them all");
+}
+
 /// core-workflow 8.1.15 / 8.6.4: one Esc cancels the appearance editor, its hex field focused (live request 1663 (a)).
 #[gpui::test]
 fn escape_cancels_the_appearance_editor(cx: &mut TestAppContext) {
