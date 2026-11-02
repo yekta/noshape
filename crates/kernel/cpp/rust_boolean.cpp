@@ -143,6 +143,36 @@ occ::handle<Geom_BSplineCurve> conic_as_bspline(const occ::handle<Geom_Curve>& c
   return fit.IsDone() ? fit.Curve() : occ::handle<Geom_BSplineCurve>();
 }
 
+// A hyperbola's or parabola's part from `f` to `l` as a cubic B-spline through 129 of its points at its own
+// parameters (its parameters the conic's), else null where it misses the conic by over 1e-9 m between them: an
+// input's edge on one (a plane's section of a cone), the curve an extruded face sweeps (Shell's slabs of those).
+occ::handle<Geom_BSplineCurve> conic_part_as_bspline(const occ::handle<Geom_Curve>& c, double f, double l)
+{
+  if (occ::down_cast<Geom_Hyperbola>(c).IsNull() && occ::down_cast<Geom_Parabola>(c).IsNull())
+    return occ::handle<Geom_BSplineCurve>();
+  const int                                n   = 128;
+  occ::handle<NCollection_HArray1<gp_Pnt>> pts = new NCollection_HArray1<gp_Pnt>(1, n + 1);
+  occ::handle<NCollection_HArray1<double>> prm = new NCollection_HArray1<double>(1, n + 1);
+  for (int k = 0; k <= n; ++k)
+  {
+    const double t = f + (l - f) * k / n;
+    pts->SetValue(k + 1, c->Value(t));
+    prm->SetValue(k + 1, t);
+  }
+  GeomAPI_Interpolate fit(pts, prm, false, 1e-12);
+  fit.Perform();
+  if (!fit.IsDone())
+    return occ::handle<Geom_BSplineCurve>();
+  const occ::handle<Geom_BSplineCurve> b = fit.Curve();
+  for (int k = 0; k < n; ++k)
+  {
+    const double t = f + (l - f) * (k + 0.5) / n;
+    if (b->Value(t).Distance(c->Value(t)) > 1e-9)
+      return occ::handle<Geom_BSplineCurve>();
+  }
+  return b;
+}
+
 void push3(rust::Vec<double>& v, const gp_XYZ& p)
 {
   v.push_back(p.X());
@@ -317,7 +347,10 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     const occ::handle<Geom_Circle>       circ = occ::down_cast<Geom_Circle>(bc);
     // (A Bézier curve (Shell's slabs of B-spline faces have them): as the B-spline it is, the same parameters.)
     const occ::handle<Geom_BezierCurve>  bzc  = occ::down_cast<Geom_BezierCurve>(bc);
-    const occ::handle<Geom_BSplineCurve> bsc  = bzc.IsNull() ? occ::down_cast<Geom_BSplineCurve>(bc) : GeomConvert::CurveToBSplineCurve(bzc);
+    // (A hyperbola or parabola: a B-spline of it, its parameters.)
+    occ::handle<Geom_BSplineCurve> bsc = bzc.IsNull() ? occ::down_cast<Geom_BSplineCurve>(bc) : GeomConvert::CurveToBSplineCurve(bzc);
+    if (bsc.IsNull())
+      bsc = conic_part_as_bspline(bc, f, l);
     const occ::handle<Geom_Ellipse>      ell  = occ::down_cast<Geom_Ellipse>(bc);
     if (occ::down_cast<Geom_Line>(bc).IsNull() && circ.IsNull() && bsc.IsNull() && ell.IsNull())
       return !occ::down_cast<Geom_Ellipse>(bc).IsNull() ? "an ellipse edge" : !occ::down_cast<Geom_Conic>(bc).IsNull() ? "a conic edge" : "a curved edge";
@@ -400,6 +433,14 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     occ::handle<Geom_BSplineCurve> swept = occ::down_cast<Geom_BSplineCurve>(basis_of(!ext.IsNull() ? ext->BasisCurve() : !rvl.IsNull() ? rvl->BasisCurve() : occ::handle<Geom_Curve>()));
     if (swept.IsNull() && !ext.IsNull())
       swept = conic_as_bspline(basis_of(ext->BasisCurve()));
+    // (A hyperbola's or parabola's over the face's range of it, a little more either side.)
+    if (swept.IsNull() && !ext.IsNull())
+    {
+      double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+      BRepTools::UVBounds(f, u0, u1, v0, v1);
+      const double m = 0.01 * (u1 - u0);
+      swept = conic_part_as_bspline(basis_of(ext->BasisCurve()), u0 - m, u1 + m);
+    }
     const bool free = !bss.IsNull() || !tor.IsNull() || !sph.IsNull() || ((!ext.IsNull() || !rvl.IsNull()) && !swept.IsNull());
     if (pl.IsNull() && cyl.IsNull() && con.IsNull() && !free)
     {

@@ -672,3 +672,18 @@ fn a_vertex_at_an_arc_inside_two_slabs_edges_is_deleted_as_occt() {
     let counts = |x: &k::OpResult| placed_records(x).into_iter().map(|(key, v)| (key, v.len())).collect::<std::collections::BTreeMap<_, _>>();
     assert_eq!(counts(&r), counts(&o));
 }
+
+/// Shell's slab common on a part with a cone cut by a plane (recorded): its edges on the hyperbola and the face
+/// extruded from it taken as cubic B-splines through the conic at its own parameters (it declined "a conic edge",
+/// then "an extruded face"); valid, OCCT's counts and volume.
+#[test]
+fn hyperbola_edges_and_a_face_extruded_from_one() {
+    valid_as_occt("6abd9f7169b73894", 1e-9);
+}
+
+/// Shell's slab common on a part whose vertices have 0.18 mm tolerances, a vertex 0.12 mm off its face's plane
+/// (recorded): within its own tolerance, as OCCT's (it declined "a face's vertex off its plane").
+#[test]
+fn a_tolerant_vertex_off_its_faces_plane() {
+    valid_as_occt("f2a83857d9152ede", 1e-9);
+}

@@ -1120,6 +1120,19 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Shell's slab fuses: conic edges, extruded conics, tolerant vertices off planes (11-02 08:00 UTC)
+- Shell's recorded fuzz Booleans (vibe5 ~/agents/bool-corpora/shfall, 194 OCCT-built): 13 -> 25 taken, 0 differ
+  (4 equivalent: the recorded result differs from OCCT's now, ours is the live one's).
+- "a conic edge" (22, the top): an input's hyperbola or parabola edge (a plane's section of a cone) is a cubic
+  B-spline through 129 of its points at its own parameters (within 1e-9 m checked between them, else declined as
+  before); "an extruded face" (then 13): a face extruded from one, the same over the face's range of it (+1 %).
+  T1 hyperbola_edges_and_a_face_extruded_from_one.
+- "a face's vertex off its plane" (then 19): a tolerant vertex within its own tolerance of the plane, up to 1 mm
+  (0.18 mm vertices 0.12 mm off; an 8 mm one still declines). T1 a_tolerant_vertex_off_its_faces_plane.
+- Left there now: two edges leave a vertex in one direction 19, a point near two vertices 16 (mostly absurd
+  tolerances), seams apart 15, an edge nearly on another argument's face 13, a non-manifold result 11, arguments
+  share vertices 9. Corpora unchanged, 0 differ.
+
 ## A vertex OCCT's history loses; seams apart is unify's; knurls' "two edges" (11-02 07:10 UTC)
 - "One cylinder in faces of two inputs, their seams apart" guards unify, not the Boolean: on 38b2cd00 (a hole
   through a boss in a mirrored plate) our faces, edges and pcurves are OCCT's, only the faces' order differs. USD
