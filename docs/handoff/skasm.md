@@ -509,6 +509,18 @@ calls are rate-limited until ~04:05 UTC 11-02 (≈ 600 / 3 500 calls to build th
 Live: asked (REQUESTS 18:30, scripting allowed); the old figures (request 1501): an assembly drag step ≈ 1.2 s at 200
 instances, insert 1.3–2.2 s, sketch drag ≈ 400 ms a step at 188 entities.
 
+Sketches on vibe3 (perf.sh, 11-02 09:30), `-p noshape-scene --test all sketch_perf::s300 -- --ignored --nocapture`:
+| | live (S300, lines) | S300 (640 entities, lines) | S300 mixed (840 entities, 330 curves: slots, circles, fit splines, conics) |
+|---|---|---|---|
+| open for edit | 1.2–1.9 s | 3.4 ms | 12 → 7.2 ms |
+| change a dimension | 1.1 s | 2.9 ms | 3.1 ms |
+| drag | 3.8 fps | 2.7 ms (370 fps) | 11.3 → 6.6 ms (88 → 151 fps): solve 0.6, regions 1.7, regeneration 4.9 |
+| add a dimension | 1.7 s | 2.9 ms | 9 → 6.0 ms |
+| Part Studio, all 151 regions extruded (119 parts), a dimension changed | (asked) | | 265 ms (the one Extrude rebuilds every part) |
+Fix (c202cb3f): a NURBS curve's box (a tessellation) and each curve pair's crossings are kept by the curves' exact
+values, so a step only recomputes what moved (results identical). Left: the drag's sketch regeneration (curve and
+region tessellation, 4.9 ms), the extrude of unchanged regions (regeneration, not the sketch).
+
 Fixes so far (5bde395b / 34aa527a):
 1. Profile (perf on vibe4/vibe5, sudo): ~70 % of an evaluation was dense SVD / symmetric eigendecomposition in the
    solver's `least_change`, group after group on one thread.
