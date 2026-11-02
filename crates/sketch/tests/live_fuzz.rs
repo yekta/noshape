@@ -623,6 +623,13 @@ fn differences(case: &Value, live: &Value) -> Vec<String> {
     out
 }
 
+/// The sum of the named points' distances from live's (mm).
+fn position_error(case: &Value, live: &Value) -> f64 {
+    let Some(pts) = live["points"].as_object() else { return 0.0 };
+    let at = |v: &Value, i: usize| v[i].as_f64().unwrap_or(f64::NAN);
+    pts.iter().map(|(n, p)| (at(&case["ours"]["points"][n], 0) - at(p, 0)).hypot(at(&case["ours"]["points"][n], 1) - at(p, 1))).sum()
+}
+
 /// Live's UI drag of a case against ours dragged to where live's point
 /// ended (live's pointer lands within a pixel of the target, 0.2 mm).
 fn drag_differences(seed: u64, rich: bool, case: &Value, live: &Value) -> Vec<String> {
@@ -680,7 +687,7 @@ fn live_matches() {
             if d.is_empty() {
                 exact += 1;
             } else {
-                positions.push(format!("{name} ({} differ{}): {}", d.len(), if l["solved"] == false { ", live unsolved" } else { "" }, d.join("; ")));
+                positions.push(format!("{name} ({} differ, {:.2} mm{}): {}", d.len(), position_error(case, l), if l["solved"] == false { ", live unsolved" } else { "" }, d.join("; ")));
             }
         }
     }
@@ -979,4 +986,15 @@ fn probe_matches() {
         }
         println!("live probes {n}: {total} answered, {ok} match");
     }
+}
+
+/// One generated case solved as live_matches does, its points printed as
+/// JSON (FUZZ_SEED=<seed>; 101 on are rich).
+#[test]
+#[ignore = "T2: one live fuzz case"]
+fn one_case() {
+    let seed: u64 = std::env::var("FUZZ_SEED").unwrap().parse().unwrap();
+    let mut c = generate(seed, seed > 100);
+    let o = ours(&mut c);
+    eprintln!("{}", o["points"]);
 }
