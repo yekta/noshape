@@ -318,8 +318,8 @@ fn everyday(seed: u64) -> Case {
             1.0
         };
         // (Batch 6 on, seed 381: three more kinds; batch 7 on, seed 421,
-        // three more.)
-        match r.below(if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
+        // three more; batch 8 on, seed 461, three more.)
+        match r.below(if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
             // Corner rectangle (live's tool constraints), width and height.
             0 => {
                 let (w, h) = (r.range(15.0, 50.0), r.range(10.0, 35.0));
@@ -509,6 +509,71 @@ fn everyday(seed: u64) -> Case {
                 c.length(&l[0], w * fw);
                 c.length(&l[1], h * fh);
                 c.radius(&hole, rad * fr, true);
+            }
+            // Hexagon as the polygon tool draws it: six Equal sides, their
+            // corners on a construction circle, one side Horizontal; the
+            // circle's diameter.
+            11 => {
+                let rad = r.range(8.0, 20.0);
+                let p: Vec<DVec2> = (0..6).map(|i| o + DVec2::from_angle(-FRAC_PI_2 - PI / 6.0 + i as f64 * PI / 3.0) * rad).collect();
+                let l: Vec<String> = (0..6).map(|i| c.line(p[i], p[(i + 1) % 6])).collect();
+                let circle = c.circle(o, rad);
+                c.construction(&circle);
+                for i in 0..6 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 6]));
+                    c.on_curve(&format!("{}.start", l[i]), &circle);
+                }
+                for i in 1..6 {
+                    c.pair("EQUAL", &l[0], &l[i]);
+                }
+                c.hv(true, &l[0]);
+                let fr = f(&mut r);
+                c.radius(&circle, rad * fr, true);
+            }
+            // Rectangle with a chamfered corner: H / V sides, the chamfer's
+            // two legs Equal (a distance from the corner each way); width,
+            // height and one leg.
+            12 => {
+                let (w, h) = (r.range(25.0, 50.0), r.range(18.0, 35.0));
+                let ch = r.range(3.0, 7.0);
+                let p = [o, o + v(w - ch, 0.0), o + v(w, ch), o + v(w, h), o + v(0.0, h)];
+                let l: Vec<String> = (0..5).map(|i| c.line(p[i], p[(i + 1) % 5])).collect();
+                for i in 0..5 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 5]));
+                }
+                c.hv(true, &l[0]);
+                c.hv(false, &l[2]);
+                c.hv(true, &l[3]);
+                c.hv(false, &l[4]);
+                c.angle(&l[0], &l[1], 45.0);
+                let (fw, fh, fc) = (f(&mut r), f(&mut r), f(&mut r));
+                c.length(&l[4], h * fh);
+                c.length(&l[3], w * fw);
+                c.length(&l[1], ch * std::f64::consts::SQRT_2 * fc);
+            }
+            // Parallelogram: Horizontal base and top, the sides Parallel;
+            // the base's length, a side's length and the angle between them.
+            13 => {
+                let (b, side, deg) = (r.range(25.0, 50.0), r.range(12.0, 30.0), r.range(50.0, 80.0));
+                let d = DVec2::from_angle(deg.to_radians()) * side;
+                let p = [o, o + v(b, 0.0), o + v(b, 0.0) + d, o + d];
+                let l1 = c.line(p[0], p[1]);
+                let l2 = c.line(p[1], p[2]);
+                let l3 = c.line(p[2], p[3]);
+                // (The left side drawn up from the base's start: the angle is
+                // the inner one, counter-clockwise.)
+                let l4 = c.line(p[0], p[3]);
+                c.coincident(&format!("{l1}.end"), &format!("{l2}.start"));
+                c.coincident(&format!("{l2}.end"), &format!("{l3}.start"));
+                c.coincident(&format!("{l3}.end"), &format!("{l4}.end"));
+                c.coincident(&format!("{l4}.start"), &format!("{l1}.start"));
+                c.hv(true, &l1);
+                c.hv(true, &l3);
+                c.pair("PARALLEL", &l2, &l4);
+                let (fb, fs, fa) = (f(&mut r), f(&mut r), f(&mut r));
+                c.length(&l1, b * fb);
+                c.length(&l4, side * fs);
+                c.angle(&l1, &l4, (deg * fa).clamp(35.0, 85.0));
             }
             // D shape: a Horizontal chord and an arc over it, the chord's
             // length and the arc's radius.
@@ -817,7 +882,7 @@ fn write_batch() {
 }
 
 /// The batches: (number, first seed, rich).
-const BATCHES: [(usize, u64, bool); 7] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true)];
+const BATCHES: [(usize, u64, bool); 8] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true)];
 
 /// Cases in batch `n` (batch 3 on: 40, where positions match least).
 fn batch_size(n: usize) -> usize {
