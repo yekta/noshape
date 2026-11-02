@@ -50,10 +50,10 @@ types and views 10 of them. noshape stores all 13 as file tabs and views:
 
 | Type | Extensions | Onshape | ours | Notes |
 |---|---|---|---|---|
-| PDF | .pdf | viewed | ✅ | the file tab shows the pages one under the other at 1.5 px per point. The first 50 pages are rendered in the background by hayro, a pure-Rust rasterizer (MIT / Apache, `crates/ops/src/file_preview.rs`). The agent API: `render_file_page` (e2e `a_pdf_file_tab_renders_its_pages`). Live's look asked (request 11-02) |
+| PDF | .pdf | viewed | ✅ | live shows Chrome's PDF viewer (dark): ours copies it. A bar with ☰, the title, the page box "1 / 2" and − 100 % +, page thumbnails at the left, the pages one under the other. The first 50 pages are rendered in the background by hayro, a pure-Rust rasterizer (MIT / Apache, `crates/ops/src/file_preview.rs`). The agent API: `render_file_page` (e2e `a_pdf_file_tab_renders_its_pages`) |
 | Video | .mp4 | viewed | ⊘ | stored. Viewing needs an H.264 decoder: open-source ones (ffmpeg, openh264) exist, but they're native libraries, and H.264 is patent-licensed. Left out for now |
-| Images | .png .jpg .jpeg .svg .gif (and .bmp .tif .webp) | viewed | ✅ | the file tab shows the picture (actual size, scaled down to fit) under a bar with name, size, Update…, Download; app check 11-02; live's look asked (request 11-02) |
-| Text, Markdown, CSV, JSON | .txt .md .csv .json | viewed | ✅ | Markdown rendered (headings, emphasis, lists, code, tables, quotes); CSV as a table (RFC 4180 quoting, columns as wide as their text); text and JSON as text (JSON pretty-printed); the first 5000 lines or rows. Live's look asked (request 11-02) |
+| Images | .png .jpg .jpeg .svg .gif (and .bmp .tif .webp) | viewed | ✅ | at actual size from the top left, on white, no toolbar (live 1756) |
+| Text, Markdown, CSV, JSON | .txt .md .csv .json | viewed | ✅ | as live 1756: TXT and Markdown raw in monospace (live doesn't render Markdown); CSV a grid with column and row numbers, every line a row (a final line break gives an empty row); JSON as written, in a code view with line numbers and colours. The first 5000 lines |
 | Programming files, MOV, Word | .py .java .js .mov .doc .docx | stored, not viewable | ✅ | stored as file tabs |
 
 ## Speed on big files (see docs/handoff/dx.md for the history)

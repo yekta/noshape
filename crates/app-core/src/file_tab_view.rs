@@ -18,7 +18,7 @@ use noshape_model::file_tab::{FileKind, FileTab};
 
 /// The tab-bar / card icon of a file: Onshape's per-format art (live
 /// tabbar/icons2-filetab-*: STEP, X_T, X_B, JT, STL, PVZ, 3MF, SolidWorks,
-/// DXF/DWG, DWT, TXT, ZIP have their own; IGES, SAT, 3DM, CATIA, Inventor,
+/// DXF/DWG, DWT, TXT (and MD, live 1756), ZIP have their own; IGES, SAT, 3DM, CATIA, Inventor,
 /// Solid Edge and NX share the generic geometry card; CSV / JSON the page).
 pub fn file_icon(f: &FileTab) -> &'static str {
     let ext = f.file_name.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase()).unwrap_or_default();
@@ -33,7 +33,7 @@ pub fn file_icon(f: &FileTab) -> &'static str {
         "sldprt" | "sldasm" | "slddrw" => return "file-sw",
         "dxf" | "dwg" => return "file-dwg",
         "dwt" => return "file-dwt",
-        "txt" => return "file-txt",
+        "txt" | "md" => return "file-txt",
         "zip" => return "file-zip",
         "igs" | "iges" | "sat" | "sab" | "3dm" | "catpart" | "catproduct" | "ipt" | "iam" | "par" | "psm" | "asm" | "prt" | "obj" | "brep" | "x3d" => return "file-geometry",
         "csv" | "json" => return "file",
@@ -78,30 +78,46 @@ pub struct FileTabView {
     tab: TabId,
     /// The file's view (decoded once per file data).
     preview: Option<(std::sync::Arc<str>, std::rc::Rc<Preview>)>,
+    /// The PDF viewer's zoom (an index into [`PDF_ZOOMS`]) and scroll.
+    pdf_zoom: usize,
+    pdf_scroll: ScrollHandle,
+    /// The PDF viewer's thumbnail sidebar (☰; open at first, as Chrome's).
+    pdf_thumbnails: bool,
+    /// The page a thumbnail click went to (its scroll applies at the next
+    /// layout), until the view scrolls.
+    pdf_jump: Option<usize>,
 }
 
 /// What a file tab shows (Onshape views images, PDF, text, Markdown, CSV
-/// and JSON; help "Supported File Formats", Non-CAD files): the picture, a
-/// PDF's pages, the text, else the file's card. Video needs a decoder
+/// and JSON; help "Supported File Formats", Non-CAD files; live behaviours
+/// "dx (2026-11-02, P3 formats.md non-CAD viewers)"): the picture, a PDF's
+/// pages, the text, else the file's card. Video needs a decoder
 /// (docs/parity/formats.md).
 enum Preview {
     Image(std::sync::Arc<gpui_kit::Image>),
     /// A PDF's first pages (rendered in the background: None until then),
-    /// its page count, or why it can't be shown.
+    /// or why it can't be shown.
     Pages(Option<Result<PdfPages, String>>),
+    /// TXT and Markdown, raw (live doesn't render Markdown).
     Text(String),
-    /// Markdown, rendered (headings, emphasis, lists, code, tables).
-    Markdown(SharedString),
+    /// JSON as written, coloured, with line numbers (live: a read-only Ace editor).
+    Json(String),
     /// CSV rows (the first [`LINE_LIMIT`]) and the file's row count.
     Table(Vec<Vec<String>>, usize),
     Card,
 }
 
-/// A PDF's first pages and its page count.
-type PdfPages = (Vec<std::sync::Arc<gpui_kit::Image>>, usize);
+/// A PDF's first pages (each with its size in points) and its page count.
+struct PdfPages {
+    pages: Vec<(std::sync::Arc<gpui_kit::Image>, [f32; 2])>,
+    total: usize,
+}
 
-/// A PDF page's pixels per point (1: 72 dpi).
+/// A PDF page's pixels per point (1: 72 dpi): sharp up to 112 % zoom.
 const PDF_SCALE: f32 = 1.5;
+
+/// The PDF viewer's zoom steps (Chrome's, 100 %: 96 px per inch).
+const PDF_ZOOMS: [f32; 11] = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5];
 
 /// Text read at most, and lines shown (a larger file shows its start).
 const TEXT_LIMIT: usize = 1 << 20;
@@ -132,7 +148,7 @@ fn preview_of(f: &FileTab) -> Preview {
     }
     let raw = String::from_utf8_lossy(&bytes[..bytes.len().min(TEXT_LIMIT)]).into_owned();
     match ext.as_str() {
-        "md" => return Preview::Markdown(raw.into()),
+        "json" => return Preview::Json(raw),
         "csv" => {
             let mut rows = csv_rows(&raw);
             let total = rows.len();
@@ -141,13 +157,12 @@ fn preview_of(f: &FileTab) -> Preview {
         }
         _ => {}
     }
-    // JSON pretty-printed (as it reads best); anything else as it is.
-    let shown = if ext == "json" { serde_json::from_str::<serde_json::Value>(&raw).ok().and_then(|v| serde_json::to_string_pretty(&v).ok()).unwrap_or(raw) } else { raw };
-    Preview::Text(shown)
+    Preview::Text(raw)
 }
 
 /// CSV records (RFC 4180: quoted fields may hold commas, quotes as "" and
-/// line breaks; CRLF or LF).
+/// line breaks; CRLF or LF). A final line break starts an empty last row
+/// (live's grid shows it).
 fn csv_rows(text: &str) -> Vec<Vec<String>> {
     let mut rows = Vec::new();
     let (mut row, mut field) = (Vec::new(), String::new());
@@ -170,17 +185,54 @@ fn csv_rows(text: &str) -> Vec<Vec<String>> {
             (false, c) => field.push(c),
         }
     }
-    if !field.is_empty() || !row.is_empty() {
+    if !text.is_empty() {
         row.push(field);
         rows.push(row);
     }
     rows
 }
 
+/// A JSON line's colours (Ace's: strings and keys blue, numbers and
+/// true / false / null dark blue).
+fn json_highlights(line: &str) -> Vec<(std::ops::Range<usize>, HighlightStyle)> {
+    let colour = |c: u32| HighlightStyle { color: Some(gpui_kit::rgb(c).into()), ..Default::default() };
+    let b = line.as_bytes();
+    let (mut out, mut i) = (Vec::new(), 0);
+    while i < b.len() {
+        let start = i;
+        match b[i] {
+            b'"' => {
+                i += 1;
+                while i < b.len() && b[i] != b'"' {
+                    i += if b[i] == b'\\' { 2 } else { 1 };
+                }
+                i = (i + 1).min(b.len());
+                out.push((start..i, colour(0x1a1aa6)));
+            }
+            b'-' | b'0'..=b'9' => {
+                while i < b.len() && matches!(b[i], b'-' | b'+' | b'.' | b'e' | b'E' | b'0'..=b'9') {
+                    i += 1;
+                }
+                out.push((start..i, colour(0x0000cd)));
+            }
+            b't' | b'f' | b'n' => {
+                while i < b.len() && b[i].is_ascii_alphabetic() {
+                    i += 1;
+                }
+                if matches!(&line[start..i], "true" | "false" | "null") {
+                    out.push((start..i, colour(0x0000cd)));
+                }
+            }
+            _ => i += 1,
+        }
+    }
+    out
+}
+
 impl FileTabView {
     pub fn new(doc: Entity<DocModel>, tab: TabId, cx: &mut Context<Self>) -> Self {
         cx.observe(&doc, |_, _, cx| cx.notify()).detach();
-        Self { doc, tab, preview: None }
+        Self { doc, tab, preview: None, pdf_zoom: 7, pdf_scroll: ScrollHandle::new(), pdf_thumbnails: true, pdf_jump: None }
     }
 
     fn preview(&mut self, f: &FileTab, cx: &mut Context<Self>) -> std::rc::Rc<Preview> {
@@ -199,7 +251,18 @@ impl FileTabView {
                                 noshape_ops::file_preview::pdf_pages(&bytes, PDF_SCALE, 0, noshape_ops::file_preview::PDF_PAGE_LIMIT)
                             })
                             .await
-                            .map(|(total, pngs)| (pngs.into_iter().map(|png| std::sync::Arc::new(gpui_kit::Image::from_bytes(ImageFormat::Png, png))).collect(), total));
+                            .map(|(total, pngs)| PdfPages {
+                                pages: pngs
+                                    .into_iter()
+                                    .map(|png| {
+                                        // The page's size in points, from the PNG header (IHDR).
+                                        let dim = |i: usize| png.get(i..i + 4).map_or(0, |b| u32::from_be_bytes([b[0], b[1], b[2], b[3]])) as f32 / PDF_SCALE;
+                                        let size = [dim(16), dim(20)];
+                                        (std::sync::Arc::new(gpui_kit::Image::from_bytes(ImageFormat::Png, png)), size)
+                                    })
+                                    .collect(),
+                                total,
+                            });
                         let _ = this.update(cx, |v, cx| {
                             if v.preview.as_ref().is_some_and(|(d, _)| std::sync::Arc::ptr_eq(d, &data)) {
                                 v.preview = Some((data, std::rc::Rc::new(Preview::Pages(Some(pages)))));
@@ -212,6 +275,108 @@ impl FileTabView {
                 p
             }
         }
+    }
+
+    /// A PDF as Chrome's viewer shows it in live's tab (dark theme): a bar
+    /// with ☰, the title, the page box "1 / 2" and − 100 % +; the pages'
+    /// thumbnails at the left (the current one outlined, a click goes to
+    /// it); the pages one under the other.
+    fn pdf_view(&self, f: &FileTab, pages: &Option<Result<PdfPages, String>>, cx: &mut Context<Self>) -> AnyElement {
+        let white = gpui_kit::rgb_static(0xffffff);
+        let body = || div().flex_1().min_h_0().bg(gpui_kit::rgb(0x282828));
+        let note = |t: String| body().flex().items_center().justify_center().text_size(px(14.)).text_color(white).child(t).into_any_element();
+        let pdf = match pages {
+            None => return note("Rendering…".into()),
+            Some(Err(e)) => return note(format!("This PDF can't be shown: {e}. Download it to open it.")),
+            Some(Ok(p)) => p,
+        };
+        let zoom = PDF_ZOOMS[self.pdf_zoom];
+        let (gap, px_per_pt) = (8.0, 96.0 / 72.0 * zoom);
+        // Each page's top in the list, and the page at the top of the view.
+        let tops: Vec<f32> = pdf.pages.iter().scan(gap, |y, (_, s)| {
+            let top = *y;
+            *y += s[1] * px_per_pt + gap;
+            Some(top)
+        }).collect();
+        let top = -f32::from(self.pdf_scroll.offset().y);
+        let current = self.pdf_jump.unwrap_or_else(|| tops.iter().zip(&pdf.pages).position(|(t, (_, s))| t + s[1] * px_per_pt + gap > top + 1.0).unwrap_or(0));
+        let title = f.file_name.rsplit_once('.').map_or(f.file_name.clone(), |(t, _)| t.to_string());
+        let round = |id: &'static str| div().id(id).size(px(32.)).flex().items_center().justify_center().rounded_full().cursor_pointer().hover(|d| d.bg(gpui_kit::rgb(0x505050)));
+        let zoom_button = |id: &'static str, label: &'static str, step: isize| {
+            round(id).text_size(px(20.)).child(label).on_click(cx.listener(move |v, _, _, cx| {
+                v.pdf_zoom = v.pdf_zoom.saturating_add_signed(step).min(PDF_ZOOMS.len() - 1);
+                cx.notify();
+            }))
+        };
+        let field = |t: String| div().px(px(6.)).py(px(2.)).bg(gpui_kit::rgb(0x191919)).child(t);
+        let bar = h_flex()
+            .h(px(56.))
+            .flex_none()
+            .px(px(16.))
+            .gap(px(10.))
+            .bg(gpui_kit::rgb(0x3c3c3c))
+            .text_color(white)
+            .text_size(px(14.))
+            .child(round("pdf-thumbnails").text_size(px(18.)).child("☰").on_click(cx.listener(|v, _, _, cx| {
+                v.pdf_thumbnails = !v.pdf_thumbnails;
+                cx.notify();
+            })))
+            .child(div().flex_1().min_w_0().truncate().font_weight(FontWeight::MEDIUM).child(crate::ui::user_text(title)))
+            .child(field(format!("{}", current + 1)))
+            .child(format!("/  {}", pdf.total))
+            .child(div().w(px(1.)).h(px(24.)).mx(px(6.)).bg(gpui_kit::rgb(0x6b6b6b)))
+            .child(zoom_button("pdf-zoom-out", "−", -1))
+            .child(field(format!("{}%", (zoom * 100.0).round())))
+            .child(zoom_button("pdf-zoom-in", "+", 1))
+            .child(div().flex_1());
+        let thumbnails = self.pdf_thumbnails.then(|| {
+            div()
+                .id("pdf-thumbnails-list")
+                .w(px(300.))
+                .flex_none()
+                .h_full()
+                .overflow_y_scroll()
+                .border_r_1()
+                .border_color(gpui_kit::rgb(0x5f6368))
+                .child(v_flex().items_center().gap(px(16.)).py(px(18.)).children(pdf.pages.iter().enumerate().map(|(k, (i, s))| {
+                    let y = tops[k];
+                    v_flex()
+                        .id(("pdf-thumbnail", k))
+                        .items_center()
+                        .gap(px(6.))
+                        .cursor_pointer()
+                        .text_size(px(13.))
+                        .text_color(white)
+                        .child(div().p(px(4.)).when(k == current, |d| d.bg(gpui_kit::rgb(0x8ab4f8))).child(img(i.clone()).flex_none().w(px(112.)).h(px(112. * s[1] / s[0].max(1.)))))
+                        .child((k + 1).to_string())
+                        .on_click(cx.listener(move |v, _, _, cx| {
+                            v.pdf_scroll.set_offset(point(px(0.), px(-(y - gap))));
+                            v.pdf_jump = Some(k);
+                            cx.notify();
+                        }))
+                })))
+        });
+        let list = div()
+            .id("file-pages")
+            .flex_1()
+            .h_full()
+            .min_w_0()
+            .overflow_scroll()
+            .track_scroll(&self.pdf_scroll)
+            .on_scroll_wheel(cx.listener(|v, _, _, cx| {
+                v.pdf_jump = None;
+                cx.notify();
+            }))
+            .child(
+                v_flex()
+                    .min_w_full()
+                    .items_center()
+                    .gap(px(gap))
+                    .py(px(gap))
+                    .children(pdf.pages.iter().map(|(i, s)| img(i.clone()).flex_none().w(px(s[0] * px_per_pt)).h(px(s[1] * px_per_pt))))
+                    .when(pdf.total > pdf.pages.len(), |d| d.child(div().text_size(px(13.)).text_color(white).child(format!("… {} more pages (Download for the whole file)", pdf.total - pdf.pages.len())))),
+            );
+        v_flex().size_full().child(bar).child(body().flex().children(thumbnails).child(list)).into_any_element()
     }
 
     fn file(&self, cx: &App) -> Option<FileTab> {
@@ -276,96 +441,60 @@ impl Render for FileTabView {
         let doc2 = doc.clone();
         let preview = self.preview(&f, cx);
         if !matches!(*preview, Preview::Card) {
-            // A viewable file: a slim bar with its name, size and actions,
-            // the picture or the text under it.
-            let bar = gpui_kit::component::h_flex()
-                .h(px(40.))
-                .flex_none()
-                .px(px(12.))
-                .gap(px(10.))
-                .bg(pal.panel)
-                .border_b_1()
-                .border_color(gpui_kit::rgb(0xd3d7d9))
-                .text_color(pal.text)
-                .child(crate::assets::icon(file_icon(&f), 20., cx))
-                .child(div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).child(crate::ui::user_text(f.file_name.clone())))
-                .child(div().text_size(px(12.)).text_color(pal.text_muted).child(format!("{} · {}", f.type_label(), f.size_label())))
-                .child(div().flex_1())
-                .child(Button::new("file-update").label("Update…").outline().small().on_click(move |_, w, cx| update(&doc, tab, w, cx)))
-                .child(Button::new("file-download").label("Download").outline().small().on_click(move |_, w, cx| download(&doc2, tab, w, cx)));
-            let body = match &*preview {
-                Preview::Image(image) => div().flex_1().min_h_0().p(px(16.)).bg(gpui_kit::rgb(0x999999)).child(img(image.clone()).size_full().object_fit(ObjectFit::ScaleDown)).into_any_element(),
-                Preview::Pages(pages) => {
-                    let gray = div().flex_1().min_h_0().bg(gpui_kit::rgb(0x999999));
-                    let note = |t: String| gray.flex().items_center().justify_center().text_size(px(14.)).text_color(gpui_kit::rgb_static(0xffffff)).child(t).into_any_element();
-                    match pages {
-                        None => note("Rendering…".into()),
-                        Some(Err(e)) => note(format!("This PDF can't be shown: {e}. Download it to open it.")),
-                        // Each page at its size (scaled down to the width), one under the other.
-                        Some(Ok((images, total))) => div()
-                            .id("file-pages")
-                            .flex_1()
-                            .min_h_0()
-                            .overflow_y_scroll()
-                            .bg(gpui_kit::rgb(0x999999))
-                            .child(
-                                v_flex()
-                                    .w_full()
-                                    .items_center()
-                                    .gap(px(12.))
-                                    .p(px(16.))
-                                    .children(images.iter().map(|i| img(i.clone()).max_w_full().shadow_md()))
-                                    .when(*total > images.len(), |d| d.child(div().text_size(px(13.)).text_color(gpui_kit::rgb_static(0xffffff)).child(format!("… {} more pages (Download for the whole file)", total - images.len())))),
-                            )
-                            .into_any_element(),
-                    }
-                }
-                Preview::Text(text) => div()
-                    .id("file-text")
-                    .flex_1()
-                    .min_h_0()
-                    .overflow_y_scroll()
-                    .p(px(16.))
-                    .bg(pal.panel)
-                    .font_family("Inconsolata")
-                    .text_size(px(13.))
-                    .text_color(pal.text)
+            // A viewable file fills the tab, no bar (live: Download and
+            // Update… are in the tab's menu).
+            let mono = |d: Stateful<Div>| d.size_full().overflow_y_scroll().bg(gpui_kit::rgb_static(0xffffff)).font_family("Inconsolata").text_size(px(13.)).text_color(gpui_kit::rgb_static(0x000000));
+            return match &*preview {
+                // At its size from the top left, on white (live).
+                Preview::Image(image) => div().id("file-image").size_full().overflow_scroll().bg(gpui_kit::rgb_static(0xffffff)).child(img(image.clone()).flex_none()).into_any_element(),
+                Preview::Pages(pages) => self.pdf_view(&f, pages, cx),
+                // The browser's plain-text view (live, Markdown too): monospace, wrapped.
+                Preview::Text(text) => mono(div().id("file-text"))
+                    .p(px(8.))
                     .whitespace_normal()
-                    .children(text.lines().take(LINE_LIMIT).map(|l| div().min_h(px(17.)).child(crate::ui::user_text(l.to_string()))))
+                    .children(text.lines().take(LINE_LIMIT).map(|l| div().min_h(px(16.)).child(crate::ui::user_text(l.to_string()))))
                     .when(text.lines().count() > LINE_LIMIT, |d| d.child(div().pt(px(8.)).text_color(pal.text_muted).child(format!("… {} more lines (Download for the whole file)", text.lines().count() - LINE_LIMIT))))
                     .into_any_element(),
-                Preview::Markdown(text) => div()
-                    .id("file-markdown")
-                    .flex_1()
-                    .min_h_0()
-                    .overflow_y_scroll()
-                    .bg(pal.panel)
-                    .child(div().max_w(px(900.)).px(px(24.)).py(px(16.)).text_size(px(14.)).text_color(pal.text).child(gpui_kit::component::text::TextView::markdown("file-markdown-text", text.clone())))
+                // A read-only code view (live's Ace editor): line numbers,
+                // JSON colours, the text as written.
+                Preview::Json(text) => mono(div().id("file-json"))
+                    .child(
+                        div()
+                            .flex()
+                            .children(text.lines().take(LINE_LIMIT).enumerate().map(|(i, l)| {
+                                h_flex()
+                                    .w_full()
+                                    .items_start()
+                                    .child(div().w(px(40.)).flex_none().pr(px(6.)).bg(gpui_kit::rgb(0xebebeb)).text_color(gpui_kit::rgb(0x333333)).flex().justify_end().child((i + 1).to_string()))
+                                    .child(div().flex_1().min_w_0().pl(px(4.)).whitespace_normal().child(StyledText::new(l.to_string()).with_highlights(json_highlights(l))))
+                            }))
+                            .flex_col(),
+                    )
                     .into_any_element(),
+                // A spreadsheet-like grid (live's csv-viewer-table): column
+                // numbers above, row numbers beside, every line a row.
                 Preview::Table(rows, total) => {
-                    // Each column as wide as its longest cell (within limits).
                     let cols = rows.iter().map(|r| r.len()).max().unwrap_or(0).min(200);
-                    let widths: Vec<f32> = (0..cols).map(|c| rows.iter().filter_map(|r| r.get(c)).map(|v| v.chars().count()).max().unwrap_or(0).clamp(4, 40) as f32 * 7.5 + 16.).collect();
-                    let border = gpui_kit::rgb(0xd3d7d9);
+                    let widths: Vec<f32> = (0..cols).map(|c| rows.iter().filter_map(|r| r.get(c)).map(|v| v.chars().count()).max().unwrap_or(0).clamp(2, 40) as f32 * 7.5 + 12.).collect();
+                    let num_w = (rows.len().to_string().len() as f32 * 7.5 + 12.).max(24.);
+                    let (border, head) = (gpui_kit::rgb(0xcccccc), gpui_kit::rgb(0xeeeeee));
+                    let cell = |w: f32| div().w(px(w)).flex_none().h(px(22.)).px(px(5.)).flex().items_center().border_r_1().border_b_1().border_color(border).truncate();
                     div()
                         .id("file-table")
-                        .flex_1()
-                        .min_h_0()
+                        .size_full()
                         .overflow_scroll()
-                        .bg(pal.panel)
-                        .p(px(16.))
+                        .bg(gpui_kit::rgb_static(0xffffff))
                         .child(
                             v_flex()
-                                .w(px(widths.iter().sum::<f32>() + 1.))
+                                .w(px(num_w + widths.iter().sum::<f32>() + 1.))
                                 .border_l_1()
                                 .border_t_1()
                                 .border_color(border)
                                 .text_size(px(13.))
-                                .text_color(pal.text)
-                                .children(rows.iter().map(|r| {
-                                    h_flex().children(widths.iter().enumerate().map(|(c, w)| {
-                                        div().w(px(*w)).flex_none().h(px(24.)).px(px(6.)).flex().items_center().border_r_1().border_b_1().border_color(border).truncate().child(crate::ui::user_text(r.get(c).cloned().unwrap_or_default()))
-                                    }))
+                                .text_color(gpui_kit::rgb_static(0x000000))
+                                .child(h_flex().bg(head).child(cell(num_w)).children(widths.iter().enumerate().map(|(c, w)| cell(*w).justify_center().child((c + 1).to_string()))))
+                                .children(rows.iter().enumerate().map(|(i, r)| {
+                                    h_flex().child(cell(num_w).bg(head).justify_center().child((i + 1).to_string())).children(widths.iter().enumerate().map(|(c, w)| cell(*w).child(crate::ui::user_text(r.get(c).cloned().unwrap_or_default()))))
                                 }))
                                 .when(*total > rows.len(), |d| d.child(div().pt(px(8.)).text_color(pal.text_muted).child(format!("… {} more rows (Download for the whole file)", total - rows.len())))),
                         )
@@ -373,7 +502,6 @@ impl Render for FileTabView {
                 }
                 Preview::Card => div().into_any_element(),
             };
-            return gpui_kit::component::v_flex().size_full().child(bar).child(body).into_any_element();
         }
         div()
             .size_full()
@@ -665,7 +793,14 @@ mod tests {
     #[test]
     fn csv_rows_follow_rfc_4180() {
         let rows = super::csv_rows("a,b,c\r\n1,\"x, y\",\"say \"\"hi\"\"\"\n2,\"two\nlines\",\n");
-        assert_eq!(rows, vec![vec!["a", "b", "c"], vec!["1", "x, y", "say \"hi\""], vec!["2", "two\nlines", ""]]);
+        assert_eq!(rows, vec![vec!["a", "b", "c"], vec!["1", "x, y", "say \"hi\""], vec!["2", "two\nlines", ""], vec![""]]);
         assert_eq!(super::csv_rows("x"), vec![vec!["x"]]);
+    }
+
+    #[test]
+    fn json_lines_are_coloured_by_token() {
+        let line = r#"{"a": "x\"y", "n": -1.5e3, "t": true}"#;
+        let spans: Vec<&str> = super::json_highlights(line).into_iter().map(|(r, _)| &line[r]).collect();
+        assert_eq!(spans, [r#""a""#, r#""x\"y""#, r#""n""#, "-1.5e3", r#""t""#, "true"]);
     }
 }
