@@ -517,6 +517,10 @@ impl PartStudioView {
             // A resize released outside the table: its width as dragged.
             if let Some((c, x)) = self.ui.var_col_drag.take() {
                 crate::ui::set_var_col_width(c, x - 1. - ws[..c].iter().sum::<f32>());
+                // The inserted Variable Studio tables follow.
+                for v in self.ui.var_tables.values() {
+                    App::notify(cx, v.entity_id());
+                }
             }
         }
         let row_drop = self.ui.var_row_drop;
@@ -704,7 +708,15 @@ impl PartStudioView {
                 .id(SharedString::from(format!("pvar-name-drag-{fid}")))
                 .debug_selector(|| format!("pvar-name-drag-{k}"))
                 .child(name_cell(&name_st, cx))
-                .on_drag(VarRowDrag { feature: fid, name: r.name.clone().into(), offset: Point::default() }, |d, offset, _, cx| cx.new(|_| VarRowDrag { offset, ..d.clone() }));
+                .on_drag(VarRowDrag { feature: fid, name: r.name.clone().into(), offset: Point::default() }, {
+                    // The press that started the drag focused the name (all of it selected): not while dragging.
+                    let st = name_st.clone();
+                    move |d, offset, window, cx| {
+                        st.update(cx, |s, cx| s.set_selected_range(0..0, cx));
+                        window.blur(cx);
+                        cx.new(|_| VarRowDrag { offset, ..d.clone() })
+                    }
+                });
             let ids = row_ids.clone();
             rows.push(
                 h_flex()
@@ -906,6 +918,9 @@ impl PartStudioView {
             .on_drop(cx.listener(move |this, d: &VarColDrag, _, cx| {
                 if let Some((c, x)) = this.ui.var_col_drag.take().filter(|x| x.0 == d.0) {
                     crate::ui::set_var_col_width(c, x - 1. - ws[..c].iter().sum::<f32>());
+                    for v in this.ui.var_tables.values() {
+                        App::notify(cx, v.entity_id());
+                    }
                 }
                 cx.notify();
             }))

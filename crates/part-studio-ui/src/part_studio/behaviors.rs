@@ -1985,9 +1985,13 @@ impl PartStudioView {
         // visibility change doesn't regenerate: update it here (it stayed
         // drawn after Hide, user bug v0.4.0).
         if !defaults.is_empty() || !feats.is_empty() {
+            // A FeatureScript feature's plane is drawn while both it and its feature are shown (live 11-02).
+            let (own, hidden_features): (Vec<Reference>, Vec<FeatureId>) = self.studio(cx).map(|s| (s.hidden_defaults.clone(), s.features.iter().filter(|f| f.hidden).map(|f| f.id).collect())).unwrap_or_default();
             let display = std::sync::Arc::make_mut(&mut self.display);
             for p in &mut display.planes {
-                if defaults.contains(&p.reference) || matches!(&p.reference, Reference::FeaturePlane(f) | Reference::ConstructionPlane { feature: f, .. } if feats.contains(f)) {
+                if let Reference::ConstructionPlane { feature, .. } = &p.reference {
+                    p.hidden = own.contains(&p.reference) || hidden_features.contains(feature);
+                } else if defaults.contains(&p.reference) || matches!(&p.reference, Reference::FeaturePlane(f) if feats.contains(f)) {
                     p.hidden = hidden;
                 }
             }

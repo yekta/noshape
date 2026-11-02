@@ -1304,5 +1304,9 @@ fn a_variable_row_drags_to_reorder(cx: &mut TestAppContext) {
     draw(cx, window);
     let names: Vec<String> = var_values(cx, &view).into_iter().map(|v| v.0).collect();
     assert_eq!(names, ["depth", "rib_diameter", "rib_empty_space", "rib_count"]);
+    // The press that started the drag left no name focused with its text selected.
+    let key = format!("pvar-name-{}", ids[3]);
+    let focused = cx.update_window(window, |_, w, cx| view.read(cx).panel_inputs.get(&key).is_some_and(|e| e.0.read(cx).focus_handle(cx).is_focused(w))).unwrap();
+    assert!(!focused, "the dragged row's name isn't left focused");
     wait_until(cx, window, |cx| view.read(cx).display.feature_state(ids[3]).is_some_and(|s| s.status == noshape_model::display::FeatureStatus::Error));
 }

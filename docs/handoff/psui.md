@@ -207,8 +207,9 @@ planes as `Reference::ConstructionPlane`, listed under it with eyes; live 11-02 
 test doc). Mesher (queued after them): B-spline edges marched as GCPnts does instead of halved and merged (NIST 1.11M -> 989k
 triangles against BRepMesh's 909k, regeneration 343 ms against 616 ms with BRepMesh; knurl 50k against 64k; the
 4096 px NIST render within 10% but for 598 px of tangent-edge dashes).
-Open from these passes: inserted Variable Studio tables keep 140 px columns (live shares the widths); a child plane's
-eye while its feature is hidden (live unchecked).
+11-02 later: the user's yribs.fs passes on a cylinder (T1); the small differences closed (plane rows grey under the
+hover, no plane names, a plane's own state as live, shared widths in Variable Studio tables, no selection on a row
+drag). Next: back to the audit (M11 rest, M12, M15 points: P3).
 
 11-01 22:25: landed bf64da4e (B-spline faces in our mesher). Queued 42c306d8 (audit 12: Helix Turns and pitch flip,
 interaction::helix_manipulators), c92c5408 (audit 12: Move curve boundary's arrow, interaction::

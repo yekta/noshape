@@ -835,7 +835,6 @@ pub fn panel_footer(doc: Entity<DocModel>, element: TabId, cx: &App) -> AnyEleme
 /// and the reference's "…" menu.
 pub fn readonly_table(doc: &Entity<DocModel>, target: InsertTarget, r: &StudioRef, k: usize, n: usize, cx: &App) -> Option<AnyElement> {
     use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
-    const COL_W: f32 = 140.;
     const RULE: u32 = 0xaaaaaa;
     const HEAD_BG: u32 = 0xeaeaea;
     let pal = p();
@@ -852,7 +851,9 @@ pub fn readonly_table(doc: &Entity<DocModel>, target: InsertTarget, r: &StudioRe
     };
     let values = vars::studio_variables(&src, r.studio);
     let units = here.settings.units;
-    let cell = || div().w(px(COL_W)).h(px(34.)).flex_none().flex().items_center().px(px(7.)).border_r_1().border_b_1().border_color(rgb(RULE)).truncate();
+    // The Part Studio Variable table's widths (shared, live 11-02).
+    let ws = crate::ui::var_col_widths();
+    let cell = |c: usize| div().w(px(ws[c])).h(px(34.)).flex_none().flex().items_center().px(px(7.)).border_r_1().border_b_1().border_color(rgb(RULE)).truncate();
     let rows: Vec<AnyElement> = studio
         .variables
         .iter()
@@ -872,10 +873,10 @@ pub fn readonly_table(doc: &Entity<DocModel>, target: InsertTarget, r: &StudioRe
                 .bg(rgb(0xffffff))
                 .text_size(px(14.))
                 .text_color(pal.text_muted)
-                .child(cell().child(crate::ui::user_text(v.name.clone())))
-                .child(cell().child(kind))
-                .child(cell().child(value))
-                .child(cell().child(crate::ui::user_text(v.description.clone())))
+                .child(cell(0).child(crate::ui::user_text(v.name.clone())))
+                .child(cell(1).child(kind))
+                .child(cell(2).child(value))
+                .child(cell(3).child(crate::ui::user_text(v.description.clone())))
                 .into_any_element()
         })
         .collect();
@@ -934,7 +935,7 @@ pub fn readonly_table(doc: &Entity<DocModel>, target: InsertTarget, r: &StudioRe
                     .text_size(px(14.))
                     .font_weight(FontWeight::BOLD)
                     .text_color(pal.text)
-                    .children(["Name", "Variable type", "Value", "Description"].map(|h| cell().justify_center().child(h))),
+                    .children(["Name", "Variable type", "Value", "Description"].into_iter().enumerate().map(|(c, h)| cell(c).justify_center().child(h))),
             )
             .children(rows)
             .into_any_element(),

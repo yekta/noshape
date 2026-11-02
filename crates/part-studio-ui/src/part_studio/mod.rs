@@ -4094,20 +4094,32 @@ impl PartStudioView {
     fn render_construction_plane_row(&self, r: Reference, cx: &mut Context<Self>) -> AnyElement {
         let Some(pl) = self.display.planes.iter().find(|p| p.reference == r) else { return div().h(px(crate::ui::ROW_H)).into_any_element() };
         let pal = p();
-        let hidden = pl.hidden;
+        // Live 11-02: the eye, tooltip and menu follow the plane's own state ("Plane 1 (Hidden)"), the grey its
+        // being drawn (not while its feature is hidden).
+        let dimmed = pl.hidden;
+        let hidden = self.studio(cx).is_some_and(|s| s.hidden_defaults.contains(&r));
         let selected = self.selection.contains(&r);
         let name = pl.name.clone();
+        let tip = if hidden { format!("{name} (Hidden)") } else { name.clone() };
         let key = noshape_ops::refs::to_id(&r);
         let view = cx.entity();
         let (r_hover, r_click, r_eye) = (r.clone(), r.clone(), r.clone());
-        crate::ui::with_user_side_tooltip(crate::ui::tree_row(SharedString::from(format!("cpl-{key}")), selected), name.clone())
+        // tree_row's, but grey under the pointer too (live 11-02: no blue hover band on these rows).
+        let row = h_flex()
+            .id(SharedString::from(format!("cpl-{key}")))
+            .h(px(crate::ui::ROW_H))
+            .flex_none()
+            .gap(px(3.))
+            .text_size(px(crate::ui::ROW_TEXT))
+            .text_color(pal.text)
+            .bg(if selected { pal.accent_soft } else { gpui_kit::rgb(0xf0f0f0) });
+        crate::ui::with_user_side_tooltip(row, tip)
             .pl(px(23.))
             .mr(px(5.))
             .pr(px(11.))
             .group("cpl-row")
-            .when(!selected, |d| d.bg(gpui_kit::rgb(0xf0f0f0)))
-            .when(hidden, |d| d.text_color(pal.text_faint))
-            .child(div().flex_none().child(crate::ui::tree_icon("plane", hidden, cx)))
+            .when(dimmed, |d| d.text_color(pal.text_faint))
+            .child(div().flex_none().child(crate::ui::tree_icon("plane", dimmed, cx)))
             .child(div().flex_1().truncate().child(crate::ui::user_text(name)))
             .child({
                 let v = view.clone();
@@ -4119,7 +4131,7 @@ impl PartStudioView {
                         cx.stop_propagation();
                         v.update(cx, |this, cx| this.set_visibility(std::slice::from_ref(&r_eye), !hidden, cx));
                     });
-                crate::ui::hover_reveal(eye, "cpl-row")
+                if hidden { eye } else { crate::ui::hover_reveal(eye, "cpl-row") }
             })
             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                 let new = if *h { Some(r_hover.clone()) } else { None };

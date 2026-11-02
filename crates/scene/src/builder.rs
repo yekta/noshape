@@ -649,8 +649,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&border))).with_color([outline[0], outline[1], outline[2], outline_alpha]).ignore_clip().pick_behind().layer(5));
             // Its name in the plane at the top-left corner, inside: over the
             // plane's fill, hidden by parts in front (live selection/02);
-            // Isolate takes the names away (qa5 KB3).
-            if !opts.faint_planes {
+            // Isolate takes the names away (qa5 KB3). A FeatureScript feature's
+            // planes have none (live 11-02, "Leave planes").
+            if !opts.faint_planes && !matches!(pl.reference, Reference::ConstructionPlane { .. }) {
                 let asc = 0.031 * 2.0 * pl.half_height;
                 // Live dk-921, psui/m-01 (light, same camera): the name's
                 // ink starts 0.11 of the ascender in from the corner, its

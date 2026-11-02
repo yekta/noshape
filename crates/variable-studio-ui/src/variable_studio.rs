@@ -253,7 +253,6 @@ impl VariableStudioView {
 
 /// Onshape's table metrics (live DOM): 140 px columns, 34 px rows, `#aaa`
 /// rules, `#eaeaea` title and header rows.
-const COL_W: f32 = 140.;
 const ROW_H: f32 = 34.;
 const RULE: u32 = 0xaaaaaa;
 
@@ -297,8 +296,14 @@ fn cell_input(st: &Entity<InputState>) -> Div {
     div().flex_1().ml(px(-4.)).child(Input::new(st).appearance(false).text_size(px(13.33)))
 }
 
-fn cell_div() -> Div {
-    div().w(px(COL_W)).h(px(ROW_H)).flex_none().flex().items_center().bg(p().bg_senary).border_r_1().border_b_1().border_color(rgb(RULE))
+/// Column `c`'s width: the Part Studio Variable table's, shared by every table (live 11-02: dragging a header edge
+/// there resizes the inserted Variable Studio tables too).
+fn col_w(c: usize) -> f32 {
+    crate::ui::var_col_widths()[c]
+}
+
+fn cell_div(c: usize) -> Div {
+    div().w(px(col_w(c))).h(px(ROW_H)).flex_none().flex().items_center().bg(p().bg_senary).border_r_1().border_b_1().border_color(rgb(RULE))
 }
 
 /// A variable table's "Variable type" cell: the type 7 px in, a ▾ in the text
@@ -310,7 +315,7 @@ pub fn type_cell(id: impl Into<ElementId>, options: Vec<String>, current: usize,
     let probe = bounds.clone();
     let on_select = std::rc::Rc::new(on_select);
     let label = options.get(current).cloned().unwrap_or_default();
-    cell_div()
+    cell_div(1)
         .relative()
         // The cell's painted bounds place the select list under it.
         .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
@@ -332,7 +337,7 @@ pub fn type_cell(id: impl Into<ElementId>, options: Vec<String>, current: usize,
                     let (options, on_select, b) = (options.clone(), on_select.clone(), bounds.get());
                     // Onshape's select list (live, document/16).
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
-                        m = m.select_list(COL_W);
+                        m = m.select_list(col_w(1));
                         for (k, o) in options.iter().enumerate() {
                             let f = on_select.clone();
                             m = m.item(crate::os_menu::OsMenuItem::new(o.clone()).checked(k == current).on_click(move |_, window, cx| f(k, window, cx)));
@@ -402,7 +407,7 @@ impl VariableStudioView {
                 let view = self.inserted_views.entry(s).or_insert_with(|| cx.new(|cx| VariableStudioView::new_in_panel(doc, s, host, window, cx)));
                 Some(view.clone().into_any_element())
             };
-            out.extend(table.map(|t| div().w(px(COL_W * 4. + 1.)).mb(px(12.)).child(t).into_any_element()));
+            out.extend(table.map(|t| div().w(px((0..4).map(col_w).sum::<f32>() + 1.)).mb(px(12.)).child(t).into_any_element()));
         }
         out
     }
@@ -619,7 +624,7 @@ impl Render for VariableStudioView {
                 _ if from_import => {
                     let text = v.import.as_ref().map(|imp| noshape_model::variables::import_value(&self.doc.read(cx).session.doc, imp).map(|x| x.to_string()).unwrap_or_else(|e| e)).unwrap_or_else(|| "Select CSV file".into());
                     let (doc, tab) = (self.doc.clone(), self.tab);
-                    cell_div()
+                    cell_div(2)
                         .id(("vs-val", i))
                         .px(px(7.))
                         .gap(px(4.))
@@ -629,7 +634,7 @@ impl Render for VariableStudioView {
                 }
                 // Editing: the field inside the focused cell's blue border.
                 _ if self.value_editing == Some(i) => gpui_kit::base::input::input_frame(
-                    cell_div()
+                    cell_div(2)
                         .id(("vs-val", i))
                         .border_2()
                         .border_color(rgb(0x1651b0))
@@ -650,7 +655,7 @@ impl Render for VariableStudioView {
                     let selected = self.value_selected == Some(i) && fh.is_focused(window);
                     let text = shown.unwrap_or_else(|| noshape_units::localize(&v.expr.text));
                     let tip = error.clone().unwrap_or_else(|| noshape_units::localize(&v.expr.text));
-                    cell_div()
+                    cell_div(2)
                         .id(("vs-val", i))
                         .px(px(7.))
                         .track_focus(&fh)
@@ -705,7 +710,7 @@ impl Render for VariableStudioView {
                                 move |m, _, _| row_menu(m, view.clone(), i, n)
                             })
                             .child(gpui_kit::base::input::input_frame(
-                                cell_div()
+                                cell_div(0)
                                     .relative()
                                     .child(cell_input(&name))
                                     .when(overwritten.contains(&v.name), |d| d.child(div().id(("vs-over", i)).absolute().right(px(8.)).top(px(12.)).tooltip(crate::ui::tooltip("Overwritten in another variable table.")).child(crate::ui::glyph("info", 10., rgb(0x666666))))),
@@ -748,7 +753,7 @@ impl Render for VariableStudioView {
                         div()
                             .id(("vs-desc", i))
                             .relative()
-                            .child(gpui_kit::base::input::input_frame(cell_div().child(cell_input(&desc))))
+                            .child(gpui_kit::base::input::input_frame(cell_div(3).child(cell_input(&desc))))
                             .when(cfg_desc, |d| d.child(variable_config::configured_outline()))
                             .when_some(desc_tip, |d, t| d.tooltip(crate::ui::tooltip(t)))
                             .os_context_menu_over_inputs(move |m, _, _| {
@@ -796,7 +801,7 @@ impl Render for VariableStudioView {
         // In a panel the title row spans the panel (live, part-studio/77).
         let in_panel = self.host.is_some();
         let table = v_flex()
-            .when(!in_panel, |d| d.w(px(COL_W * 4. + 1.)))
+            .when(!in_panel, |d| d.w(px((0..4).map(col_w).sum::<f32>() + 1.)))
             .when(in_panel, |d| d.w_full())
             .child(
                 h_flex()
@@ -878,13 +883,13 @@ impl Render for VariableStudioView {
                         .text_size(px(14.))
                         .font_weight(FontWeight::BOLD)
                         .text_color(pal.text)
-                        .children(["Name", "Variable type", "Value", "Description"].map(|h| cell_div().justify_center().child(h))),
+                        .children(["Name", "Variable type", "Value", "Description"].into_iter().enumerate().map(|(c, h)| cell_div(c).justify_center().child(h))),
                 )
                 .children(rows)
                 .when(only.is_none(), |t| {
                     // The add row's other columns are one borderless cell band
                     // (live dark/dk-961: `#1c1c1c` across them).
-                    t.child(h_flex().child(gpui_kit::base::input::input_frame(cell_div().border_l_1().child(cell_input(&new_name)))).child(div().w(px(3. * COL_W)).h(px(ROW_H)).flex_none().bg(p().bg_senary)))
+                    t.child(h_flex().child(gpui_kit::base::input::input_frame(cell_div(0).border_l_1().child(cell_input(&new_name)))).child(div().w(px(col_w(1) + col_w(2) + col_w(3))).h(px(ROW_H)).flex_none().bg(p().bg_senary)))
                 })
             });
         if self.host.is_some() {

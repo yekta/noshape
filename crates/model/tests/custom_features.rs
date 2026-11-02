@@ -2561,3 +2561,45 @@ fn a_features_planes_are_its_own_and_hide_alone_or_with_it() {
     let r = fx.regen(&mut reg, &ps);
     assert_eq!(planes(&r).iter().map(|p| p.2).collect::<Vec<_>>(), [true, true], "with the feature");
 }
+
+/// The user's "Y Ribs on Faces" (11-02, tests/fs/yribs.fs) on a Ø20 × 20 mm cylinder's outer face, no direction (the
+/// cylinder's axis): the ribs build and fuse into the part, and none of the cutting planes it deletes is left.
+#[test]
+fn y_ribs_on_a_cylinder_leave_no_planes() {
+    let source = format!(
+        "{}\n{}",
+        include_str!("fs/yribs.fs"),
+        r#"
+annotation { "Feature Type Name" : "Test cylinder" }
+export const testCylinder = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        fCylinder(context, id + "cyl", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 20) * millimeter, "radius" : 10 * millimeter });
+    });
+"#
+    );
+    let fx = Fixture::new(&source);
+    let mut ps = PartStudio::new();
+    let cyl = ps.new_feature(&fx.ty("testCylinder"), &fx.units).expect("cylinder feature");
+    ps.features.push(cyl);
+    let mut reg = Regenerator::new();
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
+    let body = &r.context.bodies[0];
+    let v0 = body.shape.volume().unwrap();
+    let side = body.shape.faces().iter().position(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. }))).expect("the outer face");
+    let face = Reference::Face((*body.faces[side]).clone());
+    let mut ribs = ps.new_feature(&fx.ty("yRibsOnFaces"), &fx.units).expect("Y Ribs type");
+    ribs.params.set("faces", ParamValue::Query(vec![face]));
+    ps.features.push(ribs);
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
+    assert!(r.context.planes.is_empty(), "planes left: {:?}", r.context.planes.iter().map(|p| (&p.reference, &p.name)).collect::<Vec<_>>());
+    assert!(r.display.planes.iter().all(|p| matches!(p.reference, Reference::Plane(_))), "only the default planes drawn");
+    assert_eq!(r.context.bodies.len(), 1, "the ribs fused into the part");
+    let v1 = r.context.bodies[0].shape.volume().unwrap();
+    // 1.6 mm ribs at a 2.2 mm pitch: 9 along 20 mm, each half buried, about π·1.6²/8 · 2π·10 mm³ outside.
+    assert!(v1 > v0 * 1.05, "ribs added: {v0} -> {v1}");
+}
