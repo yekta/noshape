@@ -647,3 +647,38 @@ fn a_dragged_bolt_circle_hole_swings_the_pattern_about_the_next_hole() {
         assert!((*p - *q).length() < 1e-3, "ours {got:?} live {live:?}");
     }
 }
+
+#[test]
+fn a_dragged_slot_keeps_its_horizontal_bottom_level() {
+    // Live drag probes 9 g4: a slot without dimensions (its bottom
+    // Horizontal, its arcs Equal), the top line's start dragged up and out
+    // in 25 steps: the bottom stays at its height (its end slides out with
+    // the right arc), the arcs grow, the top follows the pointer.
+    use std::f64::consts::FRAC_PI_2;
+    let mut sk = Sketch::new();
+    let bottom = sk.add_line(v(0.0, -6.0), v(30.0, -6.0));
+    let right = sk.add_arc_angles(v(30.0, 0.0), 6.0, -FRAC_PI_2, FRAC_PI_2);
+    let top = sk.add_line(v(30.0, 6.0), v(0.0, 6.0));
+    let left = sk.add_arc_angles(v(0.0, 0.0), 6.0, FRAC_PI_2, 3.0 * FRAC_PI_2);
+    let chain = [bottom, right, top, left];
+    for i in 0..4 {
+        let (a, b) = (chain[i], chain[(i + 1) % 4]);
+        let (_, a_end) = sk.endpoints(a).unwrap();
+        let (b_start, _) = sk.endpoints(b).unwrap();
+        sk.add_constraint(ConstraintKind::Coincident { a: a_end, b: b_start }).unwrap();
+        sk.add_constraint(ConstraintKind::Tangent { a, b }).unwrap();
+    }
+    sk.add_constraint(ConstraintKind::Equal { a: right, b: left }).unwrap();
+    sk.add_constraint(ConstraintKind::Horizontal { a: bottom, b: None }).unwrap();
+    assert!(sk.solve().is_solved());
+    let (grab, _) = sk.endpoints(top).unwrap();
+    for k in 1..=25 {
+        let f = k as f64 / 25.0;
+        assert!(sk.drag(&[(DragHandle::Point(grab), v(30.0 + 4.0 * f, 6.0 + 3.0 * f))]).is_solved());
+    }
+    let (s, e) = sk.endpoints(bottom).unwrap();
+    for p in [s, e] {
+        assert!((sk.point(p).unwrap().y + 6.0).abs() < 1e-6, "bottom {:?} {:?}", sk.point(s), sk.point(e));
+    }
+    assert!((sk.point(grab).unwrap() - v(34.0, 9.0)).length() < 1e-6);
+}

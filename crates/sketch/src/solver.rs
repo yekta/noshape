@@ -104,6 +104,9 @@ pub struct SolveOptions {
     pub light: Vec<EntityId>,
     /// Points of `light` entities that are held all the same.
     pub still: Vec<EntityId>,
+    /// Points of `light` entities held in one coordinate (0 x, 1 y) only:
+    /// a drag's Horizontal / Vertical line slides along itself.
+    pub still_across: Vec<(EntityId, u8)>,
     /// A line may collapse to a point (a dimension value edit: live solves a
     /// fillet radius that shrinks the next line to nothing, or a length set
     /// to 0). Off, a solve collapsing a line is refused (CON-HV-COLLAPSE:
@@ -119,7 +122,7 @@ pub struct SolveOptions {
 
 impl Default for SolveOptions {
     fn default() -> Self {
-        SolveOptions { tolerance: 1e-10, max_iterations: 100, analyze: true, light: Vec::new(), still: Vec::new(), allow_collapse: false, constructive: false }
+        SolveOptions { tolerance: 1e-10, max_iterations: 100, analyze: true, light: Vec::new(), still: Vec::new(), still_across: Vec::new(), allow_collapse: false, constructive: false }
     }
 }
 
@@ -305,8 +308,8 @@ impl System {
             }
         }
         for i in 0..self.p.owner.len() {
-            if let Owner::Ent(id, _) = self.p.owner[i]
-                && opts.still.contains(&id)
+            if let Owner::Ent(id, k) = self.p.owner[i]
+                && (opts.still.contains(&id) || opts.still_across.contains(&(id, k)))
             {
                 light_reps.remove(&find(&mut self.uf, i as u32));
             }
@@ -1385,6 +1388,12 @@ impl Sketch {
         let (light, still) = self.drag_weights(handles);
         opts.light = light;
         opts.still = still;
+        if opts.light.is_empty() {
+            opts.still_across = self.drag_levels(handles);
+            if !opts.still_across.is_empty() {
+                opts.light = self.entities().filter(|e| !e.external).map(|e| e.id).collect();
+            }
+        }
         let targets = self.drag_targets(handles);
         if !opts.light.is_empty() {
             self.drag_graph();
@@ -1393,7 +1402,7 @@ impl Sketch {
         let report = if opts.light.is_empty() {
             run(self, &opts, &targets)
         } else {
-            if !(solve_held(self, &opts, &targets) && self.targets_met(&targets)) {
+            if !(solve_held(self, &opts, &targets) && self.targets_met(&targets)) && !opts.still.is_empty() {
                 self.keep_far(&start, handles, &opts, &targets);
             }
             run_weighted(self, &opts, &targets, true)

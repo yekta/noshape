@@ -89,16 +89,7 @@ impl Sketch {
     /// first hold that reaches it; else the sketch is left as it was.
     pub(crate) fn keep_far(&mut self, start: &Sketch, handles: &[(DragHandle, glam::DVec2)], opts: &SolveOptions, targets: &[DragTarget]) -> bool {
         let g = self.drag_graph();
-        let mut dragged: Vec<EntityId> = Vec::new();
-        for (h, _) in handles {
-            let id = match *h {
-                DragHandle::Point(id) | DragHandle::Entity { id, .. } => id,
-            };
-            dragged.extend(g.units_of.get(&id).into_iter().flatten().copied());
-        }
-        if dragged.is_empty() || dragged.iter().any(|u| g.comp_size.get(u).is_none_or(|n| *n > MAX_UNITS)) {
-            return false;
-        }
+        let Some(dragged) = g.dragged(handles) else { return false };
         let dist = g.reach(&dragged);
         let near: Vec<EntityId> = dist.iter().filter(|(_, d)| **d <= 1).map(|(u, _)| *u).collect();
         let mut far: Vec<(usize, EntityId)> = dist.iter().filter(|(_, d)| **d >= 2).map(|(u, d)| (*d, *u)).collect();
@@ -121,6 +112,32 @@ impl Sketch {
         }
         *self = was;
         false
+    }
+
+    /// With nothing dimensioned to hold: the points of Horizontal / Vertical
+    /// lines away from the dragged geometry, held in their level (live drag
+    /// probes 9 g4: an undimensioned slot's top dragged, its Horizontal
+    /// bottom stays and its end slides out as the arcs grow).
+    pub(crate) fn drag_levels(&mut self, handles: &[(DragHandle, glam::DVec2)]) -> Vec<(EntityId, u8)> {
+        let g = self.drag_graph();
+        let Some(dragged) = g.dragged(handles) else { return Vec::new() };
+        let ids: Vec<EntityId> = handles.iter().map(|(h, _)| match *h {
+            DragHandle::Point(id) | DragHandle::Entity { id, .. } => id,
+        }).collect();
+        let units = g.reach(&dragged);
+        let mut out = Vec::new();
+        for c in self.constraints().filter(|c| c.driving) {
+            let (a, k) = match c.kind {
+                ConstraintKind::Horizontal { a, b: None } => (a, 1),
+                ConstraintKind::Vertical { a, b: None } => (a, 0),
+                _ => continue,
+            };
+            let Some(e) = self.entity(a).filter(|e| e.kind() == EntityKind::Line && units.contains_key(&e.id)) else { continue };
+            if !ids.contains(&e.id) && !e.point_refs().iter().any(|p| ids.contains(p)) {
+                out.extend(e.point_refs().into_iter().map(|p| (p, k)));
+            }
+        }
+        out
     }
 
     /// The geometry a hold released, placed last by least change from where
@@ -164,6 +181,18 @@ impl Sketch {
 }
 
 impl DragGraph {
+    /// The dragged units, when their components are small enough.
+    fn dragged(&self, handles: &[(DragHandle, glam::DVec2)]) -> Option<Vec<EntityId>> {
+        let mut dragged: Vec<EntityId> = Vec::new();
+        for (h, _) in handles {
+            let id = match *h {
+                DragHandle::Point(id) | DragHandle::Entity { id, .. } => id,
+            };
+            dragged.extend(self.units_of.get(&id).into_iter().flatten().copied());
+        }
+        (!dragged.is_empty() && dragged.iter().all(|u| self.comp_size.get(u).is_some_and(|n| *n <= MAX_UNITS))).then_some(dragged)
+    }
+
     /// Units reached from `from` with their distance in relations.
     fn reach(&self, from: &[EntityId]) -> HashMap<EntityId, usize> {
         let mut dist: HashMap<EntityId, usize> = from.iter().map(|u| (*u, 0)).collect();
