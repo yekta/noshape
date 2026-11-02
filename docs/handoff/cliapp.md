@@ -102,3 +102,14 @@ discovery probe is a 300 ms localhost connect) and passed on the re-run and loca
   the app's process is gone or its port refuses; T1 `live::servers_starting_together_stay_discoverable_and_stale_files_go`
   failed 3 of 6 runs on the old code.
 - macOS and Windows builds aren't notarized/signed beyond ad hoc.
+
+## 11-02: the setup dialogs answer a click at once (P1, macOS v0.4.20: Help items showed nothing)
+
+The macOS app menu's items are actions dispatched while their window is busy; the dialog was opened with an update of
+that same window, which fails inside its own dispatch, and the error was dropped. `in_some_window` now defers to after
+the dispatch and logs when no window can take the dialog. The dialog opens within the click with every row
+"checking…"; each check runs on the background executor with a 5 s timeout ("couldn't check" after that); Install /
+Connect run in the dialog, each row "installing…" then the path installed to or the exact error. T1 (app, GPUI test
+platform, runs on macOS CI too): agent_setup::tests (dialog open before any frame with a 30 s-sleeping `claude` on
+PATH, a never-answering check times out, the menu action opens the dialog: it failed without the deferral).
+

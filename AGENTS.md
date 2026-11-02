@@ -61,6 +61,8 @@ registry), with the same options and results as the app's dialogs.
   something, and match it exactly. Don't propose deviations.
 - Speed is a feature: no blocking work on the UI thread (`cx.background_spawn`), cache derived data, no per-frame
   allocation; the targets are in docs/PLAN.md 2.7. A speed regression is a P0.
+- A click always gives visible feedback within a frame (a dialog, a progress row or an error), never silence while
+  background work runs; background work that can hang (a file system, another program) has a timeout that says so.
 - Keep it simple. Follow the crate layering (docs/CRATES.md): data down, logic up; logic methods on data types are
   extension traits (`noshape_model::prelude`); upward calls are hooks or actions, never a dependency on a higher crate.
 - Do not leave paragraphs of comments on top of the code. Prefer clear names; keep necessary comments short; comments

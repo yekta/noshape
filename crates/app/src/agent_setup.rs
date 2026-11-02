@@ -2,6 +2,8 @@
 //! command on PATH and noshape's MCP server in the coding agents installed.
 //! Help › Install command line tool… and Connect to coding agents…, the
 //! macOS app menu's same two items, and a one-time prompt on first launch.
+//! A click shows the dialog at once (its rows "checking…"), never silence
+//! while background work runs.
 
 use crate::os_menu::{OsMenu, OsMenuItem};
 use crate::os_ui as os;
@@ -10,10 +12,13 @@ use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_ops::install::{self, Agent, AgentStatus, CliStatus, Env, State};
+use noshape_ops::install::{self, Agent, Env, State};
 use std::cell::RefCell;
-use std::path::PathBuf;
+use std::future::Future;
+use std::pin::Pin;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::time::Duration;
 
 actions!(noshape_setup, [InstallCommandLineTool, ConnectCodingAgents]);
 
@@ -34,8 +39,8 @@ pub fn help_items(menu: OsMenu) -> OsMenu {
 
 /// The two items as actions (the macOS app menu), in the active window.
 pub fn init(cx: &mut App) {
-    cx.on_action(|_: &InstallCommandLineTool, cx| in_active_window(Scope::Cli, cx));
-    cx.on_action(|_: &ConnectCodingAgents, cx| in_active_window(Scope::Agents, cx));
+    cx.on_action(|_: &InstallCommandLineTool, cx| in_some_window(Scope::Cli, cx));
+    cx.on_action(|_: &ConnectCodingAgents, cx| in_some_window(Scope::Agents, cx));
     // macOS: the app menu (noshape ▸), where Mac apps put these.
     if cfg!(target_os = "macos") {
         cx.set_menus(vec![Menu::new("noshape").items([
@@ -47,16 +52,168 @@ pub fn init(cx: &mut App) {
     }
 }
 
-fn in_active_window(scope: Scope, cx: &mut App) {
-    if cx.active_window().is_none() {
-        crate::files::show_start_window(cx);
+/// Menu actions arrive while the window they were dispatched to is busy: the dialog opens right after (an update of
+/// that window from inside its own dispatch fails, and the click showed nothing).
+fn in_some_window(scope: Scope, cx: &mut App) {
+    cx.defer(move |cx| {
+        let mut w = cx.active_window().or_else(|| cx.windows().first().copied());
+        if w.is_none() {
+            crate::files::show_start_window(cx);
+            w = cx.active_window().or_else(|| cx.windows().first().copied());
+        }
+        let Some(w) = w else {
+            log::error!("setup: no window to show the dialog in");
+            return;
+        };
+        if let Err(e) = w.update(cx, |_, window, cx| open(scope, window, cx)) {
+            log::error!("setup: could not open the dialog: {e:#}");
+        }
+    });
+}
+
+/// How long a check of what is set up may take before its row says it couldn't (a hung network home, a slow disk).
+const CHECK_TIMEOUT: Duration = Duration::from_secs(5);
+/// Installing or connecting: macOS's password prompt waits for the user, an agent's command for its login.
+const APPLY_TIMEOUT: Duration = Duration::from_secs(300);
+
+/// What a row sets up.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum What {
+    Cli,
+    Agent(Agent),
+}
+
+/// A row's state.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Check {
+    /// Being checked, or being set up.
+    Working,
+    /// Can be set up: a checkbox.
+    Offer,
+    /// Set up already, or just now.
+    Done,
+    /// Nothing to do: not installed, or the check couldn't tell.
+    Unavailable,
+    /// Setting it up failed (the row says why).
+    Failed,
+}
+
+struct Row {
+    what: What,
+    label: String,
+    status: String,
+    check: Check,
+    on: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Phase {
+    Choosing,
+    Working,
+    Finished,
+}
+
+/// The dialog's state, shared by its rows' checks and its renders.
+struct Setup {
+    scope: Scope,
+    rows: Vec<Row>,
+    phase: Phase,
+}
+
+impl Setup {
+    /// Every row "checking…" (the dialog shows at once; the checks fill them in).
+    fn new(scope: Scope) -> Setup {
+        let mut whats = Vec::new();
+        if scope != Scope::Agents {
+            whats.push(What::Cli);
+        }
+        if scope != Scope::Cli {
+            whats.extend(Agent::ALL.into_iter().filter(|a| *a != Agent::ClaudeDesktop || !cfg!(target_os = "linux")).map(What::Agent));
+        }
+        let rows = whats.into_iter().map(|what| Row { what, label: label(what), status: "checking…".into(), check: Check::Working, on: false }).collect();
+        Setup { scope, rows, phase: Phase::Choosing }
     }
-    let Some(w) = cx.active_window().or_else(|| cx.windows().first().copied()) else { return };
-    let _ = w.update(cx, |_, window, cx| open(scope, window, cx));
+
+    /// A check's answer for row `i` (None: no answer in time).
+    fn checked(&mut self, i: usize, r: Option<Result<(Check, String), String>>) {
+        let Some(row) = self.rows.get_mut(i) else { return };
+        let (check, status) = match r {
+            None => (Check::Unavailable, format!("couldn't check (no answer in {} s)", CHECK_TIMEOUT.as_secs())),
+            Some(Err(e)) => (Check::Unavailable, format!("couldn't check: {e}")),
+            Some(Ok(v)) => v,
+        };
+        row.on = check == Check::Offer;
+        row.check = check;
+        row.status = status;
+    }
+
+    fn checking(&self) -> bool {
+        self.rows.iter().any(|r| r.check == Check::Working)
+    }
+}
+
+fn label(what: What) -> String {
+    match what {
+        What::Cli => "Install the noshape command".into(),
+        What::Agent(a) => format!("Connect {}", a.name()),
+    }
+}
+
+/// What is set up for `what` now (files and folders only: no agent's command runs).
+fn check(what: What, env: &Env) -> Result<(Check, String), String> {
+    let command = install::this_binary().ok_or("couldn't tell where this program is")?;
+    Ok(match what {
+        What::Cli => {
+            let st = install::cli_status(env, &command);
+            match (&st.installed, st.on_path) {
+                (Some(p), true) => (Check::Done, format!("installed: {}", p.display())),
+                (Some(p), false) => (Check::Offer, format!("installed: {} (not on PATH)", p.display())),
+                (None, _) => (Check::Offer, match &st.other {
+                    Some(o) => format!("not installed ({} starts another noshape)", o.display()),
+                    None => "not installed".into(),
+                }),
+            }
+        }
+        What::Agent(a) => {
+            let st = install::status(env, a, &command);
+            match st.state {
+                State::Missing => (Check::Unavailable, "not installed".into()),
+                State::Connected => (Check::Done, st.state.label()),
+                _ => (Check::Offer, st.state.label()),
+            }
+        }
+    })
+}
+
+/// Set `what` up; what happened, or why it failed.
+fn set_up(what: What, env: &Env) -> Result<String, String> {
+    let command = install::this_binary().ok_or("couldn't tell where this program is")?;
+    match what {
+        What::Cli => install::cli_install(env, &command, None).map(|v| {
+            let path = v["path"].as_str().unwrap_or("").to_string();
+            match v["note"].as_str() {
+                Some(n) => format!("installed: {path} ({n})"),
+                None => format!("installed: {path}"),
+            }
+        }),
+        What::Agent(a) => install::connect(env, a, &command).map(|ch| format!("{}{}", ch.result, if a == Agent::ClaudeDesktop { " (restart Claude Desktop to load it)" } else { "" })),
+    }
+}
+
+/// `work` on the background executor: its result, or None after `limit` (left to finish on its own).
+async fn timed<T: Send + 'static>(ex: BackgroundExecutor, work: impl Future<Output = T> + Send + 'static, limit: Duration) -> Option<T> {
+    ex.spawn(work).with_timeout(limit, &ex).await.ok()
+}
+
+type CheckFuture = Pin<Box<dyn Future<Output = Result<(Check, String), String>> + Send>>;
+type Checker = Arc<dyn Fn(What, Env) -> CheckFuture + Send + Sync>;
+
+fn file_checks() -> Checker {
+    Arc::new(|what, env| Box::pin(async move { check(what, &env) }))
 }
 
 /// Once, on the first launch of an installed (release) app: offer what isn't
-/// set up yet, if anything is.
+/// set up yet, if anything is (checked first: this isn't a click).
 pub fn first_launch(cx: &mut App) {
     let flag = noshape_app_core::paths::config_dir().join("setup-offered");
     let installed = option_env!("NOSHAPE_VERSION").is_some() && !cfg!(debug_assertions);
@@ -65,83 +222,54 @@ pub fn first_launch(cx: &mut App) {
         return;
     }
     let _ = std::fs::write(&flag, "");
-    let task = cx.background_executor().spawn(async move { gather() });
     cx.spawn(async move |cx| {
-        let Some(found) = task.await else { return };
-        let worth = found.cli.installed.is_none() || found.agents.iter().any(|a| matches!(a.state, State::NotConnected | State::Elsewhere(_)));
-        if !worth {
+        let mut setup = Setup::new(Scope::Everything);
+        let env = Env::current();
+        for i in 0..setup.rows.len() {
+            let (what, env) = (setup.rows[i].what, env.clone());
+            let r = timed(cx.background_executor().clone(), async move { check(what, &env) }, CHECK_TIMEOUT).await;
+            setup.checked(i, r);
+        }
+        if !setup.rows.iter().any(|r| r.check == Check::Offer) {
             return;
         }
         cx.update(|cx| {
             let Some(w) = cx.active_window().or_else(|| cx.windows().first().copied()) else { return };
-            let _ = w.update(cx, |_, window, cx| show(Scope::Everything, found, window, cx));
+            let _ = w.update(cx, |_, window, cx| show(Rc::new(RefCell::new(setup)), Env::current(), window, cx));
         });
     })
     .detach();
 }
 
-/// What is set up now (files and folders only: no agent's command runs).
-#[derive(Clone)]
-struct Found {
-    command: PathBuf,
-    cli: CliStatus,
-    agents: Vec<AgentStatus>,
-}
-
-fn gather() -> Option<Found> {
-    let command = install::this_binary()?;
-    let env = Env::current();
-    Some(Found { cli: install::cli_status(&env, &command), agents: install::statuses(&env, &command).into_iter().filter(|a| a.found.is_some()).collect(), command })
-}
-
+/// The dialog, at once, with its rows "checking…"; each check fills its row in (or says it couldn't).
 fn open(scope: Scope, window: &mut Window, cx: &mut App) {
-    let task = cx.background_executor().spawn(async move { gather() });
-    window
-        .spawn(cx, async move |cx| {
-            let Some(found) = task.await else { return };
-            let _ = cx.update(|window, cx| show(scope, found, window, cx));
-        })
-        .detach();
+    open_with(scope, Env::current(), file_checks(), CHECK_TIMEOUT, window, cx);
 }
 
-/// One row: a checkbox, what it does, its current state.
-struct Row {
-    what: Option<Agent>,
-    label: String,
-    state: String,
-    on: bool,
-    /// Already done: shown checked, not a choice.
-    done: bool,
-}
-
-fn rows(scope: Scope, found: &Found) -> Vec<Row> {
-    let mut v = Vec::new();
-    if scope != Scope::Agents {
-        let (state, done) = match (&found.cli.installed, found.cli.on_path) {
-            (Some(p), true) => (format!("installed: {}", p.display()), true),
-            (Some(p), false) => (format!("installed: {} (not on PATH)", p.display()), false),
-            (None, _) => (match &found.cli.other {
-                Some(o) => format!("not installed ({} starts another noshape)", o.display()),
-                None => "not installed".into(),
-            }, false),
-        };
-        v.push(Row { what: None, label: "Install the noshape command".into(), state, on: !done, done });
+fn open_with(scope: Scope, env: Env, checker: Checker, limit: Duration, window: &mut Window, cx: &mut App) -> Rc<RefCell<Setup>> {
+    let setup = Rc::new(RefCell::new(Setup::new(scope)));
+    show(setup.clone(), env.clone(), window, cx);
+    let whats: Vec<What> = setup.borrow().rows.iter().map(|r| r.what).collect();
+    for (i, what) in whats.into_iter().enumerate() {
+        let (env, checker, setup) = (env.clone(), checker.clone(), setup.clone());
+        window
+            .spawn(cx, async move |cx| {
+                let r = timed(cx.background_executor().clone(), checker(what, env), limit).await;
+                let _ = cx.update(|window, _| {
+                    setup.borrow_mut().checked(i, r);
+                    window.refresh();
+                });
+            })
+            .detach();
     }
-    if scope != Scope::Cli {
-        for a in &found.agents {
-            let done = a.state == State::Connected;
-            v.push(Row { what: Some(a.agent), label: format!("Connect {}", a.agent.name()), state: a.state.label(), on: !done, done });
-        }
-    }
-    v
+    setup
 }
 
-fn show(scope: Scope, found: Found, window: &mut Window, cx: &mut App) {
-    let rows = Rc::new(RefCell::new(rows(scope, &found)));
-    let none_found = scope != Scope::Cli && found.agents.is_empty();
-    let command = found.command.clone();
+fn show(setup: Rc<RefCell<Setup>>, env: Env, window: &mut Window, cx: &mut App) {
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
+        let s = setup.borrow();
+        let scope = s.scope;
         let title = match scope {
             Scope::Cli => "Install command line tool",
             Scope::Agents => "Connect to coding agents",
@@ -152,27 +280,39 @@ fn show(scope: Scope, found: Found, window: &mut Window, cx: &mut App) {
             Scope::Agents => "Connected agents can use noshape through its MCP server (noshape mcp): ask them to model a part, edit a drawing or export files.",
             Scope::Everything => "noshape can be used from a terminal and by coding agents through its MCP server (noshape mcp).",
         };
-        let any = rows.borrow().iter().any(|r| r.on && !r.done);
-        let list = v_flex().gap(px(6.)).children(rows.borrow().iter().enumerate().map(|(i, r)| {
-            let rows = rows.clone();
-            let done = r.done;
+        let choosing = s.phase == Phase::Choosing;
+        let any = s.rows.iter().any(|r| r.on && r.check == Check::Offer);
+        let none_found = scope == Scope::Agents && !s.checking() && s.rows.iter().all(|r| r.check == Check::Unavailable);
+        let list = v_flex().gap(px(6.)).children(s.rows.iter().enumerate().map(|(i, r)| {
+            let toggles = choosing && r.check == Check::Offer;
+            let shown_on = r.check == Check::Done || (r.on && r.check == Check::Offer);
+            let setup = setup.clone();
             h_flex()
                 .id(("setup-row", i))
                 .min_h(px(26.))
                 .gap(px(8.))
-                .when(!done, |d| d.cursor_pointer())
-                .child(div().when(done, |d| d.opacity(0.5)).child(os::checkbox_box(r.on || done)))
-                .child(div().font_weight(FontWeight::SEMIBOLD).child(r.label.clone()))
-                .child(div().text_color(pal.text_muted).child(r.state.clone()))
+                .when(toggles, |d| d.cursor_pointer())
+                .child(div().when(!toggles, |d| d.opacity(0.5)).child(os::checkbox_box(shown_on)))
+                .child(div().flex_none().font_weight(FontWeight::SEMIBOLD).child(r.label.clone()))
+                .child(div().min_w_0().text_color(if r.check == Check::Failed { pal.error } else { pal.text_muted }).child(r.status.clone()))
                 .on_click(move |_, window, _| {
-                    if let Some(r) = rows.borrow_mut().get_mut(i).filter(|r| !r.done) {
+                    if let Some(r) = setup.borrow_mut().rows.get_mut(i).filter(|_| toggles) {
                         r.on = !r.on;
                     }
                     window.refresh();
                 })
         }));
-        let (rows2, command) = (rows.clone(), command.clone());
-        os::modal(dialog, title, 560.)
+        let ok_label = match s.phase {
+            Phase::Choosing if scope == Scope::Everything => "Set up",
+            Phase::Choosing => "Apply",
+            Phase::Working => "Working…",
+            Phase::Finished => "Close",
+        };
+        let ok_pale = (choosing && !any) || s.phase == Phase::Working;
+        let cancel = (s.phase != Phase::Finished).then(|| os::modal_cancel(os::cancel_button("cancel", if !choosing { "Close" } else if scope == Scope::Everything { "Not now" } else { "Cancel" }, cx)));
+        drop(s);
+        let (setup2, env) = (setup.clone(), env.clone());
+        os::modal(dialog, title, 600.)
             .child(
                 v_flex()
                     .px(px(11.))
@@ -185,57 +325,67 @@ fn show(scope: Scope, found: Found, window: &mut Window, cx: &mut App) {
                     .child(list)
                     .when(none_found, |d| d.child(div().text_color(pal.text_muted).child("No coding agent found (Claude Code, Codex CLI, Claude Desktop). Install one, then use Help › Connect to coding agents…"))),
             )
-            .footer(os::modal_footer().child(os::modal_ok(div().when(!any, |d| d.opacity(0.4)).child(os::primary_button("ok", if scope == Scope::Everything { "Set up" } else { "Apply" })))).child(os::modal_cancel(os::cancel_button("cancel", if scope == Scope::Everything { "Not now" } else { "Cancel" }, cx))))
+            .footer(os::modal_footer().child(os::modal_ok(div().when(ok_pale, |d| d.opacity(0.4)).child(os::primary_button("ok", ok_label)))).children(cancel))
             .on_ok(move |_, window, cx| {
-                let chosen: Vec<Option<Agent>> = rows2.borrow().iter().filter(|r| r.on && !r.done).map(|r| r.what).collect();
-                if chosen.is_empty() {
-                    return false;
+                let phase = setup2.borrow().phase;
+                match phase {
+                    Phase::Finished => true,
+                    Phase::Working => false,
+                    Phase::Choosing => {
+                        apply(setup2.clone(), env.clone(), window, cx);
+                        false
+                    }
                 }
-                apply(chosen, command.clone(), window, cx);
-                true
             })
     });
 }
 
-/// Do what was chosen (in the background: the agents' commands, macOS's
-/// password prompt), then say what happened.
-fn apply(chosen: Vec<Option<Agent>>, command: PathBuf, window: &mut Window, cx: &mut App) {
-    let task = cx.background_executor().spawn(async move {
-        let env = Env::current();
-        let mut lines = Vec::new();
-        let mut failed = false;
-        for c in chosen {
-            match c {
-                None => match install::cli_install(&env, &command, None) {
-                    Ok(v) => {
-                        lines.push(format!("The noshape command: {}", v["path"].as_str().unwrap_or("")));
-                        if let Some(n) = v["note"].as_str() {
-                            lines.push(format!("  {n}"));
-                        }
-                    }
-                    Err(e) => {
-                        failed = true;
-                        lines.push(format!("The noshape command: {e}"));
-                    }
-                },
-                Some(a) => match install::connect(&env, a, &command) {
-                    Ok(ch) => lines.push(format!("{}: {}{}", a.name(), ch.result, if a == Agent::ClaudeDesktop { " (restart Claude Desktop to load it)" } else { "" })),
-                    Err(e) => {
-                        failed = true;
-                        lines.push(format!("{}: {e}", a.name()));
-                    }
-                },
-            }
+/// Set up what was chosen, one after the other (in the background: the agents' commands, macOS's password prompt),
+/// each row saying "working…" and then what happened: the path installed to, or the exact error.
+fn apply(setup: Rc<RefCell<Setup>>, env: Env, window: &mut Window, cx: &mut App) {
+    let chosen: Vec<(usize, What)> = {
+        let mut s = setup.borrow_mut();
+        let chosen: Vec<(usize, What)> = s.rows.iter().enumerate().filter(|(_, r)| r.on && r.check == Check::Offer).map(|(i, r)| (i, r.what)).collect();
+        if chosen.is_empty() {
+            return;
         }
-        (failed, lines.join("\n"))
-    });
+        s.phase = Phase::Working;
+        for (i, what) in &chosen {
+            s.rows[*i].check = Check::Working;
+            s.rows[*i].status = if *what == What::Cli { "installing…".into() } else { "connecting…".into() };
+        }
+        chosen
+    };
+    window.refresh();
     window
         .spawn(cx, async move |cx| {
-            let (failed, detail) = task.await;
-            let _ = cx.update(|window, cx| {
-                let (level, message) = if failed { (PromptLevel::Warning, "Some of the setup didn't work") } else { (PromptLevel::Info, "noshape is set up") };
-                drop(window.prompt(level, message, Some(&detail), &["OK"], cx));
+            for (i, what) in chosen {
+                let env = env.clone();
+                let r = timed(cx.background_executor().clone(), async move { set_up(what, &env) }, APPLY_TIMEOUT).await;
+                let (check, status) = match r {
+                    Some(Ok(text)) => (Check::Done, text),
+                    Some(Err(e)) => (Check::Failed, format!("failed: {e}")),
+                    None => (Check::Failed, format!("no answer in {} min", APPLY_TIMEOUT.as_secs() / 60)),
+                };
+                if check == Check::Failed {
+                    log::warn!("setup: {}: {status}", label(what));
+                }
+                let setup = setup.clone();
+                let _ = cx.update(move |window, _| {
+                    let mut s = setup.borrow_mut();
+                    s.rows[i].check = check;
+                    s.rows[i].status = status;
+                    window.refresh();
+                });
+            }
+            let _ = cx.update(move |window, _| {
+                setup.borrow_mut().phase = Phase::Finished;
+                window.refresh();
             });
         })
         .detach();
 }
+
+#[cfg(test)]
+#[path = "agent_setup_tests.rs"]
+mod tests;
