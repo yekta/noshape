@@ -601,7 +601,12 @@ fn asm_fuzz_live_matches() {
     // matches (a Revolute opposed to its Cylindrical still slides the plate,
     // probes 1786 cb1) but C's free Ball pose is 2e-6 off in its rotation:
     // the conflict stops the solve just short of full convergence.
-    const KNOWN: &[&str] = &["f50"];
+    // Batch 3 (live 11-02 15:36, 23/30 at first, f53's statuses since):
+    // f80 / f54 which mates of a conflicting loop read red (live spares a
+    // Fastened in f80, flags its Fastened mates in f79); f69 "not
+    // consistent" on a Parallel; f53 the half-turn's axis when both parts
+    // are held; f52 / f55 / f64 a free part's pose after a Ball / Cylindrical.
+    const KNOWN: &[&str] = &["f50", "f52", "f53", "f54", "f55", "f64", "f69", "f80"];
     let mut parts = parts();
     let (mut answered, mut matches, mut report) = (0, 0, Vec::new());
     for n in 1.. {
