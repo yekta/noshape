@@ -20,6 +20,11 @@ solid: an erosion-based shell), FI2 (a G1 Fill that live builds with a warning),
 vasedoc with NOSHAPE_KERNEL_PROFILE: op_shell_solid 0.84 s = offset 0.11 + cut 0.47 + volume check 0.24; then the
 feature's two volumes 0.19 s and two areas 0.07 s); live ~0.3 s. Tried: the whole Shell at the working scale (mm) like the blends: 6 kernel and 2 model shell tests changed
 results (the constructions' absolute thresholds): reverted; worth doing path by path (offset first) with the corpus.
+16:35: the sharp vase end to end (vase-e2e/vase_sharp.py): loft 8 faces, Shells OK as live but 13-24 s here: OCCT's
+offset spent 2.6-3 s (vibe5) intersecting the sides' offsets; now free-form faces meeting at sharp edges try the
+direct construction first (1.2-2.8 s, 1-3 mm both ways). Its B-spline sides are extended 3 walls past their bounds (was
+10); the outward foot corner depends on that continuation (2 mm out: 64475.65 with 3, .42 with 10, OCCT .56): live
+asked (1799) to pick Parasolid's. The kernel shell T1 suite 40-56 s -> 6 s (the vase test's Boolean diffs replaced).
 
 **State 11-02 14:50 (this session, from 11:55).** Builds / tests on vibe5 (rb-hosts), the profile documents copied
 to vibe5 ~/agents/profdocs, fuzz scripts in vibe5 / vibe4 ~/agents/fuzz/bin. Landed: P1 smooth twisted vase (3c534b35:
