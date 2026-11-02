@@ -584,3 +584,111 @@ fn bench_editing_logic() {
     }
     let _ = std::fs::remove_dir_all(&tmp);
 }
+
+/// T2 bench: edit latency. Each document of tests/perf, NOSHAPE_PROFILE_DIR (else ~/agents/profdocs) and
+/// NOSHAPE_EDIT_DOCS (more directories, `:`-separated) regenerated once (warm, as an open document is), then typical
+/// edits each committed and regenerated as the app does (the same Regenerator, preview meshes: what the graphics
+/// wait for): a dimension of the first sketch with one, the first extrude's depth, the first fillet's radius, the
+/// middle feature suppressed and unsuppressed. One line per edit: the time, how much of it features / display, and
+/// how many features ran again of how many.
+#[test]
+#[ignore = "T2 bench: tools/tiers/perf.sh"]
+fn bench_edit_latency() {
+    use noshape_model::params::ParamValue;
+    let mut dirs = vec![std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf")];
+    dirs.push(std::env::var_os("NOSHAPE_PROFILE_DIR").map_or_else(|| std::path::PathBuf::from(format!("{}/agents/profdocs", std::env::var("HOME").unwrap_or_default())), std::path::PathBuf::from));
+    if let Ok(more) = std::env::var("NOSHAPE_EDIT_DOCS") {
+        dirs.extend(more.split(':').map(std::path::PathBuf::from));
+    }
+    let only = std::env::var("NOSHAPE_PROFILE_ONLY").ok();
+    let tmp = std::env::temp_dir().join(format!("noshape-edits-{}", std::process::id()));
+    std::fs::create_dir_all(&tmp).unwrap();
+    // Round edits, as typed: a length one 1 mm more, anything else 1 % more.
+    let scaled = |e: &noshape_units::ExprValue| noshape_units::ExprValue::new(if e.text.trim_end().ends_with("mm") { format!("({}) + 1 mm", e.text) } else { format!("({}) * 1.01", e.text) });
+    // Each feature's own effect: the bodies it adds or changes (fingerprinted), from the context after each feature
+    // (the cached runs up to it).
+    type Print = (String, usize, usize, i64, i64);
+    let effects = |reg: &mut Regenerator, ps: &noshape_model::partstudio::PartStudio, units: &noshape_units::UnitPrefs, opts: &RegenOptions| -> Vec<Vec<Print>> {
+        let print = |b: &noshape_model::regen::context::Body| -> Print {
+            let v = b.shape.volume().unwrap_or(0.0) * 1e9;
+            let a = noshape_kernel::surface_properties(&b.shape).map_or(0.0, |p| p.mass) * 1e6;
+            (b.id.to_string(), b.shape.count(noshape_kernel::ShapeType::Face), b.shape.count(noshape_kernel::ShapeType::Edge), (v * 1e6).round() as i64, (a * 1e6).round() as i64)
+        };
+        let mut before: Vec<Print> = Vec::new();
+        let mut out = Vec::new();
+        for k in 0..ps.features.len() {
+            let o = RegenOptions { upto: Some(k + 1), preview_meshes: true, ..opts.clone() };
+            let ctx = reg.regenerate(ps, &ConfigValues::default(), units, &o).context;
+            let after: Vec<Print> = ctx.bodies.iter().map(|b| print(b)).collect();
+            out.push(after.iter().filter(|p| !before.contains(p)).cloned().collect());
+            before = after;
+        }
+        out
+    };
+    for dir in dirs {
+        let Ok(rd) = std::fs::read_dir(&dir) else { continue };
+        let mut files: Vec<_> = rd.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "noshape") && only.as_ref().is_none_or(|o| p.file_name().is_some_and(|n| n.to_string_lossy() == *o))).collect();
+        files.sort();
+        for path in files {
+            let copy = tmp.join(path.file_name().unwrap());
+            std::fs::copy(&path, &copy).unwrap();
+            let Ok(s) = noshape_ops::session::Session::open(&copy) else { continue };
+            let units = s.doc.settings.units;
+            let opts = RegenOptions { custom_features: Some(noshape_model::custom::DocumentScripts::from_document(&s.doc)), preview_meshes: true, ..Default::default() };
+            let doc = path.file_stem().unwrap().to_string_lossy().to_string();
+            for tab in &s.doc.tabs {
+                let TabContent::PartStudio(ps) = &tab.content else { continue };
+                if ps.features.is_empty() {
+                    continue;
+                }
+                let mut reg = Regenerator::new();
+                let t = Instant::now();
+                let _ = reg.regenerate(ps, &ConfigValues::default(), &units, &opts);
+                let open_ms = t.elapsed().as_secs_f64() * 1e3;
+                let n = ps.features.len();
+                println!("edit {doc} / {}: {n} features, first regeneration {open_ms:.0} ms", tab.name);
+                // The edits: (label, the studio after it).
+                let mut edits: Vec<(String, noshape_model::partstudio::PartStudio)> = Vec::new();
+                if let Some((i, f)) = ps.features.iter().enumerate().find(|(_, f)| matches!(f.params.get("sketch"), Some(ParamValue::Sketch(d)) if !d.dimension_exprs.is_empty())) {
+                    let mut e = ps.clone();
+                    if let Some(ParamValue::Sketch(d)) = e.features[i].params.0.get_mut("sketch") {
+                        let (k, v) = d.dimension_exprs.iter().next().map(|(k, v)| (*k, scaled(v))).unwrap();
+                        d.dimension_exprs.insert(k, v);
+                    }
+                    edits.push((format!("dimension in {} (#{})", f.name, i + 1), e));
+                }
+                for (ty, key, what) in [("extrude", "depth", "depth"), ("fillet", "radius", "radius")] {
+                    if let Some((i, f)) = ps.features.iter().enumerate().find(|(_, f)| f.type_id == ty && !f.suppressed && matches!(f.params.get(key), Some(ParamValue::Expr(_)))) {
+                        let mut e = ps.clone();
+                        if let Some(ParamValue::Expr(x)) = e.features[i].params.0.get_mut(key) {
+                            *x = scaled(x);
+                        }
+                        edits.push((format!("{what} of {} (#{})", f.name, i + 1), e));
+                    }
+                }
+                let mid = n / 2;
+                let mut e = ps.clone();
+                e.features[mid].suppressed = !e.features[mid].suppressed;
+                edits.push((format!("suppress {} (#{})", ps.features[mid].name, mid + 1), e));
+                let old_effects = effects(&mut reg, ps, &units, &opts);
+                for (label, edited) in edits {
+                    for (step, studio) in [(label.clone(), &edited), (format!("undo ({label})"), ps)] {
+                        let t = Instant::now();
+                        let r = reg.regenerate(studio, &ConfigValues::default(), &units, &opts);
+                        let ms = t.elapsed().as_secs_f64() * 1e3;
+                        let ran: Vec<usize> = (0..studio.features.len()).filter(|&k| r.evaluated.contains(&studio.features[k].id)).collect();
+                        let time = |k: usize| r.display.features.get(k).map_or(0.0, |st| st.time_ms as f64);
+                        let features: f64 = ran.iter().map(|&k| time(k)).sum();
+                        // Features that ran again with their own effect as before (and the same position: no reorder).
+                        let new_effects = if std::ptr::eq(studio, ps) { old_effects.clone() } else { effects(&mut reg, studio, &units, &opts) };
+                        let same: Vec<usize> = ran.iter().copied().filter(|&k| k > 0 && !studio.features[k].suppressed && new_effects.get(k) == old_effects.get(k) && studio.features[k].id == ps.features[k].id).collect();
+                        let same_ms: f64 = same.iter().map(|&k| time(k)).sum();
+                        let names: Vec<&str> = same.iter().filter(|&&k| time(k) >= 1.0).map(|&k| studio.features[k].name.as_str()).collect();
+                        println!("timing edit {doc} / {} / {step}: {ms:.1} ms (features {features:.1}, display and the rest {:.1}), {} of {n} features ran, {} of them ({same_ms:.1} ms) with their effect unchanged {names:?}", tab.name, ms - features, ran.len(), same.len());
+                    }
+                }
+            }
+        }
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+}
