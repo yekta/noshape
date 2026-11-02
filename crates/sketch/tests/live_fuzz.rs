@@ -1134,6 +1134,116 @@ fn probes6() -> Vec<(String, Case)> {
     out
 }
 
+/// Drag probes (probes 7, after batch 1's drags s1 / s3 / s5 / s12): minimal
+/// sketches that already solve, one point dragged in the UI by (dx, dy) mm
+/// in 25 steps: what moves, what keeps its size or direction.
+fn drag_probes() -> Vec<(String, Case, String, DVec2)> {
+    let v = DVec2::new;
+    let mut out = Vec::new();
+    let mut add = |name: &str, point: &str, by: DVec2, f: &dyn Fn(&mut Case)| {
+        let mut c = Case::new();
+        f(&mut c);
+        out.push((name.to_string(), c, point.to_string(), by));
+    };
+    // A closed quad from `p`; `hv` puts H / V on its sides.
+    let quad = |c: &mut Case, p: [DVec2; 4], hv: [bool; 4]| -> Vec<String> {
+        let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+        for i in 0..4 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+        }
+        for (i, x) in l.iter().enumerate() {
+            if hv[i] {
+                c.hv(i % 2 == 0, x);
+            }
+        }
+        l
+    };
+    let rect = [v(0.0, 0.0), v(20.0, 0.0), v(20.0, 10.0), v(0.0, 10.0)];
+    add("d1 rectangle with H / V on all four sides, its lower-left corner dragged by (3, 2)", "l1.start", v(3.0, 2.0), &|c| {
+        quad(c, rect, [true; 4]);
+    });
+    add("d2 as d1, the left side without its Vertical", "l1.start", v(3.0, 2.0), &|c| {
+        quad(c, rect, [true, true, true, false]);
+    });
+    add("d3 as d1, the bottom dimensioned 20", "l1.start", v(3.0, 2.0), &|c| {
+        let l = quad(c, rect, [true; 4]);
+        c.length(&l[0], 20.0);
+    });
+    add("d4 as d1, width 20 and height 10 dimensioned", "l1.start", v(3.0, 2.0), &|c| {
+        let l = quad(c, rect, [true; 4]);
+        c.length(&l[0], 20.0);
+        c.length(&l[1], 10.0);
+    });
+    add("d5 a free quad (no H / V), its lower-left corner dragged by (3, 2)", "l1.start", v(3.0, 2.0), &|c| {
+        quad(c, rect, [false; 4]);
+    });
+    add("d6 an L: horizontal (0,0)-(20,0) and vertical (20,0)-(20,10), the corner dragged by (3, 2)", "l1.end", v(3.0, 2.0), &|c| {
+        let a = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        let b = c.line(v(20.0, 0.0), v(20.0, 10.0));
+        c.coincident(&format!("{a}.end"), &format!("{b}.start"));
+        c.hv(true, &a);
+        c.hv(false, &b);
+    });
+    add("d7 a line (0,0)-(20,0), Horizontal, length 20, its end dragged by (3, 2)", "l1.end", v(3.0, 2.0), &|c| {
+        let a = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        c.hv(true, &a);
+        c.length(&a, 20.0);
+    });
+    add("d8 fuzz s3's chain alone: line, tangent arc, perpendicular line with length 20; the first line's start dragged by (5, 3)", "l1.start", v(5.0, 3.0), &|c| {
+        let l1 = c.line(v(-20.0, 0.0), v(0.0, 0.0));
+        let a = c.arc(v(0.0, 6.0), 6.0, -std::f64::consts::FRAC_PI_2, 0.0);
+        let l3 = c.line(v(6.0, 6.0), v(6.0, 26.0));
+        c.coincident(&format!("{l1}.end"), &format!("{a}.start"));
+        c.coincident(&format!("{a}.end"), &format!("{l3}.start"));
+        c.pair("TANGENT", &l1, &a);
+        c.pair("TANGENT", &a, &l3);
+        c.pair("PERPENDICULAR", &l3, &l1);
+        c.length(&l3, 20.0);
+    });
+    out
+}
+
+/// Writes the drag probes (LIVE_FUZZ_WRITE=probe-7) in the batches' shape,
+/// each case's `drag` = the point, its target and ours dragged there in 25
+/// steps; compares with live's answers when there.
+#[test]
+#[ignore = "T2: live fuzz drag probes"]
+fn drag_probe_matches() {
+    let cases: Vec<Value> = drag_probes().into_iter().map(|(name, mut c, point, by)| {
+        let o = ours(&mut c);
+        let from = c.pos(&point) / MM;
+        let to = from + by;
+        let p = c.point(&point);
+        for k in 1..=25 {
+            c.sk.drag(&[(DragHandle::Point(p), (from + by * (k as f64 / 25.0)) * MM)]);
+        }
+        let id = name.split(' ').next().unwrap().to_string();
+        json!({"case": id, "what": name, "constraints": c.spec, "onshape": {"entities": c.os_entities, "constraints": c.os_constraints}, "ours": o, "drag": {"point": point, "to": [to.x, to.y], "ours": ours_points(&c)}})
+    }).collect();
+    let b = json!({"units": "mm (Onshape JSON: metres, radians)", "plane": "Top", "cases": cases});
+    let path = fixture("sketch-probe-7.json");
+    if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == "probe-7") {
+        std::fs::write(&path, serde_json::to_string_pretty(&b).unwrap()).unwrap();
+    }
+    let Ok(live) = std::fs::read_to_string(fixture("sketch-probe-7.live.json")) else { return };
+    let live: Value = serde_json::from_str(&live).unwrap();
+    let (mut total, mut ok) = (0, 0);
+    for case in b["cases"].as_array().unwrap() {
+        let Some(after) = live["cases"][case["case"].as_str().unwrap()]["drag"]["after"].as_object() else { continue };
+        total += 1;
+        let d: Vec<String> = after.iter().filter(|(n, p)| {
+            let o = &case["drag"]["ours"][n.as_str()];
+            (o[0].as_f64().unwrap_or(f64::NAN) - p[0].as_f64().unwrap_or(0.0)).hypot(o[1].as_f64().unwrap_or(f64::NAN) - p[1].as_f64().unwrap_or(0.0)) >= 1e-3
+        }).map(|(n, p)| format!("{n}: ours {} live {p}", case["drag"]["ours"][n.as_str()])).collect();
+        if d.is_empty() {
+            ok += 1;
+        } else {
+            println!("  {} ({}): {}", case["case"], case["what"], d.join("; "));
+        }
+    }
+    println!("live drag probes: {total} answered, {ok} match");
+}
+
 fn probe_batch(list: Vec<(String, Case)>) -> Value {
     let cases: Vec<Value> = list.into_iter().map(|(name, mut c)| {
         let ours = ours(&mut c);
