@@ -280,8 +280,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   fuse takes 14 s and comes out invalid. T2 probe kernel shell::shellhang_shell5_probe. core 11-02 22:10: builds now
   (175216.21 mm³, live 175040.09: +0.1 %; 63 faces, live 52; 13 s on loaded vibe5): a removed face with nothing a wall
   behind it stays a face when another opens (live keeps Shell 5's first removed face), and past 112 slabs the cavity is
-  grown from the opening (77 of 128 slabs fused). Left: our pocket's ceiling is at z 16 along a 2 mm strip (y -11.6 ..
-  -9.6) where live's is at z 17 (the extra 209 mm³), live's 0.3 s.
+  grown from the opening (77 of 128 slabs fused). 22:55: 175009.28 (-0.02 %), 7.3 s: Parasolid bounds the cavity by the
+  removed face's own plane past its edges (live's new face in that plane over the face beside it): a kept face meeting
+  a removed planar face at a concave edge loses its wall a wall's depth behind the opening and a wall past their shared
+  edge. Left (51 / 20 mm³): live extends the holes' cylinder walls up into the pocket (slabs end with their faces), an
+  18 mm³ corner below the opening's end that live keeps, 76 faces to live's 52, live's 0.3 s.
 - [x] (core 11-02 19:40, our own four-sided G1 Coons fill; three-edge fills still take OCCT's flat ConstrainedFilling) P2 FILL-G1-DOME (core 11-02, live 1739 FI2): a Fill G1 to a shelled box's outer side faces builds in live with the
   warning "Could not meet tangency constraints at highlighted points." (a dome to z 42.97, 4327.5641 mm²: the corners
   can't be tangent to two perpendicular walls); ours fails ("Cannot create fill surface…"): OCCT's plate throws for

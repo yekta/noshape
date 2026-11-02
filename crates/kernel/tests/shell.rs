@@ -1098,11 +1098,33 @@ fn shellhang_shell5_faces_probe() {
     for f in live.faces() {
         let (c, a, k) = desc(&f);
         let same = inp.iter().any(|(c2, a2, _)| (c - *c2).length() < 1e-4 && (a - a2).abs() < 1e-4);
-        println!("{} {k} area {a:.4} centre ({:.3}, {:.3}, {:.3})", if same { "kept" } else { "NEW " }, c.x, c.y, c.z);
+        if same {
+            println!("kept {k} area {a:.4} centre ({:.3}, {:.3}, {:.3})", c.x, c.y, c.z);
+        } else {
+            let b = f.bounding_box(true).unwrap();
+            println!("NEW  {k} area {a:.4} centre ({:.3}, {:.3}, {:.3}) normal {:?} box {:?} .. {:?}", c.x, c.y, c.z, f.normal_at_point(c).ok(), b.min, b.max);
+        }
     }
     for (c, a, k) in &inp {
         if !live.faces().iter().any(|f| { let (c2, a2, _) = desc(f); (*c - c2).length() < 1e-4 && (a - a2).abs() < 1e-4 }) {
             println!("input face gone or changed: {k} area {a:.4} centre ({:.3}, {:.3}, {:.3})", c.x, c.y, c.z);
         }
+    }
+}
+
+/// SHELL-HANG-5: the input faces over the strip where our pocket's ceiling differs from live's.
+#[test]
+#[ignore = "T2: probe"]
+fn shellhang_shell5_strip_probe() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_step(&dir.join("shellhang-shell5-input.step"), LengthUnit::Millimeter).unwrap().remove(0).shape;
+    for f in s.faces() {
+        let b = f.bounding_box(true).unwrap();
+        if b.max.y < -13.0 || b.min.y > -8.0 || b.max.z < 13.0 {
+            continue;
+        }
+        let c = f.centroid().unwrap();
+        let n = f.normal_at_point(c).ok();
+        println!("{} area {:.4} centre ({:.3}, {:.3}, {:.3}) normal {n:?} box {:?} .. {:?}", format!("{:?}", f.face_surface().ok()).chars().take(9).collect::<String>(), surface_properties(&f).unwrap().mass, c.x, c.y, c.z, b.min, b.max);
     }
 }

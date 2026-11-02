@@ -3979,6 +3979,91 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   return true;
 }
 
+// Parasolid bounds an opening's cavity by the removed face's own plane, extended past its edges: a kept face meeting a
+// removed planar face along a concave edge keeps no wall behind that plane (live shell-hang Shell 5: the pocket
+// behind its 45° opening runs on over the face beside it, up to the top's wall, and a wall's thickness past the
+// opening's end). The kept face's slab, less what lies behind each such opening within a wall of its outline; the
+// slab's faces keep their sources.
+TopoDS_Shape clip_behind_openings(const TopoDS_Shape& slab, const TopoDS_Face& f, const ShapeAncMap& ef, const ShapeIMap& rm,
+                                  double t, double size, SourceMap& sources)
+{
+  TopoDS_Shape r = slab;
+  GProp_GProps g;
+  BRepGProp::SurfaceProperties(f, g);
+  const gp_Pnt c = g.CentreOfMass();
+  ShapeIMap    seen;
+  for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+  {
+    const int k = ef.FindIndex(x.Current());
+    if (k == 0)
+      continue;
+    for (ShapeList::Iterator it(ef(k)); it.More(); it.Next())
+    {
+      if (!rm.Contains(it.Value()) || seen.Contains(it.Value()))
+        continue;
+      seen.Add(it.Value());
+      const TopoDS_Face& rf = TopoDS::Face(it.Value());
+      BRepAdaptor_Surface a(rf, false);
+      if (a.GetType() != GeomAbs_Plane)
+        continue;
+      gp_Pln pl = a.Plane();
+      gp_Dir n  = pl.Axis().Direction();
+      if (rf.Orientation() == TopAbs_REVERSED)
+        n.Reverse();
+      // Concave: the kept face lies in front of the removed face's plane.
+      if (gp_Vec(pl.Location(), c).Dot(gp_Vec(n)) <= 1e-7 * size)
+        continue;
+      // A wall deep behind the opening (its box in its plane), and a wall past its edges shared with this face only
+      // (live keeps Shell 5's corner past its opening's other edge).
+      gp_Ax3 ax(pl.Location(), n);
+      auto   box2 = [&](const TopoDS_Shape& sh) {
+        std::array<double, 4> b{1e300, -1e300, 1e300, -1e300};
+        for (TopExp_Explorer ee(sh, TopAbs_EDGE); ee.More(); ee.Next())
+        {
+          BRepAdaptor_Curve ec(TopoDS::Edge(ee.Current()));
+          for (int q = 0; q <= 16; ++q)
+          {
+            const gp_Pnt pt = ec.Value(ec.FirstParameter() + (ec.LastParameter() - ec.FirstParameter()) * q / 16.0);
+            const gp_Vec rel(ax.Location(), pt);
+            const double u = rel.Dot(gp_Vec(ax.XDirection())), v = rel.Dot(gp_Vec(ax.YDirection()));
+            b = {std::min(b[0], u), std::max(b[1], u), std::min(b[2], v), std::max(b[3], v)};
+          }
+        }
+        return b;
+      };
+      const std::array<double, 4> rb = box2(rf);
+      TopoDS_Compound             common_edges;
+      BRep_Builder().MakeCompound(common_edges);
+      for (TopExp_Explorer fe(f, TopAbs_EDGE); fe.More(); fe.Next())
+        for (TopExp_Explorer re(rf, TopAbs_EDGE); re.More(); re.Next())
+          if (fe.Current().IsSame(re.Current()))
+            BRep_Builder().Add(common_edges, fe.Current());
+      const std::array<double, 4> eb  = box2(common_edges);
+      const double                tol = 1e-6 * (1 + size);
+      const double                u0  = rb[0] - (eb[0] < rb[0] + tol ? t : 0), u1 = rb[1] + (eb[1] > rb[1] - tol ? t : 0);
+      const double                v0  = rb[2] - (eb[2] < rb[2] + tol ? t : 0), v1 = rb[3] + (eb[3] > rb[3] - tol ? t : 0);
+      TopoDS_Face                 mouth = BRepBuilderAPI_MakeFace(gp_Pln(ax), u0, u1, v0, v1).Face();
+      TopoDS_Shape behind = BRepPrimAPI_MakePrism(mouth, gp_Vec(n) * -t).Shape();
+      BRepAlgoAPI_Cut cm(r, behind);
+      if (!cm.IsDone() || solid_count(cm.Shape()) != 1)
+        continue;
+      const TopoDS_Shape clipped = single_solid(cm.Shape());
+      for (TopExp_Explorer y(r, TopAbs_FACE); y.More(); y.Next())
+      {
+        const Source* src = sources.Seek(y.Current());
+        if (!src)
+          continue;
+        for (ShapeList::Iterator m(cm.Modified(y.Current())); m.More(); m.Next())
+          sources.Bind(m.Value(), *src);
+      }
+      if (std::getenv("NOSHAPE_SHELL_DEBUG"))
+        std::fprintf(stderr, "slabs: a slab clipped at a removed face's plane (%.6g -> %.6g)\n", volume_of(r), volume_of(clipped));
+      r = clipped;
+    }
+  }
+  return r;
+}
+
 bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t,
               double sign, Built& out)
 {
@@ -3999,6 +4084,9 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
   const double d = sign * t;
   ShapeAncMap ef;
   TopExp::MapShapesAndAncestors(solid, TopAbs_EDGE, TopAbs_FACE, ef);
+  Bnd_Box whole;
+  BRepBndLib::Add(solid, whole);
+  const double size = std::sqrt(whole.SquareExtent()) * 2 + 10 * t;
   // Cone and cylinder bands (chamfers and fillets round an arc) meeting a
   // removed face along an arc about their axis: slab and filler as one
   // revolved section, so the offset face stays one cone (like the offset
@@ -4065,6 +4153,16 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
           fx.Perform();
           if (fx.Shape().ShapeType() == TopAbs_FACE && BRepCheck_Analyzer(fx.Shape()).IsValid())
             s = slab(TopoDS::Face(fx.Shape()), d, f, sources);
+        }
+        catch (const Standard_Failure&)
+        {
+        }
+      }
+      if (!s.IsNull() && sign < 0 && !std::getenv("NOSHAPE_SHELL_NO_OPENING_CLIP"))
+      {
+        try
+        {
+          s = clip_behind_openings(s, f, ef, rm, t, size, sources);
         }
         catch (const Standard_Failure&)
         {
@@ -4377,12 +4475,17 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
       {
         // With every slab in, the regions that reach no opening are voids, as Parasolid makes them (82ac: three
         // shells).
+        // (Slivers between slabs, a hundredth of a wall's cube, are no regions: 0.06 mm³ ones on Shell 5 at 3 mm.)
+        if (volume_of(e.Current()) < 1e-2 * t * t * t)
+          continue;
         bool touches = every;
         for (const TopoDS_Shape& g : removed)
         {
           BRepExtrema_DistShapeShape dd(e.Current(), g);
           touches = touches || (dd.IsDone() && dd.Value() < 1e-7 * (1 + t));
         }
+        if (dbg)
+          std::fprintf(stderr, "slabs: pocket region %.6g, %s\n", volume_of(e.Current()), touches ? "open" : "closed");
         if (touches)
         {
           open.Append(e.Current());
