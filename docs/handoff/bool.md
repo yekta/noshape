@@ -3,6 +3,17 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## From core (11-02 07:20): two Boolean costs found profiling FeatureScript-driven regenerations
+Sampled warm on vibe4 (model tests' `custom_features::fs_warm_profile` / `sheetmetal_std::fs_sheet_metal_profile`,
+NOSHAPE_SAMPLE_OUT; tests/sampler.rs samples every running thread):
+- boolean.cpp `group_disjoint` meshes every tool (BRepMesh at 1e-4 of the tools' box) to find the tools that can't
+  touch: in the Y Ribs custom feature (tori in the tools) that meshing is 48 % of the whole warm regeneration (OCCT's
+  Delaunay on the torus faces), more than the Boolean itself. Boxes first (only tools whose boxes meet need their
+  meshes), or a coarser deflection where the boxes are apart, would take most of it.
+- brep boolean.rs `par_map` (line ~2848) calls `std::thread::available_parallelism()` on every call; on Linux that
+  reads the cgroup files (open / statx / close each time): 3 % of std sheet metal's warm regeneration
+  (qa4 S1 enclosure). A `OnceLock` for it gives the same thread count.
+
 ## From core (11-01 18:00): Shell's slab fuses, why yours declines them, ranked by OCCT's time
 30 CLI fuzz seeds (3000-3029 × 60 steps, vibe4, NOSHAPE_SHELL_DEBUG: quick_boolean now prints noshape's decline;
 logs ~/agents/fuzz/shellseeds2/err*.txt there): 188 Shells went to slabs, 1181 s in all, 54 % of it the slab fuse

@@ -8,6 +8,23 @@ Builds and tests (11-01): on vibe4 only, `tools/tiers/rb.sh <cmd>` from the work
 (land.sh runs the full set); long probes detached on vibe4 with a log. OCCT patches build on vibe4 in
 ~/agents/core-occt (`build.sh TK...`); a private root ~/agents/occt-priv; libs go to /root/occt (synced everywhere).
 
+**FS speed (user 11-02 05:20), state 07:20.** Measured with model `fs_bench::fs_regenerations` (perf.sh on vibe3)
+and samples (tests/sampler.rs: every running thread every ms; `custom_features::fs_cold_start_profile` /
+`fs_warm_profile`, `sheetmetal_std::fs_sheet_metal_profile`, NOSHAPE_SAMPLE_OUT; ~/agents/profile.py and
+~/agents/callers.py on vibe4 read them). Where the time goes: warm, the evaluator itself (lookups, values, calls)
+is not in the top 20 anywhere; the knurl's FS share is ~3 % (2.8 of its 3 s is one Boolean), std sheet metal's
+Hem / Bend relief are > 95 % Booleans; Y Ribs is 48 % OCCT meshing in bool's group_disjoint (bool.md). What was
+ours: (1) the first FS feature of a process compiled the 7.5 MB standard library (holetables.gen.fs alone 2.1 MB):
+parse ~half, build the rest; now parsed on every core while the build takes each module as it comes to it,
+constants' initializers no longer deep-copied, a module's scope / exports start from its first import's table,
+symbols hashed with ahash: vibe3 302.6 -> 149.1 ms (the knurl document's opening 0.44 -> 0.29 s); (2) std sheet
+metal's query tracking ran an OCCT point-to-shape distance per candidate entity per snapshot point: bounding boxes
+first, and an entity still where its snapshot was matches without one: qa4 S1 enclosure 1296 -> 1104 ms. Per
+document (bench_profdocs, vibe3 6889cae3 -> 5bb63f9b): all within noise (qa5-sm23 162 -> 159, qa5-smr 100 -> 98;
+the bench opens documents outside its timer, so the cold start doesn't show there). Next: sheet metal's
+update_sheet_metal_geometry spends 21 % in OCCT point-to-face projection (inner_point / keep_names on new faces);
+ops / std-features benches flat. Not ours: Shell "too thick" native ok / std SHELL_FAILED (std_oracle T2, fails on
+main before today): parity to check.
 **State 11-02 05:00:** P0 SHELL-VOIDS-WINDOWS fixed (182fd422; main's 03:25 CI green on Windows / macOS / Linux).
 macOS "crashed holding a lock" (CI 41351354303, once, custom-feature tests): no repro on Linux in 260 stress runs; a
 fatal guard exit now prints its stack on macOS too (83924168), so the next one says where (TICKETS MACOS-GUARD-LOCK).
