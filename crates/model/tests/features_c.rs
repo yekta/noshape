@@ -635,6 +635,58 @@ fn total_area(r: &RegenResult, bi: usize) -> f64 {
     r.context.bodies[bi].shape.faces().iter().map(|f| f.area().unwrap()).sum()
 }
 
+/// Wrap's manipulators as std's addWrapManipulators (audit-part-studio M12): the 10 x 20 tool rolled onto the Ø40
+/// cylinder, shifted 4 mm in U and 5 mm in V and turned 10°: the V arrow along the axis, the U arc about it (4 / 20
+/// rad) and the angle arc about the surface normal; a V drag to 8 mm runs std's change function, and the wrap moves
+/// 3 mm the way the arrow points.
+#[test]
+fn wrap_manipulators_as_std() {
+    use noshape_model::display::FeatureManipulator as M;
+    let (mut s, region) = cylinder_and_tool();
+    let r = s.ok();
+    let target = cylinder_face(&r, 0);
+    let w = s.add("wrap", move |p| {
+        p.set("resultType", en("SURFACE"));
+        p.set("source", q(region));
+        p.set("destination", q(target));
+        p.set("uShift", expr("4 mm"));
+        p.set("vShift", expr("5 mm"));
+        p.set("angle", expr("10 deg"));
+    });
+    let r = s.ok();
+    let m = r.display.feature_state(w).expect("state").manipulators.clone();
+    let get = |k: &str| m.iter().find(|(key, _)| key == k).map(|(_, x)| x.clone()).unwrap_or_else(|| panic!("{k}: {m:?}"));
+    let M::Linear { base, direction, offset, .. } = get("vShiftManipulator") else { panic!("{m:?}") };
+    assert!(direction.z.abs() > 0.999 && (offset - mm(5.0)).abs() < 1e-12 && near(base.truncate().length(), mm(20.0), 1e-9), "{m:?}");
+    let M::Angular { axis_origin, axis_direction, rotation_origin, angle, .. } = get("uShiftAngleManipulator") else { panic!("{m:?}") };
+    assert!(axis_origin.truncate().length() < 1e-9 && axis_direction.z.abs() > 0.999 && near(rotation_origin.truncate().length(), mm(20.0), 1e-9) && near(angle, 0.2, 1e-9), "{m:?}");
+    let M::Angular { axis_origin, axis_direction, angle, .. } = get("angleManipulator") else { panic!("{m:?}") };
+    let radial = axis_origin.truncate().extend(0.0).normalize();
+    assert!(axis_direction.dot(radial).abs() > 0.999 && near(angle, 10f64.to_radians(), 1e-9), "{m:?}");
+    let centre = |r: &RegenResult| {
+        let b = r.context.bodies.iter().find(|b| b.id.feature == w).unwrap().shape.bounding_box(false).unwrap();
+        (b.min + b.max) * 0.5
+    };
+    let before_centre = centre(&r);
+    let f = s.ps.features.iter().find(|f| f.id == w).unwrap().clone();
+    let mut moved = get("vShiftManipulator");
+    if let M::Linear { offset, .. } = &mut moved {
+        *offset = mm(8.0);
+    }
+    let before = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions { upto: Some(s.ps.features.len() - 1), ..Default::default() }).context;
+    let changed = noshape_model::custom::std_feature::manipulator_change_in((*before).clone(), "wrap", f.id, &f.name, &s.units, &f.params, "vShiftManipulator", &moved).expect("std's change function ran");
+    let p = &mut s.ps.features.iter_mut().find(|f| f.id == w).unwrap().params;
+    assert!(changed.get("vShift").is_some(), "{changed:?}");
+    for k in ["vShift", "vShiftOppositeDirection"] {
+        if let Some(v) = changed.get(k) {
+            p.set(k, v.clone());
+        }
+    }
+    let r = s.ok();
+    let shift = centre(&r) - before_centre;
+    assert!((shift - direction * mm(3.0)).length() < 1e-7, "moved {shift:?} for {direction:?}");
+}
+
 #[test]
 fn wrap_surface_solid_and_split() {
     let (mut s, region) = cylinder_and_tool();

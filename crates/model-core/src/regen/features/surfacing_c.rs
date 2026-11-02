@@ -96,6 +96,29 @@ fn flat_dir(d: &Developable, f: DVec2, ref_angle: f64, v: DVec3) -> DVec2 {
     DVec2::new(v.dot(ax), v.dot(ay)).normalize_or_zero()
 }
 
+/// std's addWrapManipulators: the V shift arrow from the U-shifted anchor along the target's V, the U shift arc about
+/// the axis through the V-shifted anchor, and the angle arc about the normal at the shifted anchor (its radius a tenth
+/// of the tools' box diagonal); each handle's direction is the way its value moves the wrap in our development.
+fn wrap_manipulators(ev: &mut EvalCtx, dst: &Developable, dst_ref: f64, (anchor, along): (DVec2, DVec2), (ax_o, ax_z): (DVec3, DVec3), (angle, u, v): (f64, f64, f64), src_diag: f64) {
+    use crate::display::FeatureManipulator as M;
+    let at = |f: DVec2| dst.point(f, dst_ref);
+    let dir = |f: DVec2, d: DVec2| (at(f + d * 1e-6) - at(f)).normalize_or_zero();
+    let across = along.perp();
+    let (fu, fv, fs) = (anchor + across * u, anchor + along * v, anchor + across * u + along * v);
+    let axis = ax_z.normalize_or_zero();
+    ev.manipulators.push(("vShiftManipulator".into(), M::Linear { base: at(fu), direction: dir(fu, along), offset: v, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: Some("vShift".into()) }));
+    let rot = at(fv);
+    let foot = ax_o + axis * (rot - ax_o).dot(axis);
+    let radius = (rot - foot).length();
+    if radius > 1e-12 {
+        let turn = if (rot - foot).cross(dir(fv, across)).dot(axis) >= 0.0 { axis } else { -axis };
+        ev.manipulators.push(("uShiftAngleManipulator".into(), M::Angular { axis_origin: foot, axis_direction: turn, rotation_origin: rot, angle: u / radius, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: Some("uShift".into()) }));
+    }
+    let shifted = at(fs);
+    let (v3, u3) = (dir(fs, along), dir(fs, across));
+    ev.manipulators.push(("angleManipulator".into(), M::Angular { axis_origin: shifted, axis_direction: v3.cross(u3).normalize_or_zero(), rotation_origin: shifted + v3 * 0.1 * src_diag, angle, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: Some("angle".into()) }));
+}
+
 pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
     let sources = wrap_sources(ev)?;
     let (dst, dst_face) = destination(ev)?;
@@ -123,7 +146,7 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     // Anchors.
-    let src_center = {
+    let (src_center, src_diag) = {
         let mut lo = DVec3::splat(f64::INFINITY);
         let mut hi = DVec3::splat(f64::NEG_INFINITY);
         for f in &src_faces {
@@ -131,7 +154,7 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
             lo = lo.min(b.min);
             hi = hi.max(b.max);
         }
-        (lo + hi) * 0.5
+        ((lo + hi) * 0.5, (hi - lo).length())
     };
     let (curved, flat_side) = (&dst, &src);
     let (ax_o, ax_z) = axis_of(curved).ok_or_else(|| fe("The wrap surfaces are invalid"))?;
@@ -194,6 +217,7 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
     let v = ev.length("vShift")? * if ev.bool("vShiftOppositeDirection") { -1.0 } else { 1.0 };
     let shift = d_dst.perp() * u + d_dst * v;
     let placement = Placement2d::align(f_src, d_src, f_dst, d_dst, mirror).then_rotate_shift(f_dst, angle, shift);
+    wrap_manipulators(ev, &dst, dst_ref, (f_dst, d_dst), (ax_o, ax_z), (angle, u, v), src_diag);
     let res = k::wrap_faces(&src_faces, &src, src_ref, &dst, dst_ref, &placement, 1e-7).map_err(|e| fe(format!("Wrap failed: {e}")))?;
     let out_faces = res.shape.faces();
     if out_faces.len() != src_faces.len() {
