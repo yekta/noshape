@@ -142,6 +142,11 @@ fn each_install_takes_its_own_asset() {
     std::fs::remove_file(dir.join("unins000.exe")).unwrap();
     assert_eq!(kind_of(&dir.join("noshape.exe"), Os::Windows).asset_name("0.4.21").as_deref(), Some("noshape-0.4.21-windows-x86_64.zip"));
     let _ = std::fs::remove_dir_all(dir);
+    // Windows' verbatim paths (what canonicalize gives) are made plain for the helper; others are left alone.
+    use noshape_update::plain_path;
+    assert_eq!(plain_path(r"\\?\D:\a\noshape\noshape.exe".into()), PathBuf::from(r"D:\a\noshape\noshape.exe"));
+    assert_eq!(plain_path(r"\\?\UNC\server\share\noshape.exe".into()), PathBuf::from(r"\\?\UNC\server\share\noshape.exe"));
+    assert_eq!(plain_path("/usr/bin/noshape".into()), PathBuf::from("/usr/bin/noshape"));
 }
 
 // ------------------------------------------------------------- a fake GitHub

@@ -222,7 +222,7 @@ pub fn kind_of(exe: &Path, os: Os) -> Kind {
 
 pub fn current_kind() -> Kind {
     match std::env::current_exe().and_then(|p| p.canonicalize()) {
-        Ok(exe) => kind_of(&exe, Os::current()),
+        Ok(exe) => kind_of(&plain_path(exe), Os::current()),
         Err(e) => Kind::Unsupported(format!("couldn't tell where this program is: {e}")),
     }
 }
@@ -247,6 +247,15 @@ impl Kind {
             Kind::Unsupported(_) => false,
             _ => true,
         }
+    }
+}
+
+/// Windows' canonical paths are verbatim (`\\?\D:\…`), which Windows PowerShell's file commands don't take: the
+/// plain `D:\…` form (a network path `\\?\UNC\…` is left as it is).
+pub fn plain_path(p: PathBuf) -> PathBuf {
+    match p.to_str().and_then(|s| s.strip_prefix(r"\\?\")) {
+        Some(rest) if !rest.starts_with("UNC\\") && rest.as_bytes().get(1) == Some(&b':') => PathBuf::from(rest),
+        _ => p,
     }
 }
 
@@ -474,9 +483,11 @@ if ($Mode -eq 'installer') {
   $p = Start-Process -FilePath $Payload -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/NOCANCEL' -Verb RunAs -Wait -PassThru
   if ($p.ExitCode -ne 0) { Log "installer exit $($p.ExitCode)"; exit 1 }
 } else {
-  $dir = Split-Path $Exe
-  Copy-Item (Join-Path $Payload 'noshape.exe') $Exe -Force
-  if (Test-Path (Join-Path $Payload 'noshape.com')) { Copy-Item (Join-Path $Payload 'noshape.com') (Join-Path $dir 'noshape.com') -Force }
+  try {
+    $dir = Split-Path $Exe
+    Copy-Item (Join-Path $Payload 'noshape.exe') $Exe -Force -ErrorAction Stop
+    if (Test-Path (Join-Path $Payload 'noshape.com')) { Copy-Item (Join-Path $Payload 'noshape.com') (Join-Path $dir 'noshape.com') -Force -ErrorAction Stop }
+  } catch { Log "copy failed: $_"; exit 1 }
 }
 Log "swapped $Exe"
 Remove-Item Env:NOSHAPE_UPDATE_AUTORESTART -ErrorAction SilentlyContinue
