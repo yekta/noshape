@@ -201,6 +201,9 @@ impl Sketch {
 
     /// Places `comp`'s units from what changes outwards (module docs).
     fn place_component(&mut self, comp: &[EntityId], cons: &[(crate::ids::ConstraintId, Vec<EntityId>)], unit_of: &HashMap<EntityId, EntityId>) -> bool {
+        if self.scale_for_chord(comp, cons) {
+            return true;
+        }
         let mut placed: BTreeSet<EntityId> = BTreeSet::new();
         // Sizes and directions to keep are as the pass found them (a side
         // sharing a point with one placed before has already been pulled:
@@ -250,7 +253,19 @@ impl Sketch {
                 self.kept_first(&broken, cons)
             };
             let before: HashMap<EntityId, DVec2> = self.entity(u).map(|e| e.point_refs()).into_iter().flatten().filter_map(|p| self.point(p).map(|q| (p, q))).collect();
-            self.carry_onto_placed(u, &placed, unit_of);
+            let carried_at = self.carry_onto_placed(u, &placed, unit_of);
+            // A line moved at its end keeps its start and turns (live as a
+            // line's (start, direction, length): probes 5 u8, fuzz s8); one
+            // moved at its start is carried whole first.
+            let end_carried = self.kind(u) == Some(EntityKind::Line) && carried_at.is_some() && self.endpoints(u).map(|(_, e)| e) == carried_at;
+            // Turned onto a Perpendicular to a placed line: about the two
+            // lines' intersection (live probes 5 u4–u6, u8: even off the
+            // segment, its length kept); a line's least change then starts
+            // there.
+            let mut start = before.clone();
+            if let Some(turned) = self.turn_perpendicular(u, &placed, cons, &holds) {
+                start = turned;
+            }
             // Neighbours joined to u (a shared point, a tangency) hanging on
             // u alone follow it; the others are held. Relations to unplaced
             // units (Equal, Parallel, …) wait for those units (fuzz s10: an
@@ -258,21 +273,39 @@ impl Sketch {
             // that line follows the Equal when its turn comes).
             let neighbours: BTreeSet<EntityId> = cons.iter().filter(|(c, us)| us.contains(&u) && self.connective(*c)).flat_map(|(_, us)| us.iter().copied()).filter(|x| *x != u && !placed.contains(x)).collect();
             let held: BTreeSet<EntityId> = neighbours.iter().copied().filter(|v| cons.iter().any(|(_, us)| us.contains(v) && !us.contains(&u))).collect();
-            let anchor = self.anchor(u);
+            let anchor = if end_carried { self.endpoints(u).map(|(s0, _)| s0) } else { self.anchor(u) };
             let mut done = None;
             // Least change in its own terms: its length and direction kept,
             // then its length only (Parallel turns it, probe p11), then
             // neither; tied neighbours held first, released after (fuzz s5:
             // a side carried by a distance translates, it doesn't tilt).
-            'attempts: for (hold_neighbours, shape) in [(true, 3), (false, 3), (true, 2), (true, 1), (true, 0), (false, 2), (false, 1), (false, 0)] {
+            // An arc or circle may keep the end it shares with one held
+            // neighbour (`lower_shared`; live probes 5 u1 / u3: a slot arc's
+            // new radius keeps the bottom line, the top comes down).
+            let round = matches!(self.kind(u), Some(EntityKind::Arc | EntityKind::Circle));
+            let lower_held = if round { self.lower_shared(u, &held) } else { None };
+            // (neighbours held: 0 none, 1 all, 2 the lower one; shape)
+            let ladder: &[(u8, u8)] = if lower_held.is_some() {
+                &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (2, 1), (2, 0), (0, 2), (0, 1), (0, 0)]
+            } else {
+                &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (0, 2), (0, 1), (0, 0)]
+            };
+            'attempts: for &(hold, shape) in ladder {
+                let hold_neighbours = hold == 1;
                 let mut fixed = placed.clone();
                 if hold_neighbours {
                     fixed.extend(held.iter().copied());
+                }
+                if hold == 2 {
+                    fixed.extend(lower_held.map(|(v, _)| v));
                 }
                 let mut with = fixed.clone();
                 with.insert(u);
                 let keep = |c: crate::ids::ConstraintId, us: &[EntityId]| us.contains(&u) && us.iter().all(|x| with.contains(x)) && (us.iter().all(|x| *x == u || placed.contains(x)) || self.connective(c));
                 let Some(mut sub) = self.sub_sketch_by(cons, &keep, &fixed) else { return false };
+                if shape == 3 && end_carried {
+                    continue;
+                }
                 if (shape == 3 || shape == 2) && !orig.hold_size(&mut sub, u) {
                     continue;
                 }
@@ -283,11 +316,12 @@ impl Sketch {
                 // change from where it was (probe t1: a rectangle's top,
                 // raised and stretched, keeps its far end's x).
                 if shape < 3 && self.kind(u) == Some(EntityKind::Line) {
-                    for (p, q) in &before {
+                    for (p, q) in &start {
                         let _ = sub.set_point(*p, *q);
                     }
                 }
-                let opts = SolveOptions { light: vec![u], still: anchor.into_iter().collect(), analyze: false, constructive: false, ..Default::default() };
+                let still = if hold == 2 { lower_held.map(|(_, q)| q) } else { anchor };
+                let opts = SolveOptions { light: vec![u], still: still.into_iter().collect(), analyze: false, constructive: false, ..Default::default() };
                 let st = sub.solve_with(&opts).status;
                 // With its neighbours let go: only when each of them can
                 // follow, stretching along itself or carried by a neighbour
@@ -295,7 +329,7 @@ impl Sketch {
                 // whole, the top stretches; s8: a triangle side tied to a
                 // turned line turns too, its other end stays; probe t1: the
                 // top doesn't move sideways, the left side couldn't follow).
-                if !hold_neighbours && shape >= 1 && matches!(st, SolveStatus::Solved) && !held.is_empty() && !self.neighbours_follow(&sub, u, &held, &before, &placed) {
+                if hold == 0 && shape >= 1 && matches!(st, SolveStatus::Solved) && !held.is_empty() && !self.neighbours_follow(&sub, u, &held, &before, &placed) {
                     continue;
                 }
                 if matches!(st, SolveStatus::Solved) {
@@ -391,7 +425,8 @@ impl Sketch {
                 continue;
             }
             for (v, theirs) in sharing(mine, u) {
-                if !held.contains(&v) || along(v, d) {
+                // Free in direction, it follows by turning (probes 5 u8).
+                if !held.contains(&v) || along(v, d) || !self.direction_bound(v) {
                     continue;
                 }
                 // Carried across itself (it stretches along): its other
@@ -452,7 +487,7 @@ impl Sketch {
                 }
             }
         }
-        let key = |u: EntityId| if g == 1 { self.size(u) } else { self.placing_line_dir(u).map_or(f64::MAX, |d| d.y.atan2(d.x).rem_euclid(std::f64::consts::PI)) };
+        let key = |u: EntityId| if g == 1 { self.equal_key(u) } else { self.placing_line_dir(u).map_or(f64::MAX, |d| d.y.atan2(d.x).rem_euclid(std::f64::consts::PI)) };
         let kk = key(k);
         !kk.is_finite() || class.iter().all(|u| *u == k || key(*u).partial_cmp(&kk) != Some(std::cmp::Ordering::Less))
     }
@@ -519,6 +554,125 @@ impl Sketch {
         false
     }
 
+    /// Of `held`, the unit an arc or circle `u` keeps its shared end with
+    /// (through a Coincident), and that point of u's: one with a dimension
+    /// of its own first, then the lower point (smaller y, then x). Live:
+    /// fuzz s223 keeps the end on the dimensioned line; s234 (both lines
+    /// dimensioned), probes 5 u1 / u3 and s215 (neither) the lower end.
+    fn lower_shared(&self, u: EntityId, held: &BTreeSet<EntityId>) -> Option<(EntityId, EntityId)> {
+        let own = self.entity(u)?.point_refs();
+        let dimensioned = |v: EntityId| self.constraints().any(|c| c.driving && c.kind.is_dimension() && c.kind.entities().as_slice() == [v]);
+        own.iter()
+            .flat_map(|p| self.coincident_with(*p).into_iter().map(move |q| (*p, q)))
+            .filter_map(|(p, q)| held.iter().find(|v| self.entity(**v).is_some_and(|e| e.point_refs().contains(&q))).map(|v| (*v, p)))
+            .filter_map(|(v, p)| self.point(p).map(|x| (v, p, x, dimensioned(v))))
+            .min_by(|a, b| b.3.cmp(&a.3).then(if (a.2.y - b.2.y).abs() > 1e-9 { a.2.y.total_cmp(&b.2.y) } else { a.2.x.total_cmp(&b.2.x) }))
+            .map(|(v, p, _, _)| (v, p))
+    }
+
+    /// A free component whose one change is the distance between an arc's
+    /// own ends (its chord): scaled whole about the arc's center (live
+    /// probes 5 u2, fuzz s17: a slot by 0.8 about the right arc's center),
+    /// where a radius would only resize it. Only when nothing else in it is
+    /// a dimension or fixed (everything else holds at any scale).
+    fn scale_for_chord(&mut self, comp: &[EntityId], cons: &[(crate::ids::ConstraintId, Vec<EntityId>)]) -> bool {
+        let unheld = self.unheld_constraints(1e-9);
+        let changes: Vec<&(crate::ids::ConstraintId, Vec<EntityId>)> = cons.iter().filter(|(c, _)| unheld.contains(c)).collect();
+        let [(cid, us)] = changes.as_slice() else { return false };
+        let ([u], Some(c)) = (us.as_slice(), self.constraint(*cid)) else { return false };
+        let ConstraintKind::Distance { a, b, value, .. } = c.kind else { return false };
+        if self.kind(*u) != Some(EntityKind::Arc) {
+            return false;
+        }
+        let (Some(center), Some(pa), Some(pb)) = (self.entity(*u).and_then(|e| e.center()), self.point(a), self.point(b)) else { return false };
+        let Some(o) = self.point(center) else { return false };
+        let now = (pb - pa).length();
+        if now < 1e-12 || value <= 0.0 {
+            return false;
+        }
+        let set: BTreeSet<EntityId> = comp.iter().copied().collect();
+        let fixed_or_sized = self.constraints().filter(|k| k.driving && k.id != *cid).any(|k| {
+            let touches = cons.iter().any(|(x, us)| *x == k.id && us.iter().any(|v| set.contains(v)));
+            touches && (k.kind.is_dimension() || matches!(k.kind, ConstraintKind::Fix { .. }))
+        });
+        if fixed_or_sized || comp.iter().any(|v| self.entity(*v).is_some_and(|e| e.external)) {
+            return false;
+        }
+        let k = value / now;
+        let mut pts: BTreeSet<EntityId> = BTreeSet::new();
+        for v in comp {
+            let Some(e) = self.entity(*v) else { return false };
+            let refs: Vec<EntityId> = e.point_refs().into_iter().collect();
+            if refs.is_empty() && e.kind() == EntityKind::Point {
+                pts.insert(*v);
+            }
+            pts.extend(refs);
+        }
+        for p in pts {
+            if let Some(x) = self.point(p) {
+                let _ = self.set_point(p, o + (x - o) * k);
+            }
+        }
+        for v in comp {
+            if let Some(e) = self.entity_mut_silent(*v)
+                && let Geometry::Circle { radius, .. } = &mut e.geometry
+            {
+                *radius *= k;
+            }
+        }
+        self.touch();
+        true
+    }
+
+    /// Whether a driving constraint fixes `v`'s direction (Horizontal,
+    /// Vertical, Fix, Angle, Parallel, Perpendicular).
+    fn direction_bound(&self, v: EntityId) -> bool {
+        self.constraints().filter(|c| c.driving).any(|c| match c.kind {
+            ConstraintKind::Horizontal { a, b: None } | ConstraintKind::Vertical { a, b: None } | ConstraintKind::Fix { entity: a } => a == v,
+            ConstraintKind::Angle { a, b, .. } | ConstraintKind::Parallel { a, b } | ConstraintKind::Perpendicular { a, b } => a == v || b == v,
+            _ => false,
+        })
+    }
+
+    /// Turns line `u` about the intersection of its line with a placed
+    /// line it must be Perpendicular to (a pending one that doesn't hold),
+    /// the shortest way; its points' new positions, or None.
+    fn turn_perpendicular(&mut self, u: EntityId, placed: &BTreeSet<EntityId>, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)], holds: &HashMap<crate::ids::ConstraintId, bool>) -> Option<HashMap<EntityId, DVec2>> {
+        let (s0, e0) = self.endpoints(u)?;
+        if self.kind(u) != Some(EntityKind::Line) {
+            return None;
+        }
+        let w = cons.iter().find_map(|(c, us)| {
+            if holds[c] || us.len() != 2 || !us.contains(&u) {
+                return None;
+            }
+            let ConstraintKind::Perpendicular { a, b } = self.constraint(*c)?.kind else { return None };
+            let w = if a == u { b } else { a };
+            (placed.contains(&w) && self.kind(w) == Some(EntityKind::Line)).then_some(w)
+        })?;
+        let (p, q) = (self.point(s0)?, self.point(e0)?);
+        let (ws, we) = self.endpoints(w)?;
+        let (wp, wq) = (self.point(ws)?, self.point(we)?);
+        let (d, wd) = (q - p, wq - wp);
+        let den = d.perp_dot(wd);
+        if den.abs() < 1e-12 * d.length() * wd.length() {
+            return None;
+        }
+        let pivot = p + d * ((wp - p).perp_dot(wd) / den);
+        // The shortest turn onto either normal of w.
+        let n = wd.perp();
+        let a = d.y.atan2(d.x);
+        let turn = [n, -n].iter().map(|m| (m.y.atan2(m.x) - a + std::f64::consts::PI).rem_euclid(std::f64::consts::TAU) - std::f64::consts::PI).min_by(|x, y| x.abs().total_cmp(&y.abs()))?;
+        let rot = DVec2::from_angle(turn);
+        let mut out = HashMap::new();
+        for pt in [s0, e0] {
+            let x = pivot + rot.rotate(self.point(pt)? - pivot);
+            self.set_point(pt, x).ok()?;
+            out.insert(pt, x);
+        }
+        Some(out)
+    }
+
     /// Holds a line's direction in `sub` (parallel to a fixed construction
     /// line along it); false for other curves.
     fn hold_direction(&self, sub: &mut Sketch, u: EntityId) -> bool {
@@ -560,7 +714,7 @@ impl Sketch {
     }
 
     /// Of tied units, the one a relation between two of them keeps (Equal:
-    /// the shorter; Parallel / Perpendicular: the smaller angle in [0°, 180°);
+    /// see `equal_key`; Parallel / Perpendicular: the smaller angle in [0°, 180°);
     /// Concentric: the lower center); else the one with the lower point.
     fn kept_first(&self, tied: &[EntityId], cons: &[(crate::ids::ConstraintId, Vec<EntityId>)]) -> EntityId {
         let lower = |u: EntityId| self.anchor(u).and_then(|p| self.point(p)).unwrap_or(DVec2::splat(f64::MAX));
@@ -571,7 +725,7 @@ impl Sketch {
             let Some(c) = self.constraint(*cid) else { continue };
             let key = |u: EntityId| -> f64 {
                 match c.kind {
-                    ConstraintKind::Equal { .. } => self.size(u),
+                    ConstraintKind::Equal { .. } => self.equal_key(u),
                     // The angle in [0°, 180°) (live fuzz s14: a vertical line
                     // stays, the one at 97° turns).
                     ConstraintKind::Parallel { .. } | ConstraintKind::Perpendicular { .. } => self.placing_line_dir(u).map_or(f64::MAX, |d| d.y.atan2(d.x).rem_euclid(std::f64::consts::PI)),
@@ -660,6 +814,30 @@ impl Sketch {
             .map(|(p, _)| p)
     }
 
+    /// Of Equal members, the one with the smaller key stays: a line's
+    /// largest x (its end that would move: live probes 1–2 shrink the 20 mm
+    /// line ending further right, probes 5 u9 / u10 grow the shorter side of
+    /// a quad whose free end is further right, fuzz s14's chain keeps its
+    /// leftmost side); other curves their size.
+    fn equal_key(&self, u: EntityId) -> f64 {
+        match self.kind(u) {
+            Some(EntityKind::Line) => self.entity(u).map_or(f64::NAN, |e| e.point_refs().iter().filter_map(|p| self.point(*p)).map(|q| q.x).fold(f64::NEG_INFINITY, f64::max)),
+            _ => self.size(u),
+        }
+    }
+
+    /// The points a driving Coincident joins to point `p`.
+    fn coincident_with(&self, p: EntityId) -> Vec<EntityId> {
+        self.constraints()
+            .filter(|c| c.driving)
+            .filter_map(|c| match c.kind {
+                ConstraintKind::Coincident { a, b } if a == p => Some(b),
+                ConstraintKind::Coincident { a, b } if b == p => Some(a),
+                _ => None,
+            })
+            .collect()
+    }
+
     fn size(&self, u: EntityId) -> f64 {
         match &self.entity(u).map(|e| e.geometry.clone()) {
             Some(Geometry::Line { start, end }) => (self.point(*end).unwrap_or_default() - self.point(*start).unwrap_or_default()).length(),
@@ -677,20 +855,19 @@ impl Sketch {
     }
 
     /// Moves `u` rigidly so a point it shares (Coincident, Concentric) with
-    /// a placed unit is where that one is.
-    fn carry_onto_placed(&mut self, u: EntityId, placed: &BTreeSet<EntityId>, unit_of: &HashMap<EntityId, EntityId>) {
-        let Some(own) = self.entity(u).map(|e| {
+    /// a placed unit is where that one is; that point of u's, if it moved.
+    fn carry_onto_placed(&mut self, u: EntityId, placed: &BTreeSet<EntityId>, unit_of: &HashMap<EntityId, EntityId>) -> Option<EntityId> {
+        let own = self.entity(u).map(|e| {
             let mut v: Vec<EntityId> = e.point_refs().into_iter().collect();
             v.push(u);
             v
-        }) else {
-            return;
-        };
+        })?;
         let center = |s: &Sketch, id: EntityId| -> Option<EntityId> {
             let e = s.entity(id)?;
             if e.kind() == EntityKind::Point { Some(id) } else { e.center() }
         };
         let mut shift = None;
+        let mut at = None;
         for c in self.constraints().filter(|c| c.driving) {
             let (a, b) = match c.kind {
                 ConstraintKind::Coincident { a, b } | ConstraintKind::Concentric { a, b } => (a, b),
@@ -706,16 +883,21 @@ impl Sketch {
             };
             if let (Some(m), Some(t)) = (self.point(mine), self.point(theirs)) {
                 shift = Some(t - m);
+                at = Some(mine);
                 break;
             }
         }
-        let Some(d) = shift else { return };
-        let Some(points) = self.entity(u).map(|e| e.point_refs()) else { return };
+        let d = shift?;
+        if d.length() <= 1e-12 {
+            return None;
+        }
+        let points = self.entity(u).map(|e| e.point_refs())?;
         let points: Vec<EntityId> = if points.is_empty() { vec![u] } else { points.into_iter().collect() };
         for p in points {
             if let Some(x) = self.point(p) {
                 let _ = self.set_point(p, x + d);
             }
         }
+        at
     }
 }
