@@ -899,6 +899,51 @@ fn probes3() -> Vec<(String, Case)> {
     out
 }
 
+/// Fourth probes (fuzz s115: a rectangle whose left side is Perpendicular
+/// to a separate, dimensioned line kept its top-right corner where a lone
+/// rectangle keeps its lower left): a rectangle 20 x 10 at (40, 0) and a line
+/// (0, 0)–(20, 0), related or not, either one dimensioned.
+fn probes4() -> Vec<(String, Case)> {
+    let v = DVec2::new;
+    let mut out = Vec::new();
+    // sides: 0 bottom, 1 right, 2 top, 3 left; `rel`: (relation, side);
+    // `dims`: rectangle sides' lengths; `line`: the line's length.
+    let build = |c: &mut Case, rel: Option<(&str, usize)>, dims: &[(usize, f64)], line: Option<f64>| {
+        let corners = [v(40.0, 0.0), v(60.0, 0.0), v(60.0, 10.0), v(40.0, 10.0)];
+        let l: Vec<String> = (0..4).map(|i| c.line(corners[i], corners[(i + 1) % 4])).collect();
+        for i in 0..4 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+        }
+        for (i, x) in l.iter().enumerate() {
+            c.hv(i % 2 == 0, x);
+        }
+        let s = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        if let Some((kind, side)) = rel {
+            c.pair(kind, &s, &l[side]);
+        }
+        for (i, mm) in dims {
+            c.length(&l[*i], *mm);
+        }
+        if let Some(mm) = line {
+            c.length(&s, mm);
+        }
+    };
+    let mut add = |name: &str, rel: Option<(&str, usize)>, dims: &[(usize, f64)], line: Option<f64>| {
+        let mut c = Case::new();
+        build(&mut c, rel, dims, line);
+        out.push((name.to_string(), c));
+    };
+    add("t1 line Perpendicular to the rectangle's left side; rectangle bottom 25 and right 12", Some(("PERPENDICULAR", 3)), &[(0, 25.0), (1, 12.0)], None);
+    add("t2 as t1, the line also dimensioned 25", Some(("PERPENDICULAR", 3)), &[(0, 25.0), (1, 12.0)], Some(25.0));
+    add("t3 line Perpendicular to the left side, only the line dimensioned 25", Some(("PERPENDICULAR", 3)), &[], Some(25.0));
+    add("t4 line Perpendicular to the right side; rectangle bottom 25 and right 12", Some(("PERPENDICULAR", 1)), &[(0, 25.0), (1, 12.0)], None);
+    add("t5 line Parallel to the bottom; rectangle bottom 25 and right 12", Some(("PARALLEL", 0)), &[(0, 25.0), (1, 12.0)], None);
+    add("t6 line Parallel to the top; rectangle bottom 25 and right 12", Some(("PARALLEL", 2)), &[(0, 25.0), (1, 12.0)], None);
+    add("t7 no relation, both dimensioned (rectangle bottom 25 / right 12, line 25)", None, &[(0, 25.0), (1, 12.0)], Some(25.0));
+    add("t8 line Perpendicular to the left side; rectangle bottom 15 (shrink) and right 12 (grow)", Some(("PERPENDICULAR", 3)), &[(0, 15.0), (1, 12.0)], None);
+    out
+}
+
 fn probe_batch(list: Vec<(String, Case)>) -> Value {
     let cases: Vec<Value> = list.into_iter().map(|(name, mut c)| {
         let ours = ours(&mut c);
@@ -913,7 +958,7 @@ fn probe_batch(list: Vec<(String, Case)>) -> Value {
 #[test]
 #[ignore = "T2: live fuzz least-change probes"]
 fn probe_matches() {
-    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3())] {
+    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4())] {
         let b = probe_batch(list);
         let path = fixture(&format!("sketch-probe-{n}.json"));
         if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == format!("probe-{n}")) {
