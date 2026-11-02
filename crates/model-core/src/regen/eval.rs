@@ -1,7 +1,7 @@
 //! Feature evaluation context: parameter access, reference resolution,
 //! profile construction, history-based naming and boolean merging.
 
-use super::context::{Body, Context, SketchResult, face_key};
+use super::context::{Body, BodyReads, Context, LookupKind, SketchResult, face_key};
 use crate::display::{BodyKind, PlaneFrame};
 use crate::naming::{FaceNamingInput, HistRecord, Kind, Name, Relation, ShapeNames, name_faces};
 use crate::params::{NumKind, ParamValue, ParamValues};
@@ -101,6 +101,37 @@ pub struct EffectiveFeature {
     pub suppressed: bool,
 }
 
+/// The Part Studio's features as a feature sees them (feature patterns re-run others): reading them makes the
+/// evaluation one that is never reused (incremental regeneration doesn't know which it read).
+#[derive(Clone, Copy, Default)]
+pub struct Features<'a> {
+    list: &'a [EffectiveFeature],
+    reads: Option<&'a BodyReads>,
+}
+
+impl<'a> Features<'a> {
+    pub fn new(list: &'a [EffectiveFeature], reads: Option<&'a BodyReads>) -> Self {
+        Features { list, reads }
+    }
+    /// The list, for as long as the Part Studio lives (a read, as `Deref`).
+    pub fn list(self) -> &'a [EffectiveFeature] {
+        if let Some(r) = self.reads {
+            r.read_all();
+        }
+        self.list
+    }
+}
+
+impl<'a> std::ops::Deref for Features<'a> {
+    type Target = [EffectiveFeature];
+    fn deref(&self) -> &[EffectiveFeature] {
+        if let Some(r) = self.reads {
+            r.read_all();
+        }
+        self.list
+    }
+}
+
 pub struct EvalCtx<'a> {
     pub feature: FeatureId,
     pub name: &'a str,
@@ -136,7 +167,7 @@ pub struct EvalCtx<'a> {
     pub derived: Option<std::sync::Arc<dyn super::derived::DerivedProvider>>,
     /// Every feature of the Part Studio in list order (empty outside a
     /// Part Studio regeneration).
-    pub features: &'a [EffectiveFeature],
+    pub features: Features<'a>,
     /// Pattern instance transform while a feature is re-applied by a feature
     /// pattern / mirror. Geometry returned by the `resolve_*` helpers
     /// (points, planes, axes, directions, mate connectors and face profiles)
@@ -303,7 +334,7 @@ impl<'a> EvalCtx<'a> {
     /// A context for evaluating one feature (no feature list, no pattern
     /// transform, not editing a sketch).
     pub fn new(feature: FeatureId, name: &'a str, params: &'a ParamValues, units: &'a UnitPrefs, ctx: Context, outer_vars: &'a BTreeMap<String, Quantity>) -> Self {
-        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), manipulators: Vec::new(), touched: Vec::new(), error_shapes: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), editing_sketch: None, derived: None, features: &[], xform: None, custom: None, custom_type: None, cancel: None, scratch: false }
+        EvalCtx { feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), manipulators: Vec::new(), touched: Vec::new(), error_shapes: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), editing_sketch: None, derived: None, features: Features::default(), xform: None, custom: None, custom_type: None, cancel: None, scratch: false }
     }
 
     /// The run was aborted (a newer edit made it stale): stop and return
@@ -435,13 +466,7 @@ impl<'a> EvalCtx<'a> {
         let mut out = Vec::new();
         for r in refs {
             match r {
-                Reference::Face(n) => {
-                    for (bi, b) in self.ctx.bodies.iter().enumerate() {
-                        for fi in b.find_faces(n) {
-                            out.push((bi, fi));
-                        }
-                    }
-                }
+                Reference::Face(n) => out.extend(self.ctx.bodies.find(LookupKind::Face, n)),
                 Reference::QueryVariable(name) => out.extend(self.resolve_faces(self.query_variable(name))),
                 _ => {}
             }
@@ -455,17 +480,12 @@ impl<'a> EvalCtx<'a> {
         let mut out = Vec::new();
         for r in refs {
             match r {
-                Reference::Edge(n) => {
-                    for (bi, b) in self.ctx.bodies.iter().enumerate() {
-                        for ei in b.find_edges(n) {
-                            out.push((bi, ei));
-                        }
-                    }
-                }
+                Reference::Edge(n) => out.extend(self.ctx.bodies.find(LookupKind::Edge, n)),
                 // A face selection means all of its edges (Onshape fillet/chamfer behavior).
                 Reference::Face(n) => {
-                    for (bi, b) in self.ctx.bodies.iter().enumerate() {
-                        for fi in b.find_faces(n) {
+                    for (bi, fi) in self.ctx.bodies.find(LookupKind::Face, n) {
+                        let b = &self.ctx.bodies[bi];
+                        {
                             if let Ok(map) = b.shape.ancestor_map(ShapeType::Edge, ShapeType::Face) {
                                 for (ei, faces) in map.to_vecs().iter().enumerate() {
                                     if faces.contains(&(fi as u32)) {
@@ -499,12 +519,8 @@ impl<'a> EvalCtx<'a> {
         match r {
             Reference::Origin => Some(DVec3::ZERO),
             Reference::Vertex(n) => {
-                for b in &self.ctx.bodies {
-                    if let Some(vi) = b.find_vertices(n).first() {
-                        return b.shape.sub_shape(ShapeType::Vertex, *vi).ok()?.vertex_point().ok();
-                    }
-                }
-                None
+                let (bi, vi) = *self.ctx.bodies.find(LookupKind::Vertex, n).first()?;
+                self.ctx.bodies[bi].shape.sub_shape(ShapeType::Vertex, vi).ok()?.vertex_point().ok()
             }
             Reference::SketchEntity { sketch, entity } => {
                 let s = self.ctx.sketch(*sketch)?;
@@ -522,7 +538,7 @@ impl<'a> EvalCtx<'a> {
         for r in refs {
             match r {
                 Reference::Body(id) => {
-                    if let Some(i) = self.ctx.bodies.iter().position(|b| &b.id == id) {
+                    if let Some(i) = self.ctx.bodies.position_id(id) {
                         out.push(i);
                     }
                 }

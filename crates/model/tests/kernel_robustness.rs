@@ -3167,3 +3167,49 @@ fn shell_walls_past_half_the_part_as_live() {
     }
     assert!(report.is_empty(), "{report}");
 }
+
+/// Incremental regeneration: two blocks, a fillet on each. Changing the fillet on A leaves B's fillet as it was
+/// (its edges, its body untouched): reused, not evaluated; changing B's block evaluates it again. Either way the
+/// result is a full regeneration's: every body's id, name, faces and volume, every feature's status.
+#[test]
+fn incremental_regeneration_reuses_what_an_edit_leaves_alone() {
+    let before = noshape_model::regen::set_reuse(Some(true));
+    let mut t = T::new();
+    let (_, ra) = t.sketch(&[&[(0.0, 0.0), (20.0, 0.0), (20.0, 20.0), (0.0, 20.0)]], &[]);
+    let ea = t.add("extrude", &[("entities", q(ra)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+    let (_, rb) = t.sketch(&[&[(40.0, 0.0), (60.0, 0.0), (60.0, 20.0), (40.0, 20.0)]], &[]);
+    let eb = t.add("extrude", &[("entities", q(rb)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+    let r = t.regen();
+    let vertical = |r: &RegenResult, left: bool| -> Vec<Reference> {
+        r.context.bodies.iter().flat_map(|b| {
+            b.shape.edges().into_iter().enumerate().filter(|(_, x)| x.edge_info().is_ok_and(|i| (i.start.z - i.end.z).abs() > 1e-6 && (i.start.x < 0.03) == left)).map(|(i, _)| Reference::Edge((*b.edges[i]).clone())).collect::<Vec<_>>()
+        }).collect()
+    };
+    let fa = t.add("fillet", &[("entities", q(vertical(&r, true))), ("radius", e("2 mm")), ("tangentPropagation", ParamValue::Bool(true))]);
+    let fb = t.add("fillet", &[("entities", q(vertical(&r, false))), ("radius", e("2 mm")), ("tangentPropagation", ParamValue::Bool(true))]);
+    t.ok(fb);
+    let signature = |r: &RegenResult| -> Vec<String> {
+        let mut v: Vec<String> = r.context.bodies.iter().map(|b| format!("{} {} {:?} {:.9}", b.id, b.name, b.faces, volume_of(&b.shape))).collect();
+        v.extend(r.display.features.iter().map(|s| format!("{:?} {:?} {:?}", s.id, s.status, s.message)));
+        v
+    };
+    let full = |t: &T| {
+        let was = noshape_model::regen::set_reuse(Some(false));
+        let r = Regenerator::new().regenerate(&t.ps, &ConfigValues::default(), &t.units, &RegenOptions::default());
+        noshape_model::regen::set_reuse(was);
+        r
+    };
+    t.set(fa, "radius", e("3 mm"));
+    let r = t.regen();
+    assert!(r.evaluated.contains(&fa) && !r.evaluated.contains(&fb), "A's fillet changed: B's reused ({:?})", r.evaluated);
+    assert_eq!(signature(&r), signature(&full(&t)));
+    t.set(eb, "depth", e("12 mm"));
+    let r = t.regen();
+    assert!(r.evaluated.contains(&fb) && !r.evaluated.contains(&ea), "B's block changed: B's fillet runs ({:?})", r.evaluated);
+    assert_eq!(signature(&r), signature(&full(&t)));
+    noshape_model::regen::set_reuse(before);
+}
+
+fn volume_of(s: &noshape_kernel::Shape) -> f64 {
+    noshape_kernel::volume_properties(s).map_or(0.0, |p| p.mass) * 1e9
+}

@@ -1436,7 +1436,7 @@ fn reapply_features(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance
         if me.is_some_and(|m| i >= m) {
             return err("Only features before the pattern can be patterned");
         }
-        let fd = &ev.features[i];
+        let fd = &ev.features.list()[i];
         if fd.suppressed || fd.type_id == "sketch" {
             continue;
         }

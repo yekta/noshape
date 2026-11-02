@@ -8,6 +8,21 @@ Builds and tests (11-01): on vibe4 only, `tools/tiers/rb.sh <cmd>` from the work
 (land.sh runs the full set); long probes detached on vibe4 with a log. OCCT patches build on vibe4 in
 ~/agents/core-occt (`build.sh TK...`); a private root ~/agents/occt-priv; libs go to /root/occt (synced everywhere).
 
+**Edit latency / incremental regeneration (user 11-02 08:00).** Bench ops `regen_profile::bench_edit_latency`
+(perf, profile and qa documents; a warm Regenerator, preview meshes; features that ran again and which had their
+effect unchanged) and `bench_edit_latency_reuse` (the same with reuse, every edit checked against a full
+regeneration). Waste found: multi-part studios re-run independent features (draft-hang 1.06-1.31 s of 1.3-1.45 s per
+edit, qa5-mb / rib23 / surf-main 159 of 164 ms, Fill 149 ms of it). Cache keys chain every feature to all before it.
+Step 1 (landed 4b2dda7f): ctx.bodies a `Bodies` list noting reads. Step 2 (off by default: set_reuse /
+NOSHAPE_REGEN_REUSE): a feature whose own key is unchanged takes its cached result when its input has the same body
+ids, every other context field the same (Context::same_but_bodies, every field named), each body it read the very same
+and each name lookup it made (resolve_faces / edges / vertex through Bodies::find) the same on both inputs; reading
+the whole list (iter, slices) or the feature list (patterns) makes it never reused; custom, std-run, derived and
+Assembly-context features excluded. 152 edits of the bench equal to full regenerations (vibe4); draft-hang's
+suppress Draft 6 1290 -> 3 ms, bracket24 55 -> 36 ms. T1 kernel_robustness::incremental_regeneration_reuses_what_an_
+edit_leaves_alone. NOSHAPE_REUSE_TRACE (+ _DIR) says where evaluations read all bodies. Next: Extrude New's
+auto_scope (the touched list) as a replayable read, patterns' feature reads, then on by default with vibe3 numbers;
+live's edit timings asked (REQUESTS 08:20).
 **P1 twisted vase (user 11-02 12:13):** a loft through five twisted hexagons, every Shell failing (offset, then the
 slabs for minutes, the direct path refusing "not smooth"). The loft was the cause: natural_loft rebuilt the side
 surfaces but each edge kept its pcurve on ThruSections' old surface, so SameParameter gave the side edges 3.1 mm

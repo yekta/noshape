@@ -152,6 +152,69 @@ struct CacheEntry {
     state: FeatureState,
     /// The run that last used it ([`Regenerator::run`]).
     last_run: u64,
+    /// The feature's own key (its definition and the run's settings, not what came before it), its input and what
+    /// it read of it ([`ReadSet`]; `None`: never reused): incremental regeneration.
+    local: u64,
+    input: Option<Arc<Context>>,
+    reads: Option<Arc<ReadSet>>,
+}
+
+/// What an evaluation read of its input's bodies: bodies by address (the entry's input keeps them alive) and the
+/// name lookups it made.
+struct ReadSet {
+    bodies: Vec<usize>,
+    lookups: Vec<(context::LookupKind, crate::reference::TopoName)>,
+}
+
+thread_local! {
+    static REUSE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Incremental regeneration on or off for this thread's regenerations (`None`: as NOSHAPE_REGEN_REUSE says, off
+/// unless set): a feature whose definition and the inputs it read are unchanged takes its last result instead of
+/// running again. Returns the thread's setting before.
+pub fn set_reuse(on: Option<bool>) -> Option<bool> {
+    REUSE.with(|r| r.replace(on))
+}
+
+fn reuse_on() -> bool {
+    static ENV: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    REUSE.with(|r| r.get()).unwrap_or_else(|| *ENV.get_or_init(|| std::env::var_os("NOSHAPE_REGEN_REUSE").is_some()))
+}
+
+/// `e`'s result for `input` when nothing `e`'s evaluation read differs: the same body ids in the same order, every
+/// other part of the context the same, each body it read the very same, each name lookup it made finding the same
+/// on both inputs. The result is `e`'s with the input's bodies in place of those it passed through unread.
+fn reused(e: &CacheEntry, input: &Context) -> Option<Context> {
+    let (reads, old) = (e.reads.as_ref()?, e.input.as_ref()?);
+    let (a, b) = (old.bodies.untracked(), input.bodies.untracked());
+    if a.len() != b.len() || a.iter().zip(b).any(|(x, y)| x.id != y.id) || !old.same_but_bodies(input) {
+        return None;
+    }
+    let at: HashMap<usize, usize> = a.iter().enumerate().map(|(j, x)| (Arc::as_ptr(x) as usize, j)).collect();
+    let mut read = vec![false; a.len()];
+    for p in &reads.bodies {
+        if let Some(&j) = at.get(p) {
+            if !Arc::ptr_eq(&a[j], &b[j]) {
+                return None;
+            }
+            read[j] = true;
+        }
+    }
+    for (k, n) in &reads.lookups {
+        if old.bodies.find_untracked(*k, n) != input.bodies.find_untracked(*k, n) {
+            return None;
+        }
+    }
+    let by_id: HashMap<&crate::reference::BodyId, usize> = a.iter().enumerate().map(|(j, x)| (&x.id, j)).collect();
+    let mut out = (*e.ctx).clone();
+    let bodies: Vec<Arc<context::Body>> = out.bodies.untracked().iter().map(|x| match by_id.get(&x.id) {
+        Some(&j) if !read[j] => b[j].clone(),
+        _ => x.clone(),
+    }).collect();
+    out.bodies = bodies.into();
+    out.renumber_default_names();
+    Some(out)
 }
 
 /// Entries of features a run no longer has (deleted, or a feature list from
@@ -223,6 +286,8 @@ impl Regenerator {
         for c in &studio.contexts {
             key = hash_bytes(key, &[c.id.to_le_bytes(), c.revision.to_le_bytes()].concat());
         }
+        let key0 = key;
+        let reuse = reuse_on();
         self.contexts.retain(|k, _| studio.contexts.iter().any(|c| (c.id, c.revision) == *k));
         for c in &studio.contexts {
             self.contexts.entry((c.id, c.revision)).or_insert_with(|| {
@@ -270,6 +335,7 @@ impl Regenerator {
             let params = converted.as_ref().unwrap_or(params);
             let blob = serde_json::to_vec(&(&f.type_id, &f.name, params, suppressed)).unwrap_or_default();
             key = hash_bytes(key, &blob);
+            let local = hash_bytes(key0, &blob);
             // Derived features depend on another Part Studio's state.
             if crate::features::importing::is_derived(&f.type_id)
                 && let Some(p) = &opts.derived
@@ -281,6 +347,13 @@ impl Regenerator {
                 let v = opts.custom_features.clone().unwrap_or_else(custom_features::fallback_provider).version(tab);
                 key = hash_bytes(key, &v.to_le_bytes());
             }
+            // Reused when its inputs are (not custom, std-run, derived or Assembly-context features: they read more
+            // than the context).
+            let reusable = reuse
+                && !crate::custom::is_custom(&f.type_id)
+                && std_route::evaluator(&f.type_id).is_none()
+                && !crate::features::importing::is_derived(&f.type_id)
+                && studio.contexts.is_empty();
             live.push(f.id);
             if i >= upto {
                 states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() });
@@ -297,6 +370,24 @@ impl Regenerator {
                 cached += 1;
                 continue;
             }
+            if reusable
+                && expr_error.is_none()
+                && let Some(versions) = self.entries.get_mut(&f.id)
+                && let Some((e, out)) = versions.iter().filter(|e| e.local == local).find_map(|e| reused(e, &ctx).map(|out| (e, out)))
+            {
+                let t = Instant::now();
+                let (reads, mut state) = (e.reads.clone(), e.state.clone());
+                state.time_ms = t.elapsed().as_secs_f32() * 1000.0;
+                let input = ctx.clone();
+                ctx = Arc::new(out);
+                versions.insert(0, CacheEntry { key, ctx: ctx.clone(), state: state.clone(), last_run: run, local, input: Some(input), reads });
+                versions.truncate(VERSIONS);
+                states.push(state);
+                cached += 1;
+                continue;
+            }
+            let input = ctx.clone();
+            let body_reads = reusable.then(|| Arc::new(context::BodyReads::default()));
             evaluated.push(f.id);
             let ft = Instant::now();
             let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() };
@@ -334,6 +425,7 @@ impl Regenerator {
                         // while it is evaluated (never merged, patterned or listed).
                         let uses_context = !studio.contexts.is_empty() && crate::in_context::params_use_context(params, None);
                         let mut base = (*ctx).clone();
+                        base.bodies.track(body_reads.clone());
                         if uses_context {
                             for (bodies, _) in self.contexts.values() {
                                 base.bodies.extend(bodies.iter().cloned());
@@ -342,7 +434,7 @@ impl Regenerator {
                         let mut ev = EvalCtx::new(f.id, &f.name, params, units, base, &outer_vars);
                         ev.cancel = opts.cancel.clone();
                         ev.editing_sketch = opts.editing_sketch;
-                        ev.features = &effective;
+                        ev.features = eval::Features::new(&effective, body_reads.as_deref());
                         // The sheet metal form library's studios too (`library:<id>`).
                         ev.derived = Some(Arc::new(crate::sheetmetal::forms::WithLibrary(opts.derived.clone())));
                         ev.custom = opts.custom_features.clone();
@@ -400,6 +492,7 @@ impl Regenerator {
                                 if uses_context {
                                     ev.ctx.bodies.retain(|b| !crate::in_context::is_context_feature(b.id.feature));
                                 }
+                                ev.ctx.bodies.track(None);
                                 ev.ctx.renumber_default_names();
                                 ctx = Arc::new(ev.ctx);
                                 if f.type_id == "assignVariable" {
@@ -431,8 +524,23 @@ impl Regenerator {
             if kernel_profiling() {
                 noshape_kernel::kernel_profile_mark(&format!("{} {:.1} ms", f.name, state.time_ms));
             }
+            if let Some(r) = &body_reads
+                && let Some(t) = r.first_all.lock().take()
+            {
+                // The first frame of ours below the bodies list's own.
+                let lines: Vec<&str> = t.lines().map(str::trim).collect();
+                let at = lines
+                    .iter()
+                    .position(|l| !l.starts_with("at ") && l.contains("noshape_") && !l.contains("BodyReads") && !l.contains("Bodies") && !l.contains("Features") && !l.contains("Deref") && !l.contains("IntoIterator"))
+                    .map_or("?".to_string(), |i| format!("{} {}", lines[i], lines.get(i + 1).copied().unwrap_or("")));
+                eprintln!("reuse trace: {} ({}) reads all bodies at {at}", f.name, f.type_id);
+                if let Ok(dir) = std::env::var("NOSHAPE_REUSE_TRACE_DIR") {
+                    let _ = std::fs::write(format!("{dir}/{}-{}.txt", f.type_id, f.id.0), &t);
+                }
+            }
+            let reads = body_reads.filter(|r| !r.all.load(std::sync::atomic::Ordering::Relaxed)).map(|r| Arc::new(ReadSet { bodies: r.bodies.lock().clone(), lookups: r.lookups.lock().clone() }));
             let versions = self.entries.entry(f.id).or_default();
-            versions.insert(0, CacheEntry { key, ctx: ctx.clone(), state: state.clone(), last_run: run });
+            versions.insert(0, CacheEntry { key, ctx: ctx.clone(), state: state.clone(), last_run: run, local, input: Some(input), reads });
             versions.truncate(VERSIONS);
             states.push(state);
         }

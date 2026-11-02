@@ -255,7 +255,7 @@ pub struct SketchResultImage {
     pub data_base64: Arc<str>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PlaneEntity {
     pub reference: Reference,
     pub name: String,
@@ -264,7 +264,7 @@ pub struct PlaneEntity {
     pub half_height: f64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Connector {
     pub reference: Reference,
     pub name: String,
@@ -274,7 +274,7 @@ pub struct Connector {
 }
 
 /// Point bodies and other datum points.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PointEntity {
     pub reference: Reference,
     pub position: DVec3,
@@ -287,6 +287,24 @@ pub struct PointEntity {
 pub struct BodyReads {
     pub all: std::sync::atomic::AtomicBool,
     pub bodies: parking_lot::Mutex<Vec<usize>>,
+    /// Name lookups over all bodies (a reference resolved): replayed on the old and the new input.
+    pub lookups: parking_lot::Mutex<Vec<(LookupKind, TopoName)>>,
+    /// NOSHAPE_REUSE_TRACE: where the evaluation first read all the bodies (why it can't be reused).
+    pub first_all: parking_lot::Mutex<Option<String>>,
+}
+
+/// NOSHAPE_REUSE_TRACE: note where evaluations read all the bodies.
+pub fn trace_reads() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("NOSHAPE_REUSE_TRACE").is_some())
+}
+
+/// What a name lookup looked for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LookupKind {
+    Face,
+    Edge,
+    Vertex,
 }
 
 impl BodyReads {
@@ -300,8 +318,10 @@ impl BodyReads {
             v.push(p);
         }
     }
-    fn read_all(&self) {
-        self.all.store(true, std::sync::atomic::Ordering::Relaxed);
+    pub fn read_all(&self) {
+        if !self.all.swap(true, std::sync::atomic::Ordering::Relaxed) && trace_reads() {
+            *self.first_all.lock() = Some(std::backtrace::Backtrace::force_capture().to_string());
+        }
     }
 }
 
@@ -338,6 +358,26 @@ impl Bodies {
             r.read(b);
         }
         Some(b)
+    }
+    /// Every body's sub-shapes named `n` (body index, sub-shape index): a name lookup, not a read of the bodies'
+    /// geometry (noted as a lookup, replayed when an evaluation is reused).
+    pub fn find(&self, kind: LookupKind, n: &TopoName) -> Vec<(usize, usize)> {
+        if let Some(r) = &self.reads {
+            r.lookups.lock().push((kind, n.clone()));
+        }
+        self.find_untracked(kind, n)
+    }
+    pub fn find_untracked(&self, kind: LookupKind, n: &TopoName) -> Vec<(usize, usize)> {
+        let mut out = Vec::new();
+        for (bi, b) in self.v.iter().enumerate() {
+            let found = match kind {
+                LookupKind::Face => b.find_faces(n),
+                LookupKind::Edge => b.find_edges(n),
+                LookupKind::Vertex => b.find_vertices(n),
+            };
+            out.extend(found.into_iter().map(|i| (bi, i)));
+        }
+        out
     }
     /// Index of the body with id `id` (ids are no read: an input whose body ids differ is never reused).
     pub fn position_id(&self, id: &BodyId) -> Option<usize> {
@@ -606,6 +646,74 @@ impl HoleRecord {
 }
 
 impl Context {
+    /// Everything but the bodies the same as `o` (an evaluation's other inputs, for reusing it): shared parts by
+    /// identity, values by equality; FeatureScript attributes only when both have none. Every field is named here, so
+    /// a new one has to say how it compares.
+    pub fn same_but_bodies(&self, o: &Context) -> bool {
+        let Context {
+            bodies: _,
+            sketches,
+            derived_sketches,
+            sketch_copies,
+            hidden_sketches,
+            planes,
+            connectors,
+            connector_owners,
+            points,
+            variables,
+            query_variables,
+            next_part,
+            next_surface,
+            next_curve,
+            next_color,
+            sheet_metal,
+            sheet_metal_flats,
+            frame_members,
+            form_tools,
+            holes,
+            decals,
+            part_appearance,
+            face_appearance,
+            fs_attributes,
+            fs_hidden_bodies,
+            fs_transients,
+            sm_births,
+            own_names,
+        } = self;
+        fn same_arcs<T>(a: &[Arc<T>], b: &[Arc<T>]) -> bool {
+            a.len() == b.len() && a.iter().zip(b).all(|(x, y)| Arc::ptr_eq(x, y))
+        }
+        fn same_map<K: PartialEq, V>(a: &BTreeMap<K, Arc<V>>, b: &BTreeMap<K, Arc<V>>) -> bool {
+            a.len() == b.len() && a.iter().zip(b).all(|((k, v), (l, w))| k == l && Arc::ptr_eq(v, w))
+        }
+        same_arcs(sketches, &o.sketches)
+            && *derived_sketches == o.derived_sketches
+            && *sketch_copies == o.sketch_copies
+            && *hidden_sketches == o.hidden_sketches
+            && *planes == o.planes
+            && *connectors == o.connectors
+            && *connector_owners == o.connector_owners
+            && *points == o.points
+            && *variables == o.variables
+            && *query_variables == o.query_variables
+            && (*next_part, *next_surface, *next_curve, *next_color) == (o.next_part, o.next_surface, o.next_curve, o.next_color)
+            && same_map(sheet_metal, &o.sheet_metal)
+            && same_map(sheet_metal_flats, &o.sheet_metal_flats)
+            && same_map(frame_members, &o.frame_members)
+            && form_tools.is_empty()
+            && o.form_tools.is_empty()
+            && *holes == o.holes
+            && *decals == o.decals
+            && *part_appearance == o.part_appearance
+            && *face_appearance == o.face_appearance
+            && fs_attributes.is_empty()
+            && o.fs_attributes.is_empty()
+            && same_arcs(fs_hidden_bodies, &o.fs_hidden_bodies)
+            && *fs_transients == o.fs_transients
+            && *sm_births == o.sm_births
+            && *own_names == o.own_names
+    }
+
     pub fn body(&self, id: &BodyId) -> Option<&Arc<Body>> {
         self.bodies.iter().find(|b| &b.id == id)
     }

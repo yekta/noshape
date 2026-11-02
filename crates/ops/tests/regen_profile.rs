@@ -594,6 +594,22 @@ fn bench_editing_logic() {
 #[test]
 #[ignore = "T2 bench: tools/tiers/perf.sh"]
 fn bench_edit_latency() {
+    noshape_model::regen::set_reuse(Some(false));
+    edit_latency(false);
+}
+
+/// [`bench_edit_latency`] with incremental regeneration, each edit's result checked against a full regeneration
+/// (no cache, no reuse) of the edited Part Studio: every body (id, name, kind, colour, names, volume, area, faces)
+/// and every feature's status and message the same.
+#[test]
+#[ignore = "T2 bench: tools/tiers/perf.sh"]
+fn bench_edit_latency_reuse() {
+    noshape_model::regen::set_reuse(Some(true));
+    edit_latency(true);
+    noshape_model::regen::set_reuse(None);
+}
+
+fn edit_latency(check: bool) {
     use noshape_model::params::ParamValue;
     let mut dirs = vec![std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf")];
     dirs.push(std::env::var_os("NOSHAPE_PROFILE_DIR").map_or_else(|| std::path::PathBuf::from(format!("{}/agents/profdocs", std::env::var("HOME").unwrap_or_default())), std::path::PathBuf::from));
@@ -685,6 +701,19 @@ fn bench_edit_latency() {
                         let same_ms: f64 = same.iter().map(|&k| time(k)).sum();
                         let names: Vec<&str> = same.iter().filter(|&&k| time(k) >= 1.0).map(|&k| studio.features[k].name.as_str()).collect();
                         println!("timing edit {doc} / {} / {step}: {ms:.1} ms (features {features:.1}, display and the rest {:.1}), {} of {n} features ran, {} of them ({same_ms:.1} ms) with their effect unchanged {names:?}", tab.name, ms - features, ran.len(), same.len());
+                        if check {
+                            noshape_model::regen::set_reuse(Some(false));
+                            let full = Regenerator::new().regenerate(studio, &ConfigValues::default(), &units, &opts);
+                            noshape_model::regen::set_reuse(Some(true));
+                            let sig = |r: &RegenResult| -> Vec<String> {
+                                let mut v: Vec<String> = r.context.bodies.iter().map(|b| format!("{} {} {:?} {} {:?} {:?} {:?} {:.9} {:.9} {}", b.id, b.name, b.kind, b.color, b.faces, b.edges, b.vertices, b.shape.volume().unwrap_or(0.0) * 1e9, noshape_kernel::surface_properties(&b.shape).map_or(0.0, |p| p.mass) * 1e6, b.shape.count(noshape_kernel::ShapeType::Face))).collect();
+                                v.extend(r.display.features.iter().map(|st| format!("{:?} {:?} {:?}", st.id, st.status, st.message)));
+                                v
+                            };
+                            let (a, b) = (sig(&r), sig(&full));
+                            let diff: Vec<(&String, &String)> = a.iter().zip(&b).filter(|(x, y)| x != y).take(3).collect();
+                            assert!(a.len() == b.len() && diff.is_empty(), "{doc} / {} / {step}: incremental differs from full: {} vs {} lines; {diff:#?}", tab.name, a.len(), b.len());
+                        }
                     }
                 }
             }
