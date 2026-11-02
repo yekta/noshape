@@ -3016,7 +3016,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       if (auto bs = occ::down_cast<Geom_BSplineSurface>(q.base); !bs.IsNull() && !bs->IsUPeriodic() && !bs->IsVPeriodic())
       {
         occ::handle<Geom_BoundedSurface> ext = occ::down_cast<Geom_BoundedSurface>(bs->Copy());
-        const double                     len = std::min(10 * thickness, 0.5 * size);
+        const double                     len = std::min(3 * thickness, 0.5 * size);
         try
         {
           for (const bool in_u : {true, false})
@@ -3508,7 +3508,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         // (Past the edge's ends as far as the surface was extended: an outward wall's offset edge runs on past them.)
         if (occ::down_cast<Geom2d_Line>(pc))
         {
-          const double ext = (f1 - f0) * std::min(10 * thickness, 0.5 * size) / std::max(GCPnts_AbscissaPoint::Length(oc), tol);
+          const double ext = (f1 - f0) * std::min(3 * thickness, 0.5 * size) / std::max(GCPnts_AbscissaPoint::Length(oc), tol);
           f0 -= ext;
           f1 += ext;
         }
@@ -4550,6 +4550,27 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
       collapses = !rmset.Contains(e.Current()) && collapsing_blend(TopoDS::Face(e.Current()), sign * thickness);
   }
   const bool offset_ok = gap > 1e-5 && !collapses;
+  // Free-form faces meeting at sharp edges (a twisted hexagon vase's sides): OCCT's offset spends seconds intersecting
+  // their offsets (2.6-3 s of 3.7 on the vase, 2 mm), the direct construction builds the same wall in 1.4-2.4 s and
+  // nearer live's (live 1769: 47868.377 / OCCT 47868.366 / live 47868.386 mm³): it goes first there.
+  bool sharp_freeform = false;
+  {
+    ShapeAncMap ef;
+    TopExp::MapShapesAndUniqueAncestors(solid.shape, TopAbs_EDGE, TopAbs_FACE, ef);
+    auto freeform = [](const TopoDS_Shape& f) {
+      const GeomAbs_SurfaceType k = BRepAdaptor_Surface(TopoDS::Face(f)).GetType();
+      return k == GeomAbs_BSplineSurface || k == GeomAbs_BezierSurface || k == GeomAbs_OffsetSurface || k == GeomAbs_OtherSurface;
+    };
+    for (int i = 1; i <= ef.Extent() && !sharp_freeform; ++i)
+    {
+      const ShapeList& fl = ef(i);
+      if (fl.Extent() != 2 || fl.First().IsSame(fl.Last()) || !freeform(fl.First()) || !freeform(fl.Last()))
+        continue;
+      BRepAdaptor_Curve c(TopoDS::Edge(ef.FindKey(i)));
+      const gp_Pnt      m = c.Value(0.5 * (c.FirstParameter() + c.LastParameter()));
+      sharp_freeform    = normal_at(TopoDS::Face(fl.First()), m).Angle(normal_at(TopoDS::Face(fl.Last()), m)) > 1e-3;
+    }
+  }
   Built      b;
   t_shell_path = "";
   // method: 0 = automatic, 1 = offset only, 2 = slabs only, 3 = planes only, 4 = quadrics only (tests).
@@ -4569,6 +4590,7 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
   };
   const bool done = (method == 0 && removed.empty() && !outward && timed("inversion", [&] { return by_inversion(solid.shape, thickness, b); })) ||
                     (method == 0 && timed("regions", [&] { return by_regions(solid.shape, removed, thickness, sign, b); })) ||
+                    (method == 0 && sharp_freeform && !std::getenv("NOSHAPE_SHELL_NO_QUADRICS") && timed("quadrics", [&] { return by_quadrics(solid.shape, removed, thickness, sign, b); })) ||
                     ((method == 0 || method == 1) && (offset_ok || method == 1) && timed("offset", [&] { return by_offset(solid.shape, removed, thickness, sign, b); })) ||
                     ((method == 0 || method == 3) && !std::getenv("NOSHAPE_SHELL_NO_PLANES") && timed("planes", [&] {
                        const bool ok = by_planes(solid.shape, removed, thickness, sign, b);
