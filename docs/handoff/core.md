@@ -16,6 +16,13 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-02 21:50.** SHELL-HANG-5 builds (487086f6: a removed face with nothing a wall behind it stays a face when
+another opens; past 112 slabs the cavity is grown from the openings, `by_slabs` "pocket"), and within 0.02 % of live
+(queued: a kept face meeting a removed planar face at a concave edge loses its slab a wall behind the opening and a
+wall past their shared edge, `clip_behind_openings`; NOSHAPE_SHELL_NO_OPENING_CLIP / NOSHAPE_SHELL_NO_POCKET switch
+them off). Corpus A/B of the clip running on vibe4 (/root/core-scratch/corpus-ab.sh -> corpus-{clip,noclip}.txt, T2
+`shell::shell_corpus_probe` over ~/agents/shellcorpus/cases): if it changes many fuzz shells, ask live about one.
+
 **State 11-02 21:15. psui's audit M12 core items, all landed or queued:** Loft connections at each edge's
 connectionEdgeParameters (e1aeda82; std's "i,j" sliders emitted); Bridging curve run by std's bridgingCurve.fs
 (3f441353: real curvature / G3, std's manipulators; host fixes: sketch-edge qAdjacent, evEdgeCurvatures' frame and

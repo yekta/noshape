@@ -1128,3 +1128,37 @@ fn shellhang_shell5_strip_probe() {
         println!("{} area {:.4} centre ({:.3}, {:.3}, {:.3}) normal {n:?} box {:?} .. {:?}", format!("{:?}", f.face_surface().ok()).chars().take(9).collect::<String>(), surface_properties(&f).unwrap().mass, c.x, c.y, c.z, b.min, b.max);
     }
 }
+
+/// The fuzz Shell corpus (SHELL_CORPUS=<dir> of <case>.brep + <case>.txt: "face <n>" lines, 1-based, then "shell
+/// thickness <t> outward <0|1> method <m>"): each case's volume, faces and time, one line per case, on 4 threads.
+#[test]
+#[ignore = "T2: corpus probe"]
+fn shell_corpus_probe() {
+    let Some(dir) = std::env::var_os("SHELL_CORPUS") else { return };
+    let mut cases: Vec<std::path::PathBuf> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.extension().is_some_and(|x| x == "txt")).collect();
+    cases.sort();
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    std::thread::scope(|s| {
+        for _ in 0..4 {
+            s.spawn(|| loop {
+                let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                let Some(txt) = cases.get(i) else { break };
+                let spec = std::fs::read_to_string(txt).unwrap();
+                let Ok(solid) = read_brep(&txt.with_extension("brep")) else { continue };
+                let faces = solid.faces();
+                let rm: Vec<Shape> = spec.lines().filter_map(|l| l.strip_prefix("face ")).filter_map(|n| n.trim().parse::<usize>().ok()).filter_map(|n| faces.get(n - 1).cloned()).collect();
+                let Some(head) = spec.lines().find(|l| l.starts_with("shell ")) else { continue };
+                let w: Vec<&str> = head.split_whitespace().collect();
+                let (t, out) = (w[2].parse::<f64>().unwrap(), w[4] == "1");
+                let t0 = std::time::Instant::now();
+                let r = shell_solid(&solid, &rm, t, if out { ShellSide::Outside } else { ShellSide::Inside }, ShellMethod::Auto);
+                let ms = t0.elapsed().as_secs_f64() * 1e3;
+                let name = txt.file_stem().unwrap().to_string_lossy().to_string();
+                match r {
+                    Ok(r) => println!("case {name} ok {:.9e} {} {ms:.0}", vol(&r.shape), r.shape.count(ShapeType::Face)),
+                    Err(e) => println!("case {name} err {} {ms:.0}", e.to_string().chars().take(60).collect::<String>()),
+                }
+            });
+        }
+    });
+}

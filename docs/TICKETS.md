@@ -277,10 +277,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   in, two planar faces removed) builds in live in 0.3 s (175040.1025 mm³, 52 faces); ours fails after 17 s: OCCT's offset
   (any of its intersection modes) gives no solid, the direct construction's corners don't meet (most of the part is
   thinner than two walls: Parasolid keeps such regions solid and hollows around the openings), the slabs' 128-tool
-  fuse takes 14 s and comes out invalid. T2 probe kernel shell::shellhang_shell5_probe. core 11-02 22:10: builds now
+  fuse takes 14 s and comes out invalid. T2 probe kernel shell::shellhang_shell5_probe. core 11-02 21:20: builds now
   (175216.21 mm³, live 175040.09: +0.1 %; 63 faces, live 52; 13 s on loaded vibe5): a removed face with nothing a wall
   behind it stays a face when another opens (live keeps Shell 5's first removed face), and past 112 slabs the cavity is
-  grown from the opening (77 of 128 slabs fused). 22:55: 175009.28 (-0.02 %), 7.3 s: Parasolid bounds the cavity by the
+  grown from the opening (77 of 128 slabs fused). 21:45: 175009.28 (-0.02 %), 7.3 s: Parasolid bounds the cavity by the
   removed face's own plane past its edges (live's new face in that plane over the face beside it): a kept face meeting
   a removed planar face at a concave edge loses its wall a wall's depth behind the opening and a wall past their shared
   edge. Left (51 / 20 mm³): live extends the holes' cylinder walls up into the pocket (slabs end with their faces), an
