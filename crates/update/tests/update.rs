@@ -279,7 +279,7 @@ fn prepare_downloads_verifies_and_unpacks_or_refuses() {
     let _ = std::fs::remove_dir_all(dir2);
 }
 
-/// The Linux helper: once the app (here: a process that has ended) is gone, the new binary takes the old one's
+/// The Linux helper: once the app (here: a process that has ended, not yet reaped) is gone, the new binary takes the old one's
 /// place and starts with --reopen and the list of documents.
 #[cfg(target_os = "linux")]
 #[test]
@@ -293,14 +293,16 @@ fn the_linux_helper_swaps_the_binary_and_starts_it() {
     let staged = prepare(&release, &kind, &home.join("cache"), &identity(), &|_, _| {}).unwrap();
     let list = home.join("reopen.json");
     std::fs::write(&list, "[]").unwrap();
+    // The app has ended but its parent hasn't reaped it yet (a zombie): the helper goes on all the same.
     let mut gone = std::process::Command::new("true").spawn().unwrap();
     let pid = gone.id();
-    gone.wait().unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(200));
     noshape_update::apply(&staged, &list, pid).unwrap();
     let t = std::time::Instant::now();
     while std::fs::read_to_string(&bin).unwrap_or_default() == "old" && t.elapsed() < std::time::Duration::from_secs(10) {
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
     assert!(std::fs::read_to_string(&bin).unwrap().contains("noshape 0.0.2 (test)"), "the binary wasn't swapped");
+    gone.wait().unwrap();
     let _ = std::fs::remove_dir_all(home);
 }

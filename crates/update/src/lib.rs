@@ -429,7 +429,8 @@ const MAC_HELPER: &str = r#"#!/bin/sh
 # the documents that were open.
 pid="$1" bundle="$2" new="$3" list="$4"
 log() { [ -n "$NOSHAPE_UPDATE_LOG" ] && echo "helper: $*" >> "$NOSHAPE_UPDATE_LOG"; }
-while kill -0 "$pid" 2>/dev/null; do sleep 0.2; done
+# Until it has ended (a zombie its parent hasn't reaped yet counts as ended).
+while kill -0 "$pid" 2>/dev/null && ! ps -o stat= -p "$pid" | grep -q Z; do sleep 0.2; done
 old="$bundle.old.$$"
 if mv "$bundle" "$old" 2>/dev/null && mv "$new" "$bundle" 2>/dev/null; then
   rm -rf "$old"
@@ -451,7 +452,8 @@ const LINUX_HELPER: &str = r#"#!/bin/sh
 # .deb), then start it with the documents that were open.
 pid="$1" mode="$2" bin="$3" new="$4" list="$5"
 log() { [ -n "$NOSHAPE_UPDATE_LOG" ] && echo "helper: $*" >> "$NOSHAPE_UPDATE_LOG"; }
-while kill -0 "$pid" 2>/dev/null; do sleep 0.2; done
+# Until it has ended (a zombie its parent hasn't reaped yet counts as ended).
+while kill -0 "$pid" 2>/dev/null && ! ps -o stat= -p "$pid" | grep -q Z; do sleep 0.2; done
 if [ "$mode" = deb ]; then
   pkexec apt-get install -y "$new" || { log "pkexec apt-get failed"; exit 1; }
 elif ! { cp "$new/noshape" "$bin.new" 2>/dev/null && chmod 755 "$bin.new" && mv -f "$bin.new" "$bin"; }; then
