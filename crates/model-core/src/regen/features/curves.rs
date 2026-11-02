@@ -836,9 +836,10 @@ fn chain_split_pieces(split: &Shape, tools: &[Shape]) -> FResult<Vec<Shape>> {
 
 /// Offset curve on planar faces (geodesic = Euclidean on a plane).
 pub fn offset_curve(ev: &mut EvalCtx) -> FResult<()> {
-    if !ev.is("scope", "OFFSET") {
-        return err("Offset curve currently supports only the Offset scope");
+    if ev.is("scope", "OFFSET_EXTEND_AND_SPLIT") {
+        return err("Offset curve doesn't support Offset, extend and split yet");
     }
+    let extend = ev.is("scope", "OFFSET_AND_EXTEND");
     let refs = ev.query("edges");
     if refs.is_empty() {
         return err("Select edges to offset");
@@ -909,7 +910,121 @@ pub fn offset_curve(ev: &mut EvalCtx) -> FResult<()> {
         new_edges.push(if *linear { k::make_line(pts[0], pts[pts.len() - 1])? } else { k::make_interpolated_spline(&pts, &[], false)? });
         prev_end = Some((pts[pts.len() - 1], base[base.len() - 1]));
     }
-    add_wire_bodies(ev, vec![k::make_wire(&new_edges)?])
+    if extend {
+        extend_to_face_boundary(&mut new_edges, &face, ev.model_extent())?;
+    }
+    let wire = k::make_wire(&new_edges)?;
+    let wire = if extend && ev.bool("trim") { trim_offset(ev, &wire, &new_edges)? } else { wire };
+    add_wire_bodies(ev, vec![wire])
+}
+
+/// The point and unit tangent at arc length `s` along a chain of forward edges.
+fn chain_point_at_length(edges: &[Shape], s: f64) -> FResult<(DVec3, DVec3)> {
+    let mut left = s.max(0.0);
+    for (i, e) in edges.iter().enumerate() {
+        let len = e.length()?;
+        if left > len && i + 1 < edges.len() {
+            left -= len;
+            continue;
+        }
+        let info = e.edge_info()?;
+        let (a, b) = (info.first_param, info.last_param);
+        // Arc length along the edge by its chords, then the parameter there.
+        let n = 256;
+        let mut prev = e.point_at(a)?;
+        let mut acc = 0.0;
+        let mut u = b;
+        for j in 1..=n {
+            let t = a + (b - a) * j as f64 / n as f64;
+            let p = e.point_at(t)?;
+            let d = (p - prev).length();
+            if acc + d >= left {
+                let f = if d > 0.0 { (left - acc) / d } else { 0.0 };
+                u = t - (b - a) / n as f64 * (1.0 - f);
+                break;
+            }
+            acc += d;
+            prev = p;
+        }
+        return Ok((e.point_at(u)?, e.tangent_at(u)?.normalize_or_zero()));
+    }
+    err("Unable to trim to specifications.")
+}
+
+/// Offset and extend's Trim (std offsetCurveOnFace.fs): Start trim and End trim (Equal trim: the start's) off the
+/// curve's ends, with std's two trim arrows along the curve at the cuts.
+fn trim_offset(ev: &mut EvalCtx, wire: &Shape, edges: &[Shape]) -> FResult<Shape> {
+    let (start, end) = edges.first().zip(edges.last()).map(|(f, l)| (f.endpoints().map(|x| x.0), l.endpoints().map(|x| x.1))).ok_or_else(|| FeatureError::new("Unable to trim to specifications."))?;
+    if (start? - end?).length() < 1e-9 {
+        return err("Cannot trim a closed curve.");
+    }
+    let s0 = ev.length("startTrim")?;
+    let s1 = if ev.bool("equalTrim") { s0 } else { ev.length("endTrim")? };
+    let total: f64 = edges.iter().map(|e| e.length()).sum::<Result<f64, _>>()?;
+    let fail = s0 + s1 > total - 1e-9;
+    let (p0, t0) = chain_point_at_length(edges, s0.min(total))?;
+    let (p1, t1) = chain_point_at_length(edges, (total - s1).max(0.0))?;
+    use crate::display::FeatureManipulator as M;
+    let arrow = |base: DVec3, direction: DVec3, primary: &str| M::Linear { base, direction, offset: 0.0, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: Some(primary.into()) };
+    ev.manipulators.push(("startTrimManipulator".into(), arrow(p0 + t0 * (s0 - total).max(0.0), t0, "startTrim")));
+    if !ev.bool("equalTrim") {
+        ev.manipulators.push(("endTrimManipulator".into(), arrow(p1 + t1 * (total - s1).min(0.0), t1, "endTrim")));
+    }
+    if fail {
+        return Err(FeatureError { faulty: vec!["startTrim", "endTrim"], ..FeatureError::new("Unable to trim to specifications.") });
+    }
+    let cuts: Vec<DVec3> = [(s0, p0), (s1, p1)].into_iter().filter(|(d, _)| *d > 1e-12).map(|(_, p)| p).collect();
+    if cuts.is_empty() {
+        return Ok(wire.clone());
+    }
+    let tools: Vec<Shape> = cuts.iter().map(|p| k::make_vertex(*p)).collect::<Result<_, _>>()?;
+    let res = k::split(std::slice::from_ref(wire), &tools, &k::BooleanOptions::default())?;
+    let (mid, _) = chain_point_at_length(edges, s0 + (total - s0 - s1) / 2.0)?;
+    let at = k::make_vertex(mid)?;
+    chain_split_pieces(&res.shape, &tools)?
+        .into_iter()
+        .min_by(|a, b| k::distance(a, &at).map(|d| d.distance).unwrap_or(f64::INFINITY).total_cmp(&k::distance(b, &at).map(|d| d.distance).unwrap_or(f64::INFINITY)))
+        .ok_or_else(|| FeatureError::new("Unable to trim to specifications."))
+}
+
+/// Offset and extend: each open end of the offset chain continues along its tangent to the face's boundary (a line
+/// end grows as one line).
+fn extend_to_face_boundary(edges: &mut Vec<Shape>, face: &Shape, extent: f64) -> FResult<()> {
+    let (Some(first), Some(last)) = (edges.first(), edges.last()) else { return Ok(()) };
+    let start = first.endpoints()?.0;
+    let end = last.endpoints()?.1;
+    if (start - end).length() < 1e-9 {
+        return Ok(());
+    }
+    let boundary = Shape::compound(&face.edges());
+    // The nearest boundary crossing ahead of `p` along `t`.
+    let hit = |p: DVec3, t: DVec3| -> FResult<Option<DVec3>> {
+        let ray = k::make_line(p, p + t * extent * 4.0)?;
+        let sec = k::section(&ray, &boundary)?;
+        let best = sec.shape.vertices().iter().filter_map(|v| v.vertex_point().ok()).map(|q| (q - p).dot(t)).filter(|s| *s > 1e-9).fold(f64::INFINITY, f64::min);
+        Ok(best.is_finite().then(|| p + t * best))
+    };
+    // The chain's edges are new and run forward, start to end.
+    let t0 = -first.tangent_at(first.edge_info()?.first_param)?.normalize_or_zero();
+    let t1 = last.tangent_at(last.edge_info()?.last_param)?.normalize_or_zero();
+    let (start_hit, end_hit) = (hit(start, t0)?, hit(end, t1)?);
+    let is_line = |e: &Shape| matches!(e.edge_curve(), Ok(k::Curve::Line { .. }));
+    if let Some(q) = start_hit {
+        if is_line(&edges[0]) {
+            edges[0] = k::make_line(q, edges[0].endpoints()?.1)?;
+        } else {
+            edges.insert(0, k::make_line(q, start)?);
+        }
+    }
+    if let Some(q) = end_hit {
+        let n = edges.len();
+        if is_line(&edges[n - 1]) {
+            edges[n - 1] = k::make_line(edges[n - 1].endpoints()?.0, q)?;
+        } else {
+            edges.push(k::make_line(end, q)?);
+        }
+    }
+    Ok(())
 }
 
 // ------------------------------------------------------------------ isoparametric curve

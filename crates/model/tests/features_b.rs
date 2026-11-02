@@ -844,6 +844,64 @@ fn boundary_routing_edit_isoparametric() {
     }
 }
 
+/// Offset curve, Offset and extend: the offset of a trapezoid's front edge 5 mm into its top face runs on along its
+/// tangents to the face's slanted sides (x -2.5 .. 42.5 at y 5; plain Offset: 0 .. 40); Trim cuts it as std.
+#[test]
+fn offset_curve_extends_to_the_face_boundary() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p: Vec<_> = [(0.0, 0.0), (0.04, 0.0), (0.05, 0.02), (-0.01, 0.02)].iter().map(|&(x, y)| sk.add_point(DVec2::new(x, y))).collect();
+    for i in 0..4 {
+        sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
+    }
+    let id = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    s.extrude_largest(id, "10 mm");
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let e = b.shape.edges().iter().position(|e| e.endpoints().is_ok_and(|(a, c)| near(a.z, 0.01, 1e-9) && near(c.z, 0.01, 1e-9) && a.y.abs() < 1e-9 && c.y.abs() < 1e-9)).unwrap();
+    let edge = Reference::Edge((*b.edges[e]).clone());
+    let top = top_face(&r);
+    let mut ends = Vec::new();
+    let mut arrows = Vec::new();
+    for (scope, trim) in [("OFFSET", false), ("OFFSET_AND_EXTEND", false), ("OFFSET_AND_EXTEND", true)] {
+        let (edge, top) = (edge.clone(), top.clone());
+        let f = s.add("offsetCurveOnFace", move |p| {
+            p.set("edges", ParamValue::Query(vec![edge]));
+            p.set("targets", ParamValue::Query(vec![top]));
+            p.set("distance", expr("5 mm"));
+            p.set("scope", ParamValue::Enum(scope.into()));
+            p.set("trim", ParamValue::Bool(trim));
+            p.set("startTrim", expr("3 mm"));
+        });
+        let r = s.ok();
+        let w = r.context.bodies.iter().find(|b| b.id.feature == f).expect("the offset");
+        let xs: Vec<f64> = w.shape.vertices().iter().filter_map(|v| v.vertex_point().ok()).inspect(|q| assert!(near(q.y, 0.005, 1e-9), "{q:?}")).map(|q| q.x).collect();
+        ends.push((xs.iter().cloned().fold(f64::INFINITY, f64::min), xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max)));
+        arrows.push(r.display.features.iter().find(|x| x.id == f).unwrap().manipulators.clone());
+        if trim {
+            // Dragging the start arrow 2 mm on (std's offsetCurveOnFaceManipulators): Start trim 5 mm.
+            let ft = s.ps.features.iter().find(|x| x.id == f).unwrap().clone();
+            let at = s.ps.features.iter().position(|x| x.id == f).unwrap();
+            let ctx = s.reg.regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions { upto: Some(at), ..Default::default() }).context;
+            let (key, mut moved) = arrows[2][0].clone();
+            if let noshape_model::display::FeatureManipulator::Linear { offset, .. } = &mut moved {
+                *offset = 0.002;
+            }
+            let changed = noshape_model::custom::std_feature::manipulator_change_in((*ctx).clone(), "offsetCurveOnFace", ft.id, &ft.name, &s.units, &ft.params, &key, &moved).expect("std's change function ran");
+            let st = changed.get("startTrim").and_then(|v| if let ParamValue::Expr(x) = v { x.cached.map(|q| q.value) } else { None });
+            assert!(st.is_some_and(|x| near(x, 0.005, 1e-12)), "{changed:?}");
+        }
+        s.ps.features.retain(|x| x.id != f);
+    }
+    assert!(near(ends[0].0, 0.0, 1e-9) && near(ends[0].1, 0.04, 1e-9), "{ends:?}");
+    assert!(near(ends[1].0, -0.0025, 1e-9) && near(ends[1].1, 0.0425, 1e-9), "{ends:?}");
+    // Trim, start 3 mm: std's arrows at the cuts along the curve.
+    assert!(near(ends[2].0, 0.0005, 1e-9) && near(ends[2].1, 0.0425, 1e-9), "{ends:?}");
+    use noshape_model::display::FeatureManipulator as M;
+    let keys: Vec<(&str, DVec3)> = arrows[2].iter().filter_map(|(k, m)| if let M::Linear { base, .. } = m { Some((k.as_str(), *base)) } else { None }).collect();
+    assert!(keys.len() == 2 && keys[0].0 == "startTrimManipulator" && vnear(keys[0].1, DVec3::new(0.0005, 0.005, 0.01)) && vnear(keys[1].1, DVec3::new(0.0425, 0.005, 0.01)), "{keys:?}");
+}
+
 #[test]
 fn offset_curve_move_boundary_mutual_trim() {
     let mut s = block();
