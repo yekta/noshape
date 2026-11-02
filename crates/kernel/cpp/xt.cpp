@@ -10,9 +10,11 @@
 // spheres, tori, lines, circles and ellipses where they are, otherwise as
 // non-periodic B-splines; surfaces of revolution are spun surfaces (periodic
 // like Parasolid's own: a revolved spline is one face, Onshape G21), surfaces
-// of extrusion and offset are converted first (same parameterisation), and
-// faces closed on a B-spline surface are split (an XT B-surface attached to a
-// face may not be closed). Seam and degenerate edges of the periodic surfaces
+// of extrusion and offset are converted first (same parameterisation), a
+// face going round a B-spline surface that is periodic (or closed with a
+// tangent seam) has it periodic (live's smooth loft), and other faces closed
+// on a B-spline surface are split (an XT B-surface attached to a face may be
+// periodic, not closed). Seam and degenerate edges of the periodic surfaces
 // are dropped: an XT cylinder face is bounded by its two circles alone.
 //
 // Edges whose curve lies on both faces within Parasolid's precision (1e-8 m)
@@ -665,9 +667,69 @@ bool periodic_analytic(const occ::handle<Geom_Surface>& s)
          !occ::down_cast<Geom_SphericalSurface>(s).IsNull() || !occ::down_cast<Geom_ToroidalSurface>(s).IsNull() || spun(s);
 }
 
-// ---------------------------------------------------------------- body
-
 constexpr double kPrecision = 1e-8; // Parasolid linear precision (metres)
+
+// The face's B-spline surface made periodic where the face goes all the way
+// round it (Parasolid's periodic B-surface: one face, no seam, like live's
+// smooth loft): a periodic direction, or a closed one whose seam is tangent.
+// Null when it has none, or a periodic direction the face doesn't go round.
+occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surface>& s, const TopoDS_Face& F, bool& up, bool& vp)
+{
+  up = vp = false;
+  occ::handle<Geom_BSplineSurface> b = occ::down_cast<Geom_BSplineSurface>(s);
+  if (b.IsNull())
+    return nullptr;
+  bool seam = false;
+  for (TopExp_Explorer ee(F, TopAbs_EDGE); ee.More() && !seam; ee.Next())
+    seam = BRep_Tool::IsClosed(TopoDS::Edge(ee.Current()), F);
+  if (!seam)
+    return nullptr;
+  double fu0, fu1, fv0, fv1, u0, u1, v0, v1;
+  BRepTools::UVBounds(F, fu0, fu1, fv0, fv1);
+  b->Bounds(u0, u1, v0, v1);
+  const bool round_u = fu1 - fu0 > u1 - u0 - 1e-9, round_v = fv1 - fv0 > v1 - v0 - 1e-9;
+  if ((b->IsUPeriodic() && !round_u) || (b->IsVPeriodic() && !round_v))
+    return nullptr;
+  // A closed direction is periodic when its seam is tangent (C1).
+  auto tangent_seam = [&](bool in_u) {
+    for (int i = 0; i <= 8; ++i)
+    {
+      const double t = in_u ? v0 + (v1 - v0) * i / 8 : u0 + (u1 - u0) * i / 8;
+      gp_Pnt       p0, p1;
+      gp_Vec       a0, b0, a1, b1;
+      in_u ? b->D1(u0, t, p0, a0, b0) : b->D1(t, v0, p0, b0, a0);
+      in_u ? b->D1(u1, t, p1, a1, b1) : b->D1(t, v1, p1, b1, a1);
+      if (p0.Distance(p1) > kPrecision || (a0 - a1).Magnitude() > 1e-6 * std::max(1.0, a0.Magnitude()))
+        return false;
+    }
+    return true;
+  };
+  occ::handle<Geom_BSplineSurface> ps = occ::down_cast<Geom_BSplineSurface>(b->Copy());
+  up = round_u && (b->IsUPeriodic() || (b->IsUClosed() && tangent_seam(true)));
+  vp = round_v && (b->IsVPeriodic() || (b->IsVClosed() && tangent_seam(false)));
+  try
+  {
+    if (up && !ps->IsUPeriodic())
+    {
+      ps->SetUPeriodic();
+      ps->RemoveUKnot(1, ps->UMultiplicity(1) - 1, kPrecision);
+    }
+    if (vp && !ps->IsVPeriodic())
+    {
+      ps->SetVPeriodic();
+      ps->RemoveVKnot(1, ps->VMultiplicity(1) - 1, kPrecision);
+    }
+  }
+  catch (const Standard_Failure&)
+  {
+    up = vp = false;
+  }
+  if (!up && !vp)
+    return nullptr;
+  return ps;
+}
+
+// ---------------------------------------------------------------- body
 
 struct XFin
 {
@@ -846,9 +908,18 @@ struct BodyWriter
       };
       return xs;
     }
-    // Anything else: a B-spline surface over the face's range (not closed:
-    // closed faces were split beforehand).
-    occ::handle<Geom_BSplineSurface> b = occ::down_cast<Geom_BSplineSurface>(s);
+    // Anything else: a B-spline surface, periodic where the face goes round
+    // it (Parasolid's form: unclamped, its first degree rows of poles repeated
+    // at the end), otherwise over the face's range (other closed faces were
+    // split beforehand).
+    bool                             up = false, vp = false;
+    occ::handle<Geom_BSplineSurface> b = periodic_bsurface(s, f, up, vp);
+    if (up)
+      b->SetUNotPeriodic();
+    if (vp)
+      b->SetVNotPeriodic();
+    if (b.IsNull())
+      b = occ::down_cast<Geom_BSplineSurface>(s);
     if (b.IsNull() || b->IsUPeriodic() || b->IsVPeriodic())
     {
       double u0, u1, v0, v1;
@@ -882,8 +953,8 @@ struct BodyWriter
     const int uk = w.knot_nodes(b->UKnots(), b->UMultiplicities(), um);
     const int vk = w.knot_nodes(b->VKnots(), b->VMultiplicities(), vm);
     Node&     ns = w.add(126, nurbs);
-    ns.fields    = {fl(false), fl(false), fn(b->UDegree()), fn(b->VDegree()), fd(b->NbUPoles()), fd(b->NbVPoles()), fu(1), fu(1),
-                    fd(b->NbUKnots()), fd(b->NbVKnots()), fl(rat), fl(b->IsUClosed()), fl(b->IsVClosed()), fu(1),
+    ns.fields    = {fl(up), fl(vp), fn(b->UDegree()), fn(b->VDegree()), fd(b->NbUPoles()), fd(b->NbVPoles()), fu(1), fu(1),
+                    fd(b->NbUKnots()), fd(b->NbVKnots()), fl(rat), fl(up || b->IsUClosed()), fl(vp || b->IsVClosed()), fu(1),
                     fn(rat ? 4 : 3), fp(verts), fp(um), fp(vm), fp(uk), fp(vk)};
     Node& nd = head(124);
     nd.fields.push_back(fp(nurbs));
@@ -1246,10 +1317,10 @@ struct BodyWriter
     for (int i = 0; i < nf; ++i)
       face_idx[i] = w.alloc();
 
-    // Fins (seams of periodic analytic surfaces and degenerate edges dropped), in loops.
+    // Fins (seams of periodic surfaces and degenerate edges dropped), in loops.
     face_loops.resize(nf);
     for (int fi = 0; fi < nf; ++fi)
-      for (const auto& cycle : exchange_loops(TopoDS::Face(faces(fi + 1))))
+      for (const auto& cycle : exchange_loops(TopoDS::Face(faces(fi + 1)), true))
       {
         const size_t first = fins.size();
         for (const TopoDS_Edge& e : cycle)
@@ -1633,8 +1704,9 @@ TopoDS_Shape swept_to_elementary(const TopoDS_Shape& s)
 // Prepare a shape for XT: elementary surfaces where swept/revolved ones are,
 // B-splines for the other swept and offset surfaces (same parameterisation),
 // revolved ones too unless `keep_spun` (and all of them when one has a profile
-// the writer can't keep), and faces closed on a surface that isn't periodic split.
-TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun)
+// the writer can't keep), and faces closed on a surface that isn't periodic
+// split (B-surfaces made periodic are kept with `periodic_splines`).
+TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, bool periodic_splines)
 {
   TopoDS_Shape r = swept_to_elementary(s);
   for (TopExp_Explorer ef(r, TopAbs_FACE); ef.More() && keep_spun; ef.Next())
@@ -1652,7 +1724,9 @@ TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun)
   {
     const TopoDS_Face& F = TopoDS::Face(ef.Current());
     TopLoc_Location    loc;
-    if (periodic_analytic(basis_surface(BRep_Tool::Surface(F, loc))))
+    const occ::handle<Geom_Surface> fs = basis_surface(BRep_Tool::Surface(F, loc));
+    bool                            up, vp;
+    if (periodic_analytic(fs) || (periodic_splines && !periodic_bsurface(fs, F, up, vp).IsNull()))
       continue;
     for (TopExp_Explorer ee(F, TopAbs_EDGE); ee.More() && !split; ee.Next())
       split = BRep_Tool::IsClosed(TopoDS::Edge(ee.Current()), F);
@@ -1695,7 +1769,7 @@ TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun)
 
 TopoDS_Shape exchange_prepared(const TopoDS_Shape& s, bool keep_spun)
 {
-  return prepared(s, keep_spun);
+  return prepared(s, keep_spun, false);
 }
 
 bool exchange_periodic_analytic(const TopoDS_Face& f)
@@ -1704,9 +1778,12 @@ bool exchange_periodic_analytic(const TopoDS_Face& f)
   return periodic_analytic(basis_surface(BRep_Tool::Surface(f, loc)));
 }
 
-std::vector<std::vector<TopoDS_Edge>> exchange_loops(const TopoDS_Face& F)
+std::vector<std::vector<TopoDS_Edge>> exchange_loops(const TopoDS_Face& F, bool periodic_splines)
 {
-  const bool               periodic = exchange_periodic_analytic(F);
+  TopLoc_Location                 loc;
+  const occ::handle<Geom_Surface> fs = basis_surface(BRep_Tool::Surface(F, loc));
+  bool                            up, vp;
+  const bool periodic = periodic_analytic(fs) || (periodic_splines && !periodic_bsurface(fs, F, up, vp).IsNull());
   std::vector<TopoDS_Edge> mine;
   for (TopExp_Explorer ee(F, TopAbs_EDGE); ee.More(); ee.Next())
   {
@@ -1915,7 +1992,7 @@ std::pair<std::string, const double*> name_colour(rust::Slice<const rust::String
 int write_body(Writer& w, const TopoDS_Shape& s)
 {
   require_non_null(s, "shape");
-  const TopoDS_Shape p = prepared(s, true);
+  const TopoDS_Shape p = prepared(s, true, true);
   bool               solid = false;
   for (TopExp_Explorer ex(p, TopAbs_SOLID); ex.More(); ex.Next())
     solid = true;

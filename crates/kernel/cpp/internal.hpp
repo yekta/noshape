@@ -420,7 +420,7 @@ GProp_GProps surface_props(const TopoDS_Shape& s);
 // without degenerate edges.
 TopoDS_Shape                          exchange_prepared(const TopoDS_Shape& s, bool keep_spun);
 bool                                  exchange_periodic_analytic(const TopoDS_Face& f);
-std::vector<std::vector<TopoDS_Edge>> exchange_loops(const TopoDS_Face& f);
+std::vector<std::vector<TopoDS_Edge>> exchange_loops(const TopoDS_Face& f, bool periodic_splines = false);
 
 // Mesh import (mesh_io.cpp): a shell (solid when closed) of planar triangle
 // faces; nodes closer than `weld` are one vertex and T-junctions are split

@@ -87,8 +87,8 @@ fn parasolid_round_trip() {
             assert!(back.is_valid(), "{name} binary={binary}: invalid");
             assert_eq!(back.count(ShapeType::Solid), s.count(ShapeType::Solid), "{name}");
             // Parasolid's faces: periodic ones (a revolved spline's spun face too)
-            // whole; a face closed on a B-surface we don't write as periodic (the
-            // loft's side face) in two.
+            // whole; a face closed on a B-surface with a seam that isn't tangent
+            // (the loft's side face, through the square's corner) in two.
             let split = usize::from(name == "loft");
             assert_eq!(back.count(ShapeType::Face), s.count(ShapeType::Face) + split, "{name} binary={binary}: faces");
             let v = volume_properties(&back).unwrap().mass;
@@ -1250,6 +1250,40 @@ fn parasolid_periodic_bsurface_face_reads_whole() {
     assert_eq!(s.count(ShapeType::Face), 3);
     assert!((v - 437833.229).abs() < 437833.229 * 1e-6, "{v}");
     assert!(s.is_valid());
+}
+
+/// Written back, a face going round a periodic B-surface (the vase's side
+/// face, as in live's file) or one closed with a tangent seam (a loft between
+/// circles) stays one face: no seam, not split. `NOSHAPE_XT_SAMPLES=<dir>`
+/// keeps the files.
+#[test]
+fn parasolid_writes_a_periodic_bsurface_face_whole() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let vase = read_parasolid(&dir.join("vase-smooth-live-loft.x_t"), LengthUnit::Millimeter).unwrap();
+    // In millimeters, as the vase read in millimeters (live 1808: written in meters it was 1000x too small).
+    let ring = |z: f64, r: f64| make_wire(&[make_circle(DVec3::new(0.0, 0.0, z), DVec3::Z, r).unwrap()]).unwrap();
+    let lofted = loft(&[ring(0.0, 10.0), ring(15.0, 6.0), ring(30.0, 9.0)], &LoftOptions { solid: true, ..Default::default() }).unwrap().shape;
+    let out = std::env::var_os("NOSHAPE_XT_SAMPLES").map(std::path::PathBuf::from).unwrap_or_else(|| std::env::temp_dir().join(format!("noshape-xt-periodic-{}", std::process::id())));
+    std::fs::create_dir_all(&out).unwrap();
+    // Live's loft through the same circles (request 1808: 3 faces, 2 edges, 5156.5974 mm³).
+    let live = read_parasolid(&dir.join("loft-circles-live.x_t"), LengthUnit::Millimeter).unwrap();
+    assert_eq!(live.count(ShapeType::Face), 3);
+    for (name, s) in [("vase-smooth", vase), ("loft-circles", lofted), ("loft-circles-live", live)] {
+        let want = volume_properties(&s).unwrap().mass;
+        if name.starts_with("loft-circles") {
+            // Live's loft through the same circles: 5156.5974 mm³ (massproperties, request 1808).
+            assert!((want - 5156.5974).abs() < 5.0, "{want}");
+        }
+        for binary in [false, true] {
+            let path = out.join(format!("{name}-noshape.{}", if binary { "x_b" } else { "x_t" }));
+            write_parasolid(&path, std::slice::from_ref(&s), LengthUnit::Millimeter, binary).unwrap();
+            let back = read_parasolid(&path, LengthUnit::Millimeter).unwrap();
+            assert_eq!(back.count(ShapeType::Face), s.count(ShapeType::Face), "{name} binary={binary}");
+            assert!(back.is_valid(), "{name} binary={binary}");
+            let v = volume_properties(&back).unwrap().mass;
+            assert!((v - want).abs() < want * 1e-6, "{name} binary={binary}: {v} vs {want}");
+        }
+    }
 }
 
 /// `NOSHAPE_STEP_READ=<assembly.step> cargo test … export::dump_step_assembly_parts -- --ignored --nocapture`:

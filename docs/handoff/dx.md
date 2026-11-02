@@ -11,6 +11,24 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-02 (to 20:40 UTC): drawing speed on big models (user 11-02; live 1809), periodic Parasolid faces (live 1808)
+- dx_perf `timed_big_drawings` (NOSHAPE_LIVE_BIG for live's files): live's 2000-instance assembly drawing with the
+  suggested views 12.3 s -> about 2 s (vibe5 loaded: 2-4.5 s; live 19.7 s); BOM 0.2 s (live 13.1 s); a 2-point
+  dimension 0.4 s (live 0.8-1.5 s); NIST FTC 08 drawing 0.2 s (live 22.6 s).
+  - Sheet views are computed in parallel (`compute_sheet_views`, details after the others).
+  - Exact HLR of 64+ bodies (hlr.cpp `exact_chunked`): Z-ordered chunks of 32 bodies, each hidden in its own
+    HLRBRep_Algo on its own thread by itself and by the bodies whose projected boxes overlap it and aren't wholly
+    behind it; same fragments as one pass (T1 hlr::many_bodies_hide_in_chunks_as_in_one_pass). Own threads, not
+    OSD_Parallel: OCCT's pool runs concurrent Fors (the other views) on the caller.
+  - Views of 64+ bodies are always exact (`always_exact`): the polygonal pass took as long, so the app drew twice.
+  - `regenerate_source` keeps the last 4 sources by key and content hash: Create Drawing's layout bounds and the
+    views share one assembly evaluation.
+  - Open: a Part Studio drawing regenerates the studio again in its own Regenerator (live's 1000-part FeatureScript
+    studio: 17 s, so its drawing took 16.6 s and Update 12 s; live 3.7-4 s per view, Update 6.4 s).
+- Parasolid export writes a face going round a periodic B-surface (or one closed with a tangent seam) as one
+  periodic face, as Onshape does: live imports our re-exported vase identical to its own (1808). Our loft sample
+  was 1000x small (the test wrote metres as millimetres); rewritten, re-import asked (REQUESTS P3 follow-up).
+
 ## 11-02 evening (to 11-02 18:39 UTC): IGES as live, parallel STEP healing (OCCT patch 0019)
 - Live's own big files (1755) imported by dx_perf `timed_live_big_samples` (samples on vibe5 in
   ~/agents/dx/live-big): STEP / Parasolid / IGES assembly and the Part Studio all come back as live (1000 parts, names,
