@@ -505,6 +505,30 @@ impl PartStudioView {
                 let (base, n) = self.frame_of_ref(r).map(|f| (f.origin, f.normal)).or_else(|| self.axis_of(r))?;
                 Some(Arrow { base, dir: if p.bool("oppositeDirection") { -n } else { n }, length: 0.0, param: "", flip: Some("oppositeDirection"), secondary: false })
             }
+            // frameTrim.fs addKeepSideManipulator (Face): a flip arrow on the
+            // tool where it is nearest the parts to trim, along its normal
+            // there; a mate connector's at its origin along its Z.
+            "frameTrim" if p.is("trimType", "FACE") => {
+                let r = p.query("tool").first()?;
+                let flipped = p.bool("flipTrim");
+                let (base, n) = if matches!(r, Reference::MateConnector { .. }) {
+                    let f = self.frame_of_ref(r)?;
+                    (f.origin, f.normal)
+                } else {
+                    let tool = match noshape_model::regen::measure::resolve_shapes(ctx, r).into_iter().next() {
+                        Some(s) => s,
+                        None => {
+                            let f = self.frame_of_ref(r)?;
+                            noshape_kernel::make_plane_face(&noshape_kernel::Plane::new(f.origin, f.normal, f.x), -1e3, 1e3, -1e3, 1e3).ok()?
+                        }
+                    };
+                    let targets: Vec<noshape_kernel::Shape> = p.query("targets").iter().flat_map(|t| noshape_model::regen::measure::resolve_shapes(ctx, t)).collect();
+                    let d = noshape_kernel::distance(&tool, &noshape_kernel::Shape::compound(&targets)).ok()?;
+                    let face = tool.faces().into_iter().find(|f| noshape_kernel::make_vertex(d.point_a).ok().and_then(|v| noshape_kernel::distance(f, &v).ok()).is_some_and(|x| x.distance < 1e-7))?;
+                    (d.point_a, face.normal_at_point(d.point_a).ok()?)
+                };
+                Some(Arrow { base, dir: if flipped { -n } else { n }, length: 0.0, param: "", flip: Some("flipTrim"), secondary: false })
+            }
             // bodyDraft.fs createManipulators: a flip arrow along the pull
             // direction, at the first drafted entity's point nearest the
             // pull direction's entity (Draft on self), else on the parting
@@ -870,6 +894,14 @@ impl PartStudioView {
             "helix" => {
                 let Some(ctx) = self.ui.before_context.as_ref().or(self.context.as_ref()) else { return Vec::new() };
                 noshape_model::interaction::helix_manipulators(ctx, p, &self.doc.read(cx).session.doc.settings.units, &self.display.variables)
+            }
+            "mutualTrim" => {
+                let Some(ctx) = self.ui.before_context.as_ref().or(self.context.as_ref()) else { return Vec::new() };
+                noshape_model::interaction::mutual_trim_manipulators(ctx, p, &self.doc.read(cx).session.doc.settings.units)
+            }
+            "faceBlend" => {
+                let Some(ctx) = self.ui.before_context.as_ref().or(self.context.as_ref()) else { return Vec::new() };
+                noshape_model::interaction::face_blend_manipulators(ctx, p, &self.doc.read(cx).session.doc.settings.units)
             }
             "fillet" if p.bool("isPartial") => {
                 let Some(ctx) = self.ui.before_context.as_ref().or(self.context.as_ref()) else { return Vec::new() };

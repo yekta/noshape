@@ -1310,3 +1310,23 @@ fn a_variable_row_drags_to_reorder(cx: &mut TestAppContext) {
     assert!(!focused, "the dragged row's name isn't left focused");
     wait_until(cx, window, |cx| view.read(cx).display.feature_state(ids[3]).is_some_and(|s| s.status == noshape_model::display::FeatureStatus::Error));
 }
+
+/// Frame trim (Face)'s keep-side flip (audit-part-studio M11; frameTrim.fs addKeepSideManipulator): with the Top
+/// plane as the tool and the block (standing on it) to trim, at the plane's point nearest the part (z 0) along +Z,
+/// along −Z with Opposite side.
+#[gpui::test]
+fn frame_trim_flip_as_std(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "frame-trim-flip");
+    let part = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone()))).expect("the part");
+    let arrow = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).param_arrow(cx).map(|a| (a.base, a.dir, a.flip)));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("frameTrim", w, cx))).unwrap();
+    let d = cx.update(|cx| view.read(cx).edit.as_ref().expect("the dialog").dialog.clone());
+    let set = |cx: &mut TestAppContext, k: &str, v: noshape_model::ParamValue| cx.update(|cx| d.update(cx, |d, cx| d.set_value(k, v, cx)));
+    set(cx, "trimType", noshape_model::ParamValue::Enum("FACE".into()));
+    set(cx, "targets", noshape_model::ParamValue::Query(vec![part]));
+    set(cx, "tool", noshape_model::ParamValue::Query(vec![P[0].clone()]));
+    let a = arrow(cx).expect("a flip arrow");
+    assert!(a.0.z.abs() < 1e-9 && a.1.z > 0.999 && a.2 == Some("flipTrim"), "{a:?}");
+    set(cx, "flipTrim", noshape_model::ParamValue::Bool(true));
+    assert!(arrow(cx).is_some_and(|a| a.1.z < -0.999), "flipped");
+}

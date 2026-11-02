@@ -825,6 +825,78 @@ pub fn move_curve_boundary_anchor(ctx: &crate::regen::context::Context, params: 
     crate::regen::features::curves::extend_curve_anchor(&ev)
 }
 
+/// Face blend's side flips as std's faceBlend.fs adds them (addFlipManipulators; caps and limits aren't built
+/// here): on each side's first face at its middle by its parameters, along its normal, reversed unless the side is
+/// "aligned" (wallsNormalAlignment: sides with a common edge both are when that edge is concave; apart, a side is
+/// when its normal at the closest point leans toward the other side), flipped by Flip side 1 / 2.
+pub fn face_blend_manipulators(ctx: &crate::regen::context::Context, params: &ParamValues, units: &noshape_units::UnitPrefs) -> Vec<(String, crate::display::FeatureManipulator)> {
+    face_blend_manipulators_opt(ctx, params, units).unwrap_or_default()
+}
+
+fn face_blend_manipulators_opt(ctx: &crate::regen::context::Context, params: &ParamValues, units: &noshape_units::UnitPrefs) -> Option<Vec<(String, crate::display::FeatureManipulator)>> {
+    use crate::display::FeatureManipulator as M;
+    let vars = std::collections::BTreeMap::new();
+    let ev = crate::regen::eval::EvalCtx::new(FeatureId(0), "", params, units, ctx.clone(), &vars);
+    let (s1, s2) = (ev.resolve_faces(params.query("side1")), ev.resolve_faces(params.query("side2")));
+    let (&(b1, f1), &(b2, f2)) = (s1.first()?, s2.first()?);
+    let (fa, fb) = (ev.face_shape(b1, f1).ok()?, ev.face_shape(b2, f2).ok()?);
+    let middle = |f: &noshape_kernel::Shape| -> Option<(DVec3, DVec3)> {
+        let [u0, u1, v0, v1] = f.uv_bounds().ok()?;
+        let (u, v) = ((u0 + u1) * 0.5, (v0 + v1) * 0.5);
+        Some((f.point_at_uv(u, v).ok()?, f.normal_at_uv(u, v).ok()?.normalize()))
+    };
+    let (ma, mb) = (middle(&fa)?, middle(&fb)?);
+    let d = noshape_kernel::distance(&fa, &fb).ok()?;
+    let aligned = if b1 == b2 && d.distance <= 1e-9 {
+        // A common edge: concave when the other side's middle lies outside the first's plane.
+        let n = fa.normal_at_point(d.point_a).ok()?;
+        let concave = n.dot(mb.0 - d.point_a) > 0.0;
+        [concave, concave]
+    } else {
+        let v = (d.point_b - d.point_a).normalize();
+        [fa.normal_at_point(d.point_a).ok()?.dot(v) >= -1e-5, fb.normal_at_point(d.point_b).ok()?.dot(v) >= -1e-5]
+    };
+    let flip = |key: &str, (base, n): (DVec3, DVec3), aligned: bool, flipped: bool| (key.to_string(), M::Flip { base, direction: if aligned { n } else { -n }, flipped, other_direction: None, secondary: false });
+    Some(vec![flip("side1FlipManipulator", ma, aligned[0], params.bool("flipSide1")), flip("side2FlipManipulator", mb, aligned[1], params.bool("flipSide2"))])
+}
+
+/// Mutual trim's keep-side flips as std's mutualTrim.fs adds them (createManipulators): where the two surfaces
+/// meet (the middle of the first edge of their section), each in its own surface across that edge, turned away
+/// from the other surface's normal, flipped by its Keep opposite side.
+pub fn mutual_trim_manipulators(ctx: &crate::regen::context::Context, params: &ParamValues, units: &noshape_units::UnitPrefs) -> Vec<(String, crate::display::FeatureManipulator)> {
+    mutual_trim_manipulators_opt(ctx, params, units).unwrap_or_default()
+}
+
+fn mutual_trim_manipulators_opt(ctx: &crate::regen::context::Context, params: &ParamValues, units: &noshape_units::UnitPrefs) -> Option<Vec<(String, crate::display::FeatureManipulator)>> {
+    use crate::display::FeatureManipulator as M;
+    let vars = std::collections::BTreeMap::new();
+    let ev = crate::regen::eval::EvalCtx::new(FeatureId(0), "", params, units, ctx.clone(), &vars);
+    let body = |q: &str| ev.resolve_bodies(params.query(q)).first().map(|&b| ctx.bodies[b].shape.clone());
+    let (a, b) = (body("body1")?, body("body2")?);
+    let edge = noshape_kernel::section(&a, &b).ok()?.shape.edges().into_iter().next()?;
+    let info = edge.edge_info().ok()?;
+    let t = (info.first_param + info.last_param) * 0.5;
+    let (p, x) = (edge.point_at(t).ok()?, edge.tangent_at(t).ok()?);
+    let normal = |s: &noshape_kernel::Shape| -> Option<DVec3> {
+        let v = noshape_kernel::make_vertex(p).ok()?;
+        let f = s.faces().into_iter().min_by(|f, g| {
+            let d = |x: &noshape_kernel::Shape| noshape_kernel::distance(x, &v).map(|d| d.distance).unwrap_or(f64::MAX);
+            d(f).total_cmp(&d(g))
+        })?;
+        f.normal_at_point(p).ok()
+    };
+    let (n1, n2) = (normal(&a)?, normal(&b)?);
+    let across = |n: DVec3, other: DVec3| {
+        let d = n.cross(x).normalize_or_zero();
+        if d.dot(other) > 0.0 { -d } else { d }
+    };
+    let flip = |key: &str, direction: DVec3, flipped: bool| (key.to_string(), M::Flip { base: p, direction, flipped, other_direction: None, secondary: false });
+    Some(vec![
+        flip("Keep first surface opposite side manipulator", across(n1, n2), params.bool("keepOtherSide1")),
+        flip("Keep second surface opposite side manipulator", across(n2, n1), params.bool("keepOtherSide2")),
+    ])
+}
+
 /// A partial fillet's bound manipulators as std's fillet.fs adds them
 /// (addPartialFilletManipulators), keyed as std keys them for its
 /// filletManipulatorChange: for each Position or Offset bound, an arrow

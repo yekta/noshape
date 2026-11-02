@@ -1242,3 +1242,47 @@ fn fill_on_an_open_box_knits_a_solid() {
     assert!((b.shape.volume().unwrap() * 1e9 - 8000.0).abs() < 1e-6);
 }
 
+
+/// Mutual trim's keep-side flips as std's (audit-part-studio M11; mutualTrim.fs createManipulators): a Front fill
+/// crossing one on a plane at x 20 mm meets it along x 20, y 0: both arrows at that line's middle (z 15 mm), the
+/// first across it in the Front surface (along X), the second in the other (along Y); std's change function turns a
+/// click on the first into Keep opposite side.
+#[test]
+fn mutual_trim_flips_as_std() {
+    let mut s = Studio::new();
+    let mut a = noshape_sketch::Sketch::new();
+    let la = rect(&mut a, 0.0, 0.0, 0.05, 0.03);
+    let sa = s.sketch(Reference::Plane(DatumPlane::Front), a);
+    s.add("cPlane", |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::Plane(DatumPlane::Right)]));
+        p.set("offset", expr("20 mm"));
+    });
+    let pl = s.ps.features.last().unwrap().id;
+    let mut b = noshape_sketch::Sketch::new();
+    let lb = rect(&mut b, -0.01, 0.0, 0.04, 0.03);
+    let sb = s.sketch(Reference::FeaturePlane(pl), b);
+    let mut fills = Vec::new();
+    for (sk, lines) in [(sa, la), (sb, lb)] {
+        fills.push(s.add("fill", move |p| {
+            let mut row = ParamValues::default();
+            row.set("entities", ParamValue::Query(lines.iter().map(|&e| Reference::SketchEntity { sketch: sk, entity: e }).collect()));
+            p.set("edges", ParamValue::Array(vec![row]));
+        }));
+    }
+    let r = s.ok();
+    s.add("mutualTrim", move |p| {
+        p.set("body1", ParamValue::Query(vec![Reference::Body(BodyId { feature: fills[0], index: 0 })]));
+        p.set("body2", ParamValue::Query(vec![Reference::Body(BodyId { feature: fills[1], index: 0 })]));
+    });
+    let mt = s.ps.features.last().unwrap().clone();
+    let m = noshape_model::interaction::mutual_trim_manipulators(&r.context, &mt.params, &s.units);
+    use noshape_model::display::FeatureManipulator as M;
+    let [(k1, M::Flip { base, direction: d1, .. }), (_, M::Flip { direction: d2, .. })] = m.as_slice() else { panic!("{m:?}") };
+    assert!((*base - DVec3::new(0.02, 0.0, 0.015)).length() < 1e-6 && d1.x.abs() > 0.999 && d2.y.abs() > 0.999, "{m:?}");
+    let mut moved = m[0].1.clone();
+    if let M::Flip { flipped, .. } = &mut moved {
+        *flipped = true;
+    }
+    let changed = noshape_model::custom::std_feature::manipulator_change_in((*r.context).clone(), "mutualTrim", mt.id, &mt.name, &s.units, &mt.params, k1, &moved).expect("std's change function ran");
+    assert_eq!(changed.get("keepOtherSide1"), Some(&ParamValue::Bool(true)), "{changed:?}");
+}

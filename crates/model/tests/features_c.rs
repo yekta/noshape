@@ -3044,3 +3044,40 @@ fn move_curve_boundary_arrow_at_the_growing_end() {
     params.set("helpPoint", ParamValue::Query(Vec::new()));
     assert!(anchor(&params).is_none());
 }
+
+/// Face blend's side flips as std's (audit-part-studio M11; faceBlend.fs addFlipManipulators): the 40 × 20 × 10
+/// block's top and front faces meet at a convex edge, so neither side is aligned: each arrow sits at its face's
+/// middle pointing into the part (top −Z, front +Y); std's faceBlendManipulatorChanges turns a click on side 1's
+/// into Flip side 1.
+#[test]
+fn face_blend_side_flips_as_std() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 20.0), (0.0, 20.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = s.ok();
+    let (top, front) = (face_at(&r, 0, DVec3::new(mm(20.0), mm(10.0), mm(10.0))), face_at(&r, 0, DVec3::new(mm(20.0), 0.0, mm(5.0))));
+    s.add("faceBlend", move |p| {
+        p.set("side1", ParamValue::Query(vec![top]));
+        p.set("side2", ParamValue::Query(vec![front]));
+        p.set("radius", expr("2 mm"));
+    });
+    let fb = s.ps.features.last().unwrap().clone();
+    let m = noshape_model::interaction::face_blend_manipulators(&r.context, &fb.params, &s.units);
+    use noshape_model::display::FeatureManipulator as M;
+    let [(k1, M::Flip { base: b1, direction: d1, flipped: false, .. }), (k2, M::Flip { base: b2, direction: d2, flipped: false, .. })] = m.as_slice() else { panic!("{m:?}") };
+    assert_eq!((k1.as_str(), k2.as_str()), ("side1FlipManipulator", "side2FlipManipulator"));
+    assert!((*b1 - DVec3::new(mm(20.0), mm(10.0), mm(10.0))).length() < 1e-9 && d1.z < -0.999, "{m:?}");
+    assert!((*b2 - DVec3::new(mm(20.0), 0.0, mm(5.0))).length() < 1e-9 && d2.y > 0.999, "{m:?}");
+    let mut moved = m[0].1.clone();
+    if let M::Flip { flipped, .. } = &mut moved {
+        *flipped = true;
+    }
+    let changed = noshape_model::custom::std_feature::manipulator_change_in((*r.context).clone(), "faceBlend", fb.id, &fb.name, &s.units, &fb.params, k1, &moved).expect("std's change function ran");
+    assert_eq!(changed.get("flipSide1"), Some(&ParamValue::Bool(true)), "{changed:?}");
+}
