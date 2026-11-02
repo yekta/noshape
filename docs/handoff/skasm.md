@@ -487,12 +487,12 @@ sketch: `-p noshape-scene --test all sketch_perf::s300 -- --ignored --nocapture`
   stack's top pin (solve + scene retransform per pointer move), insert a pin; sketch: open for edit (solve with DOF,
   regions, regeneration), change a dimension, drag a corner, add a dimension.
 
-Numbers on vibe3 (release, 3 runs, medians), before (2f715f2d) → after (7e269c42: solver, connector frames, drag step):
+Numbers on vibe3 (release, 3 runs, medians), before (2f715f2d) → after (7e269c42 solver, connector frames, drag step; a5cec47e regenerate):
 | | a200 | a1000 |
 |---|---|---|
 | open: first evaluation | 105 → 78 ms | 327 → 237 ms |
 | evaluate again | 32 → 6.1 ms | 106 → 24 ms |
-| regenerate | **621 → 216 ms** | **3693 → 1252 ms** |
+| regenerate | **621 → 177 ms** | **3693 → 840 ms** |
 | add a mate | 42 → 15 ms | 120 → 37 ms |
 | drag frame | 2.1 → 1.4 ms (723 fps) | **20.7 → 8.2 ms (48 → 123 fps)** |
 | insert a pin | 33 → 6.1 ms | 107 → 24 ms |
@@ -523,16 +523,19 @@ Fixes so far (5bde395b / 34aa527a):
    evaluation spent a quarter of its time integrating the same face centroids (OCCT BRepGProp).
 7. `orient_axial_mates` (run before every solve) copied every body's pose for every mate: one list kept in step
    (a1000: 5 of 7 ms of a drag step, and part of every evaluation).
-8. The bench folds nested positions as the app does (`ops::assembly::fold_solved`); without it every evaluation
+8. `least_change` also stops when the free-direction pull is under the null basis's tilt (1e-8 of the pull-back,
+   mates held): after a regenerate the rounds after the first only chased that leak (×0.66 a round); 12 → ~3.5.
+9. The bench folds nested positions as the app does (`ops::assembly::fold_solved`); without it every evaluation
    re-solved each flexible subassembly from its unsolved start.
 Tried and dropped: one SVD instead of the eigendecomposition + SVD per `least_change` round (changes which directions
 count as free near the threshold: the live oracle failed).
 
-Next (biggest first): a1000's regenerate (1.25 s) is `least_change` converging only ×0.66 a round (all 12 rounds) on
-the 40 stack groups after their heights change (its comment expects ~10×; apply_delta and the pull-back agree to first
-order, so the cause is elsewhere: null-space tolerance or the skipped bodies; a fix changes results in the last
-digits); the drag step's remaining whole-assembly passes (two solve_inner over all 2380 mates' residuals and status);
-the first evaluation (237 ms). Live's numbers decide which matters most.
+Next (biggest first): a1000's regenerate (840 ms) is now the patterned flexible subassembly: its 10 copies' 100 pins
+form one solver group with the seed (followers act at instance level), and that group's dense LM + least change (600
+unknowns, 53 + 260 ms on vibe5) is the critical path while the 40 stacks solve in parallel beside it. Options: solve
+copies after the seed (followers one-way; differs when copies have mates of their own) or a sparse / block solver.
+The drag step's two passes over all 2380 mates (~1 ms each); the first evaluation (240 ms, cold DOF analysis). Live's
+A200 / A1000 numbers (request 1741, after its REST limit) decide the order.
 
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
