@@ -496,7 +496,16 @@ Numbers on vibe3 (release, 3 runs, medians), before (2f715f2d) → after (7e269c
 | add a mate | 42 → 15 ms | 120 → 37 ms |
 | drag frame | 2.1 → 1.4 ms (723 fps) | **20.7 → 8.2 ms (48 → 123 fps)** |
 | insert a pin | 33 → 6.1 ms | 107 → 24 ms |
-S300 (vibe4, loaded): open for edit 4.4 ms, change a dimension 3.5 ms, drag step 3.2 ms (≈ 300 fps), add a dimension 3.4 ms.
+S300 against live (live 1741, behaviours "skasm (2026-11-01, P1 speed vs Onshape) part 1"; live's sketch is the same
+80 rectangles with its own corner-rectangle constraints, ≈ 800 constraints; ours on vibe4, loaded):
+| | Onshape | noshape |
+|---|---|---|
+| open the sketch for edit | 1.2–1.9 s | 4.4 ms |
+| change a dimension | 1.1 s | 3.5 ms |
+| drag a corner | 3.8 fps, 1.6 solves/s (its VM's software renderer caps it; 2.9 fps with one circle) | 3.2 ms a step (≈ 300 fps) |
+| add a dimension | 1.7 s | 3.4 ms |
+Each Onshape solve ships the whole sketch (≈ 190 KB + 127 KB) over its WebSocket. Assemblies A200 / A1000: live's REST
+calls are rate-limited until ~04:05 UTC 11-02 (≈ 600 / 3 500 calls to build them).
 Live: asked (REQUESTS 18:30, scripting allowed); the old figures (request 1501): an assembly drag step ≈ 1.2 s at 200
 instances, insert 1.3–2.2 s, sketch drag ≈ 400 ms a step at 188 entities.
 
