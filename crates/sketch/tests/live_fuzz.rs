@@ -572,8 +572,13 @@ fn live_matches() {
     let mut positions = Vec::new();
     for (n, first, rich) in BATCHES {
         let Ok(live) = std::fs::read_to_string(fixture(&format!("sketch-{n}.live.json"))) else { continue };
-        // Ours as the solver stands now (the batch file keeps ours as sent).
-        let ours = batch(20, first, rich);
+        // Ours as the solver stands now (the batch file keeps ours as sent);
+        // FUZZ_ONLY=<seed> for one case.
+        let ours = match std::env::var("FUZZ_ONLY").ok().and_then(|v| v.parse::<u64>().ok()) {
+            Some(seed) if (first..first + 20).contains(&seed) => batch(1, seed, rich),
+            Some(_) => continue,
+            None => batch(20, first, rich),
+        };
         let live: Value = serde_json::from_str(&live).unwrap();
         for case in ours["cases"].as_array().unwrap() {
             let name = case["case"].as_str().unwrap();
@@ -600,7 +605,7 @@ fn live_matches() {
     }
     println!("live fuzz (sketch): {cases} cases answered, solvability matches {status_ok}, everything matches {exact}");
     for p in &positions {
-        println!("  {}", p.chars().take(300).collect::<String>());
+        println!("  {}", p.chars().take(std::env::var("FUZZ_WIDE").map_or(300, |_| 4000)).collect::<String>());
     }
     assert!(report.is_empty(), "{}", report.join("\n"));
 }

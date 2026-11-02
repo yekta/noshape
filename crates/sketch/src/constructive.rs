@@ -33,10 +33,6 @@ impl Sketch {
     /// (an entity alone can't meet its constraints to the placed ones); the
     /// sketch may then be partly moved, and the caller restores it.
     pub(crate) fn place_constructively(&mut self, unheld: &HashSet<crate::ids::ConstraintId>) -> bool {
-        // Lines, arcs, circles and points only.
-        if self.entities().any(|e| !matches!(e.kind(), EntityKind::Point | EntityKind::Line | EntityKind::Arc | EntityKind::Circle)) {
-            return false;
-        }
         // Units: each curve with its points; points of no curve on their own.
         let mut unit_of: HashMap<EntityId, EntityId> = HashMap::new();
         let mut units: Vec<EntityId> = Vec::new();
@@ -106,6 +102,31 @@ impl Sketch {
         true
     }
 
+    /// Whether constraint `c` joins geometry by position (a shared point, a
+    /// tangency, a point on a curve…) rather than relating sizes or
+    /// directions.
+    fn connective(&self, c: crate::ids::ConstraintId) -> bool {
+        matches!(
+            self.constraint(c).map(|c| &c.kind),
+            Some(
+                ConstraintKind::Coincident { .. }
+                    | ConstraintKind::Concentric { .. }
+                    | ConstraintKind::Tangent { .. }
+                    | ConstraintKind::Midpoint { .. }
+                    | ConstraintKind::MidpointOf { .. }
+                    | ConstraintKind::Pierce { .. }
+                    | ConstraintKind::Collinear { .. }
+                    | ConstraintKind::Symmetric { .. }
+            )
+        )
+    }
+
+    /// [`Sketch::sub_sketch`] with a filter that sees each constraint's id.
+    fn sub_sketch_by(&self, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)], keep: &dyn Fn(crate::ids::ConstraintId, &[EntityId]) -> bool, placed: &BTreeSet<EntityId>) -> Option<Sketch> {
+        let wanted: Vec<(crate::ids::ConstraintId, Vec<EntityId>)> = cons.iter().filter(|(c, us)| keep(*c, us)).cloned().collect();
+        self.sub_sketch(&[], &wanted, &|_| true, placed)
+    }
+
     /// This sketch with only the constraints `keep` allows (of `cons`) and
     /// the placed units fixed.
     fn sub_sketch(&self, _comp: &[EntityId], cons: &[(crate::ids::ConstraintId, Vec<EntityId>)], keep: &dyn Fn(&[EntityId]) -> bool, placed: &BTreeSet<EntityId>) -> Option<Sketch> {
@@ -144,17 +165,22 @@ impl Sketch {
             let pending = |u: EntityId| cons.iter().filter(|(c, us)| us.contains(&u) && us.iter().all(|x| *x == u || placed.contains(x)) && !holds[c]).count();
             let open: Vec<EntityId> = comp.iter().copied().filter(|u| !placed.contains(u)).collect();
             let best = open.iter().map(|u| (pending(*u), total(*u))).max().unwrap();
+            // First, a relation between units that doesn't hold, none of
+            // them placed: the member it keeps stays as it is (if its own
+            // constraints hold), so the others come to it (fuzz s8: the
+            // dimensioned circle of a concentric pair moves onto the other).
+            let own_hold = |u: EntityId| cons.iter().filter(|(_, us)| us.as_slice() == [u]).all(|(c, _)| holds[c]);
+            let keep = cons.iter().filter(|(c, us)| us.len() >= 2 && !holds[c] && !us.iter().any(|x| placed.contains(x))).find_map(|(_, us)| {
+                let k = self.kept_first(us, cons);
+                own_hold(k).then_some(k)
+            });
+            if let Some(k) = keep {
+                placed.insert(k);
+                continue;
+            }
             let u = if best.0 > 0 {
                 let tied: Vec<EntityId> = open.iter().copied().filter(|u| (pending(*u), total(*u)) == best).collect();
                 self.kept_first(&tied, cons)
-            } else if let Some(keep) = {
-                // A relation that doesn't hold, nothing of it placed: the
-                // member it keeps stays as it is (its own constraints hold).
-                let broken: Vec<EntityId> = open.iter().copied().filter(|u| cons.iter().any(|(c, us)| us.contains(u) && !holds[c] && !us.iter().any(|x| placed.contains(x)))).collect();
-                (!broken.is_empty()).then(|| self.kept_first(&broken, cons))
-            } {
-                placed.insert(keep);
-                continue;
             } else {
                 let broken: Vec<EntityId> = open.iter().copied().filter(|u| cons.iter().any(|(c, us)| us.contains(u) && !holds[c])).collect();
                 if broken.is_empty() {
@@ -166,8 +192,12 @@ impl Sketch {
                 self.kept_first(&broken, cons)
             };
             self.carry_onto_placed(u, &placed, unit_of);
-            // Neighbours hanging on u alone follow it; the others are held.
-            let neighbours: BTreeSet<EntityId> = cons.iter().filter(|(_, us)| us.contains(&u)).flat_map(|(_, us)| us.iter().copied()).filter(|x| *x != u && !placed.contains(x)).collect();
+            // Neighbours joined to u (a shared point, a tangency) hanging on
+            // u alone follow it; the others are held. Relations to unplaced
+            // units (Equal, Parallel, …) wait for those units (fuzz s10: an
+            // Equal to the next line didn't hold the line being dimensioned;
+            // that line follows the Equal when its turn comes).
+            let neighbours: BTreeSet<EntityId> = cons.iter().filter(|(c, us)| us.contains(&u) && self.connective(*c)).flat_map(|(_, us)| us.iter().copied()).filter(|x| *x != u && !placed.contains(x)).collect();
             let held: BTreeSet<EntityId> = neighbours.iter().copied().filter(|v| cons.iter().any(|(_, us)| us.contains(v) && !us.contains(&u))).collect();
             let anchor = self.anchor(u);
             let mut done = None;
@@ -178,8 +208,8 @@ impl Sketch {
                 }
                 let mut with = fixed.clone();
                 with.insert(u);
-                let keep = |us: &[EntityId]| us.contains(&u) && us.iter().all(|x| with.contains(x));
-                let Some(mut sub) = self.sub_sketch(comp, cons, &keep, &fixed) else { return false };
+                let keep = |c: crate::ids::ConstraintId, us: &[EntityId]| us.contains(&u) && us.iter().all(|x| with.contains(x)) && (us.iter().all(|x| *x == u || placed.contains(x)) || self.connective(c));
+                let Some(mut sub) = self.sub_sketch_by(cons, &keep, &fixed) else { return false };
                 if keep_size && !self.hold_size(&mut sub, u) {
                     continue;
                 }
@@ -267,6 +297,13 @@ impl Sketch {
                 }
             };
             let (a, b) = (us[0], us[1]);
+            // Structure first: the member with more of its points tied to
+            // other geometry stays (fuzz s1: a rectangle's side kept, the lone
+            // line with a free end lengthened to it).
+            let (ta, tb) = (self.tied_points(a, cons), self.tied_points(b, cons));
+            if ta != tb {
+                return if ta > tb { a } else { b };
+            }
             let (ka, kb) = (key(a), key(b));
             if ka.is_finite() && kb.is_finite() && ka != kb {
                 return if ka < kb { a } else { b };
@@ -282,17 +319,40 @@ impl Sketch {
         best
     }
 
+    /// How many of `u`'s points a joining constraint ties to other units
+    /// (a shared point, a concentric center, a point on a curve).
+    fn tied_points(&self, u: EntityId, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)]) -> usize {
+        let Some(e) = self.entity(u) else { return 0 };
+        let own: Vec<EntityId> = e.point_refs().into_iter().collect();
+        let center = e.center();
+        let mut tied: BTreeSet<EntityId> = BTreeSet::new();
+        for (c, us) in cons {
+            if us.len() < 2 || !us.contains(&u) || !self.connective(*c) {
+                continue;
+            }
+            let Some(k) = self.constraint(*c).map(|c| c.kind.clone()) else { continue };
+            if matches!(k, ConstraintKind::Concentric { .. }) {
+                tied.extend(center);
+                continue;
+            }
+            tied.extend(k.entities().into_iter().filter(|x| own.contains(x)));
+        }
+        tied.len()
+    }
+
     /// A unit's point kept when it alone takes a change: its lowest point
     /// (smaller x, then y); a circle's or arc's center.
     fn anchor(&self, u: EntityId) -> Option<EntityId> {
         match &self.entity(u)?.geometry {
             Geometry::Point { .. } => Some(u),
             Geometry::Circle { center, .. } | Geometry::Arc { center, .. } => Some(*center),
-            Geometry::Line { start, end } => {
-                let (a, b) = (self.point(*start)?, self.point(*end)?);
-                Some(if (a.x, a.y) <= (b.x, b.y) { *start } else { *end })
+            // A line, a conic, a spline: its lowest defining point (live
+            // fuzz s116: a conic closed by a dimensioned line kept its start).
+            g => {
+                let _ = g;
+                let e = self.entity(u)?;
+                e.point_refs().into_iter().filter_map(|p| self.point(p).map(|q| (p, q))).min_by(|a, b| (a.1.x, a.1.y).partial_cmp(&(b.1.x, b.1.y)).unwrap_or(std::cmp::Ordering::Equal)).map(|(p, _)| p)
             }
-            _ => None,
         }
     }
 
