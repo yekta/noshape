@@ -688,7 +688,7 @@ fn write_batch() {
 }
 
 /// The batches: (number, first seed, rich).
-const BATCHES: [(usize, u64, bool); 4] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true)];
+const BATCHES: [(usize, u64, bool); 5] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true)];
 
 /// Cases in batch `n` (batch 3 on: 40, where positions match least).
 fn batch_size(n: usize) -> usize {
