@@ -697,8 +697,77 @@ fn probes() -> Vec<(String, Case)> {
     out
 }
 
-fn probe_batch() -> Value {
-    let cases: Vec<Value> = probes().into_iter().map(|(name, mut c)| {
+/// Second probes: structure (a line keeps its start, dangling geometry
+/// moves) against position (values at zero kept, smaller kept): the first
+/// probes' cases away from the origin, drawn the other way, created in the
+/// other order.
+fn probes2() -> Vec<(String, Case)> {
+    let v = DVec2::new;
+    let mut out = Vec::new();
+    let mut add = |name: &str, f: &dyn Fn(&mut Case)| {
+        let mut c = Case::new();
+        f(&mut c);
+        out.push((name.to_string(), c));
+    };
+    add("q1 lone line far from the origin (100,50)->(120,50), length 15", &|c| {
+        let l = c.line(v(100.0, 50.0), v(120.0, 50.0));
+        c.length(&l, 15.0);
+    });
+    add("q2 lone line drawn right to left (20,0)->(0,0), length 15", &|c| {
+        let l = c.line(v(20.0, 0.0), v(0.0, 0.0));
+        c.length(&l, 15.0);
+    });
+    add("q3 lone line (-20,0)->(0,0), length 15", &|c| {
+        let l = c.line(v(-20.0, 0.0), v(0.0, 0.0));
+        c.length(&l, 15.0);
+    });
+    add("q4 L far from the origin, first line 20 -> 15", &|c| {
+        let a = c.line(v(100.0, 50.0), v(120.0, 50.0));
+        let b = c.line(v(120.0, 50.0), v(120.0, 60.0));
+        c.coincident(&format!("{a}.end"), &format!("{b}.start"));
+        c.length(&a, 15.0);
+    });
+    add("q5 equal, the 10 mm line created first", &|c| {
+        let a = c.line(v(0.0, 5.0), v(10.0, 5.0));
+        let b = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        c.pair("EQUAL", &a, &b);
+    });
+    add("q6 equal far from the origin (20 long first)", &|c| {
+        let a = c.line(v(100.0, 50.0), v(120.0, 50.0));
+        let b = c.line(v(100.0, 55.0), v(110.0, 55.0));
+        c.pair("EQUAL", &a, &b);
+    });
+    add("q7 parallel, the tilted line created first", &|c| {
+        let a = c.line(v(0.0, 5.0), v(20.0, 7.0));
+        let b = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        c.pair("PARALLEL", &a, &b);
+    });
+    add("q8 parallel, both tilted (5° first, 10° second)", &|c| {
+        let a = c.line(v(0.0, 0.0), v(20.0, 20.0 * 5f64.to_radians().tan()));
+        let b = c.line(v(0.0, 10.0), v(20.0, 10.0 + 20.0 * 10f64.to_radians().tan()));
+        c.pair("PARALLEL", &a, &b);
+    });
+    add("q9 concentric far from the origin, (101,51) r10 then (100,50) r4", &|c| {
+        let a = c.circle(v(101.0, 51.0), 10.0);
+        let b = c.circle(v(100.0, 50.0), 4.0);
+        c.pair("CONCENTRIC", &a, &b);
+    });
+    add("q10 rectangle away from the origin (100,50) 20 x 10, width -> 25", &|c| {
+        let p = [v(100.0, 50.0), v(120.0, 50.0), v(120.0, 60.0), v(100.0, 60.0)];
+        let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+        for i in 0..4 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+        }
+        for (i, x) in l.iter().enumerate() {
+            c.hv(i % 2 == 0, x);
+        }
+        c.length(&l[0], 25.0);
+    });
+    out
+}
+
+fn probe_batch(list: Vec<(String, Case)>) -> Value {
+    let cases: Vec<Value> = list.into_iter().map(|(name, mut c)| {
         let ours = ours(&mut c);
         let id = name.split(' ').next().unwrap().to_string();
         json!({"case": id, "what": name, "constraints": c.spec, "onshape": {"entities": c.os_entities, "constraints": c.os_constraints}, "ours": ours})
@@ -706,28 +775,30 @@ fn probe_batch() -> Value {
     json!({"units": "mm (Onshape JSON: metres, radians)", "plane": "Top", "cases": cases})
 }
 
-/// The least-change probes (`sketch-probe-1.json`, live's answers in
-/// `sketch-probe-1.live.json`); written with LIVE_FUZZ_WRITE=probe-1.
+/// The least-change probes (`sketch-probe-N.json`, live's answers in
+/// `sketch-probe-N.live.json`); written with LIVE_FUZZ_WRITE=probe-N.
 #[test]
 #[ignore = "T2: live fuzz least-change probes"]
 fn probe_matches() {
-    let b = probe_batch();
-    let path = fixture("sketch-probe-1.json");
-    if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == "probe-1") {
-        std::fs::write(&path, serde_json::to_string_pretty(&b).unwrap()).unwrap();
-    }
-    let Ok(live) = std::fs::read_to_string(fixture("sketch-probe-1.live.json")) else { return };
-    let live: Value = serde_json::from_str(&live).unwrap();
-    let (mut n, mut ok) = (0, 0);
-    for case in b["cases"].as_array().unwrap() {
-        let Some(l) = live["cases"].get(case["case"].as_str().unwrap()) else { continue };
-        n += 1;
-        let d = differences(case, l);
-        if d.is_empty() {
-            ok += 1;
-        } else {
-            println!("  {} ({}): {}", case["case"], case["what"], d.join("; "));
+    for (n, list) in [(1, probes()), (2, probes2())] {
+        let b = probe_batch(list);
+        let path = fixture(&format!("sketch-probe-{n}.json"));
+        if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == format!("probe-{n}")) {
+            std::fs::write(&path, serde_json::to_string_pretty(&b).unwrap()).unwrap();
         }
+        let Ok(live) = std::fs::read_to_string(fixture(&format!("sketch-probe-{n}.live.json"))) else { continue };
+        let live: Value = serde_json::from_str(&live).unwrap();
+        let (mut total, mut ok) = (0, 0);
+        for case in b["cases"].as_array().unwrap() {
+            let Some(l) = live["cases"].get(case["case"].as_str().unwrap()) else { continue };
+            total += 1;
+            let d = differences(case, l);
+            if d.is_empty() {
+                ok += 1;
+            } else {
+                println!("  {} ({}): {}", case["case"], case["what"], d.join("; "));
+            }
+        }
+        println!("live probes {n}: {total} answered, {ok} match");
     }
-    println!("live probes: {n} answered, {ok} match");
 }
