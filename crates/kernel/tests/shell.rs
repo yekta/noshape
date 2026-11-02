@@ -1162,3 +1162,35 @@ fn shell_corpus_probe() {
         }
     });
 }
+
+/// One corpus case (SHELL_CASE=<dir>/<case>) as STEP (SHELL_EXPORT=<file>, millimetres) with its removed faces and
+/// both Shells (with and without the opening clip), for asking live.
+#[test]
+#[ignore = "T2: corpus probe"]
+fn shell_corpus_case_probe() {
+    let Some(case) = std::env::var_os("SHELL_CASE") else { return };
+    let case = std::path::PathBuf::from(case);
+    let spec = std::fs::read_to_string(case.with_extension("txt")).unwrap();
+    let solid = read_brep(&case.with_extension("brep")).unwrap();
+    let faces = solid.faces();
+    let rm: Vec<Shape> = spec.lines().filter_map(|l| l.strip_prefix("face ")).filter_map(|n| n.trim().parse::<usize>().ok()).filter_map(|n| faces.get(n - 1).cloned()).collect();
+    let head = spec.lines().find(|l| l.starts_with("shell ")).unwrap();
+    let t: f64 = head.split_whitespace().nth(2).unwrap().parse().unwrap();
+    println!("solid {:.6} mm3, {} faces, thickness {} mm", vol(&solid) * 1e9, faces.len(), t * 1e3);
+    for f in &rm {
+        let c = f.centroid().unwrap();
+        println!("removed: centre {:?} mm, normal {:?}, area {:.6} mm2", c * 1e3, f.normal_at_point(c).ok(), f.area().unwrap() * 1e6);
+    }
+    if let Some(out) = std::env::var_os("SHELL_EXPORT") {
+        write_step(std::path::Path::new(&out), &[ExportShape { shape: solid.clone(), name: Some("case".into()), color: None }], LengthUnit::Meter).unwrap();
+    }
+    for clip in [true, false] {
+        // SAFETY: the probe runs alone (T2, one test).
+        unsafe {
+            if clip { std::env::remove_var("NOSHAPE_SHELL_NO_OPENING_CLIP") } else { std::env::set_var("NOSHAPE_SHELL_NO_OPENING_CLIP", "1") }
+        }
+        let t0 = std::time::Instant::now();
+        let r = shell_solid(&solid, &rm, t, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+        println!("clip {clip}: {:.6} mm3, {} faces, {:.0} ms", vol(&r) * 1e9, r.count(ShapeType::Face), t0.elapsed().as_secs_f64() * 1e3);
+    }
+}
