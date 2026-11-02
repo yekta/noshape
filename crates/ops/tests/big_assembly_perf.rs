@@ -30,6 +30,10 @@ struct Case {
     subs: usize,
     bolts: usize,
     pattern: u32,
+    /// The stack pins' redundant Parallels (to the base and to the pin
+    /// below) besides their Planar. Live refuses them ("Mate overdefines
+    /// the assembly.", live 1741): its A200 has the Planar alone.
+    redundant: bool,
 }
 
 /// What [`build`] made.
@@ -61,9 +65,11 @@ fn build(case: Case) -> Built {
             for k in 1..case.height {
                 let p = pin_at(asm, &seed, DVec3::new(x + 0.3 * k as f64, y + 0.2 * k as f64, 10.0 * k as f64), false);
                 mate(asm, &template, MateType::Planar, p, below);
-                mate(asm, &template, MateType::Parallel, p, base);
-                if k >= 2 {
-                    mate(asm, &template, MateType::Parallel, p, below);
+                if case.redundant {
+                    mate(asm, &template, MateType::Parallel, p, base);
+                    if k >= 2 {
+                        mate(asm, &template, MateType::Parallel, p, below);
+                    }
                 }
                 below = p;
             }
@@ -207,13 +213,22 @@ fn run(case: Case) {
     println!("  insert a pin: {:.1} ms (median of 3)", ms(insert));
 }
 
-const A200: Case = Case { name: "a200", stacks: 8, height: 15, subs: 20, bolts: 30, pattern: 6 };
-const A1000: Case = Case { name: "a1000", stacks: 40, height: 20, subs: 60, bolts: 80, pattern: 10 };
+const A200: Case = Case { name: "a200", stacks: 8, height: 15, subs: 20, bolts: 30, pattern: 6, redundant: true };
+const A1000: Case = Case { name: "a1000", stacks: 40, height: 20, subs: 60, bolts: 80, pattern: 10, redundant: true };
+/// Live's A200 as built (live 1741): the Planar alone on each stack pin, the
+/// pattern of 7 instances (the seed and 6).
+const A200_LIVE: Case = Case { name: "a200-live", stacks: 8, height: 15, subs: 20, bolts: 30, pattern: 7, redundant: false };
 
 #[test]
 #[ignore]
 fn big_assembly_200() {
     run(A200);
+}
+
+#[test]
+#[ignore]
+fn big_assembly_200_as_live() {
+    run(A200_LIVE);
 }
 
 #[test]
