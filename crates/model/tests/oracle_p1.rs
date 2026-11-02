@@ -1736,3 +1736,88 @@ fn audit_feature_results() {
     }
     assert!(report.is_empty(), "differences from live:\n{report}");
 }
+
+/// Live 1686: mixed-radius vertex blends (verticals filleted, then the top loop by tangent propagation from its
+/// edges): ours against live's volume, area and faces, timed. (a) 45 x 20 x 10, R2 then R4; (b) R4 then R2; (d)
+/// 40 x 20 x 12, R3 then R8.
+#[test]
+#[ignore = "T2: oracle probe"]
+fn mixed_radius_corners_probe() {
+    for (name, (w, d, h), r1, r2, live) in [("a", (45.0, 20.0, 10.0), 2.0, 4.0, (8548.563923114056, 2832.511965362249, 18)), ("b", (45.0, 20.0, 10.0), 4.0, 2.0, (8759.36625936351, 2896.381021786417, 18)), ("d", (40.0, 20.0, 12.0), 3.0, 8.0, (8077.548981670606, 2531.71152260531, 18))] {
+        let mut s = Studio::new();
+        let reg = s.sketch(top(), |sk| rect(sk, (0.0, 0.0), (w, d)));
+        s.add("extrude", |p| {
+            p.set("entities", ParamValue::Query(vec![reg[0].clone()]));
+            p.set("depth", mm(h));
+        });
+        let r = s.regen();
+        let verticals = [DVec3::new(0.0, 0.0, h / 2.0), DVec3::new(w, 0.0, h / 2.0), DVec3::new(w, d, h / 2.0), DVec3::new(0.0, d, h / 2.0)];
+        s.add("fillet", |p| {
+            p.set("entities", edges(&r, &verticals));
+            p.set("radius", mm(r1));
+        });
+        let r = s.regen();
+        let tops = [DVec3::new(w / 2.0, 0.0, h), DVec3::new(w / 2.0, d, h), DVec3::new(0.0, d / 2.0, h), DVec3::new(w, d / 2.0, h)];
+        s.add("fillet", |p| {
+            p.set("entities", edges(&r, &tops));
+            p.set("radius", mm(r2));
+        });
+        let t0 = std::time::Instant::now();
+        let r = s.regen();
+        let ms = t0.elapsed().as_secs_f64() * 1e3;
+        let st = r.display.features.last().unwrap();
+        let b = &r.context.bodies[0];
+        println!("({name}) {:?} {:?}: {:.6} mm3 (live {:.6}), {:.6} mm2 (live {:.6}), {} faces (live {}), {ms:.0} ms", st.status, st.message, b.shape.volume().unwrap() * 1e9, live.0, b.shape.area().unwrap() * 1e6, live.1, b.shape.count(noshape_kernel::ShapeType::Face), live.2);
+    }
+}
+
+/// Live 1686 (c): the 60 x 40 x 20 block's sides drafted 5° (neutral plane the bottom, narrowing upward), the slanted
+/// edges R3, then the top loop R2.
+#[test]
+#[ignore = "T2: oracle probe"]
+fn mixed_radius_drafted_corners_probe() {
+    let mut s = Studio::block();
+    let r = s.regen();
+    s.add("draft", |p| {
+        p.set("neutralPlane", q(face_at(&r, BOTTOM)));
+        p.set("draftFaces", ParamValue::Query(SIDES.iter().map(|x| face_at(&r, *x)).collect()));
+        p.set("angle", deg(5.0));
+        p.set("pullDirection", ParamValue::Bool(std::env::var_os("PULL").is_some()));
+    });
+    let r = s.regen();
+    let (k, k2) = (10.0 * 5f64.to_radians().tan(), 20.0 * 5f64.to_radians().tan());
+    let slanted = [DVec3::new(k, k, 10.0), DVec3::new(60.0 - k, k, 10.0), DVec3::new(60.0 - k, 40.0 - k, 10.0), DVec3::new(k, 40.0 - k, 10.0)];
+    s.add("fillet", |p| {
+        p.set("entities", edges(&r, &slanted));
+        p.set("radius", mm(3.0));
+    });
+    let r = s.regen();
+    {
+        let b = &r.context.bodies[0];
+        let top = b.shape.faces().into_iter().find(|f| f.bounding_box(true).is_ok_and(|x| x.min.z > 0.0199)).unwrap();
+        println!("after fillet 1: {} faces, the top face's edges {}", b.shape.count(noshape_kernel::ShapeType::Face), top.edges().len());
+        for f in b.shape.faces() {
+            let bb = f.bounding_box(true).unwrap();
+            if bb.min.x * 1e3 > 50.0 && bb.min.y * 1e3 > 30.0 {
+                println!("  fillet 1 corner: {} {} edges", format!("{:?}", f.face_surface().ok()).chars().take(30).collect::<String>(), f.edges().len());
+            }
+        }
+    }
+    let tops = [DVec3::new(30.0, k2, 20.0), DVec3::new(30.0, 40.0 - k2, 20.0), DVec3::new(k2, 20.0, 20.0), DVec3::new(60.0 - k2, 20.0, 20.0)];
+    s.add("fillet", |p| {
+        p.set("entities", edges(&r, &tops));
+        p.set("radius", mm(2.0));
+    });
+    let t0 = std::time::Instant::now();
+    let r = s.regen();
+    let ms = t0.elapsed().as_secs_f64() * 1e3;
+    let st = r.display.features.last().unwrap();
+    let b = &r.context.bodies[0];
+    println!("(c) {:?} {:?}: {:.6} mm3 (live 44304.933893), {:.6} mm2 (live 8092.652480), {} faces (live 18), {ms:.0} ms", st.status, st.message, b.shape.volume().unwrap() * 1e9, b.shape.area().unwrap() * 1e6, b.shape.count(noshape_kernel::ShapeType::Face));
+    for f in b.shape.faces() {
+        let bb = f.bounding_box(true).unwrap();
+        if bb.min.x * 1e3 > 50.0 && bb.min.y * 1e3 > 30.0 {
+            println!("  {} area {:.6} box {:?} .. {:?}", format!("{:?}", f.face_surface().ok()).chars().take(40).collect::<String>(), f.area().unwrap() * 1e6, bb.min * 1e3, bb.max * 1e3);
+        }
+    }
+}
