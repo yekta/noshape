@@ -1483,6 +1483,11 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
+- (11-02 23:50) For bool (speed, SHELL-HANG-5): shell-hang Shell 5's slab pocket fuses 77 slabs (kernel T2
+  `shell::shellhang_shell5_probe`, NOSHAPE_SHELL_DEBUG=1): noshape's Boolean works 5.8 s on it, then declines "no point
+  inside a face piece" and OCCT fuses it in 4.8 s (serial); the following cut (solid - union) declines "a tolerant
+  input" (OCCT 1.0 s). Shell 5 takes 13 s by slabs, live 0.3 s: taking that fuse, or declining it at once, is most of
+  the gap.
 - (11-02 15:05) OCCT patch 0018 (P1 NF-CHAMFER-HANG-1212: a Chamfer's validity check looped forever in TKBRep's wire
   explorer): please let the sync carry /root/occt/lib/libTKBRep.a to vibe3 / vibe4 / vibe5 (/opt/occt); the old one is
   /root/core-scratch/libTKBRep.a.pre0018 (same 111 members, only BRepTools_WireExplorer.o differs). Nothing else

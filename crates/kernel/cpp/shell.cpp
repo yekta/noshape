@@ -4424,9 +4424,14 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
       boxes.push_back(b);
     }
     std::vector<bool> used(all.size(), false);
-    Bnd_Box           reach;
-    for (const TopoDS_Shape& g : removed)
-      BRepBndLib::Add(g, reach);
+    Bnd_Box              reach;
+    std::vector<Bnd_Box> removed_boxes(removed.size());
+    for (size_t k = 0; k < removed.size(); ++k)
+    {
+      BRepBndLib::Add(removed[k], reach);
+      BRepBndLib::Add(removed[k], removed_boxes[k]);
+      removed_boxes[k].Enlarge(1e-6 * (1 + t));
+    }
     reach.Enlarge(t);
     ShapeList open;
     for (int round = 0; round < 20; ++round)
@@ -4472,11 +4477,23 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
         // (Slivers between slabs, a hundredth of a wall's cube, are no regions: 0.06 mm³ ones on Shell 5 at 3 mm.)
         if (volume_of(e.Current()) < 1e-2 * t * t * t)
           continue;
+        // Open: a piece of a removed face bounds it (a point inside one of its faces lies on one); a region meeting
+        // a removed face only along an edge or at a vertex stays solid (shell-hang Shell 5's 18 mm³ corner, live).
         bool touches = every;
-        for (const TopoDS_Shape& g : removed)
+        for (TopExp_Explorer ff(e.Current(), TopAbs_FACE); ff.More() && !touches; ff.Next())
         {
-          BRepExtrema_DistShapeShape dd(e.Current(), g);
-          touches = touches || (dd.IsDone() && dd.Value() < 1e-7 * (1 + t));
+          gp_Pnt p;
+          gp_Dir n;
+          if (!inner_point(TopoDS::Face(ff.Current()), p, n))
+            continue;
+          const TopoDS_Vertex v = BRepBuilderAPI_MakeVertex(p).Vertex();
+          for (size_t k = 0; k < removed.size() && !touches; ++k)
+          {
+            if (removed_boxes[k].IsOut(p))
+              continue;
+            BRepExtrema_DistShapeShape dd(v, removed[k]);
+            touches = dd.IsDone() && dd.Value() < 1e-7 * (1 + t);
+          }
         }
         if (dbg)
           std::fprintf(stderr, "slabs: pocket region %.6g, %s\n", volume_of(e.Current()), touches ? "open" : "closed");

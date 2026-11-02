@@ -303,7 +303,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   removed face's own plane past its edges (live's new face in that plane over the face beside it): a kept face meeting
   a removed planar face at a concave edge loses its wall a wall's depth behind the opening and a wall past their shared
   edge. Left (51 / 20 mm³): live extends the holes' cylinder walls up into the pocket (slabs end with their faces), an
-  18 mm³ corner below the opening's end that live keeps, 76 faces to live's 52, live's 0.3 s.
+  18 mm³ corner below the opening's end that live keeps, 76 faces to live's 52, live's 0.3 s. 11-03 00:10: the 18 mm³
+  corner kept as live (a pocket region is open only when a piece of a removed face bounds it, not when it meets one
+  along an edge): 175027.28 (live - ours 33.3, ours - live 20.5 mm³), 72 faces; the fuzz corpus unchanged (211 of
+  211). Left: live bounds the pocket's front strip by the opening's own plane up to the ceiling (one 380.97 mm² face,
+  z 15 -> 17), ours by the slabs' ends (small faces); the time: 12-18 s on vibe4, of it the 77-slab fuse ~11 s
+  (noshape's Boolean 5.8 s before declining "no point inside a face piece", then OCCT's serial 4.8 s; asked bool).
 - [x] verified bc7d7e9f (qa 11-02 23:20, qa-scratch/bin/fillg1.py, live 1805's FI2 on the green as CLI: Fill 1 Warning "Could not meet tangency constraints at highlighted points." as live, Part 1 11712 mm³ = live; the sheet 4302.286 mm² (live 4327.564, −0.6 %), z 20…42.615 (live 20…42.969: live's dome peaks 6.5 mm off centre at 42.964, its centre 42.615 = our symmetric peak)) (core 11-02 19:40, our own four-sided G1 Coons fill; three-edge fills still take OCCT's flat ConstrainedFilling) P2 FILL-G1-DOME (core 11-02, live 1739 FI2): a Fill G1 to a shelled box's outer side faces builds in live with the
   warning "Could not meet tangency constraints at highlighted points." (a dome to z 42.97, 4327.5641 mm²: the corners
   can't be tangent to two perpendicular walls); ours fails ("Cannot create fill surface…"): OCCT's plate throws for

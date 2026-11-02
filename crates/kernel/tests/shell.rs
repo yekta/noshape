@@ -1030,7 +1030,8 @@ fn shellhang_shell5_probe() {
             for f in r.shape.faces() {
                 let (c, a) = (f.centroid().unwrap(), surface_properties(&f).unwrap().mass);
                 if !inp.iter().any(|(c2, a2)| (c - *c2).length() < 1e-4 && (a - a2).abs() < 1e-4) {
-                    println!("NEW {} area {a:.4} centre ({:.3}, {:.3}, {:.3})", format!("{:?}", f.face_surface().ok()).chars().take(9).collect::<String>(), c.x, c.y, c.z);
+                    let b = f.bounding_box(true).unwrap();
+                    println!("NEW {} area {a:.4} centre ({:.3}, {:.3}, {:.3}) normal {:.4?} box {:.3?} .. {:.3?}", format!("{:?}", f.face_surface().ok()).chars().take(9).collect::<String>(), c.x, c.y, c.z, f.normal_at_point(c).ok(), b.min, b.max);
                 }
             }
             for d in [cut(&r.shape, &live).unwrap().shape, cut(&live, &r.shape).unwrap().shape] {
