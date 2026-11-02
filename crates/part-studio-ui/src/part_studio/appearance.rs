@@ -225,17 +225,32 @@ impl PartStudioView {
         let hex = cx.new(|cx| InputState::new(window, cx).default_value(hex_field(rgb)));
         let channels = [0, 1, 2].map(|i| cx.new(|cx| InputState::new(window, cx).default_value(rgb[i].to_string())));
         let alpha = cx.new(|cx| InputState::new(window, cx).default_value(noshape_units::to_fixed(f64::from(1.0 - transparency), 2)));
-        let mut subs = vec![cx.subscribe_in(&hex, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
-            if matches!(ev, InputEvent::Change | InputEvent::PressEnter { .. })
-                && let Some(rgb) = parse_hex(&st.read(cx).value())
-            {
+        // Live (behaviours "Appearance editor R / G / B / A / hex"): keystroke-filtered colour fields, rewritten as
+        // typed (the filter below), not expression fields.
+        let refilter = |st: &Entity<InputState>, filter: fn(&str) -> String, window: &mut Window, cx: &mut App| -> String {
+            let text = st.read(cx).value().to_string();
+            let kept = filter(&text);
+            if kept != text {
+                st.update(cx, |s, cx| s.set_value(kept.clone(), window, cx));
+            }
+            kept
+        };
+        let mut subs = vec![cx.subscribe_in(&hex, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
+            if !matches!(ev, InputEvent::Change | InputEvent::PressEnter { .. }) {
+                return;
+            }
+            let text = refilter(st, hex_input, window, cx);
+            if let Some(rgb) = parse_hex(&text).filter(|_| text.len() == 6) {
                 this.set_edit_color_from(rgb, Some(ColorField::Hex), window, cx);
             }
         })];
         for (i, ch) in channels.iter().enumerate() {
             subs.push(cx.subscribe_in(ch, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
-                if matches!(ev, InputEvent::Change | InputEvent::PressEnter { .. })
-                    && let Ok(v) = st.read(cx).value().trim().parse::<u8>()
+                if !matches!(ev, InputEvent::Change | InputEvent::PressEnter { .. }) {
+                    return;
+                }
+                let text = refilter(st, channel_input, window, cx);
+                if let Ok(v) = text.parse::<u8>()
                     && let Some(mut rgb) = this.ui.appearance_edit.as_ref().map(|e| e.rgb)
                 {
                     rgb[i] = v;
@@ -243,9 +258,12 @@ impl PartStudioView {
                 }
             }));
         }
-        subs.push(cx.subscribe_in(&alpha, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
-            if matches!(ev, InputEvent::Change | InputEvent::PressEnter { .. })
-                && let Ok(v) = st.read(cx).value().trim().parse::<f32>()
+        subs.push(cx.subscribe_in(&alpha, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
+            if !matches!(ev, InputEvent::Change | InputEvent::PressEnter { .. }) {
+                return;
+            }
+            let text = refilter(st, alpha_input, window, cx);
+            if let Ok(v) = text.parse::<f32>()
                 && let Some(e) = &mut this.ui.appearance_edit
             {
                 e.transparency = 1.0 - v.clamp(0.0, 1.0);
@@ -926,6 +944,31 @@ fn rgb_u32(hex: u32) -> gpui_kit::Rgba {
     gpui_kit::rgb(hex)
 }
 
+/// The hex field as typed (live): hex digits only, no `#`, at most six, upper case once all six are there
+/// ("0000ff" → "0000FF"; "abc" stays "abc").
+fn hex_input(text: &str) -> String {
+    let kept: String = text.chars().filter(char::is_ascii_hexdigit).take(6).collect();
+    if kept.len() == 6 { kept.to_ascii_uppercase() } else { kept }
+}
+
+/// An R / G / B field as typed (live): digits only ("1 in" → "1", "12.7" → "127"), 255 at most ("300" → "255").
+fn channel_input(text: &str) -> String {
+    let kept: String = text.chars().filter(char::is_ascii_digit).collect();
+    match kept.parse::<u32>() {
+        Ok(v) if v > 255 => "255".into(),
+        _ => kept,
+    }
+}
+
+/// The A field as typed (live): digits and "." only, 0 to 1 ("5" → "1", "-1" → "1"; ".25" stays).
+fn alpha_input(text: &str) -> String {
+    let kept: String = text.chars().filter(|c| c.is_ascii_digit() || *c == '.').collect();
+    match kept.parse::<f64>() {
+        Ok(v) if v > 1.0 => "1".into(),
+        _ => kept,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -938,6 +981,18 @@ mod tests {
         assert_eq!(parse_hex("f80"), Some([255, 136, 0]));
         assert_eq!(parse_hex("nope"), None);
         assert_eq!(hex_field([1, 2, 255]), "0102FF");
+        // Typed as live filters them.
+        assert_eq!(super::hex_input("0000ff"), "0000FF");
+        assert_eq!(super::hex_input("#12345678"), "123456");
+        assert_eq!(super::hex_input("abc"), "abc");
+        assert_eq!(super::hex_input("xyz12"), "12");
+        assert_eq!(super::channel_input("300"), "255");
+        assert_eq!(super::channel_input("1 in"), "1");
+        assert_eq!(super::channel_input("12.7"), "127");
+        assert_eq!(super::channel_input("-5"), "5");
+        assert_eq!(super::alpha_input("5"), "1");
+        assert_eq!(super::alpha_input("-1"), "1");
+        assert_eq!(super::alpha_input(".25"), ".25");
         for c in [0u8, 17, 128, 200, 255] {
             assert_eq!(lin_to_srgb(srgb_to_lin(c)), c);
         }
