@@ -670,18 +670,21 @@ impl Sketch {
 
     /// Of `held`, the unit an arc or circle `u` keeps its shared end with
     /// (through a Coincident), and that point of u's: one with a dimension
-    /// of its own first, then the lower point (smaller y, then x). Live:
-    /// fuzz s223 keeps the end on the dimensioned line; s234 (both lines
-    /// dimensioned), probes 5 u1 / u3 and s215 (neither) the lower end.
+    /// of its own first, then one without a Horizontal / Vertical of its
+    /// own, then the lower point (smaller y, then x). Live: fuzz s223 keeps
+    /// the end on the dimensioned line; s303 / s307 / s377 a slot's free
+    /// top over its Horizontal bottom; s234 (both lines dimensioned), probes
+    /// 5 u1 / u3 and s215 (neither) the lower end.
     fn lower_shared(&self, u: EntityId, held: &BTreeSet<EntityId>) -> Option<(EntityId, EntityId)> {
         let own = self.entity(u)?.point_refs();
         let dimensioned = |v: EntityId| self.constraints().any(|c| c.driving && c.kind.is_dimension() && c.kind.entities().as_slice() == [v]);
+        let bound = |v: EntityId| self.constraints().any(|c| c.driving && matches!(c.kind, ConstraintKind::Horizontal { a, b: None } | ConstraintKind::Vertical { a, b: None } if a == v));
         own.iter()
             .flat_map(|p| self.coincident_with(*p).into_iter().map(move |q| (*p, q)))
             .filter_map(|(p, q)| held.iter().find(|v| self.entity(**v).is_some_and(|e| e.point_refs().contains(&q))).map(|v| (*v, p)))
-            .filter_map(|(v, p)| self.point(p).map(|x| (v, p, x, dimensioned(v))))
-            .min_by(|a, b| b.3.cmp(&a.3).then(if (a.2.y - b.2.y).abs() > 1e-9 { a.2.y.total_cmp(&b.2.y) } else { a.2.x.total_cmp(&b.2.x) }))
-            .map(|(v, p, _, _)| (v, p))
+            .filter_map(|(v, p)| self.point(p).map(|x| (v, p, x, dimensioned(v), bound(v))))
+            .min_by(|a, b| b.3.cmp(&a.3).then(a.4.cmp(&b.4)).then(if (a.2.y - b.2.y).abs() > 1e-9 { a.2.y.total_cmp(&b.2.y) } else { a.2.x.total_cmp(&b.2.x) }))
+            .map(|(v, p, _, _, _)| (v, p))
     }
 
     /// A free component whose one change is the distance between an arc's
@@ -867,9 +870,9 @@ impl Sketch {
             let own_length = |v: EntityId| cons.iter().any(|(c, us)| us.as_slice() == [v] && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Length { .. })));
             let alongside = |v: EntityId| !own_length(v) && hv(v).is_some_and(|k| resizing.iter().any(|w| *w != v && hv(*w) == Some(k)))
                 || cons.iter().any(|(c, us)| us.len() == 2 && us.contains(&v) && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Parallel { .. })) && us.iter().any(|w| *w != v && resizing.contains(w)));
-            // A Horizontal / Vertical line (fuzz s222: a slot's free top
-            // line isn't kept; its bottom is, as probes 5 u1 / u3).
-            let steady = |v: EntityId| hv(v).is_some() && cons.iter().filter(|(_, us)| us.contains(&v)).all(|(c, _)| holds[c]) && self.chained_size(v, cons).is_none() && !alongside(v);
+            // A Vertical line (fuzz s222: a slot's free top line isn't
+            // kept; s377: nor a slot's Horizontal bottom, its free top is).
+            let steady = |v: EntityId| hv(v) == Some(1) && cons.iter().filter(|(_, us)| us.contains(&v)).all(|(c, _)| holds[c]) && self.chained_size(v, cons).is_none() && !alongside(v);
             let lower = |v: EntityId| self.anchor(v).and_then(|p| self.point(p)).unwrap_or(DVec2::splat(f64::MAX));
             if let Some(a) = lp.iter().copied().filter(|v| steady(*v)).min_by(|a, b| {
                 let (p, q) = (lower(*a), lower(*b));
