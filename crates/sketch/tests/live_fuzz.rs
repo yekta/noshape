@@ -265,6 +265,24 @@ impl Case {
         let y = self.points.iter().find(|(n, _)| n == b).map(|p| p.1).unwrap_or_else(|| self.curve(b));
         self.con(ConstraintKind::Distance { a: x, b: y, value: mm * MM, mode: DistanceMode::Center }, "DISTANCE", vec![s("localFirst", a), s("localSecond", b), dir("MINIMUM"), q("length", mm)], json!({"first": a, "second": b, "mm": mm}));
     }
+    /// Makes a curve construction geometry.
+    fn construction(&mut self, c: &str) {
+        let x = self.curve(c);
+        self.sk.set_construction(x, true).unwrap();
+        if let Some(e) = self.os_entities.iter_mut().find(|e| e["entityId"] == c) {
+            e["isConstruction"] = json!(true);
+        }
+    }
+    /// Points `a` and `b` symmetric about the line `axis`.
+    fn symmetric(&mut self, a: &str, b: &str, axis: &str) {
+        let (x, y, z) = (self.point(a), self.point(b), self.curve(axis));
+        self.con(ConstraintKind::Symmetric { a: x, b: y, axis: z }, "SYMMETRIC", vec![s("localFirst", a), s("localSecond", b), s("localMirror", axis)], json!({"first": a, "second": b, "mirror": axis}));
+    }
+    /// Point `p` at the midpoint of line `l`.
+    fn midpoint(&mut self, p: &str, l: &str) {
+        let (x, y) = (self.point(p), self.curve(l));
+        self.con(ConstraintKind::Midpoint { point: x, curve: y }, "MIDPOINT", vec![s("localFirst", p), s("localSecond", l)], json!({"first": p, "second": l}));
+    }
     fn radius(&mut self, c: &str, mm: f64, diameter: bool) {
         let x = self.curve(c);
         let (kind, os, v) = if diameter { (ConstraintKind::Diameter { curve: x, value: 2.0 * mm * MM }, "DIAMETER", 2.0 * mm) } else { (ConstraintKind::Radius { curve: x, value: mm * MM }, "RADIUS", mm) };
@@ -297,8 +315,9 @@ fn everyday(seed: u64) -> Case {
         } else {
             1.0
         };
-        // (Batch 6 on, seed 381: three more kinds.)
-        match r.below(if seed >= 381 { 8 } else { 5 }) {
+        // (Batch 6 on, seed 381: three more kinds; batch 7 on, seed 421,
+        // three more.)
+        match r.below(if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
             // Corner rectangle (live's tool constraints), width and height.
             0 => {
                 let (w, h) = (r.range(15.0, 50.0), r.range(10.0, 35.0));
@@ -428,6 +447,66 @@ fn everyday(seed: u64) -> Case {
                 c.radius(&hole, rad * fs[2], true);
                 c.distance(&format!("{hole}.center"), &l[3], dx * fs[3]);
                 c.distance(&format!("{hole}.center"), &l[0], dy * fs[4]);
+            }
+            // Rectangle centred on a Vertical construction line: its bottom
+            // corners Symmetric about it; width and height.
+            8 => {
+                let (w, h) = (r.range(20.0, 50.0), r.range(12.0, 35.0));
+                let p = [o, o + v(w, 0.0), o + v(w, h), o + v(0.0, h)];
+                let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+                for i in 0..4 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+                    c.hv(i % 2 == 0, &l[i]);
+                }
+                let axis = c.line(o + v(w / 2.0, -6.0), o + v(w / 2.0, h + 6.0));
+                c.construction(&axis);
+                c.hv(false, &axis);
+                c.symmetric(&format!("{}.start", l[0]), &format!("{}.end", l[0]), &axis);
+                let (fw, fh) = (f(&mut r), f(&mut r));
+                c.length(&l[0], w * fw);
+                c.length(&l[1], h * fh);
+            }
+            // Triangle: a Horizontal base, its length, the left side's
+            // length and the angle between them.
+            9 => {
+                let (b, side, deg) = (r.range(25.0, 50.0), r.range(15.0, 35.0), r.range(35.0, 75.0));
+                let top = o + DVec2::from_angle(deg.to_radians()) * side;
+                let l1 = c.line(o, o + v(b, 0.0));
+                let l2 = c.line(o + v(b, 0.0), top);
+                // (The left side drawn up from the base's start: the angle
+                // from the base to it is the inner one, counter-clockwise.)
+                let l3 = c.line(o, top);
+                c.coincident(&format!("{l1}.end"), &format!("{l2}.start"));
+                c.coincident(&format!("{l2}.end"), &format!("{l3}.end"));
+                c.coincident(&format!("{l3}.start"), &format!("{l1}.start"));
+                c.hv(true, &l1);
+                let (fb, fs, fa) = (f(&mut r), f(&mut r), f(&mut r));
+                c.length(&l1, b * fb);
+                c.length(&l3, side * fs);
+                // (Between 25° and 85°.)
+                c.angle(&l1, &l3, (deg * fa).clamp(25.0, 85.0));
+            }
+            // Plate with a centred hole: an H / V rectangle, width and
+            // height, a hole at the midpoint of its construction diagonal.
+            10 => {
+                let (w, h) = (r.range(30.0, 50.0), r.range(20.0, 35.0));
+                let p = [o, o + v(w, 0.0), o + v(w, h), o + v(0.0, h)];
+                let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+                for i in 0..4 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+                    c.hv(i % 2 == 0, &l[i]);
+                }
+                let diag = c.line(o, o + v(w, h));
+                c.construction(&diag);
+                c.coincident(&format!("{diag}.start"), &format!("{}.start", l[0]));
+                c.coincident(&format!("{diag}.end"), &format!("{}.start", l[2]));
+                let rad = r.range(2.0, 6.0);
+                let hole = c.circle(o + v(w / 2.0, h / 2.0), rad);
+                c.midpoint(&format!("{hole}.center"), &diag);
+                let (fw, fh, fr) = (f(&mut r), f(&mut r), f(&mut r));
+                c.length(&l[0], w * fw);
+                c.length(&l[1], h * fh);
+                c.radius(&hole, rad * fr, true);
             }
             // D shape: a Horizontal chord and an arc over it, the chord's
             // length and the arc's radius.
@@ -736,7 +815,7 @@ fn write_batch() {
 }
 
 /// The batches: (number, first seed, rich).
-const BATCHES: [(usize, u64, bool); 6] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true)];
+const BATCHES: [(usize, u64, bool); 7] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true)];
 
 /// Cases in batch `n` (batch 3 on: 40, where positions match least).
 fn batch_size(n: usize) -> usize {
