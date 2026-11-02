@@ -12,7 +12,7 @@ pub fn ops() -> Vec<Op> {
         group: "export",
         verb: "parts",
         summary: "Export a Part Studio's parts or an Assembly to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino)",
-        description: "Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`; with `tab` an Assembly, its visible instances (or `parts`: instance ids or names) — STEP and Parasolid keep the assembly (the root product / ASSEMBLY, each part once, placed by its instances), the other formats get the placed parts. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine for mesh formats), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.",
+        description: "Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`; with `tab` an Assembly, its visible instances (or `parts`: instance ids or names) — STEP and Parasolid keep the assembly (the root product / ASSEMBLY, each part once, placed by its instances), the other formats get the placed parts. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine/custom for mesh formats; Custom's fields: STL `chordal_tolerance` mm / `angular_deviation` deg / `min_facet_width` mm, the other mesh formats `distance_tolerance` m / `angular_tolerance` deg / `max_chord_length` m), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.",
         fields: vec![
             doc_field(),
             tab_field(),
@@ -23,7 +23,13 @@ pub fn ops() -> Vec<Op> {
             opt("y_up", json!({ "type": "boolean" }), "Export models oriented Y axis up."),
             opt("version", s(), "Format version (e.g. \"AP214\", \"35.1\", \"7\")."),
             opt("units", json!({ "type": "string", "enum": UNITS.iter().map(|u| u.0).collect::<Vec<_>>() }), "File units (STL, OBJ...; STEP: custom units)."),
-            opt("resolution", json!({ "type": "string", "enum": ["Coarse", "Medium", "Fine"] }), "Mesh resolution (default Medium)."),
+            opt("resolution", json!({ "type": "string", "enum": ["Coarse", "Medium", "Fine", "Custom"] }), "Mesh resolution (default Medium); Custom takes the fields below."),
+            opt("chordal_tolerance", json!({ "type": "number", "exclusiveMinimum": 0 }), "Custom, STL: Chordal tolerance (mm)."),
+            opt("angular_deviation", json!({ "type": "number", "exclusiveMinimum": 0 }), "Custom, STL: Angular deviation (deg)."),
+            opt("min_facet_width", json!({ "type": "number", "minimum": 0 }), "Custom, STL: Minimum facet width (mm; kept, not applied by our mesher)."),
+            opt("distance_tolerance", json!({ "type": "number", "exclusiveMinimum": 0 }), "Custom, glTF / GLB / OBJ / 3MF: Distance tolerance (m)."),
+            opt("angular_tolerance", json!({ "type": "number", "exclusiveMinimum": 0 }), "Custom, glTF / GLB / OBJ / 3MF: Angular tolerance (deg)."),
+            opt("max_chord_length", json!({ "type": "number", "minimum": 0 }), "Custom, glTF / GLB / OBJ / 3MF: Maximum chord length (m; kept, not applied by our mesher)."),
             opt("stl_text", json!({ "type": "boolean" }), "STL as text instead of binary."),
             opt("individual", json!({ "type": "boolean" }), "Export unique parts as individual files (zipped)."),
             opt("include_hidden", json!({ "type": "boolean" }), "Include hidden parts."),
@@ -55,6 +61,15 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     s.hidden = a.bool_or("include_hidden", false)?;
     s.derived_tolerances = a.bool_or("derived_tolerances", false)?;
     s.mbd_text_height = a.bool_or("mbd_text_height", false)?;
+    let c = &mut s.custom;
+    for (k, v) in [("chordal_tolerance", &mut c.chordal_mm), ("angular_deviation", &mut c.angular_deg), ("min_facet_width", &mut c.min_facet_mm), ("distance_tolerance", &mut c.distance_m), ("angular_tolerance", &mut c.angular_tol_deg), ("max_chord_length", &mut c.max_chord_m)] {
+        if let Some(x) = a.opt_f64(k)? {
+            if !x.is_finite() || x < 0.0 {
+                return Err(OpError::param(k, "a positive number"));
+            }
+            *v = x;
+        }
+    }
     s.iges_compat = a.bool_or("iges_compatibility", false)?;
     s.pvz_group = a.bool_or("group_composites", false)?;
     s.compress = a.bool_or("compress", false)?;
@@ -69,7 +84,7 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         s.custom_units = true;
     }
     if let Some(r) = a.opt_str("resolution")? {
-        s.resolution = ["coarse", "medium", "fine"].iter().position(|x| x.eq_ignore_ascii_case(r)).ok_or_else(|| OpError::param("resolution", "Coarse, Medium or Fine"))?;
+        s.resolution = ["coarse", "medium", "fine", "custom"].iter().position(|x| x.eq_ignore_ascii_case(r)).ok_or_else(|| OpError::param("resolution", "Coarse, Medium, Fine or Custom"))?;
     }
     if let Some(v) = a.opt_str("version")? {
         let list: &[&str] = match format {

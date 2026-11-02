@@ -8,7 +8,7 @@
 
 use super::PartStudioView;
 use gpui_kit::component::{WindowExt as _, h_flex};
-use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_kernel as k;
@@ -127,6 +127,38 @@ pub fn open_export_modal(base: String, assembly: bool, run: RunExport, window: &
 pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, run: RunExport, window: &mut Window, cx: &mut App) {
     let file = cx.new(|cx| InputState::new(window, cx).default_value(base));
     let st = Rc::new(RefCell::new(ExportSettings::default()));
+    // Resolution › Custom's fields (live dom g39-export-ps-step: STL's three,
+    // the other tessellated formats' three), kept while the dialog is open.
+    type SetCustom = fn(&mut noshape_ops::export::CustomResolution, f64);
+    let c0 = noshape_ops::export::CustomResolution::default();
+    let fields: [(&'static str, &'static str, f64, SetCustom); 6] = [
+        ("ex-chordal", "Chordal tolerance (mm)", c0.chordal_mm, |c, v| c.chordal_mm = v),
+        ("ex-angdev", "Angular deviation (deg)", c0.angular_deg, |c, v| c.angular_deg = v),
+        ("ex-minfacet", "Minimum facet width (mm)", c0.min_facet_mm, |c, v| c.min_facet_mm = v),
+        ("ex-distance", "Distance tolerance (m)", c0.distance_m, |c, v| c.distance_m = v),
+        ("ex-angtol", "Angular tolerance (deg)", c0.angular_tol_deg, |c, v| c.angular_tol_deg = v),
+        ("ex-maxchord", "Maximum chord length (m)", c0.max_chord_m, |c, v| c.max_chord_m = v),
+    ];
+    let custom: Rc<Vec<(&'static str, &'static str, Entity<InputState>)>> = Rc::new(
+        fields
+            .iter()
+            .map(|&(id, label, v, set)| {
+                let input = cx.new(|cx| InputState::new(window, cx).default_value(noshape_model::drawing::format::format_number(v, None, 6)));
+                let st = st.clone();
+                cx.subscribe(&input, move |input, ev: &InputEvent, cx| {
+                    if matches!(ev, InputEvent::Change)
+                        && let Ok(v) = input.read(cx).value().trim().parse::<f64>()
+                        && v.is_finite()
+                        && v >= 0.0
+                    {
+                        set(&mut st.borrow_mut().custom, v);
+                    }
+                })
+                .detach();
+                (id, label, input)
+            })
+            .collect(),
+    );
     window.open_dialog(cx, move |dialog, _, cx| {
         let s = st.borrow().clone();
         let f = s.format;
@@ -138,6 +170,7 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
         enum Row {
             Select { id: &'static str, label: &'static str, opts: Vec<String>, cur: usize, disabled: bool, set: fn(&mut ExportSettings, usize) },
             Check { id: &'static str, label: &'static str, on: bool, set: fn(&mut ExportSettings, bool) },
+            Number { label: &'static str, input: Entity<InputState> },
         }
         let sel = |id, label, opts: &[&str], cur, disabled, set| Row::Select { id, label, opts: opts.iter().map(|o| o.to_string()).collect(), cur, disabled, set };
         let chk = |id, label, on, set| Row::Check { id, label, on, set };
@@ -190,6 +223,17 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
                 rows.push(sel("ex-res", "Resolution", &RESOLUTIONS, s.resolution, false, |s, i| s.resolution = i));
             }
             PartFormat::Acis | PartFormat::Jt => {}
+        }
+        // Resolution › Custom: its three fields under the list (STL's, else
+        // the tessellated formats').
+        if s.resolution == noshape_ops::export::CUSTOM_RESOLUTION
+            && let Some(at) = rows.iter().position(|r| matches!(r, Row::Select { id: "ex-res", .. }))
+        {
+            let stl = f == PartFormat::Stl || (f == PartFormat::Urdf && URDF_GEOMETRY[s.urdf_geometry.min(3)] == PartFormat::Stl);
+            let set = if stl { &custom[..3] } else { &custom[3..] };
+            for (k, (_, label, input)) in set.iter().enumerate() {
+                rows.insert(at + 1 + k, Row::Number { label, input: input.clone() });
+            }
         }
         rows.push(sel("ex-options", "Options", &OPTIONS, s.options, false, |s, i| s.options = i));
         if !parts_only {
@@ -248,6 +292,15 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
                                 // Live: "Version" is grayed out while "Use latest
                                 // version" is checked.
                                 .when(disabled, |d| d.child(div().absolute().inset_0().rounded(px(4.)).bg(gpui_kit::rgba(0x00000011)).occlude())),
+                        ),
+                    )
+                }
+                Row::Number { label, input } => {
+                    let mt = if prev_check { LABEL_MT - LABEL_AFTER_CHECK } else { LABEL_MT };
+                    prev_check = false;
+                    body.child(
+                        div().mt(px(mt)).child(crate::os_ui::field_label(label)).child(
+                            div().mt(px(FIELD_MT)).h(px(34.)).px(px(1.)).flex().items_center().border_1().border_color(gpui_kit::rgb(0xaaaaaa)).rounded(px(4.)).bg(pal.panel).child(Input::new(&input).appearance(false).text_size(px(14.))),
                         ),
                     )
                 }

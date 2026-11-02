@@ -1428,6 +1428,27 @@ fn import_every_format() {
     }
 }
 
+/// Export Resolution › Custom (audit X2): STL's chordal tolerance and
+/// angular deviation drive the mesh (a finer one has more triangles).
+#[test]
+fn export_custom_resolution_drives_the_mesh() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "export_custom.noshape");
+    let triangles = |ctx: &mut Ctx, name: &str, args: Value| {
+        let f = scratch(name);
+        let mut a = json!({ "format": "STL", "file": f.to_str().unwrap(), "resolution": "Custom" });
+        a.as_object_mut().unwrap().extend(args.as_object().unwrap().clone());
+        call(ctx, "export_parts", a);
+        let b = std::fs::read(&f).unwrap();
+        u32::from_le_bytes([b[80], b[81], b[82], b[83]])
+    };
+    let coarse = triangles(&mut ctx, "custom_coarse.stl", json!({ "chordal_tolerance": 1.0, "angular_deviation": 30 }));
+    let fine = triangles(&mut ctx, "custom_fine.stl", json!({ "chordal_tolerance": 0.005, "angular_deviation": 2 }));
+    assert!(fine > coarse * 2, "{fine} vs {coarse}");
+    let e = try_call(&mut ctx, "export_parts", json!({ "format": "STL", "file": scratch("bad.stl").to_str().unwrap(), "resolution": "Custom", "chordal_tolerance": -1 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("chordal_tolerance"), "{e:?}");
+}
+
 /// Import options: combine into one Part Studio, no file tabs, mesh units;
 /// and the errors name the file.
 #[test]

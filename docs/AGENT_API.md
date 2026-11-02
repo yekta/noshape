@@ -6298,7 +6298,7 @@ Examples:
 
 Export a Part Studio's parts or an Assembly to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino) (edits the document (one undoable history entry)).
 
-Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`; with `tab` an Assembly, its visible instances (or `parts`: instance ids or names) — STEP and Parasolid keep the assembly (the root product / ASSEMBLY, each part once, placed by its instances), the other formats get the placed parts. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine for mesh formats), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.
+Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`; with `tab` an Assembly, its visible instances (or `parts`: instance ids or names) — STEP and Parasolid keep the assembly (the root product / ASSEMBLY, each part once, placed by its instances), the other formats get the placed parts. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine/custom for mesh formats; Custom's fields: STL `chordal_tolerance` mm / `angular_deviation` deg / `min_facet_width` mm, the other mesh formats `distance_tolerance` m / `angular_tolerance` deg / `max_chord_length` m), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.
 
 Examples:
 
@@ -6319,7 +6319,13 @@ Examples:
 | `y_up` | boolean |  | Export models oriented Y axis up. |
 | `version` | string |  | Format version (e.g. "AP214", "35.1", "7"). |
 | `units` | one of `Centimeter`, `Foot`, `Inch`, `Meter`, `Millimeter`, `Yard` |  | File units (STL, OBJ...; STEP: custom units). |
-| `resolution` | one of `Coarse`, `Medium`, `Fine` |  | Mesh resolution (default Medium). |
+| `resolution` | one of `Coarse`, `Medium`, `Fine`, `Custom` |  | Mesh resolution (default Medium); Custom takes the fields below. |
+| `chordal_tolerance` | number |  | Custom, STL: Chordal tolerance (mm). |
+| `angular_deviation` | number |  | Custom, STL: Angular deviation (deg). |
+| `min_facet_width` | number |  | Custom, STL: Minimum facet width (mm; kept, not applied by our mesher). |
+| `distance_tolerance` | number |  | Custom, glTF / GLB / OBJ / 3MF: Distance tolerance (m). |
+| `angular_tolerance` | number |  | Custom, glTF / GLB / OBJ / 3MF: Angular tolerance (deg). |
+| `max_chord_length` | number |  | Custom, glTF / GLB / OBJ / 3MF: Maximum chord length (m; kept, not applied by our mesher). |
 | `stl_text` | boolean |  | STL as text instead of binary. |
 | `individual` | boolean |  | Export unique parts as individual files (zipped). |
 | `include_hidden` | boolean |  | Include hidden parts. |

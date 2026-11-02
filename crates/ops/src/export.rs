@@ -115,7 +115,35 @@ pub struct ExportSettings {
     /// Options: 0 Download, 1 Download and store file in a new tab, 2 Store
     /// file in a new tab (see [`store_file_tab`]).
     pub options: usize,
+    /// Resolution › Custom's fields (live dom g39-export-ps-step).
+    pub custom: CustomResolution,
 }
+
+/// Resolution › Custom (live dom g39-export-ps-step.html): STL's Chordal
+/// tolerance (mm) · Angular deviation (deg) · Minimum facet width (mm); the
+/// other tessellated formats' Distance tolerance (m) · Angular tolerance
+/// (deg) · Maximum chord length (m). Defaults are a reading of Onshape's
+/// help (pending live request 18:13 for the dialog's own). Our mesher takes
+/// the tolerance and the angle; the facet width and chord length limits are
+/// kept but not applied.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CustomResolution {
+    pub chordal_mm: f64,
+    pub angular_deg: f64,
+    pub min_facet_mm: f64,
+    pub distance_m: f64,
+    pub angular_tol_deg: f64,
+    pub max_chord_m: f64,
+}
+
+impl Default for CustomResolution {
+    fn default() -> Self {
+        Self { chordal_mm: 0.06, angular_deg: 2.5, min_facet_mm: 0.0254, distance_m: 0.00006, angular_tol_deg: 2.5, max_chord_m: 0.01 }
+    }
+}
+
+/// Index of "Custom" in [`RESOLUTIONS`].
+pub const CUSTOM_RESOLUTION: usize = 3;
 
 impl ExportSettings {
     /// The extension of the file the export saves (the save prompt's name
@@ -147,6 +175,7 @@ impl Default for ExportSettings {
             hidden: false,
             urdf_geometry: 0,
             options: 0,
+            custom: CustomResolution::default(),
         }
     }
 }
@@ -220,8 +249,8 @@ pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(Stri
     // OBJ: a zip of `<name>.obj` and its `<name>.mtl`, as live downloads it.
     if s.format == PartFormat::Obj {
         let stem = path.file_stem().map(|x| x.to_string_lossy().to_string()).unwrap_or_else(|| "part".into());
-        let defl = deflection(s, &parts);
-        let meshes: Vec<(String, k::Tessellation, [f32; 4])> = parts.iter().map(|(n, sh, c)| Ok((n.clone(), k::tessellate(sh, defl, 0.35, true)?, *c))).collect::<anyhow::Result<_>>()?;
+        let (defl, ang) = mesh_params(s, &parts);
+        let meshes: Vec<(String, k::Tessellation, [f32; 4])> = parts.iter().map(|(n, sh, c)| Ok((n.clone(), k::tessellate(sh, defl, ang, true)?, *c))).collect::<anyhow::Result<_>>()?;
         let (obj, mtl) = obj_and_mtl(&meshes, &stem);
         let (on, mn) = (format!("{stem}.obj"), format!("{stem}.mtl"));
         let out = path.with_extension("zip");
@@ -415,6 +444,19 @@ fn sanitize(name: &str) -> String {
     name.chars().map(|c| if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') { '_' } else { c }).collect()
 }
 
+/// The mesher's linear (meters) and angular (radians) deflection: Custom's
+/// fields (STL's chordal tolerance / angular deviation, the others' distance
+/// / angular tolerance), else the preset's.
+fn mesh_params(s: &ExportSettings, parts: &[(String, k::Shape, [f32; 4])]) -> (f64, f64) {
+    if s.resolution == CUSTOM_RESOLUTION {
+        let c = &s.custom;
+        let stl = s.format == PartFormat::Stl || (s.format == PartFormat::Urdf && URDF_GEOMETRY[s.urdf_geometry.min(3)] == PartFormat::Stl);
+        let (lin, ang) = if stl { (c.chordal_mm / 1000.0, c.angular_deg) } else { (c.distance_m, c.angular_tol_deg) };
+        return (lin.max(1e-7), ang.to_radians().clamp(1e-3, 1.5));
+    }
+    (deflection(s, parts), 0.35)
+}
+
 /// Chord tolerance (meters) of a mesh resolution, from the parts' size.
 fn deflection(s: &ExportSettings, parts: &[(String, k::Shape, [f32; 4])]) -> f64 {
     let diag = parts.iter().filter_map(|p| p.1.bounding_box(false).ok()).map(|b| b.diagonal()).fold(0.0f64, f64::max).max(1e-3);
@@ -452,8 +494,8 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
             k::write_rhino(path, &shapes, k::LengthUnit::Meter, version)?;
         }
         f if f.mesh() => {
-            let defl = deflection(s, parts);
-            let meshes: Vec<(String, k::Tessellation, [f32; 4])> = parts.iter().map(|(n, sh, c)| Ok((n.clone(), k::tessellate(sh, defl, 0.35, true)?, *c))).collect::<anyhow::Result<_>>()?;
+            let (defl, ang) = mesh_params(s, parts);
+            let meshes: Vec<(String, k::Tessellation, [f32; 4])> = parts.iter().map(|(n, sh, c)| Ok((n.clone(), k::tessellate(sh, defl, ang, true)?, *c))).collect::<anyhow::Result<_>>()?;
             match f {
                 PartFormat::Stl | PartFormat::Obj => {
                     // STL: in the chosen unit; OBJ: meters.
