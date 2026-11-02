@@ -31,6 +31,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Our drawing PDFs (Text "Normal", the default) wrote each text triangle as its own fill (8048 in one A3 sheet).
   hayro over-covers the slivers, so an "N" looked like "И". Each run of fills sharing a layer and colour is now
   one nonzero path (drawing test `a_pdf_fills_each_texts_triangles_as_one_path`).
+- File tabs also render Markdown (gpui-component's TextView) and show CSV as a table (RFC 4180). The look is our
+  best reading; live's is asked (request 02:34). `import_files` now stores non-CAD files as file tabs (e2e
+  `import_files_stores_other_files_as_file_tabs`); before, the op refused what the app's + › Import… accepts.
 - To psui: NIST's regeneration after import is 1.7 s, of which the features are 0.12 s and the rest is display
   meshing, mostly the two cap screws' thread faces (B-spline surfaces with dense pcurves).
 

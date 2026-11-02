@@ -90,6 +90,10 @@ enum Preview {
     /// its page count, or why it can't be shown.
     Pages(Option<Result<PdfPages, String>>),
     Text(String),
+    /// Markdown, rendered (headings, emphasis, lists, code, tables).
+    Markdown(SharedString),
+    /// CSV rows (the first [`LINE_LIMIT`]) and the file's row count.
+    Table(Vec<Vec<String>>, usize),
     Card,
 }
 
@@ -127,9 +131,50 @@ fn preview_of(f: &FileTab) -> Preview {
         return Preview::Image(std::sync::Arc::new(gpui_kit::Image::from_bytes(format, bytes)));
     }
     let raw = String::from_utf8_lossy(&bytes[..bytes.len().min(TEXT_LIMIT)]).into_owned();
+    match ext.as_str() {
+        "md" => return Preview::Markdown(raw.into()),
+        "csv" => {
+            let mut rows = csv_rows(&raw);
+            let total = rows.len();
+            rows.truncate(LINE_LIMIT);
+            return Preview::Table(rows, total);
+        }
+        _ => {}
+    }
     // JSON pretty-printed (as it reads best); anything else as it is.
     let shown = if ext == "json" { serde_json::from_str::<serde_json::Value>(&raw).ok().and_then(|v| serde_json::to_string_pretty(&v).ok()).unwrap_or(raw) } else { raw };
     Preview::Text(shown)
+}
+
+/// CSV records (RFC 4180: quoted fields may hold commas, quotes as "" and
+/// line breaks; CRLF or LF).
+fn csv_rows(text: &str) -> Vec<Vec<String>> {
+    let mut rows = Vec::new();
+    let (mut row, mut field) = (Vec::new(), String::new());
+    let (mut quoted, mut chars) = (false, text.chars().peekable());
+    while let Some(c) = chars.next() {
+        match (quoted, c) {
+            (true, '"') if chars.peek() == Some(&'"') => {
+                chars.next();
+                field.push('"');
+            }
+            (true, '"') => quoted = false,
+            (true, c) => field.push(c),
+            (false, '"') if field.is_empty() => quoted = true,
+            (false, ',') => row.push(std::mem::take(&mut field)),
+            (false, '\r') => {}
+            (false, '\n') => {
+                row.push(std::mem::take(&mut field));
+                rows.push(std::mem::take(&mut row));
+            }
+            (false, c) => field.push(c),
+        }
+    }
+    if !field.is_empty() || !row.is_empty() {
+        row.push(field);
+        rows.push(row);
+    }
+    rows
 }
 
 impl FileTabView {
@@ -289,6 +334,43 @@ impl Render for FileTabView {
                     .children(text.lines().take(LINE_LIMIT).map(|l| div().min_h(px(17.)).child(crate::ui::user_text(l.to_string()))))
                     .when(text.lines().count() > LINE_LIMIT, |d| d.child(div().pt(px(8.)).text_color(pal.text_muted).child(format!("… {} more lines (Download for the whole file)", text.lines().count() - LINE_LIMIT))))
                     .into_any_element(),
+                Preview::Markdown(text) => div()
+                    .id("file-markdown")
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .bg(pal.panel)
+                    .child(div().max_w(px(900.)).px(px(24.)).py(px(16.)).text_size(px(14.)).text_color(pal.text).child(gpui_kit::component::text::TextView::markdown("file-markdown-text", text.clone())))
+                    .into_any_element(),
+                Preview::Table(rows, total) => {
+                    // Each column as wide as its longest cell (within limits).
+                    let cols = rows.iter().map(|r| r.len()).max().unwrap_or(0).min(200);
+                    let widths: Vec<f32> = (0..cols).map(|c| rows.iter().filter_map(|r| r.get(c)).map(|v| v.chars().count()).max().unwrap_or(0).clamp(4, 40) as f32 * 7.5 + 16.).collect();
+                    let border = gpui_kit::rgb(0xd3d7d9);
+                    div()
+                        .id("file-table")
+                        .flex_1()
+                        .min_h_0()
+                        .overflow_scroll()
+                        .bg(pal.panel)
+                        .p(px(16.))
+                        .child(
+                            v_flex()
+                                .w(px(widths.iter().sum::<f32>() + 1.))
+                                .border_l_1()
+                                .border_t_1()
+                                .border_color(border)
+                                .text_size(px(13.))
+                                .text_color(pal.text)
+                                .children(rows.iter().map(|r| {
+                                    h_flex().children(widths.iter().enumerate().map(|(c, w)| {
+                                        div().w(px(*w)).flex_none().h(px(24.)).px(px(6.)).flex().items_center().border_r_1().border_b_1().border_color(border).truncate().child(crate::ui::user_text(r.get(c).cloned().unwrap_or_default()))
+                                    }))
+                                }))
+                                .when(*total > rows.len(), |d| d.child(div().pt(px(8.)).text_color(pal.text_muted).child(format!("… {} more rows (Download for the whole file)", total - rows.len())))),
+                        )
+                        .into_any_element()
+                }
                 Preview::Card => div().into_any_element(),
             };
             return gpui_kit::component::v_flex().size_full().child(bar).child(body).into_any_element();
@@ -576,4 +658,14 @@ pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [Fi
                     ),
             )
     });
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn csv_rows_follow_rfc_4180() {
+        let rows = super::csv_rows("a,b,c\r\n1,\"x, y\",\"say \"\"hi\"\"\"\n2,\"two\nlines\",\n");
+        assert_eq!(rows, vec![vec!["a", "b", "c"], vec!["1", "x, y", "say \"hi\""], vec!["2", "two\nlines", ""]]);
+        assert_eq!(super::csv_rows("x"), vec![vec!["x"]]);
+    }
 }

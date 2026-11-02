@@ -2705,6 +2705,31 @@ fn export_store_file_in_a_new_tab() {
     assert_eq!(e.param.as_deref(), Some("file"), "{e:?}");
 }
 
+/// Files that aren't CAD (Markdown, CSV, a picture) import as file tabs,
+/// one edit each, as the app's + › Import… (Onshape: imported for viewing).
+#[test]
+fn import_files_stores_other_files_as_file_tabs() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "import_other.noshape");
+    let md = scratch("notes.md");
+    std::fs::write(&md, "# Notes\n\nThe plate is **6061**.\n").unwrap();
+    let csv = scratch("bom.csv");
+    std::fs::write(&csv, "Part,Qty\nPlate,1\n").unwrap();
+    let r = call(&mut ctx, "import_files", json!({ "files": [md.to_str().unwrap(), csv.to_str().unwrap()] }));
+    let tabs: Vec<(&str, &str)> = r["tabs"].as_array().unwrap().iter().map(|t| (t["name"].as_str().unwrap(), t["kind"].as_str().unwrap())).collect();
+    assert_eq!(tabs, [("notes.md", "File"), ("bom.csv", "File")], "{r}");
+    assert_eq!(r["first"], r["tabs"][1]["id"], "the window shows the last one");
+    let hist = call(&mut ctx, "history_list", json!({ "limit": 2 }));
+    assert_eq!(hist["history"][0]["description"], "Import bom.csv", "{hist}");
+    assert_eq!(hist["history"][1]["description"], "Import notes.md", "{hist}");
+    // With a CAD file: its Part Studio too, the other file stored as well.
+    let step = scratch("import_other.step");
+    call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "STEP", "file": step.to_str().unwrap() }));
+    let r = call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap(), md.to_str().unwrap()] }));
+    let kinds: Vec<&str> = r["tabs"].as_array().unwrap().iter().map(|t| t["kind"].as_str().unwrap()).collect();
+    assert!(kinds.contains(&"Part Studio") && kinds.iter().filter(|k| **k == "File").count() == 2, "the stored .md and the kept .step: {r}");
+}
+
 /// A PDF file tab's pages render (render_file_page; Onshape views PDFs in
 /// their tab): a drawing stored as PDF, its one ISO A3 page at 1 px per point.
 #[test]

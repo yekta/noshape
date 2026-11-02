@@ -6362,9 +6362,9 @@ Examples:
 
 #### import_files
 
-Import CAD or mesh files (STEP, IGES, Parasolid, ACIS, JT, Rhino, SolidWorks/Inventor/NX/Solid Edge parts and assembly zips, STL, OBJ, 3MF, glTF) (edits the document (one undoable history entry)).
+Import CAD or mesh files (STEP, IGES, Parasolid, ACIS, JT, Rhino, SolidWorks/Inventor/NX/Solid Edge parts and assembly zips, STL, OBJ, 3MF, glTF); other files as file tabs (edits the document (one undoable history entry)).
 
-The Import dialog: each file becomes a Part Studio with an Import feature (or all of them one Part Studio with `combine`); a native assembly zip becomes an Assembly and its Part Studio. The files are kept as file tabs in a "CAD Imports" folder unless `keep_files` is false. One edit ("Import <files>"). Returns the new tabs and the imported parts. The window then shows the first new tab (`first`), and tools without `tab` act on it.
+The Import dialog: each file becomes a Part Studio with an Import feature (or all of them one Part Studio with `combine`); a native assembly zip becomes an Assembly and its Part Studio. The files are kept as file tabs in a "CAD Imports" folder unless `keep_files` is false. One edit ("Import <files>"). Any other file (an image, PDF, text, Markdown, CSV, DXF / DWG…) becomes a file tab, one edit each ("Import <file>"), as the app's + › Import…. Returns the new tabs and the imported parts. The window then shows the first new tab (`first`), and tools without `tab` act on it.
 
 Examples:
 

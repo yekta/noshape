@@ -12,9 +12,10 @@ Onshape imports 22 CAD / 2D formats and exports 21. noshape: import 17 ✅, 1 �
 (CATIA v5, Creo / Pro/E, Parasolid mesh, Parasolid mixed model); export 19 ✅, 2 ⊘ (Parasolid mesh, mixed model).
 Every export format round-trips through our importers (12 part formats measured). Non-CAD: Onshape stores 13 file
 types and views 10 of them. noshape stores all 13 as file tabs and views:
-- PNG, JPEG, SVG, GIF and PDF ✅;
-- text, Markdown, CSV and JSON ◐ (as plain text);
+- PNG, JPEG, SVG, GIF, PDF, text, Markdown, CSV and JSON ✅;
 - not video (⊘: needs a native decoder).
+
+`import_files` stores any non-CAD file as a file tab, as the app's + › Import… does.
 
 ## Part, assembly and drawing formats
 
@@ -52,7 +53,7 @@ types and views 10 of them. noshape stores all 13 as file tabs and views:
 | PDF | .pdf | viewed | ✅ | the file tab shows the pages one under the other at 1.5 px per point. The first 50 pages are rendered in the background by hayro, a pure-Rust rasterizer (MIT / Apache, `crates/ops/src/file_preview.rs`). The agent API: `render_file_page` (e2e `a_pdf_file_tab_renders_its_pages`). Live's look asked (request 11-02) |
 | Video | .mp4 | viewed | ⊘ | stored. Viewing needs an H.264 decoder: open-source ones (ffmpeg, openh264) exist, but they're native libraries, and H.264 is patent-licensed. Left out for now |
 | Images | .png .jpg .jpeg .svg .gif (and .bmp .tif .webp) | viewed | ✅ | the file tab shows the picture (actual size, scaled down to fit) under a bar with name, size, Update…, Download; app check 11-02; live's look asked (request 11-02) |
-| Text, Markdown, CSV, JSON | .txt .md .csv .json | viewed | ◐ | shown as text (JSON pretty-printed, the first 5000 lines); Markdown not rendered yet, CSV not as a table: live's look asked |
+| Text, Markdown, CSV, JSON | .txt .md .csv .json | viewed | ✅ | Markdown rendered (headings, emphasis, lists, code, tables, quotes); CSV as a table (RFC 4180 quoting, columns as wide as their text); text and JSON as text (JSON pretty-printed); the first 5000 lines or rows. Live's look asked (request 11-02) |
 | Programming files, MOV, Word | .py .java .js .mov .doc .docx | stored, not viewable | ✅ | stored as file tabs |
 
 ## Speed on big files (see docs/handoff/dx.md for the history)

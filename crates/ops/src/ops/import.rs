@@ -12,8 +12,8 @@ pub fn ops() -> Vec<Op> {
     vec![Op {
         group: "import",
         verb: "files",
-        summary: "Import CAD or mesh files (STEP, IGES, Parasolid, ACIS, JT, Rhino, SolidWorks/Inventor/NX/Solid Edge parts and assembly zips, STL, OBJ, 3MF, glTF)",
-        description: "The Import dialog: each file becomes a Part Studio with an Import feature (or all of them one Part Studio with `combine`); a native assembly zip becomes an Assembly and its Part Studio. The files are kept as file tabs in a \"CAD Imports\" folder unless `keep_files` is false. One edit (\"Import <files>\"). Returns the new tabs and the imported parts. The window then shows the first new tab (`first`), and tools without `tab` act on it.",
+        summary: "Import CAD or mesh files (STEP, IGES, Parasolid, ACIS, JT, Rhino, SolidWorks/Inventor/NX/Solid Edge parts and assembly zips, STL, OBJ, 3MF, glTF); other files as file tabs",
+        description: "The Import dialog: each file becomes a Part Studio with an Import feature (or all of them one Part Studio with `combine`); a native assembly zip becomes an Assembly and its Part Studio. The files are kept as file tabs in a \"CAD Imports\" folder unless `keep_files` is false. One edit (\"Import <files>\"). Any other file (an image, PDF, text, Markdown, CSV, DXF / DWG…) becomes a file tab, one edit each (\"Import <file>\"), as the app's + › Import…. Returns the new tabs and the imported parts. The window then shows the first new tab (`first`), and tools without `tab` act on it.",
         fields: vec![
             doc_field(),
             req("files", json!({ "type": "array", "items": { "type": "string" }, "minItems": 1 }), "Paths of the files."),
@@ -38,13 +38,32 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let units = od.doc().settings.units;
     let paths: Vec<PathBuf> = a.array("files")?.iter().enumerate().map(|(i, v)| v.as_str().map(PathBuf::from).ok_or_else(|| OpError::param(&format!("files[{i}]"), "a path"))).collect::<Result<_, _>>()?;
     for (i, p) in paths.iter().enumerate() {
-        let ext = p.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
-        if !import::IMPORT_EXTS.contains(&ext.as_str()) {
-            return Err(OpError::param(&format!("files[{i}]"), &format!("can't import .{ext} files; types: {}", import::IMPORT_EXTS.join(", "))));
-        }
-        if !p.exists() {
+        if !p.is_file() {
             return Err(OpError::param(&format!("files[{i}]"), "no such file"));
         }
+    }
+    let after = match a.opt_str("after")? {
+        Some(t) => Some(doc::find_tab(od.doc(), t).map_err(|e| e.with_param("after"))?),
+        None => None,
+    };
+    // Other files (images, PDF, text, DXF / DWG…) become file tabs, one edit
+    // each, as the app's "+ › Import…" (Onshape).
+    let cad_file = |p: &PathBuf| p.extension().is_some_and(|e| import::IMPORT_EXTS.contains(&e.to_string_lossy().to_lowercase().as_str()));
+    let (paths, other): (Vec<PathBuf>, Vec<PathBuf>) = paths.into_iter().partition(cad_file);
+    let (mut stored, mut last) = (Vec::new(), None);
+    for p in &other {
+        let bytes = std::fs::read(p).map_err(|e| OpError::new("io", format!("reading {}: {e}", p.display())))?;
+        let (_, file) = import::import_names(p);
+        let id = od.session.edit_document(&format!("Import {file}"), |d| import::add_file_tab(d, noshape_model::file_tab::FileTab::new(&file, &bytes, noshape_model::file_tab::now()), None, after))?;
+        stored.push(json!({ "id": id.to_string(), "name": file, "kind": "File" }));
+        last = Some(id);
+    }
+    // Only other files: the window shows the last one (the app's).
+    if paths.is_empty() {
+        if let Some(t) = last {
+            super::show(ctx, a.opt_str("doc")?, crate::UiRequest::ActivateTab(t))?;
+        }
+        return Ok(json!({ "tabs": stored, "parts": [], "first": last.map(|t| t.to_string()) }).into());
     }
     let mut c = ImportChoice::defaults(&paths, units.length);
     c.combine = a.bool_or("combine", false)?;
@@ -57,10 +76,6 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if let Some(u) = a.opt_str("mesh_unit")? {
         c.unit = MESH_UNITS.iter().position(|x| x.0.eq_ignore_ascii_case(u)).ok_or_else(|| OpError::param("mesh_unit", "one of the listed units"))?;
     }
-    let after = match a.opt_str("after")? {
-        Some(t) => Some(doc::find_tab(od.doc(), t).map_err(|e| e.with_param("after"))?),
-        None => None,
-    };
     // NOSHAPE_IMPORT_TIMING=1: each stage's time on stderr (dx_perf big imports).
     let timing = std::env::var_os("NOSHAPE_IMPORT_TIMING").is_some();
     let t0 = std::time::Instant::now();
@@ -97,7 +112,8 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             parts.push(json!({ "tab": name, "id": crate::refs::body_id(&b.id), "name": b.name }));
         }
     }
-    let mut out = json!({ "tabs": new_tabs, "parts": parts, "first": first.map(|t| t.to_string()) });
+    let tabs: Vec<serde_json::Value> = stored.into_iter().chain(new_tabs).collect();
+    let mut out = json!({ "tabs": tabs, "parts": parts, "first": first.map(|t| t.to_string()) });
     if !errors.is_empty() {
         out["errors"] = json!(errors);
     }
