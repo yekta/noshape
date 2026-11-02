@@ -87,6 +87,7 @@
 #include <Geom2d_TrimmedCurve.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2dConvert.hxx>
+#include <GeomAdaptor_Curve.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Shell.hxx>
@@ -1826,6 +1827,11 @@ static bool split_closed_sections(std::vector<TopoDS_Wire>& wires, HHist& hist)
     for (double& t : ts)
       t = t0 + std::fmod(std::fmod(t - t0, period) + period, period);
     std::sort(ts.begin() + 1, ts.end());
+    // A circle in equal arcs from there (live 1788: a rounded rectangle's 8 segments to a Ø30 circle split it every
+    // 45° from the direction of the first corner, not at each corner's direction).
+    if (GeomAdaptor_Curve(c).GetType() == GeomAbs_Circle)
+      for (size_t k = 1; k < ts.size(); ++k)
+        ts[k] = t0 + period * (double)k / (double)ts.size();
     ts.push_back(t0 + period);
     BRepBuilderAPI_MakeWire mk;
     TopoDS_Edge             key = own[0];

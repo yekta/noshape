@@ -568,8 +568,10 @@ fn rounded_rect(plane: &Plane, w: f64, h: f64, r: f64) -> Shape {
 /// Live 1784: two sections with matching segments loft a face per segment ((a) rounded rectangles: 8 sides; (c) a D
 /// and its half: 4, the tangent joints too); three or more sections ((b)) or sections of different topology ((d)
 /// rounded rectangle to circle) one side face where the sections are smooth, the caps' edges split per segment; sides
-/// lying in a plane are planes ((a)'s and (c)'s straight segments). Ours
-/// has a seam edge more (OCCT's closed faces have one). (d)'s volume differs (1.5 %: where the circle is split, asked).
+/// lying in a plane are planes ((a)'s and (c)'s straight segments); (d)'s circle is split in equal arcs from the first
+/// corner's direction (live 1788; its volume 0.2 % under live's, which lofts a cubic fit of each section: our section at
+/// z 20 within 0.19 mm of live's, theirs a little fuller at the corners). Ours has a seam edge more (OCCT's closed faces
+/// have one).
 #[test]
 fn loft_side_faces_as_live() {
     let xy = Plane::xy();
@@ -582,13 +584,13 @@ fn loft_side_faces_as_live() {
             Segment2d::Line { a: p(0.0, 40.0), b: p(0.0, 0.0) },
         ]).unwrap()
     };
-    // (name, sections, faces, planes, edges, vertices, live's volume if ours is within 1e-5 of it)
-    type Case = (&'static str, Vec<Shape>, usize, usize, usize, usize, Option<f64>);
+    // (name, sections, faces, planes, edges, vertices, (live's volume, ours within this fraction of it))
+    type Case = (&'static str, Vec<Shape>, usize, usize, usize, usize, (f64, f64));
     let cases: Vec<Case> = vec![
-        ("a", vec![rounded_rect(&xy, 60.0, 40.0, 5.0), rounded_rect(&xy.offset(40.0), 40.0, 30.0, 5.0)], 10, 6, 24, 16, Some(69807.9004)),
-        ("b", vec![rounded_rect(&xy, 60.0, 40.0, 5.0), rounded_rect(&xy.offset(40.0), 40.0, 30.0, 5.0), rounded_rect(&xy.offset(80.0), 60.0, 40.0, 5.0)], 3, 2, 17, 16, Some(128054.0491)),
-        ("c", vec![d(1.0, 0.0), d(0.5, 30.0)], 6, 5, 12, 8, Some(38995.5716)),
-        ("d", vec![rounded_rect(&xy, 60.0, 40.0, 5.0), make_wire_2d(&xy.offset(40.0), &[Segment2d::Circle { center: DVec2::ZERO, radius: 15.0 }]).unwrap()], 3, 2, 17, 16, None),
+        ("a", vec![rounded_rect(&xy, 60.0, 40.0, 5.0), rounded_rect(&xy.offset(40.0), 40.0, 30.0, 5.0)], 10, 6, 24, 16, (69807.9004, 1e-5)),
+        ("b", vec![rounded_rect(&xy, 60.0, 40.0, 5.0), rounded_rect(&xy.offset(40.0), 40.0, 30.0, 5.0), rounded_rect(&xy.offset(80.0), 60.0, 40.0, 5.0)], 3, 2, 17, 16, (128054.0491, 1e-5)),
+        ("c", vec![d(1.0, 0.0), d(0.5, 30.0)], 6, 5, 12, 8, (38995.5716, 1e-5)),
+        ("d", vec![rounded_rect(&xy, 60.0, 40.0, 5.0), make_wire_2d(&xy.offset(40.0), &[Segment2d::Circle { center: DVec2::ZERO, radius: 15.0 }]).unwrap()], 3, 2, 17, 16, (57601.5824, 2.5e-3)),
     ];
     for (name, secs, faces, planes, edges, vertices, live) in cases {
         let l = loft(&secs, &LoftOptions { solid: true, ..Default::default() }).unwrap().shape;
@@ -596,8 +598,22 @@ fn loft_side_faces_as_live() {
         assert_eq!((l.count(ShapeType::Face), l.count(ShapeType::Edge), l.count(ShapeType::Vertex)), (faces, edges, vertices), "{name}");
         let flat = l.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Plane(_)))).count();
         assert_eq!(flat, planes, "{name}: planes");
-        if let Some(v) = live {
-            assert!((l.volume().unwrap() - v).abs() < 1e-5 * v, "{name}: {} mm³, live {v}", l.volume().unwrap());
-        }
+        let (v, within) = live;
+        assert!((l.volume().unwrap() - v).abs() < within * v, "{name}: {} mm³, live {v}", l.volume().unwrap());
     }
+}
+
+/// (d) of live 1784 / 1788: our section at z 20 against live's (1388.7098 mm², perimeter 138.9262).
+#[test]
+#[ignore = "T2: probe"]
+fn loft_rect_to_circle_section_probe() {
+    let xy = Plane::xy();
+    let l = loft(&[rounded_rect(&xy, 60.0, 40.0, 5.0), make_wire_2d(&xy.offset(40.0), &[Segment2d::Circle { center: DVec2::ZERO, radius: 15.0 }]).unwrap()], &LoftOptions { solid: true, ..Default::default() }).unwrap().shape;
+    for z in [10.0, 20.0, 30.0] {
+        let cap = section_caps(&l, &xy.offset(z)).unwrap();
+        let area = surface_properties(&cap).unwrap().mass;
+        let len: f64 = cap.edges().iter().map(|e| linear_properties(e).map(|p| p.mass).unwrap_or(0.0)).sum();
+        println!("z {z}: area {area:.4}, perimeter {len:.4}");
+    }
+    println!("volume {:.4} (live 57601.5824); faces {:?}", l.volume().unwrap(), l.faces().iter().map(|f| format!("{:?}", f.face_surface().ok()).chars().take(12).collect::<String>()).collect::<Vec<_>>());
 }
