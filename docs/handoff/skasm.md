@@ -703,6 +703,10 @@ With live now (16:30): sketch batch 6 (s381–s420: the everyday kinds plus wash
 shape; generator kinds 5–7 only from seed 381, so batches 4–5 stay as sent) and drag probes 9 (g1–g6, everyday
 profiles; `drag_probe_matches` runs probes 7 and 9). Tried and dropped: Equal relations not freezing a unit in the keep
 step (s201 −26 but s214 / s209 +27 each; s6 still fails at l11, see above).
+16:45: batch 6 answered: 37/40 on its FIRST answer (batch 5: 22/40, batch 4: 14/40): the rules generalise to new
+everyday profiles and the three new kinds. The three (washers with a changing diameter) fixed: a Concentric pair tied
+to nothing else places its kept circle first, not holding the other (40/40). Now: everyday batches 4 / 5 / 6 at
+39 / 39 / 40 of 40, probes 52 + drags 8 + edits 6 all match, batches 1–6 1281 mm; drag probes 9 with live.
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
