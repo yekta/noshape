@@ -6,6 +6,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## From the user, 2026-11-02 (v0.4.19, macOS)
+- [ ] MACOS-GUARD-LOCK (core, CI 41351354303 on agent/ci2 76a61696, macOS arm64 Test, once): the model tests' `all`
+  ended with "noshape: the kernel crashed holding a lock; not recoverable" (SIGSEGV) in the custom-feature tests,
+  just after `a_cancelled_custom_feature_stops_soon_and_the_studio_is_as_before`. In flight then:
+  `ops_and_evaluations_are_the_same_on_many_threads` (the ops harness on 4 threads), `ops_and_evaluations_run_in_
+  custom_features`, `part_studio_reference_swept_body_query`. On macOS the mutex counting is off, so that message
+  means a fault inside a LockedSection (an OcShape cache's call_once body, mirror_copy, mesh / XDE locks). No stack
+  then: a fatal guard exit now always prints its backtrace (Linux and macOS; the unwinder loaded at install, so it
+  doesn't allocate under malloc's lock). Linux: 60 runs of custom_features at 8 threads clean; 200 of the in-flight
+  set with NOSHAPE_TEST_THREADS=12 running (vibe4 ~/agents/logs/racestress2.log). Next: the stack, when it recurs.
 - [x] P0 SHELL-VOIDS-WINDOWS (core, CI a8c535aa / 67e44bb7): `shell::a_void_waits_for_live` failed on Windows only.
   Cause: the test switched the void gate on with `std::env::set_var`, which on Windows changes the process
   environment but not the MSVC CRT's copy that the kernel's C++ `getenv` reads (taken at start-up); Linux / macOS

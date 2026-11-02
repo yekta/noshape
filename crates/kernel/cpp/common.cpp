@@ -9,8 +9,10 @@
 #include <OSD_ThreadPool.hxx>
 #ifdef __linux__
 #include <dlfcn.h>
-#include <execinfo.h>
 #include <link.h>
+#endif
+#if defined(__linux__) || defined(__APPLE__)
+#include <execinfo.h>
 #endif
 #ifndef _WIN32
 #include <unistd.h> // write() in the crash guard's messages (macOS doesn't get it through other headers)
@@ -1705,10 +1707,9 @@ void on_crash(int sig, siginfo_t* info, void* ctx)
                                          : abort_raw      ? write(2, aborted, sizeof aborted - 1)
                                                           : write(2, in_lock, sizeof in_lock - 1);
       crash_guard = nullptr;
-#ifdef __linux__
-      // NOSHAPE_GUARD_TRACE=1: where (diagnosis; not async-signal-safe, the
-      // process is ending anyway).
-      if (g_guard_trace)
+#if defined(__linux__) || defined(__APPLE__)
+      // Where, always (not async-signal-safe, but the process is ending anyway): a fatal exit seen once in CI
+      // (macOS, 11-01 "holding a lock" in the custom-feature tests) says where next time.
       {
         void*     frames[64];
         const int n = backtrace(frames, 64);
@@ -1722,7 +1723,7 @@ void on_crash(int sig, siginfo_t* info, void* ctx)
     crash_guard  = nullptr;
     crash_signal = sig;
     asan_unpoison_abandoned(ctx);
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
     // NOSHAPE_GUARD_TRACE=1: the recovered ones too (where the kernel faults).
     if (g_guard_trace)
     {
@@ -1765,6 +1766,14 @@ void install_crash_guard()
     if (std::getenv("NOSHAPE_NO_CRASH_GUARD") != nullptr)
       return;
     g_guard_trace = std::getenv("NOSHAPE_GUARD_TRACE") != nullptr;
+#if defined(__linux__) || defined(__APPLE__)
+    // backtrace() loads its unwinder (allocating) the first time: done here, so a fatal exit's trace doesn't
+    // allocate inside a fault taken with malloc's lock held (glibc's abort in free).
+    {
+      void* frames[4];
+      [[maybe_unused]] const int n = backtrace(frames, 4);
+    }
+#endif
 #ifdef __linux__
     Dl_info di{};
     if (dladdr(reinterpret_cast<void*>(&malloc), &di) != 0 && di.dli_fbase != nullptr)
