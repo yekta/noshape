@@ -89,6 +89,10 @@ What changed (dev build timings on vibe5, 2000 parts):
 
   Most of the healing time, and 17 of the 26 MB, are the two cap screws' thread pcurves. Onshape writes no pcurves, so OCCT projects each thread edge onto its B-spline surface, which gives 2D B-splines with thousands of poles. A user precision makes it slower: 1e-4 mm takes 28 s, with the same sizes.
 - After reading, regeneration takes about 1.7 s, of which the features are 0.12 s and the display meshing the rest (the Part Studio display, psui's area).
-- Not done: healing parts in parallel. Transfer without healing, then heal each part on its own thread, would cut the 0.84 s Transfer of the 2000-part import. It needs face colours mapped through the healing history; parked until live's numbers show we're behind.
+- Not done: healing parts in parallel, which would cut the 0.84 s Transfer of the 2000-part import. Parked until live's numbers show we're behind.
+  - OCCT heals inside its STEP actor (`STEPControl_ActorRead::TransferEntity`), per shape representation and with that representation's own uncertainty as the tolerance (NIST mixes 1e-8 and 2e-5 m).
+  - The healed shape is bound at once for the parents (assemblies, mapped items) to use.
+  - Healing afterwards with one tolerance would change results.
+  - Doing it right means patching the actor to queue the jobs, run them on threads and merge the transfer info serially, then mapping face colours through the healing history.
 
 `NOSHAPE_IMPORT_TIMING=1` and `NOSHAPE_EXPORT_TIMING=1` print the stages.

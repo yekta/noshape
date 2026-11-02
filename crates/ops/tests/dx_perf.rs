@@ -169,7 +169,7 @@ fn timed_nist_import() {
 /// Big files (user 11-02): 1000 distinct parts (a 40 × 25 part pattern of
 /// Ø4 × 10 mm pins) exported as STEP, Parasolid and IGES, then each file
 /// imported into a new document; times both ways and checks fidelity (part
-/// count, total volume). `NOSHAPE_BIG_PARTS` changes the count (rows of 40).
+/// count, total volume, names). `NOSHAPE_BIG_PARTS` changes the count (rows of 40).
 #[test]
 #[ignore]
 fn timed_big_part_imports() {
@@ -193,9 +193,11 @@ fn timed_big_part_imports() {
     let volume = |ctx: &mut Ctx, tab: Option<&str>| {
         let q = call(ctx, "query_parts", match tab { Some(t) => json!({ "tab": t }), None => json!({}) });
         let parts = q["parts"].as_array().unwrap().clone();
-        (parts.len(), parts.iter().map(|p| p["volume"].as_f64().unwrap_or(0.0)).sum::<f64>())
+        let mut names: Vec<String> = parts.iter().map(|p| p["name"].as_str().unwrap_or("").to_string()).collect();
+        names.sort();
+        (parts.len(), parts.iter().map(|p| p["volume"].as_f64().unwrap_or(0.0)).sum::<f64>(), names)
     };
-    let (count, v0) = volume(&mut ctx, None);
+    let (count, v0, names0) = volume(&mut ctx, None);
     assert_eq!(count, n);
     for (format, ext) in [("STEP", "step"), ("PARASOLID", "x_t"), ("IGES", "igs")] {
         let file = dir.join(format!("big.{ext}"));
@@ -208,12 +210,13 @@ fn timed_big_part_imports() {
         let r = call(&mut ictx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
         let ms = t.elapsed().as_secs_f64() * 1000.0;
         let studio = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").map(|t| t["name"].as_str().unwrap().to_string()).expect("a Part Studio");
-        let (got, v1) = volume(&mut ictx, Some(&studio));
+        let (got, v1, names1) = volume(&mut ictx, Some(&studio));
         report(&format!("big: import {n} parts {ext} -> {got} parts, volume {:.4} of {:.4}", v1, v0), vec![ms]);
         // IGES carries surfaces: its parts may come in as sheets.
         if ext != "igs" {
             assert_eq!(got, n, "{ext}");
             assert!((v1 - v0).abs() < v0 * 1e-6, "{ext}: volume {v1} vs {v0}");
+            assert!(names1 == names0, "{ext}: the parts' names ({:?}… vs {:?}…)", &names1[..3], &names0[..3]);
         }
     }
     let _ = std::fs::remove_dir_all(&dir);
