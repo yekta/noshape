@@ -789,6 +789,9 @@ struct Ctx<'a> {
     face_segs: Vec<Vec<Seg>>,
     /// For each of a face's curves, the section it is (its index in `sections`), or `usize::MAX`.
     seg_section: Vec<Vec<usize>>,
+    /// For each of a face's curves, the tolerance of the input edge it is a piece of (another argument's lying in
+    /// the face), or 0.
+    seg_edge_tol: Vec<Vec<f64>>,
     coplanar: Vec<(usize, usize)>,
     /// Where two faces cross (the curve, the faces).
     sections: Vec<(Seg, usize, usize)>,
@@ -828,7 +831,7 @@ impl Drop for Ctx<'_> {
         let heavy = (
             (take(&mut self.pool.p), take(&mut self.pool.inputs), take(&mut self.pool.grid), take(&mut self.pool.t), take(&mut self.pool.coarse)),
             (take(&mut self.faces), take(&mut self.edges), take(&mut self.solids), take(&mut self.side_cache), take(&mut self.in_face_done)),
-            (take(&mut self.face_segs), take(&mut self.seg_section), take(&mut self.coplanar), take(&mut self.sections), take(&mut self.pending)),
+            (take(&mut self.face_segs), take(&mut self.seg_section), take(&mut self.seg_edge_tol), take(&mut self.coplanar), take(&mut self.sections), take(&mut self.pending)),
             (take(&mut self.copies), take(&mut self.families), take(&mut self.canonical), take(&mut self.canon_secs), take(&mut self.apart)),
             (take(&mut self.on_surface), take(&mut self.ncurves), take(&mut self.polylines)),
         );
@@ -1468,6 +1471,8 @@ impl Ctx<'_> {
                 self.face_segs[ft].push(seg);
                 self.seg_section[fs].push(self.sections.len());
                 self.seg_section[ft].push(self.sections.len());
+                self.seg_edge_tol[fs].push(0.0);
+                self.seg_edge_tol[ft].push(0.0);
                 self.sections.push((seg, fs, ft));
             }
         }
@@ -1532,13 +1537,37 @@ impl Ctx<'_> {
         Ok(())
     }
 
-    /// An edge's pieces in face `f` (where `path` lies inside it): its edges there.
-    fn in_face_from(&mut self, f: usize, path: &Path, ivs: Vec<Ival>) -> R<()> {
+    /// The greatest tolerance (past the Boolean's, up to half a millimetre) of face `f`'s edges that `p` is on within
+    /// it, or 0.
+    fn boundary_tol(&self, f: usize, p: DVec3) -> f64 {
+        let on = |e: usize, t: f64| {
+            let (u, d) = self.seg_param(&self.edge_seg(e), p);
+            (0.0..=1.0).contains(&u) && d <= t
+        };
+        self.faces[f].edges.iter().map(|&(e, _)| (e, self.edges[e].t)).filter(|&(e, t)| t > self.tol && t <= 5e-4 && on(e, t)).fold(0.0, |m: f64, x| m.max(x.1))
+    }
+
+    /// An edge's pieces in face `f` (where `path` lies inside it; the edge's tolerance `te`): its edges there.
+    fn in_face_from(&mut self, f: usize, path: &Path, ivs: Vec<Ival>, te: f64) -> R<()> {
+        // (A point on it has its tolerance, and where it leaves the face, the tolerance of the face's edge it is on
+        // too, OCCT's: an edge leaving a slab's face across its edge of 0.1 mm, 0.1 mm from another's vertex, is at
+        // that vertex (OCCT's corner one vertex of 0.21 mm); up to half a millimetre.)
+        let te = if te <= 5e-4 { te } else { 0.0 };
         for iv in ivs {
             let mut ends = [0u32; 2];
             for k in 0..2 {
                 ends[k] = match iv[k].1 {
                     End::Vertex(v) => v,
+                    End::Point(p) if te.max(self.boundary_tol(f, p)) > self.tol => {
+                        let t = te.max(self.boundary_tol(f, p));
+                        match self.pool.find_tol(p, t)? {
+                            Some(w) => {
+                                self.pool.grow(w, t);
+                                w
+                            }
+                            None => self.pool.push_tol(p, t),
+                        }
+                    }
                     End::Point(p) => self.pool.add(p)?,
                     End::Open => return Err(Decline("an edge's piece without ends")),
                 };
@@ -1550,6 +1579,7 @@ impl Ctx<'_> {
             }
             self.face_segs[f].push(Seg { v: [a, b], g });
             self.seg_section[f].push(usize::MAX);
+            self.seg_edge_tol[f].push(te);
         }
         Ok(())
     }
@@ -3081,6 +3111,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         in_face_done: Default::default(),
         face_segs: Vec::new(),
         seg_section: Vec::new(),
+        seg_edge_tol: Vec::new(),
         coplanar: Vec::new(),
         sections: Vec::new(),
         pending: Vec::new(),
@@ -3243,6 +3274,15 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 }
             };
             if v[0] == v[1] && e.v[0] != e.v[1] {
+                // (An arc between two of a group, no longer than the group across: OCCT's micro edge too.)
+                if let (Curve::Circle { center, normal, xdir, radius }, true) = (e.curve, cx.pool.is_group(v[0])) {
+                    let k = Circ { c: center, n: normal, x: xdir, y: normal.cross(xdir), r: radius };
+                    let (p0, p1) = (body.vertices[e.v[0] as usize], body.vertices[e.v[1] as usize]);
+                    if (k.angle(p1) - k.angle(p0)).rem_euclid(TAU) * radius <= 2.0 * cx.pool.t[v[0] as usize] {
+                        cx.edges.push(GEdge { arg: a, index: i as u32, v, g: Geo::Line, t: 0.0, micro: true });
+                        continue;
+                    }
+                }
                 return Err(Decline("a micro edge"));
             }
             cx.edges.push(GEdge { arg: a, index: i as u32, v, g, t: body.edge_tol.get(i).copied().unwrap_or(0.0), micro: false });
@@ -3425,6 +3465,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     }
     cx.face_segs = vec![Vec::new(); cx.faces.len()];
     cx.seg_section = vec![Vec::new(); cx.faces.len()];
+    cx.seg_edge_tol = vec![Vec::new(); cx.faces.len()];
     // A pattern's instances that must only touch: one with a vertex inside another argument's solid overlaps it,
     // told before any section (the classification would tell it at the end).
     if touching_only {
@@ -3734,7 +3775,10 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         match p {
             Pending::Section(fs, ft, path, ..) if !ia.is_empty() => cx.section_from(fs, ft, path, ia, ib)?,
             Pending::Section(..) => {}
-            Pending::InFace(f, path, ..) => cx.in_face_from(f, &path, ia)?,
+            Pending::InFace(f, path, _, _, e) => {
+                let te = cx.edges[e].t;
+                cx.in_face_from(f, &path, ia, te)?
+            }
         }
     }
     // Coplanar faces where a sheet is one of them: taken where they only meet at each other's vertices (side by
@@ -3995,11 +4039,11 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                     }
                 }
             }
-            // (A point on a section has the section's tolerance (OCCT's pave tolerance: a section edge's vertices
-            // have its tolerance): within the sum of its and another vertex's, it is that vertex, OCCT's rule; else a
+            // (A point on a section, or on another argument's edge lying in the face, has its tolerance (OCCT's pave
+            // tolerance: a section edge's vertices have its tolerance; an edge's own): within the sum of its and another vertex's, it is that vertex, OCCT's rule; else a
             // new vertex of that tolerance, so the curves near it are split there too (a knurl's flank, another
             // tool's cap and the cylinder: their three sections miss each other by 3 um, one place within 5 um).)
-            let reach = sec_tol(&cx, &segs[i]).max(sec_tol(&cx, &segs[j]));
+            let reach = sec_tol(&cx, &segs[i]).max(sec_tol(&cx, &segs[j])).max(cx.seg_edge_tol[f][i]).max(cx.seg_edge_tol[f][j]);
             if reach > tol {
                 match cx.pool.find_tol(p, reach)? {
                     Some(w) => cx.pool.grow(w, reach),

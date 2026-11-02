@@ -374,6 +374,19 @@ fn an_arc_leaving_along_a_side_splits_the_face() {
     assert_eq!(crate::arrange::regions(&pts, &segs).unwrap().len(), 2);
 }
 
+#[test]
+fn parallel_curves_leaving_one_vertex_go_by_their_side() {
+    use crate::curve2::C2;
+    use glam::DVec2;
+    // A unit square and a line up from its corner vertex that starts 0.1 mm right of the vertex's place (two
+    // rulings ending at one merged vertex of OCCT's): the same direction as the square's side, told apart by side.
+    let pts = [DVec2::ZERO, DVec2::X, DVec2::ONE, DVec2::Y, DVec2::new(1e-4, 1.0)];
+    let seg = |a: usize, b: usize| ([a as u32, b as u32], C2::Seg { a: pts[a], b: pts[b] });
+    let segs = [seg(0, 1), seg(1, 2), seg(2, 4), seg(4, 3), seg(3, 0), ([0, 4], C2::Seg { a: DVec2::new(1e-4, 0.0), b: pts[4] })];
+    let r = crate::arrange::regions(&pts, &segs).expect("the regions");
+    assert_eq!(r.len(), 2);
+}
+
 fn segment(a: DVec3, b: DVec3) -> Body {
     Body { vertices: vec![a, b], edges: vec![Edge { v: [0, 1], curve: Curve::Line }], ..Default::default() }
 }

@@ -24,18 +24,19 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
     let from = |h: usize| segs[h / 2].0[h % 2] as usize;
     let to = |h: usize| segs[h / 2].0[1 - h % 2] as usize;
     let curve = |h: usize| if h.is_multiple_of(2) { segs[h / 2].1.clone() } else { segs[h / 2].1.reversed() };
-    // Half-edges leaving each point, counter-clockwise by direction, then by how much they turn left (each one's
-    // on all threads).
-    let mut out: Vec<Vec<(f64, f64, usize)>> = vec![Vec::new(); pts.len()];
+    // Half-edges leaving each point, counter-clockwise by direction, then by how much they turn left, then by how
+    // far left of the point they start (two rulings 0.16 mm apart ending at one vertex of 0.21 mm, OCCT's merged
+    // corner: parallel, the left one further round) (each one's on all threads).
+    let mut out: Vec<Vec<(f64, f64, f64, usize)>> = vec![Vec::new(); pts.len()];
     let leaving = crate::boolean::par_map(n_h, &|h| {
         let c = curve(h);
         let d = c.leaving();
         // -π is π (one direction).
         let a = d.y.atan2(d.x);
-        (if a < 1e-9 - PI { a + TAU } else { a }, c.curvature())
+        (if a < 1e-9 - PI { a + TAU } else { a }, c.curvature(), d.normalize_or_zero().perp_dot(c.start() - pts[from(h)]))
     })?;
-    for (h, (a, k)) in leaving.into_iter().enumerate() {
-        out[from(h)].push((a, k, h));
+    for (h, (a, k, o)) in leaving.into_iter().enumerate() {
+        out[from(h)].push((a, k, o, h));
     }
     let mut pos = vec![0usize; n_h];
     for list in &mut out {
@@ -48,17 +49,17 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
                 list[i].0 = list[i - 1].0;
             }
         }
-        list.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)));
+        list.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)).then(a.2.total_cmp(&b.2)));
         let n = list.len();
         for i in 0..n {
             if n > 1 {
                 let j = (i + 1) % n;
                 let gap = list[j].0 + if j == 0 { TAU } else { 0.0 } - list[i].0;
-                if gap < 1e-9 && (list[j].1 - list[i].1).abs() < 1e-9 {
+                if gap < 1e-9 && (list[j].1 - list[i].1).abs() < 1e-9 && (list[j].2 - list[i].2).abs() < 1e-9 {
                     return Err(Decline("two edges leave a vertex in one direction"));
                 }
             }
-            pos[list[i].2] = i;
+            pos[list[i].3] = i;
         }
     }
     // Cycles, each with its region on the left.
@@ -81,7 +82,7 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
             cycle_of[h] = c;
             cyc.push(h);
             let list = &out[to(h)];
-            h = list[(pos[h ^ 1] + list.len() - 1) % list.len()].2;
+            h = list[(pos[h ^ 1] + list.len() - 1) % list.len()].3;
         }
         cycles.push(cyc);
     }

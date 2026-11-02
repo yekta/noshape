@@ -41,6 +41,25 @@ Fusing the slabs yours takes first and adding the offset ones after doesn't help
 next reasons: 3.9 → 5.9 s on a dump); one OCCT common of the solid with all slabs as one tool group changes results.
 Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scratch SHELLDUMP=<path without .brep>).
 
+## Coincidence step 3: edges' own tolerances at their points; parallel curves at a merged vertex (11-02 21:30 UTC)
+- Shell's "two edges leave a vertex in one direction" (20, ~15 s of OCCT time), by cause: tolerant slab corners
+  (7: another argument's edge leaving a face across its 0.1 mm edge, its point with no tolerance, 0.1 mm from a vertex
+  of the edge it crosses: OCCT's corner one vertex of 0.21 mm, pftrace on 5bb0531e); merged corner vertices
+  (7: a vertex of 0.21-0.23 mm holding two rulings 0.16 mm apart, the arrangement telling directions by tangent
+  alone); a periodic free-form face across its seam (9fccb94d: a whole revolution's curves π..3π on a surface of
+  range 0..2π, its parameter box clipped to π..2π, so the other half's points map into the wrong half: the free-form
+  seam item, not tolerance); absurd or odd inputs (00a8cd46's 1.08 m section, 766ea1fd's 8 mm vertex, dee9f914's
+  overlapping edges of one argument).
+- Now: a point on another argument's edge lying in a face has that edge's tolerance (a crossing on it, as a
+  section's in step 1; an end where it leaves the face also the tolerance of the face's edge it is on), up to 0.5 mm
+  (`seg_edge_tol`, `boundary_tol`); a short arc between two vertices of a group is a micro edge too; the
+  arrangement orders parallel curves leaving a vertex by the side they start on (T1 brep
+  parallel_curves_leaving_one_vertex_go_by_their_side).
+- shfall: "two edges" 20 -> 7; still 45 taken, the same 3 differing. They stop next at "an edge off a plane past its
+  tolerance" (4 -> 11: the merged corner vertex off a made plane edge's plane; that check stays, fuzz seed 1144) and
+  "coincident pieces differ". Corpora decline as before, 0 differ; qa's shellmatrix and boolmatrix identical,
+  cli-shell-gpf Shell 2 Ok.
+
 ## Step 1's knurl time back: the pool's coarse grid (11-02 20:00 UTC)
 - vibe3 baseline knurl (custom_features::knurl_feature_b94_on_a_cylinder) 16.45 -> 22.46 s between 27703a7c and
   801d7a5e: e9346814 (step 1), measured with perf.sh: its parent cade6b03 16.52 s, e9346814 22.44 s (the diamond
