@@ -877,6 +877,10 @@ fn a_twisted_vase_shells_as_live() {
     // (Volume, area and faces: a Boolean against live's coincident offset walls takes 16-26 s.)
     let area = |x: &Shape| surface_properties(x).unwrap().mass;
     assert!((vol(&r) - vol(&live)).abs() < 0.05 && (area(&r) - area(&live)).abs() < 1e-5 * area(&live) && r.count(ShapeType::Face) == 15, "{} mm³ (live {}), {} mm² (live {}), {} faces", vol(&r), vol(&live), area(&r), area(&live), r.count(ShapeType::Face));
+    // Outward the foot's corner lies past the sides, which run on as their own polynomials (live 1799's body).
+    let out = read_parasolid(&dir.join("vase-shell2-outward-live.x_t"), LengthUnit::Millimeter).unwrap();
+    let r = shell_solid(&s, &top(&s, 120.0), 2.0, ShellSide::Outside, ShellMethod::Auto).unwrap().shape;
+    assert!((vol(&r) - vol(&out)).abs() < 0.1 && r.count(ShapeType::Face) == 15, "2 mm outward: {} mm³ (live {}), {} faces", vol(&r), vol(&out), r.count(ShapeType::Face));
     let v = vase();
     let r = shell_solid(&v, &top(&v, 120.0), 2.0, ShellSide::Outside, ShellMethod::Auto).unwrap_or_else(|e| panic!("2 mm outward: {e}")).shape;
     assert!(r.is_valid() && r.count(ShapeType::Face) == 15, "2 mm outward");

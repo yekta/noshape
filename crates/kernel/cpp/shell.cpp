@@ -2888,6 +2888,114 @@ bool add_pcurve(const TopoDS_Edge& ne, const TopoDS_Face& nf, const TopoDS_Edge&
 }
 } // namespace quad
 
+// `bs` continued past its start (or end) in u by `len` (measured along the surface), as its end span's polynomial runs
+// on (Parasolid's continuation: live 1799, a flaring vase's outward wall). The clamped end knot moves out by δ and the
+// p poles next to it become the end span's blossoms at the new knots (homogeneous for rational surfaces); every other
+// pole and knot is kept, so the surface on its own domain is unchanged (checked by the caller). Null: not done.
+occ::handle<Geom_BSplineSurface> continued_u(const occ::handle<Geom_BSplineSurface>& bs, double len, bool at_end)
+{
+  const int p  = bs->UDegree();
+  const int nk = bs->NbUKnots();
+  const int np = bs->NbUPoles();
+  if (nk < 2 || bs->UMultiplicity(at_end ? nk : 1) != p + 1)
+    return nullptr;
+  double a0, a1, b0, b1;
+  bs->Bounds(a0, a1, b0, b1);
+  // The end knot e and the span's other end o.
+  const double e = at_end ? bs->UKnot(nk) : bs->UKnot(1), o = at_end ? bs->UKnot(nk - 1) : bs->UKnot(2);
+  double       speed = 0;
+  for (int k = 0; k <= 8; ++k)
+  {
+    gp_Pnt P;
+    gp_Vec du, dv;
+    bs->D1(e, b0 + (b1 - b0) * k / 8, P, du, dv);
+    speed = std::max(speed, du.Magnitude());
+  }
+  if (!(speed > 1e-300))
+    return nullptr;
+  const double moved = at_end ? e + len / speed : e - len / speed;
+  // The end span's Bezier poles: o inserted to multiplicity p in a copy (the span's p + 1 poles at that end).
+  auto bez = occ::down_cast<Geom_BSplineSurface>(bs->Copy());
+  bez->InsertUKnot(o, p, 1e-12, false);
+  const int                         nb   = bez->NbUPoles();
+  const NCollection_Array1<double>& flat = bs->UKnotSequence();
+  const int                         nf   = flat.Length();
+  const int                         nv   = bs->NbVPoles();
+  const bool                        rat  = bs->IsURational() || bs->IsVRational();
+  NCollection_Array2<gp_Pnt>        poles(1, np, 1, nv);
+  NCollection_Array2<double>        weights(1, np, 1, nv);
+  bs->Poles(poles);
+  if (rat)
+    bs->Weights(weights);
+  else
+    weights.Init(1.0);
+  for (int j = 1; j <= nv; ++j)
+  {
+    // Homogeneous Bezier poles of the end span, from o (k = 0) to e (k = p).
+    std::vector<std::array<double, 4>> B(p + 1);
+    for (int k = 0; k <= p; ++k)
+    {
+      const int    idx = at_end ? nb - p + k : p + 1 - k; // (start: e is pole 1, o pole p + 1)
+      const gp_Pnt q   = bez->Pole(idx, j);
+      const double w   = rat ? bez->Weight(idx, j) : 1.0;
+      B[k]             = {q.X() * w, q.Y() * w, q.Z() * w, w};
+    }
+    // Pole i from the end (i < p): blossom(moved × (p − i), the i knots past the end block, nearest first).
+    for (int i = 0; i < p; ++i)
+    {
+      std::vector<double> args(p - i, moved);
+      for (int k = 0; k < i; ++k)
+        args.push_back(at_end ? flat(flat.Lower() + nf - p - 2 - k) : flat(flat.Lower() + p + 1 + k));
+      std::vector<std::array<double, 4>> c = B;
+      for (int r = 1; r <= p; ++r)
+      {
+        const double t = (args[r - 1] - o) / (e - o);
+        for (int k = 0; k + r <= p; ++k)
+          for (int d = 0; d < 4; ++d)
+            c[k][d] = (1 - t) * c[k][d] + t * c[k + 1][d];
+      }
+      const double w = c[0][3];
+      if (!(w > 0))
+        return nullptr;
+      const int pi    = at_end ? np - i : i + 1;
+      poles(pi, j)   = gp_Pnt(c[0][0] / w, c[0][1] / w, c[0][2] / w);
+      weights(pi, j) = w;
+    }
+  }
+  NCollection_Array1<double> uk(1, nk), vk(1, bs->NbVKnots());
+  NCollection_Array1<int>    um(1, nk), vm(1, bs->NbVKnots());
+  bs->UKnots(uk);
+  bs->UMultiplicities(um);
+  bs->VKnots(vk);
+  bs->VMultiplicities(vm);
+  uk(at_end ? nk : 1) = moved;
+  try
+  {
+    return rat ? new Geom_BSplineSurface(poles, weights, uk, vk, um, vm, p, bs->VDegree())
+               : new Geom_BSplineSurface(poles, uk, vk, um, vm, p, bs->VDegree());
+  }
+  catch (const Standard_Failure&)
+  {
+    return nullptr;
+  }
+}
+
+// `bs` continued past all four of its sides by `len` (u's ends, then v's with the directions swapped); null where a
+// side can't be.
+occ::handle<Geom_BSplineSurface> continued(const occ::handle<Geom_BSplineSurface>& bs, double len)
+{
+  occ::handle<Geom_BSplineSurface> s = occ::down_cast<Geom_BSplineSurface>(bs->Copy());
+  for (int side = 0; side < 4 && !s.IsNull(); ++side)
+  {
+    if (side == 2)
+      s->ExchangeUV();
+    s = continued_u(s, len, side % 2 == 1);
+    if (!s.IsNull() && side == 3)
+      s->ExchangeUV();
+  }
+  return s;
+}
+
 bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double thickness, double sign, Built& out)
 {
   const bool dbg = std::getenv("NOSHAPE_SHELL_DEBUG") != nullptr;
@@ -3015,13 +3123,18 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       // edges lie past the face where it flares (a vase's foot), the offsets must meet there.
       if (auto bs = occ::down_cast<Geom_BSplineSurface>(q.base); !bs.IsNull() && !bs->IsUPeriodic() && !bs->IsVPeriodic())
       {
-        occ::handle<Geom_BoundedSurface> ext = occ::down_cast<Geom_BoundedSurface>(bs->Copy());
         const double                     len = std::min(3 * thickness, 0.5 * size);
         try
         {
-          for (const bool in_u : {true, false})
-            for (const bool after : {true, false})
-              GeomLib::ExtendSurfByLength(ext, len, 1, in_u, after);
+          // Its own polynomials run on (live 1799); GeomLib's tangent extension where that can't be done.
+          occ::handle<Geom_BoundedSurface> ext = continued(bs, len);
+          if (ext.IsNull() || std::getenv("NOSHAPE_SHELL_TANGENT_EXTENSION"))
+          {
+            ext = occ::down_cast<Geom_BoundedSurface>(bs->Copy());
+            for (const bool in_u : {true, false})
+              for (const bool after : {true, false})
+                GeomLib::ExtendSurfByLength(ext, len, 1, in_u, after);
+          }
           bool same = !ext.IsNull();
           for (int a = 0; a <= 4 && same; ++a)
             for (int b = 0; b <= 4 && same; ++b)
