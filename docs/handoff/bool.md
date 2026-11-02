@@ -1124,6 +1124,21 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Knurls: lenses and the corner-edge class are most of what's left (11-02 09:40 UTC)
+- The sweep's 72 declined cases rerun (vibe5 ~/agents/sweep/bad7.tsv): 9 taken, 37 two edges leave a vertex in one
+  direction, 21 a non-manifold result, 5 singles.
+- "Two edges": pieces under 100 tol between the same two vertices, both straightened onto one chord (1d4f8171's
+  rule). On the 30 TPI group (Ø25 × 10 CP30 45/30) they are two tools' helical edges crossing twice 2 um apart,
+  1.3-2.4 um apart between (a real lens); on Ø100 × 25 CP20 two sections 1 um apart. Drawing each such pair as
+  arcs through their own middles (/root/bool-scratch/knurl-arcs2.patch) gets past it; then the 30 TPI case is the
+  corner-edge class again (12k open edges: a tool's corner edge 3 um outside the cylinder, its flank's section
+  with the cylinder missing along it), and Ø100 thousands of 1 um lenses classified by rays that their tool
+  neighbours disagree with (merging such sections breaks the flanks; deciding a lens by its edges' kept neighbours
+  disagrees on 22k). Next: the corner-edge class's missing section.
+- Shell's slab Booleans left (shfall): mostly tolerant inputs (1e-5..1e-4 m edges and vertices: lines 37 um off a
+  cylinder's ruling, 73 um section pieces whose ends collapse into one vertex); a ruling's end at its own angle
+  (/root/bool-scratch/cyl-line-slant.patch) gets 5 of the 19 "two edges" one step further, none taken: not landed.
+
 ## op_boolean's tree of fuses lost a tool (user's P1, 11-02 09:00 UTC)
 - bf976715 (Shell's fuse of a part with 47 slabs) through op_boolean: 5.755e-5 m³, the union is 6.154e-5 (plain
   OCCT, ours). The step: fuse_tree (many tools with free-form faces: a balanced tree of OCCT fuses two at a time)
