@@ -534,6 +534,13 @@ fn a_ray_crossing_a_twisted_flank_twice() {
     valid_as_occt("5074542e7423ed66", 1e-8);
 }
 
+/// Two sheets on one cylinder (a hole's wall in two pieces; recorded, fuzz seed 1192's mirror: model-core asks
+/// whether faces overlap by their common): taken as two coplanar sheets are ("sheets that meet").
+#[test]
+fn a_common_of_two_sheets_on_one_cylinder() {
+    valid_as_occt("0dd37c751e8ee2b3", 1e-9);
+}
+
 /// Slivers a micrometre wide between two end caps whose edges nearly meet for 330 µm (recorded: the Ø10 × 25 knurl
 /// at 45° / 30°, CP30, its tools 21 and 58): every point of one is in the grey band of the other cap's boundary ("a
 /// piece's point near a coincident face's boundary"); on the cap's side or not by a curve of it that is a piece of

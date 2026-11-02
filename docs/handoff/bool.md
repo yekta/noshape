@@ -1109,6 +1109,31 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## qa's NOSHAPE_BOOL_FALLBACK=0 fuzz again; sheets on one cylinder (11-02 04:30 UTC)
+- qa's 29 BOOL-DECLINE tickets (seeds 1191-1210 on 45424566: 755 declined calls). The same seeds with a CLI of this
+  worktree (vibe4 ~/bool-fuzz/nfrun.sh: clifuzz_nf.py, NOSHAPE_RECORD_FAILED; cases in
+  ~/agents/bool-corpora/nf/<seed>, all in nfall): 155 declined calls, by seeds hit: coincident pieces differ 5,
+  two edges leave a vertex in one direction 3, sheets that meet 3, an edge on another argument's free-form face 3,
+  then 2 each (an ellipse across a cylinder's seam, an edge off a plane past its tolerance, a plane nearly along a
+  cylinder, a piece across its surface's seam angle, a non-manifold result, a face lost) and 1 each (no clean ray,
+  an invalid result, an edge nearly on another argument's face, an arc across a cylinder's seam, a tolerant input,
+  a tiny arc, a new edge on a free-form face, a face's vertex off its plane, a conic edge, a closed edge). By calls:
+  coincident pieces differ 36, a closed edge 26 (one model: a 0.19 mm line whose two ends are one vertex of
+  tolerance 1.9e-4, a bad input), an invalid result 13, ellipse / arc across a cylinder's seam 12 + 12.
+- Fixed: "sheets that meet" for two sheets on one cylinder (a hole's wall in pieces, 12 calls of seed 1192):
+  coaxial cylinders with one radius go as coplanar sheets do, apart past the grey band as crossing ones. T1
+  a_common_of_two_sheets_on_one_cylinder (OCCT's result).
+- Next, "coincident pieces differ" (smallest: nfall/a0c5604f279369fa, a common of two coplanar sheets: a face of
+  two arcs (two discs' union) and a whole circle 1 mm off one of them, its seam vertex inside the face; only the
+  face's piece was found on the circle's).
+- Knurl grid at the end of this round (vibe4 ~/agents/sweep/final.tsv, all of today's fixes, 126 of 356 done): 107
+  taken; declining: non-manifold at Ø10 (heights 50-100, CP12-30, 30° helix) and CP30 at Ø25 (heights 10-17), one
+  each at Ø25 × 71 CP12 45/30 and Ø63 × 17 CP12 45/45, Ø25 × 10 CP20 80/30 (the seam crossing), "two edges leave a
+  vertex in one direction" Ø10 × 10 45/45 (pool vertices 4e-14 apart), "an edge against its curve" Ø25 × 25 CP20
+  45/45. The Ø10 / CP30 non-manifold edges are short pieces of a groove's corner edge (3 um outside the cylinder)
+  where another groove crosses it (not the whole section along the edge: merging sections into edges within the
+  section's own 5 um tolerance didn't change them).
+
 ## Shell's slab fuses: offset faces; the seeded sections' cost (11-02 03:00 UTC)
 - Offset faces (rust_boolean.cpp to_body): a Geom_OffsetSurface is taken as the elementary surface OCCT keeps as its
   equivalent (a plane's, cylinder's, cone's offset), else as a B-spline within 1e-7 of it over the face's parameter

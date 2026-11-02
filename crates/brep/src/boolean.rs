@@ -2903,10 +2903,18 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             Surface::Plane { origin, normal } => Some((origin, normal)),
             _ => None,
         };
+        // (Two faces on cylinders about one axis: their radii's difference; None for any other two.)
+        let coaxial = |f: &Face, g: &Face| match (f.surface, g.surface) {
+            (Surface::Cylinder { origin: o1, axis: a1, radius: r1, .. }, Surface::Cylinder { origin: o2, axis: a2, radius: r2, .. }) => {
+                let w = o2 - o1;
+                (a1.cross(a2).length() <= 1e-9 && (w - a1 * w.dot(a1)).length() <= tol).then_some((r1 - r2).abs())
+            }
+            _ => None,
+        };
         let crossing = args[0].faces.iter().all(|f| {
             args[1].faces.iter().all(|g| match (plane(f), plane(g)) {
                 (Some((o1, n1)), Some((o2, n2))) => n1.cross(n2).length() > 1e-9 || (o2 - o1).dot(n1).abs() > GREY * tol,
-                _ => false,
+                _ => coaxial(f, g).is_some_and(|dr| dr > GREY * tol),
             })
         });
         let bx = |b: &Body| {
@@ -2926,10 +2934,11 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         };
         let ((l0, h0), (l1, h1)) = (bx(args[0]), bx(args[1]));
         // (Every pair of faces on planes that cross, or on one plane within the tolerance, or apart past the grey band.)
+        // (Or on one cylinder (a hole's wall in pieces), or on cylinders about one axis apart past the grey band.)
         let planar = args[0].faces.iter().all(|f| {
             args[1].faces.iter().all(|g| match (plane(f), plane(g)) {
                 (Some((o1, n1)), Some((o2, n2))) => n1.cross(n2).length() > 1e-9 || (o2 - o1).dot(n1).abs() <= tol || (o2 - o1).dot(n1).abs() > GREY * tol,
-                _ => false,
+                _ => coaxial(f, g).is_some_and(|dr| dr <= tol || dr > GREY * tol),
             })
         });
         if !crossing && boxes_meet(l0, h0, l1, h1, GREY * tol) && !planar {
