@@ -7,6 +7,32 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 right (7607.301), mirror set and cli-fillet-segv right; published 08:43:30 (all three bundles); the release tarball is byte-identical to the smoked artifact.
 Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfmir2 B P0.
 
+## Session 7 (qa, pinned account, from 11-02 22:40; greens bc7d7e9f → 6b4704f2)
+
+- **11-02 23:25 state.** Watch re-armed (`bash /tmp/qa-watch.sh`, run_in_background; it now also stops on **GUIFUZZ** — a
+  fz*-result.txt with DIED / NOAPP). **The GUI fuzz on :110 / :131 had run with no app since 11-01 11:05**: the
+  noshape-green-new / -cur symlinks pointed at a deleted green copy and fuzz.py printed "alive" anyway. Fixed: fuzz.py
+  prints NOAPP when no pid, and **every time a green copy is made or deleted, re-point both symlinks**
+  (`ln -sfn rel/k/green/p/noshape-<sha> noshape-green-new` and `-cur`). Green copies: noshape-bc7d7e9f (nfloop20 /
+  gfloop6 use it via /tmp/qa-wrapgw.sh), noshape-6b4704f2 (the symlinks; /tmp/qa-w-6b4.sh is a quiet CLI wrapper).
+  Detached: /tmp/qa-nfloop20.sh (fallback off, 1761–1780), /tmp/qa-gfloop6.sh (1741–1760), /tmp/qa-cfloop65.sh (v22,
+  1661–1680). Pause :110's GUI fuzz with `touch /tmp/qa-fz-pause-110` (wait for "idle" in /tmp/qa-fz-state-110) before
+  using :110; my own app runs use HOME=/tmp/qa-home3 (default panel widths; the shared HOME's left_panel_width.txt is
+  moved by the fuzz).
+- **New standing work (lead 23:35, docs/PARITY-SUITES.md):** (1) interaction scenarios, **69 drafted** in
+  /root/qa-scratch/ui-parity/ (format README-draft.md, starts.json; generator qa-scratch/bin/mkscen.py — add scenarios
+  there and re-run it); move them to tests/ui-parity/ once psui / live write its README; target 100 by 11-05, 300 by
+  11-09; every UI difference found becomes a scenario as well as a ticket. (2) docs/parity/SCORE.md, one line per day
+  from **11-03 evening** (models from dx's T2 parity_models, scenarios from psui's runner, five biggest causes).
+  (3) VAR-AUTOCOMPLETE-ENTER reproduced: the autocomplete works, but a first click / Tab into a number field doesn't
+  select all (live does), so `#wall` lands inside the old value (ticket updated, tickets/varac/).
+- Verified tonight: COMPOSITE-LATER-FEATURE, LOFT-ONE-FACE, FILL-G1-DOME (bin/fillg1.py), RUST-MIRROR-ZERO-SOLID;
+  ROW-TOOLTIP-WIDE-PANEL not reproduced. Still open: RUST-MIRROR-SPLIT-FACES (8 vs 5 faces). App rows (mirror set, P0
+  repros, sheet metal, c14) on bc7d7e9f = v0.4.21. Live request qa 23:10: sketch-mode Undo / Redo state (ours: both
+  enabled on entering a sketch).
+- Next: 04:30 blocker list (nothing blocks so far), then the 05:00 release steps from Session 6's handover below
+  (artifact check, relsmoke, updater on :149); more scenarios; SCORE.md first line 11-03 evening.
+
 ## Session 6 (qa, another account, from 10-28 16:45; greens 78958d0f → 5267fdaf → 87ddb793 → b184b401 → 4994be03 → 4b9d7eaf → b8f46ab6 → e66f8a83 → 989f756b → e4cccdff → 70eb094c → 59c8c51e → 58d89104)
 
 - **11-02 22:27 update — HANDOVER to the next qa session (account move).**
