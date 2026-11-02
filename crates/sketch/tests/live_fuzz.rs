@@ -1343,15 +1343,19 @@ fn drag_probes() -> Vec<(String, Case, String, DVec2)> {
 #[test]
 #[ignore = "T2: live fuzz drag probes"]
 fn drag_probe_matches() {
+    let live: Option<Value> = std::fs::read_to_string(fixture("sketch-probe-7.live.json")).ok().and_then(|t| serde_json::from_str(&t).ok());
     let cases: Vec<Value> = drag_probes().into_iter().map(|(name, mut c, point, by)| {
         let o = ours(&mut c);
         let from = c.pos(&point) / MM;
         let to = from + by;
+        let id = name.split(' ').next().unwrap().to_string();
+        // Ours dragged to where live's pointer landed (within a pixel of
+        // `to`), when live answered.
+        let end = live.as_ref().and_then(|l| l["cases"][&id]["drag"]["final"].as_array().map(|f| DVec2::new(f[0].as_f64().unwrap(), f[1].as_f64().unwrap()))).unwrap_or(to);
         let p = c.point(&point);
         for k in 1..=25 {
-            c.sk.drag(&[(DragHandle::Point(p), (from + by * (k as f64 / 25.0)) * MM)]);
+            c.sk.drag(&[(DragHandle::Point(p), (from + (end - from) * (k as f64 / 25.0)) * MM)]);
         }
-        let id = name.split(' ').next().unwrap().to_string();
         json!({"case": id, "what": name, "constraints": c.spec, "onshape": {"entities": c.os_entities, "constraints": c.os_constraints}, "ours": o, "drag": {"point": point, "to": [to.x, to.y], "ours": ours_points(&c)}})
     }).collect();
     let b = json!({"units": "mm (Onshape JSON: metres, radians)", "plane": "Top", "cases": cases});
@@ -1359,8 +1363,7 @@ fn drag_probe_matches() {
     if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == "probe-7") {
         std::fs::write(&path, serde_json::to_string_pretty(&b).unwrap()).unwrap();
     }
-    let Ok(live) = std::fs::read_to_string(fixture("sketch-probe-7.live.json")) else { return };
-    let live: Value = serde_json::from_str(&live).unwrap();
+    let Some(live) = live else { return };
     let (mut total, mut ok) = (0, 0);
     for case in b["cases"].as_array().unwrap() {
         let Some(after) = live["cases"][case["case"].as_str().unwrap()]["drag"]["after"].as_object() else { continue };
