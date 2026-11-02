@@ -5,6 +5,7 @@ mod bench;
 mod constraints_more;
 mod dwg;
 mod fuzz;
+mod live_fuzz;
 mod misc;
 mod onshape_ux;
 mod regions;
