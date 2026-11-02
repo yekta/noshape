@@ -2218,6 +2218,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
+- [ ] P2 OCCT-0019-DEPLOY (dx 2026-11-02 18:50 UTC, for lead / core): patches/occt/0019-step-parallel-shape-processing.patch
+  (landed cd13ca69) makes STEP reads about 2.5x faster with byte-identical results (formats.md, "Speed on big
+  files"). CI builds it from the patch set; the machines' OCCT installs (local /root/occt, vibe3/4/5 /opt/occt) need
+  TKDESTEP rebuilt from the patched source, then libTKDESTEP.a and STEPControl_ActorRead.hxx installed. A build
+  with it is on vibe5 at ~/agents/dx/occt-root, tree ~/agents/dx/occt-work. Nothing calls the patch's API, so it is
+  safe to deploy machine by machine. Release builds get the speed-up only once theirs has it.
 - [x] fixed (dx 11-02 17:27) P2 XT-PERIODIC-SPLINE-FACE (core 11-02, request 1782): live's smooth twisted vase loft
   (crates/kernel/tests/data/shell/vase-smooth-live-loft.x_t, Parasolid text from live: one closed B-spline side face
   with no seam edge, two planar caps, 3 faces / 24 edges, 437833.229 mm³) reads as **4 faces, 126983.225 mm³, invalid**
