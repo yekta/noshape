@@ -91,10 +91,11 @@ fn draw(cx: &mut TestAppContext, window: AnyWindowHandle) {
     cx.run_until_parked();
 }
 
-/// Draws until `done` holds (a regeneration on the background threads), at most 5 s.
+/// Draws until `done` holds (a regeneration on the background threads), at most 30 s (a loaded land server takes
+/// seconds; it returns as soon as `done` holds).
 fn wait_until(cx: &mut TestAppContext, window: AnyWindowHandle, done: impl Fn(&gpui_kit::App) -> bool) {
     let t = std::time::Instant::now();
-    while !cx.update(|cx| done(cx)) && t.elapsed() < std::time::Duration::from_secs(5) {
+    while !cx.update(|cx| done(cx)) && t.elapsed() < std::time::Duration::from_secs(30) {
         std::thread::sleep(std::time::Duration::from_millis(10));
         cx.executor().advance_clock(std::time::Duration::from_millis(20));
         draw(cx, window);
