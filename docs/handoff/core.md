@@ -8,6 +8,14 @@ Builds and tests (11-01): on vibe4 only, `tools/tiers/rb.sh <cmd>` from the work
 (land.sh runs the full set); long probes detached on vibe4 with a log. OCCT patches build on vibe4 in
 ~/agents/core-occt (`build.sh TK...`); a private root ~/agents/occt-priv; libs go to /root/occt (synced everywhere).
 
+**State 11-02 16:25.** Since 15:50 landed / queued: planar Fill (e1f0fdb8) and Fill on a cylinder (live 1762),
+Shell's no-cavity rule (bc497e6a, live 1794), Fill's per-edge adjacent faces, FL7's single-chain rule (70eb8b23, live
+1796), the direct Shell construction first for sharp free-form edges (99e534b6) and its B-spline faces continued as
+their own polynomials (live 1799), the feature audit's table. Checked and not a gap: a box on a thin flange shells by
+slabs in 40 ms (thin regions kept solid as live). Open: shell-hang Shell 5 (live builds; ours fails in 17 s: OCCT's
+offset modes all give no solid), FI2 (G1 Fill dome: OCCT's plate throws), the working-scale Shell (6 tests moved).
+perf.sh of bench_edit_latency_reuse started on vibe3 15:45 (log /root/core-scratch/perf-reuse.log).
+
 **State 11-02 15:50.** Landed since 14:50: NF-CHAMFER-HANG-1212 (a40adc90, patch 0018, lib sync asked),
 COMPOSITE-LATER-FEATURE (75d20033), loft circle split (466a0805), feature audit batches 11-13 with BD2 / WR1 fixed
 (35281650, d09b7b79); queued: planar Fill as a plane (live 1762: qa5-mb / rib23 / surf-main depth edits 110 -> 9.7 ms, vibe5 bench), Shell's no-cavity rule (live 1794). Open with live:
