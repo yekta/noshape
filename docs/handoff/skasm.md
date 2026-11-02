@@ -482,7 +482,8 @@ fs-oracle-asm vocabulary, mates added one at a time as live does; asm-N.live.jso
 | batch | cases | sent to live | answered | match | differences fixed |
 |---|---|---|---|---|---|
 | sketch 1 (lines, arcs, circles; 11 drags) | 20 | REQUESTS 09:45 | 20 + drags + curve colours | solvability 19 → 20; positions 0–1 (least change) | 1: a redundant dimension |
-| least-change probes | 14 | REQUESTS 11:30 | 14 | 4 | – (rule found, see below) |
+| least-change probes 1 | 14 | REQUESTS 11:30 | 14 | 4 | – (rule, see below) |
+| least-change probes 2 | 10 | REQUESTS 12:15 | 10 | 1 | – (rule, see below) |
 | asm 1 (BLOCK / PLATE / PIN, 1–4 mates) | 20 | REQUESTS 10:05 | – | – | 1 before live: f8 / f11 / f19 |
 | sketch 2 (+ fit splines, conics, angles) | 20 | REQUESTS 10:40 | – | – | – |
 Fixed before live answered: an axial mate whose connectors start exactly perpendicular (a part inserted square to its
@@ -513,6 +514,16 @@ Ours (weighted minimum norm over point coordinates) splits each change (p1: both
 it reads as a constructive solve (keep what is tied, move what dangles, carry rigid pieces), like the assembly tree
 placement. That's the next solver change (it also governs the app's dimension edits: dimension_edit_options only
 special-cases an arc's radius, so editing a line's length moves both its ends today, live moves the end).
+Probes 2 (live 10:10, 10 cases, 1 match: q9 concentric) separate the readings: a lone line keeps its endpoint with
+the SMALLER x whatever way it was drawn (q1 (100,50)→(120,50) keeps 100; q2 (20,0)→(0,0) keeps the end at 0, its start
+goes to 15; q3 (−20,0)→(0,0) keeps −20, the end at 0 moves); Equal shrinks the longer line to the shorter in either
+creation order (q5, q6); Parallel turns the line at the larger angle to the smaller, about its lower start (q7; q8 5° /
+10° → both 5°); concentric moves the circle at larger coordinates (q9). Structure first: a dimensioned line whose end is
+tied to an arc moves its free start (p10), what hangs on a moved end is carried rigidly (p3, p9, q4, q10).
+Design for the solver change (next): a constructive pass like the assembly tree placement: entities ordered by how
+constrained they are (ties: the "smaller" first: lower point, shorter, smaller angle), each solved alone against the
+placed ones in its own (lower endpoint, angle, length) terms with the least change there, then every constraint
+checked; anything unheld falls back to today's weighted minimum norm. Probes 1+2 (24 cases) and batch 1 are its tests.
 UI drags (11 in batch 1) compare ours dragged to where live's pointer ended (live lands within 0.2 mm): s12's differs
 the same way (what follows the dragged point).
 Next batches: splines / conics / angles (once live confirms their REST form), assemblies with drags and patterns.

@@ -1,0 +1,222 @@
+{
+ "note": "Live 2026-11-02, Part Studio \"skasm probes 2\" in \"skasm speed\"; each probe POSTed as is on Top; points via evVertexPoint(sketchEntityQuery), centres/radii via evCurveDefinition (mm, 6 dp).",
+ "cases": {
+  "q1": {
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     115,
+     50
+    ],
+    "l1.start": [
+     100,
+     50
+    ]
+   },
+   "radii": {}
+  },
+  "q2": {
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     0,
+     0
+    ],
+    "l1.start": [
+     15,
+     0
+    ]
+   },
+   "radii": {}
+  },
+  "q3": {
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     -5.0,
+     0
+    ],
+    "l1.start": [
+     -20,
+     0
+    ]
+   },
+   "radii": {}
+  },
+  "q4": {
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     115,
+     50
+    ],
+    "l1.start": [
+     100,
+     50
+    ],
+    "l2.end": [
+     115,
+     60.0
+    ],
+    "l2.start": [
+     115,
+     50
+    ]
+   },
+   "radii": {}
+  },
+  "q5": {
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     10,
+     5
+    ],
+    "l1.start": [
+     0,
+     5
+    ],
+    "l2.end": [
+     10,
+     0
+    ],
+    "l2.start": [
+     0,
+     0
+    ]
+   },
+   "radii": {}
+  },
+  "q6": {
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     110,
+     50
+    ],
+    "l1.start": [
+     100,
+     50
+    ],
+    "l2.end": [
+     110,
+     55
+    ],
+    "l2.start": [
+     100,
+     55
+    ]
+   },
+   "radii": {}
+  },
+  "q7": {
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     20.099751,
+     5
+    ],
+    "l1.start": [
+     0,
+     5
+    ],
+    "l2.end": [
+     20,
+     0
+    ],
+    "l2.start": [
+     0,
+     0
+    ]
+   },
+   "radii": {}
+  },
+  "q8": {
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     20,
+     1.749773
+    ],
+    "l1.start": [
+     0,
+     0
+    ],
+    "l2.end": [
+     20.231252,
+     11.770005
+    ],
+    "l2.start": [
+     0,
+     10
+    ]
+   },
+   "radii": {}
+  },
+  "q9": {
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "c1.center": [
+     100,
+     50
+    ],
+    "c2.center": [
+     100,
+     50
+    ]
+   },
+   "radii": {
+    "c1": 10,
+    "c2": 4
+   }
+  },
+  "q10": {
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     125,
+     50
+    ],
+    "l1.start": [
+     100,
+     50
+    ],
+    "l2.end": [
+     125,
+     60
+    ],
+    "l2.start": [
+     125,
+     50
+    ],
+    "l3.end": [
+     100.0,
+     60
+    ],
+    "l3.start": [
+     125,
+     60
+    ],
+    "l4.end": [
+     100,
+     50.0
+    ],
+    "l4.start": [
+     100,
+     60
+    ]
+   },
+   "radii": {}
+  }
+ }
+}
