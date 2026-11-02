@@ -245,7 +245,7 @@ impl Sketch {
             // constraints hold), so the others come to it (fuzz s8: the
             // dimensioned circle of a concentric pair moves onto the other).
             let own_hold = |u: EntityId| cons.iter().filter(|(_, us)| us.as_slice() == [u]).all(|(c, _)| holds[c]);
-            let keep = cons.iter().filter(|(c, us)| us.len() >= 2 && !holds[c] && !us.iter().any(|x| placed.contains(x)) && !self.chained_to_change(*c, cons, &holds)).find_map(|(c, us)| {
+            let keep = cons.iter().filter(|(c, us)| us.len() >= 2 && !holds[c] && !(self.connective(*c) && self.aliased(*c)) && !us.iter().any(|x| placed.contains(x)) && !self.chained_to_change(*c, cons, &holds)).find_map(|(c, us)| {
                 let k = self.kept_first_in(us, cons, Some(*c));
                 let resized = anchored.contains(&k) && self.chained_size(k, cons).is_some_and(|x| (x.value().unwrap_or(0.0) - self.size(k)).abs() > 1e-9);
                 (own_hold(k) && !resized && self.class_keeps(*c, k, cons) && self.direction_agrees(k, cons)).then_some(k)
@@ -367,7 +367,7 @@ impl Sketch {
                 // whole, the top stretches; s8: a triangle side tied to a
                 // turned line turns too, its other end stays; probe t1: the
                 // top doesn't move sideways, the left side couldn't follow).
-                if hold == 0 && shape >= 1 && matches!(st, SolveStatus::Solved) && !held.is_empty() && !self.neighbours_follow(&sub, u, &held, &before, &placed) {
+                if hold == 0 && shape >= 1 && matches!(st, SolveStatus::Solved) && !held.is_empty() && !self.neighbours_follow(&sub, u, &held, &before, &placed, cons) {
                     continue;
                 }
                 if matches!(st, SolveStatus::Solved) {
@@ -438,6 +438,26 @@ impl Sketch {
         true
     }
 
+    /// Whether constraint `c` only reads as not holding because a point of
+    /// its curves has moved off a point it coincides with (the evaluation
+    /// merges coincident points: fuzz s368, a Tangent next to a moved
+    /// corner, isn't a reason to keep the arc as it is; a Perpendicular
+    /// read that way still is, fuzz s238).
+    fn aliased(&self, c: crate::ids::ConstraintId) -> bool {
+        let Some(k) = self.constraint(c) else { return false };
+        if matches!(k.kind, ConstraintKind::Coincident { .. }) {
+            return false;
+        }
+        k.kind.entities().iter().flat_map(|e| {
+            let mut v: Vec<EntityId> = self.entity(*e).map(|x| x.point_refs().into_iter().collect()).unwrap_or_default();
+            v.push(*e);
+            v
+        }).any(|p| self.coincident_with(p).iter().any(|q| match (self.point(p), self.point(*q)) {
+            (Some(a), Some(b)) => (a - b).length() > 1e-9,
+            _ => false,
+        }))
+    }
+
     /// How far a placed unit's shared point is from `u`'s (the move
     /// carrying `u` onto placed geometry would take).
     fn pulled_by(&self, u: EntityId, placed: &BTreeSet<EntityId>, unit_of: &HashMap<EntityId, EntityId>) -> f64 {
@@ -474,15 +494,16 @@ impl Sketch {
         }
         let neighbours: BTreeSet<EntityId> = cons.iter().filter(|(c, us)| us.contains(&u) && self.connective(*c)).flat_map(|(_, us)| us.iter().copied()).filter(|x| *x != u && !placed.contains(x)).collect();
         let held: BTreeSet<EntityId> = neighbours.iter().copied().filter(|v| cons.iter().any(|(_, us)| us.contains(v) && !us.contains(&u))).collect();
-        probe.neighbours_follow(&sub, u, &held, &before, placed)
+        probe.neighbours_follow(&sub, u, &held, &before, placed, cons)
     }
 
     /// Whether each unit of `held` sharing a point `u` moved (from `before`
     /// to `sub`) can follow it: the move runs along its line, or it can be
     /// carried across itself because each other unit at its other points is
     /// unplaced and runs along that part of the move.
-    fn neighbours_follow(&self, sub: &Sketch, u: EntityId, held: &BTreeSet<EntityId>, before: &HashMap<EntityId, DVec2>, placed: &BTreeSet<EntityId>) -> bool {
+    fn neighbours_follow(&self, sub: &Sketch, u: EntityId, held: &BTreeSet<EntityId>, before: &HashMap<EntityId, DVec2>, placed: &BTreeSet<EntityId>, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)]) -> bool {
         let Some(own) = self.entity(u).map(|e| e.point_refs()) else { return false };
+        let unit_of_placed = |r: EntityId| placed.iter().any(|x| self.entity(*x).is_some_and(|e| e.point_refs().contains(&r) || e.id == r));
         // A line with a length of its own can't stretch (fuzz s330: an
         // L-bracket's dimensioned short leg doesn't take the riser's move).
         let sized = |v: EntityId| self.constraints().any(|c| c.driving && matches!(c.kind, ConstraintKind::Length { curve, .. } if curve == v));
@@ -507,14 +528,26 @@ impl Sketch {
             }
             for (v, theirs) in sharing(mine, u) {
                 // Free in direction, it follows by turning (probes 5 u8).
-                if !held.contains(&v) || along(v, d) || !self.direction_bound(v) {
+                if !held.contains(&v) || along(v, d) || (self.kind(v) == Some(EntityKind::Line) && !self.direction_bound(v)) {
                     continue;
                 }
                 // Carried across itself (it stretches along): its other
                 // points' units stretch along that.
-                // (Only lines are judged: an arc or circle follows its own
-                // way, live fuzz s17's slot.)
-                let Some(dir) = self.placing_line_dir(v).filter(|x| x.length() > 0.0).map(|x| x.normalize()) else { continue };
+                // An arc or circle follows its own way (live fuzz s17's
+                // slot), unless its other end is on placed geometry (fuzz
+                // s368: a filleted rectangle's top-left arc on the kept left
+                // side: the top stretches, it isn't carried whole).
+                let Some(dir) = self.placing_line_dir(v).filter(|x| x.length() > 0.0).map(|x| x.normalize()) else {
+                    let pinned = self.entity(v).is_some_and(|e| e.point_refs().iter().filter(|q| **q != theirs).any(|q| self.coincident_with(*q).iter().any(|r| unit_of_placed(*r))));
+                    // (One whose size gives way still follows: probes 5 u1,
+                    // the left arc shrinks with its Equal partner.)
+                    let sized_still = self.constraints().any(|c| c.driving && matches!(c.kind, ConstraintKind::Radius { curve, .. } | ConstraintKind::Diameter { curve, .. } if curve == v))
+                        || cons.iter().any(|(c, us)| us.len() == 2 && us.contains(&v) && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Equal { .. })) && us.iter().any(|w| *w != v && placed.contains(w) && (self.size(*w) - self.size(v)).abs() <= 1e-9));
+                    if pinned && sized_still {
+                        return false;
+                    }
+                    continue;
+                };
                 let t = d - dir * dir.dot(d);
                 let Some(vp) = self.entity(v).map(|e| e.point_refs()) else { return false };
                 let n = dir.perp();
