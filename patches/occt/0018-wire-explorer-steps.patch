@@ -1,0 +1,23 @@
+--- a/src/ModelingData/TKBRep/BRepTools/BRepTools_WireExplorer.cxx
++++ b/src/ModelingData/TKBRep/BRepTools/BRepTools_WireExplorer.cxx
+@@ -810,7 +810,9 @@
+   {
+     double startPar      = fP;
+     bool   nextPntOnEdge = false;
+-    while (!nextPntOnEdge && startPar < lP)
++    // noshape (patch 0018): at most the 1000 steps the range was cut into; a step below the parameter's
++    // resolution (a short pcurve far from 0) left startPar where it was, forever (qa NF-CHAMFER-HANG-1212).
++    for (int aStep = 0; !nextPntOnEdge && startPar < lP && aStep <= 1000; ++aStep)
+     {
+       gp_Pnt2d pnt;
+       startPar += dP;
+@@ -841,7 +843,8 @@
+   {
+     double startPar      = lP;
+     bool   nextPntOnEdge = false;
+-    while (!nextPntOnEdge && startPar > fP)
++    // noshape (patch 0018): as above.
++    for (int aStep = 0; !nextPntOnEdge && startPar > fP && aStep <= 1000; ++aStep)
+     {
+       gp_Pnt2d pnt;
+       startPar -= dP;

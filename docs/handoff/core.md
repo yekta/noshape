@@ -8,6 +8,17 @@ Builds and tests (11-01): on vibe4 only, `tools/tiers/rb.sh <cmd>` from the work
 (land.sh runs the full set); long probes detached on vibe4 with a log. OCCT patches build on vibe4 in
 ~/agents/core-occt (`build.sh TK...`); a private root ~/agents/occt-priv; libs go to /root/occt (synced everywhere).
 
+**State 11-02 14:50 (this session, from 11:55).** Builds / tests on vibe5 (rb-hosts), the profile documents copied
+to vibe5 ~/agents/profdocs, fuzz scripts in vibe5 / vibe4 ~/agents/fuzz/bin. Landed: P1 smooth twisted vase (3c534b35:
+loft tangency, direct Shell path for curved tangent edges and outward walls), incremental regeneration on by default
+(097f9750) and reusing more (d79e6fa6), LOFT-ONE-FACE (dc190132) and planar loft faces (a038835c), P1 CRASH-1388
+(4099de0f: the crash guard left a dead budget's deadline as the thread's). In progress: P1 NF-CHAMFER-HANG-1212, OCCT
+patch 0018 (patches/occt/0018-wire-explorer-steps.patch: BRepTools_WireExplorer's GetNextParamOnPC stepped forever
+when its step was below the parameter's resolution; valid_shape's BudgetHold kept the budget from stopping it);
+libTKBRep.a built on vibe4 (~/agents/core-occt, ~/agents/occt-priv), verified with seed 1212 (NOSHAPE_BOOL_FALLBACK=0,
+clifuzz_nf.py 1212 60: unpatched hangs at step 58, patched 0.4 s), in /root/occt, sync asked. Next: live 1788 ((d) rect -> circle split points), the
+direct Shell path's speed on free-form faces (its self-interference check), finer reads for reuse (qa5's Fill).
+
 **LOFT-ONE-FACE (11-02 14:10, landing with this note).** features.cpp `merge_tangent_sides`: after the loft, chains of
 side faces meeting smoothly at the sections (normals equal at both ends of the edge between them, u order face to
 face) become one B-spline face (degrees raised, v knots common, spans scaled to match the u derivative at each joint,
@@ -1375,6 +1386,10 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
+- (11-02 15:05) OCCT patch 0018 (P1 NF-CHAMFER-HANG-1212: a Chamfer's validity check looped forever in TKBRep's wire
+  explorer): please let the sync carry /root/occt/lib/libTKBRep.a to vibe3 / vibe4 / vibe5 (/opt/occt); the old one is
+  /root/core-scratch/libTKBRep.a.pre0018 (same 111 members, only BRepTools_WireExplorer.o differs). Nothing else
+  changes; without it the hang stays on those hosts.
 - (11-02 00:40) Release note (SHELL-SLOW step 2): "Shell: a pocket's floor corners are now mitred as Onshape does (the
   wall used to thin to a point at each corner where the fallback construction built the shell); some shells of complex
   parts change volume slightly." (live 1747; 20 of 211 fuzz-corpus slab results change.)
