@@ -1109,6 +1109,24 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Micrometre junctions on knurls: crossings, tiny pieces, rulings (11-02 12:00 UTC)
+- A crossing of two curves in a face's plane within a section's own tolerance of that section's end is that end,
+  its tolerance grown to the point (OCCT's pave); otherwise a new vertex whose tolerance reaches the other curve
+  when that is a section off it by its error.
+- In a cut, a tool's piece outside every object is outside another tool too when the rays find its point on that
+  tool's face (a 3 um strip of a flank between its corner edge and the cylinder's section; not kept either way).
+- c2_of's ruling test on a cylinder needed only the middle at the far end's angle: a piece shorter than a few
+  tolerances passed and was mapped as a ruling; two knurl sections' 0.32 um pieces from one vertex, 0.64 um apart
+  round the cylinder, then ended at one point in its plane ("two edges leave a vertex in one direction"). Both
+  ends at one angle now (unless at a cone's apex).
+- A piece within 100 tol in space is straight between its vertices' places in a face's plane (its curve on the face
+  can miss them by more than its length); such a section piece merged with a third face's is straight there too
+  (not "a section on a third face"); in the build, such a piece whose parameters came out reversed is a line between
+  its vertices, and an ellipse / section piece on a third face gets its curve there projected.
+- Seam crossing (Ø25 × 24 45/30, Ø25 × 10 CP20 80/30) now taken; Ø25 × 24 against OCCT: equivalent (7.7e-11 of the
+  volume; history ordering), 1.3 s vs OCCT's 11.5 s. Ø10 × 10 45/45 now builds but OCCT's checker finds its 0.45 um
+  section pieces' curves on the flanks off (InvalidCurveOnSurface): declined as invalid.
+
 ## Sections split within their own error (11-02 10:00 UTC)
 - A section (and a section added to a face as its own curve) is split at a pool vertex within its OCCT error
   (`acc`) off it, the ends kept at the Boolean's tolerance (split_reach): two sections crossing in a face's plane are

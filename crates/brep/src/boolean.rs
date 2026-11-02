@@ -832,7 +832,17 @@ impl Ctx<'_> {
             if let Geo::Nurbs { id, t0, t1 } = s.g
                 && let Some((faces, on, _)) = &self.ncurves[id as usize].sec
             {
-                let k = if faces[0] == f { 0 } else if faces[1] == f { 1 } else { return Err(Decline("a section on a third face")) };
+                let k = if faces[0] == f {
+                    0
+                } else if faces[1] == f {
+                    1
+                } else if self.seg_length(s) <= 100.0 * self.tol {
+                    // (A piece a few tolerances long merged with another face's between the same vertices (three
+                    // knurl faces' 0.32 um curves into one vertex): straight between its ends there.)
+                    return Ok(C2::Seg { a: g.to2(self.p(s.v[0])), b: g.to2(self.p(s.v[1])) });
+                } else {
+                    return Err(Decline("a section on a third face"));
+                };
                 return Ok(C2::Nurbs { c: free::scaled(&on[k], su, sv), t0, t1 });
             }
             // (Another argument's straight, round, elliptic or B-spline edge lying on it: the one whose curve on it was
@@ -887,11 +897,15 @@ impl Ctx<'_> {
                 });
             // (A ruling: its middle at the angle of its end off the axis (a short piece of a knurl's section is
             // straight within the tolerance, not a ruling).)
+            // (And its other end at that angle too, unless at a cone's apex: a piece shorter than a few tolerances
+            // is straight, and its middle within the tolerance of either end's angle (two knurl sections' 0.32 um
+            // pieces from one vertex, 0.64 um apart round the cylinder, both mapped as rulings to one point).)
             let ruling = || {
                 let Surf::Cyl { o, a: ax, .. } = g.s else { return false };
                 let off = |p: DVec3| (p - o).cross(ax).length();
-                let far = if off(a) > off(b) { a } else { b };
-                (g.to2(self.seg_at(s, 0.5)).x - g.to2(far).x).abs() <= self.tol
+                let (far, other) = if off(a) > off(b) { (a, b) } else { (b, a) };
+                let x = g.to2(far).x;
+                (g.to2(self.seg_at(s, 0.5)).x - x).abs() <= self.tol && (off(other) <= self.tol || (g.to2(other).x - x).abs() <= self.tol)
             };
             if matches!(g.s, Surf::Cyl { .. }) && ((straight && ruling()) || edge.is_some_and(|e| self.edges[e].g == Geo::Line)) {
                 return g.curve2(a, b, &Geo::Line, copy);
@@ -3755,11 +3769,46 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             Err(e) => Err(*e),
         };
     }
-    let all_crossings: Vec<R<Vec<(usize, f64)>>> = full.into_iter().map(|x| x.map(|v| v.into_iter().map(|c| (c.0, c.2)).collect())).collect();
+    let all_crossings: Vec<R<Crossings>> = full;
+    // (A crossing within a section's own tolerance of that section's end: the end, its tolerance grown to reach the
+    // point, as OCCT's pave on the section (a knurl groove's flank's section with another groove's flank ends on a
+    // corner edge 3 um outside the cylinder; the cylinder's section crosses it 3.9 um from there, in the flank's
+    // plane; split there on the cylinder's section, merged into the end on the other, the two crossed without a
+    // vertex).)
+    let sec_tol = |cx: &Ctx, s: &Seg| match s.g {
+        Geo::Nurbs { id, .. } if cx.ncurves[id as usize].sec.is_some() => cx.ncurves[id as usize].tol,
+        _ => 0.0,
+    };
     for (f, crossings) in all_crossings.into_iter().enumerate() {
         let segs = cx.face_segs[f].clone();
-        for (i, t) in crossings? {
-            cx.pool.add(cx.seg_at(&segs[i], t))?;
+        'cross: for (i, j, t, u) in crossings? {
+            let p = cx.seg_at(&segs[i], t);
+            for (k, x) in [(j, u), (i, t)] {
+                let st = sec_tol(&cx, &segs[k]);
+                if st <= tol {
+                    continue;
+                }
+                let len = cx.seg_length(&segs[k]);
+                let end = if x * len <= st { Some(segs[k].v[0]) } else if (1.0 - x) * len <= st { Some(segs[k].v[1]) } else { None };
+                if let Some(w) = end {
+                    let d = (cx.p(w) - p).length();
+                    if d <= st {
+                        cx.pool.grow(w, d);
+                        continue 'cross;
+                    }
+                }
+            }
+            // (The point is on the first curve; the second, a section, may be off it by its error: the vertex's
+            // tolerance reaches it, as OCCT's vertex of two sections (two of a knurl's cylinder sections crossing
+            // 0.64 um apart in space were split at a vertex each).)
+            let w = cx.pool.add(p)?;
+            let reach = sec_tol(&cx, &segs[i]).max(sec_tol(&cx, &segs[j]));
+            if reach > tol {
+                let d = cx.seg_param(&segs[j], p).1;
+                if d > tol && d <= reach {
+                    cx.pool.grow(w, d);
+                }
+            }
         }
     }
     crate::check_cancel()?;
@@ -4134,6 +4183,10 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                         (pts.len() - 1) as u32
                     });
                 }
+                // (A piece a few tolerances long: straight between its vertices' places here, which its curve on
+                // the face can miss by more than its length (a knurl section's piece 0.4 um long whose curve on the
+                // flank is 1e-13 long).)
+                let c = if ends[0] != ends[1] && cx.seg_length(&s) <= 100.0 * tol { C2::Seg { a: pts[ends[0] as usize], b: pts[ends[1] as usize] } } else { c };
                 lsegs.push((ends, c));
                 lsrc.push(si);
             }
@@ -4338,7 +4391,21 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             }
             let st = match st {
                 Some(st) => st,
-                None => cx.ray_state(pieces[pi].inside, t)?,
+                // (In a cut, a tool's piece outside every object isn't kept whatever it is against another tool: on
+                // that tool's face by the rays (a 3 um strip of a knurl groove's flank outside the cylinder, between
+                // its corner edge and the cylinder's section, 0.6 um from another groove's flank) it is as outside.)
+                None => match cx.ray_state(pieces[pi].inside, t) {
+                    Err(Decline(w))
+                        if w == "a piece's point on another solid's face"
+                            && op == Op::Cut
+                            && arg != 0
+                            && cx.solids[t].arg != 0
+                            && states.iter().filter(|x| cx.solids[x.0].arg == 0).all(|x| x.1 == State::Out) =>
+                    {
+                        State::Out
+                    }
+                    r => r?,
+                },
             };
             states.push((t, st));
         }

@@ -544,6 +544,14 @@ fn an_arc_tangent_to_an_edge_at_a_vertex() {
     valid_as_occt("c8f89e0180653cee", 1e-9);
 }
 
+/// Two knurl grooves crossing at the cylinder's seam 0.8 mm above its end (recorded: the Ø25 × 24 knurl at 45° /
+/// 30°, its tools 13 and 50): micrometre junctions where sections cross within their tolerance of a section's end,
+/// tiny pieces mapped as rulings, short pieces off their curves' ends ("an invalid result" before).
+#[test]
+fn grooves_crossing_at_the_seam() {
+    valid_as_occt("13187a9d1dd709bc", 1e-9);
+}
+
 /// A Shell common whose part has a face of nominal tolerance 1e-5 (its real one 1e-7) and many vertices and edges of
 /// 1e-4 (recorded, Shell's fuzz): the tolerant face checked alone against the other argument (nothing in its grey
 /// band), the vertices and edges by their own rule ("a tolerant input": every tolerant sub-shape was checked, and

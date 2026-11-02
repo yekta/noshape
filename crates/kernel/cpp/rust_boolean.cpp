@@ -1026,6 +1026,21 @@ const char* ellipse_pcurve(const EllEdge& x, const TopoDS_Face& src, const TopoD
       bb.UpdateEdge(e, adjusted, s, loc, BRep_Tool::Tolerance(e));
       return nullptr;
     }
+  // (On a third face, a piece a few tolerances long merged with that face's (three knurl faces' curves into one
+  // vertex): its curve there projected, as for a new edge.)
+  if (!x.curve.IsNull() && BRep_Tool::Pnt(TopExp::FirstVertex(e)).Distance(BRep_Tool::Pnt(TopExp::LastVertex(e))) <= 100 * BRep_Tool::Tolerance(e) + 1e-5)
+  {
+    try
+    {
+      BOPTools_AlgoTools2D::BuildPCurveForEdgeOnFace(e, TopoDS::Face(src.Oriented(TopAbs_FORWARD)));
+      double a, z;
+      if (!BRep_Tool::CurveOnSurface(e, s, loc, a, z).IsNull())
+        return nullptr;
+    }
+    catch (const Standard_Failure&)
+    {
+    }
+  }
   return "an ellipse on another face";
 }
 
@@ -1256,6 +1271,15 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       t0 = *at0;
     if (at1)
       t1 = *at1;
+    // (A piece a few tolerances long whose ends' parameters on its curve came out the wrong way (a knurl section's
+    // 0.3 um piece by three faces' vertices): straight between its vertices, as the Boolean put it in the faces.)
+    if (!(t0 < t1) && p0.Distance(p1) > 1e-12 && p0.Distance(p1) <= 100 * tol)
+    {
+      c   = new Geom_Line(p0, gp_Dir(gp_Vec(p0, p1)));
+      loc = TopLoc_Location();
+      t0  = 0;
+      t1  = p0.Distance(p1);
+    }
     if (!(t0 < t1))
       return "an edge against its curve";
     TopoDS_Edge e;
