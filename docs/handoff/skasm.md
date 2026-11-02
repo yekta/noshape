@@ -624,6 +624,13 @@ live for asm probes 2. Tried and dropped (net worse): y-first "lower" points (s2
 Distance member at the lower point, releasing every moved unit when a loop can't close (s6 170 → 403).
 Open, biggest: s215 (331: live moved the whole triangle 30 mm, kept the slot's bottom), s6 (170: the constructive
 pass fails at the last side, l9's Equal length set before its partner settled), s226 (120), s236 (116), s102 (107).
+13:40: landed the axis key (lines related by Parallel / Perpendicular: the one nearer an axis stays, ties the smaller
+angle; s102 −28 mm; batches 1–3 1666 mm) and drags holding dimensioned curves (s3's drag exact; T2 drags now step 25
+times as live's UI). Sent to live: probes 6 (w1–w10: a distance between two separate loops, which one moves: s226 /
+s236 / s215 disagree), drag probes 7 (d1–d8, UI: s1 shows live translating a dragged rectangle whole, the other loop
+untouched; our point-space least norm deforms it: the drag wants the shape-keeping placement, pending d1–d8), sketch
+batch 4 (s301–s340, everyday profiles regenerated with new values), asm probes 2 (f40 slider, f50 conflict), the
+corner-rectangle editor edit. T2 tests: live_fuzz::drag_probe_matches, batch 4 in live_matches once answered.
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
