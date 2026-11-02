@@ -21,6 +21,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   #wall_thickness, Enter → "2#wall_thickness.5 mm" in red (vd-shell.png); Extrude Depth "#wall_thickness" clicked →
   "#wall_thickn#wall…" (vd-click1-typed.png). On macOS (Cmd+A not used, one click) that is exactly "Enter doesn't take
   #wall_thickness". Fix: first click (and Tab) into a number field selects all, second click places the caret, as live.
+  qa 23:45: **Tab the same**: Tab from the region field (3 presses: an unseen stop, the direction arrow, then Depth) puts
+  the caret at the start of "#wall_thickness", nothing selected; typing 7 gives "7#wall_thickness" (tickets/varac/vd-tab3.png,
+  vd-tab4.png); live selects all on Tab. The sketch dimension box (opens all selected) and #width + Enter there = live (ƒx 30).
+  Scenarios: qa-scratch/ui-parity/extrude-depth-variable-click-once.json and 8 more around it (draft format README-draft.md).
 - [ ] MACOS-GUARD-LOCK (core, CI 41351354303 on agent/ci2 76a61696, macOS arm64 Test, once): the model tests' `all`
   ended with "noshape: the kernel crashed holding a lock; not recoverable" (SIGSEGV) in the custom-feature tests,
   just after `a_cancelled_custom_feature_stops_soon_and_the_studio_is_as_before`. In flight then:
