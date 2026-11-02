@@ -1101,7 +1101,7 @@ fn std_handle(m: &noshape_model::display::FeatureManipulator, i: usize) -> Optio
             }
             Handle::StdArc(ArcHandle { origin: *axis_origin + *axis_direction * axis_direction.dot(rel), axis: *axis_direction, radial, angle: *angle, param: "", flip: None, secondary: *secondary, max: max.abs().max(min.abs()) }, i)
         }
-        M::Points { .. } => return None,
+        M::Points { .. } | M::Triad { .. } => return None,
     })
 }
 

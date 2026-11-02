@@ -966,6 +966,11 @@ pub fn isoparametric_curve(ev: &mut EvalCtx) -> FResult<()> {
 // ------------------------------------------------------------------ edit curve
 
 pub fn edit_curve(ev: &mut EvalCtx) -> FResult<()> {
+    // std's editCurve.fs (its approximation, elevation, planarization and control point edits, its triad and UVN
+    // manipulators); natively only without the FeatureScript host.
+    if crate::regen::custom_features::host().is_some() && std::env::var_os("NOSHAPE_EDIT_CURVE_NATIVE").is_none() {
+        return crate::regen::custom_features::evaluate_std(ev, "editCurve.fs", "editCurve");
+    }
     let refs = ev.query("wire");
     let edges = curve_edges(ev, refs)?;
     if edges.is_empty() {

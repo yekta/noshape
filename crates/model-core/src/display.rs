@@ -380,6 +380,8 @@ pub enum FeatureManipulator {
     Flip { base: DVec3, direction: DVec3, flipped: bool, other_direction: Option<DVec3>, secondary: bool },
     /// `pointsManipulator`: points, one of them selected.
     Points { points: Vec<DVec3>, index: usize },
+    /// `triadManipulator` (LINEAR_3D): a triad at `base + offset`, dragged freely in 3D (Edit curve's control point).
+    Triad { base: DVec3, offset: DVec3 },
 }
 
 /// One point of a `TOGGLE_POINTS` manipulator.

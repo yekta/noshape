@@ -833,6 +833,8 @@ fn hole_dialog_table_values_then_edits() {
 
 #[test]
 fn edit_curve_moves_control_points() {
+    // std's editCurve runs on the FeatureScript host, as in the app.
+    noshape_model::custom::register();
     let mut t = T::new();
     let mut sk = noshape_sketch::Sketch::new();
     let pts: Vec<_> = [(0.0, 0.0), (0.01, 0.01), (0.02, -0.005), (0.03, 0.0)].iter().map(|(x, y)| sk.add_point(DVec2::new(*x, *y))).collect();
@@ -855,6 +857,25 @@ fn edit_curve_moves_control_points() {
     assert!((after.weights.as_ref().unwrap()[1] - 2.0).abs() < 1e-9);
     assert!((after.poles[0] - before.poles[0]).length() < 1e-12);
     let _ = (fs, BodyId { feature: fs, index: 0 });
+    // std editCurve.fs: the selected control point's triad sits at the point less its offset, offset by it; dragging
+    // it (std's onEditCurveManipulatorChange) sets the edit's offsets.
+    let ec = t.ps.features.last().unwrap().id;
+    let mut sel = ParamValues::default();
+    sel.set("indexValue", e("1"));
+    t.set(ec, "selectedIndices", ParamValue::Array(vec![sel]));
+    let res = t.ok();
+    use noshape_model::display::FeatureManipulator as M;
+    let m = &res.display.features.iter().find(|x| x.id == ec).unwrap().manipulators;
+    let Some((key, M::Triad { base, offset })) = m.first() else { panic!("{m:?}") };
+    assert!(key == "offsetManipulator" && (*base - before.poles[1]).length() < 1e-9 && (*offset - DVec3::new(0.0, 0.0, 0.005)).length() < 1e-9, "{m:?}");
+    let f = t.ps.features.last().unwrap().clone();
+    let at = t.ps.features.len() - 1;
+    let ctx = t.reg.regenerate(&t.ps, &ConfigValues::default(), &t.units, &RegenOptions { upto: Some(at), ..Default::default() }).context;
+    let moved = M::Triad { base: *base, offset: DVec3::new(0.002, 0.0, 0.005) };
+    let changed = noshape_model::custom::std_feature::manipulator_change_in((*ctx).clone(), "editCurve", f.id, &f.name, &t.units, &f.params, key, &moved).expect("std's change function ran");
+    let edit = &changed.array("controlPointEdits")[0];
+    let x = edit.get("x").and_then(|v| if let ParamValue::Expr(x) = v { x.cached.map(|q| q.value) } else { None });
+    assert!(x.is_some_and(|x| (x - 0.002).abs() < 1e-12), "{changed:?}");
 }
 
 // ------------------------------------------------------------------ hole records (drawing callouts)

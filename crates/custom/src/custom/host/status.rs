@@ -366,7 +366,7 @@ fn quantity_value(q: &Quantity) -> Value {
 
 /// `@addManipulators(context, id, { key: Manipulator })` (std manipulator.fs):
 /// the feature's manipulators, kept by key (a later call with a key replaces
-/// it). Triads stay native (Transform, Routing curve).
+/// it). Transform's and Routing curve's triads stay native; std's triadManipulator (Edit curve) is a Triad.
 fn add_manipulators(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     use crate::display::FeatureManipulator as M;
     let cx = context_arg(i, &a)?;
@@ -406,6 +406,7 @@ fn add_manipulators(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 })
             })(),
             "FLIP" => (|| Some(M::Flip { base: vec3_of(m.get("base"))?, direction: vec3_of(m.get("direction"))?.normalize_or_zero(), flipped: m.get("flipped").as_bool()?, other_direction: vec3_of(m.get("otherDirection")).map(|d| d.normalize_or_zero()), secondary }))(),
+            "LINEAR_3D" => (|| Some(M::Triad { base: vec3_of(m.get("base"))?, offset: vec3_of(m.get("offset"))? }))(),
             "POINTS" => (|| Some(M::Points { points: m.get("points").as_array()?.iter().filter_map(vec3_of).collect(), index: m.get("index").as_number()? as usize }))(),
             _ => None,
         };
@@ -467,6 +468,11 @@ pub fn manipulator_value(m: &crate::display::FeatureManipulator) -> Option<Value
                 put("otherDirection", dir_value(*d));
             }
             put("style", style(*secondary)?);
+        }
+        M::Triad { base, offset } => {
+            put("manipulatorType", ty("LINEAR_3D")?);
+            put("base", point_value(*base));
+            put("offset", point_value(*offset));
         }
         M::Points { points, index } => {
             put("manipulatorType", ty("POINTS")?);
