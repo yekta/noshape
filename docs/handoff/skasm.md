@@ -699,6 +699,10 @@ the parts Fastened to it (`turn_carrying`: f80's block left behind made its Fast
 74/80; known: f50 (C's Ball 2e-6), f52 / f55 / f64 (free poses through Ball / Cylindrical / Slider chains), f53 (half-turn
 point), f54 (a loop of Cylindricals: live flags Cylindrical 1 and 3). Tried, not needed: flagging exactly the loop the
 failing mate closes (cut edges between its parts): no change once the carry was in.
+With live now (16:30): sketch batch 6 (s381–s420: the everyday kinds plus washers, a plate with a located hole, a D
+shape; generator kinds 5–7 only from seed 381, so batches 4–5 stay as sent) and drag probes 9 (g1–g6, everyday
+profiles; `drag_probe_matches` runs probes 7 and 9). Tried and dropped: Equal relations not freezing a unit in the keep
+step (s201 −26 but s214 / s209 +27 each; s6 still fails at l11, see above).
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
