@@ -737,6 +737,40 @@ fn asm_probes_match_live() {
     assert!(report.is_empty(), "{}", report.join("\n"));
 }
 
+/// Live's assembly probes posted from their own input (`asm-probe-<n>.input.json`,
+/// live's lines in `asm-probe-<n>.live.jsonl`): 1786 and 1798 (conflicting
+/// loops, f69's Parallel, f53's half-turn), 4 (f54's redundant coaxial loops).
+#[test]
+#[ignore = "T2: live's assembly probes from their input"]
+fn asm_spec_probes_match_live() {
+    // 1798 f53par: the half-turn's point when both parts are held (as f53);
+    // a3: every mate reads red in both, live leaves B turned over elsewhere.
+    const KNOWN: &[&str] = &["f53par", "a3"];
+    let mut parts = parts();
+    let (mut answered, mut matches, mut report) = (0, 0, Vec::new());
+    for n in ["1786", "1798", "4"] {
+        let input: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(fuzz_fixture(&format!("asm-probe-{n}.input.json"))).unwrap()).unwrap();
+        let Ok(live) = std::fs::read_to_string(fuzz_fixture(&format!("asm-probe-{n}.live.jsonl"))) else { continue };
+        for l in live.lines().filter(|l| !l.trim().is_empty()).map(|l| serde_json::from_str::<serde_json::Value>(l).unwrap()) {
+            let Some(case) = input["cases"].as_array().unwrap().iter().find(|c| c["case"] == l["case"]) else { continue };
+            answered += 1;
+            let asm = spec_assembly(&parts, case);
+            let d = fuzz_differences(&serde_json::json!({"ours": fuzz_ours(&mut parts, &asm)}), &l);
+            let name = l["case"].as_str().unwrap_or("?");
+            if d.is_empty() {
+                matches += 1;
+            } else {
+                println!("  {n} {name}: {}", d.join("; "));
+                if !KNOWN.contains(&name) {
+                    report.push(name.to_string());
+                }
+            }
+        }
+    }
+    println!("live assembly probes from input: {answered} answered, {matches} match");
+    assert!(report.is_empty(), "{}", report.join(", "));
+}
+
 /// One fuzz case mate by mate (FUZZ_CASE=<seed>): each step's statuses.
 #[test]
 #[ignore = "debug: one fuzz case"]
@@ -790,6 +824,10 @@ fn spec_assembly(parts: &Parts, spec: &serde_json::Value) -> Assembly {
         let mut x = mate(10 + asm.mates.len() as u64, t, side(&m["first"]), side(&m["second"]));
         x.flip_primary = m["flip_primary"].as_bool().unwrap_or(false);
         x.name = m["name"].as_str().unwrap_or("").to_string();
+        if let Some(o) = m["offset_mm"].as_array() {
+            let at = |k: usize| o.get(k).and_then(|v| v.as_f64()).filter(|v| *v != 0.0).map(|v| ExprValue::new(format!("{v} mm")));
+            (x.offset_x, x.offset_y, x.offset_z) = (at(0), at(1), at(2));
+        }
         asm.mates.push(x);
     }
     asm

@@ -1,0 +1,815 @@
+{
+ "parts": "fs-oracle-asm",
+ "method": "as batches; mates and starts from asm-3 f54 (C, D left out)",
+ "cases": [
+  {
+   "case": "c1",
+   "instances": [
+    {
+     "name": "A",
+     "part": "PLATE",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "PIN",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 269.6,
+      "translate_mm": [
+       -15.0,
+       96.0,
+       22.0
+      ]
+     }
+    },
+    {
+     "name": "E",
+     "part": "PIN",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 106.7,
+      "translate_mm": [
+       74.0,
+       -97.0,
+       45.0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Cylindrical",
+     "first": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "top edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       30.0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole bottom edge",
+      "at_mm": [
+       130.0,
+       25.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Cylindrical 1"
+    },
+    {
+     "type": "Cylindrical",
+     "first": {
+      "instance": "E",
+      "entity": "edge",
+      "what": "bottom edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "bottom edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Cylindrical 3"
+    },
+    {
+     "type": "Cylindrical",
+     "first": {
+      "instance": "E",
+      "entity": "face",
+      "what": "cylinder",
+      "at_mm": [
+       205.0,
+       0.0,
+       15.0
+      ],
+      "inference": "MID_AXIS_POINT"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole top edge",
+      "at_mm": [
+       130.0,
+       25.0,
+       10.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Cylindrical 4"
+    }
+   ]
+  },
+  {
+   "case": "c2",
+   "instances": [
+    {
+     "name": "A",
+     "part": "PLATE",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "PIN",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 269.6,
+      "translate_mm": [
+       -15.0,
+       96.0,
+       22.0
+      ]
+     }
+    },
+    {
+     "name": "E",
+     "part": "PIN",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 106.7,
+      "translate_mm": [
+       74.0,
+       -97.0,
+       45.0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Cylindrical",
+     "first": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "top edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       30.0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole bottom edge",
+      "at_mm": [
+       130.0,
+       25.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Cylindrical 1"
+    },
+    {
+     "type": "Cylindrical",
+     "first": {
+      "instance": "E",
+      "entity": "edge",
+      "what": "bottom edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "bottom edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Cylindrical 3"
+    },
+    {
+     "type": "Slider",
+     "first": {
+      "instance": "E",
+      "entity": "face",
+      "what": "cylinder",
+      "at_mm": [
+       205.0,
+       0.0,
+       15.0
+      ],
+      "inference": "MID_AXIS_POINT"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole top edge",
+      "at_mm": [
+       130.0,
+       25.0,
+       10.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Slider 2"
+    }
+   ]
+  },
+  {
+   "case": "c3",
+   "instances": [
+    {
+     "name": "A",
+     "part": "PLATE",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "PIN",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 269.6,
+      "translate_mm": [
+       -15.0,
+       96.0,
+       22.0
+      ]
+     }
+    },
+    {
+     "name": "E",
+     "part": "PIN",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 106.7,
+      "translate_mm": [
+       74.0,
+       -97.0,
+       45.0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Cylindrical",
+     "first": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "top edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       30.0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole bottom edge",
+      "at_mm": [
+       130.0,
+       25.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Cylindrical 1"
+    },
+    {
+     "type": "Cylindrical",
+     "first": {
+      "instance": "E",
+      "entity": "edge",
+      "what": "bottom edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "bottom edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Cylindrical 3"
+    },
+    {
+     "type": "Revolute",
+     "first": {
+      "instance": "E",
+      "entity": "face",
+      "what": "cylinder",
+      "at_mm": [
+       205.0,
+       0.0,
+       15.0
+      ],
+      "inference": "MID_AXIS_POINT"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole top edge",
+      "at_mm": [
+       130.0,
+       25.0,
+       10.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Revolute 1"
+    }
+   ]
+  },
+  {
+   "case": "c4",
+   "instances": [
+    {
+     "name": "A",
+     "part": "PLATE",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "PIN",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 269.6,
+      "translate_mm": [
+       -15.0,
+       96.0,
+       22.0
+      ]
+     }
+    },
+    {
+     "name": "E",
+     "part": "PIN",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 106.7,
+      "translate_mm": [
+       74.0,
+       -97.0,
+       45.0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Cylindrical",
+     "first": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "top edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       30.0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole bottom edge",
+      "at_mm": [
+       130.0,
+       25.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Cylindrical 1"
+    },
+    {
+     "type": "Cylindrical",
+     "first": {
+      "instance": "E",
+      "entity": "edge",
+      "what": "bottom edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "bottom edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Cylindrical 3"
+    },
+    {
+     "type": "Fastened",
+     "first": {
+      "instance": "E",
+      "entity": "face",
+      "what": "cylinder",
+      "at_mm": [
+       205.0,
+       0.0,
+       15.0
+      ],
+      "inference": "MID_AXIS_POINT"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole top edge",
+      "at_mm": [
+       130.0,
+       25.0,
+       10.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Fastened 1"
+    }
+   ]
+  },
+  {
+   "case": "c5",
+   "instances": [
+    {
+     "name": "A",
+     "part": "PLATE",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "PIN",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 269.6,
+      "translate_mm": [
+       -15.0,
+       96.0,
+       22.0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Cylindrical",
+     "first": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "top edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       30.0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole bottom edge",
+      "at_mm": [
+       130.0,
+       25.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Cylindrical 1"
+    },
+    {
+     "type": "Cylindrical",
+     "first": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "top edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       30.0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole bottom edge",
+      "at_mm": [
+       130.0,
+       25.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Cylindrical 2"
+    }
+   ]
+  },
+  {
+   "case": "c6",
+   "instances": [
+    {
+     "name": "A",
+     "part": "PLATE",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "PIN",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 269.6,
+      "translate_mm": [
+       -15.0,
+       96.0,
+       22.0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Revolute",
+     "first": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "top edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       30.0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole bottom edge",
+      "at_mm": [
+       130.0,
+       25.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Revolute 1"
+    },
+    {
+     "type": "Revolute",
+     "first": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "top edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       30.0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole bottom edge",
+      "at_mm": [
+       130.0,
+       25.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Revolute 2"
+    }
+   ]
+  },
+  {
+   "case": "c7",
+   "instances": [
+    {
+     "name": "A",
+     "part": "PLATE",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "PIN",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 269.6,
+      "translate_mm": [
+       -15.0,
+       96.0,
+       22.0
+      ]
+     }
+    },
+    {
+     "name": "E",
+     "part": "PIN",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 106.7,
+      "translate_mm": [
+       74.0,
+       -97.0,
+       45.0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Cylindrical",
+     "first": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "top edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       30.0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole bottom edge",
+      "at_mm": [
+       130.0,
+       25.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Cylindrical 1"
+    },
+    {
+     "type": "Slider",
+     "first": {
+      "instance": "E",
+      "entity": "face",
+      "what": "cylinder",
+      "at_mm": [
+       205.0,
+       0.0,
+       15.0
+      ],
+      "inference": "MID_AXIS_POINT"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole top edge",
+      "at_mm": [
+       130.0,
+       25.0,
+       10.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Slider 2"
+    },
+    {
+     "type": "Cylindrical",
+     "first": {
+      "instance": "E",
+      "entity": "edge",
+      "what": "bottom edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "bottom edge",
+      "at_mm": [
+       200.0,
+       5.0,
+       0.0
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Cylindrical 3"
+    }
+   ]
+  }
+ ]
+}
