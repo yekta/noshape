@@ -482,8 +482,8 @@ fs-oracle-asm vocabulary, mates added one at a time as live does; asm-N.live.jso
 | batch | cases | sent to live | answered | match | differences fixed |
 |---|---|---|---|---|---|
 | sketch 1 (lines, arcs, circles; 11 drags) | 20 | REQUESTS 09:45 | 20 + drags + curve colours | solvability 19 → 20; positions 0–1 (least change) | 1: a redundant dimension |
-| least-change probes 1 | 14 | REQUESTS 11:30 | 14 | 4 | – (rule, see below) |
-| least-change probes 2 | 10 | REQUESTS 12:15 | 10 | 1 | – (rule, see below) |
+| least-change probes 1 | 14 | REQUESTS 11:30 | 14 | 4 → 14 | the least-change rule |
+| least-change probes 2 | 10 | REQUESTS 12:15 | 10 | 0 → 10 | the least-change rule |
 | asm 1 (BLOCK / PLATE / PIN, 1–4 mates) | 20 | REQUESTS 10:05 | – | – | 1 before live: f8 / f11 / f19 |
 | sketch 2 (+ fit splines, conics, angles) | 20 | REQUESTS 10:40 | – | – | – |
 Fixed before live answered: an axial mate whose connectors start exactly perpendicular (a part inserted square to its
@@ -524,6 +524,17 @@ Design for the solver change (next): a constructive pass like the assembly tree 
 constrained they are (ties: the "smaller" first: lower point, shorter, smaller angle), each solved alone against the
 placed ones in its own (lower endpoint, angle, length) terms with the least change there, then every constraint
 checked; anything unheld falls back to today's weighted minimum norm. Probes 1+2 (24 cases) and batch 1 are its tests.
+**Done (11-02 11:00, constructive.rs):** a regeneration's solve and a dimension edit (SolveOptions::constructive,
+default off: the tools rely on the solve to pull new geometry onto its inferences, live places it there exactly) first
+place each component whose constraints don't hold (Sketch::unheld_constraints: one evaluation, plus coincident points
+/ concentric centers apart, which the solver aliases): the next entity is one with a constraint to placed geometry
+that doesn't hold; one hanging on it alone follows rigidly (carried onto the shared point), tied neighbours are held;
+its size (length / radius) is kept when it can be; a relation that doesn't hold keeps its smaller member as is; an
+entity that can't close a loop alone goes with its neighbours (the change shared within that group); kept only when
+the regular solve then finds everything held where it was put, else today's weighted minimum norm. Probes 4/24 →
+24/24 (all of live's answers); batch 1: positions now match in s3 and s12, the solved s1, s5, s6, s8, s10, s11, s14,
+s17 still differ (loops, tangent chains: next, case by case); onshape_ux's "length edit moves both ends by half"
+(never checked against live) now moves the far end as live. S300 timings unchanged on vibe3.
 UI drags (11 in batch 1) compare ours dragged to where live's pointer ended (live lands within 0.2 mm): s12's differs
 the same way (what follows the dragged point).
 Next batches: splines / conics / angles (once live confirms their REST form), assemblies with drags and patterns.
