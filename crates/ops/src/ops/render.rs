@@ -47,7 +47,7 @@ pub fn ops() -> Vec<Op> {
         fields: vec![
             doc_field(),
             opt("tab", s(), "Part Studio or Assembly tab, by name or id. Default: the first Part Studio."),
-            opt("section", json!({ "type": "array", "items": { "type": "object" }, "maxItems": 3 }), "Section view: up to 3 planes [{\"plane\": a plane / planar face / sketch / mate connector id, \"offset\": length along its normal (default 0), \"flip\": cut the other side}]; the side the normal points to is cut away. A named `view` keeps its own section unless this is given."),
+            opt("section", json!({ "type": "array", "items": { "type": "object" }, "maxItems": 3 }), "Section view: up to 3 planes [{\"plane\": a plane / planar face / sketch / mate connector id, or a cylinder or cone face (the plane through its axis), \"offset\": length along its normal (default 0), \"flip\": cut the other side}]; the side the normal points to is cut away. A named `view` keeps its own section unless this is given."),
             opt("section_exclude", json!({ "type": "array", "items": { "type": "string" } }), "Section view › Items to exclude: parts (`body:…`) left whole."),
             opt("view", json!({ "type": "string" }), "isometric (default), front, back, left, right, top, bottom, dimetric, trimetric, the name of a saved named view, or \"window\": the window's camera (view_camera; perspective and fit options then don't apply)."),
             opt("width", json!({ "type": "integer", "minimum": 16, "maximum": 4096 }), "Pixels (default 800)."),
@@ -246,8 +246,8 @@ fn section_planes(od: &crate::OpenDoc, r: &noshape_model::regen::RegenResult, a:
     for (i, p) in list.iter().enumerate() {
         let field = format!("section[{i}]");
         let o = p.as_object().ok_or_else(|| OpError::param(&field, "{\"plane\": reference id, \"offset\", \"flip\"}"))?;
-        let rf = o.get("plane").and_then(|v| v.as_str()).and_then(crate::refs::parse_str).ok_or_else(|| OpError::param(&format!("{field}.plane"), "a plane, planar face, sketch or mate connector id"))?;
-        let f = crate::studio::frame_of_ref(&r.display, Some(&r.context), &rf).ok_or_else(|| OpError::param(&format!("{field}.plane"), "Select a plane, planar face, cylinder, cone, or mate connector."))?;
+        let rf = o.get("plane").and_then(|v| v.as_str()).and_then(crate::refs::parse_str).ok_or_else(|| OpError::param(&format!("{field}.plane"), "a plane, planar face, cylinder, cone, sketch or mate connector id"))?;
+        let f = crate::studio::section_frame_of_ref(&r.display, Some(&r.context), &rf).ok_or_else(|| OpError::param(&format!("{field}.plane"), "Select a plane, planar face, cylinder, cone, or mate connector."))?;
         let offset = match o.get("offset") {
             Some(v) => crate::ops::sketch::length_value(v, &units).map_err(|e| e.with_param(format!("{field}.offset")))?,
             None => 0.0,

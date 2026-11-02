@@ -591,6 +591,24 @@ pub fn frame_of_ref(display: &noshape_model::display::StudioDisplay, ctx: Option
     }
 }
 
+/// A Section view plane for a reference: [`frame_of_ref`]'s, or for a cylinder or cone face the plane through its
+/// axis across its reference direction (live 1709, 11-02: a cylinder extruded from a circle on Top reads "Section
+/// plane 1 (Right)", wherever it is picked).
+pub fn section_frame_of_ref(display: &noshape_model::display::StudioDisplay, ctx: Option<&noshape_model::regen::context::Context>, r: &Reference) -> Option<noshape_model::display::PlaneFrame> {
+    if let Some(f) = frame_of_ref(display, ctx, r) {
+        return Some(f);
+    }
+    let Reference::Face(n) = r else { return None };
+    ctx?.bodies.iter().find_map(|b| {
+        let fi = *b.find_faces(n).first()?;
+        let (origin, axis, x_dir) = match b.shape.sub_shape(noshape_kernel::ShapeType::Face, fi).ok()?.face_surface().ok()? {
+            noshape_kernel::Surface::Cylinder { origin, axis, x_dir, .. } | noshape_kernel::Surface::Cone { origin, axis, x_dir, .. } => (origin, axis.normalize(), x_dir.normalize()),
+            _ => return None,
+        };
+        Some(noshape_model::display::PlaneFrame { origin, x: axis.cross(x_dir), y: axis, normal: x_dir })
+    })
+}
+
 #[cfg(test)]
 mod rename_tests {
     use super::*;

@@ -6216,7 +6216,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
-| `section` | array of object |  | Section view: up to 3 planes [{"plane": a plane / planar face / sketch / mate connector id, "offset": length along its normal (default 0), "flip": cut the other side}]; the side the normal points to is cut away. A named `view` keeps its own section unless this is given. |
+| `section` | array of object |  | Section view: up to 3 planes [{"plane": a plane / planar face / sketch / mate connector id, or a cylinder or cone face (the plane through its axis), "offset": length along its normal (default 0), "flip": cut the other side}]; the side the normal points to is cut away. A named `view` keeps its own section unless this is given. |
 | `section_exclude` | array of string |  | Section view › Items to exclude: parts (`body:…`) left whole. |
 | `view` | string |  | isometric (default), front, back, left, right, top, bottom, dimetric, trimetric, the name of a saved named view, or "window": the window's camera (view_camera; perspective and fit options then don't apply). |
 | `width` | integer |  | Pixels (default 800). |

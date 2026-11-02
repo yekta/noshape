@@ -3336,6 +3336,9 @@ fn part_studio_menu_ops() {
     assert!(num(&img["bytes"]) > 100.0, "{img}");
     let e = try_call(&mut ctx, "render_image", json!({ "section": [{ "plane": "entity:nope" }] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("section[0].plane"));
+    // Through the hole's axis (a cylinder face, as the dialog takes it).
+    let hole = call(&mut ctx, "query_entities", json!({ "kind": "faces", "surface": "cylinder" }))["faces"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "render_image", json!({ "width": 200, "height": 150, "section": [{ "plane": hole }] }));
     let v = call(&mut ctx, "render_named_view", json!({ "name": "Cut", "view": "front", "section": [{ "plane": "plane:right", "flip": true }] }));
     assert_eq!(v["saved"], "Cut");
     call(&mut ctx, "render_image", json!({ "view": "Cut", "width": 200, "height": 150 }));

@@ -78,6 +78,11 @@ impl PartStudioView {
         noshape_ops::studio::frame_of_ref(&self.display, self.context.as_deref(), r)
     }
 
+    /// A section plane's frame: [`Self::frame_of_ref`]'s, or through a cylinder's or cone's axis.
+    fn section_frame(&self, r: &Reference) -> Option<PlaneFrame> {
+        noshape_ops::studio::section_frame_of_ref(&self.display, self.context.as_deref(), r)
+    }
+
     /// Push the planes and the excluded parts into the scene and rebuild.
     pub(super) fn apply_section(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.opts.section = self.ui.section.iter().map(|p| p.clip()).collect();
@@ -96,7 +101,7 @@ impl PartStudioView {
     /// Planes for the given references (or the Front plane).
     fn planes_for(&self, refs: &[Reference], cx: &App) -> Vec<SectionPlane> {
         let labeler = self.labeler(cx);
-        let mut frames: Vec<(String, PlaneFrame, Option<DVec3>)> = refs.iter().filter_map(|r| self.frame_of_ref(r).map(|f| (labeler(r), f, self.section_home(r, &f)))).collect();
+        let mut frames: Vec<(String, PlaneFrame, Option<DVec3>)> = refs.iter().filter_map(|r| self.section_frame(r).map(|f| (labeler(r), f, self.section_home(r, &f)))).collect();
         if frames.is_empty() {
             frames.push(("Front plane".to_string(), PlaneFrame::FRONT, Some(PlaneFrame::FRONT.origin)));
         }
@@ -232,7 +237,7 @@ impl PartStudioView {
                 self.ui.section_parts = Some((d.include, d.items.clone()));
             }
         } else {
-            let Some(f) = self.frame_of_ref(r) else {
+            let Some(f) = self.section_frame(r) else {
                 self.flash_info(SELECT_SECTION_PLANE.into(), cx);
                 return true;
             };
