@@ -41,6 +41,20 @@ Fusing the slabs yours takes first and adding the offset ones after doesn't help
 next reasons: 3.9 → 5.9 s on a dump); one OCCT common of the solid with all slabs as one tool group changes results.
 Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scratch SHELLDUMP=<path without .brep>).
 
+## Step 1's knurl time back: the pool's coarse grid (11-02 20:00 UTC)
+- vibe3 baseline knurl (custom_features::knurl_feature_b94_on_a_cylinder) 16.45 -> 22.46 s between 27703a7c and
+  801d7a5e: e9346814 (step 1), measured with perf.sh: its parent cade6b03 16.52 s, e9346814 22.44 s (the diamond
+  knurl's Boolean 9.6 -> 15.5 s). Each crossing on a section got the section's 5 um tolerance, so it became a
+  tolerant ("loose") vertex: every later lookup went through every loose one, and every tolerant lookup through the
+  whole pool (quadratic in the knurl's crossings); split_reach folded over the loose ones per edge as well.
+- Now: a second grid of every vertex in cells of max(64 x the Boolean's tolerance, 50 um) (`Pool::coarse`); a
+  lookup reads the 27 fine cells where the farthest vertex in reach fits in one (the Boolean's tolerance + the
+  point's + the largest of the vertices'), else the 27 coarse cells, else all; vertices of tolerance past a quarter
+  of a coarse cell (`huge`) checked against every point. The same vertices found as before; split_reach takes the
+  pool's largest tolerance. f439d692: 16.34 s (diamond 9.4 s); knurl_d25_app (regen_profile::timed_knurl_d25)
+  26.17 -> 22.42 s, its baseline 22.42. Corpora and Shell's recordings decline exactly as
+  before, 0 differ; knurl recordings unchanged; T1s pass.
+
 ## Coincidence step 2: OCCT's merged vertex, groups of vertices, tolerant vertices off their planes (11-02 18:30 UTC)
 - Two input vertices of different arguments merged: OCCT's merged vertex (BOPTools_AlgoTools::MakeVertex /
   BRepLib::BoundingVertex): the one whose sphere holds the other's, else the least sphere bounding both

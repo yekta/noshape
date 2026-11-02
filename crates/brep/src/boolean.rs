@@ -451,10 +451,18 @@ struct Pool {
     grid: HashMap<(i64, i64, i64), Vec<u32>>,
     cell: f64,
     tol: f64,
-    /// Per vertex its own tolerance (an input's, OCCT's; 0 for a new one), and those over half the Boolean's
-    /// (tolerant ones: within the sum of the two's tolerances another is the same vertex, OCCT's rule).
+    /// Per vertex its own tolerance (an input's, OCCT's; 0 for a new one: within the sum of the two's tolerances
+    /// another is the same vertex, OCCT's rule).
     t: Vec<f64>,
-    loose: Vec<u32>,
+    /// Every vertex but the huge ones by position in cells of `ccell` (their tolerances up to a quarter of it: a
+    /// point's vertices within reach in the 27 cells round it; a knurl's thousands of crossings of 5 um tolerance
+    /// were each checked against every one), and the huge ones (checked against every point).
+    coarse: HashMap<(i64, i64, i64), Vec<u32>>,
+    ccell: f64,
+    huge: Vec<u32>,
+    /// The greatest tolerance of the vertices in `coarse`, and of all.
+    tmax: f64,
+    tall: f64,
     /// Vertices merged as one group (OCCT's vertices interfering in a chain, one vertex: two of one argument's
     /// closer than their tolerances and another's within both): its sphere and vertex; any point within reach of the
     /// sphere is that vertex.
@@ -465,8 +473,17 @@ struct Pool {
 }
 
 impl Pool {
+    fn new(tol: f64, groups: Vec<(DVec3, f64, u32)>, regroup: std::sync::Arc<std::sync::Mutex<Vec<(DVec3, f64)>>>) -> Pool {
+        let (p, inputs, grid, coarse, t, huge) = Default::default();
+        Pool { p, inputs, grid, cell: GREY * tol * 1.01, tol, t, coarse, ccell: (64.0 * tol).max(5e-5), huge, tmax: 0.0, tall: 0.0, groups, regroup }
+    }
+
     fn key(&self, p: DVec3) -> (i64, i64, i64) {
         ((p.x / self.cell).floor() as i64, (p.y / self.cell).floor() as i64, (p.z / self.cell).floor() as i64)
+    }
+
+    fn ckey(&self, p: DVec3) -> (i64, i64, i64) {
+        ((p.x / self.ccell).floor() as i64, (p.y / self.ccell).floor() as i64, (p.z / self.ccell).floor() as i64)
     }
 
     /// The vertex within `tol` of `p`, if any. (A new point has its curves' tolerance, the inputs' at most half the
@@ -482,7 +499,6 @@ impl Pool {
         if let Some(g) = self.groups.iter().find(|g| (p - g.0).length() <= g.1 + tp) {
             return Ok(Some(g.2));
         }
-        let half = 0.5 * self.tol;
         // (Each vertex within reach: its distance and reach.)
         let mut near: Vec<(u32, f64, f64)> = Vec::new();
         let mut take = |i: u32| {
@@ -495,28 +511,30 @@ impl Pool {
                 near.push((i, d, reach));
             }
         };
-        if tp > half {
-            // (A tolerant point: against every vertex.)
-            for i in 0..self.p.len() as u32 {
-                take(i);
-            }
-        } else {
-            let k = self.key(p);
+        // (The farthest a vertex but a huge one can be: within a cell of either grid, the 27 round it; else every one.)
+        let far = self.tol.max(tp + self.tmax);
+        let cells = |grid: &HashMap<(i64, i64, i64), Vec<u32>>, k: (i64, i64, i64), take: &mut dyn FnMut(u32)| {
             for dx in -1..=1 {
                 for dy in -1..=1 {
                     for dz in -1..=1 {
-                        let Some(list) = self.grid.get(&(k.0 + dx, k.1 + dy, k.2 + dz)) else { continue };
-                        for &i in list {
-                            if self.t[i as usize] <= half {
-                                take(i);
-                            }
+                        for &i in grid.get(&(k.0 + dx, k.1 + dy, k.2 + dz)).into_iter().flatten() {
+                            take(i);
                         }
                     }
                 }
             }
-            for &i in &self.loose {
+        };
+        if far <= self.cell {
+            cells(&self.grid, self.key(p), &mut take);
+        } else if far <= self.ccell {
+            cells(&self.coarse, self.ckey(p), &mut take);
+        } else {
+            for i in 0..self.p.len() as u32 {
                 take(i);
             }
+        }
+        for &i in &self.huge {
+            take(i);
         }
         if near.len() <= 1 {
             return Ok(near.first().map(|x| x.0));
@@ -550,9 +568,16 @@ impl Pool {
     /// Vertex `w`'s tolerance at least `t` (another merged into it, as OCCT's merged vertex covers both).
     fn grow(&mut self, w: u32, t: f64) {
         if t > self.t[w as usize] {
-            if t > 0.5 * self.tol && self.t[w as usize] <= 0.5 * self.tol {
-                self.loose.push(w);
+            if t > 0.25 * self.ccell && self.t[w as usize] <= 0.25 * self.ccell {
+                let k = self.ckey(self.p[w as usize]);
+                if let Some(list) = self.coarse.get_mut(&k) {
+                    list.retain(|&x| x != w);
+                }
+                self.huge.push(w);
+            } else if t <= 0.25 * self.ccell {
+                self.tmax = self.tmax.max(t);
             }
+            self.tall = self.tall.max(t);
             self.t[w as usize] = t;
         }
     }
@@ -574,6 +599,13 @@ impl Pool {
                 }
                 self.grid.entry(k1).or_default().push(w);
             }
+            let (k0, k1) = (self.ckey(q), self.ckey(c));
+            if k0 != k1 && tq <= 0.25 * self.ccell {
+                if let Some(list) = self.coarse.get_mut(&k0) {
+                    list.retain(|&x| x != w);
+                }
+                self.coarse.entry(k1).or_default().push(w);
+            }
             self.p[w as usize] = c;
         }
         self.grow(w, tc);
@@ -582,13 +614,13 @@ impl Pool {
     fn push_tol(&mut self, p: DVec3, t: f64) -> u32 {
         let i = self.p.len() as u32;
         self.p.push(p);
-        self.t.push(t);
-        if t > 0.5 * self.tol {
-            self.loose.push(i);
-        }
+        self.t.push(0.0);
         self.inputs.push(Vec::new());
         let k = self.key(p);
         self.grid.entry(k).or_default().push(i);
+        let k = self.ckey(p);
+        self.coarse.entry(k).or_default().push(i);
+        self.grow(i, t);
         i
     }
 
@@ -794,7 +826,7 @@ impl Drop for Ctx<'_> {
         }
         use std::mem::take;
         let heavy = (
-            (take(&mut self.pool.p), take(&mut self.pool.inputs), take(&mut self.pool.grid), take(&mut self.pool.t), take(&mut self.pool.loose)),
+            (take(&mut self.pool.p), take(&mut self.pool.inputs), take(&mut self.pool.grid), take(&mut self.pool.t), take(&mut self.pool.coarse)),
             (take(&mut self.faces), take(&mut self.edges), take(&mut self.solids), take(&mut self.side_cache), take(&mut self.in_face_done)),
             (take(&mut self.face_segs), take(&mut self.seg_section), take(&mut self.coplanar), take(&mut self.sections), take(&mut self.pending)),
             (take(&mut self.copies), take(&mut self.families), take(&mut self.canonical), take(&mut self.canon_secs), take(&mut self.apart)),
@@ -2676,7 +2708,7 @@ impl Ctx<'_> {
         let tol = self.tol;
         let reach = |w: u32| tol.max(te + self.pool.t[w as usize]);
         let end_reach = |w: u32| if at_ends { reach(w) } else { tol.max(self.pool.t[w as usize]) };
-        let tol_far = self.pool.loose.iter().fold(tol, |m, &w| m.max(reach(w))).max(tol.max(te));
+        let tol_far = tol.max(te + self.pool.tall);
         let (lo, hi) = match s.g {
             Geo::Line => {
                 let (a, b) = (self.p(s.v[0]), self.p(s.v[1]));
@@ -3041,7 +3073,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     }
     let mut cx = Ctx {
         tol,
-        pool: Pool { p: Vec::new(), inputs: Vec::new(), grid: HashMap::default(), cell: GREY * tol * 1.01, tol, t: Vec::new(), loose: Vec::new(), groups: Vec::new(), regroup },
+        pool: Pool::new(tol, Vec::new(), regroup),
         faces: Vec::new(),
         edges: Vec::new(),
         solids: Vec::new(),
