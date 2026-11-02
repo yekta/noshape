@@ -218,6 +218,9 @@ const A1000: Case = Case { name: "a1000", stacks: 40, height: 20, subs: 60, bolt
 /// Live's A200 as built (live 1741): the Planar alone on each stack pin, the
 /// pattern of 7 instances (the seed and 6).
 const A200_LIVE: Case = Case { name: "a200-live", stacks: 8, height: 15, subs: 20, bolts: 30, pattern: 7, redundant: false };
+/// A1000 as live would accept it (live refuses the redundant Parallels,
+/// 1741): the Planar alone on each stack pin.
+const A1000_LIVE: Case = Case { name: "a1000-live", stacks: 40, height: 20, subs: 60, bolts: 80, pattern: 10, redundant: false };
 
 #[test]
 #[ignore]
@@ -235,6 +238,12 @@ fn big_assembly_200_as_live() {
 #[ignore]
 fn big_assembly_1000() {
     run(A1000);
+}
+
+#[test]
+#[ignore]
+fn big_assembly_1000_as_live() {
+    run(A1000_LIVE);
 }
 
 /// A1000's drag alone, long (to profile a frame: `perf record` this test).
