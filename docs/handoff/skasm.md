@@ -761,6 +761,17 @@ seed 421, `Case::construction / symmetric / midpoint`) and asm probes 4 (c1–c7
 Cylindrical 1 and 3 "overdefines" in live, all OK in ours, while 1764's consistent Planar / Parallel loops were OK).
 Tried for g4 (drag): only the dragged point's curves light in an undimensioned sketch: no change (the bottom line and
 the far arc weigh the same; live's answer needs the H bottom kept, as the constructive `lower_shared`).
+19:06: P0 SKETCH-CONSTRUCTIVE-RECURSION (qa, v0.4.21; landed 7607128b, qa verified on green fff177bd): a closed spline
+repeats its first point id, so `split_shared_points` saw a shared point and `place_constructively` recursed on the
+copy forever (stack overflow opening qa's sk211-step89.noshape). Fixed: each curve counted once, the copy placed by
+`place_split` directly (no recursion left in constructive.rs). Tests: ops sketch_recursion (the document, fixture
+crates/ops/tests/fixtures), sketch solver_basic closed spline / two 4000-curve chains.
+19:32: the drag rule (a Horizontal / Vertical line away from the dragged point keeps its level: `SolveOptions::still_across`;
+g4's bottom exact, s12's drag exact) is parked on branch skasm-drag-across (f1a81069): it makes the held-first step run
+for most drags, the 1549-curve bench drag 12.3 → 14.6 ms avg on vibe3 (+18 %: a speed regression). Skipping the
+weighted solve after a held-first step that converged breaks drags (probes 7 8 → 4/8, 9 4 → 0/6: that solve brings the
+point onto the pointer). To land it the hold must cost nothing extra (inside the one weighted solve, or the held-first
+only on the dragged component).
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
