@@ -150,7 +150,7 @@ fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev
             // A group title is not a parameter; a button is undefined (std isButton).
             ParamKindFs::Group { .. } | ParamKindFs::Button => Value::Undefined,
             ParamKindFs::Anything => match values.get(&d.id) {
-                Some(ParamValue::Text(s)) => Value::str(s.as_str()),
+                Some(ParamValue::Text(s)) => anything_value(s),
                 _ => Value::Undefined,
             },
         };
@@ -518,6 +518,8 @@ fn editing_value(i: &mut Interp, cx: &Arc<FsContext>, d: &ParamDecl, v: &Value, 
             }
             ParamValue::Array(out)
         }
+        // std Loft's connectionEdgeParameters (an array of numbers its editing logic and manipulators keep).
+        ParamKindFs::Anything => ParamValue::Text(anything_text(v)?),
         // A LookupTablePath back to the options along the path (std
         // External thread's size from the picked cylinder).
         ParamKindFs::Lookup { table } => {
@@ -530,6 +532,38 @@ fn editing_value(i: &mut Interp, cx: &Arc<FsContext>, d: &ParamDecl, v: &Value, 
         }
         _ => return None,
     })
+}
+
+/// An `isAnything` parameter's value as stored (numbers, booleans, strings and arrays of them, as "fs:" and JSON);
+/// `None` for anything else.
+pub(crate) fn anything_text(v: &Value) -> Option<String> {
+    fn json(v: &Value) -> Option<serde_json::Value> {
+        Some(match v {
+            Value::Number(n, _) => serde_json::Value::from(*n),
+            Value::Bool(b, _) => serde_json::Value::Bool(*b),
+            Value::Str(s, _) => serde_json::Value::String(s.to_string()),
+            Value::Array(a, _) => serde_json::Value::Array(a.iter().map(json).collect::<Option<Vec<_>>>()?),
+            _ => return None,
+        })
+    }
+    Some(format!("fs:{}", json(v)?))
+}
+
+/// [`anything_text`] back to its value (other text is a string).
+pub(crate) fn anything_value(t: &str) -> Value {
+    fn value(j: &serde_json::Value) -> Value {
+        match j {
+            serde_json::Value::Number(n) => Value::num(n.as_f64().unwrap_or(0.0)),
+            serde_json::Value::Bool(b) => Value::bool(*b),
+            serde_json::Value::String(s) => Value::str(s.as_str()),
+            serde_json::Value::Array(a) => Value::array(a.iter().map(value).collect()),
+            _ => Value::Undefined,
+        }
+    }
+    match t.strip_prefix("fs:").and_then(|j| serde_json::from_str::<serde_json::Value>(j).ok()) {
+        Some(j) => value(&j),
+        None => Value::str(t),
+    }
 }
 
 /// One entry of the FeatureScript notices panel's Monitor (live

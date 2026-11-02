@@ -8,7 +8,7 @@
 use super::helpers_a::*;
 use crate::display::BodyKind;
 use crate::naming::Name;
-use crate::params::ParamValues;
+use crate::params::{ParamValue, ParamValues};
 use crate::reference::{BodyId, Reference, Role, Source};
 use crate::regen::eval::{EvalCtx, FResult, NamedShape, Profile, err, kernel_plane, sweep_names};
 use glam::DVec3;
@@ -758,7 +758,7 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
     // each profile (point profiles excepted).
     if ev.bool("matchConnections") {
         for c in ev.params.array("connections") {
-            let pts: Vec<DVec3> = c.query("connectionEntities").iter().filter_map(|r| ev.resolve_vertex_point(r).or_else(|| edge_ref_mid(ev, r))).collect();
+            let pts: Vec<DVec3> = c.query("connectionEntities").iter().filter_map(|r| ev.resolve_vertex_point(r).or_else(|| connection_edge_point(ev, c, r))).collect();
             let on = |s: &Shape| pts.iter().any(|p| k::make_vertex(*p).and_then(|v| k::distance(&v, s)).is_ok_and(|d| d.distance < 1e-6));
             if shapes.iter().any(|s| s.shape_type() != ShapeType::Vertex && !on(s)) {
                 return crate::regen::eval::err_at(&["connections"], "Select a point on each profile to define a connection.");
@@ -769,9 +769,20 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
     // where the profiles start; several split the profiles and are lofted
     // connection to connection.
     if ev.bool("matchConnections") {
+        // std's connection manipulators (addLinearManipulatorForConnection): one per edge of each connection, keyed
+        // "connection,edge", at its point along its tangent; a drag moves the edge's parameter (loftLinearManipulator).
+        for (ci, c) in vals.array("connections").iter().enumerate() {
+            let ts = connection_parameters(c);
+            for (j, q) in c.query("connectionEdgeQueries").iter().enumerate() {
+                if let Some((base, direction)) = connection_edge(ev, q).and_then(|e| edge_at(&e, ts.get(j).copied().unwrap_or(0.5))) {
+                    use crate::display::FeatureManipulator as M;
+                    ev.manipulators.push((format!("{ci},{j}"), M::Linear { base, direction, offset: 0.0, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: None }));
+                }
+            }
+        }
         let mut all = Vec::new();
         for c in ev.params.array("connections") {
-            let pts: Vec<DVec3> = c.query("connectionEntities").iter().filter_map(|r| ev.resolve_vertex_point(r).or_else(|| edge_ref_mid(ev, r))).collect();
+            let pts: Vec<DVec3> = c.query("connectionEntities").iter().filter_map(|r| ev.resolve_vertex_point(r).or_else(|| connection_edge_point(ev, c, r))).collect();
             if pts.is_empty() {
                 continue;
             }
@@ -939,9 +950,41 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
     }
 }
 
-fn edge_ref_mid(ev: &EvalCtx, r: &Reference) -> Option<DVec3> {
-    let (bi, ei) = *ev.resolve_edges(std::slice::from_ref(r)).first()?;
-    edge_mid(&ev.edge_shape(bi, ei).ok()?)
+/// A loft connection's point on edge `r`: std's connectionEdgeParameters (kept by its editing logic and its
+/// connection manipulators, in step with connectionEdgeQueries) give where along the edge, in the curve's
+/// parameter (loft.fs: arcLengthParameterization false), along the edge's direction; an edge without one is at
+/// std's default, the middle (EDGE_INTERIOR_PARAMETER_BOUNDS[1]).
+fn connection_edge_point(ev: &EvalCtx, c: &ParamValues, r: &Reference) -> Option<DVec3> {
+    let edge = connection_edge(ev, r)?;
+    let at = c.query("connectionEdgeQueries").iter().position(|q| q == r || connection_edge(ev, q).is_some_and(|e| e.is_same(&edge)));
+    let t = at.and_then(|j| connection_parameters(c).get(j).copied()).unwrap_or(0.5);
+    edge_at(&edge, t).map(|(p, _)| p)
+}
+
+/// A connection's edge: a part's or a sketch's.
+fn connection_edge(ev: &EvalCtx, r: &Reference) -> Option<Shape> {
+    if let Some(&(bi, ei)) = ev.resolve_edges(std::slice::from_ref(r)).first() {
+        return ev.edge_shape(bi, ei).ok();
+    }
+    if matches!(r, Reference::SketchEntity { .. }) {
+        return resolve_curves(ev, std::slice::from_ref(r)).ok()?.into_iter().next().map(|e| e.shape);
+    }
+    None
+}
+
+/// The point and tangent at std parameter `t` (0..1 along the edge's direction, in its curve's parameter) of `edge`.
+fn edge_at(edge: &Shape, t: f64) -> Option<(DVec3, DVec3)> {
+    let i = edge.edge_info().ok()?;
+    let t = t.clamp(0.0, 1.0);
+    let t = if edge.orientation() == k::Orientation::Reversed { 1.0 - t } else { t };
+    let u = i.first_param + (i.last_param - i.first_param) * t;
+    Some((edge.point_at(u).ok()?, edge.tangent_at(u).ok()?))
+}
+
+/// A loft connection's connectionEdgeParameters (stored as "fs:" and a JSON array of numbers).
+pub(crate) fn connection_parameters(c: &ParamValues) -> Vec<f64> {
+    let Some(ParamValue::Text(t)) = c.get("connectionEdgeParameters") else { return Vec::new() };
+    t.strip_prefix("fs:").and_then(|j| serde_json::from_str::<Vec<f64>>(j).ok()).unwrap_or_default()
 }
 
 // ------------------------------------------------------------------ thicken

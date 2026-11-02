@@ -242,6 +242,79 @@ fn loft_between_squares() {
     assert!(total_volume(&res.context) < expect, "a twisted loft is thinner in the middle");
 }
 
+/// std Loft (loft.fs): a connection on edges sits at each edge's connectionEdgeParameters (std's editing logic puts a
+/// new pick at 0.5, its connection manipulator "connection,edge" moves it along the edge's tangent), not always the
+/// middle.
+#[test]
+fn loft_connections_take_each_edges_parameter_as_std() {
+    let mut t = T::new();
+    let square = |h: f64| {
+        let mut sk = noshape_sketch::Sketch::new();
+        let p: Vec<_> = [DVec2::new(-h, -h), DVec2::new(h, -h), DVec2::new(h, h), DVec2::new(-h, h)].iter().map(|q| sk.add_point(*q)).collect();
+        let lines: Vec<_> = (0..4).map(|i| sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap()).collect();
+        (sk, lines)
+    };
+    let (s1, l1) = square(0.01);
+    let s1 = t.sketch(Reference::Plane(DatumPlane::Top), s1);
+    let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("30 mm"))]);
+    let (s2, l2) = square(0.005);
+    let s2 = t.sketch(Reference::FeaturePlane(pl), s2);
+    let (r1, r2) = (t.regions(s1)[0].clone(), t.regions(s2)[0].clone());
+    let item = |r: Reference| {
+        let mut v = ParamValues::default();
+        v.set("sheetProfileEntities", q(vec![r]));
+        v
+    };
+    let loft = t.add("loft", &[("sheetProfilesArray", ParamValue::Array(vec![item(r1), item(r2)]))]);
+    let before = t.ps.features.iter().position(|f| f.id == loft).unwrap();
+    let old = t.ps.features[before].params.clone();
+    let mut new = old.clone();
+    // Two connections: the front edges and the back ones.
+    let conn = |i: usize| {
+        let mut c = ParamValues::default();
+        c.set("connectionEntities", q(vec![Reference::SketchEntity { sketch: s1, entity: l1[i].0 }, Reference::SketchEntity { sketch: s2, entity: l2[i].0 }]));
+        c
+    };
+    new.set("matchConnections", b(true));
+    new.set("connections", ParamValue::Array(vec![conn(0), conn(2)]));
+    // std's editing logic: the edges in step with their parameters, each at 0.5.
+    let ctx = t.reg.regenerate(&t.ps, &ConfigValues::default(), &t.units, &RegenOptions { upto: Some(before), ..Default::default() }).context;
+    let f = t.ps.features[before].clone();
+    let changed = noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), "loft", f.id, &f.name, &t.units, &old, &new, &["connections".to_string()], false).expect("std's editing logic ran");
+    for (k, v) in changed.0 {
+        new.set(&k, v);
+    }
+    let c = &new.array("connections")[0];
+    assert_eq!(c.get("connectionEdgeParameters"), Some(&ParamValue::Text("fs:[0.5,0.5]".into())), "{c:?}");
+    assert_eq!(c.query("connectionEdgeQueries").len(), 2);
+    t.ps.feature_mut(loft).unwrap().params = new.clone();
+    let res = t.ok();
+    let seam = |res: &RegenResult, a: DVec3, z: DVec3| {
+        res.context.bodies[0].shape.edges().iter().any(|e| e.endpoints().is_ok_and(|(p, q)| (p.distance(a) < 1e-7 && q.distance(z) < 1e-7) || (p.distance(z) < 1e-7 && q.distance(a) < 1e-7)))
+    };
+    let ends: Vec<_> = res.context.bodies[0].shape.edges().iter().filter_map(|e| e.endpoints().ok()).collect();
+    assert!(seam(&res, DVec3::new(0.0, -0.01, 0.0), DVec3::new(0.0, -0.005, 0.03)), "the edges' middles connected: {ends:?}");
+    // The bottom edge's manipulator dragged 5 mm along it: std's change function moves its parameter to 0.75.
+    let m = &res.display.features.iter().find(|s| s.id == loft).unwrap().manipulators;
+    use noshape_model::display::FeatureManipulator as M;
+    let Some((key, M::Linear { base, direction, .. })) = m.first() else { panic!("{m:?}") };
+    assert_eq!((key.as_str(), m.len()), ("0,0", 4), "{m:?}");
+    assert!((*base - DVec3::new(0.0, -0.01, 0.0)).length() < 1e-9 && direction.x.abs() > 0.999, "{m:?}");
+    let mut moved = m[0].1.clone();
+    if let M::Linear { offset, .. } = &mut moved {
+        *offset = 0.005;
+    }
+    let changed = noshape_model::custom::std_feature::manipulator_change_in((*ctx).clone(), "loft", f.id, &f.name, &t.units, &new, key, &moved).expect("std's change function ran");
+    for (k, v) in changed.0 {
+        new.set(&k, v);
+    }
+    assert_eq!(new.array("connections")[0].get("connectionEdgeParameters"), Some(&ParamValue::Text("fs:[0.75,0.5]".into())));
+    t.ps.feature_mut(loft).unwrap().params = new;
+    let res = t.ok();
+    let at = *base + *direction * 0.005;
+    assert!(seam(&res, at, DVec3::new(0.0, -0.005, 0.03)), "the bottom edge connected three quarters along it");
+}
+
 /// Live "psb (10-24) loft end derivative" and its follow-up: two-profile
 /// lofts from □20 on Top with end conditions (Normal: 3·ΔCP1 = m·(0.9 h +
 /// 0.1 chord) at each corner column, blended along each face).
