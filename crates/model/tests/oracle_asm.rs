@@ -353,7 +353,7 @@ const LIVE_MATES: &[(&str, &str, bool, &str)] = &[
 /// connectors and solver. The test fails on a new difference and on a known
 /// one that matches again.
 const KNOWN: &[(&str, &str)] = &[
-    ("M1", "skb: Revolute (bottom on top) + Slider (front faces): live keeps B upright, turned 30° at (7.68, −8.66, 10); ours turns it upside down"),
+    ("M1", "skb: Revolute (bottom on top) + Slider (front faces), both \"Mate overdefines the assembly.\" as live; live's B upright, turned 30° at (7.68, −8.66, 10) where its Revolute (added first) had put it; ours, both mates at once, moves nothing from the start (live 1764: a conflict moves nothing)"),
 ];
 
 #[test]

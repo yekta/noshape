@@ -236,6 +236,9 @@ pub struct Solved {
     pub dof: usize,
     pub instance_dof: HashMap<InstanceId, usize>,
     pub mate_ok: HashMap<MateId, bool>,
+    /// Mates in a conflict that failed before the solve too (see
+    /// `SolveResult::mate_unheld`).
+    pub mate_unheld: HashSet<MateId>,
     pub mate_frames: HashMap<MateId, (Frame, Frame)>,
     pub mate_values: HashMap<MateId, [f64; 4]>,
     pub relation_ok: HashMap<MateId, bool>,
@@ -674,6 +677,9 @@ impl Prepared {
                 None => true,
             };
             out.mate_ok.insert(*id, ok);
+            if active_ix.get(i).copied().flatten().is_some_and(|k| r.mate_unheld.get(k).copied().unwrap_or(false)) {
+                out.mate_unheld.insert(*id);
+            }
             let fa = poses[m.a].mul(&m.a_local);
             let fb = poses[m.b].mul(&m.b_local);
             out.mate_frames.insert(*id, (fa, fb));
@@ -2138,6 +2144,11 @@ impl AssemblyEvaluator {
                 (!m.suppressed && instance_off).then(|| "One or more instances is suppressed".to_string())
             } else if let Some(f) = failed {
                 Some(f)
+            } else if !ok && m.mate_type == MateType::Fastened && solved.mate_unheld.contains(&m.id) {
+                // Live 1764 (5): a Fastened its chain can't reach (it failed
+                // before the solve) "Mate is not consistent."; the mates it
+                // fights "Mate overdefines the assembly.".
+                Some("Mate is not consistent.".into())
             } else if !ok {
                 // Live (request 1559): "Revolute 1 has error: Mate overdefines the assembly.".
                 Some("Mate overdefines the assembly.".into())

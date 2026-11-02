@@ -531,7 +531,7 @@ Tried and dropped: one SVD instead of the eigendecomposition + SVD per `least_ch
 count as free near the threshold: the live oracle failed).
 
 A200 against live (live 1741 part 2; live built it by REST with **a Planar alone on each stack pin**, 162 mates, a pattern
-of 7, since it refuses the redundant Parallels; our bench case a200-live is the same; live on its software-GL VM,
+of 7, since its Parallels as requested disagreed with the Planars; our bench case a200-live is the same; live on its software-GL VM,
 wall clock; ours vibe3, release, median of 3):
 | | Onshape | noshape (a200-live) |
 |---|---|---|
@@ -541,10 +541,8 @@ wall clock; ours vibe3, release, median of 3):
 | drag a top pin | one update every 2.3–2.5 s (≈ 0.4 a second) | 0.6 ms a frame (≈ 1700 fps) |
 | insert a pin | 5.0 s | 4.4 ms |
 A1000: live left it for the lead (≈ 2800 more REST calls).
-**Parity gap found (P1, solver):** live refuses consistent redundant mates: Planar + Parallel to the base + Parallel to
-the pin below gives "Mate overdefines the assembly." on the Planar and both Parallels (k ≥ 2), "Mate is not
-consistent." with the default alignment; the add-a-mate test's Parallel between two tops overdefines too. Our solver
-accepts them (all green). Needs a redundancy test from the DOF analysis (a mate whose rows add no rank).
+(The "refuses consistent redundant mates" gap noted here was wrong: 1764 shows live accepts them; 1741's Parallels
+disagreed with the Planars. See "Redundant mates = live 1764" below.)
 
 Pattern copies (11-02, user: decide against live; live 1754): Onshape's copies of a patterned (flexible) subassembly
 have no freedom of their own. Their children keep the seed's positions; a drag on any copy's child turns every copy's,
@@ -584,9 +582,19 @@ Parity (11-02, user: correctness before more speed):
   mate, as live) get "Mate overdefines the assembly.", the copy's follower fails, so the pattern row gets the same message
   and its copies (and all under them) are red with just their name as tooltip; the root badge follows. T1: part (C) of
   a_patterned_flexible_subassembly_follows_its_seed.
-- **Redundant consistent mates (P1, open):** live's evidence is ambiguous on which mates get the error (Revolute + Slider:
-  both; the stack's Planar + Parallel at k = 1: "on the Planar"); asked live (REQUESTS 07:45, seven small cases) before
-  building the rank test.
+- **Redundant mates = live 1764** (done): live ACCEPTS consistent redundant mates (Planar + agreeing Parallel, a chain
+  closed by a Parallel, a duplicate Planar: all OK; 1741's "refused" Parallels disagreed with the Planars by their
+  default alignment, so the earlier gap note here was wrong and ours already matched). A conflict moves nothing (poses
+  as before the mate), puts "Mate overdefines the assembly." on the mates the group's compromise fails, "Mate is not
+  consistent." on a Fastened that already failed before the solve (1764 (5)), and the group shows no DOF. Ours did a
+  compromise solve, and a disagreeing axial mate wasn't seen at all (residuals ignore the axis sign; the orientation
+  pass turned the part over for the later mate, silently breaking the earlier). Now: a group whose solve leaves a mate
+  failing, or an axial mate's Z against its alignment, keeps its start poses (from before the orientation pass) and
+  flags as above; the pattern-copy rule above is its special case. T1 redundant_mates_are_fine_until_they_disagree
+  (cases 1, 3, 4, 5, 6); oracle M1 now reads "overdefines" on both mates as live and keeps B upright (its position is
+  live's after the Revolute was added alone first; known list updated).
+  Known difference: 1764 (4') (a chain A–B–C closed by a disagreeing Parallel): live flags Planar 2 and the Parallel
+  but not Planar 1; ours flags whatever the compromise bends.
 
 - **Mate chain regenerate = live 1763** (done): live keeps every instance whose geometry didn't change where it is
   (C's part moved +10 mm in its own coordinates: only C's transform changes, −10 mm; P, free on its Planar, and D on C
@@ -595,12 +603,12 @@ Parity (11-02, user: correctness before more speed):
   against its parent's mates (LM, then least change measured at its connectors over the whole group); anything left
   unheld falls back to the whole-group solve. T1 a_regenerate_moves_only_the_changed_instance_along_a_chain (fails on
   the old code); oracle_asm and the assembly suites unchanged.
-  vibe3 regenerate: a200 69 → 34 ms, a200-live 63 → 19 ms (live 13–16 s), a1000 380 → 280 ms (its stacks keep the
-  redundant Parallels live refuses, so they aren't trees). New case a1000-live (A1000 with the Planar alone, 900 mates):
+  vibe3 regenerate: a200 69 → 34 ms, a200-live 63 → 19 ms (live 13–16 s), a1000 380 → 280 ms (its stacks' redundant
+  Parallels close loops, so they aren't trees). New case a1000-live (A1000 with the Planar alone, 900 mates):
   open 6 + 67 + 14 ms, evaluate again 15 ms, regenerate 65 ms, add a mate 28 ms, drag 2.2–2.4 ms a frame (≈ 430 fps),
   insert 15 ms. Live's A1000 is not being timed (lead 11-02: REST budget for parity questions).
 
-Next: the redundant-mate rule when live answers (07:45); each Sub instance's own solve from its
+Next: each Sub instance's own solve from its
 stored positions; live's A1000 timings (1741, after its REST limit), the overdefinition messages of live 1754 (C).
 
 ## Next, in order

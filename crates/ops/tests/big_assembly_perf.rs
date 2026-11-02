@@ -218,8 +218,8 @@ const A1000: Case = Case { name: "a1000", stacks: 40, height: 20, subs: 60, bolt
 /// Live's A200 as built (live 1741): the Planar alone on each stack pin, the
 /// pattern of 7 instances (the seed and 6).
 const A200_LIVE: Case = Case { name: "a200-live", stacks: 8, height: 15, subs: 20, bolts: 30, pattern: 7, redundant: false };
-/// A1000 as live would accept it (live refuses the redundant Parallels,
-/// 1741): the Planar alone on each stack pin.
+/// A1000 the way live built A200 (1741): the Planar alone on each stack pin
+/// (its Parallels disagreed with the Planars; agreeing ones live accepts, 1764).
 const A1000_LIVE: Case = Case { name: "a1000-live", stacks: 40, height: 20, subs: 60, bolts: 80, pattern: 10, redundant: false };
 
 #[test]

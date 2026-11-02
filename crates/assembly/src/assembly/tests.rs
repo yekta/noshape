@@ -6040,3 +6040,73 @@ fn a_patterned_flexible_subassembly_follows_its_seed() {
     // The copies have no degrees of freedom of their own.
     assert_eq!(res.solved.instance_dof.get(&copies[1]).copied(), Some(0), "{:?}", res.solved.instance_dof);
 }
+
+/// Live 1764: consistent redundant mates are all OK (a Parallel agreeing with
+/// a Planar, a Parallel closing a chain of Planars, a duplicate Planar). A
+/// redundant mate that disagrees moves nothing: it and the mates it fights
+/// read "Mate overdefines the assembly." and the group shows no degrees of
+/// freedom; a Fastened its chain can't reach reads "Mate is not consistent.".
+/// Each case adds its last mate to an assembly already solved (as live's
+/// mates are added one at a time).
+#[test]
+fn redundant_mates_are_fine_until_they_disagree() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (top, bottom) = (face_with(&r, "CapEnd"), face_with(&r, "CapStart"));
+    let planar = |id: u64, a: u64, b: u64| mate(id, MateType::Planar, conn(a, top.clone(), Inference::Centroid), conn(b, bottom.clone(), Inference::Centroid));
+    // Top face to top face: Z to Z, so the default alignment (Z axes opposed)
+    // disagrees with the stack, flipped it agrees.
+    let parallel = |id: u64, a: u64, b: u64, agree: bool| {
+        let mut m = mate(id, MateType::Parallel, conn(a, top.clone(), Inference::Centroid), conn(b, top.clone(), Inference::Centroid));
+        m.flip_primary = agree;
+        m
+    };
+    let base = Assembly {
+        instances: vec![
+            part_instance(1, "A <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
+            part_instance(2, "B <1>", f.studios[0], body.clone(), DVec3::new(0.06, 0.0, 0.0), false),
+            part_instance(3, "C <1>", f.studios[0], body.clone(), DVec3::new(0.12, 0.0, 0.0), false),
+        ],
+        ..Default::default()
+    };
+    // Solve `first`, store its placements, then add `last` and solve again.
+    let mut add = |first: Vec<Mate>, last: Mate| {
+        let mut asm = base.clone();
+        asm.mates = first;
+        let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+        assert!(res.mates.iter().all(|m| m.ok), "{:?}", res.mates);
+        for (id, p) in &res.solved.placements {
+            if let Some(i) = asm.instances.iter_mut().find(|i| i.id == *id) {
+                i.placement = *p;
+            }
+        }
+        let before = res.solved.placements.clone();
+        asm.mates.push(last);
+        (ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None), before)
+    };
+    let status = |res: &eval::AssemblyResult| res.mates.iter().map(|m| (m.id.0, m.message.clone())).collect::<Vec<_>>();
+    let over = || Some("Mate overdefines the assembly.".to_string());
+    // (1) Planar, then an agreeing Parallel: both OK, B still slides.
+    let (res, _) = add(vec![planar(10, 1, 2)], parallel(11, 1, 2, true));
+    assert_eq!(status(&res), vec![(10, None), (11, None)]);
+    assert_eq!(res.solved.instance_dof.get(&InstanceId(2)), Some(&3));
+    // (6) A duplicate Planar: both OK.
+    let (res, _) = add(vec![planar(10, 1, 2)], planar(11, 1, 2));
+    assert_eq!(status(&res), vec![(10, None), (11, None)]);
+    // (4) A chain closed by an agreeing Parallel: all OK.
+    let (res, _) = add(vec![planar(10, 1, 2), planar(20, 2, 3)], parallel(30, 1, 3, true));
+    assert_eq!(status(&res), vec![(10, None), (20, None), (30, None)]);
+    // (3) A disagreeing Parallel: nothing moves, both red, no DOF.
+    let (res, before) = add(vec![planar(10, 1, 2)], parallel(11, 1, 2, false));
+    assert_eq!(res.solved.placements, before, "nothing moved");
+    assert_eq!(status(&res), vec![(10, over()), (11, over())]);
+    assert_eq!(res.solved.instance_dof.get(&InstanceId(2)), Some(&0));
+    assert!(res.has_errors());
+    // (5) A Fastened from C's bottom to A's top, which the Planars hold
+    // 20 mm higher: "Mate is not consistent.", both Planars red, nothing moves.
+    let fastened = mate(40, MateType::Fastened, conn(1, top.clone(), Inference::Centroid), conn(3, bottom.clone(), Inference::Centroid));
+    let (res, before) = add(vec![planar(10, 1, 2), planar(20, 2, 3)], fastened);
+    assert_eq!(res.solved.placements, before, "nothing moved");
+    assert_eq!(status(&res), vec![(10, over()), (20, over()), (40, Some("Mate is not consistent.".to_string()))]);
+}

@@ -355,6 +355,11 @@ pub struct SolveResult {
     pub max_residual: f64,
     /// Per-mate satisfied flag.
     pub mate_ok: Vec<bool>,
+    /// Mates in a conflict that already failed before the solve (the mate
+    /// its group can't take); empty when no group conflicts.
+    pub mate_unheld: Vec<bool>,
+    /// The free bodies of groups in conflict, left where they started.
+    pub held_back: Vec<usize>,
     /// Remaining degrees of freedom of the whole assembly.
     pub dof: usize,
     /// Per-body remaining DOF (0 = fully constrained).
@@ -1013,6 +1018,34 @@ pub fn solve_with(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
 /// [`solve_with`] reusing (and keeping) mates' residuals in `memo`; `mates`
 /// must be the list the memo was kept for.
 pub fn solve_with_memo(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool, memo: Option<&std::cell::RefCell<MateMemo>>) -> SolveResult {
+    // A group in conflict moves nothing, not even the orientation pass's
+    // half-turns below (live 1764 (3)).
+    let given: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+    let mut r = solve_oriented(bodies, mates, relations, drags, dof, memo);
+    if r.held_back.is_empty() {
+        return r;
+    }
+    for &b in &r.held_back {
+        bodies[b].pose = given[b];
+    }
+    // Their mates as they stand there: the one the group can't take fails
+    // (a disagreeing Parallel the orientation pass had turned the part for).
+    let bound = 1e-5 * characteristic_length(&given, mates).max(1e-3).max(1.0);
+    let mut buf = Vec::new();
+    for (i, m) in mates.iter().enumerate() {
+        if !mate_bodies(m).any(|b| r.held_back.contains(&b)) {
+            continue;
+        }
+        let (res, nan) = residual_max(&given, m, &mut buf);
+        let unheld = nan || res >= bound || axis_disagrees(&given, m);
+        r.mate_unheld[i] = unheld;
+        r.mate_ok[i] &= !unheld;
+    }
+    r
+}
+
+/// [`solve_with_memo`] from the orientation pass on.
+fn solve_oriented(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool, memo: Option<&std::cell::RefCell<MateMemo>>) -> SolveResult {
     // Followers (pattern / mirror copies) start at their expected pose (one
     // list of poses kept in step: a copy per follower was most of an a1000
     // drag step once a flexible copy's children follow too).
@@ -1217,6 +1250,15 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) -> Vec<us
     stays
 }
 
+/// Whether an axial mate's connectors' Z axes point the other way from its
+/// alignment: its residual can't tell (a half-turn is as flat as none), the
+/// orientation pass ([`orient_axial_mates`]) turns each such mate's part over
+/// and a later mate turning it back leaves an earlier one so (live 1764 (3):
+/// a Parallel disagreeing with a Planar overdefines both).
+fn axis_disagrees(poses: &[Frame], m: &SolverMate) -> bool {
+    m.follow.is_none() && matches!(m.kind, MateType::Revolute | MateType::Cylindrical | MateType::PinSlot | MateType::Planar | MateType::Parallel) && (relative(poses, m).rotation * DVec3::Z).z < 0.0
+}
+
 /// The first coordinate of `v` (x, then y, then z) that isn't zero.
 fn first_nonzero(v: DVec3) -> f64 {
     v.to_array().into_iter().find(|c| c.abs() > 1e-9).unwrap_or(0.0)
@@ -1397,28 +1439,36 @@ fn place_tree(p: &Problem, poses: &mut Vec<Frame>, order: &[(usize, Vec<usize>)]
     Some(iterations)
 }
 
-/// A group's solve: its free bodies' new poses, the iterations, the mates in
-/// error ([`copy_conflict`]).
-type GroupSolved = (Vec<(usize, Frame)>, usize, Vec<usize>);
+/// A group's solve: its free bodies' new poses, the iterations, and when it
+/// can't hold its mates ([`group_conflict`]) the mates in error, with
+/// whether each already failed before the solve.
+type GroupSolved = (Vec<(usize, Frame)>, usize, Vec<(usize, bool)>);
 
-/// The mates a group's solution fails (`local`), with the follower placing
-/// each copy among their bodies, when one of them is on a pattern copy;
-/// empty otherwise.
-fn copy_conflict(problem: &Problem, local: &[Frame], scale: f64) -> Vec<usize> {
+/// When a group's solution (`local`) fails some of its mates: those mates,
+/// each with whether it fails at the start poses too (`start`: the mate the
+/// group can't take, as opposed to the ones it fights), and the follower
+/// placing each pattern copy among their bodies. Empty when every mate holds.
+///
+/// Live moves nothing then (1764 (3)–(5), 1754 (C), 1559: the poses stay as
+/// they were before the conflicting mate) and puts every mate it fights in
+/// error: the compromise's failing mates are those (1764 (5): the Fastened and
+/// both Planars of the chain; (3): the Planar and the Parallel).
+fn group_conflict(problem: &Problem, start: &[Frame], local: &[Frame], scale: f64) -> Vec<(usize, bool)> {
     let bound = 1e-5 * scale.max(1.0);
     let mut buf = Vec::new();
-    let failing: Vec<usize> = problem.terms.iter().filter_map(|t| if let Term::Mate(i) = t { Some(*i) } else { None }).filter(|&i| {
-        let (r, nan) = residual_max(local, &problem.mates[i], &mut buf);
-        nan || r >= bound
-    }).collect();
-    let copies: Vec<usize> = failing.iter().flat_map(|&i| mate_bodies(&problem.mates[i])).filter(|&b| problem.driven.is_driven.get(b).copied().unwrap_or(false)).collect();
-    if copies.is_empty() {
+    let mut fails = |poses: &[Frame], i: usize| {
+        let (r, nan) = residual_max(poses, &problem.mates[i], &mut buf);
+        nan || r >= bound || axis_disagrees(poses, &problem.mates[i])
+    };
+    let failing: Vec<usize> = problem.terms.iter().filter_map(|t| if let Term::Mate(i) = t { Some(*i) } else { None }).filter(|&i| fails(local, i)).collect();
+    if failing.is_empty() {
         return Vec::new();
     }
-    let mut out = failing;
-    out.extend(copies.iter().filter_map(|&b| problem.driven.placer[b]));
+    let mut out: Vec<(usize, bool)> = failing.iter().map(|&i| (i, fails(start, i))).collect();
+    let copies: Vec<usize> = failing.iter().flat_map(|&i| mate_bodies(&problem.mates[i])).filter(|&b| problem.driven.is_driven.get(b).copied().unwrap_or(false)).collect();
+    out.extend(copies.iter().filter_map(|&b| problem.driven.placer[b]).map(|i| (i, false)));
     out.sort_unstable();
-    out.dedup();
+    out.dedup_by_key(|(i, _)| *i);
     out
 }
 
@@ -1440,14 +1490,15 @@ fn solve_driven(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[So
     }
 
     let eps = 1e-7;
-    let mut conflicts: Vec<usize> = Vec::new();
+    let mut conflicts: Vec<(usize, bool)> = Vec::new();
+    let mut conflict_bodies: Vec<usize> = Vec::new();
     // Groups share no free body (a term's bodies are one group's or fixed),
     // so each is solved on its own copy of the poses, in parallel: the same
     // arithmetic as one after the other, the results bit for bit the same.
     {
         use rayon::prelude::*;
         let start = &poses;
-        let solved: Vec<GroupSolved> = groups
+        let solved: Vec<(GroupSolved, &Vec<usize>)> = groups
             .par_iter()
             .filter_map(|(free, terms)| {
                 let problem = Problem { bodies, mates, relations, drags, driven, terms: terms.clone(), scale };
@@ -1478,23 +1529,24 @@ fn solve_driven(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[So
                         iterations
                     }
                 };
-                // A conflict on a pattern copy (live 1754 (C): a Planar
-                // pulling copy 3 off its seed's Fastened place) moves
-                // nothing; the mates it can't hold together and the copy's
-                // pattern are in error.
-                let conflict = if dragged { Vec::new() } else { copy_conflict(&problem, &local, scale) };
+                // Mates that can't all hold: nothing moves, the mates fought
+                // over (and a copy's pattern) are in error.
+                let conflict = if dragged { Vec::new() } else { group_conflict(&problem, start, &local, scale) };
                 if !conflict.is_empty() {
-                    return Some((Vec::new(), iterations, conflict));
+                    return Some(((Vec::new(), iterations, conflict), free));
                 }
-                Some((free.iter().map(|&b| (b, local[b])).collect(), iterations, Vec::new()))
+                Some(((free.iter().map(|&b| (b, local[b])).collect(), iterations, Vec::new()), free))
             })
             .collect();
-        for (moved, iterations, failed) in solved {
+        for ((moved, iterations, failed), free) in solved {
             for (b, p) in moved {
                 poses[b] = p;
             }
             result.iterations = result.iterations.max(iterations);
-            conflicts.extend(failed);
+            if !failed.is_empty() {
+                conflicts.extend(failed);
+                conflict_bodies.extend_from_slice(free);
+            }
         }
     }
     // The copies from their solved drivers.
@@ -1520,8 +1572,11 @@ fn solve_driven(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[So
         for rel in relations {
             max_r = max_r.max(relation_residual(&poses, mates, rel).abs());
         }
-        for &i in &conflicts {
+        result.mate_unheld = vec![false; mates.len()];
+        result.held_back.clone_from(&conflict_bodies);
+        for &(i, unheld) in &conflicts {
             result.mate_ok[i] = false;
+            result.mate_unheld[i] = unheld;
         }
         result.max_residual = if conflicts.is_empty() { max_r } else { f64::INFINITY };
         result.converged = result.max_residual < 1e-6 * scale.max(1.0);
@@ -1588,6 +1643,10 @@ fn solve_driven(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[So
             .collect()
     };
     for (d, body_dof) in analysed {
+        // A group in conflict shows no degrees of freedom (live 1764 (3), (4')).
+        if body_dof.iter().any(|(bi, _)| conflict_bodies.contains(bi)) {
+            continue;
+        }
         result.dof += d;
         for (bi, r) in body_dof {
             result.body_dof[bi] = r;
