@@ -775,7 +775,9 @@ only on the dragged component).
 20:49: lead 20:15 item 1 (dx's X1 (B)): another document's Assembly was already evaluable (External key on an Assembly
 tab: `external_assembly`); added the API path (assembly_insert `document` + `version`; part / Part Studio / Assembly),
 live's "Versioned assembly from other document" tip, e2e assembly_inserts_another_documents_assembly_at_a_version
-(landed 27549ea9). Told dx in docs/handoff/dx.md "From skasm (11-02)". Next: lead items 2 (open fuzz cases, P1 first)
+(landed 27549ea9). Told dx in docs/handoff/dx.md "From skasm (11-02)". App check: a document made by the CLI
+(assembly_insert of another document's Assembly 1 at V1) shows "Assembly 1 <1>" with its parts, an expand arrow and
+the version icon, tip "Versioned assembly from other document". Next: lead items 2 (open fuzz cases, P1 first)
 and 3 (batch 7, asm probes 4 when live answers).
 20:51: sketch batch 7 answered (live 1806): 40/40 match on the first answer, the new kinds too (a Symmetric rectangle's
 width: left side kept, right side moves, the free centre line by half, as ours). Live's REST: Symmetric is `MIRROR`,
