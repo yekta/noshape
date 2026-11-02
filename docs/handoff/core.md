@@ -158,7 +158,19 @@ shell-hang 48.8 → 32.2 s, the 16 profile documents 55.8 → 39.2 s. **1748 / 1
 faces, ours (slabs) 12748.07 / 86: live has the same two sliver voids and the same three bits of the removed top, but
 keeps 8 input faces untouched (the four 2088.062 planes at z ±19, the four 507.8638 cylinders at x 20) where the
 slabs cut offsets (2098.66 planes, 272.80 / 209.996 cylinders, 5.48 / 12.24 planes): a thin region Parasolid leaves
-solid; the bodies as .x_t asked (REQUESTS 03:40) to diff here. shell-hang's Shell 5 (30 s, then fails) has an edge of
+solid. Diffed with live's .x_t (core_scratch XTDIFF): the inputs are identical (both differences 0); live − ours =
+four 142.63 mm³ pieces (570.5), each the outer half (r 6.5…7, ~150°, z ±2.9…±19) of a tube wall at (20, ±20): an r 6
+hole in an r 7 boss along z, so the wall is exactly 2t (t 0.5) and both inner offsets are r 6.5; live keeps it
+solid, our slabs hollow its outer half where the boss is half sunk in the body (between the z ±19 ceilings and a
+sloped plane). A plain exact-2t fin or tube on a plate is right both ways (2244 / 1799.919 mm³, the wall kept): the
+embedding matters; a small repro for live is next.
+shell-hang's Shell 5 (30 s, then fails) runs on Shell 3's slab result, which has a pinch: the x −60 plane meets itself
+along 5 mm edges (ops `regen_profile::non_manifold_origin` now flags a plane using an edge on both sides too: first
+after Shell 3); Shell 3's input asked of live as STEP (REQUESTS 05:35). Parked: planar strips whose offset vanishes
+(a chamfer narrower than the wall; /root/core-scratch/shell-planar-strips-wip.patch: detection by the strip's
+section, its two offset edges reversed; T1 case a 1 mm chamfer under a 2 mm wall as the slabs'): no share yet (Auto
+takes that block by regions; the corpus's cases are chains of collapsing strips under 8-20 mm walls, shell-hang's
+Shells 2 / 3 a chamfer loop's corner). shell-hang's Shell 5 (30 s, then fails) has an edge of
 one face that isn't a seam (5 mm edges at x −60 that the x −60 face uses on both sides: valid to BRepCheck); no
 prefix of the document has an edge of more than two faces (ops `regen_profile::non_manifold_origin`). Live 1760:
 Union of two boxes touching along an edge is OK and leaves two parts (no non-manifold body), a Shell of one box then

@@ -491,7 +491,8 @@ fn regen_summary() {
 }
 
 /// The first feature of each NOSHAPE_PROFILE_DIR document (NOSHAPE_PROFILE_ONLY: one) after which a body has an edge
-/// of more than two faces (Parasolid makes no such body: live 1760), regenerating each prefix of the feature list.
+/// of more than two faces (Parasolid makes no such body: live 1760) or a plane using an edge on both sides (a slit),
+/// regenerating each prefix of the feature list.
 #[test]
 #[ignore = "T2 tool: NOSHAPE_PROFILE_DIR"]
 fn non_manifold_origin() {
@@ -512,12 +513,16 @@ fn non_manifold_origin() {
                     let mut p = ps.clone();
                     p.features.truncate(k);
                     let r = Regenerator::new().regenerate(&p, &ConfigValues::default(), &units, &RegenOptions::default());
-                    let bad: Vec<String> = r.context.bodies.iter().filter(|b| b.shape.edge_faces().is_ok_and(|ef| ef.iter().any(|f| {
-                        let mut f = f.clone();
-                        f.sort_unstable();
-                        f.dedup();
-                        f.len() > 2
-                    }))).map(|b| b.name.clone()).collect();
+                    // (Or an edge only a plane uses: a slit, as no plane has a seam.)
+                    let bad: Vec<String> = r.context.bodies.iter().filter(|b| {
+                        let faces = b.shape.faces();
+                        b.shape.edge_faces().is_ok_and(|ef| ef.iter().any(|f| {
+                            let mut f = f.clone();
+                            f.sort_unstable();
+                            f.dedup();
+                            f.len() > 2 || (f.len() == 1 && faces.get(f[0] as usize).is_some_and(|x| matches!(x.face_surface(), Ok(noshape_kernel::Surface::Plane(_)))))
+                        }))
+                    }).map(|b| b.name.clone()).collect();
                     if !bad.is_empty() {
                         let f = &ps.features[k - 1];
                         println!("{} / {}: after feature {k} {} ({}): {bad:?} non-manifold", path.file_stem().unwrap().to_string_lossy(), tab.name, f.name, f.type_id);
