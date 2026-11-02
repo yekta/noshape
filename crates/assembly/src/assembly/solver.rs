@@ -28,7 +28,7 @@
 use crate::assembly::MateType;
 use glam::{DMat3, DQuat, DVec3};
 use nalgebra::{DMatrix, DVector};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// Rigid frame: rotation + translation.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1374,44 +1374,58 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
 }
 
 /// A group's free bodies in placing order from the fixed parts, each with
-/// the mates to the body placed before it (its parent), when the group's
-/// mates form a tree hanging from fixed parts (two bodies a mate, several
-/// mates between one pair allowed): no relations, drags, stays or pattern
-/// copies, every free body reached. None otherwise.
-fn tree_order(p: &Problem, free: &[usize]) -> Option<Vec<(usize, Vec<usize>)>> {
-    const ROOT: usize = usize::MAX;
-    let node = |b: usize| if free.contains(&b) { Some(b) } else if p.bodies[b].fixed { Some(ROOT) } else { None };
-    let mut pairs: HashMap<(usize, usize), Vec<usize>> = HashMap::new();
+/// its mates to the bodies placed before it: next is always the body those
+/// mates hold most (residual rows), so a tree goes parent before child and a
+/// stack closed by consistent redundant mates (a Parallel to the base) pin
+/// by pin. Only for two-body mates without relations, drags, stays or pattern
+/// copies, every free body reached; None otherwise. A loop the bodies can't
+/// close one at a time (a linkage) fails in [`place_tree`] instead.
+fn tree_order(p: &Problem, poses: &[Frame], free: &[usize]) -> Option<Vec<(usize, Vec<usize>)>> {
+    let ix: HashMap<usize, usize> = free.iter().enumerate().map(|(k, &b)| (b, k)).collect();
+    // Per free body: (other body, mate, rows).
+    let mut links: Vec<Vec<(usize, usize, usize)>> = vec![Vec::new(); free.len()];
+    let mut weight = vec![0usize; free.len()];
+    let mut buf = Vec::new();
     for t in &p.terms {
         let Term::Mate(i) = *t else { return None };
         let m = &p.mates[i];
         if !m.extra.is_empty() || m.follow.is_some() || [m.a, m.b].iter().any(|&b| p.driven.is_driven.get(b).copied().unwrap_or(false) || !p.driven.dependents.get(b).is_none_or(|d| d.is_empty())) {
             return None;
         }
-        let (a, b) = (node(m.a)?, node(m.b)?);
-        if a == b {
-            return None;
+        buf.clear();
+        mate_residuals(poses, m, &mut buf);
+        let rows = buf.len().max(1);
+        match (ix.get(&m.a), ix.get(&m.b)) {
+            (Some(&ka), Some(&kb)) if ka != kb => {
+                links[ka].push((m.b, i, rows));
+                links[kb].push((m.a, i, rows));
+            }
+            (Some(&k), None) if p.bodies[m.b].fixed => weight[k] += rows,
+            (None, Some(&k)) if p.bodies[m.a].fixed => weight[k] += rows,
+            _ => return None,
         }
-        pairs.entry((a.min(b), a.max(b))).or_default().push(i);
     }
-    // Connected with one edge per free body: a tree.
-    if pairs.len() != free.len() {
-        return None;
-    }
+    let mut placed = vec![false; free.len()];
     let mut order = Vec::with_capacity(free.len());
-    let mut placed: HashSet<usize> = HashSet::from([ROOT]);
-    let mut queue = std::collections::VecDeque::from([ROOT]);
-    while let Some(u) = queue.pop_front() {
-        let mut next: Vec<(usize, Vec<usize>)> = pairs.iter().filter(|((a, b), _)| *a == u || *b == u).map(|((a, b), ms)| (if *a == u { *b } else { *a }, ms.clone())).filter(|(v, _)| !placed.contains(v)).collect();
-        next.sort_unstable();
-        for (v, mut ms) in next {
-            ms.sort_unstable();
-            placed.insert(v);
-            queue.push_back(v);
-            order.push((v, ms));
+    for _ in 0..free.len() {
+        let k = (0..free.len()).filter(|&k| !placed[k] && weight[k] > 0).max_by_key(|&k| (weight[k], std::cmp::Reverse(free[k])))?;
+        placed[k] = true;
+        let b = free[k];
+        // Its mates to the fixed parts and to the bodies placed so far.
+        let mut ms: Vec<usize> = p.terms.iter().filter_map(|t| if let Term::Mate(i) = t { Some(*i) } else { None }).filter(|&i| {
+            let m = &p.mates[i];
+            let other = if m.a == b { m.b } else if m.b == b { m.a } else { return false };
+            ix.get(&other).is_none_or(|&o| placed[o] && o != k)
+        }).collect();
+        ms.sort_unstable();
+        for &(other, _, rows) in &links[k] {
+            if let Some(&o) = ix.get(&other).filter(|&&o| !placed[o]) {
+                weight[o] += rows;
+            }
         }
+        order.push((b, ms));
     }
-    (order.len() == free.len()).then_some(order)
+    Some(order)
 }
 
 /// Each body of `order` ([`tree_order`]) solved alone against its parent's
@@ -1517,7 +1531,7 @@ fn solve_driven(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[So
                 // from its parent alone (live 1763: the instance whose geometry
                 // changed absorbs the change, the rest stay), and a stack's
                 // small solves in place of one dense one.
-                let tree = if dragged { None } else { tree_order(&problem, free) };
+                let tree = if dragged { None } else { tree_order(&problem, start, free) };
                 let iterations = match tree.and_then(|order| place_tree(&problem, &mut local, &order, free, &anchors, scale)) {
                     Some(iterations) => iterations,
                     None => {
