@@ -746,3 +746,22 @@ fn a_void_waits_for_live() {
     eprintln!("void: ours {} ({} solids, {} faces), slabs {} ({} solids, {} faces)", vol(&p.shape), p.shape.solids().len(), p.shape.count(ShapeType::Face), vol(&q.shape), q.shape.solids().len(), q.shape.count(ShapeType::Face));
     assert!(close(vol(&p.shape), vol(&q.shape)));
 }
+
+/// A removed fillet as the opening (live 1752): Parasolid ends the walls next to it in flat rims normal to them,
+/// 2175.269908 mm³ and 16 faces, as the slabs; the direct construction (its walls run on to the fillet's surface,
+/// 2330.6 mm³) declines it.
+#[test]
+fn a_removed_fillet_opening_is_lives() {
+    let b = bx([0.0; 3], [40.0, 20.0, 10.0]);
+    let e = edges_where(&b, |i| i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9 && i.start.z > 9.99 && i.end.z > 9.99);
+    assert_eq!(e.len(), 1);
+    let s = fillet(&b, &e, 5.0).unwrap().shape;
+    let rm: Vec<Shape> = s.faces().into_iter().filter(|f| !matches!(f.face_surface(), Ok(Surface::Plane { .. }))).collect();
+    assert_eq!(rm.len(), 1);
+    assert!(shell_solid(&s, &rm, 1.0, ShellSide::Inside, ShellMethod::Quadrics).is_err());
+    let r = shell_solid(&s, &rm, 1.0, ShellSide::Inside, ShellMethod::Auto).unwrap();
+    assert!(r.shape.is_valid());
+    let v = vol(&r.shape);
+    assert!((v - 2175.269908169872).abs() < 1e-4, "{v}");
+    assert_eq!(r.shape.count(ShapeType::Face), 16);
+}

@@ -2914,8 +2914,8 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     BRepAdaptor_Curve c(e);
     const gp_Pnt      m = c.Value(0.5 * (c.FirstParameter() + c.LastParameter()));
     const gp_Dir      na = normal_at(TopoDS::Face(faces(a)), m), nb = normal_at(TopoDS::Face(faces(b)), m);
-    // A kept face tangent to a removed one (a removed fillet): ours and the slabs' disagree there (2330.6 against
-    // 2175.3 mm³ on a block whose R5 fillet is removed); live asked.
+    // A kept face tangent to a removed one (a removed fillet): Parasolid ends the kept walls in flat rims normal to
+    // them, as the slabs (live 1752: 2175.27 mm³, 16 faces); ours ran them on to the fillet (2330.6). Declined.
     if (na.Dot(nb) > 1 - 1e-9 && (!kept[(size_t)a] || !kept[(size_t)b]))
       return no("a kept face tangent to a removed one");
     if (na.Dot(nb) > 1 - 1e-9)

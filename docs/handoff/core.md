@@ -127,6 +127,13 @@ of its own (the void inside its offset), the result a compound. Gated by NOSHAPE
 `shell::a_void_waits_for_live`), but on the corpus's two void parts ours and the slabs differ (3e53d79e: 1015.2221 /
 1015.2123 mm³, the slabs' void cylinder offset in its own frame plus four 1.5 mm² patches; c24afe9e: 1032.2176 /
 9.1467, the slabs' clearly wrong).
+Live's answers (11-02 03:00): **1752** the removed R5 fillet is the slabs' (2175.269908 mm³, 16 faces: the kept walls
+end in flat rims normal to them): the decline stays, T1 `shell::a_removed_fillet_opening_is_lives`. **1753** live
+refuses both void parts ("Could not shell part with selections.", also at 1 mm), and **1748**'s a73 / 86dd (both with
+voids) fail the same way: every void case tried fails in live; plain void cases asked (REQUESTS 02:50) before Shell
+fails every solid with a void. **1748** 82ac: live 13318.805622 / 70 faces, ours 12748.07 / 86 (both slab results);
+ours has two 2.3 mm³ sliver voids along the bottom edges and keeps three bits of the removed top (z 20): live's face
+list asked (REQUESTS 03:00). (The evidence STEPs had metre values under an mm label: my chk/tostep probe, not the app.)
 Was: next (step 2b): collapsing fillets (their offset vanishes: the neighbours' offsets meet; contract the face to an
 edge, its end arcs to points), vertices of more faces, removed curved faces.
 Release note for the lead: "Shell: a pocket's floor corners are now mitred as Onshape does (the wall used to thin to
