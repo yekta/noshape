@@ -34,6 +34,7 @@ pub(crate) struct Cache {
     /// removed or modified other than by solving).
     pub revision: u64,
     pub analysis: Option<(u64, Analysis)>,
+    pub drag_graph: Option<(u64, std::sync::Arc<crate::drag_hold::DragGraph>)>,
 }
 
 /// A 2D sketch: entities + constraints.

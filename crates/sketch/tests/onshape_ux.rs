@@ -613,3 +613,37 @@ fn a_tilted_rectangle_comes_onto_the_kept_one() {
         assert!((*p - *q).length() < 2e-3, "A {:?} B {:?}", starts(&sk, &a), starts(&sk, &b));
     }
 }
+
+#[test]
+fn a_dragged_bolt_circle_hole_swings_the_pattern_about_the_next_hole() {
+    // Live drag probes 9 g6: a Ø40 circle, three Ø6 holes 14 from its centre
+    // (Equal, the first hole's and the big circle's radii dimensioned). The
+    // top hole dragged to (3.0755, 16.1871): the next hole stays, the centre
+    // swings about it and the last hole comes radially onto its circle.
+    use std::f64::consts::{FRAC_PI_2, TAU};
+    let mut sk = Sketch::new();
+    let centre_of = |sk: &Sketch, c: EntityId| match sk.entity(c).unwrap().geometry {
+        Geometry::Circle { center, .. } => center,
+        _ => unreachable!(),
+    };
+    let big = sk.add_circle(v(0.0, 0.0), 20.0);
+    let holes: Vec<EntityId> = (0..3).map(|i| sk.add_circle(DVec2::from_angle(FRAC_PI_2 + i as f64 * TAU / 3.0) * 14.0, 3.0)).collect();
+    for h in &holes[1..] {
+        sk.add_constraint(ConstraintKind::Equal { a: holes[0], b: *h }).unwrap();
+    }
+    sk.add_constraint(ConstraintKind::Radius { curve: big, value: 20.0 }).unwrap();
+    sk.add_constraint(ConstraintKind::Radius { curve: holes[0], value: 3.0 }).unwrap();
+    let c = centre_of(&sk, big);
+    let hc: Vec<EntityId> = holes.iter().map(|h| centre_of(&sk, *h)).collect();
+    for h in &hc {
+        sk.add_constraint(ConstraintKind::Distance { a: c, b: *h, value: 14.0, mode: DistanceMode::Center }).unwrap();
+    }
+    assert!(sk.solve().is_solved());
+    let rep = sk.drag(&[(DragHandle::Point(hc[0]), v(3.0755, 16.1871))]);
+    assert!(rep.is_solved(), "{rep:?}");
+    let got: Vec<DVec2> = [c, hc[0], hc[1], hc[2]].iter().map(|p| sk.point(*p).unwrap()).collect();
+    let live = [v(-2.8875, 3.5205), v(3.0755, 16.1871), v(-12.1244, -7.0), v(8.5774, -4.5142)];
+    for (p, q) in got.iter().zip(&live) {
+        assert!((*p - *q).length() < 1e-3, "ours {got:?} live {live:?}");
+    }
+}

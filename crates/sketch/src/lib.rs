@@ -21,6 +21,7 @@
 pub mod constraints;
 mod constructive;
 mod dof;
+mod drag_hold;
 mod dual;
 pub mod entities;
 mod equations;

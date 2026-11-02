@@ -912,28 +912,41 @@ fn dedup_sorted(mut v: Vec<ConstraintId>) -> Vec<ConstraintId> {
     v
 }
 
+/// Moves only `opts.light` (with its points, less `opts.still`), every
+/// other parameter held; true (and written back) when that solves.
+pub(crate) fn solve_held(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget]) -> bool {
+    let mut sys = System::build(sk, &HashSet::new(), drag);
+    for i in sys.still_reps(sk, opts) {
+        sys.p.fixed[i] = true;
+    }
+    let out = sys.solve(&SolveOptions { analyze: false, ..opts.clone() });
+    let ok = out.all_converged && out.comp_conflicts.is_empty() && out.const_conflicts.is_empty();
+    if ok {
+        sys.write_back(sk);
+    }
+    ok
+}
+
 /// Runs the solver on a sketch.
 pub(crate) fn run(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget]) -> SolveReport {
     run_ext(sk, opts, drag, true)
 }
 
 pub(crate) fn run_ext(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget], allow_exclusion: bool) -> SolveReport {
-    let mut excluded: HashSet<ConstraintId> = HashSet::new();
-    let mut conflicting: Vec<ConstraintId> = Vec::new();
-    let mut attempt = 0;
     if !opts.light.is_empty() {
         // First try to move `light` alone (everything else held; a drag's
         // dimensioned geometry, `Sketch::drag_weights`); the weighted solve
-        // below then only analyses the result.
-        let mut sys = System::build(sk, &excluded, drag);
-        for i in sys.still_reps(sk, opts) {
-            sys.p.fixed[i] = true;
-        }
-        let out = sys.solve(&SolveOptions { analyze: false, ..opts.clone() });
-        if out.all_converged && out.comp_conflicts.is_empty() && out.const_conflicts.is_empty() {
-            sys.write_back(sk);
-        }
+        // then only analyses the result.
+        solve_held(sk, opts, drag);
     }
+    run_weighted(sk, opts, drag, allow_exclusion)
+}
+
+/// `run_ext` after its held step.
+fn run_weighted(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget], allow_exclusion: bool) -> SolveReport {
+    let mut excluded: HashSet<ConstraintId> = HashSet::new();
+    let mut conflicting: Vec<ConstraintId> = Vec::new();
+    let mut attempt = 0;
     loop {
         let mut sys = System::build(sk, &excluded, drag);
         if !opts.light.is_empty() {
@@ -1373,8 +1386,18 @@ impl Sketch {
         opts.light = light;
         opts.still = still;
         let targets = self.drag_targets(handles);
+        if !opts.light.is_empty() {
+            self.drag_graph();
+        }
         let start = self.clone();
-        let report = run(self, &opts, &targets);
+        let report = if opts.light.is_empty() {
+            run(self, &opts, &targets)
+        } else {
+            if !(solve_held(self, &opts, &targets) && self.targets_met(&targets)) {
+                self.keep_far(&start, handles, &opts, &targets);
+            }
+            run_weighted(self, &opts, &targets, true)
+        };
         // A drag never satisfies its constraints by collapsing a line (one
         // with Horizontal + Vertical, dragged itself): it doesn't move.
         let collapsed = self.collapsed_lines(&start);
