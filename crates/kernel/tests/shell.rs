@@ -1040,3 +1040,20 @@ fn twisted_vase_cut_time_probe() {
         println!("{m}: shell {:.0} ms, live - ours {a:.4} in {:.0} ms, ours - live {b:.4} in {:.0} ms, kinds {:?}", (t1 - t0).as_secs_f64() * 1e3, (t2 - t1).as_secs_f64() * 1e3, (t3 - t2).as_secs_f64() * 1e3, r.faces().iter().map(|f| format!("{:?}", f.face_surface().ok()).chars().take(10).collect::<String>()).collect::<Vec<_>>());
     }
 }
+
+/// Live 1799: the sharp vase's 2 mm Shells as live's bodies (live's loft shelled here, each way).
+#[test]
+#[ignore = "T2: probe"]
+fn sharp_vase_2mm_probe() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_parasolid(&dir.join("vase-live-loft.x_t"), LengthUnit::Millimeter).unwrap();
+    for (side, file) in [(ShellSide::Outside, "vase-shell2-outward-live.x_t"), (ShellSide::Inside, "vase-shell2-inward-live.x_t")] {
+        let live = read_parasolid(&dir.join(file), LengthUnit::Millimeter).unwrap();
+        for (m, method) in [("auto", ShellMethod::Auto), ("offset", ShellMethod::Offset), ("quadrics", ShellMethod::Quadrics)] {
+            match shell_solid(&s, &top(&s, 120.0), 2.0, side, method) {
+                Ok(r) => println!("{side:?} {m}: {:.4} mm3 (live {:.4}, {:+.4}), {} faces", vol(&r.shape), vol(&live), vol(&r.shape) - vol(&live), r.shape.count(ShapeType::Face)),
+                Err(e) => println!("{side:?} {m}: {e}"),
+            }
+        }
+    }
+}

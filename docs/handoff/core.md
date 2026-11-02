@@ -24,7 +24,13 @@ results (the constructions' absolute thresholds): reverted; worth doing path by 
 offset spent 2.6-3 s (vibe5) intersecting the sides' offsets; now free-form faces meeting at sharp edges try the
 direct construction first (1.2-2.8 s, 1-3 mm both ways). Its B-spline sides are extended 3 walls past their bounds (was
 10); the outward foot corner depends on that continuation (2 mm out: 64475.65 with 3, .42 with 10, OCCT .56): live
-asked (1799) to pick Parasolid's. The kernel shell T1 suite 40-56 s -> 6 s (the vase test's Boolean diffs replaced).
+asked (1799): live's bodies (tests/data/shell/vase-shell2-*-live.x_t; T2 probe shell::sharp_vase_2mm_probe, live's loft):
+outward 64474.5365 mm³; ours with the sides extended 1 / 3 / 10 / 30 / 100 walls +0.88 / +0.37 / +0.13 / +0.05 /
++0.034, OCCT's offset +0.28; inward 5e-4 either way. So Parasolid continues the B-spline sides naturally (their end
+spans' polynomials): the exact fix is to extrapolate the end spans instead of GeomLib::ExtendSurfByLength (kept at 3
+walls meanwhile: longer surfaces made later Booleans slower). The kernel shell T1 suite 40-56 s -> 6 s.
+FL7 (live 1796): Width-controlled fillets take one unbranched chain of edges per part (detail.rs single_chain), else
+"Edges must form single chain per part."; T1 oracle_p1::fillet_width_takes_one_chain_per_part_as_live.
 
 **State 11-02 14:50 (this session, from 11:55).** Builds / tests on vibe5 (rb-hosts), the profile documents copied
 to vibe5 ~/agents/profdocs, fuzz scripts in vibe5 / vibe4 ~/agents/fuzz/bin. Landed: P1 smooth twisted vase (3c534b35:

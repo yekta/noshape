@@ -339,6 +339,11 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
     for (bi, edges) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let propagate = ev.bool("tangentPropagation");
+        // Live 1796: Width control takes one unbranched chain of edges per part (open or closed); a corner of three
+        // edges, two separate edges or a box's 12 fail.
+        if width && !single_chain(&body.shape, &if propagate { propagate_tangent(&body.shape, &edges) } else { edges.clone() }) {
+            return err("Edges must form single chain per part.");
+        }
         let unpropagated = |r: f64| super::blend_section::BlendSpec { section: super::blend_section::Section::Circular, r1: r, r2: r, width: None, partial: None, run_on: true, cliff: false, sides: None };
         if !propagate && curved_edge_left_open(&body.shape, &edges) {
             return err("Adjoining edge not filleted.");
@@ -707,6 +712,41 @@ pub fn shell(ev: &mut EvalCtx) -> FResult<()> {
         ev.replace_body(bi, res.shape, face_names);
     }
     Ok(())
+}
+
+/// Whether edges `es` of `shape` are one chain: connected through their vertices, no vertex on more than two of them.
+fn single_chain(shape: &k::Shape, es: &[usize]) -> bool {
+    fn root(p: &mut [usize], i: usize) -> usize {
+        if p[i] == i {
+            i
+        } else {
+            let r = root(p, p[i]);
+            p[i] = r;
+            r
+        }
+    }
+    let mut degree: BTreeMap<usize, usize> = BTreeMap::new();
+    let mut parent: Vec<usize> = (0..es.len()).collect();
+    let mut first: BTreeMap<usize, usize> = BTreeMap::new();
+    for (i, &e) in es.iter().enumerate() {
+        let Ok(edge) = shape.sub_shape(ShapeType::Edge, e) else { return true };
+        let mut vs: Vec<usize> = edge.vertices().iter().filter_map(|v| shape.index_of(v, ShapeType::Vertex)).collect();
+        vs.sort_unstable();
+        vs.dedup();
+        for v in vs {
+            *degree.entry(v).or_default() += 1;
+            match first.get(&v) {
+                Some(&j) => {
+                    let (a, b) = (root(&mut parent, i), root(&mut parent, j));
+                    parent[a] = b;
+                }
+                None => {
+                    first.insert(v, i);
+                }
+            }
+        }
+    }
+    degree.values().all(|&d| d <= 2) && (0..es.len()).all(|i| root(&mut parent, i) == root(&mut parent, 0))
 }
 
 /// Shell `part` (faces `removed`; none: hollow), as Shell and std's opShell do: offsets extend until they meet,

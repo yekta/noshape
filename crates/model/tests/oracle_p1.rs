@@ -153,6 +153,43 @@ fn edges(r: &RegenResult, at: &[DVec3]) -> ParamValue {
     ParamValue::Query(at.iter().map(|p| edge_at(r, *p)).collect())
 }
 
+/// Live 1796 (audit FL7): Width control fillets one unbranched chain of edges per part, open or closed, else "Edges
+/// must form single chain per part." (a corner of three edges, two separate edges, all 12); Radius control has no such
+/// rule.
+#[test]
+fn fillet_width_takes_one_chain_per_part_as_live() {
+    let back_bottom = DVec3::new(30.0, 40.0, 0.0);
+    let corner = [FRONT_TOP, LEFT_TOP, FRONT_LEFT];
+    let width = |at: &'static [DVec3], conic: bool| {
+        on_block("fillet", move |p, r| {
+            p.set("entities", edges(r, at));
+            if conic {
+                p.set("crossSection", en("CONIC"));
+                p.set("rho", ParamValue::Expr(ExprValue::new("0.5")));
+            }
+            p.set("blendControlType", en("WIDTH"));
+            p.set("width", mm(6.0));
+        })
+    };
+    let fails = |s: Studio, what: &str| {
+        let r = s.regen();
+        let st = r.display.features.last().unwrap();
+        assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("Edges must form single chain per part.")), "{what}");
+    };
+    fails(width(Box::leak(Box::new(corner)), true), "a corner of three edges");
+    fails(width(Box::leak(Box::new([FRONT_TOP, back_bottom])), true), "two separate edges");
+    let all: Vec<DVec3> = [FRONT_TOP, BACK_TOP, LEFT_TOP, RIGHT_TOP, back_bottom].into_iter().collect();
+    fails(width(Box::leak(all.into_boxed_slice()), false), "five edges, circular");
+    // A closed loop and two edges meeting end to end build (live 47420.4690 / 47705.1291 mm³).
+    for (at, live) in [(&[FRONT_TOP, BACK_TOP, LEFT_TOP, RIGHT_TOP][..], 47420.4690), (&[FRONT_TOP, RIGHT_TOP][..], 47705.1291)] {
+        let r = width(Box::leak(at.to_vec().into_boxed_slice()), true).regen();
+        let st = r.display.features.last().unwrap();
+        assert_eq!(st.status, FeatureStatus::Ok, "{:?}", st.message);
+        let v = r.context.bodies[0].shape.volume().unwrap() * 1e9;
+        assert!((v - live).abs() < 1e-3 * live, "{v} mm³, live {live}");
+    }
+}
+
 /// Batch 3: Fillet; batch 4: Chamfer; batch 6: Shell and Draft (CASES.md).
 fn blend_cases() -> Vec<(&'static str, Studio)> {
     let mut cases = Vec::new();
