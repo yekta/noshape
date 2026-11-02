@@ -127,6 +127,15 @@ of its own (the void inside its offset), the result a compound. Gated by NOSHAPE
 `shell::a_void_waits_for_live`), but on the corpus's two void parts ours and the slabs differ (3e53d79e: 1015.2221 /
 1015.2123 mm³, the slabs' void cylinder offset in its own frame plus four 1.5 mm² patches; c24afe9e: 1032.2176 /
 9.1467, the slabs' clearly wrong).
+Step 2f (11-02): spheres and tori (the offset radius by the generator; the circles where they meet a plane or a cone
+tangentially by GC_MakeCircle; a vertex where every face is tangent moves along the common normal; degenerate pole
+edges kept; a v-periodic pcurve shifted by whole periods; spindle tori allowed). T1 quadrics_and_slabs_agree: a tub
+(R3 on the vertical and bottom edges: spheres at the corners) and a rounded pocket (R3 corners, R2 floor fillet: tori)
+as the slabs'. Share: corpus 0 of 134 (7 stop at "a sphere's or torus's offset collapses", R ≤ t: the 2b kind for
+spheres / tori, next with the planar strips); on those two shapes OCCT's offset already works, so Auto doesn't
+change; where the offset fails, the direct construction replaces the slabs. vibe3 (perf.sh 43e955ad, best of 3 × 5):
+tub direct 177.7 ms / OCCT's offset 86.7 / slabs 378.1; rounded pocket 190.7 / 237.4 / 486.4. (Direct is twice the
+offset on the tub: its checks, likely the self-interference analysis; to look at.)
 Live's answers (11-02 03:00): **1752** the removed R5 fillet is the slabs' (2175.269908 mm³, 16 faces: the kept walls
 end in flat rims normal to them): the decline stays, T1 `shell::a_removed_fillet_opening_is_lives`. **1753** live
 refuses both void parts ("Could not shell part with selections.", also at 1 mm), and **1748**'s a73 / 86dd (both with

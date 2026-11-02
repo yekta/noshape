@@ -54,6 +54,22 @@ fn close(a: f64, b: f64) -> bool {
     (a - b).abs() <= 1e-6 * a.abs().max(b.abs()).max(1.0)
 }
 
+/// A tub: a block with R3 fillets on its vertical and bottom edges (spheres at the bottom corners), the top sharp.
+fn tub() -> Shape {
+    let p = bx([0.0; 3], [40.0, 20.0, 10.0]);
+    let es = edges_where(&p, |i| !(i.start.z > 9.99 && i.end.z > 9.99));
+    fillet(&p, &es, 3.0).unwrap().shape
+}
+
+/// A pocket with R3 vertical corners and an R2 floor fillet (tori where the floor fillet turns the corners).
+fn round_pocket() -> Shape {
+    let p = unify_same_domain(&cut(&bx([0.0; 3], [60.0, 40.0, 20.0]), &bx([20.0, 10.0, 10.0], [40.0, 30.0, 21.0])).unwrap().shape).unwrap().shape;
+    let v = edges_where(&p, |i| (i.start.z - i.end.z).abs() > 1e-6 && i.start.x > 19.0 && i.start.x < 41.0 && i.start.y > 9.0 && i.start.y < 31.0);
+    let p = fillet(&p, &v, 3.0).unwrap().shape;
+    let floor = edges_where(&p, |i| (i.start.z - 10.0).abs() < 1e-9 && (i.end.z - 10.0).abs() < 1e-9);
+    fillet(&p, &floor, 2.0).unwrap().shape
+}
+
 /// Where OCCT's offset works, the slab construction gives the same solid.
 #[test]
 fn offset_and_slabs_agree() {
@@ -605,6 +621,7 @@ fn quadrics_and_slabs_agree() {
     };
     // A block with a blind Ø10 hole 10 deep from the top (its floor edge concave).
     let blind = unified(cut(&bx([0.0; 3], [60.0, 40.0, 20.0]), &cyl_z(30.0, 20.0, 10.0, 5.0, 11.0)).unwrap().shape);
+    let (tub, round_pocket) = (tub(), round_pocket());
     // A block whose top is a vault (an R50 cylinder along x, 15 mm high in the middle); a slot cut in its floor.
     let vault = {
         let c = make_cylinder(&Plane::from_normal(DVec3::new(-1.0, 10.0, -35.0), DVec3::X), 50.0, 42.0, std::f64::consts::TAU).unwrap();
@@ -622,6 +639,8 @@ fn quadrics_and_slabs_agree() {
         ("countersunk plate, bottom removed", sunk.clone(), bottom(&sunk), 2.0),
         ("two chamfers meeting (a vertex of four faces), bottom removed", chamfered.clone(), bottom(&chamfered), 1.0),
         ("a blind hole, bottom removed (a concave cylinder-plane edge)", blind.clone(), bottom(&blind), 2.0),
+        ("rounded bottom corners (spheres), top removed", tub.clone(), top(&tub, 10.0), 1.0),
+        ("a rounded pocket (tori at its floor corners), bottom removed", round_pocket.clone(), bottom(&round_pocket), 1.0),
         ("a vaulted top removed (a curved opening)", vault.clone(), faces_where(&vault, |c| c.z > 12.0), 1.0),
         ("a hole's wall removed (a closed curved opening)", plate_hole.clone(), plate_hole.faces().into_iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { .. }))).collect(), 2.0),
         ("qa plate R2, top removed, 1.5", qa_plate.clone(), top(&qa_plate, 10.0), 1.5),
@@ -764,4 +783,26 @@ fn a_removed_fillet_opening_is_lives() {
     let v = vol(&r.shape);
     assert!((v - 2175.269908169872).abs() < 1e-4, "{v}");
     assert_eq!(r.shape.count(ShapeType::Face), 16);
+}
+
+/// Spheres and tori taken directly: the tub's and the rounded pocket's Shell by each path, best of 5.
+#[test]
+#[ignore = "T2 bench: tools/tiers/perf.sh"]
+fn spheres_and_tori_shell_time() {
+    let (t, p) = (tub(), round_pocket());
+    for (name, s, rm) in [("tub, top removed, 1 mm", &t, top(&t, 10.0)), ("rounded pocket, bottom removed, 1 mm", &p, faces_where(&p, |c| c.z.abs() < 1e-9))] {
+        let best = |m: ShellMethod| {
+            (0..5)
+                .map(|_| {
+                    let t0 = std::time::Instant::now();
+                    shell_solid(s, &rm, 1.0, ShellSide::Inside, m).unwrap();
+                    t0.elapsed().as_secs_f64() * 1e3
+                })
+                .fold(f64::INFINITY, f64::min)
+        };
+        let auto = best(ShellMethod::Auto);
+        let path = last_shell_path();
+        let (direct, offset, slabs) = (best(ShellMethod::Quadrics), best(ShellMethod::Offset), best(ShellMethod::Slabs));
+        println!("timing {name}: direct {direct:.1} ms, OCCT's offset {offset:.1} ms, slabs {slabs:.1} ms; Auto ({path}) {auto:.1} ms");
+    }
 }

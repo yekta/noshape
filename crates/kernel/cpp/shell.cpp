@@ -98,6 +98,9 @@
 
 #include <cmath>
 #include <map>
+#include <GC_MakeCircle.hxx>
+#include <Geom_ToroidalSurface.hxx>
+#include <Geom_SphericalSurface.hxx>
 #include <functional>
 #include <GeomProjLib.hxx>
 #include <Geom_Plane.hxx>
@@ -2614,8 +2617,8 @@ struct Surf
   GeomAbs_SurfaceType       kind;
   occ::handle<Geom_Surface> off;    // the offset (world coordinates)
   gp_Ax3                    ax;     // the offset's frame (cylinders, cones)
-  double                    r = 0;  // the offset's radius (cylinder) / reference radius (cone)
-  double                    ang = 0;
+  double                    r = 0;  // the offset's radius (cylinder, sphere) / reference radius (cone) / minor radius (torus)
+  double                    ang = 0; // a cone's semi-angle / a torus's major radius
   gp_XYZ                    n;      // planes: outward normal, n.x = c
   double                    c = 0;
 };
@@ -2630,6 +2633,10 @@ double eval(const Surf& s, const gp_XYZ& x)
   const double rho = (w - s.ax.Direction().XYZ() * h).Modulus();
   if (s.kind == GeomAbs_Cylinder)
     return rho - s.r;
+  if (s.kind == GeomAbs_Sphere)
+    return w.Modulus() - s.r;
+  if (s.kind == GeomAbs_Torus) // (ang: the major radius)
+    return std::sqrt((rho - s.ang) * (rho - s.ang) + h * h) - s.r;
   return (rho - (s.r + h * std::tan(s.ang))) * std::cos(s.ang);
 }
 
@@ -2729,15 +2736,14 @@ bool add_pcurve(const TopoDS_Edge& ne, const TopoDS_Face& nf, const TopoDS_Edge&
     occ::handle<Geom2d_Curve>        cn = GeomProjLib::Curve2d(c3, a, b, sn);
     if (co.IsNull() || cn.IsNull())
       return nullptr;
-    if (per)
+    if (per || sn->IsVPeriodic())
     {
-      // Original start (in oe's own direction) against the new curve's start.
-      const double uo = co->Value(o == TopAbs_REVERSED ? f0 : f0).X();
-      const double un = cn->Value(a).X();
-      const double P  = sn->UPeriod();
-      const double du = std::round((uo - un) / P) * P;
-      if (du != 0)
-        cn->Translate(gp_Vec2d(du, 0));
+      // Original start (in oe's own direction) against the new curve's start, by whole periods in u (and v).
+      const gp_Pnt2d qo = co->Value(f0), qn = cn->Value(a);
+      const double   du = per ? std::round((qo.X() - qn.X()) / sn->UPeriod()) * sn->UPeriod() : 0.0;
+      const double   dv = sn->IsVPeriodic() ? std::round((qo.Y() - qn.Y()) / sn->VPeriod()) * sn->VPeriod() : 0.0;
+      if (du != 0 || dv != 0)
+        cn->Translate(gp_Vec2d(du, dv));
     }
     return cn;
   };
@@ -2840,8 +2846,44 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       continue;
     }
     curved = true;
+    if (q.kind == GeomAbs_Sphere || q.kind == GeomAbs_Torus)
+    {
+      // A sphere's or torus's offset: its radius (the minor one) moved along the natural normal; the frame kept.
+      q.ax = q.kind == GeomAbs_Sphere ? s.Sphere().Position() : s.Torus().Position();
+      const double r0 = q.kind == GeomAbs_Sphere ? s.Sphere().Radius() : s.Torus().MinorRadius();
+      q.ang           = q.kind == GeomAbs_Torus ? s.Torus().MajorRadius() : 0.0;
+      if (!kept[(size_t)i])
+      {
+        q.r   = r0;
+        q.off = BRep_Tool::Surface(f);
+        continue;
+      }
+      // The natural normal's way against the radius: at (0, 0), the point moved along it, nearer or farther from
+      // the centre (the tube's circle).
+      gp_Pnt P;
+      gp_Vec Du, Dv;
+      s.D1(0.3, 0.3, P, Du, Dv);
+      gp_Vec N = Du.Crossed(Dv);
+      if (N.Magnitude() < 1e-12)
+        return no("a face's normal undefined");
+      N.Normalize();
+      quad::Surf probe = q;
+      probe.r          = r0;
+      const double out = quad::eval(probe, P.XYZ() + N.XYZ() * (1e-3 * r0)) > 0 ? 1.0 : -1.0;
+      q.r              = r0 + out * d;
+      if (q.r <= 10 * tol)
+        return no("a sphere's or torus's offset collapses");
+      if (q.kind == GeomAbs_Sphere)
+        q.off = new Geom_SphericalSurface(q.ax, q.r);
+      else
+      {
+        // (A tube past its axis, a spindle torus: only its outer part is the wall's; the checks below decide.)
+        q.off = new Geom_ToroidalSurface(q.ax, q.ang, q.r);
+      }
+      continue;
+    }
     if (q.kind != GeomAbs_Cylinder && q.kind != GeomAbs_Cone)
-      return no("a face neither a plane, a cylinder nor a cone");
+      return no("a face neither a plane, a cylinder, a cone, a sphere nor a torus");
     if (!kept[(size_t)i])
     {
       // A removed cylinder or cone stays: the rim lies on it.
@@ -2889,12 +2931,21 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   TopExp::MapShapesAndUniqueAncestors(so, TopAbs_VERTEX, TopAbs_EDGE, ve);
   // Edges: their faces (a seam: the same twice), whether tangent there.
   std::vector<std::array<int, 2>> efi(ne + 1);
-  std::vector<char>               seam(ne + 1), tangent(ne + 1);
+  std::vector<char>               seam(ne + 1), tangent(ne + 1), degen(ne + 1);
   for (int i = 1; i <= ne; ++i)
   {
     const TopoDS_Edge& e = TopoDS::Edge(edges(i));
     if (BRep_Tool::Degenerated(e))
-      return no("a degenerate edge");
+    {
+      // A sphere's pole: a degenerate edge again, at its vertex's offset.
+      const ShapeList& fl = ef.FindFromKey(e);
+      const int        a  = faces.FindIndex(fl.First());
+      if (fl.Extent() != 1 || !kept[(size_t)a] || sf[(size_t)a].kind != GeomAbs_Sphere)
+        return no("a degenerate edge not a kept sphere's pole");
+      efi[(size_t)i]   = {a, a};
+      degen[(size_t)i] = 1;
+      continue;
+    }
     const ShapeList& fl = ef.FindFromKey(e);
     if (fl.Extent() == 1 && BRep_Tool::IsClosed(e, TopoDS::Face(fl.First())))
     {
@@ -2920,8 +2971,8 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       return no("a kept face tangent to a removed one");
     if (na.Dot(nb) > 1 - 1e-9)
     {
-      if (c.GetType() != GeomAbs_Line)
-        return no("faces tangent along a curve");
+      if (c.GetType() != GeomAbs_Line && c.GetType() != GeomAbs_Circle)
+        return no("faces tangent along a curve neither a line nor a circle");
       tangent[(size_t)i] = 1;
     }
   }
@@ -2987,7 +3038,14 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     auto n_at = [&](int f) { return gp_Vec(normal_at(TopoDS::Face(faces(f)), V)).XYZ(); };
     gp_XYZ x;
     const auto col = std::find_if(fs.begin(), fs.end(), [&](int f) { return collapse[(size_t)f] != 0; });
-    if (col != fs.end())
+    // Every face tangent there (a sphere's pole on a plane, a corner sphere's point on two fillets and a side): each
+    // offset passes V moved in along the common normal.
+    bool all_tangent = fs.size() >= 2 && col == fs.end();
+    for (size_t p = 0; p < fs.size() && all_tangent; ++p)
+      all_tangent = kept[(size_t)fs[p]] && n_at(fs[p]).Dot(n_at(fs[0])) > 1 - 1e-9;
+    if (all_tangent)
+      x = V.XYZ() - n_at(fs[0]) * t;
+    else if (col != fs.end())
     {
       // A corner of a collapsing fillet: where its neighbours' offsets meet the cap's.
       const int c = *col;
@@ -3019,12 +3077,28 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           if (f != a && f != b)
             third = f;
         BRepAdaptor_Curve c(TopoDS::Edge(edges(tp)));
-        gp_Pnt            p0;
-        gp_Vec            d0;
-        c.D1(c.FirstParameter(), p0, d0);
-        const gp_XYZ o = V.XYZ() - n_at(a) * t;
-        if (third < 0 || !quad::solve_line(sf[(size_t)third], o, d0.Normalized().XYZ(), x, size))
-          return no("a tangent line's corner not found");
+        if (c.GetType() == GeomAbs_Circle)
+        {
+          // Faces tangent along a circle: their offsets meet along the circle moved along the normals, in its plane.
+          const gp_Circ     ci = c.Circle();
+          quad::Surf        pl;
+          pl.kind               = GeomAbs_Plane;
+          pl.n                  = ci.Axis().Direction().XYZ();
+          pl.c                  = pl.n.Dot(ci.Location().XYZ());
+          const quad::Surf* s3[3] = {&sf[(size_t)a], &sf[(size_t)third], &pl};
+          x = V.XYZ() - n_at(a) * t - n_at(third) * (third >= 0 && kept[(size_t)third] ? t : 0.0);
+          if (third < 0 || !quad::solve3(s3, x, size))
+            return no("a tangent circle's corner not found");
+        }
+        else
+        {
+          gp_Pnt p0;
+          gp_Vec d0;
+          c.D1(c.FirstParameter(), p0, d0);
+          const gp_XYZ o = V.XYZ() - n_at(a) * t;
+          if (third < 0 || !quad::solve_line(sf[(size_t)third], o, d0.Normalized().XYZ(), x, size))
+            return no("a tangent line's corner not found");
+        }
       }
       else
       {
@@ -3138,6 +3212,20 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     // (A removed face's seam has no offset: its rim bands get their own, below.)
     if (gone[(size_t)i] || (seam[(size_t)i] && !kept[(size_t)efi[(size_t)i][0]]))
       continue;
+    if (degen[(size_t)i])
+    {
+      // A pole: degenerate at its vertex's offset (its curve on the face added with the face, below).
+      TopoDS_Vertex a, b;
+      TopExp::Vertices(TopoDS::Edge(edges(i).Oriented(TopAbs_FORWARD)), a, b);
+      TopoDS_Edge d;
+      bld.MakeEdge(d);
+      bld.Degenerated(d, true);
+      const TopoDS_Vertex& v = vx[(size_t)find(verts.FindIndex(a))];
+      bld.Add(d, v.Oriented(TopAbs_FORWARD));
+      bld.Add(d, v.Oriented(TopAbs_REVERSED));
+      ex[(size_t)i] = d;
+      continue;
+    }
     const TopoDS_Edge e = TopoDS::Edge(edges(i).Oriented(TopAbs_FORWARD));
     TopoDS_Vertex     a, b;
     TopExp::Vertices(e, a, b);
@@ -3162,7 +3250,8 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     // (A collapsing face's tangent edge: the mitre of its two neighbours' offsets.)
     const int fa = group[(size_t)i] != 0 ? across[(size_t)group[(size_t)i]][0] : efi[(size_t)i][0];
     const int fb = group[(size_t)i] != 0 ? across[(size_t)group[(size_t)i]][1] : efi[(size_t)i][1];
-    if (seam[(size_t)i] || (tangent[(size_t)i] && group[(size_t)i] == 0) || (sf[(size_t)fa].kind == GeomAbs_Plane && sf[(size_t)fb].kind == GeomAbs_Plane))
+    const bool tangent_circle = tangent[(size_t)i] && group[(size_t)i] == 0 && oc.GetType() == GeomAbs_Circle;
+    if (!tangent_circle && (seam[(size_t)i] || (tangent[(size_t)i] && group[(size_t)i] == 0) || (sf[(size_t)fa].kind == GeomAbs_Plane && sf[(size_t)fb].kind == GeomAbs_Plane)))
     {
       if (A.Distance(B) <= 10 * tol || gp_Vec(A, B).Dot(t0) <= 0)
       {
@@ -3178,12 +3267,33 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     }
     else
     {
-      GeomAPI_IntSS is(sf[(size_t)fa].off, sf[(size_t)fb].off, 1e-9 * size);
-      if (!is.IsDone())
-        return no("two offsets don't intersect");
-      for (int k = 1; k <= is.NbLines() && c.IsNull(); ++k)
+      std::vector<occ::handle<Geom_Curve>> cands;
+      if (tangent_circle)
       {
-        occ::handle<Geom_Curve>     cand = is.Line(k);
+        // The circle moved along the faces' common normal (three of its points): its offset, in its plane.
+        const double a0 = oc.FirstParameter(), a1 = oc.LastParameter();
+        gp_Pnt       q3[3];
+        for (int k = 0; k < 3; ++k)
+        {
+          const gp_Pnt q = oc.Value(a0 + (a1 - a0) * (0.1 + 0.4 * k));
+          q3[k]          = q.Translated(gp_Vec(normal_at(TopoDS::Face(faces(fa)), q)) * -t);
+        }
+        GC_MakeCircle mc(q3[0], q3[1], q3[2]);
+        if (!mc.IsDone())
+          return no("a tangent circle's offset failed");
+        cands.push_back(mc.Value());
+      }
+      else
+      {
+        GeomAPI_IntSS is(sf[(size_t)fa].off, sf[(size_t)fb].off, 1e-9 * size);
+        if (!is.IsDone())
+          return no("two offsets don't intersect");
+        for (int k = 1; k <= is.NbLines(); ++k)
+          cands.push_back(is.Line(k));
+      }
+      for (size_t k = 0; k < cands.size() && c.IsNull(); ++k)
+      {
+        occ::handle<Geom_Curve>     cand = cands[k];
         GeomAPI_ProjectPointOnCurve pa(A, cand), pb(B, cand);
         if (pa.NbPoints() == 0 || pb.NbPoints() == 0 || pa.LowerDistance() > 1e3 * tol || pb.LowerDistance() > 1e3 * tol)
           continue;
@@ -3285,6 +3395,17 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           if (done.Contains(edges(k)) || gone[(size_t)k])
             continue;
           done.Add(edges(k));
+          if (degen[(size_t)k])
+          {
+            // The pole's curve on the offset sphere: the original's (the frame is kept).
+            double                          c0, c1;
+            const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(TopoDS::Edge(edges(k).Oriented(TopAbs_FORWARD)), ff, c0, c1);
+            if (pc.IsNull())
+              return no("a pole without its curve");
+            bld.UpdateEdge(ex[(size_t)k], occ::down_cast<Geom2d_Curve>(pc->Copy()), of, 1e3 * tol);
+            bld.Range(ex[(size_t)k], of, c0, c1);
+            continue;
+          }
           if (!quad::add_pcurve(ex[(size_t)k], of, TopoDS::Edge(edges(k).Oriented(TopAbs_FORWARD)), ff, seam[(size_t)k] != 0, 1e3 * tol))
             return no("an offset edge's curve on its face failed");
         }
@@ -3394,7 +3515,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   }
   }
   for (int i = 1; i <= ne; ++i)
-    if (!ex[(size_t)i].IsNull())
+    if (!ex[(size_t)i].IsNull() && !degen[(size_t)i])
       BRepLib::SameParameter(ex[(size_t)i], 1e3 * tol);
   if (!ok_wires)
     return no("an edge without its offset");
