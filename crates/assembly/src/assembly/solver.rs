@@ -1028,6 +1028,28 @@ pub fn solve_with_memo(bodies: &mut [SolverBody], mates: &[SolverMate], relation
     for &b in &r.held_back {
         bodies[b].pose = given[b];
     }
+    // An axial mate whose axis is opposed to the part's other axial mates
+    // still takes the part where its flipped self would (live probes 1786
+    // cb1 / cb2, fuzz f50: a Revolute opposed to the Cylindrical holding a
+    // plate slides it onto its connector; both stay red). A Fastened
+    // conflict moves nothing (cb3).
+    let axial = |m: &SolverMate| matches!(m.kind, MateType::Revolute | MateType::Cylindrical | MateType::PinSlot | MateType::Slider);
+    let opposed: Vec<usize> = mates.iter().enumerate().filter(|(_, m)| mate_bodies(m).any(|b| r.held_back.contains(&b)) && axial(m) && axis_disagrees(&given, m)).map(|(i, _)| i).collect();
+    let others_axial = mates.iter().filter(|m| mate_bodies(m).any(|b| r.held_back.contains(&b))).all(axial);
+    if !opposed.is_empty() && others_axial {
+        let mut flipped: Vec<SolverMate> = mates.to_vec();
+        for &i in &opposed {
+            flipped[i].flip_primary = !flipped[i].flip_primary;
+        }
+        let mut trial: Vec<SolverBody> = bodies.to_vec();
+        let r2 = solve_oriented(&mut trial, &flipped, relations, drags, false, None);
+        if r2.held_back.is_empty() && r2.mate_ok.iter().all(|ok| *ok) {
+            for &b in &r.held_back {
+                bodies[b].pose = trial[b].pose;
+            }
+        }
+    }
+    let given: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
     // Their mates as they stand there: the one the group can't take fails
     // (a disagreeing Parallel the orientation pass had turned the part for).
     let bound = 1e-5 * characteristic_length(&given, mates).max(1e-3).max(1.0);
