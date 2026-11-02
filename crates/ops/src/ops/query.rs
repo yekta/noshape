@@ -19,7 +19,7 @@ pub fn ops() -> Vec<Op> {
             group: "query",
             verb: "parts",
             summary: "The parts, surfaces and curves of a Part Studio",
-            description: "Each body with its id (`body:…`), name, kind, volume, surface area, bounding box and face/edge/vertex counts. Lengths in the workspace units (see `units`).",
+            description: "Each body with its id (`body:…`), name, kind, volume and centroid (solids), surface area, bounding box and face/edge/vertex counts. Lengths in the workspace units (see `units`).",
             fields: vec![doc_field(), tab_field(), opt("configuration", json!({ "type": "object" }), "In this configuration: {input: option or value} by id or name (config_list); the other inputs as shown.")],
             mutates: false,
             destructive: false,
@@ -156,10 +156,11 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 let s = |c: f32| crate::appearance::lin_to_srgb(c);
                 v["color"] = json!(format!("#{:02x}{:02x}{:02x}", s(d.color[0]), s(d.color[1]), s(d.color[2])));
             }
-            if let Ok(vol) = b.shape.volume()
-                && matches!(b.kind, noshape_model::display::BodyKind::Solid)
+            if matches!(b.kind, noshape_model::display::BodyKind::Solid)
+                && let Ok(mp) = noshape_kernel::volume_properties(&b.shape)
             {
-                v["volume"] = json!(r6(vol * k * k * k));
+                v["volume"] = json!(r6(mp.mass * k * k * k));
+                v["centroid"] = pt(mp.center, k);
             }
             if let Ok(area) = b.shape.area() {
                 v["surface_area"] = json!(r6(area * k * k));

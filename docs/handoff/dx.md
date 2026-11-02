@@ -31,6 +31,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   (asVersion, defaultsChanged, computeTransformsWithoutBuiltin) skipped; features without a live.jsonl line are not
   compared (end-state dumps). Model dirs from older dumps: sm-forms-v4 (end state from bodydetails / massproperties)
   in /root/dx-scratch/pm/models: the runner compares them (custom `tag` feature: not P1).
+- 11-02 23:55: packed queries decoded with custom's `host::packed` (now public): sketch regions (the imprint face
+  named by its bounding curves → our region whose `inside` point (new in sketch_get) is inside those curves, ray-cast
+  parity), sketch entities (`SKETCH_ENTITY` of a sketch's own wire), Plane-feature planes, `qCreatedBy(makeId(sketch),
+  VERTEX)`; ids placed from the raw `bodies` (bodydetails) a live.jsonl line carries (`refs_from_bodies`), refs.jsonl
+  optional; query_parts gives each solid's `centroid`, compared within 1e-6 m. Fetch script for one document:
+  /root/dx-scratch/live/pm-fetch.js with rest.js (run via /root/live-pw/dxr.mjs; set DID / WID / EID / NAME). Don't
+  burn the account's REST quota: live is fetching the corpus. When GET /features reopens (~04:45 UTC): fetch
+  "dx mbd 1721" (noshape mm test, e 2c69867e1296f9a369ea1c36) and a few P1 studios of that document ("live hole
+  row", "live pattern holes", "live mirror half hole A") into /root/parity/models-dx/ and run parity_models on them.
 - Tried on 6 older feature dumps (/root/dx-scratch/pm/models, on vibe5 ~/agents/dx/pm-models): next in the translator:
   configuration inputs and variables (`#HeadHeight`), Onshape-internal parameters (asVersion, defaultsChanged),
   revolveType, constraints on external references (`externalSecond`), splines / ellipses, BTMParameterLookupTablePath

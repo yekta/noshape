@@ -5716,7 +5716,7 @@ Examples:
 
 The parts, surfaces and curves of a Part Studio.
 
-Each body with its id (`body:…`), name, kind, volume, surface area, bounding box and face/edge/vertex counts. Lengths in the workspace units (see `units`).
+Each body with its id (`body:…`), name, kind, volume and centroid (solids), surface area, bounding box and face/edge/vertex counts. Lengths in the workspace units (see `units`).
 
 Examples:
 

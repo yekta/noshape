@@ -51,6 +51,8 @@ pub struct Translator<'a> {
     /// Onshape sketch frames by feature id (`sketches` from `GET …/sketches`):
     /// origin, x, y in metres.
     frames: HashMap<String, [[f64; 3]; 3]>,
+    /// Free sketch points (Onshape sketch id, ours), in drawing order.
+    sketch_points: Vec<(String, String)>,
     /// Onshape sketch curves by (sketch feature id, entity id), sampled as
     /// sketch-plane segments (metres), for picking regions.
     curves: HashMap<(String, String), Vec<[f64; 2]>>,
@@ -102,7 +104,7 @@ impl<'a> Translator<'a> {
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
         let _ = std::fs::remove_file(path);
-        let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), frames, curves: HashMap::new(), config_defaults, notes: Vec::new() };
+        let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, notes: Vec::new() };
         t.call("document_create", json!({ "path": path.to_str().ok_or("path")? }))?;
         for c in doc["configuration"]["configurationParameters"].as_array().into_iter().flatten() {
             t.config_input(c);
@@ -297,6 +299,18 @@ impl<'a> Translator<'a> {
         if let Some(r) = self.region_from_query(text)? {
             return Ok(vec![r]);
         }
+        if let Some(e) = self.sketch_entity_from_query(text) {
+            return Ok(vec![e]);
+        }
+        // qCreatedBy(makeId("F…"), EntityType.VERTEX): a sketch's points.
+        if let Some(sk) = text.split("qCreatedBy(makeId(\"").nth(1).and_then(|r| r.split('"').next())
+            && text.contains("EntityType.VERTEX")
+        {
+            let points: Vec<String> = self.sketch_points.iter().filter(|(s, _)| s == sk).map(|(_, e)| e.clone()).collect();
+            if !points.is_empty() {
+                return Ok(points);
+            }
+        }
         // qSketchRegion(id + "F…", true): every region of that sketch.
         if let Some(sk) = text.split("qSketchRegion(id + \"").nth(1).and_then(|r| r.split('"').next()) {
             let ours = self.feature_ids.get(sk).cloned().ok_or_else(|| format!("sketch {sk} was not built"))?;
@@ -348,6 +362,25 @@ impl<'a> Translator<'a> {
             }
         }
         best.map(|b| Some(b.1)).ok_or_else(|| format!("no region of ours inside sketch {sk}'s curves {:?}", strings.iter().filter(|e| self.curves.contains_key(&(sk.clone(), (*e).clone()))).collect::<Vec<_>>()))
+    }
+
+    /// A sketch curve or point named by its Onshape id (packed
+    /// `SKETCH_ENTITY` query of a sketch's own wire, not of a feature made
+    /// from it).
+    fn sketch_entity_from_query(&self, text: &str) -> Option<String> {
+        let packed = text.split("qCompressed(1.0,\"").nth(1)?.split('"').next()?;
+        let tree = noshape_model::custom::host::packed::unpack(packed).ok()?;
+        let mut strings = Vec::new();
+        packed_strings(&tree, &mut strings);
+        if !strings.iter().any(|s| s == "SKETCH_ENTITY") || strings.iter().any(|s| s == "IMPRINT") {
+            return None;
+        }
+        let mut ops = strings.iter().filter(|s| s.contains(".op") || s.ends_with("Op"));
+        let sk = ops.next()?.strip_suffix(".wireOp")?.to_string();
+        if ops.next().is_some() {
+            return None;
+        }
+        strings.iter().find_map(|e| self.sketch_entities.get(&(sk.clone(), e.clone())).cloned())
     }
 
     /// The entity of ours at live's geometry of `id`.
@@ -501,6 +534,9 @@ impl<'a> Translator<'a> {
             for (eid, c) in ids.iter().zip(made) {
                 if let Some(cid) = c["id"].as_str() {
                     self.sketch_entities.insert((oid.clone(), eid.clone()), cid.to_string());
+                    if points {
+                        self.sketch_points.push((oid.clone(), cid.to_string()));
+                    }
                 }
                 for (end, key) in [("start", "start_point"), ("end", "end_point"), ("center", "center_point")] {
                     if let Some(pid) = c[key].as_str() {
@@ -732,6 +768,7 @@ pub struct PartState {
     pub volume_band: Option<[f64; 2]>,
     pub area_band: Option<[f64; 2]>,
     pub bbox: Option<[[f64; 3]; 2]>,
+    pub centroid: Option<[f64; 3]>,
 }
 
 /// Live's parts of one live.jsonl line.
@@ -752,6 +789,7 @@ pub fn live_parts(line: &Value) -> Vec<PartState> {
             volume_band: band(&p["volume_band"]),
             area_band: band(&p["area_band"]),
             bbox: f3(&p["bbox"]["min"]).zip(f3(&p["bbox"]["max"])).map(|(a, b)| [a, b]),
+            centroid: f3(&p["centroid"]),
         })
         .collect()
 }
@@ -781,13 +819,14 @@ pub fn our_parts(t: &mut Translator) -> Result<Vec<PartState>, String> {
             volume_band: None,
             area_band: None,
             bbox: at(&p["bounding_box"]["min"]).zip(at(&p["bounding_box"]["max"])).map(|(a, b)| [a, b]),
+            centroid: at(&p["centroid"]),
         })
         .collect())
 }
 
 /// How ours differs from live after a feature (empty: it matches). Parts
 /// are paired by volume and box; counts exact, volume and area within live's
-/// band or 1e-6 relative, boxes within 1e-6 m.
+/// band or 1e-6 relative, centroids and boxes within 1e-6 m.
 pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
     let mut out = Vec::new();
     if live.len() != ours.len() {
@@ -822,6 +861,11 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
             && !within(o.area, a, l.area_band)
         {
             out.push(format!("{who}: area {:.6} mm², live {:.6}", o.area.unwrap_or(f64::NAN) * 1e6, a * 1e6));
+        }
+        if let (Some(a), Some(b)) = (o.centroid, l.centroid)
+            && (0..3).any(|j| (a[j] - b[j]).abs() > 1e-6)
+        {
+            out.push(format!("{who}: centroid {:?} mm, live {:?}", a.map(|c| c * 1e3), b.map(|c| c * 1e3)));
         }
         if let (Some(a), Some(b)) = (o.bbox, l.bbox)
             && (0..2).any(|i| (0..3).any(|j| (a[i][j] - b[i][j]).abs() > 1e-6))
