@@ -474,13 +474,15 @@ impl Prepared {
             let p = opts.start.as_ref().and_then(|s| s.get(&id)).unwrap_or(stored);
             placement_to_frame(p)
         };
-        let mut stored: HashMap<InstanceId, Placement> = self.instances.iter().cloned().collect();
-        stored.insert(InstanceId::ORIGIN, Placement::default());
+        let origin = Placement::default();
+        let mut stored: HashMap<InstanceId, &Placement> = HashMap::with_capacity(self.instances.len() + 1);
+        stored.extend(self.instances.iter().map(|(id, p)| (*id, p)));
+        stored.insert(InstanceId::ORIGIN, &origin);
         let mut bodies: Vec<SolverBody> = self
             .reps
             .iter()
             .enumerate()
-            .map(|(i, id)| SolverBody { pose: if *id == InstanceId::ORIGIN { Frame::default() } else { pose_of(*id, &stored[id]) }, fixed: self.fixed[i] || opts.hold.iter().any(|h| self.body_of.get(h).is_some_and(|(b, _)| *b == i)) })
+            .map(|(i, id)| SolverBody { pose: if *id == InstanceId::ORIGIN { Frame::default() } else { pose_of(*id, stored[id]) }, fixed: self.fixed[i] || opts.hold.iter().any(|h| self.body_of.get(h).is_some_and(|(b, _)| *b == i)) })
             .collect();
         // Flexible subassembly children: world pose = subassembly pose * child placement.
         for (b, sid, child, q0) in &self.nested_bodies {
@@ -573,7 +575,7 @@ impl Prepared {
         // Unconstrained bodies follow a drag by pure translation (no solve).
         // The mates handed to the solver (all of them unless `only_mate`; the
         // relations index into the full list, which is then the same).
-        let active: Vec<SolverMate> = mates.iter().zip(&enforced).filter(|(_, on)| **on).map(|(m, _)| m.clone()).collect();
+        let active: std::borrow::Cow<[SolverMate]> = if enforced.iter().all(|on| *on) { std::borrow::Cow::Borrowed(&mates) } else { std::borrow::Cow::Owned(mates.iter().zip(&enforced).filter(|(_, on)| **on).map(|(m, _)| m.clone()).collect()) };
         let active_ix: Vec<Option<usize>> = enforced.iter().scan(0usize, |n, on| Some(on.then(|| { *n += 1; *n - 1 }))).collect();
         let constrained = |b: usize| active.iter().any(|m| m.a == b || m.b == b || m.extra.iter().any(|(e, _)| *e == b) || m.follow.is_some_and(|f| f.axis_body == b && m.b != b));
         let mut drags: Vec<DragTarget> = Vec::new();
@@ -644,7 +646,8 @@ impl Prepared {
             r.body_dof = full.body_dof;
         }
         let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
-        let mut out = Solved { converged: r.converged, dof: r.dof, ..Default::default() };
+        let n = self.mates.len();
+        let mut out = Solved { converged: r.converged, dof: r.dof, placements: Vec::with_capacity(self.instances.len()), mate_ok: HashMap::with_capacity(n), mate_frames: HashMap::with_capacity(n), mate_values: HashMap::with_capacity(n), ..Default::default() };
         for (id, _) in &self.instances {
             let (b, off) = self.body_of[id];
             let f = poses[b].mul(&off);
@@ -680,11 +683,8 @@ impl Prepared {
         if let (Some(g), Some(mm)) = (guard.as_mut(), memo) {
             **g = mm;
         }
-        for (k, rel) in rels.iter().enumerate() {
-            let va = solver::mate_values(&poses, &mates[rel.mate_a]);
-            let vb = solver::mate_values(&poses, &mates[rel.mate_b]);
-            let _ = (va, vb);
-            out.relation_ok.insert(rel_ids[k], r.converged || r.max_residual < 1e-4);
+        for id in &rel_ids {
+            out.relation_ok.insert(*id, r.converged || r.max_residual < 1e-4);
         }
         out
     }
