@@ -11,6 +11,14 @@ link), its nearest ring giving way one curve at a time (latest first), what it r
 Both only in dragged components of ≤ 60 curves (`DragGraph`, cached per revision). Probes 7 8/8, probes 9 4/6 over
 25 steps (g4 0.002 mm in x; g6's c4 0.11 mm: path dependence, exact in one step: asked live, REQUESTS "drag probes
 12"), live fuzz 169/230.
+23:50: GUI check (my build, a bolt circle made by the CLI, /root/skasm-scratch/g6ui/): dragging a hole keeps the next
+hole exactly while the drag stays reachable (centre within 14 mm of both); past that (≥ 28 mm from the held hole) the
+next ring gives way too, as the rule says. Seen there: the viewport repeats pointer moves (4 of 21 drag steps solved
+twice): a repeated position is no longer solved again, sketch (bb93e015, scene test) and assembly (92045a14).
+Assembly drag probe d6 (Ball, ours 12°, live 6.2°) looks like live solving only ~3 of its 25 events (each step's
+target on the pointer's ray at the point's depth converges to ours); asked live for slow drags of g6 and d6
+(REQUESTS "drag probes 12", → asm-drag-3.live.jsonl / sketch-probe-12.live.json). Sent probes 13 (leave-one-out of
+s209 / s11). T2 oracle_asm asm_spec_probes_match_live reads probes 1786 / 1798 / 4 from their input (12/14).
 Lead's list (20:15), in order:
 1. Done: dx's X1 (B), other documents' assemblies (27549ea9; note to dx in docs/handoff/dx.md "From skasm (11-02)").
    If dx asks for more (configurations of another document's assembly aren't offered), that comes first.
