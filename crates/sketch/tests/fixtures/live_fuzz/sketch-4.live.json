@@ -1,0 +1,3371 @@
+{
+ "note": "Live 2026-11-02, Part Studio \"skasm fuzz 4\" (0353d12d\u2026) in \"skasm speed\". One sketch per case POSTed unchanged on Top via REST, same method and fields as batches 1-2. points = evVertexPoint per start/end id; arc/circle centre+radius from evCurveDefinition; splines and conics also sampled at parameters 0.25/0.5/0.75 of evEdgeTangentLines (arc-length parameterisation by default) under \"samples\". curves = editor colour sampled at 11-12 points along each curve (not just the midpoint, see 1778: dimensions drawn over a line are black): over if any sample red, under if any sample blue, else fully; tallies in brackets. no drags (per the request).",
+ "cases": {
+  "s301": {
+   "feature": "OK",
+   "message": "s301 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     19.282571,
+     0.808922
+    ],
+    "l1.start": [
+     -2.818051,
+     0.808922
+    ],
+    "l2.end": [
+     19.282571,
+     41.979528
+    ],
+    "l2.start": [
+     19.282571,
+     0.808922
+    ],
+    "l3.end": [
+     -2.818051,
+     41.979528
+    ],
+    "l3.start": [
+     19.282571,
+     41.979528
+    ],
+    "l4.end": [
+     -2.818051,
+     0.808922
+    ],
+    "l4.start": [
+     -2.818051,
+     41.979528
+    ]
+   },
+   "curves": {
+    "l1": "under  (samples {\"black\": 2, \"blue\": 9})",
+    "l2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "l4": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s302": {
+   "feature": "OK",
+   "message": "s302 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     17.324629,
+     -2.147342
+    ],
+    "l1.start": [
+     -5.424962,
+     -2.147342
+    ],
+    "l2.end": [
+     17.324629,
+     7.432334
+    ],
+    "l2.start": [
+     17.324629,
+     -2.147342
+    ],
+    "l3.end": [
+     -5.424962,
+     7.432334
+    ],
+    "l3.start": [
+     17.324629,
+     7.432334
+    ],
+    "l4.end": [
+     -5.424962,
+     -2.147342
+    ],
+    "l4.start": [
+     -5.424962,
+     7.432334
+    ],
+    "l5.end": [
+     97.755089,
+     -8.910987
+    ],
+    "l5.start": [
+     79.315425,
+     -8.910987
+    ],
+    "l6.end": [
+     97.755089,
+     2.331768
+    ],
+    "l6.start": [
+     97.755089,
+     -8.910987
+    ],
+    "l7.end": [
+     79.315425,
+     2.331768
+    ],
+    "l7.start": [
+     97.755089,
+     2.331768
+    ],
+    "l8.end": [
+     79.315425,
+     -8.910987
+    ],
+    "l8.start": [
+     79.315425,
+     2.331768
+    ]
+   },
+   "curves": {
+    "l1": "under  (samples {\"black\": 2, \"blue\": 9})",
+    "l2": "under  (samples {\"black\": 6, \"blue\": 5})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "l4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"black\": 7, \"blue\": 4})",
+    "l6": "under  (samples {\"black\": 4, \"blue\": 7})",
+    "l7": "under  (samples {\"blue\": 11})",
+    "l8": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s303": {
+   "feature": "OK",
+   "message": "s303 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     13.816168,
+     2.722697
+    ],
+    "l1.start": [
+     -6.27264,
+     2.722697
+    ],
+    "a2.center": [
+     13.816168,
+     8.174694
+    ],
+    "a2.end": [
+     13.816168,
+     13.626691
+    ],
+    "a2.start": [
+     13.816168,
+     2.722697
+    ],
+    "l3.end": [
+     -6.27264,
+     13.626691
+    ],
+    "l3.start": [
+     13.816168,
+     13.626691
+    ],
+    "a4.center": [
+     -6.27264,
+     8.174694
+    ],
+    "a4.end": [
+     -6.27264,
+     2.722697
+    ],
+    "a4.start": [
+     -6.27264,
+     13.626691
+    ],
+    "l5.end": [
+     126.851956,
+     -5.726682
+    ],
+    "l5.start": [
+     88.530914,
+     -5.726682
+    ],
+    "a6.center": [
+     126.851956,
+     0.771491
+    ],
+    "a6.end": [
+     126.851956,
+     7.269664
+    ],
+    "a6.start": [
+     126.851956,
+     -5.726682
+    ],
+    "l7.end": [
+     88.530914,
+     7.269664
+    ],
+    "l7.start": [
+     126.851956,
+     7.269664
+    ],
+    "a8.center": [
+     88.530914,
+     0.771491
+    ],
+    "a8.end": [
+     88.530914,
+     -5.726682
+    ],
+    "a8.start": [
+     88.530914,
+     7.269664
+    ]
+   },
+   "radii": {
+    "a2": 5.451997,
+    "a4": 5.451997,
+    "a6": 6.498173,
+    "a8": 6.498173
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 11})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "a4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"blue\": 11})",
+    "a6": "under  (samples {\"blue\": 11})",
+    "l7": "under  (samples {\"blue\": 11})",
+    "a8": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s304": {
+   "feature": "OK",
+   "message": "s304 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     20.008573,
+     2.698187
+    ],
+    "l1.start": [
+     -1.002737,
+     2.698187
+    ],
+    "a2.center": [
+     20.008573,
+     4.702277
+    ],
+    "a2.end": [
+     22.012663,
+     4.702277
+    ],
+    "a2.start": [
+     20.008573,
+     2.698187
+    ],
+    "l3.end": [
+     22.012663,
+     21.360023
+    ],
+    "l3.start": [
+     22.012663,
+     4.702277
+    ],
+    "a4.center": [
+     20.008573,
+     21.360023
+    ],
+    "a4.end": [
+     20.008573,
+     23.364113
+    ],
+    "a4.start": [
+     22.012663,
+     21.360023
+    ],
+    "l5.end": [
+     -1.002737,
+     23.364113
+    ],
+    "l5.start": [
+     20.008573,
+     23.364113
+    ],
+    "a6.center": [
+     -1.002737,
+     21.360023
+    ],
+    "a6.end": [
+     -3.006827,
+     21.360023
+    ],
+    "a6.start": [
+     -1.002737,
+     23.364113
+    ],
+    "l7.end": [
+     -3.006827,
+     4.702277
+    ],
+    "l7.start": [
+     -3.006827,
+     21.360023
+    ],
+    "a8.center": [
+     -1.002737,
+     4.702277
+    ],
+    "a8.end": [
+     -1.002737,
+     2.698187
+    ],
+    "a8.start": [
+     -3.006827,
+     4.702277
+    ],
+    "c9.center": [
+     72.114674,
+     -5.357299
+    ],
+    "c10.center": [
+     72.114674,
+     14.400634
+    ],
+    "c11.center": [
+     52.356741,
+     -5.357299
+    ],
+    "c12.center": [
+     72.114674,
+     -25.115232
+    ],
+    "c13.center": [
+     91.872607,
+     -5.357299
+    ]
+   },
+   "radii": {
+    "a2": 2.00409,
+    "a4": 2.00409,
+    "a6": 2.00409,
+    "a8": 2.00409,
+    "c9": 29.109582,
+    "c10": 2.645303,
+    "c11": 2.645303,
+    "c12": 2.645303,
+    "c13": 2.645303
+   },
+   "curves": {
+    "l1": "under  (samples {\"black\": 5, \"blue\": 2})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "a4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"blue\": 11})",
+    "a6": "under  (samples {\"blue\": 11})",
+    "l7": "under  (samples {\"blue\": 11})",
+    "a8": "under  (samples {\"blue\": 11})",
+    "c9": "under  (samples {\"blue\": 12})",
+    "c10": "under  (samples {\"blue\": 12})",
+    "c11": "under  (samples {\"blue\": 12})",
+    "c12": "under  (samples {\"blue\": 12})",
+    "c13": "under  (samples {\"blue\": 12})"
+   }
+  },
+  "s305": {
+   "feature": "OK",
+   "message": "s305 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     28.823599,
+     -5.830222
+    ],
+    "l1.start": [
+     -0.345118,
+     -5.830222
+    ],
+    "a2.center": [
+     28.823599,
+     1.251565
+    ],
+    "a2.end": [
+     28.823599,
+     8.333352
+    ],
+    "a2.start": [
+     28.823599,
+     -5.830222
+    ],
+    "l3.end": [
+     -0.345118,
+     8.333352
+    ],
+    "l3.start": [
+     28.823599,
+     8.333352
+    ],
+    "a4.center": [
+     -0.345118,
+     1.251565
+    ],
+    "a4.end": [
+     -0.345118,
+     -5.830222
+    ],
+    "a4.start": [
+     -0.345118,
+     8.333352
+    ],
+    "l5.end": [
+     120.107501,
+     6.111901
+    ],
+    "l5.start": [
+     75.794212,
+     6.111901
+    ],
+    "l6.end": [
+     120.107501,
+     37.647026
+    ],
+    "l6.start": [
+     120.107501,
+     6.111901
+    ],
+    "l7.end": [
+     75.794212,
+     37.647026
+    ],
+    "l7.start": [
+     120.107501,
+     37.647026
+    ],
+    "l8.end": [
+     75.794212,
+     6.111901
+    ],
+    "l8.start": [
+     75.794212,
+     37.647026
+    ]
+   },
+   "radii": {
+    "a2": 7.081787,
+    "a4": 7.081787
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 11})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "a4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"blue\": 11})",
+    "l6": "under  (samples {\"blue\": 11})",
+    "l7": "under  (samples {\"blue\": 11})",
+    "l8": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s306": {
+   "feature": "OK",
+   "message": "s306 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     37.58711,
+     0.959549
+    ],
+    "l1.start": [
+     7.045097,
+     0.959549
+    ],
+    "l2.end": [
+     37.58711,
+     9.008994
+    ],
+    "l2.start": [
+     37.58711,
+     0.959549
+    ],
+    "l3.end": [
+     36.279812,
+     9.008994
+    ],
+    "l3.start": [
+     37.58711,
+     9.008994
+    ],
+    "l4.end": [
+     36.279812,
+     45.508157
+    ],
+    "l4.start": [
+     36.279812,
+     9.008994
+    ],
+    "l5.end": [
+     7.045097,
+     45.508157
+    ],
+    "l5.start": [
+     36.279812,
+     45.508157
+    ],
+    "l6.end": [
+     7.045097,
+     0.959549
+    ],
+    "l6.start": [
+     7.045097,
+     45.508157
+    ]
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 2, \"black\": 1})",
+    "l2": "under  (samples {\"black\": 6, \"blue\": 5})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "l4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"blue\": 10, \"black\": 1})",
+    "l6": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler fully  (samples {\"black\": 1}))"
+   }
+  },
+  "s307": {
+   "feature": "OK",
+   "message": "s307 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     25.321639,
+     5.116572
+    ],
+    "l1.start": [
+     -0.370153,
+     5.116572
+    ],
+    "a2.center": [
+     25.321639,
+     8.810771
+    ],
+    "a2.end": [
+     25.321639,
+     12.50497
+    ],
+    "a2.start": [
+     25.321639,
+     5.116572
+    ],
+    "l3.end": [
+     -0.370153,
+     12.50497
+    ],
+    "l3.start": [
+     25.321639,
+     12.50497
+    ],
+    "a4.center": [
+     -0.370153,
+     8.810771
+    ],
+    "a4.end": [
+     -0.370153,
+     5.116572
+    ],
+    "a4.start": [
+     -0.370153,
+     12.50497
+    ]
+   },
+   "radii": {
+    "a2": 3.694199,
+    "a4": 3.694199
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 11})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "a4": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s308": {
+   "feature": "OK",
+   "message": "s308 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     28.588524,
+     -3.48024
+    ],
+    "l1.start": [
+     12.363801,
+     -3.48024
+    ],
+    "a2.center": [
+     28.588524,
+     0.733894
+    ],
+    "a2.end": [
+     32.802658,
+     0.733894
+    ],
+    "a2.start": [
+     28.588524,
+     -3.48024
+    ],
+    "l3.end": [
+     32.802658,
+     10.624042
+    ],
+    "l3.start": [
+     32.802658,
+     0.733894
+    ],
+    "a4.center": [
+     28.588524,
+     10.624042
+    ],
+    "a4.end": [
+     28.588524,
+     14.838176
+    ],
+    "a4.start": [
+     32.802658,
+     10.624042
+    ],
+    "l5.end": [
+     12.363801,
+     14.838176
+    ],
+    "l5.start": [
+     28.588524,
+     14.838176
+    ],
+    "a6.center": [
+     12.363801,
+     10.624042
+    ],
+    "a6.end": [
+     8.149667,
+     10.624042
+    ],
+    "a6.start": [
+     12.363801,
+     14.838176
+    ],
+    "l7.end": [
+     8.149667,
+     0.733894
+    ],
+    "l7.start": [
+     8.149667,
+     10.624042
+    ],
+    "a8.center": [
+     12.363801,
+     0.733894
+    ],
+    "a8.end": [
+     12.363801,
+     -3.48024
+    ],
+    "a8.start": [
+     8.149667,
+     0.733894
+    ]
+   },
+   "radii": {
+    "a2": 4.214134,
+    "a4": 4.214134,
+    "a6": 4.214134,
+    "a8": 4.214134
+   },
+   "curves": {
+    "l1": "under  (samples {\"black\": 4, \"blue\": 5})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "a4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"blue\": 11})",
+    "a6": "under  (samples {\"blue\": 11})",
+    "l7": "under  (samples {\"blue\": 11})",
+    "a8": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s309": {
+   "feature": "OK",
+   "message": "s309 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     13.376527,
+     1.196797
+    ],
+    "l1.start": [
+     -6.897152,
+     1.196797
+    ],
+    "a2.center": [
+     13.376527,
+     8.670343
+    ],
+    "a2.end": [
+     13.376527,
+     16.143889
+    ],
+    "a2.start": [
+     13.376527,
+     1.196797
+    ],
+    "l3.end": [
+     -6.897152,
+     16.143889
+    ],
+    "l3.start": [
+     13.376527,
+     16.143889
+    ],
+    "a4.center": [
+     -6.897152,
+     8.670343
+    ],
+    "a4.end": [
+     -6.897152,
+     1.196797
+    ],
+    "a4.start": [
+     -6.897152,
+     16.143889
+    ]
+   },
+   "radii": {
+    "a2": 7.473546,
+    "a4": 7.473546
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 11})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "a4": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s310": {
+   "feature": "OK",
+   "message": "s310 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "c1.center": [
+     -9.418696,
+     4.613024
+    ],
+    "c2.center": [
+     -9.418696,
+     15.761784
+    ],
+    "c3.center": [
+     -20.567456,
+     4.613024
+    ],
+    "c4.center": [
+     -9.418696,
+     -6.535736
+    ],
+    "c5.center": [
+     1.730064,
+     4.613024
+    ]
+   },
+   "radii": {
+    "c1": 25.144761,
+    "c2": 1.731502,
+    "c3": 1.731502,
+    "c4": 1.731502,
+    "c5": 1.731502
+   },
+   "curves": {
+    "c1": "under  (samples {\"blue\": 12})",
+    "c2": "under  (samples {\"blue\": 11, \"black\": 1})",
+    "c3": "under  (samples {\"black\": 1, \"blue\": 11})",
+    "c4": "under  (samples {\"blue\": 11, \"black\": 1})",
+    "c5": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s311": {
+   "feature": "OK",
+   "message": "s311 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     35.335829,
+     -8.344986
+    ],
+    "l1.start": [
+     -5.517861,
+     -8.344986
+    ],
+    "l2.end": [
+     35.335829,
+     -0.625279
+    ],
+    "l2.start": [
+     35.335829,
+     -8.344986
+    ],
+    "l3.end": [
+     16.931079,
+     -0.625279
+    ],
+    "l3.start": [
+     35.335829,
+     -0.625279
+    ],
+    "l4.end": [
+     16.931079,
+     21.823661
+    ],
+    "l4.start": [
+     16.931079,
+     -0.625279
+    ],
+    "l5.end": [
+     -5.517861,
+     21.823661
+    ],
+    "l5.start": [
+     16.931079,
+     21.823661
+    ],
+    "l6.end": [
+     -5.517861,
+     -8.344986
+    ],
+    "l6.start": [
+     -5.517861,
+     21.823661
+    ]
+   },
+   "curves": {
+    "l1": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler fully  (samples {\"black\": 3}))",
+    "l2": "under  (samples {\"black\": 6, \"blue\": 5})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "l4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"black\": 4, \"blue\": 7})",
+    "l6": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s312": {
+   "feature": "OK",
+   "message": "s312 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "c1.center": [
+     5.349633,
+     2.98877
+    ],
+    "c2.center": [
+     5.349633,
+     14.580781
+    ],
+    "c3.center": [
+     -6.242378,
+     2.98877
+    ],
+    "c4.center": [
+     5.349633,
+     -8.603241
+    ],
+    "c5.center": [
+     16.941644,
+     2.98877
+    ]
+   },
+   "radii": {
+    "c1": 22.596435,
+    "c2": 3.676098,
+    "c3": 3.676098,
+    "c4": 3.676098,
+    "c5": 3.676098
+   },
+   "curves": {
+    "c1": "under  (samples {\"blue\": 12})",
+    "c2": "under  (samples {\"blue\": 12})",
+    "c3": "under  (samples {\"black\": 1, \"blue\": 11})",
+    "c4": "under  (samples {\"blue\": 12})",
+    "c5": "under  (samples {\"blue\": 12})"
+   }
+  },
+  "s313": {
+   "feature": "OK",
+   "message": "s313 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     36.524001,
+     -4.967255
+    ],
+    "l1.start": [
+     4.483478,
+     -4.967255
+    ],
+    "a2.center": [
+     36.524001,
+     2.897211
+    ],
+    "a2.end": [
+     36.524001,
+     10.761677
+    ],
+    "a2.start": [
+     36.524001,
+     -4.967255
+    ],
+    "l3.end": [
+     4.483478,
+     10.761677
+    ],
+    "l3.start": [
+     36.524001,
+     10.761677
+    ],
+    "a4.center": [
+     4.483478,
+     2.897211
+    ],
+    "a4.end": [
+     4.483478,
+     -4.967255
+    ],
+    "a4.start": [
+     4.483478,
+     10.761677
+    ]
+   },
+   "radii": {
+    "a2": 7.864466,
+    "a4": 7.864466
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 11})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "a4": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s314": {
+   "feature": "OK",
+   "message": "s314 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     34.006861,
+     -5.407796
+    ],
+    "l1.start": [
+     -1.315438,
+     -5.407796
+    ],
+    "a2.center": [
+     34.006861,
+     -2.071056
+    ],
+    "a2.end": [
+     37.343601,
+     -2.071056
+    ],
+    "a2.start": [
+     34.006861,
+     -5.407796
+    ],
+    "l3.end": [
+     37.343601,
+     25.813978
+    ],
+    "l3.start": [
+     37.343601,
+     -2.071056
+    ],
+    "a4.center": [
+     34.006861,
+     25.813978
+    ],
+    "a4.end": [
+     34.006861,
+     29.150718
+    ],
+    "a4.start": [
+     37.343601,
+     25.813978
+    ],
+    "l5.end": [
+     -1.315438,
+     29.150718
+    ],
+    "l5.start": [
+     34.006861,
+     29.150718
+    ],
+    "a6.center": [
+     -1.315438,
+     25.813978
+    ],
+    "a6.end": [
+     -4.652178,
+     25.813978
+    ],
+    "a6.start": [
+     -1.315438,
+     29.150718
+    ],
+    "l7.end": [
+     -4.652178,
+     -2.071056
+    ],
+    "l7.start": [
+     -4.652178,
+     25.813978
+    ],
+    "a8.center": [
+     -1.315438,
+     -2.071056
+    ],
+    "a8.end": [
+     -1.315438,
+     -5.407796
+    ],
+    "a8.start": [
+     -4.652178,
+     -2.071056
+    ]
+   },
+   "radii": {
+    "a2": 3.33674,
+    "a4": 3.33674,
+    "a6": 3.33674,
+    "a8": 3.33674
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 11})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "a4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"blue\": 11})",
+    "a6": "under  (samples {\"blue\": 11})",
+    "l7": "under  (samples {\"blue\": 11})",
+    "a8": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s315": {
+   "feature": "OK",
+   "message": "s315 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     38.793415,
+     7.925931
+    ],
+    "l1.start": [
+     8.946007,
+     7.925931
+    ],
+    "l2.end": [
+     38.793415,
+     36.70991
+    ],
+    "l2.start": [
+     38.793415,
+     7.925931
+    ],
+    "l3.end": [
+     8.946007,
+     36.70991
+    ],
+    "l3.start": [
+     38.793415,
+     36.70991
+    ],
+    "l4.end": [
+     8.946007,
+     7.925931
+    ],
+    "l4.start": [
+     8.946007,
+     36.70991
+    ]
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 6, \"black\": 1})",
+    "l2": "under  (samples {\"black\": 1, \"blue\": 10})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "l4": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s316": {
+   "feature": "OK",
+   "message": "s316 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     38.019681,
+     0.146327
+    ],
+    "l1.start": [
+     4.205175,
+     0.146327
+    ],
+    "a2.center": [
+     38.019681,
+     3.125855
+    ],
+    "a2.end": [
+     40.999209,
+     3.125855
+    ],
+    "a2.start": [
+     38.019681,
+     0.146327
+    ],
+    "l3.end": [
+     40.999209,
+     28.53022
+    ],
+    "l3.start": [
+     40.999209,
+     3.125855
+    ],
+    "a4.center": [
+     38.019681,
+     28.53022
+    ],
+    "a4.end": [
+     38.019681,
+     31.509748
+    ],
+    "a4.start": [
+     40.999209,
+     28.53022
+    ],
+    "l5.end": [
+     4.205175,
+     31.509748
+    ],
+    "l5.start": [
+     38.019681,
+     31.509748
+    ],
+    "a6.center": [
+     4.205175,
+     28.53022
+    ],
+    "a6.end": [
+     1.225647,
+     28.53022
+    ],
+    "a6.start": [
+     4.205175,
+     31.509748
+    ],
+    "l7.end": [
+     1.225647,
+     3.125855
+    ],
+    "l7.start": [
+     1.225647,
+     28.53022
+    ],
+    "a8.center": [
+     4.205175,
+     3.125855
+    ],
+    "a8.end": [
+     4.205175,
+     0.146327
+    ],
+    "a8.start": [
+     1.225647,
+     3.125855
+    ]
+   },
+   "radii": {
+    "a2": 2.979528,
+    "a4": 2.979528,
+    "a6": 2.979528,
+    "a8": 2.979528
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 11})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "a4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"blue\": 11})",
+    "a6": "under  (samples {\"blue\": 11})",
+    "l7": "under  (samples {\"blue\": 11})",
+    "a8": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s317": {
+   "feature": "OK",
+   "message": "s317 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     10.623319,
+     -8.747468
+    ],
+    "l1.start": [
+     -6.606038,
+     -8.747468
+    ],
+    "l2.end": [
+     10.623319,
+     17.498977
+    ],
+    "l2.start": [
+     10.623319,
+     -8.747468
+    ],
+    "l3.end": [
+     -6.606038,
+     17.498977
+    ],
+    "l3.start": [
+     10.623319,
+     17.498977
+    ],
+    "l4.end": [
+     -6.606038,
+     -8.747468
+    ],
+    "l4.start": [
+     -6.606038,
+     17.498977
+    ]
+   },
+   "curves": {
+    "l1": "under  (samples {\"black\": 4, \"blue\": 5})",
+    "l2": "under  (samples {\"blue\": 8})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "l4": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s318": {
+   "feature": "OK",
+   "message": "s318 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     19.424909,
+     -2.79446
+    ],
+    "l1.start": [
+     1.238212,
+     -2.79446
+    ],
+    "a2.center": [
+     19.424909,
+     1.572972
+    ],
+    "a2.end": [
+     23.792341,
+     1.572972
+    ],
+    "a2.start": [
+     19.424909,
+     -2.79446
+    ],
+    "l3.end": [
+     23.792341,
+     24.47596
+    ],
+    "l3.start": [
+     23.792341,
+     1.572972
+    ],
+    "a4.center": [
+     19.424909,
+     24.47596
+    ],
+    "a4.end": [
+     19.424909,
+     28.843392
+    ],
+    "a4.start": [
+     23.792341,
+     24.47596
+    ],
+    "l5.end": [
+     1.238212,
+     28.843392
+    ],
+    "l5.start": [
+     19.424909,
+     28.843392
+    ],
+    "a6.center": [
+     1.238212,
+     24.47596
+    ],
+    "a6.end": [
+     -3.12922,
+     24.47596
+    ],
+    "a6.start": [
+     1.238212,
+     28.843392
+    ],
+    "l7.end": [
+     -3.12922,
+     1.572972
+    ],
+    "l7.start": [
+     -3.12922,
+     24.47596
+    ],
+    "a8.center": [
+     1.238212,
+     1.572972
+    ],
+    "a8.end": [
+     1.238212,
+     -2.79446
+    ],
+    "a8.start": [
+     -3.12922,
+     1.572972
+    ]
+   },
+   "radii": {
+    "a2": 4.367432,
+    "a4": 4.367432,
+    "a6": 4.367432,
+    "a8": 4.367432
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 11})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "a4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"blue\": 11})",
+    "a6": "under  (samples {\"blue\": 11})",
+    "l7": "under  (samples {\"blue\": 11})",
+    "a8": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s319": {
+   "feature": "OK",
+   "message": "s319 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     29.777032,
+     9.663289
+    ],
+    "l1.start": [
+     4.423184,
+     9.663289
+    ],
+    "a2.center": [
+     29.777032,
+     11.941819
+    ],
+    "a2.end": [
+     32.055562,
+     11.941819
+    ],
+    "a2.start": [
+     29.777032,
+     9.663289
+    ],
+    "l3.end": [
+     32.055562,
+     32.593249
+    ],
+    "l3.start": [
+     32.055562,
+     11.941819
+    ],
+    "a4.center": [
+     29.777032,
+     32.593249
+    ],
+    "a4.end": [
+     29.777032,
+     34.871779
+    ],
+    "a4.start": [
+     32.055562,
+     32.593249
+    ],
+    "l5.end": [
+     4.423184,
+     34.871779
+    ],
+    "l5.start": [
+     29.777032,
+     34.871779
+    ],
+    "a6.center": [
+     4.423184,
+     32.593249
+    ],
+    "a6.end": [
+     2.144654,
+     32.593249
+    ],
+    "a6.start": [
+     4.423184,
+     34.871779
+    ],
+    "l7.end": [
+     2.144654,
+     11.941819
+    ],
+    "l7.start": [
+     2.144654,
+     32.593249
+    ],
+    "a8.center": [
+     4.423184,
+     11.941819
+    ],
+    "a8.end": [
+     4.423184,
+     9.663289
+    ],
+    "a8.start": [
+     2.144654,
+     11.941819
+    ],
+    "l9.end": [
+     106.712893,
+     6.942562
+    ],
+    "l9.start": [
+     82.946394,
+     6.942562
+    ],
+    "l10.end": [
+     106.712893,
+     22.614913
+    ],
+    "l10.start": [
+     106.712893,
+     6.942562
+    ],
+    "l11.end": [
+     82.946394,
+     22.614913
+    ],
+    "l11.start": [
+     106.712893,
+     22.614913
+    ],
+    "l12.end": [
+     82.946394,
+     6.942562
+    ],
+    "l12.start": [
+     82.946394,
+     22.614913
+    ]
+   },
+   "radii": {
+    "a2": 2.27853,
+    "a4": 2.27853,
+    "a6": 2.27853,
+    "a8": 2.27853
+   },
+   "curves": {
+    "l1": "under  (samples {\"black\": 3, \"blue\": 1})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "a4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"blue\": 11})",
+    "a6": "under  (samples {\"blue\": 11})",
+    "l7": "under  (samples {\"blue\": 11})",
+    "a8": "under  (samples {\"blue\": 11})",
+    "l9": "under  (samples {\"black\": 4, \"blue\": 3})",
+    "l10": "under  (samples {\"black\": 2, \"blue\": 9})",
+    "l11": "under  (samples {\"blue\": 11})",
+    "l12": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s320": {
+   "feature": "OK",
+   "message": "s320 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     37.312364,
+     -7.863986
+    ],
+    "l1.start": [
+     7.711292,
+     -7.863986
+    ],
+    "a2.center": [
+     37.312364,
+     -2.221903
+    ],
+    "a2.end": [
+     37.312364,
+     3.42018
+    ],
+    "a2.start": [
+     37.312364,
+     -7.863986
+    ],
+    "l3.end": [
+     7.711292,
+     3.42018
+    ],
+    "l3.start": [
+     37.312364,
+     3.42018
+    ],
+    "a4.center": [
+     7.711292,
+     -2.221903
+    ],
+    "a4.end": [
+     7.711292,
+     -7.863986
+    ],
+    "a4.start": [
+     7.711292,
+     3.42018
+    ]
+   },
+   "radii": {
+    "a2": 5.642083,
+    "a4": 5.642083
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 11})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 8})",
+    "a4": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s321": {
+   "feature": "OK",
+   "message": "s321 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     26.978111,
+     2.003933
+    ],
+    "l1.start": [
+     7.289524,
+     2.003933
+    ],
+    "a2.center": [
+     26.978111,
+     4.559912
+    ],
+    "a2.end": [
+     29.53409,
+     4.559912
+    ],
+    "a2.start": [
+     26.978111,
+     2.003933
+    ],
+    "l3.end": [
+     29.53409,
+     34.635171
+    ],
+    "l3.start": [
+     29.53409,
+     4.559912
+    ],
+    "a4.center": [
+     26.978111,
+     34.635171
+    ],
+    "a4.end": [
+     26.978111,
+     37.19115
+    ],
+    "a4.start": [
+     29.53409,
+     34.635171
+    ],
+    "l5.end": [
+     7.289524,
+     37.19115
+    ],
+    "l5.start": [
+     26.978111,
+     37.19115
+    ],
+    "a6.center": [
+     7.289524,
+     34.635171
+    ],
+    "a6.end": [
+     4.733545,
+     34.635171
+    ],
+    "a6.start": [
+     7.289524,
+     37.19115
+    ],
+    "l7.end": [
+     4.733545,
+     4.559912
+    ],
+    "l7.start": [
+     4.733545,
+     34.635171
+    ],
+    "a8.center": [
+     7.289524,
+     4.559912
+    ],
+    "a8.end": [
+     7.289524,
+     2.003933
+    ],
+    "a8.start": [
+     4.733545,
+     4.559912
+    ],
+    "l9.end": [
+     98.756797,
+     -8.597596
+    ],
+    "l9.start": [
+     79.799437,
+     -8.597596
+    ],
+    "a10.center": [
+     98.756797,
+     -4.382371
+    ],
+    "a10.end": [
+     102.972022,
+     -4.382371
+    ],
+    "a10.start": [
+     98.756797,
+     -8.597596
+    ],
+    "l11.end": [
+     102.972022,
+     7.469989
+    ],
+    "l11.start": [
+     102.972022,
+     -4.382371
+    ],
+    "a12.center": [
+     98.756797,
+     7.469989
+    ],
+    "a12.end": [
+     98.756797,
+     11.685214
+    ],
+    "a12.start": [
+     102.972022,
+     7.469989
+    ],
+    "l13.end": [
+     79.799437,
+     11.685214
+    ],
+    "l13.start": [
+     98.756797,
+     11.685214
+    ],
+    "a14.center": [
+     79.799437,
+     7.469989
+    ],
+    "a14.end": [
+     75.584212,
+     7.469989
+    ],
+    "a14.start": [
+     79.799437,
+     11.685214
+    ],
+    "l15.end": [
+     75.584212,
+     -4.382371
+    ],
+    "l15.start": [
+     75.584212,
+     7.469989
+    ],
+    "a16.center": [
+     79.799437,
+     -4.382371
+    ],
+    "a16.end": [
+     79.799437,
+     -8.597596
+    ],
+    "a16.start": [
+     75.584212,
+     -4.382371
+    ]
+   },
+   "radii": {
+    "a2": 2.555979,
+    "a4": 2.555979,
+    "a6": 2.555979,
+    "a8": 2.555979,
+    "a10": 4.215225,
+    "a12": 4.215225,
+    "a14": 4.215225,
+    "a16": 4.215225
+   },
+   "curves": {
+    "l1": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler fully  (samples {\"black\": 5}))",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "a4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"blue\": 11})",
+    "a6": "under  (samples {\"blue\": 11})",
+    "l7": "under  (samples {\"blue\": 10})",
+    "a8": "under  (samples {\"blue\": 11})",
+    "l9": "under  (samples {\"black\": 6, \"blue\": 5})",
+    "a10": "under  (samples {\"blue\": 11})",
+    "l11": "under  (samples {\"blue\": 11})",
+    "a12": "under  (samples {\"blue\": 11})",
+    "l13": "under  (samples {\"blue\": 11})",
+    "a14": "under  (samples {\"blue\": 11})",
+    "l15": "under  (samples {\"blue\": 11})",
+    "a16": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s322": {
+   "feature": "OK",
+   "message": "s322 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     22.564605,
+     0.002818
+    ],
+    "l1.start": [
+     0.908154,
+     0.002818
+    ],
+    "a2.center": [
+     22.564605,
+     7.585769
+    ],
+    "a2.end": [
+     22.564605,
+     15.16872
+    ],
+    "a2.start": [
+     22.564605,
+     0.002818
+    ],
+    "l3.end": [
+     0.908154,
+     15.16872
+    ],
+    "l3.start": [
+     22.564605,
+     15.16872
+    ],
+    "a4.center": [
+     0.908154,
+     7.585769
+    ],
+    "a4.end": [
+     0.908154,
+     0.002818
+    ],
+    "a4.start": [
+     0.908154,
+     15.16872
+    ]
+   },
+   "radii": {
+    "a2": 7.582951,
+    "a4": 7.582951
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 11})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 10})",
+    "a4": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s323": {
+   "feature": "OK",
+   "message": "s323 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     14.618938,
+     -5.768351
+    ],
+    "l1.start": [
+     -4.355096,
+     -5.768351
+    ],
+    "a2.center": [
+     14.618938,
+     -1.524384
+    ],
+    "a2.end": [
+     18.862905,
+     -1.524384
+    ],
+    "a2.start": [
+     14.618938,
+     -5.768351
+    ],
+    "l3.end": [
+     18.862905,
+     11.029868
+    ],
+    "l3.start": [
+     18.862905,
+     -1.524384
+    ],
+    "a4.center": [
+     14.618938,
+     11.029868
+    ],
+    "a4.end": [
+     14.618938,
+     15.273835
+    ],
+    "a4.start": [
+     18.862905,
+     11.029868
+    ],
+    "l5.end": [
+     -4.355096,
+     15.273835
+    ],
+    "l5.start": [
+     14.618938,
+     15.273835
+    ],
+    "a6.center": [
+     -4.355096,
+     11.029868
+    ],
+    "a6.end": [
+     -8.599063,
+     11.029868
+    ],
+    "a6.start": [
+     -4.355096,
+     15.273835
+    ],
+    "l7.end": [
+     -8.599063,
+     -1.524384
+    ],
+    "l7.start": [
+     -8.599063,
+     11.029868
+    ],
+    "a8.center": [
+     -4.355096,
+     -1.524384
+    ],
+    "a8.end": [
+     -4.355096,
+     -5.768351
+    ],
+    "a8.start": [
+     -8.599063,
+     -1.524384
+    ]
+   },
+   "radii": {
+    "a2": 4.243967,
+    "a4": 4.243967,
+    "a6": 4.243967,
+    "a8": 4.243967
+   },
+   "curves": {
+    "l1": "under  (samples {\"black\": 5, \"blue\": 6})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 6})",
+    "a4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"blue\": 10})",
+    "a6": "under  (samples {\"blue\": 11})",
+    "l7": "under  (samples {\"blue\": 11})",
+    "a8": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s324": {
+   "feature": "OK",
+   "message": "s324 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "c1.center": [
+     -3.562755,
+     2.538502
+    ],
+    "c2.center": [
+     -3.562755,
+     15.057724
+    ],
+    "c3.center": [
+     -16.081977,
+     2.538502
+    ],
+    "c4.center": [
+     -3.562755,
+     -9.98072
+    ],
+    "c5.center": [
+     8.956467,
+     2.538502
+    ],
+    "l6.end": [
+     117.59196,
+     3.055557
+    ],
+    "l6.start": [
+     83.56214,
+     3.055557
+    ],
+    "a7.center": [
+     117.59196,
+     9.851176
+    ],
+    "a7.end": [
+     124.387579,
+     9.851176
+    ],
+    "a7.start": [
+     117.59196,
+     3.055557
+    ],
+    "l8.end": [
+     124.387579,
+     32.843609
+    ],
+    "l8.start": [
+     124.387579,
+     9.851176
+    ],
+    "a9.center": [
+     117.59196,
+     32.843609
+    ],
+    "a9.end": [
+     117.59196,
+     39.639228
+    ],
+    "a9.start": [
+     124.387579,
+     32.843609
+    ],
+    "l10.end": [
+     83.56214,
+     39.639228
+    ],
+    "l10.start": [
+     117.59196,
+     39.639228
+    ],
+    "a11.center": [
+     83.56214,
+     32.843609
+    ],
+    "a11.end": [
+     76.766521,
+     32.843609
+    ],
+    "a11.start": [
+     83.56214,
+     39.639228
+    ],
+    "l12.end": [
+     76.766521,
+     9.851176
+    ],
+    "l12.start": [
+     76.766521,
+     32.843609
+    ],
+    "a13.center": [
+     83.56214,
+     9.851176
+    ],
+    "a13.end": [
+     83.56214,
+     3.055557
+    ],
+    "a13.start": [
+     76.766521,
+     9.851176
+    ]
+   },
+   "radii": {
+    "c1": 17.883527,
+    "c2": 3.126326,
+    "c3": 3.126326,
+    "c4": 3.126326,
+    "c5": 3.126326,
+    "a7": 6.795619,
+    "a9": 6.795619,
+    "a11": 6.795619,
+    "a13": 6.795619
+   },
+   "curves": {
+    "c1": "under  (samples {\"blue\": 10})",
+    "c2": "under  (samples {\"blue\": 12})",
+    "c3": "under  (samples {\"black\": 1, \"blue\": 11})",
+    "c4": "under  (samples {\"blue\": 12})",
+    "c5": "under  (samples {\"black\": 1, \"blue\": 5})",
+    "l6": "under  (samples {\"blue\": 11})",
+    "a7": "under  (samples {\"blue\": 11})",
+    "l8": "under  (samples {\"blue\": 11})",
+    "a9": "under  (samples {\"blue\": 11})",
+    "l10": "under  (samples {\"blue\": 11})",
+    "a11": "under  (samples {\"blue\": 11})",
+    "l12": "under  (samples {\"blue\": 11})",
+    "a13": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s325": {
+   "feature": "OK",
+   "message": "s325 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     33.012284,
+     8.494103
+    ],
+    "l1.start": [
+     -5.009348,
+     8.494103
+    ],
+    "a2.center": [
+     33.012284,
+     12.357818
+    ],
+    "a2.end": [
+     36.875999,
+     12.357818
+    ],
+    "a2.start": [
+     33.012284,
+     8.494103
+    ],
+    "l3.end": [
+     36.875999,
+     30.733777
+    ],
+    "l3.start": [
+     36.875999,
+     12.357818
+    ],
+    "a4.center": [
+     33.012284,
+     30.733777
+    ],
+    "a4.end": [
+     33.012284,
+     34.597492
+    ],
+    "a4.start": [
+     36.875999,
+     30.733777
+    ],
+    "l5.end": [
+     -5.009348,
+     34.597492
+    ],
+    "l5.start": [
+     33.012284,
+     34.597492
+    ],
+    "a6.center": [
+     -5.009348,
+     30.733777
+    ],
+    "a6.end": [
+     -8.873063,
+     30.733777
+    ],
+    "a6.start": [
+     -5.009348,
+     34.597492
+    ],
+    "l7.end": [
+     -8.873063,
+     12.357818
+    ],
+    "l7.start": [
+     -8.873063,
+     30.733777
+    ],
+    "a8.center": [
+     -5.009348,
+     12.357818
+    ],
+    "a8.end": [
+     -5.009348,
+     8.494103
+    ],
+    "a8.start": [
+     -8.873063,
+     12.357818
+    ],
+    "l9.end": [
+     137.927439,
+     6.040658
+    ],
+    "l9.start": [
+     79.447898,
+     6.040658
+    ],
+    "l10.end": [
+     137.927439,
+     21.298675
+    ],
+    "l10.start": [
+     137.927439,
+     6.040658
+    ],
+    "l11.end": [
+     79.447898,
+     21.298675
+    ],
+    "l11.start": [
+     137.927439,
+     21.298675
+    ],
+    "l12.end": [
+     79.447898,
+     6.040658
+    ],
+    "l12.start": [
+     79.447898,
+     21.298675
+    ]
+   },
+   "radii": {
+    "a2": 3.863715,
+    "a4": 3.863715,
+    "a6": 3.863715,
+    "a8": 3.863715
+   },
+   "curves": {
+    "l1": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler fully  (samples {\"black\": 3}))",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "a4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"blue\": 11})",
+    "a6": "under  (samples {\"blue\": 11})",
+    "l7": "under  (samples {\"blue\": 11})",
+    "a8": "under  (samples {\"blue\": 11})",
+    "l9": "under  (samples {\"blue\": 2})",
+    "l10": "under  (samples {\"blue\": 11})",
+    "l11": "under  (samples {\"blue\": 11})",
+    "l12": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s326": {
+   "feature": "OK",
+   "message": "s326 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     50.843738,
+     -5.80505
+    ],
+    "l1.start": [
+     12.356802,
+     -5.80505
+    ],
+    "a2.center": [
+     50.843738,
+     0.372698
+    ],
+    "a2.end": [
+     57.021486,
+     0.372698
+    ],
+    "a2.start": [
+     50.843738,
+     -5.80505
+    ],
+    "l3.end": [
+     57.021486,
+     15.989426
+    ],
+    "l3.start": [
+     57.021486,
+     0.372698
+    ],
+    "a4.center": [
+     50.843738,
+     15.989426
+    ],
+    "a4.end": [
+     50.843738,
+     22.167174
+    ],
+    "a4.start": [
+     57.021486,
+     15.989426
+    ],
+    "l5.end": [
+     12.356802,
+     22.167174
+    ],
+    "l5.start": [
+     50.843738,
+     22.167174
+    ],
+    "a6.center": [
+     12.356802,
+     15.989426
+    ],
+    "a6.end": [
+     6.179054,
+     15.989426
+    ],
+    "a6.start": [
+     12.356802,
+     22.167174
+    ],
+    "l7.end": [
+     6.179054,
+     0.372698
+    ],
+    "l7.start": [
+     6.179054,
+     15.989426
+    ],
+    "a8.center": [
+     12.356802,
+     0.372698
+    ],
+    "a8.end": [
+     12.356802,
+     -5.80505
+    ],
+    "a8.start": [
+     6.179054,
+     0.372698
+    ],
+    "l9.end": [
+     106.55476,
+     -3.898288
+    ],
+    "l9.start": [
+     84.839489,
+     -3.898288
+    ],
+    "a10.center": [
+     106.55476,
+     3.769692
+    ],
+    "a10.end": [
+     106.55476,
+     11.437672
+    ],
+    "a10.start": [
+     106.55476,
+     -3.898288
+    ],
+    "l11.end": [
+     84.839489,
+     11.437672
+    ],
+    "l11.start": [
+     106.55476,
+     11.437672
+    ],
+    "a12.center": [
+     84.839489,
+     3.769692
+    ],
+    "a12.end": [
+     84.839489,
+     -3.898288
+    ],
+    "a12.start": [
+     84.839489,
+     11.437672
+    ]
+   },
+   "radii": {
+    "a2": 6.177748,
+    "a4": 6.177748,
+    "a6": 6.177748,
+    "a8": 6.177748,
+    "a10": 7.66798,
+    "a12": 7.66798
+   },
+   "curves": {
+    "l1": "under  (samples {\"black\": 2, \"blue\": 1})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "a4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"blue\": 11})",
+    "a6": "under  (samples {\"blue\": 11})",
+    "l7": "under?  (visual: too faint under other sketches' grey fills to be sure; no black/red seen; sampler ?  (samples {}))",
+    "a8": "under  (samples {\"blue\": 11})",
+    "l9": "under  (samples {\"blue\": 11})",
+    "a10": "under  (samples {\"blue\": 11})",
+    "l11": "under  (samples {\"blue\": 11})",
+    "a12": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s327": {
+   "feature": "OK",
+   "message": "s327 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     26.17737,
+     -11.625529
+    ],
+    "l1.start": [
+     6.84534,
+     -11.625529
+    ],
+    "a2.center": [
+     26.17737,
+     -4.091549
+    ],
+    "a2.end": [
+     26.17737,
+     3.442431
+    ],
+    "a2.start": [
+     26.17737,
+     -11.625529
+    ],
+    "l3.end": [
+     6.84534,
+     3.442431
+    ],
+    "l3.start": [
+     26.17737,
+     3.442431
+    ],
+    "a4.center": [
+     6.84534,
+     -4.091549
+    ],
+    "a4.end": [
+     6.84534,
+     -11.625529
+    ],
+    "a4.start": [
+     6.84534,
+     3.442431
+    ]
+   },
+   "radii": {
+    "a2": 7.53398,
+    "a4": 7.53398
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 11})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 4})",
+    "a4": "under  (samples {\"blue\": 8})"
+   }
+  },
+  "s328": {
+   "feature": "OK",
+   "message": "s328 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "c1.center": [
+     -7.662596,
+     6.006068
+    ],
+    "c2.center": [
+     -7.662596,
+     26.653959
+    ],
+    "c3.center": [
+     -25.544194,
+     -4.317877
+    ],
+    "c4.center": [
+     10.219002,
+     -4.317877
+    ]
+   },
+   "radii": {
+    "c1": 27.981156,
+    "c2": 3.410729,
+    "c3": 3.410729,
+    "c4": 3.410729
+   },
+   "curves": {
+    "c1": "under  (samples {\"blue\": 12})",
+    "c2": "under  (samples {\"blue\": 12})",
+    "c3": "under  (samples {\"blue\": 12})",
+    "c4": "under  (samples {\"blue\": 10})"
+   }
+  },
+  "s329": {
+   "feature": "OK",
+   "message": "s329 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     42.501635,
+     -5.992302
+    ],
+    "l1.start": [
+     -1.301637,
+     -5.992302
+    ],
+    "l2.end": [
+     42.501635,
+     -0.813987
+    ],
+    "l2.start": [
+     42.501635,
+     -5.992302
+    ],
+    "l3.end": [
+     31.198442,
+     -0.813987
+    ],
+    "l3.start": [
+     42.501635,
+     -0.813987
+    ],
+    "l4.end": [
+     31.198442,
+     42.43927
+    ],
+    "l4.start": [
+     31.198442,
+     -0.813987
+    ],
+    "l5.end": [
+     -1.301637,
+     42.43927
+    ],
+    "l5.start": [
+     31.198442,
+     42.43927
+    ],
+    "l6.end": [
+     -1.301637,
+     -5.992302
+    ],
+    "l6.start": [
+     -1.301637,
+     42.43927
+    ],
+    "l7.end": [
+     112.354395,
+     -8.698922
+    ],
+    "l7.start": [
+     83.614659,
+     -8.698922
+    ],
+    "l8.end": [
+     112.354395,
+     -2.994658
+    ],
+    "l8.start": [
+     112.354395,
+     -8.698922
+    ],
+    "l9.end": [
+     103.180558,
+     -2.994658
+    ],
+    "l9.start": [
+     112.354395,
+     -2.994658
+    ],
+    "l10.end": [
+     103.180558,
+     19.223249
+    ],
+    "l10.start": [
+     103.180558,
+     -2.994658
+    ],
+    "l11.end": [
+     83.614659,
+     19.223249
+    ],
+    "l11.start": [
+     103.180558,
+     19.223249
+    ],
+    "l12.end": [
+     83.614659,
+     -8.698922
+    ],
+    "l12.start": [
+     83.614659,
+     19.223249
+    ]
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 6, \"black\": 2})",
+    "l2": "under  (samples {\"blue\": 2, \"black\": 9})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "l4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"blue\": 11})",
+    "l6": "under  (samples {\"blue\": 4, \"black\": 1})",
+    "l7": "under  (samples {\"blue\": 9, \"black\": 2})",
+    "l8": "under  (samples {\"blue\": 3, \"black\": 8})",
+    "l9": "under  (samples {\"blue\": 11})",
+    "l10": "under  (samples {\"blue\": 11})",
+    "l11": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler fully  (samples {\"black\": 7}))",
+    "l12": "under  (samples {\"blue\": 8, \"black\": 2})"
+   }
+  },
+  "s330": {
+   "feature": "OK",
+   "message": "s330 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     38.862619,
+     2.525418
+    ],
+    "l1.start": [
+     2.177875,
+     2.525418
+    ],
+    "l2.end": [
+     38.862619,
+     8.131221
+    ],
+    "l2.start": [
+     38.862619,
+     2.525418
+    ],
+    "l3.end": [
+     34.05139,
+     8.131221
+    ],
+    "l3.start": [
+     38.862619,
+     8.131221
+    ],
+    "l4.end": [
+     34.05139,
+     51.420559
+    ],
+    "l4.start": [
+     34.05139,
+     8.131221
+    ],
+    "l5.end": [
+     2.177875,
+     51.420559
+    ],
+    "l5.start": [
+     34.05139,
+     51.420559
+    ],
+    "l6.end": [
+     2.177875,
+     2.525418
+    ],
+    "l6.start": [
+     2.177875,
+     51.420559
+    ]
+   },
+   "curves": {
+    "l1": "under  (samples {\"black\": 3, \"blue\": 2})",
+    "l2": "under  (samples {\"blue\": 2, \"black\": 9})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "l4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"blue\": 9, \"black\": 2})",
+    "l6": "under  (samples {\"blue\": 2, \"black\": 1})"
+   }
+  },
+  "s331": {
+   "feature": "OK",
+   "message": "s331 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     34.759945,
+     -0.976882
+    ],
+    "l1.start": [
+     9.166576,
+     -0.976882
+    ],
+    "a2.center": [
+     34.759945,
+     8.547803
+    ],
+    "a2.end": [
+     34.759945,
+     18.072488
+    ],
+    "a2.start": [
+     34.759945,
+     -0.976882
+    ],
+    "l3.end": [
+     9.166576,
+     18.072488
+    ],
+    "l3.start": [
+     34.759945,
+     18.072488
+    ],
+    "a4.center": [
+     9.166576,
+     8.547803
+    ],
+    "a4.end": [
+     9.166576,
+     -0.976882
+    ],
+    "a4.start": [
+     9.166576,
+     18.072488
+    ],
+    "c5.center": [
+     85.265364,
+     -3.213921
+    ],
+    "c6.center": [
+     85.265364,
+     10.019419
+    ],
+    "c7.center": [
+     72.032024,
+     -3.213921
+    ],
+    "c8.center": [
+     85.265364,
+     -16.447261
+    ],
+    "c9.center": [
+     98.498704,
+     -3.213921
+    ]
+   },
+   "radii": {
+    "a2": 9.524685,
+    "a4": 9.524685,
+    "c5": 24.940506,
+    "c6": 2.356366,
+    "c7": 2.356366,
+    "c8": 2.356366,
+    "c9": 2.356366
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 9})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 8})",
+    "a4": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler ?  (samples {}))",
+    "c5": "under  (samples {\"blue\": 12})",
+    "c6": "under  (samples {\"blue\": 12})",
+    "c7": "under  (samples {\"blue\": 12})",
+    "c8": "under  (samples {\"blue\": 12})",
+    "c9": "under  (samples {\"blue\": 12})"
+   }
+  },
+  "s332": {
+   "feature": "OK",
+   "message": "s332 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     43.926575,
+     -7.80357
+    ],
+    "l1.start": [
+     -4.977626,
+     -7.80357
+    ],
+    "l2.end": [
+     43.926575,
+     -2.998802
+    ],
+    "l2.start": [
+     43.926575,
+     -7.80357
+    ],
+    "l3.end": [
+     12.133823,
+     -2.998802
+    ],
+    "l3.start": [
+     43.926575,
+     -2.998802
+    ],
+    "l4.end": [
+     12.133823,
+     14.28463
+    ],
+    "l4.start": [
+     12.133823,
+     -2.998802
+    ],
+    "l5.end": [
+     -4.977626,
+     14.28463
+    ],
+    "l5.start": [
+     12.133823,
+     14.28463
+    ],
+    "l6.end": [
+     -4.977626,
+     -7.80357
+    ],
+    "l6.start": [
+     -4.977626,
+     14.28463
+    ]
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 8, \"black\": 1})",
+    "l2": "under  (samples {\"blue\": 2, \"black\": 9})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "l4": "under?  (visual: too faint under other sketches' grey fills to be sure; no black/red seen; sampler ?  (samples {}))",
+    "l5": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler fully  (samples {\"black\": 5}))",
+    "l6": "under  (samples {\"blue\": 2, \"black\": 1})"
+   }
+  },
+  "s333": {
+   "feature": "OK",
+   "message": "s333 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     21.848927,
+     -11.925549
+    ],
+    "l1.start": [
+     -8.493897,
+     -11.925549
+    ],
+    "a2.center": [
+     21.848927,
+     -3.151228
+    ],
+    "a2.end": [
+     21.848927,
+     5.623093
+    ],
+    "a2.start": [
+     21.848927,
+     -11.925549
+    ],
+    "l3.end": [
+     -8.493897,
+     5.623093
+    ],
+    "l3.start": [
+     21.848927,
+     5.623093
+    ],
+    "a4.center": [
+     -8.493897,
+     -3.151228
+    ],
+    "a4.end": [
+     -8.493897,
+     -11.925549
+    ],
+    "a4.start": [
+     -8.493897,
+     5.623093
+    ]
+   },
+   "radii": {
+    "a2": 8.774321,
+    "a4": 8.774321
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 11})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 2})",
+    "a4": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s334": {
+   "feature": "OK",
+   "message": "s334 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     35.631436,
+     2.484229
+    ],
+    "l1.start": [
+     8.857765,
+     2.484229
+    ],
+    "a2.center": [
+     35.631436,
+     9.135263
+    ],
+    "a2.end": [
+     35.631436,
+     15.786297
+    ],
+    "a2.start": [
+     35.631436,
+     2.484229
+    ],
+    "l3.end": [
+     8.857765,
+     15.786297
+    ],
+    "l3.start": [
+     35.631436,
+     15.786297
+    ],
+    "a4.center": [
+     8.857765,
+     9.135263
+    ],
+    "a4.end": [
+     8.857765,
+     2.484229
+    ],
+    "a4.start": [
+     8.857765,
+     15.786297
+    ],
+    "l5.end": [
+     107.538093,
+     -10.916644
+    ],
+    "l5.start": [
+     82.992735,
+     -10.916644
+    ],
+    "a6.center": [
+     107.538093,
+     -3.782859
+    ],
+    "a6.end": [
+     107.538093,
+     3.350926
+    ],
+    "a6.start": [
+     107.538093,
+     -10.916644
+    ],
+    "l7.end": [
+     82.992735,
+     3.350926
+    ],
+    "l7.start": [
+     107.538093,
+     3.350926
+    ],
+    "a8.center": [
+     82.992735,
+     -3.782859
+    ],
+    "a8.end": [
+     82.992735,
+     -10.916644
+    ],
+    "a8.start": [
+     82.992735,
+     3.350926
+    ]
+   },
+   "radii": {
+    "a2": 6.651034,
+    "a4": 6.651034,
+    "a6": 7.133785,
+    "a8": 7.133785
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 3})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 7})",
+    "a4": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler ?  (samples {}))",
+    "l5": "under  (samples {\"blue\": 11})",
+    "a6": "under  (samples {\"blue\": 11})",
+    "l7": "under  (samples {\"blue\": 11})",
+    "a8": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s335": {
+   "feature": "OK",
+   "message": "s335 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     37.605443,
+     -2.208618
+    ],
+    "l1.start": [
+     5.317956,
+     -2.208618
+    ],
+    "a2.center": [
+     37.605443,
+     0.560533
+    ],
+    "a2.end": [
+     37.605443,
+     3.329684
+    ],
+    "a2.start": [
+     37.605443,
+     -2.208618
+    ],
+    "l3.end": [
+     5.317956,
+     3.329684
+    ],
+    "l3.start": [
+     37.605443,
+     3.329684
+    ],
+    "a4.center": [
+     5.317956,
+     0.560533
+    ],
+    "a4.end": [
+     5.317956,
+     -2.208618
+    ],
+    "a4.start": [
+     5.317956,
+     3.329684
+    ],
+    "l5.end": [
+     107.103187,
+     -1.521646
+    ],
+    "l5.start": [
+     78.439041,
+     -1.521646
+    ],
+    "l6.end": [
+     107.103187,
+     5.257596
+    ],
+    "l6.start": [
+     107.103187,
+     -1.521646
+    ],
+    "l7.end": [
+     108.287947,
+     5.257596
+    ],
+    "l7.start": [
+     107.103187,
+     5.257596
+    ],
+    "l8.end": [
+     108.287947,
+     35.106502
+    ],
+    "l8.start": [
+     108.287947,
+     5.257596
+    ],
+    "l9.end": [
+     78.439041,
+     35.106502
+    ],
+    "l9.start": [
+     108.287947,
+     35.106502
+    ],
+    "l10.end": [
+     78.439041,
+     -1.521646
+    ],
+    "l10.start": [
+     78.439041,
+     35.106502
+    ]
+   },
+   "radii": {
+    "a2": 2.769151,
+    "a4": 2.769151
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 8})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 3})",
+    "a4": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler ?  (samples {}))",
+    "l5": "under  (samples {\"blue\": 3, \"black\": 4})",
+    "l6": "under  (samples {\"black\": 9, \"blue\": 2})",
+    "l7": "under  (samples {\"blue\": 11})",
+    "l8": "under  (samples {\"blue\": 11})",
+    "l9": "under  (samples {\"black\": 3, \"blue\": 1})",
+    "l10": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler fully  (samples {\"black\": 1}))"
+   }
+  },
+  "s336": {
+   "feature": "OK",
+   "message": "s336 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     38.956059,
+     7.824515
+    ],
+    "l1.start": [
+     3.211664,
+     7.824515
+    ],
+    "l2.end": [
+     38.956059,
+     15.862106
+    ],
+    "l2.start": [
+     38.956059,
+     7.824515
+    ],
+    "l3.end": [
+     34.598192,
+     15.862106
+    ],
+    "l3.start": [
+     38.956059,
+     15.862106
+    ],
+    "l4.end": [
+     34.598192,
+     47.248634
+    ],
+    "l4.start": [
+     34.598192,
+     15.862106
+    ],
+    "l5.end": [
+     3.211664,
+     47.248634
+    ],
+    "l5.start": [
+     34.598192,
+     47.248634
+    ],
+    "l6.end": [
+     3.211664,
+     7.824515
+    ],
+    "l6.start": [
+     3.211664,
+     47.248634
+    ]
+   },
+   "curves": {
+    "l1": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler fully  (samples {\"black\": 3}))",
+    "l2": "under  (samples {\"black\": 9, \"blue\": 2})",
+    "l3": "under  (samples {\"blue\": 11})",
+    "l4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"blue\": 10, \"black\": 1})",
+    "l6": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler fully  (samples {\"black\": 1}))"
+   }
+  },
+  "s337": {
+   "feature": "OK",
+   "message": "s337 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "c1.center": [
+     -4.884635,
+     9.461597
+    ],
+    "c2.center": [
+     -4.884635,
+     23.762842
+    ],
+    "c3.center": [
+     -17.269877,
+     2.310975
+    ],
+    "c4.center": [
+     7.500606,
+     2.310975
+    ],
+    "l5.end": [
+     111.899574,
+     -0.85571
+    ],
+    "l5.start": [
+     70.764279,
+     -0.85571
+    ],
+    "l6.end": [
+     111.899574,
+     25.293337
+    ],
+    "l6.start": [
+     111.899574,
+     -0.85571
+    ],
+    "l7.end": [
+     70.764279,
+     25.293337
+    ],
+    "l7.start": [
+     111.899574,
+     25.293337
+    ],
+    "l8.end": [
+     70.764279,
+     -0.85571
+    ],
+    "l8.start": [
+     70.764279,
+     25.293337
+    ]
+   },
+   "radii": {
+    "c1": 12.684869,
+    "c2": 2.712845,
+    "c3": 2.712845,
+    "c4": 2.712845
+   },
+   "curves": {
+    "c1": "under  (samples {\"blue\": 6, \"black\": 2})",
+    "c2": "under  (samples {\"blue\": 12})",
+    "c3": "under  (samples {\"blue\": 12})",
+    "c4": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler ?  (samples {}))",
+    "l5": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler fully  (samples {\"black\": 3}))",
+    "l6": "under  (samples {\"black\": 2, \"blue\": 3})",
+    "l7": "under  (samples {\"blue\": 11})",
+    "l8": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s338": {
+   "feature": "OK",
+   "message": "s338 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     19.774389,
+     -0.200106
+    ],
+    "l1.start": [
+     -8.473548,
+     -0.200106
+    ],
+    "l2.end": [
+     19.774389,
+     21.796677
+    ],
+    "l2.start": [
+     19.774389,
+     -0.200106
+    ],
+    "l3.end": [
+     -8.473548,
+     21.796677
+    ],
+    "l3.start": [
+     19.774389,
+     21.796677
+    ],
+    "l4.end": [
+     -8.473548,
+     -0.200106
+    ],
+    "l4.start": [
+     -8.473548,
+     21.796677
+    ],
+    "c5.center": [
+     72.271394,
+     -1.079751
+    ],
+    "c6.center": [
+     72.271394,
+     10.342002
+    ],
+    "c7.center": [
+     62.379866,
+     -6.790628
+    ],
+    "c8.center": [
+     82.162922,
+     -6.790628
+    ]
+   },
+   "radii": {
+    "c5": 15.584136,
+    "c6": 3.58282,
+    "c7": 3.58282,
+    "c8": 3.58282
+   },
+   "curves": {
+    "l1": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler fully  (samples {\"black\": 3}))",
+    "l2": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler fully  (samples {\"black\": 1}))",
+    "l3": "under  (samples {\"blue\": 5})",
+    "l4": "under  (samples {\"blue\": 11})",
+    "c5": "under  (samples {\"blue\": 12})",
+    "c6": "under  (samples {\"blue\": 12})",
+    "c7": "under  (samples {\"blue\": 11, \"black\": 1})",
+    "c8": "under  (samples {\"blue\": 11, \"black\": 1})"
+   }
+  },
+  "s339": {
+   "feature": "OK",
+   "message": "s339 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     25.639117,
+     -7.131448
+    ],
+    "l1.start": [
+     -9.480162,
+     -7.131448
+    ],
+    "a2.center": [
+     25.639117,
+     -0.620035
+    ],
+    "a2.end": [
+     25.639117,
+     5.891378
+    ],
+    "a2.start": [
+     25.639117,
+     -7.131448
+    ],
+    "l3.end": [
+     -9.480162,
+     5.891378
+    ],
+    "l3.start": [
+     25.639117,
+     5.891378
+    ],
+    "a4.center": [
+     -9.480162,
+     -0.620035
+    ],
+    "a4.end": [
+     -9.480162,
+     -7.131448
+    ],
+    "a4.start": [
+     -9.480162,
+     5.891378
+    ]
+   },
+   "radii": {
+    "a2": 6.511413,
+    "a4": 6.511413
+   },
+   "curves": {
+    "l1": "under  (samples {\"blue\": 11})",
+    "a2": "under  (samples {\"blue\": 11})",
+    "l3": "under  (samples {\"blue\": 1})",
+    "a4": "under  (samples {\"blue\": 11})"
+   }
+  },
+  "s340": {
+   "feature": "OK",
+   "message": "s340 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     16.204335,
+     1.853144
+    ],
+    "l1.start": [
+     -5.162733,
+     1.853144
+    ],
+    "a2.center": [
+     16.204335,
+     5.150962
+    ],
+    "a2.end": [
+     16.204335,
+     8.44878
+    ],
+    "a2.start": [
+     16.204335,
+     1.853144
+    ],
+    "l3.end": [
+     -5.162733,
+     8.44878
+    ],
+    "l3.start": [
+     16.204335,
+     8.44878
+    ],
+    "a4.center": [
+     -5.162733,
+     5.150962
+    ],
+    "a4.end": [
+     -5.162733,
+     1.853144
+    ],
+    "a4.start": [
+     -5.162733,
+     8.44878
+    ],
+    "l5.end": [
+     90.194946,
+     1.647824
+    ],
+    "l5.start": [
+     71.702042,
+     1.647824
+    ],
+    "a6.center": [
+     90.194946,
+     6.928093
+    ],
+    "a6.end": [
+     90.194946,
+     12.208362
+    ],
+    "a6.start": [
+     90.194946,
+     1.647824
+    ],
+    "l7.end": [
+     71.702042,
+     12.208362
+    ],
+    "l7.start": [
+     90.194946,
+     12.208362
+    ],
+    "a8.center": [
+     71.702042,
+     6.928093
+    ],
+    "a8.end": [
+     71.702042,
+     1.647824
+    ],
+    "a8.start": [
+     71.702042,
+     12.208362
+    ]
+   },
+   "radii": {
+    "a2": 3.297818,
+    "a4": 3.297818,
+    "a6": 5.280269,
+    "a8": 5.280269
+   },
+   "curves": {
+    "l1": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler ?  (samples {}))",
+    "a2": "under  (visual: blue; the sampler hit its black dimension label or a heavily muted stretch; sampler ?  (samples {}))",
+    "l3": "under?  (visual: too faint under other sketches' grey fills to be sure; no black/red seen; sampler ?  (samples {}))",
+    "a4": "under  (samples {\"blue\": 11})",
+    "l5": "under  (samples {\"blue\": 11})",
+    "a6": "under  (samples {\"blue\": 11})",
+    "l7": "under  (samples {\"blue\": 11})",
+    "a8": "under  (samples {\"blue\": 11})"
+   }
+  }
+ }
+}

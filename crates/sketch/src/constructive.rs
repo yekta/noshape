@@ -231,7 +231,7 @@ impl Sketch {
             // dimensioned circle of a concentric pair moves onto the other).
             let own_hold = |u: EntityId| cons.iter().filter(|(_, us)| us.as_slice() == [u]).all(|(c, _)| holds[c]);
             let keep = cons.iter().filter(|(c, us)| us.len() >= 2 && !holds[c] && !us.iter().any(|x| placed.contains(x)) && !self.chained_to_change(*c, cons, &holds)).find_map(|(c, us)| {
-                let k = self.kept_first(us, cons);
+                let k = self.kept_first_in(us, cons, Some(*c));
                 (own_hold(k) && self.class_keeps(*c, k, cons) && self.direction_agrees(k, cons)).then_some(k)
             });
             if let Some(k) = keep {
@@ -242,7 +242,11 @@ impl Sketch {
                 // Ties: the member a relation keeps, else the lower one
                 // (probe t4: a rectangle's bottom before its right side).
                 let tied: Vec<EntityId> = open.iter().copied().filter(|u| rank(*u) == best).collect();
-                self.kept_first(&tied, cons)
+                // One that can be placed keeping its whole shape goes first
+                // (fuzz s336: an L-bracket's riser shifts whole before the
+                // inner side, which then shortens).
+                let whole: Vec<EntityId> = if tied.len() > 1 { tied.iter().copied().filter(|u| self.can_keep_shape(*u, &placed, cons, unit_of)).collect() } else { Vec::new() };
+                if !whole.is_empty() && whole.len() < tied.len() { self.kept_first(&whole, cons) } else { self.kept_first(&tied, cons) }
             } else {
                 let broken: Vec<EntityId> = open.iter().copied().filter(|u| cons.iter().any(|(c, us)| us.contains(u) && !holds[c])).collect();
                 if broken.is_empty() {
@@ -401,13 +405,38 @@ impl Sketch {
         true
     }
 
+    /// Whether `u` could be placed now carried whole (its size and
+    /// direction kept) with its neighbours able to follow.
+    fn can_keep_shape(&self, u: EntityId, placed: &BTreeSet<EntityId>, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)], unit_of: &HashMap<EntityId, EntityId>) -> bool {
+        let mut probe = self.clone();
+        let before: HashMap<EntityId, DVec2> = self.entity(u).map(|e| e.point_refs()).into_iter().flatten().filter_map(|p| self.point(p).map(|q| (p, q))).collect();
+        probe.carry_onto_placed(u, placed, unit_of);
+        let mut with = placed.clone();
+        with.insert(u);
+        let keep = |c: crate::ids::ConstraintId, us: &[EntityId]| us.contains(&u) && us.iter().all(|x| with.contains(x)) && (us.iter().all(|x| *x == u || placed.contains(x)) || probe.connective(c));
+        let Some(mut sub) = probe.sub_sketch_by(cons, &keep, placed) else { return false };
+        if !self.hold_size(&mut sub, u) || !self.hold_direction(&mut sub, u) {
+            return false;
+        }
+        let opts = SolveOptions { light: vec![u], still: probe.anchor(u).into_iter().collect(), analyze: false, constructive: false, ..Default::default() };
+        if !matches!(sub.solve_with(&opts).status, SolveStatus::Solved) {
+            return false;
+        }
+        let neighbours: BTreeSet<EntityId> = cons.iter().filter(|(c, us)| us.contains(&u) && self.connective(*c)).flat_map(|(_, us)| us.iter().copied()).filter(|x| *x != u && !placed.contains(x)).collect();
+        let held: BTreeSet<EntityId> = neighbours.iter().copied().filter(|v| cons.iter().any(|(_, us)| us.contains(v) && !us.contains(&u))).collect();
+        probe.neighbours_follow(&sub, u, &held, &before, placed)
+    }
+
     /// Whether each unit of `held` sharing a point `u` moved (from `before`
     /// to `sub`) can follow it: the move runs along its line, or it can be
     /// carried across itself because each other unit at its other points is
     /// unplaced and runs along that part of the move.
     fn neighbours_follow(&self, sub: &Sketch, u: EntityId, held: &BTreeSet<EntityId>, before: &HashMap<EntityId, DVec2>, placed: &BTreeSet<EntityId>) -> bool {
         let Some(own) = self.entity(u).map(|e| e.point_refs()) else { return false };
-        let along = |v: EntityId, d: DVec2| self.placing_line_dir(v).filter(|x| x.length() > 0.0).is_some_and(|dir| dir.normalize().perp_dot(d).abs() <= 1e-9);
+        // A line with a length of its own can't stretch (fuzz s330: an
+        // L-bracket's dimensioned short leg doesn't take the riser's move).
+        let sized = |v: EntityId| self.constraints().any(|c| c.driving && matches!(c.kind, ConstraintKind::Length { curve, .. } if curve == v));
+        let along = |v: EntityId, d: DVec2| d.length() <= 1e-9 || (!sized(v) && self.placing_line_dir(v).filter(|x| x.length() > 0.0).is_some_and(|dir| dir.normalize().perp_dot(d).abs() <= 1e-9));
         // The units sharing point p (through a Coincident), but `not`.
         let sharing = |p: EntityId, not: EntityId| -> Vec<(EntityId, EntityId)> {
             self.constraints()
@@ -719,9 +748,16 @@ impl Sketch {
     /// see `equal_key`; Parallel / Perpendicular: the smaller angle in [0°, 180°);
     /// Concentric: the lower center); else the one with the lower point.
     fn kept_first(&self, tied: &[EntityId], cons: &[(crate::ids::ConstraintId, Vec<EntityId>)]) -> EntityId {
+        self.kept_first_in(tied, cons, None)
+    }
+
+    /// [`Sketch::kept_first`] decided by relation `only` alone (then the
+    /// lower point), when given (fuzz s309: a slot's centre distance keeps
+    /// the left arc, not the one the arcs' Equal would keep).
+    fn kept_first_in(&self, tied: &[EntityId], cons: &[(crate::ids::ConstraintId, Vec<EntityId>)], only: Option<crate::ids::ConstraintId>) -> EntityId {
         let lower = |u: EntityId| self.anchor(u).and_then(|p| self.point(p)).unwrap_or(DVec2::splat(f64::MAX));
         for (cid, us) in cons {
-            if us.len() != 2 || !us.iter().all(|u| tied.contains(u)) {
+            if us.len() != 2 || !us.iter().all(|u| tied.contains(u)) || only.is_some_and(|o| o != *cid) {
                 continue;
             }
             let Some(c) = self.constraint(*cid) else { continue };
