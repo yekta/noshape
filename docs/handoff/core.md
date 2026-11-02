@@ -8,6 +8,17 @@ Builds and tests (11-01): on vibe4 only, `tools/tiers/rb.sh <cmd>` from the work
 (land.sh runs the full set); long probes detached on vibe4 with a log. OCCT patches build on vibe4 in
 ~/agents/core-occt (`build.sh TK...`); a private root ~/agents/occt-priv; libs go to /root/occt (synced everywhere).
 
+**State 11-02 05:00:** P0 SHELL-VOIDS-WINDOWS fixed (182fd422; main's 03:25 CI green on Windows / macOS / Linux).
+macOS "crashed holding a lock" (CI 41351354303, once, custom-feature tests): no repro on Linux in 260 stress runs; a
+fatal guard exit now prints its stack on macOS too (83924168), so the next one says where (TICKETS MACOS-GUARD-LOCK).
+SHELL-SLOW: steps 2f (spheres / tori) and 3 (free-form faces) landed; live's answers applied: a removed fillet is the
+slabs' (1752), every Shell of a solid with a void fails as in live (1757: shell-hang 48.8 → 32.2 s on vibe3), a
+Union of edge-touching parts is two parts with no note (1760). Open with live: Shell 3 of shell-hang (a pinch in our
+slab result, which makes Shell 5 spend 30 s), the 82ac sunk exact-2t tube wall, Fill on a planar boundary (a plane
+would be exact and instant). Parked: planar strip collapse (no share yet; patch in /root/core-scratch). Shell in the
+profile documents now: only draft-hang (regions, quadrics, slabs once each) and shell-hang, both fuzz; the real
+documents' remaining sinks are Booleans (fins-400's pattern, the knurl: bool), the NIST import's mesh (psui), Fill
+(~150 ms in qa's three: live asked) and Hem (skasm).
 **State 11-01 12:00:** landed today: CANCEL-LATENCY rounds 5-9 (27-128 ms at every cancel point on the 45 / 45
 knurl, vibe4 at load 64-75), OCCT patches 0013 (unify / shell fix / modifier break hooks) and 0014 (TKFillet:
 Draft reapply 5.6 → 0.1 s), mixed-radius fillet (b), BLEND-RUST clearance (+1 case), thin loft (b) / (c) / (d).
@@ -166,7 +177,7 @@ sloped plane). A plain exact-2t fin or tube on a plate is right both ways (2244 
 embedding matters; a small repro for live is next.
 shell-hang's Shell 5 (30 s, then fails) runs on Shell 3's slab result, which has a pinch: the x −60 plane meets itself
 along 5 mm edges (ops `regen_profile::non_manifold_origin` now flags a plane using an edge on both sides too: first
-after Shell 3); Shell 3's input asked of live as STEP (REQUESTS 05:35). Parked: planar strips whose offset vanishes
+after Shell 3); Shell 3's input asked of live as STEP (REQUESTS 04:58). Parked: planar strips whose offset vanishes
 (a chamfer narrower than the wall; /root/core-scratch/shell-planar-strips-wip.patch: detection by the strip's
 section, its two offset edges reversed; T1 case a 1 mm chamfer under a 2 mm wall as the slabs'): no share yet (Auto
 takes that block by regions; the corpus's cases are chains of collapsing strips under 8-20 mm walls, shell-hang's
