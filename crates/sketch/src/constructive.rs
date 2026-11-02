@@ -341,7 +341,19 @@ impl Sketch {
                 placed.insert(k);
                 continue;
             }
-            let u = if best.0 > 0 {
+            // A Concentric's kept circle with a new size of its own is placed
+            // next (its centre stays), the other comes onto it (live fuzz
+            // s386 / s400: washers, the circle at larger coordinates moves).
+            // (A pair tied to nothing else: s213's circles, with a distance
+            // to a slot, go the loops' way.)
+            let alone = |us: &[EntityId]| cons.iter().all(|(_, xs)| xs.iter().all(|x| us.contains(x)) || !xs.iter().any(|x| us.contains(x)));
+            let concentric_first = cons.iter().filter(|(c, us)| us.len() == 2 && !holds[c] && !us.iter().any(|x| placed.contains(x)) && alone(us) && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Concentric { .. }))).find_map(|(c, us)| {
+                let k = self.kept_first_in(us, cons, Some(*c));
+                (!own_hold(k)).then_some(k)
+            });
+            let u = if let Some(k) = concentric_first {
+                k
+            } else if best.0 > 0 {
                 // Ties: the member a relation keeps, else the lower one
                 // (probe t4: a rectangle's bottom before its right side).
                 let tied: Vec<EntityId> = open.iter().copied().filter(|u| rank(*u) == best).collect();
@@ -406,7 +418,8 @@ impl Sketch {
             } else {
                 &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (0, 2), (0, 1), (0, 0)]
             };
-            'attempts: for &(hold, shape) in ladder {
+            // (A Concentric's kept circle doesn't hold the other: it comes.)
+            'attempts: for &(hold, shape) in ladder.iter().filter(|(h, _)| concentric_first.is_none() || *h == 0) {
                 let hold_neighbours = hold == 1;
                 let mut fixed = placed.clone();
                 if hold_neighbours {
