@@ -898,7 +898,7 @@ impl PartStudioView {
     /// The edited feature's FeatureScript manipulators: what its preview
     /// added (`addManipulators`), else std's computed here for the native
     /// features std's change function serves (Draft's parting line).
-    fn feature_manipulators(&self, cx: &App) -> Vec<(String, noshape_model::display::FeatureManipulator)> {
+    pub(super) fn feature_manipulators(&self, cx: &App) -> Vec<(String, noshape_model::display::FeatureManipulator)> {
         let Some(d) = self.edit.as_ref().map(|e| e.dialog.read(cx)) else { return Vec::new() };
         if let Some(state) = self.display.feature_state(d.feature.id).filter(|s| !s.manipulators.is_empty()) {
             return state.manipulators.clone();
@@ -930,7 +930,7 @@ impl PartStudioView {
     }
 
     /// The FeatureScript manipulator `i` as it stands (dragged or as the preview added it), with its key.
-    fn std_manipulator(&self, i: usize, cx: &App) -> Option<(String, noshape_model::display::FeatureManipulator)> {
+    pub(super) fn std_manipulator(&self, i: usize, cx: &App) -> Option<(String, noshape_model::display::FeatureManipulator)> {
         let (key, m) = self.feature_manipulators(cx).get(i)?.clone();
         Some((key, self.ui.std_manip_live.as_ref().filter(|(j, _)| *j == i).map_or(m, |(_, live)| live.clone())))
     }
@@ -939,7 +939,7 @@ impl PartStudioView {
     /// "Manipulator Change Function" runs in the background on the model
     /// before it and its parameter changes go to the dialog (a result for
     /// values changed since is dropped).
-    fn std_manip_change(&mut self, i: usize, moved: noshape_model::display::FeatureManipulator, cx: &mut Context<Self>) {
+    pub(super) fn std_manip_change(&mut self, i: usize, moved: noshape_model::display::FeatureManipulator, cx: &mut Context<Self>) {
         let Some((key, _)) = self.std_manipulator(i, cx) else { return };
         let Some(ctx) = self.ui.before_context.clone() else { return };
         let Some(dialog) = self.edit.as_ref().map(|e| e.dialog.clone()) else { return };
@@ -979,7 +979,7 @@ impl PartStudioView {
     /// End of a FeatureScript manipulator's drag: the drawn one follows the
     /// preview again; its primaryParameterId's field shows the value
     /// selected (manipulator.fs: the dialog focus moves there).
-    fn std_manip_end(&mut self, primary: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn std_manip_end(&mut self, primary: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
         self.manip_drag = None;
         self.ui.std_manip_live = None;
         if let (Some(p), Some(e)) = (primary, &self.edit) {

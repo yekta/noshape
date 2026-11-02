@@ -698,6 +698,33 @@ fn frame_on(s: &mut Studio, sid: FeatureId, ids: &[u32], profile: &str, corner: 
     })
 }
 
+/// Frame's manipulators as std's createFrameManipulators (audit-part-studio M15): on a straight 200 mm member of
+/// SHS 40x40, the nine alignment points of the profile's box around the centre (chosen) at the member's middle and
+/// the angle arc 40 mm out; a click on a corner runs std's change function, which picks it (index 0).
+#[test]
+fn frame_alignment_points_as_std() {
+    use noshape_model::display::FeatureManipulator as M;
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let ids = polyline(&mut sk, &[(0.0, 0.0), (200.0, 0.0)], false);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let frame = frame_on(&mut s, sid, &ids, "SHS 40x40x3", "MITER");
+    let r = s.ok();
+    let m = &r.display.feature_state(frame).expect("state").manipulators;
+    let Some((_, M::Points { points, index })) = m.iter().find(|(k, _)| k == "points") else { panic!("{m:?}") };
+    let mid = DVec3::new(mm(100.0), 0.0, 0.0);
+    assert!(points.len() == 9 && *index == 4 && (points[4] - mid).length() < 1e-9, "{m:?}");
+    assert!(points.iter().all(|p| near(p.x, mm(100.0), 1e-9)) && points.iter().map(|p| (*p - mid).length()).fold(0.0, f64::max) > mm(28.0), "{points:?}");
+    let Some((_, M::Angular { axis_direction, rotation_origin, .. })) = m.iter().find(|(k, _)| k == "angleManipulator") else { panic!("{m:?}") };
+    assert!(axis_direction.x.abs() > 0.999 && near((*rotation_origin - mid).length(), mm(40.0), 1e-9), "{m:?}");
+    let moved = M::Points { points: points.clone(), index: 0 };
+    let f = s.ps.features.iter().find(|f| f.id == frame).unwrap().clone();
+    let before = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions { upto: Some(s.ps.features.len() - 1), ..Default::default() }).context;
+    let changed = noshape_model::custom::std_feature::manipulator_change_in((*before).clone(), "frame", f.id, &f.name, &s.units, &f.params, "points", &moved).expect("std's change function ran");
+    let i = noshape_model::regen::eval::EvalCtx::new(f.id, "", &changed, &s.units, (*before).clone(), &std::collections::BTreeMap::new()).integer("index").unwrap();
+    assert_eq!(i, 0, "{changed:?}");
+}
+
 #[test]
 #[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn frame_rectangle_mitered_cut_list() {

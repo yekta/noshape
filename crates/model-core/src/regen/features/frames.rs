@@ -413,6 +413,21 @@ struct Plan {
     copes: Vec<(usize, bool)>,
 }
 
+/// std's createFrameManipulators: on the first segment (its middle when straight) the nine alignment points of the
+/// profile's box around the chosen one (a click picks another), and the angle arc about the path, its radius the
+/// profile's width.
+fn frame_manipulators(ev: &mut EvalCtx, profile: &FrameProfile, seg: &PathSeg, (x0, x): (DVec3, DVec3), angle: f64) {
+    use crate::display::FeatureManipulator as M;
+    let index = ev.integer("index").unwrap_or(4).clamp(0, 8);
+    let mirror = if ev.bool("mirrorProfile") { -1.0 } else { 1.0 };
+    let origin = if seg.line { (seg.start + seg.end) * 0.5 } else { seg.start };
+    let (t, align) = (seg.t0, profile.alignment_point(index));
+    let points = (0..9).map(|i| profile.alignment_point(i) - align).map(|d| origin + x * d.x * mirror + t.cross(x) * d.y).collect();
+    ev.manipulators.push(("points".into(), M::Points { points, index: index as usize }));
+    let width = profile.max.x - profile.min.x;
+    ev.manipulators.push(("angleManipulator".into(), M::Angular { axis_origin: origin, axis_direction: t * mirror, rotation_origin: origin + x0 * mirror * width, angle, min: 0.0, max: std::f64::consts::TAU, secondary: false, primary: Some("angle".into()) }));
+}
+
 pub fn frame(ev: &mut EvalCtx) -> FResult<()> {
     let text = ev.params.text("profileSketch").to_string();
     let (profile, canon) = resolve_profile(ev, &text)?;
@@ -457,8 +472,11 @@ pub fn frame(ev: &mut EvalCtx) -> FResult<()> {
             y = t0.any_orthonormal_vector();
         }
         let y = y.normalize();
-        let mut x = y.cross(t0).normalize();
-        x = DQuat::from_axis_angle(t0, angle) * x;
+        let x0 = y.cross(t0).normalize();
+        let mut x = DQuat::from_axis_angle(t0, angle) * x0;
+        if pi == 0 {
+            frame_manipulators(ev, &profile, &path.segs[0], (x0, x), angle);
+        }
         let mut x_start = Vec::with_capacity(n);
         let mut x_end = Vec::with_capacity(n);
         for (i, s) in path.segs.iter().enumerate() {

@@ -1121,6 +1121,28 @@ impl PartStudioView {
             let up = self.gpu.uploader();
             extra.push(noshape_render::Instance::new(noshape_render::Drawable::Points(up.upload_points(&noshape_render::PointData { points: sprites }))).per_primitive_color().unpickable().ignore_clip().layer(22));
         }
+        // A FeatureScript points manipulator (live 1709, Frame's alignment points): 7 px white dots ringed grey, the
+        // chosen one ringed light blue, the hovered one blue.
+        if let Some((_, points, index)) = self.std_points(cx) {
+            use noshape_render::{LineSegment, PointSprite};
+            let style = LineSegment::ON_TOP | PointSprite::HOLLOW | PointSprite::THICK;
+            let sprites = points
+                .iter()
+                .enumerate()
+                .map(|(i, p)| {
+                    let color = if self.ui.std_point_hover == Some(i) {
+                        [0x13, 0x4e, 0x96, 255]
+                    } else if i == index {
+                        [0x8c, 0xb8, 0xf0, 255]
+                    } else {
+                        [0x8a, 0x8a, 0x8a, 255]
+                    };
+                    PointSprite { position: p.as_vec3().into(), color, pick_id: 0, size: STD_POINT_PX, style, _pad: 0 }
+                })
+                .collect();
+            let up = self.gpu.uploader();
+            extra.push(noshape_render::Instance::new(noshape_render::Drawable::Points(up.upload_points(&noshape_render::PointData { points: sprites }))).per_primitive_color().unpickable().ignore_clip().layer(22));
+        }
         crate::nav_trace::highlights("part_studio", &selection, single_hover.as_ref());
         // Planes picked in the graphics stop dragging their rings once
         // deselected (a later pick from the list doesn't drag, live).
@@ -1459,6 +1481,52 @@ impl PartStudioView {
         }
     }
 
+    /// The edited feature's FeatureScript points manipulator (std's `pointsManipulator`): its index among the
+    /// feature's manipulators, its points and the chosen one.
+    fn std_points(&self, cx: &App) -> Option<(usize, Vec<glam::DVec3>, usize)> {
+        let n = self.feature_manipulators(cx).len();
+        (0..n).find_map(|i| match self.std_manipulator(i, cx)?.1 {
+            noshape_model::display::FeatureManipulator::Points { points, index } => Some((i, points, index)),
+            _ => None,
+        })
+    }
+
+    /// The points manipulator's point under `p` (viewport px).
+    fn std_point_at(&self, p: glam::DVec2, cx: &App) -> Option<usize> {
+        let (_, points, _) = self.std_points(cx)?;
+        let vp = self.viewport.read(cx);
+        points.iter().enumerate().filter_map(|(i, q)| Some((i, vp.project(*q)?.distance(p)))).filter(|(_, d)| *d <= f64::from(STD_POINT_PX) / 2.0 + 3.0).min_by(|a, b| a.1.total_cmp(&b.1)).map(|(i, _)| i)
+    }
+
+    /// A points manipulator's point lights under the pointer; a click chooses it (std's change function runs).
+    fn std_points_event(&mut self, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some((mi, points, index)) = self.std_points(cx) else {
+            if self.ui.std_point_hover.take().is_some() {
+                self.refresh_scene(false, cx);
+            }
+            return false;
+        };
+        match ev {
+            ViewportEvent::PointerMove { position, .. } => {
+                let h = self.std_point_at(*position, cx);
+                if h != self.ui.std_point_hover {
+                    self.ui.std_point_hover = h;
+                    self.refresh_scene(false, cx);
+                }
+                false
+            }
+            ViewportEvent::Click { position, .. } => {
+                let Some(i) = self.std_point_at(*position, cx) else { return false };
+                if i != index {
+                    self.std_manip_change(mi, noshape_model::display::FeatureManipulator::Points { points, index: i }, cx);
+                    self.std_manip_end(None, window, cx);
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
     /// The edited pattern's instance points while its "Instances to skip"
     /// field is active (FeatureScript `TOGGLE_POINTS`).
     fn toggle_points(&self, cx: &App) -> Option<&[noshape_model::display::TogglePoint]> {
@@ -1742,6 +1810,9 @@ impl PartStudioView {
             return;
         }
         if self.sketch.is_none() && self.toggle_points_event(ev, cx) {
+            return;
+        }
+        if self.sketch.is_none() && self.std_points_event(ev, window, cx) {
             return;
         }
         if self.sketch.is_none() && self.manipulator_event(ev, window, cx) {
@@ -6416,3 +6487,6 @@ pub(super) fn part_section(b: &noshape_model::display::BodyDisplay) -> &'static 
 /// A pattern instance point's diameter (live p1audit skip-02: 12 px, a
 /// 3 px ring).
 const TOGGLE_POINT_PX: f32 = 12.0;
+
+/// A FeatureScript points manipulator's dot (live 1709: Frame's alignment points, ≈7 px with a grey ring).
+const STD_POINT_PX: f32 = 7.0;

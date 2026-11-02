@@ -501,6 +501,8 @@ pub struct UiState {
     /// The pattern instance point under the pointer while "Instances to
     /// skip" is active (its index).
     pub toggle_hover: Option<(i64, i64)>,
+    /// The point of a FeatureScript points manipulator under the cursor.
+    pub std_point_hover: Option<usize>,
     pub triad_drag: Option<super::triad::TriadDrag>,
     /// Parts an open Transform moves (not copies): drawn moved and
     /// display-only, with the original as a faded, selectable ghost.
@@ -730,6 +732,7 @@ impl UiState {
             dim_invalid: false,
             triad_hover: None,
             toggle_hover: None,
+            std_point_hover: None,
             triad_drag: None,
             transform_ghost: Vec::new(),
             dg_renaming: None,
