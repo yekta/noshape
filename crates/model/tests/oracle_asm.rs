@@ -759,3 +759,115 @@ fn asm_fuzz_trace() {
         }
     }
 }
+
+/// An assembly from a case in the fuzz vocabulary (live's own inputs, e.g.
+/// the drag probes).
+fn spec_assembly(parts: &Parts, spec: &serde_json::Value) -> Assembly {
+    let mut asm = Assembly::default();
+    let names: Vec<String> = spec["instances"].as_array().unwrap().iter().map(|i| i["name"].as_str().unwrap().to_string()).collect();
+    let kind = |name: &str| PART_NAMES.iter().position(|p| *p == name).unwrap();
+    let kinds: Vec<usize> = spec["instances"].as_array().unwrap().iter().map(|i| kind(i["part"].as_str().unwrap())).collect();
+    for (k, i) in spec["instances"].as_array().unwrap().iter().enumerate() {
+        let t = &i["start"]["translate_mm"];
+        let at = pose(i["start"]["rotate_z_deg"].as_f64().unwrap(), (t[0].as_f64().unwrap(), t[1].as_f64().unwrap(), t[2].as_f64().unwrap()));
+        asm.instances.push(instance(parts, k as u64 + 1, &names[k], kinds[k], at, i["fixed"].as_bool().unwrap()));
+    }
+    let types = [MateType::Fastened, MateType::Revolute, MateType::Slider, MateType::Cylindrical, MateType::Planar, MateType::Ball, MateType::Parallel];
+    let infer = |s: &str| [Inference::Centroid, Inference::Vertex, Inference::Midpoint, Inference::Center, Inference::MidAxis, Inference::TopAxis, Inference::BottomAxis, Inference::Origin].into_iter().find(|i| onshape_inference(*i) == s).unwrap();
+    for m in spec["mates"].as_array().unwrap() {
+        let t = types.into_iter().find(|t| t.name() == m["type"].as_str().unwrap()).unwrap();
+        let side = |c: &serde_json::Value| {
+            let inst = names.iter().position(|n| n == c["instance"].as_str().unwrap()).unwrap();
+            let at = &c["at_mm"];
+            let (x, y, z) = (at[0].as_f64().unwrap(), at[1].as_f64().unwrap(), at[2].as_f64().unwrap());
+            let r = match c["entity"].as_str().unwrap() {
+                "face" => face(parts, kinds[inst], x, y, z),
+                "edge" => edge(parts, kinds[inst], x, y, z),
+                _ => vertex(parts, kinds[inst], x, y, z),
+            };
+            conn(inst as u64 + 1, r, infer(c["inference"].as_str().unwrap()))
+        };
+        let mut x = mate(10 + asm.mates.len() as u64, t, side(&m["first"]), side(&m["second"]));
+        x.flip_primary = m["flip_primary"].as_bool().unwrap_or(false);
+        x.name = m["name"].as_str().unwrap_or("").to_string();
+        asm.mates.push(x);
+    }
+    asm
+}
+
+/// Live's assembly drag probes (request after the sketch drag probes:
+/// `asm-drag-1.input.json`, live's lines in `asm-drag-1.live.jsonl`): each
+/// case solved mate by mate, then the named point dragged in the view plane
+/// in 25 steps, released, and every instance's transform compared.
+#[test]
+#[ignore = "T2: live assembly drag probes"]
+fn asm_drag_probes_match_live() {
+    let mut parts = parts();
+    let input: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(fuzz_fixture("asm-drag-1.input.json")).unwrap()).unwrap();
+    let live: Vec<serde_json::Value> = std::fs::read_to_string(fuzz_fixture("asm-drag-1.live.jsonl")).map(|t| t.lines().filter(|l| !l.trim().is_empty()).filter_map(|l| serde_json::from_str(l).ok()).collect()).unwrap_or_default();
+    let (mut answered, mut matches) = (0, 0);
+    for case in input["cases"].as_array().unwrap() {
+        let name = case["case"].as_str().unwrap();
+        let asm = spec_assembly(&parts, case);
+        // Mate by mate, as live adds them.
+        let mut built = asm.clone();
+        built.mates.clear();
+        for m in &asm.mates {
+            built.mates.push(m.clone());
+            let res = parts.ev.evaluate(&parts.doc, &built, &SolveOptions::default(), None);
+            for (id, p) in &res.solved.placements {
+                if let Some(i) = built.instances.iter_mut().find(|i| i.id == *id) {
+                    i.placement = *p;
+                }
+            }
+        }
+        let d = &case["drag"];
+        let inst = built.instances.iter().find(|i| i.name == d["inst"].as_str().unwrap()).unwrap().id;
+        let l = &d["local"];
+        let local = DVec3::new(l[0].as_f64().unwrap(), l[1].as_f64().unwrap(), l[2].as_f64().unwrap()) * 1e-3;
+        for mv in d["moves"].as_array().unwrap() {
+            let (view, by) = (mv[0].as_str().unwrap(), &mv[1]);
+            let (a, b) = (by[0].as_f64().unwrap() * 1e-3, by[1].as_f64().unwrap() * 1e-3);
+            let step = match view {
+                "front" => DVec3::new(a, 0.0, b),
+                "right" => DVec3::new(0.0, a, b),
+                _ => DVec3::new(a, b, 0.0),
+            };
+            let place = |asm: &Assembly| {
+                let p = asm.instances.iter().find(|i| i.id == inst).unwrap().placement;
+                let q = glam::DQuat::from_array(p.rotation);
+                DVec3::from(p.translation) + q * local
+            };
+            let from = place(&built);
+            for k in 1..=25 {
+                let opts = SolveOptions { drags: vec![(inst, local, from + step * (k as f64 / 25.0))], ..Default::default() };
+                let res = parts.ev.evaluate(&parts.doc, &built, &opts, None);
+                for (id, p) in &res.solved.placements {
+                    if let Some(i) = built.instances.iter_mut().find(|i| i.id == *id) {
+                        i.placement = *p;
+                    }
+                }
+            }
+        }
+        let res = parts.ev.evaluate(&parts.doc, &built, &SolveOptions::default(), None);
+        let got = outcome(&built, &res);
+        let ours: std::collections::BTreeMap<String, Vec<f64>> = got.instances.iter().map(|i| (i.0.clone(), i.1.to_vec())).collect();
+        println!("{name} ours: {}", serde_json::to_string(&ours).unwrap());
+        let Some(l) = live.iter().find(|l| l["case"] == name) else { continue };
+        answered += 1;
+        let after = if l["after"].is_object() { &l["after"] } else { &l["transforms"] };
+        let off: Vec<String> = after.as_object().into_iter().flatten().filter(|(n, t)| {
+            let o = &ours[n.as_str()];
+            (0..16).any(|k| {
+                let (a, b) = (o[k], t[k].as_f64().unwrap_or(f64::NAN) * if [3, 7, 11].contains(&k) { 1e3 } else { 1.0 });
+                (a - b).abs() > if [3, 7, 11].contains(&k) { 0.3 } else { 1e-3 }
+            })
+        }).map(|(n, t)| format!("{n}: ours {:?} live {t}", ours[n.as_str()])).collect();
+        if off.is_empty() {
+            matches += 1;
+        } else {
+            println!("  {name} differs: {}", off.join("; "));
+        }
+    }
+    println!("live assembly drag probes: {answered} answered, {matches} match (positions within 0.3 mm: the pointer's landing)");
+}

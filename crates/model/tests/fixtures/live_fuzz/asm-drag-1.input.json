@@ -1,0 +1,515 @@
+{
+ "parts": "fs-oracle-asm",
+ "method": "as asm batches; then UI drags",
+ "cases": [
+  {
+   "case": "d1",
+   "instances": [
+    {
+     "name": "A",
+     "part": "PLATE",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "PIN",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Revolute",
+     "first": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "bottom edge",
+      "at_mm": [
+       200,
+       5,
+       0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole top edge",
+      "at_mm": [
+       130,
+       25,
+       10
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Revolute 1"
+    }
+   ],
+   "drag": {
+    "inst": "B",
+    "local": [
+     205,
+     0,
+     30
+    ],
+    "moves": [
+     [
+      "top",
+      [
+       10,
+       10
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "case": "d2",
+   "instances": [
+    {
+     "name": "A",
+     "part": "BLOCK",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "BLOCK",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Slider",
+     "first": {
+      "instance": "B",
+      "entity": "face",
+      "what": "bottom face",
+      "at_mm": [
+       20,
+       10,
+       0
+      ],
+      "inference": "CENTROID"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "face",
+      "what": "top face",
+      "at_mm": [
+       20,
+       10,
+       10
+      ],
+      "inference": "CENTROID"
+     },
+     "flip_primary": false,
+     "name": "Slider 1"
+    }
+   ],
+   "drag": {
+    "inst": "B",
+    "local": [
+     40,
+     20,
+     10
+    ],
+    "moves": [
+     [
+      "top",
+      [
+       10,
+       10
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "case": "d3",
+   "instances": [
+    {
+     "name": "A",
+     "part": "BLOCK",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "BLOCK",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Planar",
+     "first": {
+      "instance": "B",
+      "entity": "face",
+      "what": "bottom face",
+      "at_mm": [
+       20,
+       10,
+       0
+      ],
+      "inference": "CENTROID"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "face",
+      "what": "top face",
+      "at_mm": [
+       20,
+       10,
+       10
+      ],
+      "inference": "CENTROID"
+     },
+     "flip_primary": false,
+     "name": "Planar 1"
+    }
+   ],
+   "drag": {
+    "inst": "B",
+    "local": [
+     40,
+     20,
+     10
+    ],
+    "moves": [
+     [
+      "top",
+      [
+       10,
+       5
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "case": "d4",
+   "instances": [
+    {
+     "name": "A",
+     "part": "PLATE",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "PLATE",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "C",
+     "part": "PIN",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Revolute",
+     "first": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "hole bottom edge",
+      "at_mm": [
+       130,
+       25,
+       0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole top edge",
+      "at_mm": [
+       130,
+       25,
+       10
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Revolute 1"
+    },
+    {
+     "type": "Revolute",
+     "first": {
+      "instance": "C",
+      "entity": "edge",
+      "what": "bottom edge",
+      "at_mm": [
+       200,
+       5,
+       0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "B",
+      "entity": "vertex",
+      "what": "vertex (160,40,10)",
+      "at_mm": [
+       160,
+       40,
+       10
+      ],
+      "inference": "POINT"
+     },
+     "flip_primary": false,
+     "name": "Revolute 2"
+    }
+   ],
+   "drag": {
+    "inst": "C",
+    "local": [
+     205,
+     0,
+     30
+    ],
+    "moves": [
+     [
+      "top",
+      [
+       15,
+       0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "case": "d5",
+   "instances": [
+    {
+     "name": "A",
+     "part": "PLATE",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "PIN",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Cylindrical",
+     "first": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "bottom edge",
+      "at_mm": [
+       200,
+       5,
+       0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole top edge",
+      "at_mm": [
+       130,
+       25,
+       10
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Cylindrical 1"
+    }
+   ],
+   "drag": {
+    "inst": "B",
+    "local": [
+     205,
+     0,
+     30
+    ],
+    "moves": [
+     [
+      "top",
+      [
+       10,
+       0
+      ]
+     ],
+     [
+      "front",
+      [
+       0,
+       10
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "case": "d6",
+   "instances": [
+    {
+     "name": "A",
+     "part": "BLOCK",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "BLOCK",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Ball",
+     "first": {
+      "instance": "B",
+      "entity": "vertex",
+      "what": "vertex (0,0,0)",
+      "at_mm": [
+       0,
+       0,
+       0
+      ],
+      "inference": "POINT"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "vertex",
+      "what": "vertex (40,20,10)",
+      "at_mm": [
+       40,
+       20,
+       10
+      ],
+      "inference": "POINT"
+     },
+     "flip_primary": false,
+     "name": "Ball 1"
+    }
+   ],
+   "drag": {
+    "inst": "B",
+    "local": [
+     40,
+     20,
+     10
+    ],
+    "moves": [
+     [
+      "top",
+      [
+       10,
+       10
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}
