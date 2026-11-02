@@ -154,6 +154,29 @@ pub fn read_step_assembly_nested(path: &Path, unit: LengthUnit) -> Result<Option
     Ok(Some(((t.root.clone(), parts, pvz_instances_of(&t.instances)), nesting)))
 }
 
+/// An IGES file's shapes as parts, named and coloured through OCCT's XDE
+/// reader (each placed instance of a shared shape on its own; see
+/// [`read_iges_assembly`]), in `unit`.
+pub fn read_iges_parts(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
+    let t = ck(ffi::read_iges_tree(path_str(path)?))?;
+    if t.instances.is_empty() && !t.parts.names.is_empty() {
+        return step_shapes(&t.parts, 1.0 / unit.mm_per_unit());
+    }
+    Ok(vec![ImportedShape { shape: read_iges(path, unit)?, name: None, color: None, opacity: None, face_colors: Vec::new() }])
+}
+
+/// An IGES file whose roots are shared shapes placed (subfigure instances,
+/// as Onshape exports an assembly): its sending product id, distinct parts
+/// (named and coloured, in `unit`) and placed instances (file order,
+/// metres). `None` for files of separate shapes.
+pub fn read_iges_assembly(path: &Path, unit: LengthUnit) -> Result<Option<StepAssembly>> {
+    let t = ck(ffi::read_iges_tree(path_str(path)?))?;
+    if t.instances.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some((t.root.clone(), step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?, pvz_instances_of(&t.instances))))
+}
+
 /// A Parasolid transmit file (.x_t / .x_b) holding an assembly: the top
 /// assembly's name, its distinct bodies (each in its own coordinates, in
 /// `unit`) and every placed body instance (file order, metres). `None` for

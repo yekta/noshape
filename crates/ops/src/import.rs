@@ -100,7 +100,8 @@ pub fn read_foreign(path: &Path, units: &UnitPrefs) -> anyhow::Result<Foreign> {
     };
     let shape = match ext.as_str() {
         "step" | "stp" => compound(k::read_step(path, k::LengthUnit::Meter)?),
-        "iges" | "igs" => k::read_iges(path, k::LengthUnit::Meter)?,
+        // Named and coloured (XDE), each placed instance a part.
+        "iges" | "igs" => compound(k::read_iges_parts(path, k::LengthUnit::Meter)?),
         "brep" => k::read_brep(path)?,
         // Onshape imports STL, OBJ and PVZ as mesh parts (PVZ is in metres).
         "stl" | "obj" => k::read_mesh_bodies(path, mesh_unit)?,
@@ -246,6 +247,16 @@ fn read_xt_assembly(path: &Path) -> anyhow::Result<Option<PvzAssembly>> {
     pvz_of_tree(path, a).map(Some)
 }
 
+/// An IGES file holding placed instances of shared shapes (subfigures: how
+/// Onshape exports an assembly to IGES; live 1755 re-imports it as an
+/// Assembly of 2000 instances and a "<file> parts" Part Studio); `None` for
+/// files of separate shapes.
+fn read_iges_assembly(path: &Path) -> anyhow::Result<Option<PvzAssembly>> {
+    use noshape_kernel as k;
+    let Some(a) = k::read_iges_assembly(path, k::LengthUnit::Meter)? else { return Ok(None) };
+    pvz_of_tree(path, a).map(Some)
+}
+
 /// An assembly file's tree (STEP, Parasolid) as the Assembly + Part Studio import.
 fn pvz_of_tree(path: &Path, (root, parts, mut instances): noshape_kernel::StepAssembly) -> anyhow::Result<PvzAssembly> {
     use noshape_kernel as k;
@@ -327,8 +338,12 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
         }
         // A STEP or Parasolid assembly: Assembly + Part Studio (not when combining).
         let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
-        if !c.combine && matches!(ext.as_str(), "step" | "stp" | "x_t" | "x_b") {
-            let tree = if ext.starts_with('x') { read_xt_assembly(path) } else { read_step_assembly(path) };
+        if !c.combine && matches!(ext.as_str(), "step" | "stp" | "x_t" | "x_b" | "igs" | "iges") {
+            let tree = match ext.as_str() {
+                "x_t" | "x_b" => read_xt_assembly(path),
+                "igs" | "iges" => read_iges_assembly(path),
+                _ => read_step_assembly(path),
+            };
             match tree {
                 Ok(Some(a)) => {
                     pvz.push(a);

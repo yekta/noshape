@@ -17,6 +17,19 @@ types and views 10 of them. noshape stores all 13 as file tabs and views:
 
 `import_files` stores any non-CAD file as a file tab, as the app's + › Import… does.
 
+## Live's own big files (request 1755, 11-02)
+
+`dx_perf::timed_live_big_samples` imports live's samples (live/samples/dx-big, in `NOSHAPE_LIVE_BIG`). Ours is the
+whole import in a dev build on vibe5; live's is the time to "Post-processing done".
+
+| File | Ours | Live | Parts, names, colours, volume, instances |
+|---|---|---|---|
+| 1000-part / 2000-instance assembly, STEP AP242 | 4.6 s | 33.5 s | 1000, 1000, 900 + 100, 396562.770332 mm³ (live 396562.770315), 2000: as live |
+| the same, Parasolid | 2.2 s | 12.9 s | as live |
+| the same, IGES | 7.5 s | 69.3 s | as live (was 2000 flat parts, no colours: now read through XDE, shared subfigures as instances) |
+| the 1000-part Part Studio, STEP AP242 | 3.8 s | 29.3 s | as live |
+| NIST FTC 08 / FTC 09 / STC 09 (single PMI parts) | 0.6 / 0.6 / 0.6 s | 13.1 / 12.3 / 13.4 s | one solid each, live's volumes; live also lists their PMI curves |
+
 ## Exporting imported geometry (NIST, 11-02)
 
 Every export format on the NIST assembly's 8 parts as imported (healed STEP), each part on its own:

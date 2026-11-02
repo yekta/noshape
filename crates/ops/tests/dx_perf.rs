@@ -308,3 +308,43 @@ fn timed_many_heavy_parts() {
     assert_eq!(got, n);
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Live's own big files (request 1755, live/samples/dx-big in
+/// `NOSHAPE_LIVE_BIG`): its 1000-part / 2000-instance assembly as STEP,
+/// Parasolid and IGES, the 1000-part Part Studio as STEP, and NIST's largest
+/// PMI test parts. Each imported into a new document: time, parts, distinct
+/// names, colours, total volume and instances. Live: 33.5 / 12.9 / 69.3 /
+/// 29.3 s to "Post-processing done"; 1000 parts, 1000 names, 900 + 100
+/// colours, 396562.770315 mm³, 2000 instances; NIST parts 12–14 s.
+#[test]
+#[ignore]
+fn timed_live_big_samples() {
+    let Some(dir) = std::env::var_os("NOSHAPE_LIVE_BIG").map(std::path::PathBuf::from) else { return };
+    let scratch = std::env::temp_dir().join(format!("noshape-dx-livebig-{}", std::process::id()));
+    std::fs::create_dir_all(&scratch).unwrap();
+    let files = ["dx-big-asm-ap242.step", "dx-big-asm.x_t", "dx-big-asm.igs", "dx-big-parts-ap242.step", "nist/nist_ftc_08_asme1_ap242-e2.stp", "nist/nist_ftc_09_asme1_ap242-e1.stp", "nist/nist_stc_09_asme1_ap242-e3.stp"];
+    for (k, f) in files.iter().enumerate() {
+        let file = dir.join(f);
+        if !file.exists() {
+            continue;
+        }
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": scratch.join(format!("in-{k}.noshape")).to_str().unwrap() }));
+        let t = Instant::now();
+        let r = call(&mut ctx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
+        let ms = t.elapsed().as_secs_f64() * 1000.0;
+        let tab = |kind: &str| r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == kind).map(|t| t["name"].as_str().unwrap().to_string());
+        let studio = tab("Part Studio").expect("a Part Studio");
+        let parts = call(&mut ctx, "query_parts", json!({ "tab": studio }))["parts"].as_array().unwrap().clone();
+        let solids: Vec<&Value> = parts.iter().filter(|p| p["kind"] == "Solid").collect();
+        let names: std::collections::HashSet<&str> = solids.iter().filter_map(|p| p["name"].as_str()).collect();
+        let mut colours: std::collections::BTreeMap<String, usize> = Default::default();
+        for p in &solids {
+            *colours.entry(p["color"].as_str().unwrap_or("?").to_string()).or_default() += 1;
+        }
+        let volume: f64 = solids.iter().map(|p| p["volume"].as_f64().unwrap_or(0.0)).sum();
+        let instances = tab("Assembly").map_or(0, |a| call(&mut ctx, "assembly_list", json!({ "tab": a }))["instances"].as_array().unwrap().len());
+        report(&format!("live big: {f}: {} solids ({} names), colours {colours:?}, {volume:.6} mm3, {instances} instances", solids.len(), names.len()), vec![ms]);
+    }
+    let _ = std::fs::remove_dir_all(&scratch);
+}

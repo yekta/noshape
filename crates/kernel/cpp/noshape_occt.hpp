@@ -869,6 +869,7 @@ rust::Vec<uint8_t>       bin_to_bytes(const OcShape& s, bool with_triangles);
 std::unique_ptr<OcShape> bin_from_bytes(rust::Slice<const uint8_t> bytes);
 StepImport               read_step(rust::Str path);
 StepTree                 read_step_tree(rust::Str path);
+StepTree                 read_iges_tree(rust::Str path);
 void write_step(const OcShapeList& shapes, rust::Slice<const rust::String> names,
                 rust::Slice<const float> colors, rust::Slice<const bool> has_color,
                 rust::Str path, uint8_t schema, uint8_t file_unit);

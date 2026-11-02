@@ -27,6 +27,8 @@
 #include <Message_Messenger.hxx>
 #include <Message_PrinterOStream.hxx>
 #include <IGESControl_Reader.hxx>
+#include <IGESCAFControl_Reader.hxx>
+#include <XSControl_WorkSession.hxx>
 #include <IGESControl_Writer.hxx>
 #include <IGESData_GlobalSection.hxx>
 #include <IGESData_IGESModel.hxx>
@@ -1036,6 +1038,112 @@ std::unique_ptr<OcShape> read_iges(rust::Str path)
   if (s.IsNull())
     fail_io("IGES file contains no shapes: " + p);
   return wrap(s);
+}
+
+// An IGES file's parts and placed instances when several of its roots are
+// the same shape placed (subfigure instances: live's IGES export of an
+// assembly, request 1755, round-trips as an Assembly); no instances
+// otherwise. Names and colours through OCCT's XDE reader; the root's name is
+// the file's sending product id. Parts in mm, placements in metres.
+StepTree read_iges_tree(rust::Str path)
+{
+  const LockedSection         locked_section_iges_tree;
+  std::lock_guard<std::mutex> lock(xde_mutex());
+  quiet_messenger();
+  const std::string p = path_str(path);
+  StepTree          out;
+  out.parts.shapes = std::make_unique<OcShapeList>();
+  occ::handle<XCAFApp_Application> app = XCAFApp_Application::GetApplication();
+  occ::handle<TDocStd_Document>    doc;
+  app->NewDocument("MDTV-XCAF", doc);
+  if (doc.IsNull())
+    fail_io("could not read IGES file " + p);
+  IGESCAFControl_Reader r;
+  r.SetColorMode(true);
+  r.SetNameMode(true);
+  r.SetLayerMode(false);
+  if (r.ReadFile(p.c_str()) != IFSelect_RetDone || !r.Transfer(doc))
+  {
+    app->Close(doc);
+    fail_io("could not read IGES file " + p);
+  }
+  occ::handle<XCAFDoc_ShapeTool>  st = XCAFDoc_DocumentTool::ShapeTool(doc->Main());
+  occ::handle<XCAFDoc_ColorTool>  ct = XCAFDoc_DocumentTool::ColorTool(doc->Main());
+  NCollection_Sequence<TDF_Label> roots;
+  st->GetFreeShapes(roots);
+  // Roots by their unlocated shape.
+  NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher> protos;
+  std::vector<int>                                              part_of;
+  for (int i = 1; i <= roots.Length(); ++i)
+  {
+    const TopoDS_Shape s = XCAFDoc_ShapeTool::GetShape(roots(i));
+    part_of.push_back(s.IsNull() ? -1 : protos.Add(s.Located(TopLoc_Location())) - 1);
+  }
+  std::vector<Leaf> parts;
+  const bool        shared = protos.Extent() > 0 && protos.Extent() < roots.Length();
+  // Separate shapes: each a part, named and coloured (no instances).
+  for (int i = 1; i <= roots.Length() && !shared; ++i)
+    collect(st, ct, roots(i), TopLoc_Location(), std::string(), false, Quantity_Color(), parts, 0);
+  if (shared)
+    parts.resize((size_t)protos.Extent());
+  std::vector<bool> seen((size_t)protos.Extent(), false);
+  for (int i = 1; i <= roots.Length() && shared; ++i)
+  {
+    const int k = part_of[(size_t)i - 1];
+    if (k < 0)
+      continue;
+    const TopoDS_Shape s = XCAFDoc_ShapeTool::GetShape(roots(i));
+    if (!seen[(size_t)k])
+    {
+      seen[(size_t)k] = true;
+      Leaf& leaf      = parts[(size_t)k];
+      leaf.shape      = protos(k + 1);
+      leaf.name       = label_name(roots(i));
+      leaf.hasColor   = label_color(ct, roots(i), TopoDS_Shape(), leaf.color);
+      // Else its solid's (an IGES solid points to its colour definition).
+      for (TopExp_Explorer ex(leaf.shape, TopAbs_SOLID); ex.More() && !leaf.hasColor; ex.Next())
+        leaf.hasColor = ct->GetColor(ex.Current(), XCAFDoc_ColorGen, leaf.color) || ct->GetColor(ex.Current(), XCAFDoc_ColorSurf, leaf.color);
+      leaf.faceColors = face_colors(ct, roots(i), leaf.shape);
+    }
+    const gp_Trsf t = s.Location().Transformation();
+    PvzInstance   inst;
+    inst.part = (uint32_t)k;
+    inst.name = rust::String(label_name(roots(i)));
+    for (int row = 1; row <= 3; ++row)
+      for (int c = 1; c <= 4; ++c)
+        inst.transform.push_back(c == 4 ? t.Value(row, c) * 1e-3 : t.Value(row, c));
+    out.instances.push_back(std::move(inst));
+  }
+  occ::handle<IGESData_IGESModel> model = occ::down_cast<IGESData_IGESModel>(r.WS()->Model());
+  std::string                     root;
+  if (!model.IsNull() && !model->GlobalSection().SendName().IsNull())
+    root = model->GlobalSection().SendName()->ToCString();
+  out.root = rust::String(root);
+  for (auto& inst : out.instances)
+    inst.root = rust::String(root);
+  for (const auto& l : parts)
+  {
+    out.parts.shapes->items.push_back(l.shape);
+    out.parts.names.push_back(rust::String(l.name));
+    double r_, g_, b_;
+    l.color.Values(r_, g_, b_, Quantity_TOC_sRGB);
+    out.parts.colors.push_back((float)r_);
+    out.parts.colors.push_back((float)g_);
+    out.parts.colors.push_back((float)b_);
+    out.parts.has_color.push_back(l.hasColor);
+    for (const auto& [face, fc] : l.faceColors)
+    {
+      double fr, fg, fb;
+      fc.Values(fr, fg, fb, Quantity_TOC_sRGB);
+      out.parts.face_part.push_back((uint32_t)(out.parts.names.size() - 1));
+      out.parts.face_index.push_back((uint32_t)face);
+      out.parts.face_colors.push_back((float)fr);
+      out.parts.face_colors.push_back((float)fg);
+      out.parts.face_colors.push_back((float)fb);
+    }
+  }
+  app->Close(doc);
+  return out;
 }
 
 // IGES 5.1 laid out as Onshape's (HOOPS Exchange) export (live "qa5 iges
