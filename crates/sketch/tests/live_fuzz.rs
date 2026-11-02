@@ -1740,6 +1740,9 @@ fn one_case() {
     }) else {
         return;
     };
+    if std::env::var("CTRACE").is_ok() {
+        eprintln!("CT names {:?}", c.curves.iter().map(|(n, id, _)| format!("{n}={id:?}")).collect::<Vec<_>>());
+    }
     let o = ours(&mut c);
     eprintln!("{}", o["points"]);
 }

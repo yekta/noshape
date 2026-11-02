@@ -302,8 +302,10 @@ impl Sketch {
         // Loops placed round from an anchor: their units next to placed
         // geometry go first.
         let mut anchored: BTreeSet<EntityId> = BTreeSet::new();
+        let mut kept: BTreeSet<EntityId> = BTreeSet::new();
         for a in self.loop_anchors(comp, cons, &holds) {
             placed.insert(a);
+            kept.insert(a);
             anchored.extend(self.loop_of(a, cons));
         }
         while placed.len() < comp.len() {
@@ -355,6 +357,7 @@ impl Sketch {
                     }
                     None => {
                         placed.insert(k);
+                        kept.insert(k);
                         continue;
                     }
                 }
@@ -401,6 +404,7 @@ impl Sketch {
             };
             if let Some(v) = stays {
                 placed.insert(v);
+                kept.insert(v);
             }
             let before: HashMap<EntityId, DVec2> = self.entity(u).map(|e| e.point_refs()).into_iter().flatten().filter_map(|p| self.point(p).map(|q| (p, q))).collect();
             let carried_at = self.carry_onto_placed(u, &placed, unit_of);
@@ -509,9 +513,23 @@ impl Sketch {
                 // before the rest (live fuzz s11: an equilateral triangle
                 // keeps its dimensioned side and closes on the other two).
                 let own = |x: EntityId| cons.iter().any(|(_, us)| us.as_slice() == [x]);
-                for release in 0..3 {
-                    let mut g: BTreeSet<EntityId> = all_neighbours.iter().copied().filter(|x| !placed.contains(x) || release == 2 || (release == 1 && !own(*x))).collect();
-                    if release == 1 && g.iter().all(|x| !placed.contains(x)) {
+                // A closed loop tied to another loop's placed curve gives way
+                // whole first, the other loop staying (live probes 10
+                // r6-k26 / r6-k29: a rectangle comes onto the kept one by a
+                // point on its top line, an Equal height and a distance),
+                // unless the pass kept one of its curves as it was.
+                let ring = self.ring_of(u, cons);
+                let ring_first = all_neighbours.iter().any(|x| placed.contains(x) && !ring.contains(x)) && self.closed(&ring) && ring.iter().all(|x| !kept.contains(x));
+                for release in 0..4 {
+                    if release == 1 && !ring_first {
+                        continue;
+                    }
+                    let mut g: BTreeSet<EntityId> = if release == 1 {
+                        ring.iter().copied().filter(|x| comp.contains(x)).collect()
+                    } else {
+                        all_neighbours.iter().copied().filter(|x| !placed.contains(x) || release == 3 || (release == 2 && !own(*x))).collect()
+                    };
+                    if (release == 1 || release == 2) && g.iter().all(|x| !placed.contains(x)) {
                         continue;
                     }
                     g.insert(u);
@@ -966,12 +984,8 @@ impl Sketch {
             }
             let lp = self.loop_of(u, cons);
             seen.extend(lp.iter().copied());
-            // Closed: every curve end shared with another of the loop's
-            // (an open chain keeps its usual order: fuzz s223).
-            let closed = lp.iter().all(|v| match self.endpoints(*v) {
-                Some((a, b)) => [a, b].iter().all(|p| self.coincident_with(*p).iter().any(|q| lp.iter().any(|w| *w != *v && self.entity(*w).is_some_and(|e| e.point_refs().contains(q))))),
-                None => false,
-            });
+            // Closed (an open chain keeps its usual order: fuzz s223).
+            let closed = self.closed(&lp);
             // With arcs (a plain rectangle keeps its lower-left corner as
             // before: fuzz s319's corner rectangle, only its top Horizontal).
             let rounded = lp.iter().any(|v| self.kind(*v) == Some(EntityKind::Arc));
@@ -1376,6 +1390,34 @@ impl Sketch {
         while let Some(x) = todo.pop() {
             for (c, us) in cons {
                 if us.contains(&x) && self.connective(*c) {
+                    for v in us {
+                        if seen.insert(*v) {
+                            todo.push(*v);
+                        }
+                    }
+                }
+            }
+        }
+        seen
+    }
+
+    /// Whether every curve end of `lp` is shared with another of its curves.
+    fn closed(&self, lp: &BTreeSet<EntityId>) -> bool {
+        lp.iter().all(|v| match self.endpoints(*v) {
+            Some((a, b)) => [a, b].iter().all(|p| self.coincident_with(*p).iter().any(|q| lp.iter().any(|w| *w != *v && self.entity(*w).is_some_and(|e| e.point_refs().contains(q))))),
+            None => false,
+        })
+    }
+
+    /// The curves joined to `u` end to end (point-to-point Coincidents
+    /// only: a point on another loop's line doesn't join the loops).
+    fn ring_of(&self, u: EntityId, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)]) -> BTreeSet<EntityId> {
+        let ends = |c: crate::ids::ConstraintId| matches!(self.constraint(c).map(|k| &k.kind), Some(ConstraintKind::Coincident { a, b }) if self.kind(*a) == Some(EntityKind::Point) && self.kind(*b) == Some(EntityKind::Point));
+        let mut seen: BTreeSet<EntityId> = BTreeSet::from([u]);
+        let mut todo = vec![u];
+        while let Some(x) = todo.pop() {
+            for (c, us) in cons {
+                if us.contains(&x) && ends(*c) {
                     for v in us {
                         if seen.insert(*v) {
                             todo.push(*v);

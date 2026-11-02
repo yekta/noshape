@@ -568,3 +568,48 @@ fn slot_with_new_radius_and_centre_distance_keeps_its_top_line() {
         assert!((*a - b).length() < 1e-6, "{at:?}");
     }
 }
+
+#[test]
+fn a_tilted_rectangle_comes_onto_the_kept_one() {
+    // Live probes 10 r6-k29 (fuzz s6 without its length): rectangle A
+    // (its left side Vertical, its top Parallel to a separate line) stays;
+    // rectangle B, drawn tilted, has its
+    // sides Vertical / Horizontal, its top through A's top-left corner, its
+    // right side Equal to A's left, its bottom Equal to A's top, and its
+    // top-right 74.636 from A's top-left. B comes whole onto A.
+    let mut sk = Sketch::new();
+    let quad = |sk: &mut Sketch, p: [DVec2; 4]| -> Vec<EntityId> {
+        let l: Vec<EntityId> = (0..4).map(|i| sk.add_line(p[i], p[(i + 1) % 4])).collect();
+        for i in 0..4 {
+            let (_, e) = sk.endpoints(l[i]).unwrap();
+            let (s, _) = sk.endpoints(l[(i + 1) % 4]).unwrap();
+            sk.add_constraint(ConstraintKind::Coincident { a: e, b: s }).unwrap();
+        }
+        l
+    };
+    // A: bottom, right, top, left (counter-clockwise).
+    let a = quad(&mut sk, [v(59.551, 3.576), v(88.306, 3.576), v(88.306, 23.759), v(59.551, 23.759)]);
+    let b = quad(&mut sk, [v(116.444, 1.658), v(150.007, -0.773), v(151.219, 15.965), v(117.656, 18.395)]);
+    let level = sk.add_line(v(-0.91, -11.645), v(24.057, -11.645));
+    sk.add_constraint(ConstraintKind::Parallel { a: a[2], b: level }).unwrap();
+    sk.add_constraint(ConstraintKind::Vertical { a: a[3], b: None }).unwrap();
+    sk.add_constraint(ConstraintKind::Vertical { a: b[1], b: None }).unwrap();
+    sk.add_constraint(ConstraintKind::Horizontal { a: b[2], b: None }).unwrap();
+    sk.add_constraint(ConstraintKind::Vertical { a: b[3], b: None }).unwrap();
+    sk.add_constraint(ConstraintKind::Equal { a: a[3], b: b[1] }).unwrap();
+    sk.add_constraint(ConstraintKind::Parallel { a: b[0], b: b[2] }).unwrap();
+    sk.add_constraint(ConstraintKind::Equal { a: b[0], b: a[2] }).unwrap();
+    let (a_top_left, _) = sk.endpoints(a[3]).unwrap();
+    sk.add_constraint(ConstraintKind::Coincident { a: a_top_left, b: b[2] }).unwrap();
+    sk.add_constraint(ConstraintKind::Parallel { a: a[3], b: b[1] }).unwrap();
+    let (_, a_corner) = sk.endpoints(a[2]).unwrap();
+    let (_, b_top_right) = sk.endpoints(b[1]).unwrap();
+    sk.add_constraint(ConstraintKind::Distance { a: a_corner, b: b_top_right, value: 74.636, mode: DistanceMode::Center }).unwrap();
+    let before: Vec<DVec2> = a.iter().map(|l| sk.point(sk.endpoints(*l).unwrap().0).unwrap()).collect();
+    assert!(sk.solve_with(&SolveOptions { constructive: true, ..Default::default() }).is_solved());
+    let starts = |sk: &Sketch, q: &[EntityId]| -> Vec<DVec2> { q.iter().map(|l| sk.point(sk.endpoints(*l).unwrap().0).unwrap()).collect() };
+    let want_b = [v(105.432, 3.576), v(134.187, 3.576), v(134.187, 23.759), v(105.432, 23.759)];
+    for (p, q) in starts(&sk, &a).iter().zip(&before).chain(starts(&sk, &b).iter().zip(&want_b)) {
+        assert!((*p - *q).length() < 2e-3, "A {:?} B {:?}", starts(&sk, &a), starts(&sk, &b));
+    }
+}

@@ -737,6 +737,15 @@ Everyday batches 4 / 5 / 6 now 40 / 40 / 40 on positions; batches 1–6 1295 →
 dropped: skipping such an arc in the keep step (s303 12 → 55 mm: the right arc then keeps its x). Sent live sketch
 probes 10 (s6 and s102, batches 1–2's largest, each with one relation left out: which relation moves what; T2 in
 `probe_matches`, fixture sketch-probe-10.json).
+18:55: probes 10 answered (live 1804, s6 / s102 leave-one-out). In s6 the middle rectangle grows only through k29
+(l11's length) carried by k26 (l9 = l7) and the rectangle; without k29 (r6-k29) or k26 live keeps the middle rectangle
+and brings the right one onto it whole. Fixed (r6-k26, r6-k29 exact): in the group fallback a closed loop (curves
+joined end to end, `ring_of`) tied to another loop's placed curve gives way whole first, unless the pass kept one of
+its curves (T1 onshape_ux::a_tilted_rectangle_comes_onto_the_kept_one). Batches unchanged (1262 mm). Still open in
+s6: with k29, live keeps l11's start y (the middle rectangle comes down 7.8 mm) and both rectangles end 0.323 mm left
+of where the distance alone puts them; r6-k28 (no distance) has the same 0.323 at the right rectangle's right side.
+That shift needs k19 / k26 / k27 / k28 / k29 together; no rule found for it yet (looks like a least-squares share).
+s102's l4 halves only with all of k10 / k11 / k14 / k15 (live's numeric share across two Equals and two distances).
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
