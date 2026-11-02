@@ -487,7 +487,7 @@ impl Sketch {
                 }
             }
         }
-        let key = |u: EntityId| if g == 1 { self.equal_key(u) } else { self.placing_line_dir(u).map_or(f64::MAX, |d| d.y.atan2(d.x).rem_euclid(std::f64::consts::PI)) };
+        let key = |u: EntityId| if g == 1 { self.equal_key(u) } else { self.axis_off(u) };
         let kk = key(k);
         !kk.is_finite() || class.iter().all(|u| *u == k || key(*u).partial_cmp(&kk) != Some(std::cmp::Ordering::Less))
     }
@@ -521,7 +521,7 @@ impl Sketch {
                 }
             }
         }
-        let Some((best, off)) = class.iter().filter_map(|(u, off)| angle(*u).map(|a| (a, *off))).min_by(|a, b| a.0.total_cmp(&b.0)) else { return true };
+        let Some((best, off, _)) = class.iter().filter_map(|(u, off)| angle(*u).map(|a| (a, *off, self.axis_off(*u)))).min_by(|a, b| a.2.total_cmp(&b.2)) else { return true };
         let d = (ak - (best - off)).rem_euclid(PI);
         d.min(PI - d) <= 1e-9
     }
@@ -728,7 +728,7 @@ impl Sketch {
                     ConstraintKind::Equal { .. } => self.equal_key(u),
                     // The angle in [0°, 180°) (live fuzz s14: a vertical line
                     // stays, the one at 97° turns).
-                    ConstraintKind::Parallel { .. } | ConstraintKind::Perpendicular { .. } => self.placing_line_dir(u).map_or(f64::MAX, |d| d.y.atan2(d.x).rem_euclid(std::f64::consts::PI)),
+                    ConstraintKind::Parallel { .. } | ConstraintKind::Perpendicular { .. } => self.axis_off(u),
                     _ => f64::NAN,
                 }
             };
@@ -812,6 +812,22 @@ impl Sketch {
             .filter_map(|p| self.point(p).map(|q| (p, q)))
             .min_by(|a, b| (a.1.x, a.1.y).partial_cmp(&(b.1.x, b.1.y)).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(p, _)| p)
+    }
+
+    /// How far line `u` is turned from the nearest axis (0 to 45°): of
+    /// lines related by Parallel / Perpendicular the one nearer an axis
+    /// stays (live: fuzz s102 turns the side 10.8° off horizontal, not the
+    /// one 7.2° off vertical; s14 keeps a vertical line; probes 2 q7 / q8,
+    /// 5 u6).
+    /// Ties (both on an axis: fuzz s238) go to the smaller angle in
+    /// [0°, 180°).
+    fn axis_off(&self, u: EntityId) -> f64 {
+        use std::f64::consts::{FRAC_PI_2, PI};
+        self.placing_line_dir(u).filter(|d| d.length() > 0.0).map_or(f64::MAX, |d| {
+            let raw = d.y.atan2(d.x).rem_euclid(PI);
+            let a = raw.rem_euclid(FRAC_PI_2);
+            (a.min(FRAC_PI_2 - a) * 1e9).round() * 1e-6 + raw
+        })
     }
 
     /// Of Equal members, the one with the smaller key stays: a line's
