@@ -146,7 +146,12 @@ pub fn read_step_assembly_nested(path: &Path, unit: LengthUnit) -> Result<Option
             .collect(),
     };
     // OCCT reads STEP in millimetres.
-    Ok(Some(((t.root.clone(), step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?, pvz_instances_of(&t.instances)), nesting)))
+    let t0 = std::time::Instant::now();
+    let parts = step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?;
+    if std::env::var_os("NOSHAPE_IMPORT_TIMING").is_some() {
+        eprintln!("  step tree scale: {:.1} ms", t0.elapsed().as_secs_f64() * 1000.0);
+    }
+    Ok(Some(((t.root.clone(), parts, pvz_instances_of(&t.instances)), nesting)))
 }
 
 /// A Parasolid transmit file (.x_t / .x_b) holding an assembly: the top

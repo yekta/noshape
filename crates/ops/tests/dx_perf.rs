@@ -218,3 +218,45 @@ fn timed_big_part_imports() {
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Big assemblies (user 11-02): `tests/perf/pins-assembly-1000.noshape`
+/// (1000 instances of one pin) exported as STEP, Parasolid and IGES, each
+/// file imported into a new document; times both ways and checks fidelity
+/// (STEP / Parasolid: an Assembly of 1000 instances of the one part, named
+/// after it; IGES: 1000 parts, flat).
+#[test]
+#[ignore]
+fn timed_big_assembly_round_trip() {
+    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf/pins-assembly-1000.noshape");
+    let dir = std::env::temp_dir().join(format!("noshape-dx-bigasm-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("pins.noshape");
+    std::fs::copy(&src, &path).unwrap();
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_open", json!({ "path": path.to_str().unwrap() }));
+    let n = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }))["instances"].as_array().unwrap().len();
+    assert_eq!(n, 1000);
+    for (format, ext) in [("STEP", "step"), ("PARASOLID", "x_t"), ("IGES", "igs")] {
+        let file = dir.join(format!("pins.{ext}"));
+        let t = Instant::now();
+        call(&mut ctx, "export_parts", json!({ "tab": "Assembly 1", "format": format, "file": file.to_str().unwrap() }));
+        report(&format!("big asm: export {n} instances {ext} ({} KB)", std::fs::metadata(&file).map(|m| m.len() / 1000).unwrap_or(0)), vec![t.elapsed().as_secs_f64() * 1000.0]);
+        let mut ictx = Ctx::new();
+        call(&mut ictx, "document_create", json!({ "path": dir.join(format!("in-{ext}.noshape")).to_str().unwrap() }));
+        let t = Instant::now();
+        let r = call(&mut ictx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
+        let ms = t.elapsed().as_secs_f64() * 1000.0;
+        let tab = |kind: &str| r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == kind).map(|t| t["name"].as_str().unwrap().to_string());
+        let studio = tab("Part Studio").expect("a Part Studio");
+        let parts = call(&mut ictx, "query_parts", json!({ "tab": studio }))["parts"].as_array().unwrap().clone();
+        let instances = tab("Assembly").map_or(0, |a| call(&mut ictx, "assembly_list", json!({ "tab": a }))["instances"].as_array().unwrap().len());
+        report(&format!("big asm: import {n} instances {ext} -> {} part(s), {instances} instances", parts.len()), vec![ms]);
+        if ext == "igs" {
+            assert_eq!(parts.len(), n, "IGES is flat");
+        } else {
+            assert_eq!((parts.len(), instances), (1, n), "{ext}");
+            assert_eq!(parts[0]["name"], "Part 1", "{ext}");
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -709,6 +709,7 @@ StepTree read_step_tree(rust::Str path)
   const LockedSection locked_section_421;
   std::lock_guard<std::mutex> lock(xde_mutex());
   quiet_messenger();
+  StageClock        clock;
   const std::string p = path_str(path);
   StepTree          out;
   out.parts.shapes = std::make_unique<OcShapeList>();
@@ -721,11 +722,18 @@ StepTree read_step_tree(rust::Str path)
   r.SetColorMode(true);
   r.SetNameMode(true);
   r.SetLayerMode(false);
-  if (r.ReadFile(p.c_str()) != IFSelect_RetDone || !r.Transfer(doc))
+  if (r.ReadFile(p.c_str()) != IFSelect_RetDone)
   {
     app->Close(doc);
     fail_io("could not read STEP file " + p);
   }
+  clock.lap("step tree ReadFile");
+  if (!r.Transfer(doc))
+  {
+    app->Close(doc);
+    fail_io("could not read STEP file " + p);
+  }
+  clock.lap("step tree Transfer");
   TreeWalk w;
   w.st = XCAFDoc_DocumentTool::ShapeTool(doc->Main());
   w.ct = XCAFDoc_DocumentTool::ColorTool(doc->Main());
@@ -767,8 +775,11 @@ StepTree read_step_tree(rust::Str path)
   out.instances = std::move(w.instances);
   out.sub_names = std::move(w.subNames);
   out.nest      = std::move(w.nest);
+  clock.lap("step tree walk");
   app->Close(doc);
+  clock.lap("step tree close");
   fix_pole_pcurves(out.parts.shapes->items);
+  clock.lap("step tree pole pcurves");
   return out;
 }
 

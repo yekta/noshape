@@ -1107,6 +1107,23 @@ fn dump_step_colours() {
     }
 }
 
+/// `NOSHAPE_STEP_READ=<assembly.step> cargo test … export::dump_step_assembly_parts -- --ignored --nocapture`:
+/// each part's volume, face / edge counts, validity and BREP size (comparing
+/// readers' settings).
+#[test]
+#[ignore]
+fn dump_step_assembly_parts() {
+    let Some(p) = std::env::var_os("NOSHAPE_STEP_READ") else { return };
+    let ((_, parts, _), _) = read_step_assembly_nested(std::path::Path::new(&p), LengthUnit::Millimeter).unwrap().unwrap();
+    for s in parts {
+        let v = volume_properties(&s.shape).map(|m| m.mass).unwrap_or(f64::NAN);
+        if let Some(d) = std::env::var_os("NOSHAPE_STEP_DUMP_DIR") {
+            std::fs::write(std::path::Path::new(&d).join(format!("{}.brep", s.name.clone().unwrap_or_default().replace(['/', ' '], "_"))), s.shape.to_brep_bytes().unwrap()).unwrap();
+        }
+        println!("part {:?}: volume {v:.4} mm3, faces {}, edges {}, valid {}, brep {} KB", s.name, s.shape.count(ShapeType::Face), s.shape.count(ShapeType::Edge), s.shape.is_valid(), s.shape.to_brep_bytes().unwrap().len() / 1000);
+    }
+}
+
 /// A STEP face's own colour (a STYLED_ITEM on an ADVANCED_FACE; live's
 /// g48 export with one face made red) comes in on that face, the parts keep
 /// theirs. Read from the part's sub-shape labels (not a document-wide

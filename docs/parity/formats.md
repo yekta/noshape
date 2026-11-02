@@ -71,6 +71,21 @@ What changed (dev build timings on vibe5, 2000 parts):
 - STEP import: face colours were looked up by a document-wide search per face (quadratic). They're now read from each part's sub-shape labels: collect went from 2920 ms to 3 ms, and the whole import from 4.6 s to 1.6 s.
 - STEP / Parasolid assembly import: each part's body follows from the Import feature's numbering, with no probe regeneration. NIST apply went from 2.15 s to 0.1 s. `NOSHAPE_IMPORT_CHECK=1` compares the result with the probe.
 - STEP export: all parts without model definitions go through one OCCT call, then are split by product. It took 2.0 s and now takes 1.15 s (OCCT 1404 → 752 ms, layout 582 → 337 ms).
-- What's left on NIST import is OCCT's reading (about 1.8 s dev) and the display meshing after regeneration (about 1.85 s, the Part Studio display).
+- Big assembly (`dx_perf::timed_big_assembly_round_trip`, the 1000-instance pin fixture, dev on vibe5):
+
+  | Format | Export | Import | Result |
+  |---|---|---|---|
+  | STEP | 16 ms (571 KB) | 250 ms | 1 part, 1000 instances, named "Part 1" |
+  | Parasolid | 5 ms (111 KB) | 36 ms | same |
+  | IGES | 378 ms (7.7 MB) | 939 ms | 1000 parts, flat (IGES has no assembly) |
+
+- NIST import, what's left (dev): reading is 1.8 s, of which:
+  - OCCT's parse: 0.15 s.
+  - OCCT's Transfer: 1.24 s, nearly all of it shape healing. With healing off it takes 0.05 s, but every part is then invalid and the volumes are off by up to 70 %.
+  - Writing the Import feature's BREP text: 0.41 s for 26 MB.
+
+  Most of the healing time, and 17 of the 26 MB, are the two cap screws' thread pcurves. Onshape writes no pcurves, so OCCT projects each thread edge onto its B-spline surface, which gives 2D B-splines with thousands of poles. A user precision makes it slower: 1e-4 mm takes 28 s, with the same sizes.
+- After reading, regeneration takes about 1.7 s, of which the features are 0.12 s and the display meshing the rest (the Part Studio display, psui's area).
+- Not done: healing parts in parallel. Transfer without healing, then heal each part on its own thread, would cut the 0.84 s Transfer of the 2000-part import. It needs face colours mapped through the healing history; parked until live's numbers show we're behind.
 
 `NOSHAPE_IMPORT_TIMING=1` and `NOSHAPE_EXPORT_TIMING=1` print the stages.

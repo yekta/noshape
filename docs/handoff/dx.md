@@ -11,6 +11,23 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-02 (to 03:17 UTC): user's order: X2 / X3, then big-file import / export speed, then format coverage
+- X2 export Resolution › Custom (defaults from Onshape's help, pending live 18:13) and X3 STEP AP242 semantic PMI
+  through OCCT's XDE, round-tripped with XDE in tests (pending live's samples 18:18): landed (b9feffeb).
+- Speed (docs/parity/formats.md "Speed on big files"; dx_perf `timed_nist_import`, `timed_big_part_imports`,
+  `timed_big_assembly_round_trip`; NOSHAPE_IMPORT_TIMING / NOSHAPE_EXPORT_TIMING print stages):
+  - STEP import face colours were quadratic: 4.6 s → 1.6 s for 2000 parts.
+  - Assembly imports skip the probe regeneration (`bodies_by_order`): NIST apply 2.15 s → 0.1 s.
+  - STEP export uses one OCCT call for all parts: 2.0 s → 1.15 s for 2000 parts.
+  - vibe3 release: NIST STEP 12.2 s → 8.0 s, Parasolid 7.4 s → 3.9 s (live 38.7 / 24.5 s).
+  - NIST's remaining read is OCCT's healing of the screws' threads (pcurves; see formats.md). Parallel healing is
+    parked until live's big-file timings (request 01:57) show we're behind.
+  - Queued 02:43 as e24cd093 with the formats piece.
+- Formats: docs/parity/formats.md (import 17 ✅ / 1 ◐ / 4 ⊘, export 19 ✅ / 2 ⊘). Every export format re-imports
+  (e2e `every_export_format_imports_back`). The non-CAD viewers wait on live's look (request 02:34).
+- To psui: NIST's regeneration after import is 1.7 s, of which the features are 0.12 s and the rest is display
+  meshing, mostly the two cap screws' thread faces (B-spline surfaces with dense pcurves).
+
 ## Late 11-01 (21:11 UTC)
 - D19 multi-selection palette, D20 hole tables over several views, X1 (A) nested STEP subassemblies + V1 on
   documents-page imports: landed 23:31 (751444a9) with everything queued since 18:47.

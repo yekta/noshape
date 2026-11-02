@@ -266,8 +266,12 @@ fn pvz_of_tree(path: &Path, (root, parts, mut instances): noshape_kernel::StepAs
     let info: Vec<noshape_model::features::importing::ImportPartInfo> = parts.iter().map(|p| noshape_model::features::importing::ImportPartInfo { name: p.name.clone(), color: p.color, opacity: p.opacity, faces: p.face_colors.clone() }).collect();
     let names = parts.iter().map(|p| p.name.clone()).collect();
     let part_shapes = parts.iter().map(|p| [k::ShapeType::Solid, k::ShapeType::Shell, k::ShapeType::Face, k::ShapeType::Edge].map(|t| p.shape.count(t))).collect();
+    let t = std::time::Instant::now();
     let shape = k::Shape::compound(&parts.into_iter().map(|p| p.shape).collect::<Vec<_>>());
     let foreign = Foreign { brep: String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string(), parts: serde_json::to_string(&info)? };
+    if std::env::var_os("NOSHAPE_IMPORT_TIMING").is_some() {
+        eprintln!("import stage brep text ({} MB): {:.1} ms", foreign.brep.len() / 1_000_000, t.elapsed().as_secs_f64() * 1000.0);
+    }
     let (name, file) = import_names(path);
     Ok(PvzAssembly { name, file, root, foreign, names, instances, step: true, nesting: None, order, part_shapes: Some(part_shapes) })
 }
