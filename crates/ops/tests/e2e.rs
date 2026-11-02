@@ -3756,6 +3756,41 @@ fn two_part_assembly(ctx: &mut Ctx, file: &str) -> (String, String) {
     (b, p)
 }
 
+/// Insert › Other documents through the API (dx's Split into multiple
+/// documents builds on it): another document's Assembly, with the parts of
+/// its own Part Studio, as one subassembly pinned to V1, and one part of
+/// that document's Part Studio.
+#[test]
+fn assembly_inserts_another_documents_assembly_at_a_version() {
+    let mut ctx = Ctx::new();
+    two_part_assembly(&mut ctx, "other-doc-asm-lib.noshape");
+    let lib = std::env::temp_dir().join(format!("noshape-ops-e2e-{}", std::process::id())).join("other-doc-asm-lib.noshape");
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    let top = scratch("other-doc-asm-top.noshape");
+    call(&mut ctx, "document_create", json!({ "path": top.to_str().unwrap() }));
+    let e = try_call(&mut ctx, "assembly_insert", json!({ "source": "Assembly 1", "document": lib.to_str().unwrap() })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("version"), "{e:?}");
+    let e = try_call(&mut ctx, "assembly_insert", json!({ "source": "Assembly 1", "document": lib.to_str().unwrap(), "version": "V9" })).unwrap_err();
+    assert!(e.param.as_deref() == Some("version") && e.message.contains("V1"), "{e:?}");
+    let r = call(&mut ctx, "assembly_insert", json!({ "source": "Assembly 1", "document": lib.to_str().unwrap(), "version": "V1" }));
+    assert_eq!(r["name"], "Assembly 1 <1>", "{r}");
+    let sub = r["instances"].as_array().unwrap().iter().find(|i| i["id"] == r["instance"]).unwrap().clone();
+    assert_eq!(sub["source"]["version_of"]["document"], "other-doc-asm-lib.noshape", "{sub}");
+    assert!(sub["source"]["version_of"]["part"].is_null(), "{sub}");
+    // The subassembly brings the other document's two parts.
+    let bom = call(&mut ctx, "assembly_bom", json!({ "type": "flattened" }));
+    let text = bom.to_string();
+    assert!(text.contains("Part 1") && text.contains("Part 2"), "{bom}");
+    // One part of the other document's Part Studio.
+    let p = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2", "document": lib.to_str().unwrap(), "version": "V1" }));
+    let pin = p["instances"].as_array().unwrap().iter().find(|i| i["id"] == p["instance"]).unwrap().clone();
+    assert!(pin["source"]["version_of"]["part"].is_string(), "{pin}");
+    let faces = call(&mut ctx, "assembly_entities", json!({ "instance": p["instance"], "kind": "faces" }));
+    assert!(!faces["faces"].as_array().unwrap().is_empty(), "{faces}");
+    let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
+    assert_eq!(hist["history"][0]["description"], "Assembly 1 :: Insert : Part Studio 1 (other document)", "{hist}");
+}
+
 /// A callout on a part's silhouette is that part's, not the part of an edge
 /// a little way off (qa BALLOON-WRONG-ITEM: a click on a pin's silhouette
 /// near the plate's edge showed the plate's item).

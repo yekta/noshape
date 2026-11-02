@@ -3482,19 +3482,22 @@ impl AssemblyView {
             .when_some(warning.filter(|_| error.is_none()), |d, w| d.child(div().id(SharedString::from(format!("warn-{}", top.0))).child(crate::assets::icon(&icon_path("warning"), 12., cx)).tooltip(move |win, cx| gpui_kit::component::tooltip::Tooltip::new(w.clone()).build(win, cx))))
             .when_some(error.clone().map(|e| if e.is_empty() { name.to_string() } else { format!("{name} has error: {e}") }), |d, e| d.child(div().id(SharedString::from(format!("err-{}", top.0))).size(px(6.)).rounded_full().bg(pal.error).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx))))
             .when_some(versioned.filter(|_| is_top), |d, own| {
-                let tip = if newer_badge {
-                    "Versioned part from other document with newer version"
+                // Another document's Assembly (live 1742 (B)): "Versioned assembly from other document".
+                let noun = if node.is_some_and(|n| n.linked.is_some()) { "assembly" } else { "part" };
+                let tip: SharedString = if newer_badge {
+                    format!("Versioned {noun} from other document with newer version")
                 } else if own {
-                    "Versioned part from current document"
+                    format!("Versioned {noun} from current document")
                 } else {
-                    "Versioned part from other document"
-                };
+                    format!("Versioned {noun} from other document")
+                }
+                .into();
                 d.child(
                     div()
                         .id(SharedString::from(format!("ver-{}", top.0)))
                         .flex_none()
                         .child(crate::assets::icon(&icon_path(if newer_badge { "inserted-version-update" } else { "list-versioned" }), 14., cx))
-                        .tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(tip).build(w, cx)),
+                        .tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(tip.clone()).build(w, cx)),
                 )
             })
             .child(div().flex_1())

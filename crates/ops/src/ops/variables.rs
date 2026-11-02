@@ -360,13 +360,8 @@ fn insert_studio(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     // The studio: this document's, or another document's at a version.
     let (src, external): (std::sync::Arc<noshape_model::Document>, Option<vars::ExternalStudio>) = match (a.opt_str("document")?, a.opt_str("version")?) {
         (Some(path), Some(version)) => {
-            let path = std::path::Path::new(path);
-            let path = path.canonicalize().map_err(|e| OpError::param("document", &format!("{}: {e}", path.display())))?;
-            let info = crate::derived::external_doc_info(&path).map_err(|e| OpError::param("document", &format!("can't read it: {e}")))?;
-            let named: Vec<&crate::derived::VersionChoice> = info.versions.iter().filter(|v| v.label != "Current state").collect();
-            let v = named.iter().find(|v| v.label == version).ok_or_else(|| OpError::not_found(if named.is_empty() { "the document has no versions: create one in it first (history_create_version)".into() } else { format!("no version `{version}`; versions: {}", named.iter().map(|v| v.label.as_str()).collect::<Vec<_>>().join(", ")) }).with_param("version"))?;
-            let snapshot = crate::derived::external_snapshot(&path, v.microversion).map_err(|e| OpError::param("version", &format!("can't read it: {e}")))?;
-            (snapshot, Some(vars::ExternalStudio { path, microversion: v.microversion.to_string(), version: v.label.clone() }))
+            let (path, v, snapshot) = crate::derived::named_version(path, version)?;
+            (snapshot, Some(vars::ExternalStudio { path, microversion: v.microversion.to_string(), version: v.label }))
         }
         (Some(_), None) => return Err(OpError::param("version", "required with `document`: one of its named versions")),
         (None, Some(_)) => return Err(OpError::param("document", "required with `version`")),

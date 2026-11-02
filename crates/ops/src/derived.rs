@@ -190,6 +190,20 @@ pub fn external_tab(key: &str) -> Option<noshape_model::document::Tab> {
 }
 
 /// Versions of another document available for pinning.
+/// Another document (`document`: a path) at one of its named versions
+/// (`version`), as the Insert dialogs' Other documents offer it: its path,
+/// the version, and that version's snapshot.
+pub fn named_version(document: &str, version: &str) -> Result<(std::path::PathBuf, VersionChoice, Arc<Document>), crate::error::OpError> {
+    use crate::error::OpError;
+    let path = std::path::Path::new(document);
+    let path = path.canonicalize().map_err(|e| OpError::param("document", &format!("{}: {e}", path.display())))?;
+    let info = external_doc_info(&path).map_err(|e| OpError::param("document", &format!("can't read it: {e}")))?;
+    let named: Vec<&VersionChoice> = info.versions.iter().filter(|v| v.label != "Current state").collect();
+    let v = named.iter().find(|v| v.label == version).ok_or_else(|| OpError::not_found(if named.is_empty() { "the document has no versions: create one in it first (history_create_version)".into() } else { format!("no version `{version}`; versions: {}", named.iter().map(|v| v.label.as_str()).collect::<Vec<_>>().join(", ")) }).with_param("version"))?;
+    let snapshot = external_snapshot(&path, v.microversion).map_err(|e| OpError::param("version", &format!("can't read it: {e}")))?;
+    Ok((path, (*v).clone(), snapshot))
+}
+
 pub fn external_doc_info(path: &std::path::Path) -> anyhow::Result<ExternalDocInfo> {
     let store = noshape_store::Document::open_read_only(path)?;
     let graph = store.graph()?;

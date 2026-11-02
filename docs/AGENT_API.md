@@ -2244,7 +2244,7 @@ Examples:
 
 Insert a part (or a whole Part Studio, or a subassembly) into an Assembly (edits the document (one undoable history entry)).
 
-The Insert dialog. Inserting the same item again offsets the new instance along X so they don't overlap. Returns the instance id; place it with mates or assembly_transform.
+The Insert dialog. Inserting the same item again offsets the new instance along X so they don't overlap. `document` + `version` insert from another document at a named version (the dialog's Other documents: a part, a whole Part Studio, or an Assembly as one subassembly, "Versioned … from other document"). Returns the instance id; place it with mates or assembly_transform.
 
 Examples:
 
@@ -2258,10 +2258,12 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
-| `source` | string | required | Part Studio or Assembly tab (name or id) to insert from. |
+| `source` | string | required | Part Studio or Assembly tab (name or id) to insert from (in `document` when given). |
 | `part` | string |  | A part of that Part Studio (`body:…` id or part name); default: the whole Part Studio as one instance. |
 | `sketch` | string |  | A sketch of that Part Studio (feature id or name): the Insert dialog's sketches. |
 | `configuration` | object or string |  | Configuration of the source: {input id: value}, or the Insert dialog's "default" (Reset to default) / "last_viewed" (Set to last viewed: the configuration the source shows). |
+| `document` | string |  | Another .noshape document to insert from (with `version`). |
+| `version` | string |  | With `document`: the name of one of its versions (the dialog lists named versions). |
 
 #### assembly_list
 
