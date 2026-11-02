@@ -1047,6 +1047,88 @@ fn probes5() -> Vec<(String, Case)> {
     out
 }
 
+/// Probes 6 (after batch 3, fuzz s226 / s215): a distance between points of
+/// two separate loops that doesn't hold: which loop moves (by position,
+/// creation order, how constrained each is, which one has its own change).
+fn probes6() -> Vec<(String, Case)> {
+    let v = DVec2::new;
+    let mut out = Vec::new();
+    let mut add = |name: &str, f: &dyn Fn(&mut Case)| {
+        let mut c = Case::new();
+        f(&mut c);
+        out.push((name.to_string(), c));
+    };
+    // A closed quad from `p` (counter-clockwise); `hv` puts H / V on it.
+    let quad = |c: &mut Case, p: [DVec2; 4], hv: bool| -> Vec<String> {
+        let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+        for i in 0..4 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+        }
+        if hv {
+            for (i, x) in l.iter().enumerate() {
+                c.hv(i % 2 == 0, x);
+            }
+        }
+        l
+    };
+    let sq = |x: f64| [v(x, 0.0), v(x + 10.0, 0.0), v(x + 10.0, 10.0), v(x, 10.0)];
+    // Square L at x 0, square R at x 30; the distance from L's lower-right
+    // corner to R's lower-left corner (20 now) set to 25.
+    add("w1 two H/V squares, L created first; L's right corner to R's left corner 20 -> 25", &|c| {
+        let l = quad(c, sq(0.0), true);
+        let r = quad(c, sq(30.0), true);
+        c.distance(&format!("{}.end", l[0]), &format!("{}.start", r[0]), 25.0);
+    });
+    add("w2 as w1, R created first", &|c| {
+        let r = quad(c, sq(30.0), true);
+        let l = quad(c, sq(0.0), true);
+        c.distance(&format!("{}.end", l[0]), &format!("{}.start", r[0]), 25.0);
+    });
+    add("w3 as w1, the distance's points the other order (R's first)", &|c| {
+        let l = quad(c, sq(0.0), true);
+        let r = quad(c, sq(30.0), true);
+        c.distance(&format!("{}.start", r[0]), &format!("{}.end", l[0]), 25.0);
+    });
+    add("w4 as w1, L has no H / V (a free quad of the same shape)", &|c| {
+        let l = quad(c, sq(0.0), false);
+        let r = quad(c, sq(30.0), true);
+        c.distance(&format!("{}.end", l[0]), &format!("{}.start", r[0]), 25.0);
+    });
+    add("w5 as w1, R has no H / V", &|c| {
+        let l = quad(c, sq(0.0), true);
+        let r = quad(c, sq(30.0), false);
+        c.distance(&format!("{}.end", l[0]), &format!("{}.start", r[0]), 25.0);
+    });
+    add("w6 as w1, R's bottom also dimensioned 12 (R changes too)", &|c| {
+        let l = quad(c, sq(0.0), true);
+        let r = quad(c, sq(30.0), true);
+        c.length(&r[0], 12.0);
+        c.distance(&format!("{}.end", l[0]), &format!("{}.start", r[0]), 25.0);
+    });
+    add("w7 as w1, L's bottom also dimensioned 12 (L changes too)", &|c| {
+        let l = quad(c, sq(0.0), true);
+        let r = quad(c, sq(30.0), true);
+        c.length(&l[0], 12.0);
+        c.distance(&format!("{}.end", l[0]), &format!("{}.start", r[0]), 25.0);
+    });
+    add("w8 as w1, R one above the other: R at (0, 30), L's top-left to R's bottom-left 20 -> 25", &|c| {
+        let l = quad(c, sq(0.0), true);
+        let r = quad(c, [v(0.0, 30.0), v(10.0, 30.0), v(10.0, 40.0), v(0.0, 40.0)], true);
+        c.distance(&format!("{}.start", l[3]), &format!("{}.start", r[0]), 25.0);
+    });
+    add("w9 an H/V square at x 0 and a lone line (30,0)-(40,0); the square's lower-right corner to the line's start 20 -> 25", &|c| {
+        let l = quad(c, sq(0.0), true);
+        let s = c.line(v(30.0, 0.0), v(40.0, 0.0));
+        c.distance(&format!("{}.end", l[0]), &format!("{s}.start"), 25.0);
+    });
+    add("w10 as w9, the line on the left at (-30,0)-(-20,0), the square at x 0", &|c| {
+        let s = c.line(v(-30.0, 0.0), v(-20.0, 0.0));
+        let l = quad(c, sq(0.0), true);
+        c.distance(&format!("{s}.end"), &format!("{}.start", l[0]), 25.0);
+    });
+    out
+}
+
 fn probe_batch(list: Vec<(String, Case)>) -> Value {
     let cases: Vec<Value> = list.into_iter().map(|(name, mut c)| {
         let ours = ours(&mut c);
@@ -1061,7 +1143,7 @@ fn probe_batch(list: Vec<(String, Case)>) -> Value {
 #[test]
 #[ignore = "T2: live fuzz least-change probes"]
 fn probe_matches() {
-    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5())] {
+    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6())] {
         let b = probe_batch(list);
         let path = fixture(&format!("sketch-probe-{n}.json"));
         if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == format!("probe-{n}")) {
@@ -1090,7 +1172,7 @@ fn probe_matches() {
 #[ignore = "T2: one live fuzz case"]
 fn one_case() {
     let probe = std::env::var("FUZZ_PROBE").ok();
-    let Some(mut c) = probe.as_ref().and_then(|p| [probes(), probes2(), probes3(), probes4(), probes5()].into_iter().flatten().find(|(n, _)| n.split(' ').next() == Some(p.as_str())).map(|(_, c)| c)).or_else(|| {
+    let Some(mut c) = probe.as_ref().and_then(|p| [probes(), probes2(), probes3(), probes4(), probes5(), probes6()].into_iter().flatten().find(|(n, _)| n.split(' ').next() == Some(p.as_str())).map(|(_, c)| c)).or_else(|| {
         let seed: u64 = std::env::var("FUZZ_SEED").ok()?.parse().ok()?;
         Some(generate(seed, seed > 100))
     }) else {
