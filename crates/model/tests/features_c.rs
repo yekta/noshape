@@ -2763,6 +2763,65 @@ fn decal_places_its_image_as_std() {
     assert_eq!((st, msg.as_str()), (FeatureStatus::Error, "Decal is not on target face."));
 }
 
+/// Decal's manipulators as std's addDecalManipulators (audit-part-studio M15): the 25 x 12.5 image on the block's
+/// top shifted 5 mm along U: the U arrow ending at the decal's origin, the V arrow, the scale arrow a fifth of the
+/// way to the top right corner and the angle arc a quarter width out; dragging the scale arrow its own distance on
+/// runs std's change function, which doubles the size.
+#[test]
+fn decal_manipulators_as_std() {
+    use noshape_model::display::FeatureManipulator as M;
+    use noshape_model::{Document, TabContent};
+    let mut doc = Document::new();
+    let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\x0dIHDR".to_vec();
+    png.extend_from_slice(&[0, 0, 0, 200, 0, 0, 0, 100, 8, 2, 0, 0, 0]);
+    let img = doc.add_tab("logo.png", TabContent::File(noshape_model::file_tab::FileTab::new("logo.png", &png, 0)));
+    let mut s = Studio::new();
+    s.opts.custom_features = Some(noshape_model::custom::DocumentScripts::from_document(&doc));
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 20.0), (0.0, 20.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = s.ok();
+    let face = face_at(&r, 0, DVec3::new(mm(20.0), mm(10.0), mm(10.0)));
+    let tab = img.to_string();
+    let d = s.add("decal", move |p| {
+        p.set("image", ParamValue::Text(tab));
+        p.set("face", q(face));
+        p.set("uShift", expr("5 mm"));
+        // As std's editing logic keeps them: the image's aspect.
+        p.set("width", expr("25 mm"));
+        p.set("height", expr("12.5 mm"));
+    });
+    let r = s.ok();
+    let m = r.display.feature_state(d).expect("state").manipulators.clone();
+    let get = |k: &str| m.iter().find(|(key, _)| key == k).map(|(_, x)| x.clone()).unwrap_or_else(|| panic!("{k}: {m:?}"));
+    let origin = DVec3::new(mm(25.0), mm(10.0), mm(10.0));
+    let M::Linear { base, direction, offset, .. } = get("uShiftManipulator") else { panic!() };
+    assert!((base + direction * offset - origin).length() < 1e-12 && (direction - DVec3::X).length() < 1e-12 && near(offset, mm(5.0), 1e-12), "{m:?}");
+    let M::Linear { direction, .. } = get("vShiftManipulator") else { panic!() };
+    assert!((direction - DVec3::Y).length() < 1e-12, "{m:?}");
+    let scale @ M::Linear { base, .. } = get("scaleManipulator") else { panic!() };
+    let diagonal = DVec3::new(mm(12.5), mm(6.25), 0.0);
+    assert!((base - (origin + diagonal * 0.2)).length() < 1e-12, "{m:?}");
+    let M::Angular { axis_direction, rotation_origin, .. } = get("angleManipulator") else { panic!() };
+    assert!(axis_direction.z < -0.999 && (rotation_origin - (origin + DVec3::X * mm(6.25))).length() < 1e-12, "{m:?}");
+    assert!(m.iter().all(|(k, _)| k != "imageOriginManipulator"), "no placement origin, no points");
+    let mut moved = scale.clone();
+    if let M::Linear { offset, .. } = &mut moved {
+        *offset = diagonal.length() * 0.2;
+    }
+    let f = s.ps.features.iter().find(|f| f.id == d).unwrap().clone();
+    let before = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions { upto: Some(s.ps.features.len() - 1), ..Default::default() }).context;
+    let changed = noshape_model::custom::std_feature::manipulator_change_in((*before).clone(), "decal", f.id, &f.name, &s.units, &f.params, "scaleManipulator", &moved).expect("std's change function ran");
+    let vars = std::collections::BTreeMap::new();
+    let w = noshape_model::regen::eval::EvalCtx::new(f.id, "", &changed, &s.units, (*before).clone(), &vars).length("width").unwrap();
+    assert!(near(w, mm(50.0), 1e-9), "width {w}");
+}
+
 /// Face blend between faces without a common edge (live psb 10-26 b GA/GC):
 /// an L bracket with a 2 mm inside chamfer, and one with a groove (x 5..10,
 /// z 2..5) between base and wall; side 1 the base top, side 2 the wall.

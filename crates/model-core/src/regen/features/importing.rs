@@ -425,6 +425,48 @@ fn apply_look(ev: &mut EvalCtx, bi: usize, look: &Look, appearances: bool) {
 
 /// Decal (std decal.fs): the image's placement on a planar or cylindrical
 /// face, recorded for display (`Context::decals`); the part is unchanged.
+/// std's addDecalManipulators: the U and V shift arrows ending at the decal's origin, the scale arrow a fifth of the
+/// way to the image's top right corner, the angle arc a quarter width out, and with a placement origin the image's
+/// nine points, the chosen one at it.
+fn decal_manipulators(ev: &mut EvalCtx, record: &crate::regen::context::DecalRecord, (w, h): (f64, f64), (u, v): (f64, f64), angle: f64, with_origin: bool) {
+    use crate::display::FeatureManipulator as M;
+    use crate::regen::context::DecalMapping;
+    let lin = |base: DVec3, direction: DVec3, offset: f64, primary: Option<&str>| M::Linear { base, direction, offset, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: primary.map(str::to_string) };
+    // A point of the image (0..1 each way) on the decal's surface: the inverse of its UV transform.
+    let world_at = |uv: [f64; 2]| -> DVec3 {
+        let (l, t) = (&record.uv_linear, &record.uv_translation);
+        let (a, b) = (uv[0] - t[0], uv[1] - t[1]);
+        let det = l[0][0] * l[1][1] - l[0][1] * l[1][0];
+        let (p, q) = ((l[1][1] * a - l[0][1] * b) / det, (-l[1][0] * a + l[0][0] * b) / det);
+        match record.mapping {
+            DecalMapping::Planar { origin, x, y, .. } => origin + x * p + y * q,
+            DecalMapping::Cylindrical { origin, x, y, z, radius } => origin + (x * (p / radius).cos() + y * (p / radius).sin()) * radius + z * q,
+        }
+    };
+    let scale_id = ev.bool("maintainAspectRatio").then(|| if ev.is("aspectRatioConstraint", "HEIGHT_DRIVING") { "height" } else { "width" });
+    let (at, du, dv, axis, turn_from, scale) = match record.mapping {
+        DecalMapping::Planar { origin, x, y, z } => {
+            let diagonal = x * (w / 2.0) + y * (h / 2.0);
+            (origin, x, y, -z, x, lin(origin + diagonal * 0.2, diagonal.normalize_or_zero(), 0.0, scale_id))
+        }
+        DecalMapping::Cylindrical { origin, x, y, z, radius } => {
+            let theta = h.atan2(w);
+            let len = (w / 2.0).hypot(h / 2.0) * 0.2;
+            let base_uv = [0.5 + theta.cos() * len / w, 0.5 + theta.sin() * len / h];
+            let (b0, b1) = (world_at(base_uv), world_at([base_uv[0] * 1.1, base_uv[1] * 1.1]));
+            (origin + x * radius, y, z, -x, y, lin(b0, (b1 - b0).normalize_or_zero(), 0.0, scale_id))
+        }
+    };
+    ev.manipulators.push(("uShiftManipulator".into(), lin(at - du * u, du, u, Some("uShift"))));
+    ev.manipulators.push(("vShiftManipulator".into(), lin(at - dv * v, dv, v, Some("vShift"))));
+    ev.manipulators.push(("scaleManipulator".into(), scale));
+    ev.manipulators.push(("angleManipulator".into(), M::Angular { axis_origin: at, axis_direction: axis, rotation_origin: at + turn_from * (w / 4.0), angle, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: Some("angle".into()) }));
+    if with_origin {
+        let points = (0..9).map(|i| world_at([0.5 * (i % 3) as f64, 0.5 * (i / 3) as f64])).collect();
+        ev.manipulators.push(("imageOriginManipulator".into(), M::Points { points, index: ev.integer("imageOriginIndex").unwrap_or(4).clamp(0, 8) as usize }));
+    }
+}
+
 pub fn decal(ev: &mut EvalCtx) -> FResult<()> {
     use crate::regen::context::{DecalMapping, DecalRecord};
     use crate::regen::eval::err_at;
@@ -550,6 +592,7 @@ pub fn decal(ev: &mut EvalCtx) -> FResult<()> {
         }
         _ => return err_at(&["face"], "Select face for decal"),
     };
+    decal_manipulators(ev, &record, (w, h), (u_shift, v_shift), angle, origin_mc.is_some());
     // isDecalNearFace.
     let near = match &record.mapping {
         DecalMapping::Planar { .. } => {
