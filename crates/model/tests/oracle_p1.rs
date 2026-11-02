@@ -1538,6 +1538,22 @@ fn audit_cases() -> Vec<(&'static str, Studio)> {
         }).collect()));
     });
     cases.push(("LF5", s));
+    let mut s = Studio::new();
+    let a = s.sketch(top(), |sk| rect(sk, (-10.0, -10.0), (10.0, 10.0)))[0].clone();
+    let plane = s.offset_plane(top(), 20.0);
+    let b = s.sketch(plane, |sk| circle(sk, (0.0, 0.0), 16.0))[0].clone();
+    s.add("loft", |p| {
+        p.set("sheetProfilesArray", ParamValue::Array([a, b].into_iter().map(|r| {
+            let mut v = ParamValues::default();
+            v.set("sheetProfileEntities", q(r));
+            v
+        }).collect()));
+        for (cond, mag) in [("startCondition", "startMagnitude"), ("endCondition", "endMagnitude")] {
+            p.set(cond, en("NORMAL_TO_PROFILE"));
+            p.set(mag, ParamValue::Expr(ExprValue::new("1")));
+        }
+    });
+    cases.push(("LF4", s));
     cases.push(("RV5", on_block("revolve", |p, r| {
         p.set("entities", q(face_at(r, TOP)));
         p.set("axis", q(edge_at(r, FRONT_TOP)));
@@ -1571,6 +1587,12 @@ fn audit_cases() -> Vec<(&'static str, Studio)> {
         p.set("neutralPlane", q(face_at(r, BOTTOM)));
         p.set("draftFaces", ParamValue::Query(SIDES.iter().map(|x| face_at(r, *x)).collect()));
         p.set("angle", deg(3.0));
+    })));
+    cases.push(("DR5b", on_block("draft", |p, r| {
+        p.set("neutralPlane", q(face_at(r, BOTTOM)));
+        p.set("draftFaces", ParamValue::Query(SIDES.iter().map(|x| face_at(r, *x)).collect()));
+        p.set("angle", deg(3.0));
+        p.set("pullDirection", ParamValue::Bool(true));
     })));
     cases.push(("CH7", on_block("chamfer", |p, r| {
         p.set("entities", edges(r, &[FRONT_TOP]));
