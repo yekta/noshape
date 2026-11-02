@@ -333,6 +333,8 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
       b.curves.push_back(2);
       for (int k = 0; k < 10; ++k)
         b.curves.push_back(0);
+      // (One per edge, as `curves`: an ellipse after an apex read another edge's minor radius, 0 there: "degenerate".)
+      b.ellipse_minor.push_back(0);
       b.edges.push_back(static_cast<uint32_t>(vm.FindIndex(v1) - 1));
       b.edges.push_back(static_cast<uint32_t>(vm.FindIndex(v1) - 1));
       b.edge_tol.push_back(BRep_Tool::Tolerance(e));

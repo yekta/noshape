@@ -71,6 +71,16 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
   it splits either: a7bdd15b taken, as OCCT's (T1 a_vertex_inside_a_face); the other two move on to a point near two
   vertices. shfall 21 -> 22 taken, 0 differ.
 
+## An ellipse edge after a cone's apex read another edge's minor radius: fixed (11-02 14:00 UTC)
+- to_body kept no minor radius for a degenerate (apex) edge, so each ellipse edge after one in the body took the
+  next one's: 0 made it decode as degenerate ("a degenerate edge between two vertices", 8 of Shell's fuzz
+  recordings: parts with countersinks and tilted holes), any other value a wrong ellipse. One per edge now.
+  b200c5bf taken, as OCCT's; the others move on (a face's vertex off its plane, an edge on another argument's
+  free-form face, ...). Corpora 0 differ (corpus5 +4 taken). T1 ellipse_edges_after_a_cones_apex.
+- "An edge on another argument's free-form face" (5): a circle on a periodic B-spline face across its seam,
+  projected in one piece (clamped at the face's parameter box, 0.21 mm off); B-spline edges are cut at the seam
+  first (seam_cuts), lines and arcs not yet: next for these.
+
 ## The merge after USD left a Shell common's unify invalid: fixed (11-02 12:00 UTC)
 - 82ba8082's merge after USD (groups of one frame it left apart) is checked as a whole now: USD joining their
   boundary's edges after it left a Shell common with hyperbola edges (shfall 14218a58, taken since d03803a2)

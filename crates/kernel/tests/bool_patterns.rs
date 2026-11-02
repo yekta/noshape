@@ -838,3 +838,12 @@ fn a_vertex_inside_a_face() {
 fn a_plane_steeper_than_a_cones_rulings() {
     valid_as_occt("45794f15a71f879f", 1e-9);
 }
+
+/// Shell's slab common on a part with countersinks (cone apexes) and tilted holes (ellipse edges) (recorded): each
+/// ellipse edge takes its own minor radius (the body's minor radii skipped the apex edges, so an ellipse after one read
+/// another edge's: 0 there made it "a degenerate edge between two vertices", else a wrong ellipse); valid, OCCT's
+/// counts and volume.
+#[test]
+fn ellipse_edges_after_a_cones_apex() {
+    valid_as_occt("b200c5bfa89fcb3d", 1e-9);
+}
