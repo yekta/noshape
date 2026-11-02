@@ -1109,6 +1109,20 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Sections split within their own error (11-02 10:00 UTC)
+- A section (and a section added to a face as its own curve) is split at a pool vertex within its OCCT error
+  (`acc`) off it, the ends kept at the Boolean's tolerance (split_reach): two sections crossing in a face's plane are
+  that far apart in space at the crossing. Knurl Ø63 × 17 CP12 45/45 taken (7992 faces).
+- The 30 TPI corner-edge class (Ø25 × 10 CP30 45/30) narrowed further: the cylinder's section is split at X (the
+  crossing found in flank 165:0's plane), but X in space is 3.9 um from the flank-flank section, its nearest point
+  being that section's end P on the corner edge; so the section's curve on the face and in space disagree by up to
+  its 5 um tolerance near P, and X is P within it. Snapping X onto P (find_tol with the section's tolerance) made
+  it worse (Ø63 × 17 declined again; the cylinder's section then vanishes from the flank's piece). Not symmetry:
+  the same with it off (bool-a NOSHAPE_X_NOSYM).
+- Not changed (looked at): "an edge nearly on another argument's face" in Shell's fuses is edges starting on a face
+  and leaving it at a tiny angle (0 to 35 um along them): OCCT's partial common block, a feature; "a point near two
+  vertices": mostly parts with absurd tolerances (vertices of 1.1 m, 7 cm, 4 cm), rightly declined.
+
 ## Tolerant faces; Shell's tools at their real tolerances (11-02 09:00 UTC)
 - rust_boolean.cpp's tolerant-input check: only tolerant faces are checked against the other arguments (nothing in
   a face's grey band, the other's own tolerance counted up to the ordinary); tolerant vertices and edges go by their

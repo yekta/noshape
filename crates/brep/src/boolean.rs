@@ -2533,8 +2533,16 @@ impl Ctx<'_> {
 
     /// `split`, a vertex on `s` within the Boolean's tolerance or the sum of its own and `te` where that's more.
     fn split_tol(&self, s: &Seg, sorted_x: &[(f64, u32)], te: f64) -> R<Vec<u32>> {
+        self.split_reach(s, sorted_x, te, true)
+    }
+
+    /// `split_tol`; `te` counted towards the ends too (an edge's tolerance: a vertex within it of an end is that
+    /// end) or only off the curve (a section's error: a crossing on it a few micrometres from its end is still a
+    /// point of it).
+    fn split_reach(&self, s: &Seg, sorted_x: &[(f64, u32)], te: f64, at_ends: bool) -> R<Vec<u32>> {
         let tol = self.tol;
         let reach = |w: u32| tol.max(te + self.pool.t[w as usize]);
+        let end_reach = |w: u32| if at_ends { reach(w) } else { tol.max(self.pool.t[w as usize]) };
         let tol_far = self.pool.loose.iter().fold(tol, |m, &w| m.max(reach(w))).max(tol.max(te));
         let (lo, hi) = match s.g {
             Geo::Line => {
@@ -2577,8 +2585,8 @@ impl Ctx<'_> {
                 continue;
             }
             let len = *len.get_or_init(|| self.seg_length(s));
-            let r = reach(w);
-            if t * len <= r || (1.0 - t) * len <= r {
+            let (r, re) = (reach(w), end_reach(w));
+            if t * len <= re || (1.0 - t) * len <= re {
                 continue;
             }
             if off <= r {
@@ -4005,9 +4013,16 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     // (A section's split once, for both faces' curves it is.)
     let extra_segs: Vec<(usize, Seg)> = (0..cx.faces.len()).flat_map(|f| cx.face_segs[f].iter().map(move |&s| (f, s))).collect();
     let extra_of: Vec<usize> = (0..cx.faces.len()).flat_map(|f| cx.seg_section[f].iter().copied()).collect();
-    let section_chains = by_period(cx.sections.len(), &|k| cx.sections[k].0, &|k| cx.split(&cx.sections[k].0, &by_x))?;
+    // (A section at a vertex within its own error too (OCCT's approximation's): two sections crossing in a face's
+    // plane are that far apart in space there (a knurl groove's flank's section with the cylinder and with another
+    // groove's flank, 3 um outside the cylinder: the crossing on one, not split on the other).)
+    let sec_acc = |s: &Seg| match s.g {
+        Geo::Nurbs { id, .. } if cx.ncurves[id as usize].sec.is_some() => cx.ncurves[id as usize].acc,
+        _ => 0.0,
+    };
+    let section_chains = by_period(cx.sections.len(), &|k| cx.sections[k].0, &|k| cx.split_reach(&cx.sections[k].0, &by_x, sec_acc(&cx.sections[k].0), false))?;
     let own: Vec<usize> = (0..extra_segs.len()).filter(|&k| extra_of[k] == usize::MAX).collect();
-    let mut own_chains = by_period(own.len(), &|i| extra_segs[own[i]].1, &|i| cx.split(&extra_segs[own[i]].1, &by_x))?.into_iter();
+    let mut own_chains = by_period(own.len(), &|i| extra_segs[own[i]].1, &|i| cx.split_reach(&extra_segs[own[i]].1, &by_x, sec_acc(&extra_segs[own[i]].1), false))?.into_iter();
     let extra_chains: Vec<R<Vec<u32>>> = (0..extra_segs.len()).map(|k| if extra_of[k] == usize::MAX { own_chains.next().expect("a curve's split points") } else { section_chains[extra_of[k]].clone() }).collect();
     let mut face_extra: Vec<Vec<usize>> = vec![Vec::new(); cx.faces.len()];
     for (&(f, s), chain) in extra_segs.iter().zip(extra_chains) {
