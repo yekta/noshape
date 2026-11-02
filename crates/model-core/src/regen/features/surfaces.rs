@@ -166,11 +166,13 @@ pub fn fill(ev: &mut EvalCtx) -> FResult<()> {
             Some("G2") => k::Continuity::Curvature,
             _ => k::Continuity::Position,
         };
-        let adj = match row {
-            Some(r) if continuity != k::Continuity::Position => ev.resolve_faces(r.query("adjacentFaces")).first().map(|&(bi, fi)| ev.face_shape(bi, fi)).transpose()?,
-            _ => None,
+        // Each edge's own face among the row's adjacent faces (a row around a box's top: one side face per edge).
+        let adjs: Vec<Shape> = match row {
+            Some(r) if continuity != k::Continuity::Position => ev.resolve_faces(r.query("adjacentFaces")).iter().map(|&(bi, fi)| ev.face_shape(bi, fi)).collect::<FResult<_>>()?,
+            _ => Vec::new(),
         };
         for e in curve_edges(ev, refs)? {
+            let adj = adjs.iter().find(|f| f.index_of(&e, ShapeType::Edge).is_some()).or(adjs.first()).cloned();
             if boundary.iter().any(|b: &k::FillEdge| b.edge.is_same(&e)) {
                 return err("A boundary edge can have only one type of continuity constraint.");
             }
