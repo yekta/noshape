@@ -80,7 +80,8 @@ fn state_of(id: u32) -> u32 {
     return states[id];
 }
 
-// Geometry lying on a section plane is kept (live ui-cap/04, 10-25: the
+// Geometry is removed where any section plane removes it (live 11-02: Top and Front leave only what is under Top
+// and behind Front). Geometry lying on a section plane is kept (live ui-cap/04, 10-25: the
 // plane on a block's top face leaves the face as it is, no cap; skb-sv
 // bottom-edge-released: the plane through the bottom face keeps it and caps
 // it hatched; an edge in the plane stays and lights up): 0.1 µm.
@@ -89,8 +90,8 @@ const CLIP_EPS: f32 = 1e-7;
 fn clipped(world: vec3<f32>) -> bool {
     if (g.flags.x == 0u || (inst.params.y & 1u) != 0u) { return false; }
     var c = dot(world, g.clip.xyz) > g.clip.w + CLIP_EPS;
-    if (g.flags.x > 1u) { c = c && dot(world, g.clip2.xyz) > g.clip2.w + CLIP_EPS; }
-    if (g.flags.x > 2u) { c = c && dot(world, g.clip3.xyz) > g.clip3.w + CLIP_EPS; }
+    if (g.flags.x > 1u) { c = c || dot(world, g.clip2.xyz) > g.clip2.w + CLIP_EPS; }
+    if (g.flags.x > 2u) { c = c || dot(world, g.clip3.xyz) > g.clip3.w + CLIP_EPS; }
     return c;
 }
 
@@ -601,11 +602,11 @@ fn hatch(t: vec2<f32>, c: vec3<f32>) -> f32 {
 
 @fragment
 fn fs_section_cap(i: CapOut) -> @location(0) vec4<f32> {
-    // Only where the other planes cut too.
+    // Only where the other planes keep the model.
     var planes = array<vec4<f32>, 3>(g.clip, g.clip2, g.clip3);
     for (var k = 0u; k < g.flags.x; k = k + 1u) {
         let pl = planes[k];
-        if (k != cap.index.x && dot(i.world, pl.xyz) - pl.w < -CLIP_EPS) { discard; }
+        if (k != cap.index.x && dot(i.world, pl.xyz) - pl.w > CLIP_EPS) { discard; }
     }
     let p = vec2<i32>(floor(i.pos.xy));
     // The sample with the median alpha of three in a row (Onshape: robust

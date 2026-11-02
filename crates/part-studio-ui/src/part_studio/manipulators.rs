@@ -618,7 +618,11 @@ impl PartStudioView {
                 h.extend(self.routing_points(cx).into_iter().map(|(_, p)| (p, p + DVec3::X * 1e-6, 0.0)));
                 h
             }
-            Some(Manip::Section(s)) => self.section_hit_segments(&s, cx),
+            Some(Manip::Section(s)) => {
+                let mut h = self.section_hit_segments(&s, cx);
+                h.extend(self.section_other_manips().iter().flat_map(|(_, o)| self.section_hit_segments(o, cx)));
+                h
+            }
             None => Vec::new(),
         };
         // Datum boxes can be dragged too.
@@ -646,6 +650,7 @@ impl PartStudioView {
                 self.manip_drag.map(|_| super::section_manip::SectionHandle::Arrow)
             },
             section_face: self.section_face_marks(),
+            section_others: self.section_other_manips().into_iter().map(|(i, s)| (s, self.ui.section_hover_other.filter(|h| h.0 == i).map(|h| h.1))).collect(),
         }))
     }
 
@@ -663,7 +668,20 @@ impl PartStudioView {
 
     /// Handle tool events for a manipulator drag. Returns true if consumed.
     pub(super) fn manipulator_event(&mut self, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        let manip = self.current_manip(cx);
+        let mut manip = self.current_manip(cx);
+        // Another section plane's handle grabbed: that plane becomes the one the manipulator drives.
+        if let (ViewportEvent::ToolDown { position, .. }, Some(Manip::Section(s))) = (ev, manip)
+            && self.section_handle_at(&s, *position, cx).is_none()
+            && let Some((i, _)) = self.section_other_at(*position, cx)
+        {
+            if let Some(d) = &mut self.ui.section_dialog {
+                d.active = i;
+            }
+            self.reset_section_manip();
+            self.ui.section_hover_other = None;
+            self.apply_section(window, cx);
+            manip = self.current_manip(cx);
+        }
         // The handle grabbed (the nearest), kept for the drag.
         let count = match manip {
             Some(Manip::Handles(hs)) => hs.iter().flatten().count(),
@@ -1128,6 +1146,8 @@ pub(super) struct ManipGeometry {
     section_dragging: Option<super::section_manip::SectionHandle>,
     /// The face under a dragged section base (its implicit points).
     section_face: Option<super::section_manip::FaceMarks>,
+    /// The other section planes' manipulators and the handle hovered on each.
+    section_others: Vec<(super::section_manip::SectionManip, Option<super::section_manip::SectionHandle>)>,
 }
 
 impl ManipGeometry {
@@ -1153,6 +1173,10 @@ impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
                 use super::section_manip::SectionHandle;
                 let mut out = arrow_glyph(&s.arrow, self.section_hover == Some(SectionHandle::Arrow), self.section_dragging == Some(SectionHandle::Arrow), view, up);
                 out.extend(super::section_manip::section_glyph(&s, self.section_hover, self.section_dragging, self.section_face.as_ref(), view, up));
+                for (o, hover) in &self.section_others {
+                    out.extend(arrow_glyph(&o.arrow, *hover == Some(SectionHandle::Arrow), false, view, up));
+                    out.extend(super::section_manip::section_glyph(o, *hover, None, None, view, up));
+                }
                 out
             }
         }

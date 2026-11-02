@@ -174,6 +174,23 @@ impl PartStudioView {
         Some(SectionManip { arrow, axes: ring_axes(arrow.dir), start, snapped })
     }
 
+    /// The other planes' manipulators, idle (live 11-02: each plane's can be dragged while the dialog is open).
+    pub(super) fn section_other_manips(&self) -> Vec<(usize, SectionManip)> {
+        let Some(d) = &self.ui.section_dialog else { return Vec::new() };
+        (0..self.ui.section.len())
+            .filter(|i| *i != d.active)
+            .filter_map(|i| {
+                let arrow = self.section_arrow_of(i, false)?;
+                Some((i, SectionManip { arrow, axes: ring_axes(arrow.dir), start: None, snapped: None }))
+            })
+            .collect()
+    }
+
+    /// Another plane's handle under a viewport position.
+    pub(super) fn section_other_at(&self, p: DVec2, cx: &App) -> Option<(usize, SectionHandle)> {
+        self.section_other_manips().into_iter().find_map(|(i, s)| Some((i, self.section_handle_at(&s, p, cx)?)))
+    }
+
     /// Segments the viewport hit-tests (all handles).
     pub(super) fn section_hit_segments(&self, s: &SectionManip, cx: &App) -> Vec<(DVec3, DVec3, f64)> {
         let tip = s.tip();
@@ -471,7 +488,7 @@ impl PartStudioView {
             pl.origin = r.pivot;
             pl.offset = 0.0;
             if r.deg != 0.0 {
-                pl.label = format!("Section plane {}", i + 1);
+                pl.label = format!("Section plane {}", pl.number);
             }
         }
         self.ui.section_rot = Some(r);

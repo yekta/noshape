@@ -702,6 +702,45 @@ fn section_caps_cover_the_cut() {
     assert!(dark * 4 < light * 3, "no hatch lines on the cap (darkest {dark}, median {light})");
 }
 
+/// Several section planes remove what any one of them removes (live 11-02: Top with Front, which alone cuts
+/// nothing, still takes everything above Top away). A red block stands on a box, under a plane through the box.
+#[test]
+fn section_planes_each_remove_their_side() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.05, -0.03, -0.03], [0.05, 0.03, 0.03], 1)))).with_color([0.45, 0.6, 0.75, 1.0]));
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.01, -0.01, 0.03], [0.01, 0.01, 0.05], 100)))).with_color([1.0, 0.0, 0.0, 1.0]));
+    let mut cam = Camera { rotation: Camera::look_rotation(glam::DVec3::NEG_Z, glam::DVec3::Y), ..Default::default() };
+    let (w, h) = (400u32, 300u32);
+    cam.fit_box(glam::DVec3::new(-0.05, -0.03, -0.03), glam::DVec3::new(0.05, 0.03, 0.05), w as f64 / h as f64);
+    let mut red = |scene: &Scene| {
+        let f = r.render(RenderParams { scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+        let mut n = 0;
+        for y in (h / 2 - 5)..(h / 2 + 5) {
+            for x in (w / 2 - 5)..(w / 2 + 5) {
+                let p = &f.bgra[((y * w + x) * 4) as usize..][..3];
+                if p[2] as i32 > p[1] as i32 + 60 && p[2] as i32 > p[0] as i32 + 60 {
+                    n += 1;
+                }
+            }
+        }
+        n
+    };
+    // Removes y < -0.1: nothing of either.
+    scene.clip = Some(ClipPlane::new(glam::Vec3::NEG_Y, 0.1));
+    assert!(red(&scene) > 80, "a plane past the model removed the block");
+    // With z > 0.01 removed too, the block is gone.
+    scene.clip_extra = vec![ClipPlane::new(glam::Vec3::Z, 0.01)];
+    assert_eq!(red(&scene), 0, "the second plane's side is kept");
+}
+
 /// Where two parts' material meets on the cut the cap is red (Onshape's
 /// interference colour) while `section_interference` is on (assemblies and
 /// Part Studios); off, it stays hatched in the part colours.

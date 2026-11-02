@@ -4,7 +4,7 @@
 //! planar faces, mate connectors; up to three here) and "Items to exclude"
 //! (or include). Dragging the arrow on the active plane moves it, with the
 //! offset shown in a box beside the arrow. ✓ / Enter keeps the section,
-//! ✕ / Esc restores what was there before. Geometry is cut away where every
+//! ✕ / Esc restores what was there before. Geometry is cut away where any
 //! plane removes it; the state can be saved in named views.
 
 use super::PartStudioView;
@@ -29,6 +29,8 @@ pub struct SectionPlane {
     /// face's centre, a mate connector's or plane's origin); else (a
     /// restored or turned plane) across the model's centre.
     pub base: Option<DVec3>,
+    /// Its number in the dialog ("Section plane 2"), kept while others are removed.
+    pub number: usize,
 }
 
 impl SectionPlane {
@@ -101,7 +103,8 @@ impl PartStudioView {
         frames
             .into_iter()
             .take(MAX_PLANES)
-            .map(|(l, f, base)| SectionPlane { base, ..plane(&l, f.origin, f.normal) })
+            .zip(1..)
+            .map(|((l, f, base), number)| SectionPlane { base, number, ..plane(&l, f.origin, f.normal) })
             .collect()
     }
 
@@ -237,10 +240,11 @@ impl PartStudioView {
             if let Some(i) = self.ui.section.iter().position(|p| p.label == label) {
                 self.ui.section.remove(i);
             } else if self.ui.section.len() >= MAX_PLANES {
-                self.flash_info("Maximum number of section planes reached".into(), cx);
+                self.flash_info(crate::section_dialog::MAX_PLANES_REACHED.into(), cx);
                 return true;
             } else {
-                self.ui.section.push(SectionPlane { base: self.section_home(r, &f), ..plane(&label, f.origin, f.normal) });
+                let number = crate::section_dialog::next_plane_number(self.ui.section.iter().map(|p| p.number));
+                self.ui.section.push(SectionPlane { base: self.section_home(r, &f), number, ..plane(&label, f.origin, f.normal) });
                 if self.message.as_ref().is_some_and(|(_, m)| m == SELECT_SECTION_PLANE) {
                     self.message = None;
                 }
@@ -288,7 +292,7 @@ impl PartStudioView {
             .enumerate()
             .map(|(i, s)| {
                 let n = DVec3::new(s[0], s[1], s[2]);
-                plane(&format!("Section plane {}", i + 1), n * s[3], n)
+                SectionPlane { number: i + 1, ..plane(&format!("Section plane {}", i + 1), n * s[3], n) }
             })
             .collect();
         self.apply_section(window, cx);
@@ -298,16 +302,21 @@ impl PartStudioView {
     /// (where it passes the model's center) along its normal.
     pub(super) fn section_arrow(&self) -> Option<super::manipulators::Arrow> {
         let d = self.ui.section_dialog.as_ref()?;
-        let pl = self.ui.section.get(d.active)?;
+        self.section_arrow_of(d.active, true)
+    }
+
+    /// Plane `i`'s arrow; the active plane's base may be slid or snapped.
+    pub(super) fn section_arrow_of(&self, i: usize, active: bool) -> Option<super::manipulators::Arrow> {
+        let pl = self.ui.section.get(i)?;
         let (lo, hi) = self.fit_bounds()?;
         let center = (lo + hi) * 0.5;
         let on_plane = pl.origin + pl.normal * pl.offset;
         // Where the base circle was slid to (live), else across the model's centre.
-        let at = self.ui.section_base.or(pl.base).unwrap_or(center);
+        let at = if active { self.ui.section_base.or(pl.base) } else { pl.base }.unwrap_or(center);
         // A snapped base sits on what it snapped to, off the plane too.
         let base = match &self.ui.section_snap {
-            Some((q, _, _)) => *q,
-            None => at - pl.normal * pl.normal.dot(at - on_plane),
+            Some((q, _, _)) if active => *q,
+            _ => at - pl.normal * pl.normal.dot(at - on_plane),
         };
         Some(super::manipulators::Arrow { base, dir: pl.normal, length: section_handle(lo, hi), param: SECTION_PARAM, flip: None, secondary: false })
     }
@@ -365,7 +374,7 @@ impl PartStudioView {
     }
 
     /// Forget the manipulator's rotation and moved base (another plane).
-    fn reset_section_manip(&mut self) {
+    pub(super) fn reset_section_manip(&mut self) {
         self.ui.section_rot = None;
         self.ui.section_box = false;
         self.ui.section_drag0 = None;
@@ -380,7 +389,7 @@ impl PartStudioView {
         // face, a connector: "Section plane 1 (Top)"); a turned plane has no
         // name.
         // Flip plane names the other side (live: "Section plane 2 (Back)").
-        let planes = self.ui.section.iter().map(|pl| if pl.label.starts_with("Section plane") { String::new() } else if pl.flipped { opposite_name(direction_name(pl.normal)).to_string() } else { direction_name(pl.normal).to_string() }).collect();
+        let planes = self.ui.section.iter().map(|pl| (pl.number, if pl.label.starts_with("Section plane") { String::new() } else if pl.flipped { opposite_name(direction_name(pl.normal)).to_string() } else { direction_name(pl.normal).to_string() })).collect();
         let items = d.items.iter().map(|b| self.display.body(b).map(|x| x.name.clone()).unwrap_or_else(|| "Part".into())).collect();
         let props = crate::section_dialog::Props { include: d.include, items_active: d.items_active, planes, active: d.active, items, popup: d.popup };
         Some(crate::section_dialog::render(props, "ps-section", &cx.entity(), Self::on_section_action, cx))
@@ -445,14 +454,16 @@ impl PartStudioView {
             Action::PopupPick(k) => {
                 let Some(d) = &mut self.ui.section_dialog else { return };
                 let normal = [DVec3::Z, DVec3::NEG_Y, DVec3::X][k.min(2)];
-                let pl = plane(["Top", "Front", "Right"][k.min(2)], DVec3::ZERO, normal);
+                let mut pl = plane(["Top", "Front", "Right"][k.min(2)], DVec3::ZERO, normal);
+                pl.number = crate::section_dialog::next_plane_number(self.ui.section.iter().map(|p| p.number));
                 let i = match d.popup_plane.filter(|i| *i < self.ui.section.len()) {
                     Some(i) => {
+                        pl.number = self.ui.section[i].number;
                         self.ui.section[i] = pl;
                         i
                     }
                     None if self.ui.section.len() >= MAX_PLANES => {
-                        self.flash_info("Maximum number of section planes reached".into(), cx);
+                        self.flash_info(crate::section_dialog::MAX_PLANES_REACHED.into(), cx);
                         return;
                     }
                     None => {
@@ -648,7 +659,7 @@ fn opposite_name(name: &str) -> &'static str {
 }
 
 fn plane(label: &str, origin: DVec3, normal: DVec3) -> SectionPlane {
-    SectionPlane { label: label.to_string(), origin, normal, offset: 0.0, flipped: false, base: None }
+    SectionPlane { label: label.to_string(), origin, normal, offset: 0.0, flipped: false, base: None, number: 1 }
 }
 
 /// Length of the section arrow's handle: a fraction of the model size.

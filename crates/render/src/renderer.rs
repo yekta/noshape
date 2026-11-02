@@ -1355,7 +1355,7 @@ fn make_globals(scene: &Scene, camera: &Camera, width: u32, height: u32, dpr: f3
         Some(c) => ([c.normal.x, c.normal.y, c.normal.z, c.d], 1),
         None => ([0.0; 4], 0),
     };
-    // Extra section planes: geometry is removed where every plane clips it.
+    // Extra section planes: geometry is removed where any plane clips it.
     let extra = |i: usize| scene.clip_extra.get(i).map(|c| [c.normal.x, c.normal.y, c.normal.z, c.d]).unwrap_or([0.0; 4]);
     let clip_count = if clip_on == 1 { 1 + scene.clip_extra.len().min(2) as u32 } else { 0 };
     // Compare mode: Onshape's depth range, and how much of "both versions"

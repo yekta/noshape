@@ -18,14 +18,23 @@ pub struct Props {
     pub include: bool,
     /// The "Items" field takes picks (else "Section planes").
     pub items_active: bool,
-    /// Plane labels ("Top", "Face of Part 1 <1>", …).
-    pub planes: Vec<String>,
+    /// Each plane's number and direction name ("Top"; empty once turned).
+    pub planes: Vec<(usize, String)>,
     /// The plane the manipulator drives (its chip is bold).
     pub active: usize,
     /// Excluded / included items' names.
     pub items: Vec<String>,
     /// The "Select default plane" popup, when open.
     pub popup: Option<PlanePopup>,
+}
+
+/// Live's message when a fourth plane is picked.
+pub const MAX_PLANES_REACHED: &str = "Maximum number of section planes reached. Remove a section plane to add another.";
+
+/// The number a new section plane takes: the lowest one free (live 11-02: with plane 1 removed the other stays
+/// "Section plane 2 (Front)", and Top added again is "Section plane 1 (Top)").
+pub fn next_plane_number(used: impl IntoIterator<Item = usize> + Clone) -> usize {
+    (1..).find(|n| !used.clone().into_iter().any(|u| u == *n)).unwrap_or(1)
 }
 
 /// The "Select default plane" popup (live behaviours "Select default
@@ -131,7 +140,7 @@ pub fn render<V: 'static>(props: Props, key: &'static str, view: &Entity<V>, on:
             .children(rows)
             .on_click(act(Action::ItemsActive(items)))
     };
-    let plane_rows = props.planes.iter().enumerate().map(|(i, l)| chip(SharedString::from(format!("sec-plane-{i}")), if l.is_empty() { format!("Section plane {}", i + 1) } else { format!("Section plane {} ({l})", i + 1) }, i == props.active, Action::RemovePlane(i))).collect();
+    let plane_rows = props.planes.iter().enumerate().map(|(i, (n, l))| chip(SharedString::from(format!("sec-plane-{i}")), if l.is_empty() { format!("Section plane {n}") } else { format!("Section plane {n} ({l})") }, i == props.active, Action::RemovePlane(i))).collect();
     let item_rows = props.items.iter().enumerate().map(|(i, n)| chip(SharedString::from(format!("sec-item-{i}")), n.clone(), false, Action::RemoveItem(i))).collect();
     let planes_field = field("sec-planes", "Section planes".into(), !props.items_active, plane_rows, false);
     let items_field = field("sec-items", if props.include { "Items to include".into() } else { "Items to exclude".into() }, props.items_active, item_rows, true);

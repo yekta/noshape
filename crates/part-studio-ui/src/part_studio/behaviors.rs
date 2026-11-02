@@ -289,6 +289,8 @@ pub struct UiState {
     pub section_box: bool,
     pub section_drag0: Option<f64>,
     pub section_hover: Option<super::section_manip::SectionHandle>,
+    /// Another section plane's handle under the cursor (its index).
+    pub section_hover_other: Option<(usize, super::section_manip::SectionHandle)>,
     pub section_parts: Option<(bool, Vec<BodyId>)>,
     /// Open Appearance editor, and faces of a hovered appearance row.
     pub appearance_edit: Option<super::appearance::AppearanceEdit>,
@@ -632,6 +634,7 @@ impl UiState {
             section_box: false,
             section_drag0: None,
             section_hover: None,
+            section_hover_other: None,
             section_parts: None,
             appearance_edit: None,
             appearance_hover: Vec::new(),

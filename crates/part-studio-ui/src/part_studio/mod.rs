@@ -1037,7 +1037,7 @@ impl PartStudioView {
         // (live p1audit skip-03: the edge under the hovered point stays unlit).
         // A manipulator handle under the cursor hides the geometry hover too (live qa4-r5-s9-5b–e: on a Section view
         // handle only the handle lights, not the face or plane under it).
-        let on_handle = self.ui.manip_hover.is_some() || self.ui.triad_hover.is_some() || self.ui.section_hover.is_some();
+        let on_handle = self.ui.manip_hover.is_some() || self.ui.triad_hover.is_some() || self.ui.section_hover.is_some() || self.ui.section_hover_other.is_some();
         let hovered = if self.ui.toggle_hover.is_some() || on_handle { Vec::new() } else { hovered };
         let single_hover = if hovered.len() == 1 && self.ui.list_hover.is_none() && self.ui.var_hover.is_none() && self.ui.ct.hover.is_none() && !on_handle { hovered.first().cloned() } else { None };
         // Live (sketch/08-09): while a drawing tool is active, regions under
@@ -1698,8 +1698,13 @@ impl PartStudioView {
                     Some(manipulators::Manip::Section(s)) => self.section_handle_at(&s, *position, cx),
                     _ => None,
                 };
-                if sh != self.ui.section_hover {
+                let other = match self.current_manip(cx) {
+                    Some(manipulators::Manip::Section(_)) if sh.is_none() => self.section_other_at(*position, cx),
+                    _ => None,
+                };
+                if sh != self.ui.section_hover || other != self.ui.section_hover_other {
                     self.ui.section_hover = sh;
+                    self.ui.section_hover_other = other;
                     self.refresh_scene(false, cx);
                 }
                 // The translate triad outlines the handle under the cursor.

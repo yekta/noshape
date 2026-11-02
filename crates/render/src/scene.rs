@@ -875,7 +875,7 @@ pub struct Scene {
     pub hover_outline: bool,
     pub clip: Option<ClipPlane>,
     /// Up to two more section planes (with `clip`): geometry is removed
-    /// where all planes clip it.
+    /// where any plane clips it.
     pub clip_extra: Vec<ClipPlane>,
     /// Section planes drawn selected (`clip` first, then `clip_extra`): the
     /// one being edited in the Section view dialog. Onshape mixes its cap 80%

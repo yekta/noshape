@@ -500,6 +500,63 @@ fn a_feature_started_over_the_section_dialog_accepts_it(cx: &mut TestAppContext)
     .unwrap();
 }
 
+/// Live 11-02: a section plane keeps its number when another is removed ("Section plane 2 (Front)" alone), a new one
+/// takes the lowest number free.
+#[gpui::test]
+fn section_planes_keep_their_numbers(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "section-numbers");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let numbers = |v: &PartStudioView| v.ui.section.iter().map(|p| p.number).collect::<Vec<_>>();
+            v.section_through(Reference::Plane(DatumPlane::Top), w, cx);
+            assert!(v.section_pick(&Reference::Plane(DatumPlane::Front), w, cx));
+            assert_eq!(numbers(v), [1, 2]);
+            assert!(v.section_pick(&Reference::Plane(DatumPlane::Top), w, cx), "Top again removes it");
+            assert_eq!(numbers(v), [2]);
+            assert!(v.section_pick(&Reference::Plane(DatumPlane::Top), w, cx));
+            assert!(v.section_pick(&Reference::Plane(DatumPlane::Right), w, cx));
+            assert_eq!(numbers(v), [2, 1, 3]);
+        })
+    })
+    .unwrap();
+}
+
+/// Live 11-02: every section plane's manipulator is shown while the dialog is open, and dragging another plane's
+/// arrow moves that plane.
+#[gpui::test]
+fn another_section_planes_arrow_drags_it(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "section-others", Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.finish_sketch(w, cx);
+            v.section_through(Reference::Plane(DatumPlane::Top), w, cx);
+            assert!(v.section_pick(&Reference::Plane(DatumPlane::Right), w, cx));
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    let (from, to) = view.update(cx, |v, cx| {
+        assert_eq!(v.ui.section_dialog.as_ref().map(|d| d.active), Some(1), "Right is the active plane");
+        let others = v.section_other_manips();
+        assert_eq!(others.len(), 1, "Top's manipulator is shown too");
+        let a = others[0].1.arrow;
+        let vp = v.viewport.read(cx);
+        let tip = a.base + a.dir * a.length;
+        let (p0, p1) = (vp.project(tip).unwrap(), vp.project(tip + vp.camera.right() * 1e-3).unwrap());
+        let wpp = 1e-3 / (p1 - p0).length();
+        let (from, to) = (vp.project(tip + a.dir * 10.0 * wpp).unwrap(), vp.project(tip + a.dir * 40.0 * wpp).unwrap());
+        ((from.x, from.y), (to.x, to.y))
+    });
+    drag(cx, window, &view, from, to, 4);
+    view.update(cx, |v, _| {
+        assert_eq!(v.ui.section_dialog.as_ref().map(|d| d.active), Some(0), "Top is now the active plane");
+        assert!(v.ui.section[0].offset > 0.0, "Top moved up: {}", v.ui.section[0].offset);
+        assert_eq!(v.ui.section[1].offset, 0.0, "Right stayed");
+    });
+}
+
 /// Interaction 6.2 (live qa4-r5-s9-5b / 5f): each rotate handle of the Section view manipulator lights alone along
 /// its axis line, and the glyph's exact centre, where the two cross, is on no handle.
 #[gpui::test]

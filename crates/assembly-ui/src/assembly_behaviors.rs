@@ -110,12 +110,14 @@ pub struct AsmSectionPlane {
     pub offset: f64,
     pub flipped: bool,
     pub x: DVec3,
+    /// Its number in the dialog ("Section plane 2"), kept while others are removed.
+    pub number: usize,
 }
 
 impl AsmSectionPlane {
     pub fn new(origin: DVec3, normal: DVec3, x: DVec3) -> Self {
         let x = (x - normal * x.dot(normal)).try_normalize().unwrap_or_else(|| normal.any_orthonormal_vector());
-        Self { origin, normal, offset: 0.0, flipped: false, x }
+        Self { origin, normal, offset: 0.0, flipped: false, x, number: 1 }
     }
 
     /// Clip plane (normal, d): geometry with dot(normal, p) > d is removed.
@@ -4872,10 +4874,11 @@ impl AssemblyView {
                 }
             }
         } else if t.kind == PickKind::Face
-            && let Some(pl) = self.section_plane_of(&t, cx)
+            && let Some(mut pl) = self.section_plane_of(&t, cx)
             && let Some(s) = &mut self.ui.section
             && s.planes.len() < MAX_SECTION_PLANES
         {
+            pl.number = crate::section_dialog::next_plane_number(s.planes.iter().map(|p| p.number));
             s.planes.push(pl);
             if let Some(d) = &mut s.dialog {
                 d.active = s.planes.len() - 1;
@@ -5229,7 +5232,7 @@ impl AssemblyView {
         let d = s.dialog.as_ref()?;
         let asm = self.assembly(cx);
         let items = s.items.iter().map(|id| asm.and_then(|a| a.instance(*id).map(|i| i.name.clone())).unwrap_or_default()).collect();
-        let props = crate::section_dialog::Props { include: s.include, items_active: d.items_active, planes: s.planes.iter().map(|p| p.direction_name().to_string()).collect(), active: if d.chosen { d.active } else { usize::MAX }, items, popup: d.popup };
+        let props = crate::section_dialog::Props { include: s.include, items_active: d.items_active, planes: s.planes.iter().map(|p| (p.number, p.direction_name().to_string())).collect(), active: if d.chosen { d.active } else { usize::MAX }, items, popup: d.popup };
         Some(crate::section_dialog::render(props, "asm-section", &cx.entity(), Self::on_section_action, cx))
     }
 
@@ -5277,9 +5280,11 @@ impl AssemblyView {
             Action::PopupPick(k) => {
                 let Some(d) = &mut s.dialog else { return };
                 let (normal, x) = [(DVec3::Z, DVec3::X), (DVec3::NEG_Y, DVec3::X), (DVec3::X, DVec3::Y)][k.min(2)];
-                let pl = AsmSectionPlane::new(DVec3::ZERO, normal, x);
+                let mut pl = AsmSectionPlane::new(DVec3::ZERO, normal, x);
+                pl.number = crate::section_dialog::next_plane_number(s.planes.iter().map(|p| p.number));
                 let i = match d.popup_plane.filter(|i| *i < s.planes.len()) {
                     Some(i) => {
+                        pl.number = s.planes[i].number;
                         s.planes[i] = pl;
                         i
                     }
