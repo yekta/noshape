@@ -46,6 +46,7 @@
 #include <Adaptor3d_CurveOnSurface.hxx>
 #include <GeomFill_BoundWithSurf.hxx>
 #include <GeomFill_ConstrainedFilling.hxx>
+#include <GeomAPI_PointsToBSplineSurface.hxx>
 #include <BRepOffsetAPI_MakeOffsetShape.hxx>
 #include <BRepOffsetAPI_MakePipe.hxx>
 #include <BRepOffsetAPI_MakePipeShell.hxx>
@@ -5551,6 +5552,193 @@ OpOut op_sew(const OcShapeList& shapes, double tol, bool make_solid)
   return make_result(shapes.items, result, h.get());
 }
 
+namespace
+{
+// One side of a four-sided G1 fill: a boundary edge walked from one corner to the next on [0, 1], with the direction
+// that continues its support across it (in the support's tangent plane, square to the edge, away from the support's
+// material).
+struct FillSide
+{
+  BRepAdaptor_Curve           c;
+  double                      a = 0, b = 1;
+  bool                        rev = false;
+  occ::handle<Geom2d_Curve>   pc;
+  occ::handle<Geom_Surface>   s;
+  double                      sign = 1;  // edge orientation in the support x support orientation
+  gp_Pnt                      at(double t) const { return c.Value(rev ? b - t * (b - a) : a + t * (b - a)); }
+  gp_Vec                      d1(double t) const
+  {
+    gp_Pnt p;
+    gp_Vec v;
+    c.D1(rev ? b - t * (b - a) : a + t * (b - a), p, v);
+    return v * (rev ? -(b - a) : (b - a));
+  }
+  gp_Vec across(double t) const
+  {
+    const double   w = rev ? b - t * (b - a) : a + t * (b - a);
+    const gp_Pnt2d q = pc->Value(w);
+    gp_Pnt         p;
+    gp_Vec         su, sv, tg;
+    s->D1(q.X(), q.Y(), p, su, sv);
+    c.D1(w, p, tg);
+    gp_Vec n = su.Crossed(sv);
+    if (n.Magnitude() < 1e-12 || tg.Magnitude() < 1e-12)
+      return gp_Vec();
+    // The support's material lies to the left of its oriented edge seen from its normal: n x T points into it.
+    gp_Vec d = tg.Crossed(n) * sign;
+    return d.Normalized();
+  }
+};
+
+// A four-sided fill tangent to its supports along the middles of its edges, as Parasolid's (live 1805, FI2: a 60 x 40
+// box shelled 2 mm, Fill G1 to the four outer walls: a dome 22.6 mm high, vertical along the edges' middles, the
+// tangency giving way near the corners where two walls meet): a bicubically blended Coons patch whose cross-boundary
+// derivatives continue each support, their length a fraction of the distance across the patch tapering to the
+// corners, turning near each corner into the adjacent edge's tangent so that the corners stay compatible.
+occ::handle<Geom_BSplineSurface> g1_coons_fill(const OcShapeList& edges, const OcShapeList& supports)
+{
+  const size_t n = edges.items.size();
+  // Chain the edges into a loop: corners 00 -> 10 -> 11 -> 01.
+  std::vector<int>  order{0};
+  std::vector<bool> rev{false};
+  std::vector<bool> used(n, false);
+  used[0]         = true;
+  auto ends       = [&](size_t i, bool r) {
+    TopoDS_Vertex v0, v1;
+    TopExp::Vertices(TopoDS::Edge(edges.items[i]), v0, v1, true);
+    gp_Pnt p0 = BRep_Tool::Pnt(v0), p1 = BRep_Tool::Pnt(v1);
+    return r ? std::make_pair(p1, p0) : std::make_pair(p0, p1);
+  };
+  Bnd_Box box;
+  for (const auto& e : edges.items)
+    BRepBndLib::Add(e, box);
+  const double size = box.IsVoid() ? 1.0 : std::sqrt(box.SquareExtent());
+  const double tol  = 1e-4 * size;
+  for (size_t k = 1; k < n; ++k)
+  {
+    const gp_Pnt tail = ends((size_t)order.back(), rev.back()).second;
+    bool         found = false;
+    for (size_t i = 0; i < n && !found; ++i)
+    {
+      if (used[i])
+        continue;
+      for (bool r : {false, true})
+        if (ends(i, r).first.Distance(tail) < tol)
+        {
+          order.push_back((int)i);
+          rev.push_back(r);
+          used[i] = true;
+          found   = true;
+          break;
+        }
+    }
+    if (!found)
+      return nullptr;
+  }
+  if (ends((size_t)order.back(), rev.back()).second.Distance(ends(0, false).first) > tol)
+    return nullptr;
+  FillSide side[4];
+  for (int k = 0; k < 4; ++k)
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(edges.items[(size_t)order[(size_t)k]]);
+    const TopoDS_Face& f = TopoDS::Face(supports.items[(size_t)order[(size_t)k]]);
+    FillSide&          sd = side[k];
+    sd.c.Initialize(e);
+    sd.a   = sd.c.FirstParameter();
+    sd.b   = sd.c.LastParameter();
+    sd.rev = rev[(size_t)k] != (e.Orientation() == TopAbs_REVERSED);
+    double pa, pb;
+    sd.pc = BRep_Tool::CurveOnSurface(e, f, pa, pb);
+    sd.s  = BRep_Tool::Surface(f);
+    if (sd.pc.IsNull() || sd.s.IsNull())
+      return nullptr;
+    // The edge's orientation in its support, which the cross-boundary direction depends on.
+    bool found = false;
+    for (TopExp_Explorer x(f, TopAbs_EDGE); x.More() && !found; x.Next())
+      if (x.Current().IsSame(e))
+      {
+        // BRepAdaptor_Curve walks the edge's curve forward whatever its orientation; the face's material is to the
+        // left of the edge as the face uses it.
+        sd.sign = (x.Current().Orientation() == TopAbs_REVERSED) ? -1 : 1;
+        found   = true;
+      }
+    if (!found)
+      return nullptr;
+    if (f.Orientation() == TopAbs_REVERSED)
+      sd.sign = -sd.sign;
+  }
+  // The patch's sides on [0, 1]: C1 (v = 0) 00 -> 10, C2 (u = 1) 10 -> 11, C3 (v = 1) 01 -> 11, C4 (u = 0) 00 -> 01.
+  auto C1 = [&](double u) { return side[0].at(u); };
+  auto C2 = [&](double v) { return side[1].at(v); };
+  auto C3 = [&](double u) { return side[2].at(1 - u); };
+  auto C4 = [&](double v) { return side[3].at(1 - v); };
+  auto T1 = [&](double u) { return side[0].d1(u); };
+  auto T2 = [&](double v) { return side[1].d1(v); };
+  auto T3 = [&](double u) { return -side[2].d1(1 - u); };
+  auto T4 = [&](double v) { return -side[3].d1(1 - v); };
+  // Fitted to live 1805's dome (centre 42.615 mm, rms 0.9 mm from the mean of live's slightly lopsided dome).
+  const double c = 0.9046, ramp = 0.15, taper = 1.0, flat = 2.0;
+  auto         w = [&](double t) {
+    const double x = std::min(t, 1 - t) / ramp;
+    return x >= 1 ? 1.0 : x * x * (3 - 2 * x);
+  };
+  auto phi = [&](double t) { return std::pow(std::max(0.0, 1 - std::pow(std::abs(2 * t - 1), flat)), taper); };
+  auto mix = [&](const gp_Vec& corner, const gp_Vec& across, double t, double m) {
+    return corner * (1 - w(t)) + across * (w(t) * m * phi(t));
+  };
+  // dS/du along u = 0 and u = 1, dS/dv along v = 0 and v = 1.
+  auto D4 = [&](double v) {
+    const double m = gp_Vec(C4(v), C2(v)).Magnitude() * c;
+    return mix(T1(0) * (1 - v) + T3(0) * v, side[3].across(1 - v), v, m);
+  };
+  auto D2 = [&](double v) {
+    const double m = gp_Vec(C4(v), C2(v)).Magnitude() * c;
+    return mix(T1(1) * (1 - v) + T3(1) * v, -side[1].across(v), v, m);
+  };
+  auto E1 = [&](double u) {
+    const double m = gp_Vec(C1(u), C3(u)).Magnitude() * c;
+    return mix(T4(0) * (1 - u) + T2(0) * u, side[0].across(u), u, m);
+  };
+  auto E3 = [&](double u) {
+    const double m = gp_Vec(C1(u), C3(u)).Magnitude() * c;
+    return mix(T4(1) * (1 - u) + T2(1) * u, -side[2].across(1 - u), u, m);
+  };
+  auto h0 = [](double t) { return 1 - 3 * t * t + 2 * t * t * t; };
+  auto h1 = [](double t) { return 3 * t * t - 2 * t * t * t; };
+  auto g0 = [](double t) { return t - 2 * t * t + t * t * t; };
+  auto g1 = [](double t) { return t * t * t - t * t; };
+  const gp_XYZ P00 = C1(0).XYZ(), P10 = C1(1).XYZ(), P01 = C3(0).XYZ(), P11 = C3(1).XYZ();
+  // Corner twists: the mean of what the two sides' cross derivatives ask for.
+  const gp_XYZ X00 = ((T3(0) - T1(0)) + (T2(0) - T4(0))).XYZ() * 0.5;
+  const gp_XYZ X10 = ((T3(1) - T1(1)) + (T2(0) - T4(0))).XYZ() * 0.5;
+  const gp_XYZ X01 = ((T3(0) - T1(0)) + (T2(1) - T4(1))).XYZ() * 0.5;
+  const gp_XYZ X11 = ((T3(1) - T1(1)) + (T2(1) - T4(1))).XYZ() * 0.5;
+  const gp_XYZ M[4][4] = {{P00, P01, T4(0).XYZ(), T4(1).XYZ()},
+                          {P10, P11, T2(0).XYZ(), T2(1).XYZ()},
+                          {T1(0).XYZ(), T3(0).XYZ(), X00, X01},
+                          {T1(1).XYZ(), T3(1).XYZ(), X10, X11}};
+  auto S = [&](double u, double v) {
+    const double hu[4] = {h0(u), h1(u), g0(u), g1(u)}, hv[4] = {h0(v), h1(v), g0(v), g1(v)};
+    gp_XYZ       r = C4(v).XYZ() * hu[0] + C2(v).XYZ() * hu[1] + D4(v).XYZ() * hu[2] + D2(v).XYZ() * hu[3];
+    r += C1(u).XYZ() * hv[0] + C3(u).XYZ() * hv[1] + E1(u).XYZ() * hv[2] + E3(u).XYZ() * hv[3];
+    for (int i = 0; i < 4; ++i)
+      for (int j = 0; j < 4; ++j)
+        r -= M[i][j] * (hu[i] * hv[j]);
+    return gp_Pnt(r);
+  };
+  const int               k = 41;
+  NCollection_Array2<gp_Pnt> grid(1, k, 1, k);
+  for (int i = 0; i < k; ++i)
+    for (int j = 0; j < k; ++j)
+      grid(i + 1, j + 1) = S((double)i / (k - 1), (double)j / (k - 1));
+  GeomAPI_PointsToBSplineSurface fit;
+  fit.Interpolate(grid, Approx_IsoParametric);
+  if (!fit.IsDone())
+    return nullptr;
+  return fit.Surface();
+}
+} // namespace
+
 OpOut op_fill(const OcShapeList& edges, const OcShapeList& supports,
               rust::Slice<const int32_t> orders, rust::Slice<const double> points,
               const OcShapeList& guides)
@@ -5580,12 +5768,18 @@ OpOut op_fill(const OcShapeList& edges, const OcShapeList& supports,
       occ::handle<GeomAdaptor_Surface> sf = new GeomAdaptor_Surface(BRep_Tool::Surface(f));
       bounds.push_back(new GeomFill_BoundWithSurf(Adaptor3d_CurveOnSurface(c2, sf), 1e-4, 1e-2));
     }
-    GeomFill_ConstrainedFilling cf(8, 2);
-    if (n == 3)
-      cf.Init(bounds[0], bounds[1], bounds[2], true);
-    else
-      cf.Init(bounds[0], bounds[1], bounds[2], bounds[3], true);
-    const occ::handle<Geom_BSplineSurface> surf = cf.Surface();
+    occ::handle<Geom_BSplineSurface> surf;
+    if (n == 4 && !std::getenv("NOSHAPE_FILL_CONSTRAINED"))
+      surf = g1_coons_fill(edges, supports);
+    if (surf.IsNull())
+    {
+      GeomFill_ConstrainedFilling cf(8, 2);
+      if (n == 3)
+        cf.Init(bounds[0], bounds[1], bounds[2], true);
+      else
+        cf.Init(bounds[0], bounds[1], bounds[2], bounds[3], true);
+      surf = cf.Surface();
+    }
     if (surf.IsNull())
       fail_op("fill surface failed");
     BRepBuilderAPI_MakeFace mf(surf, Precision::Confusion());

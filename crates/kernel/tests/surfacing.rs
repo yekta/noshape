@@ -341,8 +341,42 @@ fn fill_g1_on_a_shelled_box_probe() {
         boundary.push(FillEdge { edge: e.clone(), support: wall, continuity: Continuity::Tangent });
     }
     println!("{} boundary edges, supports {}", boundary.len(), boundary.iter().filter(|b| b.support.is_some()).count());
-    match fill_surface(&boundary, &[]) {
-        Ok(r) => println!("fill: {} faces, area {:.4}", r.shape.count(ShapeType::Face), surface_properties(&r.shape).unwrap().mass),
+    let loose: Vec<FillEdge> = boundary.iter().map(|b| FillEdge { continuity: Continuity::TangentLoose, ..b.clone() }).collect();
+    match fill_surface(&boundary, &[]).or_else(|_| fill_surface(&loose, &[])) {
+        Ok(r) => {
+            println!("fill: {} faces, area {:.4} (live 4327.5624)", r.shape.count(ShapeType::Face), surface_properties(&r.shape).unwrap().mass);
+            let bb = r.shape.bounding_box(true).unwrap();
+            println!("bounds {:?} {:?} (live z 20 .. 42.969)", bb.min, bb.max);
+            for (x, y) in [(30.0, 20.0), (30.0, 8.0), (30.0, 4.0), (6.5, 20.0), (54.5, 20.0), (2.5, 2.5), (2.5, 17.5)] {
+                let l = make_line(DVec3::new(x, y, 0.0), DVec3::new(x, y, 60.0)).unwrap();
+                let d = distance(&l, &r.shape).unwrap();
+                println!("z at ({x}, {y}): {:?}", d.point_b.z);
+            }
+            let f = &r.shape.faces()[0];
+            for p in [DVec3::new(0.0, 20.0, 20.0), DVec3::new(0.0, 14.0, 20.0), DVec3::new(30.0, 0.0, 20.0), DVec3::new(20.0, 0.0, 20.0), DVec3::new(60.0, 20.0, 20.0), DVec3::new(30.0, 40.0, 20.0), DVec3::new(5.0, 0.0, 20.0)] {
+                let n = f.normal_at_point(p).unwrap();
+                println!("normal at {p:?}: {n:?}, {:.4} deg from horizontal", n.z.abs().asin().to_degrees());
+            }
+        }
         Err(e) => println!("fill failed: {e}"),
     }
+}
+
+/// Live 1805's FI2 sheet (G1 Fill of a 60 x 40 box shelled 2 mm, top removed): its surface.
+#[test]
+#[ignore = "T2: probe"]
+fn fill_g1_live_dome_probe() {
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell/fi2-fill-live.x_t");
+    let s = read_parasolid(&p, LengthUnit::Millimeter).unwrap();
+    for f in s.faces() {
+        println!("face area {:.4} {:?}", surface_properties(&f).unwrap().mass, f.face_surface().map(|s| format!("{s:?}").chars().take(80).collect::<String>()));
+        if let Ok(b) = f.face_bspline() {
+            println!("deg {} x {}, poles {} x {}, rational {}, uk {:?}\nvk {:?}", b.u_degree, b.v_degree, b.nu, b.nv, b.weights.is_some(), b.u_knots, b.v_knots);
+            for i in 0..b.nu {
+                let row: Vec<String> = (0..b.nv).map(|j| { let q = b.poles[i * b.nv + j]; format!("({:.3},{:.3},{:.3})", q.x, q.y, q.z) }).collect();
+                println!("{i}: {}", row.join(" "));
+            }
+        }
+    }
+    for e in s.edges() { if let Ok(i) = e.edge_info() { println!("edge {:?} -> {:?}", i.start, i.end); } }
 }

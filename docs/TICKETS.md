@@ -276,7 +276,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (any of its intersection modes) gives no solid, the direct construction's corners don't meet (most of the part is
   thinner than two walls: Parasolid keeps such regions solid and hollows around the openings), the slabs' 128-tool
   fuse takes 14 s and comes out invalid. T2 probe kernel shell::shellhang_shell5_probe.
-- [ ] P2 FILL-G1-DOME (core 11-02, live 1739 FI2): a Fill G1 to a shelled box's outer side faces builds in live with the
+- [x] (core 11-02 19:40, our own four-sided G1 Coons fill; three-edge fills still take OCCT's flat ConstrainedFilling) P2 FILL-G1-DOME (core 11-02, live 1739 FI2): a Fill G1 to a shelled box's outer side faces builds in live with the
   warning "Could not meet tangency constraints at highlighted points." (a dome to z 42.97, 4327.5641 mm²: the corners
   can't be tangent to two perpendicular walls); ours fails ("Cannot create fill surface…"): OCCT's plate throws for
   these constraints at any tolerance. Needs our own G1 patch (or plate) that relaxes the corners. core 11-02 17:30: the

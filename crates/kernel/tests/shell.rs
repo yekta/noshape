@@ -1018,7 +1018,8 @@ fn an_opening_with_nothing_behind_it_fails_as_live() {
 fn shellhang_shell5_probe() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
     let s = read_step(&dir.join("shellhang-shell5-input.step"), LengthUnit::Millimeter).unwrap().remove(0).shape;
-    let rm = faces_where(&s, |c| (c - DVec3::new(-57.5, -37.0, 0.0)).length() < 1e-3 || (c - DVec3::new(2.509939, -4.556823, 9.985755)).length() < 1e-3);
+    let only2 = std::env::var_os("SHELL5_ONLY2").is_some();
+    let rm = faces_where(&s, |c| (!only2 && (c - DVec3::new(-57.5, -37.0, 0.0)).length() < 1e-3) || (c - DVec3::new(2.509939, -4.556823, 9.985755)).length() < 1e-3);
     let live = read_parasolid(&dir.join("shellhang-shell5-live.x_t"), LengthUnit::Millimeter).unwrap();
     println!("input {:.4} mm3 {} faces; removing {}; live {:.4} mm3 {} faces", vol(&s), s.count(ShapeType::Face), rm.len(), vol(&live), live.count(ShapeType::Face));
     let t0 = std::time::Instant::now();
@@ -1059,6 +1060,33 @@ fn sharp_vase_2mm_probe() {
                 Ok(r) => println!("{side:?} {m}: {:.4} mm3 (live {:.4}, {:+.4}), {} faces", vol(&r.shape), vol(&live), vol(&r.shape) - vol(&live), r.shape.count(ShapeType::Face)),
                 Err(e) => println!("{side:?} {m}: {e}"),
             }
+        }
+    }
+}
+
+/// SHELL-HANG-5: live's result face by face against the input (which faces stay, which are new).
+#[test]
+#[ignore = "T2: probe"]
+fn shellhang_shell5_faces_probe() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_step(&dir.join("shellhang-shell5-input.step"), LengthUnit::Millimeter).unwrap().remove(0).shape;
+    let live = read_parasolid(&dir.join("shellhang-shell5-live.x_t"), LengthUnit::Millimeter).unwrap();
+    let desc = |f: &Shape| {
+        let c = f.centroid().unwrap();
+        let a = surface_properties(f).unwrap().mass;
+        let k: String = format!("{:?}", f.face_surface().ok()).chars().take(9).collect();
+        (c, a, k)
+    };
+    let inp: Vec<_> = s.faces().iter().map(desc).collect();
+    println!("input {} faces, live {} faces, {} solids, {} shells", inp.len(), live.count(ShapeType::Face), live.count(ShapeType::Solid), live.count(ShapeType::Shell));
+    for f in live.faces() {
+        let (c, a, k) = desc(&f);
+        let same = inp.iter().any(|(c2, a2, _)| (c - *c2).length() < 1e-4 && (a - a2).abs() < 1e-4);
+        println!("{} {k} area {a:.4} centre ({:.3}, {:.3}, {:.3})", if same { "kept" } else { "NEW " }, c.x, c.y, c.z);
+    }
+    for (c, a, k) in &inp {
+        if !live.faces().iter().any(|f| { let (c2, a2, _) = desc(f); (*c - c2).length() < 1e-4 && (a - a2).abs() < 1e-4 }) {
+            println!("input face gone or changed: {k} area {a:.4} centre ({:.3}, {:.3}, {:.3})", c.x, c.y, c.z);
         }
     }
 }
