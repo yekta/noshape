@@ -691,6 +691,14 @@ That test found the pass skipped curves SHARING point entities (the tools' recta
 constraints, so the pass saw four unrelated lines and fell back to "both by half"): `place_constructively` now runs on
 a copy with the shared points split (`split_shared_points`). Probes now: 52 + drags 8 + edits 6, all match; batches
 1–5 1282 mm.
+16:13: asm probes 3 (live 1798): (a) a conflict loop through a Slider spares the Fastened links that held (the
+Slider(s) and the closing mate red), loops of Fastened / Revolute links read red throughout; (b) a Parallel that held,
+caught in a conflict over three pieces, reads "Mate is not consistent." (flip either way); (c) f53's half-turn point
+depends on what the turned part carries (not done). In (queued 3e346cfe) with: the orientation pass turns a part with
+the parts Fastened to it (`turn_carrying`: f80's block left behind made its Fastened read failing). Asm batches 1–3
+74/80; known: f50 (C's Ball 2e-6), f52 / f55 / f64 (free poses through Ball / Cylindrical / Slider chains), f53 (half-turn
+point), f54 (a loop of Cylindricals: live flags Cylindrical 1 and 3). Tried, not needed: flagging exactly the loop the
+failing mate closes (cut edges between its parts): no change once the carry was in.
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
