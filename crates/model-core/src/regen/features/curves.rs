@@ -892,7 +892,10 @@ pub fn offset_curve(ev: &mut EvalCtx) -> FResult<()> {
         let q = (o[0] + o[o.len() - 1]) * 0.5 + (mid - (b[0] + b[b.len() - 1]) * 0.5);
         k::make_vertex(q).and_then(|v| k::distance(&face, &v)).map(|x| x.distance).unwrap_or(f64::INFINITY)
     };
-    let dist = if on_face(d) <= on_face(-d) { d } else { -d };
+    let inward = if on_face(d) <= on_face(-d) { d } else { -d };
+    // With target faces (live 1813): Flip off offsets a boundary edge away from the face, Flip on onto it; without,
+    // the side on the face its edge borders.
+    let dist = if targets.is_empty() || ev.bool("oppositeDirection") { inward } else { -inward };
     let mut new_edges: Vec<Shape> = Vec::new();
     let mut prev_end: Option<(DVec3, DVec3)> = None;
     for (base, linear) in &bases {
@@ -909,6 +912,33 @@ pub fn offset_curve(ev: &mut EvalCtx) -> FResult<()> {
         }
         new_edges.push(if *linear { k::make_line(pts[0], pts[pts.len() - 1])? } else { k::make_interpolated_spline(&pts, &[], false)? });
         prev_end = Some((pts[pts.len() - 1], base[base.len() - 1]));
+    }
+    // The offset as far as it lies on the face (live: a side leaning in stops it there).
+    if !targets.is_empty() {
+        let tol = 1e-7 * ev.model_extent().max(1e-3);
+        let inside = k::common(&k::make_wire(&new_edges)?, &face).ok().map(|r| r.shape.edges()).unwrap_or_default();
+        let inside: Vec<Shape> = inside.into_iter().filter(|e| e.length().is_ok_and(|l| l > tol)).collect();
+        if inside.is_empty() {
+            ev.warnings.push("The highlighted chains did not produce any offset with the given parameters.".into());
+            return Ok(());
+        }
+        let length = |es: &[Shape]| es.iter().map(|e| e.length()).sum::<Result<f64, _>>();
+        if length(&inside)? < length(&new_edges)? - tol {
+            // Rebuilt to run forward along the offset (the extension and the trim walk them so).
+            let start = new_edges[0].endpoints()?.0;
+            let mut chain = order_chain(&inside, 1e-6)?;
+            let ends = sample_chain(&chain, 2)?;
+            if (ends[ends.len() - 1] - start).length() < (ends[0] - start).length() {
+                chain.reverse();
+                chain.iter_mut().for_each(|c| c.1 = !c.1);
+            }
+            let mut fwd = Vec::new();
+            for c in &chain {
+                let pts = sample_chain(std::slice::from_ref(c), 24)?;
+                fwd.push(if matches!(c.0.edge_curve()?, k::Curve::Line { .. }) { k::make_line(pts[0], pts[pts.len() - 1])? } else { k::make_interpolated_spline(&pts, &[], false)? });
+            }
+            new_edges = fwd;
+        }
     }
     if extend {
         extend_to_face_boundary(&mut new_edges, &face, ev.model_extent())?;
@@ -987,8 +1017,7 @@ fn trim_offset(ev: &mut EvalCtx, wire: &Shape, edges: &[Shape]) -> FResult<Shape
         .ok_or_else(|| FeatureError::new("Unable to trim to specifications."))
 }
 
-/// Offset and extend: each open end of the offset chain continues along its tangent to the face's boundary (a line
-/// end grows as one line).
+/// Offset and extend: each open end of the offset chain continues along its tangent to the face's boundary.
 fn extend_to_face_boundary(edges: &mut Vec<Shape>, face: &Shape, extent: f64) -> FResult<()> {
     let (Some(first), Some(last)) = (edges.first(), edges.last()) else { return Ok(()) };
     let start = first.endpoints()?.0;
@@ -1008,21 +1037,12 @@ fn extend_to_face_boundary(edges: &mut Vec<Shape>, face: &Shape, extent: f64) ->
     let t0 = -first.tangent_at(first.edge_info()?.first_param)?.normalize_or_zero();
     let t1 = last.tangent_at(last.edge_info()?.last_param)?.normalize_or_zero();
     let (start_hit, end_hit) = (hit(start, t0)?, hit(end, t1)?);
-    let is_line = |e: &Shape| matches!(e.edge_curve(), Ok(k::Curve::Line { .. }));
+    // Each extension its own edge (live 1813: three edges).
     if let Some(q) = start_hit {
-        if is_line(&edges[0]) {
-            edges[0] = k::make_line(q, edges[0].endpoints()?.1)?;
-        } else {
-            edges.insert(0, k::make_line(q, start)?);
-        }
+        edges.insert(0, k::make_line(q, start)?);
     }
     if let Some(q) = end_hit {
-        let n = edges.len();
-        if is_line(&edges[n - 1]) {
-            edges[n - 1] = k::make_line(edges[n - 1].endpoints()?.0, q)?;
-        } else {
-            edges.push(k::make_line(end, q)?);
-        }
+        edges.push(k::make_line(end, q)?);
     }
     Ok(())
 }

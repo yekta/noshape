@@ -177,14 +177,6 @@ TopoDS_Shape single_solid(const TopoDS_Shape& s)
   return s;
 }
 
-int shell_count(const TopoDS_Shape& s)
-{
-  int n = 0;
-  for (TopExp_Explorer e(s, TopAbs_SHELL); e.More(); e.Next())
-    ++n;
-  return n;
-}
-
 // Shells of an offset result as one outward-oriented solid.
 TopoDS_Shape solid_of(const TopoDS_Shape& s)
 {
