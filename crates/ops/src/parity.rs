@@ -508,6 +508,35 @@ impl<'a> Translator<'a> {
                         Some(json!({ "tool": "three_point_arc", "points": [pt(t0), pt(t1), pt((t0 + t1) / 2.0)], "construction": construction }))
                     }
                 }
+                "BTCurveGeometryEllipse" => {
+                    let (cx, cy, a, b, xd, yd) = (num("xCenter"), num("yCenter"), num("majorRadius"), num("minorRadius"), num("xDir"), num("yDir"));
+                    let sense = if g["clockwise"].as_bool() == Some(true) { -1.0 } else { 1.0 };
+                    let pt = |t: f64| {
+                        let (c, s) = (t.cos(), sense * t.sin());
+                        at(cx + a * c * xd - b * s * yd, cy + a * c * yd + b * s * xd)
+                    };
+                    match (e["startParam"].as_f64(), e["endParam"].as_f64()) {
+                        (Some(t0), Some(t1)) if e["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketchCurveSegment")) => {
+                            let (t0, t1) = if sense < 0.0 { (t1, t0) } else { (t0, t1) };
+                            Some(json!({ "tool": "elliptical_arc", "points": [at(cx, cy), pt(0.0), pt(t0), pt(t1)], "construction": construction }))
+                        }
+                        _ => Some(json!({ "tool": "ellipse", "points": [at(cx, cy), pt(0.0), pt(std::f64::consts::FRAC_PI_2)], "construction": construction })),
+                    }
+                }
+                "BTCurveGeometryInterpolatedSpline" => {
+                    let flat: Vec<f64> = g["interpolationPoints"].as_array().into_iter().flatten().filter_map(Value::as_f64).collect();
+                    let derivs = ["startDerivativeX", "startDerivativeY", "endDerivativeX", "endDerivativeY"].iter().any(|k| num(k).abs() > 1e-12);
+                    if derivs || g["isPeriodic"].as_bool() == Some(true) {
+                        problems.push(format!("sketch entity {eid}: spline end derivatives / periodic not translated (fit points only)"));
+                    }
+                    (flat.len() >= 4).then(|| json!({ "tool": "spline", "points": flat.chunks(2).map(|c| at(c[0], c[1])).collect::<Vec<_>>(), "construction": construction }))
+                }
+                "BTCurveGeometryControlPointSpline" => {
+                    let flat: Vec<f64> = g["controlPoints"].as_array().into_iter().flatten().filter_map(Value::as_f64).collect();
+                    let n = flat.len() / 2;
+                    let bezier = g["degree"].as_u64() == Some(n.saturating_sub(1) as u64) && g["isRational"].as_bool() != Some(true);
+                    if bezier { Some(json!({ "tool": "bezier", "points": flat.chunks(2).map(|c| at(c[0], c[1])).collect::<Vec<_>>(), "construction": construction })) } else { None }
+                }
                 _ if e["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketchPoint")) => Some(json!({ "tool": "point", "points": [at(e["x"].as_f64().unwrap_or(0.0), e["y"].as_f64().unwrap_or(0.0))], "construction": construction })),
                 _ => None,
             };
@@ -648,6 +677,30 @@ fn sampled(e: &Value) -> Option<Vec<[f64; 2]>> {
                     })
                     .collect(),
             )
+        }
+        "BTCurveGeometryEllipse" => {
+            let (cx, cy, a, b, xd, yd) = (num("xCenter"), num("yCenter"), num("majorRadius"), num("minorRadius"), num("xDir"), num("yDir"));
+            let sense = if g["clockwise"].as_bool() == Some(true) { -1.0 } else { 1.0 };
+            let (t0, t1) = match (e["startParam"].as_f64(), e["endParam"].as_f64()) {
+                (Some(x), Some(y)) => (x, y),
+                _ => (0.0, std::f64::consts::TAU),
+            };
+            Some(
+                (0..=64)
+                    .map(|i| {
+                        let t = t0 + (t1 - t0) * i as f64 / 64.0;
+                        let (c, s) = (t.cos(), sense * t.sin());
+                        [cx + a * c * xd - b * s * yd, cy + a * c * yd + b * s * xd]
+                    })
+                    .collect(),
+            )
+        }
+        // Splines through their fit or control points: enough to tell which
+        // side of them a region lies.
+        "BTCurveGeometryInterpolatedSpline" | "BTCurveGeometryControlPointSpline" => {
+            let key = if g["interpolationPoints"].is_array() { "interpolationPoints" } else { "controlPoints" };
+            let flat: Vec<f64> = g[key].as_array()?.iter().filter_map(Value::as_f64).collect();
+            (flat.len() >= 4).then(|| flat.chunks(2).map(|c| [c[0], c[1]]).collect())
         }
         _ => None,
     }
