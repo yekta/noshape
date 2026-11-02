@@ -609,6 +609,21 @@ Open, biggest first: s215 (331 mm), s6 (170), s102 (162), s236 (114), s226 (120)
 scaled the whole slot about a2's center (a4 moved 1.309 mm in; no rule yet, probe it); s104's triangle turned about
 the intersection of l9 with l3 (the Perpendicular's lines; one case, probe it); s11's quad kept the LONGER of an
 Equal pair (l5) where its ends are both tied. Probes 5 next: Perpendicular pivot, slot scaling, Equal between tied lines.
+11-02 13:00–13:40: probes 5 answered (10/10 now; probes 1–5 52/52): a Perpendicular turn pivots about the two lines'
+intersection; a line moved at its end keeps its start and turns (one free in direction can always follow; u8 / s8);
+Equal keeps the member whose far end lies further left (`equal_key`: lone lines the longer shrinks, a quad the
+shorter grows); an arc with a new radius keeps its end on a held neighbour with its own dimension, else the lower end
+(`lower_shared`); an arc's chord dimension scales a free component about the arc's centre (`scale_for_chord`).
+Batches 1–3 summed error 1829 → 1700 mm (s17, s214, s223, s234 exact). Live 1775: a dimension typed in the EDITOR
+grows a lone line about its midpoint (dimension_edit_options no longer constructive; the regeneration with one new
+value still is: model-core regen/features/sketch.rs). Asked live: the same edit on a corner rectangle.
+Assembly batch 2 answered: statuses / texts 89/89, transforms 27 → 48/50 after f43 (a part > 90° off an axial
+mate turns the shortest way, not over about its X). Known: f40 (a Slider 67° off: live 31.7 mm further along; the
+foot pivot gives 43.9), f50 (a Revolute in conflict with a Cylindrical still slid the plate along the axis); asked
+live for asm probes 2. Tried and dropped (net worse): y-first "lower" points (s215 −183 mm but s1 broke), keeping the
+Distance member at the lower point, releasing every moved unit when a loop can't close (s6 170 → 403).
+Open, biggest: s215 (331: live moved the whole triangle 30 mm, kept the slot's bottom), s6 (170: the constructive
+pass fails at the last side, l9's Equal length set before its partner settled), s226 (120), s236 (116), s102 (107).
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
