@@ -591,10 +591,10 @@ Parity (11-02, user: correctness before more speed):
   pass turned the part over for the later mate, silently breaking the earlier). Now: a group whose solve leaves a mate
   failing, or an axial mate's Z against its alignment, keeps its start poses (from before the orientation pass) and
   flags as above; the pattern-copy rule above is its special case. T1 redundant_mates_are_fine_until_they_disagree
-  (cases 1, 3, 4, 5, 6); oracle M1 now reads "overdefines" on both mates as live and keeps B upright (its position is
+  (cases 1, 3, 4, 4', 5, 6); oracle M1 now reads "overdefines" on both mates as live and keeps B upright (its position is
   live's after the Revolute was added alone first; known list updated).
-  Known difference: 1764 (4') (a chain A–B–C closed by a disagreeing Parallel): live flags Planar 2 and the Parallel
-  but not Planar 1; ours flags whatever the compromise bends.
+  1764 (4') (a chain A–B–C closed by a disagreeing Parallel) matches too: Planar 2 and the Parallel red, Planar 1 OK
+  (the orientation pass turns C for the Parallel, so only C's Planar disagrees).
 
 - **Mate chain regenerate = live 1763** (done): live keeps every instance whose geometry didn't change where it is
   (C's part moved +10 mm in its own coordinates: only C's transform changes, −10 mm; P, free on its Planar, and D on C

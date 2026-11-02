@@ -6103,6 +6103,12 @@ fn redundant_mates_are_fine_until_they_disagree() {
     assert_eq!(status(&res), vec![(10, over()), (11, over())]);
     assert_eq!(res.solved.instance_dof.get(&InstanceId(2)), Some(&0));
     assert!(res.has_errors());
+    // (4') The chain closed by a disagreeing Parallel: nothing moves; Planar 2
+    // and the Parallel red, the ground-side Planar 1 OK; no DOF on B or C.
+    let (res, before) = add(vec![planar(10, 1, 2), planar(20, 2, 3)], parallel(30, 1, 3, false));
+    assert_eq!(res.solved.placements, before, "nothing moved");
+    assert_eq!(status(&res), vec![(10, None), (20, over()), (30, over())]);
+    assert_eq!((res.solved.instance_dof.get(&InstanceId(2)), res.solved.instance_dof.get(&InstanceId(3))), (Some(&0), Some(&0)));
     // (5) A Fastened from C's bottom to A's top, which the Planars hold
     // 20 mm higher: "Mate is not consistent.", both Planars red, nothing moves.
     let fastened = mate(40, MateType::Fastened, conn(1, top.clone(), Inference::Centroid), conn(3, bottom.clone(), Inference::Centroid));
