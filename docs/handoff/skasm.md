@@ -631,6 +631,19 @@ s236 / s215 disagree), drag probes 7 (d1–d8, UI: s1 shows live translating a d
 untouched; our point-space least norm deforms it: the drag wants the shape-keeping placement, pending d1–d8), sketch
 batch 4 (s301–s340, everyday profiles regenerated with new values), asm probes 2 (f40 slider, f50 conflict), the
 corner-rectangle editor edit. T2 tests: live_fuzz::drag_probe_matches, batch 4 in live_matches once answered.
+13:40–14:00 (all landed): probes 6 (10/10): a distance between two separate loops keeps the loop with more vertices
+(`loop_points`: curve ends, a circle one), between equal ones the one at the smaller coordinate along it; the other
+moves whole (`shift_loops_for_distances`, at the start and again once the kept loop settled), or rigidly onto several
+relations to the kept loop (`place_loop_rigidly`: spokes from two vertices; s215 241 → 40 mm). Batches 1–3 now
+1266 mm (from 1829 this morning). Drag probes 7: 8/8 (live confirms ours: undimensioned sizes give way, dimensioned
+pieces translate). Live 1785: a length / distance typed in the EDITOR scales the free geometry uniformly about its
+centre or its Origin point (`Sketch::scale_for_edit`, called by sketch_mode before the edit's solve; not radii:
+SK5). Assembly: Slider = one turn about a point of the slide axis (probes 1786 sa1–sa6, f40 matches); an axial mate
+opposed to the part's other axial mates still moves the part where its flipped self would (cb1, f50's B; C's free
+Ball 2e-6 off: f50 stays KNOWN). Asm batches 1+2: 49/50.
+Open: s6 (170: the pass fails at the last side, see above), s236 (93), s226 (58), s102 (79), s218 (90: a chain with
+two distances to a merged loop that live translates, ours turns slightly; the direction-hold tweak didn't reach it),
+batch 4 pending.
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
