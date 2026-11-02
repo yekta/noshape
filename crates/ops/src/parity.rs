@@ -51,6 +51,9 @@ pub struct Translator<'a> {
     /// Onshape sketch frames by feature id (`sketches` from `GET …/sketches`):
     /// origin, x, y in metres.
     frames: HashMap<String, [[f64; 3]; 3]>,
+    /// Onshape sketch curves by (sketch feature id, entity id), sampled as
+    /// sketch-plane segments (metres), for picking regions.
+    curves: HashMap<(String, String), Vec<[f64; 2]>>,
     /// Configuration inputs' default options (`configuration` of features.json).
     config_defaults: HashMap<String, String>,
     /// What isn't translated of the document itself (configuration inputs…).
@@ -99,7 +102,7 @@ impl<'a> Translator<'a> {
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
         let _ = std::fs::remove_file(path);
-        let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), frames, config_defaults, notes: Vec::new() };
+        let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), frames, curves: HashMap::new(), config_defaults, notes: Vec::new() };
         t.call("document_create", json!({ "path": path.to_str().ok_or("path")? }))?;
         for c in doc["configuration"]["configurationParameters"].as_array().into_iter().flatten() {
             t.config_input(c);
@@ -285,6 +288,15 @@ impl<'a> Translator<'a> {
         if let Some(p) = default_plane(text) {
             return Ok(vec![p.to_string()]);
         }
+        // A Plane feature's plane (`dummyQuery(id+"F….planeOp", …)`).
+        if let Some(fid) = text.split("id+\"").nth(1).and_then(|r| r.split(".planeOp\"").next()).filter(|f| !f.contains('"'))
+            && let Some(ours) = self.feature_ids.get(fid)
+        {
+            return Ok(vec![format!("fplane:{ours}")]);
+        }
+        if let Some(r) = self.region_from_query(text)? {
+            return Ok(vec![r]);
+        }
         // qSketchRegion(id + "F…", true): every region of that sketch.
         if let Some(sk) = text.split("qSketchRegion(id + \"").nth(1).and_then(|r| r.split('"').next()) {
             let ours = self.feature_ids.get(sk).cloned().ok_or_else(|| format!("sketch {sk} was not built"))?;
@@ -292,6 +304,50 @@ impl<'a> Translator<'a> {
             return Ok(g["regions"].as_array().into_iter().flatten().filter_map(|r| r["id"].as_str().map(str::to_string)).collect());
         }
         Err(format!("query not mapped (no live geometry for {}): {}", if ids.is_empty() { "it".to_string() } else { ids.join(", ") }, text.chars().take(80).collect::<String>()))
+    }
+
+    /// A sketch region query (Onshape's packed form: a FACE whose
+    /// TOPOLOGY is the sketch entities bounding it): our region whose
+    /// interior point lies inside those curves. `None`: not a region query.
+    fn region_from_query(&mut self, text: &str) -> Result<Option<String>, String> {
+        let Some(packed) = text.split("qCompressed(1.0,\"").nth(1).and_then(|r| r.split('"').next()) else { return Ok(None) };
+        let Ok(tree) = noshape_model::custom::host::packed::unpack(packed) else { return Ok(None) };
+        let mut strings = Vec::new();
+        packed_strings(&tree, &mut strings);
+        // A face the sketch imprints, told by the curves around it (a face
+        // swept from sketch curves names them too, without the imprint).
+        if !["SKETCH_ENTITY", "FACE", "TOPOLOGY", "IMPRINT"].iter().all(|w| strings.iter().any(|s| s == w)) {
+            return Ok(None);
+        }
+        let Some(sk) = strings.iter().find_map(|s| s.strip_suffix(".wireOp")).map(str::to_string) else { return Ok(None) };
+        let segments: Vec<[f64; 2]> = strings.iter().filter_map(|e| self.curves.get(&(sk.clone(), e.clone()))).flat_map(|poly| poly.windows(2).flat_map(|w| [w[0], w[1]])).collect();
+        if segments.is_empty() {
+            return Err(format!("region of sketch {sk}: its curves were not translated"));
+        }
+        let ours = self.feature_ids.get(&sk).cloned().ok_or_else(|| format!("sketch {sk} was not built"))?;
+        let g = self.call("sketch_get", json!({ "sketch": ours }))?;
+        let (o, x, y) = (f3(&g["frame"]["origin"]), f3(&g["frame"]["x"]), f3(&g["frame"]["y"]));
+        let (Some(o), Some(x), Some(y)) = (o, x, y) else { return Err("sketch frame".into()) };
+        let frame = self.frames.get(&sk).copied();
+        let mut best: Option<(f64, String)> = None;
+        for r in g["regions"].as_array().into_iter().flatten() {
+            let (u, v) = (r["inside"][0].as_f64().unwrap_or(0.0), r["inside"][1].as_f64().unwrap_or(0.0));
+            // Ours (mm, our frame) → Onshape's sketch plane (m).
+            let w: Vec<f64> = (0..3).map(|i| (o[i] + u * x[i] + v * y[i]) / 1000.0).collect();
+            let p = match frame {
+                Some([fo, fx, fy]) => [(0..3).map(|i| (w[i] - fo[i]) * fx[i]).sum::<f64>(), (0..3).map(|i| (w[i] - fo[i]) * fy[i]).sum::<f64>()],
+                None => [u / 1000.0, v / 1000.0],
+            };
+            let crossings = segments.chunks(2).filter(|s| (s[0][1] > p[1]) != (s[1][1] > p[1]) && p[0] < s[0][0] + (p[1] - s[0][1]) * (s[1][0] - s[0][0]) / (s[1][1] - s[0][1])).count();
+            let area = r["area"].as_f64().unwrap_or(0.0);
+            if crossings % 2 == 1
+                && best.as_ref().is_none_or(|b| area > b.0)
+                && let Some(id) = r["id"].as_str()
+            {
+                best = Some((area, id.to_string()));
+            }
+        }
+        best.map(|b| Some(b.1)).ok_or_else(|| format!("no region of ours inside sketch {sk}'s curves {:?}", strings.iter().filter(|e| self.curves.contains_key(&(sk.clone(), (*e).clone()))).collect::<Vec<_>>()))
     }
 
     /// The entity of ours at live's geometry of `id`.
@@ -310,6 +366,11 @@ impl<'a> Translator<'a> {
                 if let Some(n) = r.normal {
                     a["normal"] = json!(n);
                 }
+                if let Some(f) = pick(&self.call("query_entities", a.clone())?, "faces") {
+                    return Ok(f);
+                }
+                // The normal's sense isn't always certain: the nearest face.
+                a.as_object_mut().map(|m| m.remove("normal"));
                 pick(&self.call("query_entities", a)?, "faces").ok_or_else(|| format!("{id}: no face of ours at {:?} mm", mm(p)))
             }
             "EDGE" => pick(&self.call("query_entities", json!({ "kind": "edges", "at": [mm(p)] }))?, "edges").ok_or_else(|| format!("{id}: no edge of ours at {:?} mm", mm(p))),
@@ -417,6 +478,9 @@ impl<'a> Translator<'a> {
                 _ if e["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketchPoint")) => Some(json!({ "tool": "point", "points": [at(e["x"].as_f64().unwrap_or(0.0), e["y"].as_f64().unwrap_or(0.0))], "construction": construction })),
                 _ => None,
             };
+            if let Some(poly) = sampled(e) {
+                self.curves.insert((oid.clone(), eid.clone()), poly);
+            }
             match shape {
                 Some(s) => {
                     shapes.push(s);
@@ -505,6 +569,107 @@ impl<'a> Translator<'a> {
             problems.push(format!("{others} geometric constraints left to inference (geometry at Onshape's solved positions)"));
         }
     }
+}
+
+/// Every string in a packed query.
+fn packed_strings(p: &noshape_model::custom::host::packed::Packed, out: &mut Vec<String>) {
+    use noshape_model::custom::host::packed::Packed;
+    match p {
+        Packed::Str(s) => out.push(s.clone()),
+        Packed::Map(m) => m.iter().for_each(|(k, v)| {
+            packed_strings(k, out);
+            packed_strings(v, out);
+        }),
+        Packed::Array(a) => a.iter().for_each(|v| packed_strings(v, out)),
+        Packed::Tagged(_, v) => packed_strings(v, out),
+        Packed::Num(_) | Packed::Bool(_) => {}
+    }
+}
+
+/// An Onshape sketch curve as a polyline in its sketch plane (metres).
+fn sampled(e: &Value) -> Option<Vec<[f64; 2]>> {
+    let g = &e["geometry"];
+    let num = |k: &str| g[k].as_f64().unwrap_or(0.0);
+    match g["btType"].as_str()?.split('-').next()? {
+        "BTCurveGeometryLine" => {
+            let (t0, t1) = (e["startParam"].as_f64()?, e["endParam"].as_f64()?);
+            let (px, py, dx, dy) = (num("pntX"), num("pntY"), num("dirX"), num("dirY"));
+            Some(vec![[px + t0 * dx, py + t0 * dy], [px + t1 * dx, py + t1 * dy]])
+        }
+        "BTCurveGeometryCircle" => {
+            let (cx, cy, r, xd, yd) = (num("xCenter"), num("yCenter"), num("radius"), num("xDir"), num("yDir"));
+            let sense = if g["clockwise"].as_bool() == Some(true) { -1.0 } else { 1.0 };
+            let (t0, t1) = match (e["startParam"].as_f64(), e["endParam"].as_f64()) {
+                (Some(a), Some(b)) => (a, b),
+                _ => (0.0, std::f64::consts::TAU),
+            };
+            Some(
+                (0..=64)
+                    .map(|i| {
+                        let a = sense * (t0 + (t1 - t0) * i as f64 / 64.0);
+                        let (c, s) = (a.cos(), a.sin());
+                        [cx + r * (c * xd - s * yd), cy + r * (c * yd + s * xd)]
+                    })
+                    .collect(),
+            )
+        }
+        _ => None,
+    }
+}
+
+/// Live's referenced geometry from the raw `bodydetails` bodies a
+/// live.jsonl line carries (`bodies`): line k describes the state feature
+/// k + 1 references. Faces get a point on their surface near their box
+/// centre (planes: the projection; others: the box centre), edges their
+/// midpoint, vertices their point.
+pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
+    let v3 = |v: &Value| Some([v["x"].as_f64()?, v["y"].as_f64()?, v["z"].as_f64()?]);
+    let mut out = HashMap::new();
+    for line in lines {
+        let (Some(k), Some(bodies)) = (line["index"].as_u64(), line["bodies"].as_array()) else { continue };
+        let at = k as usize + 1;
+        for b in bodies {
+            let mut lo = [f64::INFINITY; 3];
+            let mut hi = [f64::NEG_INFINITY; 3];
+            for f in b["faces"].as_array().into_iter().flatten() {
+                let (Some(mn), Some(mx)) = (v3(&f["box"]["minCorner"]), v3(&f["box"]["maxCorner"])) else { continue };
+                for i in 0..3 {
+                    lo[i] = lo[i].min(mn[i]);
+                    hi[i] = hi[i].max(mx[i]);
+                }
+                let c = [(mn[0] + mx[0]) / 2.0, (mn[1] + mx[1]) / 2.0, (mn[2] + mx[2]) / 2.0];
+                let s = &f["surface"];
+                let mut r = LiveRef { kind: "FACE".into(), point: Some(c), measure: f["area"].as_f64(), ..Default::default() };
+                if s["type"] == "PLANE"
+                    && let (Some(o), Some(n)) = (v3(&s["origin"]), v3(&s["normal"]))
+                {
+                    let d: f64 = (0..3).map(|i| (c[i] - o[i]) * n[i]).sum();
+                    r.point = Some([c[0] - d * n[0], c[1] - d * n[1], c[2] - d * n[2]]);
+                    let flip = if f["orientation"].as_bool() == Some(true) { 1.0 } else { -1.0 } * if s["isOrientedWithFace"].as_bool() == Some(false) { -1.0 } else { 1.0 };
+                    r.normal = Some(n.map(|x| x * flip));
+                }
+                if let Some(id) = f["id"].as_str() {
+                    out.insert((at, id.to_string()), r);
+                }
+            }
+            for e in b["edges"].as_array().into_iter().flatten() {
+                if let (Some(id), Some(p)) = (e["id"].as_str(), v3(&e["geometry"]["midPoint"])) {
+                    out.insert((at, id.to_string()), LiveRef { kind: "EDGE".into(), point: Some(p), measure: e["geometry"]["length"].as_f64(), ..Default::default() });
+                }
+            }
+            for v in b["vertices"].as_array().into_iter().flatten() {
+                if let (Some(id), Some(p)) = (v["id"].as_str(), v3(&v["point"])) {
+                    out.insert((at, id.to_string()), LiveRef { kind: "VERTEX".into(), point: Some(p), ..Default::default() });
+                }
+            }
+            if let Some(id) = b["id"].as_str()
+                && lo[0].is_finite()
+            {
+                out.insert((at, id.to_string()), LiveRef { kind: "BODY".into(), point: Some([(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, (lo[2] + hi[2]) / 2.0]), ..Default::default() });
+            }
+        }
+    }
+    out
 }
 
 /// Onshape's own bookkeeping, not dialog parameters: the FeatureScript

@@ -24,7 +24,7 @@ mod loft;
 mod native_args;
 mod edge_change;
 mod offsets;
-mod packed;
+pub mod packed;
 mod ops;
 mod pattern;
 pub mod query;
