@@ -5721,11 +5721,13 @@ impl PartStudioView {
         let overlay = Slice::new(&me, |this, window, cx| this.render_overlay_slice(window, cx), cx);
         let features = Slice::new(&me, |this, window, cx| this.render_feature_list(window, cx), cx);
         let parts = Slice::new(&me, |this, _, cx| this.render_parts_list(cx), cx);
-        // Labels, the view cube and manipulators follow the camera, and the
-        // lists the highlights; all read the document (undo state,
-        // features) besides the studio.
-        for s in [&underlay, &overlay, &features, &parts] {
+        // Labels, the view cube and manipulators follow the camera (the
+        // lists don't: orbiting rebuilt every row each frame); all read the
+        // document (undo state, features) besides the studio.
+        for s in [&underlay, &overlay] {
             Slice::observing(s, &self.viewport, cx);
+        }
+        for s in [&underlay, &overlay, &features, &parts] {
             Slice::observing(s, &self.doc, cx);
         }
         Slice::observing(&toolbar, &self.doc, cx);

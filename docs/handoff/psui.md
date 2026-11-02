@@ -209,9 +209,8 @@ reflection of Onshape's eye point (renderer `onshape_near_far`, also orthographi
 keeps the camera at the lock (`Reflection.lock: Option<Camera>`, ui `env_lock`, cleared when the analysis is off; the
 renderer puts its eye in the instance normal matrix's w column). Also the flaky UI test name clash p-planes
 (p_toggles_every_plane now "p-every-plane").
-Next in this line: the Part Studio's features / parts slices observe the viewport too (part_studio/mod.rs `slices()`),
-though neither list reads viewport state: drop it after an orbit bench on parts-1000 (`BENCH=orbit pickrun.sh`)
-before / after.
+Then the Part Studio's feature and parts lists stopped observing the viewport too (neither reads its state):
+parts-1000 orbit (`BENCH=orbit pickrun.sh`, llvmpipe) GPUI prepaint 194 -> 6.4 ms mean per window render.
 
 Next after the WIP, in order: read the CI pick numbers and the GPU breakdown run; profile the NIST import's GPU time
 toward 120 fps (now 62-80 at 2x); first frame and orbit fps on the 2000-instance assembly (~/psui-bigasm.noshape on

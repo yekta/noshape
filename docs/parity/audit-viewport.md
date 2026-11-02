@@ -55,7 +55,7 @@ Selection's cost in the assembly UI (local, llvmpipe, load 40+, so only indicati
 frame's GPUI prepaint took 212 ms mean (p95 286): the instance list lays out every row (1000 instances and the mates)
 whenever a selection changes one; the rows are built eagerly, not virtualized. To weigh with the CI pick benchmark.
 The list also rebuilt on every orbit frame (it observed the viewport, which it doesn't read): fixed, prepaint per orbit
-frame 230 → 7.5 ms.
+frame 230 → 7.5 ms. The Part Studio's feature and parts lists the same (parts-1000: 194 → 6.4 ms).
 
 Speed (live, this box: Chrome on software WebGL at load 25–56, so not a fair baseline, as behaviours "speed: psui
 open a document"): a click on an instance of the 2000-instance assembly took 0.7–6 s to show its selection. Ours is
