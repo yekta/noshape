@@ -276,7 +276,7 @@ fn downstream_fillet_survives_param_change() {
 }
 
 #[test]
-fn compile_and_runtime_errors_become_feature_errors() {
+pub(crate) fn compile_and_runtime_errors_become_feature_errors() {
     let mut fx = Fixture::new(&studio(BLOCK));
     let mut ps = PartStudio::new();
     let f = ps.new_feature(&fx.ty("block"), &fx.units).unwrap();
@@ -969,7 +969,7 @@ export const boltSize = defineFeature(function(context is Context, id is Id, def
 /// Operations and evaluations called directly from a custom feature
 /// (tests/fs/ops_harness.fs checks values and prints one line per check).
 #[test]
-fn ops_and_evaluations_run_in_custom_features() {
+pub(crate) fn ops_and_evaluations_run_in_custom_features() {
     let fx = Fixture::new(include_str!("fs/ops_harness.fs"));
     let mut ps = PartStudio::new();
     let f = ps.new_feature(&fx.ty("opsHarness"), &fx.units).unwrap();
@@ -1911,7 +1911,7 @@ fn std_sheet_metal_matches_onshape() {
 /// off), sweepLineArc (box 1610.0001 vs 1610), loftSquareCircle (live splits
 /// the circle into four arcs: 6/12/8 faces/edges/vertices, ours 7/15/10).
 #[test]
-fn std_features_match_onshape() {
+pub(crate) fn std_features_match_onshape() {
     let fx = Fixture::new(include_str!("fs/std_reference.fs"));
     let compiled = custom::compile(fx.fs, include_str!("fs/std_reference.fs"));
     assert!(!compiled.has_errors(), "{:?}", compiled.diagnostics);
@@ -2565,7 +2565,7 @@ fn a_features_planes_are_its_own_and_hide_alone_or_with_it() {
 /// The user's "Y Ribs on Faces" (11-02, tests/fs/yribs.fs) on a Ø20 × 20 mm cylinder's outer face, no direction (the
 /// cylinder's axis): the ribs build and fuse into the part, and none of the cutting planes it deletes is left.
 #[test]
-fn y_ribs_on_a_cylinder_leave_no_planes() {
+pub(crate) fn y_ribs_on_a_cylinder_leave_no_planes() {
     let source = format!(
         "{}\n{}",
         include_str!("fs/yribs.fs"),
@@ -2602,4 +2602,41 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
     let v1 = r.context.bodies[0].shape.volume().unwrap();
     // 1.6 mm ribs at a 2.2 mm pitch: 9 along 20 mm, each half buried, about π·1.6²/8 · 2π·10 mm³ outside.
     assert!(v1 > v0 * 1.05, "ribs added: {v0} -> {v1}");
+}
+
+/// T2 tool: the first FeatureScript regeneration of a process (the standard library compiled), sampled into
+/// NOSHAPE_SAMPLE_OUT, with its time; then the same regeneration warm.
+#[test]
+#[ignore = "T2 tool: NOSHAPE_SAMPLE_OUT"]
+fn fs_cold_start_profile() {
+    let out = std::env::var("NOSHAPE_SAMPLE_OUT").unwrap_or_else(|_| "/tmp/fs-cold.txt".into());
+    let t = std::time::Instant::now();
+    let (fx, ps) = crate::sampler::sample(std::path::Path::new(&out), || {
+        let fx = Fixture::new(&studio(BLOCK));
+        let mut ps = PartStudio::new();
+        let f = ps.new_feature(&fx.ty("block"), &fx.units).unwrap();
+        ps.features.push(f);
+        assert_ok(&fx.regen(&mut Regenerator::new(), &ps));
+        (fx, ps)
+    });
+    let cold = t.elapsed();
+    let t = std::time::Instant::now();
+    assert_ok(&fx.regen(&mut Regenerator::new(), &ps));
+    eprintln!("fs cold start: {cold:.2?}, warm regeneration {:.2?}", t.elapsed());
+}
+
+/// T2 tool: warm FeatureScript-driven regenerations sampled into NOSHAPE_SAMPLE_OUT (Y Ribs on a cylinder, the ops
+/// harness): each run once to warm up, then sampled, with its time.
+#[test]
+#[ignore = "T2 tool: NOSHAPE_SAMPLE_OUT"]
+fn fs_warm_profile() {
+    let out = std::env::var("NOSHAPE_SAMPLE_OUT").unwrap_or_else(|_| "/tmp/fs-warm.txt".into());
+    y_ribs_on_a_cylinder_leave_no_planes();
+    ops_and_evaluations_run_in_custom_features();
+    let t = std::time::Instant::now();
+    crate::sampler::sample(std::path::Path::new(&out), || {
+        y_ribs_on_a_cylinder_leave_no_planes();
+        ops_and_evaluations_run_in_custom_features();
+    });
+    eprintln!("fs warm: {:.2?}", t.elapsed());
 }

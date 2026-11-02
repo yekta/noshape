@@ -915,7 +915,7 @@ fn a_cut_after_flanges_keeps_the_bends() {
 /// Front at (50, 1.5) cut through all both ways slots the plate and both
 /// long bends: 20805.4123, 61.
 #[test]
-fn qa4_s1_enclosure_as_live() {
+pub(crate) fn qa4_s1_enclosure_as_live() {
     let mut s = Studio::new();
     let region = s.rectangle(100.0, 60.0);
     s.add("sheetMetalStart", |p| {
@@ -1524,4 +1524,16 @@ fn sheet_metal_model_adds_std_s_flip_manipulator() {
     let before = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions { upto: Some(s.ps.features.len() - 1), ..Default::default() }).context;
     let changed = noshape_model::custom::std_feature::manipulator_change_in((*before).clone(), &f.type_id, f.id, &f.name, &s.units, &f.params, key, &moved).expect("std's change function ran");
     assert_eq!(changed.get("flipDirectionUp"), Some(&ParamValue::Bool(true)), "{changed:?}");
+}
+
+/// T2 tool: qa4's enclosure (std sheet metal through FeatureScript) once to warm up, then sampled into
+/// NOSHAPE_SAMPLE_OUT, with its time.
+#[test]
+#[ignore = "T2 tool: NOSHAPE_SAMPLE_OUT"]
+fn fs_sheet_metal_profile() {
+    let out = std::env::var("NOSHAPE_SAMPLE_OUT").unwrap_or_else(|_| "/tmp/fs-sm.txt".into());
+    qa4_s1_enclosure_as_live();
+    let t = std::time::Instant::now();
+    crate::sampler::sample(std::path::Path::new(&out), qa4_s1_enclosure_as_live);
+    eprintln!("fs sheet metal warm: {:.2?}", t.elapsed());
 }
