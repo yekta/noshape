@@ -578,6 +578,11 @@ fn live_matches() {
         for case in ours["cases"].as_array().unwrap() {
             let name = case["case"].as_str().unwrap();
             let Some(l) = live["cases"].get(name) else { continue };
+            // Not an answer: Onshape refused the posted spline JSON's form
+            // (batch 2, to be reposted).
+            if l["message"].as_str().is_some_and(|m| m.contains("could not be updated after solve")) {
+                continue;
+            }
             cases += 1;
             let solved = case["ours"]["status"] == "solved";
             match l["solved"].as_bool() {

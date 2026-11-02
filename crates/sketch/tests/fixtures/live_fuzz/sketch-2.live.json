@@ -1,0 +1,1943 @@
+{
+ "note": "Live 2026-11-02, Part Studio \"skasm fuzz 2\" (021fdbe9\u2026) in \"skasm speed\". One sketch per case POSTed on Top via REST, as in batch 1 (skasm-sketch-1.live.json; same field meanings). feature/message = feature-list row tooltip. points = evVertexPoint per start/end id; arc/circle centre+radius from evCurveDefinition; non-line/non-circle curves (conics) also sampled at 25/50/75 % arc length (\"samples\"). For unsolved sketches the points are the stored positions, not a solution. curves = editor colour at the curve midpoint (black fully, blue under, red over). drags: done in the sketch editor with Shift held (no snap); constraint count before = after for every case (no constraint added); \"after\" = /sketches geometry after accepting the sketch. Spline cases (all with the posted spline JSON) fail with \"Sketch geometry could not be updated after solve.\" \u2014 see HANDOFF-live.md request \"1772 spline JSON form\"; those are PARTLY answered and will be reposted.",
+ "cases": {
+  "s101": {
+   "feature": "WARNING",
+   "message": "s101 [Sketch] did not regenerate properly: Sketch could not be solved.",
+   "solved": false,
+   "points": {
+    "q1.end": [
+     25.713027,
+     -2.459957
+    ],
+    "q1.start": [
+     -4.949119,
+     -2.459957
+    ],
+    "l2.end": [
+     -4.949119,
+     -2.459957
+    ],
+    "l2.start": [
+     25.713027,
+     -2.459957
+    ],
+    "c3.center": [
+     61.998608,
+     3.674153
+    ]
+   },
+   "radii": {
+    "c3": 9.167647
+   },
+   "samples": {
+    "q1": {
+     "ctype": "OTHER",
+     "len": 34.465838,
+     "at_0.25_0.5_0.75": [
+      [
+       1.8242,
+       2.759858
+      ],
+      [
+       10.205034,
+       4.354128
+      ],
+      [
+       18.493112,
+       2.198037
+      ]
+     ]
+    }
+   },
+   "curves": {
+    "l2": "fully  (pixel mix {\"red\": 10, \"black\": 22})",
+    "c3": "over",
+    "q1": "over"
+   }
+  },
+  "s102": {
+   "feature": "OK",
+   "message": "s102 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     3.096805,
+     16.346936
+    ],
+    "l1.start": [
+     5.765695,
+     12.630948
+    ],
+    "l2.end": [
+     -23.762489,
+     12.952551
+    ],
+    "l2.start": [
+     3.096805,
+     16.346936
+    ],
+    "l3.end": [
+     -20.825056,
+     -10.290945
+    ],
+    "l3.start": [
+     -23.762489,
+     12.952551
+    ],
+    "l4.end": [
+     -11.898298,
+     -7.885554
+    ],
+    "l4.start": [
+     -20.825056,
+     -10.290945
+    ],
+    "l5.end": [
+     5.765695,
+     12.630948
+    ],
+    "l5.start": [
+     -11.898298,
+     -7.885554
+    ],
+    "l6.end": [
+     52.465265,
+     4.033067
+    ],
+    "l6.start": [
+     49.495118,
+     7.512977
+    ],
+    "a7.center": [
+     58.429545,
+     9.123656
+    ],
+    "a7.end": [
+     65.550073,
+     5.83963
+    ],
+    "a7.start": [
+     52.465265,
+     4.033067
+    ],
+    "l8.end": [
+     73.926251,
+     24.001117
+    ],
+    "l8.start": [
+     65.550073,
+     5.83963
+    ]
+   },
+   "radii": {
+    "a7": 7.841348
+   },
+   "curves": {
+    "l1": "under",
+    "l2": "under",
+    "l3": "under",
+    "l4": "under  (pixel mix {\"blue\": 10, \"black\": 5})",
+    "l5": "under",
+    "l6": "under  (pixel mix {\"blue\": 27, \"black\": 4})",
+    "a7": "under",
+    "l8": "under"
+   },
+   "drag": {
+    "point": "l1.start",
+    "to": [
+     19.563849557061317,
+     9.09622680590391
+    ],
+    "shift_held": true,
+    "constraints_after": 15,
+    "after": {
+     "l1.start": [
+      19.586332,
+      9.226619
+     ],
+     "l1.end": [
+      4.329942,
+      13.794332
+     ],
+     "l2.start": [
+      4.329942,
+      13.794332
+     ],
+     "l2.end": [
+      -30.249221,
+      9.424336
+     ],
+     "l3.start": [
+      -30.249221,
+      9.424336
+     ],
+     "l3.end": [
+      -27.458757,
+      -12.656209
+     ],
+     "l4.start": [
+      -27.458757,
+      -12.656209
+     ],
+     "l4.end": [
+      -10.641884,
+      -8.124758
+     ],
+     "l5.start": [
+      -10.641884,
+      -8.124758
+     ],
+     "l5.end": [
+      19.586332,
+      9.226619
+     ],
+     "l6.start": [
+      40.867025,
+      11.705525
+     ],
+     "l6.end": [
+      53.979394,
+      2.667427
+     ],
+     "a7.center": [
+      58.429545,
+      9.123656
+     ],
+     "a7.radius": 7.841348,
+     "a7.start": [
+      53.979394,
+      2.667427
+     ],
+     "a7.end": [
+      65.550073,
+      5.83963
+     ],
+     "l8.start": [
+      65.550073,
+      5.83963
+     ],
+     "l8.end": [
+      73.926251,
+      24.001117
+     ]
+    }
+   }
+  },
+  "s103": {
+   "feature": "WARNING",
+   "message": "s103 [Sketch] did not regenerate properly: Sketch geometry could not be updated after solve.",
+   "solved": false,
+   "points": {
+    "l2.end": [
+     5.417716,
+     26.009355
+    ],
+    "l2.start": [
+     31.223692,
+     26.009355
+    ],
+    "l3.end": [
+     101.175778,
+     -1.13645
+    ],
+    "l3.start": [
+     64.273131,
+     -1.13645
+    ],
+    "l4.end": [
+     101.175778,
+     22.23991
+    ],
+    "l4.start": [
+     101.175778,
+     -1.13645
+    ],
+    "l5.end": [
+     64.273131,
+     22.23991
+    ],
+    "l5.start": [
+     101.175778,
+     22.23991
+    ],
+    "l6.end": [
+     64.273131,
+     -1.13645
+    ],
+    "l6.start": [
+     64.273131,
+     22.23991
+    ]
+   },
+   "note": "spline case: the posted spline JSON is not in the form Onshape solves (\"Sketch geometry could not be updated after solve.\"); points are the stored positions. Redo when the spline form in HANDOFF-live.md \"1772 spline JSON form\" is agreed.",
+   "drag": "not run (spline case; sketch did not solve as posted)"
+  },
+  "s104": {
+   "feature": "OK",
+   "message": "s104 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     41.910551,
+     -2.559608
+    ],
+    "l1.start": [
+     4.155294,
+     -2.559608
+    ],
+    "l2.end": [
+     41.910551,
+     20.412955
+    ],
+    "l2.start": [
+     41.910551,
+     -2.559608
+    ],
+    "l3.end": [
+     4.155294,
+     20.412955
+    ],
+    "l3.start": [
+     41.910551,
+     20.412955
+    ],
+    "l4.end": [
+     4.155294,
+     -2.559608
+    ],
+    "l4.start": [
+     4.155294,
+     20.412955
+    ],
+    "l5.end": [
+     58.509337,
+     -0.931211
+    ],
+    "l5.start": [
+     38.509337,
+     -0.931211
+    ],
+    "a6.center": [
+     58.509337,
+     10.497789
+    ],
+    "a6.end": [
+     69.938337,
+     10.497789
+    ],
+    "a6.start": [
+     58.509337,
+     -0.931211
+    ],
+    "l7.end": [
+     69.938337,
+     30.497789
+    ],
+    "l7.start": [
+     69.938337,
+     10.497789
+    ],
+    "l8.end": [
+     105.179961,
+     18.339196
+    ],
+    "l8.start": [
+     138.753752,
+     -0.491988
+    ],
+    "l9.end": [
+     105.179961,
+     -21.53318
+    ],
+    "l9.start": [
+     105.179961,
+     18.339196
+    ],
+    "l10.end": [
+     138.753752,
+     -0.491988
+    ],
+    "l10.start": [
+     105.179961,
+     -21.53318
+    ]
+   },
+   "radii": {
+    "a6": 11.429
+   },
+   "curves": {
+    "l1": "under",
+    "l2": "under",
+    "l3": "under",
+    "l4": "under",
+    "l5": "under",
+    "a6": "under",
+    "l7": "under",
+    "l8": "under",
+    "l9": "under",
+    "l10": "under"
+   },
+   "drag": {
+    "point": "l1.start",
+    "to": [
+     9.143500692886814,
+     0.4332166775124966
+    ],
+    "shift_held": true,
+    "constraints_after": 20,
+    "after": {
+     "l1.start": [
+      9.215006,
+      0.647482
+     ],
+     "l1.end": [
+      41.910551,
+      0.647482
+     ],
+     "l2.start": [
+      41.910551,
+      0.647482
+     ],
+     "l2.end": [
+      41.910551,
+      30.382972
+     ],
+     "l3.start": [
+      41.910551,
+      30.382972
+     ],
+     "l3.end": [
+      9.215006,
+      30.382972
+     ],
+     "l4.start": [
+      9.215006,
+      30.382972
+     ],
+     "l4.end": [
+      9.215006,
+      0.647482
+     ],
+     "l5.start": [
+      38.509337,
+      -0.931211
+     ],
+     "l5.end": [
+      58.509337,
+      -0.931211
+     ],
+     "a6.center": [
+      58.509337,
+      10.497789
+     ],
+     "a6.radius": 11.429,
+     "a6.start": [
+      58.509337,
+      -0.931211
+     ],
+     "a6.end": [
+      69.938337,
+      10.497789
+     ],
+     "l7.start": [
+      69.938337,
+      10.497789
+     ],
+     "l7.end": [
+      69.938337,
+      30.497789
+     ],
+     "l8.start": [
+      138.753752,
+      -0.491988
+     ],
+     "l8.end": [
+      105.179961,
+      18.339196
+     ],
+     "l9.start": [
+      105.179961,
+      18.339196
+     ],
+     "l9.end": [
+      105.179961,
+      -21.53318
+     ],
+     "l10.start": [
+      105.179961,
+      -21.53318
+     ],
+     "l10.end": [
+      138.753752,
+      -0.491988
+     ]
+    }
+   }
+  },
+  "s105": {
+   "feature": "WARNING",
+   "message": "s105 [Sketch] did not regenerate properly: Sketch could not be solved.",
+   "solved": false,
+   "points": {
+    "l1.end": [
+     -4.353484,
+     -1.572992
+    ],
+    "l1.start": [
+     -24.353484,
+     -1.572992
+    ],
+    "a2.center": [
+     -4.353484,
+     10.451008
+    ],
+    "a2.end": [
+     7.670516,
+     10.451008
+    ],
+    "a2.start": [
+     -4.353484,
+     -1.572992
+    ],
+    "l3.end": [
+     7.670516,
+     30.451008
+    ],
+    "l3.start": [
+     7.670516,
+     10.451008
+    ]
+   },
+   "radii": {
+    "a2": 12.024
+   },
+   "curves": {
+    "l1": "over  (pixel mix {\"red\": 37, \"blue\": 8})",
+    "a2": "under",
+    "l3": "over  (pixel mix {\"red\": 22, \"blue\": 12})"
+   }
+  },
+  "s106": {
+   "feature": "OK",
+   "message": "s106 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "q1.end": [
+     28.973996,
+     -2.377943
+    ],
+    "q1.start": [
+     -1.863398,
+     -2.377943
+    ],
+    "l2.end": [
+     -1.863398,
+     -2.377943
+    ],
+    "l2.start": [
+     28.973996,
+     -2.377943
+    ],
+    "l3.end": [
+     58.371158,
+     2.694587
+    ],
+    "l3.start": [
+     38.371158,
+     2.694587
+    ],
+    "a4.center": [
+     58.371158,
+     16.924238
+    ],
+    "a4.end": [
+     72.600809,
+     16.924238
+    ],
+    "a4.start": [
+     58.371158,
+     2.694587
+    ],
+    "l5.end": [
+     72.600809,
+     37.010258
+    ],
+    "l5.start": [
+     72.600809,
+     16.924238
+    ]
+   },
+   "radii": {
+    "a4": 14.229651
+   },
+   "samples": {
+    "q1": {
+     "ctype": "OTHER",
+     "len": 33.551918,
+     "at_0.25_0.5_0.75": [
+      [
+       5.673228,
+       1.290132
+      ],
+      [
+       13.772514,
+       3.357726
+      ],
+      [
+       21.999329,
+       2.199482
+      ]
+     ]
+    }
+   },
+   "curves": {
+    "l2": "under",
+    "l3": "under",
+    "a4": "under",
+    "l5": "under",
+    "q1": "under"
+   },
+   "drag": {
+    "point": "q1.start",
+    "to": [
+     3.1366024496119236,
+     0.6220567636919192
+    ],
+    "shift_held": true,
+    "constraints_after": 13,
+    "after": {
+     "q1.start": [
+      3.063926,
+      0.809353
+     ],
+     "q1.end": [
+      25.031802,
+      0.809353
+     ],
+     "q1.0.internal": [
+      -0.695135,
+      -1.059675
+     ],
+     "q1.2.internal": [
+      28.977067,
+      -2.373495
+     ],
+     "l2.start": [
+      25.031802,
+      0.809353
+     ],
+     "l2.end": [
+      3.063926,
+      0.809353
+     ],
+     "l3.start": [
+      38.371158,
+      2.694587
+     ],
+     "l3.end": [
+      58.371158,
+      2.694587
+     ],
+     "a4.center": [
+      58.371158,
+      16.924238
+     ],
+     "a4.radius": 14.229651,
+     "a4.start": [
+      58.371158,
+      2.694587
+     ],
+     "a4.end": [
+      72.600809,
+      16.924238
+     ],
+     "l5.start": [
+      72.600809,
+      16.924238
+     ],
+     "l5.end": [
+      72.600809,
+      37.010258
+     ]
+    }
+   }
+  },
+  "s107": {
+   "feature": "WARNING",
+   "message": "s107 [Sketch] did not regenerate properly: Sketch could not be solved.",
+   "solved": false,
+   "points": {
+    "l1.end": [
+     -2.609536,
+     2.381371
+    ],
+    "l1.start": [
+     -22.609536,
+     2.381371
+    ],
+    "a2.center": [
+     -2.609536,
+     8.945726
+    ],
+    "a2.end": [
+     3.954819,
+     8.945726
+    ],
+    "a2.start": [
+     -2.609536,
+     2.381371
+    ],
+    "l3.end": [
+     3.954819,
+     28.945726
+    ],
+    "l3.start": [
+     3.954819,
+     8.945726
+    ],
+    "l4.end": [
+     94.27188,
+     -5.111292
+    ],
+    "l4.start": [
+     59.692727,
+     -5.111292
+    ],
+    "a5.center": [
+     94.27188,
+     -1.057397
+    ],
+    "a5.end": [
+     94.27188,
+     2.996498
+    ],
+    "a5.start": [
+     94.27188,
+     -5.111292
+    ],
+    "l6.end": [
+     59.692727,
+     2.996498
+    ],
+    "l6.start": [
+     94.27188,
+     2.996498
+    ],
+    "a7.center": [
+     59.692727,
+     -1.057397
+    ],
+    "a7.end": [
+     59.692727,
+     -5.111292
+    ],
+    "a7.start": [
+     59.692727,
+     2.996498
+    ],
+    "l8.end": [
+     126.72672,
+     7.618929
+    ],
+    "l8.start": [
+     131.849284,
+     -4.117946
+    ],
+    "l9.end": [
+     114.989845,
+     2.496365
+    ],
+    "l9.start": [
+     126.72672,
+     7.618929
+    ],
+    "l10.end": [
+     109.833065,
+     -5.411909
+    ],
+    "l10.start": [
+     114.989845,
+     2.496365
+    ],
+    "l11.end": [
+     121.223208,
+     -11.265073
+    ],
+    "l11.start": [
+     109.833065,
+     -5.411909
+    ],
+    "l12.end": [
+     131.849284,
+     -4.117946
+    ],
+    "l12.start": [
+     121.223208,
+     -11.265073
+    ]
+   },
+   "radii": {
+    "a2": 6.564355,
+    "a5": 4.053895,
+    "a7": 4.053895
+   },
+   "curves": {
+    "l1": "under",
+    "a2": "under",
+    "l3": "under",
+    "l4": "under",
+    "a5": "under",
+    "l6": "under",
+    "a7": "under",
+    "l8": "under",
+    "l9": "under",
+    "l10": "over  (pixel mix {\"red\": 52, \"blue\": 3})",
+    "l11": "under",
+    "l12": "under"
+   },
+   "drag": {
+    "point": "l1.start",
+    "to": [
+     -17.60953571119931,
+     5.381370718055139
+    ],
+    "shift_held": true,
+    "constraints_after": 26,
+    "after": {
+     "l1.start": [
+      -17.655499,
+      5.503597
+     ],
+     "l1.end": [
+      -4.006102,
+      2.531651
+     ],
+     "a2.center": [
+      -2.609536,
+      8.945726
+     ],
+     "a2.radius": 6.564355,
+     "a2.start": [
+      -4.006102,
+      2.531651
+     ],
+     "a2.end": [
+      3.954819,
+      8.945726
+     ],
+     "l3.start": [
+      3.954819,
+      8.945726
+     ],
+     "l3.end": [
+      3.954819,
+      28.945726
+     ],
+     "l4.start": [
+      59.692727,
+      -5.111292
+     ],
+     "l4.end": [
+      94.27188,
+      -5.111292
+     ],
+     "a5.center": [
+      94.27188,
+      -1.057397
+     ],
+     "a5.radius": 4.053895,
+     "a5.start": [
+      94.27188,
+      -5.111292
+     ],
+     "a5.end": [
+      94.27188,
+      2.996498
+     ],
+     "l6.start": [
+      94.27188,
+      2.996498
+     ],
+     "l6.end": [
+      59.692727,
+      2.996498
+     ],
+     "a7.center": [
+      59.692727,
+      -1.057397
+     ],
+     "a7.radius": 4.053895,
+     "a7.start": [
+      59.692727,
+      2.996498
+     ],
+     "a7.end": [
+      59.692727,
+      -5.111292
+     ],
+     "l8.start": [
+      131.849284,
+      -4.117946
+     ],
+     "l8.end": [
+      126.72672,
+      7.618929
+     ],
+     "l9.start": [
+      126.72672,
+      7.618929
+     ],
+     "l9.end": [
+      114.989845,
+      2.496365
+     ],
+     "l10.start": [
+      114.989845,
+      2.496365
+     ],
+     "l10.end": [
+      109.833065,
+      -5.411909
+     ],
+     "l11.start": [
+      109.833065,
+      -5.411909
+     ],
+     "l11.end": [
+      121.223208,
+      -11.265073
+     ],
+     "l12.start": [
+      121.223208,
+      -11.265073
+     ],
+     "l12.end": [
+      131.849284,
+      -4.117946
+     ]
+    }
+   }
+  },
+  "s108": {
+   "feature": "WARNING",
+   "message": "s108 [Sketch] did not regenerate properly: Sketch geometry could not be updated after solve.",
+   "solved": false,
+   "points": {
+    "q1.end": [
+     27.716754,
+     4.178271
+    ],
+    "q1.start": [
+     -4.005479,
+     4.178271
+    ],
+    "l2.end": [
+     -4.005479,
+     4.178271
+    ],
+    "l2.start": [
+     27.716754,
+     4.178271
+    ],
+    "l3.end": [
+     60.892311,
+     14.792112
+    ],
+    "l3.start": [
+     70.737642,
+     3.911291
+    ],
+    "l4.end": [
+     47.314963,
+     3.741967
+    ],
+    "l4.start": [
+     60.892311,
+     14.792112
+    ],
+    "l5.end": [
+     59.301686,
+     -9.342726
+    ],
+    "l5.start": [
+     47.314963,
+     3.741967
+    ],
+    "l6.end": [
+     70.737642,
+     3.911291
+    ],
+    "l6.start": [
+     59.301686,
+     -9.342726
+    ],
+    "l8.end": [
+     116.265518,
+     1.438712
+    ],
+    "l8.start": [
+     133.771233,
+     1.438712
+    ]
+   },
+   "samples": {
+    "q1": {
+     "ctype": "OTHER",
+     "len": 34.085054,
+     "at_0.25_0.5_0.75": [
+      [
+       3.505412,
+       8.08051
+      ],
+      [
+       11.902444,
+       9.35451
+      ],
+      [
+       20.31904,
+       8.239541
+      ]
+     ]
+    }
+   },
+   "note": "spline case: the posted spline JSON is not in the form Onshape solves (\"Sketch geometry could not be updated after solve.\"); points are the stored positions. Redo when the spline form in HANDOFF-live.md \"1772 spline JSON form\" is agreed.",
+   "drag": "not run (spline case; sketch did not solve as posted)"
+  },
+  "s109": {
+   "feature": "WARNING",
+   "message": "s109 [Sketch] did not regenerate properly: Sketch geometry could not be updated after solve.",
+   "solved": false,
+   "points": {
+    "l2.end": [
+     -1.987179,
+     1.202932
+    ],
+    "l2.start": [
+     25.932821,
+     1.202932
+    ],
+    "l3.end": [
+     49.126684,
+     9.725065
+    ],
+    "l3.start": [
+     68.146499,
+     1.202932
+    ],
+    "l4.end": [
+     48.530235,
+     -11.57777
+    ],
+    "l4.start": [
+     49.126684,
+     9.725065
+    ],
+    "l5.end": [
+     68.146499,
+     1.202932
+    ],
+    "l5.start": [
+     48.530235,
+     -11.57777
+    ]
+   },
+   "note": "spline case: the posted spline JSON is not in the form Onshape solves (\"Sketch geometry could not be updated after solve.\"); points are the stored positions. Redo when the spline form in HANDOFF-live.md \"1772 spline JSON form\" is agreed."
+  },
+  "s110": {
+   "feature": "WARNING",
+   "message": "s110 [Sketch] did not regenerate properly: Sketch could not be solved.",
+   "solved": false,
+   "points": {
+    "l1.end": [
+     -1.357549,
+     -1.183772
+    ],
+    "l1.start": [
+     -21.357549,
+     -1.183772
+    ],
+    "a2.center": [
+     -1.357549,
+     4.524378
+    ],
+    "a2.end": [
+     4.3506,
+     4.524378
+    ],
+    "a2.start": [
+     -1.357549,
+     -1.183772
+    ],
+    "l3.end": [
+     4.3506,
+     24.524378
+    ],
+    "l3.start": [
+     4.3506,
+     4.524378
+    ],
+    "q4.end": [
+     85.485322,
+     4.524378
+    ],
+    "q4.start": [
+     63.010368,
+     4.524378
+    ],
+    "l5.end": [
+     63.010368,
+     4.524378
+    ],
+    "l5.start": [
+     85.485322,
+     4.524378
+    ],
+    "l6.end": [
+     154.543987,
+     0.610398
+    ],
+    "l6.start": [
+     124.410892,
+     0.610398
+    ],
+    "l7.end": [
+     154.543987,
+     24.847677
+    ],
+    "l7.start": [
+     154.543987,
+     0.610398
+    ],
+    "l8.end": [
+     124.410892,
+     24.847677
+    ],
+    "l8.start": [
+     154.543987,
+     24.847677
+    ],
+    "l9.end": [
+     124.410892,
+     0.610398
+    ],
+    "l9.start": [
+     124.410892,
+     24.847677
+    ]
+   },
+   "radii": {
+    "a2": 5.70815
+   },
+   "samples": {
+    "q4": {
+     "ctype": "OTHER",
+     "len": 23.855077,
+     "at_0.25_0.5_0.75": [
+      [
+       68.539083,
+       6.738377
+      ],
+      [
+       74.39176,
+       7.819746
+      ],
+      [
+       80.311251,
+       7.342527
+      ]
+     ]
+    }
+   },
+   "curves": {
+    "l1": "under",
+    "a2": "under",
+    "l3": "under",
+    "l5": "under",
+    "l6": "over  (pixel mix {\"blue\": 17, \"red\": 30})",
+    "l7": "under",
+    "l8": "under",
+    "l9": "under",
+    "q4": "under"
+   },
+   "drag": {
+    "point": "l1.start",
+    "to": [
+     -16.35767028439979,
+     -1.0433097904500306
+    ],
+    "shift_held": true,
+    "constraints_after": 20,
+    "after": {
+     "l1.start": [
+      -16.397076,
+      -0.809353
+     ],
+     "l1.end": [
+      -1.500291,
+      -1.181987
+     ],
+     "a2.center": [
+      -1.357549,
+      4.524378
+     ],
+     "a2.radius": 5.70815,
+     "a2.start": [
+      -1.500291,
+      -1.181987
+     ],
+     "a2.end": [
+      4.3506,
+      4.524378
+     ],
+     "l3.start": [
+      4.3506,
+      4.524378
+     ],
+     "l3.end": [
+      4.3506,
+      24.524378
+     ],
+     "q4.start": [
+      63.010368,
+      4.524378
+     ],
+     "q4.end": [
+      85.485322,
+      4.524378
+     ],
+     "q4.0.internal": [
+      63.010368,
+      4.524378
+     ],
+     "q4.2.internal": [
+      85.485322,
+      4.524378
+     ],
+     "l5.start": [
+      85.485322,
+      4.524378
+     ],
+     "l5.end": [
+      63.010368,
+      4.524378
+     ],
+     "l6.start": [
+      124.410892,
+      0.610398
+     ],
+     "l6.end": [
+      154.543987,
+      0.610398
+     ],
+     "l7.start": [
+      154.543987,
+      0.610398
+     ],
+     "l7.end": [
+      154.543987,
+      24.847677
+     ],
+     "l8.start": [
+      154.543987,
+      24.847677
+     ],
+     "l8.end": [
+      124.410892,
+      24.847677
+     ],
+     "l9.start": [
+      124.410892,
+      24.847677
+     ],
+     "l9.end": [
+      124.410892,
+      0.610398
+     ]
+    }
+   }
+  },
+  "s111": {
+   "feature": "WARNING",
+   "message": "s111 [Sketch] did not regenerate properly: Sketch geometry could not be updated after solve.",
+   "solved": false,
+   "points": {
+    "l1.end": [
+     -1.159411,
+     -2.798514
+    ],
+    "l1.start": [
+     -21.159411,
+     -2.798514
+    ],
+    "a2.center": [
+     -1.159411,
+     4.337411
+    ],
+    "a2.end": [
+     5.976514,
+     4.337411
+    ],
+    "a2.start": [
+     -1.159411,
+     -2.798514
+    ],
+    "l3.end": [
+     5.976514,
+     24.676031
+    ],
+    "l3.start": [
+     5.976514,
+     4.337411
+    ],
+    "l5.end": [
+     60.604633,
+     -2.798514
+    ],
+    "l5.start": [
+     79.061565,
+     -2.798514
+    ],
+    "l7.end": [
+     147.256482,
+     6.340443
+    ],
+    "l7.start": [
+     167.595102,
+     6.340443
+    ]
+   },
+   "radii": {
+    "a2": 7.135925
+   },
+   "note": "spline case: the posted spline JSON is not in the form Onshape solves (\"Sketch geometry could not be updated after solve.\"); points are the stored positions. Redo when the spline form in HANDOFF-live.md \"1772 spline JSON form\" is agreed.",
+   "drag": "not run (spline case; sketch did not solve as posted)"
+  },
+  "s112": {
+   "feature": "WARNING",
+   "message": "s112 [Sketch] did not regenerate properly: Sketch could not be solved.",
+   "solved": false,
+   "points": {
+    "q1.end": [
+     14.0539,
+     -1.836212
+    ],
+    "q1.start": [
+     -4.5211,
+     -1.836212
+    ],
+    "l2.end": [
+     -4.5211,
+     -1.836212
+    ],
+    "l2.start": [
+     14.0539,
+     -1.836212
+    ],
+    "c3.center": [
+     56.465982,
+     2.239222
+    ]
+   },
+   "radii": {
+    "c3": 5.611604
+   },
+   "samples": {
+    "q1": {
+     "ctype": "OTHER",
+     "len": 19.337792,
+     "at_0.25_0.5_0.75": [
+      [
+       -0.106803,
+       0.044036
+      ],
+      [
+       4.701329,
+       0.4011
+      ],
+      [
+       9.477956,
+       -0.295308
+      ]
+     ]
+    }
+   },
+   "curves": {
+    "l2": "fully  (pixel mix {\"blue\": 9, \"black\": 24})",
+    "c3": "over",
+    "q1": "under"
+   }
+  },
+  "s113": {
+   "feature": "WARNING",
+   "message": "s113 [Sketch] did not regenerate properly: Sketch geometry could not be updated after solve.",
+   "solved": false,
+   "points": {
+    "l2.end": [
+     0.574889,
+     -3.270975
+    ],
+    "l2.start": [
+     15.374889,
+     -3.270975
+    ],
+    "l3.end": [
+     75.472343,
+     -8.869572
+    ],
+    "l3.start": [
+     60.672343,
+     -8.869572
+    ],
+    "a4.center": [
+     75.472343,
+     -3.782572
+    ],
+    "a4.end": [
+     75.472343,
+     1.304428
+    ],
+    "a4.start": [
+     75.472343,
+     -8.869572
+    ],
+    "l5.end": [
+     60.672343,
+     1.304428
+    ],
+    "l5.start": [
+     75.472343,
+     1.304428
+    ],
+    "a6.center": [
+     60.672343,
+     -3.782572
+    ],
+    "a6.end": [
+     60.672343,
+     -8.869572
+    ],
+    "a6.start": [
+     60.672343,
+     1.304428
+    ]
+   },
+   "radii": {
+    "a4": 5.087,
+    "a6": 5.087
+   },
+   "note": "spline case: the posted spline JSON is not in the form Onshape solves (\"Sketch geometry could not be updated after solve.\"); points are the stored positions. Redo when the spline form in HANDOFF-live.md \"1772 spline JSON form\" is agreed.",
+   "drag": "not run (spline case; sketch did not solve as posted)"
+  },
+  "s114": {
+   "feature": "WARNING",
+   "message": "s114 [Sketch] did not regenerate properly: Sketch geometry could not be updated after solve.",
+   "solved": false,
+   "points": {
+    "l2.end": [
+     -1.070068,
+     3.630095
+    ],
+    "l2.start": [
+     23.524943,
+     3.630095
+    ],
+    "l3.end": [
+     80.066211,
+     -4.992905
+    ],
+    "l3.start": [
+     55.4712,
+     -4.992905
+    ],
+    "a4.center": [
+     80.066211,
+     3.630095
+    ],
+    "a4.end": [
+     80.066211,
+     12.253095
+    ],
+    "a4.start": [
+     80.066211,
+     -4.992905
+    ],
+    "l5.end": [
+     55.4712,
+     12.253095
+    ],
+    "l5.start": [
+     80.066211,
+     12.253095
+    ],
+    "a6.center": [
+     55.4712,
+     3.630095
+    ],
+    "a6.end": [
+     55.4712,
+     -4.992905
+    ],
+    "a6.start": [
+     55.4712,
+     12.253095
+    ]
+   },
+   "radii": {
+    "a4": 8.623,
+    "a6": 8.623
+   },
+   "note": "spline case: the posted spline JSON is not in the form Onshape solves (\"Sketch geometry could not be updated after solve.\"); points are the stored positions. Redo when the spline form in HANDOFF-live.md \"1772 spline JSON form\" is agreed.",
+   "drag": "not run (spline case; sketch did not solve as posted)"
+  },
+  "s115": {
+   "feature": "OK",
+   "message": "s115 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     -4.897004,
+     -3.819833
+    ],
+    "l1.start": [
+     -26.789004,
+     -3.819833
+    ],
+    "a2.center": [
+     -4.897004,
+     8.069059
+    ],
+    "a2.end": [
+     6.991889,
+     8.069059
+    ],
+    "a2.start": [
+     -4.897004,
+     -3.819833
+    ],
+    "l3.end": [
+     6.991889,
+     28.069059
+    ],
+    "l3.start": [
+     6.991889,
+     8.069059
+    ],
+    "l4.end": [
+     102.867931,
+     1.855085
+    ],
+    "l4.start": [
+     66.475931,
+     1.855085
+    ],
+    "l5.end": [
+     102.867931,
+     25.372085
+    ],
+    "l5.start": [
+     102.867931,
+     1.855085
+    ],
+    "l6.end": [
+     66.475931,
+     25.372085
+    ],
+    "l6.start": [
+     102.867931,
+     25.372085
+    ],
+    "l7.end": [
+     66.475931,
+     1.855085
+    ],
+    "l7.start": [
+     66.475931,
+     25.372085
+    ]
+   },
+   "radii": {
+    "a2": 11.888892
+   },
+   "curves": {
+    "l1": "fully  (pixel mix {\"blue\": 4, \"black\": 30})",
+    "a2": "under",
+    "l3": "under",
+    "l4": "fully  (pixel mix {\"blue\": 9, \"black\": 19})",
+    "l5": "fully  (pixel mix {\"black\": 9, \"blue\": 4})",
+    "l6": "under",
+    "l7": "under"
+   },
+   "drag": {
+    "point": "l1.start",
+    "to": [
+     -21.23412012968498,
+     -0.7061697626573404
+    ],
+    "shift_held": true,
+    "constraints_after": 17,
+    "after": {
+     "l1.start": [
+      -21.202452,
+      -0.485612
+     ],
+     "l1.end": [
+      0.689548,
+      -0.485612
+     ],
+     "a2.center": [
+      0.689548,
+      5.81673
+     ],
+     "a2.radius": 6.302341,
+     "a2.start": [
+      0.689548,
+      -0.485612
+     ],
+     "a2.end": [
+      6.991889,
+      5.81673
+     ],
+     "l3.start": [
+      6.991889,
+      5.81673
+     ],
+     "l3.end": [
+      6.991889,
+      28.069059
+     ],
+     "l4.start": [
+      66.475931,
+      1.855085
+     ],
+     "l4.end": [
+      102.867931,
+      1.855085
+     ],
+     "l5.start": [
+      102.867931,
+      1.855085
+     ],
+     "l5.end": [
+      102.867931,
+      25.372085
+     ],
+     "l6.start": [
+      102.867931,
+      25.372085
+     ],
+     "l6.end": [
+      66.475931,
+      25.372085
+     ],
+     "l7.start": [
+      66.475931,
+      25.372085
+     ],
+     "l7.end": [
+      66.475931,
+      1.855085
+     ]
+    }
+   }
+  },
+  "s116": {
+   "feature": "OK",
+   "message": "s116 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "q1.end": [
+     22.500757,
+     -1.896547
+    ],
+    "q1.start": [
+     -2.060243,
+     -1.896547
+    ],
+    "l2.end": [
+     -2.060243,
+     -1.896547
+    ],
+    "l2.start": [
+     22.500757,
+     -1.896547
+    ]
+   },
+   "samples": {
+    "q1": {
+     "ctype": "OTHER",
+     "len": 26.246134,
+     "at_0.25_0.5_0.75": [
+      [
+       4.039636,
+       0.517193
+      ],
+      [
+       10.392184,
+       2.109619
+      ],
+      [
+       16.848411,
+       1.39146
+      ]
+     ]
+    }
+   },
+   "curves": {
+    "l2": "fully  (pixel mix {\"blue\": 10, \"black\": 18})",
+    "q1": "under"
+   },
+   "drag": {
+    "point": "q1.start",
+    "to": [
+     4.003477327277963,
+     1.1034527944133883
+    ],
+    "shift_held": true,
+    "constraints_after": 10,
+    "after": {
+     "q1.start": [
+      4.049348,
+      1.294964
+     ],
+     "q1.end": [
+      28.610348,
+      1.294964
+     ],
+     "q1.0.internal": [
+      1.938221,
+      0.364669
+     ],
+     "q1.2.internal": [
+      28.610348,
+      1.294964
+     ],
+     "l2.start": [
+      28.610348,
+      1.294964
+     ],
+     "l2.end": [
+      4.049348,
+      1.294964
+     ]
+    }
+   }
+  },
+  "s117": {
+   "feature": "WARNING",
+   "message": "s117 [Sketch] did not regenerate properly: Sketch geometry could not be updated after solve.",
+   "solved": false,
+   "points": {
+    "l1.end": [
+     2.731936,
+     -0.878503
+    ],
+    "l1.start": [
+     -15.557064,
+     -0.878503
+    ],
+    "a2.center": [
+     2.731936,
+     13.907569
+    ],
+    "a2.end": [
+     17.518007,
+     13.907569
+    ],
+    "a2.start": [
+     2.731936,
+     -0.878503
+    ],
+    "l3.end": [
+     17.518007,
+     32.196569
+    ],
+    "l3.start": [
+     17.518007,
+     13.907569
+    ],
+    "c4.center": [
+     56.44594,
+     -3.109526
+    ],
+    "c5.center": [
+     56.44594,
+     -3.109526
+    ],
+    "l7.end": [
+     115.406088,
+     -0.600158
+    ],
+    "l7.start": [
+     133.695088,
+     -0.600158
+    ]
+   },
+   "radii": {
+    "a2": 14.786072,
+    "c4": 7.241145,
+    "c5": 4.014
+   },
+   "note": "spline case: the posted spline JSON is not in the form Onshape solves (\"Sketch geometry could not be updated after solve.\"); points are the stored positions. Redo when the spline form in HANDOFF-live.md \"1772 spline JSON form\" is agreed."
+  },
+  "s118": {
+   "feature": "WARNING",
+   "message": "s118 [Sketch] did not regenerate properly: Sketch geometry could not be updated after solve.",
+   "solved": false,
+   "points": {
+    "l2.end": [
+     1.683684,
+     -4.729256
+    ],
+    "l2.start": [
+     22.87285,
+     -4.729256
+    ],
+    "l3.end": [
+     81.823012,
+     -1.292197
+    ],
+    "l3.start": [
+     49.764586,
+     -1.292197
+    ],
+    "l4.end": [
+     81.109227,
+     14.108916
+    ],
+    "l4.start": [
+     81.823012,
+     -1.292197
+    ],
+    "l5.end": [
+     49.764586,
+     14.108916
+    ],
+    "l5.start": [
+     81.109227,
+     14.108916
+    ],
+    "l6.end": [
+     49.764586,
+     -1.292197
+    ],
+    "l6.start": [
+     49.764586,
+     14.108916
+    ]
+   },
+   "note": "spline case: the posted spline JSON is not in the form Onshape solves (\"Sketch geometry could not be updated after solve.\"); points are the stored positions. Redo when the spline form in HANDOFF-live.md \"1772 spline JSON form\" is agreed.",
+   "drag": "not run (spline case; sketch did not solve as posted)"
+  },
+  "s119": {
+   "feature": "WARNING",
+   "message": "s119 [Sketch] did not regenerate properly: Sketch geometry could not be updated after solve.",
+   "solved": false,
+   "points": {
+    "q1.end": [
+     38.563591,
+     -1.774065
+    ],
+    "q1.start": [
+     3.796674,
+     -1.774065
+    ],
+    "l2.end": [
+     3.796674,
+     -1.774065
+    ],
+    "l2.start": [
+     38.563591,
+     -1.774065
+    ],
+    "l4.end": [
+     57.228482,
+     -1.774065
+    ],
+    "l4.start": [
+     73.565864,
+     -1.774065
+    ]
+   },
+   "samples": {
+    "q1": {
+     "ctype": "OTHER",
+     "len": 35.277027,
+     "at_0.25_0.5_0.75": [
+      [
+       12.475875,
+       -0.219263
+      ],
+      [
+       21.252593,
+       0.611209
+      ],
+      [
+       30.061161,
+       0.399053
+      ]
+     ]
+    }
+   },
+   "note": "spline case: the posted spline JSON is not in the form Onshape solves (\"Sketch geometry could not be updated after solve.\"); points are the stored positions. Redo when the spline form in HANDOFF-live.md \"1772 spline JSON form\" is agreed.",
+   "drag": "not run (spline case; sketch did not solve as posted)"
+  },
+  "s120": {
+   "feature": "WARNING",
+   "message": "s120 [Sketch] did not regenerate properly: Sketch geometry could not be updated after solve.",
+   "solved": false,
+   "points": {
+    "l2.end": [
+     -1.299272,
+     -2.708509
+    ],
+    "l2.start": [
+     55.947855,
+     -0.997595
+    ],
+    "l4.end": [
+     80.598872,
+     2.202427
+    ],
+    "l4.start": [
+     109.331029,
+     2.202427
+    ],
+    "l5.end": [
+     181.079713,
+     7.198623
+    ],
+    "l5.start": [
+     153.030926,
+     7.198623
+    ],
+    "l6.end": [
+     181.079713,
+     20.956144
+    ],
+    "l6.start": [
+     181.079713,
+     7.198623
+    ],
+    "l7.end": [
+     153.030926,
+     20.956144
+    ],
+    "l7.start": [
+     181.079713,
+     20.956144
+    ],
+    "l8.end": [
+     153.030926,
+     7.198623
+    ],
+    "l8.start": [
+     153.030926,
+     20.956144
+    ]
+   },
+   "note": "spline case: the posted spline JSON is not in the form Onshape solves (\"Sketch geometry could not be updated after solve.\"); points are the stored positions. Redo when the spline form in HANDOFF-live.md \"1772 spline JSON form\" is agreed.",
+   "drag": "not run (spline case; sketch did not solve as posted)"
+  }
+ }
+}

@@ -484,8 +484,8 @@ fs-oracle-asm vocabulary, mates added one at a time as live does; asm-N.live.jso
 | sketch 1 (lines, arcs, circles; 11 drags) | 20 | REQUESTS 09:45 | 20 + drags + curve colours | solvability 19 → 20; positions 0–1 (least change) | 1: a redundant dimension |
 | least-change probes 1 | 14 | REQUESTS 11:30 | 14 | 4 → 14 | the least-change rule |
 | least-change probes 2 | 10 | REQUESTS 12:15 | 10 | 0 → 10 | the least-change rule |
-| asm 1 (BLOCK / PLATE / PIN, 1–4 mates) | 20 | REQUESTS 10:05 | – | – | 1 before live: f8 / f11 / f19 |
-| sketch 2 (+ fit splines, conics, angles) | 20 | REQUESTS 10:40 | – | – | – |
+| asm 1 (BLOCK / PLATE / PIN, 1–4 mates) | 20 | REQUESTS 10:05 | 20 | 15 | 1 before live (perpendicular start) |
+| sketch 2 (+ fit splines, conics, angles) | 20 | REQUESTS 10:40 | 10 (10 spline cases refused: our spline JSON form, live reposts) | solvability 10/10 | – |
 Fixed before live answered: an axial mate whose connectors start exactly perpendicular (a part inserted square to its
 mate) could solve reversed: the residual is as flat both ways, the orientation pass only turned parts more than 90°
 off. The old code accepted the reversed pose as OK; the 11-02 conflict rule then flagged it. Now the moving part is
@@ -537,6 +537,14 @@ s17 still differ (loops, tangent chains: next, case by case); onshape_ux's "leng
 (never checked against live) now moves the far end as live. S300 timings unchanged on vibe3.
 UI drags (11 in batch 1) compare ours dragged to where live's pointer ended (live lands within 0.2 mm): s12's differs
 the same way (what follows the dragged point).
+Assembly batch 1 against live (11-02 12:00): 15/20 match (statuses, messages, transforms to 1e-3 mm / 1e-6;
+live's tooltips carry "<mate> has error: " and both solvers stop near 1e-7, so the first comparison's 8/20 was
+mostly that). Open, as KNOWN in asm_fuzz_live_matches: f1 / f7 a conflicting Fastened reads "Mate overdefines the
+assembly." in live where ours (1764 (5)'s rule: a Fastened that failed before the solve) says "not consistent"; the
+orientation-holds refinement didn't separate them (one live data point for "not consistent"): needs a probe. f8 / f12:
+a Slider's free value after a large reorientation lands 44 / 47 / 33 mm further along its axis in live (ours keeps the
+connector's start position along the axis): live measures that least change about another pivot. f16: live leaves a
+Parallel of the conflicting loop OK.
 Next batches: splines / conics / angles (once live confirms their REST form), assemblies with drags and patterns.
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
