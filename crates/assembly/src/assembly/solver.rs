@@ -28,7 +28,7 @@
 use crate::assembly::MateType;
 use glam::{DMat3, DQuat, DVec3};
 use nalgebra::{DMatrix, DVector};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Rigid frame: rotation + translation.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1331,6 +1331,72 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
     solve_driven(bodies, mates, relations, drags, dof, status, memo, &driven)
 }
 
+/// A group's free bodies in placing order from the fixed parts, each with
+/// the mates to the body placed before it (its parent), when the group's
+/// mates form a tree hanging from fixed parts (two bodies a mate, several
+/// mates between one pair allowed): no relations, drags, stays or pattern
+/// copies, every free body reached. None otherwise.
+fn tree_order(p: &Problem, free: &[usize]) -> Option<Vec<(usize, Vec<usize>)>> {
+    const ROOT: usize = usize::MAX;
+    let node = |b: usize| if free.contains(&b) { Some(b) } else if p.bodies[b].fixed { Some(ROOT) } else { None };
+    let mut pairs: HashMap<(usize, usize), Vec<usize>> = HashMap::new();
+    for t in &p.terms {
+        let Term::Mate(i) = *t else { return None };
+        let m = &p.mates[i];
+        if !m.extra.is_empty() || m.follow.is_some() || [m.a, m.b].iter().any(|&b| p.driven.is_driven.get(b).copied().unwrap_or(false) || !p.driven.dependents.get(b).is_none_or(|d| d.is_empty())) {
+            return None;
+        }
+        let (a, b) = (node(m.a)?, node(m.b)?);
+        if a == b {
+            return None;
+        }
+        pairs.entry((a.min(b), a.max(b))).or_default().push(i);
+    }
+    // Connected with one edge per free body: a tree.
+    if pairs.len() != free.len() {
+        return None;
+    }
+    let mut order = Vec::with_capacity(free.len());
+    let mut placed: HashSet<usize> = HashSet::from([ROOT]);
+    let mut queue = std::collections::VecDeque::from([ROOT]);
+    while let Some(u) = queue.pop_front() {
+        let mut next: Vec<(usize, Vec<usize>)> = pairs.iter().filter(|((a, b), _)| *a == u || *b == u).map(|((a, b), ms)| (if *a == u { *b } else { *a }, ms.clone())).filter(|(v, _)| !placed.contains(v)).collect();
+        next.sort_unstable();
+        for (v, mut ms) in next {
+            ms.sort_unstable();
+            placed.insert(v);
+            queue.push_back(v);
+            order.push((v, ms));
+        }
+    }
+    (order.len() == free.len()).then_some(order)
+}
+
+/// Each body of `order` ([`tree_order`]) solved alone against its parent's
+/// mates (Levenberg-Marquardt, then the least change from its start), in
+/// order. None when a body can't hold its mates that way.
+fn place_tree(p: &Problem, poses: &mut Vec<Frame>, order: &[(usize, Vec<usize>)], free: &[usize], anchors: &[DVec3], scale: f64) -> Option<usize> {
+    let mut iterations = 0;
+    let bound = 1e-5 * scale.max(1.0);
+    let mut buf = Vec::new();
+    for (b, ms) in order {
+        let sub = Problem { bodies: p.bodies, mates: p.mates, relations: p.relations, drags: p.drags, driven: p.driven, terms: ms.iter().map(|&i| Term::Mate(i)).collect(), scale };
+        let one = [*b];
+        iterations = iterations.max(levenberg_marquardt(&sub, poses, &one, scale, false));
+        if poses[*b] != p.bodies[*b].pose {
+            let k = free.iter().position(|f| f == b)?;
+            least_change(&sub, poses, &one, scale, &anchors[k..k + 1]);
+        }
+        if ms.iter().any(|&i| {
+            let (r, nan) = residual_max(poses, &p.mates[i], &mut buf);
+            nan || r >= bound
+        }) {
+            return None;
+        }
+    }
+    Some(iterations)
+}
+
 /// A group's solve: its free bodies' new poses, the iterations, the mates in
 /// error ([`copy_conflict`]).
 type GroupSolved = (Vec<(usize, Frame)>, usize, Vec<usize>);
@@ -1395,10 +1461,23 @@ fn solve_driven(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[So
                     return None;
                 }
                 let mut local = start.clone();
-                let iterations = levenberg_marquardt(&problem, &mut local, free, scale, dragged);
-                if !dragged && free.iter().any(|&b| local[b] != bodies[b].pose) {
-                    least_change(&problem, &mut local, free, scale);
-                }
+                let anchors: Vec<DVec3> = free.iter().map(|&b| anchor(&problem, b)).collect();
+                // A tree of mates hanging from fixed parts: each body placed
+                // from its parent alone (live 1763: the instance whose geometry
+                // changed absorbs the change, the rest stay), and a stack's
+                // small solves in place of one dense one.
+                let tree = if dragged { None } else { tree_order(&problem, free) };
+                let iterations = match tree.and_then(|order| place_tree(&problem, &mut local, &order, free, &anchors, scale)) {
+                    Some(iterations) => iterations,
+                    None => {
+                        local.clone_from(start);
+                        let iterations = levenberg_marquardt(&problem, &mut local, free, scale, dragged);
+                        if !dragged && free.iter().any(|&b| local[b] != bodies[b].pose) {
+                            least_change(&problem, &mut local, free, scale, &anchors);
+                        }
+                        iterations
+                    }
+                };
                 // A conflict on a pattern copy (live 1754 (C): a Planar
                 // pulling copy 3 off its seed's Fastened place) moves
                 // nothing; the mates it can't hold together and the copy's
@@ -1676,7 +1755,7 @@ fn levenberg_marquardt(problem: &Problem, poses: &mut Vec<Frame>, free: &[usize]
 /// a far start would leak into the others' free directions through the
 /// finite-difference Jacobian). Kept only when the mates hold as well as
 /// before.
-fn least_change(problem: &Problem, poses: &mut [Frame], free: &[usize], scale: f64) {
+fn least_change(problem: &Problem, poses: &mut [Frame], free: &[usize], scale: f64, anchors: &[DVec3]) {
     let n = free.len() * 6;
     let mut r = Vec::new();
     residuals(problem, poses, &mut r);
@@ -1695,7 +1774,7 @@ fn least_change(problem: &Problem, poses: &mut [Frame], free: &[usize], scale: f
         // not at its part origin (oracle_asm R1: a pin on a Revolute keeps
         // its turn, where pulling its far part origin back turned it −6°):
         // in coordinates (anchor move, turn), anchor move = t + w × lever.
-        let levers: Vec<DVec3> = free.iter().map(|&bi| trial[bi].rotation * anchor(problem, bi) / scale).collect();
+        let levers: Vec<DVec3> = free.iter().zip(anchors).map(|(&bi, a)| trial[bi].rotation * *a / scale).collect();
         let to_anchor = |v: &mut DMatrix<f64>, sign: f64| {
             for (k, l) in levers.iter().enumerate() {
                 for c in 0..v.ncols() {
@@ -1715,7 +1794,7 @@ fn least_change(problem: &Problem, poses: &mut [Frame], free: &[usize], scale: f
                 continue;
             }
             let (s, c) = (problem.bodies[bi].pose, trial[bi]);
-            let a = anchor(problem, bi);
+            let a = anchors[k];
             let t = (s.transform_point(a) - c.transform_point(a)) / scale;
             let w = log_rot(s.rotation * c.rotation.inverse());
             for (j, v) in [t.x, t.y, t.z, w.x, w.y, w.z].into_iter().enumerate() {
@@ -1849,6 +1928,31 @@ mod tests {
         // B keeps its orientation (bottom face down).
         assert!((p.z() - DVec3::Z).length() < 1e-6);
         assert_eq!(r.dof, 0);
+    }
+
+    /// Live 1763: along a mate chain the instance whose geometry changed
+    /// absorbs the change. Base fixed, P Planar on it, C Fastened on P, D
+    /// Fastened on C; C's part moved 10 mm in +X in its own coordinates (its
+    /// connectors with it): only C's transform changes (−10 mm), P (free to
+    /// slide on its Planar) and D stay where they were.
+    #[test]
+    fn a_regenerate_moves_only_the_changed_instance_along_a_chain() {
+        let up = |o: DVec3| Frame::from_axes(o, DVec3::Z, DVec3::X);
+        let down = |o: DVec3| Frame::from_axes(o, DVec3::NEG_Z, DVec3::X);
+        let start = [DVec3::ZERO, DVec3::new(0.0, 0.0, 0.01), DVec3::new(0.0, 0.0, 0.02), DVec3::new(0.0, 0.0, 0.03)];
+        let mut bodies: Vec<SolverBody> = start.iter().enumerate().map(|(i, o)| body(*o, i == 0)).collect();
+        let c = DVec3::new(0.01, 0.0, 0.0);
+        let mates = vec![
+            mate(MateType::Planar, 0, up(DVec3::new(0.03, 0.03, 0.01)), 1, down(DVec3::new(0.01, 0.01, 0.0))),
+            mate(MateType::Fastened, 1, up(DVec3::new(0.01, 0.01, 0.01)), 2, down(DVec3::new(0.01, 0.01, 0.0) + c)),
+            mate(MateType::Fastened, 2, up(DVec3::new(0.01, 0.01, 0.01) + c), 3, down(DVec3::new(0.01, 0.01, 0.0))),
+        ];
+        let r = solve(&mut bodies, &mates, &[], &[]);
+        assert!(r.converged, "{r:?}");
+        let want = [start[0], start[1], start[2] - c, start[3]];
+        for (b, w) in bodies.iter().zip(want) {
+            assert!((b.pose.origin - w).length() < 1e-9 && b.pose.rotation.angle_between(DQuat::IDENTITY) < 1e-9, "{:?} vs {w:?}", b.pose);
+        }
     }
 
     #[test]
