@@ -63,6 +63,10 @@ git fetch -q origin || fail "fetch"
 git rebase -q "origin/$target" || { git rebase --abort; fail "rebase conflict: rebase by hand, then re-run"; }
 changed=$(git diff --name-only "origin/$target...HEAD")
 [ -n "$changed" ] || { echo "nothing to land"; exit 0; }
+# A squash onto a stale base reverts other agents' work (bool 11-02: 54,689 lines): refuse big deletions.
+deleted=$(git diff --numstat "origin/$target...HEAD" | awk '$2 != "-" {d += $2} END {print d + 0}')
+[ "$deleted" -le 3000 ] || [ "${LAND_BIG_DELETE:-0}" = 1 ] ||
+  fail "deletes $deleted lines (git diff --stat origin/$target...HEAD): a stale squash? LAND_BIG_DELETE=1 if meant"
 # Docs-only changes: push without building.
 if ! echo "$changed" | grep -qvE '^(docs/|.*\.md$)'; then
   git push -q origin "HEAD:$target" && { echo "LANDED (docs only) $(git rev-parse --short HEAD)"; exit 0; } || fail "push rejected: re-run"
