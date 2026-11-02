@@ -10,6 +10,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   `#wall` then Enter doesn't take the first match `#wall_thickness`; live highlights the first match as you type and
   Enter inserts it. Reproduce side by side with live (which field, what Enter does in ours), fix, and make it the
   first scenario of the interaction suite (docs/PARITY-SUITES.md).
+  qa 11-02 23:30 (green bc7d7e9f, Linux; start document qa-scratch/tickets/varac/vardoc.noshape from vardoc.py:
+  #wall_thickness = 2 mm, #width = 30 mm, Extrude 1 10 mm): **the autocomplete and Enter work** when the field's text is
+  selected: double-click Depth (or Ctrl+A), type `#wall` → the list "(x) #wall_thickness 2 mm" (highlighted) / "(x) New
+  variable…", Enter → `#wall_thickness`, the preview 2 mm (tickets/varac/vd-1.png, vd-2.png; also typed at full speed).
+  **The cause is the first click: in live a first click into a dialog number field selects all its text** (behaviours
+  "Focus, click and selection", fields A/B/C: 1st click selects all, 2nd click puts the caret); **ours puts the caret at
+  the click point and selects nothing** (vd-click1.png). So a user who clicks the field once and types `#wall` gets it
+  inserted into the old value: Shell thickness "2.5 mm" clicked after the 2 → "2#wall.5 mm", the list still offers
+  #wall_thickness, Enter → "2#wall_thickness.5 mm" in red (vd-shell.png); Extrude Depth "#wall_thickness" clicked →
+  "#wall_thickn#wall…" (vd-click1-typed.png). On macOS (Cmd+A not used, one click) that is exactly "Enter doesn't take
+  #wall_thickness". Fix: first click (and Tab) into a number field selects all, second click places the caret, as live.
 - [ ] MACOS-GUARD-LOCK (core, CI 41351354303 on agent/ci2 76a61696, macOS arm64 Test, once): the model tests' `all`
   ended with "noshape: the kernel crashed holding a lock; not recoverable" (SIGSEGV) in the custom-feature tests,
   just after `a_cancelled_custom_feature_stops_soon_and_the_studio_is_as_before`. In flight then:
