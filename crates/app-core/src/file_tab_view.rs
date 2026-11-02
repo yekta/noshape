@@ -80,15 +80,24 @@ pub struct FileTabView {
     preview: Option<(std::sync::Arc<str>, std::rc::Rc<Preview>)>,
 }
 
-/// What a file tab shows (Onshape views images, text, Markdown, CSV and
-/// JSON; help "Supported File Formats", Non-CAD files): the picture, the
-/// text, else the file's card. PDF and video need libraries
+/// What a file tab shows (Onshape views images, PDF, text, Markdown, CSV
+/// and JSON; help "Supported File Formats", Non-CAD files): the picture, a
+/// PDF's pages, the text, else the file's card. Video needs a decoder
 /// (docs/parity/formats.md).
 enum Preview {
     Image(std::sync::Arc<gpui_kit::Image>),
+    /// A PDF's first pages (rendered in the background: None until then),
+    /// its page count, or why it can't be shown.
+    Pages(Option<Result<PdfPages, String>>),
     Text(String),
     Card,
 }
+
+/// A PDF's first pages and its page count.
+type PdfPages = (Vec<std::sync::Arc<gpui_kit::Image>>, usize);
+
+/// A PDF page's pixels per point (1: 72 dpi).
+const PDF_SCALE: f32 = 1.5;
 
 /// Text read at most, and lines shown (a larger file shows its start).
 const TEXT_LIMIT: usize = 1 << 20;
@@ -106,6 +115,9 @@ fn preview_of(f: &FileTab) -> Preview {
         "webp" => Some(ImageFormat::Webp),
         _ => None,
     };
+    if ext == "pdf" {
+        return Preview::Pages(None);
+    }
     let text = matches!(ext.as_str(), "txt" | "md" | "csv" | "json");
     if image.is_none() && !text {
         return Preview::Card;
@@ -126,12 +138,32 @@ impl FileTabView {
         Self { doc, tab, preview: None }
     }
 
-    fn preview(&mut self, f: &FileTab) -> std::rc::Rc<Preview> {
+    fn preview(&mut self, f: &FileTab, cx: &mut Context<Self>) -> std::rc::Rc<Preview> {
         match &self.preview {
             Some((data, p)) if std::sync::Arc::ptr_eq(data, &f.data_base64) => p.clone(),
             _ => {
                 let p = std::rc::Rc::new(preview_of(f));
                 self.preview = Some((f.data_base64.clone(), p.clone()));
+                // A PDF's pages are rendered in the background.
+                if matches!(*p, Preview::Pages(None)) {
+                    let (data, bytes) = (f.data_base64.clone(), f.bytes());
+                    cx.spawn(async move |this, cx| {
+                        let pages = cx
+                            .background_spawn(async move {
+                                let bytes = bytes.ok_or_else(|| "the file data is damaged".to_string())?;
+                                noshape_ops::file_preview::pdf_pages(&bytes, PDF_SCALE, 0, noshape_ops::file_preview::PDF_PAGE_LIMIT)
+                            })
+                            .await
+                            .map(|(total, pngs)| (pngs.into_iter().map(|png| std::sync::Arc::new(gpui_kit::Image::from_bytes(ImageFormat::Png, png))).collect(), total));
+                        let _ = this.update(cx, |v, cx| {
+                            if v.preview.as_ref().is_some_and(|(d, _)| std::sync::Arc::ptr_eq(d, &data)) {
+                                v.preview = Some((data, std::rc::Rc::new(Preview::Pages(Some(pages)))));
+                                cx.notify();
+                            }
+                        });
+                    })
+                    .detach();
+                }
                 p
             }
         }
@@ -197,7 +229,7 @@ impl Render for FileTabView {
         let Some(f) = self.file(cx) else { return div().size_full().into_any_element() };
         let (doc, tab) = (self.doc.clone(), self.tab);
         let doc2 = doc.clone();
-        let preview = self.preview(&f);
+        let preview = self.preview(&f, cx);
         if !matches!(*preview, Preview::Card) {
             // A viewable file: a slim bar with its name, size and actions,
             // the picture or the text under it.
@@ -218,6 +250,31 @@ impl Render for FileTabView {
                 .child(Button::new("file-download").label("Download").outline().small().on_click(move |_, w, cx| download(&doc2, tab, w, cx)));
             let body = match &*preview {
                 Preview::Image(image) => div().flex_1().min_h_0().p(px(16.)).bg(gpui_kit::rgb(0x999999)).child(img(image.clone()).size_full().object_fit(ObjectFit::ScaleDown)).into_any_element(),
+                Preview::Pages(pages) => {
+                    let gray = div().flex_1().min_h_0().bg(gpui_kit::rgb(0x999999));
+                    let note = |t: String| gray.flex().items_center().justify_center().text_size(px(14.)).text_color(gpui_kit::rgb_static(0xffffff)).child(t).into_any_element();
+                    match pages {
+                        None => note("Rendering…".into()),
+                        Some(Err(e)) => note(format!("This PDF can't be shown: {e}. Download it to open it.")),
+                        // Each page at its size (scaled down to the width), one under the other.
+                        Some(Ok((images, total))) => div()
+                            .id("file-pages")
+                            .flex_1()
+                            .min_h_0()
+                            .overflow_y_scroll()
+                            .bg(gpui_kit::rgb(0x999999))
+                            .child(
+                                v_flex()
+                                    .w_full()
+                                    .items_center()
+                                    .gap(px(12.))
+                                    .p(px(16.))
+                                    .children(images.iter().map(|i| img(i.clone()).max_w_full().shadow_md()))
+                                    .when(*total > images.len(), |d| d.child(div().text_size(px(13.)).text_color(gpui_kit::rgb_static(0xffffff)).child(format!("… {} more pages (Download for the whole file)", total - images.len())))),
+                            )
+                            .into_any_element(),
+                    }
+                }
                 Preview::Text(text) => div()
                     .id("file-text")
                     .flex_1()

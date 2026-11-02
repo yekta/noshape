@@ -610,13 +610,24 @@ fn pdf_content(g: &SheetGeometry, ocgs: &mut Vec<super::cad_layers::CadLayer>, f
         content.push_str(if l.closed { "s\n" } else { "S\n" });
     }
     content.push_str("[] 0 d\n");
+    // Consecutive fills of one layer and colour (an exploded text's
+    // triangles, arrowheads) are one path: the triangles don't overlap, so
+    // the nonzero rule fills their union, and a renderer's antialiasing
+    // sees each glyph whole (hayro darkened the slivers of an "N" drawn
+    // one triangle at a time; the file is smaller too).
+    let keys: Vec<_> = (0..g.fills.len()).map(|fi| (g.cad_fill_layer(fi), rgb(g.fill_color(fi)))).collect();
     for (fi, f) in g.fills.iter().enumerate() {
-        layer(&mut content, Some(g.cad_fill_layer(fi)));
-        let _ = writeln!(content, "{} rg", rgb(g.fill_color(fi)));
+        let k = &keys[fi];
+        if fi == 0 || keys[fi - 1] != *k {
+            layer(&mut content, Some(k.0));
+            let _ = writeln!(content, "{} rg", k.1);
+        }
         for (i, p) in f.points.iter().enumerate() {
             let _ = writeln!(content, "{:.3} {:.3} {}", p[0] * pt, p[1] * pt, if i == 0 { "m" } else { "l" });
         }
-        content.push_str("f\n");
+        if keys.get(fi + 1) != Some(k) {
+            content.push_str("f\n");
+        }
     }
     for (ti, t) in g.texts.iter().enumerate().filter(|(ti, t)| stroked(g, *ti, t)) {
         layer(&mut content, Some(g.cad_text_layer(ti)));
@@ -1012,6 +1023,24 @@ mod tests {
         assert!(d.contains("$INSUNITS\n 70\n1"));
         let pdf = to_pdf_pages_version(&[g], "1.5");
         assert!(pdf.starts_with(b"%PDF-1.5\n"));
+    }
+
+    /// PDF Text "Normal": a text's triangles are one filled path (not one
+    /// fill each: hayro darkened an "N"'s slivers), per colour.
+    #[test]
+    fn a_pdf_fills_each_texts_triangles_as_one_path() {
+        let mut g = sample();
+        let m = g.mark();
+        g.texts.push(Text2 { pos: [15.0, 15.0], height: 2.5, text: "NAME".into(), angle: 0.0, anchor: Anchor::Center, pick: 0 });
+        g.color_since(m, [255, 0, 0]);
+        let p = prepare(&g, &ExportOptions { explode_all: true, ..Default::default() });
+        let red = (0..p.fills.len()).filter(|&i| p.fill_color(i) == Some([255, 0, 0])).count();
+        assert!(red > 20, "{red} triangles");
+        let content = pdf_decoded(&to_pdf(&p));
+        let paths: Vec<&str> = content.split("1.000 0.000 0.000 rg\n").skip(1).collect();
+        assert_eq!(paths.len(), 1, "one colour change for the red text");
+        let path = paths[0].split("\nf\n").next().unwrap();
+        assert_eq!(path.matches(" m\n").count(), red, "every triangle in that one path");
     }
 
     #[test]

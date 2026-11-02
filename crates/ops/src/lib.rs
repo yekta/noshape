@@ -25,6 +25,7 @@ pub mod history_filter;
 pub mod docedit;
 pub mod error;
 pub mod export;
+pub mod file_preview;
 pub mod import;
 pub mod in_context;
 pub mod install;

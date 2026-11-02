@@ -336,7 +336,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference), [`analysis_draft`](#analysis_draft), [`analysis_flatten`](#analysis_flatten)
 - **sheetmetal**: [`sheetmetal_table`](#sheetmetal_table), [`sheetmetal_edit_bend`](#sheetmetal_edit_bend), [`sheetmetal_move_bend`](#sheetmetal_move_bend), [`sheetmetal_convert_to_rip`](#sheetmetal_convert_to_rip), [`sheetmetal_edit_joint`](#sheetmetal_edit_joint), [`sheetmetal_export_flat`](#sheetmetal_export_flat)
 - **release**: [`release_create`](#release_create), [`release_revision_history`](#release_revision_history)
-- **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image)
+- **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image), [`render_file_page`](#render_file_page)
 - **view**: [`view_camera`](#view_camera), [`view_display`](#view_display)
 - **export**: [`export_parts`](#export_parts)
 - **import**: [`import_files`](#import_files)
@@ -6234,6 +6234,27 @@ Examples:
 | `high_quality` | boolean |  | View in high quality (finer tessellation). |
 | `zebra` | object |  | Zebra stripes: {"stripes": 35, "flip": false, "show_edges": true}. |
 | `reflection` | object |  | Reflection analysis: {"image": an environment map name ("Blue sky", default the first) or an image file path, "rotation": degrees, "opposite": bool, "blur": bool, "show_edges": bool (default false)}. |
+| `file` | string |  | Also write the PNG here. |
+
+#### render_file_page
+
+Render a PDF file tab's page to a PNG image.
+
+A PDF imported as a file tab, as its tab shows it: the page (1 = the first) on white at `scale` pixels per point (default 1.5; 1 = 72 dpi). Returns the page count; the image as MCP image content and, with `file`, written to disk.
+
+Examples:
+
+```json
+{"tab": "plan.pdf"}
+{"tab": "plan.pdf", "page": 2, "scale": 3, "file": "/tmp/plan-2.png"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string | required | The PDF's file tab, by name ("plan.pdf") or id. |
+| `page` | integer |  | Page number (default 1). |
+| `scale` | number |  | Pixels per point (default 1.5). |
 | `file` | string |  | Also write the PNG here. |
 
 ### view

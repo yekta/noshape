@@ -70,7 +70,43 @@ pub fn ops() -> Vec<Op> {
         mutates: false,
         destructive: false,
         run: image,
+    },
+    Op {
+        group: "render",
+        verb: "file_page",
+        summary: "Render a PDF file tab's page to a PNG image",
+        description: "A PDF imported as a file tab, as its tab shows it: the page (1 = the first) on white at `scale` pixels per point (default 1.5; 1 = 72 dpi). Returns the page count; the image as MCP image content and, with `file`, written to disk.",
+        fields: vec![
+            doc_field(),
+            req("tab", s(), "The PDF's file tab, by name (\"plan.pdf\") or id."),
+            opt("page", json!({ "type": "integer", "minimum": 1 }), "Page number (default 1)."),
+            opt("scale", json!({ "type": "number", "exclusiveMinimum": 0, "maximum": 8 }), "Pixels per point (default 1.5)."),
+            opt("file", s(), "Also write the PNG here."),
+        ],
+        mutates: false,
+        destructive: false,
+        run: file_page,
     }]
+}
+
+fn file_page(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = crate::doc::find_tab(od.doc(), a.str("tab")?).map_err(|e| e.with_param("tab"))?;
+    let Some(noshape_model::document::TabContent::File(f)) = od.doc().tab(tab).map(|t| &t.content) else { return Err(OpError::param("tab", "not a file tab")) };
+    if f.ext() != "pdf" {
+        return Err(OpError::param("tab", &format!("{} is not a PDF", f.file_name)));
+    }
+    let bytes = f.bytes().ok_or_else(|| OpError::new("io", "the file tab holds no data"))?;
+    let page = a.opt_u64("page")?.unwrap_or(1).max(1) as usize;
+    let scale = a.opt_f64("scale")?.unwrap_or(1.5) as f32;
+    let (pages, mut pngs) = crate::file_preview::pdf_pages(&bytes, scale, page - 1, 1).map_err(|e| OpError::new("render_failed", e))?;
+    let Some(png) = pngs.pop() else { return Err(OpError::param("page", &format!("the PDF has {pages} page(s)"))) };
+    let mut v = json!({ "pages": pages, "page": page, "bytes": png.len() });
+    if let Some(file) = a.opt_str("file")? {
+        std::fs::write(file, &png).map_err(|e| OpError::new("io", format!("writing {file}: {e}")).with_param("file"))?;
+        v["file"] = json!(file);
+    }
+    Ok(OpOutput { value: v, images: vec![Image { png }] })
 }
 
 fn image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

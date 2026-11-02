@@ -2705,6 +2705,37 @@ fn export_store_file_in_a_new_tab() {
     assert_eq!(e.param.as_deref(), Some("file"), "{e:?}");
 }
 
+/// A PDF file tab's pages render (render_file_page; Onshape views PDFs in
+/// their tab): a drawing stored as PDF, its one ISO A3 page at 1 px per point.
+#[test]
+fn a_pdf_file_tab_renders_its_pages() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "pdf_tab.noshape");
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "PDF", "options": "store" }));
+    let pdf = r["stored_tab"].as_str().unwrap_or_else(|| panic!("{r}")).to_string();
+    let file = scratch("pdf_tab_page.png");
+    let p = call(&mut ctx, "render_file_page", json!({ "tab": pdf, "scale": 1.0, "file": file.to_str().unwrap() }));
+    assert_eq!(p["pages"], 1, "{p}");
+    let bytes = std::fs::read(&file).unwrap();
+    let mut r = png::Decoder::new(std::io::Cursor::new(&bytes)).read_info().unwrap();
+    let info = r.info().clone();
+    // A3 landscape: 420 × 297 mm = 1190.55 × 841.89 points (whole pixels).
+    assert_eq!((info.width, info.height), (1190, 841), "{p}");
+    let mut buf = vec![0; r.output_buffer_size().unwrap()];
+    r.next_frame(&mut buf).unwrap();
+    let px: Vec<&[u8]> = buf.chunks(info.color_type.samples()).map(|c| &c[..3]).collect();
+    // White paper with the border, title block and views drawn on it.
+    let dark = px.iter().filter(|c| c.iter().all(|&v| v < 128)).count();
+    let white = px.iter().filter(|c| c.iter().all(|&v| v > 240)).count();
+    assert!(white > px.len() / 2 && dark > 2000, "{dark} dark, {white} white of {} pixels", px.len());
+    let e = try_call(&mut ctx, "render_file_page", json!({ "tab": pdf, "page": 2 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("page"), "{e:?}");
+    let e = try_call(&mut ctx, "render_file_page", json!({ "tab": "Part Studio 1" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("tab"), "{e:?}");
+}
+
 /// Rhino (EXP1): export and import back with the same volume (builds with
 /// openNURBS; without it the export says so).
 #[test]

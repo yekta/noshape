@@ -29,6 +29,8 @@ jpeg-encoder = { version = "0.7", default-features = false, features = ["std"] }
 png = "0.18"
 tiff = "0.11"
 resvg = { version = "0.46", default-features = false }
+# PDF file tabs' pages (file_preview.rs): a pure-Rust rasterizer.
+hayro = "0.8"
 noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
 # Integration tests (tools/tiers/merge-tests.py): tests/all.rs holds every file but the standalone ones.

@@ -25,6 +25,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   - Queued 02:43 as e24cd093 with the formats piece.
 - Formats: docs/parity/formats.md (import 17 ✅ / 1 ◐ / 4 ⊘, export 19 ✅ / 2 ⊘). Every export format re-imports
   (e2e `every_export_format_imports_back`). The non-CAD viewers wait on live's look (request 02:34).
+- PDF file tabs (formats.md, now ✅): the first 50 pages render in the background with hayro 0.8, a pure-Rust
+  rasterizer added to ops (`file_preview.rs`); the agent API gets `render_file_page`. Running cargo hakari for it
+  also picked up a stale rust-embed-utils entry from main.
+- Our drawing PDFs (Text "Normal", the default) wrote each text triangle as its own fill (8048 in one A3 sheet).
+  hayro over-covers the slivers, so an "N" looked like "И". Each run of fills sharing a layer and colour is now
+  one nonzero path (drawing test `a_pdf_fills_each_texts_triangles_as_one_path`).
 - To psui: NIST's regeneration after import is 1.7 s, of which the features are 0.12 s and the rest is display
   meshing, mostly the two cap screws' thread faces (B-spline surfaces with dense pcurves).
 
