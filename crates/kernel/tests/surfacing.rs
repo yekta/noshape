@@ -320,3 +320,29 @@ fn same_surface(got: &BSplineSurfaceData, want: &BSplineSurfaceData) {
     assert!(got.poles.iter().zip(&want.poles).all(|(a, b)| a.distance(*b) < 1e-9), "poles {:?}", got.poles);
     assert_eq!(got.weights.is_some(), want.weights.is_some());
 }
+
+/// FILL-G1-DOME: a fill G1 to a shelled box's four outer walls (live 1739 FI2 builds a dome with a warning).
+#[test]
+#[ignore = "T2: probe"]
+fn fill_g1_on_a_shelled_box_probe() {
+    let b = make_box_corners(DVec3::ZERO, DVec3::new(60.0, 40.0, 20.0)).unwrap();
+    let top: Vec<Shape> = b.faces().into_iter().filter(|f| f.centroid().unwrap().z > 19.99).collect();
+    let s = shell_solid(&b, &top, 2.0, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+    let faces = s.faces();
+    // The outer top edges (z 20, on the outer walls) and each one's outer wall.
+    let mut boundary = Vec::new();
+    for e in s.edges() {
+        let Ok(i) = e.edge_info() else { continue };
+        let m = (i.start + i.end) * 0.5;
+        if i.start.z < 19.99 || i.end.z < 19.99 || !(m.x.abs() < 1e-6 || (m.x - 60.0).abs() < 1e-6 || m.y.abs() < 1e-6 || (m.y - 40.0).abs() < 1e-6) {
+            continue;
+        }
+        let wall = faces.iter().find(|f| f.index_of(&e, ShapeType::Edge).is_some() && f.centroid().unwrap().z < 19.0).cloned();
+        boundary.push(FillEdge { edge: e.clone(), support: wall, continuity: Continuity::Tangent });
+    }
+    println!("{} boundary edges, supports {}", boundary.len(), boundary.iter().filter(|b| b.support.is_some()).count());
+    match fill_surface(&boundary, &[]) {
+        Ok(r) => println!("fill: {} faces, area {:.4}", r.shape.count(ShapeType::Face), surface_properties(&r.shape).unwrap().mass),
+        Err(e) => println!("fill failed: {e}"),
+    }
+}

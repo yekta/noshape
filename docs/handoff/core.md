@@ -4,9 +4,17 @@ Area: features, regeneration, the kernel (crates/kernel incl. the OCCT bridge an
 STEP/Parasolid/Rhino/JT/PVZ import-export files), crates/model-core/src/regen, behaviors.rs / manipulators.rs feature
 behaviour, crates/featurescript, the FeatureScript host (crates/custom), the Onshape oracle tests. Worktree
 /root/projects/noshape-wt/core (branch agent/core), target dir /root/target-core, scratch /root/core-scratch.
-Builds and tests (11-01): on vibe4 only, `tools/tiers/rb.sh <cmd>` from the worktree, one test filter at a time
-(land.sh runs the full set); long probes detached on vibe4 with a log. OCCT patches build on vibe4 in
-~/agents/core-occt (`build.sh TK...`); a private root ~/agents/occt-priv; libs go to /root/occt (synced everywhere).
+Builds and tests (11-02): `tools/tiers/rb.sh <cmd>` from the worktree runs on vibe5 (tools/tiers/rb-hosts; heavy probes
+NOSHAPE_RB_HOST=vibe4), one build at a time, long runs detached with a log (grep --line-buffered, or nothing shows until
+the end); land.sh queues and runs the full sets. vibe5 has ~/agents/profdocs (profile documents), ~/agents/qadocs (qa's
+ticket documents), ~/agents/fuzz/bin (qa's fuzz scripts). OCCT patches build on vibe4 in ~/agents/core-occt
+(`build.sh TK...`), a private root ~/agents/occt-priv; new libs go to /root/occt and the lead syncs them to /opt/occt.
+
+**The lead's list of 11-02 11:55, all done:** (1) the twisted vase, smooth and sharp, inward and outward, as live and
+in ~1-3 s (loft tangency, LOFT-ONE-FACE, direct Shell path; ops T1 twisted_vase); (2) incremental regeneration on by
+default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle); MACOS-GUARD-LOCK's likely cause fixed
+with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
+COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
 **State 11-02 16:25.** Since 15:50 landed / queued: planar Fill (e1f0fdb8) and Fill on a cylinder (live 1762),
 Shell's no-cavity rule (bc497e6a, live 1794), Fill's per-edge adjacent faces, FL7's single-chain rule (70eb8b23, live
