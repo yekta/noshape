@@ -830,3 +830,11 @@ fn a_plane_along_a_cylinder_but_for_rounding() {
 fn a_vertex_inside_a_face() {
     valid_as_occt("a7bdd15ba4f8613a", 1e-9);
 }
+
+/// Shell's slab common with a plane at an angle to a cone steeper than its rulings (recorded): a hyperbola, its axes
+/// from where the plane meets the two rulings in the plane of the axis and its normal, drawn on the cone point by
+/// point (it declined "a plane at an angle to a cone"); valid, OCCT's counts and volume.
+#[test]
+fn a_plane_steeper_than_a_cones_rulings() {
+    valid_as_occt("45794f15a71f879f", 1e-9);
+}

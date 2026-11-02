@@ -314,19 +314,19 @@ impl GFace {
                 }
                 if e.par {
                     let Surf::Plane { origin, u, v, .. } = self.s else { unreachable!() };
-                    return Ok(C2::Conic { c: e.c, u: e.x / (4.0 * e.a), v: e.y, t0: *t0, sweep: *sweep, m: Map::Plane { origin, u, v }, par: true });
+                    return Ok(C2::Conic { c: e.c, u: e.x / (4.0 * e.a), v: e.y, t0: *t0, sweep: *sweep, m: Map::Plane { origin, u, v }, par: true, hyp: false });
                 }
                 Ok(C2::Trig { c: self.to2(e.c), u: lin(e.x) * e.a, v: lin(e.y) * e.b, w: DVec2::ZERO, t0: *t0, sweep: *sweep })
             }
-            (&Surf::Cyl { o, a, x, y, r, flip, th0, k: slope, .. }, &Geo::Ell { e, t0, sweep, .. }) if slope != 0.0 && !e.hyp => {
+            (&Surf::Cyl { o, a, x, y, r, flip, th0, k: slope, .. }, &Geo::Ell { e, t0, sweep, .. }) if slope != 0.0 && (!e.hyp || e.n.dot(a).abs() > 1e-12) => {
                 // (Seen along the axis its centre is off it: mapped point by point, on the side of its middle at
-                // the face's seam.)
+                // the face's seam; a hyperbola of a plane at an angle to the axis too.)
                 let mid = self.to2(e.at(t0 + 0.5 * sweep)).x;
                 let m = Map::Cyl { o, a, x, y, r, flip, th0, mid };
                 if e.par {
-                    return Ok(C2::Conic { c: e.c, u: e.x / (4.0 * e.a), v: e.y, t0, sweep, m, par: true });
+                    return Ok(C2::Conic { c: e.c, u: e.x / (4.0 * e.a), v: e.y, t0, sweep, m, par: true, hyp: false });
                 }
-                Ok(C2::Conic { c: e.c, u: e.x * e.a, v: e.y * e.b, t0, sweep, m, par: false })
+                Ok(C2::Conic { c: e.c, u: e.x * e.a, v: e.y * e.b, t0, sweep, m, par: false, hyp: e.hyp })
             }
             (Surf::Cyl { k: slope, .. }, Geo::Ell { e, .. }) if *slope == 0.0 && e.open() => Err(Decline("a hyperbola on a cylinder")),
             (Surf::Cyl { r, th0, a, o, full, .. }, g) => {
@@ -2244,6 +2244,59 @@ impl Ctx<'_> {
         Ok(())
     }
 
+    /// A plane at an angle to a cone's axis steeper than its rulings (cutting both nappes): a hyperbola, its
+    /// transverse axis through the points where the plane meets the two rulings in the plane of the axis and the
+    /// plane's normal (one on each nappe), towards the face's nappe; its conjugate radius from its width two radii
+    /// from its centre. OCCT's hyperbola there (IntAna_QuadQuadGeo) is the same curve.
+    fn plane_cone_hyperbola(&mut self, fp: usize, fc: usize) -> R<()> {
+        let Surf::Plane { n, d, flip, .. } = self.faces[fp].s else { unreachable!() };
+        let Surf::Cyl { o, a, r0, k: slope, .. } = self.faces[fc].s else { unreachable!() };
+        let tol = self.tol;
+        let na = n.dot(a);
+        let apex = o - a * (r0 / slope);
+        let up = if slope > 0.0 { a } else { -a };
+        let side = (n - a * na).normalize();
+        let (ca, sa) = (1.0 / (1.0 + slope * slope).sqrt(), slope.abs() / (1.0 + slope * slope).sqrt());
+        // The two rulings' points (s > 0: on the face's nappe).
+        let on = |g: DVec3| {
+            let den = n.dot(g);
+            (den.abs() > 1e-300).then(|| (d - n.dot(apex)) / den)
+        };
+        let (g1, g2) = (up * ca + side * sa, up * ca - side * sa);
+        let (Some(s1), Some(s2)) = (on(g1), on(g2)) else { return Err(Decline("a plane at an angle to a cone")) };
+        let (ours, other) = if s1 > 0.0 && s2 < 0.0 {
+            (apex + g1 * s1, apex + g2 * s2)
+        } else if s2 > 0.0 && s1 < 0.0 {
+            (apex + g2 * s2, apex + g1 * s1)
+        } else {
+            return Err(Decline("a plane at an angle to a cone"));
+        };
+        let ae = (ours - other).length() * 0.5;
+        if ae <= GREY * tol {
+            // Through the apex: its two lines.
+            return Err(Decline("a plane through a cone's apex"));
+        }
+        let c = (ours + other) * 0.5;
+        let xe = (ours - other).normalize();
+        let sn = if flip { -n } else { n };
+        let ye = sn.cross(xe);
+        // Its half-width two radii from the centre (across the plane of the axis: at one height), y² = 3 b².
+        let q = c + xe * (2.0 * ae);
+        let h = (q - o).dot(a);
+        let (rq, w) = (r0 + slope * h, (q - o - a * h).length());
+        let y2 = rq * rq - w * w;
+        if y2.is_nan() || y2 <= 0.0 {
+            return Err(Decline("a plane at an angle to a cone"));
+        }
+        let be = (y2 / 3.0).sqrt();
+        let e = Ell { c, n: sn, x: xe, y: ye, a: ae, b: be, hyp: true, par: false };
+        // Its range: past the face's box from the centre.
+        let (lo, hi) = (self.faces[fc].lo, self.faces[fc].hi);
+        let far = (lo - c).abs().max((hi - c).abs()).length() + GREY * tol;
+        let t = (far / ae.min(be)).max(1.0).acosh() * 1.01 + 1e-3;
+        self.section(fp, fc, Path::Ellipse(e), -t, t)
+    }
+
     /// Whether cone face `fc` reaches its apex (the apex's height within its vertices' heights).
     fn apex_on_face(&self, fc: usize) -> bool {
         let Surf::Cyl { o, a, r0, k, .. } = self.faces[fc].s else { unreachable!() };
@@ -2264,7 +2317,9 @@ impl Ctx<'_> {
         if (na.abs() - along).abs() <= 1e-12 {
             return self.plane_cone_parabola(fp, fc);
         }
-        // (A hyperbola: not yet.)
+        if na.abs() < along * (1.0 - 1e-6) {
+            return self.plane_cone_hyperbola(fp, fc);
+        }
         if na.abs() <= along * (1.0 + 1e-6) {
             return Err(Decline("a plane at an angle to a cone"));
         }

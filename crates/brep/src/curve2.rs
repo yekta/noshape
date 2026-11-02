@@ -22,7 +22,7 @@ pub(crate) enum C2 {
     Mapped { c: Arc<NurbsCurve>, t0: f64, t1: f64, m: Map },
     /// A 3D ellipse `c + u cos a + v sin a` (`par`: parabola `c + u a² + v a`), a from `t0` through `sweep`, seen so
     /// (a plane's section of a cone).
-    Conic { c: DVec3, u: DVec3, v: DVec3, t0: f64, sweep: f64, m: Map, par: bool },
+    Conic { c: DVec3, u: DVec3, v: DVec3, t0: f64, sweep: f64, m: Map, par: bool, hyp: bool },
 }
 
 /// A face's map from 3D to its parameter plane (the Boolean's own): a plane's frame, or a cylinder's or cone's
@@ -86,9 +86,11 @@ impl Map {
 }
 
 /// A 3D ellipse's point at `a` and its derivative (`par`: a parabola's, `c + u a² + v a`).
-fn conic(c: DVec3, u: DVec3, v: DVec3, a: f64, par: bool) -> (DVec3, DVec3) {
+fn conic(c: DVec3, u: DVec3, v: DVec3, a: f64, par: bool, hyp: bool) -> (DVec3, DVec3) {
     if par {
         (c + u * (a * a) + v * a, u * (2.0 * a) + v)
+    } else if hyp {
+        (c + u * a.cosh() + v * a.sinh(), u * a.sinh() + v * a.cosh())
     } else {
         (c + u * a.cos() + v * a.sin(), v * a.cos() - u * a.sin())
     }
@@ -138,9 +140,9 @@ impl C2 {
                     m.map(p, DVec3::ZERO).0
                 }
             }
-            C2::Conic { c, u, v, t0, sweep, m, par } => {
+            C2::Conic { c, u, v, t0, sweep, m, par, hyp } => {
                 let a = t0 + sweep * t;
-                let (p, d) = conic(c, u, v, a, par);
+                let (p, d) = conic(c, u, v, a, par, hyp);
                 if m.at_seam(p) {
                     m.map_on(p, d * sweep, Some(t > 0.5)).0
                 } else {
@@ -184,9 +186,9 @@ impl C2 {
                 let (a, b) = ((t - h).max(0.0), (t + h).min(1.0));
                 (d(t), (d(b) - d(a)) / (b - a))
             }
-            C2::Conic { c, u, v, t0, sweep, m, par } => {
+            C2::Conic { c, u, v, t0, sweep, m, par, hyp } => {
                 let d = |s: f64| {
-                    let (p, d1) = conic(c, u, v, t0 + sweep * s, par);
+                    let (p, d1) = conic(c, u, v, t0 + sweep * s, par, hyp);
                     m.map(p, d1 * sweep).1
                 };
                 let h = 1e-5;
@@ -212,7 +214,7 @@ impl C2 {
             C2::Hyp { c, u, v, w, k, t0, sweep } => C2::Hyp { c, u, v, w, k, t0: t0 + sweep, sweep: -sweep },
             C2::Nurbs { ref c, t0, t1 } => C2::Nurbs { c: c.clone(), t0: t1, t1: t0 },
             C2::Mapped { ref c, t0, t1, m } => C2::Mapped { c: c.clone(), t0: t1, t1: t0, m },
-            C2::Conic { c, u, v, t0, sweep, m, par } => C2::Conic { c, u, v, t0: t0 + sweep, sweep: -sweep, m, par },
+            C2::Conic { c, u, v, t0, sweep, m, par, hyp } => C2::Conic { c, u, v, t0: t0 + sweep, sweep: -sweep, m, par, hyp },
         }
     }
 

@@ -41,6 +41,14 @@ Fusing the slabs yours takes first and adding the offset ones after doesn't help
 next reasons: 3.9 → 5.9 s on a dump); one OCCT common of the solid with all slabs as one tool group changes results.
 Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scratch SHELLDUMP=<path without .brep>).
 
+## Planes steeper than a cone's rulings: hyperbolas (11-02 13:50 UTC)
+- "A plane at an angle to a cone" (shfall 5): all hyperbolas (|n · a| below the rulings' slope). Now: its transverse
+  axis through the points where the plane meets the two rulings in the plane of the axis and its normal (one on
+  each nappe), towards the face's nappe; b from its half-width two radii from the centre (y² = 3 b²); on the cone
+  mapped point by point (C2::Conic with a hyperbola). 45794f15 taken (as OCCT's), 83b621a3 equivalent; the other
+  three move on (two edges, a plane through a cone's apex, a section touching a face's boundary). shfall 37 -> 39,
+  corpora unchanged, 0 differ. T1 a_plane_steeper_than_a_cones_rulings.
+
 ## Seams apart: the decline is gone (11-02 13:20 UTC)
 - With the unify's cylinder-wall merges (frames apart, after USD, one loop; volume on the changed faces), the
   Boolean's "one cylinder in faces of two inputs, their seams apart" decline is removed: corpora +16 taken, 0
