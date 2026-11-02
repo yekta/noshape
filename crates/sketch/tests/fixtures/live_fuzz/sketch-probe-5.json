@@ -1,0 +1,2324 @@
+{
+  "units": "mm (Onshape JSON: metres, radians)",
+  "plane": "Top",
+  "cases": [
+    {
+      "case": "u1",
+      "what": "u1 slot, the right arc's radius 5 -> 4",
+      "constraints": [
+        {
+          "first": "l1.end",
+          "second": "a2.start",
+          "id": "k1",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "a2.end",
+          "second": "l3.start",
+          "id": "k2",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l3.end",
+          "second": "a4.start",
+          "id": "k3",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "a4.end",
+          "second": "l1.start",
+          "id": "k4",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l1",
+          "second": "a2",
+          "id": "k5",
+          "type": "TANGENT"
+        },
+        {
+          "first": "a2",
+          "second": "l3",
+          "id": "k6",
+          "type": "TANGENT"
+        },
+        {
+          "first": "l3",
+          "second": "a4",
+          "id": "k7",
+          "type": "TANGENT"
+        },
+        {
+          "first": "a4",
+          "second": "l1",
+          "id": "k8",
+          "type": "TANGENT"
+        },
+        {
+          "first": "a2",
+          "second": "a4",
+          "id": "k9",
+          "type": "EQUAL"
+        },
+        {
+          "first": "l1",
+          "second": "l3",
+          "id": "k10",
+          "type": "PARALLEL"
+        },
+        {
+          "first": "a2",
+          "mm": 4.0,
+          "id": "k11",
+          "type": "RADIUS"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.02,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.0,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "a2",
+            "startPointId": "a2.start",
+            "endPointId": "a2.end",
+            "centerId": "a2.center",
+            "startParam": -1.5707963267948966,
+            "endParam": 1.5707963267948966,
+            "geometry": {
+              "btType": "BTCurveGeometryCircle-115",
+              "radius": 0.005,
+              "xCenter": 0.02,
+              "yCenter": 0.005,
+              "xDir": 1.0,
+              "yDir": 0.0,
+              "clockwise": false
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l3",
+            "startPointId": "l3.start",
+            "endPointId": "l3.end",
+            "startParam": 0.0,
+            "endParam": 0.02,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.02,
+              "pntY": 0.01,
+              "dirX": -1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "a4",
+            "startPointId": "a4.start",
+            "endPointId": "a4.end",
+            "centerId": "a4.center",
+            "startParam": 1.5707963267948966,
+            "endParam": 4.71238898038469,
+            "geometry": {
+              "btType": "BTCurveGeometryCircle-115",
+              "radius": 0.005,
+              "xCenter": 0.0,
+              "yCenter": 0.005,
+              "xDir": 1.0,
+              "yDir": 0.0,
+              "clockwise": false
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "a2.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k2",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a2.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k3",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "a4.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k4",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a4.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "TANGENT",
+            "entityId": "k5",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "a2"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "TANGENT",
+            "entityId": "k6",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "TANGENT",
+            "entityId": "k7",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "a4"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "TANGENT",
+            "entityId": "k8",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a4"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "EQUAL",
+            "entityId": "k9",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "a4"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "PARALLEL",
+            "entityId": "k10",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "RADIUS",
+            "entityId": "k11",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a2"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "4.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [
+          "k9"
+        ],
+        "refused": [],
+        "dof": 4,
+        "curves": {
+          "a2": "under",
+          "a4": "under",
+          "l1": "under",
+          "l3": "under"
+        },
+        "points": {
+          "a2.center": [
+            20.0,
+            5.0
+          ],
+          "a2.end": [
+            20.0,
+            9.0
+          ],
+          "a2.start": [
+            20.0,
+            1.0
+          ],
+          "a4.center": [
+            7e-6,
+            5.0
+          ],
+          "a4.end": [
+            7e-6,
+            1.0
+          ],
+          "a4.start": [
+            7e-6,
+            9.0
+          ],
+          "l1.end": [
+            20.0,
+            1.0
+          ],
+          "l1.start": [
+            7e-6,
+            1.0
+          ],
+          "l3.end": [
+            7e-6,
+            9.0
+          ],
+          "l3.start": [
+            20.0,
+            9.0
+          ]
+        },
+        "radii": {}
+      }
+    },
+    {
+      "case": "u2",
+      "what": "u2 slot, the right arc's chord (its start to the top line's start) 10 -> 8",
+      "constraints": [
+        {
+          "first": "l1.end",
+          "second": "a2.start",
+          "id": "k1",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "a2.end",
+          "second": "l3.start",
+          "id": "k2",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l3.end",
+          "second": "a4.start",
+          "id": "k3",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "a4.end",
+          "second": "l1.start",
+          "id": "k4",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l1",
+          "second": "a2",
+          "id": "k5",
+          "type": "TANGENT"
+        },
+        {
+          "first": "a2",
+          "second": "l3",
+          "id": "k6",
+          "type": "TANGENT"
+        },
+        {
+          "first": "l3",
+          "second": "a4",
+          "id": "k7",
+          "type": "TANGENT"
+        },
+        {
+          "first": "a4",
+          "second": "l1",
+          "id": "k8",
+          "type": "TANGENT"
+        },
+        {
+          "first": "a2",
+          "second": "a4",
+          "id": "k9",
+          "type": "EQUAL"
+        },
+        {
+          "first": "l1",
+          "second": "l3",
+          "id": "k10",
+          "type": "PARALLEL"
+        },
+        {
+          "first": "a2.start",
+          "second": "l3.start",
+          "mm": 8.0,
+          "id": "k11",
+          "type": "DISTANCE"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.02,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.0,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "a2",
+            "startPointId": "a2.start",
+            "endPointId": "a2.end",
+            "centerId": "a2.center",
+            "startParam": -1.5707963267948966,
+            "endParam": 1.5707963267948966,
+            "geometry": {
+              "btType": "BTCurveGeometryCircle-115",
+              "radius": 0.005,
+              "xCenter": 0.02,
+              "yCenter": 0.005,
+              "xDir": 1.0,
+              "yDir": 0.0,
+              "clockwise": false
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l3",
+            "startPointId": "l3.start",
+            "endPointId": "l3.end",
+            "startParam": 0.0,
+            "endParam": 0.02,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.02,
+              "pntY": 0.01,
+              "dirX": -1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "a4",
+            "startPointId": "a4.start",
+            "endPointId": "a4.end",
+            "centerId": "a4.center",
+            "startParam": 1.5707963267948966,
+            "endParam": 4.71238898038469,
+            "geometry": {
+              "btType": "BTCurveGeometryCircle-115",
+              "radius": 0.005,
+              "xCenter": 0.0,
+              "yCenter": 0.005,
+              "xDir": 1.0,
+              "yDir": 0.0,
+              "clockwise": false
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "a2.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k2",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a2.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k3",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "a4.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k4",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a4.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "TANGENT",
+            "entityId": "k5",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "a2"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "TANGENT",
+            "entityId": "k6",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "TANGENT",
+            "entityId": "k7",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "a4"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "TANGENT",
+            "entityId": "k8",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a4"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "EQUAL",
+            "entityId": "k9",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "a4"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "PARALLEL",
+            "entityId": "k10",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "DISTANCE",
+            "entityId": "k11",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a2.start"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3.start"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "8.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [
+          "k9"
+        ],
+        "refused": [],
+        "dof": 4,
+        "curves": {
+          "a2": "under",
+          "a4": "under",
+          "l1": "under",
+          "l3": "under"
+        },
+        "points": {
+          "a2.center": [
+            20.0,
+            5.0
+          ],
+          "a2.end": [
+            20.0,
+            9.0
+          ],
+          "a2.start": [
+            20.0,
+            1.0
+          ],
+          "a4.center": [
+            2e-6,
+            5.0
+          ],
+          "a4.end": [
+            2e-6,
+            1.0
+          ],
+          "a4.start": [
+            2e-6,
+            9.0
+          ],
+          "l1.end": [
+            20.0,
+            1.0
+          ],
+          "l1.start": [
+            2e-6,
+            1.0
+          ],
+          "l3.end": [
+            2e-6,
+            9.0
+          ],
+          "l3.start": [
+            20.0,
+            9.0
+          ]
+        },
+        "radii": {}
+      }
+    },
+    {
+      "case": "u3",
+      "what": "u3 slot, the left arc's radius 5 -> 4",
+      "constraints": [
+        {
+          "first": "l1.end",
+          "second": "a2.start",
+          "id": "k1",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "a2.end",
+          "second": "l3.start",
+          "id": "k2",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l3.end",
+          "second": "a4.start",
+          "id": "k3",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "a4.end",
+          "second": "l1.start",
+          "id": "k4",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l1",
+          "second": "a2",
+          "id": "k5",
+          "type": "TANGENT"
+        },
+        {
+          "first": "a2",
+          "second": "l3",
+          "id": "k6",
+          "type": "TANGENT"
+        },
+        {
+          "first": "l3",
+          "second": "a4",
+          "id": "k7",
+          "type": "TANGENT"
+        },
+        {
+          "first": "a4",
+          "second": "l1",
+          "id": "k8",
+          "type": "TANGENT"
+        },
+        {
+          "first": "a2",
+          "second": "a4",
+          "id": "k9",
+          "type": "EQUAL"
+        },
+        {
+          "first": "l1",
+          "second": "l3",
+          "id": "k10",
+          "type": "PARALLEL"
+        },
+        {
+          "first": "a4",
+          "mm": 4.0,
+          "id": "k11",
+          "type": "RADIUS"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.02,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.0,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "a2",
+            "startPointId": "a2.start",
+            "endPointId": "a2.end",
+            "centerId": "a2.center",
+            "startParam": -1.5707963267948966,
+            "endParam": 1.5707963267948966,
+            "geometry": {
+              "btType": "BTCurveGeometryCircle-115",
+              "radius": 0.005,
+              "xCenter": 0.02,
+              "yCenter": 0.005,
+              "xDir": 1.0,
+              "yDir": 0.0,
+              "clockwise": false
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l3",
+            "startPointId": "l3.start",
+            "endPointId": "l3.end",
+            "startParam": 0.0,
+            "endParam": 0.02,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.02,
+              "pntY": 0.01,
+              "dirX": -1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "a4",
+            "startPointId": "a4.start",
+            "endPointId": "a4.end",
+            "centerId": "a4.center",
+            "startParam": 1.5707963267948966,
+            "endParam": 4.71238898038469,
+            "geometry": {
+              "btType": "BTCurveGeometryCircle-115",
+              "radius": 0.005,
+              "xCenter": 0.0,
+              "yCenter": 0.005,
+              "xDir": 1.0,
+              "yDir": 0.0,
+              "clockwise": false
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "a2.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k2",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a2.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k3",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "a4.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k4",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a4.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "TANGENT",
+            "entityId": "k5",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "a2"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "TANGENT",
+            "entityId": "k6",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "TANGENT",
+            "entityId": "k7",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "a4"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "TANGENT",
+            "entityId": "k8",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a4"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "EQUAL",
+            "entityId": "k9",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "a4"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "PARALLEL",
+            "entityId": "k10",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "RADIUS",
+            "entityId": "k11",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "a4"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "4.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [
+          "k9"
+        ],
+        "refused": [],
+        "dof": 4,
+        "curves": {
+          "a2": "under",
+          "a4": "under",
+          "l1": "under",
+          "l3": "under"
+        },
+        "points": {
+          "a2.center": [
+            20.0,
+            5.0
+          ],
+          "a2.end": [
+            20.0,
+            9.0
+          ],
+          "a2.start": [
+            20.0,
+            1.0
+          ],
+          "a4.center": [
+            0.0,
+            5.0
+          ],
+          "a4.end": [
+            -0.0,
+            1.0
+          ],
+          "a4.start": [
+            -0.0,
+            9.0
+          ],
+          "l1.end": [
+            20.0,
+            1.0
+          ],
+          "l1.start": [
+            -0.0,
+            1.0
+          ],
+          "l3.end": [
+            -0.0,
+            9.0
+          ],
+          "l3.start": [
+            20.0,
+            9.0
+          ]
+        },
+        "radii": {}
+      }
+    },
+    {
+      "case": "u4",
+      "what": "u4 line B (30,10)-(31,30) Perpendicular to a Horizontal line A (0,0)-(20,0)",
+      "constraints": [
+        {
+          "first": "l1",
+          "id": "k1",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l2",
+          "second": "l1",
+          "id": "k2",
+          "type": "PERPENDICULAR"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.02,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.0,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l2",
+            "startPointId": "l2.start",
+            "endPointId": "l2.end",
+            "startParam": 0.0,
+            "endParam": 0.020024984394500785,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.03,
+              "pntY": 0.01,
+              "dirX": 0.04993761694389223,
+              "dirY": 0.9987523388778448
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "PERPENDICULAR",
+            "entityId": "k2",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1"
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [],
+        "refused": [],
+        "dof": 6,
+        "curves": {
+          "l1": "under",
+          "l2": "under"
+        },
+        "points": {
+          "l1.end": [
+            20.0,
+            0.0
+          ],
+          "l1.start": [
+            0.0,
+            0.0
+          ],
+          "l2.end": [
+            30.0,
+            30.024984
+          ],
+          "l2.start": [
+            30.0,
+            10.0
+          ]
+        },
+        "radii": {}
+      }
+    },
+    {
+      "case": "u5",
+      "what": "u5 as u4, B below A: (30,-30)-(31,-10)",
+      "constraints": [
+        {
+          "first": "l1",
+          "id": "k1",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l2",
+          "second": "l1",
+          "id": "k2",
+          "type": "PERPENDICULAR"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.02,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.0,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l2",
+            "startPointId": "l2.start",
+            "endPointId": "l2.end",
+            "startParam": 0.0,
+            "endParam": 0.020024984394500785,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.03,
+              "pntY": -0.03,
+              "dirX": 0.04993761694389223,
+              "dirY": 0.9987523388778448
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "PERPENDICULAR",
+            "entityId": "k2",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1"
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [],
+        "refused": [],
+        "dof": 6,
+        "curves": {
+          "l1": "under",
+          "l2": "under"
+        },
+        "points": {
+          "l1.end": [
+            20.0,
+            0.0
+          ],
+          "l1.start": [
+            0.0,
+            0.0
+          ],
+          "l2.end": [
+            30.0,
+            -9.975016
+          ],
+          "l2.start": [
+            30.0,
+            -30.0
+          ]
+        },
+        "radii": {}
+      }
+    },
+    {
+      "case": "u6",
+      "what": "u6 as u4, A not Horizontal",
+      "constraints": [
+        {
+          "first": "l2",
+          "second": "l1",
+          "id": "k1",
+          "type": "PERPENDICULAR"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.02,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.0,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l2",
+            "startPointId": "l2.start",
+            "endPointId": "l2.end",
+            "startParam": 0.0,
+            "endParam": 0.020024984394500785,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.03,
+              "pntY": 0.01,
+              "dirX": 0.04993761694389223,
+              "dirY": 0.9987523388778448
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "PERPENDICULAR",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1"
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [],
+        "refused": [],
+        "dof": 7,
+        "curves": {
+          "l1": "under",
+          "l2": "under"
+        },
+        "points": {
+          "l1.end": [
+            20.0,
+            0.0
+          ],
+          "l1.start": [
+            0.0,
+            0.0
+          ],
+          "l2.end": [
+            30.0,
+            30.024984
+          ],
+          "l2.start": [
+            30.0,
+            10.0
+          ]
+        },
+        "radii": {}
+      }
+    },
+    {
+      "case": "u7",
+      "what": "u7 line B (30,10)-(50,11) Parallel to a Horizontal line A (0,0)-(20,0)",
+      "constraints": [
+        {
+          "first": "l1",
+          "id": "k1",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l2",
+          "second": "l1",
+          "id": "k2",
+          "type": "PARALLEL"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.02,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.0,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l2",
+            "startPointId": "l2.start",
+            "endPointId": "l2.end",
+            "startParam": 0.0,
+            "endParam": 0.020024984394500785,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.03,
+              "pntY": 0.01,
+              "dirX": 0.9987523388778448,
+              "dirY": 0.04993761694389223
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "PARALLEL",
+            "entityId": "k2",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1"
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [],
+        "refused": [],
+        "dof": 6,
+        "curves": {
+          "l1": "under",
+          "l2": "under"
+        },
+        "points": {
+          "l1.end": [
+            20.0,
+            0.0
+          ],
+          "l1.start": [
+            0.0,
+            0.0
+          ],
+          "l2.end": [
+            50.024984,
+            10.0
+          ],
+          "l2.start": [
+            30.0,
+            10.0
+          ]
+        },
+        "radii": {}
+      }
+    },
+    {
+      "case": "u8",
+      "what": "u8 triangle (40,0) (41,20) (60,10), its side (40,0)-(41,20) Perpendicular to a Horizontal line (0,0)-(20,0)",
+      "constraints": [
+        {
+          "first": "l1",
+          "id": "k1",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l2.end",
+          "second": "l3.start",
+          "id": "k2",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l3.end",
+          "second": "l4.start",
+          "id": "k3",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l4.end",
+          "second": "l2.start",
+          "id": "k4",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l2",
+          "second": "l1",
+          "id": "k5",
+          "type": "PERPENDICULAR"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.02,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.0,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l2",
+            "startPointId": "l2.start",
+            "endPointId": "l2.end",
+            "startParam": 0.0,
+            "endParam": 0.020024984394500785,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.04,
+              "pntY": 0.0,
+              "dirX": 0.04993761694389223,
+              "dirY": 0.9987523388778448
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l3",
+            "startPointId": "l3.start",
+            "endPointId": "l3.end",
+            "startParam": 0.0,
+            "endParam": 0.021470910553583886,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.041,
+              "pntY": 0.02,
+              "dirX": 0.8849182223819825,
+              "dirY": -0.46574643283262235
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l4",
+            "startPointId": "l4.start",
+            "endPointId": "l4.end",
+            "startParam": 0.0,
+            "endParam": 0.022360679774997897,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.06,
+              "pntY": 0.01,
+              "dirX": -0.8944271909999159,
+              "dirY": -0.4472135954999579
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k2",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k3",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l4.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k4",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l2.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "PERPENDICULAR",
+            "entityId": "k5",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1"
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [],
+        "refused": [],
+        "dof": 8,
+        "curves": {
+          "l1": "under",
+          "l2": "under",
+          "l3": "under",
+          "l4": "under"
+        },
+        "points": {
+          "l1.end": [
+            20.0,
+            0.0
+          ],
+          "l1.start": [
+            0.0,
+            0.0
+          ],
+          "l2.end": [
+            40.0,
+            20.05
+          ],
+          "l2.start": [
+            40.0,
+            0.0
+          ],
+          "l3.end": [
+            60.0,
+            10.0
+          ],
+          "l3.start": [
+            40.0,
+            20.05
+          ],
+          "l4.end": [
+            40.0,
+            0.0
+          ],
+          "l4.start": [
+            60.0,
+            10.0
+          ]
+        },
+        "radii": {}
+      }
+    },
+    {
+      "case": "u9",
+      "what": "u9 fuzz s11's quad alone, Equal (second side, first side): 16.87 vs 14.53 mm",
+      "constraints": [
+        {
+          "first": "l1.end",
+          "second": "l2.start",
+          "id": "k1",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l2.end",
+          "second": "l3.start",
+          "id": "k2",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l3.end",
+          "second": "l4.start",
+          "id": "k3",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l4.end",
+          "second": "l1.start",
+          "id": "k4",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l2",
+          "second": "l1",
+          "id": "k5",
+          "type": "EQUAL"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.014536440107728062,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.07825015,
+              "pntY": 0.005446345,
+              "dirX": -0.8391141785474199,
+              "dirY": 0.5439553247838362
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l2",
+            "startPointId": "l2.start",
+            "endPointId": "l2.end",
+            "startParam": 0.0,
+            "endParam": 0.016872820090980917,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.066052417,
+              "pntY": 0.013353519000000001,
+              "dirX": -0.812749257448093,
+              "dirY": -0.5826136322792087
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l3",
+            "startPointId": "l3.start",
+            "endPointId": "l3.end",
+            "startParam": 0.0,
+            "endParam": 0.01701320218860709,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.052339045,
+              "pntY": 0.003523184,
+              "dirX": 0.6679309911222754,
+              "dirY": -0.7442232132219572
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l4",
+            "startPointId": "l4.start",
+            "endPointId": "l4.end",
+            "startParam": 0.0,
+            "endParam": 0.0205996220661827,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.06370268999999999,
+              "pntY": -0.009138436,
+              "dirX": 0.7062003348052582,
+              "dirY": 0.708012067072971
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l2.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k2",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k3",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l4.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k4",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "EQUAL",
+            "entityId": "k5",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1"
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [],
+        "refused": [],
+        "dof": 7,
+        "curves": {
+          "l1": "under",
+          "l2": "under",
+          "l3": "under",
+          "l4": "under"
+        },
+        "points": {
+          "l1.end": [
+            66.052417,
+            13.353519
+          ],
+          "l1.start": [
+            78.25015,
+            5.446345
+          ],
+          "l2.end": [
+            54.237936,
+            4.884391
+          ],
+          "l2.start": [
+            66.052417,
+            13.353519
+          ],
+          "l3.end": [
+            63.70269,
+            -9.138436
+          ],
+          "l3.start": [
+            54.237936,
+            4.884391
+          ],
+          "l4.end": [
+            78.25015,
+            5.446345
+          ],
+          "l4.start": [
+            63.70269,
+            -9.138436
+          ]
+        },
+        "radii": {}
+      }
+    },
+    {
+      "case": "u10",
+      "what": "u10 as u9, Equal (first side, second side)",
+      "constraints": [
+        {
+          "first": "l1.end",
+          "second": "l2.start",
+          "id": "k1",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l2.end",
+          "second": "l3.start",
+          "id": "k2",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l3.end",
+          "second": "l4.start",
+          "id": "k3",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l4.end",
+          "second": "l1.start",
+          "id": "k4",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l1",
+          "second": "l2",
+          "id": "k5",
+          "type": "EQUAL"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.014536440107728062,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.07825015,
+              "pntY": 0.005446345,
+              "dirX": -0.8391141785474199,
+              "dirY": 0.5439553247838362
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l2",
+            "startPointId": "l2.start",
+            "endPointId": "l2.end",
+            "startParam": 0.0,
+            "endParam": 0.016872820090980917,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.066052417,
+              "pntY": 0.013353519000000001,
+              "dirX": -0.812749257448093,
+              "dirY": -0.5826136322792087
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l3",
+            "startPointId": "l3.start",
+            "endPointId": "l3.end",
+            "startParam": 0.0,
+            "endParam": 0.01701320218860709,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.052339045,
+              "pntY": 0.003523184,
+              "dirX": 0.6679309911222754,
+              "dirY": -0.7442232132219572
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l4",
+            "startPointId": "l4.start",
+            "endPointId": "l4.end",
+            "startParam": 0.0,
+            "endParam": 0.0205996220661827,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.06370268999999999,
+              "pntY": -0.009138436,
+              "dirX": 0.7062003348052582,
+              "dirY": 0.708012067072971
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l2.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k2",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k3",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l4.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k4",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "EQUAL",
+            "entityId": "k5",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l2"
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [],
+        "refused": [],
+        "dof": 7,
+        "curves": {
+          "l1": "under",
+          "l2": "under",
+          "l3": "under",
+          "l4": "under"
+        },
+        "points": {
+          "l1.end": [
+            66.052417,
+            13.353519
+          ],
+          "l1.start": [
+            78.25015,
+            5.446345
+          ],
+          "l2.end": [
+            54.237936,
+            4.884391
+          ],
+          "l2.start": [
+            66.052417,
+            13.353519
+          ],
+          "l3.end": [
+            63.70269,
+            -9.138436
+          ],
+          "l3.start": [
+            54.237936,
+            4.884391
+          ],
+          "l4.end": [
+            78.25015,
+            5.446345
+          ],
+          "l4.start": [
+            63.70269,
+            -9.138436
+          ]
+        },
+        "radii": {}
+      }
+    }
+  ]
+}

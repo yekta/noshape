@@ -951,6 +951,102 @@ fn probes4() -> Vec<(String, Case)> {
     out
 }
 
+/// Probes 5 (after batch 3): a slot's size change (does the whole slot
+/// scale, fuzz s17), where a line turns onto a Perpendicular / Parallel to
+/// a separate line (fuzz s104's triangle turned about the two lines'
+/// intersection), and an Equal between two lines tied at both ends (fuzz
+/// s11's quad kept the longer one).
+fn probes5() -> Vec<(String, Case)> {
+    use std::f64::consts::FRAC_PI_2;
+    let v = DVec2::new;
+    let mut out = Vec::new();
+    let mut add = |name: &str, f: &dyn Fn(&mut Case)| {
+        let mut c = Case::new();
+        f(&mut c);
+        out.push((name.to_string(), c));
+    };
+    // A 20 mm slot of radius 5 from (0, 0): bottom, right arc, top, left arc.
+    let slot = |c: &mut Case| -> [String; 4] {
+        let l1 = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        let a2 = c.arc(v(20.0, 5.0), 5.0, -FRAC_PI_2, FRAC_PI_2);
+        let l3 = c.line(v(20.0, 10.0), v(0.0, 10.0));
+        let a4 = c.arc(v(0.0, 5.0), 5.0, FRAC_PI_2, 3.0 * FRAC_PI_2);
+        c.coincident(&format!("{l1}.end"), &format!("{a2}.start"));
+        c.coincident(&format!("{a2}.end"), &format!("{l3}.start"));
+        c.coincident(&format!("{l3}.end"), &format!("{a4}.start"));
+        c.coincident(&format!("{a4}.end"), &format!("{l1}.start"));
+        for (a, b) in [(&l1, &a2), (&a2, &l3), (&l3, &a4), (&a4, &l1)] {
+            c.pair("TANGENT", a, b);
+        }
+        c.pair("EQUAL", &a2, &a4);
+        c.pair("PARALLEL", &l1, &l3);
+        [l1, a2, l3, a4]
+    };
+    add("u1 slot, the right arc's radius 5 -> 4", &|c| {
+        let [_, a2, _, _] = slot(c);
+        c.radius(&a2, 4.0, false);
+    });
+    add("u2 slot, the right arc's chord (its start to the top line's start) 10 -> 8", &|c| {
+        let [_, a2, l3, _] = slot(c);
+        c.distance(&format!("{a2}.start"), &format!("{l3}.start"), 8.0);
+    });
+    add("u3 slot, the left arc's radius 5 -> 4", &|c| {
+        let [_, _, _, a4] = slot(c);
+        c.radius(&a4, 4.0, false);
+    });
+    add("u4 line B (30,10)-(31,30) Perpendicular to a Horizontal line A (0,0)-(20,0)", &|c| {
+        let a = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        c.hv(true, &a);
+        let b = c.line(v(30.0, 10.0), v(31.0, 30.0));
+        c.pair("PERPENDICULAR", &b, &a);
+    });
+    add("u5 as u4, B below A: (30,-30)-(31,-10)", &|c| {
+        let a = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        c.hv(true, &a);
+        let b = c.line(v(30.0, -30.0), v(31.0, -10.0));
+        c.pair("PERPENDICULAR", &b, &a);
+    });
+    add("u6 as u4, A not Horizontal", &|c| {
+        let a = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        let b = c.line(v(30.0, 10.0), v(31.0, 30.0));
+        c.pair("PERPENDICULAR", &b, &a);
+    });
+    add("u7 line B (30,10)-(50,11) Parallel to a Horizontal line A (0,0)-(20,0)", &|c| {
+        let a = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        c.hv(true, &a);
+        let b = c.line(v(30.0, 10.0), v(50.0, 11.0));
+        c.pair("PARALLEL", &b, &a);
+    });
+    add("u8 triangle (40,0) (41,20) (60,10), its side (40,0)-(41,20) Perpendicular to a Horizontal line (0,0)-(20,0)", &|c| {
+        let a = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        c.hv(true, &a);
+        let p = [v(40.0, 0.0), v(41.0, 20.0), v(60.0, 10.0)];
+        let l: Vec<String> = (0..3).map(|i| c.line(p[i], p[(i + 1) % 3])).collect();
+        for i in 0..3 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 3]));
+        }
+        c.pair("PERPENDICULAR", &l[0], &a);
+    });
+    // Fuzz s11's quad (l4..l7 there), Equal between its first two sides.
+    let quad = |c: &mut Case| -> Vec<String> {
+        let p = [v(78.25015, 5.446345), v(66.052417, 13.353519), v(52.339045, 3.523184), v(63.70269, -9.138436)];
+        let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+        for i in 0..4 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+        }
+        l
+    };
+    add("u9 fuzz s11's quad alone, Equal (second side, first side): 16.87 vs 14.53 mm", &|c| {
+        let l = quad(c);
+        c.pair("EQUAL", &l[1], &l[0]);
+    });
+    add("u10 as u9, Equal (first side, second side)", &|c| {
+        let l = quad(c);
+        c.pair("EQUAL", &l[0], &l[1]);
+    });
+    out
+}
+
 fn probe_batch(list: Vec<(String, Case)>) -> Value {
     let cases: Vec<Value> = list.into_iter().map(|(name, mut c)| {
         let ours = ours(&mut c);
@@ -965,7 +1061,7 @@ fn probe_batch(list: Vec<(String, Case)>) -> Value {
 #[test]
 #[ignore = "T2: live fuzz least-change probes"]
 fn probe_matches() {
-    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4())] {
+    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5())] {
         let b = probe_batch(list);
         let path = fixture(&format!("sketch-probe-{n}.json"));
         if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == format!("probe-{n}")) {
@@ -994,7 +1090,7 @@ fn probe_matches() {
 #[ignore = "T2: one live fuzz case"]
 fn one_case() {
     let probe = std::env::var("FUZZ_PROBE").ok();
-    let Some(mut c) = probe.as_ref().and_then(|p| [probes(), probes2(), probes3(), probes4()].into_iter().flatten().find(|(n, _)| n.split(' ').next() == Some(p.as_str())).map(|(_, c)| c)).or_else(|| {
+    let Some(mut c) = probe.as_ref().and_then(|p| [probes(), probes2(), probes3(), probes4(), probes5()].into_iter().flatten().find(|(n, _)| n.split(' ').next() == Some(p.as_str())).map(|(_, c)| c)).or_else(|| {
         let seed: u64 = std::env::var("FUZZ_SEED").ok()?.parse().ok()?;
         Some(generate(seed, seed > 100))
     }) else {
