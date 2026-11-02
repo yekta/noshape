@@ -23,7 +23,7 @@ fn median_ms(bodies: &mut [SolverBody], mates: &[SolverMate], dragged: usize, lp
     let start = bodies[dragged].pose.transform_point(lp);
     let mut ms: Vec<f64> = (1..=steps)
         .map(|k| {
-            let drags = [DragTarget { body: dragged, local_point: lp, target: start + step * k as f64 }];
+            let drags = [DragTarget { body: dragged, local_point: lp, target: start + step * k as f64, along: None }];
             let t = Instant::now();
             solve_with(bodies, mates, &[], &drags, false);
             t.elapsed().as_secs_f64() * 1e3

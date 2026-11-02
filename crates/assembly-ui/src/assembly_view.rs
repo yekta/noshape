@@ -3105,11 +3105,12 @@ impl AssemblyView {
             // its offset to the grab point.
             None if !d.start.is_empty() => {
                 let drags = d.ids.iter().filter_map(|id| d.start.get(id).map(|p| (*id, placement_to_frame(p).inverse().transform_point(d.grab0), target))).collect();
-                SolveOptions { drags, start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() }
+                SolveOptions { drags, drag_view: Some(d.plane_normal), start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() }
             }
+            // (The pointer's ray, along the view: live asm drag probes.)
             _ => match d.nested {
-                Some(c) => SolveOptions { nested_drags: vec![((d.top, c), d.local, target)], start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },
-                None => SolveOptions { drags: vec![(d.top, d.local, target)], start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },
+                Some(c) => SolveOptions { nested_drags: vec![((d.top, c), d.local, target)], drag_view: Some(d.plane_normal), start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },
+                None => SolveOptions { drags: vec![(d.top, d.local, target)], drag_view: Some(d.plane_normal), start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },
             },
         };
         // The instance list keeps its DOF glyphs while dragging; the drag's

@@ -828,10 +828,10 @@ fn asm_drag_probes_match_live() {
         for mv in d["moves"].as_array().unwrap() {
             let (view, by) = (mv[0].as_str().unwrap(), &mv[1]);
             let (a, b) = (by[0].as_f64().unwrap() * 1e-3, by[1].as_f64().unwrap() * 1e-3);
-            let step = match view {
-                "front" => DVec3::new(a, 0.0, b),
-                "right" => DVec3::new(0.0, a, b),
-                _ => DVec3::new(a, b, 0.0),
+            let (step, view_dir) = match view {
+                "front" => (DVec3::new(a, 0.0, b), DVec3::Y),
+                "right" => (DVec3::new(0.0, a, b), DVec3::X),
+                _ => (DVec3::new(a, b, 0.0), DVec3::Z),
             };
             let place = |asm: &Assembly| {
                 let p = asm.instances.iter().find(|i| i.id == inst).unwrap().placement;
@@ -840,7 +840,7 @@ fn asm_drag_probes_match_live() {
             };
             let from = place(&built);
             for k in 1..=25 {
-                let opts = SolveOptions { drags: vec![(inst, local, from + step * (k as f64 / 25.0))], ..Default::default() };
+                let opts = SolveOptions { drags: vec![(inst, local, from + step * (k as f64 / 25.0))], drag_view: Some(view_dir), ..Default::default() };
                 let res = parts.ev.evaluate(&parts.doc, &built, &opts, None);
                 for (id, p) in &res.solved.placements {
                     if let Some(i) = built.instances.iter_mut().find(|i| i.id == *id) {
@@ -855,7 +855,9 @@ fn asm_drag_probes_match_live() {
         println!("{name} ours: {}", serde_json::to_string(&ours).unwrap());
         let Some(l) = live.iter().find(|l| l["case"] == name) else { continue };
         answered += 1;
-        let after = if l["after"].is_object() { &l["after"] } else { &l["transforms"] };
+        // After the last move (live's lines: `moves[..].after`).
+        let after = l["moves"].as_array().and_then(|m| m.last()).map(|m| &m["after"]).unwrap_or(&serde_json::Value::Null);
+        assert!(after.is_object(), "{name}: no result in live's line");
         let off: Vec<String> = after.as_object().into_iter().flatten().filter(|(n, t)| {
             let o = &ours[n.as_str()];
             (0..16).any(|k| {

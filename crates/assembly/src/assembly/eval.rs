@@ -194,6 +194,10 @@ pub struct RelationStatus {
 pub struct SolveOptions {
     /// Drag targets: (top-level instance, point in instance coordinates, world target).
     pub drags: Vec<(InstanceId, DVec3, DVec3)>,
+    /// The pointer drags' view direction: each dragged point is drawn to the
+    /// pointer's ray through its target (live asm drag probes), not to the
+    /// target's depth.
+    pub drag_view: Option<DVec3>,
     /// Drive a mate's first free value (rotation for revolute/cylindrical,
     /// translation for slider) to a value (animation).
     pub drive: Option<(MateId, f64)>,
@@ -633,7 +637,7 @@ impl Prepared {
                 }
                 continue;
             }
-            drags.push(DragTarget { body: *b, local_point: lp, target: *target });
+            drags.push(DragTarget { body: *b, local_point: lp, target: *target, along: opts.drag_view });
         }
         for (key, local, target) in &opts.nested_drags {
             let Some((b, off)) = self.nested_body_of.get(key) else { continue };
@@ -645,7 +649,7 @@ impl Prepared {
                 }
                 continue;
             }
-            drags.push(DragTarget { body: *b, local_point: lp, target: *target });
+            drags.push(DragTarget { body: *b, local_point: lp, target: *target, along: opts.drag_view });
         }
         // Placement targets (triad rotate / typed values). Without pointer
         // drags they are placed and projected onto the mates exactly (live:
@@ -671,7 +675,7 @@ impl Prepared {
                 continue;
             }
             for lp in [DVec3::ZERO, DVec3::X * scale, DVec3::Y * scale, DVec3::Z * scale] {
-                drags.push(DragTarget { body: *b, local_point: lp, target: want.transform_point(lp) });
+                drags.push(DragTarget { body: *b, local_point: lp, target: want.transform_point(lp), along: None });
             }
         }
         // The memo is kept for the full list of mates (not while one mate is

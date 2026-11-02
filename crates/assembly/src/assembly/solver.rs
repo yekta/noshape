@@ -346,6 +346,22 @@ pub struct DragTarget {
     /// Point in body-local coordinates.
     pub local_point: DVec3,
     pub target: DVec3,
+    /// The pointer's ray direction: the point is drawn to the ray, not to a
+    /// depth on it (live asm drag probes d6: a Ball-held block tips toward
+    /// the vertical ray of a Top-view drag). None: to the target point.
+    pub along: Option<DVec3>,
+}
+
+impl DragTarget {
+    /// Where the dragged point is from its target, the ray's own direction
+    /// left out.
+    fn miss(&self, at: DVec3) -> DVec3 {
+        let w = at - self.target;
+        match self.along.and_then(|a| a.try_normalize()) {
+            Some(a) => w - a * w.dot(a),
+            None => w,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -744,7 +760,7 @@ fn term_residuals(p: &Problem, poses: &[Frame], t: Term, out: &mut Vec<f64>) {
         Term::Relation(i) => out.push(relation_residual(poses, p.mates, &p.relations[i])),
         Term::Drag(i) => {
             let d = &p.drags[i];
-            let w = poses[d.body].transform_point(d.local_point) - d.target;
+            let w = d.miss(poses[d.body].transform_point(d.local_point));
             out.extend_from_slice(&[w.x * DRAG_WEIGHT, w.y * DRAG_WEIGHT, w.z * DRAG_WEIGHT]);
         }
         Term::Stay(b) => {
@@ -1156,7 +1172,15 @@ fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations
     let trial_driven = Driven::new(&trial, mates);
     solve_driven(&mut trial, mates, relations, drags, false, false, None, &trial_driven);
     let r = solve_driven(&mut trial, mates, relations, &[], false, true, memo, &trial_driven);
-    let reached = drags.iter().all(|d| trial[d.body].pose.transform_point(d.local_point).distance(d.target) < 1e-7);
+    let reached = drags.iter().all(|d| d.miss(trial[d.body].pose.transform_point(d.local_point)).length() < 1e-7);
+    // A dragged part that moved on its own keeps that: live moves only
+    // along the dragged part's own freedom (asm drag probes d4: in a
+    // two-link arm only the dragged link turns, the inner joint stays); its
+    // group moves only when it can't move alone (a linkage).
+    let moved_alone = moving.iter().any(|&b| {
+        let (a, c) = (bodies[b].pose, trial[b].pose);
+        a.origin.distance(c.origin) > 1e-9 || log_rot(a.rotation.inverse() * c.rotation).length() > 1e-9
+    });
     // The dragged bodies' mates must hold (a failing mate elsewhere isn't
     // this step's business); with relations, everything must.
     let held = if relations.is_empty() { mates.iter().enumerate().filter(|(_, m)| mate_bodies(m).any(|b| moving.contains(&b) || follows.contains(&b))).all(|(i, _)| r.mate_ok[i]) } else { r.converged };
@@ -1167,7 +1191,7 @@ fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations
     // the pointer moves in the view plane) is still their answer unless
     // moving the rest of their group gets the drag closer: one damped
     // Gauss-Newton step on the whole group must find (almost) nothing.
-    if !reached {
+    if !reached && !moved_alone {
         let poses: Vec<Frame> = trial.iter().map(|b| b.pose).collect();
         let scale = characteristic_length(&poses, mates).max(1e-3);
         let held_bodies: &[SolverBody] = bodies;
@@ -2206,7 +2230,7 @@ mod tests {
         let la = Frame::from_axes(DVec3::ZERO, DVec3::Z, DVec3::X);
         let lb = Frame::from_axes(DVec3::ZERO, DVec3::NEG_Z, DVec3::X);
         let mates = vec![mate(MateType::Slider, 0, la, 1, lb)];
-        let drags = vec![DragTarget { body: 1, local_point: DVec3::ZERO, target: DVec3::new(0.02, 0.0, 0.05) }];
+        let drags = vec![DragTarget { body: 1, local_point: DVec3::ZERO, target: DVec3::new(0.02, 0.0, 0.05), along: None }];
         let r = solve(&mut bodies, &mates, &[], &drags);
         assert!(r.converged);
         let o = bodies[1].pose.origin;
@@ -2239,7 +2263,7 @@ mod tests {
             assert!(r.converged, "{kind:?}");
             assert_eq!(r.dof, dof, "{kind:?} DOF");
             assert_eq!(r.body_dof[1], dof, "{kind:?} body DOF");
-            let drags = vec![DragTarget { body: 1, local_point: DVec3::ZERO, target }];
+            let drags = vec![DragTarget { body: 1, local_point: DVec3::ZERO, target, along: None }];
             let r = solve(&mut bodies, &mates, &[], &drags);
             assert!(r.converged, "{kind:?} drag");
             let o = bodies[1].pose.origin;
@@ -2251,7 +2275,7 @@ mod tests {
         // Ball: dragging a point off the centre turns the part about it.
         let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::ZERO, false)];
         let mates = vec![mate(MateType::Ball, 0, la, 1, lb)];
-        let drags = vec![DragTarget { body: 1, local_point: DVec3::new(0.01, 0.0, 0.0), target: DVec3::new(0.0, 0.0, 0.01) }];
+        let drags = vec![DragTarget { body: 1, local_point: DVec3::new(0.01, 0.0, 0.0), target: DVec3::new(0.0, 0.0, 0.01), along: None }];
         let r = solve(&mut bodies, &mates, &[], &drags);
         assert!(r.converged);
         let p = bodies[1].pose;
@@ -2332,7 +2356,7 @@ mod tests {
         let lp = DVec3::new(10.0 * mm, 10.0 * mm, 20.0 * mm);
         for step in 1..=10 {
             let target = before[n].transform_point(lp) + DVec3::new(5.0, 3.0, 0.0) * mm * step as f64;
-            let drags = vec![DragTarget { body: n, local_point: lp, target }];
+            let drags = vec![DragTarget { body: n, local_point: lp, target, along: None }];
             let r = solve_with(&mut bodies, &mates, &[], &drags, false);
             assert!(r.converged);
         }
@@ -2348,7 +2372,7 @@ mod tests {
         let start: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
         for step in 1..=5 {
             let target = start[n].transform_point(lp) + DVec3::new(-4.0, 2.0, 3.0) * mm * step as f64;
-            let drags = vec![DragTarget { body: n, local_point: lp, target }];
+            let drags = vec![DragTarget { body: n, local_point: lp, target, along: None }];
             assert!(solve_with(&mut bodies, &mates, &[], &drags, false).converged);
         }
         for i in 1..n {
@@ -2359,9 +2383,10 @@ mod tests {
         assert!((moved - DVec3::new(-20.0, 10.0, 0.0) * mm).length() < 1e-6, "dragged cube moved {moved:?}");
     }
 
-    /// The whole group must move (a 3-link revolute chain, its end dragged)
-    /// while 10 cubes ride Planar-stacked on the last link: the cubes' free
-    /// in-plane motion stays unused (least change), the chain follows.
+    /// A 3-link revolute chain, its end link dragged, while 10 cubes ride
+    /// Planar-stacked on that link: only the dragged link turns, about its
+    /// own joint (live asm drag probes d4: the inner joints stay); the
+    /// cubes on it don't move (their plane keeps its height).
     #[test]
     fn coupled_drag_leaves_free_bodies_put() {
         let mm = 1e-3;
@@ -2380,10 +2405,13 @@ mod tests {
         let lp = DVec3::new(0.03, 0.006, 0.0);
         for step in 1..=5 {
             let target = before[3].transform_point(lp) + DVec3::new(-1.0, 2.0, 0.0) * mm * step as f64;
-            let drags = vec![DragTarget { body: 3, local_point: lp, target }];
+            let drags = vec![DragTarget { body: 3, local_point: lp, target, along: None }];
             assert!(solve_with(&mut bodies, &mates, &[], &drags, false).converged);
-            assert!((bodies[3].pose.transform_point(lp) - target).length() < 1e-6, "step {step}: the chain end lags");
         }
+        for i in 1..3 {
+            assert!(bodies[i].pose.origin.distance(before[i].origin) < 1e-9, "inner link {i} moved");
+        }
+        assert!(log_rot(before[3].rotation.inverse() * bodies[3].pose.rotation).length() > 1e-3, "the dragged link turns");
         // The links turn about Z, so the plane the cubes sit on keeps its
         // height: nothing asks them to move at all.
         for i in cube0..bodies.len() {
@@ -2392,24 +2420,36 @@ mod tests {
         }
     }
 
-    /// Dragging the free end of a 20-link revolute chain: each step follows
-    /// the pointer exactly, and the drag phase starts nearly undamped (it
-    /// took 111 iterations over these 5 steps with the old damping).
+    /// Dragging the free end of a 20-link revolute chain: only the end link
+    /// turns, about its own joint (live asm drag probes d4), and the drag
+    /// phase starts nearly undamped (it took 111 iterations over these 5
+    /// steps with the old damping, when the whole chain followed).
     #[test]
     fn chain_drag_follows_in_few_iterations() {
         let (mut bodies, mates) = chain(20);
         assert!(solve(&mut bodies, &mates, &[], &[]).converged);
+        let before: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
         let lp = DVec3::new(0.03, 0.006, 0.0);
+        // The whole chain's drag phase (what a linkage's drag runs), its
+        // end following the pointer, on its own copy.
+        let mut follow = bodies.clone();
         let mut iterations = 0;
         for _ in 0..5 {
+            let target = follow[19].pose.transform_point(lp) + DVec3::new(-0.002, 0.001, 0.0);
+            let drags = vec![DragTarget { body: 19, local_point: lp, target, along: None }];
+            iterations += solve_inner(&mut follow, &mates, &[], &drags, false, false, None).iterations;
+        }
+        for _ in 0..5 {
             let target = bodies[19].pose.transform_point(lp) + DVec3::new(-0.002, 0.001, 0.0);
-            let drags = vec![DragTarget { body: 19, local_point: lp, target }];
-            iterations += solve_inner(&mut bodies.clone(), &mates, &[], &drags, false, false, None).iterations;
+            let drags = vec![DragTarget { body: 19, local_point: lp, target, along: None }];
             let r = solve(&mut bodies, &mates, &[], &drags);
             assert!(r.converged);
             assert_eq!(r.dof, 19);
-            assert!((bodies[19].pose.transform_point(lp) - target).length() < 1e-6);
         }
+        for i in 1..19 {
+            assert!(bodies[i].pose.origin.distance(before[i].origin) < 1e-9, "link {i} moved");
+        }
+        assert!(log_rot(before[19].rotation.inverse() * bodies[19].pose.rotation).length() > 1e-3, "the end link turns");
         assert!(iterations <= 80, "{iterations} drag-phase iterations");
     }
 
@@ -2429,7 +2469,7 @@ mod tests {
         assert_eq!(r.body_dof[1], 1);
         assert!(r.body_dof[2..].iter().all(|d| *d == 6));
         let before: Vec<DVec3> = bodies.iter().map(|b| b.pose.origin).collect();
-        let drags = vec![DragTarget { body: 1, local_point: DVec3::X * 0.01, target: DVec3::Y * 0.01 }];
+        let drags = vec![DragTarget { body: 1, local_point: DVec3::X * 0.01, target: DVec3::Y * 0.01, along: None }];
         let r = solve(&mut bodies, &mates, &[], &drags);
         assert!(r.converged);
         assert!((bodies[1].pose.transform_point(DVec3::X * 0.01) - DVec3::Y * 0.01).length() < 1e-6);
@@ -2574,7 +2614,7 @@ mod tests {
         let base_b = mate_values(&poses0, &mates[1])[0];
         let rel = vec![SolverRelation { kind: RelationKind::Gear, mate_a: 0, mate_b: 1, ratio: 2.0, reverse: false, base_a, base_b, value_a: 0, value_b: 0 }];
         // Drag body 1 to rotate it by pulling a point.
-        let drags = vec![DragTarget { body: 1, local_point: DVec3::new(0.01, 0.0, 0.0), target: DVec3::new(0.0, 0.01, 0.0) }];
+        let drags = vec![DragTarget { body: 1, local_point: DVec3::new(0.01, 0.0, 0.0), target: DVec3::new(0.0, 0.01, 0.0), along: None }];
         let r = solve(&mut bodies, &mates, &rel, &drags);
         assert!(r.converged, "{r:?}");
         let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
