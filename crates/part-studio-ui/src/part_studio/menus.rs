@@ -75,6 +75,20 @@ impl PartStudioView {
         // Live 1714: Hide other / all parts on a solid part's entities only
         // (not on a surface's face or a curve).
         let solid_body = body.as_ref().and_then(|b| self.display.body(b)).is_some_and(|d| d.kind == noshape_model::display::BodyKind::Solid);
+        let wire_body = body.as_ref().and_then(|b| self.display.body(b)).is_some_and(|d| d.kind == noshape_model::display::BodyKind::Wire);
+        // A curve made from a sketch's edges (Composite curve of Sketch 4's lines) names that sketch too (live 1714).
+        let source_sketch = source_sketch.or_else(|| {
+            let s = studio?;
+            let f = s.feature(creator?)?;
+            let sketch = f.params.0.values().find_map(|v| match v {
+                noshape_model::params::ParamValue::Query(refs) => refs.iter().find_map(|r| match r {
+                    Reference::Edge(n) => n.creator().filter(|id| s.feature(*id).is_some_and(|g| g.type_id == "sketch")),
+                    _ => None,
+                }),
+                _ => None,
+            })?;
+            s.feature(sketch).map(|g| (sketch, g.name.clone()))
+        });
         let planar = target_ref.as_ref().is_some_and(|r| self.frame_of_ref(r).is_some());
         let linear_edge = target_ref.as_ref().is_some_and(|r| self.linear_edge_direction(r).is_some());
         let plane_name = target_ref.as_ref().map(|r| self.labeler(cx)(r)).unwrap_or_default();
@@ -369,6 +383,53 @@ impl PartStudioView {
                         .item(icon_item("Section view…", "menu-section-view", Box::new(move |this, w, cx| this.section_through(rs.clone(), w, cx))))
                         .separator();
                     m = select_menu(m, &r, PickKind::Connector, window, cx).separator().item(zoom_fit()).item(normal_to(&r));
+                    if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
+                        m = m.separator().item(icon_item(&format!("Delete {name}"), "menu-delete", Box::new(move |this, _, cx| this.delete_features(vec![id], cx))));
+                    }
+                }
+                // A curve (live 1714): Edit <feature>… · Edit <sketch>… · Show dimensions · Show dependencies… |
+                // Hide <curve> · Isolate… · Make transparent… | Create Drawing of <curve>… | Select ▸ · Select
+                // other… | Zoom to fit | Delete <feature>.
+                (Some(r), Some(k)) if wire_body => {
+                    if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
+                        m = m.item(item(&format!("Edit {name}…"), Box::new(move |this, w, cx| this.edit_feature(id, w, cx))));
+                        if let Some((sid, sname)) = source_sketch.clone() {
+                            m = m
+                                .item(item(&format!("Edit {sname}…"), Box::new(move |this, w, cx| this.edit_feature(sid, w, cx))))
+                                .item(item("Show dimensions", Box::new(move |this, w, cx| this.show_dimensions(sid, w, cx))));
+                        }
+                        m = m
+                            .item(item(&format!("Show dependencies of {name}…"), Box::new(move |this, _, cx| {
+                                this.ui.dependencies = Some(id);
+                                cx.notify();
+                            })))
+                            .separator();
+                    }
+                    if let Some(b) = body.clone() {
+                        let (b1, b2, b3, b7, name) = (b.clone(), b.clone(), b.clone(), b.clone(), body_name.to_string());
+                        m = m
+                            .item(icon_item(&format!("Hide {body_name}"), "eye-off", Box::new(move |this, _, cx| {
+                                this.set_part_hidden(&b1, true, cx);
+                                this.hover = None;
+                            })))
+                            .item(item("Isolate…", Box::new(move |this, w, cx| {
+                                this.selection = vec![Reference::Body(b2.clone())];
+                                this.hover = None;
+                                this.isolate(super::behaviors::IsolateMode::Isolate, w, cx);
+                            })))
+                            .item(item("Make transparent…", Box::new(move |this, w, cx| {
+                                this.selection = vec![Reference::Body(b3.clone())];
+                                this.hover = None;
+                                this.isolate(super::behaviors::IsolateMode::Transparent, w, cx);
+                            })))
+                            .separator()
+                            .item(icon_item(&format!("Create Drawing of {body_name}…"), "menu-create-drawing", Box::new(move |this, w, cx| {
+                                let source = Some(noshape_model::drawing::create::DrawingSource { tab: this.tab, part: Some(b7.clone()), config: Default::default(), sketch: None, flat: false });
+                                crate::drawing_create::request_create_drawing(crate::drawing_create::CreateRequest { source, name: Some(name.clone()) }, w, cx);
+                            })))
+                            .separator();
+                    }
+                    m = select_menu(m, &r, k, window, cx).separator().item(zoom_fit());
                     if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
                         m = m.separator().item(icon_item(&format!("Delete {name}"), "menu-delete", Box::new(move |this, _, cx| this.delete_features(vec![id], cx))));
                     }

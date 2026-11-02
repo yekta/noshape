@@ -1330,3 +1330,45 @@ fn frame_trim_flip_as_std(cx: &mut TestAppContext) {
     set(cx, "flipTrim", noshape_model::ParamValue::Bool(true));
     assert!(arrow(cx).is_some_and(|a| a.1.z < -0.999), "flipped");
 }
+
+/// Live 1714 (dom/psui-audit-rmb-graphics-curve.txt): a curve's graphics menu: Edit Composite curve 1… · Edit
+/// Sketch 1… · Show dimensions · Show dependencies… | Hide Curve 1 · Isolate… · Make transparent… | Create Drawing
+/// of Curve 1… | Select ▸ · Select other… | Zoom to fit | Delete Composite curve 1 (no Fillet / Chamfer, analysis,
+/// Copy, Export, Zoom to selection, appearance or material).
+#[gpui::test]
+fn a_curves_graphics_menu_as_live(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "curve-menu", Tool::Line);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (640., 360.));
+    keys(cx, window, &["escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+    draw(cx, window);
+    let line = cx.update(|cx| {
+        let sk = view.read(cx).display.sketches.first().expect("the sketch").clone();
+        Reference::SketchEntity { sketch: sk.feature, entity: sk.curves.first().expect("the line").entity }
+    });
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_feature("compositeCurve", w, cx);
+            let d = v.edit.as_ref().expect("the dialog").dialog.clone();
+            d.update(cx, |d, cx| d.set_value("edges", noshape_model::ParamValue::Query(vec![line.clone()]), cx));
+        })
+    })
+    .unwrap();
+    wait_until(cx, window, |cx| view.read(cx).edit.as_ref().is_some_and(|e| e.dialog.read(cx).can_submit()));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).display.bodies.iter().any(|b| b.kind == noshape_model::display::BodyKind::Wire));
+    let edge = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Wire).and_then(|b| b.edge_refs.first().cloned())).expect("the curve's edge");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| v.open_context_menu(Some(noshape_scene::builder::PickTarget { reference: edge.clone(), kind: noshape_scene::builder::PickKind::Edge, anchor: None }), gpui_kit::point(px(600.), px(400.)), w, cx))
+    })
+    .unwrap();
+    draw(cx, window);
+    let labels = cx.update(|cx| view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_default());
+    let want = [
+        "Edit Composite curve 1…", "Edit Sketch 1…", "Show dimensions", "Show dependencies of Composite curve 1…", "———",
+        "Hide Curve 1", "Isolate…", "Make transparent…", "———", "Create Drawing of Curve 1…", "———",
+        "Select", "Select other…", "———", "Zoom to fit", "———", "Delete Composite curve 1",
+    ];
+    assert_eq!(labels, want);
+}

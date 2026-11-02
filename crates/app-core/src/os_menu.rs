@@ -326,6 +326,17 @@ impl OsMenu {
         self
     }
 
+    /// Its rows, "———" for a separator (UI tests compare a whole menu with live's).
+    pub fn labels(&self) -> Vec<String> {
+        self.items
+            .iter()
+            .map(|i| match i {
+                OsMenuItem::Item { label, .. } | OsMenuItem::Submenu { label, .. } => label.to_string(),
+                OsMenuItem::Separator => "———".to_string(),
+            })
+            .collect()
+    }
+
     pub fn submenu(self, label: impl Into<SharedString>, window: &mut Window, cx: &mut Context<Self>, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Self {
         self.submenu_with_icon(None, label, window, cx, f)
     }
@@ -723,6 +734,11 @@ pub fn open_anchored(position: Point<Pixels>, anchor: Anchor, menu: Entity<OsMen
 /// `menu` is the open menu (a dropdown button shows its pressed state).
 pub fn is_open_menu(menu: &WeakEntity<OsMenu>, cx: &App) -> bool {
     cx.try_global::<OsMenuHost>().and_then(|h| h.0.as_ref()).is_some_and(|(_, _, _, m, _)| m.downgrade() == *menu)
+}
+
+/// The open menu's rows (see [`OsMenu::labels`]).
+pub fn open_labels(cx: &App) -> Vec<String> {
+    cx.try_global::<OsMenuHost>().and_then(|h| h.0.as_ref()).map(|(_, _, _, m, _)| m.read(cx).labels()).unwrap_or_default()
 }
 
 /// A right-click menu is open (hover tooltips under it should not show).
