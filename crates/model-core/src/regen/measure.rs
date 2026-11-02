@@ -163,6 +163,25 @@ pub fn measure(ctx: &Context, refs: &[Reference]) -> Vec<(String, Measurement)> 
         .collect()
 }
 
+/// The Measure panel's type a row belongs to (bundle: each type and the rows it keeps; the other distances only
+/// show with Show all).
+pub fn row_type(label: &str) -> Option<&'static str> {
+    Some(match label {
+        "Point" => "Position",
+        "Center" => "Center position",
+        "Min dist" => "Min distance",
+        "Max dist" => "Max distance",
+        "Length" => "Length",
+        "Diameter" => "Diameter",
+        "Radius" => "Radius",
+        "Angle" | "Perp planes angle" | "Perp lines angle" | "Perp axes angle" | "Perp line and plane angle" => "Angle",
+        "Face tangent angle" => "Face tangent angle",
+        "Curvature deviation" => "Curvature deviation",
+        "Area" => "Surface area",
+        _ => return None,
+    })
+}
+
 /// The geometry a pair measurement looks at.
 #[derive(Clone, Copy)]
 enum Geo {
@@ -189,6 +208,14 @@ fn geo(s: &Shape) -> Geo {
             _ => Geo::Other,
         },
         _ => Geo::Other,
+    }
+}
+
+/// A circular edge's axis.
+fn circle_axis(s: &Shape) -> Option<DVec3> {
+    match s.edge_curve() {
+        Ok(k::Curve::Circle { axis, .. }) if s.shape_type() == ShapeType::Edge => Some(axis.normalize()),
+        _ => None,
     }
 }
 
@@ -256,7 +283,8 @@ fn farthest_near(shapes: &[Shape], at: DVec3, from: DVec3) -> DVec3 {
             if pr.distance > tol || !(u1 > u0 && v1 > v0) {
                 continue;
             }
-            let on_face = |x: DVec3| f.project_point(x).is_ok_and(|r| r.distance <= tol);
+            // Kept on the face within 1 nm: at `tol` a disc's Max dist against its rim read 16.001 for live's 16.000.
+            let on_face = |x: DVec3| f.project_point(x).is_ok_and(|r| r.distance <= 1e-9);
             let (mut u, mut v) = (pr.u, pr.v);
             let mut d = pr.point.distance(from);
             let (mut su, mut sv) = ((u1 - u0) * 0.05, (v1 - v0) * 0.05);
@@ -447,6 +475,8 @@ pub fn measure_shapes(shapes: &[Vec<Shape>]) -> Vec<(String, Measurement)> {
     let max = || max_row(a, b).into_iter();
     let angle = k::angle_between(a, b).ok();
     let point = |s: &Shape| (s.shape_type() == ShapeType::Vertex).then(|| s.vertex_point().ok()).flatten();
+    let touching = || min_row(a, b).is_some_and(|(_, m)| matches!(m, Measurement::Distance { distance, .. } if distance.abs() < 1e-9));
+    let on_face = || [("Face tangent angle".to_string(), Measurement::Angle(0.0)), ("Curvature deviation".to_string(), Measurement::Percent(0.0))];
     match (geo(a), geo(b)) {
         // (1) / (2) planes.
         (Geo::Plane { origin: o1, normal: n1 }, Geo::Plane { origin: o2, normal: n2 }) => {
@@ -536,6 +566,66 @@ pub fn measure_shapes(shapes: &[Vec<Shape>]) -> Vec<(String, Measurement)> {
                 out.extend(max());
                 out.extend(min());
             }
+        }
+        // Live 1709: a plane square to a cylinder's axis (a block's top and a standing cylinder).
+        (Geo::Axis { dir: d, .. }, Geo::Plane { normal: n, .. }) | (Geo::Plane { normal: n, .. }, Geo::Axis { dir: d, .. }) if parallel(d, n) => {
+            out.push(("Perp axes angle".into(), Measurement::Angle(std::f64::consts::FRAC_PI_2)));
+            out.extend(area());
+            out.extend(max());
+            out.extend(min());
+        }
+        // Live 1709: a straight edge square to a cylinder's axis.
+        (Geo::Line { origin: o1, dir: d1 }, Geo::Axis { origin: o2, dir: d2 }) | (Geo::Axis { origin: o2, dir: d2 }, Geo::Line { origin: o1, dir: d1 }) if d1.dot(d2).abs() < 1e-9 => {
+            out.push(("Perp axes angle".into(), Measurement::Angle(std::f64::consts::FRAC_PI_2)));
+            out.extend(min());
+            out.extend(face_area());
+            let n = d1.cross(d2).normalize();
+            out.push(dist_row("Center axes dist", DVec3::ZERO, n * (o2 - o1).dot(n)));
+            out.extend(max());
+            out.extend(edge_length());
+        }
+        // Live 1709: a vertex and a cylinder.
+        (Geo::Other, Geo::Axis { origin: o, dir: d }) | (Geo::Axis { origin: o, dir: d }, Geo::Other) if point(a).or(point(b)).is_some() => {
+            let p = point(a).or(point(b)).unwrap_or_default();
+            out.extend(min());
+            out.extend(face_area());
+            out.push(dist_row("Center axes dist", o + d * (p - o).dot(d), p));
+            out.extend(max());
+        }
+        // Live 1709: a circle and a plane it is parallel to; on the face, its tangent angle and curvature deviation first.
+        (Geo::Center(c), Geo::Plane { origin: p, normal: n }) | (Geo::Plane { origin: p, normal: n }, Geo::Center(c)) if circle_axis(a).or(circle_axis(b)).is_some_and(|x| parallel(x, n)) => {
+            let center = dist_row("Center dist", c, c + n * (p - c).dot(n));
+            if touching() {
+                out.extend(on_face());
+                out.extend(face_area());
+                out.push(center);
+                out.extend(max());
+                out.extend(min());
+            } else {
+                out.extend(min());
+                out.extend(max());
+                out.extend(face_area());
+                out.push(center);
+            }
+            out.extend(edge_length());
+        }
+        // Live 1709: a circle on a cylinder, around its axis.
+        (Geo::Center(c), Geo::Axis { origin: o, dir: d }) | (Geo::Axis { origin: o, dir: d }, Geo::Center(c))
+            if circle_axis(a).or(circle_axis(b)).is_some_and(|x| parallel(x, d)) && (c - o).cross(d).length() < 1e-9 && touching() =>
+        {
+            out.extend(on_face());
+            out.extend(face_area());
+            out.push(dist_row("Center axes dist", c, c));
+            out.extend(max());
+            out.extend(min());
+            out.extend(edge_length());
+        }
+        // Live 1709: a straight edge and a circle.
+        (Geo::Line { origin: o, dir: d }, Geo::Center(c)) | (Geo::Center(c), Geo::Line { origin: o, dir: d }) if circle_axis(a).or(circle_axis(b)).is_some() => {
+            out.extend(min());
+            out.extend(max());
+            out.push(dist_row("Center dist", o + d * (c - o).dot(d), c));
+            out.extend(edge_length());
         }
         // A cylinder and a plane parallel to its axis: "Center axes dist".
         (Geo::Axis { origin: o, dir: d }, Geo::Plane { origin: p, normal: n }) | (Geo::Plane { origin: p, normal: n }, Geo::Axis { origin: o, dir: d }) if d.dot(n).abs() < 1e-9 => {
@@ -1054,5 +1144,47 @@ mod tests {
         let rows = measure_shapes(&[vec![wall(&quarter)]]);
         let labels: Vec<&str> = rows.iter().map(|(l, _)| l.as_str()).collect();
         assert!(labels == ["Radius", "Area"] && matches!(rows[0].1, Measurement::Radius(r) if (r - 0.002).abs() < 1e-12), "{labels:?}");
+    }
+
+    /// Live 1709 (11-02): a 40 x 30 x 20 block and a Ø16 cylinder 25 tall standing 30 off its right face and 15
+    /// behind its front.
+    #[test]
+    fn a_block_and_a_standing_cylinder_measure_as_live() {
+        let block = k::make_box(&k::Plane::xy(), 0.04, 0.03, 0.02).unwrap();
+        let cyl = k::make_cylinder(&k::Plane::new(DVec3::new(0.07, 0.015, 0.0), DVec3::Z, DVec3::X), 0.008, 0.025, std::f64::consts::TAU).unwrap();
+        let plane_at = |s: &Shape, n: DVec3, at: f64| s.faces().into_iter().find(|f| matches!(f.face_surface(), Ok(k::Surface::Plane(p)) if p.normal.normalize().dot(n).abs() > 0.99 && (p.origin.dot(n).abs() - at).abs() < 1e-9)).unwrap();
+        let (top, front) = (plane_at(&block, DVec3::Z, 0.02), plane_at(&block, DVec3::Y, 0.0));
+        let cyl_top = plane_at(&cyl, DVec3::Z, 0.025);
+        let wall = cyl.faces().into_iter().find(|f| matches!(f.face_surface(), Ok(k::Surface::Cylinder { .. }))).unwrap();
+        let rim = cyl.edges().into_iter().find(|e| matches!(e.edge_curve(), Ok(k::Curve::Circle { center, .. }) if center.z > 0.02)).unwrap();
+        let edge = top.edges().into_iter().find(|e| matches!(e.edge_curve(), Ok(k::Curve::Line { origin, direction }) if direction.x.abs() > 0.9 && origin.y.abs() < 1e-9)).unwrap();
+        let corner = block.vertices().into_iter().find(|v| v.vertex_point().is_ok_and(|p| p.distance(DVec3::new(0.0, 0.0, 0.02)) < 1e-9)).unwrap();
+        let rows = |a: &Shape, b: &Shape| measure_shapes(&[vec![a.clone()], vec![b.clone()]]);
+        let labels = |r: &[(String, Measurement)]| r.iter().map(|(l, _)| l.clone()).collect::<Vec<_>>();
+        let dist = |r: &[(String, Measurement)], l: &str| r.iter().find_map(|(n, m)| match m { Measurement::Distance { distance, .. } if n == l => Some(*distance), _ => None }).unwrap();
+        let r = rows(&top, &wall);
+        assert_eq!(labels(&r), ["Perp axes angle", "Area", "Max dist", "Min dist"]);
+        assert!((dist(&r, "Min dist") - 0.022).abs() < 1e-7);
+        let r = rows(&top, &rim);
+        assert_eq!(labels(&r), ["Min dist", "Max dist", "Area", "Center dist", "Length"]);
+        assert!((dist(&r, "Center dist") - 0.005).abs() < 1e-9 && (dist(&r, "Min dist") - 0.022561).abs() < 1e-6);
+        let r = rows(&cyl_top, &rim);
+        assert_eq!(labels(&r), ["Face tangent angle", "Curvature deviation", "Area", "Center dist", "Max dist", "Min dist", "Length"]);
+        assert!((dist(&r, "Max dist") - 0.016).abs() < 1e-7, "{}", dist(&r, "Max dist"));
+        let r = rows(&wall, &rim);
+        assert_eq!(labels(&r), ["Face tangent angle", "Curvature deviation", "Area", "Center axes dist", "Max dist", "Min dist", "Length"]);
+        let r = rows(&front, &wall);
+        assert_eq!(labels(&r), ["Min dist", "Area", "Center axes dist", "Max dist"]);
+        assert!((dist(&r, "Center axes dist") - 0.015).abs() < 1e-9 && (dist(&r, "Min dist") - 0.025541).abs() < 1e-6);
+        let r = rows(&corner, &wall);
+        assert_eq!(labels(&r), ["Min dist", "Area", "Center axes dist", "Max dist"]);
+        assert!((dist(&r, "Center axes dist") - 0.071589).abs() < 1e-6 && (dist(&r, "Min dist") - 0.063589).abs() < 1e-6);
+        let r = rows(&edge, &wall);
+        assert_eq!(labels(&r), ["Perp axes angle", "Min dist", "Area", "Center axes dist", "Max dist", "Length"]);
+        assert!((dist(&r, "Center axes dist") - 0.015).abs() < 1e-9);
+        let r = rows(&edge, &rim);
+        assert_eq!(labels(&r), ["Min dist", "Max dist", "Center dist", "Length"]);
+        assert!((dist(&r, "Center dist") - 0.015811).abs() < 1e-6);
+        assert!(matches!(r[3].1, Measurement::Length(l) if (l - 0.090265).abs() < 1e-6));
     }
 }

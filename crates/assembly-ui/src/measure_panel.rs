@@ -55,24 +55,6 @@ pub struct Row {
     pub axis: Option<usize>,
 }
 
-/// The Measure type a row belongs to (bundle: each type and the rows it
-/// keeps; the other distances only show with Show all).
-pub fn filter_type(label: &str) -> Option<&'static str> {
-    Some(match label {
-        "Point" => "Position",
-        "Center" => "Center position",
-        "Min dist" => "Min distance",
-        "Max dist" => "Max distance",
-        "Length" => "Length",
-        "Diameter" => "Diameter",
-        "Radius" => "Radius",
-        "Angle" | "Perp planes angle" | "Perp lines angle" | "Perp axes angle" | "Perp line and plane angle" => "Angle",
-        "Curvature deviation" => "Curvature deviation",
-        "Area" => "Surface area",
-        _ => return None,
-    })
-}
-
 /// A value as Onshape's panel writes it (bundle `formatValue`: "90.000 deg",
 /// "11.902 in²"): the display precision with its trailing zeros.
 pub fn format(q: Quantity, units: &UnitPrefs) -> String {
@@ -110,7 +92,7 @@ pub fn rows(results: &[(String, Measurement)], settings: &MeasureSettings, doc_u
     ordered.sort_by_key(|(l, _)| rank(l));
     for (label, m) in ordered {
         if let Some(t) = settings.kind
-            && filter_type(label) != Some(t)
+            && noshape_model::regen::measure::row_type(label) != Some(t)
         {
             continue;
         }

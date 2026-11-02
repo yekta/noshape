@@ -1323,7 +1323,7 @@ impl PartStudioView {
             for (label, m) in results {
                 // Measure type selector (bundle: each type and the rows it keeps).
                 if let Some(t) = filter
-                    && measure_filter_type(&label) != Some(t)
+                    && measure::row_type(&label) != Some(t)
                 {
                     continue;
                 }
@@ -1916,25 +1916,6 @@ const MEASURE_LENGTH_UNITS: [(&str, noshape_units::LengthUnit); 6] = [
     ("Millimeter", noshape_units::LengthUnit::Millimeter),
     ("Yard", noshape_units::LengthUnit::Yard),
 ];
-
-/// The Measure type a row belongs to (bundle: the map from each type to
-/// its measurement types; Angle keeps every angle; the other distances only
-/// show with Show all).
-fn measure_filter_type(label: &str) -> Option<&'static str> {
-    Some(match label {
-        "Point" => "Position",
-        "Center" => "Center position",
-        "Min dist" => "Min distance",
-        "Max dist" => "Max distance",
-        "Length" => "Length",
-        "Diameter" => "Diameter",
-        "Radius" => "Radius",
-        "Angle" | "Perp planes angle" | "Perp lines angle" | "Perp axes angle" | "Perp line and plane angle" => "Angle",
-        "Curvature deviation" => "Curvature deviation",
-        "Area" => "Surface area",
-        _ => return None,
-    })
-}
 
 /// A measured value as Onshape's measure readout and panel write it (bundle
 /// `formatValue`, live part-studio/81: "90.000 deg", "11.902 in²"): the
