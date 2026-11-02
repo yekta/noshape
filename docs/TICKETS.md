@@ -1325,6 +1325,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P2 ROLLBACK-BAR-UNDO-STEP (psui) moving the rollback bar is an undo step in ours, not in live: a 40 x 30 x 10 box
+  (Sketch 1, Extrude 1; nothing undoable after open), click the Extrude 1 row, ArrowUp (bar above Extrude 1), ArrowDown;
+  live (11-02, qa's tab, "qa parity vars", toolbar `[command-id=UNDO_A_CHANGE]`): **Undo stays disabled** through both
+  moves; ours: **Undo enabled after the first move**, and Ctrl+Z moves the bar back up (qa-scratch/tickets/fl/ub-undo-bar.png:
+  open / after ArrowUp / after ArrowDown). Scenario ui-parity/feature-row-arrow-up-moves-bar. (qa 2026-11-02, build 6b4704f2)
+- [ ] P2 FEATURE-RCLICK-WITH-SELECTION (psui) right-clicking a feature row that isn't selected while another is: click
+  Extrude 1, right-click Sketch 1; live: Extrude 1 stays selected and the **multi-selection menu** opens: Add selection to
+  folder… · Suppress · Dynamic suppression ▸ · Clear selection · Edit sketch appearance… · Add appearance to feature… ·
+  Delete (qa-scratch/tickets/fl/live-menu-other.png); ours: the single-feature Sketch 1 menu (Rename · Edit… · Copy sketch
+  · Show dimensions · … · Roll to here · Edit sketch appearance… · Delete; tickets/fl/ub-menu2.png). Scenario
+  ui-parity/feature-row-rclick-other-selected. (qa 2026-11-02, build 6b4704f2)
 - [x] (psui 10-31 13:03: `os_ui::modal_help`, a filled #888 "?" 5 px before the ✕ as live's drawing/90, on Export Drawing and
   Export as DXF/DWG; the Part Studio / assembly Export keeps its "?" beside File name (live document/80), confirmations
   and Import to Onshape have none. Checked on :102 against drawing/90 within 1 px.)
