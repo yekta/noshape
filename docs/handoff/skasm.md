@@ -714,6 +714,12 @@ norm, lowers the bottom 0.68 mm), g6 (a fully dimensioned bolt circle, one hole 
 rigidly about the undragged lower-left hole; ours moves the pattern centre). Both say a drag keeps far geometry
 stiller than our point-space least norm: the next drag change (weights growing with distance from the dragged point,
 or the constructive pass with the dragged point pinned), with drag_probe_matches (7 + 9) as its test.
+17:20: tried for the drags, both dropped: distance-falloff weights (never exact, no probe changes), the constructive
+pass with the dragged point pinned (probes 7 8 → 3/8). Asked live for assembly drag probes d1–d6 (Revolute pin,
+Slider, Planar, a two-link arm, Cylindrical, Ball); T2 oracle_asm::asm_drag_probes_match_live is ready for its
+answer (`asm-drag-1.live.jsonl`; cases built from live's own input by `spec_assembly`, 25-step view-plane drags,
+positions within 0.3 mm for the pointer's landing). Tried for f53: half-turning about the Ball's point: no change
+(live's half-turn AXIS differs: about world y there).
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
