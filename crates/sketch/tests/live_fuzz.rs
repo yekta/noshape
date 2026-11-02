@@ -1381,6 +1381,154 @@ fn drag_probe_matches() {
     println!("live drag probes: {total} answered, {ok} match");
 }
 
+/// UI edit probes (probes 8, after live 1775 / 1785): everyday profiles that
+/// already solve, one dimension then typed anew in the editor: what moves
+/// when the profile has other dimensions too (no uniform scaling then).
+/// (name, case, the edited constraint's id in `spec`, the new value in mm).
+fn edit_probes() -> Vec<(String, Case, String, f64)> {
+    use std::f64::consts::FRAC_PI_2;
+    let v = DVec2::new;
+    let mut out = Vec::new();
+    let mut add = |name: &str, f: &dyn Fn(&mut Case) -> String, value: f64| {
+        let mut c = Case::new();
+        let id = f(&mut c);
+        out.push((name.to_string(), c, id, value));
+    };
+    let last = |c: &Case| c.spec.last().unwrap()["id"].as_str().unwrap().to_string();
+    // An H / V rectangle 40 x 20 from (10, 10), width and height dimensioned.
+    let rect = |c: &mut Case| -> Vec<String> {
+        let p = [v(10.0, 10.0), v(50.0, 10.0), v(50.0, 30.0), v(10.0, 30.0)];
+        let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+        for i in 0..4 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+            c.hv(i % 2 == 0, &l[i]);
+        }
+        l
+    };
+    add("e1 rectangle 40 x 20 with both dimensioned: the width 40 -> 50 in the editor", &|c| {
+        let l = rect(c);
+        c.length(&l[1], 20.0);
+        c.length(&l[0], 40.0);
+        last(c)
+    }, 50.0);
+    add("e2 as e1, the height 20 -> 30", &|c| {
+        let l = rect(c);
+        c.length(&l[0], 40.0);
+        c.length(&l[1], 20.0);
+        last(c)
+    }, 30.0);
+    // L-bracket: 40 wide, 30 high, legs 8 thick, four lengths.
+    add("e3 L-bracket, the bottom 40 -> 50 in the editor", &|c| {
+        let p = [v(0.0, 0.0), v(40.0, 0.0), v(40.0, 8.0), v(8.0, 8.0), v(8.0, 30.0), v(0.0, 30.0)];
+        let l: Vec<String> = (0..6).map(|i| c.line(p[i], p[(i + 1) % 6])).collect();
+        for i in 0..6 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 6]));
+            c.hv(i % 2 == 0, &l[i]);
+        }
+        c.length(&l[5], 30.0);
+        c.length(&l[1], 8.0);
+        c.length(&l[4], 22.0);
+        c.length(&l[0], 40.0);
+        last(c)
+    }, 50.0);
+    // Slot: centres 30 apart, radius 6.
+    let slot = |c: &mut Case| -> [String; 4] {
+        let l1 = c.line(v(0.0, -6.0), v(30.0, -6.0));
+        let a2 = c.arc(v(30.0, 0.0), 6.0, -FRAC_PI_2, FRAC_PI_2);
+        let l3 = c.line(v(30.0, 6.0), v(0.0, 6.0));
+        let a4 = c.arc(v(0.0, 0.0), 6.0, FRAC_PI_2, 3.0 * FRAC_PI_2);
+        c.coincident(&format!("{l1}.end"), &format!("{a2}.start"));
+        c.coincident(&format!("{a2}.end"), &format!("{l3}.start"));
+        c.coincident(&format!("{l3}.end"), &format!("{a4}.start"));
+        c.coincident(&format!("{a4}.end"), &format!("{l1}.start"));
+        for (a, b) in [(&l1, &a2), (&a2, &l3), (&l3, &a4), (&a4, &l1)] {
+            c.pair("TANGENT", a, b);
+        }
+        c.pair("EQUAL", &a2, &a4);
+        c.hv(true, &l1);
+        [l1, a2, l3, a4]
+    };
+    add("e4 slot (centres 30 apart, R6, both dimensioned): the centre distance 30 -> 40 in the editor", &|c| {
+        let [_, a2, _, a4] = slot(c);
+        c.radius(&a2, 6.0, false);
+        c.distance(&format!("{a4}.center"), &format!("{a2}.center"), 30.0);
+        last(c)
+    }, 40.0);
+    add("e5 as e4, the radius 6 -> 8", &|c| {
+        let [_, a2, _, a4] = slot(c);
+        c.distance(&format!("{a4}.center"), &format!("{a2}.center"), 30.0);
+        c.radius(&a2, 6.0, false);
+        last(c)
+    }, 8.0);
+    // Rectangle 40 x 20 from (10, 10) with its four corners filleted R4.
+    add("e6 filleted rectangle (R4, the straight bottom 32 dimensioned): the radius 4 -> 6 in the editor", &|c| {
+        let (o, w, h, r) = (v(10.0, 10.0), 40.0, 20.0, 4.0);
+        let corners = [o + v(w, 0.0), o + v(w, h), o + v(0.0, h), o];
+        let pts = [(o + v(r, 0.0), o + v(w - r, 0.0)), (o + v(w, r), o + v(w, h - r)), (o + v(w - r, h), o + v(r, h)), (o + v(0.0, h - r), o + v(0.0, r))];
+        let mut lines = Vec::new();
+        let mut arcs = Vec::new();
+        for i in 0..4 {
+            lines.push(c.line(pts[i].0, pts[i].1));
+            let cc = corners[i] + match i { 0 => v(-r, r), 1 => v(-r, -r), 2 => v(r, -r), _ => v(r, r) };
+            let a0 = -FRAC_PI_2 + i as f64 * FRAC_PI_2;
+            arcs.push(c.arc(cc, r, a0, a0 + FRAC_PI_2));
+        }
+        for i in 0..4 {
+            c.coincident(&format!("{}.end", lines[i]), &format!("{}.start", arcs[i]));
+            c.coincident(&format!("{}.end", arcs[i]), &format!("{}.start", lines[(i + 1) % 4]));
+            c.pair("TANGENT", &lines[i], &arcs[i]);
+            c.pair("TANGENT", &arcs[i], &lines[(i + 1) % 4]);
+            c.hv(i % 2 == 0, &lines[i]);
+        }
+        for i in 1..4 {
+            c.pair("EQUAL", &arcs[0], &arcs[i]);
+        }
+        c.length(&lines[0], w - 2.0 * r);
+        c.radius(&arcs[0], r, false);
+        last(c)
+    }, 6.0);
+    out
+}
+
+/// Writes the edit probes (LIVE_FUZZ_WRITE=probe-8): each case's `edit` =
+/// the constraint and its new value, with ours after the editor's edit
+/// (`scale_for_edit`, then the dimension edit's solve).
+#[test]
+#[ignore = "T2: live fuzz editor edit probes"]
+fn edit_probe_matches() {
+    let live: Option<Value> = std::fs::read_to_string(fixture("sketch-probe-8.live.json")).ok().and_then(|t| serde_json::from_str(&t).ok());
+    let cases: Vec<Value> = edit_probes().into_iter().map(|(name, mut c, id, value)| {
+        let o = ours(&mut c);
+        let cid = c.cons.iter().find(|(n, _)| *n == id).and_then(|(_, x)| *x).unwrap();
+        c.sk.set_dimension_value(cid, value * MM).unwrap();
+        c.sk.scale_for_edit(cid);
+        let opts = c.sk.dimension_edit_options(cid);
+        let rep = c.sk.solve_with(&opts);
+        let cname = name.split(' ').next().unwrap().to_string();
+        json!({"case": cname, "what": name, "constraints": c.spec, "onshape": {"entities": c.os_entities, "constraints": c.os_constraints}, "ours": o, "edit": {"constraint": id, "value_mm": value, "ours_solved": rep.is_solved(), "ours": ours_points(&c)}})
+    }).collect();
+    let b = json!({"units": "mm (Onshape JSON: metres, radians)", "plane": "Top", "cases": cases});
+    if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == "probe-8") {
+        std::fs::write(fixture("sketch-probe-8.json"), serde_json::to_string_pretty(&b).unwrap()).unwrap();
+    }
+    let Some(live) = live else { return };
+    let (mut total, mut ok) = (0, 0);
+    for case in b["cases"].as_array().unwrap() {
+        let Some(after) = live["cases"][case["case"].as_str().unwrap()]["edit"]["after"].as_object() else { continue };
+        total += 1;
+        let d: Vec<String> = after.iter().filter(|(n, p)| {
+            let o = &case["edit"]["ours"][n.as_str()];
+            (o[0].as_f64().unwrap_or(f64::NAN) - p[0].as_f64().unwrap_or(0.0)).hypot(o[1].as_f64().unwrap_or(f64::NAN) - p[1].as_f64().unwrap_or(0.0)) >= 1e-3
+        }).map(|(n, p)| format!("{n}: ours {} live {p}", case["edit"]["ours"][n.as_str()])).collect();
+        if d.is_empty() {
+            ok += 1;
+        } else {
+            println!("  {} ({}): {}", case["case"], case["what"], d.join("; "));
+        }
+    }
+    println!("live edit probes: {total} answered, {ok} match");
+}
+
 fn probe_batch(list: Vec<(String, Case)>) -> Value {
     let cases: Vec<Value> = list.into_iter().map(|(name, mut c)| {
         let ours = ours(&mut c);
