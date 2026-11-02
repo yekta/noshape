@@ -212,6 +212,13 @@ impl Sketch {
         let unheld = self.unheld_constraints(1e-9);
         let mut holds: HashMap<crate::ids::ConstraintId, bool> = cons.iter().map(|(c, _)| (*c, !unheld.contains(c))).collect();
         self.shift_loops_for_distances(cons, &placed);
+        // Loops placed round from an anchor: their units next to placed
+        // geometry go first.
+        let mut anchored: BTreeSet<EntityId> = BTreeSet::new();
+        for a in self.loop_anchors(comp, cons, &holds) {
+            placed.insert(a);
+            anchored.extend(self.loop_of(a, cons));
+        }
         while placed.len() < comp.len() {
             // Next: a unit with a constraint to placed units (or of its own)
             // that doesn't hold, the one with most of them; with none, a
@@ -223,7 +230,11 @@ impl Sketch {
             // constraints; relations to others don't count: probe t4, a
             // rectangle side Perpendicular to a separate line isn't first).
             let joined = |u: EntityId| cons.iter().filter(|(c, us)| us.contains(&u) && (us.len() == 1 || self.connective(*c))).count();
-            let rank = |u: EntityId| (pending(u), joined(u));
+            let adjacent = |u: EntityId| usize::from(anchored.contains(&u) && cons.iter().any(|(c, us)| us.contains(&u) && self.connective(*c) && us.iter().any(|x| placed.contains(x))));
+            // In a loop placed round from its anchor, a curve whose Equal
+            // partner's dimension resizes it is pending too.
+            let chained_change = |u: EntityId| usize::from(anchored.contains(&u) && self.chained_size(u, cons).is_some_and(|k| (k.value().unwrap_or(0.0) - self.size(u)).abs() > 1e-9));
+            let rank = |u: EntityId| (pending(u) + chained_change(u), adjacent(u), joined(u));
             let best = open.iter().map(|u| rank(*u)).max().unwrap();
             // First, a relation between units that doesn't hold, none of
             // them placed: the member it keeps stays as it is (if its own
@@ -232,7 +243,8 @@ impl Sketch {
             let own_hold = |u: EntityId| cons.iter().filter(|(_, us)| us.as_slice() == [u]).all(|(c, _)| holds[c]);
             let keep = cons.iter().filter(|(c, us)| us.len() >= 2 && !holds[c] && !us.iter().any(|x| placed.contains(x)) && !self.chained_to_change(*c, cons, &holds)).find_map(|(c, us)| {
                 let k = self.kept_first_in(us, cons, Some(*c));
-                (own_hold(k) && self.class_keeps(*c, k, cons) && self.direction_agrees(k, cons)).then_some(k)
+                let resized = anchored.contains(&k) && self.chained_size(k, cons).is_some_and(|x| (x.value().unwrap_or(0.0) - self.size(k)).abs() > 1e-9);
+                (own_hold(k) && !resized && self.class_keeps(*c, k, cons) && self.direction_agrees(k, cons)).then_some(k)
             });
             if let Some(k) = keep {
                 placed.insert(k);
@@ -287,6 +299,7 @@ impl Sketch {
             // An arc or circle may keep the end it shares with one held
             // neighbour (`lower_shared`; live probes 5 u1 / u3: a slot arc's
             // new radius keeps the bottom line, the top comes down).
+            let chained = self.chained_size(u, cons);
             let round = matches!(self.kind(u), Some(EntityKind::Arc | EntityKind::Circle));
             let lower_held = if round { self.lower_shared(u, &held) } else { None };
             // (neighbours held: 0 none, 1 all, 2 the lower one; shape)
@@ -311,7 +324,16 @@ impl Sketch {
                 if shape == 3 && end_carried {
                     continue;
                 }
-                if (shape == 3 || shape == 2) && !orig.hold_size(&mut sub, u) {
+                // An Equal partner of a dimension that changes takes its new
+                // value as the size it keeps (fuzz s321: a filleted
+                // rectangle's other corners grow with the dimensioned one).
+                let keeps_size = shape == 3 || shape == 2;
+                if keeps_size
+                    && !match &chained {
+                        Some(kind) => sub.add_constraint(kind.clone()).is_ok(),
+                        None => orig.hold_size(&mut sub, u),
+                    }
+                {
                     continue;
                 }
                 if (shape == 3 || shape == 1) && !orig.hold_direction(&mut sub, u) {
@@ -742,6 +764,95 @@ impl Sketch {
             _ => return false,
         };
         size.is_finite() && sub.add_constraint(kind).is_ok()
+    }
+
+    /// For each loop of `comp` that changes only within itself (its sizes,
+    /// relations between its own curves): its leftmost unit that doesn't
+    /// change, kept as it is (live fuzz s321: a filleted rectangle keeps
+    /// its left side and grows round from it).
+    fn loop_anchors(&self, comp: &[EntityId], cons: &[(crate::ids::ConstraintId, Vec<EntityId>)], holds: &HashMap<crate::ids::ConstraintId, bool>) -> Vec<EntityId> {
+        let mut seen: BTreeSet<EntityId> = BTreeSet::new();
+        let mut out = Vec::new();
+        for &u in comp {
+            if seen.contains(&u) {
+                continue;
+            }
+            let lp = self.loop_of(u, cons);
+            seen.extend(lp.iter().copied());
+            // Closed: every curve end shared with another of the loop's
+            // (an open chain keeps its usual order: fuzz s223).
+            let closed = lp.iter().all(|v| match self.endpoints(*v) {
+                Some((a, b)) => [a, b].iter().all(|p| self.coincident_with(*p).iter().any(|q| lp.iter().any(|w| *w != *v && self.entity(*w).is_some_and(|e| e.point_refs().contains(q))))),
+                None => false,
+            });
+            if lp.len() < 3 || !closed {
+                continue;
+            }
+            let touching: Vec<&(crate::ids::ConstraintId, Vec<EntityId>)> = cons.iter().filter(|(_, us)| us.iter().any(|x| lp.contains(x))).collect();
+            if !touching.iter().any(|(c, _)| !holds[c]) || touching.iter().any(|(c, us)| !holds[c] && us.iter().any(|x| !lp.contains(x))) {
+                continue;
+            }
+            // Not a line running like one whose length changes (probe r5:
+            // a rectangle's bottom must lengthen with its dimensioned top).
+            let hv = |v: EntityId| self.constraints().find_map(|c| match c.kind {
+                ConstraintKind::Horizontal { a, b: None } if a == v => Some(0),
+                ConstraintKind::Vertical { a, b: None } if a == v => Some(1),
+                _ => None,
+            });
+            let resizing: Vec<EntityId> = lp.iter().copied().filter(|v| cons.iter().any(|(c, us)| us.as_slice() == [*v] && !holds[c] && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Length { .. })))).collect();
+            let own_length = |v: EntityId| cons.iter().any(|(c, us)| us.as_slice() == [v] && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Length { .. })));
+            let alongside = |v: EntityId| !own_length(v) && hv(v).is_some_and(|k| resizing.iter().any(|w| *w != v && hv(*w) == Some(k)))
+                || cons.iter().any(|(c, us)| us.len() == 2 && us.contains(&v) && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Parallel { .. })) && us.iter().any(|w| *w != v && resizing.contains(w)));
+            // A Horizontal / Vertical line (fuzz s222: a slot's free top
+            // line isn't kept; its bottom is, as probes 5 u1 / u3).
+            let steady = |v: EntityId| hv(v).is_some() && cons.iter().filter(|(_, us)| us.contains(&v)).all(|(c, _)| holds[c]) && self.chained_size(v, cons).is_none() && !alongside(v);
+            let lower = |v: EntityId| self.anchor(v).and_then(|p| self.point(p)).unwrap_or(DVec2::splat(f64::MAX));
+            if let Some(a) = lp.iter().copied().filter(|v| steady(*v)).min_by(|a, b| {
+                let (p, q) = (lower(*a), lower(*b));
+                (p.x, p.y).partial_cmp(&(q.x, q.y)).unwrap_or(std::cmp::Ordering::Equal)
+            }) {
+                out.push(a);
+            }
+        }
+        out
+    }
+
+    /// The size `u` takes from a dimension on a curve it is Equal to
+    /// (through Equal relations), as a constraint on `u`: a line's Length,
+    /// an arc's or circle's Radius.
+    fn chained_size(&self, u: EntityId, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)]) -> Option<ConstraintKind> {
+        let mut seen: BTreeSet<EntityId> = BTreeSet::from([u]);
+        let mut todo = vec![u];
+        while let Some(x) = todo.pop() {
+            if x != u {
+                for (c, us) in cons {
+                    if us.as_slice() != [x] {
+                        continue;
+                    }
+                    let value = match self.constraint(*c).map(|k| &k.kind) {
+                        Some(ConstraintKind::Length { value, .. }) => *value,
+                        Some(ConstraintKind::Radius { value, .. }) => *value,
+                        Some(ConstraintKind::Diameter { value, .. }) => *value / 2.0,
+                        _ => continue,
+                    };
+                    return match self.kind(u) {
+                        Some(EntityKind::Line) if self.kind(x) == Some(EntityKind::Line) => Some(ConstraintKind::Length { curve: u, value }),
+                        Some(EntityKind::Arc | EntityKind::Circle) if matches!(self.kind(x), Some(EntityKind::Arc | EntityKind::Circle)) => Some(ConstraintKind::Radius { curve: u, value }),
+                        _ => None,
+                    };
+                }
+            }
+            for (c, us) in cons {
+                if us.len() == 2 && us.contains(&x) && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Equal { .. })) {
+                    for v in us {
+                        if seen.insert(*v) {
+                            todo.push(*v);
+                        }
+                    }
+                }
+            }
+        }
+        None
     }
 
     /// Of tied units, the one a relation between two of them keeps (Equal:
