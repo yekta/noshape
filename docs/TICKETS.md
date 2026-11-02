@@ -10,7 +10,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   `#wall` then Enter doesn't take the first match `#wall_thickness`; live highlights the first match as you type and
   Enter inserts it. Reproduce side by side with live (which field, what Enter does in ours), fix, and make it the
   first scenario of the interaction suite (docs/PARITY-SUITES.md).
-  qa 11-02 23:30 (green bc7d7e9f, Linux; start document qa-scratch/tickets/varac/vardoc.noshape from vardoc.py:
+  qa 11-02 23:15 (green bc7d7e9f, Linux; start document qa-scratch/tickets/varac/vardoc.noshape from vardoc.py:
   #wall_thickness = 2 mm, #width = 30 mm, Extrude 1 10 mm): **the autocomplete and Enter work** when the field's text is
   selected: double-click Depth (or Ctrl+A), type `#wall` → the list "(x) #wall_thickness 2 mm" (highlighted) / "(x) New
   variable…", Enter → `#wall_thickness`, the preview 2 mm (tickets/varac/vd-1.png, vd-2.png; also typed at full speed).
@@ -21,7 +21,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   #wall_thickness, Enter → "2#wall_thickness.5 mm" in red (vd-shell.png); Extrude Depth "#wall_thickness" clicked →
   "#wall_thickn#wall…" (vd-click1-typed.png). On macOS (Cmd+A not used, one click) that is exactly "Enter doesn't take
   #wall_thickness". Fix: first click (and Tab) into a number field selects all, second click places the caret, as live.
-  qa 23:45: **Tab the same**: Tab from the region field (3 presses: an unseen stop, the direction arrow, then Depth) puts
+  qa 23:22: **Tab the same**: Tab from the region field (3 presses: an unseen stop, the direction arrow, then Depth) puts
   the caret at the start of "#wall_thickness", nothing selected; typing 7 gives "7#wall_thickness" (tickets/varac/vd-tab3.png,
   vd-tab4.png); live selects all on Tab. The sketch dimension box (opens all selected) and #width + Enter there = live (ƒx 30).
   Scenarios: qa-scratch/ui-parity/extrude-depth-variable-click-once.json and 8 more around it (draft format README-draft.md).
