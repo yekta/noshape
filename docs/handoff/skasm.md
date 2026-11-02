@@ -666,6 +666,15 @@ positions (s326, s332 only curve colours), batches 1–4 1412 mm. S300 timings u
 (s341–s380, same everyday generator, new seeds) to check the rules generalise: compare its first answer with batch
 4's first 14/40. Left in batch 4: s321 (two filleted rectangles: the second shifts 2 mm, a keep step on its arcs),
 s307, s319 (26), s303, s331, s334, s335, s340, s320.
+15:05: batch 5 (s341–s380, sent before its rules were tuned): live counted 22/40 against ours as sent (batch 4's
+first answer: 14/40), so the rules generalise. Since then (all landed or queued): tied candidates the placed geometry
+pulls furthest first (`pulled_by`); an own H / V reading unheld only through a moved shared end isn't pending; a
+joining constraint reading unheld only that way (`aliased`) doesn't trigger the keep; an arc pinned to placed
+geometry with its size held can't follow a carried neighbour; loop anchors only Vertical lines (and only loops with
+arcs); `lower_shared` prefers a neighbour without its own H / V (a slot keeps its free top over its Horizontal
+bottom). Now batch 4: 39/40 on positions (s303 left; s326 / s332 / s340 curve colours only), batch 5: 39/40 (s354
+left), batches 1–5 1315 mm (1829 this morning on 1–3 alone, which are now ~1100). Asm batch 3 (f51–f80) is with
+live. Next: s303 / s354, then batches 1–3's s6 (170), s226 (94), s218 (90), s236 (81), s102 (79).
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
