@@ -463,9 +463,18 @@ fn a_hole_through_a_tilted_plate() {
     for (major, minor) in ellipses {
         assert!((major - 0.5 / a.cos()).abs() < 1e-12 && (minor - 0.5).abs() < 1e-12, "{major} {minor}");
     }
-    // Nearly along the axis: declined.
-    let steep = turned_about_x(&cuboid((-2.0, -2.0, -0.5), (2.0, 2.0, 0.5)), 80f64.to_radians());
-    assert!(boolean(Op::Cut, &[&steep, &hole], TOL).is_err());
+    // Nearly along the axis (80°): its long ellipses as well (the plate's big faces, and its narrow ones 10° off
+    // across the axis, crossed now too).
+    let b = 80f64.to_radians();
+    let steep = turned_about_x(&cuboid((-2.0, -2.0, -0.5), (2.0, 2.0, 0.5)), b);
+    let cut = boolean(Op::Cut, &[&steep, &hole], TOL).unwrap();
+    check_used_both_ways(&cut.body);
+    let ellipses: Vec<(f64, f64)> = cut.body.edges.iter().filter_map(|e| if let Curve::Ellipse { major, minor, .. } = e.curve { Some((major, minor)) } else { None }).collect();
+    assert!(!ellipses.is_empty());
+    for (major, minor) in ellipses {
+        let on = |c: f64| (major - 0.5 / c).abs() < 1e-12;
+        assert!((on(b.cos()) || on(b.sin())) && (minor - 0.5).abs() < 1e-12, "{major} {minor}");
+    }
 }
 
 /// A cone between radius `r0` at height `z0` and `r1` at `z1` about the vertical through (cx, cy), capped.

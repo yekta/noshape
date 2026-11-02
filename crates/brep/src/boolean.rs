@@ -2151,7 +2151,7 @@ impl Ctx<'_> {
             if slope != 0.0 {
                 return self.plane_cone(fp, fc);
             }
-            if na.abs() < 0.25 {
+            if na.abs() < 1e-3 {
                 return Err(Decline("a plane nearly along a cylinder"));
             }
             // OCCT's ellipse (IntAna_QuadQuadGeo): its centre where the plane meets the axis, its normal the

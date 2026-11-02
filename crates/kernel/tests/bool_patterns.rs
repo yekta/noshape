@@ -452,7 +452,8 @@ fn valid_as_occt(name: &str, rel: f64) {
     let counts = |s: &k::Shape| [k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
     assert_eq!(counts(&r.shape), counts(&o.shape));
     let (v, w) = (r.shape.volume().unwrap(), o.shape.volume().unwrap());
-    assert!((v - w).abs() <= rel * w, "volume {v} against OCCT's {w}");
+    // (A fuzz part's volume can be negative: a solid turned inside out, both alike.)
+    assert!((v - w).abs() <= rel * w.abs(), "volume {v} against OCCT's {w}");
 }
 
 /// Two knurl grooves of opposite hands crossing 44 µm above the cylinder's end face, where both tools' caps lie (the
@@ -541,6 +542,13 @@ fn a_ray_crossing_a_twisted_flank_twice() {
 #[test]
 fn an_arc_tangent_to_an_edge_at_a_vertex() {
     valid_as_occt("c8f89e0180653cee", 1e-9);
+}
+
+/// A drafted plane a few degrees off a hole's axis cutting its cylinder (recorded, fuzz seed 1194's draft): OCCT's
+/// long ellipse, taken down to |n · a| = 1e-3 now ("a plane nearly along a cylinder" below 0.25 before).
+#[test]
+fn a_plane_a_few_degrees_off_a_cylinders_axis() {
+    valid_as_occt("a9a9f9b663091ab2", 1e-9);
 }
 
 /// Two coplanar sheets, a vertex of one of tolerance 1e-4 lying 1e-4 from the other's edge (recorded, fuzz seed

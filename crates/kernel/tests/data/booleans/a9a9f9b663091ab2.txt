@@ -1,0 +1,18 @@
+op fuse
+fuzzy 0e0
+glue off
+unify 0
+parallel 1
+obb 0
+objects 1
+tools 1
+target_faces 26
+valid 0
+volume 0e0
+faces 0
+edges 0
+vertices 0
+history 0000000000000000
+ms 0.520
+path failed
+error unsupported: noshape's Boolean declined: a plane nearly along a cylinder

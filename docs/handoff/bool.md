@@ -1109,6 +1109,23 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## A plane nearly along a cylinder; Shell's slab fuses re-measured; seams apart looked at (11-02 07:30 UTC)
+- plane_cyl declined planes with |n · a| < 0.25 (within 14.5° of the axis: drafted faces cutting holes); OCCT's
+  ellipse is taken down to 1e-3 now. nfall's 9 such taken (OCCT's results), corpus6 +6, 0 differ. T1
+  a_plane_a_few_degrees_off_a_cylinders_axis.
+- Shell's slab fuses over core's 30 seeds (3000-3029 × 60) with this build (vibe5 ~/bool-fuzz/sh/err-*.txt):
+  "an offset face" gone; quick_boolean's declines now: one cylinder in faces of two inputs, their seams apart 24,
+  a tolerant input 18, two edges leave a vertex in one direction 11, a plane nearly along a cylinder 11 (fixed
+  here), arguments share vertices 10, an edge nearly on another argument's face 8, a face of revolution 8, a point
+  near two vertices 7, then ≤ 5 each. Those fuses recorded (only the ones OCCT built) into vibe5
+  ~/agents/bool-corpora/shf/<seed> (shrec.sh) for replays.
+- Seams apart (the end check before unify): tried instead unifying our result in rust_boolean.cpp (twice, as
+  op_boolean and the model do) and declining only an invalid one. 38b2cd00 / fd7ef128 still decline (their unify
+  is invalid; a BRepBuilderAPI_Copy of the result unifies validly, so it is something in our result's sharing),
+  corpus6 and sh-new2 +1 each, but that case (f864957f) differs from OCCT in one history record (an input vertex
+  at (50, 25, 1.5) mm: ours Modified into a new vertex of tolerance 1e-5, OCCT's keeps the input vertex, tol
+  2.1e-7, and says Deleted for that argument), and corpus3 lost one. Reverted; next.
+
 ## Fuzz declines: sheets on one torus; a tolerant vertex at its reach (11-02 06:30 UTC)
 - "sheets that meet": all 8 left were two sheets on one torus (fillet faces, mirror's overlap tests; one pair
   with the axis reversed): taken as coplanar ones (T1 a_common_of_two_sheets_on_one_torus).
