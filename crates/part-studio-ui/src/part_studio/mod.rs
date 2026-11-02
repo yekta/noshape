@@ -1517,10 +1517,24 @@ impl PartStudioView {
             }
             ViewportEvent::Click { position, .. } => {
                 let Some(i) = self.std_point_at(*position, cx) else { return false };
-                if i != index {
-                    self.std_manip_change(mi, noshape_model::display::FeatureManipulator::Points { points, index: i }, cx);
-                    self.std_manip_end(None, window, cx);
+                if i == index {
+                    return true;
                 }
+                // Derived's base mate connector is ours to set (std's change function rebuilds the source studio):
+                // its index and the name the derived copy of it carries.
+                if let Some(dialog) = self.edit.as_ref().map(|e| e.dialog.clone())
+                    && dialog.read(cx).feature.type_id == "importDerived"
+                {
+                    let fid = dialog.read(cx).feature.id;
+                    let name = self.display.connectors.iter().find(|c| matches!(c.reference, Reference::MateConnector { feature, index } if feature == fid && index as usize == i)).map(|c| c.name.clone()).unwrap_or_default();
+                    dialog.update(cx, |d, cx| {
+                        d.set_value_logic("mateConnectorIndex", ParamValue::Expr(noshape_units::ExprValue::new(i.to_string())), cx);
+                        d.set_value_logic("mateConnectorId", ParamValue::Text(name), cx);
+                    });
+                    return true;
+                }
+                self.std_manip_change(mi, noshape_model::display::FeatureManipulator::Points { points, index: i }, cx);
+                self.std_manip_end(None, window, cx);
                 true
             }
             _ => false,

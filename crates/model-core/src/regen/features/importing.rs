@@ -107,6 +107,15 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
         DMat4::IDENTITY
     };
     let inv = base.inverse();
+    // std's mate connector points (Base mate connector): the source's connectors where the first instance puts
+    // them, the base one chosen.
+    if ev.is("placement", "AT_MATE_CONNECTOR") {
+        let m = frames[0] * inv;
+        let id = ev.params.text("mateConnectorId").trim().to_string();
+        let index = if id.is_empty() { ev.integer("mateConnectorIndex").unwrap_or(0).max(0) as usize } else { src.connectors.iter().position(|c| c.name == id).unwrap_or(0) };
+        let points = src.connectors.iter().map(|c| m.transform_point3(c.origin)).collect();
+        ev.manipulators.push(("mateConnectorManipulator".into(), crate::display::FeatureManipulator::Points { points, index }));
+    }
     let mut n = 0u32;
     for (inst, f) in frames.iter().enumerate() {
         let m = *f * inv;

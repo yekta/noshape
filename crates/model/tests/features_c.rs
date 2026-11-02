@@ -939,6 +939,11 @@ fn derived_placed_at_mate_connectors() {
     let bb0 = derived[0].shape.bounding_box(true).unwrap();
     assert!(near(bb0.max.z, 0.0, 1e-6) && near(bb0.min.z, mm(-10.0), 1e-6), "{bb0:?}");
     assert!(near((bb0.min.x + bb0.max.x) * 0.5, mm(50.0), 1e-6), "{bb0:?}");
+    // std's mate connector points (audit-part-studio M15): the source's connector where the first instance puts it
+    // (on the first point), chosen.
+    let m = &r.display.feature_state(d).expect("state").manipulators;
+    let [(key, noshape_model::display::FeatureManipulator::Points { points, index })] = m.as_slice() else { panic!("{m:?}") };
+    assert!(key == "mateConnectorManipulator" && *index == 0 && points.len() == 1 && (points[0] - DVec3::new(mm(50.0), 0.0, 0.0)).length() < 1e-9, "{m:?}");
     // Unknown connector name: clear error.
     s.ps.features.last_mut().unwrap().params.set("mateConnectorId", ParamValue::Text("nope".into()));
     let (st, msg) = s.last_status();
