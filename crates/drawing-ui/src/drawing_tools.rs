@@ -638,8 +638,13 @@ impl DrawingEditor {
         let base = self.datum_rows_drawing();
         if let Some(v) = self.pending_view() {
             let mut d = self.drawing.clone();
+            let insert = matches!(self.tool, Tool::InsertView { .. });
             if let Some(s) = d.sheets.get_mut(self.sheet) {
-                s.views.push(v);
+                if insert {
+                    noshape_model::drawing::create::push_inserted_view(s, v);
+                } else {
+                    s.views.push(v);
+                }
             }
             preview = Some(d);
         } else if let Some(a) = self.pending_annotation() {
@@ -738,7 +743,12 @@ impl DrawingEditor {
             Tool::InsertView { .. } => {
                 if let Some(v) = self.pending_view() {
                     let id = v.id;
-                    self.edit_sheet("Insert view", cx, |s| s.views.push(v));
+                    // The first view gives the sheet its scale; later
+                    // views default to it.
+                    if self.drawing_sheet().views.is_empty() {
+                        self.insert.scale = None;
+                    }
+                    self.edit_sheet("Insert view", cx, |s| noshape_model::drawing::create::push_inserted_view(s, v));
                     // Placing a view on an out-of-date drawing updates it.
                     if self.out_of_date {
                         self.update_drawing(cx);

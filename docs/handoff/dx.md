@@ -11,6 +11,29 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-02 22:27 UTC: state at the move to the new account (read first)
+- First inserted view auto-scaled as live (behaviours request 1812): `create::first_view_scale` (largest list scale
+  whose Front view fits 30 % of the border frame), `create::push_inserted_view` (the first view's scale becomes the
+  sheet's; the preview too, so the title block shows it while the view follows), `views::front_extent`; API in
+  `place_view`, app in `drawing_insert.rs` `first_view_scale` (reads `drawing_sheet()`: the preview drawing already
+  holds the pending view). Checked in the app: big1755 Part Studio 1 -> 1:8 in the panel and the title block, as
+  live. Flat-pattern and sketch views keep the sheet scale (live gave a flat 1:3; rule unverified).
+- Landed today after 20:40: d8e65509 (Part Studio drawings reuse the studio's regeneration), c84d3ba8 (export spans
+  per run, PDF 31.6 s -> 0.38 s), 7e72e3ab (SVG / raster fills merged per colour). Main green at last check.
+- Open live requests (REQUESTS.md): 1811 loft-circles re-import (P3), 1817 drawing export timings (P2). When 1817
+  answers, add live's numbers to formats.md / the drawing audit next to ours (dx_perf timed_big_drawings).
+- Build host: vibe5 is short of memory (earlyoom SIGTERMs the release ops test link); run release timings on vibe4:
+  `NOSHAPE_RB_HOST=vibe4 tools/tiers/rb.sh env NOSHAPE_LIVE_BIG=/home/ngyekta/agents/dx/live-big cargo test -q
+  --release -p noshape-ops --test all dx_perf::timed_big_drawings -- --ignored --nocapture` (live's samples copied
+  to vibe4 ~/agents/dx/live-big and /root/dx-scratch/live-big). Detach long runs with `setsid nohup`.
+- No detached jobs running; the test app (pid in /root/dx-scratch/w3/app.pid) was killed.
+- Next, in order: (1) land the first-view scale after the app check; (2) PNG export 1.6 s (resvg over 250k glyph
+  triangles; consider rasterizing the geometry directly); (3) live 1817 numbers into docs; (4) the 1000-part
+  FeatureScript regeneration (ours 6.5-8.5 s vs live ~5 s commit / 11 s preview) is core's; mention to the lead if
+  it matters; (5) remaining items of the user's 11-02 list (drawing speed against live is otherwise done: assembly
+  drawing 1.3-2 s vs live 19.7 s, BOM 0.15 s vs 13.1 s, NIST drawing 0.19 s vs 22.6 s, Part Studio drawing 0.8 s vs
+  3.7-4 s per view, Update 1 s vs 6.4 s).
+
 ## 11-02 (to 20:40 UTC): drawing speed on big models (user 11-02; live 1809), periodic Parasolid faces (live 1808)
 - dx_perf `timed_big_drawings` (NOSHAPE_LIVE_BIG for live's files): live's 2000-instance assembly drawing with the
   suggested views 12.3 s -> about 2 s (vibe5 loaded: 2-4.5 s; live 19.7 s); BOM 0.2 s (live 13.1 s); a 2-point

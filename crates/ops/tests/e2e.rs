@@ -972,6 +972,49 @@ fn new_drawing_goes_out_of_date() {
     assert_eq!(g["out_of_date"], true, "{g}");
 }
 
+/// The first view inserted into an empty drawing is scaled to fit (live
+/// 1812: a 100 x 50 x 20 block's Front view 1:2 on ANSI A, a 10 x 10 x 5
+/// one's 6:1), and gives the sheet that scale: the next view takes it.
+#[test]
+fn first_inserted_view_is_scaled_to_fit() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("first_view_scale.noshape").to_str().unwrap() }));
+    call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+    let src = r#"FeatureScript 3095;
+import(path : "onshape/std/geometry.fs", version : "3095.0");
+
+annotation { "Feature Type Name" : "Block" }
+export const block = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "L" }
+        isLength(definition.l, { (millimeter) : [1, 100, 1000] } as LengthBoundSpec);
+        annotation { "Name" : "W" }
+        isLength(definition.w, { (millimeter) : [1, 50, 1000] } as LengthBoundSpec);
+        annotation { "Name" : "H" }
+        isLength(definition.h, { (millimeter) : [1, 20, 1000] } as LengthBoundSpec);
+    }
+    {
+        fCuboid(context, id + "box", { "corner1" : vector(0, 0, 0) * millimeter, "corner2" : vector(definition.l, definition.w, definition.h) });
+    });
+"#;
+    call(&mut ctx, "featurestudio_edit", json!({ "source": src }));
+    let c = call(&mut ctx, "featurestudio_commit", json!({}));
+    let ty = c["feature_types"].as_array().unwrap().iter().find(|t| t["name"] == "Block").unwrap()["type"].as_str().unwrap().to_string();
+    let small = call(&mut ctx, "tab_create", json!({ "kind": "partstudio" }))["tab"]["name"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "tab": "Part Studio 1", "type": ty, "params": { "l": "100 mm", "w": "50 mm", "h": "20 mm" } }));
+    call(&mut ctx, "feature_add", json!({ "tab": small, "type": ty, "params": { "l": "10 mm", "w": "10 mm", "h": "5 mm" } }));
+    for (studio, want) in [("Part Studio 1", 0.5), (small.as_str(), 6.0)] {
+        let d = call(&mut ctx, "drawing_create", json!({ "template": "ANSI_A_INCH.dwt" }));
+        let drawing = d["drawing"].as_str().unwrap().to_string();
+        let v = call(&mut ctx, "drawing_insert_view", json!({ "drawing": drawing, "source": studio, "position": [100, 120] }));
+        let scale = |r: &Value, id: &Value| num(&r["views"].as_array().unwrap().iter().find(|x| x["id"] == *id).unwrap()["scale"]);
+        assert!((scale(&v, &v["view"]) - want).abs() < 1e-9, "{studio}: {v}");
+        let w = call(&mut ctx, "drawing_insert_view", json!({ "drawing": drawing, "source": studio, "orientation": "top", "position": [100, 60] }));
+        assert!((scale(&w, &w["view"]) - want).abs() < 1e-9, "{studio}, second view: {w}");
+    }
+}
+
 #[test]
 fn drawing_views_and_dimensions() {
     let mut ctx = Ctx::new();

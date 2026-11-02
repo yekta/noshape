@@ -34,6 +34,28 @@ pub(crate) const SCALES: [f64; 30] = [
     1.0 / 2.0, 1.0 / 3.0, 1.0 / 4.0, 1.0 / 5.0, 1.0 / 6.0, 1.0 / 8.0, 1.0 / 10.0, 1.0 / 12.0, 1.0 / 16.0, 1.0 / 20.0, 1.0 / 25.0, 1.0 / 32.0, 1.0 / 40.0, 1.0 / 50.0, 1.0 / 80.0, 1.0 / 100.0,
 ];
 
+/// The scale of the first view inserted into an empty sheet (live request
+/// 1812): the largest list scale at which the source's Front view
+/// (`extent`: width and height, mm at 1:1) fits 30 % of the border frame's
+/// width and height (ANSI A: 78 × 59 mm; a 70 mm cube 1:2, a 10 × 5 mm
+/// face 6:1).
+pub fn first_view_scale(size: super::SheetSize, extent: [f64; 2]) -> f64 {
+    let f = size.frame_rect();
+    let (w, h) = (0.3 * (f[2] - f[0]), 0.3 * (f[3] - f[1]));
+    SCALES.iter().copied().find(|s| extent[0] * s <= w + 1e-9 && extent[1] * s <= h + 1e-9).unwrap_or(*SCALES.last().expect("scales"))
+}
+
+/// A sheet's first inserted view gives the sheet its scale (live 1812: the
+/// title block shows it, later views default to it); others keep theirs.
+pub fn push_inserted_view(sheet: &mut super::Sheet, mut v: DrawingView) {
+    if sheet.views.is_empty() && !sheet.scale_shown
+        && let Some(s) = v.scale.take()
+    {
+        sheet.scale = s;
+    }
+    sheet.views.push(v);
+}
+
 /// Model bounds (meters) of a drawing source, regenerated from the document.
 pub fn source_bounds(doc: &Document, src: &DrawingSource) -> Option<(DVec3, DVec3)> {
     let key = SourceKey { tab: src.tab, config: src.config.clone(), explode: None, version: None, position: None, display: None };
@@ -204,6 +226,17 @@ mod tests {
     use super::*;
     use crate::document::TabContent;
     use crate::drawing::templates::template_by_name;
+
+    /// Live 1812: the first inserted view's scale per Front view extent
+    /// (block L × W × H: the view is L × H) and template.
+    #[test]
+    fn first_view_scale_fits_30_percent_of_the_frame() {
+        use crate::drawing::SheetSize::{A3, AnsiA};
+        for (size, l, h, want) in [(AnsiA, 100.0, 20.0, 0.5), (AnsiA, 400.0, 10.0, 1.0 / 6.0), (AnsiA, 10.0, 5.0, 6.0), (A3, 100.0, 20.0, 1.0), (AnsiA, 75.0, 10.0, 1.0), (AnsiA, 70.0, 10.0, 1.0), (AnsiA, 10.0, 10.0, 5.0), (AnsiA, 70.0, 70.0, 0.5), (A3, 118.0, 5.0, 1.0), (AnsiA, 476.0, 9.75, 1.0 / 8.0)] {
+            let got = first_view_scale(size, [l, h]);
+            assert!((got - want).abs() < 1e-12, "{size:?} {l} x {h}: {got} (live {want})");
+        }
+    }
 
     #[test]
     fn suggested_views_fit_the_sheet() {

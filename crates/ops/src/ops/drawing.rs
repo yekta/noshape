@@ -849,16 +849,31 @@ fn get(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 /// Place the view the active view tool previews at `position`.
-fn place_view(od: &mut OpenDoc, a: &Args, tool: Tool, opts: ViewOptions, extra: &[SourceKey], description: &str) -> Result<OpOutput, OpError> {
+fn place_view(od: &mut OpenDoc, a: &Args, tool: Tool, mut opts: ViewOptions, extra: &[SourceKey], description: &str) -> Result<OpOutput, OpError> {
     let tab = drawing_tab(od, a)?;
     let d = dr::drawing_of(od.doc(), tab).cloned().expect("drawing");
     let sheet = sheet_index(&d, a)?;
     let pos = point_value(a.get("position").expect("required"), "position")?;
     let m = SheetModel::build(od, tab, d.clone(), sheet, extra);
+    // The first view on an empty sheet: scaled to fit (live 1812).
+    let first = d.sheets[sheet].views.is_empty() && !d.sheets[sheet].scale_shown;
+    if let Tool::InsertView { source, part, .. } = &tool
+        && first
+        && opts.insert.scale.is_none()
+        && opts.insert.sketch.is_none()
+        && !opts.insert.flat
+        && let Some(e) = noshape_model::drawing::views::front_extent(&m.sources, *source, part.as_ref())
+    {
+        opts.insert.scale = Some(noshape_model::drawing::create::first_view_scale(d.sheets[sheet].size, e));
+    }
     let v = m.pick(&tool, &[], pos).pending_view(&opts).ok_or_else(|| OpError::param("position", "the view can't be placed there (a projected view goes at least 15 mm from its parent)"))?;
     let id = v.id;
     let mut d = d;
-    d.sheets[sheet].views.push(v);
+    if matches!(tool, Tool::InsertView { .. }) {
+        noshape_model::drawing::create::push_inserted_view(&mut d.sheets[sheet], v);
+    } else {
+        d.sheets[sheet].views.push(v);
+    }
     commit(od, tab, sheet, d, description)?;
     let mut out = reply(od, tab, sheet, false)?;
     out["view"] = json!(id.0);

@@ -1052,6 +1052,23 @@ pub fn view_scale_text(sheet: &Sheet, id: ViewId) -> String {
     super::sheet::scale_text(if sheet.scale > 0.0 { sheet.scale } else { 1.0 }, sheet.scale_text.as_deref())
 }
 
+/// The width and height (mm at 1:1) of the Front view of `tab` (its part
+/// `part`), from whichever of its sources is regenerated (the plainest):
+/// what the first inserted view's scale fits
+/// ([`super::create::first_view_scale`]).
+pub fn front_extent(sources: &Sources, tab: TabId, part: Option<&BodyId>) -> Option<[f64; 2]> {
+    let (_, src) = sources.iter().filter(|(k, _)| k.tab == tab).min_by_key(|(k, _)| (k.version.is_some(), k.explode.is_some(), k.position.is_some(), k.display.is_some()))?;
+    let (mut lo, mut hi) = (DVec3::splat(f64::INFINITY), DVec3::splat(f64::NEG_INFINITY));
+    for b in view_bodies(&src.context, part) {
+        if let Ok(bb) = b.shape.bounding_box(false) {
+            lo = lo.min(bb.min);
+            hi = hi.max(bb.max);
+        }
+    }
+    let e = (hi - lo) * 1000.0;
+    (lo.x <= hi.x).then_some([e.x, e.z])
+}
+
 /// The bodies a view shows.
 pub fn view_bodies<'a>(ctx: &'a Context, part: Option<&BodyId>) -> Vec<&'a Arc<Body>> {
     match part {

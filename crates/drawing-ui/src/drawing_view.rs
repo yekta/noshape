@@ -194,6 +194,9 @@ pub struct DrawingEditor {
 
     pub sources: Sources,
     regens: HashMap<SourceKey, Arc<Mutex<Regenerator>>>,
+    /// Insert view on an empty sheet: its scale is set to fit once the
+    /// picked source is regenerated (live 1812).
+    pub insert_auto_scale: bool,
     assemblies: Arc<Mutex<AssemblyEvaluator>>,
     regenerating: HashSet<SourceKey>,
     /// Sources that couldn't be resolved (a deleted display state): retried
@@ -533,6 +536,7 @@ impl DrawingEditor {
             sheets_by_ref: false,
             sources: Sources::new(),
             regens: HashMap::new(),
+            insert_auto_scale: false,
             assemblies: Arc::new(Mutex::new(crate::derived::assembly_evaluator(studio_cache))),
             regenerating: HashSet::new(),
             failed_sources: HashSet::new(),
@@ -695,6 +699,11 @@ impl DrawingEditor {
     pub fn current_sheet(&self) -> &Sheet {
         let d = self.display();
         &d.sheets[self.sheet.min(d.sheets.len().saturating_sub(1))]
+    }
+
+    /// The current sheet of the drawing itself, without a preview's pending view.
+    pub fn drawing_sheet(&self) -> &Sheet {
+        &self.drawing.sheets[self.sheet.min(self.drawing.sheets.len().saturating_sub(1))]
     }
 
     fn update_info(&mut self, cx: &App) {
@@ -948,6 +957,7 @@ impl DrawingEditor {
                         Some(src) => {
                             this.failed_sources.remove(&key);
                             this.sources.insert(key, src);
+                            this.first_view_scale(cx);
                         }
                         // A display state or exploded view deleted from the
                         // assembly: its views go blank, with Onshape's blue

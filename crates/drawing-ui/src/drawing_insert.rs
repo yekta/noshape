@@ -171,6 +171,28 @@ impl DrawingEditor {
         self.insert.sketch = None;
         self.insert.flat = false;
         self.set_tool(Tool::InsertView { source, orientation, part }, cx);
+        self.insert_auto_scale = self.insert.scale.is_none();
+        self.first_view_scale(cx);
+    }
+
+    /// The first view of an empty sheet: its scale fits the source's Front
+    /// view to the sheet (live 1812), fixed once the source is regenerated
+    /// (the panel shows it; it stays while the view follows the cursor).
+    pub fn first_view_scale(&mut self, cx: &mut Context<Self>) {
+        let Tool::InsertView { source, part, .. } = &self.tool else { return };
+        if !self.insert_auto_scale {
+            return;
+        }
+        let sheet = self.drawing_sheet();
+        if !sheet.views.is_empty() || sheet.scale_shown || self.insert.sketch.is_some() || self.insert.flat {
+            self.insert_auto_scale = false;
+            return;
+        }
+        let Some(e) = views::front_extent(&self.sources, *source, part.as_ref()) else { return };
+        self.insert.scale = Some(noshape_model::drawing::create::first_view_scale(sheet.size, e));
+        self.insert_auto_scale = false;
+        self.update_preview(cx);
+        cx.notify();
     }
 
     pub fn set_insert_orientation(&mut self, o: ViewOrientation, cx: &mut Context<Self>) {
@@ -286,6 +308,7 @@ impl DrawingEditor {
                         // Before the sheet has a scale, its own value means
                         // "follow the sheet"; after, "(Sheet)" does.
                         t.insert.scale = (t.current_sheet().scale_shown || s != t.current_sheet().scale).then_some(s);
+                        t.insert_auto_scale = false;
                         t.update_preview(cx);
                         cx.notify();
                     }) as Act,
