@@ -3848,6 +3848,21 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
   lap("tools");
   if (tools.IsEmpty())
     return false;
+  // Each tool's tolerances its real ones (OCCT's constructions leave nominal ones: faces at 1e-5 to 1e-4 whose
+  // real deviation is 1e-7, which made the fuse "a tolerant input" for noshape's Boolean and widened OCCT's), where
+  // it shares nothing with the part (no tolerance of the part changes).
+  {
+    ShapeIMap part;
+    TopExp::MapShapes(solid, TopAbs_VERTEX, part);
+    for (ShapeList::Iterator it(tools); it.More(); it.Next())
+    {
+      bool shared = false;
+      for (TopExp_Explorer v(it.Value(), TopAbs_VERTEX); v.More() && !shared; v.Next())
+        shared = part.Contains(v.Current());
+      if (!shared)
+        BRepLib::UpdateTolerances(it.Value(), true);
+    }
+  }
   if (dbg)
   {
     // Each tool's validity and signed volume (a tool turned inside out spoils the fuse).

@@ -544,6 +544,15 @@ fn an_arc_tangent_to_an_edge_at_a_vertex() {
     valid_as_occt("c8f89e0180653cee", 1e-9);
 }
 
+/// A Shell common whose part has a face of nominal tolerance 1e-5 (its real one 1e-7) and many vertices and edges of
+/// 1e-4 (recorded, Shell's fuzz): the tolerant face checked alone against the other argument (nothing in its grey
+/// band), the vertices and edges by their own rule ("a tolerant input": every tolerant sub-shape was checked, and
+/// past 64 of them declined).
+#[test]
+fn a_part_with_a_tolerant_face_and_many_tolerant_vertices() {
+    valid_as_occt("611959b22ab84eae", 1e-9);
+}
+
 /// A drafted plane a few degrees off a hole's axis cutting its cylinder (recorded, fuzz seed 1194's draft): OCCT's
 /// long ellipse, taken down to |n · a| = 1e-3 now ("a plane nearly along a cylinder" below 0.25 before).
 #[test]

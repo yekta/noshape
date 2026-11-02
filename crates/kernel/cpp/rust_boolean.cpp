@@ -2176,10 +2176,11 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
     const double exact   = 2 * std::max(rest, 1e-7);
     // (Tolerant vertices and edges alone: noshape's Boolean goes by each one's own tolerance, OCCT's rule, the
     // Boolean's by the rest.)
-    const bool faces_exact = std::none_of(tolerant.begin(), tolerant.end(), [](const auto& x) { return x.second.ShapeType() == TopAbs_FACE; });
-    bool       reaches     = !faces_exact && tolerant.size() > 64;
-    if (faces_exact)
-      tolerant.clear();
+    // (Tolerant faces: each with nothing of another argument in its grey band, the vertices and edges by their own
+    // rule as above; a Shell slab fuse's part has hundreds of tolerant vertices and edges and a face or two of
+    // 1e-5 (OCCT's nominal; their real 1e-7).)
+    tolerant.erase(std::remove_if(tolerant.begin(), tolerant.end(), [](const auto& x) { return x.second.ShapeType() != TopAbs_FACE; }), tolerant.end());
+    bool reaches = tolerant.size() > 64;
     std::vector<Bnd_Box> whole(args.size());
     for (size_t i = 0; i < args.size() && !reaches; ++i)
       BRepBndLib::Add(srcs[i]->shape, whole[i]);
@@ -2206,7 +2207,8 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
               continue;
             BRepExtrema_DistShapeShape dist(x, m(q));
             const double d = dist.IsDone() ? dist.Value() : 0.0;
-            reaches = !dist.IsDone() || (d > exact && d <= GREY_TOL * (tx + tol_of(m(q))));
+            // (The other's own tolerance up to the ordinary: a tolerant vertex or edge goes by its rule.)
+            reaches = !dist.IsDone() || (d > exact && d <= GREY_TOL * (tx + std::min(tol_of(m(q)), kMaxTol)));
           }
         }
       }

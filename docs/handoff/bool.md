@@ -1109,6 +1109,24 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Tolerant faces; Shell's tools at their real tolerances (11-02 09:00 UTC)
+- rust_boolean.cpp's tolerant-input check: only tolerant faces are checked against the other arguments (nothing in
+  a face's grey band, the other's own tolerance counted up to the ordinary); tolerant vertices and edges go by their
+  own rule as before. Before, any tolerant face made every tolerant vertex and edge go through the check too, and
+  past 64 of them it declined. T1 a_part_with_a_tolerant_face_and_many_tolerant_vertices.
+- shell.cpp by_slabs: every tool not sharing a vertex with the part gets BRepLib::UpdateTolerances (OCCT's
+  constructions leave faces at 1e-5 to 1e-4 whose real deviation is 1e-7; another tool's vertex 4 um from such a
+  face is on it by OCCT's rule, so the face's nominal tolerance can't just be ignored). Shell's tests pass.
+- Shell's 30 seeds again (vibe5 ~/bool-fuzz/sh2): "a tolerant input" 18 → 0, a plane nearly along a cylinder 11 → 6,
+  but those fuses decline next for: a point near two vertices 7 → 19, an edge nearly on another argument's face
+  8 → 15; declined fuses 141 → 145 of 175 Shells by slabs. Top now: seams apart 24, a point near two vertices 19,
+  an edge nearly on another argument's face 15, two edges leave a vertex in one direction 12, arguments share
+  vertices 10, a face of revolution 8, a non-manifold result 7.
+- Seams apart, with the end check off (bool-a NOSHAPE_X_NOSEAMS, Shell's recorded fuses vibe5
+  ~/agents/bool-corpora/seams2, 14): 5 equivalent, 9 differ (history records in 7, unify in 1, and bf976715's volume
+  6.154e-5 against OCCT's 5.755e-5: a wrong result). So the check guards real faults: next is finding them.
+- Corpora unchanged, 0 differ. Scratch: /root/bool-scratch/bin/syncdbg.sh resets bool-a to bool-b plus the debug.
+
 ## A plane nearly along a cylinder; Shell's slab fuses re-measured; seams apart looked at (11-02 07:30 UTC)
 - plane_cyl declined planes with |n · a| < 0.25 (within 14.5° of the axis: drafted faces cutting holes); OCCT's
   ellipse is taken down to 1e-3 now. nfall's 9 such taken (OCCT's results), corpus6 +6, 0 differ. T1
