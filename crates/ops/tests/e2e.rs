@@ -5478,6 +5478,16 @@ fn mbd_dimension_shows_in_the_drawing() {
     let dims: Vec<&Value> = g["annotations"].as_array().unwrap().iter().filter(|a| a["kind"] == "LinearDimension").collect();
     assert_eq!(dims.len(), 1, "{}", g["annotations"]);
     assert!(dims[0]["text"].as_str().unwrap().starts_with("30±0"), "{}", dims[0]);
+    // STEP AP242 carries it as semantic PMI (audit X3), with a datum on the
+    // top face, as OCCT's XDE reads it back.
+    let top = call(&mut ctx, "query_entities", json!({ "tab": "Part Studio 1", "kind": "faces", "surface": "plane", "normal": [0, 0, 1] }))["faces"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "part_annotation", json!({ "tab": "Part Studio 1", "action": "add_datum", "face": top }));
+    let step = scratch("mbd-pmi.step");
+    call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "STEP", "file": step.to_str().unwrap() }));
+    let pmi = noshape_kernel::read_step_pmi(&step).unwrap();
+    assert!(pmi.iter().any(|l| l == "dim 2 30 tol 0.1 0.1 faces 1+1"), "{pmi:?}");
+    let text = std::fs::read_to_string(&step).unwrap();
+    assert!(text.contains("=DATUM_FEATURE(") && text.contains(",.F.,'A');"), "the datum");
     let top = g["views"].as_array().unwrap().iter().find(|v| v["orientation"] == "top").expect("a Top view");
     assert_eq!(dims[0]["view"], top["id"], "{g}");
     // A second drawing without views: a Top view inserted later gets it.

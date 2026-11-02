@@ -19,7 +19,7 @@ fn step_schemas_and_units() {
     for (schema, tag) in [(StepSchema::Ap242, "AP242"), (StepSchema::Ap214, "AUTOMOTIVE_DESIGN"), (StepSchema::Ap203, "CONFIG_CONTROL_DESIGN")] {
         for (unit, utag) in [(LengthUnit::Millimeter, "MILLI"), (LengthUnit::Inch, "INCH"), (LengthUnit::Yard, "'YARD'")] {
             let path = dir.join(format!("{tag}-{}.step", utag.trim_matches('\'')));
-            write_step_with(&path, &[ExportShape { shape: s.clone(), name: Some("Part 1".into()), color: None }], LengthUnit::Meter, &StepOptions { schema, file_unit: Some(unit) }).unwrap();
+            write_step_with(&path, &[ExportShape { shape: s.clone(), name: Some("Part 1".into()), color: None }], LengthUnit::Meter, &StepOptions { schema, file_unit: Some(unit), pmi: Vec::new() }).unwrap();
             let text = std::fs::read_to_string(&path).unwrap();
             let header = text.split("ENDSEC").next().unwrap();
             assert!(header.to_uppercase().contains(tag), "{tag}: {header}");
@@ -810,7 +810,7 @@ fn step_layout_like_onshape() {
     let dir = std::env::temp_dir().join(format!("noshape-g47-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("g47 3parts.step");
-    write_step_with(&path, &parts, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: None }).unwrap();
+    write_step_with(&path, &parts, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: None, pmi: Vec::new() }).unwrap();
     let text = std::fs::read_to_string(&path).unwrap();
     let count = |s: &str| text.matches(s).count();
     assert!(text.starts_with("ISO-10303-21;\nHEADER;\n"));
@@ -888,7 +888,7 @@ fn step_layout_variants_like_onshape() {
 
     let one = [ExportShape { shape: cube.clone(), name: Some("Part 1".into()), color: Some([0.6157, 0.8118, 0.9294]) }];
     let p214 = dir.join("a214.step");
-    write_step_with(&p214, &one, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap214, file_unit: None }).unwrap();
+    write_step_with(&p214, &one, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap214, file_unit: None, pmi: Vec::new() }).unwrap();
     let t = std::fs::read_to_string(&p214).unwrap();
     assert!(t.contains("/* description */ ('STEP AP214',\n'CAx-IF Rec.Pracs.---User Defined Attributes---1.5---2016-08-15'),"));
     assert!(t.contains("FILE_SCHEMA (('AUTOMOTIVE_DESIGN {1 0 10303 214 3 1 1}'));"));
@@ -896,14 +896,14 @@ fn step_layout_variants_like_onshape() {
     assert!(t.contains("=VALUE_REPRESENTATION_ITEM('number of annotations',COUNT_MEASURE(0.));"));
     assert!(t.contains("=APPLICATION_CONTEXT(\n'core data for automotive mechanical design processes');"));
     let p203 = dir.join("a203.step");
-    write_step_with(&p203, &one, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap203, file_unit: None }).unwrap();
+    write_step_with(&p203, &one, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap203, file_unit: None, pmi: Vec::new() }).unwrap();
     let t = std::fs::read_to_string(&p203).unwrap();
     assert!(t.contains("/* description */ ('STEP AP203'),"));
     assert!(t.contains("FILE_SCHEMA (('CONFIG_CONTROL_DESIGN'));"));
     assert!(t.contains("=DESIGN_CONTEXT('',#") && t.contains("=MECHANICAL_CONTEXT('',#"));
     assert!(t.contains("=APPLICATION_CONTEXT(\n'configuration controlled 3D designs of mechanical parts and assemblie\ns');"));
     let pin = dir.join("inch.step");
-    write_step_with(&pin, &one, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: Some(LengthUnit::Inch) }).unwrap();
+    write_step_with(&pin, &one, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: Some(LengthUnit::Inch), pmi: Vec::new() }).unwrap();
     let t = std::fs::read_to_string(&pin).unwrap();
     assert!(t.contains("CONVERSION_BASED_UNIT('INCH',#"));
     assert!(t.contains("=UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(3.93700787401575E-7),"), "{t}");
@@ -923,7 +923,7 @@ fn write_g47_step() {
     let Some(dir) = std::env::var_os("NOSHAPE_STEP_OUT") else { return };
     let colors = [[0.6157, 0.8118, 0.9294], [0.6471, 0.6471, 0.6471], [0.2314, 0.3804, 0.7059]];
     let parts: Vec<ExportShape> = (0..3).map(|i| ExportShape { shape: make_box_corners(DVec3::new(0.02 * i as f64, 0.0, 0.0), DVec3::new(0.02 * i as f64 + 0.01, 0.01, 0.01)).unwrap(), name: Some(format!("Part {}", i + 1)), color: Some(colors[i]) }).collect();
-    write_step_with(&std::path::Path::new(&dir).join("g47 3parts.step"), &parts, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: None }).unwrap();
+    write_step_with(&std::path::Path::new(&dir).join("g47 3parts.step"), &parts, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: None, pmi: Vec::new() }).unwrap();
 }
 
 /// Prints the volume and faces (kind, area mm², box mm) of the parts of the
@@ -1055,4 +1055,43 @@ fn pvz_of_a_hole_cut_by_the_rust_boolean() {
     let path = std::env::temp_dir().join(format!("noshape-pvz-rust-{}.pvz", std::process::id()));
     write_pvz(&path, &[ExportShape { shape: s, name: Some("part".into()), color: None }], LengthUnit::Meter).unwrap();
     let _ = std::fs::remove_file(&path);
+}
+
+/// MBD in STEP AP242 as semantic PMI (CAx-IF recommended practices), read
+/// back by an independent reader (OCCT's XDE): a datum on a face and a
+/// toleranced distance between two faces of a 10 × 20 × 30 mm block.
+#[test]
+fn step_ap242_pmi_round_trips() {
+    let block = make_box_corners(DVec3::ZERO, DVec3::new(0.01, 0.02, 0.03)).unwrap();
+    let pmi = PartPmi { datums: vec![(vec![5], "A".into())], dims: vec![PmiDimension { kind: PmiKind::Distance, a: vec![1], b: vec![2], value: 0.01, tolerance: Some((-0.0001, 0.0001)) }] };
+    let dir = std::env::temp_dir().join(format!("noshape-pmi-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("pmi block.step");
+    write_step_with(&path, &[ExportShape { shape: block, name: Some("Block".into()), color: None }], LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: None, pmi: vec![Some(pmi)] }).unwrap();
+    let lines = read_step_pmi(&path).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    // The distance as XDE reads it: a linear distance (type 2) of 10 mm
+    // between one face and another, ±0.1 (OCCT keeps the lower deviation's
+    // size).
+    let dim = lines.iter().find(|l| l.starts_with("dim ")).unwrap_or_else(|| panic!("{lines:?}\n{text}"));
+    assert_eq!(dim, "dim 2 10 tol 0.1 0.1 faces 1+1");
+    for e in ["DIMENSIONAL_LOCATION('linear distance'", "DIMENSIONAL_CHARACTERISTIC_REPRESENTATION(", "PLUS_MINUS_TOLERANCE(", "TOLERANCE_VALUE("] {
+        assert!(text.contains(e), "{e}");
+    }
+    // XDE reads a datum only with a tolerance using it: its structure as the
+    // recommended practices have it, on one face of this product.
+    let ids = |pat: &str| text.lines().filter(|l| l.contains(pat)).filter_map(|l| l.split('=').next()).map(str::to_string).collect::<Vec<_>>();
+    let (feature, datum) = (ids("=DATUM_FEATURE("), ids("=DATUM('"));
+    assert_eq!((feature.len(), datum.len()), (1, 1), "{text}");
+    assert!(text.contains(&format!("=SHAPE_ASPECT_RELATIONSHIP('',$,{},{})", feature[0], datum[0])), "{text}");
+    assert!(text.lines().any(|l| l.contains("=GEOMETRIC_ITEM_SPECIFIC_USAGE(") && l.contains(&format!(",{},", feature[0]))), "{text}");
+    assert!(text.contains(",.F.,'A');"), "{text}");
+}
+
+/// Debug aid: the PMI OCCT's XDE reads from `NOSHAPE_PMI_READ`.
+#[test]
+#[ignore = "debug aid"]
+fn dump_step_pmi() {
+    let Some(p) = std::env::var_os("NOSHAPE_PMI_READ") else { return };
+    println!("{:?}", read_step_pmi(std::path::Path::new(&p)).unwrap());
 }

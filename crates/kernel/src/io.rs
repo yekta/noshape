@@ -189,11 +189,50 @@ pub enum StepSchema {
 }
 
 /// Options of [`write_step_with`].
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct StepOptions {
     pub schema: StepSchema,
     /// Length unit of the file (None: millimetres).
     pub file_unit: Option<LengthUnit>,
+    /// Each shape's MBD (index = shape), written as AP242 semantic PMI.
+    pub pmi: Vec<Option<PartPmi>>,
+}
+
+/// A part's MBD for STEP (AP242 semantic PMI, CAx-IF recommended practices):
+/// datums and dimensions on its faces (1-based `TopExp::MapShapes` face
+/// indices of the shape as given).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PartPmi {
+    pub datums: Vec<(Vec<u32>, String)>,
+    pub dims: Vec<PmiDimension>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PmiKind {
+    /// Distance between `a` and `b`.
+    Distance,
+    /// Angle between `a` and `b`.
+    Angle,
+    Radius,
+    Diameter,
+}
+
+/// A dimension: its faces, value (metres, or radians for angles) and the
+/// tolerance's lower / upper deviations (same units).
+#[derive(Clone, Debug, PartialEq)]
+pub struct PmiDimension {
+    pub kind: PmiKind,
+    pub a: Vec<u32>,
+    pub b: Vec<u32>,
+    pub value: f64,
+    pub tolerance: Option<(f64, f64)>,
+}
+
+/// A STEP file's semantic PMI as OCCT's XDE reads it back (an independent
+/// reader, for round trips): "datum A faces 1", "dim <type> <value> tol
+/// <lower> <upper> faces <n>+<m>".
+pub fn read_step_pmi(path: &Path) -> Result<Vec<String>> {
+    Ok(ck(ffi::read_step_pmi(path_str(path)?))?.into_iter().map(|s| s.to_string()).collect())
 }
 
 /// [`write_step`] with the schema and the file's length unit.
@@ -277,9 +316,49 @@ fn step_parts(shapes: &[ExportShape], unit: LengthUnit, opts: &StepOptions) -> R
     for (i, sh) in v.iter().enumerate() {
         let n = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let tmp = std::env::temp_dir().join(format!("noshape-step-{}-{n}.step", std::process::id()));
-        let written = ck(ffi::write_step(&vec_to_list(std::slice::from_ref(sh)), &[], &[], &[], path_str(&tmp)?, schema, file_unit));
+        // The part's MBD in the file's unit (OCCT writes the values as given)
+        // and degrees.
+        let written = match opts.pmi.get(i).cloned().flatten().filter(|_| opts.schema != StepSchema::Ap214 && opts.schema != StepSchema::Ap203) {
+            Some(p) => {
+                let per_unit = match file_unit {
+                    1 => 0.0254,
+                    2 => 0.001,
+                    4 => 0.3048,
+                    10 => 0.01,
+                    100 => 0.9144,
+                    _ => 1.0,
+                };
+                let mm = |v: f64, k: PmiKind| if k == PmiKind::Angle { v.to_degrees() } else { v / per_unit };
+                let pmi = ffi::StepPmi {
+                    datums: p.datums.iter().map(|(f, n)| ffi::PmiDatum { faces: f.clone(), name: n.clone() }).collect(),
+                    dims: p
+                        .dims
+                        .iter()
+                        .map(|d| ffi::PmiDim {
+                            kind: match d.kind {
+                                PmiKind::Distance => 0,
+                                PmiKind::Angle => 1,
+                                PmiKind::Radius => 2,
+                                PmiKind::Diameter => 3,
+                            },
+                            a: d.a.clone(),
+                            b: d.b.clone(),
+                            value: mm(d.value, d.kind),
+                            lower: d.tolerance.map_or(0.0, |t| mm(t.0, d.kind)),
+                            upper: d.tolerance.map_or(0.0, |t| mm(t.1, d.kind)),
+                            toleranced: d.tolerance.is_some(),
+                        })
+                        .collect(),
+                };
+                ck(ffi::write_step_pmi(&vec_to_list(std::slice::from_ref(sh)), &[], &[], &[], path_str(&tmp)?, schema, file_unit, &pmi))
+            }
+            None => ck(ffi::write_step(&vec_to_list(std::slice::from_ref(sh)), &[], &[], &[], path_str(&tmp)?, schema, file_unit)),
+        };
         let text = written.and_then(|_| std::fs::read_to_string(&tmp).map_err(|e| KernelError::Io(e.to_string())));
-        let _ = std::fs::remove_file(&tmp);
+        // NOSHAPE_STEP_KEEP_OCCT=1 keeps OCCT's per-part file (debugging the relayout).
+        if std::env::var_os("NOSHAPE_STEP_KEEP_OCCT").is_none() {
+            let _ = std::fs::remove_file(&tmp);
+        }
         let name = shapes[i].name.clone().filter(|n| !n.is_empty()).unwrap_or_else(|| format!("Part {}", i + 1));
         parts.push(crate::step_out::Part { name, color: shapes[i].color, occt: text? });
     }

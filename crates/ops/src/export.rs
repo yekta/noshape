@@ -117,6 +117,9 @@ pub struct ExportSettings {
     pub options: usize,
     /// Resolution › Custom's fields (live dom g39-export-ps-step).
     pub custom: CustomResolution,
+    /// Each part's MBD (index = part; [`studio_pmi`]), written to STEP AP242
+    /// as semantic PMI.
+    pub pmi: Vec<Option<k::PartPmi>>,
 }
 
 /// Resolution › Custom (live dom g39-export-ps-step.html): STL's Chordal
@@ -176,6 +179,7 @@ impl Default for ExportSettings {
             urdf_geometry: 0,
             options: 0,
             custom: CustomResolution::default(),
+            pmi: Vec::new(),
         }
     }
 }
@@ -208,7 +212,8 @@ pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(Stri
                 name.push('_');
             }
             let t = tmp(i, ext);
-            write_parts(s, &t, std::slice::from_ref(p))?;
+            let one = ExportSettings { pmi: vec![s.pmi.get(i).cloned().flatten()], ..s.clone() };
+            write_parts(&one, &t, std::slice::from_ref(p))?;
             out.push((format!("{name}.{ext}"), std::fs::read(&t)?));
             let _ = std::fs::remove_file(&t);
         }
@@ -415,7 +420,7 @@ fn step_options(s: &ExportSettings) -> k::StepOptions {
     } else {
         None
     };
-    k::StepOptions { schema, file_unit }
+    k::StepOptions { schema, file_unit, pmi: s.pmi.clone() }
 }
 
 /// The Part Studio Format list's row `i` ([`PartFormat::list`]).
@@ -746,6 +751,65 @@ pub fn store_file_tab(d: &mut noshape_model::document::Document, file_name: &str
 /// The history entry of [`store_file_tab`]: "Store <file>".
 pub fn store_description(file_name: &str) -> String {
     format!("Store {file_name}")
+}
+
+/// The MBD of a Part Studio's `bodies` for STEP AP242 (Model definitions):
+/// datums on their faces, and dimensions whose references are faces of the
+/// same body, valued from the model (`mbd::measure`), with their
+/// Symmetrical / Deviation / Limits tolerances (typed in the document's
+/// unit); one entry per body, None without any.
+pub fn studio_pmi(ps: &noshape_model::PartStudio, ctx: &noshape_model::regen::context::Context, bodies: &[noshape_model::BodyId], units: &noshape_units::UnitPrefs) -> Vec<Option<k::PartPmi>> {
+    use noshape_model::annotations::{AnnotationKind, Measure};
+    use noshape_model::Reference;
+    bodies
+        .iter()
+        .map(|id| {
+            let body = ctx.bodies.iter().find(|b| &b.id == id)?;
+            let faces = |r: &Reference| -> Vec<u32> {
+                match r {
+                    Reference::Face(n) => body.find_faces(n).into_iter().map(|i| i as u32 + 1).collect(),
+                    _ => Vec::new(),
+                }
+            };
+            let mut pmi = k::PartPmi::default();
+            for a in &ps.annotations {
+                match &a.kind {
+                    AnnotationKind::Datum { letter } => {
+                        let f = faces(&a.face);
+                        if !f.is_empty() {
+                            pmi.datums.push((f, letter.clone()));
+                        }
+                    }
+                    AnnotationKind::Dimension { measure, refs, tolerance } => {
+                        let fa = refs.first().map(&faces).unwrap_or_default();
+                        let fb = refs.get(1).map(&faces).unwrap_or_default();
+                        let kind = match measure {
+                            Measure::Angle => k::PmiKind::Angle,
+                            Measure::Radius => k::PmiKind::Radius,
+                            _ => k::PmiKind::Distance,
+                        };
+                        if fa.is_empty() || (kind != k::PmiKind::Radius && fb.is_empty()) {
+                            continue;
+                        }
+                        let Some((_, value)) = noshape_model::drawing::mbd::measure(ctx, a) else { continue };
+                        let angle = kind == k::PmiKind::Angle;
+                        // Deviations typed in the document unit (degrees for angles).
+                        let unit = if angle { std::f64::consts::PI / 180.0 } else { units.length.meters() };
+                        let dim = if angle { noshape_units::Dim::ANGLE } else { noshape_units::Dim::LENGTH };
+                        let dev = |s: &str| s.trim().parse::<f64>().map(|v| v * unit).unwrap_or_else(|_| noshape_units::evaluate_as(s, dim, units, &noshape_units::EmptyScope).map(|q| q.value).unwrap_or(0.0));
+                        let (u, l) = (dev(&tolerance.upper), dev(&tolerance.lower));
+                        let tol = match tolerance.kind.as_str() {
+                            "Symmetrical" => Some((-u, u)),
+                            "Deviation" | "Limits" => Some((-l, u)),
+                            _ => None,
+                        };
+                        pmi.dims.push(k::PmiDimension { kind, a: fa, b: fb, value, tolerance: tol });
+                    }
+                }
+            }
+            (pmi != k::PartPmi::default()).then_some(pmi)
+        })
+        .collect()
 }
 
 #[cfg(test)]

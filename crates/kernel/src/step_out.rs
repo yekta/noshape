@@ -488,6 +488,29 @@ impl Copier<'_> {
     }
 }
 
+/// The semantic PMI entities copied from OCCT's output (with what they
+/// reference): datum features and datums, shape aspects on faces,
+/// dimensions with their values, tolerances.
+const PMI_TYPES: &[&str] = &[
+    "DATUM_FEATURE",
+    "DATUM",
+    "DATUM_TARGET",
+    "DATUM_SYSTEM",
+    "DATUM_REFERENCE_COMPARTMENT",
+    "SHAPE_ASPECT",
+    "SHAPE_ASPECT_RELATIONSHIP",
+    "GEOMETRIC_ITEM_SPECIFIC_USAGE",
+    "DIMENSIONAL_SIZE",
+    "ANGULAR_SIZE",
+    "DIMENSIONAL_LOCATION",
+    "ANGULAR_LOCATION",
+    "DIMENSIONAL_CHARACTERISTIC_REPRESENTATION",
+    "PLUS_MINUS_TOLERANCE",
+    "LIMITS_AND_FITS",
+    "TOLERANCE_ZONE",
+    "GEOMETRIC_TOLERANCE",
+];
+
 /// The whole file in Onshape's layout.
 pub(crate) fn write(parts: &[Part], file_name: &str, timestamp: &str, schema: Schema) -> Result<String> {
     let mut b = Builder::default();
@@ -590,6 +613,21 @@ pub(crate) fn write(parts: &[Part], file_name: &str, timestamp: &str, schema: Sc
         b.add(Ent::simple("SHAPE_REPRESENTATION_RELATIONSHIP", vec![s(""), s(""), V::Ref(sr), V::Ref(absr)]));
         if let Some(m) = mdgpr {
             b.set(m, Ent::simple("MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION", vec![s(""), list(&styled), V::Ref(ctx)]));
+        }
+        // AP242 semantic PMI (CAx-IF recommended practices for PMI
+        // representation, as OCCT's XDE writes it): datums, dimensions and
+        // tolerances, moved onto this product, representation and faces.
+        if schema == Schema::Ap242 {
+            if let Some(V::Ref(src_pds)) = sdr.args().first() {
+                cp.map.insert(*src_pds, pds);
+            }
+            cp.map.insert(*rep_id, absr);
+            cp.map.insert(*ctx_id, ctx);
+            let mut roots: Vec<u32> = src.iter().filter(|(id, e)| !cp.map.contains_key(id) && PMI_TYPES.iter().any(|t| e.recs.iter().any(|r| r.0 == *t))).map(|(id, _)| *id).collect();
+            roots.sort_unstable();
+            for r in roots {
+                cp.visit(&mut b, r, &mut |_, _| {})?;
+            }
         }
         last = Some((pds, ctx));
     }

@@ -58,6 +58,18 @@ impl PartStudioView {
             self.flash_info(msg, cx);
             return;
         }
+        // The exported bodies' MBD (STEP AP242 semantic PMI), in their order.
+        let mut s = s;
+        if let (Some(ctx), Some(ps)) = (self.context.as_ref(), self.studio(cx)) {
+            let ids: Vec<BodyId> = ctx
+                .bodies
+                .iter()
+                .filter(|b| bodies.is_empty() || bodies.contains(&b.id))
+                .filter(|b| !(self.display.body(&b.id).is_some_and(|d| d.hidden) && !s.hidden && bodies.is_empty()))
+                .map(|b| b.id.clone())
+                .collect();
+            s.pmi = noshape_ops::export::studio_pmi(ps, ctx, &ids, &self.doc.read(cx).session.doc.settings.units);
+        }
         let name = if name.is_empty() { self.studio_name(cx) } else { name };
         // The saved file's own extension (OBJ downloads a .zip, as live).
         let several = if bodies.is_empty() { self.context.as_ref().is_some_and(|c| c.bodies.len() > 1) } else { bodies.len() > 1 };

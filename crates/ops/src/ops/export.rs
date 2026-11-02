@@ -133,6 +133,18 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             Some((name, b.shape.clone(), color))
         })
         .collect();
+    // The exported bodies' MBD (STEP AP242 semantic PMI).
+    let ids: Vec<noshape_model::BodyId> = r
+        .context
+        .bodies
+        .iter()
+        .filter(|b| selected.is_empty() || selected.contains(&b.id))
+        .filter(|b| !(r.display.body(&b.id).is_some_and(|d| d.hidden) && !s.hidden && selected.is_empty()))
+        .map(|b| b.id.clone())
+        .collect();
+    if let Some(noshape_model::TabContent::PartStudio(ps)) = od.doc().tab(tab).map(|t| &t.content) {
+        s.pmi = crate::export::studio_pmi(ps, &r.context, &ids, &od.doc().settings.units);
+    }
     let n = list.len();
     write_out(od, tab, a, format, n, |file| crate::export::write_export(&s, file, list))
 }
