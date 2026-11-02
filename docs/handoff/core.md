@@ -30,8 +30,14 @@ came back, because the missing-selection check (eval::drop_missing_regions) scan
 are now noted (Bodies::note_lookup) and replayed. Model and ops T1 pass with reuse on; bench_edit_latency_reuse (vibe5,
 profdocs copied to ~/agents/profdocs there) equal to full regenerations on every edit. Misses left (features reading
 all bodies, re-run with their effect unchanged): shell-hang depth edit 30.4 s of 31.3, draft-hang 769 of 1065 ms,
-qa5-mb / rib23 / surf-main ~107 of 110 ms (Fill 1 ...), bracket24's Linear pattern. Next: those reads (Extrude New's
-auto_scope, patterns' feature reads, Fill), NOSHAPE_REUSE_TRACE says where.
+qa5-mb / rib23 / surf-main ~107 of 110 ms (Fill 1 ...), bracket24's Linear pattern. 13:50 (landing): NOSHAPE_REUSE_TRACE
+now also says why a feature isn't reused ("not reused: Part 2 changed" / "the context besides the bodies differs" /
+"it read all the bodies"). Fixed: a sketch solved again the same keeps its last result (its new Arc made every later
+context differ: draft-hang's Fillet radius edit 1005 -> 141 ms, 32 -> 15 features ran), removing bodies reads only
+those (Bodies::remove / remove_ids; retain read all: Boolean, Thicken), the model's bounds (Split's plane) and
+auto_scope's touching parts (Extrude New / Mirror / Thicken's touched list) are probes found again on the new input.
+Left: qa5-mb's Fill / Extrude 3 / Boolean / Split read bodies that do change (their effect unchanged): finer reads
+(faces, not bodies) would be next; feature patterns read the feature list (all).
 **Edit latency / incremental regeneration (user 11-02 08:00).** Bench ops `regen_profile::bench_edit_latency`
 (perf, profile and qa documents; a warm Regenerator, preview meshes; features that ran again and which had their
 effect unchanged) and `bench_edit_latency_reuse` (the same with reuse, every edit checked against a full

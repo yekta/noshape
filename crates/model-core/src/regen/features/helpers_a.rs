@@ -271,11 +271,11 @@ pub fn body_named(b: &Body) -> NamedShape {
 }
 
 pub fn index_of_body(ev: &EvalCtx, id: &BodyId) -> Option<usize> {
-    ev.ctx.bodies.iter().position(|b| &b.id == id)
+    ev.ctx.bodies.position_id(id)
 }
 
 pub fn remove_bodies(ev: &mut EvalCtx, ids: &[BodyId]) {
-    ev.ctx.bodies.retain(|b| !ids.contains(&b.id));
+    ev.ctx.bodies.remove_ids(ids);
 }
 
 /// Push a new body with a fresh part name and color.

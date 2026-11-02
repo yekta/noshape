@@ -291,6 +291,11 @@ pub struct BodyReads {
     pub lookups: parking_lot::Mutex<Vec<(LookupKind, TopoName)>>,
     /// NOSHAPE_REUSE_TRACE: where the evaluation first read all the bodies (why it can't be reused).
     pub first_all: parking_lot::Mutex<Option<String>>,
+    /// The bounds of all the bodies, when the evaluation asked for them (a datum plane's tool face sized to the
+    /// model): compared with the new input's.
+    pub bounds: parking_lot::Mutex<Option<Option<(DVec3, DVec3)>>>,
+    /// The solids found touching tools (`eval::touching`): the tools and the ids found, found again on a new input.
+    pub scopes: parking_lot::Mutex<Vec<(Vec<Shape>, Vec<BodyId>)>>,
 }
 
 /// NOSHAPE_REUSE_TRACE: note where evaluations read all the bodies.
@@ -396,13 +401,48 @@ impl Bodies {
     pub fn push(&mut self, b: Arc<Body>) {
         self.v.push(b);
     }
+    /// (Positions are no read: an input whose body ids differ is never reused.)
     pub fn insert(&mut self, i: usize, b: Arc<Body>) {
-        self.all();
         self.v.insert(i, b);
     }
+    /// Removes body `i`, a read of it.
     pub fn remove(&mut self, i: usize) -> Arc<Body> {
-        self.all();
+        if let Some(r) = &self.reads {
+            r.read(&self.v[i]);
+        }
         self.v.remove(i)
+    }
+    /// Removes the bodies with these ids, a read of each.
+    pub fn remove_ids(&mut self, ids: &[BodyId]) {
+        while let Some(i) = self.v.iter().position(|b| ids.contains(&b.id)) {
+            self.remove(i);
+        }
+    }
+    /// Notes the solids found touching `tools` (found again when the evaluation is reused).
+    pub fn note_scope(&self, tools: Vec<Shape>, ids: Vec<BodyId>) {
+        if let Some(r) = &self.reads {
+            r.scopes.lock().push((tools, ids));
+        }
+    }
+    /// The bounds of all the bodies (noted, compared with a new input's when the evaluation is reused).
+    pub fn bounds(&self) -> Option<(DVec3, DVec3)> {
+        let b = self.bounds_untracked();
+        if let Some(r) = &self.reads {
+            *r.bounds.lock() = Some(b);
+        }
+        b
+    }
+    pub fn bounds_untracked(&self) -> Option<(DVec3, DVec3)> {
+        let mut acc: Option<(DVec3, DVec3)> = None;
+        for b in &self.v {
+            if let Ok(bb) = b.shape.bounding_box(false) {
+                acc = Some(match acc {
+                    None => (bb.min, bb.max),
+                    Some((a, c)) => (a.min(bb.min), c.max(bb.max)),
+                });
+            }
+        }
+        acc
     }
     pub fn retain(&mut self, f: impl FnMut(&Arc<Body>) -> bool) {
         self.all();
@@ -782,15 +822,6 @@ impl Context {
 
     /// World bounds of all bodies.
     pub fn bounds(&self) -> Option<(DVec3, DVec3)> {
-        let mut acc: Option<(DVec3, DVec3)> = None;
-        for b in &self.bodies {
-            if let Ok(bb) = b.shape.bounding_box(false) {
-                acc = Some(match acc {
-                    None => (bb.min, bb.max),
-                    Some((a, c)) => (a.min(bb.min), c.max(bb.max)),
-                });
-            }
-        }
-        acc
+        self.bodies.bounds()
     }
 }

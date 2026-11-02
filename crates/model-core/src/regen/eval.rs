@@ -216,6 +216,30 @@ fn is_sketch_ref(r: &Reference) -> bool {
 /// and the parts of this studio's features (`own`) that don't exist there,
 /// and the faces, edges and vertices of this studio's features that no body
 /// has there, and how many were left out; `None` when everything resolves.
+/// The solids among `bodies` that touch any of `tools` (their boxes overlap and a tool vertex is in or on the body, or
+/// they are no farther apart than 1e-9).
+pub fn touching(bodies: &[Arc<Body>], tools: &[Shape]) -> Vec<usize> {
+    let tb: Vec<Option<k::BoundingBox>> = tools.iter().map(|t| t.bounding_box(false).ok()).collect();
+    bodies
+        .iter()
+        .enumerate()
+        .filter(|(_, b)| b.kind == BodyKind::Solid)
+        .filter(|(_, b)| {
+            // The exact distance only for tools whose boxes reach the body,
+            // and only when none of the tool's vertices is in or on it (a
+            // boss standing on the part: the classification is cheaper
+            // than the distance, REGEN-SPEED).
+            let Ok(bb) = b.shape.bounding_box(false) else { return false };
+            let touches = |t: &Shape| {
+                t.vertices().iter().take(8).filter_map(|v| v.vertex_point().ok()).any(|p| matches!(b.shape.classify_point(p, 1e-9), Ok(k::PointClass::Inside | k::PointClass::OnBoundary)))
+                    || k::distance(&b.shape, t).map(|d| d.distance < 1e-9).unwrap_or(false)
+            };
+            tools.iter().zip(&tb).any(|(t, tbox)| tbox.as_ref().is_none_or(|x| overlaps(&bb, x)) && touches(t))
+        })
+        .map(|(i, _)| i)
+        .collect()
+}
+
 pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(FeatureId) -> bool) -> (Option<ParamValues>, usize) {
     /// Whether every face `n` is named after comes from this studio's features
     /// (sketch and wire-body curves are left alone).
@@ -910,28 +934,14 @@ impl<'a> EvalCtx<'a> {
         }
     }
 
-    /// Bodies whose bounding boxes overlap any tool (auto merge scope).
+    /// Bodies whose bounding boxes overlap any tool (auto merge scope). Noted as a probe: an evaluation is reused
+    /// only while the same bodies touch its tools.
     pub fn auto_scope(&self, tools: &[NamedShape]) -> Vec<usize> {
-        let tb: Vec<Option<k::BoundingBox>> = tools.iter().map(|t| t.shape.bounding_box(false).ok()).collect();
-        self.ctx
-            .bodies
-            .iter()
-            .enumerate()
-            .filter(|(_, b)| b.kind == BodyKind::Solid)
-            .filter(|(_, b)| {
-                // The exact distance only for tools whose boxes reach the body,
-                // and only when none of the tool's vertices is in or on it (a
-                // boss standing on the part: the classification is cheaper
-                // than the distance, REGEN-SPEED).
-                let Ok(bb) = b.shape.bounding_box(false) else { return false };
-                let touches = |t: &NamedShape| {
-                    t.shape.vertices().iter().take(8).filter_map(|v| v.vertex_point().ok()).any(|p| matches!(b.shape.classify_point(p, 1e-9), Ok(k::PointClass::Inside | k::PointClass::OnBoundary)))
-                        || k::distance(&b.shape, &t.shape).map(|d| d.distance < 1e-9).unwrap_or(false)
-                };
-                tools.iter().zip(&tb).any(|(t, tbox)| tbox.as_ref().is_none_or(|x| overlaps(&bb, x)) && touches(t))
-            })
-            .map(|(i, _)| i)
-            .collect()
+        let shapes: Vec<Shape> = tools.iter().map(|t| t.shape.clone()).collect();
+        let bodies = self.ctx.bodies.untracked();
+        let found = touching(bodies, &shapes);
+        self.ctx.bodies.note_scope(shapes, found.iter().map(|&i| bodies[i].id.clone()).collect());
+        found
     }
 
     fn fuse_named(&self, tools: Vec<NamedShape>) -> FResult<Vec<NamedShape>> {

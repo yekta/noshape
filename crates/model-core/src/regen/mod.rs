@@ -164,6 +164,8 @@ struct CacheEntry {
 struct ReadSet {
     bodies: Vec<usize>,
     lookups: Vec<(context::LookupKind, crate::reference::TopoName)>,
+    bounds: Option<Option<(glam::DVec3, glam::DVec3)>>,
+    scopes: Vec<(Vec<noshape_kernel::Shape>, Vec<crate::reference::BodyId>)>,
 }
 
 thread_local! {
@@ -185,25 +187,36 @@ fn reuse_on() -> bool {
 /// `e`'s result for `input` when nothing `e`'s evaluation read differs: the same body ids in the same order, every
 /// other part of the context the same, each body it read the very same, each name lookup it made finding the same
 /// on both inputs. The result is `e`'s with the input's bodies in place of those it passed through unread.
-fn reused(e: &CacheEntry, input: &Context) -> Option<Context> {
-    let (reads, old) = (e.reads.as_ref()?, e.input.as_ref()?);
+fn reused(e: &CacheEntry, input: &Context) -> Result<Context, String> {
+    let (Some(reads), Some(old)) = (e.reads.as_ref(), e.input.as_ref()) else { return Err("it read all the bodies".into()) };
     let (a, b) = (old.bodies.untracked(), input.bodies.untracked());
-    if a.len() != b.len() || a.iter().zip(b).any(|(x, y)| x.id != y.id) || !old.same_but_bodies(input) {
-        return None;
+    if a.len() != b.len() || a.iter().zip(b).any(|(x, y)| x.id != y.id) {
+        return Err("other body ids".into());
+    }
+    if !old.same_but_bodies(input) {
+        return Err("the context besides the bodies differs".into());
     }
     let at: HashMap<usize, usize> = a.iter().enumerate().map(|(j, x)| (Arc::as_ptr(x) as usize, j)).collect();
     let mut read = vec![false; a.len()];
     for p in &reads.bodies {
         if let Some(&j) = at.get(p) {
             if !Arc::ptr_eq(&a[j], &b[j]) {
-                return None;
+                return Err(format!("{} ({}) changed", b[j].name, b[j].id));
             }
             read[j] = true;
         }
     }
     for (k, n) in &reads.lookups {
         if old.bodies.find_untracked(*k, n) != input.bodies.find_untracked(*k, n) {
-            return None;
+            return Err(format!("a {k:?} lookup finds other entities"));
+        }
+    }
+    if reads.bounds.is_some_and(|bb| bb != input.bodies.bounds_untracked()) {
+        return Err("the bodies' bounds differ".into());
+    }
+    for (tools, ids) in &reads.scopes {
+        if eval::touching(b, tools).into_iter().map(|j| &b[j].id).ne(ids.iter()) {
+            return Err("other bodies touch its tools".into());
         }
     }
     let by_id: HashMap<&crate::reference::BodyId, usize> = a.iter().enumerate().map(|(j, x)| (&x.id, j)).collect();
@@ -214,7 +227,20 @@ fn reused(e: &CacheEntry, input: &Context) -> Option<Context> {
     }).collect();
     out.bodies = bodies.into();
     out.renumber_default_names();
-    Some(out)
+    Ok(out)
+}
+
+/// Two solved sketches the same: their definition, plane, solve report, labels and images (what the rest of their
+/// result is computed from).
+fn same_sketch(a: &context::SketchResult, b: &context::SketchResult) -> bool {
+    a.feature == b.feature
+        && a.name == b.name
+        && a.frame == b.frame
+        && a.report == b.report
+        && a.dimension_text == b.dimension_text
+        && a.images.len() == b.images.len()
+        && a.images.iter().zip(&b.images).all(|(x, y)| x.id == y.id && x.box_points == y.box_points && x.data_base64 == y.data_base64)
+        && serde_json::to_vec(&a.sketch).ok().is_some_and(|x| serde_json::to_vec(&b.sketch).ok().is_some_and(|y| x == y))
 }
 
 /// Entries of features a run no longer has (deleted, or a feature list from
@@ -373,7 +399,15 @@ impl Regenerator {
             if reusable
                 && expr_error.is_none()
                 && let Some(versions) = self.entries.get_mut(&f.id)
-                && let Some((e, out)) = versions.iter().filter(|e| e.local == local).find_map(|e| reused(e, &ctx).map(|out| (e, out)))
+                && let Some((e, out)) = versions.iter().filter(|e| e.local == local).find_map(|e| match reused(e, &ctx) {
+                    Ok(out) => Some((e, out)),
+                    Err(why) => {
+                        if context::trace_reads() {
+                            eprintln!("reuse trace: {} ({}) not reused: {why}", f.name, f.type_id);
+                        }
+                        None
+                    }
+                })
             {
                 let t = Instant::now();
                 let (reads, mut state) = (e.reads.clone(), e.state.clone());
@@ -494,6 +528,14 @@ impl Regenerator {
                                 }
                                 ev.ctx.bodies.track(None);
                                 ev.ctx.renumber_default_names();
+                                // A sketch solved again the same as before keeps its last result, so the features
+                                // after it see the context unchanged (incremental regeneration).
+                                if f.type_id == "sketch"
+                                    && let Some(i) = ev.ctx.sketches.iter().position(|s| s.feature == f.id)
+                                    && let Some(old) = self.entries.get(&f.id).into_iter().flatten().filter_map(|e| e.ctx.sketch(f.id)).find(|o| same_sketch(o, &ev.ctx.sketches[i]))
+                                {
+                                    ev.ctx.sketches[i] = old.clone();
+                                }
                                 ctx = Arc::new(ev.ctx);
                                 if f.type_id == "assignVariable" {
                                     let name = params.text("name").trim().trim_start_matches('#').to_string();
@@ -538,7 +580,7 @@ impl Regenerator {
                     let _ = std::fs::write(format!("{dir}/{}-{}.txt", f.type_id, f.id.0), &t);
                 }
             }
-            let reads = body_reads.filter(|r| !r.all.load(std::sync::atomic::Ordering::Relaxed)).map(|r| Arc::new(ReadSet { bodies: r.bodies.lock().clone(), lookups: r.lookups.lock().clone() }));
+            let reads = body_reads.filter(|r| !r.all.load(std::sync::atomic::Ordering::Relaxed)).map(|r| Arc::new(ReadSet { bodies: r.bodies.lock().clone(), lookups: r.lookups.lock().clone(), bounds: *r.bounds.lock(), scopes: r.scopes.lock().clone() }));
             let versions = self.entries.entry(f.id).or_default();
             versions.insert(0, CacheEntry { key, ctx: ctx.clone(), state: state.clone(), last_run: run, local, input: Some(input), reads });
             versions.truncate(VERSIONS);
