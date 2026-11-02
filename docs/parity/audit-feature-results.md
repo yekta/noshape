@@ -19,18 +19,18 @@ live's figures leave out.)
 | Feature | Cases | Status | Where |
 |---|---|---|---|
 | Extrude (blind, through, up to next / face / vertex / part, symmetric, second direction, draft, thin, offset start, scope) | 16 | ✅ | oracle_p1 batch 1 (E1–E15) |
-| Revolve (full, angle, symmetric, second direction, thin) | 7 | ✅ (RV5 ⏳) | oracle_p1 batch 2; batch 13 |
+| Revolve (full, angle, symmetric, second direction, thin) | 7 | ✅ (RV5 ✅ 11-02) | oracle_p1 batch 2; batch 13 |
 | Fillet (edge, chain, variable, conic / curvature, overflow, full round) | 9 + G-cases | ✅ (mixed-radius ≈, below) | oracle_p1 batch 3; kernel blend::*; live 1686 / G24 / G25 / kern f2 |
-| Chamfer (equal, two distances, distance-angle) | 5 | ✅ (CH7 ⏳) | oracle_p1 batch 4 |
+| Chamfer (equal, two distances, distance-angle) | 5 | ✅ (CH7 ✅ 11-02) | oracle_p1 batch 4 |
 | Hole (simple, counterbore, countersink, tapped, clearance, blind / through / up to next) | 8 | ✅ | oracle_p1 batch 5 |
-| Shell, Draft | 4 + 3 | ✅ but G46 (below); SH6 / SH7 / DR5 ⏳ | oracle_p1 batch 6; kernel_robustness |
-| Sweep, Loft | 4 + 3 | ✅ (SW5 / SW6 / LF4 / LF5 ⏳) | oracle_p1 batch 7 |
+| Shell, Draft | 4 + 3 | ✅ but G46 (below); SH6 / SH7 / DR5 / DR5b ✅ 11-02 | oracle_p1 batch 6; kernel_robustness |
+| Sweep, Loft | 4 + 3 | ✅ (SW5 ✅; SW6 5e-5, LF4 1.4e-5, LF5 2.3e-5 ≈, 11-02) | oracle_p1 batch 7 |
 | Thin loft (Trim ends, two-sided, three profiles, flipped) | 7 | ≈ (below) | engine::thin_loft_* (live Loft 8, 1728) |
 | Linear / circular / curve pattern, Mirror | 5 + 2 + 1 + 3 | ✅ | oracle_p1 batch 8 |
 | Boolean, Split, Transform | 5 + 4 + 5 | ✅ | oracle_p1 batch 9 |
 | Plane | 7 | ✅ | oracle_p1 batch 10 |
-| Move face, Replace face, Delete face, Offset surface, Thicken, Enclose | 12 | ⏳ (ours below) | batch 11 (REQUESTS core 11-01 20:30) |
-| Fill, Boundary, Rib, Wrap, Helix | 9 | ⏳ (ours below; Helix on a sketch circle fixed) | batch 12 |
+| Move face, Replace face, Delete face, Offset surface, Thicken, Enclose | 12 | ✅ 11-02 (live 1739) | batch 11 |
+| Fill, Boundary, Rib, Wrap, Helix | 9 | ✅ 11-02 but FI2 ❌ (live 1739; BD2 / WR1 fixed, Helix on a sketch circle fixed) | batch 12 |
 | Custom feature sweeps along a helix (knurl) | 14 pairs | ≈ (below) | custom_features::knurl_* |
 | Mass properties › calculation variance | 6 | ✅ | measure::tests::mass_property_variance_is_lives (live 1731) |
 | Sheet metal results | — | skasm's area (docs/handoff/skasm.md) | — |
