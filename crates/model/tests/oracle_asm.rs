@@ -591,12 +591,10 @@ fn cases_len(b: &serde_json::Value) -> usize {
 #[test]
 #[ignore = "T2: live fuzz batch vs live (assemblies)"]
 fn asm_fuzz_live_matches() {
-    // Known differences from live, until probed (handoff "Solver fuzz"):
-    // f1 / f7 a conflicting Fastened reads "overdefines" in live, ours "not
-    // consistent" (live 1764 (5)'s rule, one data point); f8 / f12 a Slider's
-    // free value after a large reorientation (live 44 / 47 / 33 mm further
-    // along the axis: least change measured about another pivot); f16 live
-    // leaves a Parallel of the conflicting loop OK.
+    // Known differences from live (handoff "Solver fuzz"): f16, where D's
+    // pose after Parallel 2 already differs (which way a Parallel leaves a pin
+    // turned about its own axis), and then Parallel 1 reads ERROR in ours
+    // when the conflicting Planar arrives (OK in live).
     const KNOWN: &[&str] = &["f16"];
     let mut parts = parts();
     let (mut answered, mut matches, mut report) = (0, 0, Vec::new());
