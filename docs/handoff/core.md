@@ -8,6 +8,12 @@ Builds and tests (11-01): on vibe4 only, `tools/tiers/rb.sh <cmd>` from the work
 (land.sh runs the full set); long probes detached on vibe4 with a log. OCCT patches build on vibe4 in
 ~/agents/core-occt (`build.sh TK...`); a private root ~/agents/occt-priv; libs go to /root/occt (synced everywhere).
 
+**State 11-02 15:50.** Landed since 14:50: NF-CHAMFER-HANG-1212 (a40adc90, patch 0018, lib sync asked),
+COMPOSITE-LATER-FEATURE (75d20033), loft circle split (466a0805), feature audit batches 11-13 with BD2 / WR1 fixed
+(35281650, d09b7b79); queued: planar Fill as a plane (live 1762: qa5-mb / rib23 / surf-main depth edits 110 -> 9.7 ms, vibe5 bench), Shell's no-cavity rule (live 1794). Open with live:
+1796 (FL7's "single chain" rule). Next: FL7's rule when answered, shell-hang Shell 5 (Parasolid leaves thin regions
+solid: an erosion-based shell), FI2 (a G1 Fill that live builds with a warning), BLEND-RUST coverage.
+
 **State 11-02 14:50 (this session, from 11:55).** Builds / tests on vibe5 (rb-hosts), the profile documents copied
 to vibe5 ~/agents/profdocs, fuzz scripts in vibe5 / vibe4 ~/agents/fuzz/bin. Landed: P1 smooth twisted vase (3c534b35:
 loft tangency, direct Shell path for curved tangent edges and outward walls), incremental regeneration on by default
