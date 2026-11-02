@@ -415,6 +415,11 @@ fn timed_big_drawings() {
         eprintln!("  BOM: {}", b.to_string().chars().take(200).collect::<String>());
         report("big drawing: assembly dimension", vec![dimension_longest_line(&mut ctx, &drawing, front)]);
         timed(&mut ctx, "big drawing: assembly drawing_get", "drawing_get", json!({ "drawing": drawing, "edges": false }));
+        for (format, ext) in [("PDF", "pdf"), ("DWG", "dwg"), ("DXF", "dxf"), ("PNG", "png")] {
+            let file = scratch.join(format!("asm.{ext}"));
+            timed(&mut ctx, &format!("big drawing: assembly export {format}"), "drawing_export", json!({ "drawing": drawing, "format": format, "file": file.to_str().unwrap() }));
+            eprintln!("  {} KB", std::fs::metadata(&file).map(|m| m.len() / 1000).unwrap_or(0));
+        }
     }
     {
         let mut ctx = Ctx::new();

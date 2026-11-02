@@ -1069,8 +1069,10 @@ fn export(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if !format.csv() && sheets.is_empty() {
         return Err(OpError::param("sheets", "No sheets to export"));
     }
+    // The sources and views the sheet shows, reused.
+    od.prime_drawing_sources(&d);
     let versions = |id: &str| od.session.document_at_version(id).ok().flatten();
-    let sources = noshape_model::drawing::views::regenerate_sources_with(od.doc(), &d, &versions);
+    let sources = dr::cached_sources(od.doc(), &d, &versions);
     let name = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_else(|| "Drawing".into());
     let bytes = if format.csv() {
         // The inspection panel's rows (hole callouts from the model).
@@ -1078,7 +1080,7 @@ fn export(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         noshape_model::drawing::inspection::rows_csv(&rows).into_bytes()
     } else {
         let info = dr::sheet_info(&od.session, tab);
-        let files = de::export_files(&d, &sheets, &s, &sources, &noshape_model::drawing::views::ViewCache::new(), &info, &ExportExtras::default()).map_err(|e| OpError::new("io", format!("Export failed: {e}")))?;
+        let files = de::export_files(&d, &sheets, &s, &sources, &dr::view_cache(), &info, &ExportExtras::default()).map_err(|e| OpError::new("io", format!("Export failed: {e}")))?;
         let files = if format.raster() { files.into_iter().map(|(n, svg)| de::rasterize(&svg, format).map(|b| (n, b))).collect::<Result<Vec<_>, String>>().map_err(|e| OpError::new("io", format!("Export failed: {e}")))? } else { files };
         de::bundle(files, &name, format)
     };

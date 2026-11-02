@@ -43,28 +43,31 @@ impl Default for ExportOptions {
     }
 }
 
-/// Rebuild color spans from per-element colors (consecutive runs).
-fn spans_of(lines: &[Option<[u8; 3]>], texts: &[Option<[u8; 3]>], fills: &[Option<[u8; 3]>]) -> Vec<ColorSpan> {
-    let mut out = Vec::new();
-    let runs = |v: &[Option<[u8; 3]>]| {
-        let mut r: Vec<(std::ops::Range<usize>, [u8; 3])> = Vec::new();
-        for (i, c) in v.iter().enumerate() {
-            let Some(c) = c else { continue };
-            match r.last_mut() {
-                Some((rg, rc)) if rg.end == i && rc == c => rg.end = i + 1,
-                _ => r.push((i..i + 1, *c)),
-            }
+/// Consecutive runs of equal per-element values: one span each (an
+/// element's lookup scans the spans, so one span per element made exporting
+/// a drawing of many elements quadratic: a 1000-row BOM's exploded text).
+fn runs<T: PartialEq + Clone>(v: &[Option<T>]) -> Vec<(std::ops::Range<usize>, T)> {
+    let mut r: Vec<(std::ops::Range<usize>, T)> = Vec::new();
+    for (i, c) in v.iter().enumerate() {
+        let Some(c) = c else { continue };
+        match r.last_mut() {
+            Some((rg, rc)) if rg.end == i && rc == c => rg.end = i + 1,
+            _ => r.push((i..i + 1, c.clone())),
         }
-        r
-    };
-    for (rg, c) in runs(lines) {
-        out.push(ColorSpan { lines: rg, texts: 0..0, fills: 0..0, rgb: c });
     }
-    for (rg, c) in runs(texts) {
-        out.push(ColorSpan { lines: 0..0, texts: rg, fills: 0..0, rgb: c });
-    }
-    for (rg, c) in runs(fills) {
-        out.push(ColorSpan { lines: 0..0, texts: 0..0, fills: rg, rgb: c });
+    r
+}
+
+/// [`runs`] of per-line, per-text and per-fill values as spans made by `mk`
+/// (its ranges: lines, texts, fills; two of them empty).
+fn kind_runs<T: PartialEq + Clone, S>(v: [&[Option<T>]; 3], mk: impl Fn([std::ops::Range<usize>; 3], T) -> S) -> Vec<S> {
+    let mut out = Vec::new();
+    for (k, list) in v.into_iter().enumerate() {
+        for (r, x) in runs(list) {
+            let mut ranges = [0..0, 0..0, 0..0];
+            ranges[k] = r;
+            out.push(mk(ranges, x));
+        }
     }
     out
 }
@@ -200,16 +203,13 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
         let mut k = keep_t.iter();
         out.texts.retain(|_| *k.next().unwrap_or(&true));
     }
-    out.colors = spans_of(&lc, &tc, &fc);
-    out.pens = lp.into_iter().enumerate().filter_map(|(i, p)| p.map(|(width_mm, dashes, centered)| super::sheet::PenSpan { centered, lines: i..i + 1, width_mm, dashes })).collect();
-    let one = |i: usize, l: &Option<SheetLayer>, k: u8| l.map(|layer| LayerSpan { lines: if k == 0 { i..i + 1 } else { 0..0 }, texts: if k == 1 { i..i + 1 } else { 0..0 }, fills: if k == 2 { i..i + 1 } else { 0..0 }, layer });
-    out.layers = ll.iter().enumerate().filter_map(|(i, l)| one(i, l, 0)).chain(tl.iter().enumerate().filter_map(|(i, l)| one(i, l, 1))).chain(fl.iter().enumerate().filter_map(|(i, l)| one(i, l, 2))).collect();
-    let span = |i: usize, l: &Option<CadLayer>, k: u8| l.map(|layer| super::cad_layers::CadSpan { lines: if k == 0 { i..i + 1 } else { 0..0 }, texts: if k == 1 { i..i + 1 } else { 0..0 }, fills: if k == 2 { i..i + 1 } else { 0..0 }, layer });
-    out.cad = lk.iter().enumerate().filter_map(|(i, l)| span(i, l, 0)).chain(tk.iter().enumerate().filter_map(|(i, l)| span(i, l, 1))).chain(fk.iter().enumerate().filter_map(|(i, l)| span(i, l, 2))).collect();
-    let member = |i: usize, o: &Option<usize>, k: u8| o.map(|obj| super::cad_objects::CadMember { lines: if k == 0 { i..i + 1 } else { 0..0 }, texts: if k == 1 { i..i + 1 } else { 0..0 }, fills: if k == 2 { i..i + 1 } else { 0..0 }, obj });
-    out.cad_members = lo.iter().enumerate().filter_map(|(i, o)| member(i, o, 0)).chain(to.iter().enumerate().filter_map(|(i, o)| member(i, o, 1))).chain(fo.iter().enumerate().filter_map(|(i, o)| member(i, o, 2))).collect();
-    out.cad_text_styles = ts.into_iter().enumerate().filter_map(|(i, s)| s.map(|style| super::cad_layers::CadTextStyleSpan { texts: i..i + 1, style })).collect();
-    out.fonts = tf.into_iter().enumerate().filter_map(|(i, f)| f.map(|font| FontSpan { texts: i..i + 1, font })).collect();
+    out.colors = kind_runs([&lc, &tc, &fc], |[lines, texts, fills], rgb| ColorSpan { lines, texts, fills, rgb });
+    out.pens = runs(&lp).into_iter().map(|(lines, (width_mm, dashes, centered))| super::sheet::PenSpan { centered, lines, width_mm, dashes }).collect();
+    out.layers = kind_runs([&ll, &tl, &fl], |[lines, texts, fills], layer| LayerSpan { lines, texts, fills, layer });
+    out.cad = kind_runs([&lk, &tk, &fk], |[lines, texts, fills], layer| super::cad_layers::CadSpan { lines, texts, fills, layer });
+    out.cad_members = kind_runs([&lo, &to, &fo], |[lines, texts, fills], obj| super::cad_objects::CadMember { lines, texts, fills, obj });
+    out.cad_text_styles = runs(&ts).into_iter().map(|(texts, style)| super::cad_layers::CadTextStyleSpan { texts, style }).collect();
+    out.fonts = runs(&tf).into_iter().map(|(texts, font)| FontSpan { texts, font }).collect();
     out
 }
 
@@ -558,6 +558,28 @@ impl PdfFonts {
     }
 }
 
+/// A path's point in PDF points ("x y m" first, then "x y l"), 3 decimals:
+/// formatted by hand (`{:.3}` took most of a second for the 750,000 points
+/// of a big assembly drawing's text outlines).
+fn path_point(out: &mut String, p: &[f64; 2], pt: f64, first: bool) {
+    fn fixed3(out: &mut String, v: f64) {
+        let n = (v * 1000.0).round();
+        if !n.is_finite() || n.abs() >= 9e15 {
+            let _ = write!(out, "{v:.3}");
+            return;
+        }
+        if n < 0.0 || (n == 0.0 && v < 0.0) {
+            out.push('-');
+        }
+        let a = n.abs() as u64;
+        let _ = write!(out, "{}.{:03}", a / 1000, a % 1000);
+    }
+    fixed3(out, p[0] * pt);
+    out.push(' ');
+    fixed3(out, p[1] * pt);
+    out.push_str(if first { " m\n" } else { " l\n" });
+}
+
 fn pdf_content(g: &SheetGeometry, ocgs: &mut Vec<super::cad_layers::CadLayer>, fonts: &mut PdfFonts) -> String {
     let pt = 72.0 / 25.4;
     let mut content = String::new();
@@ -586,7 +608,7 @@ fn pdf_content(g: &SheetGeometry, ocgs: &mut Vec<super::cad_layers::CadLayer>, f
     for (pts, c) in &g.backdrops {
         let _ = writeln!(content, "{} rg", rgb(Some(*c)));
         for (i, p) in pts.iter().enumerate() {
-            let _ = writeln!(content, "{:.3} {:.3} {}", p[0] * pt, p[1] * pt, if i == 0 { "m" } else { "l" });
+            path_point(&mut content, p, pt, i == 0);
         }
         content.push_str("f\n");
     }
@@ -605,7 +627,7 @@ fn pdf_content(g: &SheetGeometry, ocgs: &mut Vec<super::cad_layers::CadLayer>, f
         }
         let _ = writeln!(content, "{:.3} w", width_mm * pt);
         for (i, p) in l.points.iter().enumerate() {
-            let _ = writeln!(content, "{:.3} {:.3} {}", p[0] * pt, p[1] * pt, if i == 0 { "m" } else { "l" });
+            path_point(&mut content, p, pt, i == 0);
         }
         content.push_str(if l.closed { "s\n" } else { "S\n" });
     }
@@ -623,7 +645,7 @@ fn pdf_content(g: &SheetGeometry, ocgs: &mut Vec<super::cad_layers::CadLayer>, f
             let _ = writeln!(content, "{} rg", k.1);
         }
         for (i, p) in f.points.iter().enumerate() {
-            let _ = writeln!(content, "{:.3} {:.3} {}", p[0] * pt, p[1] * pt, if i == 0 { "m" } else { "l" });
+            path_point(&mut content, p, pt, i == 0);
         }
         if keys.get(fi + 1) != Some(k) {
             content.push_str("f\n");
@@ -634,7 +656,7 @@ fn pdf_content(g: &SheetGeometry, ocgs: &mut Vec<super::cad_layers::CadLayer>, f
         let _ = writeln!(content, "{:.3} w {} RG", stroke_width(t) * pt, rgb(g.text_color(ti)));
         for st in font::text_strokes_font(t, g.text_font(ti)) {
             for (i, p) in st.iter().enumerate() {
-                let _ = writeln!(content, "{:.3} {:.3} {}", p[0] * pt, p[1] * pt, if i == 0 { "m" } else { "l" });
+                path_point(&mut content, p, pt, i == 0);
             }
             content.push_str("S\n");
         }
@@ -703,7 +725,7 @@ fn pdf_content(g: &SheetGeometry, ocgs: &mut Vec<super::cad_layers::CadLayer>, f
     for (k, (pts, c, _)) in g.overlays.iter().enumerate() {
         let _ = writeln!(content, "q /Ov{k} gs {} rg", rgb(Some(*c)));
         for (i, p) in pts.iter().enumerate() {
-            let _ = writeln!(content, "{:.3} {:.3} {}", p[0] * pt, p[1] * pt, if i == 0 { "m" } else { "l" });
+            path_point(&mut content, p, pt, i == 0);
         }
         content.push_str("f Q\n");
     }
@@ -722,11 +744,55 @@ fn pdf_overlay_states(g: &SheetGeometry) -> String {
 /// A PDF stream object, FlateDecode-compressed as live's exports (an A3
 /// sheet's content was 680 KB plain): `dict` holds its other entries.
 fn flate_stream(dict: &str, data: &[u8]) -> Vec<u8> {
-    let z = miniz_oxide::deflate::compress_to_vec_zlib(data, 6);
+    let z = zlib_parallel(data);
     let mut o = format!("<< {dict}/Length {} /Filter /FlateDecode >>\nstream\n", z.len()).into_bytes();
     o.extend_from_slice(&z);
     o.extend_from_slice(b"\nendstream");
     o
+}
+
+/// zlib data of `data` at level 6; a large one (a big assembly drawing's
+/// 18 MB content: 0.8 s on one thread) as pigz does: 1 MB chunks deflated
+/// in parallel, each ending on a byte boundary (sync flush) but the last,
+/// joined under one header and the whole data's checksum.
+fn zlib_parallel(data: &[u8]) -> Vec<u8> {
+    use miniz_oxide::deflate::core::{CompressorOxide, TDEFLFlush, compress_to_output, create_comp_flags_from_zip_params};
+    use rayon::prelude::*;
+    const CHUNK: usize = 1 << 20;
+    if data.len() <= 2 * CHUNK {
+        return miniz_oxide::deflate::compress_to_vec_zlib(data, 6);
+    }
+    let chunks: Vec<&[u8]> = data.chunks(CHUNK).collect();
+    let last = chunks.len() - 1;
+    let parts: Vec<Vec<u8>> = chunks
+        .par_iter()
+        .enumerate()
+        .map(|(i, c)| {
+            // Raw deflate (negative window bits: no zlib header).
+            let mut d = CompressorOxide::new(create_comp_flags_from_zip_params(6, -15, 0));
+            let mut out = Vec::with_capacity(c.len() / 4);
+            compress_to_output(&mut d, c, if i == last { TDEFLFlush::Finish } else { TDEFLFlush::Sync }, |b| {
+                out.extend_from_slice(b);
+                true
+            });
+            out
+        })
+        .collect();
+    let (mut a, mut b) = (1u32, 0u32);
+    for block in data.chunks(5552) {
+        for &x in block {
+            a += x as u32;
+            b += a;
+        }
+        a %= 65521;
+        b %= 65521;
+    }
+    let mut z = vec![0x78, 0x9c];
+    for p in parts {
+        z.extend_from_slice(&p);
+    }
+    z.extend_from_slice(&((b << 16) | a).to_be_bytes());
+    z
 }
 
 /// The texts a PDF writes in its embedded fonts, read back through their
@@ -1061,6 +1127,41 @@ mod tests {
         assert!(bw.colors.is_empty());
         assert!(to_dxf(&g).contains(" 62\n1\n"));
         assert!(pdf_decoded(&to_pdf(&g)).contains("1.000 0.000 0.000 RG"));
+    }
+
+    /// A table of many cells (a 1000-row BOM) exploded into fills keeps
+    /// one span per run of equal colour, layer and font, not one per element
+    /// (each lookup scans them: the PDF of live's 2000-instance assembly
+    /// drawing took 31 s).
+    #[test]
+    fn prepare_keeps_spans_per_run() {
+        let mut g = sample();
+        let m = g.mark();
+        for r in 0..300 {
+            g.text([20.0, 20.0 + r as f64 * 0.1], 2.5, format!("B{r}-7"), Anchor::BottomLeft);
+            g.line([10.0, r as f64], [12.0, r as f64], LineStyle::Thin);
+        }
+        g.color_since(m, [0, 0, 255]);
+        for explode_all in [false, true] {
+            let p = prepare(&g, &ExportOptions { explode_all, ..Default::default() });
+            assert!(p.fills.len() + p.lines.len() + p.texts.len() > 600, "{explode_all}");
+            for (what, n) in [("colors", p.colors.len()), ("pens", p.pens.len()), ("layers", p.layers.len()), ("cad", p.cad.len()), ("cad_members", p.cad_members.len()), ("fonts", p.fonts.len())] {
+                assert!(n < 60, "explode_all {explode_all}: {n} {what} spans");
+            }
+            let last = if explode_all { p.fill_color(p.fills.len() - 1) } else { p.text_color(p.texts.len() - 1) };
+            assert_eq!(last, Some([0, 0, 255]), "{explode_all}");
+        }
+    }
+
+    /// Large streams are compressed in parallel chunks into one zlib
+    /// stream that inflates to the data.
+    #[test]
+    fn large_streams_deflate_in_parallel_chunks() {
+        let data: Vec<u8> = (0..5_000_000u32).flat_map(|i| format!("{}.{:03} {} l\n", i % 977, i % 1000, i % 13).into_bytes()).take(5_500_000).collect();
+        let z = zlib_parallel(&data);
+        assert!(miniz_oxide::inflate::decompress_to_vec_zlib(&z).unwrap() == data);
+        let one = miniz_oxide::deflate::compress_to_vec_zlib(&data, 6).len();
+        assert!(z.len() < one + one / 20, "{} vs {one}", z.len());
     }
 
     #[test]

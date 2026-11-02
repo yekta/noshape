@@ -175,7 +175,7 @@ static SOURCES: std::sync::LazyLock<parking_lot::Mutex<HashMap<(SourceKey, u64),
 static VIEWS: std::sync::LazyLock<parking_lot::Mutex<(usize, Arc<ViewCache>)>> = std::sync::LazyLock::new(|| parking_lot::Mutex::new((0, Arc::new(ViewCache::new()))));
 
 /// The shared view cache (started afresh every 200 uses, to bound it).
-fn view_cache() -> Arc<ViewCache> {
+pub(crate) fn view_cache() -> Arc<ViewCache> {
     let mut v = VIEWS.lock();
     v.0 += 1;
     if v.0 > 200 {
@@ -186,7 +186,7 @@ fn view_cache() -> Arc<ViewCache> {
 
 /// [`views::regenerate_sources_with`], reusing the sources whose content
 /// hash is unchanged.
-fn cached_sources(doc: &Document, drawing: &Drawing, versions: &dyn Fn(&str) -> Option<Document>) -> Sources {
+pub(crate) fn cached_sources(doc: &Document, drawing: &Drawing, versions: &dyn Fn(&str) -> Option<Document>) -> Sources {
     let mut out = Sources::new();
     // Derived parts and custom features find their sources.
     let mut assemblies = crate::derived::assembly_evaluator(Default::default());

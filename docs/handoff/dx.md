@@ -33,6 +33,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
     9.9 s (live 11 s preview / 5 s commit, 13.9 s).
   - Found: our first inserted view keeps the template's 1:1 where live auto-scales it (1:8 here = Create Drawing's
     suggested scale); live asked for the rule (REQUESTS P2 "first view's auto scale").
+- Drawing export of the 2000-instance assembly drawing (views + 1000-row BOM): PDF 31.6 s -> 0.38 s, DWG / DXF
+  2.7 s -> 0.14 s. `export::prepare` made one colour / layer / pen / font span per element and every lookup scans
+  the spans (quadratic over the BOM's 250k exploded glyph triangles): now one span per run (T1
+  export::tests::prepare_keeps_spans_per_run); the API's export reuses the cached sources and views (it recomputed
+  all four exact views); PDF path points formatted by hand; large streams deflated pigz-style in parallel 1 MB
+  chunks (T1 large_streams_deflate_in_parallel_chunks). PNG still 2.2 s (resvg over the triangles). Live asked for
+  its export times (REQUESTS P2 follow-up to 1809).
 - Parasolid export writes a face going round a periodic B-surface (or one closed with a tangent seam) as one
   periodic face, as Onshape does: live imports our re-exported vase identical to its own (1808). Our loft sample
   was 1000x small (the test wrote metres as millimetres); rewritten, re-import asked (REQUESTS P3 follow-up).
