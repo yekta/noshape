@@ -878,7 +878,9 @@ fn zebra_stripes_replace_shading() {
 }
 
 /// Reflection analysis: a box mirrors a two-tone environment (white sky,
-/// black ground): its top face reflects the sky, its sides the ground.
+/// black ground), lit as Onshape lights it: its top face reflects the sky, its
+/// sides the ground. Locked by a camera below the box, the top reflects the
+/// ground too.
 #[test]
 fn reflection_mirrors_the_environment() {
     let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
@@ -896,25 +898,32 @@ fn reflection_mirrors_the_environment() {
     let (w, h) = (300u32, 300u32);
     let mut cam = Camera { rotation: Camera::look_rotation(glam::DVec3::new(-1.0, -1.0, -1.0).normalize(), glam::DVec3::Z), ..Default::default() };
     cam.fit_box(glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05), 1.0);
+    let below = Camera { rotation: Camera::look_rotation(glam::DVec3::new(-1.0, -1.0, 1.0).normalize(), glam::DVec3::Z), ..cam };
     let mut shot = |reflection: Option<Reflection>| {
         let mut scene = Scene::default();
         scene.instances.push(Instance::new(Drawable::Mesh(mesh.clone())).with_color([0.45, 0.6, 0.75, 1.0]).reflection(reflection));
         let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
         // The middle of the view, where the three visible faces meet.
-        let (mut white, mut black) = (0, 0);
+        let (mut white, mut black) = (0u32, 0u32);
         for (y, x) in (h / 2 - 50..h / 2 + 50).flat_map(|y| (w / 2 - 50..w / 2 + 50).map(move |x| (y, x))) {
             let p = &f.bgra[((y * w + x) * 4) as usize..][..3];
             match (p[2], p[1], p[0]) {
-                (250.., 250.., 250..) => white += 1,
+                (120.., 120.., 120..) => white += 1,
                 (0..=5, 0..=5, 0..=5) => black += 1,
                 _ => {}
             }
         }
-        (white, black)
+        // Above the middle: the top face.
+        let top = f.bgra[(((h / 2 - 40) * w + w / 2) * 4) as usize + 2];
+        (white, black, top)
     };
-    let (white, black) = shot(Some(Reflection { environment: env.clone(), rotation: 0.0, blur: false, lock: false }));
-    assert!(white > 1500 && black > 1500, "not mirrored: {white} white, {black} black pixels");
-    let (_, black) = shot(None);
+    let (white, black, top) = shot(Some(Reflection { environment: env.clone(), rotation: 0.0, blur: false, lock: None }));
+    assert!(white > 1500 && black > 1500 && top >= 120, "not mirrored: {white} white, {black} black pixels, the top {top}");
+    let (locked_white, _, _) = shot(Some(Reflection { environment: env.clone(), rotation: 0.0, blur: false, lock: Some(cam) }));
+    assert!(locked_white.abs_diff(white) < 50, "locked where the camera is: {locked_white} white pixels, {white} unlocked");
+    let (_, _, top) = shot(Some(Reflection { environment: env.clone(), rotation: 0.0, blur: false, lock: Some(below) }));
+    assert!(top <= 5, "locked below, the top still reflects the sky: red {top}");
+    let (_, black, _) = shot(None);
     assert!(black < 100, "shaded box has {black} black pixels");
 }
 

@@ -66,9 +66,15 @@ impl AssemblyView {
     }
 
     /// The renderer's reflection: the environment decoded and uploaded once
-    /// per image.
-    pub(super) fn scene_reflection(&self) -> Option<noshape_render::Reflection> {
-        let s = self.active_reflection()?;
+    /// per image; locked, the eye stays where it was when Lock environment
+    /// was ticked.
+    pub(super) fn scene_reflection(&self, cx: &App) -> Option<noshape_render::Reflection> {
+        let Some(s) = self.active_reflection() else {
+            self.ui.env_lock.set(None);
+            return None;
+        };
+        let lock = s.lock.then(|| self.ui.env_lock.get().unwrap_or_else(|| self.viewport.read(cx).camera));
+        self.ui.env_lock.set(lock);
         let image = s.image.as_ref()?;
         let key = image.key();
         let mut cache = self.ui.env_gpu.borrow_mut();
@@ -78,7 +84,7 @@ impl AssemblyView {
         }
         let environment = cache.as_ref()?.1.clone();
         let rotation = (s.rotation_deg.to_radians() * if s.opposite { -1.0 } else { 1.0 }) as f32;
-        Some(noshape_render::Reflection { environment, rotation, blur: s.blur, lock: s.lock })
+        Some(noshape_render::Reflection { environment, rotation, blur: s.blur, lock })
     }
 
     fn set_environment(&mut self, image: EnvImageRef, close_picker: bool, cx: &mut Context<Self>) {

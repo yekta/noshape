@@ -201,6 +201,24 @@ document's display mesh is under 0.5 s.
 
 ## In progress
 
+**11-02 23:30 (pinned account): viewport parity 3 landed** (the WIP of 23:00): the assembly instance list no longer
+observes the viewport (prepaint per orbit frame 230 -> 7.5 ms on pins-assembly-1000; `a.list_render` perf timer kept);
+pick bench timeouts (10 s per click, logged); Reflection analysis as Onshape's shader 4663 (audit-viewport V8): world
+reflection of Onshape's eye point (renderer `onshape_near_far`, also orthographic), lit as lightFragment(env, env)
+(`light_fragment` in shaders.wgsl, ambient 1 / diffuse 0.5; `shade` is the same with 0.5 / 0.5); Lock environment
+keeps the camera at the lock (`Reflection.lock: Option<Camera>`, ui `env_lock`, cleared when the analysis is off; the
+renderer puts its eye in the instance normal matrix's w column). Also the flaky UI test name clash p-planes
+(p_toggles_every_plane now "p-every-plane").
+Next in this line: the Part Studio's features / parts slices observe the viewport too (part_studio/mod.rs `slices()`),
+though neither list reads viewport state: drop it after an orbit bench on parts-1000 (`BENCH=orbit pickrun.sh`)
+before / after.
+
+Next after the WIP, in order: read the CI pick numbers and the GPU breakdown run; profile the NIST import's GPU time
+toward 120 fps (now 62-80 at 2x); first frame and orbit fps on the 2000-instance assembly (~/psui-bigasm.noshape on
+vibe5) and NIST (~/psui-nistxt.noshape); if selection is still slow on big assemblies once the list is fixed,
+virtualize the instance list (rows are ROW_H high, the mates block would need one item per row); the sheet metal flat
+and triad comparisons; then report before / after numbers.
+
 11-02 night (user: "the viewport against live, looks and speed"): docs/parity/audit-viewport.md. Method: the same
 B-rep both sides (our live-30 / knurl exported as x_t into live's "noshape mm test"; live's NIST x_t and 2000-instance
 STEP imported into ours, ~/psui-nistxt.noshape and ~/psui-bigasm.noshape on vibe5), live's `#canvas` at 1673 x 886

@@ -38,6 +38,7 @@ Other models at iso (ours after V1–V4):
 |---|---|---|---|---|
 | V6 | render_image of an assembly, render_named_view | P2 | framed with the old 10 % margin | ✅ one fit (render.rs `fit_camera`: Camera::fit_box, 1.05) for all three |
 | V7 | p (planes) | P2 | ours hid and showed the three default planes only; live (qa4 "Plane z10", 11-02) every plane, a Plane feature's with them | ✅ every plane of the studio (toggle_default_planes over display.planes). T1 UI p_toggles_every_plane |
+| V8 | Reflection analysis | P1 | ours turned the environment with the camera, lit it at half (a part's ambient) and reflected a parallel eye in orthographic views (flat faces one colour); Lock environment kept the model's frame | ✅ Onshape's shader 4663: the world reflection of Onshape's eye point (0.6 D before the bounds in orthographic), lit as lightFragment(env, env) (ambient 1, diffuse 0.5); locked, the eye of the camera at the lock. live-30 iso Blue sky: top (148,198,255) → (124,179,251) across the face, live (144,191,251) → (123,167,231); side (66,88,121), live (60,80,115) (our sky is our own drawing). T1 render reflection_mirrors_the_environment (locked from below, the top reflects the ground) |
 
 Section caps (live-30 cut through Boss 1–3's axes: live Shift+X on Boss 2's side, ours `section` plane:front −15 mm):
 the same cut, the cap after ✓ hatched in the part colour with a black outline; 3.0 % of pixels differ. Live's lines run
@@ -48,8 +49,13 @@ reference direction (−X in our x_t), ours had taken the reference direction as
 
 View cube (live-30 iso, the app at 1919 × 992 against live's page): 1.8 % of the cube's pixels differ (its labels'
 anti-aliasing). Hover on a face: no fill change on both (live keeps (142,187,214) under the pointer); a selected face's
-lit top (229,163,34) on live, ours the same formula (behaviours "ENTITY_HIGHLIGHT_COLOR1"), to compare again on the
-matched framing.
+lit top (229,163,34) on live, ours (230,164,35) wherever our idle top is live's (142,187,214): within a level.
+
+Selection's cost in the assembly UI (local, llvmpipe, load 40+, so only indicative): on pins-assembly-1000 a window
+frame's GPUI prepaint took 212 ms mean (p95 286): the instance list lays out every row (1000 instances and the mates)
+whenever a selection changes one; the rows are built eagerly, not virtualized. To weigh with the CI pick benchmark.
+The list also rebuilt on every orbit frame (it observed the viewport, which it doesn't read): fixed, prepaint per orbit
+frame 230 → 7.5 ms.
 
 Speed (live, this box: Chrome on software WebGL at load 25–56, so not a fair baseline, as behaviours "speed: psui
 open a document"): a click on an instance of the 2000-instance assembly took 0.7–6 s to show its selection. Ours is

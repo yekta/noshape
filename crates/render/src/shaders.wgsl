@@ -215,16 +215,22 @@ fn mesh_vertex(v: MeshIn, slot: u32) -> MeshOut {
 fn shade(world: vec3<f32>, normal_in: vec3<f32>, front: bool, base: vec3<f32>) -> vec3<f32> {
     var n = normalize(normal_in);
     if (!front) { n = -n; }
+    // params.x bit 1: extra.z is an ambient shift, more ambient and less
+    // light (Show dimensions; reflective meshes use extra.z otherwise).
+    let s = select(0.0, inst.extra.z, (inst.params.x & 2u) != 0u);
+    return light_fragment(world, n, base, 0.5 + s, 0.5 - s);
+}
+
+// Onshape's lightFragment: `ambient` and `diffuse` times `base`, one light
+// from the viewer's upper right (diffuse 0.5) and the material's highlight.
+fn light_fragment(world: vec3<f32>, n: vec3<f32>, base: vec3<f32>, ambient: f32, diffuse: f32) -> vec3<f32> {
     let right = normalize(cross(g.camera_fwd.xyz, g.camera_up.xyz));
     let light = normalize(right + g.camera_up.xyz - g.camera_fwd.xyz);
     let eye = normalize(g.camera_pos.xyz - world);
     let h = normalize(light + eye);
     let c = linear_to_srgb(base);
     let spec = pow(max(dot(n, h), 0.0), max(g.specular.w * 1000.0, 1.0)) * linear_to_srgb(g.specular.rgb);
-    // params.x bit 1: extra.z is an ambient shift, more ambient and less
-    // light (Show dimensions; reflective meshes use extra.z otherwise).
-    let s = select(0.0, inst.extra.z, (inst.params.x & 2u) != 0u);
-    let lit = c * (0.5 + s) + max(dot(n, light), 0.0) * (0.5 - s) * c + spec;
+    let lit = c * ambient + max(dot(n, light), 0.0) * diffuse * c + spec;
     return srgb_to_linear(clamp(lit, vec3(0.0), vec3(1.0)));
 }
 
@@ -1224,31 +1230,26 @@ fn fs_image_blend(i: ImageOut) -> @location(0) vec4<f32> {
     return c;
 }
 
-// Reflection analysis: a mirror of an equirectangular environment map
-// (bound like an image). inst.extra: y = rotation (rad) about the up axis,
-// z = blur (mip level), w = 1 when locked to the model (world, Z up; else
-// it follows the camera).
+// Reflection analysis as Onshape's (shader 4663): the world reflection of
+// Onshape's eye (a point, also in an orthographic view) in an
+// equirectangular environment map (bound like an image; Z up), lit with the
+// environment's color as ambient and diffuse. inst.extra: y = rotation (rad)
+// about Z, z = blur (mip level), w = 1 when locked: the eye of the camera at
+// the lock, in the normal matrix's unused w column.
 @fragment
 fn fs_mesh_reflect(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
     load_inst(i.slot);
     let base = mesh_color(i, front);
     var n = normalize(i.normal);
     if (!front) { n = -n; }
-    var v: vec3<f32>;
-    if (g.camera_pos.w > 0.5) { v = normalize(g.camera_pos.xyz - i.world); } else { v = -g.camera_fwd.xyz; }
-    var r = reflect(-v, n);
-    if (inst.extra.w < 0.5) {
-        // Not locked: the environment turns with the camera (Onshape).
-        // Camera frame: x right, y toward the viewer, z up.
-        let right = normalize(cross(g.camera_fwd.xyz, g.camera_up.xyz));
-        r = vec3(dot(r, right), -dot(r, g.camera_fwd.xyz), dot(r, g.camera_up.xyz));
-    }
+    let eye = select(g.camera_pos.xyz, inst.normal_m[3].xyz, inst.extra.w > 0.5);
+    let r = reflect(-normalize(eye - i.world), n);
     let u = fract(atan2(r.y, r.x) / 6.2831853 + 0.5 + inst.extra.y / 6.2831853);
     let w = acos(clamp(r.z, -1.0, 1.0)) / 3.14159265;
     let env = textureSampleLevel(image_tex, image_sampler, vec2(u, w), inst.extra.z).rgb;
     // Selection and hover still tint the mirror.
     let st = state_of(i.pick);
-    var c = env;
+    var c = light_fragment(i.world, n, env, 1.0, 0.5);
     if ((st & SELECTED) != 0u) { c = mix(c, FACE_SELECTED, 0.5); }
     return enc(vec4(c, base.a));
 }

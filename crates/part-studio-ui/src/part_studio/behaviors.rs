@@ -547,6 +547,8 @@ pub struct UiState {
     /// uploaded environment and the open "Select image" dialog.
     pub reflection: Option<super::reflection::ReflectionSettings>,
     pub env_gpu: Option<(String, noshape_render::ImageHandle)>,
+    /// Lock environment: the camera when it was ticked.
+    pub env_lock: Option<noshape_render::Camera>,
     pub env_picker: Option<super::reflection::EnvPicker>,
     /// Thickness analysis (stays on after its dialog is accepted).
     pub thickness: Option<super::thickness::ThicknessState>,
@@ -752,6 +754,7 @@ impl UiState {
             zebra: None,
             reflection: None,
             env_gpu: None,
+            env_lock: None,
             env_picker: None,
             thickness: None,
             pick_filter: None,

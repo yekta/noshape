@@ -1218,8 +1218,11 @@ impl Viewport {
             && let Some((t, Some(need))) = b.click
             && seq >= need
         {
-            b.click_ms.push(t.elapsed().as_secs_f32() * 1000.0);
+            let ms = t.elapsed().as_secs_f32() * 1000.0;
+            log::info!(target: "perf", "pick bench: click {} shown after {ms:.1} ms", b.click_ms.len() + 1);
+            b.click_ms.push(ms);
             b.click = None;
+            b.last_tick = Some(Instant::now());
         }
         match result {
             Ok((frame, image)) => {
@@ -1595,8 +1598,8 @@ impl Viewport {
         true
     }
 
-    /// The pick benchmark: a click at the next of eight points around the view centre once the last one shows (or
-    /// changed nothing within 2 s), as a mouse click is handled (the pick, the studio's selection, its frame).
+    /// The pick benchmark: a click at the next of eight points around the view centre 300 ms after the last one showed
+    /// (or changed nothing within 10 s), as a mouse click is handled (the pick, the studio's selection, its frame).
     fn pick_bench_tick(&mut self, cx: &mut Context<Self>) -> bool {
         let (size, instances) = (self.size(), self.scene.instances.len());
         let Some(b) = &mut self.bench else { return false };
@@ -1609,20 +1612,21 @@ impl Viewport {
             self.bench = None;
             return false;
         }
-        if let Some((t, _)) = b.click {
-            if t.elapsed() < Duration::from_secs(2) {
+        if let Some((t, need)) = b.click {
+            if t.elapsed() < Duration::from_secs(10) {
                 return true;
             }
-            // Nothing changed (the same selection): the next point.
+            log::info!(target: "perf", "pick bench: no frame with a new selection within 10 s ({})", if need.is_some() { "the scene changed" } else { "the scene stayed" });
             b.click = None;
         }
-        // Wait between clicks, so each starts from a settled view.
-        b.ticks += 1;
-        if b.ticks % 25 != 0 {
+        // 300 ms between clicks, so each starts from a settled view.
+        if b.last_tick.is_some_and(|t| t.elapsed() < Duration::from_millis(300)) {
             return true;
         }
+        b.last_tick = Some(Instant::now());
+        b.ticks += 1;
         const AT: [(f64, f64); 8] = [(0.5, 0.5), (0.35, 0.4), (0.65, 0.6), (0.4, 0.65), (0.6, 0.35), (0.45, 0.55), (0.55, 0.45), (0.5, 0.3)];
-        let k = (b.ticks / 25) as usize % AT.len();
+        let k = b.ticks as usize % AT.len();
         let p = DVec2::new(size.x * AT[k].0, size.y * AT[k].1);
         b.click = Some((Instant::now(), None));
         self.click_at(p, Modifiers::default(), cx);

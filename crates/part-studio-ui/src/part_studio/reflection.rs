@@ -37,9 +37,14 @@ impl PartStudioView {
     }
 
     /// The renderer's reflection for the active settings (the environment
-    /// is decoded and uploaded once per image).
-    pub(super) fn scene_reflection(&mut self) -> Option<noshape_render::Reflection> {
-        let s = self.active_reflection()?;
+    /// is decoded and uploaded once per image; locked, the eye stays where
+    /// it was when Lock environment was ticked).
+    pub(super) fn scene_reflection(&mut self, cx: &App) -> Option<noshape_render::Reflection> {
+        let Some(s) = self.active_reflection() else {
+            self.ui.env_lock = None;
+            return None;
+        };
+        self.ui.env_lock = s.lock.then(|| self.ui.env_lock.unwrap_or_else(|| self.viewport.read(cx).camera));
         let image = s.image.as_ref()?;
         let key = image.key();
         if self.ui.env_gpu.as_ref().is_none_or(|(k, _)| *k != key) {
@@ -49,7 +54,7 @@ impl PartStudioView {
         }
         let environment = self.ui.env_gpu.as_ref()?.1.clone();
         let rotation = (s.rotation_deg.to_radians() * if s.opposite { -1.0 } else { 1.0 }) as f32;
-        Some(noshape_render::Reflection { environment, rotation, blur: s.blur, lock: s.lock })
+        Some(noshape_render::Reflection { environment, rotation, blur: s.blur, lock: self.ui.env_lock })
     }
 
     /// Images of this document: those inserted in sketches.

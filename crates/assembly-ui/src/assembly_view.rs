@@ -835,7 +835,7 @@ impl AssemblyView {
         cx.notify();
     }
 
-    fn scene_options(&self) -> AsmSceneOptions {
+    fn scene_options(&self, cx: &App) -> AsmSceneOptions {
         let mut o = AsmSceneOptions { isolate: self.isolate.clone(), ..Default::default() };
         if let Some(z) = self.active_zebra() {
             o.zebra = Some(noshape_render::Zebra { stripes: z.stripes, flip: z.flip });
@@ -845,8 +845,8 @@ impl AssemblyView {
         // dialog opens (live analysis/10), the environment once chosen.
         if let Some(s) = self.active_reflection() {
             o.hide_edges = !s.show_edges;
-            o.reflection = self.scene_reflection();
         }
+        o.reflection = self.scene_reflection(cx);
         if let Some(t) = &self.ui.transparent {
             o.ghost_paths = t.clone();
         }
@@ -880,7 +880,7 @@ impl AssemblyView {
     }
 
     fn rebuild_scene(&mut self, geometry_changed: bool, cx: &mut Context<Self>) {
-        let built = assembly_scene::build(&self.result, &self.scene_options(), &mut self.cache, self.gpu.uploader());
+        let built = assembly_scene::build(&self.result, &self.scene_options(cx), &mut self.cache, self.gpu.uploader());
         let prio = built.picks.priority_fn();
         self.built = Some(built);
         self.viewport.update(cx, |vp, _| vp.pick_priority = prio);
@@ -5906,7 +5906,16 @@ impl AssemblyView {
         use crate::cached_slice::Slice;
         let me = cx.entity();
         let toolbar = Slice::new(&me, |this, window, cx| this.render_toolbar(f32::from(window.viewport_size().width), cx), cx);
-        let rows = Slice::new(&me, |this, _, cx| this.render_list(cx), cx);
+        let rows = Slice::new(
+            &me,
+            |this, _, cx| {
+                let t = std::time::Instant::now();
+                let list = this.render_list(cx);
+                noshape_render::perf::record("a.list_render", t.elapsed());
+                list
+            },
+            cx,
+        );
         let overlay = Slice::new(&me, |this, _, cx| this.render_overlay_slice(cx), cx);
         let under = Slice::new(&me, |this, _, cx| this.render_under_slice(cx), cx);
         let insert_body = Slice::new(&me, |this, _, cx| this.render_insert_body(cx), cx);
@@ -5914,9 +5923,9 @@ impl AssemblyView {
         let insert_filters = Slice::new(&me, |this, _, cx| this.render_insert_part(InsertPart::Filters, cx), cx);
         let insert_footer = Slice::new(&me, |this, _, cx| this.render_insert_part(InsertPart::Footer, cx), cx);
         let front = Slice::new(&me, |this, window, cx| this.render_front_host(window, cx), cx);
-        // The view cube and labels follow the camera, the list the
-        // highlights; all read the document.
-        for s in [&rows, &overlay, &under] {
+        // The view cube and labels follow the camera (the list doesn't:
+        // orbiting rebuilt every row each frame); all read the document.
+        for s in [&overlay, &under] {
             Slice::observing(s, &self.viewport, cx);
         }
         for s in [&toolbar, &rows, &overlay, &under, &insert_body, &insert_top, &insert_filters, &insert_footer] {

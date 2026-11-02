@@ -368,14 +368,14 @@ pub struct Compare {
 
 /// Reflection analysis: an equirectangular environment image (uploaded
 /// with [`crate::Uploader::upload_image`]; its corners don't matter) turned
-/// by `rotation` radians about the up axis, optionally blurred, and either
-/// following the camera or, `lock`ed, fixed to the model (Z up).
+/// by `rotation` radians about Z, optionally blurred: the world reflection
+/// of Onshape's eye, or with `lock` of the eye of the camera at the lock.
 #[derive(Clone)]
 pub struct Reflection {
     pub environment: ImageHandle,
     pub rotation: f32,
     pub blur: bool,
-    pub lock: bool,
+    pub lock: Option<crate::Camera>,
 }
 
 /// Zebra stripes: the reflection of a striped room, `stripes` stripes

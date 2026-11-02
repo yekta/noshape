@@ -486,7 +486,7 @@ impl ViewOptions {
     fn upload_reflection(&self, up: &noshape_render::renderer::Uploader) -> Option<noshape_render::Reflection> {
         let (img, rotation, blur) = self.reflection.as_ref()?;
         let environment = up.upload_image(&noshape_render::ImageData { corners: [[0.0; 3]; 4], width: img.width, height: img.height, rgba: img.rgba.clone() });
-        Some(noshape_render::Reflection { environment, rotation: *rotation, blur: *blur, lock: false })
+        Some(noshape_render::Reflection { environment, rotation: *rotation, blur: *blur, lock: None })
     }
 
     /// Perspective view: the same direction, framed again for perspective.

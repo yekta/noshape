@@ -988,7 +988,7 @@ impl PartStudioView {
         }
         let zebra = self.active_zebra();
         o.zebra = zebra.map(|z| noshape_render::Zebra { stripes: z.stripes, flip: z.flip });
-        o.reflection = self.scene_reflection();
+        o.reflection = self.scene_reflection(cx);
         let hide_edges = zebra.is_some_and(|z| !z.show_edges) || self.active_reflection().is_some_and(|r| !r.show_edges);
         if hide_edges && o.display_mode == scene_builder::DisplayMode::ShadedWithEdges {
             o.display_mode = scene_builder::DisplayMode::Shaded;

@@ -478,6 +478,8 @@ pub struct AsmUi {
     pub reflection: Option<crate::reflection::ReflectionSettings>,
     pub reflection_last: Option<crate::reflection::ReflectionSettings>,
     pub env_gpu: std::cell::RefCell<Option<(String, noshape_render::ImageHandle)>>,
+    /// Lock environment: the camera when it was ticked.
+    pub env_lock: std::cell::Cell<Option<noshape_render::Camera>>,
     pub env_preview: Option<(&'static str, Arc<RenderImage>)>,
     /// The angular value's radius, fixed when first shown for a mate.
     pub value_radius: std::cell::Cell<Option<(MateId, f64)>>,

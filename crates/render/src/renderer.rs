@@ -2724,8 +2724,14 @@ impl Renderer {
         let bytes = &mut self.inst_scratch;
         bytes.clear();
         bytes.resize((scene.instances.len() as u64 * INST_STRIDE) as usize, 0);
+        // Lock environment: Onshape's eye of the camera at the lock.
+        let lock_eye = scene.instances.iter().find_map(|i| i.reflection.as_ref()?.lock).and_then(|c| onshape_near_far(&c, scene.bounds())).map(|(e, _, _)| e.as_vec3());
         for (i, inst) in scene.instances.iter().enumerate() {
-            let normal_m = inst.transform.inverse().transpose();
+            let mut normal_m = inst.transform.inverse().transpose();
+            // Normals use w = 0: the locked eye rides in the unused w column.
+            if let Some(eye) = lock_eye.filter(|_| inst.reflection.as_ref().is_some_and(|r| r.lock.is_some())) {
+                normal_m.w_axis = eye.extend(0.0);
+            }
             let model = match &inst.drawable {
                 Drawable::Mesh(m) => inst.transform * m.0.dequant,
                 _ => inst.transform,
@@ -2736,7 +2742,7 @@ impl Renderer {
                 color: inst.color,
                 params: [(inst.color_mode == ColorMode::PerPrimitive) as u32 | (((inst.reflection.is_none() && inst.ambient != 0.0) as u32) << 1) | ((inst.selected_only as u32) << 2) | ((inst.decal_selected as u32) << 3) | (inst.hatch_id << 8), inst.ignore_clip as u32 | ((inst.unlit as u32) << 1) | ((inst.preview as u32) << 4) | zebra_bits(inst.zebra) | ((inst.compare as u32 & 3) << 5) | (((inst.ghost > 0.0) as u32) << 7), inst.pickable as u32, inst.pick_base],
                 extra: match &inst.reflection {
-                    Some(r) => [inst.line_scale, r.rotation, if r.blur { 3.0 } else { 0.0 }, r.lock as u32 as f32],
+                    Some(r) => [inst.line_scale, r.rotation, if r.blur { 3.0 } else { 0.0 }, lock_eye.is_some_and(|_| r.lock.is_some()) as u32 as f32],
                     None => [inst.line_scale, inst.ghost, inst.ambient, 0.0],
                 },
             };
