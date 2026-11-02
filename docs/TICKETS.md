@@ -15,6 +15,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   then: a fatal guard exit now always prints its backtrace (Linux and macOS; the unwinder loaded at install, so it
   doesn't allocate under malloc's lock). Linux: 60 runs of custom_features at 8 threads clean; 200 of the in-flight
   set with NOSHAPE_TEST_THREADS=12 running (vibe4 ~/agents/logs/racestress2.log). Next: the stack, when it recurs.
+  core 11-02 16:10: a likely cause, fixed in 4099de0f (CRASH-1388): a fault the guard recovered past run_budgeted left
+  its Deadline (on the dead frame) as the thread's t_deadline on every platform (macOS's budget is the deadline alone),
+  and the next deadline check wrote into whatever the stack held there: a lock's state among them. Open until CI
+  shows the custom-feature tests clean on macOS for a few runs.
 - [x] P0 SHELL-VOIDS-WINDOWS (core, CI a8c535aa / 67e44bb7): `shell::a_void_waits_for_live` failed on Windows only.
   Cause: the test switched the void gate on with `std::env::set_var`, which on Windows changes the process
   environment but not the MSVC CRT's copy that the kernel's C++ `getenv` reads (taken at start-up); Linux / macOS
