@@ -263,3 +263,48 @@ fn timed_big_assembly_round_trip() {
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Many copies of a heavy part in a flat file (user 11-02, mesh reuse): the
+/// NIST assembly's bigger cap screw (threads) as a part pattern
+/// (`NOSHAPE_HEAVY_ROWS` rows of 5, default 5), exported as STEP and
+/// imported back; times each step (NOSHAPE_IMPORT_TIMING=1 for the
+/// import's stages).
+#[test]
+#[ignore]
+fn timed_many_heavy_parts() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf");
+    let dir = std::env::temp_dir().join(format!("noshape-dx-heavy-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": dir.join("src.noshape").to_str().unwrap() }));
+    let r = call(&mut ctx, "import_files", json!({ "files": [root.join("nist-mtc-crada-assembly.step").to_str().unwrap()] }));
+    let studio = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap()["name"].as_str().unwrap().to_string();
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": studio }))["parts"].as_array().unwrap().clone();
+    let screw = parts.iter().find(|p| p["name"].as_str().unwrap().starts_with("91274A141")).expect("the screw").clone();
+    let rows: usize = std::env::var("NOSHAPE_HEAVY_ROWS").ok().and_then(|v| v.parse().ok()).unwrap_or(5);
+    let n = 5 * rows;
+    let t = Instant::now();
+    let p = call(&mut ctx, "feature_add", json!({ "tab": studio, "type": "linearPattern", "params": {
+        "patternType": "PART", "entities": [screw["id"]],
+        "directionOne": ["plane:right"], "distance": "30 mm", "instanceCount": "5",
+        "directionTwo": ["plane:front"], "distanceTwo": "30 mm", "instanceCountTwo": rows.to_string(), "hasSecondDir": true,
+        "operationType": "NEW" } }));
+    assert_eq!(p["feature_status"]["status"], "Ok", "{p}");
+    report(&format!("heavy: pattern of {n} screws"), vec![t.elapsed().as_secs_f64() * 1000.0]);
+    let file = dir.join("screws.step");
+    // The screw and the copies the pattern added.
+    let before: Vec<&Value> = parts.iter().map(|p| &p["id"]).collect();
+    let copies: Vec<String> = call(&mut ctx, "query_parts", json!({ "tab": studio }))["parts"].as_array().unwrap().iter().filter(|p| p["id"] == screw["id"] || !before.contains(&&p["id"])).map(|p| p["id"].as_str().unwrap().to_string()).collect();
+    assert_eq!(copies.len(), n);
+    let t = Instant::now();
+    call(&mut ctx, "export_parts", json!({ "tab": studio, "format": "STEP", "parts": copies, "file": file.to_str().unwrap() }));
+    report(&format!("heavy: export {n} screws step"), vec![t.elapsed().as_secs_f64() * 1000.0]);
+    let mut ictx = Ctx::new();
+    call(&mut ictx, "document_create", json!({ "path": dir.join("in.noshape").to_str().unwrap() }));
+    let t = Instant::now();
+    let r = call(&mut ictx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
+    let got = r["parts"].as_array().map_or(0, |p| p.len());
+    report(&format!("heavy: import {n} screws step ({} MB) -> {got} parts", std::fs::metadata(&file).map(|m| m.len() / 1_000_000).unwrap_or(0)), vec![t.elapsed().as_secs_f64() * 1000.0]);
+    assert_eq!(got, n);
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -41,6 +41,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   - .md has the text icon.
 - `import_files` stores non-CAD files as file tabs (e2e `import_files_stores_other_files_as_file_tabs`). Before,
   the op refused what the app's + › Import… accepts.
+- STEP re-export of imported parts: 25 NIST cap screws took 433 s to read back, now 18.8 s (99 → 16 MB). Each edge
+  writes only the part of its B-spline it uses, and a part declares its own tolerance when that is over 1 µm
+  (formats.md). The old export's slowness only showed with heavy healed parts (dx_perf `timed_many_heavy_parts`).
 - To psui: NIST's regeneration after import is 1.7 s, of which the features are 0.12 s and the rest is display
   meshing, mostly the two cap screws' thread faces (B-spline surfaces with dense pcurves).
 

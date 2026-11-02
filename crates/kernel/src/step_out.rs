@@ -548,6 +548,36 @@ const PMI_TYPES: &[&str] = &[
     "GEOMETRIC_TOLERANCE",
 ];
 
+/// The uncertainty OCCT wrote in a representation context: its shape's
+/// greatest tolerance (the writer's Greatest precision mode), in the file's
+/// unit.
+fn occt_uncertainty(src: &HashMap<u32, Ent>, ctx: u32) -> Option<f64> {
+    let Some(V::List(l)) = src.get(&ctx)?.rec("GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT")?.first() else { return None };
+    let value = |e: &Ent| match e.args().first() {
+        Some(V::Typed(_, a)) => match a.first() {
+            Some(V::Real(x)) => Some(*x),
+            _ => None,
+        },
+        Some(V::Real(x)) => Some(*x),
+        _ => None,
+    };
+    l.iter().filter_map(|v| if let V::Ref(r) = v { src.get(r) } else { None }).filter_map(value).reduce(f64::max)
+}
+
+/// A part's uncertainty: Onshape's 1e-8 m, or the part's greatest tolerance
+/// when it is over 1 µm ("Maximum Tolerance applied to model"; modelled
+/// parts stay at OCCT's 1e-7 m, imported healed ones go higher). A healed
+/// imported part (NIST's cap screw) declared at 1e-8 m made readers heal it
+/// again at that precision: 20 s to read one screw, 0.5 s at its own
+/// tolerance.
+fn uncertainty(src: &HashMap<u32, Ent>, ctx: u32, metres: f64) -> f64 {
+    let onshape = 1e-8 / metres;
+    match occt_uncertainty(src, ctx) {
+        Some(u) if u * metres > 1e-6 => u,
+        _ => onshape,
+    }
+}
+
 /// The whole file in Onshape's layout.
 pub(crate) fn write(parts: &[Part], file_name: &str, timestamp: &str, schema: Schema) -> Result<String> {
     let mut b = Builder::default();
@@ -603,7 +633,7 @@ pub(crate) fn write(parts: &[Part], file_name: &str, timestamp: &str, schema: Sc
                 _ => 1.0,
             }
         };
-        let unc = b.add(Ent::simple("UNCERTAINTY_MEASURE_WITH_UNIT", vec![V::Typed("LENGTH_MEASURE".into(), vec![V::Real(1e-8 / metres)]), V::Ref(len_unit), s("DISTANCE_ACCURACY_VALUE"), s("Maximum Tolerance applied to model")]));
+        let unc = b.add(Ent::simple("UNCERTAINTY_MEASURE_WITH_UNIT", vec![V::Typed("LENGTH_MEASURE".into(), vec![V::Real(uncertainty(src, *ctx_id, metres))]), V::Ref(len_unit), s("DISTANCE_ACCURACY_VALUE"), s("Maximum Tolerance applied to model")]));
         let ctx = b.add(Ent {
             recs: vec![
                 ("GEOMETRIC_REPRESENTATION_CONTEXT".into(), vec![V::Int("3".into())]),
@@ -777,8 +807,25 @@ pub(crate) fn write_assembly(root: &str, parts: &[Part], instances: &[AsmInstanc
             _ => 1.0,
         }
     };
-    let context = |b: &mut Builder, name: &str, kind: &str| -> u32 {
-        let unc = b.add(Ent::simple("UNCERTAINTY_MEASURE_WITH_UNIT", vec![V::Typed("LENGTH_MEASURE".into(), vec![V::Real(1e-8 / metres)]), V::Ref(len_unit), s("DISTANCE_ACCURACY_VALUE"), s("Maximum Tolerance applied to model")]));
+    // Each part's uncertainty (its own representation context's); the root's, the greatest.
+    let part_unc: HashMap<usize, f64> = order
+        .iter()
+        .map(|&p| {
+            let src = &parts[p].occt.0;
+            let ctx = src.get(&parts[p].sdr).and_then(|sdr| match sdr.args().get(1) {
+                Some(V::Ref(rep)) => src.get(rep),
+                _ => None,
+            });
+            let ctx = ctx.and_then(|r| match r.args().get(2) {
+                Some(V::Ref(c)) => Some(*c),
+                _ => None,
+            });
+            (p, ctx.map_or(1e-8 / metres, |c| uncertainty(src, c, metres)))
+        })
+        .collect();
+    let root_unc = part_unc.values().copied().fold(1e-8 / metres, f64::max);
+    let context = |b: &mut Builder, name: &str, kind: &str, unc: f64| -> u32 {
+        let unc = b.add(Ent::simple("UNCERTAINTY_MEASURE_WITH_UNIT", vec![V::Typed("LENGTH_MEASURE".into(), vec![V::Real(unc)]), V::Ref(len_unit), s("DISTANCE_ACCURACY_VALUE"), s("Maximum Tolerance applied to model")]));
         b.add(Ent {
             recs: vec![
                 ("GEOMETRIC_REPRESENTATION_CONTEXT".into(), vec![V::Int("3".into())]),
@@ -789,8 +836,8 @@ pub(crate) fn write_assembly(root: &str, parts: &[Part], instances: &[AsmInstanc
             complex: true,
         })
     };
-    let root_ctx = context(&mut b, root, "TOP_LEVEL_ASSEMBLY_PART");
-    let part_ctx: HashMap<usize, u32> = order.iter().map(|&p| (p, context(&mut b, &parts[p].name, "COMPONENT_PART"))).collect();
+    let root_ctx = context(&mut b, root, "TOP_LEVEL_ASSEMBLY_PART", root_unc);
+    let part_ctx: HashMap<usize, u32> = order.iter().map(|&p| (p, context(&mut b, &parts[p].name, "COMPONENT_PART", part_unc[&p]))).collect();
     let mdgpr = b.reserve();
 
     // The identity placement every representation shares, the root's

@@ -1107,6 +1107,37 @@ fn dump_step_colours() {
     }
 }
 
+/// NIST's cap screw, healed on import, written to STEP and read back: each
+/// edge writes only the part of its B-spline it uses (the helix was split
+/// into 20 edges of one 848-pole curve: 4 MB, now 0.66 MB), and the file
+/// declares the part's own tolerance (at Onshape's 1e-8 m readers healed it
+/// again at that precision: 20 s, now 0.5 s).
+#[test]
+fn step_writes_the_used_part_of_long_splines() {
+    let nist = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf/nist-mtc-crada-assembly.step");
+    let ((_, parts, _), _) = read_step_assembly_nested(&nist, LengthUnit::Millimeter).unwrap().unwrap();
+    let screw = parts.into_iter().find(|p| p.name.as_deref().is_some_and(|n| n.starts_with("91274A141"))).expect("the cap screw").shape;
+    let want = volume_properties(&screw).unwrap().mass;
+    let dir = std::env::temp_dir().join(format!("noshape-compact-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("screw.step");
+    write_step(&path, &[ExportShape { shape: screw.clone(), name: Some("Screw".into()), color: None }], LengthUnit::Millimeter).unwrap();
+    let size = std::fs::metadata(&path).unwrap().len();
+    assert!(size < 1_000_000, "{size} bytes");
+    let t = std::time::Instant::now();
+    let back = read_step(&path, LengthUnit::Millimeter).unwrap();
+    let read = t.elapsed();
+    // Healed again on reading (as reading Onshape's file did): within 0.03 %.
+    let got = volume_properties(&back[0].shape).unwrap().mass;
+    assert!((got - want).abs() < want * 3e-4, "volume {got} vs {want}");
+    assert_eq!(back[0].shape.count(ShapeType::Face), screw.count(ShapeType::Face));
+    assert!(back[0].shape.is_valid());
+    assert!(read.as_secs_f64() < 5.0, "read back in {read:?}");
+    // The document's shape keeps its own curves (the export works on a copy).
+    assert!((volume_properties(&screw).unwrap().mass - want).abs() < 1e-9);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// `NOSHAPE_STEP_READ=<assembly.step> cargo test … export::dump_step_assembly_parts -- --ignored --nocapture`:
 /// each part's volume, face / edge counts, validity and BREP size (comparing
 /// readers' settings).

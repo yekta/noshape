@@ -88,6 +88,18 @@ What changed (dev build timings on vibe5, 2000 parts):
   - Writing the Import feature's BREP text: 0.41 s for 26 MB.
 
   Most of the healing time, and 17 of the 26 MB, are the two cap screws' thread pcurves. Onshape writes no pcurves, so OCCT projects each thread edge onto its B-spline surface, which gives 2D B-splines with thousands of poles. A user precision makes it slower: 1e-4 mm takes 28 s, with the same sizes.
+- Exporting imported parts (`dx_perf::timed_many_heavy_parts`: NIST's cap screw as a part pattern of 25, STEP export, then import):
+
+  | | export | file | re-import (Transfer) |
+  |---|---|---|---|
+  | before | 7.8 s | 99 MB | 433 s (419 s) |
+  | now | 2.0 s | 16 MB | 18.8 s (11.2 s) |
+
+  Two fixes in our STEP writer (IGES gets the first):
+  - Healing split the screw's helix into 20 edges, each keeping the whole 848-pole curve. Each edge now writes only the segment it uses (`compact_bspline_edges`, on a copy).
+  - Every part declared Onshape's 1e-8 m uncertainty, so readers healed the screw again at that precision (20 s per screw; 0.5 s at its own tolerance). A part now declares its greatest tolerance when that is over 1 µm. Modelled parts keep 1e-8 m.
+
+  Kernel test: `step_writes_the_used_part_of_long_splines`.
 - After reading, regeneration takes about 1.7 s, of which the features are 0.12 s and the display meshing the rest (the Part Studio display, psui's area).
 - Not done: healing parts in parallel, which would cut the 0.84 s Transfer of the 2000-part import. Parked until live's numbers show we're behind.
   - OCCT heals inside its STEP actor (`STEPControl_ActorRead::TransferEntity`), per shape representation and with that representation's own uncertainty as the tolerance (NIST mixes 1e-8 and 2e-5 m).

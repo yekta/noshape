@@ -3,7 +3,9 @@
 // All STEP/IGES exchange happens in OCCT's default session unit (millimeter);
 // unit conversion is done by the Rust layer.
 #include "internal.hpp"
+#include <BRepBuilderAPI_Copy.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
+#include <Geom_BSplineCurve.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <Geom2d_BSplineCurve.hxx>
@@ -919,6 +921,56 @@ rust::Vec<rust::String> read_step_pmi(rust::Str path)
 
 namespace
 {
+// An edge using a small part of a long B-spline writes only that part. Healing an
+// imported thread splits its helix edges, and each piece keeps the whole
+// 848-pole curve: NIST's cap screw wrote 4 MB of STEP (40 such curves), and
+// reading it back took 17 s, OCCT re-projecting every copy. The shape is
+// copied first when an edge qualifies (exported shapes may share the
+// document's geometry).
+TopoDS_Shape compact_bspline_edges(const TopoDS_Shape& in)
+{
+  auto long_spline = [](const TopoDS_Edge& e, double& f, double& l) -> occ::handle<Geom_BSplineCurve> {
+    TopLoc_Location loc;
+    occ::handle<Geom_BSplineCurve> bs = occ::down_cast<Geom_BSplineCurve>(BRep_Tool::Curve(e, loc, f, l));
+    if (bs.IsNull() || bs->NbPoles() < 64 || l - f > 0.75 * (bs->LastParameter() - bs->FirstParameter()))
+      return {};
+    return bs;
+  };
+  bool any = false;
+  for (TopExp_Explorer ex(in, TopAbs_EDGE); ex.More() && !any; ex.Next())
+  {
+    double f, l;
+    any = !long_spline(TopoDS::Edge(ex.Current()), f, l).IsNull();
+  }
+  if (!any)
+    return in;
+  TopoDS_Shape s = BRepBuilderAPI_Copy(in, true, false).Shape();
+  BRep_Builder b;
+  for (TopExp_Explorer ex(s, TopAbs_EDGE); ex.More(); ex.Next())
+  {
+    const TopoDS_Edge e = TopoDS::Edge(ex.Current());
+    double            f, l;
+    occ::handle<Geom_BSplineCurve> bs = long_spline(e, f, l);
+    if (bs.IsNull())
+      continue;
+    occ::handle<Geom_BSplineCurve> seg = occ::down_cast<Geom_BSplineCurve>(bs->Copy());
+    try
+    {
+      // Same parameterization: the edge's range and p-curves stay valid.
+      seg->Segment(f, l);
+    }
+    catch (const Standard_Failure&)
+    {
+      continue;
+    }
+    TopLoc_Location loc;
+    BRep_Tool::Curve(e, loc, f, l);
+    b.UpdateEdge(e, seg, loc, BRep_Tool::Tolerance(e));
+    b.Range(e, f, l, true);
+  }
+  return s;
+}
+
 void write_step_impl(const OcShapeList& shapes, rust::Slice<const rust::String> names,
                      rust::Slice<const float> colors, rust::Slice<const bool> has_color,
                      rust::Str path, uint8_t schema, uint8_t file_unit, const StepPmi* pmi)
@@ -951,6 +1003,7 @@ void write_step_impl(const OcShapeList& shapes, rust::Slice<const rust::String> 
       s = BRepBuilderAPI_Transform(s.Located(TopLoc_Location()), s.Location().Transformation(), true).Shape();
     if (yard)
       s = BRepBuilderAPI_Transform(s, third, true).Shape();
+    s = compact_bspline_edges(s);
     TDF_Label l = st->AddShape(s, false);
     if (pmi && i == 0)
       add_pmi(doc, st, l, s, *pmi);
@@ -975,6 +1028,9 @@ void write_step_impl(const OcShapeList& shapes, rust::Slice<const rust::String> 
   // One product per part (Onshape writes no assembly) and no p-curves.
   params.WriteAssembly       = DESTEP_Parameters::WriteMode_Assembly_Off;
   params.WriteSurfaceCurMode = false;
+  // The shapes' greatest tolerance as the uncertainty (step_out.rs keeps
+  // Onshape's 1e-8 m unless a part's is larger).
+  params.WritePrecisionMode = DESTEP_Parameters::WriteMode_PrecisionMode_Greatest;
   switch (schema)
   {
     case 1:
@@ -1053,7 +1109,7 @@ void write_iges(const OcShapeList& shapes, rust::Str path, rust::Str system, rus
   for (const auto& s : shapes.items)
   {
     require_non_null(s, "exported shape");
-    w.AddShape(s);
+    w.AddShape(compact_bspline_edges(s));
   }
   w.ComputeModel();
   const std::string sys(system.data(), system.size()), ver(version.data(), version.size());
