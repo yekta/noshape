@@ -13,6 +13,10 @@ NOSHAPE_SAMPLE_OUT; tests/sampler.rs samples every running thread):
 - brep boolean.rs `par_map` (line ~2848) calls `std::thread::available_parallelism()` on every call; on Linux that
   reads the cgroup files (open / statx / close each time): 3 % of std sheet metal's warm regeneration
   (qa4 S1 enclosure). A `OnceLock` for it gives the same thread count.
+- Done (bool, 11-02 08:30): group_disjoint takes the tools' boxes first (BRepBndLib without triangulation, widened
+  by 3 × the deflection); only tools whose box meets another's are meshed, the conflicts the same as before (none
+  meshed: one group). Y Ribs: fs_warm_profile 1.27 s -> 0.40 s, the test 1.02 -> 0.17 s (vibe4). par_map counts
+  the machine's threads once (OnceLock). Corpora unchanged, 0 differ.
 
 ## From core (11-01 18:00): Shell's slab fuses, why yours declines them, ranked by OCCT's time
 30 CLI fuzz seeds (3000-3029 × 60 steps, vibe4, NOSHAPE_SHELL_DEBUG: quick_boolean now prints noshape's decline;

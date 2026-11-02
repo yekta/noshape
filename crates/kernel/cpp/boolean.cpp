@@ -4193,12 +4193,28 @@ static std::vector<TopoDS_Shape> group_disjoint(const std::vector<TopoDS_Shape>&
   if (all.IsVoid())
     return t;
   const double defl = 1e-4 * std::sqrt(all.SquareExtent());
+  // Boxes first: two tools whose boxes, widened by what the mesh and the check reach, don't meet can't overlap there,
+  // so only tools with such a neighbour are meshed (the meshing was most of the time: 48 % of the Y Ribs feature's
+  // warm regeneration, OCCT's Delaunay on its tori).
+  std::vector<Bnd_Box> boxes((size_t)n);
+  for (int i = 0; i < n; ++i)
+  {
+    BRepBndLib::Add(t[(size_t)i], boxes[(size_t)i], false);
+    boxes[(size_t)i].Enlarge(3 * defl);
+  }
+  std::vector<char> close((size_t)n, 0);
+  for (int i = 0; i < n; ++i)
+    for (int j = i + 1; j < n; ++j)
+      if (!boxes[(size_t)i].IsOut(boxes[(size_t)j]))
+        close[(size_t)i] = close[(size_t)j] = 1;
   TopoDS_Compound copies;
   BRep_Builder    bb;
   bb.MakeCompound(copies);
   NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> owner;
   for (int i = 0; i < n; ++i)
   {
+    if (!close[(size_t)i])
+      continue;
     const TopoDS_Shape c = BRepBuilderAPI_Copy(t[(size_t)i], true, false).Shape();
     BRepMesh_IncrementalMesh(c, defl, false, 0.5);
     for (TopExp_Explorer f(c, TopAbs_FACE); f.More(); f.Next())
@@ -4206,26 +4222,30 @@ static std::vector<TopoDS_Shape> group_disjoint(const std::vector<TopoDS_Shape>&
     bb.Add(copies, c);
   }
   std::vector<std::vector<char>> conflict((size_t)n, std::vector<char>((size_t)n, 0));
-  try
+  // (None meshed: no two can meet, one group.)
+  if (!owner.IsEmpty())
   {
-    BRepExtrema_SelfIntersection si(copies, 2 * defl);
-    si.Perform();
-    if (!si.IsDone())
-      return t;
-    for (NCollection_DataMap<int, TColStd_PackedMapOfInteger>::Iterator it(si.OverlapElements()); it.More(); it.Next())
+    try
     {
-      const int* a = owner.Seek(si.GetSubShape(it.Key()));
-      for (TColStd_PackedMapOfInteger::Iterator j(it.Value()); j.More(); j.Next())
+      BRepExtrema_SelfIntersection si(copies, 2 * defl);
+      si.Perform();
+      if (!si.IsDone())
+        return t;
+      for (NCollection_DataMap<int, TColStd_PackedMapOfInteger>::Iterator it(si.OverlapElements()); it.More(); it.Next())
       {
-        const int* b = owner.Seek(si.GetSubShape(j.Key()));
-        if (a != nullptr && b != nullptr && *a != *b)
-          conflict[(size_t)*a][(size_t)*b] = conflict[(size_t)*b][(size_t)*a] = 1;
+        const int* a = owner.Seek(si.GetSubShape(it.Key()));
+        for (TColStd_PackedMapOfInteger::Iterator j(it.Value()); j.More(); j.Next())
+        {
+          const int* b = owner.Seek(si.GetSubShape(j.Key()));
+          if (a != nullptr && b != nullptr && *a != *b)
+            conflict[(size_t)*a][(size_t)*b] = conflict[(size_t)*b][(size_t)*a] = 1;
+        }
       }
     }
-  }
-  catch (const Standard_Failure&)
-  {
-    return t;
+    catch (const Standard_Failure&)
+    {
+      return t;
+    }
   }
   // Greedy colouring: each tool joins the first group it touches nothing in.
   std::vector<std::vector<int>> groups;

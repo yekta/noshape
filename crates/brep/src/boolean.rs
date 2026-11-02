@@ -2845,7 +2845,11 @@ pub fn boolean_touching(op: Op, args: &[&Body], tol: f64, touching_only: bool) -
 /// every 16 items; the workers take the caller's flag).
 pub(crate) fn par_map<T: Send>(n: usize, f: &(dyn Fn(usize) -> T + Sync)) -> R<Vec<T>> {
     crate::check_cancel()?;
-    let threads = std::thread::available_parallelism().map_or(1, |x| x.get()).min(n.div_ceil(64)).max(1);
+    // (The machine's threads, counted once: on Linux each count reads the cgroup files, 3 % of a sheet metal part's
+    // warm regeneration when asked on every call.)
+    static CPUS: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    let cpus = *CPUS.get_or_init(|| std::thread::available_parallelism().map_or(1, |x| x.get()));
+    let threads = cpus.min(n.div_ceil(64)).max(1);
     if threads == 1 {
         let mut out = Vec::with_capacity(n);
         for i in 0..n {
