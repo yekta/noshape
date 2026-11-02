@@ -534,3 +534,53 @@ fn non_manifold_origin() {
     }
     let _ = std::fs::remove_dir_all(&tmp);
 }
+
+/// T2 bench: every feature with std's (or a custom feature's) editing logic in the perf documents and NOSHAPE_PROFILE_DIR's
+/// (else ~/agents/profdocs), its logic run as a new dialog runs it (on the model just before it), best of 3: the ten
+/// slowest, one line each.
+#[test]
+#[ignore = "T2 bench: tools/tiers/perf.sh"]
+fn bench_editing_logic() {
+    let mut dirs = vec![std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf")];
+    dirs.push(std::env::var_os("NOSHAPE_PROFILE_DIR").map_or_else(|| std::path::PathBuf::from(format!("{}/agents/profdocs", std::env::var("HOME").unwrap_or_default())), std::path::PathBuf::from));
+    let tmp = std::env::temp_dir().join(format!("noshape-elogic-{}", std::process::id()));
+    std::fs::create_dir_all(&tmp).unwrap();
+    let mut rows: Vec<(f64, String)> = Vec::new();
+    for dir in dirs {
+        let Ok(rd) = std::fs::read_dir(&dir) else { continue };
+        let mut files: Vec<_> = rd.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "noshape")).collect();
+        files.sort();
+        for path in files {
+            let copy = tmp.join(path.file_name().unwrap());
+            std::fs::copy(&path, &copy).unwrap();
+            let Ok(s) = noshape_ops::session::Session::open(&copy) else { continue };
+            let units = s.doc.settings.units;
+            let opts = RegenOptions { custom_features: Some(noshape_model::custom::DocumentScripts::from_document(&s.doc)), ..Default::default() };
+            for tab in &s.doc.tabs {
+                let TabContent::PartStudio(ps) = &tab.content else { continue };
+                for (i, f) in ps.features.iter().enumerate() {
+                    if f.suppressed || !noshape_model::custom::std_feature::has_editing_logic(&f.type_id) {
+                        continue;
+                    }
+                    let before = RegenOptions { upto: Some(i), ..opts.clone() };
+                    let ctx = Regenerator::new().regenerate(ps, &ConfigValues::default(), &units, &before).context;
+                    let specified: Vec<String> = f.params.0.keys().cloned().collect();
+                    let best = (0..3)
+                        .map(|_| {
+                            let t = Instant::now();
+                            let _ = noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), &f.type_id, f.id, &f.name, &units, &Default::default(), &f.params, &specified, true);
+                            t.elapsed().as_secs_f64() * 1e3
+                        })
+                        .fold(f64::INFINITY, f64::min);
+                    rows.push((best, format!("{} / {} / {} ({})", path.file_stem().unwrap().to_string_lossy(), tab.name, f.name, f.type_id)));
+                }
+            }
+        }
+    }
+    rows.sort_by(|a, b| b.0.total_cmp(&a.0));
+    println!("editing logic: {} features, {:.1} ms in all", rows.len(), rows.iter().map(|r| r.0).sum::<f64>());
+    for (ms, what) in rows.iter().take(10) {
+        println!("timing editing logic {what}: {ms:.1} ms");
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+}

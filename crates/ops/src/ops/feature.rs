@@ -298,8 +298,8 @@ fn dialog_logic(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, fe
     // Fillet, Loft: the app's `std_edit_logic`) get the same here, on the
     // model before the feature, until what the dialog shows settles: a pass
     // that only syncs hidden legacy values (Hole `holeDiameter` after
-    // `holeDiameterV3`) needs no other (each Hole pass is ~100 ms of
-    // FeatureScript).
+    // `holeDiameterV3`) needs no other (a Hole pass ~1.3 ms on vibe4,
+    // regen_profile::bench_editing_logic).
     if noshape_model::custom::std_feature::has_editing_logic(&feature.type_id) {
         let ctx = od.regenerate_with(tab, None, |o| o.upto = Some(index))?.context;
         let specified: Vec<String> = given.keys().cloned().collect();

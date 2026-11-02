@@ -23,7 +23,8 @@ first, and an entity still where its snapshot was matches without one: qa4 S1 en
 document (bench_profdocs, vibe3 6889cae3 -> 5bb63f9b): all within noise (qa5-sm23 162 -> 159, qa5-smr 100 -> 98;
 the bench opens documents outside its timer, so the cold start doesn't show there). Next: sheet metal's
 update_sheet_metal_geometry spends 21 % in OCCT point-to-face projection (inner_point / keep_names on new faces);
-ops / std-features benches flat. Not ours: Shell "too thick" native ok / std SHELL_FAILED (std_oracle T2, fails on
+ops / std-features benches flat. Editing logic (ops `regen_profile::bench_editing_logic`, vibe4): 137 features of the
+perf and profile documents, 56.4 ms in all, the slowest big-plate's Extrude 2 at 5.9 ms (Hole 1.3 ms): not a sink. Not ours: Shell "too thick" native ok / std SHELL_FAILED (std_oracle T2, fails on
 main before today): parity to check.
 **State 11-02 05:00:** P0 SHELL-VOIDS-WINDOWS fixed (182fd422; main's 03:25 CI green on Windows / macOS / Linux).
 macOS "crashed holding a lock" (CI 41351354303, once, custom-feature tests): no repro on Linux in 260 stress runs; a
