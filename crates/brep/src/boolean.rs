@@ -233,6 +233,8 @@ enum Pending {
 struct GFace {
     arg: u32,
     index: u32,
+    /// Its own tolerance (an input's, OCCT's).
+    t: f64,
     solid: usize,
     s: Surf,
     /// Its input boundary, every loop together.
@@ -871,7 +873,7 @@ impl Ctx<'_> {
         // (On the plane within its own tolerance and the face's (OCCT's rule), apart past that: no grey band, as for
         // two vertices.)
         let tv = self.pool.t[v as usize];
-        let reach = if tv > 0.5 * self.tol { tv + 0.5 * self.tol } else { self.tol };
+        let reach = self.tol.max(tv + self.faces[f].t.max(0.5 * self.tol));
         let s = if x.abs() <= reach {
             0
         } else if x > 0.0 {
@@ -1685,6 +1687,9 @@ impl Ctx<'_> {
     /// [`Self::edge_on_surface`] by points along the edge.
     fn on_free_surface(&self, e: usize, f: usize) -> R<bool> {
         let tol = self.tol;
+        // (On within the Boolean's tolerance, or the edge's and the face's own where that's more, OCCT's rule; the
+        // grey band past that the Boolean's.)
+        let on_tol = tol.max(self.edges[e].t + self.faces[f].t);
         // Points along it: all on the surface, it lies on it (not yet taken); within the grey band
         // without being clearly off, ambiguous.
         let s = self.edge_seg(e);
@@ -1692,11 +1697,11 @@ impl Ctx<'_> {
         // (The middle first: one point clearly off, it isn't on it.)
         for k in [3, 0, 6, 1, 2, 4, 5] {
             let p = self.seg_at(&s, k as f64 / 6.0);
-            if free::clearly_off(&self.faces[f], p, GREY * tol) {
+            if free::clearly_off(&self.faces[f], p, GREY * on_tol) {
                 return Ok(false);
             }
             let d = free::surface_distance(&self.faces[f], p);
-            if d <= tol {
+            if d <= on_tol {
                 on += 1;
             } else if d <= GREY * tol {
                 near += 1;
@@ -1736,6 +1741,11 @@ impl Ctx<'_> {
         // (Every point past the tolerance: apart, OCCT's rule (an edge on a face within the two's tolerances), as a
         // sharp knurl tooth's side edge a micrometre outside the cylinder; some on, some not: ambiguous.)
         if on == 0 {
+            return Ok(false);
+        }
+        // (On a plane, cylinder or cone the distance is exact and the threshold OCCT's: past it, off (a B-spline edge
+        // touching slab planes at a point); on a free-form face, near its surface, ambiguous.)
+        if near > 0 && on + near == 7 && matches!(self.faces[f].s, Surf::Plane { .. } | Surf::Cyl { .. }) {
             return Ok(false);
         }
         if near > 0 && on + near == 7 {
@@ -2237,8 +2247,8 @@ impl Ctx<'_> {
         let dir = n1.cross(n2);
         if dir.length() <= 1e-9 {
             let off = (n1.dot(o2) - d1).abs();
-            // (Apart past the tolerance, OCCT's rule: no grey band.)
-            if off > self.tol {
+            // (Apart past the tolerance, or the two faces' own where that's more, OCCT's rule: no grey band.)
+            if off > self.tol.max(self.faces[fs].t + self.faces[ft].t) {
                 return Ok(());
             }
             self.coplanar.push((fs, ft));
@@ -2373,7 +2383,7 @@ impl Ctx<'_> {
     /// from its centre. OCCT's hyperbola there (IntAna_QuadQuadGeo) is the same curve.
     fn plane_cone_hyperbola(&mut self, fp: usize, fc: usize) -> R<()> {
         let Surf::Plane { n, d, flip, .. } = self.faces[fp].s else { unreachable!() };
-        let Surf::Cyl { o, a, r0, k: slope, .. } = self.faces[fc].s else { unreachable!() };
+        let Surf::Cyl { o, a, x, y, r0, k: slope, .. } = self.faces[fc].s else { unreachable!() };
         let tol = self.tol;
         let na = n.dot(a);
         let apex = o - a * (r0 / slope);
@@ -2396,8 +2406,24 @@ impl Ctx<'_> {
         };
         let ae = (ours - other).length() * 0.5;
         if ae <= GREY * tol {
-            // Through the apex: its two lines.
-            return Err(Decline("a plane through a cone's apex"));
+            // Through the apex: its two rulings in the plane (n · u = 0), each from the apex along the face's nappe,
+            // as OCCT's two lines (Shell's slab planes through a countersink's apex).
+            let (px, py) = (n.dot(x), n.dot(y));
+            let (rr, cc) = ((px * px + py * py).sqrt(), -n.dot(up) * ca / sa);
+            if rr <= 1e-12 || cc.abs() > rr {
+                return Err(Decline("a plane through a cone's apex"));
+            }
+            let (base, half) = (py.atan2(px), (cc / rr).clamp(-1.0, 1.0).acos());
+            let (lo, hi) = (self.faces[fc].lo, self.faces[fc].hi);
+            for th in [base + half, base - half] {
+                let u = up * ca + (x * th.cos() + y * th.sin()) * sa;
+                let (t0, t1) = box_range(apex, u, lo, hi, tol);
+                let t0 = t0.max(0.0);
+                if t1 > t0 {
+                    self.section(fp, fc, Path::Line { p: apex, d: u }, t0, t1)?;
+                }
+            }
+            return Ok(());
         }
         let c = (ours + other) * 0.5;
         let xe = (ours - other).normalize();
@@ -3329,7 +3355,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 Some(fs) => free::nurbs_surf(fs, uvbox, f.reversed),
                 None => s,
             };
-            cx.faces.push(GFace { arg: a, index: i as u32, solid: usize::MAX, s, edges, bound: Default::default(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default(), hulls: Default::default(), inner: body.face_inner_edges.iter().filter(|x| x[0] as usize == i).map(|x| first_edge[ai] + x[1] as usize).collect() });
+            cx.faces.push(GFace { arg: a, index: i as u32, t: body.face_tol.get(i).copied().unwrap_or(0.0), solid: usize::MAX, s, edges, bound: Default::default(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default(), hulls: Default::default(), inner: body.face_inner_edges.iter().filter(|x| x[0] as usize == i).map(|x| first_edge[ai] + x[1] as usize).collect() });
         }
         for (i, s) in body.solids.iter().enumerate() {
             let si = cx.solids.len();

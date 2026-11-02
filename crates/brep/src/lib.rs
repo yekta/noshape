@@ -177,6 +177,8 @@ pub struct Body {
     /// was given (the Boolean's own for all).
     pub vertex_tol: Vec<f64>,
     pub edge_tol: Vec<f64>,
+    /// Per face, its tolerance (OCCT's: a vertex within its own and the face's is on it).
+    pub face_tol: Vec<f64>,
     /// Edges inside faces, material both sides (OCCT's INTERNAL edges): (face, edge).
     pub face_inner_edges: Vec<[u32; 2]>,
 }

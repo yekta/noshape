@@ -452,6 +452,7 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     if (f.Orientation() != TopAbs_FORWARD && f.Orientation() != TopAbs_REVERSED)
       return "an internal face";
     max_tol   = std::max(max_tol, BRep_Tool::Tolerance(f));
+    b.face_tol.push_back(BRep_Tool::Tolerance(f));
     bool flip = false;
     if (!pl.IsNull())
     {
@@ -2250,7 +2251,9 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
     // (Tolerant faces: each with nothing of another argument in its grey band, the vertices and edges by their own
     // rule as above; a Shell slab fuse's part has hundreds of tolerant vertices and edges and a face or two of
     // 1e-5 (OCCT's nominal; their real 1e-7).)
-    tolerant.erase(std::remove_if(tolerant.begin(), tolerant.end(), [](const auto& x) { return x.second.ShapeType() != TopAbs_FACE; }), tolerant.end());
+    // (A tolerant face up to half a millimetre goes by its own tolerance too (noshape's Boolean has each face's:
+    // Shell's slab faces of 7.5e-5 with another slab's vertex 6.7e-5 off them).)
+    tolerant.erase(std::remove_if(tolerant.begin(), tolerant.end(), [&](const auto& x) { return x.second.ShapeType() != TopAbs_FACE || tol_of(x.second) <= 5e-4; }), tolerant.end());
     bool reaches = tolerant.size() > 64;
     std::vector<Bnd_Box> whole(args.size());
     for (size_t i = 0; i < args.size() && !reaches; ++i)
@@ -2279,7 +2282,7 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
             BRepExtrema_DistShapeShape dist(x, m(q));
             const double d = dist.IsDone() ? dist.Value() : 0.0;
             // (The other's own tolerance up to the ordinary: a tolerant vertex or edge goes by its rule.)
-            reaches = !dist.IsDone() || (d > exact && d <= GREY_TOL * (tx + std::min(tol_of(m(q)), kMaxTol)));
+            reaches = !dist.IsDone() || (d > exact && d <= (std::getenv("NOSHAPE_X_FT") ? 1.5 : GREY_TOL) * (tx + std::min(tol_of(m(q)), kMaxTol)));
           }
         }
       }

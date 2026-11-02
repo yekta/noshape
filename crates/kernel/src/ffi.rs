@@ -321,6 +321,8 @@ pub(crate) mod ffi {
         /// Per vertex and per edge, its tolerance (an input's; empty in a result).
         vertex_tol: Vec<f64>,
         edge_tol: Vec<f64>,
+        /// Per face, its tolerance (an input's; empty in a result).
+        face_tol: Vec<f64>,
         /// Edges inside faces (INTERNAL there): (face, edge) pairs.
         face_inner_edges: Vec<u32>,
         /// Start and end vertex per edge.
