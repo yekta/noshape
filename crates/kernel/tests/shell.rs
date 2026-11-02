@@ -1195,3 +1195,38 @@ fn shell_corpus_case_probe() {
         println!("clip {clip}: {:.6} mm3, {} faces, {:.0} ms", vol(&r) * 1e9, r.count(ShapeType::Face), t0.elapsed().as_secs_f64() * 1e3);
     }
 }
+
+/// SHELL-SLOW: everyday parts with concave edges (a step, a pocket, a boss): each Shell's path and time.
+#[test]
+#[ignore = "T2: timing probe"]
+fn everyday_concave_shell_times_probe() {
+    let step = cut(&bx([0.0; 3], [60.0, 40.0, 20.0]), &bx([30.0, -1.0, 10.0], [61.0, 41.0, 21.0])).unwrap().shape;
+    let pocket = cut(&bx([0.0; 3], [80.0, 50.0, 10.0]), &bx([20.0, 15.0, 5.0], [60.0, 35.0, 11.0])).unwrap().shape;
+    let rounded = {
+        let v = edges_where(&pocket, |i| (i.start.z - i.end.z).abs() > 1e-6 && i.start.x > 1.0 && i.start.x < 79.0 && i.start.y > 1.0 && i.start.y < 49.0);
+        fillet(&pocket, &v, 3.0).unwrap().shape
+    };
+    let boss = fuse(&bx([0.0; 3], [80.0, 50.0, 10.0]), &cyl_z(40.0, 25.0, 10.0, 8.0, 10.0)).unwrap().shape;
+    let step_round = {
+        let e = edges_where(&step, |i| (i.start.x - 30.0).abs() < 1e-6 && (i.end.x - 30.0).abs() < 1e-6 && (i.start.z - 10.0).abs() < 1e-6 && (i.end.z - 10.0).abs() < 1e-6);
+        fillet(&step, &e, 2.0).unwrap().shape
+    };
+    let bottom = |s: &Shape| faces_where(s, |c| c.z.abs() < 1e-6);
+    let cases: Vec<(&str, Shape, Vec<Shape>, f64)> = vec![
+        ("step, top removed", step.clone(), faces_where(&step, |c| (c.z - 20.0).abs() < 1e-6), 2.0),
+        ("step, bottom removed", step.clone(), bottom(&step), 2.0),
+        ("pocket plate, bottom removed", pocket.clone(), bottom(&pocket), 1.5),
+        ("pocket R3 corners, bottom removed", rounded.clone(), bottom(&rounded), 1.5),
+        ("boss plate, bottom removed", boss.clone(), bottom(&boss), 2.0),
+        ("step R2 concave edge, top removed", step_round.clone(), faces_where(&step_round, |c| (c.z - 20.0).abs() < 1e-6), 2.0),
+    ];
+    for (name, s, rm, t) in cases {
+        let t0 = std::time::Instant::now();
+        let r = shell_solid(&s, &rm, t, ShellSide::Inside, ShellMethod::Auto);
+        let ms = t0.elapsed().as_secs_f64() * 1e3;
+        match r {
+            Ok(r) => println!("{name}: {:.6} mm3, {} faces, {ms:.0} ms via {}", vol(&r.shape), r.shape.count(ShapeType::Face), last_shell_path()),
+            Err(e) => println!("{name}: {e} ({ms:.0} ms)"),
+        }
+    }
+}

@@ -418,7 +418,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   docs/handoff/core.md).
   core 11-01 08:10, round 9 (rust_boolean.cpp's build of noshape's result checks the cancel): vibe4 at load 64-75
   on 16 cores, cancel at 0.5-20 s: **27-128 ms at every point** (12 points), from 10-19 s before round 1.
-- [ ] P2 BLEND-DRAFT-CORNER-FACES (core 11-02 22:30, live 1686 (c)): a 60 x 40 x 20 block drafted 5° (neutral bottom),
+- [x] (core 11-03 00:50: OCCT's two patches per corner, meeting in a degenerated edge whose vertex lay 0.9 mm off the
+  top face, become live's one face: the R2 ball rolling on the top and the R3 cylinder, its spine the ellipse where
+  their offsets meet, ends where each drafted side is tangent to the R3 cylinder (kernel vertex_blend.cpp `Rolling`):
+  18 faces, the corner 10.1582457 mm² (live 10.1582447) in live's box, top plane 1733.99850 (live .99847), 44304.984
+  mm³ (live .934: the band of live's mass properties on 1686 (a) / (d), whose corners match to 1e-7); T1 kernel
+  blend::a_drafted_blocks_top_loop_over_its_corner_rounds_is_lives) P2 BLEND-DRAFT-CORNER-FACES (core 11-02 22:30, live 1686 (c)): a 60 x 40 x 20 block drafted 5° (neutral bottom),
   the slanted edges R3, then the top loop R2: ours (noshape's blends, both fillets; 24 ms) 44305.088162 mm³ / 22 faces,
   live 44304.933893 / 18: live's corner at each top vertex is one 4-sided OTHER face (two R2 arcs, the slanted
   cylinder's end ellipse, an ellipse on the top plane), ours two B-spline halves (5.081 mm² each, live's 10.158). (a)

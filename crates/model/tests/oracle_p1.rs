@@ -1814,10 +1814,18 @@ fn mixed_radius_drafted_corners_probe() {
     let st = r.display.features.last().unwrap();
     let b = &r.context.bodies[0];
     println!("(c) {:?} {:?}: {:.6} mm3 (live 44304.933893), {:.6} mm2 (live 8092.652480), {} faces (live 18), {ms:.0} ms", st.status, st.message, b.shape.volume().unwrap() * 1e9, b.shape.area().unwrap() * 1e6, b.shape.count(noshape_kernel::ShapeType::Face));
+    for (i, f) in b.shape.faces().iter().enumerate() {
+        let bb = f.bounding_box(true).unwrap();
+        println!("face f{i} area {:.7} box {:.4?} .. {:.4?} {:?}", f.area().unwrap() * 1e6, bb.min * 1e3, bb.max * 1e3, f.face_surface().ok());
+    }
     for f in b.shape.faces() {
         let bb = f.bounding_box(true).unwrap();
         if bb.min.x * 1e3 > 50.0 && bb.min.y * 1e3 > 30.0 {
-            println!("  {} area {:.6} box {:?} .. {:?}", format!("{:?}", f.face_surface().ok()).chars().take(40).collect::<String>(), f.area().unwrap() * 1e6, bb.min * 1e3, bb.max * 1e3);
+            println!("  {} area {:.6} box {:?} .. {:?} uv {:?}", format!("{:?}", f.face_surface().ok()).chars().take(40).collect::<String>(), f.area().unwrap() * 1e6, bb.min * 1e3, bb.max * 1e3, f.uv_bounds().ok());
+            for e in f.edges() {
+                let owners: Vec<String> = b.shape.faces().iter().enumerate().filter(|(_, g)| g.edges().iter().any(|x| x.is_same(&e))).map(|(i, g)| format!("f{i} {}", format!("{:?}", g.face_surface().ok()).chars().take(14).collect::<String>())).collect();
+                println!("    edge {:?} {:?} faces {owners:?}", e.endpoints().ok().map(|(a, b)| (a * 1e3, b * 1e3)), e.edge_curve().ok().map(|c| format!("{c:?}").chars().take(30).collect::<String>()));
+            }
         }
     }
 }

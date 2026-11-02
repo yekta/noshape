@@ -777,6 +777,35 @@ fn a_drafted_blocks_mixed_radius_corners_are_lives() {
     assert_eq!(r.faces().len(), 18);
 }
 
+/// Live 1686 (c) as two Fillet features: R3 on the drafted block's slanted edges, then R2 round its top loop (4 lines
+/// and the R3 rounds' 4 arcs). Live: 18 faces, each corner one 4-sided OTHER face of 10.1582447 mm² in (55.42137,
+/// 35.42137, 18.174311) .. (58.409954, 38.409954, 20); 44304.933893 mm³. OCCT's left each corner two patches meeting
+/// in a degenerated edge, its vertex 0.9 mm off the top face (22 faces, 44305.088 mm³); now the R2 ball rolling on the
+/// top and the R3 cylinder (ours 44304.984 mm³: within live's mass-property band, its corner areas to 1e-7).
+#[test]
+fn a_drafted_blocks_top_loop_over_its_corner_rounds_is_lives() {
+    setup();
+    let b = bx([0.0; 3], [60.0, 40.0, 20.0]);
+    let sides: Vec<Shape> = b.faces().into_iter().filter(|f| f.bounding_box(false).is_ok_and(|bb| bb.max.z - bb.min.z > 1.0 * MM)).collect();
+    let d = draft(&b, &sides, DVec3::Z, &Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 5f64.to_radians()).unwrap().shape;
+    let slanted = edges_where(&d, |i| (i.start.z - i.end.z).abs() > 1.0 * MM);
+    let d = fillet_checked(&d, &slanted, &[3.0 * MM; 4]).unwrap().shape;
+    let top = edges_where(&d, |i| i.start.z > 19.99 * MM && i.end.z > 19.99 * MM);
+    assert_eq!(top.len(), 8);
+    let r = fillet_checked(&d, &top, &[2.0 * MM; 8]).unwrap().shape;
+    assert!(r.is_valid());
+    assert_eq!(r.faces().len(), 18);
+    assert!((vol_mm3(&r) - 44304.933893372094).abs() < 0.1, "{}", vol_mm3(&r));
+    assert!(r.edges().iter().all(|e| !e.edge_info().unwrap().degenerated));
+    let top_face = r.faces().into_iter().find(|f| f.bounding_box(true).is_ok_and(|bb| bb.min.z > 19.99 * MM)).unwrap();
+    assert!(top_face.vertices().iter().all(|v| (v.vertex_point().unwrap().z - 20.0 * MM).abs() < 1e-6 * MM));
+    let corner = r.faces().into_iter().find(|f| f.bounding_box(true).is_ok_and(|bb| bb.min.x > 55.0 * MM && bb.min.y > 35.0 * MM && bb.min.z > 18.0 * MM)).unwrap();
+    let (a, bb) = (corner.area().unwrap(), corner.bounding_box(true).unwrap());
+    assert!((a / (MM * MM) - 10.1582447).abs() < 1e-5, "{}", a / (MM * MM));
+    let (lo, hi) = (DVec3::new(55.42137, 35.42137, 18.174311) * MM, DVec3::new(58.409954, 38.409954, 20.0) * MM);
+    assert!((bb.min - lo).abs().max_element() < 2e-4 * MM && (bb.max - hi).abs().max_element() < 2e-4 * MM, "{:?} .. {:?}", bb.min / MM, bb.max / MM);
+}
+
 /// Blends that come close but stay apart are noshape's, as OCCT's: R4.99 round all twelve edges of a 40 x 20 x 10
 /// block (the top and bottom loops' blends 0.02 apart on the sides). Declined before: the two lines' distance was
 /// sampled (9.79 for 10) and each chain counted its ball's centre (r√2) as its reach.
