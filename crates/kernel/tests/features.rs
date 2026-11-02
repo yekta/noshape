@@ -1,4 +1,4 @@
-use glam::DVec3;
+use glam::{DVec2, DVec3};
 use noshape_kernel::*;
 use std::f64::consts::PI;
 
@@ -545,4 +545,56 @@ fn ruled_translate_reports_as_extrusion() {
     let c = make_interpolated_spline(&pts(0.01, 1.5), &[], false).unwrap();
     let flared = loft(&[a, c], &LoftOptions { solid: false, ruled: true, ..Default::default() }).unwrap().shape;
     assert!(matches!(flared.sub_shape(ShapeType::Face, 0).unwrap().face_surface().unwrap(), Surface::BSpline { .. }));
+}
+
+/// A w × h rectangle centred on the origin, corners rounded r (lines and quarter arcs, counter-clockwise from the
+/// bottom line), on `plane`.
+fn rounded_rect(plane: &Plane, w: f64, h: f64, r: f64) -> Shape {
+    let (x, y) = (w / 2.0, h / 2.0);
+    let q = std::f64::consts::FRAC_PI_2;
+    let segs = [
+        Segment2d::Line { a: DVec2::new(-x + r, -y), b: DVec2::new(x - r, -y) },
+        Segment2d::Arc { center: DVec2::new(x - r, -y + r), radius: r, start_angle: -q, end_angle: 0.0 },
+        Segment2d::Line { a: DVec2::new(x, -y + r), b: DVec2::new(x, y - r) },
+        Segment2d::Arc { center: DVec2::new(x - r, y - r), radius: r, start_angle: 0.0, end_angle: q },
+        Segment2d::Line { a: DVec2::new(x - r, y), b: DVec2::new(-x + r, y) },
+        Segment2d::Arc { center: DVec2::new(-x + r, y - r), radius: r, start_angle: q, end_angle: 2.0 * q },
+        Segment2d::Line { a: DVec2::new(-x, y - r), b: DVec2::new(-x, -y + r) },
+        Segment2d::Arc { center: DVec2::new(-x + r, -y + r), radius: r, start_angle: 2.0 * q, end_angle: 3.0 * q },
+    ];
+    make_wire_2d(plane, &segs).unwrap()
+}
+
+/// Live 1784: two sections with matching segments loft a face per segment ((a) rounded rectangles: 8 sides; (c) a D
+/// and its half: 4, the tangent joints too); three or more sections ((b)) or sections of different topology ((d)
+/// rounded rectangle to circle) one side face where the sections are smooth, the caps' edges split per segment. Ours
+/// has a seam edge more (OCCT's closed faces have one). (d)'s volume differs (1.5 %: where the circle is split, asked).
+#[test]
+fn loft_side_faces_as_live() {
+    let xy = Plane::xy();
+    let d = |s: f64, z: f64| {
+        let p = |x: f64, y: f64| DVec2::new(20.0 + (x - 20.0) * s, 20.0 + (y - 20.0) * s);
+        make_wire_2d(&xy.offset(z), &[
+            Segment2d::Line { a: p(0.0, 0.0), b: p(40.0, 0.0) },
+            Segment2d::Arc { center: p(40.0, 20.0), radius: 20.0 * s, start_angle: -PI / 2.0, end_angle: PI / 2.0 },
+            Segment2d::Line { a: p(40.0, 40.0), b: p(0.0, 40.0) },
+            Segment2d::Line { a: p(0.0, 40.0), b: p(0.0, 0.0) },
+        ]).unwrap()
+    };
+    // (name, sections, faces, edges, vertices, live's volume if ours is within 1e-5 of it)
+    type Case = (&'static str, Vec<Shape>, usize, usize, usize, Option<f64>);
+    let cases: Vec<Case> = vec![
+        ("a", vec![rounded_rect(&xy, 60.0, 40.0, 5.0), rounded_rect(&xy.offset(40.0), 40.0, 30.0, 5.0)], 10, 24, 16, Some(69807.9004)),
+        ("b", vec![rounded_rect(&xy, 60.0, 40.0, 5.0), rounded_rect(&xy.offset(40.0), 40.0, 30.0, 5.0), rounded_rect(&xy.offset(80.0), 60.0, 40.0, 5.0)], 3, 17, 16, Some(128054.0491)),
+        ("c", vec![d(1.0, 0.0), d(0.5, 30.0)], 6, 12, 8, Some(38995.5716)),
+        ("d", vec![rounded_rect(&xy, 60.0, 40.0, 5.0), make_wire_2d(&xy.offset(40.0), &[Segment2d::Circle { center: DVec2::ZERO, radius: 15.0 }]).unwrap()], 3, 17, 16, None),
+    ];
+    for (name, secs, faces, edges, vertices, live) in cases {
+        let l = loft(&secs, &LoftOptions { solid: true, ..Default::default() }).unwrap().shape;
+        assert!(l.is_valid(), "{name}");
+        assert_eq!((l.count(ShapeType::Face), l.count(ShapeType::Edge), l.count(ShapeType::Vertex)), (faces, edges, vertices), "{name}");
+        if let Some(v) = live {
+            assert!((l.volume().unwrap() - v).abs() < 1e-5 * v, "{name}: {} mm³, live {v}", l.volume().unwrap());
+        }
+    }
 }

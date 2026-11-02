@@ -84,6 +84,9 @@
 #include <ShapeFix_Solid.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepAdaptor_Curve.hxx>
+#include <Geom2d_TrimmedCurve.hxx>
+#include <Geom2d_BSplineCurve.hxx>
+#include <Geom2dConvert.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Shell.hxx>
@@ -2207,6 +2210,338 @@ static bool path_sections(std::vector<TopoDS_Wire>& wires, const TopoDS_Wire& sp
   return true;
 }
 
+// Side faces that meet tangentially in every section made one face (live 1782 / 1784: a loft through three or more
+// sections, or sections of different topology, has one B-spline side face where its sections are smooth; their
+// edges stay split per segment). A chain of faces (in u order, each starting where the one before ends) becomes one
+// surface: degrees raised to the highest, v knots made common, rational if one is, each face's u span scaled so the
+// derivatives across a joint match, the joint knots then removed where the surface stays the same. The section edges
+// keep their curves; the side edges between merged faces go, a closed chain keeps one as its seam. `hist`: each
+// merged face Modified to the new one, the inner side edges removed. False: nothing merged (or it didn't work out).
+static bool merge_tangent_sides(const TopoDS_Shape& loft, TopoDS_Shape& result, HHist& hist)
+{
+  Bnd_Box box;
+  BRepBndLib::Add(loft, box);
+  if (box.IsVoid())
+    return false;
+  const double size = std::sqrt(box.SquareExtent()), tol = 1e-7 * size;
+  ShapeIMap    faces;
+  TopExp::MapShapes(loft, TopAbs_FACE, faces);
+  ShapeAncMap ef;
+  TopExp::MapShapesAndUniqueAncestors(loft, TopAbs_EDGE, TopAbs_FACE, ef);
+  struct Side
+  {
+    TopoDS_Face                      f;
+    occ::handle<Geom_BSplineSurface> s;
+    double                           u0, u1, v0, v1;
+  };
+  std::vector<Side> sides(faces.Extent() + 1);
+  for (int i = 1; i <= faces.Extent(); ++i)
+  {
+    const TopoDS_Face f = TopoDS::Face(faces(i));
+    TopLoc_Location   loc;
+    auto              bs = occ::down_cast<Geom_BSplineSurface>(BRep_Tool::Surface(f, loc));
+    if (bs.IsNull() || !loc.IsIdentity() || bs->IsUPeriodic() || bs->IsVPeriodic())
+      continue;
+    Side& sd = sides[(size_t)i];
+    sd.f     = f;
+    sd.s     = bs;
+    BRepTools::UVBounds(f, sd.u0, sd.u1, sd.v0, sd.v1);
+  }
+  // Joints: a side edge (u = const on both faces) where face a ends (u1) and face b starts (u0), the faces' normals
+  // the same at both its ends (the sections' joints).
+  std::vector<int>         next(faces.Extent() + 1, 0), prev(faces.Extent() + 1, 0);
+  std::vector<TopoDS_Edge> joint(faces.Extent() + 1); // joint[a]: the edge between a and next[a]
+  for (int k = 1; k <= ef.Extent(); ++k)
+  {
+    const TopoDS_Edge e = TopoDS::Edge(ef.FindKey(k));
+    const ShapeList&  fl = ef(k);
+    if (fl.Extent() != 2 || BRep_Tool::Degenerated(e))
+      continue;
+    int a = faces.FindIndex(fl.First()), b = faces.FindIndex(fl.Last());
+    if (a == b || sides[(size_t)a].s.IsNull() || sides[(size_t)b].s.IsNull() || sides[(size_t)a].f.Orientation() != sides[(size_t)b].f.Orientation())
+      continue;
+    auto u_on = [&](int i, double& u) {
+      double                          f0, f1;
+      const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, sides[(size_t)i].f, f0, f1);
+      if (pc.IsNull() || BRep_Tool::IsClosed(e, sides[(size_t)i].f))
+        return false;
+      const gp_Pnt2d p = pc->Value(f0), q = pc->Value(f1);
+      u = p.X();
+      return std::abs(p.X() - q.X()) < 1e-9 * (sides[(size_t)i].u1 - sides[(size_t)i].u0);
+    };
+    double ua, ub;
+    if (!u_on(a, ua) || !u_on(b, ub))
+      continue;
+    const Side &A0 = sides[(size_t)a], &B0 = sides[(size_t)b];
+    const double ea = 1e-9 * (A0.u1 - A0.u0), eb = 1e-9 * (B0.u1 - B0.u0);
+    if (std::abs(ua - A0.u0) < ea && std::abs(ub - B0.u1) < eb)
+      std::swap(a, b), std::swap(ua, ub);
+    const Side &A = sides[(size_t)a], &B = sides[(size_t)b];
+    if (!(std::abs(ua - A.u1) < 1e-9 * (A.u1 - A.u0) && std::abs(ub - B.u0) < 1e-9 * (B.u1 - B.u0)))
+      continue;
+    if (std::abs(A.v0 - B.v0) > 1e-12 || std::abs(A.v1 - B.v1) > 1e-12)
+      continue;
+    bool smooth = true;
+    for (const double v : {A.v0, A.v1})
+    {
+      GeomLProp_SLProps pa(A.s, A.u1, v, 1, 1e-12), pb(B.s, B.u0, v, 1, 1e-12);
+      smooth = smooth && pa.IsNormalDefined() && pb.IsNormalDefined() && pa.Normal().Angle(pb.Normal()) < 1e-6;
+    }
+    if (!smooth || next[(size_t)a] != 0 || prev[(size_t)b] != 0)
+      continue;
+    next[(size_t)a]  = b;
+    prev[(size_t)b]  = a;
+    joint[(size_t)a] = e;
+  }
+  BRepTools_ReShape rs;
+  hist        = new BRepTools_History();
+  bool merged = false;
+  std::vector<char> done(faces.Extent() + 1, 0);
+  for (int start = 1; start <= faces.Extent(); ++start)
+  {
+    if (done[(size_t)start] || next[(size_t)start] == 0)
+      continue;
+    // The chain's first face: one with no face before it, or (a closed chain) this one.
+    int first = start;
+    while (prev[(size_t)first] != 0 && prev[(size_t)first] != start)
+      first = prev[(size_t)first];
+    std::vector<int> chain;
+    for (int i = first; i != 0 && !done[(size_t)i]; i = next[(size_t)i])
+    {
+      chain.push_back(i);
+      done[(size_t)i] = 1;
+    }
+    const bool closed = next[(size_t)chain.back()] == chain.front();
+    if (chain.size() < 2)
+      continue;
+    // Common degrees, v knots and weights.
+    int udeg = 0, vdeg = 0;
+    bool rational = false;
+    std::vector<occ::handle<Geom_BSplineSurface>> S;
+    for (int i : chain)
+    {
+      const Side& sd = sides[(size_t)i];
+      auto        c  = occ::down_cast<Geom_BSplineSurface>(sd.s->Copy());
+      double      a0, a1, b0, b1;
+      c->Bounds(a0, a1, b0, b1);
+      if (std::abs(a0 - sd.u0) > 1e-12 || std::abs(a1 - sd.u1) > 1e-12 || std::abs(b0 - sd.v0) > 1e-12 || std::abs(b1 - sd.v1) > 1e-12)
+        c->Segment(sd.u0, sd.u1, sd.v0, sd.v1);
+      udeg     = std::max(udeg, c->UDegree());
+      vdeg     = std::max(vdeg, c->VDegree());
+      rational = rational || c->IsURational() || c->IsVRational();
+      S.push_back(c);
+    }
+    for (auto& c : S)
+      c->IncreaseDegree(udeg, vdeg);
+    for (auto& c : S)
+      for (auto& d : S)
+        d->InsertVKnots(c->VKnots(), c->VMultiplicities(), 1e-12, false);
+    const int nv = S[0]->NbVPoles();
+    for (const auto& c : S)
+      if (c->NbVPoles() != nv)
+        return false;
+    // Spans: each face's scaled so the u derivatives across a joint match (at the middle of v).
+    const double vm = 0.5 * (sides[(size_t)chain[0]].v0 + sides[(size_t)chain[0]].v1);
+    std::vector<double> lo(S.size()), len(S.size());
+    lo[0]  = 0;
+    len[0] = sides[(size_t)chain[0]].u1 - sides[(size_t)chain[0]].u0;
+    for (size_t k = 1; k < S.size(); ++k)
+    {
+      const Side &P = sides[(size_t)chain[k - 1]], &Q = sides[(size_t)chain[k]];
+      gp_Pnt      p;
+      gp_Vec      du_p, dv_p, du_q, dv_q;
+      S[k - 1]->D1(P.u1, vm, p, du_p, dv_p);
+      S[k]->D1(Q.u0, vm, p, du_q, dv_q);
+      const double dp = du_p.Magnitude() * (P.u1 - P.u0) / len[k - 1], dq = du_q.Magnitude() * (Q.u1 - Q.u0);
+      if (!(dp > 1e-300) || !(dq > 1e-300))
+        return false;
+      lo[k]  = lo[k - 1] + len[k - 1];
+      len[k] = dq / dp;
+    }
+    // Concatenated poles, weights and u knots.
+    std::vector<std::vector<gp_Pnt>> cols;
+    std::vector<std::vector<double>> wts;
+    std::vector<double>              uk;
+    std::vector<int>                 um;
+    for (size_t k = 0; k < S.size(); ++k)
+    {
+      const auto&  c  = S[k];
+      const Side&  sd = sides[(size_t)chain[k]];
+      const double sc = len[k] / (sd.u1 - sd.u0);
+      for (int j = (k == 0 ? 1 : 2); j <= c->NbUPoles(); ++j)
+      {
+        std::vector<gp_Pnt> col;
+        std::vector<double> w;
+        for (int l = 1; l <= nv; ++l)
+        {
+          col.push_back(c->Pole(j, l));
+          w.push_back(c->Weight(j, l));
+        }
+        if (k > 0 && j == 2)
+        {
+          // (The joint column, shared: the same poles and weights on both sides.)
+          const auto& last = cols.back();
+          for (int l = 0; l < nv; ++l)
+            if (last[(size_t)l].Distance(c->Pole(1, l + 1)) > tol || std::abs(wts.back()[(size_t)l] - c->Weight(1, l + 1)) > 1e-12)
+              return false;
+        }
+        cols.push_back(col);
+        wts.push_back(w);
+      }
+      for (int j = (k == 0 ? 1 : 2); j <= c->NbUKnots(); ++j)
+      {
+        uk.push_back(lo[k] + (c->UKnot(j) - sd.u0) * sc);
+        um.push_back(j == c->NbUKnots() ? (k + 1 == S.size() ? udeg + 1 : udeg) : c->UMultiplicity(j));
+      }
+    }
+    NCollection_Array2<gp_Pnt> poles(1, (int)cols.size(), 1, nv);
+    NCollection_Array2<double> weights(1, (int)cols.size(), 1, nv);
+    for (size_t j = 0; j < cols.size(); ++j)
+      for (int l = 0; l < nv; ++l)
+      {
+        poles((int)j + 1, l + 1)   = cols[j][(size_t)l];
+        weights((int)j + 1, l + 1) = wts[j][(size_t)l];
+      }
+    NCollection_Array1<double> UK(1, (int)uk.size()), VK(1, S[0]->NbVKnots());
+    NCollection_Array1<int>    UM(1, (int)um.size()), VM(1, S[0]->NbVKnots());
+    for (size_t j = 0; j < uk.size(); ++j)
+      UK((int)j + 1) = uk[j], UM((int)j + 1) = um[j];
+    for (int j = 1; j <= S[0]->NbVKnots(); ++j)
+      VK(j) = S[0]->VKnot(j), VM(j) = S[0]->VMultiplicity(j);
+    int sum = 0;
+    for (int m : um)
+      sum += m;
+    if (sum - udeg - 1 != (int)cols.size())
+      return false;
+    occ::handle<Geom_BSplineSurface> ms;
+    try
+    {
+      ms = rational ? new Geom_BSplineSurface(poles, weights, UK, VK, UM, VM, udeg, vdeg)
+                    : new Geom_BSplineSurface(poles, UK, VK, UM, VM, udeg, vdeg);
+    }
+    catch (const Standard_Failure&)
+    {
+      return false;
+    }
+    // Smooth at the joints where the surface allows it.
+    for (size_t k = 1; k < S.size(); ++k)
+      for (int j = 1; j <= ms->NbUKnots(); ++j)
+        if (std::abs(ms->UKnot(j) - lo[k]) < 1e-12 * (lo.back() + len.back()))
+        {
+          ms->RemoveUKnot(j, udeg - 1, tol);
+          break;
+        }
+    // The new face: the section edges and the chain's end side edges (a closed chain's seam on both sides).
+    auto mapped = [&](size_t k, const TopoDS_Edge& e) -> occ::handle<Geom2d_Curve> {
+      const Side&                     sd = sides[(size_t)chain[k]];
+      double                          f0, f1;
+      const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, sd.f, f0, f1);
+      if (pc.IsNull())
+        return nullptr;
+      occ::handle<Geom2d_BSplineCurve> b = Geom2dConvert::CurveToBSplineCurve(new Geom2d_TrimmedCurve(pc, f0, f1));
+      const double                     sc = len[k] / (sd.u1 - sd.u0);
+      for (int j = 1; j <= b->NbPoles(); ++j)
+      {
+        const gp_Pnt2d q = b->Pole(j);
+        b->SetPole(j, gp_Pnt2d(lo[k] + (q.X() - sd.u0) * sc, q.Y()));
+      }
+      return b;
+    };
+    const double vlo = sides[(size_t)chain[0]].v0, vhi = sides[(size_t)chain[0]].v1;
+    std::vector<std::pair<TopoDS_Edge, occ::handle<Geom2d_Curve>>> low, high;
+    TopoDS_Edge                                                    s_start, s_end;
+    occ::handle<Geom2d_Curve>                                      c_start, c_end;
+    ShapeIMap                                                      inner;
+    for (size_t k = 0; k + 1 < chain.size(); ++k)
+      inner.Add(joint[(size_t)chain[k]]);
+    for (size_t k = 0; k < chain.size(); ++k)
+    {
+      const TopoDS_Face fwd = TopoDS::Face(sides[(size_t)chain[k]].f.Oriented(TopAbs_FORWARD));
+      for (TopExp_Explorer x(fwd, TopAbs_EDGE); x.More(); x.Next())
+      {
+        const TopoDS_Edge e = TopoDS::Edge(x.Current());
+        if (inner.Contains(e))
+          continue;
+        const occ::handle<Geom2d_Curve> c = mapped(k, e);
+        if (c.IsNull())
+          return false;
+        const gp_Pnt2d m = c->Value(0.5 * (c->FirstParameter() + c->LastParameter()));
+        if (std::abs(m.Y() - vlo) < 1e-9)
+          low.emplace_back(e, c);
+        else if (std::abs(m.Y() - vhi) < 1e-9)
+          high.emplace_back(e, c);
+        else if (k == 0 && std::abs(m.X() - lo[0]) < 1e-9 * len[0])
+          s_start = e, c_start = c;
+        else if (k + 1 == chain.size() && std::abs(m.X() - (lo[k] + len[k])) < 1e-9 * len[k])
+          s_end = e, c_end = c;
+        else
+          return false;
+      }
+    }
+    if (s_start.IsNull() || s_end.IsNull() || (closed != s_start.IsSame(s_end)))
+      return false;
+    auto umid = [](const occ::handle<Geom2d_Curve>& c) { return c->Value(0.5 * (c->FirstParameter() + c->LastParameter())).X(); };
+    std::sort(low.begin(), low.end(), [&](const auto& x, const auto& y) { return umid(x.second) < umid(y.second); });
+    std::sort(high.begin(), high.end(), [&](const auto& x, const auto& y) { return umid(x.second) > umid(y.second); });
+    BRep_Builder bld;
+    TopoDS_Face  nf;
+    bld.MakeFace(nf, ms, tol);
+    TopoDS_Wire w;
+    bld.MakeWire(w);
+    for (const auto& [e, c] : low)
+    {
+      bld.UpdateEdge(TopoDS::Edge(e.Oriented(TopAbs_FORWARD)), c, nf, BRep_Tool::Tolerance(e));
+      bld.Add(w, e);
+    }
+    if (closed)
+    {
+      // The seam: FORWARD's curve at the end side if the last face uses it FORWARD there.
+      const bool fwd_end = s_end.Orientation() == TopAbs_FORWARD;
+      bld.UpdateEdge(TopoDS::Edge(s_end.Oriented(TopAbs_FORWARD)), fwd_end ? c_end : c_start, fwd_end ? c_start : c_end, nf, BRep_Tool::Tolerance(s_end));
+    }
+    else
+    {
+      bld.UpdateEdge(TopoDS::Edge(s_end.Oriented(TopAbs_FORWARD)), c_end, nf, BRep_Tool::Tolerance(s_end));
+      bld.UpdateEdge(TopoDS::Edge(s_start.Oriented(TopAbs_FORWARD)), c_start, nf, BRep_Tool::Tolerance(s_start));
+    }
+    bld.Add(w, s_end);
+    for (const auto& [e, c] : high)
+    {
+      bld.UpdateEdge(TopoDS::Edge(e.Oriented(TopAbs_FORWARD)), c, nf, BRep_Tool::Tolerance(e));
+      bld.Add(w, e);
+    }
+    bld.Add(w, s_start);
+    w.Closed(true);
+    bld.Add(nf, w);
+    const TopoDS_Face placed = TopoDS::Face(nf.Oriented(sides[(size_t)chain[0]].f.Orientation()));
+    for (size_t k = 0; k < chain.size(); ++k)
+    {
+      const TopoDS_Face& f = sides[(size_t)chain[k]].f;
+      if (k == 0)
+        rs.Replace(f, placed);
+      else
+        rs.Remove(f);
+      hist->AddModified(f, placed);
+    }
+    for (int i = 1; i <= inner.Extent(); ++i)
+      hist->Remove(inner(i));
+    merged = true;
+  }
+  if (!merged)
+    return false;
+  TopoDS_Shape r = rs.Apply(loft);
+  BRepLib::SameParameter(r, tol, true);
+  BRepLib::UpdateTolerances(r, false);
+  if (!BRepCheck_Analyzer(r).IsValid())
+  {
+    if (std::getenv("NOSHAPE_LOFT_DEBUG"))
+      std::fprintf(stderr, "loft: the merged side faces are invalid\n");
+    return false;
+  }
+  result = r;
+  return true;
+}
+
 static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool closed,
                        rust::Slice<const double> start_points, const LoftEnds& ends, bool allow_natural,
                        const TopoDS_Shape& path = TopoDS_Shape(), int path_count = 0)
@@ -2336,7 +2671,22 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
     std::vector<TopoDS_Shape> wargs(wires.begin(), wires.end());
     h = compose(compound_of(args), split, history_of(wargs, ts));
   }
-  HistoryBuilder hb(args, ts.Shape());
+  // Live 1784: through three or more sections, or between sections of different topology, faces meeting smoothly
+  // are one side face (two matching sections: a face per segment).
+  TopoDS_Shape out = ts.Shape();
+  {
+    size_t real = 0;
+    for (const auto& s : sections.items)
+      real += s.ShapeType() != TopAbs_VERTEX;
+    HHist        mh;
+    TopoDS_Shape m;
+    if (!ruled && !closed && !points && (real >= 3 || circles || counts) && !std::getenv("NOSHAPE_LOFT_NO_MERGE") && merge_tangent_sides(out, m, mh))
+    {
+      h   = compose(compound_of(args), h, mh);
+      out = m;
+    }
+  }
+  HistoryBuilder hb(args, out);
   hb.add_history(h.get());
   if (!closed)
   {

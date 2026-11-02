@@ -254,10 +254,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
-- [ ] P1 LOFT-ONE-FACE (core 11-02, live 1782): live lofts tangent-continuous sections (hexagons with R5 sketch
-  fillets: 6 lines + 6 arcs) into **one** B-spline side face (3 faces, 24 edges, 437833.229 mm³); ours gives a face per
-  section edge (14 faces, 437876.286, now tangent to each other). Shells match live within 0.7-2.4 mm³ (1.6 / 2 mm in,
-  2 mm out). Next: one side face per tangent-continuous chain.
+- [x] P1 LOFT-ONE-FACE (core 11-02, live 1782 / 1784): live lofts tangent-continuous sections (hexagons with R5 sketch
+  fillets: 6 lines + 6 arcs) into **one** B-spline side face (3 faces, 24 edges, 437833.229 mm³); ours gave a face per
+  section edge (14 faces, 437876.286). Now: through three or more sections, or sections of different topology, side
+  faces meeting smoothly at the sections are one face (two matching sections: a face per segment, as live); ours has a
+  seam edge more (OCCT). The vase's Shells: 5 faces as live, 0.9-1.1 s by OCCT's offset, within 0.7-2.4 mm³ of live.
+  Open: (d) rounded rectangle to circle is 1.5 % off live (where the circle is split: live 1788 asked); live's
+  2-section line pairs are PLANE faces (ours extrusion / B-spline).
 - [ ] P1 COMPOSITE-LATER-FEATURE (psui 11-01 09:27, audit-part-studio A10) a composite part breaks when a later feature edits a
   member: /root/psui-scratch/tickets/composite-fillet-stray-part.noshape (qa5's mkkinds.py: Part 1, Part 2, Composite part
   1 of both, Surface 1, Curve 1; then a 1 mm Fillet on a Part 1 edge and a failing 100 mm Chamfer). query_parts: Part 1

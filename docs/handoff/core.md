@@ -8,6 +8,16 @@ Builds and tests (11-01): on vibe4 only, `tools/tiers/rb.sh <cmd>` from the work
 (land.sh runs the full set); long probes detached on vibe4 with a log. OCCT patches build on vibe4 in
 ~/agents/core-occt (`build.sh TK...`); a private root ~/agents/occt-priv; libs go to /root/occt (synced everywhere).
 
+**LOFT-ONE-FACE (11-02 14:10, landing with this note).** features.cpp `merge_tangent_sides`: after the loft, chains of
+side faces meeting smoothly at the sections (normals equal at both ends of the edge between them, u order face to
+face) become one B-spline face (degrees raised, v knots common, spans scaled to match the u derivative at each joint,
+joint knots removed where the surface stays), the section edges kept (pcurves mapped), a closed chain keeping one joint
+as its seam; history: merged faces Modified to it, inner edges removed. Applies through 3+ sections or sections of
+different topology (live 1784); NOSHAPE_LOFT_NO_MERGE off. T1 kernel features::loft_side_faces_as_live (live 1784's
+counts and volumes), shell::a_smooth_twisted_vase_shells (now 3 faces, Shells 5 faces). Tried and dropped: each
+section concatenated to one C1 curve first (BRepAlgo::ConcatenateWire): the vase 212 mm³ under live (ours +43): live
+matches joints. Open: (d) rect -> circle 1.5 % off live (1788 asked for its split points), 2-section line pairs as
+PLANE (live), the direct Shell path declines B-spline seams (OCCT's offset takes these).
 **P1 smooth twisted vase (11-02 afternoon).** The vase with R5-rounded hexagons (12 side faces): every Shell failed
 after 30 s. Fixed (landing with this note): natural_loft gave each side face its own chord-length parameters (now one
 set over all faces) and moved nothing to keep line and arc faces tangent (now a line face's rows are reparametrized so

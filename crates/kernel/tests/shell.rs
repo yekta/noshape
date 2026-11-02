@@ -907,8 +907,9 @@ fn smooth_vase() -> Shape {
 /// and both ways build directly.
 #[test]
 fn a_smooth_twisted_vase_shells() {
+    // Each section's line and arc faces tangent along their edges: one side face, as live's (live 1782: 3 faces).
     let s = smooth_vase();
-    assert_eq!(s.count(ShapeType::Face), 14);
+    assert_eq!(s.count(ShapeType::Face), 3);
     let faces = s.faces();
     let ef = s.edge_faces().unwrap();
     for (i, e) in s.edges().iter().enumerate() {
@@ -926,7 +927,7 @@ fn a_smooth_twisted_vase_shells() {
     // live's, which has one side face, LOFT-ONE-FACE; inward OCCT's offset, where it builds, agrees with ours to 1e-4).
     for (side, live) in [(ShellSide::Inside, 58695.0522), (ShellSide::Outside, 63461.6237)] {
         let r = shell_solid(&s, &top(&s, 120.0), 2.0, side, ShellMethod::Auto).unwrap_or_else(|e| panic!("2 mm {side:?}: {e}")).shape;
-        assert!(r.is_valid() && r.count(ShapeType::Face) == 27, "{side:?}: {} faces", r.count(ShapeType::Face));
+        assert!(r.is_valid() && r.count(ShapeType::Face) == 5, "{side:?}: {} faces", r.count(ShapeType::Face));
         assert!((vol(&r) - live).abs() < 5e-5 * live, "{side:?}: {} mm³, live {live}", vol(&r));
     }
 }
@@ -966,4 +967,11 @@ fn smooth_vase_live_loft_probe() {
             Err(e) => println!("{t} {side:?}: {e} ({:.0} ms)", t0.elapsed().as_secs_f64() * 1e3),
         }
     }
+}
+
+#[test]
+#[ignore = "T2: probe"]
+fn smooth_vase_loft_probe() {
+    let s = smooth_vase();
+    println!("smooth vase loft: {} faces, {} edges, {:.4} mm3 (live 437833.2291, {:+.4}), valid {}", s.count(ShapeType::Face), s.count(ShapeType::Edge), vol(&s), vol(&s) - 437833.2291, s.is_valid());
 }
