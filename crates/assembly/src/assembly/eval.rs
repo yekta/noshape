@@ -2183,7 +2183,11 @@ impl AssemblyEvaluator {
                 (!m.suppressed && instance_off).then(|| "One or more instances is suppressed".to_string())
             } else if let Some(f) = failed {
                 Some(f)
-            } else if !ok && m.mate_type == MateType::Fastened && solved.mate_unheld.contains(&m.id) && prepared.conflict_pieces(&solved, m.id) >= 3 {
+            } else if !ok && ((m.mate_type == MateType::Fastened && solved.mate_unheld.contains(&m.id)) || (m.mate_type == MateType::Parallel && !solved.mate_unheld.contains(&m.id))) && prepared.conflict_pieces(&solved, m.id) >= 3 {
+                // (A Parallel that held, caught in a conflict over three
+                // pieces, too: live probes 1798 (b), f69 with its flip
+                // either way; one that is itself the conflict "overdefines",
+                // 1764 (4').)
                 // Live 1764 (5), probes a1–a6: a Fastened the assembly can't
                 // take reads "Mate is not consistent." when the mates it
                 // fights span three rigid pieces or more (a chain of Planars

@@ -1262,9 +1262,8 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) -> Vec<us
                 let (w0, w1) = (perp(turn * (c - o)), perp(axis - turn * axis));
                 let p = if w1.length_squared() > 1e-18 { -w0.dot(w1) / w1.length_squared() } else { (c - o).dot(axis) };
                 let pivot = o + axis * p;
-                let pose = bodies[moving].pose;
-                bodies[moving].pose = Frame { origin: pivot + turn * (pose.origin - pivot), rotation: (turn * pose.rotation).normalize() };
-                poses[moving] = bodies[moving].pose;
+                let other = if moving == m.a { m.b } else { m.a };
+                turn_carrying(bodies, &mut poses, mates, moving, other, pivot, turn);
             }
             continue;
         }
@@ -1306,9 +1305,8 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) -> Vec<us
             } else {
                 c
             };
-            let p = bodies[moving].pose;
-            bodies[moving].pose = Frame { origin: c + turn * (p.origin - c), rotation: (turn * p.rotation).normalize() };
-            poses[moving] = bodies[moving].pose;
+            let other = if moving == m.a { m.b } else { m.a };
+            turn_carrying(bodies, &mut poses, mates, moving, other, c, turn);
             continue;
         }
         let exact = z_rel < -1.0 + 1e-9;
@@ -1351,11 +1349,37 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) -> Vec<us
         let c = bodies[moving].pose.mul(&local);
         let axis = exact.then(|| (c.rotation * DVec3::Z).cross(HALF_TURN_W).try_normalize()).flatten().unwrap_or(c.rotation * DVec3::X);
         let turn = DQuat::from_axis_angle(axis, std::f64::consts::PI);
-        let p = bodies[moving].pose;
-        bodies[moving].pose = Frame { origin: c.origin + turn * (p.origin - c.origin), rotation: (turn * p.rotation).normalize() };
-        poses[moving] = bodies[moving].pose;
+        turn_carrying(bodies, &mut poses, mates, moving, other, c.origin, turn);
     }
     stays
+}
+
+/// Turns body `moving` by `turn` about `pivot`, and with it every free body
+/// Fastened to it (directly or through others), not `other` (live asm batch
+/// 3 f80: a plate turned onto its Slider takes the block Fastened to it; the
+/// block left behind read the Fastened as failing).
+fn turn_carrying(bodies: &mut [SolverBody], poses: &mut [Frame], mates: &[SolverMate], moving: usize, other: usize, pivot: DVec3, turn: DQuat) {
+    let mut group = vec![moving];
+    {
+        let mut todo = vec![moving];
+        while let Some(b) = todo.pop() {
+            for q in mates.iter().filter(|q| q.kind == MateType::Fastened && q.follow.is_none()) {
+                let next = if q.a == b { q.b } else if q.b == b { q.a } else { continue };
+                if next != other && !bodies[next].fixed && !group.contains(&next) {
+                    group.push(next);
+                    todo.push(next);
+                }
+            }
+        }
+        if group.contains(&other) {
+            group = vec![moving];
+        }
+    }
+    for b in group {
+        let p = bodies[b].pose;
+        bodies[b].pose = Frame { origin: pivot + turn * (p.origin - pivot), rotation: (turn * p.rotation).normalize() };
+        poses[b] = bodies[b].pose;
+    }
 }
 
 /// Whether an axial mate's connectors' Z axes point the other way from its
@@ -1587,6 +1611,13 @@ fn group_conflict(problem: &Problem, start: &[Frame], local: &[Frame], scale: f6
         return Vec::new();
     }
     let mut out: Vec<(usize, bool)> = failing.iter().map(|&i| (i, fails(start, i))).collect();
+    // A loop through a Slider spares the Fastened links that held (live
+    // probes 1798 a1 / f80: the Slider(s) and the closing mate red, the
+    // Fastened between the moving parts OK); a loop of Fastened / Revolute
+    // links reads red throughout (a2, a3, f79).
+    if out.iter().any(|&(i, _)| problem.mates[i].kind == MateType::Slider) {
+        out.retain(|&(i, unheld)| unheld || problem.mates[i].kind != MateType::Fastened);
+    }
     let copies: Vec<usize> = failing.iter().flat_map(|&i| mate_bodies(&problem.mates[i])).filter(|&b| problem.driven.is_driven.get(b).copied().unwrap_or(false)).collect();
     out.extend(copies.iter().filter_map(|&b| problem.driven.placer[b]).map(|i| (i, false)));
     out.sort_unstable();
