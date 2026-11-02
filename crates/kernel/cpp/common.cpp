@@ -1850,6 +1850,16 @@ void crash_inside_kernel(uint8_t kind)
     // takes it past run_budgeted's frame.
     run_budgeted(5.0, [] { std::raise(SIGSEGV); });
   }
+  else if (kind == 13)
+  {
+    // The same through run_guarded: the thread's deadline (run_budgeted's, on its dead frame) put back (CRASH-1388).
+    Deadline* const before = t_deadline;
+    const bool      ok     = run_guarded([] { run_budgeted(5.0, [] { std::raise(SIGSEGV); }); });
+    fail_op(std::string(ok ? "no fault" : "fault") + (t_deadline == before ? ", deadline restored" : ", a deadline left behind"));
+  }
+  else if (kind == 14)
+    // Outside any budget: no deadline (after kind 8 recovered past one).
+    fail_op(t_deadline == nullptr ? "no deadline" : "a deadline left behind");
   else if (kind == 3)
   {
     // A loop that never ends, under a 0.3 s budget (run_budgeted).

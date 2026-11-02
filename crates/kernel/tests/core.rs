@@ -438,6 +438,19 @@ fn a_fault_inside_a_budget_leaves_no_budget_behind() {
     }
 }
 
+/// CRASH-1388: a fault recovered past a budget left that budget's deadline (on its dead frame) as the thread's, so a
+/// later op's deadline check wrote into the stack there (a fillet's fault, then "stack smashing detected" in a sheet
+/// metal extrude's prism); the guard puts the deadline back.
+#[cfg(not(windows))]
+#[test]
+fn a_fault_inside_a_budget_leaves_no_deadline_behind() {
+    assert!(crash_inside_kernel(8).is_err());
+    let e = crash_inside_kernel(14).unwrap_err().to_string();
+    assert!(e.contains("no deadline"), "{e}");
+    let e = crash_inside_kernel(13).unwrap_err().to_string();
+    assert!(e.contains("fault, deadline restored"), "{e}");
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 fn a_budget_never_stops_a_call_inside_the_allocator() {
