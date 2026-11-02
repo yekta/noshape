@@ -785,7 +785,10 @@ impl Sketch {
                 Some((a, b)) => [a, b].iter().all(|p| self.coincident_with(*p).iter().any(|q| lp.iter().any(|w| *w != *v && self.entity(*w).is_some_and(|e| e.point_refs().contains(q))))),
                 None => false,
             });
-            if lp.len() < 3 || !closed {
+            // With arcs (a plain rectangle keeps its lower-left corner as
+            // before: fuzz s319's corner rectangle, only its top Horizontal).
+            let rounded = lp.iter().any(|v| self.kind(*v) == Some(EntityKind::Arc));
+            if lp.len() < 3 || !closed || !rounded {
                 continue;
             }
             let touching: Vec<&(crate::ids::ConstraintId, Vec<EntityId>)> = cons.iter().filter(|(_, us)| us.iter().any(|x| lp.contains(x))).collect();
