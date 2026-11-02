@@ -202,9 +202,12 @@ impl Sketch {
     /// Places `comp`'s units from what changes outwards (module docs).
     fn place_component(&mut self, comp: &[EntityId], cons: &[(crate::ids::ConstraintId, Vec<EntityId>)], unit_of: &HashMap<EntityId, EntityId>) -> bool {
         let mut placed: BTreeSet<EntityId> = BTreeSet::new();
+        // Sizes and directions to keep are as the pass found them (a side
+        // sharing a point with one placed before has already been pulled:
+        // a corner rectangle's right side after its bottom stretched).
+        let orig = self.clone();
         let unheld = self.unheld_constraints(1e-9);
         let mut holds: HashMap<crate::ids::ConstraintId, bool> = cons.iter().map(|(c, _)| (*c, !unheld.contains(c))).collect();
-        let total = |u: EntityId| cons.iter().filter(|(_, us)| us.contains(&u)).count();
         while placed.len() < comp.len() {
             // Next: a unit with a constraint to placed units (or of its own)
             // that doesn't hold, the one with most of them; with none, a
@@ -212,7 +215,12 @@ impl Sketch {
             // first); with none at all, everything left stays.
             let pending = |u: EntityId| cons.iter().filter(|(c, us)| us.contains(&u) && us.iter().all(|x| *x == u || placed.contains(x)) && !holds[c]).count();
             let open: Vec<EntityId> = comp.iter().copied().filter(|u| !placed.contains(u)).collect();
-            let best = open.iter().map(|u| (pending(*u), total(*u))).max().unwrap();
+            // Then the unit most joined (shared points, its own
+            // constraints; relations to others don't count: probe t4, a
+            // rectangle side Perpendicular to a separate line isn't first).
+            let joined = |u: EntityId| cons.iter().filter(|(c, us)| us.contains(&u) && (us.len() == 1 || self.connective(*c))).count();
+            let rank = |u: EntityId| (pending(u), joined(u));
+            let best = open.iter().map(|u| rank(*u)).max().unwrap();
             // First, a relation between units that doesn't hold, none of
             // them placed: the member it keeps stays as it is (if its own
             // constraints hold), so the others come to it (fuzz s8: the
@@ -220,14 +228,16 @@ impl Sketch {
             let own_hold = |u: EntityId| cons.iter().filter(|(_, us)| us.as_slice() == [u]).all(|(c, _)| holds[c]);
             let keep = cons.iter().filter(|(c, us)| us.len() >= 2 && !holds[c] && !us.iter().any(|x| placed.contains(x)) && !self.chained_to_change(*c, cons, &holds)).find_map(|(c, us)| {
                 let k = self.kept_first(us, cons);
-                (own_hold(k) && self.class_keeps(*c, k, cons)).then_some(k)
+                (own_hold(k) && self.class_keeps(*c, k, cons) && self.direction_agrees(k, cons)).then_some(k)
             });
             if let Some(k) = keep {
                 placed.insert(k);
                 continue;
             }
             let u = if best.0 > 0 {
-                let tied: Vec<EntityId> = open.iter().copied().filter(|u| (pending(*u), total(*u)) == best).collect();
+                // Ties: the member a relation keeps, else the lower one
+                // (probe t4: a rectangle's bottom before its right side).
+                let tied: Vec<EntityId> = open.iter().copied().filter(|u| rank(*u) == best).collect();
                 self.kept_first(&tied, cons)
             } else {
                 let broken: Vec<EntityId> = open.iter().copied().filter(|u| cons.iter().any(|(c, us)| us.contains(u) && !holds[c])).collect();
@@ -263,20 +273,29 @@ impl Sketch {
                 with.insert(u);
                 let keep = |c: crate::ids::ConstraintId, us: &[EntityId]| us.contains(&u) && us.iter().all(|x| with.contains(x)) && (us.iter().all(|x| *x == u || placed.contains(x)) || self.connective(c));
                 let Some(mut sub) = self.sub_sketch_by(cons, &keep, &fixed) else { return false };
-                if (shape == 3 || shape == 2) && !self.hold_size(&mut sub, u) {
+                if (shape == 3 || shape == 2) && !orig.hold_size(&mut sub, u) {
                     continue;
                 }
-                if (shape == 3 || shape == 1) && !self.hold_direction(&mut sub, u) {
+                if (shape == 3 || shape == 1) && !orig.hold_direction(&mut sub, u) {
                     continue;
+                }
+                // Carried whole when it keeps its shape; else a line's least
+                // change from where it was (probe t1: a rectangle's top,
+                // raised and stretched, keeps its far end's x).
+                if shape < 3 && self.kind(u) == Some(EntityKind::Line) {
+                    for (p, q) in &before {
+                        let _ = sub.set_point(*p, *q);
+                    }
                 }
                 let opts = SolveOptions { light: vec![u], still: anchor.into_iter().collect(), analyze: false, constructive: false, ..Default::default() };
                 let st = sub.solve_with(&opts).status;
-                // Carried whole with its neighbours let go: only when each
-                // of them can follow by stretching along itself (live fuzz
-                // s5: a rectangle's top side stretches as the right side
-                // moves out; s8: a triangle side tied to a turned line turns
-                // too, its other end stays).
-                if !hold_neighbours && shape == 3 && matches!(st, SolveStatus::Solved) && !held.is_empty() && !self.neighbours_stretch(&sub, u, &held, &before) {
+                // With its neighbours let go: only when each of them can
+                // follow, stretching along itself or carried by a neighbour
+                // that can (live fuzz s5: a rectangle's right side moves out
+                // whole, the top stretches; s8: a triangle side tied to a
+                // turned line turns too, its other end stays; probe t1: the
+                // top doesn't move sideways, the left side couldn't follow).
+                if !hold_neighbours && shape >= 1 && matches!(st, SolveStatus::Solved) && !held.is_empty() && !self.neighbours_follow(&sub, u, &held, &before, &placed) {
                     continue;
                 }
                 if matches!(st, SolveStatus::Solved) {
@@ -346,25 +365,60 @@ impl Sketch {
         true
     }
 
-    /// Whether every point `u` shares with a unit of `held` moved (from
-    /// `before` to `sub`) only along that unit's line, or not at all.
-    fn neighbours_stretch(&self, sub: &Sketch, u: EntityId, held: &BTreeSet<EntityId>, before: &HashMap<EntityId, DVec2>) -> bool {
+    /// Whether each unit of `held` sharing a point `u` moved (from `before`
+    /// to `sub`) can follow it: the move runs along its line, or it can be
+    /// carried across itself because each other unit at its other points is
+    /// unplaced and runs along that part of the move.
+    fn neighbours_follow(&self, sub: &Sketch, u: EntityId, held: &BTreeSet<EntityId>, before: &HashMap<EntityId, DVec2>, placed: &BTreeSet<EntityId>) -> bool {
         let Some(own) = self.entity(u).map(|e| e.point_refs()) else { return false };
-        for c in self.constraints().filter(|c| c.driving) {
-            let ConstraintKind::Coincident { a, b } = c.kind else { continue };
-            for (mine, theirs) in [(a, b), (b, a)] {
-                if !own.contains(&mine) {
+        let along = |v: EntityId, d: DVec2| self.placing_line_dir(v).filter(|x| x.length() > 0.0).is_some_and(|dir| dir.normalize().perp_dot(d).abs() <= 1e-9);
+        // The units sharing point p (through a Coincident), but `not`.
+        let sharing = |p: EntityId, not: EntityId| -> Vec<(EntityId, EntityId)> {
+            self.constraints()
+                .filter(|c| c.driving)
+                .filter_map(|c| match c.kind {
+                    ConstraintKind::Coincident { a, b } if a == p => Some(b),
+                    ConstraintKind::Coincident { a, b } if b == p => Some(a),
+                    _ => None,
+                })
+                .filter_map(|q| self.entities().find(|e| e.id != not && e.point_refs().contains(&q)).map(|e| (e.id, q)))
+                .collect()
+        };
+        for &mine in own.iter() {
+            let (Some(p0), Some(p1)) = (before.get(&mine).copied(), sub.point(mine)) else { return false };
+            let d = p1 - p0;
+            if d.length() <= 1e-9 {
+                continue;
+            }
+            for (v, theirs) in sharing(mine, u) {
+                if !held.contains(&v) || along(v, d) {
                     continue;
                 }
-                let Some(v) = held.iter().find(|v| self.entity(**v).is_some_and(|e| e.point_refs().contains(&theirs))) else { continue };
-                let (Some(p0), Some(p1)) = (before.get(&mine).copied(), sub.point(mine)) else { return false };
-                let d = p1 - p0;
-                if d.length() <= 1e-9 {
-                    continue;
-                }
-                let Some(dir) = self.placing_line_dir(*v).filter(|x| x.length() > 0.0) else { return false };
-                if dir.normalize().perp_dot(d).abs() > 1e-9 {
-                    return false;
+                // Carried across itself (it stretches along): its other
+                // points' units stretch along that.
+                // (Only lines are judged: an arc or circle follows its own
+                // way, live fuzz s17's slot.)
+                let Some(dir) = self.placing_line_dir(v).filter(|x| x.length() > 0.0).map(|x| x.normalize()) else { continue };
+                let t = d - dir * dir.dot(d);
+                let Some(vp) = self.entity(v).map(|e| e.point_refs()) else { return false };
+                let n = dir.perp();
+                for q in vp.iter().copied().filter(|q| *q != theirs) {
+                    for (w, wq) in sharing(q, v) {
+                        let follows = if w == u {
+                            false
+                        } else if placed.contains(&w) {
+                            // Placed: it already took its end the same way
+                            // across (live fuzz s14: a slot's side between
+                            // two shrunk arcs).
+                            let (Some(a), Some(b)) = (self.point(wq), self.point(q)) else { return false };
+                            ((a - b) - t).dot(n).abs() <= 1e-9
+                        } else {
+                            self.kind(w) != Some(EntityKind::Line) || along(w, t)
+                        };
+                        if !follows {
+                            return false;
+                        }
+                    }
                 }
             }
         }
@@ -401,6 +455,40 @@ impl Sketch {
         let key = |u: EntityId| if g == 1 { self.size(u) } else { self.placing_line_dir(u).map_or(f64::MAX, |d| d.y.atan2(d.x).rem_euclid(std::f64::consts::PI)) };
         let kk = key(k);
         !kk.is_finite() || class.iter().all(|u| *u == k || key(*u).partial_cmp(&kk) != Some(std::cmp::Ordering::Less))
+    }
+
+    /// Whether line `k`'s direction already agrees with the member its
+    /// Parallel / Perpendicular class keeps (the smallest angle in
+    /// [0°, 180°), offset 90° per Perpendicular on the way); true off any
+    /// such class (live fuzz s14: l3, the shortest of its Equal class, still
+    /// turns Parallel to the vertical l8, so it isn't kept as it is).
+    fn direction_agrees(&self, k: EntityId, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)]) -> bool {
+        use std::f64::consts::{FRAC_PI_2, PI};
+        let angle = |u: EntityId| self.placing_line_dir(u).filter(|d| d.length() > 0.0).map(|d| d.y.atan2(d.x).rem_euclid(PI));
+        let Some(ak) = angle(k) else { return true };
+        let mut class: HashMap<EntityId, f64> = HashMap::from([(k, 0.0)]);
+        let mut todo = vec![k];
+        while let Some(u) = todo.pop() {
+            for (x, us) in cons {
+                let off = match self.constraint(*x).map(|c| &c.kind) {
+                    Some(ConstraintKind::Parallel { .. }) => 0.0,
+                    Some(ConstraintKind::Perpendicular { .. }) => FRAC_PI_2,
+                    _ => continue,
+                };
+                if us.len() != 2 || !us.contains(&u) {
+                    continue;
+                }
+                let v = if us[0] == u { us[1] } else { us[0] };
+                let at = class[&u] + off;
+                if let std::collections::hash_map::Entry::Vacant(e) = class.entry(v) {
+                    e.insert(at);
+                    todo.push(v);
+                }
+            }
+        }
+        let Some((best, off)) = class.iter().filter_map(|(u, off)| angle(*u).map(|a| (a, *off))).min_by(|a, b| a.0.total_cmp(&b.0)) else { return true };
+        let d = (ak - (best - off)).rem_euclid(PI);
+        d.min(PI - d) <= 1e-9
     }
 
     /// Whether relation `c` reaches, through relations of its kind (Equal

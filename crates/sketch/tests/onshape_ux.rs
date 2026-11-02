@@ -454,3 +454,26 @@ fn slot_has_live_constraint_set_and_follows_its_width() {
     assert!(matches!(start_cap, Curve2::Arc { radius, center, .. } if (radius - 2.0).abs() < 1e-9 && center.length() < 1e-9), "{start_cap:?}");
     assert_eq!(sk.regions().len(), 1);
 }
+
+#[test]
+fn corner_rectangle_width_edit_keeps_its_height() {
+    // Live (fuzz probes 3, r1–r10): a lone rectangle keeps its lower-left
+    // corner and its other sides; a new width moves the right side only.
+    // The corner rectangle's own constraints (Perpendicular top / left,
+    // Parallel pairs, Horizontal top), as ops' e2e configurations drives it.
+    for constructive in [false, true] {
+        let mut sk = Sketch::new();
+        let r = sk.corner_rectangle(v(0.0, 0.0), v(40.0, 20.0));
+        let bottom = r.curves[0];
+        let d = sk.add_constraint(ConstraintKind::Length { curve: bottom, value: 40.0 }).unwrap();
+        assert!(sk.solve().is_solved());
+        sk.set_dimension_value(d, 50.0).unwrap();
+        let opts = if constructive { SolveOptions { constructive: true, ..Default::default() } } else { sk.dimension_edit_options(d) };
+        assert!(sk.solve_with(&opts).is_solved());
+        let at: Vec<DVec2> = r.points.iter().map(|p| sk.point(*p).unwrap()).collect();
+        let want = [v(0.0, 0.0), v(50.0, 0.0), v(50.0, 20.0), v(0.0, 20.0)];
+        for (a, b) in at.iter().zip(want) {
+            assert!((*a - b).length() < 1e-6, "constructive {constructive}: {at:?}");
+        }
+    }
+}

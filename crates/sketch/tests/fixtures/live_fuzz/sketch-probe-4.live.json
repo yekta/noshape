@@ -1,0 +1,493 @@
+{
+ "note": "Live 2026-11-02, Part Studio \"skasm probes 4\" in \"skasm speed\"; each probe POSTed as is on Top; points via evVertexPoint (mm, 6 dp). unchanged_points = points still at the posted position.",
+ "cases": {
+  "t1": {
+   "what": "t1 line Perpendicular to the rectangle's left side; rectangle bottom 25 and right 12",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     65.0,
+     0.0
+    ],
+    "l1.start": [
+     40.0,
+     0.0
+    ],
+    "l2.end": [
+     65.0,
+     12.0
+    ],
+    "l2.start": [
+     65.0,
+     0.0
+    ],
+    "l3.end": [
+     40.0,
+     12.0
+    ],
+    "l3.start": [
+     65.0,
+     12.0
+    ],
+    "l4.end": [
+     40.0,
+     0.0
+    ],
+    "l4.start": [
+     40.0,
+     12.0
+    ],
+    "l5.end": [
+     20.0,
+     0.0
+    ],
+    "l5.start": [
+     0.0,
+     0.0
+    ]
+   },
+   "unchanged_points": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     20.0,
+     0.0
+    ],
+    [
+     40.0,
+     0.0
+    ]
+   ]
+  },
+  "t2": {
+   "what": "t2 as t1, the line also dimensioned 25",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     65.0,
+     0.0
+    ],
+    "l1.start": [
+     40.0,
+     0.0
+    ],
+    "l2.end": [
+     65.0,
+     12.0
+    ],
+    "l2.start": [
+     65.0,
+     0.0
+    ],
+    "l3.end": [
+     40.0,
+     12.0
+    ],
+    "l3.start": [
+     65.0,
+     12.0
+    ],
+    "l4.end": [
+     40.0,
+     0.0
+    ],
+    "l4.start": [
+     40.0,
+     12.0
+    ],
+    "l5.end": [
+     25.0,
+     0.0
+    ],
+    "l5.start": [
+     0.0,
+     0.0
+    ]
+   },
+   "unchanged_points": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     40.0,
+     0.0
+    ]
+   ]
+  },
+  "t3": {
+   "what": "t3 line Perpendicular to the left side, only the line dimensioned 25",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     60.0,
+     0.0
+    ],
+    "l1.start": [
+     40.0,
+     0.0
+    ],
+    "l2.end": [
+     60.0,
+     10.0
+    ],
+    "l2.start": [
+     60.0,
+     0.0
+    ],
+    "l3.end": [
+     40.0,
+     10.0
+    ],
+    "l3.start": [
+     60.0,
+     10.0
+    ],
+    "l4.end": [
+     40.0,
+     0.0
+    ],
+    "l4.start": [
+     40.0,
+     10.0
+    ],
+    "l5.end": [
+     25.0,
+     0.0
+    ],
+    "l5.start": [
+     0.0,
+     0.0
+    ]
+   },
+   "unchanged_points": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     40.0,
+     0.0
+    ],
+    [
+     40.0,
+     10.0
+    ],
+    [
+     60.0,
+     0.0
+    ],
+    [
+     60.0,
+     10.0
+    ]
+   ]
+  },
+  "t4": {
+   "what": "t4 line Perpendicular to the right side; rectangle bottom 25 and right 12",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     65.0,
+     0.0
+    ],
+    "l1.start": [
+     40.0,
+     0.0
+    ],
+    "l2.end": [
+     65.0,
+     12.0
+    ],
+    "l2.start": [
+     65.0,
+     0.0
+    ],
+    "l3.end": [
+     40.0,
+     12.0
+    ],
+    "l3.start": [
+     65.0,
+     12.0
+    ],
+    "l4.end": [
+     40.0,
+     0.0
+    ],
+    "l4.start": [
+     40.0,
+     12.0
+    ],
+    "l5.end": [
+     20.0,
+     0.0
+    ],
+    "l5.start": [
+     0.0,
+     0.0
+    ]
+   },
+   "unchanged_points": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     20.0,
+     0.0
+    ],
+    [
+     40.0,
+     0.0
+    ]
+   ]
+  },
+  "t5": {
+   "what": "t5 line Parallel to the bottom; rectangle bottom 25 and right 12",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     65.0,
+     0.0
+    ],
+    "l1.start": [
+     40.0,
+     0.0
+    ],
+    "l2.end": [
+     65.0,
+     12.0
+    ],
+    "l2.start": [
+     65.0,
+     0.0
+    ],
+    "l3.end": [
+     40.0,
+     12.0
+    ],
+    "l3.start": [
+     65.0,
+     12.0
+    ],
+    "l4.end": [
+     40.0,
+     0.0
+    ],
+    "l4.start": [
+     40.0,
+     12.0
+    ],
+    "l5.end": [
+     20.0,
+     0.0
+    ],
+    "l5.start": [
+     0.0,
+     0.0
+    ]
+   },
+   "unchanged_points": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     20.0,
+     0.0
+    ],
+    [
+     40.0,
+     0.0
+    ]
+   ]
+  },
+  "t6": {
+   "what": "t6 line Parallel to the top; rectangle bottom 25 and right 12",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     65.0,
+     0.0
+    ],
+    "l1.start": [
+     40.0,
+     0.0
+    ],
+    "l2.end": [
+     65.0,
+     12.0
+    ],
+    "l2.start": [
+     65.0,
+     0.0
+    ],
+    "l3.end": [
+     40.0,
+     12.0
+    ],
+    "l3.start": [
+     65.0,
+     12.0
+    ],
+    "l4.end": [
+     40.0,
+     0.0
+    ],
+    "l4.start": [
+     40.0,
+     12.0
+    ],
+    "l5.end": [
+     20.0,
+     0.0
+    ],
+    "l5.start": [
+     0.0,
+     0.0
+    ]
+   },
+   "unchanged_points": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     20.0,
+     0.0
+    ],
+    [
+     40.0,
+     0.0
+    ]
+   ]
+  },
+  "t7": {
+   "what": "t7 no relation, both dimensioned (rectangle bottom 25 / right 12, line 25)",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     65.0,
+     0.0
+    ],
+    "l1.start": [
+     40.0,
+     0.0
+    ],
+    "l2.end": [
+     65.0,
+     12.0
+    ],
+    "l2.start": [
+     65.0,
+     0.0
+    ],
+    "l3.end": [
+     40.0,
+     12.0
+    ],
+    "l3.start": [
+     65.0,
+     12.0
+    ],
+    "l4.end": [
+     40.0,
+     0.0
+    ],
+    "l4.start": [
+     40.0,
+     12.0
+    ],
+    "l5.end": [
+     25.0,
+     0.0
+    ],
+    "l5.start": [
+     0.0,
+     0.0
+    ]
+   },
+   "unchanged_points": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     40.0,
+     0.0
+    ]
+   ]
+  },
+  "t8": {
+   "what": "t8 line Perpendicular to the left side; rectangle bottom 15 (shrink) and right 12 (grow)",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     55.0,
+     0.0
+    ],
+    "l1.start": [
+     40.0,
+     0.0
+    ],
+    "l2.end": [
+     55.0,
+     12.0
+    ],
+    "l2.start": [
+     55.0,
+     0.0
+    ],
+    "l3.end": [
+     40.0,
+     12.0
+    ],
+    "l3.start": [
+     55.0,
+     12.0
+    ],
+    "l4.end": [
+     40.0,
+     0.0
+    ],
+    "l4.start": [
+     40.0,
+     12.0
+    ],
+    "l5.end": [
+     20.0,
+     0.0
+    ],
+    "l5.start": [
+     0.0,
+     0.0
+    ]
+   },
+   "unchanged_points": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     20.0,
+     0.0
+    ],
+    [
+     40.0,
+     0.0
+    ]
+   ]
+  }
+ }
+}

@@ -988,13 +988,18 @@ fn probe_matches() {
     }
 }
 
-/// One generated case solved as live_matches does, its points printed as
-/// JSON (FUZZ_SEED=<seed>; 101 on are rich).
+/// One generated case (FUZZ_SEED=<seed>; 101 on are rich) or probe
+/// (FUZZ_PROBE=t1) solved as live_matches does, its points printed as JSON.
 #[test]
 #[ignore = "T2: one live fuzz case"]
 fn one_case() {
-    let seed: u64 = std::env::var("FUZZ_SEED").unwrap().parse().unwrap();
-    let mut c = generate(seed, seed > 100);
+    let probe = std::env::var("FUZZ_PROBE").ok();
+    let Some(mut c) = probe.as_ref().and_then(|p| [probes(), probes2(), probes3(), probes4()].into_iter().flatten().find(|(n, _)| n.split(' ').next() == Some(p.as_str())).map(|(_, c)| c)).or_else(|| {
+        let seed: u64 = std::env::var("FUZZ_SEED").ok()?.parse().ok()?;
+        Some(generate(seed, seed > 100))
+    }) else {
+        return;
+    };
     let o = ours(&mut c);
     eprintln!("{}", o["points"]);
 }
