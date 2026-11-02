@@ -7,7 +7,7 @@
 //! the cases with our answers; live's answers come back as
 //! `sketch-N.live.json` and `live_matches` compares them (T2).
 //!
-//! Write a batch: `LIVE_FUZZ_WRITE=1 cargo test -p noshape-sketch --test all live_fuzz::write_batch -- --ignored`.
+//! Write batch n: `LIVE_FUZZ_WRITE=<n> cargo test -p noshape-sketch --test all live_fuzz::write_batch -- --ignored`.
 use noshape_sketch::*;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -34,6 +34,8 @@ enum Kind {
     Line,
     Arc,
     Circle,
+    /// Fit spline or conic (named endpoints only).
+    Free,
 }
 
 /// One case built in both forms.
@@ -103,6 +105,40 @@ impl Case {
             "geometry": {"btType": "BTCurveGeometryCircle-115", "radius": r * MM, "xCenter": c.x * MM, "yCenter": c.y * MM, "xDir": 1.0, "yDir": 0.0, "clockwise": false}}));
         id
     }
+    /// Open interpolating spline through `pts` (natural ends).
+    fn spline(&mut self, pts: &[DVec2]) -> String {
+        let id = format!("p{}", self.curves.len() + 1);
+        let mm: Vec<DVec2> = pts.iter().map(|p| *p * MM).collect();
+        let e = self.sk.add_fit_spline(&mm).unwrap();
+        let (a, b) = self.sk.endpoints(e).unwrap();
+        self.points.push((format!("{id}.start"), a));
+        self.points.push((format!("{id}.end"), b));
+        self.curves.push((id.clone(), e, Kind::Free));
+        let flat: Vec<f64> = mm.iter().flat_map(|p| [p.x, p.y]).collect();
+        self.os_entities.push(json!({"btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "startParam": 0.0, "endParam": 1.0,
+            "geometry": {"btType": "BTCurveGeometryInterpolatedSpline-116", "isPeriodic": false, "interpolationPoints": flat, "startDerivativeX": 0.0, "startDerivativeY": 0.0, "endDerivativeX": 0.0, "endDerivativeY": 0.0, "startHandleX": 0.0, "startHandleY": 0.0, "endHandleX": 0.0, "endHandleY": 0.0, "derivatives": {}}}));
+        id
+    }
+    fn conic(&mut self, a: DVec2, ctrl: DVec2, b: DVec2, rho: f64) -> String {
+        let id = format!("q{}", self.curves.len() + 1);
+        let e = self.sk.add_conic(a * MM, ctrl * MM, b * MM, rho).unwrap();
+        let (pa, pb) = self.sk.endpoints(e).unwrap();
+        self.points.push((format!("{id}.start"), pa));
+        self.points.push((format!("{id}.end"), pb));
+        self.curves.push((id.clone(), e, Kind::Free));
+        self.os_entities.push(json!({"btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "startParam": 0.0, "endParam": 1.0,
+            "geometry": {"btType": "BTCurveGeometryConic-2284", "rho": rho, "points": [a.x * MM, a.y * MM, ctrl.x * MM, ctrl.y * MM, b.x * MM, b.y * MM]}}));
+        id
+    }
+    /// Angle from line `a` to line `b`, counter-clockwise (degrees).
+    fn angle(&mut self, a: &str, b: &str, deg: f64) {
+        let (x, y) = (self.curve(a), self.curve(b));
+        self.con(ConstraintKind::Angle { a: x, b: y, value: deg.to_radians() }, "ANGLE", vec![s("localFirst", a), s("localSecond", b),
+            json!({"btType": "BTMParameterQuantity-147", "parameterId": "angle", "expression": format!("{deg:.6} deg"), "isInteger": false, "value": 0, "units": ""}),
+            json!({"btType": "BTMParameterBoolean-144", "parameterId": "clockwise", "value": false}),
+            json!({"btType": "BTMParameterBoolean-144", "parameterId": "aligned", "value": true}),
+            json!({"btType": "BTMParameterBoolean-144", "parameterId": "flipped", "value": false})], json!({"first": a, "second": b, "deg": deg}));
+    }
     fn circle(&mut self, c: DVec2, r: f64) -> String {
         let id = format!("c{}", self.curves.len() + 1);
         let e = self.sk.add_circle(c * MM, r * MM);
@@ -166,8 +202,8 @@ impl Case {
     }
 }
 
-/// A random plausible sketch.
-fn generate(seed: u64) -> Case {
+/// A random plausible sketch; `rich` adds splines, conics and angles (batch 2 on).
+fn generate(seed: u64, rich: bool) -> Case {
     let mut r = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0xD1B5_4A32_D192_ED03);
     for _ in 0..4 {
         r.next();
@@ -176,7 +212,7 @@ fn generate(seed: u64) -> Case {
     let shapes = 1 + r.below(3);
     for k in 0..shapes {
         let o = DVec2::new(k as f64 * 60.0 + r.range(-5.0, 5.0), r.range(-5.0, 5.0));
-        match r.below(5) {
+        match r.below(if rich { 7 } else { 5 }) {
             // Rectangle: 4 lines, corners coincident, some sides horizontal / vertical.
             0 => {
                 let (w, h) = (r.range(10.0, 40.0), r.range(8.0, 30.0));
@@ -228,6 +264,33 @@ fn generate(seed: u64) -> Case {
                     c.pair("TANGENT", x, y);
                 }
             }
+            // Fit spline over a horizontal line closing it.
+            5 => {
+                let (w, h) = (r.range(15.0, 35.0), r.range(5.0, 15.0));
+                let n = 3 + r.below(2);
+                let pts: Vec<DVec2> = (0..n).map(|i| {
+                    let t = i as f64 / (n - 1) as f64;
+                    o + DVec2::new(w * t, if i == 0 || i == n - 1 { 0.0 } else { h * r.range(0.6, 1.2) })
+                }).collect();
+                let p = c.spline(&pts);
+                let l = c.line(o + DVec2::new(w, 0.0), o);
+                c.coincident(&format!("{p}.end"), &format!("{l}.start"));
+                c.coincident(&format!("{l}.end"), &format!("{p}.start"));
+                if r.chance(0.7) {
+                    c.hv(true, &l);
+                }
+            }
+            // Conic closed by a line.
+            6 => {
+                let (w, h) = (r.range(15.0, 35.0), r.range(5.0, 15.0));
+                let q = c.conic(o, o + DVec2::new(w * r.range(0.3, 0.7), h), o + DVec2::new(w, 0.0), (r.range(0.3, 0.7) * 100.0).round() / 100.0);
+                let l = c.line(o + DVec2::new(w, 0.0), o);
+                c.coincident(&format!("{q}.end"), &format!("{l}.start"));
+                c.coincident(&format!("{l}.end"), &format!("{q}.start"));
+                if r.chance(0.7) {
+                    c.hv(true, &l);
+                }
+            }
             // Circle, sometimes with a concentric one.
             _ => {
                 let rad = r.range(5.0, 15.0);
@@ -240,7 +303,7 @@ fn generate(seed: u64) -> Case {
         }
     }
     let lines: Vec<String> = c.curves.iter().filter(|x| x.2 == Kind::Line).map(|x| x.0.clone()).collect();
-    let round: Vec<String> = c.curves.iter().filter(|x| x.2 != Kind::Line).map(|x| x.0.clone()).collect();
+    let round: Vec<String> = c.curves.iter().filter(|x| matches!(x.2, Kind::Arc | Kind::Circle)).map(|x| x.0.clone()).collect();
     let pts: Vec<String> = c.points.iter().map(|x| x.0.clone()).collect();
     // Relations the drawing nearly has already (a designer's next click):
     // Parallel / Perpendicular for lines within 15° of it, Equal for lengths
@@ -264,7 +327,14 @@ fn generate(seed: u64) -> Case {
                 }
                 let cos = dir_of(&c, &a).dot(dir_of(&c, &b)).abs();
                 let ratio = len_of(&c, &a) / len_of(&c, &b);
-                if cos > 15f64.to_radians().cos() && r.chance(0.5) {
+                if rich && cos < 0.9 && cos > 0.1 && r.chance(0.5) {
+                    // The drawn angle from a to b (counter-clockwise, a and b
+                    // swapped when it is negative), give or take 10 %.
+                    let (u, v) = (dir_of(&c, &a), dir_of(&c, &b));
+                    let th = u.perp_dot(v).atan2(u.dot(v));
+                    let (a, b, th) = if th < 0.0 { (b, a, -th) } else { (a, b, th) };
+                    c.angle(&a, &b, (th.to_degrees() * r.range(0.9, 1.1) * 1000.0).round() / 1000.0);
+                } else if cos > 15f64.to_radians().cos() && r.chance(0.5) {
                     c.pair("PARALLEL", &a, &b);
                 } else if cos < 15f64.to_radians().sin() && r.chance(0.5) {
                     c.pair("PERPENDICULAR", &a, &b);
@@ -372,10 +442,10 @@ fn ours_points(c: &Case) -> BTreeMap<String, [f64; 2]> {
     }).collect()
 }
 
-fn batch(n: usize, first_seed: u64) -> Value {
+fn batch(n: usize, first_seed: u64, rich: bool) -> Value {
     let cases: Vec<Value> = (0..n as u64).map(|k| {
         let seed = first_seed + k;
-        let mut c = generate(seed);
+        let mut c = generate(seed, rich);
         let ours = ours(&mut c);
         // A drag on solved cases: the first line's start (or a curve's
         // center) moved 5 mm in X and 3 mm in Y, as one pointer drag.
@@ -401,18 +471,27 @@ fn fixture(name: &str) -> std::path::PathBuf {
 #[test]
 #[ignore = "T2: live fuzz batch"]
 fn write_batch() {
-    let b = batch(20, 1);
-    let path = fixture("sketch-1.json");
-    if std::env::var("LIVE_FUZZ_WRITE").is_ok() {
+    for (n, first, rich) in [(1, 1, false), (2, 101, true)] {
+        check_batch(n, first, rich);
+    }
+}
+
+/// Batch `n` (20 seeds from `first`): written when LIVE_FUZZ_WRITE is set,
+/// else checked unchanged.
+fn check_batch(n: usize, first: u64, rich: bool) {
+    let b = batch(20, first, rich);
+    let path = fixture(&format!("sketch-{n}.json"));
+    // LIVE_FUZZ_WRITE=<n>: (re)write batch n only (a batch sent to live stays as sent).
+    if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == n.to_string()) {
         std::fs::write(&path, serde_json::to_string_pretty(&b).unwrap()).unwrap();
     }
     let stored: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
     for (x, y) in b["cases"].as_array().unwrap().iter().zip(stored["cases"].as_array().unwrap()) {
         assert_eq!(x["onshape"], y["onshape"], "{}: the generator changed", x["case"]);
     }
-    let n = b["cases"].as_array().unwrap().len();
+    let count = b["cases"].as_array().unwrap().len();
     let solved = b["cases"].as_array().unwrap().iter().filter(|c| c["ours"]["status"] == "solved").count();
-    println!("batch 1: {n} cases, {solved} solved by ours");
+    println!("batch {}: {count} cases, {solved} solved by ours", path.display());
 }
 
 /// Differences of ours from live on one case (empty: a match). Positions
