@@ -1098,8 +1098,9 @@ fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations
     }
     let follows: Vec<usize> = moving.iter().flat_map(|&b| driven.dependents[b].iter().copied()).collect();
     let mut trial: Vec<SolverBody> = bodies.iter().enumerate().map(|(i, b)| SolverBody { pose: b.pose, fixed: b.fixed || !(moving.contains(&i) || follows.contains(&i)) }).collect();
-    solve_inner(&mut trial, mates, relations, drags, false, false, None);
-    let r = solve_inner(&mut trial, mates, relations, &[], false, true, memo);
+    let trial_driven = Driven::new(&trial, mates);
+    solve_driven(&mut trial, mates, relations, drags, false, false, None, &trial_driven);
+    let r = solve_driven(&mut trial, mates, relations, &[], false, true, memo, &trial_driven);
     let reached = drags.iter().all(|d| trial[d.body].pose.transform_point(d.local_point).distance(d.target) < 1e-7);
     // The dragged bodies' mates must hold (a failing mate elsewhere isn't
     // this step's business); with relations, everything must.
@@ -1326,12 +1327,19 @@ fn group_terms(bodies: &[SolverBody], mates: &[SolverMate], relations: &[SolverR
 }
 
 fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool, status: bool, memo: Option<&std::cell::RefCell<MateMemo>>) -> SolveResult {
-    let mut poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
     let driven = Driven::new(bodies, mates);
+    solve_driven(bodies, mates, relations, drags, dof, status, memo, &driven)
+}
+
+/// [`solve_inner`] with the copies' [`Driven`] already built for `bodies`
+/// (a drag step's two passes share one).
+#[allow(clippy::too_many_arguments)]
+fn solve_driven(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool, status: bool, memo: Option<&std::cell::RefCell<MateMemo>>, driven: &Driven) -> SolveResult {
+    let mut poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
     driven.place(mates, &mut poses, None);
     let scale = characteristic_length(&poses, mates).max(1e-3);
     let mut result = SolveResult { mate_ok: vec![false; mates.len()], body_dof: vec![0; bodies.len()], ..Default::default() };
-    let (groups, loose) = group_terms(bodies, mates, relations, drags, true, &driven);
+    let (groups, loose) = group_terms(bodies, mates, relations, drags, true, driven);
     if dof {
         // Unconstrained and not dragged: free in all 6 directions.
         for i in loose {
@@ -1350,7 +1358,7 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
         let solved: Vec<(Vec<(usize, Frame)>, usize)> = groups
             .par_iter()
             .filter_map(|(free, terms)| {
-                let problem = Problem { bodies, mates, relations, drags, driven: &driven, terms: terms.clone(), scale };
+                let problem = Problem { bodies, mates, relations, drags, driven, terms: terms.clone(), scale };
                 let dragged = terms.iter().any(|t| matches!(t, Term::Drag(_)));
                 // Already solved (a drag's untouched groups, held by their
                 // stays): Levenberg-Marquardt would stop at once without a
@@ -1413,7 +1421,7 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
             .par_iter()
             .filter(|_| dof)
             .map(|(free, terms)| {
-                let mut nodrag = Problem { bodies, mates, relations, drags, driven: &driven, terms: terms.iter().copied().filter(|t| !matches!(t, Term::Drag(_) | Term::Stay(_))).collect(), scale };
+                let mut nodrag = Problem { bodies, mates, relations, drags, driven, terms: terms.iter().copied().filter(|t| !matches!(t, Term::Drag(_) | Term::Stay(_))).collect(), scale };
                 // The group's own length scale, so the analysis (and its cache key)
                 // doesn't change when an instance far away is inserted or moved.
                 nodrag.scale = group_length(&nodrag, poses);
