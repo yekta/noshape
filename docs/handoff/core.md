@@ -20,7 +20,11 @@ clifuzz_nf.py 1212 60: unpatched hangs at step 58, patched 0.4 s), in /root/occt
 each feature), loft rect -> circle split in equal arcs (80b0d015, live 1788: 0.2 % under live, which lofts cubic fits).
 shell-hang now: Shell 3's pinch is gone (177929.9737 / live .9741, 42 faces, 1 shell, 0.75 s by slabs: kernel T2
 shell::shellhang_shell3_probe), the document 15.3 s, of it Shell 5 14.5 s then failing (live not asked for Shell 5).
-Asked live: 1794 (SHELL-INNER-OFFSET-DELTA's part). Next: the direct Shell path's speed on free-form faces (its
+Live 1794: SHELL-INNER-OFFSET-DELTA's Shell fails in Parasolid (no cavity behind the opening): ours now fails at once
+(shell.cpp opening_too_shallow). Live 1795: shell-hang's Shell 5 BUILDS in 0.3 s (175040.1025 mm³, 52 faces;
+tests/data/shell/shellhang-shell5-*; T2 probe shell::shellhang_shell5_probe): ours fails after 17 s (offset: no solid,
+quadrics: a corner's offsets don't meet, the slabs' 128-tool fuse 14 s and invalid): most of that part is thinner than
+two walls, which Parasolid leaves solid, hollowing only around the openings; none of our constructions does that yet. Next: the direct Shell path's speed on free-form faces (its
 self-interference check), finer reads for reuse (qa5's Fill), shell-hang's Shell 5.
 
 **LOFT-ONE-FACE (11-02 14:10, landing with this note).** features.cpp `merge_tangent_sides`: after the loft, chains of

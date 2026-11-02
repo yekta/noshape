@@ -9,9 +9,9 @@ and behaviours.md requests; ours from the T1 / T2 tests named. Status: ✅ match
 
 Match: MF1-4, RF1, DF1-2, OS1-2, TH1-2, EN1, FI1, BD1, RB1-2, SW5, RV5, SH6-7, DR5, CH7; BD2 (closed Boundary profiles
 refused, live's message) and WR1 (Wrap Add one part, 8 faces) fixed 11-02. Differ: FI2 (live builds a G1 Fill with a
-warning, ours fails), HX1 / HX2 (live's helix 378.420 mm long, ours 315.588: to look at), SW6 (5e-5 in volume), LF5
+warning, ours fails), SW6 (5e-5 in volume), LF5
 (2.3e-5), LF4 (1.4e-5: Normal to profile ends, as G32's interior columns), FL7 (live: "Edges must form single chain
-per part.", ours fillets: its rule asked, 1796). DR5b matches. (SW6's audit also lists our helix wire body, which
+per part.", ours fillets: its rule asked, 1796). DR5b and HX1 / HX2 match (live 1797: the oracle's 378.420 mm helix length included the base circle). (SW6's audit also lists our helix wire body, which
 live's figures leave out.)
 
 ## Coverage

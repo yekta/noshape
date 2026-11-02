@@ -990,3 +990,33 @@ fn shellhang_shell3_probe() {
     let slits: Vec<usize> = (0..ef.len()).filter(|&i| ef[i].len() == 2 && ef[i][0] == ef[i][1] && matches!(r.faces()[ef[i][0] as usize].face_surface(), Ok(Surface::Plane(_)))).collect();
     println!("{:.6} mm3 (live 177929.974087), {} faces, {} shells, valid {}, {:.0} ms via {}; slit edges {:?}", vol(&r), r.count(ShapeType::Face), r.count(ShapeType::Shell), r.is_valid(), t0.elapsed().as_secs_f64() * 1e3, last_shell_path(), slits);
 }
+
+/// Live 1794 (qa SHELL-INNER-OFFSET-DELTA): a fuzz part of 0.1-0.2 mm slabs, the face removed the bottom of one: every
+/// inward Shell fails in Parasolid (nothing behind the opening to hollow), outward 3 mm builds. Ours built a wall.
+#[test]
+fn an_opening_with_nothing_behind_it_fails_as_live() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_step(&dir.join("sid-shell2-input.step"), LengthUnit::Millimeter).unwrap().remove(0).shape;
+    let rm = faces_where(&s, |c| (c - DVec3::new(30.515171, 20.052576, -19.4)).length() < 1e-3);
+    assert_eq!(rm.len(), 1);
+    for t in [3.0, 0.5] {
+        assert!(shell_solid(&s, &rm, t, ShellSide::Inside, ShellMethod::Auto).is_err(), "{t} mm inward built");
+    }
+    assert!(shell_solid(&s, &rm, 3.0, ShellSide::Outside, ShellMethod::Auto).is_ok(), "outward");
+}
+
+/// shell-hang's Shell 5 (live 1795: OK in 0.3 s, 175040.1025 mm³, 52 faces, one body).
+#[test]
+#[ignore = "T2: probe"]
+fn shellhang_shell5_probe() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_step(&dir.join("shellhang-shell5-input.step"), LengthUnit::Millimeter).unwrap().remove(0).shape;
+    let rm = faces_where(&s, |c| (c - DVec3::new(-57.5, -37.0, 0.0)).length() < 1e-3 || (c - DVec3::new(2.509939, -4.556823, 9.985755)).length() < 1e-3);
+    let live = read_parasolid(&dir.join("shellhang-shell5-live.x_t"), LengthUnit::Millimeter).unwrap();
+    println!("input {:.4} mm3 {} faces; removing {}; live {:.4} mm3 {} faces", vol(&s), s.count(ShapeType::Face), rm.len(), vol(&live), live.count(ShapeType::Face));
+    let t0 = std::time::Instant::now();
+    match shell_solid(&s, &rm, 3.0, ShellSide::Inside, ShellMethod::Auto) {
+        Ok(r) => println!("ours {:.4} mm3, {} faces, valid {}, {:.0} ms via {}; live - ours {:.4}, ours - live {:.4}", vol(&r.shape), r.shape.count(ShapeType::Face), r.shape.is_valid(), t0.elapsed().as_secs_f64() * 1e3, last_shell_path(), vol(&cut(&live, &r.shape).unwrap().shape), vol(&cut(&r.shape, &live).unwrap().shape)),
+        Err(e) => println!("ours: {e} ({:.0} ms)", t0.elapsed().as_secs_f64() * 1e3),
+    }
+}

@@ -1611,7 +1611,8 @@ fn audit_cases() -> Vec<(&'static str, Studio)> {
     cases
 }
 
-/// Live's figures for the audit cases (fs-oracle-p1 results-11..13.jsonl, live 1739; a Helix's length as its wire).
+/// Live's figures for the audit cases (fs-oracle-p1 results-11..13.jsonl, live 1739; a Helix's length as its wire, HX1's
+/// corrected by live 1797: 315.588 mm, the oracle's 378.420 included the base circle).
 const AUDIT_LIVE: &[(&str, Audit)] = &[
     ("MF1", Audit { status: "OK", solids: (60000.0, 9800.0, 6, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
     ("MF2", Audit { status: "OK", solids: (52000.0, 9400.0, 6, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
@@ -1632,8 +1633,8 @@ const AUDIT_LIVE: &[(&str, Audit)] = &[
     ("RB1", Audit { status: "OK", solids: (12608.0, 12976.0, 15, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
     ("RB2", Audit { status: "OK", solids: (13728.0, 14056.0, 15, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
     ("WR1", Audit { status: "OK", solids: (6335.6853, 1920.9556, 8, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
-    ("HX1", Audit { status: "OK", solids: (6283.1853, 1884.9556, 3, 0, 1), sheets: (0.0, 0, 0), wire: 378.420214 }),
-    ("HX2", Audit { status: "OK", solids: (6283.1853, 1884.9556, 3, 0, 1), sheets: (0.0, 0, 0), wire: 378.420214 }),
+    ("HX1", Audit { status: "OK", solids: (6283.1853, 1884.9556, 3, 0, 1), sheets: (0.0, 0, 0), wire: 315.588 }),
+    ("HX2", Audit { status: "OK", solids: (6283.1853, 1884.9556, 3, 0, 1), sheets: (0.0, 0, 0), wire: 315.588 }),
     ("SW5", Audit { status: "OK", solids: (574.3832, 599.5159, 4, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
     ("SW6", Audit { status: "OK", solids: (9047.3203, 7602.07, 6, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
     ("LF4", Audit { status: "OK", solids: (5946.8647, 1907.678, 6, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),

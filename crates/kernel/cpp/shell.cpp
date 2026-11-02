@@ -508,6 +508,51 @@ bool in_onshape_mitre_band(const TopoDS_Shape& solid, const std::vector<TopoDS_S
 // offset t below the cavity floor; a through hole never. (Live also fails at
 // t <= ~1 when the tip cone's offset apex dips under the cavity floor: two
 // points only, not ruled here.)
+// Whether no removed face opens onto anything: inward, every sampled point of every removed face has the part's other
+// side less than a wall's thickness behind it (live 1794: the bottom face of a 0.1 mm slab, Shell 0.5 to 3 mm inward
+// all fail; Parasolid's shell has no cavity to open there).
+bool opening_too_shallow(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t)
+{
+  BRepClass3d_SolidClassifier in(solid);
+  Bnd_Box                     box;
+  BRepBndLib::Add(solid, box);
+  const double tol = 1e-7 * std::sqrt(box.SquareExtent());
+  for (const TopoDS_Shape& rf : removed)
+  {
+    const TopoDS_Face   f = TopoDS::Face(rf);
+    double              u0, u1, v0, v1;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    BRepAdaptor_Surface sa(f);
+    const int           n = 7;
+    for (int a = 0; a < n; ++a)
+      for (int b = 0; b < n; ++b)
+      {
+        const gp_Pnt2d uv(u0 + (u1 - u0) * (a + 0.5) / n, v0 + (v1 - v0) * (b + 0.5) / n);
+        if (BRepClass_FaceClassifier(f, uv, tol).State() != TopAbs_IN)
+          continue;
+        gp_Pnt p;
+        gp_Vec du, dv;
+        sa.D1(uv.X(), uv.Y(), p, du, dv);
+        gp_Vec nrm = du.Crossed(dv);
+        if (nrm.Magnitude() < 1e-12)
+          continue;
+        nrm.Normalize();
+        if (f.Orientation() == TopAbs_REVERSED)
+          nrm.Reverse();
+        // Material all the way to a wall's depth behind it.
+        bool deep = true;
+        for (int k = 1; k <= 4 && deep; ++k)
+        {
+          in.Perform(p.Translated(nrm * (-t * k / 4.0)), tol);
+          deep = in.State() == TopAbs_IN;
+        }
+        if (deep)
+          return false;
+      }
+  }
+  return true;
+}
+
 bool blind_hole_floor_too_thin(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t)
 {
   ShapeIMap rm;
@@ -4470,6 +4515,8 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
       if (shells > 1)
         fail_op("shell failed (Parasolid can't shell a solid with a void: live 1757)");
     }
+  if (!outward && !removed.empty() && opening_too_shallow(solid.shape, removed, thickness))
+    fail_op("shell failed (Parasolid has no cavity to open behind the removed faces: live 1794)");
   if (!outward && blind_hole_floor_too_thin(solid.shape, removed, thickness))
     fail_op("shell failed (Parasolid can't offset a blind hole's bottom past the cavity floor: live 'core (2026-10-27 b)')");
   const double gap = outward ? std::numeric_limits<double>::infinity() : offsets_touch_gap(solid.shape, removed, thickness);
