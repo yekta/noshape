@@ -183,15 +183,26 @@ impl VarCompletion {
         }
     }
 
+    /// `text` with entry `index` (the selected one when `None`) inserted,
+    /// and the cursor after it.
+    fn inserted(&self, index: Option<usize>, text: &str) -> Option<(String, usize)> {
+        let entry = self.entries.get(index.unwrap_or(self.selected))?;
+        let range = self.range.start.min(text.len())..self.range.end.min(text.len());
+        let (insert, at) = entry.insertion();
+        Some((format!("{}{}{}", &text[..range.start], insert, &text[range.end..]), range.start + at))
+    }
+
+    /// Whether Enter inserts the selected entry: it changes `text` (live
+    /// 11-02: `#va` + Enter gives `#var` and the field stays; with `#var`
+    /// typed, Enter commits).
+    pub fn enter_inserts(&self, text: &str) -> bool {
+        self.inserted(None, text).is_some_and(|(t, _)| t != text)
+    }
+
     /// Insert entry `index` (the selected one when `None`) into `state`.
     /// Returns the new text (the caller treats it as a user edit).
     pub fn accept(&self, index: Option<usize>, state: &Entity<InputState>, window: &mut Window, cx: &mut App) -> Option<String> {
-        let entry = self.entries.get(index.unwrap_or(self.selected))?;
-        let text = state.read(cx).value().to_string();
-        let range = self.range.start.min(text.len())..self.range.end.min(text.len());
-        let (insert, at) = entry.insertion();
-        let new_text = format!("{}{}{}", &text[..range.start], insert, &text[range.end..]);
-        let cursor = range.start + at;
+        let (new_text, cursor) = self.inserted(index, &state.read(cx).value())?;
         state.update(cx, |s, cx| {
             s.set_value(new_text.clone(), window, cx);
             s.set_selected_range(cursor..cursor, cx);

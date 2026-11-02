@@ -848,6 +848,12 @@ impl PartStudioView {
             self.measure_cache = None;
         }
         self.update_dialog_outputs(cx);
+        // The open dialog's variables follow the regeneration (VAR-AUTOCOMPLETE-ENTER: a dialog opened before the
+        // one defining `#wall_thickness` finished offered only "New variable…").
+        if let Some(e) = &self.edit {
+            let vars = self.scope_variables(Some(e.index), cx);
+            e.dialog.update(cx, |d, _| d.variables = vars);
+        }
         // Before building: the scene draws the edited sketch in its editing
         // colors only once `opts.editing_sketch` is set (otherwise an
         // existing sketch opened for editing showed gray until the next edit).

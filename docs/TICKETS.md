@@ -6,7 +6,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## From the user, 2026-11-02 (v0.4.19, macOS)
-- [ ] P1 VAR-AUTOCOMPLETE-ENTER (psui, user 11-02 23:30, v0.4.2x on macOS) in a dialog's number field, typing
+- [x] (psui 11-03 00:10, fixed by "psui: VAR-AUTOCOMPLETE-ENTER …": (1) an open feature dialog kept the variables of
+  the regeneration before it opened, so a dialog opened before the one defining `#wall_thickness` finished listed only
+  "New variable…" (now they follow every regeneration); (2) in a sketch dimension box Enter committed the typed `#wall`
+  (live 11-02: Enter inserts the highlighted entry and the box stays; only when that changes nothing, `#var` typed
+  whole, does it commit); (3) in a dialog field the inserted text came up selected (live: the caret after it, and the
+  next Enter accepts the dialog). T1 dialog_field_enter_inserts_the_highlighted_variable,
+  dimension_box_enter_inserts_the_highlighted_variable, a_first_click_into_a_number_field_selects_all. qa's first-click
+  and Tab findings are an Xvfb artifact: a window that was never activated (no window manager) gets no focus events,
+  so select-on-focus never runs; with `xdotool windowfocus` (or any real desktop) one click selects all as live (Tab
+  goes through the same select-on-focus).)
+  P1 VAR-AUTOCOMPLETE-ENTER (psui, user 11-02 23:30, v0.4.2x on macOS) in a dialog's number field, typing
   `#wall` then Enter doesn't take the first match `#wall_thickness`; live highlights the first match as you type and
   Enter inserts it. Reproduce side by side with live (which field, what Enter does in ours), fix, and make it the
   first scenario of the interaction suite (docs/PARITY-SUITES.md).

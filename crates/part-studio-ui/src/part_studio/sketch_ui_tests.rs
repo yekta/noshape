@@ -363,6 +363,92 @@ fn dimension_box_enter_commits_with_the_unit_list_open(cx: &mut TestAppContext) 
     assert!(near(&dimensions(cx, &view), &[0.0254]), "{:?}", dimensions(cx, &view));
 }
 
+/// A Part Studio with Variable `wall_thickness` = 4 mm (the user's VAR-AUTOCOMPLETE-ENTER).
+fn studio_with_wall_thickness(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>) {
+    let (window, view) = part_studio(cx, name);
+    cx.update(|cx| {
+        let (doc, tab) = { let v = view.read(cx); (v.doc.clone(), v.tab) };
+        doc.update(cx, |d, cx| {
+            let units = d.session.doc.settings.units;
+            d.edit_studio(tab, "Variable", cx, |ps| {
+                let mut f = ps.new_feature("assignVariable", &units).unwrap();
+                f.params.set("name", noshape_model::ParamValue::Text("wall_thickness".into()));
+                f.params.set("variableType", noshape_model::ParamValue::Enum("LENGTH".into()));
+                f.params.set("lengthValue", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("4 mm")));
+                ps.features.push(f);
+            });
+        });
+    });
+    draw(cx, window);
+    (window, view)
+}
+
+/// VAR-AUTOCOMPLETE-ENTER (live 11-02): `#wall` + Enter in a dimension's value box inserts the highlighted
+/// `#wall_thickness` and the box stays; the next Enter commits it.
+#[gpui::test]
+fn dimension_box_enter_inserts_the_highlighted_variable(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_wall_thickness(cx, "dim-wall");
+    let (window, view) = sketch_in(cx, window, view, Tool::Line);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (640., 360.));
+    keys(cx, window, &["5", "0", "enter", "escape", "escape"]);
+    let cid = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.constraints().find(|c| c.value().is_some()).unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_dim_edit(cid, w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["#", "w", "a", "l", "l", "enter"]);
+    let box_text = cx.update(|cx| view.read(cx).dim_input.as_ref().map(|d| d.1.read(cx).value().to_string()));
+    assert_eq!(box_text.as_deref(), Some("#wall_thickness"), "inserted, the box open");
+    assert!(near(&dimensions(cx, &view), &[0.05]), "not committed yet: {:?}", dimensions(cx, &view));
+    keys(cx, window, &["enter"]);
+    assert!(cx.update(|cx| view.read(cx).dim_input.is_none()), "the second Enter commits");
+    assert!(near(&dimensions(cx, &view), &[0.004]), "{:?}", dimensions(cx, &view));
+}
+
+/// VAR-AUTOCOMPLETE-ENTER (live 11-02): `#wall` + Enter in Extrude's Depth inserts `#wall_thickness`, the cursor
+/// after it (not selected), the dialog open; the next Enter accepts it.
+#[gpui::test]
+fn dialog_field_enter_inserts_the_highlighted_variable(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_wall_thickness(cx, "dlg-wall");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Extrude dialog").dialog.clone());
+    // Opened before the regeneration defining the variable finished: the dialog's variables follow it.
+    wait_until(cx, window, |cx| view.read(cx).display.variables.contains_key("wall_thickness"));
+    assert!(dialog.read_with(cx, |d, _| d.variables.contains_key("wall_thickness")), "the dialog sees the variable");
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["#", "w", "a", "l", "l", "enter"]);
+    assert_eq!(dialog.update(cx, |d, cx| d.field_text("depth", cx)).as_deref(), Some("#wall_thickness"));
+    assert_eq!(dialog.update(cx, |d, cx| d.field_selection("depth", cx)), Some(15..15), "the cursor after the insertion");
+    assert!(cx.update(|cx| view.read(cx).edit.is_some()), "the dialog stays");
+    keys(cx, window, &["enter"]);
+    assert!(cx.update(|cx| view.read(cx).edit.is_none()), "the next Enter accepts it");
+}
+
+/// VAR-AUTOCOMPLETE-ENTER (live behaviours "Focus, click and selection"): the first click into a dialog's number
+/// field selects all its text, so typing replaces it; the second click puts the caret.
+#[gpui::test]
+fn a_first_click_into_a_number_field_selects_all(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "click-select");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    // The window active, as the user's is (focus events need it).
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    draw(cx, window);
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Extrude dialog").dialog.clone());
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let b = vcx.debug_bounds("numf-depth").expect("the Depth field");
+    let at = gpui_kit::point(b.origin.x + b.size.width - gpui_kit::px(30.), b.center().y);
+    vcx.simulate_click(at, Modifiers::default());
+    draw(cx, window);
+    let text = dialog.update(cx, |d, cx| d.field_text("depth", cx)).unwrap();
+    assert_eq!(dialog.update(cx, |d, cx| d.field_selection("depth", cx)), Some(0..text.len()), "the first click selects {text:?}");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_click(at, Modifiers::default());
+    draw(cx, window);
+    let sel = dialog.update(cx, |d, cx| d.field_selection("depth", cx)).unwrap();
+    assert!(sel.is_empty(), "the second click puts the caret: {sel:?}");
+}
+
 /// A line drawn and its value box dismissed (Esc), then the Dimension tool.
 fn line_then_dimension_tool(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>) {
     let (window, view) = sketch_with(cx, name, Tool::Line);

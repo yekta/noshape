@@ -1126,14 +1126,19 @@ impl PartStudioView {
                 // (Clicking the canvas closes the box; the tolerance panel next
                 // to it may take the focus without closing it.)
                 let sub = cx.subscribe_in(&state, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
-                    // Live (behaviours "Autocomplete while typing", DIM-AC-ENTER):
-                    // Enter commits the typed text in one press, the autofill
-                    // list open or not (Tab or a click picks from the list).
+                    // Live (11-02, VAR-AUTOCOMPLETE-ENTER): Enter with the autofill
+                    // list open inserts its highlighted entry and the box stays;
+                    // when that changes nothing (`#var` typed whole), or the entry
+                    // is "New variable…", it commits the typed text.
                     InputEvent::PressEnter { .. } => {
+                        let text = st.read(cx).value().to_string();
+                        if this.ui_ref().and_then(|u| u.dim_completion.as_ref()).is_some_and(|c| !c.picks_new(None) && c.enter_inserts(&text)) {
+                            this.accept_dim_completion(cid, None, window, cx);
+                            return;
+                        }
                         if let Some(ui) = this.ui_mut() {
                             ui.dim_completion = None;
                         }
-                        let text = st.read(cx).value().to_string();
                         this.commit_dimension(cid, &text, window, cx);
                     }
                     InputEvent::Change => {

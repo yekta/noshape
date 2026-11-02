@@ -201,6 +201,25 @@ document's display mesh is under 0.5 s.
 
 ## In progress
 
+**Lead 11-02 23:35, top items (milestone 11-03 evening):** (1) P1 VAR-AUTOCOMPLETE-ENTER, (2) the interaction parity
+suite's noshape side (docs/PARITY-SUITES.md §2): the driver (`NOSHAPE_UI_SCRIPT` / `NOSHAPE_UI_STATE_OUT`), the state
+dump, the runner, live's first 20 scenarios run in ours and a first score.
+- VAR-AUTOCOMPLETE-ENTER, 11-03 00:10: three causes fixed (ticket closed, details there): the open dialog's variables
+  now follow every regeneration (mod.rs apply_display); the sketch dimension box's Enter inserts the highlighted entry
+  and stays open unless that changes nothing (`VarCompletion::enter_inserts`, live 11-02 on my tab: psui/wall-*.png);
+  a dialog field's Enter insertion leaves the caret after it (`commit_inserted`). qa's first click / Tab caret: an Xvfb
+  artifact (window never activated, no focus events): **the driver must activate its window** (`activate_window`).
+- Suite format agreed with live and qa (REQUESTS 11-02 23:50): tests/ui-parity/README.md (qa's scenario draft + live's
+  state format + `app`, first-text list rows, wait-for-idle). qa's 110 scenarios: /root/qa-scratch/ui-parity/ (to move
+  into tests/ui-parity/ by qa); live's recordings will land in tests/ui-parity/live/.
+- Driver plan: app-core `ui_script` (active only with the env var): `mark(el, "field:Depth")` records named bounds in
+  prepaint (zero cost when off; GPUI's debug_selector is a no-op in release); crates/app runs the steps (activate the
+  window, `dispatch_event` mouse events at a target's centre, `dispatch_keystroke` for keys and text, model points
+  projected through the viewport), waits for idle regeneration after each step, and writes the state that
+  part-studio-ui's `PartStudioView::ui_state` reads from its own model (dialog fields, completion list, selection,
+  feature rows, rollback, message). Start documents from starts.json through crates/ops. Runner: noshape-cli or a
+  python script comparing JSON step by step.
+
 **11-02 23:30 (pinned account): viewport parity 3 landed** (the WIP of 23:00): the assembly instance list no longer
 observes the viewport (prepaint per orbit frame 230 -> 7.5 ms on pins-assembly-1000; `a.list_render` perf timer kept);
 pick bench timeouts (10 s per click, logged); Reflection analysis as Onshape's shader 4663 (audit-viewport V8): world

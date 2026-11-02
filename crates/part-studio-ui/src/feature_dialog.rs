@@ -1382,6 +1382,18 @@ impl FeatureDialog {
         true
     }
 
+    /// The field's value after Enter inserted an autofill entry: committed
+    /// like Enter, the cursor left where the insertion put it.
+    fn commit_inserted(&mut self, path: &str, state: &Entity<InputState>, window: &mut Window, cx: &mut Context<Self>) {
+        let cursor = state.read(cx).cursor();
+        self.commit_number(path, state, window, cx);
+        let text = state.read(cx).value().to_string();
+        state.update(cx, |s, cx| s.set_selected_range(cursor.min(text.len())..cursor.min(text.len()), cx));
+        self.baselines.insert(path.to_string(), text);
+        self.flush_typed(cx);
+        cx.notify();
+    }
+
     /// One ↑ / ↓ / wheel step of a number field (`quantity_field::step_text`):
     /// only a plain value unchanged since its commit steps; the new value is
     /// committed and selected. False when it can't step.
@@ -1484,12 +1496,18 @@ impl FeatureDialog {
         .capture_action(cx.listener(move |this, _: &Enter, window, cx| {
             if open(this, &p3) {
                 cx.stop_propagation();
+                let Some(state) = this.inputs.get(&p3).cloned() else { return };
+                let inserts = this.completion.as_ref().is_some_and(|c| !c.picks_new(None) && c.enter_inserts(&state.read(cx).value()));
                 this.accept_completion(None, window, cx);
-                // Live (behaviours 7040, DIALOG-AC-ENTER): the same Enter commits the field, its text selected;
-                // the next Enter accepts the dialog. Not when it opened the Create variable popup.
-                if this.create_var.is_none()
-                    && let Some(state) = this.inputs.get(&p3).cloned()
-                {
+                if this.create_var.is_some() {
+                    return;
+                }
+                // Live (11-02, VAR-AUTOCOMPLETE-ENTER): `#va` + Enter inserts `#var`, the cursor after it, and the
+                // next Enter accepts the dialog; when the entry changes nothing (behaviours 7040, `7 mm`) the
+                // same Enter commits the field, its text selected.
+                if inserts {
+                    this.commit_inserted(&p3, &state, window, cx);
+                } else {
                     this.apply_on_enter(&p3, &state, window, cx);
                 }
             }
@@ -1545,6 +1563,12 @@ impl FeatureDialog {
     #[cfg(test)]
     pub(crate) fn field_text(&self, path: &str, cx: &gpui_kit::App) -> Option<String> {
         self.inputs.get(path).map(|st| st.read(cx).value().to_string())
+    }
+
+    /// A number field's selected range (empty: the cursor).
+    #[cfg(test)]
+    pub(crate) fn field_selection(&self, path: &str, cx: &gpui_kit::App) -> Option<std::ops::Range<usize>> {
+        self.inputs.get(path).map(|st| st.read(cx).selected_range())
     }
 
     /// A field's input: the dialog's own, or the outside one that opened
@@ -3520,6 +3544,7 @@ impl FeatureDialog {
                 .child(gpui_kit::base::input::input_frame(
                     div()
                         .id(SharedString::from(format!("numf-{path}")))
+                        .debug_selector(|| format!("numf-{path}"))
                         .border_b_1()
                         .border_color(if invalid { pal.error } else { pal.border })
                         .map(|d| crate::quantity_field::invalid_field_tip(d, invalid, invalid_tip))
