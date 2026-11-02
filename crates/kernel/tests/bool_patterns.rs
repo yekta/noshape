@@ -702,3 +702,22 @@ fn occts_tree_of_fuses_keeps_every_tool() {
     let v = r.shape.volume().unwrap();
     assert!((v - c.summary.volume).abs() <= 1e-9 * c.summary.volume, "volume {v} against the union's {}", c.summary.volume);
 }
+
+/// Holes through a boss in a mirrored plate, fused (recorded; OCCT's results): each hole's wall is one cylinder in
+/// faces of both inputs whose seams are half a turn apart, the plate's halves left-handed. The model's unify gives
+/// each wall one face, as live (1767: the second hole with a tube in it, 12 faces; OCCT's own unify left 14).
+#[test]
+fn holes_through_a_boss_in_a_mirrored_plate_unify_as_live() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    for (name, faces) in [("38b2cd00e7f8e88c", 9), ("fd7ef1286d0cf8d5", 12)] {
+        let c = k::bool_corpus::load(&dir, name).expect("the recorded case");
+        k::set_rust_boolean(Some(false));
+        let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's");
+        k::set_rust_boolean(None);
+        let u = k::unify_same_domain(&o.shape).expect("unified").shape;
+        assert!(u.is_valid(), "{name}: unified invalid");
+        assert_eq!(u.count(k::ShapeType::Face), faces, "{name}: unified");
+        assert!((u.volume().unwrap() - c.summary.volume).abs() <= 1e-9 * c.summary.volume, "{name}: volume");
+    }
+}

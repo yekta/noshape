@@ -1124,6 +1124,23 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
+## Seams apart: each hole's wall one face, as live (11-02 11:00 UTC)
+- Live (request 1767): a plate with a boss and Ø8 holes, cut / fused with a tube: 10 / 12 / 10 faces, every hole's
+  wall one face, mirrored or not. OCCT's unify gave 10 / 14 (on its own result too), ours 12 / 16 or invalid. So
+  keeping faces apart was wrong; merging them is right.
+- merge_cylinder_groups (boolean.cpp, before merge_cylinder_bands in unify_in): faces on one cylinder whose frames
+  differ (seams apart, either hand), sharing edges, the group's edges used once two closed chains round it: on a
+  copy, one face on the first one's surface, the chains' curves projected onto it (a turn from the seam, their ends
+  checked), one new seam between a vertex of each chain at one angle (of several, the one whose lower vertex comes
+  first by its point, so OCCT's result and ours get the same seam: f864957f's edges); kept only valid with the same
+  volume. Groups whose faces share one frame stay USD's.
+- Without the Boolean's "one cylinder in faces of two inputs, their seams apart" decline (tried, kept for now):
+  corpora +16 taken, 0 differ (f864957f too, with the seam's canonical place), but Shell's fuzz recordings (shfall)
+  25 -> 40 taken with 6 differing from the recorded quick_boolean results: 4 in history only, 37e806ac and 570dfc37
+  in volume (1.4e-7 relative; 570dfc37 a vertex fewer). The decline stays until those are understood (next).
+- T1 holes_through_a_boss_in_a_mirrored_plate_unify_as_live (OCCT's results: 9 and 12 faces, live's; OCCT's unify
+  alone 14 for the second). Model T1 293 passed; corpora unchanged with the decline, 0 differ.
+
 ## Knurls: lenses and the corner-edge class are most of what's left (11-02 09:40 UTC)
 - The sweep's 72 declined cases rerun (vibe5 ~/agents/sweep/bad7.tsv): 9 taken, 37 two edges leave a vertex in one
   direction, 21 a non-manifold result, 5 singles.
