@@ -481,7 +481,8 @@ fs-oracle-asm vocabulary, mates added one at a time as live does; asm-N.live.jso
 `oracle_asm::asm_fuzz_trace` (FUZZ_CASE=<seed>) prints one case mate by mate.
 | batch | cases | sent to live | answered | match | differences fixed |
 |---|---|---|---|---|---|
-| sketch 1 (lines, arcs, circles; 11 drags) | 20 | REQUESTS 09:45 | 20 (no drags yet) | solvability 19 → 20; positions 1 | 1: a redundant dimension |
+| sketch 1 (lines, arcs, circles; 11 drags) | 20 | REQUESTS 09:45 | 20 + drags + curve colours | solvability 19 → 20; positions 0–1 (least change) | 1: a redundant dimension |
+| least-change probes | 14 | REQUESTS 11:30 | 14 | 4 | – (rule found, see below) |
 | asm 1 (BLOCK / PLATE / PIN, 1–4 mates) | 20 | REQUESTS 10:05 | – | – | 1 before live: f8 / f11 / f19 |
 | sketch 2 (+ fit splines, conics, angles) | 20 | REQUESTS 10:40 | – | – | – |
 Fixed before live answered: an axial mate whose connectors start exactly perpendicular (a part inserted square to its
@@ -499,6 +500,21 @@ free end, the lone line an Equal ties to a rectangle), where ours spreads every 
 (sum of squared moves: live 3153, ours 1270 over 6 cases). Weighting by constraint counts got 3/11 at best, so not
 that; 14 minimal probes sent (REQUESTS 11:30) to pin the rule before changing the solver. live_matches fails on
 solvability only and prints position differences until then.
+Least-change probes (sketch-probe-1, live 11-02 10:04; 4/14 match: the four concentric pairs): live behaves as if
+a line were (start point, direction, length) and nothing is split between entities:
+- a length change moves the END only (p1 lone line, p2 horizontal, p4 an L's second line); when the end is tied and
+  the start free, the START moves (p10 line, tangent arc, line: the arc and the other line stay exactly);
+- what hangs on a moved end is carried rigidly (p3: the L's second line translates whole; p9: a rectangle's right side
+  moves, its left stays);
+- Parallel turns the second line about its start, whatever the argument order (p11, p12); Equal makes the 20 mm line
+  10 mm, whatever the order (p13, p14); concentric: the second circle's center moves onto the first's (p5–p8, = ours).
+Ours (weighted minimum norm over point coordinates) splits each change (p1: both ends 2.5 mm). Minimum norm in
+(start, angle, length) gets p1, p2, p4 but still splits p3 (37.5 < live's 50), so live isn't a minimum norm at all:
+it reads as a constructive solve (keep what is tied, move what dangles, carry rigid pieces), like the assembly tree
+placement. That's the next solver change (it also governs the app's dimension edits: dimension_edit_options only
+special-cases an arc's radius, so editing a line's length moves both its ends today, live moves the end).
+UI drags (11 in batch 1) compare ours dragged to where live's pointer ended (live lands within 0.2 mm): s12's differs
+the same way (what follows the dragged point).
 Next batches: splines / conics / angles (once live confirms their REST form), assemblies with drags and patterns.
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches

@@ -1,5 +1,5 @@
 {
- "note": "Live 2026-11-02, Part Studio \"skasm fuzz 1\" (943ced64\u2026) in \"skasm speed\". One sketch per case POSTed on Top via REST (all 20 accepted as posted; no JSON refused). feature/message = the feature-list row tooltip in the UI. points = REST /featurescript: evVertexPoint(sketchEntityQuery(sketch, VERTEX, \"<id>\")) for start/end ids; arc/circle centres and radii from evCurveDefinition of the edge (Circle). For sketches that \"could not be solved\" the points are the stored (posted) positions, i.e. NOT a solution. constraints/curves/drag: see the per-case note.",
+ "note": "Live 2026-11-02, Part Studio \"skasm fuzz 1\" (943ced64\u2026) in \"skasm speed\". One sketch per case POSTed on Top via REST (all 20 accepted as posted; no JSON refused). feature/message = the feature-list row tooltip in the UI. points = REST /featurescript: evVertexPoint(sketchEntityQuery(sketch, VERTEX, \"<id>\")) for start/end ids; arc/circle centres and radii from evCurveDefinition of the edge (Circle). For sketches that \"could not be solved\" the points are the stored (posted) positions, i.e. NOT a solution. constraints/curves/drag: see the per-case note. curves: colour of each curve in the sketch editor (Show errors on), sampled from a screenshot at the curve midpoint projected with the live camera; black = fully, blue = under, red = over/conflict (\"pixel mix\" = other colours in the 9x9 sample, e.g. dimension text over the midpoint). constraints: Onshape exposes no per-constraint state over REST/FS; for the unsolved sketches the red curves above mark the conflict, and the UI shows the conflicting constraints red (screenshots skasm/fuzz-1770/sk-<case>.png). drags: in a first pass the drags of s1 and s5 snapped and ADDED a constraint (s1 VERTICAL, s5 COINCIDENT); both were restored and redone with Shift held (no constraint added).",
  "cases": {
   "s1": {
    "feature": "OK",
@@ -79,7 +79,89 @@
     "c8": 14.166822,
     "c9": 5.120513
    },
-   "solved": true
+   "solved": true,
+   "curves": {
+    "l1": "under",
+    "l2": "under",
+    "l3": "under",
+    "l4": "under",
+    "l5": "under  (pixel mix {\"blue\": 23, \"black\": 7})",
+    "a6": "under",
+    "l7": "under",
+    "c8": "under",
+    "c9": "under"
+   },
+   "drag": {
+    "l1.start": [
+     0.217035,
+     7.769784
+    ],
+    "l1.end": [
+     8.275418,
+     7.769784
+    ],
+    "l2.start": [
+     8.275418,
+     7.769784
+    ],
+    "l2.end": [
+     8.275418,
+     32.25378
+    ],
+    "l3.start": [
+     8.275418,
+     32.25378
+    ],
+    "l3.end": [
+     0.217035,
+     32.25378
+    ],
+    "l4.start": [
+     0.217035,
+     32.25378
+    ],
+    "l4.end": [
+     0.217035,
+     7.769784
+    ],
+    "l5.start": [
+     43.575403,
+     -3.572778
+    ],
+    "l5.end": [
+     61.105403,
+     -3.572778
+    ],
+    "a6.center": [
+     61.105403,
+     4.974148
+    ],
+    "a6.start": [
+     61.105403,
+     -3.572778
+    ],
+    "a6.end": [
+     69.652329,
+     4.974148
+    ],
+    "l7.start": [
+     69.652329,
+     4.974148
+    ],
+    "l7.end": [
+     69.652329,
+     29.458144
+    ],
+    "c8.center": [
+     121.159336,
+     3.080886
+    ],
+    "c9.center": [
+     121.159336,
+     3.080886
+    ]
+   },
+   "drag_note": "dragged l1.start toward (0.2841, 7.6834) in the UI sketch editor (mouse grabbed the point at its projected pixel, 25 steps, released at the target pixel; 1 px = 0.162 mm, Shift held to stop snap inferences); final l1.start = [0.217035, 7.769784], 0.1094 mm from the target"
   },
   "s2": {
    "feature": "WARNING",
@@ -149,7 +231,16 @@
    "radii": {
     "a6": 12.831565
    },
-   "solved": false
+   "solved": false,
+   "curves": {
+    "l1": "fully  (pixel mix {\"red\": 5, \"blue\": 2, \"black\": 26})",
+    "l2": "fully  (pixel mix {\"black\": 19, \"red\": 9})",
+    "l3": "fully  (pixel mix {\"red\": 10, \"black\": 17})",
+    "l4": "over",
+    "l5": "over  (pixel mix {\"red\": 12, \"black\": 9})",
+    "a6": "over  (pixel mix {\"red\": 24, \"blue\": 4})",
+    "l7": "over"
+   }
   },
   "s3": {
    "feature": "OK",
@@ -192,7 +283,48 @@
     "a2": 5.66802,
     "c4": 14.264651
    },
-   "solved": true
+   "solved": true,
+   "curves": {
+    "l1": "under",
+    "a2": "under",
+    "l3": "under  (pixel mix {\"black\": 7, \"blue\": 17})",
+    "c4": "under"
+   },
+   "drag": {
+    "l1.start": [
+     -18.074332,
+     5.827338
+    ],
+    "l1.end": [
+     0.10558,
+     5.827338
+    ],
+    "a2.center": [
+     0.10558,
+     8.291865
+    ],
+    "a2.start": [
+     0.10558,
+     5.827338
+    ],
+    "a2.end": [
+     2.570107,
+     8.291865
+    ],
+    "l3.start": [
+     2.570107,
+     8.291865
+    ],
+    "l3.end": [
+     2.570107,
+     27.751865
+    ],
+    "c4.center": [
+     61.287274,
+     -4.560716
+    ]
+   },
+   "drag_note": "dragged l1.start toward (-18.0979, 5.5964) in the UI sketch editor (mouse grabbed the point at its projected pixel, 25 steps, released at the target pixel; 1 px = 0.162 mm); final l1.start = [-18.074332, 5.827338], 0.2322 mm from the target"
   },
   "s4": {
    "feature": "WARNING",
@@ -230,7 +362,12 @@
    "radii": {
     "a2": 7.557
    },
-   "solved": false
+   "solved": false,
+   "curves": {
+    "l1": "over  (pixel mix {\"blue\": 14, \"red\": 21})",
+    "a2": "under",
+    "l3": "over  (pixel mix {\"red\": 28, \"blue\": 7})"
+   }
   },
   "s5": {
    "feature": "OK",
@@ -270,7 +407,48 @@
     ]
    },
    "radii": {},
-   "solved": true
+   "solved": true,
+   "curves": {
+    "l1": "fully  (pixel mix {\"blue\": 6, \"black\": 17})",
+    "l2": "under",
+    "l3": "under",
+    "l4": "under"
+   },
+   "drag": {
+    "l1.start": [
+     -0.268576,
+     0.971223
+    ],
+    "l1.end": [
+     33.535523,
+     -14.054254
+    ],
+    "l2.start": [
+     33.535523,
+     -14.054254
+    ],
+    "l2.end": [
+     33.535523,
+     9.400822
+    ],
+    "l3.start": [
+     33.535523,
+     9.400822
+    ],
+    "l3.end": [
+     8.436958,
+     20.556804
+    ],
+    "l4.start": [
+     8.436958,
+     20.556804
+    ],
+    "l4.end": [
+     -0.268576,
+     0.971223
+    ]
+   },
+   "drag_note": "dragged l1.start toward (-0.1993, 0.7876) in the UI sketch editor (mouse grabbed the point at its projected pixel, 25 steps, released at the target pixel; 1 px = 0.162 mm, Shift held to stop snap inferences); final l1.start = [-0.268576, 0.971223], 0.1963 mm from the target"
   },
   "s6": {
    "feature": "OK",
@@ -385,7 +563,128 @@
     "a2": 7.543309,
     "a4": 7.543309
    },
-   "solved": true
+   "solved": true,
+   "curves": {
+    "l1": "under",
+    "a2": "under",
+    "l3": "under",
+    "a4": "under",
+    "l5": "under",
+    "l6": "under",
+    "l7": "under",
+    "l8": "under",
+    "l9": "under",
+    "l10": "under",
+    "l11": "fully",
+    "l12": "under"
+   },
+   "drag": {
+    "l1.start": [
+     4.587539,
+     -9.226619
+    ],
+    "l1.end": [
+     24.057113,
+     -9.226619
+    ],
+    "a2.center": [
+     24.057113,
+     -2.892533
+    ],
+    "a2.start": [
+     24.057113,
+     -9.226619
+    ],
+    "a2.end": [
+     24.057113,
+     3.441554
+    ],
+    "l3.start": [
+     24.057113,
+     3.441554
+    ],
+    "l3.end": [
+     4.587539,
+     3.441554
+    ],
+    "a4.center": [
+     4.587539,
+     -2.892533
+    ],
+    "a4.start": [
+     4.587539,
+     3.441554
+    ],
+    "a4.end": [
+     4.587539,
+     -9.226619
+    ],
+    "l5.start": [
+     59.227537,
+     -4.217971
+    ],
+    "l5.end": [
+     91.878537,
+     -4.217971
+    ],
+    "l6.start": [
+     91.878537,
+     -4.217971
+    ],
+    "l6.end": [
+     91.878537,
+     15.965283
+    ],
+    "l7.start": [
+     91.878537,
+     15.965283
+    ],
+    "l7.end": [
+     59.227537,
+     15.965283
+    ],
+    "l8.start": [
+     59.227537,
+     15.965283
+    ],
+    "l8.end": [
+     59.227537,
+     -4.217971
+    ],
+    "l9.start": [
+     101.212537,
+     -4.217971
+    ],
+    "l9.end": [
+     133.863537,
+     -4.217971
+    ],
+    "l10.start": [
+     133.863537,
+     -4.217971
+    ],
+    "l10.end": [
+     133.863537,
+     15.965283
+    ],
+    "l11.start": [
+     133.863537,
+     15.965283
+    ],
+    "l11.end": [
+     101.212537,
+     15.965283
+    ],
+    "l12.start": [
+     101.212537,
+     15.965283
+    ],
+    "l12.end": [
+     101.212537,
+     -4.217971
+    ]
+   },
+   "drag_note": "dragged l1.start toward (4.5467, -9.4255) in the UI sketch editor (mouse grabbed the point at its projected pixel, 25 steps, released at the target pixel; 1 px = 0.162 mm); final l1.start = [4.587539, -9.226619], 0.2030 mm from the target"
   },
   "s7": {
    "feature": "WARNING",
@@ -457,7 +756,80 @@
     "c4": 12.404115,
     "c5": 6.77704
    },
-   "solved": false
+   "solved": false,
+   "curves": {
+    "l1": "fully  (pixel mix {\"blue\": 10, \"black\": 22})",
+    "a2": "under",
+    "l3": "under",
+    "c4": "over",
+    "c5": "under",
+    "l6": "under",
+    "l7": "fully  (pixel mix {\"black\": 16, \"blue\": 1})",
+    "l8": "under"
+   },
+   "drag": {
+    "l1.start": [
+     -20.843616,
+     5.179856
+    ],
+    "l1.end": [
+     -35.632377,
+     -11.758642
+    ],
+    "a2.center": [
+     388.18163,
+     -381.784591
+    ],
+    "a2.start": [
+     -35.632377,
+     -11.758642
+    ],
+    "a2.end": [
+     -11.680502,
+     14.002966
+    ],
+    "l3.start": [
+     -11.680502,
+     14.002966
+    ],
+    "l3.end": [
+     -1.681026,
+     24.105385
+    ],
+    "c4.center": [
+     58.590129,
+     -3.54207
+    ],
+    "c5.center": [
+     58.590129,
+     -3.54207
+    ],
+    "l6.start": [
+     139.499826,
+     -0.011785
+    ],
+    "l6.end": [
+     107.434997,
+     17.672237
+    ],
+    "l7.start": [
+     107.434997,
+     17.672237
+    ],
+    "l7.end": [
+     108.152599,
+     -18.938731
+    ],
+    "l8.start": [
+     108.152599,
+     -18.938731
+    ],
+    "l8.end": [
+     139.499826,
+     -0.011785
+    ]
+   },
+   "drag_note": "dragged l1.start toward (-20.7842, 5.0775) in the UI sketch editor (mouse grabbed the point at its projected pixel, 25 steps, released at the target pixel; 1 px = 0.162 mm); final l1.start = [-20.843616, 5.179856], 0.1184 mm from the target"
   },
   "s8": {
    "feature": "OK",
@@ -532,7 +904,85 @@
     "c1": 9.527671,
     "c2": 4.108
    },
-   "solved": true
+   "solved": true,
+   "curves": {
+    "c1": "under",
+    "c2": "fully",
+    "l3": "under",
+    "l4": "under",
+    "l5": "under",
+    "l6": "under",
+    "l7": "under",
+    "l8": "under",
+    "l9": "under"
+   },
+   "drag": {
+    "c1.center": [
+     -4.27211,
+     0.218668
+    ],
+    "c2.center": [
+     -4.27211,
+     0.218668
+    ],
+    "l3.start": [
+     65.188147,
+     0.707707
+    ],
+    "l3.end": [
+     80.448989,
+     0.707707
+    ],
+    "l4.start": [
+     80.448989,
+     0.707707
+    ],
+    "l4.end": [
+     80.448989,
+     6.260073
+    ],
+    "l5.start": [
+     80.448989,
+     6.260073
+    ],
+    "l5.end": [
+     60.017391,
+     6.260073
+    ],
+    "l6.start": [
+     60.017391,
+     6.260073
+    ],
+    "l6.end": [
+     65.188147,
+     0.707707
+    ],
+    "l7.start": [
+     132.821626,
+     2.47978
+    ],
+    "l7.end": [
+     106.784764,
+     14.553893
+    ],
+    "l8.start": [
+     106.784764,
+     14.553893
+    ],
+    "l8.end": [
+     106.784764,
+     -10.415261
+    ],
+    "l9.start": [
+     106.784764,
+     -10.415261
+    ],
+    "l9.end": [
+     132.821626,
+     2.47978
+    ]
+   },
+   "drag_note": "dragged l3.start toward (65.0174, -0.9727) in the UI sketch editor (mouse grabbed the point at its projected pixel, 25 steps, released at the target pixel; 1 px = 0.162 mm); final l3.start = [65.188147, 0.707707], 1.6891 mm from the target"
   },
   "s9": {
    "feature": "WARNING",
@@ -607,7 +1057,16 @@
     "a5": 9.424706,
     "a7": 9.424706
    },
-   "solved": false
+   "solved": false,
+   "curves": {
+    "l1": "fully  (pixel mix {\"blue\": 14, \"black\": 20})",
+    "l2": "under",
+    "l3": "under",
+    "l4": "under",
+    "a5": "under",
+    "l6": "under",
+    "a7": "over"
+   }
   },
   "s10": {
    "feature": "OK",
@@ -650,7 +1109,48 @@
     "a2": 6.153338,
     "c4": 11.702
    },
-   "solved": true
+   "solved": true,
+   "curves": {
+    "l1": "fully  (pixel mix {\"blue\": 14, \"black\": 18})",
+    "a2": "under",
+    "l3": "under",
+    "c4": "under"
+   },
+   "drag": {
+    "l1.start": [
+     -14.40814,
+     -1.667501
+    ],
+    "l1.end": [
+     3.71386,
+     -1.667501
+    ],
+    "a2.center": [
+     3.71386,
+     4.485838
+    ],
+    "a2.start": [
+     3.71386,
+     -1.667501
+    ],
+    "a2.end": [
+     9.867198,
+     4.485838
+    ],
+    "l3.start": [
+     9.867198,
+     4.485838
+    ],
+    "l3.end": [
+     9.867198,
+     22.607838
+    ],
+    "c4.center": [
+     57.663615,
+     0.435511
+    ]
+   },
+   "drag_note": "dragged l1.start toward (-10.0341, 1.3325) in the UI sketch editor (mouse grabbed the point at its projected pixel, 25 steps, released at the target pixel; 1 px = 0.162 mm); final l1.start = [-14.40814, -1.667501], 5.3039 mm from the target"
   },
   "s11": {
    "feature": "OK",
@@ -714,7 +1214,75 @@
     ]
    },
    "radii": {},
-   "solved": true
+   "solved": true,
+   "curves": {
+    "l1": "fully  (pixel mix {\"blue\": 13, \"black\": 24})",
+    "l2": "under",
+    "l3": "under",
+    "l4": "under",
+    "l5": "under",
+    "l6": "under",
+    "l7": "under"
+   },
+   "drag": {
+    "l1.start": [
+     11.41252,
+     6.798009
+    ],
+    "l1.end": [
+     -6.114747,
+     17.661736
+    ],
+    "l2.start": [
+     -6.114747,
+     17.661736
+    ],
+    "l2.end": [
+     -6.759377,
+     -2.949186
+    ],
+    "l3.start": [
+     -6.759377,
+     -2.949186
+    ],
+    "l3.end": [
+     11.41252,
+     6.798009
+    ],
+    "l4.start": [
+     80.21064,
+     4.175458
+    ],
+    "l4.end": [
+     66.052417,
+     13.353519
+    ],
+    "l5.start": [
+     66.052417,
+     13.353519
+    ],
+    "l5.end": [
+     52.339045,
+     3.523184
+    ],
+    "l6.start": [
+     52.339045,
+     3.523184
+    ],
+    "l6.end": [
+     65.648084,
+     -10.424459
+    ],
+    "l7.start": [
+     65.648084,
+     -10.424459
+    ],
+    "l7.end": [
+     80.21064,
+     4.175458
+    ]
+   },
+   "drag_note": "dragged l1.start toward (17.7444, 7.3374) in the UI sketch editor (mouse grabbed the point at its projected pixel, 25 steps, released at the target pixel; 1 px = 0.162 mm); final l1.start = [11.41252, 6.798009], 6.3548 mm from the target"
   },
   "s12": {
    "feature": "OK",
@@ -754,7 +1322,48 @@
     ]
    },
    "radii": {},
-   "solved": true
+   "solved": true,
+   "curves": {
+    "l1": "under",
+    "l2": "under",
+    "l3": "under",
+    "l4": "under  (pixel mix {\"black\": 6, \"blue\": 10})"
+   },
+   "drag": {
+    "l1.start": [
+     4.475101,
+     -0.50657
+    ],
+    "l1.end": [
+     37.388844,
+     -0.50657
+    ],
+    "l2.start": [
+     37.388844,
+     -0.50657
+    ],
+    "l2.end": [
+     37.388844,
+     6.284549
+    ],
+    "l3.start": [
+     37.388844,
+     6.284549
+    ],
+    "l3.end": [
+     -0.241967,
+     6.284549
+    ],
+    "l4.start": [
+     -0.241967,
+     6.284549
+    ],
+    "l4.end": [
+     4.475101,
+     -0.50657
+    ]
+   },
+   "drag_note": "dragged l1.start toward (4.7580, -1.2623) in the UI sketch editor (mouse grabbed the point at its projected pixel, 25 steps, released at the target pixel; 1 px = 0.162 mm); final l1.start = [4.475101, -0.50657], 0.8070 mm from the target"
   },
   "s13": {
    "feature": "WARNING",
@@ -821,7 +1430,15 @@
     "a2": 11.247265,
     "a5": 14.874017
    },
-   "solved": false
+   "solved": false,
+   "curves": {
+    "l1": "under",
+    "a2": "under",
+    "l3": "under",
+    "l4": "under",
+    "a5": "over",
+    "l6": "under"
+   }
   },
   "s14": {
    "feature": "OK",
@@ -941,7 +1558,132 @@
     "a10": 4.826,
     "a12": 4.826
    },
-   "solved": true
+   "solved": true,
+   "curves": {
+    "l1": "under",
+    "l2": "under",
+    "l3": "under",
+    "l4": "under",
+    "l5": "fully  (pixel mix {\"black\": 32, \"blue\": 11})",
+    "l6": "under",
+    "a7": "under",
+    "l8": "under",
+    "l9": "under",
+    "a10": "under",
+    "l11": "under",
+    "a12": "under"
+   },
+   "drag": {
+    "l1.start": [
+     5.787016,
+     7.626424
+    ],
+    "l1.end": [
+     0.120843,
+     10.72605
+    ],
+    "l2.start": [
+     0.120843,
+     10.72605
+    ],
+    "l2.end": [
+     -13.859023,
+     7.048727
+    ],
+    "l3.start": [
+     -13.859023,
+     7.048727
+    ],
+    "l3.end": [
+     -13.859023,
+     -7.406698
+    ],
+    "l4.start": [
+     -13.859023,
+     -7.406698
+    ],
+    "l4.end": [
+     0.596403,
+     -7.406698
+    ],
+    "l5.start": [
+     0.596403,
+     -7.406698
+    ],
+    "l5.end": [
+     5.787016,
+     7.626424
+    ],
+    "l6.start": [
+     36.832026,
+     2.496151
+    ],
+    "l6.end": [
+     56.832026,
+     2.496151
+    ],
+    "a7.center": [
+     56.832026,
+     11.697744
+    ],
+    "a7.start": [
+     56.832026,
+     2.496151
+    ],
+    "a7.end": [
+     66.033619,
+     11.697744
+    ],
+    "l8.start": [
+     66.033619,
+     11.697744
+    ],
+    "l8.end": [
+     66.033619,
+     31.697744
+    ],
+    "l9.start": [
+     116.147238,
+     -0.544633
+    ],
+    "l9.end": [
+     144.950358,
+     -0.544633
+    ],
+    "a10.center": [
+     144.950358,
+     4.281367
+    ],
+    "a10.start": [
+     144.950358,
+     -0.544633
+    ],
+    "a10.end": [
+     144.950358,
+     9.107367
+    ],
+    "l11.start": [
+     144.950358,
+     9.107367
+    ],
+    "l11.end": [
+     116.147238,
+     9.107367
+    ],
+    "a12.center": [
+     116.147238,
+     4.281367
+    ],
+    "a12.start": [
+     116.147238,
+     9.107367
+    ],
+    "a12.end": [
+     116.147238,
+     -0.544633
+    ]
+   },
+   "drag_note": "dragged l1.start toward (14.7988, 7.3555) in the UI sketch editor (mouse grabbed the point at its projected pixel, 25 steps, released at the target pixel; 1 px = 0.162 mm); final l1.start = [5.787016, 7.626424], 9.0158 mm from the target"
   },
   "s15": {
    "feature": "WARNING",
@@ -984,7 +1726,13 @@
     "c1": 9.88203,
     "a3": 9.466799
    },
-   "solved": false
+   "solved": false,
+   "curves": {
+    "c1": "under",
+    "l2": "over",
+    "a3": "over",
+    "l4": "over"
+   }
   },
   "s16": {
    "feature": "WARNING",
@@ -1077,7 +1825,17 @@
     "a6": 9.383982,
     "a8": 9.383982
    },
-   "solved": false
+   "solved": false,
+   "curves": {
+    "l1": "fully  (pixel mix {\"red\": 6, \"black\": 21})",
+    "a2": "over",
+    "l3": "over",
+    "a4": "over",
+    "l5": "over",
+    "a6": "over",
+    "l7": "over",
+    "a8": "over"
+   }
   },
   "s17": {
    "feature": "OK",
@@ -1128,7 +1886,56 @@
     "a2": 7.336,
     "a4": 7.336
    },
-   "solved": true
+   "solved": true,
+   "curves": {
+    "l1": "under",
+    "a2": "under",
+    "l3": "under",
+    "a4": "under"
+   },
+   "drag": {
+    "l1.start": [
+     4.341435,
+     -4.100823
+    ],
+    "l1.end": [
+     22.305414,
+     -4.100823
+    ],
+    "a2.center": [
+     22.305414,
+     3.235177
+    ],
+    "a2.start": [
+     22.305414,
+     -4.100823
+    ],
+    "a2.end": [
+     22.305414,
+     10.571177
+    ],
+    "l3.start": [
+     22.305414,
+     10.571177
+    ],
+    "l3.end": [
+     4.341435,
+     10.571177
+    ],
+    "a4.center": [
+     4.341435,
+     3.235177
+    ],
+    "a4.start": [
+     4.341435,
+     10.571177
+    ],
+    "a4.end": [
+     4.341435,
+     -4.100823
+    ]
+   },
+   "drag_note": "dragged l1.start toward (8.0323, -1.1008) in the UI sketch editor (mouse grabbed the point at its projected pixel, 25 steps, released at the target pixel; 1 px = 0.162 mm); final l1.start = [4.341435, -4.100823], 4.7563 mm from the target"
   },
   "s18": {
    "feature": "WARNING",
@@ -1216,7 +2023,18 @@
     "a7": 6.075875,
     "a9": 6.075875
    },
-   "solved": false
+   "solved": false,
+   "curves": {
+    "c1": "under",
+    "l2": "over",
+    "l3": "over",
+    "l4": "over",
+    "l5": "over",
+    "l6": "over",
+    "a7": "over",
+    "l8": "over",
+    "a9": "over"
+   }
   },
   "s19": {
    "feature": "WARNING",
@@ -1318,7 +2136,20 @@
    "radii": {
     "a2": 10.877018
    },
-   "solved": false
+   "solved": false,
+   "curves": {
+    "l1": "under",
+    "a2": "over",
+    "l3": "under",
+    "l4": "under",
+    "l5": "under",
+    "l6": "under",
+    "l7": "under",
+    "l8": "under",
+    "l9": "under",
+    "l10": "under",
+    "l11": "under"
+   }
   },
   "s20": {
    "feature": "WARNING",
@@ -1411,7 +2242,17 @@
     "a6": 6.364868,
     "a8": 6.364868
    },
-   "solved": false
+   "solved": false,
+   "curves": {
+    "l1": "under  (pixel mix {\"blue\": 14, \"black\": 14})",
+    "a2": "under",
+    "l3": "under",
+    "a4": "under",
+    "l5": "under",
+    "a6": "over",
+    "l7": "under",
+    "a8": "under"
+   }
   }
  }
 }

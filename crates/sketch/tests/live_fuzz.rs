@@ -531,19 +531,30 @@ fn differences(case: &Value, live: &Value) -> Vec<String> {
     }
     if let Some(curves) = live["curves"].as_object() {
         for (n, st) in curves {
-            if ours["curves"][n] != *st {
+            // "under  (pixel mix …)": the colour read under the label.
+            let st = st.as_str().and_then(|x| x.split_whitespace().next()).unwrap_or("");
+            if ours["curves"][n] != st {
                 out.push(format!("{n}: ours {} live {st}", ours["curves"][n]));
             }
         }
     }
-    if let (Some(d), Some(ld)) = (case["drag"].as_object(), live["drag"].as_object()) {
-        for (n, p) in ld {
-            if !close(&d["ours"][n], p) {
-                out.push(format!("drag {n}: ours {} live {p}", d["ours"][n]));
-            }
-        }
-    }
     out
+}
+
+/// Live's UI drag of a case against ours dragged to where live's point
+/// ended (live's pointer lands within a pixel of the target, 0.2 mm).
+fn drag_differences(seed: u64, rich: bool, case: &Value, live: &Value) -> Vec<String> {
+    let (Some(name), Some(ld)) = (case["drag"]["point"].as_str(), live["drag"].as_object()) else { return Vec::new() };
+    let Some(to) = ld.get(name) else { return Vec::new() };
+    let mut c = generate(seed, rich);
+    c.sk.solve();
+    let target = DVec2::new(to[0].as_f64().unwrap(), to[1].as_f64().unwrap()) * MM;
+    c.sk.drag(&[(DragHandle::Point(c.point(name)), target)]);
+    let after = ours_points(&c);
+    ld.iter()
+        .filter(|(n, p)| after.get(*n).is_none_or(|o| (o[0] - p[0].as_f64().unwrap()).hypot(o[1] - p[1].as_f64().unwrap()) >= 1e-3))
+        .map(|(n, p)| format!("drag {n}: ours {:?} live {p}", after.get(n)))
+        .collect()
 }
 
 /// Ours against live's answers (`sketch-N.live.json`, written by live:
@@ -572,7 +583,8 @@ fn live_matches() {
                 Some(ls) if ls != solved => report.push(format!("{name}: ours {}, live {}", case["ours"]["status"], l["message"])),
                 _ => status_ok += 1,
             }
-            let d = differences(case, l);
+            let mut d = differences(case, l);
+            d.extend(drag_differences(case["seed"].as_u64().unwrap(), rich, case, l));
             if d.is_empty() {
                 exact += 1;
             } else {
