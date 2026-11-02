@@ -588,7 +588,19 @@ Parity (11-02, user: correctness before more speed):
   both; the stack's Planar + Parallel at k = 1: "on the Planar"); asked live (REQUESTS 07:45, seven small cases) before
   building the rank test.
 
-Next: that answer, then the tree placement if live moves the child alone; each Sub instance's own solve from its
+- **Mate chain regenerate = live 1763** (done): live keeps every instance whose geometry didn't change where it is
+  (C's part moved +10 mm in its own coordinates: only C's transform changes, −10 mm; P, free on its Planar, and D on C
+  stay). Ours split it (P slid 3.3 mm). Now a group whose mates form a tree hanging from fixed parts (no relations,
+  drags or pattern copies; several mates on one pair allowed) is placed body by body from the ground, each body alone
+  against its parent's mates (LM, then least change measured at its connectors over the whole group); anything left
+  unheld falls back to the whole-group solve. T1 a_regenerate_moves_only_the_changed_instance_along_a_chain (fails on
+  the old code); oracle_asm and the assembly suites unchanged.
+  vibe3 regenerate: a200 69 → 34 ms, a200-live 63 → 19 ms (live 13–16 s), a1000 380 → 280 ms (its stacks keep the
+  redundant Parallels live refuses, so they aren't trees). New case a1000-live (A1000 with the Planar alone, 900 mates):
+  open 6 + 67 + 14 ms, evaluate again 15 ms, regenerate 65 ms, add a mate 28 ms, drag 2.2–2.4 ms a frame (≈ 430 fps),
+  insert 15 ms. Live's A1000 is not being timed (lead 11-02: REST budget for parity questions).
+
+Next: the redundant-mate rule when live answers (07:45); each Sub instance's own solve from its
 stored positions; live's A1000 timings (1741, after its REST limit), the overdefinition messages of live 1754 (C).
 
 ## Next, in order
