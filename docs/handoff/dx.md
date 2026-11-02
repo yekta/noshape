@@ -44,6 +44,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - STEP re-export of imported parts: 25 NIST cap screws took 433 s to read back, now 18.8 s (99 → 16 MB). Each edge
   writes only the part of its B-spline it uses, and a part declares its own tolerance when that is over 1 µm
   (formats.md). The old export's slowness only showed with heavy healed parts (dx_perf `timed_many_heavy_parts`).
+- Every export format on imported NIST parts (formats.md "Exporting imported geometry"):
+  - fixed: the Parasolid writer's crash on the cap screws, PVZ's throws, and Rhino for 3 more parts;
+  - left: Rhino still refuses the nut, screws and pin (openNURBS validity: non-iso seam trims, trims off their
+    edges). Next if Rhino of imports matters: rebuild those seam p-curves as isolines.
 - To psui: NIST's regeneration after import is 1.7 s, of which the features are 0.12 s and the rest is display
   meshing, mostly the two cap screws' thread faces (B-spline surfaces with dense pcurves).
 
