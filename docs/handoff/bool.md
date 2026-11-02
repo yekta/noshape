@@ -41,6 +41,30 @@ Fusing the slabs yours takes first and adding the offset ones after doesn't help
 next reasons: 3.9 → 5.9 s on a dump); one OCCT common of the solid with all slabs as one tool group changes results.
 Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scratch SHELLDUMP=<path without .brep>).
 
+## Coincidence step 2: OCCT's merged vertex, groups of vertices, tolerant vertices off their planes (11-02 18:30 UTC)
+- Two input vertices of different arguments merged: OCCT's merged vertex (BOPTools_AlgoTools::MakeVertex /
+  BRepLib::BoundingVertex): the one whose sphere holds the other's, else the least sphere bounding both
+  (`Pool::merge_with`; on 54630d70 OCCT's corner is at the slab's vertex, 0.11 mm, 15 um from the part's).
+- Groups: a point within reach of several vertices that don't split clearly (one within a tenth of its reach, the
+  others past half of theirs) is all one vertex, as OCCT's VV stage merges vertices interfering in a chain (two of
+  one argument's 0.14 mm apart, tolerance 0.1 mm, and another argument's point within both). The run takes the
+  nearest meanwhile and records the group's bounding sphere; the Boolean is done again with every group found as one
+  vertex from the start (`Pool::groups`: any point within reach of the sphere is it, same-argument vertices too;
+  `boolean_with` -> `boolean_in`, at most 4 rounds). Groups wider than 0.5 mm decline as before (the 1 mm-tolerance
+  vertices of 50a8ad1c / 35b0acca, where OCCT ends with a 2.34 mm vertex at none of the inputs' points). A line
+  between two vertices of a group is OCCT's micro edge: in no face, no pieces, Deleted (`GEdge::micro`); any other
+  curve so declines "a micro edge".
+- A tolerant vertex off its face's plane within its own tolerance (up to 1 mm) is taken again (as d03803a2; reverted
+  for qa's RUST-SHELL-GPF-REGRESS): with the merged vertex at OCCT's point that case (54630d70) declines "coincident
+  pieces differ" instead of coming out 3.3e-7 off. T1 a_tolerant_vertex_off_its_faces_plane_declines checks it.
+- Shell's fuzz recordings (shfall): 40 -> 45 of 194 taken (23.2 %; OCCT time 10.6 of 269 s, 4.0 %), the same 3
+  differing (OCCT's oddities above). Corpora unchanged, 0 differ (shares as step 1's). qa's cli-shell-gpf Shell 2 Ok;
+  shellmatrix (96) and boolmatrix (28) identical to green a65c2b35. T1 a_group_of_vertices_one_vertex (d6d166ba),
+  a_tolerant_vertex_off_its_faces_plane (952c2efc).
+- Left in shfall: two edges leave a vertex in one direction 20, an edge nearly on another argument's face 19
+  (edges within their own tolerance of free-form faces: next), a point near two vertices 12 (absurd: sections of
+  tolerance up to 1.08 m, groups past 0.5 mm), a non-manifold result 11, arguments share vertices 9.
+
 ## Coincidence by the sections' own tolerance: step 1 (11-02 15:30 UTC)
 - The design (OCCT's semantics): every vertex, edge and section piece has its tolerance; within the sum of two's
   they are one (vertices merge; a section piece within tolerance of a curve it runs along is that curve, OCCT's

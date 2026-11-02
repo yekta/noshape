@@ -682,8 +682,9 @@ fn hyperbola_edges_and_a_face_extruded_from_one() {
 }
 
 /// A Shell's common (qa's cli-shell-gpf, Shell 2; recorded) with a vertex 44 um off its face's plane, its tolerance
-/// 0.12 mm: declined to OCCT (taken within the vertex's tolerance it came out 3.3e-7 off OCCT's in volume, and the
-/// Shell failed: RUST-SHELL-GPF-REGRESS).
+/// 0.12 mm: declined to OCCT (taken with the merged vertex at the first one's point it came out 3.3e-7 off OCCT's in
+/// volume, and the Shell failed: RUST-SHELL-GPF-REGRESS; at OCCT's merged vertex's point, the slab's, the part's face
+/// and the slab's split differently).
 #[test]
 fn a_tolerant_vertex_off_its_faces_plane_declines() {
     let _ = k::set_working_scale(1000.0);
@@ -693,7 +694,22 @@ fn a_tolerant_vertex_off_its_faces_plane_declines() {
     let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
     let why = k::last_rust_decline();
     k::set_rust_boolean_only(false);
-    assert!(r.is_err() && why == "a face's vertex off its plane", "taken, or declined otherwise: {why}");
+    assert!(r.is_err() && why == "coincident pieces differ", "taken, or declined otherwise: {why}");
+}
+
+/// Shell's slab fuse (recorded) with tolerant vertices off their faces' planes within their own tolerances (up to
+/// 1 mm taken, as OCCT's): valid, OCCT's counts and volume.
+#[test]
+fn a_tolerant_vertex_off_its_faces_plane() {
+    valid_as_occt("952c2efc54541e86", 1e-9);
+}
+
+/// Shell's slab common (recorded): two of the slab's vertices (tolerance 0.1 mm) 0.14 mm apart and the part's point
+/// within both, one vertex as OCCT's (its vertices interfering in a chain merge as one), the slab's edge between the
+/// two OCCT's micro edge, deleted (it declined "a point near two vertices"); valid, OCCT's counts and volume.
+#[test]
+fn a_group_of_vertices_one_vertex() {
+    valid_as_occt("d6d166ba28b54cd2", 1e-9);
 }
 
 /// Shell's fuse of a part with 47 slabs (recorded; free-form faces among them: op_boolean's tree of fuses two at a

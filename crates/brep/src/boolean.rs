@@ -429,6 +429,8 @@ struct GEdge {
     g: Geo,
     /// Its own tolerance (an input's, OCCT's).
     t: f64,
+    /// A line between two vertices of a group (OCCT's micro edge): in no face, no pieces, deleted.
+    micro: bool,
 }
 
 struct GSolid {
@@ -453,6 +455,13 @@ struct Pool {
     /// (tolerant ones: within the sum of the two's tolerances another is the same vertex, OCCT's rule).
     t: Vec<f64>,
     loose: Vec<u32>,
+    /// Vertices merged as one group (OCCT's vertices interfering in a chain, one vertex: two of one argument's
+    /// closer than their tolerances and another's within both): its sphere and vertex; any point within reach of the
+    /// sphere is that vertex.
+    groups: Vec<(DVec3, f64, u32)>,
+    /// Groups found on the way (a point within reach of several vertices, the nearest taken meanwhile): their
+    /// spheres, for the Boolean done again with them.
+    regroup: std::sync::Arc<std::sync::Mutex<Vec<(DVec3, f64)>>>,
 }
 
 impl Pool {
@@ -470,6 +479,9 @@ impl Pool {
     /// The vertex `p` (its own tolerance `tp`) is: one within the Boolean's tolerance, or within the sum of the
     /// two's own where that's more (OCCT's rule for tolerant vertices); none past that.
     fn find_tol(&self, p: DVec3, tp: f64) -> R<Option<u32>> {
+        if let Some(g) = self.groups.iter().find(|g| (p - g.0).length() <= g.1 + tp) {
+            return Ok(Some(g.2));
+        }
         let half = 0.5 * self.tol;
         // (Each vertex within reach: its distance and reach.)
         let mut near: Vec<(u32, f64, f64)> = Vec::new();
@@ -516,11 +528,23 @@ impl Pool {
         if near[0].1 <= 0.1 * near[0].2 && near[1..].iter().all(|x| x.1 > 0.5 * x.2) {
             return Ok(Some(near[0].0));
         }
+        // (Else all one vertex, as OCCT's: its sphere the members' bound, within half a millimetre (Shell's slabs of
+        // 1e-4 vertices; a 1 mm one's group declined).)
+        let members: Vec<(DVec3, f64)> = std::iter::once((p, tp)).chain(near.iter().map(|x| (self.p[x.0 as usize], self.t[x.0 as usize]))).collect();
+        let (c, r) = bounding_sphere(&members);
+        if r <= 5e-4 {
+            self.regroup.lock().expect("a group").push((c, r));
+            return Ok(Some(near[0].0));
+        }
         Err(Decline("a point near two vertices"))
     }
 
     fn push(&mut self, p: DVec3) -> u32 {
         self.push_tol(p, 0.0)
+    }
+
+    fn is_group(&self, w: u32) -> bool {
+        self.groups.iter().any(|g| g.2 == w)
     }
 
     /// Vertex `w`'s tolerance at least `t` (another merged into it, as OCCT's merged vertex covers both).
@@ -531,6 +555,28 @@ impl Pool {
             }
             self.t[w as usize] = t;
         }
+    }
+
+    /// Vertex `w` merged with a point `p` of tolerance `t`, as OCCT's merged vertex (BOPTools_AlgoTools::MakeVertex):
+    /// where one's sphere holds the other's, that one; else between the two, covering both.
+    fn merge_with(&mut self, w: u32, p: DVec3, t: f64) {
+        let (q, tq) = (self.p[w as usize], self.t[w as usize]);
+        let d = (p - q).length();
+        if tq >= d + t {
+            return;
+        }
+        let (c, tc) = if t >= d + tq { (p, t) } else { ((p + q) * 0.5, 0.5 * d + t.max(tq)) };
+        if c != q {
+            let (k0, k1) = (self.key(q), self.key(c));
+            if k0 != k1 {
+                if let Some(list) = self.grid.get_mut(&k0) {
+                    list.retain(|&x| x != w);
+                }
+                self.grid.entry(k1).or_default().push(w);
+            }
+            self.p[w as usize] = c;
+        }
+        self.grow(w, tc);
     }
 
     fn push_tol(&mut self, p: DVec3, t: f64) -> u32 {
@@ -552,6 +598,21 @@ impl Pool {
         }
         Ok(self.push(p))
     }
+}
+
+/// The sphere bounding spheres `m` (OCCT's merged vertex, BRepLib::BoundingVertex): one of them where it holds the
+/// rest; else for two the least, for more about their points' centroid.
+fn bounding_sphere(m: &[(DVec3, f64)]) -> (DVec3, f64) {
+    if let Some(&x) = m.iter().find(|x| m.iter().all(|y| (y.0 - x.0).length() + y.1 <= x.1)) {
+        return x;
+    }
+    if let [(p, t), (q, u)] = *m {
+        let d = (q - p).length();
+        let r = 0.5 * (d + t + u);
+        return (p + (q - p) * ((r - t) / d), r);
+    }
+    let c = m.iter().map(|x| x.0).sum::<DVec3>() / m.len() as f64;
+    (c, m.iter().map(|x| (x.0 - c).length() + x.1).fold(0.0, f64::max))
 }
 
 /// A split edge: a curve between two pool vertices, no pool vertex inside it.
@@ -2947,6 +3008,31 @@ pub(crate) fn par_map<T: Send>(n: usize, f: &(dyn Fn(usize) -> T + Sync)) -> R<V
 
 /// The same; free-form (NURBS) faces taken where `src` gives their sections (else declined).
 pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option<&dyn SectionSource>) -> R<Output> {
+    // (Done again with the groups of vertices found on the way merged from the start, as OCCT merges them before
+    // anything else; at most 4 times.)
+    let mut groups: Vec<(DVec3, f64)> = Vec::new();
+    for round in 0.. {
+        let regroup = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let out = boolean_in(op, args, tol, touching_only, src, &groups, regroup.clone());
+        let found = std::mem::take(&mut *regroup.lock().expect("a group"));
+        if found.is_empty() {
+            return out;
+        }
+        if round == 3 {
+            return Err(Decline("a point near two vertices"));
+        }
+        for mut g in found {
+            // (One overlapping another: the two one.)
+            while let Some(k) = groups.iter().position(|h| (h.0 - g.0).length() <= h.1 + g.1) {
+                g = bounding_sphere(&[g, groups.swap_remove(k)]);
+            }
+            groups.push(g);
+        }
+    }
+    unreachable!()
+}
+
+fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option<&dyn SectionSource>, groups: &[(DVec3, f64)], regroup: std::sync::Arc<std::sync::Mutex<Vec<(DVec3, f64)>>>) -> R<Output> {
     if args.len() < 2 {
         return Err(Decline("a Boolean needs an object and a tool"));
     }
@@ -2955,7 +3041,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     }
     let mut cx = Ctx {
         tol,
-        pool: Pool { p: Vec::new(), inputs: Vec::new(), grid: HashMap::default(), cell: GREY * tol * 1.01, tol, t: Vec::new(), loose: Vec::new() },
+        pool: Pool { p: Vec::new(), inputs: Vec::new(), grid: HashMap::default(), cell: GREY * tol * 1.01, tol, t: Vec::new(), loose: Vec::new(), groups: Vec::new(), regroup },
         faces: Vec::new(),
         edges: Vec::new(),
         solids: Vec::new(),
@@ -2977,6 +3063,10 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         ncurves: Vec::new(),
         src,
     };
+    for &(c, r) in groups {
+        let w = cx.pool.push_tol(c, r);
+        cx.pool.groups.push((c, r, w));
+    }
     // Vertices, edges, faces and solids of every argument (a vertex outside every other argument's box can't
     // be one of theirs).
     // Two sheets (faces, no solids) apart, or on planes that cross: an empty common (faces in common only where
@@ -3061,11 +3151,13 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             let found = if near { cx.pool.find_tol(p, tv)? } else { None };
             let w = match found {
                 // (Two of one argument's: OCCT doesn't intersect an argument with itself, both kept.)
-                Some(w) if cx.pool.inputs[w as usize].iter().any(|x| x.0 == a) => cx.pool.push_tol(p, tv),
+                Some(w) if cx.pool.inputs[w as usize].iter().any(|x| x.0 == a) && !cx.pool.is_group(w) => cx.pool.push_tol(p, tv),
+                Some(w) if cx.pool.is_group(w) => w,
                 Some(w) => {
+                    // (As OCCT's merged vertex: the more tolerant one's point where its sphere holds the other's (a
+                    // Shell's slab vertex of 0.11 mm 15 um from the part's of 0.066 mm: OCCT's corner at the slab's).)
                     if tv > 0.0 {
-                        let d = (cx.p(w) - p).length();
-                        cx.pool.grow(w, tv + d);
+                        cx.pool.merge_with(w, p, tv);
                     }
                     w
                 }
@@ -3099,6 +3191,10 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                     Geo::Apex { a0: f64::NAN, a1: f64::NAN }
                 }
                 Curve::Line => {
+                    if v[0] == v[1] && e.v[0] != e.v[1] && cx.pool.is_group(v[0]) {
+                        cx.edges.push(GEdge { arg: a, index: i as u32, v, g: Geo::Line, t: 0.0, micro: true });
+                        continue;
+                    }
                     if v[0] == v[1] {
                         return Err(Decline("a closed or tiny edge"));
                     }
@@ -3114,11 +3210,14 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                     Geo::Arc { k, a0, sweep }
                 }
             };
-            cx.edges.push(GEdge { arg: a, index: i as u32, v, g, t: body.edge_tol.get(i).copied().unwrap_or(0.0) });
+            if v[0] == v[1] && e.v[0] != e.v[1] {
+                return Err(Decline("a micro edge"));
+            }
+            cx.edges.push(GEdge { arg: a, index: i as u32, v, g, t: body.edge_tol.get(i).copied().unwrap_or(0.0), micro: false });
         }
         let face0 = cx.faces.len();
         for (i, f) in body.faces.iter().enumerate() {
-            let edges: Vec<(usize, bool)> = f.loops.iter().flatten().map(|u| (first_edge[ai] + u.edge as usize, u.reversed)).collect();
+            let edges: Vec<(usize, bool)> = f.loops.iter().flatten().map(|u| (first_edge[ai] + u.edge as usize, u.reversed)).filter(|x| !cx.edges[x.0].micro).collect();
             let s = match f.surface {
                 Surface::Nurbs { .. } | Surface::Torus { .. } | Surface::Sphere { .. } | Surface::Extrusion { .. } | Surface::Revolution { .. } if cx.src.is_none() => {
                     return Err(Decline("a curved face"));
@@ -3274,13 +3373,15 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         cx.solids[s].lo = cx.solids[s].lo.min(lo);
         cx.solids[s].hi = cx.solids[s].hi.max(hi);
     }
-    // (Not a tolerant vertex within its own tolerance of it either: a Shell's common with a vertex 44 um off its face's
-    // plane (tolerance 0.12 mm) came out 3.3e-7 off OCCT's in volume and the Shell failed: qa RUST-SHELL-GPF-REGRESS.)
+    // (A tolerant vertex within its own tolerance of it, up to 1 mm, as OCCT's: Shell's slabs. It came out 3.3e-7 off
+    // OCCT's in volume on a Shell's common (a vertex 44 um off, tolerance 0.12 mm; qa RUST-SHELL-GPF-REGRESS) while
+    // the merged vertices kept the first one's point; at OCCT's merged vertex's, that one declines.)
     for f in 0..cx.faces.len() {
         if let Surf::Plane { n, d, .. } = cx.faces[f].s {
             for &(e, _) in &cx.faces[f].edges {
                 for v in cx.edges[e].v {
-                    if (n.dot(cx.pool.p[v as usize]) - d).abs() > tol {
+                    let own = if cx.pool.t[v as usize] <= 1e-3 { cx.pool.t[v as usize] } else { 0.0 };
+                    if (n.dot(cx.pool.p[v as usize]) - d).abs() > tol + own {
                         return Err(Decline("a face's vertex off its plane"));
                     }
                 }
@@ -3995,6 +4096,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     let edge_chain = |e: usize| -> R<Vec<u32>> {
         let es = edge_solid[e];
         let s = cx.edge_seg(e);
+        if cx.edges[e].micro {
+            return Ok(s.v.to_vec());
+        }
         let (lo, hi) = match s.g {
             Geo::Line | Geo::Apex { .. } => (cx.p(s.v[0]).min(cx.p(s.v[1])), cx.p(s.v[0]).max(cx.p(s.v[1]))),
             Geo::Arc { k, .. } => (k.c - DVec3::splat(k.r), k.c + DVec3::splat(k.r)),
@@ -4083,6 +4187,11 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     for (e, chain) in edge_chains.into_iter().enumerate() {
         let s = cx.edge_seg(e);
         let chain = chain?;
+        if cx.edges[e].micro {
+            edge_inner.push(Vec::new());
+            edge_pieces.push(Vec::new());
+            continue;
+        }
         for &w in &chain {
             note(&mut touched, &cx.pool, w, cx.edges[e].arg);
         }
