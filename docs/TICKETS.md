@@ -25,6 +25,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the caret at the start of "#wall_thickness", nothing selected; typing 7 gives "7#wall_thickness" (tickets/varac/vd-tab3.png,
   vd-tab4.png); live selects all on Tab. The sketch dimension box (opens all selected) and #width + Enter there = live (ƒx 30).
   Scenarios: qa-scratch/ui-parity/extrude-depth-variable-click-once.json and 8 more around it (draft format README-draft.md).
+  qa 23:38: **live checked today** (qa's tab, Part Studio "qa parity vars" in "noshape mm test": the same two
+  variables + 40 x 30 x 10 box; qa-scratch/livek/t-var.mjs, t-tab.mjs): double-click Extrude 1, one click on Depth →
+  `input.os-param-number` focused with **selectionStart 0, selectionEnd 5 of "10 mm"**; `#wall` → list
+  "*#wall_thickness 2 mm" (active) / "New variable…"; Enter → "#wall_thickness". Tab order from the region field: the
+  end-type select, the direction icon button, **Depth with 0..5 selected**, the ± tolerance toggle — ours has the same
+  first three stops but leaves Depth unselected (live shots live/qa-var-typed.png, qa-var-enter.png).
 - [ ] MACOS-GUARD-LOCK (core, CI 41351354303 on agent/ci2 76a61696, macOS arm64 Test, once): the model tests' `all`
   ended with "noshape: the kernel crashed holding a lock; not recoverable" (SIGSEGV) in the custom-feature tests,
   just after `a_cancelled_custom_feature_stops_soon_and_the_studio_is_as_before`. In flight then:
