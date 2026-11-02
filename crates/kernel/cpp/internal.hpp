@@ -51,11 +51,6 @@ inline P3     from_pnt(const gp_Pnt& p) { return P3{p.X(), p.Y(), p.Z()}; }
 inline P3     from_vec(const gp_Vec& p) { return P3{p.X(), p.Y(), p.Z()}; }
 inline P3     from_dir(const gp_Dir& p) { return P3{p.X(), p.Y(), p.Z()}; }
 
-// Edges whose range runs past their (non-periodic) 3D curve's ends, a
-// healed import's within its tolerance, get the curve's range (in place:
-// call it on a copy). NURBS conversion throws on them (io.cpp).
-void clamp_edge_ranges(const TopoDS_Shape& s);
-
 // Right-handed axis system from a PlaneF (origin, normal = Z, xdir = X).
 gp_Ax3 to_ax3(const PlaneF& p);
 gp_Ax2 to_ax2(const PlaneF& p);

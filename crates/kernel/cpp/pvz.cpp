@@ -14,7 +14,6 @@
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
 #include <BRepBuilderAPI_NurbsConvert.hxx>
-#include <ShapeFix_Shape.hxx>
 #include <BRepGProp.hxx>
 #include <BRepLib_ToolTriangulatedShape.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
@@ -170,29 +169,14 @@ pvz::Surface surface(const TopoDS_Face& original, const Face& f)
 pvz::Part pvz_part(const TopoDS_Shape& shape, const std::string& name)
 {
   // Closed faces in halves (as Onshape writes them), on a copy (meshing must not touch the model).
-  const TopoDS_Shape copy = BRepBuilderAPI_Copy(shape, true, false).Shape();
-  clamp_edge_ranges(copy);
-  ShapeUpgrade_ShapeDivideClosed split(copy);
+  ShapeUpgrade_ShapeDivideClosed split(BRepBuilderAPI_Copy(shape, true, false).Shape());
   split.SetNbSplitPoints(1);
   split.Perform();
-  TopoDS_Shape                                 original = split.Result();
-  std::unique_ptr<BRepBuilderAPI_NurbsConvert> conv;
-  try
-  {
-    conv = std::make_unique<BRepBuilderAPI_NurbsConvert>(original, true);
-  }
-  catch (const Standard_Failure&)
-  {
-    // A healed import's p-curve not covering its edge (NIST's cap screws):
-    // repaired, then converted.
-    ShapeFix_Shape fix(original);
-    fix.Perform();
-    original = fix.Shape();
-    conv     = std::make_unique<BRepBuilderAPI_NurbsConvert>(original, true);
-  }
-  if (!conv->IsDone())
+  const TopoDS_Shape          original = split.Result();
+  BRepBuilderAPI_NurbsConvert conv(original, true);
+  if (!conv.IsDone())
     fail_op("pvz: NURBS conversion failed");
-  const TopoDS_Shape s = conv->Shape();
+  const TopoDS_Shape s = conv.Shape();
   Bnd_Box            box;
   BRepBndLib::Add(s, box);
   const double diag = box.IsVoid() ? 1.0 : std::sqrt(box.SquareExtent());
@@ -229,10 +213,6 @@ pvz::Part pvz_part(const TopoDS_Shape& shape, const std::string& name)
       occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l);
       if (c.IsNull())
         fail_op("pvz: an edge without a 3D curve");
-      // A healed edge's range may run past its (non-periodic) curve's ends
-      // within tolerance (NIST's cap screws): trimmed to the curve.
-      if (!c->IsPeriodic())
-        f = std::max(f, c->FirstParameter()), l = std::min(l, c->LastParameter());
       pe.curve = curve3d(GeomConvert::CurveToBSplineCurve(new Geom_TrimmedCurve(c, f, l)));
     }
     part.edges.push_back(pe);
@@ -260,7 +240,7 @@ pvz::Part pvz_part(const TopoDS_Shape& shape, const std::string& name)
     // The original (split, unconverted) face for the analytic record.
     TopoDS_Face original_face = F;
     for (TopExp_Explorer eo(original, TopAbs_FACE); eo.More(); eo.Next())
-      if (conv->ModifiedShape(eo.Current()).IsSame(F))
+      if (conv.ModifiedShape(eo.Current()).IsSame(F))
         original_face = TopoDS::Face(eo.Current());
 
     pvz::Face pf;
@@ -290,8 +270,6 @@ pvz::Part pvz_part(const TopoDS_Shape& shape, const std::string& name)
         occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, F, pf_, pl_);
         if (pc.IsNull())
           fail_op("pvz: an edge without a curve on its face");
-        if (!pc->IsPeriodic())
-          pf_ = std::max(pf_, pc->FirstParameter()), pl_ = std::min(pl_, pc->LastParameter());
         c.pcurve.nurbs = pcurve(Geom2dConvert::CurveToBSplineCurve(new Geom2d_TrimmedCurve(pc, pf_, pl_)), f);
         loop.coedges.push_back(c);
       }

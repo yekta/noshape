@@ -17,19 +17,6 @@ types and views 10 of them. noshape stores all 13 as file tabs and views:
 
 `import_files` stores any non-CAD file as a file tab, as the app's + › Import… does.
 
-## Exporting imported geometry (NIST, 11-02)
-
-Every export format on the NIST assembly's 8 parts as imported (healed STEP), each part on its own:
-
-| Format | Before | Now |
-|---|---|---|
-| STEP, ACIS, IGES, JT, glTF / GLB, OBJ, 3MF, STL | ✅ | ✅ |
-| Parasolid | the writer crashed (signal 11) on the cap screws | ✅: a refit that misses a vertex is dropped (it read the dropped curve) |
-| PVZ | 3 parts threw (`Geom_TrimmedCurve` out of range, then OCCT's NURBS conversion) | ✅: ranges trimmed to their curves; a shape the conversion throws on is repaired first. The screws read back as mesh within 1.7 % |
-| Rhino | 7 of 8 failed openNURBS' check | box, plate, cover and window ✅: trims a period apart are shifted, trim ends matched. The nut, both screws and the pin still fail the check with an error (seam trims that aren't isoparametric, trims off their edges) |
-
-Kernel test: `imported_nist_parts_write_to_rhino_and_pvz`, `parasolid_writes_an_imported_thread`.
-
 ## Part, assembly and drawing formats
 
 | Format | Extensions | Onshape import | ours | Onshape export | ours | Notes |

@@ -1138,69 +1138,6 @@ fn step_writes_the_used_part_of_long_splines() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// NIST's cap screw, healed on import, written as Parasolid: an edge whose
-/// refitted curve misses a vertex drops the refit (the writer read the
-/// dropped curve's other end and crashed), and the screw reads back whole.
-#[test]
-fn parasolid_writes_an_imported_thread() {
-    let nist = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf/nist-mtc-crada-assembly.step");
-    let ((_, parts, _), _) = read_step_assembly_nested(&nist, LengthUnit::Meter).unwrap().unwrap();
-    let screw = parts.into_iter().find(|p| p.name.as_deref().is_some_and(|n| n.starts_with("91274A141"))).expect("the cap screw").shape;
-    let want = volume_properties(&screw).unwrap().mass;
-    let path = std::env::temp_dir().join(format!("noshape-xt-screw-{}.x_t", std::process::id()));
-    write_parasolid(&path, std::slice::from_ref(&screw), LengthUnit::Meter, false).unwrap();
-    let back = read_parasolid(&path, LengthUnit::Meter).unwrap();
-    let got = volume_properties(&back).unwrap().mass;
-    assert!((got - want).abs() < want * 1e-4, "volume {got} vs {want}");
-    assert_eq!(back.count(ShapeType::Face), screw.count(ShapeType::Face));
-    let _ = std::fs::remove_file(&path);
-}
-
-/// Every NIST part as imported (healed STEP) written to Rhino and PVZ and
-/// read back. Rhino: trims a period apart on closed surfaces are shifted to
-/// meet and trim ends matched (7 of 8 parts failed openNURBS' check; the
-/// box, plate and cover now pass, the nut, screws and pin still fail its
-/// check with an error, never a wrong solid). PVZ: a healed edge's range
-/// past its curve's ends is trimmed to it, and a shape OCCT's NURBS
-/// conversion throws on is repaired first (the screws threw).
-#[test]
-fn imported_nist_parts_write_to_rhino_and_pvz() {
-    let nist = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf/nist-mtc-crada-assembly.step");
-    let ((_, parts, _), _) = read_step_assembly_nested(&nist, LengthUnit::Meter).unwrap().unwrap();
-    let dir = std::env::temp_dir().join(format!("noshape-nist-out-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let (mut wrong, mut rhino_ok) = (Vec::new(), Vec::new());
-    for p in parts.iter().filter(|p| p.shape.count(ShapeType::Face) > 0) {
-        let name = p.name.clone().unwrap_or_default();
-        let want = volume_properties(&p.shape).unwrap().mass;
-        let shapes = [ExportShape { shape: p.shape.clone(), name: Some(name.clone()), color: None }];
-        let path = dir.join("part.3dm");
-        if let Ok(back) = write_rhino(&path, &shapes, LengthUnit::Meter, 8).and_then(|_| read_rhino_parts(&path, LengthUnit::Meter)) {
-            let v = volume_properties(&back[0].shape).unwrap().mass;
-            if (v - want).abs() > 1e-3 * want {
-                wrong.push(format!("rhino {name}: volume {v} vs {want}"));
-            }
-            rhino_ok.push(name.clone());
-        }
-        let path = dir.join("part.pvz");
-        match write_pvz(&path, &shapes, LengthUnit::Meter).and_then(|_| read_pvz(&path, LengthUnit::Meter)) {
-            Ok(back) => {
-                let v = volume_properties(&back).unwrap().mass;
-                // PVZ reads back as its mesh: a thread's 1.7 % under.
-                if (v - want).abs() > 3e-2 * want {
-                    wrong.push(format!("pvz {name}: volume {v} vs {want}"));
-                }
-            }
-            Err(e) => wrong.push(format!("pvz {name}: {e}")),
-        }
-    }
-    let _ = std::fs::remove_dir_all(&dir);
-    assert!(wrong.is_empty(), "{wrong:#?}");
-    for n in ["nist_mtc_crada_box_rev-D-1", "nist_mtc_crada_plate_rev-A-1", "nist_mtc_crada_cover_rev-B-1", "nist_mtc_crada_polycarb-window-1"] {
-        assert!(rhino_ok.iter().any(|r| r == n), "{n} to Rhino: {rhino_ok:?}");
-    }
-}
-
 /// `NOSHAPE_STEP_READ=<assembly.step> cargo test … export::dump_step_assembly_parts -- --ignored --nocapture`:
 /// each part's volume, face / edge counts, validity and BREP size (comparing
 /// readers' settings).
