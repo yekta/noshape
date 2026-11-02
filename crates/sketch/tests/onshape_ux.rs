@@ -529,3 +529,42 @@ fn width_edit_with_other_dimensions_moves_the_far_side() {
         assert!((*a - b).length() < 1e-6, "{at:?}");
     }
 }
+
+#[test]
+fn slot_with_new_radius_and_centre_distance_keeps_its_top_line() {
+    // Live fuzz s303 / s354 (regenerated with both values new): a slot with
+    // a Horizontal bottom, its arcs Equal, the right arc's radius and the
+    // centres' distance dimensioned. The free top line stays where it was
+    // and grows from its left end; the arcs grow down from it.
+    use std::f64::consts::FRAC_PI_2;
+    let mut sk = Sketch::new();
+    let bottom = sk.add_line(v(0.0, -5.0), v(30.0, -5.0));
+    let right = sk.add_arc_angles(v(30.0, 0.0), 5.0, -FRAC_PI_2, FRAC_PI_2);
+    let top = sk.add_line(v(30.0, 5.0), v(0.0, 5.0));
+    let left = sk.add_arc_angles(v(0.0, 0.0), 5.0, FRAC_PI_2, 3.0 * FRAC_PI_2);
+    let ends = |sk: &Sketch, e| sk.endpoints(e).unwrap();
+    let centre = |sk: &Sketch, e| match sk.entity(e).map(|x| x.geometry.clone()) {
+        Some(Geometry::Arc { center, .. }) => center,
+        _ => unreachable!(),
+    };
+    let chain = [bottom, right, top, left];
+    for i in 0..4 {
+        let (a, b) = (chain[i], chain[(i + 1) % 4]);
+        let (_, a_end) = ends(&sk, a);
+        let (b_start, _) = ends(&sk, b);
+        sk.add_constraint(ConstraintKind::Coincident { a: a_end, b: b_start }).unwrap();
+        sk.add_constraint(ConstraintKind::Tangent { a, b }).unwrap();
+    }
+    sk.add_constraint(ConstraintKind::Equal { a: right, b: left }).unwrap();
+    sk.add_constraint(ConstraintKind::Horizontal { a: bottom, b: None }).unwrap();
+    let (lc, rc) = (centre(&sk, left), centre(&sk, right));
+    sk.add_constraint(ConstraintKind::Distance { a: lc, b: rc, value: 36.0, mode: DistanceMode::Center }).unwrap();
+    sk.add_constraint(ConstraintKind::Radius { curve: right, value: 6.0 }).unwrap();
+    assert!(sk.solve_with(&SolveOptions { constructive: true, ..Default::default() }).is_solved());
+    let (s, e) = ends(&sk, top);
+    let at = [sk.point(s).unwrap(), sk.point(e).unwrap(), sk.point(lc).unwrap(), sk.point(rc).unwrap()];
+    let want = [v(36.0, 5.0), v(0.0, 5.0), v(0.0, -1.0), v(36.0, -1.0)];
+    for (a, b) in at.iter().zip(want) {
+        assert!((*a - b).length() < 1e-6, "{at:?}");
+    }
+}

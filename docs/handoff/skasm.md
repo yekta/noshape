@@ -729,6 +729,14 @@ that assumed whole-chain following now assert d4's rule (the iteration budget me
 T2 asm_drag_probes_match_live: 2/6 within 0.3 mm (d2, d3); d1 / d5 / d6 differ by live's pointer lag (1–2°), d4's
 small turn size. Asked live for drag probes 2 (a tangential pull on the arm, a Fastened link, a four-bar) to confirm
 the own-freedom rule beyond a radial pull.
+18:10: a7d3bf69 landed; GUI (asmchk copy, Revolute pin): a drag across the pin leaves it in place (it only spins).
+s303 / s354 fixed: an arc the keep step keeps but whose Equal chain resizes it keeps the end it shares with its
+`lower_shared` neighbour instead (that neighbour stays, the arc is placed next from it): the slot's free top line
+stays and grows from its left end, the arcs grow down (T1 onshape_ux::slot_with_new_radius_and_centre_distance_keeps_its_top_line).
+Everyday batches 4 / 5 / 6 now 40 / 40 / 40 on positions; batches 1–6 1295 → 1262 mm; probes unchanged. Tried and
+dropped: skipping such an arc in the keep step (s303 12 → 55 mm: the right arc then keeps its x). Sent live sketch
+probes 10 (s6 and s102, batches 1–2's largest, each with one relation left out: which relation moves what; T2 in
+`probe_matches`, fixture sketch-probe-10.json).
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;

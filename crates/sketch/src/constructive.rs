@@ -337,9 +337,27 @@ impl Sketch {
                 let resized = anchored.contains(&k) && self.chained_size(k, cons).is_some_and(|x| (x.value().unwrap_or(0.0) - self.size(k)).abs() > 1e-9);
                 (own_hold(k) && !resized && self.class_keeps(*c, k, cons) && self.direction_agrees(k, cons)).then_some(k)
             });
+            // An arc or circle so kept whose Equal chain gives it a new size
+            // keeps the end it shares with a neighbour instead: that
+            // neighbour stays and the arc is placed next, from it (live
+            // fuzz s303 / s354: a slot with a new radius and a new centre
+            // distance keeps its free top line and its left arc's centre x).
+            let mut forced = None;
+            let mut stays = None;
             if let Some(k) = keep {
-                placed.insert(k);
-                continue;
+                let round = matches!(self.kind(k), Some(EntityKind::Arc | EntityKind::Circle));
+                let grows = round && self.chained_size(k, cons).is_some_and(|x| (x.value().unwrap_or(0.0) - self.size(k)).abs() > 1e-9);
+                let neighbours: BTreeSet<EntityId> = cons.iter().filter(|(c, us)| us.contains(&k) && self.connective(*c)).flat_map(|(_, us)| us.iter().copied()).filter(|x| *x != k && !placed.contains(x)).collect();
+                match grows.then(|| self.lower_shared(k, &neighbours)).flatten() {
+                    Some((v, _)) => {
+                        stays = Some(v);
+                        forced = Some(k);
+                    }
+                    None => {
+                        placed.insert(k);
+                        continue;
+                    }
+                }
             }
             // A Concentric's kept circle with a new size of its own is placed
             // next (its centre stays), the other comes onto it (live fuzz
@@ -351,7 +369,9 @@ impl Sketch {
                 let k = self.kept_first_in(us, cons, Some(*c));
                 (!own_hold(k)).then_some(k)
             });
-            let u = if let Some(k) = concentric_first {
+            let u = if let Some(k) = forced {
+                k
+            } else if let Some(k) = concentric_first {
                 k
             } else if best.0 > 0 {
                 // Ties: the member a relation keeps, else the lower one
@@ -379,6 +399,9 @@ impl Sketch {
                 // still moves onto the lower one).
                 self.kept_first(&broken, cons)
             };
+            if let Some(v) = stays {
+                placed.insert(v);
+            }
             let before: HashMap<EntityId, DVec2> = self.entity(u).map(|e| e.point_refs()).into_iter().flatten().filter_map(|p| self.point(p).map(|q| (p, q))).collect();
             let carried_at = self.carry_onto_placed(u, &placed, unit_of);
             // A line moved at its end keeps its start and turns (live as a
