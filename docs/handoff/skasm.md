@@ -707,6 +707,13 @@ step (s201 −26 but s214 / s209 +27 each; s6 still fails at l11, see above).
 everyday profiles and the three new kinds. The three (washers with a changing diameter) fixed: a Concentric pair tied
 to nothing else places its kept circle first, not holding the other (40/40). Now: everyday batches 4 / 5 / 6 at
 39 / 39 / 40 of 40, probes 52 + drags 8 + edits 6 all match, batches 1–6 1281 mm; drag probes 9 with live.
+16:46: drag probes 9 (live 1801, everyday profiles): 4/6 match (fully dimensioned L-bracket / slot translate whole,
+undimensioned sizes next to the dragged point give way, the filleted rectangle translates in x and grows up). Open:
+g4 (an undimensioned slot's top corner dragged: live keeps the bottom line still and the radius grows; ours, least
+norm, lowers the bottom 0.68 mm), g6 (a fully dimensioned bolt circle, one hole dragged: live turns the pattern
+rigidly about the undragged lower-left hole; ours moves the pattern centre). Both say a drag keeps far geometry
+stiller than our point-space least norm: the next drag change (weights growing with distance from the dragged point,
+or the constructive pass with the dragged point pinned), with drag_probe_matches (7 + 9) as its test.
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
