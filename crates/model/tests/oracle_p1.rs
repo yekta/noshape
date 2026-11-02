@@ -153,6 +153,33 @@ fn edges(r: &RegenResult, at: &[DVec3]) -> ParamValue {
     ParamValue::Query(at.iter().map(|p| edge_at(r, *p)).collect())
 }
 
+/// Live 1739 FI2 (FILL-G1-DOME): a Fill G1 to a shelled box's four outer walls can't be tangent at the corners (two
+/// perpendicular walls): live builds it with the warning, a dome up to z 42.97, 4327.5641 mm². Ours builds with the
+/// warning too, but flat (GeomFill_ConstrainedFilling's tangent fields vanish against walls square to the opening):
+/// the dome is FILL-G1-DOME's open half.
+#[test]
+fn fill_tangent_to_four_walls_builds_with_a_warning_as_live() {
+    let mut s = on_block("shell", |p, r| {
+        p.set("entities", q(face_at(r, TOP)));
+        p.set("thickness", mm(2.0));
+    });
+    let r = s.regen();
+    s.add("fill", |p| {
+        let mut row = ParamValues::default();
+        row.set("entities", edges(&r, &[FRONT_TOP, BACK_TOP, LEFT_TOP, RIGHT_TOP]));
+        row.set("continuity", en("G1"));
+        row.set("adjacentFaces", ParamValue::Query(SIDES.iter().map(|x| face_at(&r, *x)).collect()));
+        p.set("edges", ParamValue::Array(vec![row]));
+    });
+    let r = s.regen();
+    let st = r.display.features.last().unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Warning, Some("Could not meet tangency constraints at highlighted points.")));
+    let sheet = r.context.bodies.iter().find(|b| b.kind == BodyKind::Surface).expect("the fill");
+    let area = sheet.shape.area().unwrap() * 1e6;
+    let top = sheet.shape.bounding_box(false).unwrap().max.z * 1e3;
+    assert!(area > 2399.0 && top >= 19.999, "{area} mm², up to z {top}");
+}
+
 /// Live 1796 (audit FL7): Width control fillets one unbranched chain of edges per part, open or closed, else "Edges
 /// must form single chain per part." (a corner of three edges, two separate edges, all 12); Radius control has no such
 /// rule.

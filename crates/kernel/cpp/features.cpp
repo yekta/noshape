@@ -41,6 +41,11 @@
 #include <BRepLib_FindSurface.hxx>
 #include <BRepOffsetAPI_DraftAngle.hxx>
 #include <BRepOffsetAPI_MakeFilling.hxx>
+#include <GeomAdaptor_Surface.hxx>
+#include <Geom2dAdaptor_Curve.hxx>
+#include <Adaptor3d_CurveOnSurface.hxx>
+#include <GeomFill_BoundWithSurf.hxx>
+#include <GeomFill_ConstrainedFilling.hxx>
 #include <BRepOffsetAPI_MakeOffsetShape.hxx>
 #include <BRepOffsetAPI_MakePipe.hxx>
 #include <BRepOffsetAPI_MakePipeShell.hxx>
@@ -5554,6 +5559,41 @@ OpOut op_fill(const OcShapeList& edges, const OcShapeList& supports,
     fail_invalid("fill needs boundary edges");
   if (points.size() % 3 != 0)
     fail_invalid("fill points must be (x, y, z) triples");
+  // Tangent as far as the corners allow (order 3 on every edge, 3 or 4 of them): a Coons patch tangent to each support
+  // (GeomFill_ConstrainedFilling), for the fills OCCT's plate can't build: the plate is a displacement over a plane
+  // fitted to the boundary, so it can't leave a boundary square to it (G1 to a box's four walls, live 1739 FI2).
+  if (!orders.empty() && std::all_of(orders.begin(), orders.end(), [](int32_t o) { return o == 3; }))
+  {
+    const size_t n = edges.items.size();
+    if ((n != 3 && n != 4) || supports.items.size() != n)
+      fail_op("fill: tangency to the supports needs three or four boundary edges");
+    std::vector<occ::handle<GeomFill_Boundary>> bounds;
+    for (size_t i = 0; i < n; ++i)
+    {
+      const TopoDS_Edge& e = as_edge(edges.items[i], "fill boundary edge");
+      const TopoDS_Face& f = as_face(supports.items[i], "fill support face");
+      double             a, b;
+      const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, f, a, b);
+      if (pc.IsNull())
+        fail_op("fill: a boundary edge isn't on its support face");
+      occ::handle<Geom2dAdaptor_Curve> c2 = new Geom2dAdaptor_Curve(pc, a, b);
+      occ::handle<GeomAdaptor_Surface> sf = new GeomAdaptor_Surface(BRep_Tool::Surface(f));
+      bounds.push_back(new GeomFill_BoundWithSurf(Adaptor3d_CurveOnSurface(c2, sf), 1e-4, 1e-2));
+    }
+    GeomFill_ConstrainedFilling cf(8, 2);
+    if (n == 3)
+      cf.Init(bounds[0], bounds[1], bounds[2], true);
+    else
+      cf.Init(bounds[0], bounds[1], bounds[2], bounds[3], true);
+    const occ::handle<Geom_BSplineSurface> surf = cf.Surface();
+    if (surf.IsNull())
+      fail_op("fill surface failed");
+    BRepBuilderAPI_MakeFace mf(surf, Precision::Confusion());
+    if (!mf.IsDone())
+      fail_op("fill surface failed");
+    std::vector<TopoDS_Shape> args(edges.items.begin(), edges.items.end());
+    return make_result(args, mf.Face(), nullptr);
+  }
   // Guide curves are met to modelling tolerance (live "psb (10-24 d)":
   // within 1e-4 mm): more points on them, more iterations, a finer surface.
   const bool guided = !guides.items.empty();

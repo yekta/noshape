@@ -285,6 +285,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   throws Geom_RectangularTrimmedSurface::V1==V2. Underlying: OCCT's plate is a displacement over an initial surface
   fitted to the boundary (here the opening's plane), so it can't leave the boundary at 90° to it, which live's dome
   does (vertical at the walls). Needs our own construction (or an initial surface given to LoadInitSurface).
+  core 11-02 18:45: half done: such a Fill (G1 rows that OCCT's plate can't build, 3 or 4 edges) now builds with live's
+  warning through GeomFill_ConstrainedFilling (kernel Continuity::TangentLoose), but flat: its tangent fields come
+  from the flat Coons patch projected onto the supports, nothing against walls square to the opening. The dome needs a
+  Hermite Coons patch with our own cross-boundary derivatives (in each support, square to the edge). T1
+  oracle_p1::fill_tangent_to_four_walls_builds_with_a_warning_as_live (status and message).
 - [x] P1 LOFT-ONE-FACE (core 11-02, live 1782 / 1784): live lofts tangent-continuous sections (hexagons with R5 sketch
   fillets: 6 lines + 6 arcs) into **one** B-spline side face (3 faces, 24 edges, 437833.229 mm³); ours gave a face per
   section edge (14 faces, 437876.286). Now: through three or more sections, or sections of different topology, side

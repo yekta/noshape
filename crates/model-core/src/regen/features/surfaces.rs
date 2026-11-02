@@ -265,8 +265,21 @@ pub fn fill(ev: &mut EvalCtx) -> FResult<()> {
             return surface_result(ev, NamedShape::new(face, names));
         }
     }
-    // Onshape's FILL_SURFACE_FAIL text, not the kernel's (qa5 SF5).
-    let res = k::fill_surface_guided(&boundary, &points, &curves).map_err(|_| FeatureError::new(crate::regen::custom_features::error_text("FILL_SURFACE_FAIL")))?;
+    // Onshape's FILL_SURFACE_FAIL text, not the kernel's (qa5 SF5). Tangency the corners can't all meet (live 1739
+    // FI2: G1 to a box's four walls) builds tangent as far as they allow, with live's warning.
+    let fail = || FeatureError::new(crate::regen::custom_features::error_text("FILL_SURFACE_FAIL"));
+    let res = match k::fill_surface_guided(&boundary, &points, &curves) {
+        Ok(r) => r,
+        Err(_) if points.is_empty() && curves.is_empty() && boundary.iter().all(|b| b.continuity == k::Continuity::Tangent && b.support.is_some()) => {
+            let loose: Vec<k::FillEdge> = boundary.iter().map(|b| k::FillEdge { continuity: k::Continuity::TangentLoose, ..b.clone() }).collect();
+            let r = k::fill_surface_guided(&loose, &points, &curves).map_err(|_| fail())?;
+            if !ev.warnings.iter().any(|w| w == FILL_TANGENCY) {
+                ev.warnings.push(FILL_TANGENCY.into());
+            }
+            r
+        }
+        Err(_) => return Err(fail()),
+    };
     let names = new_face_names(ev, &res.shape);
     surface_result(ev, NamedShape::new(res.shape, names))
 }

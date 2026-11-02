@@ -606,6 +606,10 @@ pub enum Continuity {
     Position,
     Tangent,
     Curvature,
+    /// Tangent to the support as far as the corners allow (two perpendicular walls at a corner can't both be met):
+    /// a Coons patch over 3 or 4 tangent boundaries (GeomFill_ConstrainedFilling), where OCCT's plate fails; live
+    /// builds such fills with a warning.
+    TangentLoose,
 }
 
 /// A boundary constraint for [`fill_surface`].
@@ -634,6 +638,7 @@ pub fn fill_surface_guided(boundary: &[FillEdge], points: &[DVec3], curves: &[Sh
             Continuity::Position => 0,
             Continuity::Tangent => 1,
             Continuity::Curvature => 2,
+            Continuity::TangentLoose => 3,
         })
         .collect();
     let pts: Vec<f64> = points.iter().flat_map(|p| [p.x, p.y, p.z]).collect();
