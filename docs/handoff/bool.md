@@ -41,6 +41,14 @@ Fusing the slabs yours takes first and adding the offset ones after doesn't help
 next reasons: 3.9 → 5.9 s on a dump); one OCCT common of the solid with all slabs as one tool group changes results.
 Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scratch SHELLDUMP=<path without .brep>).
 
+## The merge after USD left a Shell common's unify invalid: fixed (11-02 12:00 UTC)
+- 82ba8082's merge after USD (groups of one frame it left apart) is checked as a whole now: USD joining their
+  boundary's edges after it left a Shell common with hyperbola edges (shfall 14218a58, taken since d03803a2)
+  unified invalid, 41 faces against OCCT's valid 42. Where the result isn't valid the merge is dropped (its own
+  history, merged only when kept). T1 a_merge_after_usd_left_invalid_is_dropped (our 14218a58 result). Found in
+  Shell's fuzz recordings on main (the only one differing); bf976715's op_boolean volume confirmed right on main
+  (6.1536e-5, T1 occts_tree_of_fuses_keeps_every_tool).
+
 ## Knurls: the section reach (11-02 11:30 UTC)
 - The crossing loop lets a crossing reach a section by the section's tolerance (OCCT's pave, 5 um on the 30 TPI
   knurl) and grows vertices up to it (1d4f8171). A tool's corner edge 3 um outside the cylinder then lost the 3 um

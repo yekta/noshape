@@ -766,3 +766,15 @@ fn walls_usd_leaves_apart_are_merged_after_it() {
     assert!(u.is_valid(), "unified invalid");
     assert_eq!((u.count(k::ShapeType::Face), u.count(k::ShapeType::Edge)), (32, 77));
 }
+
+/// Shell's common with hyperbola edges (14218a58), our result (tests/data/unify): walls on one cylinder USD leaves
+/// apart, merged after it, and USD's joining of their boundary's edges then left the shape invalid. That merge is
+/// dropped then: valid, OCCT's counts (42 faces, 100 edges).
+#[test]
+fn a_merge_after_usd_left_invalid_is_dropped() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/unify/hyperbola-edges-walls.brep");
+    let ours = k::read_brep(&path).expect("our result");
+    let u = k::unify_same_domain(&ours).expect("unified").shape;
+    assert!(u.is_valid(), "unified invalid");
+    assert_eq!((u.count(k::ShapeType::Face), u.count(k::ShapeType::Edge)), (42, 100));
+}

@@ -2637,10 +2637,13 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
     // Faces on one cylinder USD left apart (one frame, its result depending on the faces' order and wires' starts:
     // a Shell fuse's walls, 1b121fc3, a face more on ours than on OCCT's), merged as those whose frames differ.
     fail_if_cancelled();
+    // (Its own history, merged only where its result is kept: valid, as USD's edges after it can leave it invalid
+    // (a Shell's common with hyperbola edges, 14218a58: OCCT's result 42 faces valid, ours then 41 invalid).)
     TopoDS_Shape s4 = s3;
+    HHist        h4;
     try
     {
-      s4 = merge_cylinder_groups(s3, hist, true);
+      s4 = merge_cylinder_groups(s3, h4, true);
     }
     catch (const Standard_Failure&)
     {
@@ -2652,6 +2655,12 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
     ShapeUpgrade_UnifySameDomain u(s4, true, false, false);
     u.Build();
     fail_if_cancelled();
+    if (!BRepCheck_Analyzer(u.Shape()).IsValid())
+      return s3;
+    if (hist.IsNull())
+      hist = new BRepTools_History();
+    if (!h4.IsNull())
+      hist->Merge(h4);
     if (!u.History().IsNull())
       hist->Merge(u.History());
     return u.Shape();
