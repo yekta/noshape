@@ -22,6 +22,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   once as its default) the C++ side asks through the bridge; the test uses it. Default (off) unchanged everywhere.
   Same pattern, not failing today (owners note): kernel tests boolean_budget.rs / bool_patterns.rs (NOSHAPE_BOOLEAN_
   MEMORY_MB, NOSHAPE_BOP_PARALLEL, NOSHAPE_KERNEL_PROFILE, NOSHAPE_BOOL_NO_SCALE), band_mesh.rs, rust_mesh.rs.
+  (11-02 03:45: the switch is gone with the void walls: live refuses every Shell of a solid with a void (1757), so
+  such a Shell now fails at once; the test is `shell::a_solid_with_a_void_doesnt_shell`.)
 - [x] verified 7b11ede71 (qa 11-02 00:52, qa-scratch/bin/splitnames.py: a Ø20 × 30 cylinder split by Right then Front into 4 quarters, Chamfer 0.8 mm of one quarter's x = 0 cut face: **v0.4.19 chamfers two parts** (Part 1 and Part 3, both 2331.1635 / 9 faces), **green 4a0fc474 only Part 1** (2331.1635 / 9; the other three 2356.1945 / 5)) P0 SPLIT-PIECE-NAMES (core): a revolved body split by two planes into 3 parts; Chamfer "Face of Split 1" (one
   face picked on one part, 0.8 mm, tangent propagation) chamfered the matching face of all three. Cause: OCCT's
   splitter leaves a cut face shared by the two pieces (one face in both solids), so both pieces' faces got one name and

@@ -136,13 +136,22 @@ spheres / tori, next with the planar strips); on those two shapes OCCT's offset 
 change; where the offset fails, the direct construction replaces the slabs. vibe3 (perf.sh 43e955ad, best of 3 × 5):
 tub direct 177.7 ms / OCCT's offset 86.7 / slabs 378.1; rounded pocket 190.7 / 237.4 / 486.4. (Direct is twice the
 offset on the tub: its checks, likely the self-interference analysis; to look at.)
-Live's answers (11-02 03:00): **1752** the removed R5 fillet is the slabs' (2175.269908 mm³, 16 faces: the kept walls
-end in flat rims normal to them): the decline stays, T1 `shell::a_removed_fillet_opening_is_lives`. **1753** live
-refuses both void parts ("Could not shell part with selections.", also at 1 mm), and **1748**'s a73 / 86dd (both with
-voids) fail the same way: every void case tried fails in live; plain void cases asked (REQUESTS 02:50) before Shell
-fails every solid with a void. **1748** 82ac: live 13318.805622 / 70 faces, ours 12748.07 / 86 (both slab results);
-ours has two 2.3 mm³ sliver voids along the bottom edges and keeps three bits of the removed top (z 20): live's face
-list asked (REQUESTS 03:00). (The evidence STEPs had metre values under an mm label: my chk/tostep probe, not the app.)
+Live's answers (11-02 03:00-03:40): **1752** the removed R5 fillet is the slabs' (2175.269908 mm³, 16 faces: the kept
+walls end in flat rims normal to them): the decline stays, T1 `shell::a_removed_fillet_opening_is_lives` (building
+those rims directly would take the corpus's 13 "kept face tangent to a removed one" cases: speed only). **1753 /
+1757** Parasolid refuses every shell of a solid with a void (the corpus's fuzz parts, and a plain 60 × 40 × 20 block
+with a box or a Ø10 cylinder void, top removed or hollow: "Could not shell part with selections."; the block alone
+shells): an inward Shell of a solid with a void now fails before any construction (shell.cpp
+`op_shell_solid_unbudgeted`), step 2e's void walls and the set_shell_voids switch removed; T1
+`shell::a_solid_with_a_void_doesnt_shell`. Before, the slabs built 11 of the corpus's 21 void cases and failed the
+other 10 after 2-28 s each; shell-hang's Shell 4 failed after 14.9 s. vibe3 (perf.sh bench_profdocs 6889cae3 → 9e1ef85e):
+shell-hang 48.8 → 32.2 s, the 16 profile documents 55.8 → 39.2 s. **1748 / 1758** 82ac: live 13318.805622 / 70
+faces, ours (slabs) 12748.07 / 86: live has the same two sliver voids and the same three bits of the removed top, but
+keeps 8 input faces untouched (the four 2088.062 planes at z ±19, the four 507.8638 cylinders at x 20) where the
+slabs cut offsets (2098.66 planes, 272.80 / 209.996 cylinders, 5.48 / 12.24 planes): a thin region Parasolid leaves
+solid; the bodies as .x_t asked (REQUESTS 03:40) to diff here. shell-hang's Shell 5 (30 s, then fails) has an edge of
+four faces (non-manifold): not asked yet. (The evidence STEPs had metre values under an mm label: my chk/tostep
+probe, not the app.)
 Was: next (step 2b): collapsing fillets (their offset vanishes: the neighbours' offsets meet; contract the face to an
 edge, its end arcs to points), vertices of more faces, removed curved faces.
 Release note for the lead: "Shell: a pocket's floor corners are now mitred as Onshape does (the wall used to thin to

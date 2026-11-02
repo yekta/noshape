@@ -2784,39 +2784,22 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     so = x.Current();
   if (nso != 1)
     return no("not one solid");
-  // Its shells: the one with the removed faces is the wall's outside; the others (voids) get walls of their own.
-  std::vector<TopoDS_Shape> olds;
+  // Its shell (a solid with a void fails before: live refuses it, 1757).
   for (TopoDS_Iterator x(so, false); x.More(); x.Next(), ++nsh)
     if (x.Value().ShapeType() == TopAbs_SHELL)
-      olds.push_back(x.Value());
+      old_shell = x.Value();
     else
       return no("a solid holding more than shells");
+  if (nsh != 1)
+    return no("not one shell");
   ShapeIMap faces, edges, verts, rm;
   TopExp::MapShapes(so, TopAbs_FACE, faces);
   TopExp::MapShapes(so, TopAbs_EDGE, edges);
   TopExp::MapShapes(so, TopAbs_VERTEX, verts);
   for (const TopoDS_Shape& f : removed)
     rm.Add(f);
-  int outer = -1;
-  for (size_t k = 0; k < olds.size(); ++k)
-  {
-    bool has = false;
-    for (TopExp_Explorer x(olds[k], TopAbs_FACE); x.More() && !has; x.Next())
-      has = rm.Contains(x.Current());
-    if (has)
-    {
-      if (outer >= 0)
-        return no("removed faces on two shells");
-      outer = (int)k;
-    }
-  }
-  if (outer < 0)
+  if (rm.IsEmpty())
     return no("no face removed");
-  // Voids: built (each void's wall a solid of its own) only when switched on (set_shell_voids, NOSHAPE_SHELL_VOIDS)
-  // until live says which of ours and the slabs' is Parasolid's (REQUESTS 11-02 04:00).
-  if (olds.size() > 1 && !shell_voids_enabled())
-    return no("a void (live asked)");
-  old_shell = olds[(size_t)outer];
   Bnd_Box bb;
   BRepBndLib::Add(so, bb, false);
   const double size = std::sqrt(bb.SquareExtent());
@@ -3360,28 +3343,16 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   HHist        h = new BRepTools_History();
   TopoDS_Shell shell;
   bld.MakeShell(shell);
-  // Per void shell, its offset (the void's wall: the void inside its offset).
-  std::vector<TopoDS_Shell> voids(olds.size());
-  for (size_t ks = 0; ks < olds.size(); ++ks)
-  {
-  const bool is_outer = (int)ks == outer;
-  if (!is_outer)
-    bld.MakeShell(voids[ks]);
-  TopoDS_Shell& into = is_outer ? shell : voids[ks];
-  for (TopoDS_Iterator it(olds[ks], false); it.More(); it.Next())
+  for (TopoDS_Iterator it(old_shell, false); it.More(); it.Next())
   {
     const TopoDS_Face& f  = TopoDS::Face(it.Value());
     const int          i  = faces.FindIndex(f);
     const TopoDS_Face  ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
     if (collapse[(size_t)i])
-    {
-      if (is_outer)
-        bld.Add(shell, f); // (no offset: the neighbours' offsets meet where it was)
-    }
+      bld.Add(shell, f); // (no offset: the neighbours' offsets meet where it was)
     else if (kept[(size_t)i])
     {
-      if (is_outer)
-        bld.Add(shell, f);
+      bld.Add(shell, f);
       TopoDS_Face of;
       bld.MakeFace(of, sf[(size_t)i].off, 1e3 * tol);
       for (TopoDS_Iterator w(ff, false); w.More(); w.Next())
@@ -3411,7 +3382,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         }
       }
       const TopoDS_Face inner = TopoDS::Face(of.Oriented(TopAbs::Reverse(f.Orientation())));
-      bld.Add(into, inner);
+      bld.Add(shell, inner);
       sources.Bind(inner, Source{f, (uint8_t)REL_GENERATED});
     }
     else
@@ -3513,7 +3484,6 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       }
     }
   }
-  }
   for (int i = 1; i <= ne; ++i)
     if (!ex[(size_t)i].IsNull() && !degen[(size_t)i])
       BRepLib::SameParameter(ex[(size_t)i], 1e3 * tol);
@@ -3523,25 +3493,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   TopoDS_Solid outer_wall;
   bld.MakeSolid(outer_wall);
   bld.Add(outer_wall, shell.Oriented(old_shell.Orientation()));
-  TopoDS_Shape wall = outer_wall;
-  if (olds.size() > 1)
-  {
-    // Each void's wall: its offset outside, the void (as the part had it) inside.
-    TopoDS_Compound all;
-    bld.MakeCompound(all);
-    bld.Add(all, outer_wall);
-    for (size_t ks = 0; ks < olds.size(); ++ks)
-      if ((int)ks != outer)
-      {
-        voids[ks].Closed(true);
-        TopoDS_Solid vw;
-        bld.MakeSolid(vw);
-        bld.Add(vw, voids[ks].Oriented(old_shell.Orientation()));
-        bld.Add(vw, olds[ks]);
-        bld.Add(all, vw);
-      }
-    wall = all;
-  }
+  const TopoDS_Shape wall = outer_wall;
   if (!BRepCheck_Analyzer(wall).IsValid())
   {
     if (const char* dir = std::getenv("NOSHAPE_SHELL_DUMP"))
@@ -4104,6 +4056,17 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
   const double sign = outward ? 1.0 : -1.0;
   if (!outward && in_onshape_mitre_band(solid.shape, removed, thickness))
     fail_op("shell failed (Parasolid can't build this wall: live G51)");
+  // Parasolid refuses to shell a solid with a void ("Could not shell part with selections."), a plain block with a
+  // box or cylinder void too, a face removed or none (live 1753 / 1757).
+  if (!outward)
+    for (TopExp_Explorer x(solid.shape, TopAbs_SOLID); x.More(); x.Next())
+    {
+      int shells = 0;
+      for (TopoDS_Iterator it(x.Current(), false); it.More(); it.Next())
+        shells += it.Value().ShapeType() == TopAbs_SHELL;
+      if (shells > 1)
+        fail_op("shell failed (Parasolid can't shell a solid with a void: live 1757)");
+    }
   if (!outward && blind_hole_floor_too_thin(solid.shape, removed, thickness))
     fail_op("shell failed (Parasolid can't offset a blind hole's bottom past the cavity floor: live 'core (2026-10-27 b)')");
   const double gap = outward ? std::numeric_limits<double>::infinity() : offsets_touch_gap(solid.shape, removed, thickness);

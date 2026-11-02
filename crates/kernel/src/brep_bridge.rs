@@ -449,23 +449,6 @@ pub fn set_rust_blend(on: Option<bool>) -> Option<bool> {
     BLEND_MODE.with(|m| m.replace(on))
 }
 
-thread_local! {
-    /// This thread's switch for Shell's direct walls of solids with voids: None as NOSHAPE_SHELL_VOIDS says.
-    static SHELL_VOIDS: Cell<Option<bool>> = const { Cell::new(None) };
-}
-
-/// Shell's direct walls of solids with voids on or off for this thread (`None`: as NOSHAPE_SHELL_VOIDS says, off
-/// unless set at start-up). A switch, not the environment: on Windows the C++ side's getenv keeps the start-up
-/// environment and never sees a later `std::env::set_var`. Returns the thread's mode before.
-pub fn set_shell_voids(on: Option<bool>) -> Option<bool> {
-    SHELL_VOIDS.with(|m| m.replace(on))
-}
-
-pub(crate) fn shell_voids_enabled() -> bool {
-    static ENV: OnceLock<bool> = OnceLock::new();
-    SHELL_VOIDS.with(|m| m.get()).unwrap_or_else(|| *ENV.get_or_init(|| std::env::var_os("NOSHAPE_SHELL_VOIDS").is_some()))
-}
-
 pub(crate) fn brep_blend_enabled() -> bool {
     static ENV: OnceLock<bool> = OnceLock::new();
     BLEND_MODE.with(|m| m.get()).unwrap_or_else(|| *ENV.get_or_init(|| std::env::var("NOSHAPE_BLEND_RUST").as_deref() == Ok("1")))

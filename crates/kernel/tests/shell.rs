@@ -747,23 +747,19 @@ fn shell_corpus_time() {
     }
 }
 
-/// A box with a box-shaped void: the direct wall only with NOSHAPE_SHELL_VOIDS (live asked); with it, as the slabs'.
+/// Parasolid refuses to shell a solid with a void, a box or a cylinder void in a plain block alike (live 1757: "Could
+/// not shell part with selections."); without the void the block shells.
 #[test]
-fn a_void_waits_for_live() {
-    let s = cut(&bx([0.0; 3], [60.0, 40.0, 20.0]), &bx([20.0, 10.0, 6.0], [40.0, 30.0, 14.0])).unwrap().shape;
-    assert_eq!(s.solids()[0].count(ShapeType::Shell), 2);
-    let rm = top(&s, 20.0);
-    let before = set_shell_voids(Some(false));
-    assert!(shell_solid(&s, &rm, 2.0, ShellSide::Inside, ShellMethod::Quadrics).is_err());
-    set_shell_voids(before);
-    // (The switch, not the environment: on Windows the kernel's C++ getenv never sees a set_var.)
-    let before = set_shell_voids(Some(true));
-    let p = shell_solid(&s, &rm, 2.0, ShellSide::Inside, ShellMethod::Quadrics);
-    set_shell_voids(before);
-    let q = shell_solid(&s, &rm, 2.0, ShellSide::Inside, ShellMethod::Slabs).unwrap();
-    let p = p.unwrap();
-    eprintln!("void: ours {} ({} solids, {} faces), slabs {} ({} solids, {} faces)", vol(&p.shape), p.shape.solids().len(), p.shape.count(ShapeType::Face), vol(&q.shape), q.shape.solids().len(), q.shape.count(ShapeType::Face));
-    assert!(close(vol(&p.shape), vol(&q.shape)));
+fn a_solid_with_a_void_doesnt_shell() {
+    let block = bx([0.0; 3], [60.0, 40.0, 20.0]);
+    for void in [bx([20.0, 10.0, 5.0], [40.0, 30.0, 15.0]), cyl_z(30.0, 20.0, 5.0, 5.0, 10.0)] {
+        let s = cut(&block, &void).unwrap().shape;
+        assert_eq!(s.solids()[0].count(ShapeType::Shell), 2);
+        for m in [ShellMethod::Auto, ShellMethod::Quadrics, ShellMethod::Slabs] {
+            assert!(shell_solid(&s, &top(&s, 20.0), 1.0, ShellSide::Inside, m).is_err(), "{m:?}");
+        }
+    }
+    assert!(close(vol(&shell_solid(&block, &top(&block, 20.0), 1.0, ShellSide::Inside, ShellMethod::Auto).unwrap().shape), 60.0 * 40.0 * 20.0 - 58.0 * 38.0 * 19.0));
 }
 
 /// A removed fillet as the opening (live 1752): Parasolid ends the walls next to it in flat rims normal to them,
