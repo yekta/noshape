@@ -159,7 +159,11 @@ faces, ours (slabs) 12748.07 / 86: live has the same two sliver voids and the sa
 keeps 8 input faces untouched (the four 2088.062 planes at z ±19, the four 507.8638 cylinders at x 20) where the
 slabs cut offsets (2098.66 planes, 272.80 / 209.996 cylinders, 5.48 / 12.24 planes): a thin region Parasolid leaves
 solid; the bodies as .x_t asked (REQUESTS 03:40) to diff here. shell-hang's Shell 5 (30 s, then fails) has an edge of
-four faces (non-manifold): not asked yet. (The evidence STEPs had metre values under an mm label: my chk/tostep
+one face that isn't a seam (5 mm edges at x −60 that the x −60 face uses on both sides: valid to BRepCheck); no
+prefix of the document has an edge of more than two faces (ops `regen_profile::non_manifold_origin`). Live 1760:
+Union of two boxes touching along an edge is OK and leaves two parts (no non-manifold body), a Shell of one box then
+shells it alone: ours already kept two parts but showed "no geometry change" (live: plain OK): now only when no two
+picked parts touch; T1 `kernel_robustness::union_of_boxes_touching_along_an_edge_leaves_two_parts`. (The evidence STEPs had metre values under an mm label: my chk/tostep
 probe, not the app.)
 Was: next (step 2b): collapsing fillets (their offset vanishes: the neighbours' offsets meet; contract the face to an
 edge, its end arcs to points), vertices of more faces, removed curved faces.

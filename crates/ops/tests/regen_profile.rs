@@ -489,3 +489,43 @@ fn regen_summary() {
     }
     let _ = std::fs::remove_dir_all(&tmp);
 }
+
+/// The first feature of each NOSHAPE_PROFILE_DIR document (NOSHAPE_PROFILE_ONLY: one) after which a body has an edge
+/// of more than two faces (Parasolid makes no such body: live 1760), regenerating each prefix of the feature list.
+#[test]
+#[ignore = "T2 tool: NOSHAPE_PROFILE_DIR"]
+fn non_manifold_origin() {
+    let Some(dir) = std::env::var_os("NOSHAPE_PROFILE_DIR") else { return };
+    let only = std::env::var("NOSHAPE_PROFILE_ONLY").ok();
+    let mut files: Vec<_> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "noshape") && only.as_ref().is_none_or(|o| p.file_name().is_some_and(|n| n.to_string_lossy() == *o))).collect();
+    files.sort();
+    let tmp = std::env::temp_dir().join(format!("noshape-nm-{}", std::process::id()));
+    std::fs::create_dir_all(&tmp).unwrap();
+    for path in files {
+        let copy = tmp.join(path.file_name().unwrap());
+        std::fs::copy(&path, &copy).unwrap();
+        let Ok(s) = noshape_ops::session::Session::open(&copy) else { continue };
+        let units = s.doc.settings.units;
+        for tab in &s.doc.tabs {
+            if let TabContent::PartStudio(ps) = &tab.content {
+                for k in 1..=ps.features.len() {
+                    let mut p = ps.clone();
+                    p.features.truncate(k);
+                    let r = Regenerator::new().regenerate(&p, &ConfigValues::default(), &units, &RegenOptions::default());
+                    let bad: Vec<String> = r.context.bodies.iter().filter(|b| b.shape.edge_faces().is_ok_and(|ef| ef.iter().any(|f| {
+                        let mut f = f.clone();
+                        f.sort_unstable();
+                        f.dedup();
+                        f.len() > 2
+                    }))).map(|b| b.name.clone()).collect();
+                    if !bad.is_empty() {
+                        let f = &ps.features[k - 1];
+                        println!("{} / {}: after feature {k} {} ({}): {bad:?} non-manifold", path.file_stem().unwrap().to_string_lossy(), tab.name, f.name, f.type_id);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+}

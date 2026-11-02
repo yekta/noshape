@@ -3087,3 +3087,38 @@ fn part_mirror_of_a_half_through_hole_is_the_whole_plate() {
         assert!(b.faces().iter().any(|f| (f.area().unwrap() * 1e6 - 100.0 * std::f64::consts::PI).abs() < 1e-6), "rust {rust}: no whole hole wall");
     }
 }
+
+/// Two boxes touching along one edge only: live's Union is OK and leaves two parts (Parasolid makes no body with an
+/// edge of four faces), and a Shell of one box's top shells that box alone (live 1760: 1084 mm³, 11 faces), the
+/// edge vertical or horizontal.
+#[test]
+fn union_of_boxes_touching_along_an_edge_leaves_two_parts() {
+    for (label, b0, b1) in [("vertical", [20.0, 20.0, 0.0], [40.0, 40.0, 10.0]), ("horizontal", [0.0, 20.0, 10.0], [20.0, 40.0, 20.0])] {
+        let mut t = T::new();
+        for (a, b) in [([0.0, 0.0, 0.0], [20.0, 20.0, 10.0]), (b0, b1)] {
+            let (_, regions) = t.sketch(&[&[(a[0], a[1]), (b[0], a[1]), (b[0], b[1]), (a[0], b[1])]], &[]);
+            let mut p = vec![("entities", q(regions)), ("depth", e(&format!("{} mm", b[2] - a[2]))), ("operationType", en("NEW"))];
+            if a[2] > 0.0 {
+                p.extend([("startOffset", ParamValue::Bool(true)), ("startOffsetBound", en("BLIND")), ("startOffsetDistance", e(&format!("{} mm", a[2])))]);
+            }
+            t.add("extrude", &p);
+        }
+        let all: Vec<Reference> = t.regen().context.bodies.iter().map(|b| Reference::Body(b.id.clone())).collect();
+        assert_eq!(all.len(), 2);
+        let u = t.add("booleanBodies", &[("operationType", en("UNION")), ("tools", q(all))]);
+        let r = t.regen();
+        let st = r.display.features.iter().find(|s| s.id == u).unwrap();
+        assert_eq!(st.status, FeatureStatus::Ok, "{label}: {:?}", st.message);
+        let solids: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).collect();
+        assert_eq!(solids.len(), 2, "{label}: union of edge-touching boxes");
+        let top = t.faces_where(|c| c.z > 9.999 && c.z < 10.001 && c.x < 20.0 && c.y < 20.0);
+        assert_eq!(top.len(), 1, "{label}");
+        let s = t.shell(top, "1 mm");
+        let r = t.regen();
+        let st = r.display.features.iter().find(|x| x.id == s).unwrap();
+        assert_eq!(st.status, FeatureStatus::Ok, "{label}: {:?}", st.message);
+        let mut vols: Vec<(f64, usize)> = r.context.bodies.iter().map(|b| (noshape_kernel::volume_properties(&b.shape).unwrap().mass / MM3, b.shape.count(noshape_kernel::ShapeType::Face))).collect();
+        vols.sort_by(|a, b| a.0.total_cmp(&b.0));
+        assert!((vols[0].0 - 1084.0).abs() < 1e-6 && vols[0].1 == 11 && (vols[1].0 - 4000.0).abs() < 1e-6, "{label}: {vols:?}");
+    }
+}
