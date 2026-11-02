@@ -801,6 +801,17 @@ impl Sketch {
                     if na != nb {
                         return if na > nb { a } else { b };
                     }
+                    // Then the one more tied to other loops (fuzz s328: a
+                    // bolt circle's big circle, three centre distances,
+                    // stays; its holes move out).
+                    let ties = |u: EntityId| {
+                        let lp = self.loop_of(u, cons);
+                        cons.iter().filter(|(_, us)| us.len() >= 2 && us.iter().any(|x| lp.contains(x)) && us.iter().any(|x| !lp.contains(x))).count()
+                    };
+                    let (ra, rb) = (ties(a), ties(b));
+                    if ra != rb {
+                        return if ra > rb { a } else { b };
+                    }
                     // Along the distance: a's point against b's.
                     let (qa_own, qb_own) = if owns(a, pa) { (qa, qb) } else { (qb, qa) };
                     let d = qb_own - qa_own;
