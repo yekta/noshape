@@ -41,6 +41,17 @@ Fusing the slabs yours takes first and adding the offset ones after doesn't help
 next reasons: 3.9 → 5.9 s on a dump); one OCCT common of the solid with all slabs as one tool group changes results.
 Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scratch SHELLDUMP=<path without .brep>).
 
+## Knurls: the section reach (11-02 11:30 UTC)
+- The crossing loop lets a crossing reach a section by the section's tolerance (OCCT's pave, 5 um on the 30 TPI
+  knurl) and grows vertices up to it (1d4f8171). A tool's corner edge 3 um outside the cylinder then lost the 3 um
+  strip of its flank between it and the flank's section: by the section's approximation error instead (2e-8),
+  Ø25 × 10 CP30 45/30's open edges went 12432 -> 2232 (with the lens arcs, knurl-arcs2.patch). Alone, over the 11
+  smaller knurl recordings (vibe5 bool-corpora/kg-*, kh*): no change but that one moving on (two edges -> a
+  non-manifold result); knurl T1s pass with it. Not landed (nothing taken yet).
+- What's left on that knurl: 372 open edges per tool at its caps (a section at z = 1.22 mm where one tool's cap meets
+  another's flank, kept on both sides of it).
+- The big recordings (kh46, k25, k10x50, kt-100) take 30+ min each without OCCT in the replay now (vibe5, nice 19).
+
 ## qa's P1 RUST-SHELL-GPF-REGRESS fixed (11-02 10:00 UTC)
 - cli-shell-gpf's Shell 2 failed since d03803a2: its rule taking a tolerant vertex off its face's plane within its
   own tolerance took one of the Shell's commons (54630d70: a vertex 44 um off, tolerance 0.12 mm), 3.3e-7 off OCCT's
