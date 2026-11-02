@@ -1217,6 +1217,35 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) -> Vec<us
         if m.follow.is_some() || !matches!(m.kind, MateType::Revolute | MateType::Cylindrical | MateType::PinSlot | MateType::Planar | MateType::Parallel | MateType::Slider) {
             continue;
         }
+        // A Slider started turned: one turn onto its alignment about an
+        // axis through a point of the slide axis, the point chosen so the
+        // connector lands on that axis; no slide after (live probes 1786
+        // sa1–sa6, exact: the connector moves along the axis by tan(θ/2) ×
+        // its offset from it; 1776 b1–b5 the quarter-turn case; fuzz f40).
+        if m.kind == MateType::Slider {
+            if log_rot(relative(&poses, m).rotation).length() > 1e-9 {
+                let (fa, fb) = (poses[m.a].mul(&m.a_local), poses[m.b].mul(&m.b_local));
+                let r0 = base_rotation(m.flip_primary, m.reorient);
+                let (moving, c, o, axis, turn) = if !bodies[m.a].fixed {
+                    (m.a, fa.origin, fb.origin, fb.z(), fb.rotation * r0.inverse() * fa.rotation.inverse())
+                } else if !bodies[m.b].fixed {
+                    (m.b, fb.origin, fa.origin, fa.z(), fa.rotation * r0 * fb.rotation.inverse())
+                } else {
+                    continue;
+                };
+                let turn = turn.normalize();
+                // The pivot o + p·axis: least squares of the connector's
+                // drop off the axis after the turn (zero when it can be).
+                let perp = |v: DVec3| v - axis * v.dot(axis);
+                let (w0, w1) = (perp(turn * (c - o)), perp(axis - turn * axis));
+                let p = if w1.length_squared() > 1e-18 { -w0.dot(w1) / w1.length_squared() } else { (c - o).dot(axis) };
+                let pivot = o + axis * p;
+                let pose = bodies[moving].pose;
+                bodies[moving].pose = Frame { origin: pivot + turn * (pose.origin - pivot), rotation: (turn * pose.rotation).normalize() };
+                poses[moving] = bodies[moving].pose;
+            }
+            continue;
+        }
         let z_rel = (relative(&poses, m).rotation * DVec3::Z).z;
         if z_rel >= 1e-6 {
             continue;
