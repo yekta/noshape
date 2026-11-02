@@ -486,6 +486,8 @@ fs-oracle-asm vocabulary, mates added one at a time as live does; asm-N.live.jso
 | least-change probes 2 | 10 | REQUESTS 12:15 | 10 | 0 → 10 | the least-change rule |
 | asm 1 (BLOCK / PLATE / PIN, 1–4 mates) | 20 | REQUESTS 10:05 | 20 | 15 → 20 | perpendicular start; Slider pivot; "not consistent" rule; exact flip turns the free part |
 | sketch probes 3 (rectangles) | 10 | REQUESTS 15:10 | 10 | 10 | – |
+| sketch probes 4 (rectangle + line) | 8 | REQUESTS 1780 | 8 | 5 → 8 | follow check, order |
+| sketch 3 (40, splines / conics / angles) | 40 | REQUESTS 1777 | 40 | solvability 40/40; positions open | – |
 | asm 2 (3–5 instances, 99 mates) | 30 | REQUESTS 15:40 | – | – | – |
 | asm probes (1776: a1–a6, b1–b5) | 11 | REQUESTS 14:00 | 11 | 8/8 encoded | – |
 | sketch 2 (+ fit splines, conics, angles) | 20 | REQUESTS 10:40 | 10 (10 spline cases refused: our spline JSON form, live reposts) | solvability 10/10 | – |
@@ -588,6 +590,25 @@ dimensioned (r9 / r10 = s115's rectangle alone). So s115's top-right corner come
 left side to the dimensioned chain line l1: geometry related to changing geometry gives way. One case; left open.
 Live's batch-2 colour correction (1778): every "fully" was a dimension arrow / label artifact; they are blue as ours.
 Next batches: splines / conics / angles (once live confirms their REST form), assemblies with drags and patterns.
+
+11-02 12:00–13:30 (constructive.rs, from batch 1/2 cases, probes 4 and batch 3; summed position error over the solved
+non-drag cases printed per case by live_matches, `one_case` with FUZZ_SEED / FUZZ_PROBE prints one): batches 1+2
+435 → 388 mm (s8 exact; s11's triangle, s14's slot and arc chain, s104's rectangle and arc exact), all three batches
+1855 → 1829 mm, probes 1–4 42/42 (probes 4 were 5/8), batch 3 solvability 40/40. Rules added: an arc placed alone
+keeps its end directions; a loop the change can't pass pins the change's lower point and least-changes the rest
+(a rectangle's diagonal scales it about the lower-left, s104); a distance between one curve's own ends (through shared
+points) is that curve's size (s17); a relation member whose own H / V / dimension fixes the related value stays (s8);
+a relation's keep waits for a chain of its kind to a dimension (s11), keeps only the shortest / smallest angle in
+[0°, 180°) of its class (s14) and only a line agreeing with its Parallel / Perpendicular class; a released neighbour
+must be able to follow (stretch along itself, or be carried across by neighbours that stretch; probe t1, s5, s8);
+units ordered by pending, then joining constraints, then the lower one (t4); a line's least change measured from
+before it was carried; sizes / directions kept are as the pass started (corner rectangles share points: the land
+of 963fae85 failed e2e::configurations on that, fixed with T1 onshape_ux::corner_rectangle_width_edit_keeps_its_height).
+Tried and dropped: keeping the other member when the relation's choice can't stay (s226 −62 mm but broke s1, exact).
+Open, biggest first: s215 (331 mm), s6 (170), s102 (162), s236 (114), s226 (120), s218 (76), s209 (71); s17 live
+scaled the whole slot about a2's center (a4 moved 1.309 mm in; no rule yet, probe it); s104's triangle turned about
+the intersection of l9 with l3 (the Perpendicular's lines; one case, probe it); s11's quad kept the LONGER of an
+Equal pair (l5) where its ends are both tied. Probes 5 next: Perpendicular pivot, slot scaling, Equal between tied lines.
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
