@@ -217,11 +217,12 @@ fn conflicts_and_fixed_fixed() {
     let dia = sk.add_constraint(ConstraintKind::Diameter { curve: circ, value: 3.0 }).unwrap();
     let r = sk.solve();
     assert!(r.conflicting().contains(&dia));
-    // redundant but consistent radius + diameter
+    // Redundant but consistent radius + diameter: a dimension the rest
+    // already fixes over-defines the sketch (live fuzz s7: a radius
+    // dimensioned twice, "Sketch could not be solved.").
     sk.set_dimension_value(dia, 2.0).unwrap();
     let r = sk.solve();
-    assert!(r.is_solved(), "{r:?}");
-    assert_eq!(r.redundant, vec![dia]);
+    assert_eq!(r.conflicting(), &[dia], "{r:?}");
     // switching it to a reference dimension removes the redundancy
     sk.set_driving(dia, false).unwrap();
     let r = sk.solve();

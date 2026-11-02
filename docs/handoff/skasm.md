@@ -481,7 +481,7 @@ fs-oracle-asm vocabulary, mates added one at a time as live does; asm-N.live.jso
 `oracle_asm::asm_fuzz_trace` (FUZZ_CASE=<seed>) prints one case mate by mate.
 | batch | cases | sent to live | answered | match | differences fixed |
 |---|---|---|---|---|---|
-| sketch 1 (lines, arcs, circles; 11 drags) | 20 | REQUESTS 09:45 | – | – | – |
+| sketch 1 (lines, arcs, circles; 11 drags) | 20 | REQUESTS 09:45 | 20 (no drags yet) | solvability 19 → 20; positions 1 | 1: a redundant dimension |
 | asm 1 (BLOCK / PLATE / PIN, 1–4 mates) | 20 | REQUESTS 10:05 | – | – | 1 before live: f8 / f11 / f19 |
 | sketch 2 (+ fit splines, conics, angles) | 20 | REQUESTS 10:40 | – | – | – |
 Fixed before live answered: an axial mate whose connectors start exactly perpendicular (a part inserted square to its
@@ -489,6 +489,16 @@ mate) could solve reversed: the residual is as flat both ways, the orientation p
 off. The old code accepted the reversed pose as OK; the 11-02 conflict rule then flagged it. Now the moving part is
 turned the shortest way onto the alignment first (T1 a_perpendicular_start_ends_aligned); asm batch 1's mates in error
 went 9 → 5 (the rest are deliberate conflicts).
+Sketch batch 1 against live (11-02 11:20): solvability (solved vs "Sketch could not be solved.") 19/20 → 20/20 after
+fixing s7: **a driving dimension the rest already fixes over-defines the sketch** (a radius dimensioned twice at the
+same value), where redundant relations (a second Perpendicular, an Equal twice) stay fine; ours called it "redundant"
+and solved (constraints_more updated). Live, like ours, solves the rest of an over-defined sketch (its "could not be
+solved" sketches still moved, up to 22 mm; only 3 kept the posted positions); tried and reverted keeping the geometry.
+Positions: 1/20 exact. Live keeps well-tied geometry exactly where it was and moves free ends (a dimensioned line's
+free end, the lone line an Equal ties to a rectangle), where ours spreads every change by a weighted minimum norm
+(sum of squared moves: live 3153, ours 1270 over 6 cases). Weighting by constraint counts got 3/11 at best, so not
+that; 14 minimal probes sent (REQUESTS 11:30) to pin the rule before changing the solver. live_matches fails on
+solvability only and prints position differences until then.
 Next batches: splines / conics / angles (once live confirms their REST form), assemblies with drags and patterns.
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches

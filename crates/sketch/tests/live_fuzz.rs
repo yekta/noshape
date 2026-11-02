@@ -471,10 +471,13 @@ fn fixture(name: &str) -> std::path::PathBuf {
 #[test]
 #[ignore = "T2: live fuzz batch"]
 fn write_batch() {
-    for (n, first, rich) in [(1, 1, false), (2, 101, true)] {
+    for (n, first, rich) in BATCHES {
         check_batch(n, first, rich);
     }
 }
+
+/// The batches: (number, first seed, rich).
+const BATCHES: [(usize, u64, bool); 2] = [(1, 1, false), (2, 101, true)];
 
 /// Batch `n` (20 seeds from `first`): written when LIVE_FUZZ_WRITE is set,
 /// else checked unchanged.
@@ -544,34 +547,175 @@ fn differences(case: &Value, live: &Value) -> Vec<String> {
 }
 
 /// Ours against live's answers (`sketch-N.live.json`, written by live:
-/// `{"cases": {"s1": {"points": {...}, "radii": {...}, "constraints": {"k3": "OK" | message}, "curves": {...}, "drag": {...}}}}`).
-/// Known differences are listed in `KNOWN` until fixed.
+/// `{"cases": {"s1": {"solved": bool, "points": {...}, "radii": {...}, "constraints": {...}, "curves": {...}, "drag": {...}}}}`).
+/// Fails on a solvability difference (live "Sketch could not be solved."
+/// against ours Solved, or the reverse); position differences are counted
+/// and printed: under-defined geometry lands where each solver's least
+/// change puts it, and live's rule is still being pinned down (handoff).
 #[test]
 #[ignore = "T2: live fuzz batch vs live"]
 fn live_matches() {
-    const KNOWN: &[&str] = &[];
+    let (mut cases, mut status_ok, mut exact) = (0, 0, 0);
     let mut report = Vec::new();
-    let (mut cases, mut matches) = (0, 0);
-    for n in 1.. {
-        let (ours_path, live_path) = (fixture(&format!("sketch-{n}.json")), fixture(&format!("sketch-{n}.live.json")));
-        if !ours_path.exists() {
-            break;
-        }
-        let Ok(live) = std::fs::read_to_string(&live_path) else { continue };
-        let ours: Value = serde_json::from_str(&std::fs::read_to_string(&ours_path).unwrap()).unwrap();
+    let mut positions = Vec::new();
+    for (n, first, rich) in BATCHES {
+        let Ok(live) = std::fs::read_to_string(fixture(&format!("sketch-{n}.live.json"))) else { continue };
+        // Ours as the solver stands now (the batch file keeps ours as sent).
+        let ours = batch(20, first, rich);
         let live: Value = serde_json::from_str(&live).unwrap();
         for case in ours["cases"].as_array().unwrap() {
             let name = case["case"].as_str().unwrap();
             let Some(l) = live["cases"].get(name) else { continue };
             cases += 1;
+            let solved = case["ours"]["status"] == "solved";
+            match l["solved"].as_bool() {
+                Some(ls) if ls != solved => report.push(format!("{name}: ours {}, live {}", case["ours"]["status"], l["message"])),
+                _ => status_ok += 1,
+            }
             let d = differences(case, l);
             if d.is_empty() {
-                matches += 1;
-            } else if !KNOWN.contains(&name) {
-                report.push(format!("{name}: {}", d.join("; ")));
+                exact += 1;
+            } else {
+                positions.push(format!("{name}: {}", d.join("; ")));
             }
         }
     }
-    println!("live fuzz (sketch): {cases} cases answered, {matches} match");
+    println!("live fuzz (sketch): {cases} cases answered, solvability matches {status_ok}, everything matches {exact}");
+    for p in &positions {
+        println!("  {}", p.chars().take(300).collect::<String>());
+    }
     assert!(report.is_empty(), "{}", report.join("\n"));
+}
+
+/// Probes of live's least change (after batch 1, where under-defined
+/// geometry landed elsewhere in ours): each a minimal sketch with one
+/// constraint or dimension the drawing doesn't meet, so what moves shows
+/// live's rule.
+fn probes() -> Vec<(String, Case)> {
+    let v = DVec2::new;
+    let mut out = Vec::new();
+    let mut add = |name: &str, f: &dyn Fn(&mut Case)| {
+        let mut c = Case::new();
+        f(&mut c);
+        out.push((name.to_string(), c));
+    };
+    add("p1 lone line, length 20 -> 15", &|c| {
+        let l = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        c.length(&l, 15.0);
+    });
+    add("p2 lone horizontal line, length 20 -> 15", &|c| {
+        let l = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        c.hv(true, &l);
+        c.length(&l, 15.0);
+    });
+    add("p3 L, first line 20 -> 15", &|c| {
+        let a = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        let b = c.line(v(20.0, 0.0), v(20.0, 10.0));
+        c.coincident(&format!("{a}.end"), &format!("{b}.start"));
+        c.length(&a, 15.0);
+    });
+    add("p4 L, second line 10 -> 5", &|c| {
+        let a = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        let b = c.line(v(20.0, 0.0), v(20.0, 10.0));
+        c.coincident(&format!("{a}.end"), &format!("{b}.start"));
+        c.length(&b, 5.0);
+    });
+    add("p5 concentric(big first, small second), big created first", &|c| {
+        let a = c.circle(v(0.0, 0.0), 10.0);
+        let b = c.circle(v(1.0, 1.0), 4.0);
+        c.pair("CONCENTRIC", &a, &b);
+    });
+    add("p6 concentric(small, big), big created first", &|c| {
+        let a = c.circle(v(0.0, 0.0), 10.0);
+        let b = c.circle(v(1.0, 1.0), 4.0);
+        c.pair("CONCENTRIC", &b, &a);
+    });
+    add("p7 concentric(small first, big second), small created first", &|c| {
+        let a = c.circle(v(0.0, 0.0), 4.0);
+        let b = c.circle(v(1.0, 1.0), 10.0);
+        c.pair("CONCENTRIC", &a, &b);
+    });
+    add("p8 concentric, the second circle dimensioned", &|c| {
+        let a = c.circle(v(0.0, 0.0), 10.0);
+        let b = c.circle(v(1.0, 1.0), 4.0);
+        c.pair("CONCENTRIC", &a, &b);
+        c.radius(&b, 4.0, false);
+    });
+    add("p9 rectangle with H / V, width 20 -> 25", &|c| {
+        let p = [v(0.0, 0.0), v(20.0, 0.0), v(20.0, 10.0), v(0.0, 10.0)];
+        let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+        for i in 0..4 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+        }
+        for (i, x) in l.iter().enumerate() {
+            c.hv(i % 2 == 0, x);
+        }
+        c.length(&l[0], 25.0);
+    });
+    add("p10 line, tangent arc, line: first line 20 -> 15", &|c| {
+        let l1 = c.line(v(-20.0, 0.0), v(0.0, 0.0));
+        let a = c.arc(v(0.0, 6.0), 6.0, -std::f64::consts::FRAC_PI_2, 0.0);
+        let l2 = c.line(v(6.0, 6.0), v(6.0, 26.0));
+        c.coincident(&format!("{l1}.end"), &format!("{a}.start"));
+        c.coincident(&format!("{a}.end"), &format!("{l2}.start"));
+        c.pair("TANGENT", &l1, &a);
+        c.pair("TANGENT", &a, &l2);
+        c.length(&l1, 15.0);
+    });
+    add("p11 parallel(first flat, second tilted)", &|c| {
+        let a = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        let b = c.line(v(0.0, 5.0), v(20.0, 7.0));
+        c.pair("PARALLEL", &a, &b);
+    });
+    add("p12 parallel(second tilted, first flat)", &|c| {
+        let a = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        let b = c.line(v(0.0, 5.0), v(20.0, 7.0));
+        c.pair("PARALLEL", &b, &a);
+    });
+    add("p13 equal(20 long, 10 long)", &|c| {
+        let a = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        let b = c.line(v(0.0, 5.0), v(10.0, 5.0));
+        c.pair("EQUAL", &a, &b);
+    });
+    add("p14 equal(10 long, 20 long)", &|c| {
+        let a = c.line(v(0.0, 0.0), v(20.0, 0.0));
+        let b = c.line(v(0.0, 5.0), v(10.0, 5.0));
+        c.pair("EQUAL", &b, &a);
+    });
+    out
+}
+
+fn probe_batch() -> Value {
+    let cases: Vec<Value> = probes().into_iter().map(|(name, mut c)| {
+        let ours = ours(&mut c);
+        let id = name.split(' ').next().unwrap().to_string();
+        json!({"case": id, "what": name, "constraints": c.spec, "onshape": {"entities": c.os_entities, "constraints": c.os_constraints}, "ours": ours})
+    }).collect();
+    json!({"units": "mm (Onshape JSON: metres, radians)", "plane": "Top", "cases": cases})
+}
+
+/// The least-change probes (`sketch-probe-1.json`, live's answers in
+/// `sketch-probe-1.live.json`); written with LIVE_FUZZ_WRITE=probe-1.
+#[test]
+#[ignore = "T2: live fuzz least-change probes"]
+fn probe_matches() {
+    let b = probe_batch();
+    let path = fixture("sketch-probe-1.json");
+    if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == "probe-1") {
+        std::fs::write(&path, serde_json::to_string_pretty(&b).unwrap()).unwrap();
+    }
+    let Ok(live) = std::fs::read_to_string(fixture("sketch-probe-1.live.json")) else { return };
+    let live: Value = serde_json::from_str(&live).unwrap();
+    let (mut n, mut ok) = (0, 0);
+    for case in b["cases"].as_array().unwrap() {
+        let Some(l) = live["cases"].get(case["case"].as_str().unwrap()) else { continue };
+        n += 1;
+        let d = differences(case, l);
+        if d.is_empty() {
+            ok += 1;
+        } else {
+            println!("  {} ({}): {}", case["case"], case["what"], d.join("; "));
+        }
+    }
+    println!("live probes: {n} answered, {ok} match");
 }

@@ -960,6 +960,18 @@ pub(crate) fn run_ext(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget],
         // a drag beside a failing component reported Solved with its residual).
         let drag_ok = is_drag && out.comps.iter().zip(&out.comp_ok).all(|(c, ok)| *ok || !c.vars.iter().any(|v| sys.drag_target.contains_key(v)));
         let failed = || SolveStatus::Failed { reason: format!("solver did not converge (max residual {:.3e})", out.max_residual) };
+        // A driving dimension the rest already fixes over-defines the sketch
+        // (live fuzz s7: a radius dimensioned twice, both 13.096 mm: "Sketch
+        // could not be solved."), where a redundant relation (a second
+        // Perpendicular, an Equal twice) doesn't.
+        let analysis = (opts.analyze && !is_drag).then(|| analyze(sk, &mut sys, &out, &conflicting));
+        let mut conflicting = conflicting;
+        if let Some(a) = &analysis {
+            let dims: Vec<ConstraintId> = a.redundant.iter().copied().filter(|c| sk.constraint(*c).is_some_and(|c| c.driving && c.kind.is_dimension())).collect();
+            if !dims.is_empty() {
+                conflicting = dedup_sorted(conflicting.into_iter().chain(dims).collect());
+            }
+        }
         let status = if !out.all_converged || out.max_residual > opts.tolerance {
             failed()
         } else if conflicting.is_empty() {
@@ -982,7 +994,10 @@ pub(crate) fn run_ext(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget],
             drag_solved: drag_ok,
         };
         if opts.analyze {
-            let a = analyze(sk, &mut sys, &out, &conflicting);
+            let a = match analysis {
+                Some(a) if conflicting.is_empty() => a,
+                _ => analyze(sk, &mut sys, &out, &conflicting),
+            };
             sk.cache.analysis = Some((sk.cache.revision, a.clone()));
             report.dof = Some(a.dof);
             report.entity_states = a.states;
