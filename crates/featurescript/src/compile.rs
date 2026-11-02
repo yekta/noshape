@@ -55,7 +55,8 @@ pub struct Symbol {
     pub ty: Option<TypeRef>,
 }
 
-pub type SymbolTable = HashMap<Name, Symbol>;
+/// (ahash: building std's modules merges every import's export table, millions of lookups.)
+pub type SymbolTable = HashMap<Name, Symbol, ahash::RandomState>;
 
 /// What a module can see.
 #[derive(Default)]
@@ -176,7 +177,82 @@ pub fn std_module(name: &str) -> Result<Arc<CompiledModule>, Vec<CompileError>> 
 /// (see [`crate::std_version_for`]).
 pub fn std_module_at(version: u32, name: &str) -> Result<Arc<CompiledModule>, Vec<CompileError>> {
     let mut cache = STD_CACHE.lock();
-    load_std(crate::std_version_for(version), name, &mut cache)
+    let version = crate::std_version_for(version);
+    if let Some(m) = cache.get(&(version, name.to_string())) {
+        return Ok(m.clone());
+    }
+    if cache.keys().any(|(v, _)| *v == version) {
+        return load_std(version, name, &mut cache, None);
+    }
+    // The release's first module: its modules parsed on every core meanwhile (largest first), each taken by the
+    // build as it comes to it (parsed here when no core has started it yet); built in import order as before
+    // (parsing was half of the first custom feature's 300 ms, std's hole tables alone 2 MB).
+    let pending = Pending::new(version);
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).clamp(1, 16) - 1;
+    std::thread::scope(|s| {
+        for _ in 0..threads {
+            s.spawn(|| pending.work());
+        }
+        let r = load_std(version, name, &mut cache, Some(&pending));
+        pending.stop();
+        r
+    })
+}
+
+/// A release's modules being parsed: each claimed once, by a worker or by the build that needs it first.
+struct Pending {
+    files: Vec<(&'static str, &'static str)>,
+    index: HashMap<&'static str, usize>,
+    claimed: Vec<std::sync::atomic::AtomicBool>,
+    done: Mutex<HashMap<&'static str, Result<ast::Module, crate::parser::ParseError>>>,
+    ready: parking_lot::Condvar,
+}
+
+impl Pending {
+    fn new(version: u32) -> Pending {
+        let mut files: Vec<(&'static str, &'static str)> = if version == crate::STD_VERSION {
+            crate::STD_SOURCES.to_vec()
+        } else {
+            crate::STD_VERSIONS.iter().find(|(v, _)| *v == version).map(|(_, f)| f.to_vec()).unwrap_or_default()
+        };
+        files.sort_by_key(|(_, src)| std::cmp::Reverse(src.len()));
+        let index = files.iter().enumerate().map(|(i, (n, _))| (*n, i)).collect();
+        let claimed = files.iter().map(|_| std::sync::atomic::AtomicBool::new(false)).collect();
+        Pending { files, index, claimed, done: Mutex::new(HashMap::new()), ready: parking_lot::Condvar::new() }
+    }
+    fn claim(&self, i: usize) -> bool {
+        !self.claimed[i].swap(true, std::sync::atomic::Ordering::AcqRel)
+    }
+    /// A worker: every unclaimed module parsed, largest first.
+    fn work(&self) {
+        for (i, (name, src)) in self.files.iter().enumerate() {
+            if self.claim(i) {
+                let r = crate::parser::parse(src);
+                self.done.lock().insert(name, r);
+                self.ready.notify_all();
+            }
+        }
+    }
+    /// The workers stop taking modules (the build has all it needs).
+    fn stop(&self) {
+        for c in &self.claimed {
+            c.store(true, std::sync::atomic::Ordering::Release);
+        }
+    }
+    /// Module `name`'s tree: parsed here if nobody has started it, else waited for.
+    fn take(&self, name: &str) -> Option<Result<ast::Module, crate::parser::ParseError>> {
+        let i = *self.index.get(name)?;
+        if self.claim(i) {
+            return Some(crate::parser::parse(self.files[i].1));
+        }
+        let mut done = self.done.lock();
+        loop {
+            if let Some(r) = done.remove(name) {
+                return Some(r);
+            }
+            self.ready.wait(&mut done);
+        }
+    }
 }
 
 /// The version number of an import's `version : "1963.0"`.
@@ -184,7 +260,7 @@ fn import_version(version: &str) -> u32 {
     version.split('.').next().and_then(|v| v.parse().ok()).unwrap_or(crate::STD_VERSION)
 }
 
-fn load_std(version: u32, name: &str, cache: &mut StdCache) -> Result<Arc<CompiledModule>, Vec<CompileError>> {
+fn load_std(version: u32, name: &str, cache: &mut StdCache, pending: Option<&Pending>) -> Result<Arc<CompiledModule>, Vec<CompileError>> {
     if let Some(m) = cache.get(&(version, name.to_string())) {
         return Ok(m.clone());
     }
@@ -192,7 +268,9 @@ fn load_std(version: u32, name: &str, cache: &mut StdCache) -> Result<Arc<Compil
     let Some(src) = crate::std_source_at(version, name) else {
         return Err(vec![CompileError { module: path, pos: Pos::default(), message: format!("Standard library module {name} not found"), parse: false, level: Level::Error }]);
     };
-    let ast = Arc::new(crate::parser::parse(src).map_err(|e| vec![CompileError { module: path.clone(), pos: e.pos, message: e.message, parse: true, level: Level::Error }])?);
+    // (From the parse in progress when this release's first module was asked for; else parsed here.)
+    let tree = pending.and_then(|p| p.take(name)).unwrap_or_else(|| crate::parser::parse(src));
+    let ast = Arc::new(tree.map_err(|e| vec![CompileError { module: path.clone(), pos: e.pos, message: e.message, parse: true, level: Level::Error }])?);
     let mut imports = Vec::new();
     for item in &ast.items {
         if let TopKind::Import { path: p, version: v, .. } = &item.kind {
@@ -201,7 +279,8 @@ fn load_std(version: u32, name: &str, cache: &mut StdCache) -> Result<Arc<Compil
             };
             // An older library imports its own version's modules.
             let v = if version == crate::STD_VERSION { version } else { crate::std_version_for(import_version(v)) };
-            imports.push(Some(load_std(v, n, cache)?));
+            // (Another release's module: parsed on its own, the pending parse is this release's.)
+            imports.push(Some(load_std(v, n, cache, pending.filter(|_| v == version))?));
         } else {
             imports.push(None);
         }
@@ -404,7 +483,7 @@ fn build_module(path: Arc<str>, ast: Arc<ast::Module>, imports: Vec<Option<Arc<C
     let mut errors = Vec::new();
     let err = |errors: &mut Vec<CompileError>, pos: Pos, m: String| errors.push(CompileError { module: path.clone(), pos, message: m, parse: false, level: Level::Error });
     let mut scope = Scope::default();
-    let mut exports = SymbolTable::new();
+    let mut exports = SymbolTable::default();
     let mut kept = Vec::new();
     // Imported symbols.
     for (item, m) in ast.items.iter().zip(&imports) {
@@ -414,6 +493,8 @@ fn build_module(path: Arc<str>, ast: Arc<ast::Module>, imports: Vec<Option<Arc<C
             Some(ns) => {
                 scope.namespaces.insert(ns.clone(), m.exports.clone());
             }
+            // The first import's table taken whole (merging into an empty table is inserting each symbol).
+            None if scope.symbols.is_empty() => scope.symbols = (*m.exports).clone(),
             None => {
                 for (n, s) in m.exports.iter() {
                     // Live (dom/fs-import): two un-namespaced imports exporting
@@ -428,7 +509,9 @@ fn build_module(path: Arc<str>, ast: Arc<ast::Module>, imports: Vec<Option<Arc<C
                 }
             }
         }
-        if item.export {
+        if item.export && exports.is_empty() {
+            exports = (*m.exports).clone();
+        } else if item.export {
             for (n, s) in m.exports.iter() {
                 merge_symbol(&mut exports, n, s);
             }
@@ -467,8 +550,9 @@ fn build_module(path: Arc<str>, ast: Arc<ast::Module>, imports: Vec<Option<Arc<C
     }
     // Functions and constants.
     let mut own_fns: Vec<(Arc<FnDecl>, Arc<ast::FnDef>)> = Vec::new();
-    let mut own_consts: Vec<(Arc<GlobalCell>, Option<QualName>, ast::Expr)> = Vec::new();
-    let mut own_values: SymbolTable = SymbolTable::new();
+    // (The initializer borrowed from the module's tree: std's hole tables are megabytes of map literals.)
+    let mut own_consts: Vec<(Arc<GlobalCell>, Option<QualName>, &ast::Expr)> = Vec::new();
+    let mut own_values: SymbolTable = SymbolTable::default();
     for item in &ast.items {
         match &item.kind {
             TopKind::Function(def) => {
@@ -517,7 +601,7 @@ fn build_module(path: Arc<str>, ast: Arc<ast::Module>, imports: Vec<Option<Arc<C
                     merge_symbol(&mut exports, name, &sym);
                 }
                 decls.push(Decl { name: name.clone(), pos: item.pos, export: item.export, kind: DeclKind::Const(cell.clone()) });
-                own_consts.push((cell, ty.clone(), init.clone()));
+                own_consts.push((cell, ty.clone(), init));
             }
             _ => {}
         }

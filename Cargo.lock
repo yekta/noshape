@@ -4799,6 +4799,7 @@ dependencies = [
 name = "noshape-featurescript"
 version = "0.0.0-dev"
 dependencies = [
+ "ahash",
  "log",
  "noshape-workspace-hack",
  "parking_lot",
