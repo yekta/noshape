@@ -243,8 +243,10 @@ fn loft_between_squares() {
 }
 
 /// std Loft (loft.fs): a connection on edges sits at each edge's connectionEdgeParameters (std's editing logic puts a
-/// new pick at 0.5, its connection manipulator "connection,edge" moves it along the edge's tangent), not always the
-/// middle.
+/// new pick at 0.5, its connection manipulator "connection,edge" moves it along the edge's tangent), and, as live
+/// 1810, adds no vertex, edge or face: between parallel edges the side face stays a plane (the frustum, 7000 mm³, 6
+/// faces, 12 edges), one connection isn't snapped to a vertex, and the bottom front edge to the top right edge turns
+/// the loft (5000 mm³).
 #[test]
 fn loft_connections_take_each_edges_parameter_as_std() {
     let mut t = T::new();
@@ -292,14 +294,16 @@ fn loft_connections_take_each_edges_parameter_as_std() {
     let seam = |res: &RegenResult, a: DVec3, z: DVec3| {
         res.context.bodies[0].shape.edges().iter().any(|e| e.endpoints().is_ok_and(|(p, q)| (p.distance(a) < 1e-7 && q.distance(z) < 1e-7) || (p.distance(z) < 1e-7 && q.distance(a) < 1e-7)))
     };
-    let ends: Vec<_> = res.context.bodies[0].shape.edges().iter().filter_map(|e| e.endpoints().ok()).collect();
-    assert!(seam(&res, DVec3::new(0.0, -0.01, 0.0), DVec3::new(0.0, -0.005, 0.03)), "the edges' middles connected: {ends:?}");
+    // Live 1810: a connection adds no vertex, edge or face: the frustum, 6 faces, 12 edges, 7000 mm³.
+    let n = (res.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), res.context.bodies[0].shape.edges().len(), total_volume(&res.context) * 1e9);
+    assert!(n.0 == 6 && n.1 == 12 && (n.2 - 7000.0).abs() < 1e-6 && !seam(&res, DVec3::new(0.0, -0.01, 0.0), DVec3::new(0.0, -0.005, 0.03)), "{n:?}");
     // The bottom edge's manipulator dragged 5 mm along it: std's change function moves its parameter to 0.75.
     let m = &res.display.features.iter().find(|s| s.id == loft).unwrap().manipulators;
     use noshape_model::display::FeatureManipulator as M;
     let Some((key, M::Linear { base, direction, .. })) = m.first() else { panic!("{m:?}") };
     assert_eq!((key.as_str(), m.len()), ("0,0", 4), "{m:?}");
     assert!((*base - DVec3::new(0.0, -0.01, 0.0)).length() < 1e-9 && direction.x.abs() > 0.999, "{m:?}");
+    let at = *base + *direction * 0.005;
     let mut moved = m[0].1.clone();
     if let M::Linear { offset, .. } = &mut moved {
         *offset = 0.005;
@@ -311,8 +315,23 @@ fn loft_connections_take_each_edges_parameter_as_std() {
     assert_eq!(new.array("connections")[0].get("connectionEdgeParameters"), Some(&ParamValue::Text("fs:[0.75,0.5]".into())));
     t.ps.feature_mut(loft).unwrap().params = new;
     let res = t.ok();
-    let at = *base + *direction * 0.005;
-    assert!(seam(&res, at, DVec3::new(0.0, -0.005, 0.03)), "the bottom edge connected three quarters along it");
+    let shape = |res: &RegenResult| (res.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), res.context.bodies[0].shape.edges().len(), total_volume(&res.context) * 1e9);
+    let (f, e, v) = shape(&res);
+    assert!(f == 6 && e == 12 && (v - 7000.0).abs() < 1e-6 && !seam(&res, at, DVec3::new(0.0, -0.005, 0.03)), "{f} faces, {e} edges, {v} mm³");
+    // One connection (live 1810 (a)): [0.75, 0.5] on the front edges, the plain frustum; the bottom front edge to the
+    // top right edge, a quarter turn: 5000 mm³.
+    for (top_edge, ts, want) in [(0, "fs:[0.75,0.5]", 7000.0), (1, "fs:[0.5,0.5]", 5000.0)] {
+        let mut p = t.ps.feature_mut(loft).unwrap().params.clone();
+        let mut c = ParamValues::default();
+        let refs = vec![Reference::SketchEntity { sketch: s1, entity: l1[0].0 }, Reference::SketchEntity { sketch: s2, entity: l2[top_edge].0 }];
+        c.set("connectionEntities", q(refs.clone()));
+        c.set("connectionEdgeQueries", q(refs));
+        c.set("connectionEdgeParameters", ParamValue::Text(ts.into()));
+        p.set("connections", ParamValue::Array(vec![c]));
+        t.ps.feature_mut(loft).unwrap().params = p;
+        let (f, e, v) = shape(&t.ok());
+        assert!(f == 6 && e == 12 && (v - want).abs() < 1e-6, "one connection to top edge {top_edge}: {f} faces, {e} edges, {v} mm³ (live {want})");
+    }
 }
 
 /// Live "psb (10-24) loft end derivative" and its follow-up: two-profile

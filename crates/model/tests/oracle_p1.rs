@@ -1782,7 +1782,7 @@ fn mixed_radius_drafted_corners_probe() {
         p.set("neutralPlane", q(face_at(&r, BOTTOM)));
         p.set("draftFaces", ParamValue::Query(SIDES.iter().map(|x| face_at(&r, *x)).collect()));
         p.set("angle", deg(5.0));
-        p.set("pullDirection", ParamValue::Bool(std::env::var_os("PULL").is_some()));
+        p.set("pullDirection", ParamValue::Bool(true));
     });
     let r = s.regen();
     let (k, k2) = (10.0 * 5f64.to_radians().tan(), 20.0 * 5f64.to_radians().tan());

@@ -400,7 +400,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   live 44304.933893 / 18: live's corner at each top vertex is one 4-sided OTHER face (two R2 arcs, the slanted
   cylinder's end ellipse, an ellipse on the top plane), ours two B-spline halves (5.081 mm² each, live's 10.158). (a)
   R2 verticals under an R4 loop: +0.10 mm³, 18 faces as live; (b) R4 / R2: exact (torus); (d) R3 / R8: -0.04 mm³, 18 as
-  live. T2 model oracle_p1::mixed_radius_corners_probe, mixed_radius_drafted_corners_probe (PULL=1 for live's draft).
+  live. T2 model oracle_p1::mixed_radius_corners_probe, mixed_radius_drafted_corners_probe.
 - [ ] P0 BLEND-RUST (core, lead 10-30 20:50) noshape's own fillets and chamfers for simple edges, OCCT as fallback
   (crates/brep blend.rs; kernel cpp/rust_blend.cpp in front of op_fillet / op_chamfer behind NOSHAPE_BLEND_RUST, off
   until correct; corpus NOSHAPE_RECORD_BLENDS + kernel `blend_replay`). 10-30 22:00, step 1: closed tangent chains

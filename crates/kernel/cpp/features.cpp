@@ -2617,6 +2617,26 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
   if (!start_points.empty() && start_points.size() % (3 * n) != 0)
     fail_invalid("loft start points must be one (x, y, z) per section");
   const size_t connections = start_points.size() / (3 * n);
+  // One connection with a point profile, or at a vertex of every section (a section blend's corners): each wire
+  // started at the vertex nearest its point (the matching below needs wires only).
+  auto at_vertices = [&]() {
+    for (size_t i = 0; i < n; ++i)
+    {
+      const TopoDS_Shape& s = sections.items[i];
+      if (s.IsNull() || s.ShapeType() == TopAbs_VERTEX || !std::isfinite(start_points[3 * i]))
+        continue;
+      const gp_Pnt p(start_points[3 * i], start_points[3 * i + 1], start_points[3 * i + 2]);
+      bool on = false;
+      for (TopExp_Explorer e(s, TopAbs_VERTEX); e.More() && !on; e.Next())
+        on = BRep_Tool::Pnt(TopoDS::Vertex(e.Current())).Distance(p) < Precision::Confusion();
+      if (!on)
+        return false;
+    }
+    return true;
+  };
+  const bool snap_one = connections == 1
+                        && (std::any_of(sections.items.begin(), sections.items.end(), [](const TopoDS_Shape& x) { return !x.IsNull() && x.ShapeType() == TopAbs_VERTEX; })
+                            || at_vertices() || std::getenv("NOSHAPE_LOFT_SNAP_CONNECTION"));
   const bool conditions = ends.start != 0 || ends.end != 0;
   bool       natural    = allow_natural && !ruled && !closed && (n >= 3 || conditions);
   for (const auto& s : sections.items)
@@ -2640,7 +2660,7 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
       continue;
     }
     TopoDS_Wire w = outer_or_wire(s, "loft section");
-    if (connections == 1 && std::isfinite(start_points[3 * i]))
+    if (connections == 1 && std::isfinite(start_points[3 * i]) && snap_one)
       w = rotate_wire_start(
         w, gp_Pnt(start_points[3 * i], start_points[3 * i + 1], start_points[3 * i + 2]));
     wires.push_back(w);
@@ -2648,7 +2668,8 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
   // Vertex counts matched like Parasolid; then OCCT must keep that matching.
   HHist split;
   bool  connected = false;
-  if (connections >= 2)
+  // One connection too (live 1810: a point partway along an edge is matched as it is, no vertex snapped to).
+  if (connections >= 2 || (connections == 1 && !snap_one))
   {
     if (points)
       fail_invalid("loft connections need wire sections");
@@ -2743,7 +2764,7 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
       real += s.ShapeType() != TopAbs_VERTEX;
     HHist        mh;
     TopoDS_Shape m;
-    if (!ruled && !closed && !points && (real >= 3 || circles || counts) && !std::getenv("NOSHAPE_LOFT_NO_MERGE") && merge_tangent_sides(out, m, mh))
+    if (!ruled && !closed && !points && (real >= 3 || circles || counts || connected) && !std::getenv("NOSHAPE_LOFT_NO_MERGE") && merge_tangent_sides(out, m, mh))
     {
       h   = compose(compound_of(args), h, mh);
       out = m;
@@ -2752,6 +2773,17 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
     {
       h   = compose(compound_of(args), h, mh);
       out = m;
+    }
+    // Live 1810: connections add no vertex or edge; the profile edges split at them are whole again.
+    if (connected)
+    {
+      ShapeUpgrade_UnifySameDomain usd(out, true, false, false);
+      usd.Build();
+      if (BRepCheck_Analyzer(usd.Shape()).IsValid())
+      {
+        h   = compose(compound_of(args), h, usd.History());
+        out = usd.Shape();
+      }
     }
   }
   HistoryBuilder hb(args, out);
