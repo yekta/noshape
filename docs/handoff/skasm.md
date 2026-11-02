@@ -683,6 +683,14 @@ f69 "not consistent" on a Parallel, f53's half-turn axis with both parts held, f
 probes 8 (editor edits on dimensioned profiles). Tried and dropped for s303 / s354 (slot with a new centre distance
 AND radius: live keeps the left arc's centre x and the free top): forcing the kept-but-resized arc to be placed next
 (with and without a hold-one-neighbour shape-3 step) made both worse.
+16:05: editor edit probes 8 answered (live 1793): with other dimensions present an editor edit is NOT scaled nor
+split: the far side (right / up) takes all of it, a slot's radius keeps its top line, a filleted rectangle's radius
+keeps its left side: i.e. live's least-change placement. So `dimension_edit_options` is constructive again, after
+`scale_for_edit` (free profiles only: 1775 / 1785). 6/6 with T1 width_edit_with_other_dimensions_moves_the_far_side.
+That test found the pass skipped curves SHARING point entities (the tools' rectangles / polylines have no Coincident
+constraints, so the pass saw four unrelated lines and fell back to "both by half"): `place_constructively` now runs on
+a copy with the shared points split (`split_shared_points`). Probes now: 52 + drags 8 + edits 6, all match; batches
+1–5 1282 mm.
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
