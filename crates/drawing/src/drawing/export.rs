@@ -300,9 +300,23 @@ pub fn to_svg(g: &SheetGeometry) -> String {
         };
         let _ = writeln!(s, r#"<{tag} points="{}" stroke-width="{}"{dash_attr}{stroke}/>"#, pts.join(" "), width_mm);
     }
+    // Consecutive fills of one colour (an exploded text's triangles) are one
+    // path, as in the PDF: a raster export of a 1000-row BOM parsed 250,000
+    // polygons.
+    let colors: Vec<String> = (0..g.fills.len()).map(|fi| hex(g.fill_color(fi))).collect();
     for (fi, f) in g.fills.iter().enumerate() {
-        let pts: Vec<String> = f.points.iter().map(|p| format!("{:.4},{:.4}", p[0], p[1])).collect();
-        let _ = writeln!(s, r#"<polygon points="{}" fill="{}" stroke="none"/>"#, pts.join(" "), hex(g.fill_color(fi)));
+        if fi == 0 || colors[fi - 1] != colors[fi] {
+            s.push_str("<path d=\"");
+        }
+        if f.points.len() >= 3 {
+            for (i, p) in f.points.iter().enumerate() {
+                let _ = write!(s, "{}{:.4},{:.4} ", if i == 0 { "M" } else { "L" }, p[0], p[1]);
+            }
+            s.push('Z');
+        }
+        if colors.get(fi + 1) != Some(&colors[fi]) {
+            let _ = writeln!(s, r#"" fill="{}" stroke="none"/>"#, colors[fi]);
+        }
     }
     let _ = writeln!(s, "</g>");
     for (ti, t) in g.texts.iter().enumerate().filter(|(ti, t)| stroked(g, *ti, t)) {
