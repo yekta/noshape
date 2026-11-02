@@ -338,12 +338,12 @@
             "parameters": [
               {
                 "btType": "BTMParameterString-149",
-                "parameterId": "localFirst",
+                "parameterId": "localEntity1",
                 "value": "c6.center"
               },
               {
                 "btType": "BTMParameterString-149",
-                "parameterId": "localSecond",
+                "parameterId": "localEntity2",
                 "value": "l5"
               }
             ]
@@ -2515,7 +2515,7 @@
           "second": "l1.end",
           "mirror": "l5",
           "id": "k10",
-          "type": "SYMMETRIC"
+          "type": "MIRROR"
         },
         {
           "first": "l1",
@@ -2740,7 +2740,7 @@
           },
           {
             "btType": "BTMSketchConstraint-2",
-            "constraintType": "SYMMETRIC",
+            "constraintType": "MIRROR",
             "entityId": "k10",
             "parameters": [
               {
@@ -2981,7 +2981,7 @@
           "second": "l1.end",
           "mirror": "l5",
           "id": "k10",
-          "type": "SYMMETRIC"
+          "type": "MIRROR"
         },
         {
           "first": "l1",
@@ -3386,7 +3386,7 @@
           },
           {
             "btType": "BTMSketchConstraint-2",
-            "constraintType": "SYMMETRIC",
+            "constraintType": "MIRROR",
             "entityId": "k10",
             "parameters": [
               {
@@ -5060,7 +5060,7 @@
           "second": "l1.end",
           "mirror": "l5",
           "id": "k10",
-          "type": "SYMMETRIC"
+          "type": "MIRROR"
         },
         {
           "first": "l1",
@@ -5465,7 +5465,7 @@
           },
           {
             "btType": "BTMSketchConstraint-2",
-            "constraintType": "SYMMETRIC",
+            "constraintType": "MIRROR",
             "entityId": "k10",
             "parameters": [
               {
@@ -7146,7 +7146,7 @@
           "second": "l1.end",
           "mirror": "l5",
           "id": "k10",
-          "type": "SYMMETRIC"
+          "type": "MIRROR"
         },
         {
           "first": "l1",
@@ -7371,7 +7371,7 @@
           },
           {
             "btType": "BTMSketchConstraint-2",
-            "constraintType": "SYMMETRIC",
+            "constraintType": "MIRROR",
             "entityId": "k10",
             "parameters": [
               {
@@ -9347,7 +9347,7 @@
           "second": "l5.end",
           "mirror": "l9",
           "id": "k20",
-          "type": "SYMMETRIC"
+          "type": "MIRROR"
         },
         {
           "first": "l5",
@@ -9815,7 +9815,7 @@
           },
           {
             "btType": "BTMSketchConstraint-2",
-            "constraintType": "SYMMETRIC",
+            "constraintType": "MIRROR",
             "entityId": "k20",
             "parameters": [
               {
@@ -12393,12 +12393,12 @@
             "parameters": [
               {
                 "btType": "BTMParameterString-149",
-                "parameterId": "localFirst",
+                "parameterId": "localEntity1",
                 "value": "c6.center"
               },
               {
                 "btType": "BTMParameterString-149",
-                "parameterId": "localSecond",
+                "parameterId": "localEntity2",
                 "value": "l5"
               }
             ]
@@ -15939,7 +15939,7 @@
           "second": "l1.end",
           "mirror": "l5",
           "id": "k10",
-          "type": "SYMMETRIC"
+          "type": "MIRROR"
         },
         {
           "first": "l1",
@@ -16442,7 +16442,7 @@
           },
           {
             "btType": "BTMSketchConstraint-2",
-            "constraintType": "SYMMETRIC",
+            "constraintType": "MIRROR",
             "entityId": "k10",
             "parameters": [
               {
@@ -17726,12 +17726,12 @@
             "parameters": [
               {
                 "btType": "BTMParameterString-149",
-                "parameterId": "localFirst",
+                "parameterId": "localEntity1",
                 "value": "c6.center"
               },
               {
                 "btType": "BTMParameterString-149",
-                "parameterId": "localSecond",
+                "parameterId": "localEntity2",
                 "value": "l5"
               }
             ]
@@ -18644,12 +18644,12 @@
             "parameters": [
               {
                 "btType": "BTMParameterString-149",
-                "parameterId": "localFirst",
+                "parameterId": "localEntity1",
                 "value": "c6.center"
               },
               {
                 "btType": "BTMParameterString-149",
-                "parameterId": "localSecond",
+                "parameterId": "localEntity2",
                 "value": "l5"
               }
             ]
@@ -19332,12 +19332,12 @@
             "parameters": [
               {
                 "btType": "BTMParameterString-149",
-                "parameterId": "localFirst",
+                "parameterId": "localEntity1",
                 "value": "c6.center"
               },
               {
                 "btType": "BTMParameterString-149",
-                "parameterId": "localSecond",
+                "parameterId": "localEntity2",
                 "value": "l5"
               }
             ]
@@ -21708,7 +21708,7 @@
           "second": "l1.end",
           "mirror": "l5",
           "id": "k10",
-          "type": "SYMMETRIC"
+          "type": "MIRROR"
         },
         {
           "first": "l1",
@@ -21933,7 +21933,7 @@
           },
           {
             "btType": "BTMSketchConstraint-2",
-            "constraintType": "SYMMETRIC",
+            "constraintType": "MIRROR",
             "entityId": "k10",
             "parameters": [
               {
@@ -22500,7 +22500,7 @@
           "second": "l1.end",
           "mirror": "l5",
           "id": "k10",
-          "type": "SYMMETRIC"
+          "type": "MIRROR"
         },
         {
           "first": "l1",
@@ -22725,7 +22725,7 @@
           },
           {
             "btType": "BTMSketchConstraint-2",
-            "constraintType": "SYMMETRIC",
+            "constraintType": "MIRROR",
             "entityId": "k10",
             "parameters": [
               {
@@ -26126,12 +26126,12 @@
             "parameters": [
               {
                 "btType": "BTMParameterString-149",
-                "parameterId": "localFirst",
+                "parameterId": "localEntity1",
                 "value": "c6.center"
               },
               {
                 "btType": "BTMParameterString-149",
-                "parameterId": "localSecond",
+                "parameterId": "localEntity2",
                 "value": "l5"
               }
             ]
@@ -26906,12 +26906,12 @@
             "parameters": [
               {
                 "btType": "BTMParameterString-149",
-                "parameterId": "localFirst",
+                "parameterId": "localEntity1",
                 "value": "c9.center"
               },
               {
                 "btType": "BTMParameterString-149",
-                "parameterId": "localSecond",
+                "parameterId": "localEntity2",
                 "value": "l8"
               }
             ]
@@ -27495,12 +27495,12 @@
             "parameters": [
               {
                 "btType": "BTMParameterString-149",
-                "parameterId": "localFirst",
+                "parameterId": "localEntity1",
                 "value": "c6.center"
               },
               {
                 "btType": "BTMParameterString-149",
-                "parameterId": "localSecond",
+                "parameterId": "localEntity2",
                 "value": "l5"
               }
             ]

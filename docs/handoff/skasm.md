@@ -777,6 +777,11 @@ tab: `external_assembly`); added the API path (assembly_insert `document` + `ver
 live's "Versioned assembly from other document" tip, e2e assembly_inserts_another_documents_assembly_at_a_version
 (landed 27549ea9). Told dx in docs/handoff/dx.md "From skasm (11-02)". Next: lead items 2 (open fuzz cases, P1 first)
 and 3 (batch 7, asm probes 4 when live answers).
+20:51: sketch batch 7 answered (live 1806): 40/40 match on the first answer, the new kinds too (a Symmetric rectangle's
+width: left side kept, right side moves, the free centre line by half, as ours). Live's REST: Symmetric is `MIRROR`,
+Midpoint `localEntity1` / `localEntity2` (the generator writes those now; sketch-7.json rewritten, same cases). Open
+P1: drag probes g4 (parked, speed) and g6 (live keeps the lower-left hole, moves the centre on its circle, projects the
+free hole radially: a constructive drag, not least norm; the constructive-drag try broke probes 7 before).
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;

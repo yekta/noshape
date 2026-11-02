@@ -276,12 +276,14 @@ impl Case {
     /// Points `a` and `b` symmetric about the line `axis`.
     fn symmetric(&mut self, a: &str, b: &str, axis: &str) {
         let (x, y, z) = (self.point(a), self.point(b), self.curve(axis));
-        self.con(ConstraintKind::Symmetric { a: x, b: y, axis: z }, "SYMMETRIC", vec![s("localFirst", a), s("localSecond", b), s("localMirror", axis)], json!({"first": a, "second": b, "mirror": axis}));
+        // (Onshape's type is MIRROR: live 1806.)
+        self.con(ConstraintKind::Symmetric { a: x, b: y, axis: z }, "MIRROR", vec![s("localFirst", a), s("localSecond", b), s("localMirror", axis)], json!({"first": a, "second": b, "mirror": axis}));
     }
     /// Point `p` at the midpoint of line `l`.
     fn midpoint(&mut self, p: &str, l: &str) {
         let (x, y) = (self.point(p), self.curve(l));
-        self.con(ConstraintKind::Midpoint { point: x, curve: y }, "MIDPOINT", vec![s("localFirst", p), s("localSecond", l)], json!({"first": p, "second": l}));
+        // (The UI's form, localEntity1 / localEntity2: live 1806.)
+        self.con(ConstraintKind::Midpoint { point: x, curve: y }, "MIDPOINT", vec![s("localEntity1", p), s("localEntity2", l)], json!({"first": p, "second": l}));
     }
     fn radius(&mut self, c: &str, mm: f64, diameter: bool) {
         let x = self.curve(c);
