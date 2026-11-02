@@ -1543,6 +1543,11 @@ fn probes11() -> Vec<(String, Case)> {
     leave_one_out(&[218, 236, 226])
 }
 
+/// Probes 13: the same for the rest of batches 1-3 left (s209, s11).
+fn probes13() -> Vec<(String, Case)> {
+    leave_one_out(&[209, 11])
+}
+
 /// Each case of `seeds` again with one of its relations left out.
 fn leave_one_out(seeds: &[u64]) -> Vec<(String, Case)> {
     let mut out = Vec::new();
@@ -1861,7 +1866,7 @@ fn probe_batch(list: Vec<(String, Case)>) -> Value {
 #[test]
 #[ignore = "T2: live fuzz least-change probes"]
 fn probe_matches() {
-    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11())] {
+    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13())] {
         let b = probe_batch(list);
         let path = fixture(&format!("sketch-probe-{n}.json"));
         if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == format!("probe-{n}")) {
@@ -1890,7 +1895,7 @@ fn probe_matches() {
 #[ignore = "T2: one live fuzz case"]
 fn one_case() {
     let probe = std::env::var("FUZZ_PROBE").ok();
-    let Some(mut c) = probe.as_ref().and_then(|p| [probes(), probes2(), probes3(), probes4(), probes5(), probes6(), probes10(), probes11()].into_iter().flatten().find(|(n, _)| n.split(' ').next() == Some(p.as_str())).map(|(_, c)| c)).or_else(|| {
+    let Some(mut c) = probe.as_ref().and_then(|p| [probes(), probes2(), probes3(), probes4(), probes5(), probes6(), probes10(), probes11(), probes13()].into_iter().flatten().find(|(n, _)| n.split(' ').next() == Some(p.as_str())).map(|(_, c)| c)).or_else(|| {
         let seed: u64 = std::env::var("FUZZ_SEED").ok()?.parse().ok()?;
         Some(generate(seed, seed > 100))
     }) else {
