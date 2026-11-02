@@ -270,7 +270,9 @@ struct Click {
 enum DragState {
     /// Pressed on an entity; becomes a geometry drag when moved.
     Pending { entity: EntityId, start: DVec2 },
-    Geometry { handle: DragHandle },
+    /// `at`: the pointer the last step solved for (a repeated pointer
+    /// position isn't solved again).
+    Geometry { handle: DragHandle, at: Option<DVec2> },
     /// Pressed on a dimension label: moves it when dragged, selects it on release.
     Label { constraint: ConstraintId, start: DVec2, moved: bool, additive: bool },
     /// Pressed on a constraint glyph: moves it when dragged, selects it on release.
@@ -1470,7 +1472,7 @@ impl SketchEditor {
         if shift {
             self.external_snap = None;
             self.drag_snap = None;
-        } else if let Some(DragState::Geometry { handle: DragHandle::Point(id) }) = self.drag {
+        } else if let Some(DragState::Geometry { handle: DragHandle::Point(id), .. }) = self.drag {
             self.drag_snap = self.point_drop_target(&data.sketch, id);
         }
         if let Some(p) = self.cursor && self.tool.draws() {
@@ -3322,15 +3324,21 @@ impl SketchEditor {
                 // redoing it (qa SKETCH-DRAG-BIG: 30–50 ms per step on 1000
                 // entities).
                 data.sketch.refresh_analysis();
-                self.drag = Some(DragState::Geometry { handle });
+                self.drag = Some(DragState::Geometry { handle, at: None });
                 self.tool_drag(data, p)
             }
-            Some(DragState::Geometry { handle }) => {
+            Some(DragState::Geometry { handle, at }) => {
+                if at == Some(p) {
+                    return EditOutcome::none();
+                }
                 let _report = data.sketch.drag(&[(handle, p)]);
                 match handle {
-                    DragHandle::Entity { id, .. } => self.drag = Some(DragState::Geometry { handle: DragHandle::Entity { id, grab: p } }),
-                    // Shift suppresses snapping onto other geometry.
-                    DragHandle::Point(id) => self.drag_snap = if self.shift_held { None } else { self.point_drop_target(&data.sketch, id) },
+                    DragHandle::Entity { id, .. } => self.drag = Some(DragState::Geometry { handle: DragHandle::Entity { id, grab: p }, at: Some(p) }),
+                    DragHandle::Point(id) => {
+                        self.drag = Some(DragState::Geometry { handle, at: Some(p) });
+                        // Shift suppresses snapping onto other geometry.
+                        self.drag_snap = if self.shift_held { None } else { self.point_drop_target(&data.sketch, id) };
+                    }
                     #[allow(unreachable_patterns)]
                     _ => {}
                 }
@@ -3587,7 +3595,7 @@ impl SketchEditor {
                 }
                 EditOutcome::redraw()
             }
-            Some(DragState::Geometry { handle }) => {
+            Some(DragState::Geometry { handle, .. }) => {
                 if let (DragHandle::Point(id), Some((target, _, is_pt))) = (handle, self.drag_snap.take()) {
                     let target = if target == noshape_sketch::ORIGIN { origin_point(&mut data.sketch) } else { target };
                     // The hidden Origin stand-in is constrained to, not merged into.
@@ -7599,6 +7607,19 @@ mod tests {
         ed.tool_up(&mut data, v(PX, PX));
         assert_eq!(data.sketch.entity_count(), 1);
         assert!(!data.sketch.entity(p).unwrap().external);
+    }
+
+    #[test]
+    fn a_drag_event_at_the_same_pointer_position_is_not_solved_again() {
+        // The viewport repeats pointer moves at one position (seen in the
+        // app: 4 of 21 drag steps twice); each would cost a whole drag solve.
+        let (mut ed, mut data) = editor(Tool::Select);
+        let p = data.sketch.add_point(v(0.01, 0.01));
+        ed.tool_down(&mut data, v(0.01, 0.01), Some(p), false, false);
+        assert!(ed.tool_drag(&mut data, v(0.012, 0.011)).changed);
+        assert!(!ed.tool_drag(&mut data, v(0.012, 0.011)).changed);
+        assert!(ed.tool_drag(&mut data, v(0.013, 0.011)).changed);
+        assert_eq!(data.sketch.point(p), Some(v(0.013, 0.011)));
     }
 
     #[test]
