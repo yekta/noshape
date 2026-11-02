@@ -15,9 +15,10 @@ COMPOSITE-LATER-FEATURE (75d20033), loft circle split (466a0805), feature audit 
 solid: an erosion-based shell), FI2 (a G1 Fill that live builds with a warning), BLEND-RUST coverage.
 16:20: the user's smooth vase end to end through the agent API on green d09b7b79 (/root/core-scratch/vase-e2e/vase.py:
 5 offset planes, hexagons as lines + tangent arcs, Loft, Shell top removed): loft 3 faces / 24 edges / 437876.30 (live
-437833.23), Shells 1.6 / 2 in, 2 out OK, 5 faces each, within 0.2-2.9 mm³ of live, 4.5-6 s each in the app (OCCT's
-offset 2.5-3.3 s of it in metres; the kernel test in mm 1.2 s: offset 0.1-0.2, cut 0.4, volumes 0.3 s, NOSHAPE_SHELL_
-DEBUG laps). Tried: the whole Shell at the working scale (mm) like the blends: 6 kernel and 2 model shell tests changed
+437833.23), Shells 1.6 / 2 in, 2 out OK, 5 faces each, within 0.2-2.9 mm³ of live; 4.5-6 s per feature_add on this
+(loaded) machine with meshing and saving; on vibe5 the regeneration's Shell is 1.12 s (regen_profile on ~/agents/
+vasedoc with NOSHAPE_KERNEL_PROFILE: op_shell_solid 0.84 s = offset 0.11 + cut 0.47 + volume check 0.24; then the
+feature's two volumes 0.19 s and two areas 0.07 s); live ~0.3 s. Tried: the whole Shell at the working scale (mm) like the blends: 6 kernel and 2 model shell tests changed
 results (the constructions' absolute thresholds): reverted; worth doing path by path (offset first) with the corpus.
 
 **State 11-02 14:50 (this session, from 11:55).** Builds / tests on vibe5 (rb-hosts), the profile documents copied
