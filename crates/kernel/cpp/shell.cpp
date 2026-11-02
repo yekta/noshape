@@ -52,6 +52,7 @@
 #include <BRepBuilderAPI_MakeSolid.hxx>
 #include <BRepBuilderAPI_Sewing.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <BRepCheck_Result.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
 #include <limits>
 #include <BRepBuilderAPI_MakeVertex.hxx>
@@ -69,6 +70,10 @@
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <gp_Torus.hxx>
 #include <Geom_TrimmedCurve.hxx>
+#include <GCPnts_AbscissaPoint.hxx>
+#include <Geom_BoundedSurface.hxx>
+#include <Geom2d_Line.hxx>
+#include <GeomLib.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <BRepPrimAPI_MakeCone.hxx>
 #include <gp_Lin.hxx>
@@ -2770,6 +2775,23 @@ bool add_pcurve(const TopoDS_Edge& ne, const TopoDS_Face& nf, const TopoDS_Edge&
       pcs.Init(sn, Precision::Confusion());
       if (!pcs.Perform(c3, a, b, cn))
         cn.Nullify();
+      // An offset edge traced on the offset of the original's surface keeps the original's curve there (the same
+      // parameters on both): taken where it lies closer to the edge than the projection.
+      if (!co.IsNull() && GeomAdaptor_Surface(sn).GetType() == GeomAbs_OffsetSurface && a >= f0 - 1e-9 && b <= f1 + 1e-9)
+      {
+        auto worst = [&](const occ::handle<Geom2d_Curve>& p2) {
+          double w = 0;
+          for (int k = 0; k <= 16; ++k)
+          {
+            const double   s  = a + (b - a) * k / 16;
+            const gp_Pnt2d uv = p2->Value(s);
+            w                 = std::max(w, sn->Value(uv.X(), uv.Y()).Distance(c3->Value(s)));
+          }
+          return w;
+        };
+        if (cn.IsNull() || worst(co) < worst(cn))
+          cn = occ::down_cast<Geom2d_Curve>(co->Copy());
+      }
     }
     else
       cn = GeomProjLib::Curve2d(c3, a, b, sn);
@@ -2807,7 +2829,7 @@ bool add_pcurve(const TopoDS_Edge& ne, const TopoDS_Face& nf, const TopoDS_Edge&
 }
 } // namespace quad
 
-bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t, double sign, Built& out)
+bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double thickness, double sign, Built& out)
 {
   const bool dbg = std::getenv("NOSHAPE_SHELL_DEBUG") != nullptr;
   auto       no  = [&](const char* why) {
@@ -2815,8 +2837,18 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       std::fprintf(stderr, "quadrics: %s\n", why);
     return false;
   };
-  if (sign > 0)
-    return no("outward");
+  // The offset distance against the outward normal: outward walls are the same construction at -t, the part's faces
+  // their inside and the offsets their outside.
+  const bool   outward = sign > 0;
+  const double t       = outward ? -thickness : thickness;
+  auto         t_lap   = std::chrono::steady_clock::now();
+  auto         lap     = [&](const char* what) {
+    if (!dbg)
+      return;
+    const auto now = std::chrono::steady_clock::now();
+    std::fprintf(stderr, "quadrics: %s %.0f ms\n", what, std::chrono::duration<double, std::milli>(now - t_lap).count());
+    t_lap = now;
+  };
   TopoDS_Shape so, old_shell;
   int          nso = 0, nsh = 0;
   for (TopExp_Explorer x(solid, TopAbs_SOLID); x.More(); x.Next(), ++nso)
@@ -2920,6 +2952,36 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         return no("a free-form face not smooth");
       double u0, u1, v0, v1;
       BRepTools::UVBounds(f, u0, u1, v0, v1);
+      // A B-spline extended past its bounds (tangentially, its own parameters kept): an outward wall's corner and
+      // edges lie past the face where it flares (a vase's foot), the offsets must meet there.
+      if (auto bs = occ::down_cast<Geom_BSplineSurface>(q.base); !bs.IsNull() && !bs->IsUPeriodic() && !bs->IsVPeriodic())
+      {
+        occ::handle<Geom_BoundedSurface> ext = occ::down_cast<Geom_BoundedSurface>(bs->Copy());
+        const double                     len = std::min(10 * thickness, 0.5 * size);
+        try
+        {
+          for (const bool in_u : {true, false})
+            for (const bool after : {true, false})
+              GeomLib::ExtendSurfByLength(ext, len, 1, in_u, after);
+          bool same = !ext.IsNull();
+          for (int a = 0; a <= 4 && same; ++a)
+            for (int b = 0; b <= 4 && same; ++b)
+            {
+              const double pu = u0 + (u1 - u0) * a / 4, pv = v0 + (v1 - v0) * b / 4;
+              same = ext->Value(pu, pv).Distance(bs->Value(pu, pv)) <= tol;
+            }
+          if (same)
+          {
+            q.base = ext;
+            q.sas  = new ShapeAnalysis_Surface(q.base);
+          }
+          else if (dbg)
+            std::fprintf(stderr, "quadrics: a B-spline's extension moved its parameters\n");
+        }
+        catch (const Standard_Failure&)
+        {
+        }
+      }
       const int n = 12;
       for (int a = 0; a <= n; ++a)
         for (int b = 0; b <= n; ++b)
@@ -2927,7 +2989,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           GeomLProp_SLProps lp(q.base, u0 + (u1 - u0) * a / n, v0 + (v1 - v0) * b / n, 2, 1e-12);
           if (!lp.IsNormalDefined())
             return no("a free-form face's normal undefined");
-          if (lp.IsCurvatureDefined() && std::max(std::abs(lp.MaxCurvature()), std::abs(lp.MinCurvature())) * t > 0.9)
+          if (lp.IsCurvatureDefined() && std::max(std::abs(lp.MaxCurvature()), std::abs(lp.MinCurvature())) * thickness > 0.9)
             return no("a free-form face's offset folds");
         }
       q.d   = d;
@@ -2974,6 +3036,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     else
       q.off = new Geom_ConicalSurface(q.ax, q.ang, q.r);
   }
+  lap("offsets");
   (void)curved; // (planes too: those by_planes declines, e.g. a corner of four faces)
   ShapeAncMap ef, vf, ve;
   TopExp::MapShapesAndUniqueAncestors(so, TopAbs_EDGE, TopAbs_FACE, ef);
@@ -3138,7 +3201,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           if (third < 0 || !quad::solve3(s3, x, size))
             return no("a tangent circle's corner not found");
         }
-        else
+        else if (c.GetType() == GeomAbs_Line)
         {
           gp_Pnt p0;
           gp_Vec d0;
@@ -3146,6 +3209,46 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           const gp_XYZ o = V.XYZ() - n_at(a) * t;
           if (third < 0 || !quad::solve_line(sf[(size_t)third], o, d0.Normalized().XYZ(), x, size))
             return no("a tangent line's corner not found");
+        }
+        else
+        {
+          // Tangent along another curve: on the curve moved along the faces' common normal (as its offset edge, below),
+          // where it meets the third face's offset (Newton in the curve's parameter, from the vertex's end).
+          if (third < 0)
+            return no("a tangent curve's corner not found");
+          const double s0 = c.FirstParameter(), s1 = c.LastParameter();
+          double       s  = c.Value(s0).Distance(V) <= c.Value(s1).Distance(V) ? s0 : s1;
+          const TopoDS_Face fa = TopoDS::Face(faces(a));
+          // (On a free-form face: its curve there traced on the offset, exact and on past the face.)
+          double                          g0, g1;
+          const occ::handle<Geom2d_Curve> pc = sf[(size_t)a].general && kept[(size_t)a] ? BRep_Tool::CurveOnSurface(TopoDS::Edge(edges(tp)), fa, g0, g1) : nullptr;
+          auto q = [&](double u) {
+            if (!pc.IsNull())
+            {
+              const gp_Pnt2d uv = pc->Value(u);
+              return sf[(size_t)a].off->Value(uv.X(), uv.Y()).XYZ();
+            }
+            const gp_Pnt p = c.Value(u);
+            return p.XYZ() - gp_Vec(normal_at(fa, p)).XYZ() * t;
+          };
+          bool found = false;
+          for (int it = 0; it < 60 && !found; ++it)
+          {
+            const double f = quad::eval(sf[(size_t)third], q(s));
+            if (std::abs(f) < 1e-13 * size)
+            {
+              x     = q(s);
+              found = true;
+              break;
+            }
+            const double h  = 1e-7 * (s1 - s0);
+            const double df = (quad::eval(sf[(size_t)third], q(s + h)) - quad::eval(sf[(size_t)third], q(s - h))) / (2 * h);
+            if (std::abs(df) < 1e-300)
+              break;
+            s -= f / df;
+          }
+          if (!found)
+            return no("a tangent curve's corner not found");
         }
       }
       else
@@ -3231,7 +3334,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     }
     else
       return no("a vertex not of three faces (or a seam and one)");
-    if ((x - V.XYZ()).Modulus() > 1e3 * t + 1e3 * tol) // (a narrow corner moves t / sin(half its angle))
+    if ((x - V.XYZ()).Modulus() > 1e3 * thickness + 1e3 * tol) // (a narrow corner moves t / sin(half its angle))
     {
       if (dbg)
         std::fprintf(stderr, "quadrics: vertex %d at %g %g %g (%zu faces, %zu edges) offset to %g %g %g\n", i, V.X(), V.Y(), V.Z(), fs.size(), es.size(), x.X(), x.Y(), x.Z());
@@ -3239,6 +3342,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     }
     pts[(size_t)i] = x;
   }
+  lap("corners");
   // The edges' offsets.
   BRep_Builder               bld;
   std::vector<TopoDS_Vertex> vx(nv + 1);
@@ -3333,6 +3437,31 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           return no("a tangent circle's offset failed");
         cands.push_back(mc.Value());
       }
+      else if (tangent_free && sf[(size_t)fa].general && kept[(size_t)fa] && !sf[(size_t)fa].off.IsNull())
+      {
+        // On a free-form face, the edge's own curve there (the offset keeps the surface's parameters) traced on the
+        // offset: exact (a fit through its points ran off both offsets by more than the wall's tolerance on a
+        // twisted vase's rounded corners).
+        double                          f0, f1;
+        const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, TopoDS::Face(faces(fa)), f0, f1);
+        if (pc.IsNull())
+          return no("a tangent curve's offset failed");
+        // (Past the edge's ends as far as the surface was extended: an outward wall's offset edge runs on past them.)
+        if (occ::down_cast<Geom2d_Line>(pc))
+        {
+          const double ext = (f1 - f0) * std::min(10 * thickness, 0.5 * size) / std::max(GCPnts_AbscissaPoint::Length(oc), tol);
+          f0 -= ext;
+          f1 += ext;
+        }
+        BRepBuilderAPI_MakeEdge tmp(pc, sf[(size_t)fa].off, f0, f1);
+        if (!tmp.IsDone() || !BRepLib::BuildCurve3d(tmp.Edge(), 1e-9 * size, GeomAbs_C2, 14, 0))
+          return no("a tangent curve's offset failed");
+        double                        g0, g1;
+        const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(tmp.Edge(), g0, g1);
+        if (c3.IsNull())
+          return no("a tangent curve's offset failed");
+        cands.push_back(new Geom_TrimmedCurve(c3, g0, g1));
+      }
       else if (tangent_free)
       {
         const double               a0 = oc.FirstParameter(), a1 = oc.LastParameter();
@@ -3358,13 +3487,25 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         for (int k = 1; k <= is.NbLines(); ++k)
           cands.push_back(is.Line(k));
       }
+      // A point's parameter on a candidate: its foot, or an end the point lies just past (an intersection of free-form
+      // offsets stops at their bounds, which a corner between tangent faces lies on).
+      auto on = [&](const gp_Pnt& p, const occ::handle<Geom_Curve>& cand, double& u) {
+        GeomAPI_ProjectPointOnCurve pr(p, cand);
+        double best = 1e300;
+        if (pr.NbPoints() > 0)
+          best = pr.LowerDistance(), u = pr.LowerDistanceParameter();
+        if (!cand->IsPeriodic())
+          for (const double e : {cand->FirstParameter(), cand->LastParameter()})
+            if (!Precision::IsInfinite(e) && cand->Value(e).Distance(p) < best)
+              best = cand->Value(e).Distance(p), u = e;
+        return best <= 1e3 * tol;
+      };
       for (size_t k = 0; k < cands.size() && c.IsNull(); ++k)
       {
-        occ::handle<Geom_Curve>     cand = cands[k];
-        GeomAPI_ProjectPointOnCurve pa(A, cand), pb(B, cand);
-        if (pa.NbPoints() == 0 || pb.NbPoints() == 0 || pa.LowerDistance() > 1e3 * tol || pb.LowerDistance() > 1e3 * tol)
+        occ::handle<Geom_Curve> cand = cands[k];
+        double                  u0 = 0, u1 = 0;
+        if (!on(A, cand, u0) || !on(B, cand, u1))
           continue;
-        double  u0 = pa.LowerDistanceParameter(), u1 = pb.LowerDistanceParameter();
         gp_Pnt  q;
         gp_Vec  d;
         cand->D1(u0, q, d);
@@ -3389,7 +3530,20 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         p1 = u1;
       }
       if (c.IsNull())
+      {
+        if (dbg)
+        {
+          const gp_Pnt m = oc.Value(0.5 * (oc.FirstParameter() + oc.LastParameter()));
+          std::fprintf(stderr, "quadrics: edge %d (faces %d kind %d, %d kind %d, tangent %d) at %g %g %g, %zu candidates\n", i, fa, (int)sf[(size_t)fa].kind, fb, (int)sf[(size_t)fb].kind, (int)tangent[(size_t)i], m.X(), m.Y(), m.Z(), cands.size());
+          for (const auto& cand : cands)
+          {
+            GeomAPI_ProjectPointOnCurve pa(A, cand), pb(B, cand);
+            const gp_Pnt e0 = cand->Value(cand->FirstParameter()), e1 = cand->Value(cand->LastParameter());
+            std::fprintf(stderr, "  candidate: A %g B %g; A %g %g %g, B %g %g %g, ends %g %g %g / %g %g %g, tol %g\n", pa.NbPoints() ? pa.LowerDistance() : -1.0, pb.NbPoints() ? pb.LowerDistance() : -1.0, A.X(), A.Y(), A.Z(), B.X(), B.Y(), B.Z(), e0.X(), e0.Y(), e0.Z(), e1.X(), e1.Y(), e1.Z(), tol);
+          }
+        }
         return no("no intersection of two offsets through an edge's ends");
+      }
     }
     BRepBuilderAPI_MakeEdge mk(c, vx[(size_t)ia], vx[(size_t)ib], p0, p1);
     if (!mk.IsDone())
@@ -3398,6 +3552,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     if (group[(size_t)i] != 0)
       group_edge[(size_t)group[(size_t)i]] = i;
   }
+  lap("edges");
   bool ok_wires = true;
   auto offset_wire = [&](const TopoDS_Shape& w) {
     TopoDS_Wire ow;
@@ -3433,10 +3588,10 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     const int          i  = faces.FindIndex(f);
     const TopoDS_Face  ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
     if (collapse[(size_t)i])
-      bld.Add(shell, f); // (no offset: the neighbours' offsets meet where it was)
+      bld.Add(shell, outward ? TopoDS_Shape(f.Reversed()) : TopoDS_Shape(f)); // (no offset: the neighbours' offsets meet where it was)
     else if (kept[(size_t)i])
     {
-      bld.Add(shell, f);
+      bld.Add(shell, outward ? TopoDS_Shape(f.Reversed()) : TopoDS_Shape(f));
       TopoDS_Face of;
       bld.MakeFace(of, sf[(size_t)i].off, 1e3 * tol);
       for (TopoDS_Iterator w(ff, false); w.More(); w.Next())
@@ -3465,7 +3620,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
             return no("an offset edge's curve on its face failed");
         }
       }
-      const TopoDS_Face inner = TopoDS::Face(of.Oriented(TopAbs::Reverse(f.Orientation())));
+      const TopoDS_Face inner = TopoDS::Face(of.Oriented(outward ? f.Orientation() : TopAbs::Reverse(f.Orientation())));
       bld.Add(shell, inner);
       sources.Bind(inner, Source{f, (uint8_t)REL_GENERATED});
     }
@@ -3476,6 +3631,8 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       bool                            closed = false;
       for (TopExp_Explorer x(ff, TopAbs_EDGE); x.More() && !closed; x.Next())
         closed = seam[(size_t)edges.FindIndex(x.Current())] != 0;
+      if (closed && outward)
+        return no("outward, a closed face removed");
       if (closed)
       {
         // A closed removed face (a hole's wall): its wire is circle, seam, circle, seam; one band per circle, between
@@ -3550,8 +3707,9 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       {
         TopoDS_Face rim;
         bld.MakeFace(rim, surf, loc, BRep_Tool::Tolerance(ff));
-        bld.Add(rim, w.Value());
-        bld.Add(rim, offset_wire(w.Value()).Oriented(TopAbs::Reverse(w.Value().Orientation())));
+        // (Outward the offset is the rim's outside, the part's edges its inside.)
+        bld.Add(rim, outward ? w.Value().Reversed() : w.Value());
+        bld.Add(rim, offset_wire(w.Value()).Oriented(outward ? w.Value().Orientation() : TopAbs::Reverse(w.Value().Orientation())));
         if (sf[(size_t)i].kind != GeomAbs_Plane)
           for (TopoDS_Iterator x(w.Value(), false); x.More(); x.Next())
           {
@@ -3568,9 +3726,11 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       }
     }
   }
+  lap("faces");
   for (int i = 1; i <= ne; ++i)
     if (!ex[(size_t)i].IsNull() && !degen[(size_t)i])
       BRepLib::SameParameter(ex[(size_t)i], 1e3 * tol);
+  lap("same parameter");
   if (!ok_wires)
     return no("an edge without its offset");
   shell.Closed(true);
@@ -3578,12 +3738,31 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   bld.MakeSolid(outer_wall);
   bld.Add(outer_wall, shell.Oriented(old_shell.Orientation()));
   const TopoDS_Shape wall = outer_wall;
-  if (!BRepCheck_Analyzer(wall).IsValid())
+  if (BRepCheck_Analyzer wan(wall); !wan.IsValid())
   {
     if (const char* dir = std::getenv("NOSHAPE_SHELL_DUMP"))
       BRepTools::Write(wall, (std::string(dir) + "/quadrics-invalid.brep").c_str());
+    if (dbg)
+      for (const TopAbs_ShapeEnum k : {TopAbs_VERTEX, TopAbs_EDGE, TopAbs_WIRE, TopAbs_FACE, TopAbs_SHELL})
+        for (TopExp_Explorer x(wall, k); x.More(); x.Next())
+        {
+          const occ::handle<BRepCheck_Result> r = wan.Result(x.Current());
+          if (r.IsNull())
+            continue;
+          Bnd_Box bb;
+          BRepBndLib::Add(x.Current(), bb);
+          const gp_Pnt c = bb.IsVoid() ? gp_Pnt() : gp_Pnt((bb.CornerMin().XYZ() + bb.CornerMax().XYZ()) / 2);
+          for (const BRepCheck_Status st : r->Status())
+            if (st != BRepCheck_NoError)
+              std::fprintf(stderr, "quadrics: kind %d status %d at %g %g %g\n", (int)k, (int)st, c.X(), c.Y(), c.Z());
+          for (r->InitContextIterator(); r->MoreShapeInContext(); r->NextShapeInContext())
+            for (const BRepCheck_Status st : r->StatusOnShape())
+              if (st != BRepCheck_NoError)
+                std::fprintf(stderr, "quadrics: kind %d status %d in context at %g %g %g\n", (int)k, (int)st, c.X(), c.Y(), c.Z());
+        }
     return no("the wall is invalid");
   }
+  lap("check");
   {
     BOPAlgo_ArgumentAnalyzer an;
     an.SetShape1(wall);
@@ -3600,10 +3779,12 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     if (an.HasFaulty())
       return no("the offsets cross each other or the part");
   }
+  lap("self-interference");
   const double vw = volume_of(wall), vs = volume_of(so);
+  lap("volumes");
   if (dbg)
     std::fprintf(stderr, "quadrics: wall volume %.17g solid %.17g\n", vw, vs);
-  if (!(vw > 0) || !(vw <= vs * (1 + 1e-9)))
+  if (!(vw > 0) || !(outward || vw <= vs * (1 + 1e-9)))
     return no("the wall's volume is off");
   out.result  = wall;
   out.history = shell_history(solid, wall, {h}, {}, sources, removed);

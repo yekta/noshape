@@ -880,3 +880,90 @@ fn a_twisted_vase_shells_as_live() {
     let r = shell_solid(&v, &top(&v, 120.0), 2.0, ShellSide::Outside, ShellMethod::Auto).unwrap_or_else(|e| panic!("2 mm outward: {e}")).shape;
     assert!(r.is_valid() && r.count(ShapeType::Face) == 15, "2 mm outward");
 }
+
+/// The vase with every section's corners rounded R5 (each hexagon offset 5 mm in, then 5 mm out with arcs): 12 sides,
+/// line faces between arc faces.
+fn smooth_vase() -> Shape {
+    let sections: Vec<Shape> = [(0.0, 35.0), (30.0, 45.0), (60.0, 40.0), (90.0, 28.0), (120.0, 35.0)]
+        .iter()
+        .enumerate()
+        .map(|(k, &(z, r))| {
+            let pts: Vec<DVec3> = (0..6).map(|i| {
+                let a = (15.0 * k as f64 + 60.0 * i as f64).to_radians();
+                DVec3::new(r * a.cos(), r * a.sin(), z)
+            }).collect();
+            let hex = make_polyline(&pts, true).unwrap();
+            let inner = offset_wire_2d(&hex, -5.0, JoinType::Intersection, false).unwrap();
+            offset_wire_2d(&inner, 5.0, JoinType::Arc, false).unwrap()
+        })
+        .collect();
+    loft(&sections, &LoftOptions { solid: true, ruled: false, closed: false, ..Default::default() }).unwrap().shape
+}
+
+/// The user's vase with rounded corners (11-02): every Shell failed after 30 s. Our loft gave each side face its own
+/// chord-length parameters, so the line and arc faces met in different curves at up to 1.8°; and the direct path
+/// placed a corner on a curved tangent edge along a straight line, fitted that edge's offset off both offsets, and
+/// built no outward walls (the faces' offsets end where the vase's foot flares out). Now the loft's sides are tangent
+/// and both ways build directly.
+#[test]
+fn a_smooth_twisted_vase_shells() {
+    let s = smooth_vase();
+    assert_eq!(s.count(ShapeType::Face), 14);
+    let faces = s.faces();
+    let ef = s.edge_faces().unwrap();
+    for (i, e) in s.edges().iter().enumerate() {
+        let inf = e.edge_info().unwrap();
+        if ef[i].len() != 2 || (inf.start.z - inf.end.z).abs() < 1.0 {
+            continue; // a section's edge
+        }
+        for k in 0..=24 {
+            let p = e.point_at(inf.first_param + (inf.last_param - inf.first_param) * k as f64 / 24.0).unwrap();
+            let (a, b) = (faces[ef[i][0] as usize].normal_at_point(p).unwrap(), faces[ef[i][1] as usize].normal_at_point(p).unwrap());
+            assert!(a.angle_between(b) < 1e-6, "sides meet at {} rad at z {}", a.angle_between(b), p.z);
+        }
+    }
+    // Live 1782's Shells, 2 mm: inward 58695.0522, outward 63461.6237 mm³ (ours 0.66 / 2.40 off: our loft is 43 mm³ off
+    // live's, which has one side face, LOFT-ONE-FACE; inward OCCT's offset, where it builds, agrees with ours to 1e-4).
+    for (side, live) in [(ShellSide::Inside, 58695.0522), (ShellSide::Outside, 63461.6237)] {
+        let r = shell_solid(&s, &top(&s, 120.0), 2.0, side, ShellMethod::Auto).unwrap_or_else(|e| panic!("2 mm {side:?}: {e}")).shape;
+        assert!(r.is_valid() && r.count(ShapeType::Face) == 27, "{side:?}: {} faces", r.count(ShapeType::Face));
+        assert!((vol(&r) - live).abs() < 5e-5 * live, "{side:?}: {} mm³, live {live}", vol(&r));
+    }
+}
+
+/// Every way of building the smooth vase's Shell, inward and outward (SWEEP_M = offset / quadrics, SWEEP_T = 1.6,2,...).
+#[test]
+#[ignore = "T2: probe"]
+fn smooth_vase_sweep_probe() {
+    let s = smooth_vase();
+    for (m, method) in [("offset", ShellMethod::Offset), ("quadrics", ShellMethod::Quadrics)].into_iter().filter(|(m, _)| std::env::var("SWEEP_M").map(|x| x == *m).unwrap_or(true)) {
+        for t in std::env::var("SWEEP_T").map(|v| v.split(',').map(|x| x.parse().unwrap()).collect::<Vec<f64>>()).unwrap_or(vec![1.0, 1.6, 1.8, 1.9, 2.0, 2.2, 2.5, 3.0]) {
+            for side in [ShellSide::Inside, ShellSide::Outside] {
+                let t0 = std::time::Instant::now();
+                match shell_solid(&s, &top(&s, 120.0), t, side, method) {
+                    Ok(r) => println!("{m} {t} {side:?}: {:.6} mm3, {} faces, valid {}, {:.0} ms", vol(&r.shape), r.shape.count(ShapeType::Face), r.shape.is_valid(), t0.elapsed().as_secs_f64() * 1e3),
+                    Err(e) => println!("{m} {t} {side:?}: {e} ({:.0} ms)", t0.elapsed().as_secs_f64() * 1e3),
+                }
+            }
+        }
+    }
+}
+
+#[test]
+#[ignore = "T2: probe"]
+fn smooth_vase_live_loft_probe() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_parasolid(&dir.join("vase-smooth-live-loft.x_t"), LengthUnit::Millimeter).unwrap();
+    let live = read_parasolid(&dir.join("vase-smooth-live-shelled.x_t"), LengthUnit::Millimeter).unwrap();
+    println!("live loft {} faces {} edges, {:.6} mm3, valid {}; live shell {:.6} mm3, {} faces", s.count(ShapeType::Face), s.count(ShapeType::Edge), vol(&s), s.is_valid(), vol(&live), live.count(ShapeType::Face));
+    for (t, side) in [(1.6, ShellSide::Inside), (2.0, ShellSide::Inside), (2.0, ShellSide::Outside)] {
+        let t0 = std::time::Instant::now();
+        match shell_solid(&s, &top(&s, 120.0), t, side, ShellMethod::Auto) {
+            Ok(r) => {
+                let d = if t == 1.6 { format!(", live - ours {:.6}, ours - live {:.6}", vol(&cut(&live, &r.shape).unwrap().shape), vol(&cut(&r.shape, &live).unwrap().shape)) } else { String::new() };
+                println!("{t} {side:?}: {:.6} mm3, {} faces, valid {}, {:.0} ms via {}{d}", vol(&r.shape), r.shape.count(ShapeType::Face), r.shape.is_valid(), t0.elapsed().as_secs_f64() * 1e3, last_shell_path())
+            }
+            Err(e) => println!("{t} {side:?}: {e} ({:.0} ms)", t0.elapsed().as_secs_f64() * 1e3),
+        }
+    }
+}

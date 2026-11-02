@@ -8,6 +8,21 @@ Builds and tests (11-01): on vibe4 only, `tools/tiers/rb.sh <cmd>` from the work
 (land.sh runs the full set); long probes detached on vibe4 with a log. OCCT patches build on vibe4 in
 ~/agents/core-occt (`build.sh TK...`); a private root ~/agents/occt-priv; libs go to /root/occt (synced everywhere).
 
+**P1 smooth twisted vase (11-02 afternoon).** The vase with R5-rounded hexagons (12 side faces): every Shell failed
+after 30 s. Fixed (landing with this note): natural_loft gave each side face its own chord-length parameters (now one
+set over all faces) and moved nothing to keep line and arc faces tangent (now a line face's rows are reparametrized so
+its cross derivative keeps one ratio to the arc's in every section: tangent to 1e-8, was 0.03 rad); the direct path
+(by_quadrics) placed a corner on a curved tangent edge along a straight line (now on the edge's pcurve traced on the
+offset), fitted that edge's offset off both offsets (now the pcurve on the offset, 3D by BuildCurve3d, the original
+pcurves reused), and built no outward walls (now outward = the same construction at -t, faces and rim wires flipped;
+free-form B-splines extended tangentially past their bounds for corners past a flaring foot). Result: inward and
+outward 1-3 mm all build directly (OCCT's offset builds only some thicknesses); live 1782: 1.6 / 2 in, 2 out within
+0.7-2.4 mm³ (our loft 43 mm³ off live's). T1 shell::a_smooth_twisted_vase_shells; T2 probes smooth_vase_sweep_probe,
+smooth_vase_live_loft_probe. Open, in order: (1) LOFT-ONE-FACE: live lofts tangent-continuous sections into ONE side
+face (3 faces); (2) the direct path's time: 4-6 s, of which OCCT's self-interference check 3.3-4.7 s (tried: per-pair
+BRepExtrema distances 20 s; BRepExtrema_ShapeProximity's tolerance isn't a distance, it flagged pairs 2-4 mm apart);
+Auto also tries OCCT's offset first (0.5-2.5 s, erratic on these faces); (3) live's smooth loft .x_t imports wrong
+(dx ticket XT-PERIODIC-SPLINE-FACE), so no body diff with live yet.
 **Edit latency / incremental regeneration (user 11-02 08:00).** Bench ops `regen_profile::bench_edit_latency`
 (perf, profile and qa documents; a warm Regenerator, preview meshes; features that ran again and which had their
 effect unchanged) and `bench_edit_latency_reuse` (the same with reuse, every edit checked against a full

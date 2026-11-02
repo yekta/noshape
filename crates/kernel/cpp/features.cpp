@@ -1212,6 +1212,16 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
   };
   std::vector<Update>                                     faces;
   std::vector<std::pair<TopoDS_Edge, occ::handle<Geom_Curve>>> seams;
+  // Each side face's sections as compatible rows (first pass), then one set of chord-length parameters for all of
+  // them (second pass): parameters per face made the columns of neighbouring faces differ, so a rounded section's
+  // line and arc faces met in different curves (gaps, and no tangency for a Shell's offset).
+  struct Side
+  {
+    TopoDS_Face                                 face;
+    double                                      u0, u1, v0, v1;
+    std::vector<occ::handle<Geom_BSplineCurve>> rows;
+  };
+  std::vector<Side> sides;
   for (TopExp_Explorer ex(loft, TopAbs_FACE); ex.More(); ex.Next())
   {
     const TopoDS_Face&        f = TopoDS::Face(ex.Current());
@@ -1276,6 +1286,112 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
     if ((ends.start == 1 || ends.end == 1) && rows[0]->Degree() < 3)
       for (auto& r : rows)
         r->IncreaseDegree(3);
+    sides.push_back({f, u0, u1, v0, v1, rows});
+  }
+  // Chord-length parameters: the mean distance between neighbouring
+  // sections (live L2: square 40 -> Ø40 -> square 20 turned 45°, 45412.22
+  // in Onshape's band; uniform ones give 45554), over every side face.
+  std::vector<double> len(n, 0);
+  for (int k = 1; k < n; ++k)
+  {
+    double    sum = 0;
+    int       count = 0;
+    const int ns  = 64;
+    for (const auto& sd : sides)
+      for (int i = 0; i <= ns; ++i, ++count)
+      {
+        const double u = sd.u0 + (sd.u1 - sd.u0) * i / ns;
+        sum += sd.rows[k]->Value(u).Distance(sd.rows[k - 1]->Value(u));
+      }
+    len[k] = len[k - 1] + (count > 0 ? sum / count : 0.0);
+  }
+  // Faces whose sections meet tangentially (a sketch fillet's arc and the line it rounds) stay tangent between the
+  // sections only if, along the shared edge, the two faces' cross derivatives keep one ratio in every section: the
+  // columns are linear in the poles. A line face's rows are reparametrized for it (its poles next to the edge moved
+  // along the line), the arc kept exact. (Else the faces met at up to 1.8° in a twisted vase with R5 corners and
+  // its inward Shells failed.)
+  {
+    auto straight = [&](const Side& sd) {
+      for (const auto& r : sd.rows)
+      {
+        const gp_Pnt a = r->Pole(1), b = r->Pole(r->NbPoles());
+        if (a.Distance(b) < tol || r->IsRational())
+          return false;
+        const gp_Lin l(a, gp_Vec(a, b));
+        for (int j = 2; j < r->NbPoles(); ++j)
+          if (l.Distance(r->Pole(j)) > tol)
+            return false;
+      }
+      return true;
+    };
+    for (auto& sd : sides)
+      if (straight(sd) && sd.rows[0]->NbPoles() < 4)
+        for (auto& r : sd.rows)
+          r->IncreaseDegree(3);
+    for (size_t a = 0; a < sides.size(); ++a)
+    {
+      Side& A = sides[a];
+      if (!straight(A))
+        continue;
+      for (int ea = 0; ea < 2; ++ea)
+      {
+        const double ua = ea ? A.u1 : A.u0;
+        for (size_t b = 0; b < sides.size(); ++b)
+        {
+          const Side& B = sides[b];
+          if (b == a || straight(B))
+            continue;
+          for (int eb = 0; eb < 2; ++eb)
+          {
+            const double ub = eb ? B.u1 : B.u0;
+            // The same edge in every section, tangent there: the end derivatives (pointing away from the faces' ends:
+            // opposite for a tangent joint).
+            std::vector<gp_Vec> da(n), dbv(n);
+            bool                ok = true;
+            for (int k = 0; k < n && ok; ++k)
+            {
+              gp_Pnt pa, pb;
+              A.rows[k]->D1(ua, pa, da[k]);
+              B.rows[k]->D1(ub, pb, dbv[k]);
+              if (ea)
+                da[k].Reverse();
+              if (eb)
+                dbv[k].Reverse();
+              ok = pa.Distance(pb) < 10 * tol && da[k].Magnitude() > 1e-12 && dbv[k].Magnitude() > 1e-12 &&
+                   da[k].IsOpposite(dbv[k], 1e-7);
+            }
+            if (!ok)
+              continue;
+            double c = 0;
+            for (int k = 0; k < n; ++k)
+              c += da[k].Magnitude() / dbv[k].Magnitude() / n;
+            std::vector<occ::handle<Geom_BSplineCurve>> moved;
+            for (int k = 0; k < n && ok; ++k)
+            {
+              occ::handle<Geom_BSplineCurve> r = occ::down_cast<Geom_BSplineCurve>(A.rows[k]->Copy());
+              const int                      np = r->NbPoles(), end = ea ? np : 1, next = ea ? np - 1 : 2;
+              // The pole next to the end moves in proportion to the derivative.
+              const double f = da[k].Magnitude() / r->Pole(end).Distance(r->Pole(next));
+              const gp_Vec d = da[k].Normalized() * (c * dbv[k].Magnitude() / f);
+              r->SetPole(next, r->Pole(end).Translated(d));
+              // Still the line, run once from end to end.
+              const gp_Vec along(r->Pole(1), r->Pole(np));
+              for (int j = 2; j <= np && ok; ++j)
+                ok = gp_Vec(r->Pole(j - 1), r->Pole(j)).Dot(along) > 1e-9 * along.SquareMagnitude();
+              moved.push_back(r);
+            }
+            if (ok)
+              A.rows = moved;
+          }
+        }
+      }
+    }
+  }
+  for (auto& sd : sides)
+  {
+    const TopoDS_Face& f = sd.face;
+    const double       u0 = sd.u0, u1 = sd.u1, v0 = sd.v0, v1 = sd.v1;
+    auto&              rows = sd.rows;
     auto corner = [&](int a, int b, const gp_Vec& nrm, double u) {
       const gp_Vec d(rows[a]->Value(u), rows[b]->Value(u));
       return 0.9 * std::abs(d.Dot(nrm)) + 0.1 * d.Magnitude();
@@ -1303,21 +1419,7 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
     // Column by column: (x, y, z) or homogeneous (w x, w y, w z, w) with equal weights.
     const int  nu = rows[0]->NbPoles();
     const bool homogeneous = rows[0]->IsRational();
-    // Chord-length parameters: the mean distance between neighbouring
-    // sections (live L2: square 40 -> Ø40 -> square 20 turned 45°, 45412.22
-    // in Onshape's band; uniform ones give 45554).
-    std::vector<double> t(n), len(n, 0);
-    for (int k = 1; k < n; ++k)
-    {
-      double    sum = 0;
-      const int ns  = 64;
-      for (int i = 0; i <= ns; ++i)
-      {
-        const double u = u0 + (u1 - u0) * i / ns;
-        sum += rows[k]->Value(u).Distance(rows[k - 1]->Value(u));
-      }
-      len[k] = len[k - 1] + sum / (ns + 1);
-    }
+    std::vector<double> t(n);
     for (int k = 0; k < n; ++k)
       t[k] = v0 + (v1 - v0) * (len[n - 1] > 0 ? len[k] / len[n - 1] : double(k) / (n - 1));
     for (int k = 1; k < n; ++k)
