@@ -644,6 +644,21 @@ Ball 2e-6 off: f50 stays KNOWN). Asm batches 1+2: 49/50.
 Open: s6 (170: the pass fails at the last side, see above), s236 (93), s226 (58), s102 (79), s218 (90: a chain with
 two distances to a merged loop that live translates, ours turns slightly; the direction-hold tweak didn't reach it),
 batch 4 pending.
+14:00–14:15: batch 4 (everyday profiles, s301–s340) answered: positions 14/40 at first, now 25/40 (24 exact + s332
+curve colour only; b4338a57's message says "14 -> 24": counted before the hub rule); 2522 → 1662 mm. Rules from it:
+a relation's keep decided by that relation alone (`kept_first_in`: slot centre distances), a line with its own length
+can't stretch to follow (L-brackets), of tied candidates one that can be carried whole first (`can_keep_shape`), of
+two equal loops the one more tied to other loops stays (bolt circles). Batches 1–3: 1266 mm.
+NEXT (biggest left, the filleted rectangles s319 / s321 / s324 / s325, ~260 mm, constructive pass fails): live
+(s321) keeps the leftmost UNCHANGED side (the left vertical) and walks round the loop from it: the corner arc next to
+it grows about its end on that side (taking its new radius through the Equal chain to the dimensioned arc), the
+dimensioned bottom is then carried from that arc's end and takes its length keeping its start, the next arc grows from
+the bottom's end, the right side translates, and so on round. Ours places the dimensioned bottom first (own unheld
+Length) keeping its own lower end, and fails to close. Needs: an anchor unit kept first when a closed loop changes
+only in its sizes (its leftmost unit whose constraints hold), candidates adjacent to placed geometry first, and an
+Equal partner of a dimensioned curve taking that value in its own placement. Also open: s307 (which side a slot's
+new radius keeps: live kept the free top line, the bottom had Horizontal; s201 / s223 disagree on "dimensioned
+neighbour first"), s6 (170), s226 (58), s236 (83), s102 (79), s218 (90).
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
