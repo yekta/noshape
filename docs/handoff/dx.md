@@ -11,6 +11,21 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-02 evening (to 11-02 18:39 UTC): IGES as live, parallel STEP healing (OCCT patch 0019)
+- Live's own big files (1755) imported by dx_perf `timed_live_big_samples` (samples on vibe5 in
+  ~/agents/dx/live-big): STEP / Parasolid / IGES assembly and the Part Studio all come back as live (1000 parts, names,
+  900 + 100 colours, volume, 2000 instances). IGES needed XDE reading and subfigure instances (landed e266ee1f).
+- OCCT patch 0019 (STEP parallel shape processing; see formats.md): results byte-identical, about 2x faster reads.
+  - Built and checked with a private OCCT on vibe5 (~/agents/dx/occt-root, build tree ~/agents/dx/occt-work).
+  - **To deploy (lead / core, whose OCCT patches these are):** rebuild TKDESTEP from the patch set in each machine's
+    OCCT (local /root/occt; vibe3/4/5 /opt/occt) and install libTKDESTEP.a and STEPControl_ActorRead.hxx. CI rebuilds
+    OCCT from patches/occt by itself.
+  - The kernel calls none of the patch's API (`STEPControl_ActorRead::SetDeferredShapeProcessing`, default on), so
+    machines without it build and read as before.
+  - A/B: dump test `export::dump_step_assembly_parts` with NOSHAPE_STEP_DUMP_DIR writes each part's BREP. Two runs
+    (two OCCT roots or the switch) compare with cmp. Touch crates/kernel/build.rs after swapping a library: cargo
+    doesn't see it.
+
 ## 11-02 afternoon (to 17:13 UTC): X2 / X3 to live's answers
 - X2 (live 1745):
   - absolute presets (Medium 0.12 mm / 6.25°);

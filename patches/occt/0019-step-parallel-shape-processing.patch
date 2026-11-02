@@ -1,0 +1,498 @@
+diff -ru a/src/DataExchange/TKDESTEP/STEPControl/STEPControl_ActorRead.cxx b/src/DataExchange/TKDESTEP/STEPControl/STEPControl_ActorRead.cxx
+--- a/src/DataExchange/TKDESTEP/STEPControl/STEPControl_ActorRead.cxx	2026-11-02 17:32:50.696387968 +0000
++++ b/src/DataExchange/TKDESTEP/STEPControl/STEPControl_ActorRead.cxx	2026-11-02 18:35:19.422029143 +0000
+@@ -122,6 +122,12 @@
+ #include <UnitsMethods.hxx>
+ #include <XSAlgo.hxx>
+ #include <XSAlgo_ShapeProcessor.hxx>
++#include <BRepTools_ReShape.hxx>
++#include <OSD_Parallel.hxx>
++#include <ShapeProcess_OperLibrary.hxx>
++#include <ShapeProcess_ShapeContext.hxx>
++#include <atomic>
++#include <vector>
+ #include <StepRepr_ConstructiveGeometryRepresentationRelationship.hxx>
+ #include <StepRepr_ConstructiveGeometryRepresentation.hxx>
+ #include <StepRepr_MechanicalDesignAndDraughtingRelationship.hxx>
+@@ -356,6 +362,93 @@
+   return false;
+ }
+ 
++// noshape: parallel shape processing. Before a root product's transfer, the
++// main shape representations of its sub-products are transferred first,
++// with the shape processing (ShapeFix) of their items deferred; the items
++// are then processed in parallel, each exactly as it would have been (its
++// own parameters and precision), their transfer information merged over the
++// entities they mapped and the representations' compounds rebuilt with the
++// processed items. The root's transfer then finds those representations
++// transferred and builds the assembly from them: the results of the serial
++// order.
++namespace
++{
++struct DeferredProcessing
++{
++  TopoDS_Shape                                                             Shape;
++  XSAlgo_ShapeProcessor::ParameterMap                                      Parameters;
++  ShapeProcess::OperationsFlags                                            Flags;
++  int                                                                      First = 0, Last = 0;
++  occ::handle<TransferBRep_ShapeBinder>                                    Binder;
++  TopoDS_Shape                                                             Result;
++  NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher> Modified;
++  bool                                                                     Failed = false;
++};
++
++std::atomic<bool>                             THE_DEFER_PROCESSING{true};
++thread_local std::vector<DeferredProcessing>* THE_DEFERRED       = nullptr;
++thread_local int                              THE_TRANSFER_DEPTH = 0;
++// The transfer process whose products were pre-transferred (once, at its
++// first root).
++thread_local const Transfer_TransientProcess* THE_PRETRANSFERRED = nullptr;
++
++// XSAlgo_ShapeProcessor::MergeShapeTransferInfo over items theFirst..theLast
++// only (the ones the representation item mapped).
++void mergeDeferred(const occ::handle<Transfer_TransientProcess>&                            theTP,
++                   const NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher>& theMap,
++                   const int                                                                theFirst,
++                   const int                                                                theLast)
++{
++  if (theMap.IsEmpty())
++  {
++    return;
++  }
++  for (int i = std::max(theFirst, 1); i <= std::min(theLast, theTP->NbMapped()); ++i)
++  {
++    occ::handle<TransferBRep_ShapeBinder> aBinder = occ::down_cast<TransferBRep_ShapeBinder>(theTP->MapItem(i));
++    if (aBinder.IsNull() || aBinder->Result().IsNull())
++    {
++      continue;
++    }
++    const TopoDS_Shape anOriginal = aBinder->Result();
++    if (theMap.IsBound(anOriginal))
++    {
++      aBinder->SetResult(theMap.Find(anOriginal));
++    }
++    else if (!anOriginal.Location().IsIdentity())
++    {
++      const TopoDS_Shape anUnlocated = anOriginal.Located(TopLoc_Location());
++      if (theMap.IsBound(anUnlocated))
++      {
++        aBinder->SetResult(theMap.Find(anUnlocated));
++      }
++    }
++    else
++    {
++      BRepTools_ReShape aReShaper;
++      bool              aModified = false;
++      for (TopExp_Explorer anExp(anOriginal, TopAbs_EDGE); anExp.More(); anExp.Next())
++      {
++        if (theMap.IsBound(anExp.Current()))
++        {
++          aModified = true;
++          aReShaper.Replace(anExp.Current(), theMap.Find(anExp.Current()));
++        }
++      }
++      if (aModified)
++      {
++        aBinder->SetResult(aReShaper.Apply(anOriginal));
++      }
++    }
++  }
++}
++} // namespace
++
++void STEPControl_ActorRead::SetDeferredShapeProcessing(const bool theToDefer)
++{
++  THE_DEFER_PROCESSING = theToDefer;
++}
++
+ // ============================================================================
+ // Method  : STEPControl_ActorRead::Transfer
+ // Purpose : recursive method that accesses the root entities and starts the
+@@ -403,7 +496,37 @@
+   }
+   // [END] Get version of preprocessor (to detect I-Deas case) (ssv; 23.11.2010)
+   bool aTrsfUse = (aStepModel->InternalParameters.ReadRootTransformation == 1);
+-  return TransferShape(start, TP, aLocalFactors, true, aTrsfUse, theProgress);
++  // noshape: a root product's sub-products' representations first, their
++  // shape processing in parallel (see preTransferRepresentations).
++  occ::handle<StepBasic_ProductDefinition> aRootPD = occ::down_cast<StepBasic_ProductDefinition>(start);
++  if (THE_TRANSFER_DEPTH == 0 && THE_DEFER_PROCESSING && !aRootPD.IsNull() && THE_PRETRANSFERRED != TP.get())
++  {
++    THE_PRETRANSFERRED = TP.get();
++    ++THE_TRANSFER_DEPTH;
++    try
++    {
++      preTransferRepresentations(aRootPD, TP, aLocalFactors, aTrsfUse);
++    }
++    catch (...)
++    {
++      --THE_TRANSFER_DEPTH;
++      throw;
++    }
++    --THE_TRANSFER_DEPTH;
++  }
++  ++THE_TRANSFER_DEPTH;
++  occ::handle<Transfer_Binder> aResult;
++  try
++  {
++    aResult = TransferShape(start, TP, aLocalFactors, true, aTrsfUse, theProgress);
++  }
++  catch (...)
++  {
++    --THE_TRANSFER_DEPTH;
++    throw;
++  }
++  --THE_TRANSFER_DEPTH;
++  return aResult;
+ }
+ 
+ // ============================================================================
+@@ -614,6 +737,267 @@
+ 
+ //=================================================================================================
+ 
++void STEPControl_ActorRead::preTransferRepresentations(const occ::handle<StepBasic_ProductDefinition>& theRoot,
++                                                       const occ::handle<Transfer_TransientProcess>&   TP,
++                                                       const StepData_Factors&                         theLocalFactors,
++                                                       const bool                                      theRootTrsf)
++{
++  occ::handle<StepData_StepModel> aStepModel   = occ::down_cast<StepData_StepModel>(TP->Model());
++  const int                       readAssembly = aStepModel->InternalParameters.ReadAssemblyLevel;
++  if (readAssembly == 3 || readAssembly == 4)
++  {
++    return;
++  }
++  const Interface_Graph& aGraph = TP->Graph();
++  // Every product: the top ones (no assembly usage takes them: the roots a
++  // transfer of all roots goes through) and their sub-products.
++  NCollection_Map<occ::handle<Standard_Transient>>      aUsed;
++  std::vector<occ::handle<StepBasic_ProductDefinition>> aQueue;
++  for (int e = 1; e <= aStepModel->NbEntities(); ++e)
++  {
++    occ::handle<StepRepr_NextAssemblyUsageOccurrence> aNAUO = occ::down_cast<StepRepr_NextAssemblyUsageOccurrence>(aStepModel->Value(e));
++    if (!aNAUO.IsNull() && !aNAUO->RelatedProductDefinition().IsNull())
++    {
++      aUsed.Add(aNAUO->RelatedProductDefinition());
++    }
++  }
++  NCollection_Map<occ::handle<Standard_Transient>> aSeen;
++  aQueue.push_back(theRoot);
++  aSeen.Add(theRoot);
++  for (int e = 1; e <= aStepModel->NbEntities(); ++e)
++  {
++    occ::handle<StepBasic_ProductDefinition> aPD = occ::down_cast<StepBasic_ProductDefinition>(aStepModel->Value(e));
++    if (!aPD.IsNull() && !aUsed.Contains(aPD) && aSeen.Add(aPD))
++    {
++      aQueue.push_back(aPD);
++    }
++  }
++  const size_t aNbTop = aQueue.size();
++  for (size_t q = 0; q < aQueue.size(); ++q)
++  {
++    Interface_EntityIterator anIt = aGraph.Sharings(aQueue[q]);
++    for (anIt.Start(); anIt.More(); anIt.Next())
++    {
++      occ::handle<StepRepr_NextAssemblyUsageOccurrence> aNAUO = occ::down_cast<StepRepr_NextAssemblyUsageOccurrence>(anIt.Value());
++      if (aNAUO.IsNull() || aNAUO->RelatingProductDefinition() != aQueue[q])
++      {
++        continue;
++      }
++      occ::handle<StepBasic_ProductDefinition> aChild = aNAUO->RelatedProductDefinition();
++      if (!aChild.IsNull() && aSeen.Add(aChild))
++      {
++        aQueue.push_back(aChild);
++      }
++    }
++  }
++  // Their main shape representations, as TransferEntity (PD) takes them.
++  // (Each with the root-placement flag TransferEntity (PD) gives it: the
++  // reader's for a top product's, none for a sub-product's; one reached both
++  // ways is left to the transfer itself.)
++  std::vector<std::pair<occ::handle<StepShape_ShapeRepresentation>, bool>> aReps;
++  NCollection_DataMap<occ::handle<Standard_Transient>, bool>             aRepTrsf;
++  NCollection_Map<occ::handle<Standard_Transient>>                        aConflict;
++  auto aTake = [&](const occ::handle<StepShape_ShapeRepresentation>& theRep, const bool theTrsf) {
++    if (theRep.IsNull() || TP->IsBound(theRep))
++    {
++      return;
++    }
++    if (aRepTrsf.IsBound(theRep))
++    {
++      if (aRepTrsf.Find(theRep) != theTrsf)
++      {
++        aConflict.Add(theRep);
++      }
++      return;
++    }
++    aRepTrsf.Bind(theRep, theTrsf);
++    aReps.emplace_back(theRep, theTrsf);
++  };
++  for (size_t q = 0; q < aQueue.size(); ++q)
++  {
++    const bool aTrsf = q < aNbTop && theRootTrsf;
++    occ::handle<NCollection_HSequence<occ::handle<Standard_Transient>>> aSDR    = new NCollection_HSequence<occ::handle<Standard_Transient>>;
++    occ::handle<NCollection_HSequence<occ::handle<Standard_Transient>>> aNAUO   = new NCollection_HSequence<occ::handle<Standard_Transient>>;
++    occ::handle<NCollection_HSequence<occ::handle<Standard_Transient>>> anAspect = new NCollection_HSequence<occ::handle<Standard_Transient>>;
++    Interface_EntityIterator anIt = aGraph.Sharings(aQueue[q]);
++    for (anIt.Start(); anIt.More(); anIt.Next())
++    {
++      occ::handle<StepRepr_ProductDefinitionShape> aPDS = occ::down_cast<StepRepr_ProductDefinitionShape>(anIt.Value());
++      if (!aPDS.IsNull())
++      {
++        getSDR(aPDS, aSDR, aNAUO, anAspect, TP);
++        continue;
++      }
++      occ::handle<StepRepr_NextAssemblyUsageOccurrence> aUsage = occ::down_cast<StepRepr_NextAssemblyUsageOccurrence>(anIt.Value());
++      if (!aUsage.IsNull() && aUsage->RelatingProductDefinition() == aQueue[q])
++      {
++        aNAUO->Append(aUsage);
++      }
++    }
++    if (readAssembly == 2 && aNAUO->Length() > 0)
++    {
++      continue;
++    }
++    for (int i = 1; i <= aSDR->Length(); ++i)
++    {
++      occ::handle<StepShape_ShapeDefinitionRepresentation> aDef = occ::down_cast<StepShape_ShapeDefinitionRepresentation>(aSDR->Value(i));
++      occ::handle<StepShape_ShapeRepresentation> aRep = aDef.IsNull() ? occ::handle<StepShape_ShapeRepresentation>() : occ::down_cast<StepShape_ShapeRepresentation>(aDef->UsedRepresentation());
++      if (aRep.IsNull())
++      {
++        continue;
++      }
++      aTake(aRep, aTrsf);
++      // The representations related to it (TransferRelatedSRR: Onshape's
++      // solids are in a related advanced B-rep representation).
++      if (!aStepModel->InternalParameters.ReadRelationship)
++      {
++        continue;
++      }
++      for (Interface_EntityIterator aRel(aGraph.Sharings(aRep)); aRel.More(); aRel.Next())
++      {
++        if (aRel.Value()->DynamicType() != STANDARD_TYPE(StepRepr_ShapeRepresentationRelationship))
++        {
++          continue;
++        }
++        occ::handle<StepRepr_ShapeRepresentationRelationship> aSRR = occ::down_cast<StepRepr_ShapeRepresentationRelationship>(aRel.Value());
++        aTake(occ::down_cast<StepShape_ShapeRepresentation>(aRep == aSRR->Rep1() ? aSRR->Rep2() : aSRR->Rep1()), aTrsf);
++      }
++    }
++  }
++  if (aReps.size() < 2)
++  {
++    return;
++  }
++  // Transferred with their items' processing deferred.
++  struct RepTransfer
++  {
++    occ::handle<StepShape_ShapeRepresentation> Rep;
++    size_t                                     FirstJob = 0, EndJob = 0;
++    int                                        First = 0, Last = 0;
++  };
++  std::vector<DeferredProcessing> aJobs;
++  std::vector<RepTransfer>        aRepJobs;
++  THE_DEFERRED = &aJobs;
++  try
++  {
++    for (const auto& [aRep, aTrsf] : aReps)
++    {
++      if (TP->IsBound(aRep) || aConflict.Contains(aRep))
++      {
++        continue;
++      }
++      RepTransfer aTransfer;
++      aTransfer.Rep      = aRep;
++      aTransfer.FirstJob = aJobs.size();
++      aTransfer.First    = TP->NbMapped() + 1;
++      bool isBound       = false;
++      TransferEntity(aRep, TP, theLocalFactors, isBound, aTrsf, Message_ProgressRange());
++      aTransfer.EndJob = aJobs.size();
++      aTransfer.Last   = TP->NbMapped();
++      aRepJobs.push_back(aTransfer);
++    }
++  }
++  catch (...)
++  {
++    THE_DEFERRED = nullptr;
++    throw;
++  }
++  THE_DEFERRED = nullptr;
++  if (aJobs.empty())
++  {
++    return;
++  }
++  ShapeProcess_OperLibrary::Init();
++  OSD_Parallel::For(0, (int)aJobs.size(), [&](const int theIndex) {
++    DeferredProcessing& aJob = aJobs[(size_t)theIndex];
++    try
++    {
++      XSAlgo_ShapeProcessor aProcessor(aJob.Parameters);
++      aJob.Result = aProcessor.ProcessShape(aJob.Shape, aJob.Flags, Message_ProgressRange());
++      if (!aProcessor.GetContext().IsNull())
++      {
++        aJob.Modified = aProcessor.GetContext()->Map();
++      }
++    }
++    catch (const Standard_Failure&)
++    {
++      aJob.Failed = true;
++    }
++  });
++  // In order: each item's transfer information, then the shapes its
++  // representation built from the items (its compound, related and mapped
++  // representations), as built from the processed items.
++  for (const RepTransfer& aTransfer : aRepJobs)
++  {
++    occ::handle<BRepTools_ReShape> aReShape = new BRepTools_ReShape();
++    bool                           aChanged = false;
++    for (size_t j = aTransfer.FirstJob; j < aTransfer.EndJob; ++j)
++    {
++      DeferredProcessing& aJob = aJobs[j];
++      if (aJob.Failed)
++      {
++        TP->AddWarning(aTransfer.Rep, "Shape processing of an item failed; the item is kept as translated");
++        continue;
++      }
++      mergeDeferred(TP, aJob.Modified, aJob.First, aJob.Last);
++      if (!aJob.Binder.IsNull())
++      {
++        aJob.Binder->SetResult(aJob.Result);
++      }
++      if (!aJob.Shape.IsSame(aJob.Result) || aJob.Shape.Location() != aJob.Result.Location())
++      {
++        aReShape->Replace(aJob.Shape, aJob.Result);
++        aChanged = true;
++      }
++    }
++    if (!aChanged)
++    {
++      continue;
++    }
++    auto anItemOwn = [&](const int theIndex) {
++      for (size_t j = aTransfer.FirstJob; j < aTransfer.EndJob; ++j)
++      {
++        if (theIndex >= aJobs[j].First && theIndex <= aJobs[j].Last)
++        {
++          return true;
++        }
++      }
++      return false;
++    };
++    auto aRebuild = [&](const occ::handle<Transfer_Binder>& theBinder) {
++      occ::handle<TransferBRep_ShapeBinder> aBinder = occ::down_cast<TransferBRep_ShapeBinder>(theBinder);
++      if (aBinder.IsNull() || aBinder->Result().IsNull())
++      {
++        return;
++      }
++      for (size_t j = aTransfer.FirstJob; j < aTransfer.EndJob; ++j)
++      {
++        if (aBinder == aJobs[j].Binder)
++        {
++          return;
++        }
++      }
++      const TopoDS_Shape aNew = aReShape->Apply(aBinder->Result());
++      if (!aNew.IsEqual(aBinder->Result()))
++      {
++        aBinder->SetResult(aNew);
++      }
++    };
++    for (int i = aTransfer.First; i <= aTransfer.Last; ++i)
++    {
++      if (!anItemOwn(i))
++      {
++        aRebuild(TP->MapItem(i));
++      }
++    }
++    const int aRepIndex = TP->MapIndex(aTransfer.Rep);
++    if (aRepIndex > 0 && (aRepIndex < aTransfer.First || aRepIndex > aTransfer.Last))
++    {
++      aRebuild(TP->MapItem(aRepIndex));
++    }
++  }
++}
++
+ occ::handle<TransferBRep_ShapeBinder> STEPControl_ActorRead::TransferEntity(
+   const occ::handle<StepBasic_ProductDefinition>& PD,
+   const occ::handle<Transfer_TransientProcess>&   TP,
+@@ -1924,6 +2308,7 @@
+     return shbinder;
+   }
+ 
++  int aDeferredJob = -1;
+   if (found && myShapeBuilder.IsDone())
+   {
+     mappedShape = myShapeBuilder.Value();
+@@ -1937,10 +2322,26 @@
+       XSAlgo_ShapeProcessor::ParameterMap aParameters = GetShapeFixParameters();
+       XSAlgo_ShapeProcessor::SetParameter("FixShape.Tolerance3d", myPrecision, true, aParameters);
+       XSAlgo_ShapeProcessor::SetParameter("FixShape.MaxTolerance3d", myMaxTol, true, aParameters);
+-      XSAlgo_ShapeProcessor aShapeProcessor(aParameters);
+-      mappedShape =
+-        aShapeProcessor.ProcessShape(mappedShape, GetProcessingFlags().first, aPS.Next());
+-      aShapeProcessor.MergeTransferInfo(TP, nbTPitems);
++      if (THE_DEFERRED != nullptr)
++      {
++        // noshape: processed with the other items (preTransferRepresentations).
++        DeferredProcessing aJob;
++        aJob.Shape      = mappedShape;
++        aJob.Parameters = aParameters;
++        aJob.Flags      = GetProcessingFlags().first;
++        aJob.First      = nbTPitems;
++        aJob.Last       = TP->NbMapped();
++        THE_DEFERRED->push_back(aJob);
++        aDeferredJob = (int)THE_DEFERRED->size() - 1;
++        aPS.Next();
++      }
++      else
++      {
++        XSAlgo_ShapeProcessor aShapeProcessor(aParameters);
++        mappedShape =
++          aShapeProcessor.ProcessShape(mappedShape, GetProcessingFlags().first, aPS.Next());
++        aShapeProcessor.MergeTransferInfo(TP, nbTPitems);
++      }
+     }
+   }
+   found = !mappedShape.IsNull();
+@@ -1948,6 +2349,10 @@
+   {
+     shbinder = new TransferBRep_ShapeBinder(mappedShape);
+   }
++  if (aDeferredJob >= 0 && THE_DEFERRED != nullptr)
++  {
++    (*THE_DEFERRED)[(size_t)aDeferredJob].Binder = shbinder;
++  }
+ #ifdef TRANSLOG
+   chrono.Stop();
+   if (TP->TraceLevel() > 2)
+diff -ru a/src/DataExchange/TKDESTEP/STEPControl/STEPControl_ActorRead.hxx b/src/DataExchange/TKDESTEP/STEPControl/STEPControl_ActorRead.hxx
+--- a/src/DataExchange/TKDESTEP/STEPControl/STEPControl_ActorRead.hxx	2026-11-02 17:32:50.719347779 +0000
++++ b/src/DataExchange/TKDESTEP/STEPControl/STEPControl_ActorRead.hxx	2026-11-02 18:33:31.245331204 +0000
+@@ -62,6 +62,11 @@
+ {
+ 
+ public:
++  //! noshape: whether a root product's transfer first transfers its
++  //! sub-products' shape representations with their shape processing run in
++  //! parallel (results as processed one by one). On by default.
++  Standard_EXPORT static void SetDeferredShapeProcessing(const bool theToDefer);
++
+   Standard_EXPORT STEPControl_ActorRead(const occ::handle<Interface_InterfaceModel>& theModel);
+ 
+   Standard_EXPORT bool Recognize(const occ::handle<Standard_Transient>& start) override;
+@@ -117,6 +122,15 @@
+   DEFINE_STANDARD_RTTIEXT(STEPControl_ActorRead, Transfer_ActorOfTransientProcess)
+ 
+ protected:
++  //! noshape: the main shape representations of every product of the
++  //! model (theRoot's first), transferred as TransferEntity (PD) would
++  //! (theRootTrsf: the reader's root placement flag for top products), with
++  //! their items' shape processing in parallel.
++  Standard_EXPORT void preTransferRepresentations(const occ::handle<StepBasic_ProductDefinition>& theRoot,
++                                                  const occ::handle<Transfer_TransientProcess>&   TP,
++                                                  const StepData_Factors&                         theLocalFactors,
++                                                  const bool                                      theRootTrsf);
++
+   //! Transfers product definition entity
+   //! theUseTrsf - special flag for using Axis2Placement from ShapeRepresentation for transform root
+   //! shape

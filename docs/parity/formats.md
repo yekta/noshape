@@ -127,7 +127,17 @@ What changed (dev build timings on vibe5, 2000 parts):
 
   Kernel test: `step_writes_the_used_part_of_long_splines`.
 - After reading, regeneration takes about 1.7 s, of which the features are 0.12 s and the display meshing the rest (the Part Studio display, psui's area).
-- Not done: healing parts in parallel, which would cut the 0.84 s Transfer of the 2000-part import. Parked until live's numbers show we're behind.
+- Parallel healing: OCCT patch `patches/occt/0019-step-parallel-shape-processing.patch` (TKDESTEP, STEPControl_ActorRead).
+  - At a transfer's first root, the shape representations of every product (and the ones related to them) are transferred first, as the product transfer would (the root placement flag for top products, none for sub-products).
+  - Their items' shape processing runs in parallel (OSD_Parallel), each with its own parameters and precision.
+  - Each item's transfer information is merged over the entities it mapped, and the representations' compounds are rebuilt with the processed items. The rest of the transfer then reuses them.
+  - Results are byte-identical BREPs: NIST's 9 parts, and every part of live's flat 1000-part file.
+  - Dev on vibe5, with the patch built into a private OCCT:
+    - NIST Transfer: 1252 → 540 ms;
+    - live's flat 1000-part STEP: Transfer 1389 → 475 ms, import 3.8 → 2.1 s;
+    - live's 2000-instance assembly: 4.0 → 1.8 s;
+    - our 1000-part STEP: 1.4 → 0.54 s.
+  - The build machines get it when their libTKDESTEP.a (and STEPControl_ActorRead.hxx) are rebuilt from the patch set (see docs/handoff/dx.md); until then results are the same, only slower.
   - OCCT heals inside its STEP actor (`STEPControl_ActorRead::TransferEntity`), per shape representation and with that representation's own uncertainty as the tolerance (NIST mixes 1e-8 and 2e-5 m).
   - The healed shape is bound at once for the parents (assemblies, mapped items) to use.
   - Healing afterwards with one tolerance would change results.

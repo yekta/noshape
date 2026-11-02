@@ -1260,7 +1260,11 @@ fn parasolid_periodic_bsurface_face_reads_whole() {
 #[ignore]
 fn dump_step_assembly_parts() {
     let Some(p) = std::env::var_os("NOSHAPE_STEP_READ") else { return };
-    let ((_, parts, _), _) = read_step_assembly_nested(std::path::Path::new(&p), LengthUnit::Millimeter).unwrap().unwrap();
+    let path = std::path::Path::new(&p);
+    let parts = match read_step_assembly_nested(path, LengthUnit::Millimeter).unwrap() {
+        Some(((_, parts, _), _)) => parts,
+        None => read_step(path, LengthUnit::Millimeter).unwrap(),
+    };
     for s in parts {
         let v = volume_properties(&s.shape).map(|m| m.mass).unwrap_or(f64::NAN);
         if let Some(d) = std::env::var_os("NOSHAPE_STEP_DUMP_DIR") {
