@@ -817,9 +817,77 @@ pub fn solve(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Solve
     solve_with(bodies, mates, relations, drags, true)
 }
 
+/// What each mate's residual and free values were at the poses of the
+/// bodies it reads, kept between solves of one prepared assembly: a drag step
+/// recomputes only the mates whose bodies moved (a1000: the other 2370 of
+/// 2380 mates were a third of every step). Entries are reused only for the
+/// very same poses, so the results are the same.
+#[derive(Default)]
+pub struct MateMemo {
+    residuals: Vec<MemoSlot<(f64, bool)>>,
+    values: Vec<MemoSlot<[f64; 4]>>,
+}
+
+/// A memo entry: the poses of the mate's bodies, and what was found there.
+type MemoSlot<T> = Option<(Vec<Frame>, T)>;
+
+/// The largest residual of `m` (NaNs left out, as `f64::max` does) and
+/// whether one is NaN.
+fn residual_max(poses: &[Frame], m: &SolverMate, buf: &mut Vec<f64>) -> (f64, bool) {
+    buf.clear();
+    mate_residuals(poses, m, buf);
+    (buf.iter().fold(0.0f64, |a, x| a.max(x.abs())), buf.iter().any(|x| x.is_nan()))
+}
+
+fn memo_hit<T: Copy>(slot: Option<&MemoSlot<T>>, m: &SolverMate, poses: &[Frame]) -> Option<T> {
+    let (key, v) = slot?.as_ref()?;
+    let mut n = 0;
+    for b in mate_bodies(m) {
+        if key.get(n) != Some(&poses[b]) {
+            return None;
+        }
+        n += 1;
+    }
+    (n == key.len()).then_some(*v)
+}
+
+impl MateMemo {
+    /// The largest residual of mate `i` (`m`) at `poses` and whether one is NaN.
+    fn max_residual(&mut self, i: usize, m: &SolverMate, poses: &[Frame], buf: &mut Vec<f64>) -> (f64, bool) {
+        if let Some(v) = memo_hit(self.residuals.get(i), m, poses) {
+            return v;
+        }
+        let v = residual_max(poses, m, buf);
+        if self.residuals.len() <= i {
+            self.residuals.resize_with(i + 1, || None);
+        }
+        self.residuals[i] = Some((mate_bodies(m).map(|b| poses[b]).collect(), v));
+        v
+    }
+
+    /// [`mate_values`] of mate `i` (`m`) at `poses`.
+    pub fn values(&mut self, i: usize, m: &SolverMate, poses: &[Frame]) -> [f64; 4] {
+        if let Some(v) = memo_hit(self.values.get(i), m, poses) {
+            return v;
+        }
+        let v = mate_values(poses, m);
+        if self.values.len() <= i {
+            self.values.resize_with(i + 1, || None);
+        }
+        self.values[i] = Some((mate_bodies(m).map(|b| poses[b]).collect(), v));
+        v
+    }
+}
+
 /// [`solve`], with the degrees-of-freedom analysis optional (`dof` false:
 /// `dof` and `body_dof` are left at zero, e.g. for each step of a drag).
 pub fn solve_with(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool) -> SolveResult {
+    solve_with_memo(bodies, mates, relations, drags, dof, None)
+}
+
+/// [`solve_with`] reusing (and keeping) mates' residuals in `memo`; `mates`
+/// must be the list the memo was kept for.
+pub fn solve_with_memo(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool, memo: Option<&std::cell::RefCell<MateMemo>>) -> SolveResult {
     // Followers (pattern / mirror copies) start at their expected pose.
     for _ in 0..2 {
         for m in mates {
@@ -840,7 +908,7 @@ pub fn solve_with(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
     // keeps its transform exactly. Solve with it held first.
     if !stays.is_empty() && drags.is_empty() {
         let mut trial: Vec<SolverBody> = bodies.iter().enumerate().map(|(i, b)| SolverBody { pose: b.pose, fixed: b.fixed || stays.contains(&i) }).collect();
-        let r = solve_inner(&mut trial, mates, relations, &[], false, true);
+        let r = solve_inner(&mut trial, mates, relations, &[], false, true, memo);
         if r.converged && r.mate_ok.iter().all(|ok| *ok) {
             for (b, t) in bodies.iter_mut().zip(&trial) {
                 b.pose = t.pose;
@@ -848,7 +916,7 @@ pub fn solve_with(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
         }
     }
     if !drags.is_empty()
-        && let Some(r) = solve_dragged_only(bodies, mates, relations, drags, dof)
+        && let Some(r) = solve_dragged_only(bodies, mates, relations, drags, dof, memo)
     {
         return r;
     }
@@ -856,10 +924,10 @@ pub fn solve_with(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
         // Phase 1: follow the drag (soft); phase 2: project back onto the
         // constraint manifold exactly, starting from the dragged pose.
         // Phase 1 needs no DOF analysis (phase 2 does it at the final poses).
-        solve_inner(bodies, mates, relations, drags, false, false);
-        return solve_inner(bodies, mates, relations, &[], dof, true);
+        solve_inner(bodies, mates, relations, drags, false, false, None);
+        return solve_inner(bodies, mates, relations, &[], dof, true, memo);
     }
-    solve_inner(bodies, mates, relations, drags, dof, true)
+    solve_inner(bodies, mates, relations, drags, dof, true, memo)
 }
 
 /// Bodies set to a requested pose (`placed`: Transform's typed values, the
@@ -889,14 +957,14 @@ pub fn solve_placed(bodies: &mut [SolverBody], mates: &[SolverMate], relations: 
 /// the stack's size): the dragged bodies alone are solved, every other body
 /// held. Taken when the mates hold and the drag points reach their targets;
 /// otherwise (a linkage the drag has to move) the whole group is solved.
-fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool) -> Option<SolveResult> {
+fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool, memo: Option<&std::cell::RefCell<MateMemo>>) -> Option<SolveResult> {
     let moving: Vec<usize> = drags.iter().map(|d| d.body).filter(|&b| !bodies[b].fixed).collect();
     if moving.is_empty() {
         return None;
     }
     let mut trial: Vec<SolverBody> = bodies.iter().enumerate().map(|(i, b)| SolverBody { pose: b.pose, fixed: b.fixed || !moving.contains(&i) }).collect();
-    solve_inner(&mut trial, mates, relations, drags, false, false);
-    let r = solve_inner(&mut trial, mates, relations, &[], false, true);
+    solve_inner(&mut trial, mates, relations, drags, false, false, None);
+    let r = solve_inner(&mut trial, mates, relations, &[], false, true, memo);
     let reached = drags.iter().all(|d| trial[d.body].pose.transform_point(d.local_point).distance(d.target) < 1e-7);
     // The dragged bodies' mates must hold (a failing mate elsewhere isn't
     // this step's business); with relations, everything must.
@@ -957,7 +1025,7 @@ fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations
         }
     }
     // The degrees of freedom are the whole assembly's (nothing held).
-    Some(if dof { solve_inner(bodies, mates, relations, &[], true, true) } else { r })
+    Some(if dof { solve_inner(bodies, mates, relations, &[], true, true, memo) } else { r })
 }
 
 /// Mates that align the Z axes only as lines (Revolute, Cylindrical, Pin
@@ -1111,7 +1179,7 @@ fn group_terms(bodies: &[SolverBody], mates: &[SolverMate], relations: &[SolverR
     (groups, loose)
 }
 
-fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool, status: bool) -> SolveResult {
+fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool, status: bool, memo: Option<&std::cell::RefCell<MateMemo>>) -> SolveResult {
     let mut poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
     let scale = characteristic_length(&poses, mates).max(1e-3);
     let mut result = SolveResult { mate_ok: vec![false; mates.len()], body_dof: vec![0; bodies.len()], ..Default::default() };
@@ -1167,11 +1235,15 @@ fn solve_inner(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[Sol
         let status_scale = characteristic_length(&poses, mates).max(1e-3);
         let mut max_r = 0.0f64;
         let mut r = Vec::new();
+        let mut memo = memo.map(|m| m.borrow_mut());
         for (i, m) in mates.iter().enumerate() {
-            r.clear();
-            mate_residuals(&poses, m, &mut r);
-            max_r = r.iter().fold(max_r, |a, v| a.max(v.abs()));
-            result.mate_ok[i] = r.iter().all(|v| v.abs() < 1e-5 * status_scale.max(1.0));
+            // (All under the bound ⇔ the largest under it and none NaN.)
+            let (mr, nan) = match memo.as_mut() {
+                Some(mm) => mm.max_residual(i, m, &poses, &mut r),
+                None => residual_max(&poses, m, &mut r),
+            };
+            max_r = max_r.max(mr);
+            result.mate_ok[i] = !nan && mr < 1e-5 * status_scale.max(1.0);
         }
         for rel in relations {
             max_r = max_r.max(relation_residual(&poses, mates, rel).abs());
@@ -1789,7 +1861,7 @@ mod tests {
         for _ in 0..5 {
             let target = bodies[19].pose.transform_point(lp) + DVec3::new(-0.002, 0.001, 0.0);
             let drags = vec![DragTarget { body: 19, local_point: lp, target }];
-            iterations += solve_inner(&mut bodies.clone(), &mates, &[], &drags, false, false).iterations;
+            iterations += solve_inner(&mut bodies.clone(), &mates, &[], &drags, false, false, None).iterations;
             let r = solve(&mut bodies, &mates, &[], &drags);
             assert!(r.converged);
             assert_eq!(r.dof, 19);

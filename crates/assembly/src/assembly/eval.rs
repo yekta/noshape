@@ -316,6 +316,9 @@ pub struct Prepared {
     connector_child: HashMap<MateId, InstanceId>,
     /// Top-level instances that are flexible subassemblies.
     pub flexible: HashSet<InstanceId>,
+    /// The mates' residuals and values between solves of this preparation
+    /// (each drag step); see [`solver::MateMemo`].
+    memo: Arc<std::sync::Mutex<solver::MateMemo>>,
 }
 
 #[derive(Clone, Debug)]
@@ -625,7 +628,12 @@ impl Prepared {
                 drags.push(DragTarget { body: *b, local_point: lp, target: want.transform_point(lp) });
             }
         }
-        let mut r = if placed.is_empty() { solver::solve_with(&mut bodies, &active, &rels, &drags, !opts.skip_dof) } else { solver::solve_placed(&mut bodies, &active, &rels, &placed, !opts.skip_dof) };
+        // The memo is kept for the full list of mates (not while one mate is
+        // being defined), by one solve at a time.
+        let mut guard = (active.len() == self.mates.len()).then(|| self.memo.try_lock().ok()).flatten();
+        let memo = guard.as_mut().map(|g| std::cell::RefCell::new(std::mem::take(&mut **g)));
+        let mut r = if placed.is_empty() { solver::solve_with_memo(&mut bodies, &active, &rels, &drags, !opts.skip_dof, memo.as_ref()) } else { solver::solve_placed(&mut bodies, &active, &rels, &placed, !opts.skip_dof) };
+        let mut memo = memo.map(|m| m.into_inner());
         // Degrees of freedom of the whole assembly with the mate being
         // defined (the instance list), not of the one-mate preview solve:
         // every mate and relation, nothing held, at the previewed poses.
@@ -664,7 +672,13 @@ impl Prepared {
             let fa = poses[m.a].mul(&m.a_local);
             let fb = poses[m.b].mul(&m.b_local);
             out.mate_frames.insert(*id, (fa, fb));
-            out.mate_values.insert(*id, solver::mate_values(&poses, m));
+            out.mate_values.insert(*id, match memo.as_mut() {
+                Some(mm) => mm.values(i, m, &poses),
+                None => solver::mate_values(&poses, m),
+            });
+        }
+        if let (Some(g), Some(mm)) = (guard.as_mut(), memo) {
+            **g = mm;
         }
         for (k, rel) in rels.iter().enumerate() {
             let va = solver::mate_values(&poses, &mates[rel.mate_a]);

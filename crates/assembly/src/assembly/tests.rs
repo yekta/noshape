@@ -5887,3 +5887,38 @@ fn a_flat_pattern_instance_is_the_flat() {
     let size = (b.1 - b.0) * 1e3;
     assert!(o.body_name == "Flat pattern of Part 1" && (size - DVec3::new(80.0, 60.0, 2.0)).length() < 1e-3, "{} {size:?}", o.body_name);
 }
+
+/// The mate memo a preparation keeps between solves (each drag step reuses
+/// the residuals and values of mates whose bodies didn't move) changes
+/// nothing: drag steps through one preparation give exactly what fresh
+/// preparations give for the same steps.
+#[test]
+fn the_mate_memo_changes_nothing() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (top, bottom) = (face_with(&r, "CapEnd"), face_with(&r, "CapStart"));
+    // Two stacks of three blocks, each block Planar on the one below.
+    let mut asm = Assembly::default();
+    for s in 0..2u64 {
+        for k in 0..3u64 {
+            let id = 1 + s * 3 + k;
+            asm.instances.push(part_instance(id, &format!("Block <{id}>"), f.studios[0], body.clone(), DVec3::new(0.1 * s as f64, 0.0, 0.01 * k as f64), k == 0));
+            if k > 0 {
+                asm.mates.push(mate(100 + id, MateType::Planar, conn(id, bottom.clone(), Inference::Centroid), conn(id - 1, top.clone(), Inference::Centroid)));
+            }
+        }
+    }
+    let warm = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let mut start: std::collections::HashMap<InstanceId, Placement> = warm.solved.placements.iter().cloned().collect();
+    for step in 1..=5 {
+        let opts = SolveOptions { drags: vec![(InstanceId(3), DVec3::ZERO, DVec3::new(0.003 * step as f64, 0.002, 0.03))], start: Some(start.clone()), skip_dof: true, ..Default::default() };
+        let memo = warm.prepared.solve(&opts);
+        let fresh = AssemblyEvaluator::new().evaluate(&f.doc, &asm, &SolveOptions::default(), None).prepared.solve(&opts);
+        assert_eq!(memo.placements, fresh.placements, "step {step}");
+        assert_eq!(memo.mate_ok, fresh.mate_ok, "step {step}");
+        assert_eq!(memo.mate_values, fresh.mate_values, "step {step}");
+        assert_eq!(memo.converged, fresh.converged, "step {step}");
+        start = memo.placements.iter().cloned().collect();
+    }
+}
