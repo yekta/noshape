@@ -4,7 +4,9 @@
 #include "internal.hpp"
 
 #include <BRepAdaptor_Curve.hxx>
+#include <BRepBndLib.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <GCPnts_TangentialDeflection.hxx>
 #include <HLRAlgo_EdgeIterator.hxx>
@@ -17,8 +19,15 @@
 #include <HLRBRep_FaceData.hxx>
 #include <HLRBRep_FaceIterator.hxx>
 #include <HLRBRep_PolyAlgo.hxx>
+#include <Bnd_Box.hxx>
+#include <TopoDS_Compound.hxx>
+#include <TopoDS_Iterator.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 
+#include <algorithm>
+#include <atomic>
+#include <numeric>
+#include <thread>
 #include <unordered_map>
 
 namespace noshape {
@@ -281,6 +290,139 @@ void exact_pass(Emitter& em, const occ::handle<HLRBRep_Data>& DS, int typ, bool 
   }
 }
 
+// Exact HLR of many bodies (a big assembly: one algo takes seconds to load
+// them all): chunks of bodies near each other on the sheet, each hidden in
+// its own algo, in parallel, by itself and by the bodies whose projected
+// boxes overlap its own; a chunk draws its own bodies' edges. False if a
+// chunk failed.
+constexpr size_t kChunkedBodies = 64, kChunkBodies = 32;
+
+bool exact_chunked(Emitter& em, const std::vector<TopoDS_Shape>& bodies, const HLRAlgo_Projector& proj, const gp_Ax2& ax)
+{
+  // Projected box; z toward the viewer.
+  struct Box2
+  {
+    double x0 = 1e300, y0 = 1e300, z0 = 1e300, x1 = -1e300, y1 = -1e300, z1 = -1e300;
+    bool   overlaps(const Box2& o) const { return x0 <= o.x1 && o.x0 <= x1 && y0 <= o.y1 && o.y0 <= y1; }
+    // Whether o can hide part of this: overlapping, not wholly behind it.
+    bool hidden_by(const Box2& o) const { return overlaps(o) && o.z1 >= z0; }
+    void add(const Box2& o) { *this = {std::min(x0, o.x0), std::min(y0, o.y0), std::min(z0, o.z0), std::max(x1, o.x1), std::max(y1, o.y1), std::max(z1, o.z1)}; }
+  };
+  const size_t      n = bodies.size();
+  std::vector<Box2> box(n);
+  Box2              all;
+  for (size_t i = 0; i < n; ++i)
+  {
+    Bnd_Box b;
+    BRepBndLib::Add(bodies[i], b, false);
+    if (b.IsVoid())
+      continue;
+    double c[6];
+    b.Get(c[0], c[1], c[2], c[3], c[4], c[5]);
+    for (int k = 0; k < 8; ++k)
+    {
+      const gp_XYZ p(c[(k & 1) ? 3 : 0], c[(k & 2) ? 4 : 1], c[(k & 4) ? 5 : 2]);
+      const double x = p.Dot(ax.XDirection().XYZ()), y = p.Dot(ax.YDirection().XYZ()), z = p.Dot(ax.Direction().XYZ());
+      box[i].add({x, y, z, x, y, z});
+    }
+    all.add(box[i]);
+  }
+  // Z-order of the box centres: chunks of neighbours.
+  auto morton = [&](size_t i) {
+    if (box[i].x0 > box[i].x1)
+      return uint32_t(0);
+    auto q = [](double v, double lo, double hi) { return (uint32_t)std::clamp((v - lo) / std::max(hi - lo, 1e-300) * 65535.0, 0.0, 65535.0); };
+    const uint32_t x = q((box[i].x0 + box[i].x1) / 2, all.x0, all.x1), y = q((box[i].y0 + box[i].y1) / 2, all.y0, all.y1);
+    uint32_t       m = 0;
+    for (int b = 0; b < 16; ++b)
+      m |= ((x >> b) & 1u) << (2 * b) | ((y >> b) & 1u) << (2 * b + 1);
+    return m;
+  };
+  std::vector<uint32_t> key(n);
+  for (size_t i = 0; i < n; ++i)
+    key[i] = morton(i);
+  std::vector<size_t> order(n);
+  std::iota(order.begin(), order.end(), 0);
+  std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return key[a] < key[b]; });
+  const size_t        hw     = std::max(1u, std::thread::hardware_concurrency());
+  const size_t        chunks = std::clamp<size_t>(n / kChunkBodies, 1, 4 * hw);
+  std::vector<HlrOut> outs(chunks);
+  std::atomic<bool>   failed{false};
+  // Own threads: OCCT's pool runs a nested or concurrent For (the other
+  // views of a sheet, computed at the same time) on the calling thread.
+  auto hide_chunk = [&](size_t c) {
+    const std::vector<size_t> members(order.begin() + (ptrdiff_t)(c * n / chunks), order.begin() + (ptrdiff_t)((c + 1) * n / chunks));
+    Box2                      cb;
+    for (size_t m : members)
+      cb.add(box[m]);
+    std::vector<char> mine(n, 0);
+    for (size_t m : members)
+      mine[m] = 1;
+    std::vector<size_t> others;
+    for (size_t j = 0; j < n; ++j)
+      if (!mine[j] && cb.hidden_by(box[j]) && std::any_of(members.begin(), members.end(), [&](size_t m) { return box[m].hidden_by(box[j]); }))
+        others.push_back(j);
+    try
+    {
+      BRep_Builder    bb;
+      TopoDS_Compound own, around;
+      bb.MakeCompound(own);
+      bb.MakeCompound(around);
+      for (size_t m : members)
+        bb.Add(own, bodies[m]);
+      for (size_t o : others)
+        bb.Add(around, bodies[o]);
+      occ::handle<HLRBRep_Algo> algo = new HLRBRep_Algo();
+      algo->Add(own);
+      if (!others.empty())
+        algo->Add(around);
+      algo->Projector(proj);
+      algo->Update();
+      algo->Hide(1);
+      if (!others.empty())
+        algo->Hide(1, 2);
+      occ::handle<HLRBRep_Data> DS = algo->DataStructure();
+      if (DS.IsNull())
+        return;
+      // Draw the chunk's own edges only.
+      algo->Select(1);
+      Emitter cem{outs[c], em.srcEdges, em.curves, em.defl, em.seams};
+      DS->Projector().Scaled(true);
+      for (bool visible : {true, false})
+        for (int typ : {5, 2, 3, 4})
+          exact_pass(cem, DS, typ, visible);
+      DS->Projector().Scaled(false);
+    }
+    catch (const Standard_Failure&)
+    {
+      failed = true;
+    }
+  };
+  std::atomic<size_t>      next{0};
+  std::vector<std::thread> workers;
+  for (size_t t = 0; t < std::min(chunks, hw); ++t)
+    workers.emplace_back([&]() {
+      for (size_t c = next++; c < chunks; c = next++)
+        hide_chunk(c);
+    });
+  for (std::thread& t : workers)
+    t.join();
+  if (failed)
+    return false;
+  for (const HlrOut& o : outs)
+  {
+    const uint32_t base = (uint32_t)(em.out.points.size() / 2);
+    for (double v : o.points)
+      em.out.points.push_back(v);
+    for (HlrEdgeF e : o.edges)
+    {
+      e.start += base;
+      em.out.edges.push_back(e);
+    }
+  }
+  return true;
+}
+
 } // namespace
 
 HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflection)
@@ -307,6 +449,12 @@ HlrOut project_hlr(const OcShape& s, P3 dir, P3 up, bool exact, double deflectio
 
   if (exact)
   {
+    std::vector<TopoDS_Shape> bodies;
+    if (s.shape.ShapeType() == TopAbs_COMPOUND)
+      for (TopoDS_Iterator it(s.shape); it.More(); it.Next())
+        bodies.push_back(it.Value());
+    if (bodies.size() >= kChunkedBodies && exact_chunked(em, bodies, proj, ax))
+      return out;
     occ::handle<HLRBRep_Algo> algo = new HLRBRep_Algo();
     algo->Add(s.shape);
     algo->Projector(proj);

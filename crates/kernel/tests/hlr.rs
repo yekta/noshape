@@ -127,3 +127,46 @@ fn fragments_are_merged_into_polylines() {
         assert_eq!(hidden, 0, "exact={exact}\n{}", dump(&e));
     }
 }
+
+/// Many bodies (a big assembly) are hidden in parallel chunks of
+/// neighbours: the same lines as one hidden-line pass over them all (a
+/// compound nested one level deeper takes that path), by source edge,
+/// visibility and class, in a front, top and isometric view of a grid of
+/// blocks and cylinders of different heights, rows hiding the rows behind.
+#[test]
+fn many_bodies_hide_in_chunks_as_in_one_pass() {
+    let mut bodies = Vec::new();
+    for r in 0..12 {
+        for c in 0..12 {
+            let (x, y, h) = (c as f64 * 12.0, r as f64 * 12.0, 4.0 + ((r * 12 + c) % 5) as f64 * 3.0);
+            let p = Plane::new(DVec3::new(x, y, 0.0), DVec3::Z, DVec3::X);
+            bodies.push(if (r + c) % 3 == 0 { make_cylinder(&Plane::new(DVec3::new(x + 5.0, y + 5.0, 0.0), DVec3::Z, DVec3::X), 5.0, h, 2.0 * PI).unwrap() } else { make_box(&p, 10.0, 10.0, h).unwrap() });
+        }
+    }
+    let flat = Shape::compound(&bodies);
+    let nested = Shape::compound(&[Shape::compound(&bodies)]);
+    type Key = (bool, u8, Option<u32>);
+    let lengths = |edges: Vec<ProjectedEdge>| {
+        let mut m: std::collections::BTreeMap<Key, f64> = Default::default();
+        for e in edges {
+            let class = match e.class {
+                EdgeClass::Sharp => 0,
+                EdgeClass::Smooth => 1,
+                EdgeClass::Outline => 2,
+                EdgeClass::Seam => 3,
+            };
+            *m.entry((e.visibility == Visibility::Visible, class, e.source_edge)).or_default() += e.polyline.windows(2).map(|w| w[0].distance(w[1])).sum::<f64>();
+        }
+        m.retain(|_, l| *l > 1e-6);
+        m
+    };
+    for (name, dir, up) in [("front", DVec3::Y, DVec3::Z), ("top", -DVec3::Z, DVec3::Y), ("iso", DVec3::new(-1.0, 1.0, -1.0), DVec3::Z)] {
+        let chunked = lengths(project_hlr_raw(&flat, dir, up, true, 0.05).unwrap());
+        let one = lengths(project_hlr_raw(&nested, dir, up, true, 0.05).unwrap());
+        assert!(one.len() > 400 && one.keys().filter(|k| !k.0).count() > 100, "{name}: {} pieces, {} hidden", one.len(), one.keys().filter(|k| !k.0).count());
+        assert_eq!(chunked.keys().collect::<Vec<_>>(), one.keys().collect::<Vec<_>>(), "{name}: the same edges, visible and hidden");
+        for (k, l) in &one {
+            assert!((chunked[k] - l).abs() < 1e-3, "{name} {k:?}: {} vs {l}", chunked[k]);
+        }
+    }
+}

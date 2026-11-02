@@ -8,7 +8,7 @@
 //! [`super::build::ViewPlacement`]); annotations store view coordinates.
 
 pub use noshape_model_data::drawing::rotate2;
-use super::{BrokenOut, Crop, Drawing, PointRef, Projection, Sheet, Simplification, ViewId, ViewKind, ViewOrientation};
+use super::{BrokenOut, Crop, Drawing, DrawingView, PointRef, Projection, Sheet, Simplification, ViewId, ViewKind, ViewOrientation};
 use crate::assembly::eval::{AssemblyEvaluator, AssemblyResult, SolveOptions};
 use crate::configuration::ConfigValues;
 use crate::display::BodyKind;
@@ -368,11 +368,29 @@ fn lin_to_srgb(c: f32) -> u8 {
     (s * 255.0).round() as u8
 }
 
+/// Sources evaluated last, by key and content hash: Create Drawing lays out
+/// its suggested views from the source's bounds and the views then show the
+/// same evaluation (a 2000-instance assembly's takes about 0.4 s).
+static RECENT_SOURCES: std::sync::LazyLock<Mutex<std::collections::VecDeque<(SourceKey, u64, SourceModel)>>> = std::sync::LazyLock::new(Default::default);
+
 /// Regenerate / evaluate one source. `regen` is reused for Part Studios
 /// (incremental), `assemblies` caches studio regenerations for assemblies.
 pub fn regenerate_source(doc: &Document, key: &SourceKey, regen: &mut Regenerator, assemblies: &mut AssemblyEvaluator) -> Option<SourceModel> {
-    let tab = doc.tab(key.tab)?;
     let hash = source_hash(doc, key)?;
+    if let Some((_, _, m)) = RECENT_SOURCES.lock().iter().find(|(k, h, _)| k == key && *h == hash) {
+        return Some(m.clone());
+    }
+    let m = evaluate_source(doc, key, hash, regen, assemblies)?;
+    let mut recent = RECENT_SOURCES.lock();
+    if recent.len() >= 4 {
+        recent.pop_front();
+    }
+    recent.push_back((key.clone(), hash, m.clone()));
+    Some(m)
+}
+
+fn evaluate_source(doc: &Document, key: &SourceKey, hash: u64, regen: &mut Regenerator, assemblies: &mut AssemblyEvaluator) -> Option<SourceModel> {
+    let tab = doc.tab(key.tab)?;
     match &tab.content {
         TabContent::PartStudio(ps) => {
             // As the Part Studio regenerates: its Derived features' sources
@@ -1964,9 +1982,18 @@ impl ViewCache {
 
 /// Cache key of a view's geometry; `None` when the view cannot be computed
 /// (missing parent or source).
+/// Views computed exact even when a quick one is asked for: View render
+/// mode › Best quality, and views of many bodies (a big assembly), whose
+/// exact hidden lines are computed in parallel and take about as long as the
+/// polygonal ones.
+fn always_exact(sheet: &Sheet, id: ViewId, sources: &Sources) -> bool {
+    const MANY_BODIES: usize = 64;
+    sheet.view(id).is_some_and(|v| v.best_quality)
+        || view_source(sheet, id).is_some_and(|(k, part)| part.is_none() && sources.get(&k).is_some_and(|s| s.context.bodies.len() >= MANY_BODIES))
+}
+
 pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources, exact: bool) -> Option<u64> {
-    // View render mode › Best quality: always exact.
-    let exact = exact || sheet.view(id).is_some_and(|v| v.best_quality);
+    let exact = exact || always_exact(sheet, id, sources);
     let v = sheet.view(id)?;
     let frame = view_frame(drawing, sheet, id)?;
     let (key, part) = view_source(sheet, id)?;
@@ -2062,7 +2089,7 @@ pub fn view_key(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources,
 
 /// Compute (or fetch from the cache) a view's geometry.
 pub fn compute_view(drawing: &Drawing, sheet: &Sheet, id: ViewId, sources: &Sources, cache: &ViewCache, exact: bool) -> Arc<ViewGeometry> {
-    let exact = exact || sheet.view(id).is_some_and(|v| v.best_quality);
+    let exact = exact || always_exact(sheet, id, sources);
     let fail = |msg: &str| Arc::new(ViewGeometry { id, error: Some(msg.to_string()), ..Default::default() });
     let Some(key) = view_key(drawing, sheet, id, sources, exact) else {
         // Its display state or exploded view deleted from the assembly: the
@@ -2338,12 +2365,18 @@ fn apply_crop(g: &mut ViewGeometry, crop: &Crop) {
     g.update_bounds();
 }
 
-/// Compute every view of a sheet (parents first).
+/// Compute every view of a sheet, in parallel: detail views after the
+/// others (they enlarge their parent's geometry).
 pub fn compute_sheet_views(drawing: &Drawing, sheet: &Sheet, sources: &Sources, cache: &ViewCache, exact: bool) -> HashMap<ViewId, Arc<ViewGeometry>> {
+    use rayon::prelude::*;
     // Section lines follow the model points they were placed through.
     let moved = resolve_sheet_cut_anchors(drawing, sheet, sources);
     let sheet = moved.as_ref().unwrap_or(sheet);
-    sheet.views.iter().map(|v| (v.id, compute_view(drawing, sheet, v.id, sources, cache, exact))).collect()
+    let (details, others): (Vec<&DrawingView>, Vec<&DrawingView>) = sheet.views.iter().partition(|v| matches!(v.kind, ViewKind::Detail { .. }));
+    let compute = |v: &&DrawingView| (v.id, compute_view(drawing, sheet, v.id, sources, cache, exact));
+    let mut out: HashMap<ViewId, Arc<ViewGeometry>> = others.par_iter().map(compute).collect();
+    out.extend(details.par_iter().map(compute).collect::<Vec<_>>());
+    out
 }
 
 /// Per-body topology used to describe model edges.

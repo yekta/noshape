@@ -348,3 +348,145 @@ fn timed_live_big_samples() {
     }
     let _ = std::fs::remove_dir_all(&scratch);
 }
+
+/// A 2-point dimension between the ends of a straight edge of a view (sheet
+/// mm; at a small scale a click on an edge is ambiguous, live picked a
+/// vertex), the longest that takes one, placed 8 mm beside it.
+fn dimension_longest_line(ctx: &mut Ctx, drawing: &str, view: i64) -> f64 {
+    let g = call(ctx, "drawing_get", json!({ "drawing": drawing }));
+    let v = g["views"].as_array().unwrap().iter().find(|v| v["id"] == view).unwrap().clone();
+    let xy = |p: &Value| (p[0].as_f64().unwrap(), p[1].as_f64().unwrap());
+    let mut lines: Vec<((f64, f64), (f64, f64))> = v["edges"].as_array().unwrap().iter().filter(|e| e["type"] == "line").map(|e| (xy(&e["a"]), xy(&e["b"]))).collect();
+    let len = |(a, b): &((f64, f64), (f64, f64))| (b.0 - a.0).hypot(b.1 - a.1);
+    lines.sort_by(|x, y| len(y).total_cmp(&len(x)));
+    let op = registry::by_tool_name("drawing_dimension").unwrap();
+    for l @ (a, b) in lines.iter().take(20) {
+        let (mx, my, n) = ((a.0 + b.0) / 2.0, (a.1 + b.1) / 2.0, len(l));
+        let (nx, ny) = ((a.1 - b.1) / n, (b.0 - a.0) / n);
+        let t = Instant::now();
+        if registry::run(ctx, op, &json!({ "drawing": drawing, "kind": "point_to_point", "picks": [[a.0, a.1], [b.0, b.1]], "place": [mx + 8.0 * nx, my + 8.0 * ny] })).is_ok() {
+            return t.elapsed().as_secs_f64() * 1000.0;
+        }
+    }
+    panic!("no line of view {view} takes a dimension");
+}
+
+/// Drawings of big models against live (user 11-02; live request "dx big
+/// drawings"): live's 2000-instance assembly (its STEP in `NOSHAPE_LIVE_BIG`,
+/// imported) with the suggested views, a BOM and a dimension; the same
+/// 1000-part Part Studio built from live's own custom feature (Big1755
+/// parts, 25 × 40) with the suggested views, then Columns 40 → 39 and the
+/// drawing's Update; NIST's largest part (FTC 08) with the suggested views.
+#[test]
+#[ignore]
+fn timed_big_drawings() {
+    let scratch = std::env::temp_dir().join(format!("noshape-dx-bigdrw-{}", std::process::id()));
+    std::fs::create_dir_all(&scratch).unwrap();
+    let live = std::env::var_os("NOSHAPE_LIVE_BIG").map(std::path::PathBuf::from);
+    let views = |d: &Value| d["views"].as_array().map_or(0, |v| v.len());
+    let timed = |ctx: &mut Ctx, what: &str, tool: &str, args: Value| {
+        let t = Instant::now();
+        let r = call(ctx, tool, args);
+        report(what, vec![t.elapsed().as_secs_f64() * 1000.0]);
+        r
+    };
+    if let Some(file) = live.as_ref().map(|d| d.join("dx-big-asm-ap242.step")).filter(|f| f.exists()) {
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": scratch.join("asm.noshape").to_str().unwrap() }));
+        let r = call(&mut ctx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
+        let asm = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Assembly").unwrap()["name"].as_str().unwrap().to_string();
+        let d = timed(&mut ctx, "big drawing: 2000-instance assembly, suggested views", "drawing_create", json!({ "source": asm, "template": "ANSI_A_INCH.dwt", "suggested_views": true }));
+        assert_eq!(views(&d), 4, "{d}");
+        let drawing = d["drawing"].as_str().unwrap().to_string();
+        // The app shows the polygonal views first (then the exact ones).
+        {
+            use noshape_model::drawing::views;
+            let doc = ctx.doc(None).unwrap().doc().clone();
+            let tab = doc.tabs.iter().find(|t| t.name == drawing).unwrap().id;
+            let dr = noshape_ops::drawing::drawing_of(&doc, tab).unwrap().clone();
+            let sources = views::regenerate_sources(&doc, &dr);
+            let t = Instant::now();
+            views::compute_sheet_views(&dr, &dr.sheets[0], &sources, &views::ViewCache::new(), false);
+            report("big drawing: assembly, polygonal views (app's first pass)", vec![t.elapsed().as_secs_f64() * 1000.0]);
+        }
+        let front = d["views"][0]["id"].as_i64().unwrap();
+        let iso = d["views"][3]["id"].as_i64().unwrap();
+        let b = timed(&mut ctx, "big drawing: assembly BOM", "drawing_view_table", json!({ "drawing": drawing, "kind": "bom", "view": iso, "position": [270, 210] }));
+        eprintln!("  BOM: {}", b.to_string().chars().take(200).collect::<String>());
+        report("big drawing: assembly dimension", vec![dimension_longest_line(&mut ctx, &drawing, front)]);
+        timed(&mut ctx, "big drawing: assembly drawing_get", "drawing_get", json!({ "drawing": drawing, "edges": false }));
+    }
+    {
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": scratch.join("parts.noshape").to_str().unwrap() }));
+        call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+        let e = call(&mut ctx, "featurestudio_edit", json!({ "source": BIG1755 }));
+        assert!(e["notices"].as_array().unwrap().iter().all(|n| n["severity"] != "error"), "{e}");
+        let c = call(&mut ctx, "featurestudio_commit", json!({}));
+        let ty = c["feature_types"].as_array().unwrap().iter().find(|t| t["name"] == "Big1755 parts").unwrap()["type"].as_str().unwrap().to_string();
+        let f = timed(&mut ctx, "big drawing: 1000 parts regenerate", "feature_add", json!({ "tab": "Part Studio 1", "type": ty, "params": { "rows": 25, "cols": 40 } }));
+        assert_eq!(f["feature_status"]["status"], "Ok", "{f}");
+        let fid = f["feature"].as_str().or(f["id"].as_str()).unwrap_or_else(|| panic!("{f}")).to_string();
+        assert_eq!(call(&mut ctx, "query_parts", json!({ "tab": "Part Studio 1" }))["parts"].as_array().unwrap().len(), 1000);
+        let d = timed(&mut ctx, "big drawing: 1000-part Part Studio, suggested views", "drawing_create", json!({ "source": "Part Studio 1", "template": "ANSI_A_INCH.dwt", "suggested_views": true }));
+        assert_eq!(views(&d), 4, "{d}");
+        let drawing = d["drawing"].as_str().unwrap().to_string();
+        report("big drawing: Part Studio dimension", vec![dimension_longest_line(&mut ctx, &drawing, d["views"][0]["id"].as_i64().unwrap())]);
+        timed(&mut ctx, "big drawing: Columns 40 -> 39 regenerate", "feature_edit", json!({ "tab": "Part Studio 1", "feature": fid, "params": { "cols": 39 } }));
+        timed(&mut ctx, "big drawing: Part Studio drawing Update", "drawing_update", json!({ "drawing": drawing }));
+    }
+    if let Some(file) = live.as_ref().map(|d| d.join("nist/nist_ftc_08_asme1_ap242-e2.stp")).filter(|f| f.exists()) {
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": scratch.join("nist.noshape").to_str().unwrap() }));
+        let r = call(&mut ctx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
+        let studio = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap()["name"].as_str().unwrap().to_string();
+        let d = timed(&mut ctx, "big drawing: NIST FTC 08 part, suggested views", "drawing_create", json!({ "source": studio, "template": "ANSI_A_INCH.dwt", "suggested_views": true }));
+        assert_eq!(views(&d), 4, "{d}");
+    }
+    let _ = std::fs::remove_dir_all(&scratch);
+}
+
+/// Live's "Big1755 parts" (behaviours request 1755): 25 × 40 blocks, holes,
+/// fillets, names and colours.
+const BIG1755: &str = r#"FeatureScript 3095;
+import(path : "onshape/std/common.fs", version : "3095.0");
+
+annotation { "Feature Type Name" : "Big1755 parts" }
+export const big1755Parts = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Rows" }
+        isInteger(definition.rows, { (unitless) : [1, 25, 100] } as IntegerBoundSpec);
+        annotation { "Name" : "Columns" }
+        isInteger(definition.cols, { (unitless) : [1, 40, 100] } as IntegerBoundSpec);
+    }
+    {
+        for (var r = 0; r < definition.rows; r += 1)
+        {
+            for (var c = 0; c < definition.cols; c += 1)
+            {
+                const k = r * definition.cols + c;
+                const bid = id + ("b" ~ k);
+                const x0 = c * 12;
+                const y0 = r * 12;
+                const h = 4 + (k % 5) + 0.25 * (r % 4);
+                fCuboid(context, bid, { "corner1" : vector(x0, y0, 0) * millimeter, "corner2" : vector(x0 + 8, y0 + 8, h) * millimeter });
+                const body = qCreatedBy(bid, EntityType.BODY);
+                if (k % 10 == 3)
+                {
+                    fCylinder(context, id + ("h" ~ k), { "topCenter" : vector(x0 + 4, y0 + 4, h + 1) * millimeter, "bottomCenter" : vector(x0 + 4, y0 + 4, -1) * millimeter, "radius" : 2 * millimeter });
+                    opBoolean(context, id + ("s" ~ k), { "tools" : qCreatedBy(id + ("h" ~ k), EntityType.BODY), "targets" : body, "operationType" : BooleanOperationType.SUBTRACTION });
+                }
+                else if (k % 10 == 7)
+                {
+                    opFillet(context, id + ("f" ~ k), { "entities" : qParallelEdges(qOwnedByBody(body, EntityType.EDGE), Z_DIRECTION), "radius" : 1.5 * millimeter });
+                }
+                setProperty(context, { "entities" : body, "propertyType" : PropertyType.NAME, "value" : "B" ~ r ~ "-" ~ c });
+                if (k % 10 == 5)
+                {
+                    setProperty(context, { "entities" : body, "propertyType" : PropertyType.APPEARANCE, "value" : color(0.9, 0.1, 0.1) });
+                }
+            }
+        }
+    });
+"#;
