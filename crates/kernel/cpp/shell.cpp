@@ -4453,6 +4453,7 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
         if (!quick_boolean(0, first, rest, bop_parallel(), u, uh))
           return false;
       }
+      lap("pocket fuse");
       ShapeList a1, a2;
       a1.Append(solid);
       a2.Append(u);
@@ -4460,6 +4461,7 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
       HHist        dh;
       if (!quick_boolean(1, a1, a2, bop_parallel(), deep, dh))
         return false;
+      lap("pocket cut");
       open.Clear();
       Bnd_Box    next;
       const bool every = std::all_of(used.begin(), used.end(), [](bool b) { return b; });
@@ -4494,7 +4496,7 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
       next.Enlarge(1e-6 * (1 + t));
       reach = next;
     }
-    lap("pocket");
+    lap("pocket regions");
     ShapeList a1;
     a1.Append(solid);
     TopoDS_Shape cut;
@@ -4503,6 +4505,7 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
       return false;
     r  = cut;
     hb = ch;
+    lap("pocket out");
   }
   else if (tools.Extent() == 1)
     union_ = tools.First();
