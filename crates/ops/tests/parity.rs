@@ -16,6 +16,8 @@ fn scratch(name: &str) -> PathBuf {
 struct ModelResult {
     name: String,
     features: usize,
+    /// Features with a live.jsonl line.
+    compared: usize,
     matching: usize,
     first: Option<String>,
     untranslated: Vec<String>,
@@ -25,7 +27,7 @@ struct ModelResult {
 fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelResult {
     let mut ctx = Ctx::new();
     let path = scratch(&format!("{name}.noshape"));
-    let mut res = ModelResult { name: name.to_string(), features: 0, matching: 0, first: None, untranslated: Vec::new() };
+    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, untranslated: Vec::new() };
     let mut t = match Translator::open(&mut ctx, &path, features, parse_refs(refs)) {
         Ok(t) => t,
         Err(e) => {
@@ -34,15 +36,15 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         }
     };
     res.features = t.len();
+    res.untranslated.extend(t.notes.iter().map(|n| format!("document: {n}")));
     for k in 0..t.len() {
         let step = t.step(k);
         for p in &step.problems {
             res.untranslated.push(format!("{} ({}): {p}", step.name, step.feature_type));
         }
-        let Some(line) = live.iter().find(|l| l["index"].as_u64() == Some(k as u64)) else {
-            res.first.get_or_insert_with(|| format!("{}: no live.jsonl line {k}", step.name));
-            continue;
-        };
+        // Not compared where live has no line (a dump of the end state only).
+        let Some(line) = live.iter().find(|l| l["index"].as_u64() == Some(k as u64)) else { continue };
+        res.compared += 1;
         let mut diff = Vec::new();
         let live_status = line["status"].as_str().unwrap_or("OK").to_uppercase();
         let ours = step.status.clone().unwrap_or_else(|| "not built".into()).to_uppercase();
@@ -96,16 +98,16 @@ fn parity_models() {
             continue;
         };
         let r = run_model(&name, &features, &live, &refs);
-        println!("{}: {}/{} features match{}", r.name, r.matching, r.features, r.first.as_ref().map(|f| format!("; first difference: {f}")).unwrap_or_else(|| "; matches to the end".into()));
+        println!("{}: {}/{} features match ({} of {} compared){}", r.name, r.matching, r.compared, r.compared, r.features, r.first.as_ref().map(|f| format!("; first difference: {f}")).unwrap_or_else(|| "; matches to the end".into()));
         for u in &r.untranslated {
             println!("  untranslated: {u}");
         }
         results.push(r);
     }
-    let docs = results.iter().filter(|r| r.first.is_none() && r.features > 0).count();
-    let (matching, total) = results.iter().fold((0, 0), |(m, t), r| (m + r.matching, t + r.features));
+    let docs = results.iter().filter(|r| r.first.is_none() && r.compared > 0).count();
+    let (matching, total) = results.iter().fold((0, 0), |(m, t), r| (m + r.matching, t + r.compared));
     println!("parity_models score: {docs}/{} documents match to the end, {matching}/{total} features match", results.len());
-    let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "matching": r.matching, "first_difference": r.first, "untranslated": r.untranslated })).collect();
+    let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "compared": r.compared, "matching": r.matching, "first_difference": r.first, "untranslated": r.untranslated })).collect();
     let _ = std::fs::write(root.with_file_name("report.json"), serde_json::to_string_pretty(&json!({ "documents_matching": docs, "documents": results.len(), "features_matching": matching, "features": total, "models": report })).unwrap());
     if std::env::var_os("NOSHAPE_PARITY_INDEX").is_some() {
         let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/parity-models/index.json");

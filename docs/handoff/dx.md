@@ -11,7 +11,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
-## 11-03 00:35 UTC: model parity suite (lead 11-02 23:35, top item; docs/PARITY-SUITES.md §1)
+## 11-02 23:35 UTC: model parity suite (lead 11-02 23:35, top item; docs/PARITY-SUITES.md §1)
 - Translator `crates/ops/src/parity.rs` (`Translator::open` / `step(k)`, through the ops registry): sketches
   (lines, arcs, circles, points at Onshape's solved positions, in Onshape's frame when `sketches` is given;
   dimensions with Onshape's expressions; other constraints left to inference and counted), features by FeatureScript
@@ -26,6 +26,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - File shapes asked of live (REQUESTS 11-02 23:55): features.json (+ configuration, variables, units, sketches),
   live.jsonl, source.json, refs.jsonl (geometry of every referenced id before its feature). GET /features and POST
   /featurescript are 429 for the account until ~04:45 UTC.
+- 11-03 00:10: configuration Variable inputs (#parameterId, default and range) built, configured parameters take the
+  default option, Revolve `revolveType` and Variable `value` upgraded as Onshape does, Onshape-internal parameters
+  (asVersion, defaultsChanged, computeTransformsWithoutBuiltin) skipped; features without a live.jsonl line are not
+  compared (end-state dumps). Model dirs from older dumps: sm-forms-v4 (end state from bodydetails / massproperties)
+  in /root/dx-scratch/pm/models: the runner compares them (custom `tag` feature: not P1).
 - Tried on 6 older feature dumps (/root/dx-scratch/pm/models, on vibe5 ~/agents/dx/pm-models): next in the translator:
   configuration inputs and variables (`#HeadHeight`), Onshape-internal parameters (asVersion, defaultsChanged),
   revolveType, constraints on external references (`externalSecond`), splines / ellipses, BTMParameterLookupTablePath

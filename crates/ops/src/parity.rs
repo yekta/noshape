@@ -51,6 +51,10 @@ pub struct Translator<'a> {
     /// Onshape sketch frames by feature id (`sketches` from `GET …/sketches`):
     /// origin, x, y in metres.
     frames: HashMap<String, [[f64; 3]; 3]>,
+    /// Configuration inputs' default options (`configuration` of features.json).
+    config_defaults: HashMap<String, String>,
+    /// What isn't translated of the document itself (configuration inputs…).
+    pub notes: Vec<String>,
 }
 
 fn f3(v: &Value) -> Option<[f64; 3]> {
@@ -88,10 +92,55 @@ impl<'a> Translator<'a> {
                 frames.insert(id.to_string(), [[m[3], m[7], m[11]], [m[0], m[4], m[8]], [m[1], m[5], m[9]]]);
             }
         }
+        let config_defaults = doc["configuration"]["configurationParameters"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
+            .collect();
         let _ = std::fs::remove_file(path);
-        let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), frames };
+        let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), frames, config_defaults, notes: Vec::new() };
         t.call("document_create", json!({ "path": path.to_str().ok_or("path")? }))?;
+        for c in doc["configuration"]["configurationParameters"].as_array().into_iter().flatten() {
+            t.config_input(c);
+        }
         Ok(t)
+    }
+
+    /// A configuration input. Variables (#parameterId) as Variable inputs
+    /// with their default and range; Lists and Checkboxes only through the
+    /// default option their configured parameters take.
+    fn config_input(&mut self, c: &Value) {
+        let id = c["parameterId"].as_str().unwrap_or("");
+        let ty = c["btType"].as_str().unwrap_or("");
+        if !ty.starts_with("BTMConfigurationParameterQuantity") {
+            let kind = ty.trim_start_matches("BTMConfigurationParameter").split('-').next().unwrap_or(ty);
+            self.notes.push(format!("configuration input {id} ({kind}): only its default is built"));
+            return;
+        }
+        let r = &c["rangeAndDefault"];
+        let unit = match r["units"].as_str().unwrap_or("") {
+            "millimeter" => "mm",
+            "centimeter" => "cm",
+            "meter" => "m",
+            "inch" => "in",
+            "foot" => "ft",
+            "yard" => "yd",
+            "degree" => "deg",
+            "radian" => "rad",
+            _ => "",
+        };
+        let q = |v: &Value| v.as_f64().map(|x| format!("{x} {unit}").trim().to_string());
+        let mut args = json!({ "kind": "variable", "name": id, "variable_kind": c["quantityType"].as_str().unwrap_or("LENGTH") });
+        if let Some(v) = q(&r["defaultValue"]) {
+            args["value"] = json!(v);
+        }
+        if let (Some(lo), Some(hi)) = (q(&r["minValue"]), q(&r["maxValue"])) {
+            args["range"] = json!([lo, hi]);
+        }
+        if let Err(e) = self.call("config_add_input", args) {
+            self.notes.push(format!("configuration variable {id}: {e}"));
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -139,15 +188,23 @@ impl<'a> Translator<'a> {
         let mut unknown = Vec::new();
         for p in f["parameters"].as_array().into_iter().flatten() {
             let Some(id) = p["parameterId"].as_str() else { continue };
+            if INTERNAL.contains(&id) {
+                continue;
+            }
             match self.param(k, p) {
                 Ok(None) => {}
-                Ok(Some(_)) if !known.iter().any(|n| n == id) => unknown.push(id.to_string()),
+                Ok(Some(v)) if !known.iter().any(|n| n == id) => {
+                    // Kept for `upgrade`, which maps older ids onto ours.
+                    params.insert(id.to_string(), v);
+                    unknown.push(id.to_string());
+                }
                 Ok(Some(v)) => {
                     params.insert(id.to_string(), v);
                 }
                 Err(e) => problems.push(format!("{id}: {e}")),
             }
         }
+        upgrade(ty, &mut params, &mut unknown);
         if !unknown.is_empty() {
             problems.push(format!("parameters not in noshape's {ty}: {}", unknown.join(", ")));
         }
@@ -201,6 +258,14 @@ impl<'a> Translator<'a> {
                     items.push(Value::Object(m));
                 }
                 Some(json!(items))
+            }
+            // A configured parameter: the default configuration's value
+            // (configurations themselves aren't translated yet).
+            "BTMParameterConfigured" => {
+                let values = p["values"].as_array().ok_or("configured parameter without values")?;
+                let want = p["configurationParameterId"].as_str().and_then(|c| self.config_defaults.get(c)).map(String::as_str).unwrap_or("Default");
+                let default = values.iter().find(|v| v["enumValue"] == want).or_else(|| values.first()).ok_or("configured parameter without values")?;
+                return self.param(k, &default["value"]);
             }
             "BTMParameterFeatureList" => {
                 let ids: Vec<String> = p["featureIds"].as_array().into_iter().flatten().filter_map(Value::as_str).map(|id| self.feature_ids.get(id).map(|o| format!("feature:{o}")).ok_or_else(|| format!("feature {id} was not built"))).collect::<Result<_, _>>()?;
@@ -407,7 +472,17 @@ impl<'a> Translator<'a> {
             let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).cloned();
             let value = ["length", "angle"].iter().find_map(|n| par(n)).and_then(|p| p["expression"].as_str().map(str::to_string));
             let mut entities = Vec::new();
-            for n in ["localFirst", "localSecond", "localEntity1", "localEntity2"] {
+            for n in ["localFirst", "externalFirst", "localSecond", "externalSecond", "localEntity1", "localEntity2"] {
+                if n.starts_with("external") {
+                    let Some(ext) = par(n) else { continue };
+                    let text: String = ext["queries"].as_array().into_iter().flatten().filter_map(|q| q["queryString"].as_str()).collect();
+                    if text.contains("Origin") || text.contains("originOp") {
+                        entities.push("origin".to_string());
+                    } else {
+                        problems.push(format!("{ty} dimension: external reference not translated ({})", text.chars().take(60).collect::<String>()));
+                    }
+                    continue;
+                }
                 if let Some(v) = par(n).and_then(|p| p["value"].as_str().map(str::to_string)).filter(|v| !v.is_empty()) {
                     match self.sketch_entities.get(&(oid.to_string(), v.clone())) {
                         Some(e) => entities.push(e.clone()),
@@ -429,6 +504,47 @@ impl<'a> Translator<'a> {
         if others > 0 {
             problems.push(format!("{others} geometric constraints left to inference (geometry at Onshape's solved positions)"));
         }
+    }
+}
+
+/// Onshape's own bookkeeping, not dialog parameters: the FeatureScript
+/// version a feature was made with, the Fillet dialog's "defaults changed"
+/// flag, a pattern's internal switch.
+const INTERNAL: [&str; 3] = ["asVersion", "defaultsChanged", "computeTransformsWithoutBuiltin"];
+
+/// Older features' parameters as today's std (and ours) has them, as
+/// Onshape upgrades them: Revolve's `revolveType`, a Variable's `value`.
+fn upgrade(ty: &str, params: &mut Map<String, Value>, unknown: &mut Vec<String>) {
+    let mut done = |id: &str, params: &mut Map<String, Value>| {
+        unknown.retain(|u| u != id);
+        params.remove(id)
+    };
+    match ty {
+        "revolve" => {
+            if let Some(t) = done("revolveType", params) {
+                let t = t.as_str().unwrap_or("FULL");
+                params.insert("fullRevolve".into(), json!(t == "FULL"));
+                params.insert("symmetric".into(), json!(t == "SYMMETRIC"));
+                if t == "TWO_DIRECTIONS" {
+                    params.insert("hasStartBound".into(), json!(true));
+                }
+            }
+        }
+        "assignVariable" => {
+            if let Some(v) = done("value", params) {
+                let key = match params.get("variableType").and_then(Value::as_str) {
+                    Some("ANGLE") => "angleValue",
+                    Some("NUMBER") => "numberValue",
+                    Some("ANY") => "anyValue",
+                    _ => "lengthValue",
+                };
+                params.insert(key.into(), v);
+            }
+        }
+        _ => {}
+    }
+    for u in unknown.iter() {
+        params.remove(u);
     }
 }
 
