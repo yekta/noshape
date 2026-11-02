@@ -1,0 +1,623 @@
+{
+ "note": "Live 2026-11-02, Part Studio \"skasm probes 8\" in \"skasm speed\". Each profile POSTed as is on Top (e1, e2, e4, e5, e6: nothing moved on posting; e3 moved: its top segment l5 is posted 8 mm long but dimensioned 22, so the inner corner went from x 8 to x 22). Then in the UI sketch editor: double-click the dimension label, type the value, Enter, \u2713 (e5/e6: the posted RADIUS had no label placement and showed no label, so labelRatio 1.5 / labelAngle \u00b145\u00b0 were added to it first; geometry unchanged). points = after posting (solved); edit.after = /sketches geometry after \u2713.",
+ "cases": {
+  "e1": {
+   "points": {
+    "l1.end": [
+     50.0,
+     10.0
+    ],
+    "l1.start": [
+     10.0,
+     10.0
+    ],
+    "l2.end": [
+     50.0,
+     30.0
+    ],
+    "l2.start": [
+     50.0,
+     10.0
+    ],
+    "l3.end": [
+     10.0,
+     30.0
+    ],
+    "l3.start": [
+     50.0,
+     30.0
+    ],
+    "l4.end": [
+     10.0,
+     10.0
+    ],
+    "l4.start": [
+     10.0,
+     30.0
+    ]
+   },
+   "moved_on_post": 0.0,
+   "edit": {
+    "constraint": "k10",
+    "value_mm": 50.0,
+    "after": {
+     "l1.start": [
+      10.0,
+      10.0
+     ],
+     "l1.end": [
+      60.0,
+      10.0
+     ],
+     "l2.start": [
+      60.0,
+      10.0
+     ],
+     "l2.end": [
+      60.0,
+      30.0
+     ],
+     "l3.start": [
+      60.0,
+      30.0
+     ],
+     "l3.end": [
+      10.0,
+      30.0
+     ],
+     "l4.start": [
+      10.0,
+      30.0
+     ],
+     "l4.end": [
+      10.0,
+      10.0
+     ]
+    }
+   }
+  },
+  "e2": {
+   "points": {
+    "l1.end": [
+     50.0,
+     10.0
+    ],
+    "l1.start": [
+     10.0,
+     10.0
+    ],
+    "l2.end": [
+     50.0,
+     30.0
+    ],
+    "l2.start": [
+     50.0,
+     10.0
+    ],
+    "l3.end": [
+     10.0,
+     30.0
+    ],
+    "l3.start": [
+     50.0,
+     30.0
+    ],
+    "l4.end": [
+     10.0,
+     10.0
+    ],
+    "l4.start": [
+     10.0,
+     30.0
+    ]
+   },
+   "moved_on_post": 0.0,
+   "edit": {
+    "constraint": "k10",
+    "value_mm": 30.0,
+    "after": {
+     "l1.start": [
+      10.0,
+      10.0
+     ],
+     "l1.end": [
+      50.0,
+      10.0
+     ],
+     "l2.start": [
+      50.0,
+      10.0
+     ],
+     "l2.end": [
+      50.0,
+      40.0
+     ],
+     "l3.start": [
+      50.0,
+      40.0
+     ],
+     "l3.end": [
+      10.0,
+      40.0
+     ],
+     "l4.start": [
+      10.0,
+      40.0
+     ],
+     "l4.end": [
+      10.0,
+      10.0
+     ]
+    }
+   }
+  },
+  "e3": {
+   "points": {
+    "l1.end": [
+     40.0,
+     0.0
+    ],
+    "l1.start": [
+     0.0,
+     0.0
+    ],
+    "l2.end": [
+     40.0,
+     8.0
+    ],
+    "l2.start": [
+     40.0,
+     0.0
+    ],
+    "l3.end": [
+     22.0,
+     8.0
+    ],
+    "l3.start": [
+     40.0,
+     8.0
+    ],
+    "l4.end": [
+     22.0,
+     30.0
+    ],
+    "l4.start": [
+     22.0,
+     8.0
+    ],
+    "l5.end": [
+     0.0,
+     30.0
+    ],
+    "l5.start": [
+     22.0,
+     30.0
+    ],
+    "l6.end": [
+     0.0,
+     0.0
+    ],
+    "l6.start": [
+     0.0,
+     30.0
+    ]
+   },
+   "moved_on_post": 14.0,
+   "edit": {
+    "constraint": "k16",
+    "value_mm": 50.0,
+    "after": {
+     "l1.start": [
+      0.0,
+      0.0
+     ],
+     "l1.end": [
+      50.0,
+      0.0
+     ],
+     "l2.start": [
+      50.0,
+      0.0
+     ],
+     "l2.end": [
+      50.0,
+      8.0
+     ],
+     "l3.start": [
+      50.0,
+      8.0
+     ],
+     "l3.end": [
+      22.0,
+      8.0
+     ],
+     "l4.start": [
+      22.0,
+      8.0
+     ],
+     "l4.end": [
+      22.0,
+      30.0
+     ],
+     "l5.start": [
+      22.0,
+      30.0
+     ],
+     "l5.end": [
+      0.0,
+      30.0
+     ],
+     "l6.start": [
+      0.0,
+      30.0
+     ],
+     "l6.end": [
+      0.0,
+      0.0
+     ]
+    }
+   }
+  },
+  "e4": {
+   "points": {
+    "l1.end": [
+     30.0,
+     -6.0
+    ],
+    "l1.start": [
+     0.0,
+     -6.0
+    ],
+    "a2.center": [
+     30.0,
+     0.0
+    ],
+    "a2.end": [
+     30.0,
+     6.0
+    ],
+    "a2.start": [
+     30.0,
+     -6.0
+    ],
+    "l3.end": [
+     0.0,
+     6.0
+    ],
+    "l3.start": [
+     30.0,
+     6.0
+    ],
+    "a4.center": [
+     0.0,
+     0.0
+    ],
+    "a4.end": [
+     0.0,
+     -6.0
+    ],
+    "a4.start": [
+     0.0,
+     6.0
+    ]
+   },
+   "moved_on_post": 0.0,
+   "edit": {
+    "constraint": "k12",
+    "value_mm": 40.0,
+    "after": {
+     "l1.start": [
+      0.0,
+      -6.0
+     ],
+     "l1.end": [
+      40.0,
+      -6.0
+     ],
+     "a2.center": [
+      40.0,
+      0.0
+     ],
+     "a2.radius": 6.0,
+     "a2.start": [
+      40.0,
+      -6.0
+     ],
+     "a2.end": [
+      40.0,
+      6.0
+     ],
+     "l3.start": [
+      40.0,
+      6.0
+     ],
+     "l3.end": [
+      0.0,
+      6.0
+     ],
+     "a4.center": [
+      0,
+      0
+     ],
+     "a4.radius": 6.0,
+     "a4.start": [
+      0.0,
+      6.0
+     ],
+     "a4.end": [
+      0.0,
+      -6.0
+     ]
+    }
+   }
+  },
+  "e5": {
+   "points": {
+    "l1.end": [
+     30.0,
+     -6.0
+    ],
+    "l1.start": [
+     0.0,
+     -6.0
+    ],
+    "a2.center": [
+     30.0,
+     0.0
+    ],
+    "a2.end": [
+     30.0,
+     6.0
+    ],
+    "a2.start": [
+     30.0,
+     -6.0
+    ],
+    "l3.end": [
+     0.0,
+     6.0
+    ],
+    "l3.start": [
+     30.0,
+     6.0
+    ],
+    "a4.center": [
+     0.0,
+     0.0
+    ],
+    "a4.end": [
+     0.0,
+     -6.0
+    ],
+    "a4.start": [
+     0.0,
+     6.0
+    ]
+   },
+   "moved_on_post": 0.0,
+   "edit": {
+    "constraint": "k12",
+    "value_mm": 8.0,
+    "after": {
+     "l1.start": [
+      0.0,
+      -10.0
+     ],
+     "l1.end": [
+      30.0,
+      -10.0
+     ],
+     "a2.center": [
+      30.0,
+      -2.0
+     ],
+     "a2.radius": 8.0,
+     "a2.start": [
+      30.0,
+      -10.0
+     ],
+     "a2.end": [
+      30.0,
+      6.0
+     ],
+     "l3.start": [
+      30.0,
+      6.0
+     ],
+     "l3.end": [
+      0.0,
+      6.0
+     ],
+     "a4.center": [
+      0.0,
+      -2.0
+     ],
+     "a4.radius": 8.0,
+     "a4.start": [
+      0.0,
+      6.0
+     ],
+     "a4.end": [
+      0.0,
+      -10.0
+     ]
+    }
+   }
+  },
+  "e6": {
+   "points": {
+    "l1.end": [
+     46.0,
+     10.0
+    ],
+    "l1.start": [
+     14.0,
+     10.0
+    ],
+    "a2.center": [
+     46.0,
+     14.0
+    ],
+    "a2.end": [
+     50.0,
+     14.0
+    ],
+    "a2.start": [
+     46.0,
+     10.0
+    ],
+    "l3.end": [
+     50.0,
+     26.0
+    ],
+    "l3.start": [
+     50.0,
+     14.0
+    ],
+    "a4.center": [
+     46.0,
+     26.0
+    ],
+    "a4.end": [
+     46.0,
+     30.0
+    ],
+    "a4.start": [
+     50.0,
+     26.0
+    ],
+    "l5.end": [
+     14.0,
+     30.0
+    ],
+    "l5.start": [
+     46.0,
+     30.0
+    ],
+    "a6.center": [
+     14.0,
+     26.0
+    ],
+    "a6.end": [
+     10.0,
+     26.0
+    ],
+    "a6.start": [
+     14.0,
+     30.0
+    ],
+    "l7.end": [
+     10.0,
+     14.0
+    ],
+    "l7.start": [
+     10.0,
+     26.0
+    ],
+    "a8.center": [
+     14.0,
+     14.0
+    ],
+    "a8.end": [
+     14.0,
+     10.0
+    ],
+    "a8.start": [
+     10.0,
+     14.0
+    ]
+   },
+   "moved_on_post": 0.0,
+   "edit": {
+    "constraint": "k25",
+    "value_mm": 6.0,
+    "after": {
+     "l1.start": [
+      16.0,
+      8.0
+     ],
+     "l1.end": [
+      48.0,
+      8.0
+     ],
+     "a2.center": [
+      48.0,
+      14.0
+     ],
+     "a2.radius": 6.0,
+     "a2.start": [
+      48.0,
+      8.0
+     ],
+     "a2.end": [
+      54.0,
+      14.0
+     ],
+     "l3.start": [
+      54.0,
+      14.0
+     ],
+     "l3.end": [
+      54.0,
+      26.0
+     ],
+     "a4.center": [
+      48.0,
+      26.0
+     ],
+     "a4.radius": 6.0,
+     "a4.start": [
+      54.0,
+      26.0
+     ],
+     "a4.end": [
+      48.0,
+      32.0
+     ],
+     "l5.start": [
+      48.0,
+      32.0
+     ],
+     "l5.end": [
+      16.0,
+      32.0
+     ],
+     "a6.center": [
+      16.0,
+      26.0
+     ],
+     "a6.radius": 6.0,
+     "a6.start": [
+      16.0,
+      32.0
+     ],
+     "a6.end": [
+      10.0,
+      26.0
+     ],
+     "l7.start": [
+      10.0,
+      26.0
+     ],
+     "l7.end": [
+      10.0,
+      14.0
+     ],
+     "a8.center": [
+      16.0,
+      14.0
+     ],
+     "a8.radius": 6.0,
+     "a8.start": [
+      10.0,
+      14.0
+     ],
+     "a8.end": [
+      16.0,
+      8.0
+     ]
+    }
+   }
+  }
+ }
+}

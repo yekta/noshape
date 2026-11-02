@@ -1120,11 +1120,10 @@ impl Sketch {
     }
 
     /// Options for solving after dimension `cid` got a new value in the
-    /// editor: the geometry that takes the change (`SolveOptions::light`).
-    /// Not live's least-change placement (`constructive`): an edit in the
-    /// editor grows a lone line about its midpoint, whichever way it was
-    /// drawn (live 1775), where a posted or regenerated sketch keeps its
-    /// lower end (the regeneration turns `constructive` on).
+    /// editor: live's least-change placement (`constructive`: with other
+    /// dimensions the far side takes all of it, live probes 8 e1–e6), after
+    /// [`Sketch::scale_for_edit`] scaled a free profile (live 1775 / 1785);
+    /// or the geometry that takes the change (`SolveOptions::light`).
     ///
     /// A fillet arc's radius (Onshape, qa5 SK5: 30.089 × 22.065 rectangle,
     /// top-right R5 → R3 gives 28.089 × 22.065): the arc keeps its end point
@@ -1132,7 +1131,7 @@ impl Sketch {
     /// length; the line at the arc's start moves with it, along with points
     /// on it (the virtual sharp).
     pub fn dimension_edit_options(&self, cid: ConstraintId) -> SolveOptions {
-        let mut opts = SolveOptions { allow_collapse: true, ..Default::default() };
+        let mut opts = SolveOptions { allow_collapse: true, constructive: true, ..Default::default() };
         let Some(c) = self.constraint(cid) else { return opts };
         let (ConstraintKind::Radius { curve, .. } | ConstraintKind::Diameter { curve, .. }) = c.kind else { return opts };
         let Some(Geometry::Arc { start, end, .. }) = self.entity(curve).map(|e| &e.geometry) else { return opts };

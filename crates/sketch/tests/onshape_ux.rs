@@ -504,3 +504,28 @@ fn corner_rectangle_width_edit_keeps_its_height() {
         }
     }
 }
+
+#[test]
+fn width_edit_with_other_dimensions_moves_the_far_side() {
+    // Live probes 8 e1: a rectangle with width and height dimensioned isn't
+    // scaled; the width typed anew in the editor moves its right side only.
+    let mut sk = Sketch::new();
+    let p = [v(10.0, 10.0), v(50.0, 10.0), v(50.0, 30.0), v(10.0, 30.0)];
+    let pts: Vec<EntityId> = p.iter().map(|x| sk.add_point(*x)).collect();
+    let l: Vec<EntityId> = (0..4).map(|i| sk.add_line_between(pts[i], pts[(i + 1) % 4]).unwrap()).collect();
+    for (i, x) in l.iter().enumerate() {
+        let k = if i % 2 == 0 { ConstraintKind::Horizontal { a: *x, b: None } } else { ConstraintKind::Vertical { a: *x, b: None } };
+        sk.add_constraint(k).unwrap();
+    }
+    sk.add_constraint(ConstraintKind::Length { curve: l[1], value: 20.0 }).unwrap();
+    let d = sk.add_constraint(ConstraintKind::Length { curve: l[0], value: 40.0 }).unwrap();
+    assert!(sk.solve().is_solved());
+    sk.set_dimension_value(d, 50.0).unwrap();
+    assert!(!sk.scale_for_edit(d), "another dimension: no scaling");
+    assert!(sk.solve_with(&sk.dimension_edit_options(d)).is_solved());
+    let at: Vec<DVec2> = pts.iter().map(|x| sk.point(*x).unwrap()).collect();
+    let want = [v(10.0, 10.0), v(60.0, 10.0), v(60.0, 30.0), v(10.0, 30.0)];
+    for (a, b) in at.iter().zip(want) {
+        assert!((*a - b).length() < 1e-6, "{at:?}");
+    }
+}
