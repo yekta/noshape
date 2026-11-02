@@ -675,6 +675,14 @@ arcs); `lower_shared` prefers a neighbour without its own H / V (a slot keeps it
 bottom). Now batch 4: 39/40 on positions (s303 left; s326 / s332 / s340 curve colours only), batch 5: 39/40 (s354
 left), batches 1–5 1315 mm (1829 this morning on 1–3 alone, which are now ~1100). Asm batch 3 (f51–f80) is with
 live. Next: s303 / s354, then batches 1–3's s6 (170), s226 (94), s218 (90), s236 (81), s102 (79).
+15:55: asm batch 3 (f51–f80) answered: 23/30 on the first try (batch 2: 27/30, batch 1: 15/20). Landed (queued
+a4b7006a): an exact flip treats a part held only by a Ball, or by a Fastened to a part nothing else holds, as free to
+turn (f53's false "overdefines" gone). Known, asked live (asm probes 3): which mates of a conflicting loop read red (f80
+spares a Fastened, f79 flags its Fastened mates: a "Fastened that held before stays OK" rule broke f62 / f79, dropped),
+f69 "not consistent" on a Parallel, f53's half-turn axis with both parts held, f52 / f55 / f64 free poses. Sent UI edit
+probes 8 (editor edits on dimensioned profiles). Tried and dropped for s303 / s354 (slot with a new centre distance
+AND radius: live keeps the left arc's centre x and the free top): forcing the kept-but-resized arc to be placed next
+(with and without a hold-one-neighbour shape-3 step) made both worse.
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
