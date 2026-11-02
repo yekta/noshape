@@ -171,8 +171,8 @@ ON_Brep* to_brep(const TopoDS_Shape& in, bool split_closed = false)
   catch (const Standard_Failure&)
   {
     // A healed import's p-curve not covering its edge (NIST's cap screws):
-    // repaired (on a copy), then converted.
-    ShapeFix_Shape fix(BRepBuilderAPI_Copy(split, true, false).Shape());
+    // repaired, then converted (on a copy unless the split made one, as PVZ).
+    ShapeFix_Shape fix(split_closed ? split : BRepBuilderAPI_Copy(split, true, false).Shape());
     fix.Perform();
     BRepBuilderAPI_NurbsConvert conv(fix.Shape(), true);
     if (!conv.IsDone())

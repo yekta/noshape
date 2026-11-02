@@ -86,9 +86,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
     Checked with and without openNURBS.
 - Every export format on imported NIST parts (formats.md "Exporting imported geometry"):
   - fixed: the Parasolid writer's crash on the cap screws and PVZ's throws;
-  - Rhino now writes 6 of 8;
-  - left: the two cap screws, where OCCT's NurbsConvert throws in `EvalAndUpdateTol` even after `ShapeFix_Shape`.
-    PVZ's same fallback works on them, so compare its order of steps first.
+  - Rhino now writes all 8. The cap screws needed the repair applied to the split copy itself (as PVZ does), not
+    to another copy.
 - To psui: NIST's regeneration after import is 1.7 s, of which the features are 0.12 s and the rest is display
   meshing, mostly the two cap screws' thread faces (B-spline surfaces with dense pcurves).
 

@@ -1187,8 +1187,8 @@ fn parasolid_writes_an_imported_thread() {
 /// read back. Rhino (7 of 8 parts failed openNURBS' check): trims a period
 /// apart on closed surfaces are shifted to meet, trim ends matched, seam
 /// trims put on the domain's edge, and a part still failing is converted
-/// again with every closed face split; all but the two cap screws now pass
-/// (they still fail with an error, never a wrong solid). PVZ: a healed edge's range
+/// again with every closed face split (repaired first where OCCT's NURBS
+/// conversion throws, as PVZ): all 8 write, at their volumes. PVZ: a healed edge's range
 /// past its curve's ends is trimmed to it, and a shape OCCT's NURBS
 /// conversion throws on is repaired first (the screws threw).
 #[test]
@@ -1234,9 +1234,8 @@ fn imported_nist_parts_write_to_rhino_and_pvz() {
     if !rhino_built {
         return;
     }
-    for n in ["nist_mtc_crada_box_rev-D-1", "nist_mtc_crada_plate_rev-A-1", "nist_mtc_crada_cover_rev-B-1", "nist_mtc_crada_polycarb-window-1", "90591A141_ZINC PLATED STEEL HEX NUT-1", "SOLID"] {
-        assert!(rhino_ok.iter().any(|r| r == n), "{n} to Rhino: {rhino_ok:?}");
-    }
+    let solids = parts.iter().filter(|p| p.shape.count(ShapeType::Face) > 0).count();
+    assert_eq!(rhino_ok.len(), solids, "every part to Rhino: {rhino_ok:?}");
 }
 
 /// Live's smooth twisted vase loft (Parasolid from live, XT-PERIODIC-SPLINE-FACE):
