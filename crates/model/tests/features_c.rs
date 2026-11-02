@@ -1308,6 +1308,52 @@ fn flat_spiral_planes_and_ruled_overrides() {
     assert!(has(DVec3::new(0.0, 0.0, mm(35.0))), "other end rules along Z");
 }
 
+/// Ruled surface's top-level manipulators as std's addTopLevelManipulator (audit-part-studio M12): along Top from
+/// the block's front top edge, its far end overridden: the distance arrow at the free end, up Z, 10 mm; a drag to
+/// -20 mm runs std's change function (20 mm, opposite); Angle from vector adds the angle arc about the edge.
+#[test]
+fn ruled_surface_manipulators_as_std() {
+    use noshape_model::display::FeatureManipulator as M;
+    let mut s = block();
+    let r = s.ok();
+    let edge = edge_mid(&r, DVec3::new(mm(50.0), 0.0, mm(25.0)));
+    let v = vertex_near(&r, DVec3::new(mm(100.0), 0.0, mm(25.0)));
+    let mut item = ParamValues::default();
+    item.set("vertex", q(v));
+    item.set("overrideType", en("ALIGNED_WITH_VECTOR"));
+    item.set("axisOverride", q(Reference::Plane(DatumPlane::Right)));
+    item.set("distanceOverride", expr("10 mm"));
+    let ruled = s.add("ruledSurface", move |p| {
+        p.set("edges", q(edge));
+        p.set("ruledType", en("ALIGNED_WITH_VECTOR"));
+        p.set("axis", q(Reference::Plane(DatumPlane::Top)));
+        p.set("distance", expr("10 mm"));
+        p.set("vertexOverrides", ParamValue::Array(vec![item]));
+    });
+    let r = s.ok();
+    let state = r.display.feature_state(ruled).expect("state");
+    let [(key, M::Linear { base, direction, offset, .. })] = state.manipulators.as_slice() else { panic!("{:?}", state.manipulators) };
+    assert_eq!(key, "depthManipulator.T.-1");
+    assert!((*base - DVec3::new(0.0, 0.0, mm(25.0))).length() < 1e-9 && direction.z > 0.999 && (offset - mm(10.0)).abs() < 1e-12, "{:?}", state.manipulators);
+    let mut moved = state.manipulators[0].1.clone();
+    if let M::Linear { offset, .. } = &mut moved {
+        *offset = mm(-20.0);
+    }
+    let f = s.ps.features.iter().find(|f| f.id == ruled).unwrap().clone();
+    let before = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions { upto: Some(s.ps.features.len() - 1), ..Default::default() }).context;
+    let changed = noshape_model::custom::std_feature::manipulator_change_in((*before).clone(), "ruledSurface", f.id, &f.name, &s.units, &f.params, key, &moved).expect("std's change function ran");
+    assert_eq!(changed.get("oppositeDirection"), Some(&ParamValue::Bool(true)), "{changed:?}");
+    let d = noshape_model::regen::eval::EvalCtx::new(f.id, "", &changed, &s.units, (*before).clone(), &std::collections::BTreeMap::new()).length("distance").unwrap();
+    assert!((d - mm(20.0)).abs() < 1e-9, "distance {d}");
+    let p = &mut s.ps.features.iter_mut().find(|f| f.id == ruled).unwrap().params;
+    p.set("ruledType", en("ANGLE_FROM_VECTOR"));
+    p.set("angleFromVector", expr("30 deg"));
+    let r = s.ok();
+    let m = &r.display.feature_state(ruled).expect("state").manipulators;
+    let Some((_, M::Angular { axis_direction, angle, .. })) = m.iter().find(|(k, _)| k == "angleManipulator.T.-1") else { panic!("{m:?}") };
+    assert!(axis_direction.x.abs() > 0.999 && (angle - 30f64.to_radians()).abs() < 1e-9, "{m:?}");
+}
+
 /// qa5 SK1: a sketch whose dimensions can't all be met is in error (live:
 /// its title and feature row red), keeping its last solved shape.
 #[test]
@@ -3006,6 +3052,39 @@ fn helix_turns_and_pitch_flip_as_std() {
     let m = noshape_model::interaction::helix_manipulators(&r.context, &params, &s.units, &vars);
     let [(_, M::Flip { base, direction, flipped, .. })] = m.as_slice() else { panic!("{m:?}") };
     assert!((*base - DVec3::new(0.0, 0.0, mm(-20.0))).length() < 1e-9 && direction.z > 0.999 && *flipped, "{m:?}");
+}
+
+/// Fit spline's magnitude arrows as std's addFitSplineManipulators (audit-part-studio M12): through (0, 0), (20, 10)
+/// and (40, 0) mm on Top with the start along a line up +Y, one arrow at the first point along it, its offset the
+/// magnitude times the points' box diagonal / 3; dragging it to twice that runs std's change function: magnitude 2.
+#[test]
+fn fit_spline_magnitude_arrow_as_std() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts = [DVec2::new(0.0, 0.0), DVec2::new(0.02, 0.01), DVec2::new(0.04, 0.0)].map(|p| sk.add_point(p));
+    let up = sk.add_line(DVec2::new(-0.01, -0.01), DVec2::new(-0.01, 0.0)).0;
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let se = |e: u32| Reference::SketchEntity { sketch: sid, entity: e };
+    let fit = s.add("fitSpline", |p| {
+        p.set("vertices", ParamValue::Query(pts.iter().map(|p| se(p.0)).collect()));
+        p.set("startDirection", q(se(up)));
+    });
+    let r = s.ok();
+    let state = r.display.feature_state(fit).expect("state");
+    use noshape_model::display::FeatureManipulator as M;
+    let [(key, M::Linear { base, direction, offset, .. })] = state.manipulators.as_slice() else { panic!("{:?}", state.manipulators) };
+    assert_eq!(key, "startManipulator");
+    let span = 0.04f64.hypot(0.01);
+    assert!(base.length() < 1e-9 && direction.y.abs() > 0.999 && (offset - span / 3.0).abs() < 1e-9, "{:?}", state.manipulators);
+    let mut moved = state.manipulators[0].1.clone();
+    if let M::Linear { offset, .. } = &mut moved {
+        *offset = 2.0 * span / 3.0;
+    }
+    let f = s.ps.features.iter().find(|f| f.id == fit).unwrap().clone();
+    let before = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions { upto: Some(s.ps.features.len() - 1), ..Default::default() }).context;
+    let changed = noshape_model::custom::std_feature::manipulator_change_in((*before).clone(), "fitSpline", f.id, &f.name, &s.units, &f.params, key, &moved).expect("std's change function ran");
+    let m = noshape_model::regen::eval::EvalCtx::new(f.id, "", &changed, &s.units, (*before).clone(), &std::collections::BTreeMap::new()).real("startMagnitude").unwrap();
+    assert!((m.abs() - 2.0).abs() < 1e-9, "startMagnitude {m}");
 }
 
 /// Move curve boundary's distance arrow (audit-part-studio M10; moveCurveBoundary.fs addExtendCurveManipulator):

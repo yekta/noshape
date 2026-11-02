@@ -704,16 +704,17 @@ pub fn ruled_surface(ev: &mut EvalCtx) -> FResult<()> {
             None
         };
         let centroid = face.as_ref().and_then(|f| f.centroid().ok());
-        let dir_at = |p: DVec3, t: DVec3| -> FResult<DVec3> {
+        // The ruling at a point and the direction its angle turns from (std's ruledDirection / baseDirection).
+        let dir_at = |p: DVec3, t: DVec3| -> FResult<(DVec3, DVec3)> {
             let t = t.normalize_or(DVec3::X);
-            let d = match ty.as_str() {
-                "ALIGNED_WITH_VECTOR" => vector.unwrap_or(DVec3::Z),
+            let (d, base) = match ty.as_str() {
+                "ALIGNED_WITH_VECTOR" => (vector.unwrap_or(DVec3::Z), vector.unwrap_or(DVec3::Z)),
                 "ANGLE_FROM_VECTOR" => {
                     let v = vector.unwrap_or(DVec3::Z);
                     let b = (v - t * t.dot(v)).normalize_or(t.any_orthonormal_vector());
                     // Rotate the base direction away from the vector by the angle.
                     let side = t.cross(b);
-                    b * angle.cos() + side * angle.sin()
+                    (b * angle.cos() + side * angle.sin(), b)
                 }
                 _ => {
                     let f = face.as_ref().ok_or_else(|| FeatureError::new("Missing reference face"))?;
@@ -729,10 +730,10 @@ pub fn ruled_surface(ev: &mut EvalCtx) -> FResult<()> {
                         }
                         s
                     };
-                    if angle != 0.0 { DQuat::from_axis_angle(t, angle) * base } else { base }
+                    (if angle != 0.0 { DQuat::from_axis_angle(t, angle) * base } else { base }, base)
                 }
             };
-            Ok(d.normalize())
+            Ok((d.normalize(), base.normalize()))
         };
         let info = e.edge_info()?;
         let n = 24;
@@ -741,8 +742,28 @@ pub fn ruled_surface(ev: &mut EvalCtx) -> FResult<()> {
         for i in 0..=n {
             let prm = info.first_param + (info.last_param - info.first_param) * i as f64 / n as f64;
             let p = e.point_at(prm)?;
-            dirs.push(dir_at(p, e.tangent_at(prm)?)?);
+            dirs.push(dir_at(p, e.tangent_at(prm)?)?.0);
             pts.push(p);
+        }
+        // std's top-level manipulators (addTopLevelManipulator): on the first edge's first end without a vertex
+        // override (a closed edge: its start), the distance along the ruling and, but for Aligned with vector, the
+        // angle about the edge's tangent.
+        if pieces.is_empty() {
+            let closed = (pts[0] - pts[n]).length() < 1e-9;
+            let free = [0, n].into_iter().take(if closed { 1 } else { 2 }).find(|&i| !overrides.iter().any(|(q, _)| (*q - pts[i]).length() < 1e-7));
+            if let Some(i) = free {
+                let t = e.tangent_at(if i == 0 { info.first_param } else { info.last_param })?.normalize_or(DVec3::X);
+                let (ruled, base) = dir_at(pts[i], t)?;
+                use crate::display::FeatureManipulator as M;
+                ev.manipulators.push(("depthManipulator.T.-1".into(), M::Linear { base: pts[i], direction: ruled, offset: dist, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: Some("distance".into()) }));
+                if ty != "ALIGNED_WITH_VECTOR" {
+                    let tau = std::f64::consts::TAU;
+                    // std keeps the sign: the angle modulo a turn, less a turn when negative.
+                    let a = angle.rem_euclid(tau) - if angle < 0.0 { tau } else { 0.0 };
+                    let primary = if ty == "ANGLE_FROM_VECTOR" { "angleFromVector" } else { "angle" };
+                    ev.manipulators.push(("angleManipulator.T.-1".into(), M::Angular { axis_origin: pts[i], axis_direction: t, rotation_origin: pts[i] + base * dist, angle: a, min: -tau, max: tau, secondary: false, primary: Some(primary.into()) }));
+                }
+            }
         }
         // Ruling vectors, with vertex overrides blended in from the edge ends.
         let mut vecs: Vec<DVec3> = dirs.iter().map(|d| *d * dist).collect();

@@ -297,22 +297,32 @@ pub fn fit_spline(ev: &mut EvalCtx) -> FResult<()> {
         }
         let mut tangents = Vec::new();
         if !closed {
-            let dir = |id: &str, mag: &str, flip: &str| -> FResult<Option<DVec3>> {
+            // The picked direction and the magnitude, negated by its flip (std).
+            let dir = |id: &str, mag: &str, flip: &str| -> FResult<Option<(DVec3, f64)>> {
                 let Some(r) = ev.query(id).first() else { return Ok(None) };
                 let d = ev.resolve_direction(r).ok_or_else(|| FeatureError::new("Could not evaluate the end direction"))?;
                 let m = ev.real(mag)?;
                 if m.abs() < 1e-12 {
                     return err("End magnitude can't be zero");
                 }
-                Ok(Some(d * m * if ev.bool(flip) { -1.0 } else { 1.0 }))
+                Ok(Some((d.normalize_or_zero(), m * if ev.bool(flip) { -1.0 } else { 1.0 })))
             };
             let s = dir("startDirection", "startMagnitude", "oppositeDirectionStart")?;
             let e = dir("endDirection", "endMagnitude", "oppositeDirectionEnd")?;
+            // std's addFitSplineManipulators: at each end with a direction, an arrow along the picked direction
+            // (back from the end) whose offset is the signed magnitude times the points' box diagonal / 3.
+            let (lo, hi) = pts.iter().fold((pts[0], pts[0]), |(lo, hi), p| (lo.min(*p), hi.max(*p)));
+            let span = (hi - lo).length();
+            for (key, end, at, back, primary) in [("startManipulator", s, pts[0], false, "startMagnitude"), ("endManipulator", e, pts[pts.len() - 1], true, "endMagnitude")] {
+                let Some((d, m)) = end else { continue };
+                let direction = if back { -d } else { d };
+                ev.manipulators.push((key.into(), crate::display::FeatureManipulator::Linear { base: at, direction, offset: m * span / 3.0, min: f64::NEG_INFINITY, max: f64::INFINITY, secondary: false, primary: Some(primary.into()) }));
+            }
             if s.is_some() || e.is_some() {
                 let mut t = vec![DVec3::ZERO; pts.len()];
-                t[0] = s.unwrap_or(DVec3::ZERO);
+                t[0] = s.map_or(DVec3::ZERO, |(d, m)| d * m);
                 if let Some(last) = t.last_mut() {
-                    *last = e.unwrap_or(DVec3::ZERO);
+                    *last = e.map_or(DVec3::ZERO, |(d, m)| d * m);
                 }
                 tangents = t;
             }
