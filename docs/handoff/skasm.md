@@ -543,6 +543,20 @@ kept, the lone line with a free end lengthened); a broken relation's kept member
 (s8: the dimensioned circle of a concentric pair moves onto the other); conics / splines are placed too, at their
 lowest point (s116). Left among the solved: s5, s6, s11, s14, s17, s102, s104, s115 (loops / tangent chains), the
 curve colours (live shows some lines black that ours calls under defined: s10 l1, s116 l2), the drags.
+11-02 12:30: s5 matches too (a line placed alone keeps its length and direction first: a side carried by a distance
+translates). Live's curve colours "fully" on dimensioned lines in an under-defined sketch (s5, s10, s116) look like the
+black dimension label at the sampled midpoint; asked live to re-sample. Open, with what they show:
+- s104 (a rectangle's diagonal dimensioned): live = minimum norm with the lower-left corner pinned (width and height
+  grow in proportion); ours keeps the whole "kept" side. Suggests the model is "pin the smaller anchor of each change,
+  then least change in line terms (start, direction, length)" rather than unit-by-unit placement;
+- s115 (a rectangle's bottom shrunk, right side grown): live kept the TOP-RIGHT corner; probes 3 (REQUESTS 15:10,
+  r1–r10 rectangles) asked to separate the rule;
+- s17 (slot, the arc's chord dimensioned): live shrinks that arc about its center and shortens both lines at the far
+  end (the other arc 1.309 mm further in); not derived yet;
+- drags (s1, s3, s12, batch 2's 7): live keeps dimensioned geometry and changes free sizes (s3: l3 with its length
+  stays, the arc's radius and l1's length change); ours drags by weighted minimum norm. Needs the drag routed through
+  the constructive pass with backtracking (an entity revisited with less of its shape held when a later one can't
+  be placed), and a cheap path for the editor's drag steps.
 UI drags (11 in batch 1) compare ours dragged to where live's pointer ended (live lands within 0.2 mm): s12's differs
 the same way (what follows the dragged point).
 Assembly batch 1 against live (11-02 12:00): 15/20 match (statuses, messages, transforms to 1e-3 mm / 1e-6;
