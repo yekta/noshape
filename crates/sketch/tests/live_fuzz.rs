@@ -1385,14 +1385,19 @@ fn drag_probes() -> Vec<(String, Case, String, DVec2)> {
     out
 }
 
-/// Writes the drag probes (LIVE_FUZZ_WRITE=probe-7) in the batches' shape,
-/// each case's `drag` = the point, its target and ours dragged there in 25
-/// steps; compares with live's answers when there.
+/// Writes the drag probes (LIVE_FUZZ_WRITE=probe-7 / probe-9) in the
+/// batches' shape, each case's `drag` = the point, its target and ours
+/// dragged there in 25 steps; compares with live's answers when there.
 #[test]
 #[ignore = "T2: live fuzz drag probes"]
 fn drag_probe_matches() {
-    let live: Option<Value> = std::fs::read_to_string(fixture("sketch-probe-7.live.json")).ok().and_then(|t| serde_json::from_str(&t).ok());
-    let cases: Vec<Value> = drag_probes().into_iter().map(|(name, mut c, point, by)| {
+    drag_probe_batch(7, drag_probes());
+    drag_probe_batch(9, drag_probes9());
+}
+
+fn drag_probe_batch(n: usize, list: Vec<(String, Case, String, DVec2)>) {
+    let live: Option<Value> = std::fs::read_to_string(fixture(&format!("sketch-probe-{n}.live.json"))).ok().and_then(|t| serde_json::from_str(&t).ok());
+    let cases: Vec<Value> = list.into_iter().map(|(name, mut c, point, by)| {
         let o = ours(&mut c);
         let from = c.pos(&point) / MM;
         let to = from + by;
@@ -1407,8 +1412,8 @@ fn drag_probe_matches() {
         json!({"case": id, "what": name, "constraints": c.spec, "onshape": {"entities": c.os_entities, "constraints": c.os_constraints}, "ours": o, "drag": {"point": point, "to": [to.x, to.y], "ours": ours_points(&c)}})
     }).collect();
     let b = json!({"units": "mm (Onshape JSON: metres, radians)", "plane": "Top", "cases": cases});
-    let path = fixture("sketch-probe-7.json");
-    if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == "probe-7") {
+    let path = fixture(&format!("sketch-probe-{n}.json"));
+    if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == format!("probe-{n}")) {
         std::fs::write(&path, serde_json::to_string_pretty(&b).unwrap()).unwrap();
     }
     let Some(live) = live else { return };
@@ -1426,7 +1431,7 @@ fn drag_probe_matches() {
             println!("  {} ({}): {}", case["case"], case["what"], d.join("; "));
         }
     }
-    println!("live drag probes: {total} answered, {ok} match");
+    println!("live drag probes {n}: {total} answered, {ok} match");
 }
 
 /// UI edit probes (probes 8, after live 1775 / 1785): everyday profiles that
@@ -1575,6 +1580,92 @@ fn edit_probe_matches() {
         }
     }
     println!("live edit probes: {total} answered, {ok} match");
+}
+
+/// Drag probes 9: everyday profiles with their dimensions, one point dragged
+/// in the UI by (dx, dy) mm (after probes 7 on minimal sketches).
+fn drag_probes9() -> Vec<(String, Case, String, DVec2)> {
+    use std::f64::consts::FRAC_PI_2;
+    let v = DVec2::new;
+    let mut out = Vec::new();
+    let mut add = |name: &str, point: &str, by: DVec2, f: &dyn Fn(&mut Case)| {
+        let mut c = Case::new();
+        f(&mut c);
+        out.push((name.to_string(), c, point.to_string(), by));
+    };
+    let lbracket = |c: &mut Case, dims: usize| {
+        let p = [v(0.0, 0.0), v(40.0, 0.0), v(40.0, 8.0), v(8.0, 8.0), v(8.0, 30.0), v(0.0, 30.0)];
+        let l: Vec<String> = (0..6).map(|i| c.line(p[i], p[(i + 1) % 6])).collect();
+        for i in 0..6 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 6]));
+            c.hv(i % 2 == 0, &l[i]);
+        }
+        let all = [(0, 40.0), (5, 30.0), (1, 8.0), (4, 22.0)];
+        for (i, mm) in all.iter().take(dims) {
+            c.length(&l[*i], *mm);
+        }
+    };
+    add("g1 L-bracket, all four lengths: its top-right corner (8,30) dragged by (4, 3)", "l4.end", v(4.0, 3.0), &|c| lbracket(c, 4));
+    add("g2 L-bracket, only the bottom and the left side dimensioned: the inner corner (8,8) dragged by (4, 3)", "l3.end", v(4.0, 3.0), &|c| lbracket(c, 2));
+    let slot = |c: &mut Case, dims: bool| {
+        let l1 = c.line(v(0.0, -6.0), v(30.0, -6.0));
+        let a2 = c.arc(v(30.0, 0.0), 6.0, -FRAC_PI_2, FRAC_PI_2);
+        let l3 = c.line(v(30.0, 6.0), v(0.0, 6.0));
+        let a4 = c.arc(v(0.0, 0.0), 6.0, FRAC_PI_2, 3.0 * FRAC_PI_2);
+        c.coincident(&format!("{l1}.end"), &format!("{a2}.start"));
+        c.coincident(&format!("{a2}.end"), &format!("{l3}.start"));
+        c.coincident(&format!("{l3}.end"), &format!("{a4}.start"));
+        c.coincident(&format!("{a4}.end"), &format!("{l1}.start"));
+        for (a, b) in [(&l1, &a2), (&a2, &l3), (&l3, &a4), (&a4, &l1)] {
+            c.pair("TANGENT", a, b);
+        }
+        c.pair("EQUAL", &a2, &a4);
+        c.hv(true, &l1);
+        if dims {
+            c.radius(&a2, 6.0, false);
+            c.distance(&format!("{a4}.center"), &format!("{a2}.center"), 30.0);
+        }
+    };
+    add("g3 slot with its radius and centre distance: the right arc's centre (30,0) dragged by (4, 3)", "a2.center", v(4.0, 3.0), &|c| slot(c, true));
+    add("g4 the slot without dimensions: the top line's start (30,6) dragged by (4, 3)", "l3.start", v(4.0, 3.0), &|c| slot(c, false));
+    add("g5 filleted rectangle (R4, bottom 32 dimensioned): the top-right arc's centre dragged by (3, 2)", "a4.center", v(3.0, 2.0), &|c| {
+        let (o, w, h, r) = (v(10.0, 10.0), 40.0, 20.0, 4.0);
+        let corners = [o + v(w, 0.0), o + v(w, h), o + v(0.0, h), o];
+        let pts = [(o + v(r, 0.0), o + v(w - r, 0.0)), (o + v(w, r), o + v(w, h - r)), (o + v(w - r, h), o + v(r, h)), (o + v(0.0, h - r), o + v(0.0, r))];
+        let mut lines = Vec::new();
+        let mut arcs = Vec::new();
+        for i in 0..4 {
+            lines.push(c.line(pts[i].0, pts[i].1));
+            let cc = corners[i] + match i { 0 => v(-r, r), 1 => v(-r, -r), 2 => v(r, -r), _ => v(r, r) };
+            let a0 = -FRAC_PI_2 + i as f64 * FRAC_PI_2;
+            arcs.push(c.arc(cc, r, a0, a0 + FRAC_PI_2));
+        }
+        for i in 0..4 {
+            c.coincident(&format!("{}.end", lines[i]), &format!("{}.start", arcs[i]));
+            c.coincident(&format!("{}.end", arcs[i]), &format!("{}.start", lines[(i + 1) % 4]));
+            c.pair("TANGENT", &lines[i], &arcs[i]);
+            c.pair("TANGENT", &arcs[i], &lines[(i + 1) % 4]);
+            c.hv(i % 2 == 0, &lines[i]);
+        }
+        for i in 1..4 {
+            c.pair("EQUAL", &arcs[0], &arcs[i]);
+        }
+        c.length(&lines[0], w - 2.0 * r);
+        c.radius(&arcs[0], r, false);
+    });
+    add("g6 bolt circle (big Ø40, three Ø6 holes on a 14 mm radius): a hole's centre dragged by (3, 2)", "c2.center", v(3.0, 2.0), &|c| {
+        let cb = c.circle(v(0.0, 0.0), 20.0);
+        let holes: Vec<String> = (0..3).map(|i| c.circle(DVec2::from_angle(FRAC_PI_2 + i as f64 * 4.0 * FRAC_PI_2 / 3.0) * 14.0, 3.0)).collect();
+        for hh in &holes[1..] {
+            c.pair("EQUAL", &holes[0], hh);
+        }
+        c.radius(&cb, 20.0, true);
+        c.radius(&holes[0], 3.0, true);
+        for hh in &holes {
+            c.distance(&format!("{cb}.center"), &format!("{hh}.center"), 14.0);
+        }
+    });
+    out
 }
 
 fn probe_batch(list: Vec<(String, Case)>) -> Value {
