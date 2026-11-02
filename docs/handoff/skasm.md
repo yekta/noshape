@@ -484,7 +484,9 @@ fs-oracle-asm vocabulary, mates added one at a time as live does; asm-N.live.jso
 | sketch 1 (lines, arcs, circles; 11 drags) | 20 | REQUESTS 09:45 | 20 + drags + curve colours | solvability 19 → 20; positions 0–1 (least change) | 1: a redundant dimension |
 | least-change probes 1 | 14 | REQUESTS 11:30 | 14 | 4 → 14 | the least-change rule |
 | least-change probes 2 | 10 | REQUESTS 12:15 | 10 | 0 → 10 | the least-change rule |
-| asm 1 (BLOCK / PLATE / PIN, 1–4 mates) | 20 | REQUESTS 10:05 | 20 | 15 → 19 | perpendicular start; Slider pivot; "not consistent" rule |
+| asm 1 (BLOCK / PLATE / PIN, 1–4 mates) | 20 | REQUESTS 10:05 | 20 | 15 → 20 | perpendicular start; Slider pivot; "not consistent" rule; exact flip turns the free part |
+| sketch probes 3 (rectangles) | 10 | REQUESTS 15:10 | 10 | 10 | – |
+| asm 2 (3–5 instances, 99 mates) | 30 | REQUESTS 15:40 | – | – | – |
 | asm probes (1776: a1–a6, b1–b5) | 11 | REQUESTS 14:00 | 11 | 8/8 encoded | – |
 | sketch 2 (+ fit splines, conics, angles) | 20 | REQUESTS 10:40 | 10 (10 spline cases refused: our spline JSON form, live reposts) | solvability 10/10 | – |
 Fixed before live answered: an axial mate whose connectors start exactly perpendicular (a part inserted square to its
@@ -577,6 +579,14 @@ about its connector's foot on the other connector's axis line, then slides it on
 the start position along the axis less the connector's drop onto it); the Slider joins the orientation pass for that
 (its residual holds the whole turn, so it never needed it otherwise). A Cylindrical keeps turning about its connector
 (f2 / f3 / f4 / f9 match that way; the foot there broke them).
+f16 (11-02 11:50): from D's side, as the lead asked: after Parallel 1 ours already matched live (C flipped onto B); at
+Parallel 2 (D onto C, an exact half-turn with neither fixed) the R3 rule turned C, breaking it off Parallel 1; live
+turned D, the part with no other mates. Now in an exact flip the part held by other mates stays and the free one
+turns; between two free (or two held) parts the R3 rule as before. asm batch 1 20/20, oracle unchanged.
+Probes 3 (rectangles, live 11:25): 10/10 already: a lone rectangle keeps its lower-left corner whatever is
+dimensioned (r9 / r10 = s115's rectangle alone). So s115's top-right corner comes from the Perpendicular tying its
+left side to the dimensioned chain line l1: geometry related to changing geometry gives way. One case; left open.
+Live's batch-2 colour correction (1778): every "fully" was a dimension arrow / label artifact; they are blue as ours.
 Next batches: splines / conics / angles (once live confirms their REST form), assemblies with drags and patterns.
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches

@@ -601,7 +601,7 @@ fn asm_fuzz_live_matches() {
     // pose after Parallel 2 already differs (which way a Parallel leaves a pin
     // turned about its own axis), and then Parallel 1 reads ERROR in ours
     // when the conflicting Planar arrives (OK in live).
-    const KNOWN: &[&str] = &["f16"];
+    const KNOWN: &[&str] = &[];
     let mut parts = parts();
     let (mut answered, mut matches, mut report) = (0, 0, Vec::new());
     for n in 1.. {

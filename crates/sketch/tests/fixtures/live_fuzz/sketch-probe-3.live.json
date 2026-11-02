@@ -1,0 +1,1331 @@
+{
+ "note": "Live 2026-11-02, Part Studio \"skasm probes 3\" in \"skasm speed\"; each probe POSTed as is on Top; points via evVertexPoint(sketchEntityQuery) (mm, 6 dp). unchanged_corners = corners whose solved position equals the posted one.",
+ "cases": {
+  "r1": {
+   "what": "r1 rectangle (0,0) 20 x 10, bottom 25 and right side 12",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     25.0,
+     0.0
+    ],
+    "l1.start": [
+     0.0,
+     0.0
+    ],
+    "l2.end": [
+     25.0,
+     12.0
+    ],
+    "l2.start": [
+     25.0,
+     0.0
+    ],
+    "l3.end": [
+     0.0,
+     12.0
+    ],
+    "l3.start": [
+     25.0,
+     12.0
+    ],
+    "l4.end": [
+     0.0,
+     0.0
+    ],
+    "l4.start": [
+     0.0,
+     12.0
+    ]
+   },
+   "radii": {},
+   "unchanged_corners": [
+    [
+     0.0,
+     0.0
+    ]
+   ]
+  },
+  "r2": {
+   "what": "r2 rectangle, right side 10 -> 12 only",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     20.0,
+     0.0
+    ],
+    "l1.start": [
+     0.0,
+     0.0
+    ],
+    "l2.end": [
+     20.0,
+     12.0
+    ],
+    "l2.start": [
+     20.0,
+     0.0
+    ],
+    "l3.end": [
+     0.0,
+     12.0
+    ],
+    "l3.start": [
+     20.0,
+     12.0
+    ],
+    "l4.end": [
+     0.0,
+     0.0
+    ],
+    "l4.start": [
+     0.0,
+     12.0
+    ]
+   },
+   "radii": {},
+   "unchanged_corners": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     20.0,
+     0.0
+    ]
+   ]
+  },
+  "r3": {
+   "what": "r3 rectangle, bottom 20 -> 15 (shrink)",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     15.0,
+     0.0
+    ],
+    "l1.start": [
+     0.0,
+     0.0
+    ],
+    "l2.end": [
+     15.0,
+     10.0
+    ],
+    "l2.start": [
+     15.0,
+     0.0
+    ],
+    "l3.end": [
+     0.0,
+     10.0
+    ],
+    "l3.start": [
+     15.0,
+     10.0
+    ],
+    "l4.end": [
+     0.0,
+     0.0
+    ],
+    "l4.start": [
+     0.0,
+     10.0
+    ]
+   },
+   "radii": {},
+   "unchanged_corners": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     10.0
+    ]
+   ]
+  },
+  "r4": {
+   "what": "r4 rectangle, bottom 15 and right side 8 (both shrink)",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     15.0,
+     0.0
+    ],
+    "l1.start": [
+     0.0,
+     0.0
+    ],
+    "l2.end": [
+     15.0,
+     8.0
+    ],
+    "l2.start": [
+     15.0,
+     0.0
+    ],
+    "l3.end": [
+     0.0,
+     8.0
+    ],
+    "l3.start": [
+     15.0,
+     8.0
+    ],
+    "l4.end": [
+     0.0,
+     0.0
+    ],
+    "l4.start": [
+     0.0,
+     8.0
+    ]
+   },
+   "radii": {},
+   "unchanged_corners": [
+    [
+     0.0,
+     0.0
+    ]
+   ]
+  },
+  "r5": {
+   "what": "r5 rectangle, top 25 (the side drawn right to left)",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     25.0,
+     0.0
+    ],
+    "l1.start": [
+     0.0,
+     0.0
+    ],
+    "l2.end": [
+     25.0,
+     10.0
+    ],
+    "l2.start": [
+     25.0,
+     0.0
+    ],
+    "l3.end": [
+     0.0,
+     10.0
+    ],
+    "l3.start": [
+     25.0,
+     10.0
+    ],
+    "l4.end": [
+     0.0,
+     0.0
+    ],
+    "l4.start": [
+     0.0,
+     10.0
+    ]
+   },
+   "radii": {},
+   "unchanged_corners": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     10.0
+    ]
+   ]
+  },
+  "r6": {
+   "what": "r6 rectangle, left side 12 (drawn top to bottom)",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     20.0,
+     0.0
+    ],
+    "l1.start": [
+     0.0,
+     0.0
+    ],
+    "l2.end": [
+     20.0,
+     12.0
+    ],
+    "l2.start": [
+     20.0,
+     0.0
+    ],
+    "l3.end": [
+     0.0,
+     12.0
+    ],
+    "l3.start": [
+     20.0,
+     12.0
+    ],
+    "l4.end": [
+     0.0,
+     0.0
+    ],
+    "l4.start": [
+     0.0,
+     12.0
+    ]
+   },
+   "radii": {},
+   "unchanged_corners": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     20.0,
+     0.0
+    ]
+   ]
+  },
+  "r7": {
+   "what": "r7 rectangle drawn from the top-left corner clockwise, bottom 25",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     25.0,
+     10.0
+    ],
+    "l1.start": [
+     0.0,
+     10.0
+    ],
+    "l2.end": [
+     25.0,
+     0.0
+    ],
+    "l2.start": [
+     25.0,
+     10.0
+    ],
+    "l3.end": [
+     0.0,
+     0.0
+    ],
+    "l3.start": [
+     25.0,
+     0.0
+    ],
+    "l4.end": [
+     0.0,
+     10.0
+    ],
+    "l4.start": [
+     0.0,
+     0.0
+    ]
+   },
+   "radii": {},
+   "unchanged_corners": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     10.0
+    ]
+   ]
+  },
+  "r8": {
+   "what": "r8 rectangle at (100,50), bottom 25 and right side 12",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     125.0,
+     50.0
+    ],
+    "l1.start": [
+     100.0,
+     50.0
+    ],
+    "l2.end": [
+     125.0,
+     62.0
+    ],
+    "l2.start": [
+     125.0,
+     50.0
+    ],
+    "l3.end": [
+     100.0,
+     62.0
+    ],
+    "l3.start": [
+     125.0,
+     62.0
+    ],
+    "l4.end": [
+     100.0,
+     50.0
+    ],
+    "l4.start": [
+     100.0,
+     62.0
+    ]
+   },
+   "radii": {},
+   "unchanged_corners": [
+    [
+     100.0,
+     50.0
+    ]
+   ]
+  },
+  "r9": {
+   "what": "r9 as fuzz s115: (64.3,2.3) 38.5 x 23.1, bottom 36.4 (shrink) and right side 23.5 (grow)",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     100.716,
+     2.308
+    ],
+    "l1.start": [
+     64.324,
+     2.308
+    ],
+    "l2.end": [
+     100.716,
+     25.825
+    ],
+    "l2.start": [
+     100.716,
+     2.308
+    ],
+    "l3.end": [
+     64.324,
+     25.825
+    ],
+    "l3.start": [
+     100.716,
+     25.825
+    ],
+    "l4.end": [
+     64.324,
+     2.308
+    ],
+    "l4.start": [
+     64.324,
+     25.825
+    ]
+   },
+   "radii": {},
+   "unchanged_corners": [
+    [
+     64.324,
+     2.308
+    ]
+   ]
+  },
+  "r10": {
+   "what": "r10 as r9, the dimensions added the other order",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     100.716,
+     2.308
+    ],
+    "l1.start": [
+     64.324,
+     2.308
+    ],
+    "l2.end": [
+     100.716,
+     25.825
+    ],
+    "l2.start": [
+     100.716,
+     2.308
+    ],
+    "l3.end": [
+     64.324,
+     25.825
+    ],
+    "l3.start": [
+     100.716,
+     25.825
+    ],
+    "l4.end": [
+     64.324,
+     2.308
+    ],
+    "l4.start": [
+     64.324,
+     25.825
+    ]
+   },
+   "radii": {},
+   "unchanged_corners": [
+    [
+     64.324,
+     2.308
+    ]
+   ]
+  },
+  "r11": {
+   "what": "r9 + redundant PERPENDICULAR top(l3)-left(l4) (as s115 k13)",
+   "extra": "added by live to isolate s115",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     102.868,
+     1.855
+    ],
+    "l1.start": [
+     66.476,
+     1.855
+    ],
+    "l2.end": [
+     102.868,
+     25.372
+    ],
+    "l2.start": [
+     102.868,
+     1.855
+    ],
+    "l3.end": [
+     66.476,
+     25.372
+    ],
+    "l3.start": [
+     102.868,
+     25.372
+    ],
+    "l4.end": [
+     66.476,
+     1.855
+    ],
+    "l4.start": [
+     66.476,
+     25.372
+    ]
+   },
+   "unchanged_corners": [
+    [
+     102.868,
+     25.372
+    ]
+   ],
+   "onshape_extra_json": {
+    "constraints": [
+     {
+      "btType": "BTMSketchConstraint-2",
+      "constraintType": "PERPENDICULAR",
+      "entityId": "k11",
+      "parameters": [
+       {
+        "btType": "BTMParameterString-149",
+        "parameterId": "localFirst",
+        "value": "l3"
+       },
+       {
+        "btType": "BTMParameterString-149",
+        "parameterId": "localSecond",
+        "value": "l4"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "r12": {
+   "what": "r9 + free line l5 (s115 l1 posted 20 mm at y -3.82, no arc) PERPENDICULAR to left side l4 (as s115 k14)",
+   "extra": "added by live to isolate s115",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     100.716,
+     2.308
+    ],
+    "l1.start": [
+     64.324,
+     2.308
+    ],
+    "l2.end": [
+     100.716,
+     25.825
+    ],
+    "l2.start": [
+     100.716,
+     2.308
+    ],
+    "l3.end": [
+     64.324,
+     25.825
+    ],
+    "l3.start": [
+     100.716,
+     25.825
+    ],
+    "l4.end": [
+     64.324,
+     2.308
+    ],
+    "l4.start": [
+     64.324,
+     25.825
+    ],
+    "l5.end": [
+     -4.897,
+     -3.82
+    ],
+    "l5.start": [
+     -24.897,
+     -3.82
+    ]
+   },
+   "unchanged_corners": [
+    [
+     -24.897,
+     -3.82
+    ],
+    [
+     -4.897,
+     -3.82
+    ],
+    [
+     64.324,
+     2.308
+    ]
+   ],
+   "onshape_extra_json": {
+    "entities": [
+     {
+      "btType": "BTMSketchCurveSegment-155",
+      "entityId": "l5",
+      "startPointId": "l5.start",
+      "endPointId": "l5.end",
+      "startParam": 0.0,
+      "endParam": 0.02,
+      "geometry": {
+       "btType": "BTCurveGeometryLine-117",
+       "pntX": -0.024897,
+       "pntY": -0.00382,
+       "dirX": 1.0,
+       "dirY": 0.0
+      }
+     }
+    ],
+    "constraints": [
+     {
+      "btType": "BTMSketchConstraint-2",
+      "constraintType": "PERPENDICULAR",
+      "entityId": "k12",
+      "parameters": [
+       {
+        "btType": "BTMParameterString-149",
+        "parameterId": "localFirst",
+        "value": "l5"
+       },
+       {
+        "btType": "BTMParameterString-149",
+        "parameterId": "localSecond",
+        "value": "l4"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "r12b": {
+   "what": "r12 + LENGTH l5 21.892 (as s115 k17)",
+   "extra": "added by live to isolate s115",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     100.716,
+     2.308
+    ],
+    "l1.start": [
+     64.324,
+     2.308
+    ],
+    "l2.end": [
+     100.716,
+     25.825
+    ],
+    "l2.start": [
+     100.716,
+     2.308
+    ],
+    "l3.end": [
+     64.324,
+     25.825
+    ],
+    "l3.start": [
+     100.716,
+     25.825
+    ],
+    "l4.end": [
+     64.324,
+     2.308
+    ],
+    "l4.start": [
+     64.324,
+     25.825
+    ],
+    "l5.end": [
+     -3.005,
+     -3.82
+    ],
+    "l5.start": [
+     -24.897,
+     -3.82
+    ]
+   },
+   "unchanged_corners": [
+    [
+     -24.897,
+     -3.82
+    ],
+    [
+     64.324,
+     2.308
+    ]
+   ],
+   "onshape_extra_json": {
+    "entities": [
+     {
+      "btType": "BTMSketchCurveSegment-155",
+      "entityId": "l5",
+      "startPointId": "l5.start",
+      "endPointId": "l5.end",
+      "startParam": 0.0,
+      "endParam": 0.02,
+      "geometry": {
+       "btType": "BTCurveGeometryLine-117",
+       "pntX": -0.024897,
+       "pntY": -0.00382,
+       "dirX": 1.0,
+       "dirY": 0.0
+      }
+     }
+    ],
+    "constraints": [
+     {
+      "btType": "BTMSketchConstraint-2",
+      "constraintType": "PERPENDICULAR",
+      "entityId": "k12",
+      "parameters": [
+       {
+        "btType": "BTMParameterString-149",
+        "parameterId": "localFirst",
+        "value": "l5"
+       },
+       {
+        "btType": "BTMParameterString-149",
+        "parameterId": "localSecond",
+        "value": "l4"
+       }
+      ]
+     },
+     {
+      "btType": "BTMSketchConstraint-2",
+      "constraintType": "LENGTH",
+      "entityId": "k13",
+      "parameters": [
+       {
+        "btType": "BTMParameterString-149",
+        "parameterId": "localFirst",
+        "value": "l5"
+       },
+       {
+        "btType": "BTMParameterEnum-145",
+        "parameterId": "direction",
+        "enumName": "DimensionDirection",
+        "value": "MINIMUM"
+       },
+       {
+        "btType": "BTMParameterQuantity-147",
+        "parameterId": "length",
+        "expression": "21.892000 mm",
+        "isInteger": false,
+        "value": 0,
+        "units": ""
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "r13": {
+   "what": "fuzz s115 reposted as is",
+   "extra": "added by live to isolate s115",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     -4.897004,
+     -3.819833
+    ],
+    "l1.start": [
+     -26.789004,
+     -3.819833
+    ],
+    "a2.center": [
+     -4.897004,
+     8.069059
+    ],
+    "a2.end": [
+     6.991889,
+     8.069059
+    ],
+    "a2.start": [
+     -4.897004,
+     -3.819833
+    ],
+    "l3.end": [
+     6.991889,
+     28.069059
+    ],
+    "l3.start": [
+     6.991889,
+     8.069059
+    ],
+    "l4.end": [
+     102.867931,
+     1.855085
+    ],
+    "l4.start": [
+     66.475931,
+     1.855085
+    ],
+    "l5.end": [
+     102.867931,
+     25.372085
+    ],
+    "l5.start": [
+     102.867931,
+     1.855085
+    ],
+    "l6.end": [
+     66.475931,
+     25.372085
+    ],
+    "l6.start": [
+     102.867931,
+     25.372085
+    ],
+    "l7.end": [
+     66.475931,
+     1.855085
+    ],
+    "l7.start": [
+     66.475931,
+     25.372085
+    ]
+   },
+   "unchanged_corners": [
+    [
+     -4.897004,
+     -3.819833
+    ],
+    [
+     6.991889,
+     8.069059
+    ],
+    [
+     6.991889,
+     28.069059
+    ],
+    [
+     102.867931,
+     25.372085
+    ]
+   ]
+  },
+  "r11b": {
+   "what": "r9 + redundant PERPENDICULAR l1-l2 (shared corner bottom-right)",
+   "extra": "added by live to isolate s115",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     100.716,
+     2.308
+    ],
+    "l1.start": [
+     64.324,
+     2.308
+    ],
+    "l2.end": [
+     100.716,
+     25.825
+    ],
+    "l2.start": [
+     100.716,
+     2.308
+    ],
+    "l3.end": [
+     64.324,
+     25.825
+    ],
+    "l3.start": [
+     100.716,
+     25.825
+    ],
+    "l4.end": [
+     64.324,
+     2.308
+    ],
+    "l4.start": [
+     64.324,
+     25.825
+    ]
+   },
+   "unchanged_corners": [
+    [
+     64.324,
+     2.308
+    ]
+   ],
+   "onshape_extra_json": {
+    "constraints": [
+     {
+      "btType": "BTMSketchConstraint-2",
+      "constraintType": "PERPENDICULAR",
+      "entityId": "k11",
+      "parameters": [
+       {
+        "btType": "BTMParameterString-149",
+        "parameterId": "localFirst",
+        "value": "l1"
+       },
+       {
+        "btType": "BTMParameterString-149",
+        "parameterId": "localSecond",
+        "value": "l2"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "r11c": {
+   "what": "r9 + redundant PERPENDICULAR l2-l3 (shared corner top-right)",
+   "extra": "added by live to isolate s115",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     100.716,
+     2.308
+    ],
+    "l1.start": [
+     64.324,
+     2.308
+    ],
+    "l2.end": [
+     100.716,
+     25.825
+    ],
+    "l2.start": [
+     100.716,
+     2.308
+    ],
+    "l3.end": [
+     64.324,
+     25.825
+    ],
+    "l3.start": [
+     100.716,
+     25.825
+    ],
+    "l4.end": [
+     64.324,
+     2.308
+    ],
+    "l4.start": [
+     64.324,
+     25.825
+    ]
+   },
+   "unchanged_corners": [
+    [
+     64.324,
+     2.308
+    ]
+   ],
+   "onshape_extra_json": {
+    "constraints": [
+     {
+      "btType": "BTMSketchConstraint-2",
+      "constraintType": "PERPENDICULAR",
+      "entityId": "k11",
+      "parameters": [
+       {
+        "btType": "BTMParameterString-149",
+        "parameterId": "localFirst",
+        "value": "l2"
+       },
+       {
+        "btType": "BTMParameterString-149",
+        "parameterId": "localSecond",
+        "value": "l3"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "r11d": {
+   "what": "r9 + redundant PERPENDICULAR l4-l1 (shared corner bottom-left)",
+   "extra": "added by live to isolate s115",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     100.716,
+     2.308
+    ],
+    "l1.start": [
+     64.324,
+     2.308
+    ],
+    "l2.end": [
+     100.716,
+     25.825
+    ],
+    "l2.start": [
+     100.716,
+     2.308
+    ],
+    "l3.end": [
+     64.324,
+     25.825
+    ],
+    "l3.start": [
+     100.716,
+     25.825
+    ],
+    "l4.end": [
+     64.324,
+     2.308
+    ],
+    "l4.start": [
+     64.324,
+     25.825
+    ]
+   },
+   "unchanged_corners": [
+    [
+     64.324,
+     2.308
+    ]
+   ],
+   "onshape_extra_json": {
+    "constraints": [
+     {
+      "btType": "BTMSketchConstraint-2",
+      "constraintType": "PERPENDICULAR",
+      "entityId": "k11",
+      "parameters": [
+       {
+        "btType": "BTMParameterString-149",
+        "parameterId": "localFirst",
+        "value": "l4"
+       },
+       {
+        "btType": "BTMParameterString-149",
+        "parameterId": "localSecond",
+        "value": "l1"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "r11e": {
+   "what": "r11 with the PERPENDICULAR order reversed (l4, l3)",
+   "extra": "added by live to isolate s115",
+   "feature": "OK",
+   "solved": true,
+   "points": {
+    "l1.end": [
+     102.868,
+     1.855
+    ],
+    "l1.start": [
+     66.476,
+     1.855
+    ],
+    "l2.end": [
+     102.868,
+     25.372
+    ],
+    "l2.start": [
+     102.868,
+     1.855
+    ],
+    "l3.end": [
+     66.476,
+     25.372
+    ],
+    "l3.start": [
+     102.868,
+     25.372
+    ],
+    "l4.end": [
+     66.476,
+     1.855
+    ],
+    "l4.start": [
+     66.476,
+     25.372
+    ]
+   },
+   "unchanged_corners": [
+    [
+     102.868,
+     25.372
+    ]
+   ],
+   "onshape_extra_json": {
+    "constraints": [
+     {
+      "btType": "BTMSketchConstraint-2",
+      "constraintType": "PERPENDICULAR",
+      "entityId": "k11",
+      "parameters": [
+       {
+        "btType": "BTMParameterString-149",
+        "parameterId": "localFirst",
+        "value": "l4"
+       },
+       {
+        "btType": "BTMParameterString-149",
+        "parameterId": "localSecond",
+        "value": "l3"
+       }
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "recolor_1778": {
+  "s5": {
+   "line": "l1",
+   "samples": [
+    [
+     0.1,
+     "blue",
+     {
+      "blue": 6
+     }
+    ],
+    [
+     0.2,
+     "?",
+     {}
+    ],
+    [
+     0.3,
+     "?",
+     {}
+    ],
+    [
+     0.4,
+     "black",
+     {
+      "black": 8,
+      "blue": 2
+     }
+    ],
+    [
+     0.5,
+     "black",
+     {
+      "black": 7,
+      "blue": 2
+     }
+    ],
+    [
+     0.6,
+     "black",
+     {
+      "blue": 3,
+      "black": 5
+     }
+    ],
+    [
+     0.7,
+     "?",
+     {}
+    ],
+    [
+     0.8,
+     "?",
+     {}
+    ],
+    [
+     0.9,
+     "?",
+     {}
+    ]
+   ]
+  },
+  "s10": {
+   "line": "l1",
+   "samples": [
+    [
+     0.1,
+     "black",
+     {
+      "black": 23
+     }
+    ],
+    [
+     0.2,
+     "blue",
+     {
+      "blue": 3
+     }
+    ],
+    [
+     0.3,
+     "black",
+     {
+      "blue": 4,
+      "black": 5
+     }
+    ],
+    [
+     0.4,
+     "black",
+     {
+      "black": 11,
+      "blue": 2
+     }
+    ],
+    [
+     0.5,
+     "black",
+     {
+      "blue": 6,
+      "black": 10
+     }
+    ],
+    [
+     0.6,
+     "black",
+     {
+      "blue": 5,
+      "black": 7
+     }
+    ],
+    [
+     0.7,
+     "blue",
+     {
+      "blue": 5,
+      "black": 5
+     }
+    ],
+    [
+     0.8,
+     "blue",
+     {
+      "blue": 5
+     }
+    ],
+    [
+     0.9,
+     "black",
+     {
+      "black": 21
+     }
+    ]
+   ]
+  },
+  "s116": {
+   "line": "l2",
+   "samples": [
+    [
+     0.1,
+     "black",
+     {
+      "black": 11
+     }
+    ],
+    [
+     0.2,
+     "?",
+     {}
+    ],
+    [
+     0.3,
+     "blue",
+     {
+      "blue": 10
+     }
+    ],
+    [
+     0.4,
+     "black",
+     {
+      "blue": 4,
+      "black": 9
+     }
+    ],
+    [
+     0.5,
+     "black",
+     {
+      "blue": 5,
+      "black": 7
+     }
+    ],
+    [
+     0.6,
+     "black",
+     {
+      "black": 9,
+      "blue": 5
+     }
+    ],
+    [
+     0.7,
+     "blue",
+     {
+      "blue": 7
+     }
+    ],
+    [
+     0.8,
+     "?",
+     {}
+    ],
+    [
+     0.9,
+     "black",
+     {
+      "black": 19
+     }
+    ]
+   ]
+  }
+ }
+}

@@ -1,5 +1,5 @@
 {
- "note": "Live 2026-11-02, Part Studio \"skasm fuzz 2\" (021fdbe9\u2026) in \"skasm speed\". One sketch per case POSTed on Top via REST, as in batch 1 (skasm-sketch-1.live.json; same field meanings). feature/message = feature-list row tooltip. points = evVertexPoint per start/end id; arc/circle centre+radius from evCurveDefinition; non-line/non-circle curves (conics) also sampled at 25/50/75 % arc length (\"samples\"). For unsolved sketches the points are the stored positions, not a solution. curves = editor colour at the curve midpoint (black fully, blue under, red over). drags: done in the sketch editor with Shift held (no snap); constraint count before = after for every case (no constraint added); \"after\" = /sketches geometry after accepting the sketch. Spline cases (all with the posted spline JSON) fail with \"Sketch geometry could not be updated after solve.\" \u2014 see HANDOFF-live.md request \"1772 spline JSON form\"; those are PARTLY answered and will be reposted.",
+ "note": "Live 2026-11-02, Part Studio \"skasm fuzz 2\" (021fdbe9\u2026) in \"skasm speed\". One sketch per case POSTed on Top via REST, as in batch 1 (skasm-sketch-1.live.json; same field meanings). feature/message = feature-list row tooltip. points = evVertexPoint per start/end id; arc/circle centre+radius from evCurveDefinition; non-line/non-circle curves (conics) also sampled at 25/50/75 % arc length (\"samples\"). For unsolved sketches the points are the stored positions, not a solution. curves = editor colour at the curve midpoint (black fully, blue under, red over). drags: done in the sketch editor with Shift held (no snap); constraint count before = after for every case (no constraint added); \"after\" = /sketches geometry after accepting the sketch. Spline cases (all with the posted spline JSON) fail with \"Sketch geometry could not be updated after solve.\" \u2014 see HANDOFF-live.md request \"1772 spline JSON form\"; those are PARTLY answered and will be reposted. CORRECTION (1778): every curve first reported \"fully\" here was a sampling artifact (black dimension arrows/leader drawn over the line, or a label); re-checked visually, they are blue (under).",
  "cases": {
   "s101": {
    "feature": "WARNING",
@@ -1560,11 +1560,11 @@
     "a2": 11.888892
    },
    "curves": {
-    "l1": "fully  (pixel mix {\"blue\": 4, \"black\": 30})",
+    "l1": "under  (corrected 2026-11-02 for request 1778: the midpoint sample hit the black dimension drawn on the line / a label; the uncovered parts of the curve are blue; was \"fully\")",
     "a2": "under",
     "l3": "under",
-    "l4": "fully  (pixel mix {\"blue\": 9, \"black\": 19})",
-    "l5": "fully  (pixel mix {\"black\": 9, \"blue\": 4})",
+    "l4": "under  (corrected 2026-11-02 for request 1778: the midpoint sample hit the black dimension drawn on the line / a label; the uncovered parts of the curve are blue; was \"fully\")",
+    "l5": "under  (corrected 2026-11-02 for request 1778: the midpoint sample hit the black dimension drawn on the line / a label; the uncovered parts of the curve are blue; was \"fully\")",
     "l6": "under",
     "l7": "under"
    },
@@ -1684,7 +1684,7 @@
     }
    },
    "curves": {
-    "l2": "fully  (pixel mix {\"blue\": 10, \"black\": 18})",
+    "l2": "under  (corrected 2026-11-02 for request 1778: the midpoint sample hit the black dimension drawn on the line / a label; the uncovered parts of the curve are blue; was \"fully\")",
     "q1": "under"
    },
    "drag": {

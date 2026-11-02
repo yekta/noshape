@@ -1264,7 +1264,12 @@ fn orient_axial_mates(bodies: &mut [SolverBody], mates: &[SolverMate]) -> Vec<us
         // when the connectors' common Z points to the negative side (its
         // first non-zero coordinate, x then y then z, is negative), else the
         // second's.
-        let first_turns = !exact || first_nonzero(bodies[m.a].pose.mul(&m.a_local).rotation * DVec3::Z) < 0.0;
+        // A part held by other mates stays and the free one turns (fuzz f16:
+        // a pin Parallel to a pin that another Parallel holds, live turned
+        // the new pin); between two free parts, or two held ones, the R3 rule.
+        let others = |b: usize| mates.iter().filter(|o| !std::ptr::eq(*o, m) && o.follow.is_none() && mate_bodies(o).any(|x| x == b)).count();
+        let (held_a, held_b) = (others(m.a) > 0, others(m.b) > 0);
+        let first_turns = if exact && held_a != held_b { held_b } else { !exact || first_nonzero(bodies[m.a].pose.mul(&m.a_local).rotation * DVec3::Z) < 0.0 };
         let (moving, local) = if !bodies[m.a].fixed && (first_turns || bodies[m.b].fixed) {
             (m.a, m.a_local)
         } else if !bodies[m.b].fixed {
