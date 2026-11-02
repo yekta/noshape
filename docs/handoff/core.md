@@ -24,7 +24,7 @@ slabs in 40 ms (thin regions kept solid as live). Open: shell-hang Shell 5 (live
 offset modes all give no solid), FI2 (G1 Fill dome: OCCT's plate throws), the working-scale Shell (6 tests moved).
 Reuse safety (17:30): bench_edit_latency_reuse over qa's ticket documents (vibe5 ~/agents/qadocs, 44; the 12 biggest
 fuzz ones take hours: ~/agents/qadocs-small has the other 32): the first 29 document tabs equal to full regenerations
-before the run was stopped; the 32-document run follows (/root/core-scratch/reuse-qa2.log).
+before the run was stopped; the 32-document run (qadocs-small, 41 tabs, 39 min) equal on every edit too.
 perf.sh bench_edit_latency_reuse on vibe3 (6e9ebca4, tests/perf documents only, reuse on): live-30-features depth
 76.3 ms (21 of 30 features ran), fillet radius 41.2, suppress 39.1 (budget 200); big-plate depth 83.5, suppress 1.2;
 fins-400 depth 4589 / suppress 771 (the 400-fin pattern's Boolean: bool); the Ø25 knurl depth 8860 ms (bool).
