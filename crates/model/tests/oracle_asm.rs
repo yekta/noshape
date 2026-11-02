@@ -803,11 +803,16 @@ fn spec_assembly(parts: &Parts, spec: &serde_json::Value) -> Assembly {
 #[ignore = "T2: live assembly drag probes"]
 fn asm_drag_probes_match_live() {
     let mut parts = parts();
-    let input: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(fuzz_fixture("asm-drag-1.input.json")).unwrap()).unwrap();
-    let live: Vec<serde_json::Value> = std::fs::read_to_string(fuzz_fixture("asm-drag-1.live.jsonl")).map(|t| t.lines().filter(|l| !l.trim().is_empty()).filter_map(|l| serde_json::from_str(l).ok()).collect()).unwrap_or_default();
     let (mut answered, mut matches) = (0, 0);
+    // Probes 1 (1802: d1-d6), 2 (1803: d7 / d8; d9's four-bar didn't close in live).
+    for n in [1, 2] {
+    let input: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(fuzz_fixture(&format!("asm-drag-{n}.input.json"))).unwrap()).unwrap();
+    let live: Vec<serde_json::Value> = std::fs::read_to_string(fuzz_fixture(&format!("asm-drag-{n}.live.jsonl"))).map(|t| t.lines().filter(|l| !l.trim().is_empty()).filter_map(|l| serde_json::from_str(l).ok()).collect()).unwrap_or_default();
     for case in input["cases"].as_array().unwrap() {
         let name = case["case"].as_str().unwrap();
+        if name.starts_with("d9") {
+            continue;
+        }
         let asm = spec_assembly(&parts, case);
         // Mate by mate, as live adds them.
         let mut built = asm.clone();
@@ -864,12 +869,21 @@ fn asm_drag_probes_match_live() {
                 let (a, b) = (o[k], t[k].as_f64().unwrap_or(f64::NAN) * if [3, 7, 11].contains(&k) { 1e3 } else { 1.0 });
                 (a - b).abs() > if [3, 7, 11].contains(&k) { 0.3 } else { 1e-3 }
             })
-        }).map(|(n, t)| format!("{n}: ours {:?} live {t}", ours[n.as_str()])).collect();
+        }).map(|(n, t)| {
+            // How far off: the turn between the two rotations, the offset.
+            let o = &ours[n.as_str()];
+            let l: Vec<f64> = (0..16).map(|k| t[k].as_f64().unwrap_or(f64::NAN)).collect();
+            let trace: f64 = (0..3).map(|i| (0..3).map(|j| o[4 * j + i] * l[4 * j + i]).sum::<f64>()).sum();
+            let turn = ((trace - 1.0) / 2.0).clamp(-1.0, 1.0).acos().to_degrees();
+            let off = [3, 7, 11].iter().map(|k| (o[*k] - l[*k] * 1e3).powi(2)).sum::<f64>().sqrt();
+            format!("{n}: {turn:.2}° and {off:.2} mm off")
+        }).collect();
         if off.is_empty() {
             matches += 1;
         } else {
             println!("  {name} differs: {}", off.join("; "));
         }
+    }
     }
     println!("live assembly drag probes: {answered} answered, {matches} match (positions within 0.3 mm: the pointer's landing)");
 }

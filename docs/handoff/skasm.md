@@ -737,7 +737,7 @@ Everyday batches 4 / 5 / 6 now 40 / 40 / 40 on positions; batches 1–6 1295 →
 dropped: skipping such an arc in the keep step (s303 12 → 55 mm: the right arc then keeps its x). Sent live sketch
 probes 10 (s6 and s102, batches 1–2's largest, each with one relation left out: which relation moves what; T2 in
 `probe_matches`, fixture sketch-probe-10.json).
-18:55: probes 10 answered (live 1804, s6 / s102 leave-one-out). In s6 the middle rectangle grows only through k29
+18:28: probes 10 answered (live 1804, s6 / s102 leave-one-out). In s6 the middle rectangle grows only through k29
 (l11's length) carried by k26 (l9 = l7) and the rectangle; without k29 (r6-k29) or k26 live keeps the middle rectangle
 and brings the right one onto it whole. Fixed (r6-k26, r6-k29 exact): in the group fallback a closed loop (curves
 joined end to end, `ring_of`) tied to another loop's placed curve gives way whole first, unless the pass kept one of
@@ -746,6 +746,12 @@ s6: with k29, live keeps l11's start y (the middle rectangle comes down 7.8 mm) 
 of where the distance alone puts them; r6-k28 (no distance) has the same 0.323 at the right rectangle's right side.
 That shift needs k19 / k26 / k27 / k28 / k29 together; no rule found for it yet (looks like a least-squares share).
 s102's l4 halves only with all of k10 / k11 / k14 / k15 (live's numeric share across two Equals and two distances).
+Assembly drag probes 2 (live 1803): d7, a tangential pull on the arm's outer pin, turns only the pin about its joint
+(B stays); d8, the pin Fastened to B, turns B (with C) about A's hole toward the pointer's angle: both as ours (the
+own-freedom rule, a7d3bf69). In T2 asm_drag_probes_match_live (now probes 1 + 2, prints each miss as degrees / mm):
+d7 1.6°, d8 0.12°, d1 1.3°, d5 1.2°, d4 2.1° (live's pointer landing); d6 (Ball) 6.3°: ours tips the block 12° (the
+point nearest the pointer's ray), live 6.9° (a target in the drag plane at the point's start depth gives 5.4°):
+open. d9 (four-bar) didn't close in live with vertex connectors (not a probe).
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;

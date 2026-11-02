@@ -1,0 +1,615 @@
+{
+ "parts": "fs-oracle-asm",
+ "method": "as 1802; d9 four-bar: ground pivots A hole (130,20) and A vertex (100,0); crank B to coupler D at B (160,0); rocker C to D at C (160,40); D joints its (160,0) and (160,40)",
+ "cases": [
+  {
+   "case": "d7",
+   "instances": [
+    {
+     "name": "A",
+     "part": "PLATE",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "PLATE",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "C",
+     "part": "PIN",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Revolute",
+     "first": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "hole bottom edge",
+      "at_mm": [
+       130,
+       25,
+       0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole top edge",
+      "at_mm": [
+       130,
+       25,
+       10
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Revolute 1"
+    },
+    {
+     "type": "Revolute",
+     "first": {
+      "instance": "C",
+      "entity": "edge",
+      "what": "bottom edge",
+      "at_mm": [
+       200,
+       5,
+       0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "B",
+      "entity": "vertex",
+      "what": "vertex (160,40,10)",
+      "at_mm": [
+       160,
+       40,
+       10
+      ],
+      "inference": "POINT"
+     },
+     "flip_primary": false,
+     "name": "Revolute 2"
+    }
+   ],
+   "drag": {
+    "inst": "C",
+    "local": [
+     205,
+     0,
+     30
+    ],
+    "moves": [
+     [
+      "top",
+      [
+       0,
+       15
+      ]
+     ],
+     [
+      "top",
+      [
+       0,
+       40
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "case": "d8",
+   "instances": [
+    {
+     "name": "A",
+     "part": "PLATE",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "PLATE",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "C",
+     "part": "PIN",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Revolute",
+     "first": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "hole bottom edge",
+      "at_mm": [
+       130,
+       25,
+       0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole top edge",
+      "at_mm": [
+       130,
+       25,
+       10
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Revolute 1"
+    },
+    {
+     "type": "Fastened",
+     "first": {
+      "instance": "C",
+      "entity": "edge",
+      "what": "bottom edge",
+      "at_mm": [
+       200,
+       5,
+       0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "B",
+      "entity": "vertex",
+      "what": "vertex (160,40,10)",
+      "at_mm": [
+       160,
+       40,
+       10
+      ],
+      "inference": "POINT"
+     },
+     "flip_primary": false,
+     "name": "Fastened 2"
+    }
+   ],
+   "drag": {
+    "inst": "C",
+    "local": [
+     205,
+     0,
+     30
+    ],
+    "moves": [
+     [
+      "top",
+      [
+       0,
+       15
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "case": "d9",
+   "instances": [
+    {
+     "name": "A",
+     "part": "PLATE",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "PLATE",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "C",
+     "part": "PLATE",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "D",
+     "part": "PLATE",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Revolute",
+     "first": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "hole bottom edge",
+      "at_mm": [
+       130,
+       25,
+       0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole top edge",
+      "at_mm": [
+       130,
+       25,
+       10
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Revolute 1"
+    },
+    {
+     "type": "Revolute",
+     "first": {
+      "instance": "C",
+      "entity": "vertex",
+      "what": "vertex (100,0,0)",
+      "at_mm": [
+       100,
+       0,
+       0
+      ],
+      "inference": "POINT"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "vertex",
+      "what": "vertex (100,0,10)",
+      "at_mm": [
+       100,
+       0,
+       10
+      ],
+      "inference": "POINT"
+     },
+     "flip_primary": false,
+     "name": "Revolute 2"
+    },
+    {
+     "type": "Revolute",
+     "first": {
+      "instance": "D",
+      "entity": "vertex",
+      "what": "vertex (160,0,0)",
+      "at_mm": [
+       160,
+       0,
+       0
+      ],
+      "inference": "POINT"
+     },
+     "second": {
+      "instance": "B",
+      "entity": "vertex",
+      "what": "vertex (160,0,10)",
+      "at_mm": [
+       160,
+       0,
+       10
+      ],
+      "inference": "POINT"
+     },
+     "flip_primary": false,
+     "name": "Revolute 3"
+    },
+    {
+     "type": "Revolute",
+     "first": {
+      "instance": "D",
+      "entity": "vertex",
+      "what": "vertex (160,40,0)",
+      "at_mm": [
+       160,
+       40,
+       0
+      ],
+      "inference": "POINT"
+     },
+     "second": {
+      "instance": "C",
+      "entity": "vertex",
+      "what": "vertex (160,40,10)",
+      "at_mm": [
+       160,
+       40,
+       10
+      ],
+      "inference": "POINT"
+     },
+     "flip_primary": false,
+     "name": "Revolute 4"
+    }
+   ],
+   "drag": {
+    "inst": "D",
+    "local": [
+     160,
+     20,
+     10
+    ],
+    "moves": [
+     [
+      "top",
+      [
+       10,
+       0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "case": "d9b",
+   "instances": [
+    {
+     "name": "A",
+     "part": "PLATE",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "PLATE",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "C",
+     "part": "PLATE",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "D",
+     "part": "PLATE",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Revolute",
+     "first": {
+      "instance": "B",
+      "entity": "edge",
+      "what": "hole bottom edge",
+      "at_mm": [
+       130,
+       25,
+       0
+      ],
+      "inference": "CENTER"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "edge",
+      "what": "hole top edge",
+      "at_mm": [
+       130,
+       25,
+       10
+      ],
+      "inference": "CENTER"
+     },
+     "flip_primary": false,
+     "name": "Revolute 1"
+    },
+    {
+     "type": "Revolute",
+     "first": {
+      "instance": "C",
+      "entity": "vertex",
+      "what": "vertex (100,0,0)",
+      "at_mm": [
+       100,
+       0,
+       0
+      ],
+      "inference": "POINT"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "vertex",
+      "what": "vertex (100,0,10)",
+      "at_mm": [
+       100,
+       0,
+       10
+      ],
+      "inference": "POINT"
+     },
+     "flip_primary": false,
+     "name": "Revolute 2"
+    },
+    {
+     "type": "Revolute",
+     "first": {
+      "instance": "D",
+      "entity": "vertex",
+      "what": "vertex (160,0,0)",
+      "at_mm": [
+       160,
+       0,
+       0
+      ],
+      "inference": "POINT"
+     },
+     "second": {
+      "instance": "B",
+      "entity": "vertex",
+      "what": "vertex (160,0,10)",
+      "at_mm": [
+       160,
+       0,
+       10
+      ],
+      "inference": "POINT"
+     },
+     "flip_primary": false,
+     "name": "Revolute 3"
+    },
+    {
+     "type": "Cylindrical",
+     "first": {
+      "instance": "D",
+      "entity": "vertex",
+      "what": "vertex (160,40,0)",
+      "at_mm": [
+       160,
+       40,
+       0
+      ],
+      "inference": "POINT"
+     },
+     "second": {
+      "instance": "C",
+      "entity": "vertex",
+      "what": "vertex (160,40,10)",
+      "at_mm": [
+       160,
+       40,
+       10
+      ],
+      "inference": "POINT"
+     },
+     "flip_primary": false,
+     "name": "Cylindrical 4"
+    }
+   ],
+   "drag": {
+    "inst": "D",
+    "local": [
+     160,
+     20,
+     10
+    ],
+    "moves": [
+     [
+      "top",
+      [
+       10,
+       0
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}
