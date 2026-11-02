@@ -14,7 +14,9 @@ Shell's no-cavity rule (bc497e6a, live 1794), Fill's per-edge adjacent faces, FL
 their own polynomials (live 1799), the feature audit's table. Checked and not a gap: a box on a thin flange shells by
 slabs in 40 ms (thin regions kept solid as live). Open: shell-hang Shell 5 (live builds; ours fails in 17 s: OCCT's
 offset modes all give no solid), FI2 (G1 Fill dome: OCCT's plate throws), the working-scale Shell (6 tests moved).
-perf.sh of bench_edit_latency_reuse started on vibe3 15:45 (log /root/core-scratch/perf-reuse.log).
+perf.sh bench_edit_latency_reuse on vibe3 (6e9ebca4, tests/perf documents only, reuse on): live-30-features depth
+76.3 ms (21 of 30 features ran), fillet radius 41.2, suppress 39.1 (budget 200); big-plate depth 83.5, suppress 1.2;
+fins-400 depth 4589 / suppress 771 (the 400-fin pattern's Boolean: bool); the Ø25 knurl depth 8860 ms (bool).
 
 **State 11-02 15:50.** Landed since 14:50: NF-CHAMFER-HANG-1212 (a40adc90, patch 0018, lib sync asked),
 COMPOSITE-LATER-FEATURE (75d20033), loft circle split (466a0805), feature audit batches 11-13 with BD2 / WR1 fixed
