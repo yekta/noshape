@@ -2049,7 +2049,11 @@ fn least_change(problem: &Problem, poses: &mut [Frame], free: &[usize], scale: f
         to_anchor(&mut along, -1.0);
         let along = DVector::from_column_slice(along.as_slice());
         let svd = jac.svd(true, true);
-        let tol = 1e-10 * svd.singular_values.iter().fold(0.0f64, |a, v| a.max(*v));
+        // The correction inverts no direction the null space above takes for
+        // free (σ ≤ 1e-4 σmax, as its eigenvalue cut): a 1e-8 residual
+        // read along a free turn undid it by 23° and the rounds diverged
+        // (live asm batch 3 f52: a pin on a Revolute keeps its turn).
+        let tol = 1e-4 * svd.singular_values.iter().fold(0.0f64, |a, v| a.max(*v));
         let Ok(fix) = svd.solve(&(-DVector::from_column_slice(&r)), tol) else { return };
         let delta = along + fix;
         for (k, &bi) in free.iter().enumerate() {

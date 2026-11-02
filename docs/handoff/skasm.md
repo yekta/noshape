@@ -784,6 +784,12 @@ width: left side kept, right side moves, the free centre line by half, as ours).
 Midpoint `localEntity1` / `localEntity2` (the generator writes those now; sketch-7.json rewritten, same cases). Open
 P1: drag probes g4 (parked, speed) and g6 (live keeps the lower-left hole, moves the centre on its circle, projects the
 free hole radially: a constructive drag, not least norm; the constructive-drag try broke probes 7 before).
+21:26: asm f52 fixed (a pin C, Parallel to A and on a Revolute in D's hole, kept its 137.3° turn in live; ours turned it
+23°): `least_change` took free directions at σ ≤ 1e-4 σmax (its eigenvalue cut) but its correction's SVD inverted down to
+1e-10 σmax, so a 1e-8 residual read along the free turn undid it and the rounds diverged (the result was then thrown
+away). The correction now uses the same cut. Asm batches 1–3 75/80 (KNOWN f50 f53 f54 f55 f64); probes and drags
+unchanged. Sent live sketch batch 8 (hexagon, chamfered rectangle, parallelogram kinds, s461–s500) and probes 11
+(leave-one-out of s218 / s236 / s226).
 Drag rule, second try (not landed): no held-first for undimensioned drags, the levels weighed 1e5 in the one solve:
 g4's bottom 8e-6 off, but probes 7 8 → 7/8 and 9 4 → 3/6, and the bench (dimensioned) stays slow: its extra cost is
 the held-first step with the levels fixed too (it fails more often and the weighted solve runs after it). A free

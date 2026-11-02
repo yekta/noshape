@@ -606,7 +606,7 @@ fn asm_fuzz_live_matches() {
     // red; f53 the half-turn's point when both parts are held (probes 1798
     // (c): it depends on what the turned part carries); f52 / f55 / f64 a
     // free part's pose after a Ball / Cylindrical / Slider chain.
-    const KNOWN: &[&str] = &["f50", "f52", "f53", "f54", "f55", "f64"];
+    const KNOWN: &[&str] = &["f50", "f53", "f54", "f55", "f64"];
     let mut parts = parts();
     let (mut answered, mut matches, mut report) = (0, 0, Vec::new());
     for n in 1.. {
