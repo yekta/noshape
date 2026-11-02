@@ -337,7 +337,12 @@ impl Sketch {
             let keep = cons.iter().filter(|(c, us)| us.len() >= 2 && !holds[c] && !(self.connective(*c) && self.aliased(*c)) && !us.iter().any(|x| placed.contains(x)) && !self.chained_to_change(*c, cons, &holds)).find_map(|(c, us)| {
                 let k = self.kept_first_in(us, cons, Some(*c));
                 let resized = anchored.contains(&k) && self.chained_size(k, cons).is_some_and(|x| (x.value().unwrap_or(0.0) - self.size(k)).abs() > 1e-9);
-                (own_hold(k) && !resized && self.class_keeps(*c, k, cons) && self.direction_agrees(k, cons)).then_some(k)
+                // Not one with a relation to placed geometry that doesn't
+                // hold (fuzz s218: a side whose end must come onto a kept
+                // line can't stay; the pass then closes, s215 / s219 nearer
+                // live too).
+                let tied = cons.iter().any(|(x, xs)| xs.len() >= 2 && xs.contains(&k) && !holds[x] && xs.iter().any(|y| *y != k && placed.contains(y)));
+                (own_hold(k) && !resized && !tied && self.class_keeps(*c, k, cons) && self.direction_agrees(k, cons)).then_some(k)
             });
             // An arc or circle so kept whose Equal chain gives it a new size
             // keeps the end it shares with a neighbour instead: that

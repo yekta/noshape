@@ -752,6 +752,9 @@ own-freedom rule, a7d3bf69). In T2 asm_drag_probes_match_live (now probes 1 + 2,
 d7 1.6°, d8 0.12°, d1 1.3°, d5 1.2°, d4 2.1° (live's pointer landing); d6 (Ball) 6.3°: ours tips the block 12° (the
 point nearest the pointer's ray), live 6.9° (a target in the drag plane at the point's start depth gives 5.4°):
 open. d9 (four-bar) didn't close in live with vertex connectors (not a probe).
+18:37: the keep step no longer keeps a unit with an unheld relation to placed geometry (s218's l10, its end due on
+the kept l2, was kept by its Angle and the pass couldn't close): batches 1–6 1262 → 1223 mm (s215 40 → 16, s219 35 →
+13, s218 90 → 95: now placed, but live keeps neither l8 nor l9, see the trace). Probes / drags / edits unchanged.
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
