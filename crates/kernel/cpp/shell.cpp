@@ -177,6 +177,14 @@ TopoDS_Shape single_solid(const TopoDS_Shape& s)
   return s;
 }
 
+int shell_count(const TopoDS_Shape& s)
+{
+  int n = 0;
+  for (TopExp_Explorer e(s, TopAbs_SHELL); e.More(); e.Next())
+    ++n;
+  return n;
+}
+
 // Shells of an offset result as one outward-oriented solid.
 TopoDS_Shape solid_of(const TopoDS_Shape& s)
 {
@@ -525,46 +533,54 @@ bool in_onshape_mitre_band(const TopoDS_Shape& solid, const std::vector<TopoDS_S
 // Whether no removed face opens onto anything: inward, every sampled point of every removed face has the part's other
 // side less than a wall's thickness behind it (live 1794: the bottom face of a 0.1 mm slab, Shell 0.5 to 3 mm inward
 // all fail; Parasolid's shell has no cavity to open there).
-bool opening_too_shallow(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t)
+// Whether a removed face has material a wall's depth `t` behind it somewhere (a 7 x 7 sample of the face).
+bool face_has_depth(BRepClass3d_SolidClassifier& in, const TopoDS_Face& f, double t, double tol)
+{
+  double u0, u1, v0, v1;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  BRepAdaptor_Surface sa(f);
+  const int           n = 7;
+  for (int a = 0; a < n; ++a)
+    for (int b = 0; b < n; ++b)
+    {
+      const gp_Pnt2d uv(u0 + (u1 - u0) * (a + 0.5) / n, v0 + (v1 - v0) * (b + 0.5) / n);
+      if (BRepClass_FaceClassifier(f, uv, tol).State() != TopAbs_IN)
+        continue;
+      gp_Pnt p;
+      gp_Vec du, dv;
+      sa.D1(uv.X(), uv.Y(), p, du, dv);
+      gp_Vec nrm = du.Crossed(dv);
+      if (nrm.Magnitude() < 1e-12)
+        continue;
+      nrm.Normalize();
+      if (f.Orientation() == TopAbs_REVERSED)
+        nrm.Reverse();
+      // Material all the way to a wall's depth behind it.
+      bool deep = true;
+      for (int k = 1; k <= 4 && deep; ++k)
+      {
+        in.Perform(p.Translated(nrm * (-t * k / 4.0)), tol);
+        deep = in.State() == TopAbs_IN;
+      }
+      if (deep)
+        return true;
+    }
+  return false;
+}
+
+// The removed faces with nothing a wall's depth behind them. Parasolid keeps such a face as a face when another
+// removed face opens (live shell-hang Shell 5: its first removed face stays as it was) and fails when none opens
+// (live 1794).
+std::vector<bool> shallow_openings(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t)
 {
   BRepClass3d_SolidClassifier in(solid);
   Bnd_Box                     box;
   BRepBndLib::Add(solid, box);
-  const double tol = 1e-7 * std::sqrt(box.SquareExtent());
+  const double      tol = 1e-7 * std::sqrt(box.SquareExtent());
+  std::vector<bool> shallow;
   for (const TopoDS_Shape& rf : removed)
-  {
-    const TopoDS_Face   f = TopoDS::Face(rf);
-    double              u0, u1, v0, v1;
-    BRepTools::UVBounds(f, u0, u1, v0, v1);
-    BRepAdaptor_Surface sa(f);
-    const int           n = 7;
-    for (int a = 0; a < n; ++a)
-      for (int b = 0; b < n; ++b)
-      {
-        const gp_Pnt2d uv(u0 + (u1 - u0) * (a + 0.5) / n, v0 + (v1 - v0) * (b + 0.5) / n);
-        if (BRepClass_FaceClassifier(f, uv, tol).State() != TopAbs_IN)
-          continue;
-        gp_Pnt p;
-        gp_Vec du, dv;
-        sa.D1(uv.X(), uv.Y(), p, du, dv);
-        gp_Vec nrm = du.Crossed(dv);
-        if (nrm.Magnitude() < 1e-12)
-          continue;
-        nrm.Normalize();
-        if (f.Orientation() == TopAbs_REVERSED)
-          nrm.Reverse();
-        // Material all the way to a wall's depth behind it.
-        bool deep = true;
-        for (int k = 1; k <= 4 && deep; ++k)
-        {
-          in.Perform(p.Translated(nrm * (-t * k / 4.0)), tol);
-          deep = in.State() == TopAbs_IN;
-        }
-        if (deep)
-          return false;
-      }
-  }
-  return true;
+    shallow.push_back(!face_has_depth(in, TopoDS::Face(rf), t, tol));
+  return shallow;
 }
 
 bool blind_hole_floor_too_thin(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t)
@@ -4295,7 +4311,105 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
   }
   TopoDS_Shape union_;
   HHist        hu;
-  if (tools.Extent() == 1)
+  TopoDS_Shape r;
+  HHist        hb;
+  HHist        hc; // the pocket's cut (the fused slabs' faces -> the pocket's), when the pocket is cut out
+  // Very many slabs, inward: the cavity grown from the openings, the slabs meeting it fused, what lies beyond them and
+  // touches a removed face, again with the slabs meeting that, until none is new; then cut out of the solid (with
+  // every slab in, the regions reaching no opening too: voids). A part thinner than two walls away from its openings
+  // (shell-hang Shell 5: live hollows a 2890 mm³ pocket behind its opening, every other face as it was) never fuses
+  // the far slabs (all 128 of Shell 5's took 22 s and gave an invalid common). A deep region far from every opening
+  // that no slab near the cavity reaches stays solid.
+  // (Only past 112 slabs: 82ac's 102, its cavity most of the part, fuse at once in 7 s; grown, 10.5 s.)
+  const bool pocket = sign < 0 && tools.Extent() > 112 && !std::getenv("NOSHAPE_SHELL_NO_POCKET");
+  if (pocket)
+  {
+    std::vector<TopoDS_Shape> all;
+    std::vector<Bnd_Box>      boxes;
+    for (ShapeList::Iterator it(tools); it.More(); it.Next())
+    {
+      all.push_back(it.Value());
+      Bnd_Box b;
+      BRepBndLib::Add(it.Value(), b);
+      boxes.push_back(b);
+    }
+    std::vector<bool> used(all.size(), false);
+    Bnd_Box           reach;
+    for (const TopoDS_Shape& g : removed)
+      BRepBndLib::Add(g, reach);
+    reach.Enlarge(t);
+    ShapeList open;
+    for (int round = 0; round < 20; ++round)
+    {
+      bool grew = false;
+      for (size_t k = 0; k < all.size(); ++k)
+        if (!used[k] && !boxes[k].IsOut(reach))
+          used[k] = grew = true;
+      if (!grew && round > 0)
+        break;
+      ShapeList sel;
+      for (size_t k = 0; k < all.size(); ++k)
+        if (used[k])
+          sel.Append(all[k]);
+      if (sel.IsEmpty())
+        return false;
+      TopoDS_Shape u = sel.First();
+      HHist        uh;
+      if (sel.Extent() > 1)
+      {
+        ShapeList first, rest = sel;
+        first.Append(rest.First());
+        rest.RemoveFirst();
+        if (!quick_boolean(0, first, rest, bop_parallel(), u, uh))
+          return false;
+      }
+      ShapeList a1, a2;
+      a1.Append(solid);
+      a2.Append(u);
+      TopoDS_Shape deep;
+      HHist        dh;
+      if (!quick_boolean(1, a1, a2, bop_parallel(), deep, dh))
+        return false;
+      open.Clear();
+      Bnd_Box    next;
+      const bool every = std::all_of(used.begin(), used.end(), [](bool b) { return b; });
+      for (TopExp_Explorer e(deep, TopAbs_SOLID); e.More(); e.Next())
+      {
+        // With every slab in, the regions that reach no opening are voids, as Parasolid makes them (82ac: three
+        // shells).
+        bool touches = every;
+        for (const TopoDS_Shape& g : removed)
+        {
+          BRepExtrema_DistShapeShape dd(e.Current(), g);
+          touches = touches || (dd.IsDone() && dd.Value() < 1e-7 * (1 + t));
+        }
+        if (touches)
+        {
+          open.Append(e.Current());
+          BRepBndLib::Add(e.Current(), next);
+        }
+      }
+      if (dbg)
+        std::fprintf(stderr, "slabs: pocket round %d: %d of %d slabs, %d open regions\n", round, sel.Extent(), tools.Extent(), open.Extent());
+      union_ = u;
+      hu = uh;
+      hc = dh;
+      if (open.IsEmpty())
+        return false;
+      next.Enlarge(1e-6 * (1 + t));
+      reach = next;
+    }
+    lap("pocket");
+    ShapeList a1;
+    a1.Append(solid);
+    TopoDS_Shape cut;
+    HHist        ch;
+    if (!quick_boolean(1, a1, open, bop_parallel(), cut, ch))
+      return false;
+    r  = cut;
+    hb = ch;
+  }
+  else if (tools.Extent() == 1)
     union_ = tools.First();
   else
   {
@@ -4310,11 +4424,9 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     hu = fu_hist;
   }
   lap("fuse");
-  TopoDS_Shape r;
-  HHist        hb;
   if (dbg)
     std::fprintf(stderr, "slabs: %d tools, union volume %.6g\n", tools.Extent(), volume_of(union_));
-  if (sign < 0)
+  if (!pocket && sign < 0)
   {
     ShapeList a1, a2;
     a1.Append(solid);
@@ -4331,7 +4443,7 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     r = co_out;
     hb = co_hist;
   }
-  else
+  else if (!pocket)
   {
     // Outward: the wall is outside the solid, and stops at the planes of the
     // removed faces.
@@ -4427,7 +4539,7 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     }
   }
   out.result = r;
-  out.history = shell_history(solid, r, {hb, hs}, {hu, hb, hs}, sources, removed);
+  out.history = hc.IsNull() ? shell_history(solid, r, {hb, hs}, {hu, hb, hs}, sources, removed) : shell_history(solid, r, {hb, hs}, {hu, hc, hb, hs}, sources, removed);
   return true;
 }
 
@@ -4642,8 +4754,17 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
       if (shells > 1)
         fail_op("shell failed (Parasolid can't shell a solid with a void: live 1757)");
     }
-  if (!outward && !removed.empty() && opening_too_shallow(solid.shape, removed, thickness))
-    fail_op("shell failed (Parasolid has no cavity to open behind the removed faces: live 1794)");
+  if (!outward && !removed.empty())
+  {
+    const std::vector<bool> shallow = shallow_openings(solid.shape, removed, thickness);
+    if (std::all_of(shallow.begin(), shallow.end(), [](bool b) { return b; }))
+      fail_op("shell failed (Parasolid has no cavity to open behind the removed faces: live 1794)");
+    std::vector<TopoDS_Shape> open;
+    for (size_t i = 0; i < removed.size(); ++i)
+      if (!shallow[i])
+        open.push_back(removed[i]);
+    removed = open;
+  }
   if (!outward && blind_hole_floor_too_thin(solid.shape, removed, thickness))
     fail_op("shell failed (Parasolid can't offset a blind hole's bottom past the cavity floor: live 'core (2026-10-27 b)')");
   const double gap = outward ? std::numeric_limits<double>::infinity() : offsets_touch_gap(solid.shape, removed, thickness);

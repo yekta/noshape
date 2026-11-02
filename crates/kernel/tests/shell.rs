@@ -1024,7 +1024,23 @@ fn shellhang_shell5_probe() {
     println!("input {:.4} mm3 {} faces; removing {}; live {:.4} mm3 {} faces", vol(&s), s.count(ShapeType::Face), rm.len(), vol(&live), live.count(ShapeType::Face));
     let t0 = std::time::Instant::now();
     match shell_solid(&s, &rm, 3.0, ShellSide::Inside, ShellMethod::Auto) {
-        Ok(r) => println!("ours {:.4} mm3, {} faces, valid {}, {:.0} ms via {}; live - ours {:.4}, ours - live {:.4}", vol(&r.shape), r.shape.count(ShapeType::Face), r.shape.is_valid(), t0.elapsed().as_secs_f64() * 1e3, last_shell_path(), vol(&cut(&live, &r.shape).unwrap().shape), vol(&cut(&r.shape, &live).unwrap().shape)),
+        Ok(r) => {
+            println!("ours {:.4} mm3, {} faces, valid {}, {:.0} ms via {}; live - ours {:.4}, ours - live {:.4}", vol(&r.shape), r.shape.count(ShapeType::Face), r.shape.is_valid(), t0.elapsed().as_secs_f64() * 1e3, last_shell_path(), vol(&cut(&live, &r.shape).unwrap().shape), vol(&cut(&r.shape, &live).unwrap().shape));
+            let inp: Vec<(DVec3, f64)> = s.faces().iter().map(|f| (f.centroid().unwrap(), surface_properties(f).unwrap().mass)).collect();
+            for f in r.shape.faces() {
+                let (c, a) = (f.centroid().unwrap(), surface_properties(&f).unwrap().mass);
+                if !inp.iter().any(|(c2, a2)| (c - *c2).length() < 1e-4 && (a - a2).abs() < 1e-4) {
+                    println!("NEW {} area {a:.4} centre ({:.3}, {:.3}, {:.3})", format!("{:?}", f.face_surface().ok()).chars().take(9).collect::<String>(), c.x, c.y, c.z);
+                }
+            }
+            for d in [cut(&r.shape, &live).unwrap().shape, cut(&live, &r.shape).unwrap().shape] {
+                for p in d.solids() {
+                    let b = p.bounding_box(true).unwrap();
+                    println!("diff piece {:.4} mm3 in {:?} .. {:?}", vol(&p), b.min, b.max);
+                }
+                println!("--");
+            }
+        }
         Err(e) => println!("ours: {e} ({:.0} ms)", t0.elapsed().as_secs_f64() * 1e3),
     }
 }
