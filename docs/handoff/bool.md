@@ -41,6 +41,20 @@ Fusing the slabs yours takes first and adding the offset ones after doesn't help
 next reasons: 3.9 → 5.9 s on a dump); one OCCT common of the solid with all slabs as one tool group changes results.
 Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scratch SHELLDUMP=<path without .brep>).
 
+## Shell's declines by OCCT time; a plane along a cylinder but for rounding; a vertex in a face (11-02 12:40 UTC)
+- Shell's fuzz recordings (shfall, 194) on main by OCCT time declined: a face's vertex off its plane 63 s (19,
+  tolerant: the rule taking them broke cli-shell-gpf), a point near two vertices 40 s (16, mostly absurd tolerances),
+  a plane nearly along a cylinder 31 s (2), a vertex in a face 20 s (3), a tolerant input 20 s (6), an edge nearly on
+  another argument's face 18.5 s (11, 10-100 um tolerances), a closed edge 12.7 s (7: a 3 mm line or a half circle
+  inside one vertex: absurd), two edges 11.5 s (12), seams apart 9 s (15).
+- "A plane nearly along a cylinder": both were planes along the axis but for rounding (|n · a| 6e-11, 2.4e-9): a
+  plane whose tilt over the cylinder face stays within a tenth of the tolerance is along it now (its two rulings).
+  Both move on (an edge nearly on another argument's face; an edge without its curve on a free-form face). T1
+  a_plane_along_a_cylinder_but_for_rounding.
+- "A vertex in a face" (an INTERNAL vertex on no wire): left out of the body; OCCT's result keeps none in the faces
+  it splits either: a7bdd15b taken, as OCCT's (T1 a_vertex_inside_a_face); the other two move on to a point near two
+  vertices. shfall 21 -> 22 taken, 0 differ.
+
 ## The merge after USD left a Shell common's unify invalid: fixed (11-02 12:00 UTC)
 - 82ba8082's merge after USD (groups of one frame it left apart) is checked as a whole now: USD joining their
   boundary's edges after it left a Shell common with hyperbola edges (shfall 14218a58, taken since d03803a2)

@@ -533,6 +533,10 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     b.reversed.push_back((f.Orientation() == TopAbs_REVERSED) != flip);
     for (TopoDS_Iterator wi(f); wi.More(); wi.Next())
     {
+      // (A vertex inside it (INTERNAL, on no wire: Shell's slabs of a part with one) left out: OCCT's result keeps
+      // none in the faces it splits either (shfall a7bdd15b); any difference shows in the result's counts.)
+      if (wi.Value().ShapeType() == TopAbs_VERTEX)
+        continue;
       if (wi.Value().ShapeType() != TopAbs_WIRE)
         return "a vertex in a face";
       for (TopoDS_Iterator ei(wi.Value()); ei.More(); ei.Next())

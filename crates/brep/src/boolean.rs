@@ -2161,7 +2161,10 @@ impl Ctx<'_> {
             let k = Circ { c, n: a, x, y, r: rc };
             return self.section(fp, fc, Path::Circle(k), th0, th0 + TAU);
         }
-        if na.abs() > 1e-12 {
+        // (Along it within a tenth of the tolerance over the face (|n · a| 2.4e-9 and 6e-11: Shell's slabs of a part's
+        // walls): along it, its two rulings; OCCT's ellipse there is r / |n · a| long.)
+        let tilt = na.abs() * (self.faces[fc].hi - self.faces[fc].lo).length();
+        if na.abs() > 1e-12 && (slope != 0.0 || tilt > 0.1 * tol) {
             if slope != 0.0 {
                 return self.plane_cone(fp, fc);
             }

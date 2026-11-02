@@ -791,3 +791,34 @@ fn a_part_fused_with_its_mirror_unifies_its_holes() {
     assert!(u.is_valid(), "unified invalid");
     assert_eq!(u.count(k::ShapeType::Face), 33);
 }
+
+/// A cylinder cut by a box whose side runs along its axis but for a 1e-9 rad tilt (Shell's slabs of a part's walls:
+/// |n · a| 2.4e-9): along it within a tenth of the tolerance over the face, its two rulings (it declined "a plane
+/// nearly along a cylinder"; OCCT's ellipse there is r / |n · a| long). Taken, valid, OCCT's volume and counts.
+#[test]
+fn a_plane_along_a_cylinder_but_for_rounding() {
+    let _ = k::set_working_scale(1000.0);
+    let cyl = k::make_cylinder(&z_frame(DVec3::ZERO), 0.005, 0.02, TAU).unwrap();
+    let block = k::make_box_corners(DVec3::new(0.002, -0.01, -0.005), DVec3::new(0.01, 0.01, 0.025)).unwrap();
+    let block = k::transform(&block, &k::Transform::Rotate { origin: DVec3::ZERO, axis: DVec3::Y, angle: 1e-9 }, true).unwrap().shape;
+    let opts = k::BooleanOptions::default();
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&cyl), std::slice::from_ref(&block), &opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&cyl), std::slice::from_ref(&block), &opts).expect("OCCT's");
+    k::set_rust_boolean(None);
+    assert!(r.shape.is_valid());
+    assert_eq!(r.shape.count(k::ShapeType::Face), o.shape.count(k::ShapeType::Face));
+    let (v, w) = (r.shape.volume().unwrap(), o.shape.volume().unwrap());
+    assert!((v - w).abs() <= 1e-9 * w, "volume {v} against OCCT's {w}");
+}
+
+/// Shell's slab common on a part with a vertex inside a face (INTERNAL, on no wire; recorded): left out, as OCCT's
+/// result keeps none in the faces it splits either (it declined "a vertex in a face"); valid, OCCT's counts and volume.
+#[test]
+fn a_vertex_inside_a_face() {
+    valid_as_occt("a7bdd15ba4f8613a", 1e-9);
+}
