@@ -32,6 +32,7 @@ pub mod install;
 pub mod live;
 pub mod material_data;
 pub mod ops;
+pub mod parity;
 pub mod prefs;
 pub mod reference;
 pub mod refs;

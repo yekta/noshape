@@ -1,0 +1,190 @@
+//! The model parity suite (docs/PARITY-SUITES.md §1): Onshape Part Studios
+//! rebuilt feature by feature and compared with live after each feature.
+
+use noshape_ops::Ctx;
+use noshape_ops::parity::{Translator, differences, live_parts, our_parts, parse_refs};
+use serde_json::{Value, json};
+use std::path::{Path, PathBuf};
+
+fn scratch(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("noshape-parity-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    dir.join(name)
+}
+
+/// One document's result: features matching live, and the first that doesn't.
+struct ModelResult {
+    name: String,
+    features: usize,
+    matching: usize,
+    first: Option<String>,
+    untranslated: Vec<String>,
+}
+
+/// Rebuilds `features` and compares with `live` (live.jsonl lines) after each feature.
+fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelResult {
+    let mut ctx = Ctx::new();
+    let path = scratch(&format!("{name}.noshape"));
+    let mut res = ModelResult { name: name.to_string(), features: 0, matching: 0, first: None, untranslated: Vec::new() };
+    let mut t = match Translator::open(&mut ctx, &path, features, parse_refs(refs)) {
+        Ok(t) => t,
+        Err(e) => {
+            res.first = Some(format!("not opened: {e}"));
+            return res;
+        }
+    };
+    res.features = t.len();
+    for k in 0..t.len() {
+        let step = t.step(k);
+        for p in &step.problems {
+            res.untranslated.push(format!("{} ({}): {p}", step.name, step.feature_type));
+        }
+        let Some(line) = live.iter().find(|l| l["index"].as_u64() == Some(k as u64)) else {
+            res.first.get_or_insert_with(|| format!("{}: no live.jsonl line {k}", step.name));
+            continue;
+        };
+        let mut diff = Vec::new();
+        let live_status = line["status"].as_str().unwrap_or("OK").to_uppercase();
+        let ours = step.status.clone().unwrap_or_else(|| "not built".into()).to_uppercase();
+        if ours != live_status {
+            diff.push(format!("status {ours}, live {live_status}"));
+        }
+        match our_parts(&mut t) {
+            Ok(parts) => diff.extend(differences(&live_parts(line), &parts)),
+            Err(e) => diff.push(format!("parts: {e}")),
+        }
+        if diff.is_empty() {
+            res.matching += 1;
+        } else if res.first.is_none() {
+            res.first = Some(format!("feature {k} \"{}\" ({}): {}", step.name, step.feature_type, diff.join("; ")));
+        }
+    }
+    res
+}
+
+fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
+    let features: Value = serde_json::from_str(&std::fs::read_to_string(dir.join("features.json")).ok()?).ok()?;
+    let live = std::fs::read_to_string(dir.join("live.jsonl")).unwrap_or_default().lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).filter(|l| l.get("index").is_some()).collect();
+    let refs = std::fs::read_to_string(dir.join("refs.jsonl")).unwrap_or_default();
+    Some((features, live, refs))
+}
+
+/// Every document under /root/parity/models (NOSHAPE_PARITY_MODELS; one
+/// name with NOSHAPE_PARITY_ONLY): the first feature that differs per
+/// document, what wasn't translated, and the score. Writes report.json next
+/// to the models; NOSHAPE_PARITY_INDEX=1 rewrites tests/parity-models/index.json
+/// from their source.json.
+#[test]
+#[ignore = "T2: live's models from /root/parity/models (other people's work, never in the repo)"]
+fn parity_models() {
+    let root = PathBuf::from(std::env::var("NOSHAPE_PARITY_MODELS").unwrap_or_else(|_| "/root/parity/models".into()));
+    let only = std::env::var("NOSHAPE_PARITY_ONLY").ok();
+    let mut dirs: Vec<PathBuf> = std::fs::read_dir(&root).map(|d| d.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.join("features.json").is_file()).collect()).unwrap_or_default();
+    dirs.sort();
+    let mut results = Vec::new();
+    let mut index = Vec::new();
+    for dir in dirs {
+        let name = dir.file_name().unwrap().to_string_lossy().to_string();
+        if only.as_ref().is_some_and(|o| *o != name) {
+            continue;
+        }
+        if let Ok(s) = std::fs::read_to_string(dir.join("source.json")).map(|t| serde_json::from_str::<Value>(&t).unwrap_or(Value::Null)) {
+            index.push(json!({ "name": name, "document": s["document"], "workspace": s["workspace"], "element": s["element"], "url": s["url"] }));
+        }
+        let Some((features, live, refs)) = read_model(&dir) else {
+            println!("{name}: unreadable features.json");
+            continue;
+        };
+        let r = run_model(&name, &features, &live, &refs);
+        println!("{}: {}/{} features match{}", r.name, r.matching, r.features, r.first.as_ref().map(|f| format!("; first difference: {f}")).unwrap_or_else(|| "; matches to the end".into()));
+        for u in &r.untranslated {
+            println!("  untranslated: {u}");
+        }
+        results.push(r);
+    }
+    let docs = results.iter().filter(|r| r.first.is_none() && r.features > 0).count();
+    let (matching, total) = results.iter().fold((0, 0), |(m, t), r| (m + r.matching, t + r.features));
+    println!("parity_models score: {docs}/{} documents match to the end, {matching}/{total} features match", results.len());
+    let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "matching": r.matching, "first_difference": r.first, "untranslated": r.untranslated })).collect();
+    let _ = std::fs::write(root.with_file_name("report.json"), serde_json::to_string_pretty(&json!({ "documents_matching": docs, "documents": results.len(), "features_matching": matching, "features": total, "models": report })).unwrap());
+    if std::env::var_os("NOSHAPE_PARITY_INDEX").is_some() {
+        let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/parity-models/index.json");
+        std::fs::write(file, serde_json::to_string_pretty(&index).unwrap() + "\n").unwrap();
+    }
+}
+
+/// A small Part Studio as Onshape's REST gives it: a 60 × 40 rectangle with
+/// a Ø8 hole on Top, extruded 20 mm (all the sketch's regions but the
+/// hole's, by geometry), a 3 mm fillet on one vertical edge, and live's
+/// state after each feature.
+fn block_model() -> (Value, Vec<Value>, String) {
+    let line = |id: &str, (x0, y0): (f64, f64), (x1, y1): (f64, f64)| {
+        let l = ((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0)).sqrt();
+        json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "isConstruction": false, "startParam": 0.0, "endParam": l,
+            "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": x0, "pntY": y0, "dirX": (x1 - x0) / l, "dirY": (y1 - y0) / l } })
+    };
+    let q = |v: &str| json!({ "btType": "BTMParameterQuantity-147", "parameterId": "", "expression": v });
+    let mut depth = q("20 mm");
+    depth["parameterId"] = json!("depth");
+    let mut radius = q("3 mm");
+    radius["parameterId"] = json!("radius");
+    let mut dia = q("8 mm");
+    dia["parameterId"] = json!("length");
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"], "queryString": "query=qCompressed(1.0,\"%B5$QueryM4S…TopplaneOp…\",id);" }] }],
+          "entities": [line("r0", (0.0, 0.0), (0.06, 0.0)), line("r1", (0.06, 0.0), (0.06, 0.04)), line("r2", (0.06, 0.04), (0.0, 0.04)), line("r3", (0.0, 0.04), (0.0, 0.0)),
+                       { "btType": "BTMSketchCurve-4", "entityId": "c1", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.004, "xCenter": 0.015, "yCenter": 0.02, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [{ "btType": "BTMSketchConstraint-2", "constraintType": "DIAMETER", "parameters": [{ "btType": "BTMParameterString-149", "parameterId": "localFirst", "value": "c1" }, dia] },
+                          { "btType": "BTMSketchConstraint-2", "constraintType": "COINCIDENT", "parameters": [] }] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterEnum-145", "parameterId": "domain", "value": "MODEL" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualSketchRegionQuery-140", "deterministicIds": ["JGC"], "featureId": "FS1" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" }, depth] },
+        { "btType": "BTMFeature-134", "featureType": "fillet", "featureId": "FF1", "name": "Fillet 1", "parameters": [
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JHt"] }] }, radius] }
+    ] });
+    let refs = [
+        json!({ "index": 0, "id": "JDC", "kind": "PLANE", "point": [0.0, 0.0, 0.0], "normal": [0.0, 0.0, 1.0] }),
+        json!({ "index": 1, "id": "JGC", "kind": "SKETCH_REGION", "point": [0.0303212, 0.02, 0.0], "measure": 0.00234973452 }),
+        json!({ "index": 2, "id": "JHt", "kind": "EDGE", "point": [0.06, 0.04, 0.01], "direction": [0.0, 0.0, 1.0] }),
+    ]
+    .iter()
+    .map(|v| v.to_string())
+    .collect::<Vec<_>>()
+    .join("\n");
+    let block = 0.06 * 0.04 * 0.02 - std::f64::consts::PI * 0.004 * 0.004 * 0.02;
+    let fillet_off = 0.003 * 0.003 * (1.0 - std::f64::consts::FRAC_PI_4) * 0.02;
+    let part = |v: f64, f: u64, e: u64, vx: u64| json!([{ "name": "Part 1", "bodyType": "SOLID", "faces": f, "edges": e, "vertices": vx, "volume": v, "area": null, "bbox": { "min": [0.0, 0.0, 0.0], "max": [0.06, 0.04, 0.02] } }]);
+    let live = vec![
+        json!({ "index": 0, "status": "OK", "parts": [] }),
+        json!({ "index": 1, "status": "OK", "parts": part(block, 7, 14, 8) }),
+        json!({ "index": 2, "status": "OK", "parts": part(block - fillet_off, 8, 17, 10) }),
+    ];
+    (features, live, refs)
+}
+
+#[test]
+fn translates_a_sketch_extrude_and_fillet() {
+    let (features, mut live, refs) = block_model();
+    // Area is not given here: only what is given is compared.
+    for l in &mut live {
+        for p in l["parts"].as_array_mut().into_iter().flatten() {
+            p.as_object_mut().unwrap().remove("area");
+        }
+    }
+    let r = run_model("block", &features, &live, &refs);
+    assert_eq!((r.matching, r.features), (3, 3), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+    // What isn't translated is said, per feature.
+    assert!(r.untranslated.iter().any(|u| u.contains("geometric constraints left to inference")), "{:?}", r.untranslated);
+}
+
+/// Without live's geometry a query is reported, not guessed.
+#[test]
+fn an_unmapped_query_is_reported() {
+    let (features, live, _) = block_model();
+    let r = run_model("block-norefs", &features, &live, "");
+    assert!(r.untranslated.iter().any(|u| u.starts_with("Fillet 1 (fillet): entities: query not mapped (no live geometry for JHt)")), "{:?}", r.untranslated);
+    assert_eq!(r.matching, 1, "the sketch on Top still builds (its plane read from the query): {:?}", r.first);
+}

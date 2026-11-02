@@ -11,6 +11,26 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-03 00:35 UTC: model parity suite (lead 11-02 23:35, top item; docs/PARITY-SUITES.md §1)
+- Translator `crates/ops/src/parity.rs` (`Translator::open` / `step(k)`, through the ops registry): sketches
+  (lines, arcs, circles, points at Onshape's solved positions, in Onshape's frame when `sketches` is given;
+  dimensions with Onshape's expressions; other constraints left to inference and counted), features by FeatureScript
+  name through feature_add (unknown parameters and rejected ones reported), queries by live's geometry
+  (`refs.jsonl`: plane / face / edge / vertex / body / sketch region) else default planes and `qSketchRegion(id +
+  "F…", true)` read from the query; everything else reported per feature.
+- Runner: `crates/ops/tests/parity.rs`: T2 `parity_models` over /root/parity/models (NOSHAPE_PARITY_MODELS,
+  NOSHAPE_PARITY_ONLY), prints per document the first differing feature, the untranslated list and the score;
+  writes report.json beside the models; NOSHAPE_PARITY_INDEX=1 rewrites tests/parity-models/index.json. T1
+  translates_a_sketch_extrude_and_fillet (a hand-written Onshape feature list, 3/3 features match),
+  an_unmapped_query_is_reported.
+- File shapes asked of live (REQUESTS 11-02 23:55): features.json (+ configuration, variables, units, sketches),
+  live.jsonl, source.json, refs.jsonl (geometry of every referenced id before its feature). GET /features and POST
+  /featurescript are 429 for the account until ~04:45 UTC.
+- Tried on 6 older feature dumps (/root/dx-scratch/pm/models, on vibe5 ~/agents/dx/pm-models): next in the translator:
+  configuration inputs and variables (`#HeadHeight`), Onshape-internal parameters (asVersion, defaultsChanged),
+  revolveType, constraints on external references (`externalSecond`), splines / ellipses, BTMParameterLookupTablePath
+  (hole standards), feature types we lack reported (setData, custDesc).
+
 ## 11-02 23:30 UTC (new account; read first)
 - Landed: 6b4704f2 = the first inserted view auto-scaled (request 1812; checked in the app: big1755 Part Studio 1 at
   1:8 in View scale and the title block) + psui's flaky `p_toggles_every_plane` (shared its scratch name with another

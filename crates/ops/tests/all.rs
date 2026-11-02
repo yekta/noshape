@@ -16,6 +16,7 @@ mod live;
 mod many_parts;
 mod mate_flip;
 mod mesh_pixels;
+mod parity;
 mod regen_profile;
 mod sketch_recursion;
 mod smoke;
