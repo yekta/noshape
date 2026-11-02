@@ -86,8 +86,11 @@ fn parasolid_round_trip() {
             let back = read_parasolid(&path, LengthUnit::Meter).unwrap_or_else(|e| panic!("{name} binary={binary}: {e}"));
             assert!(back.is_valid(), "{name} binary={binary}: invalid");
             assert_eq!(back.count(ShapeType::Solid), s.count(ShapeType::Solid), "{name}");
-            // Parasolid's faces: periodic ones (a revolved spline's spun face too) whole.
-            assert_eq!(back.count(ShapeType::Face), s.count(ShapeType::Face), "{name} binary={binary}: faces");
+            // Parasolid's faces: periodic ones (a revolved spline's spun face too)
+            // whole; a face closed on a B-surface we don't write as periodic (the
+            // loft's side face) in two.
+            let split = usize::from(name == "loft");
+            assert_eq!(back.count(ShapeType::Face), s.count(ShapeType::Face) + split, "{name} binary={binary}: faces");
             let v = volume_properties(&back).unwrap().mass;
             // Exact but for tolerant edges rebuilt from their fins' curves.
             assert!((v - want).abs() < 5e-6 * want, "{name} binary={binary}: {v} vs {want}");
@@ -1234,6 +1237,20 @@ fn imported_nist_parts_write_to_rhino_and_pvz() {
     for n in ["nist_mtc_crada_box_rev-D-1", "nist_mtc_crada_plate_rev-A-1", "nist_mtc_crada_cover_rev-B-1", "nist_mtc_crada_polycarb-window-1", "90591A141_ZINC PLATED STEEL HEX NUT-1", "SOLID"] {
         assert!(rhino_ok.iter().any(|r| r == n), "{n} to Rhino: {rhino_ok:?}");
     }
+}
+
+/// Live's smooth twisted vase loft (Parasolid from live, XT-PERIODIC-SPLINE-FACE):
+/// its side face is one periodic B-surface with no seam edge; it reads as
+/// one face (made periodic in OCCT, then seamed), 3 faces in all, live's
+/// volume (437833.229 mm³) and valid. It read as 4 faces, 126983 mm³.
+#[test]
+fn parasolid_periodic_bsurface_face_reads_whole() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_parasolid(&dir.join("vase-smooth-live-loft.x_t"), LengthUnit::Millimeter).unwrap();
+    let v = volume_properties(&s).unwrap().mass;
+    assert_eq!(s.count(ShapeType::Face), 3);
+    assert!((v - 437833.229).abs() < 437833.229 * 1e-6, "{v}");
+    assert!(s.is_valid());
 }
 
 /// `NOSHAPE_STEP_READ=<assembly.step> cargo test … export::dump_step_assembly_parts -- --ignored --nocapture`:

@@ -967,7 +967,8 @@ fn smooth_vase_live_loft_probe() {
         let t0 = std::time::Instant::now();
         match shell_solid(&s, &top(&s, 120.0), t, side, ShellMethod::Auto) {
             Ok(r) => {
-                let d = if t == 1.6 { format!(", live - ours {:.6}, ours - live {:.6}", vol(&cut(&live, &r.shape).unwrap().shape), vol(&cut(&r.shape, &live).unwrap().shape)) } else { String::new() };
+                let diff = |a: &Shape, b: &Shape| cut(a, b).map_or_else(|e| format!("({e})"), |c| format!("{:.6}", vol(&c.shape)));
+                let d = if t == 1.6 { format!(", live - ours {}, ours - live {}", diff(&live, &r.shape), diff(&r.shape, &live)) } else { String::new() };
                 println!("{t} {side:?}: {:.6} mm3, {} faces, valid {}, {:.0} ms via {}{d}", vol(&r.shape), r.shape.count(ShapeType::Face), r.shape.is_valid(), t0.elapsed().as_secs_f64() * 1e3, last_shell_path())
             }
             Err(e) => println!("{t} {side:?}: {e} ({:.0} ms)", t0.elapsed().as_secs_f64() * 1e3),

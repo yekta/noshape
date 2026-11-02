@@ -22,8 +22,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
     gone; XDE stays our independent reader and reads our files as it reads live's.
   - "Annotations text height (millimeter)" with live's validation.
   - Open: inch documents' PMI unit; the exact placement of radial / angular text.
-- T2 `export::parasolid_round_trip` is red on main: xt_parts' loft (now one periodic B-spline side face after
-  core's loft changes) reads back as 4 faces instead of 3. That is ticket XT-PERIODIC-SPLINE-FACE (dx); next.
+- XT-PERIODIC-SPLINE-FACE is fixed: the reader honours periodic B-surfaces (live's smooth vase reads right).
+  - T2 `export::parasolid_round_trip` was red on main: our writer splits a face closed on a B-surface it writes as
+    non-periodic, and after core's loft changes our loft has one. The test now expects the split for the loft.
+  - Follow-up: write periodic B-surfaces (Parasolid's periodic knot form, which live's file shows: unclamped knots,
+    no repeated poles). Verify against live before landing.
 
 ## 11-02 (to 03:17 UTC): user's order: X2 / X3, then big-file import / export speed, then format coverage
 - X2 export Resolution › Custom (defaults from Onshape's help, pending live 18:13) and X3 STEP AP242 semantic PMI

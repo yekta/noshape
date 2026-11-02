@@ -746,6 +746,43 @@ struct Builder
     }
   }
 
+  // A B-surface Parasolid calls periodic in u and / or v as a periodic OCCT
+  // surface: clamped to its domain (its end rows then lie on the closed
+  // boundary) and made periodic there, the parameters kept, if it evaluates
+  // the same; s otherwise. Periodic faces have no seam in Parasolid (live's
+  // smooth vase loft): OCCT needs the surface periodic to give them one
+  // (seam_ring).
+  static occ::handle<Geom_Surface> surface_as_periodic(const occ::handle<Geom_BSplineSurface>& s, bool up, bool vp)
+  {
+    if (!up && !vp)
+      return occ::handle<Geom_Surface>(s);
+    try
+    {
+      double u0, u1, v0, v1;
+      s->Bounds(u0, u1, v0, v1);
+      occ::handle<Geom_BSplineSurface> ps = occ::down_cast<Geom_BSplineSurface>(s->Copy());
+      ps->Segment(u0, u1, v0, v1);
+      if (up && ps->IsUClosed())
+        ps->SetUPeriodic();
+      if (vp && ps->IsVClosed())
+        ps->SetVPeriodic();
+      if (ps->IsUPeriodic() != up || ps->IsVPeriodic() != vp)
+        return occ::handle<Geom_Surface>(s);
+      for (int i = 0; i <= 6; ++i)
+        for (int j = 0; j <= 6; ++j)
+        {
+          const double u = u0 + (u1 - u0) * i / 6, v = v0 + (v1 - v0) * j / 6;
+          if (ps->Value(u, v).Distance(s->Value(u, v)) > 1e-9)
+            return occ::handle<Geom_Surface>(s);
+        }
+      return occ::handle<Geom_Surface>(ps);
+    }
+    catch (const Standard_Failure&)
+    {
+      return occ::handle<Geom_Surface>(s);
+    }
+  }
+
   // Knot arrays may be longer than the knot count (NX pads them with null
   // knots of multiplicity 0).
   static void trim_knots(std::vector<double>& k, std::vector<int>& m, long long n)
@@ -825,8 +862,9 @@ struct Builder
         auto um = ints(g.ptr("u_knot_mult")), vm = ints(g.ptr("v_knot_mult"));
         trim_knots(uk, um, g.integer("n_u_knots"));
         trim_knots(vk, vm, g.integer("n_v_knots"));
-        s = rat ? new Geom_BSplineSurface(poles, w, arr(uk), arr(vk), arr(um), arr(vm), du, dv)
-                : new Geom_BSplineSurface(poles, arr(uk), arr(vk), arr(um), arr(vm), du, dv);
+        occ::handle<Geom_BSplineSurface> bs = rat ? new Geom_BSplineSurface(poles, w, arr(uk), arr(vk), arr(um), arr(vm), du, dv)
+                                                  : new Geom_BSplineSurface(poles, arr(uk), arr(vk), arr(um), arr(vm), du, dv);
+        s = surface_as_periodic(bs, g.chr("u_periodic") == 'T', g.chr("v_periodic") == 'T');
         break;
       }
       default:

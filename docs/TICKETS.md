@@ -2201,12 +2201,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
-- [ ] P2 XT-PERIODIC-SPLINE-FACE (core 11-02, request 1782): live's smooth twisted vase loft
+- [x] fixed (dx 11-02 17:27) P2 XT-PERIODIC-SPLINE-FACE (core 11-02, request 1782): live's smooth twisted vase loft
   (crates/kernel/tests/data/shell/vase-smooth-live-loft.x_t, Parasolid text from live: one closed B-spline side face
   with no seam edge, two planar caps, 3 faces / 24 edges, 437833.229 mm³) reads as **4 faces, 126983.225 mm³, invalid**
   (`read_parasolid(.., LengthUnit::Millimeter)`); its shell vase-smooth-live-shelled.x_t (5 faces, 47330.213 mm³) reads
   as 13634.815 mm³. The sharp vase (vase-live-loft.x_t, six open side faces) reads right. Likely the periodic side face
   without a seam edge. Probe: kernel `shell::smooth_vase_live_loft_probe` (T2).
+  dx 11-02 17:27: the reader ignored a B-surface's u_periodic / v_periodic. Such a surface is now made periodic in OCCT
+  (clamped to its domain, then SetUPeriodic, the parameters kept and checked), so its seamless face gets a seam
+  (seam_ring). The loft reads as 3 faces, 437833.221 mm³, valid; the shelled one as 47329.197 mm³, 5 faces; our Shell
+  1.6 inside gives 47329.200 (probe). Test `export::parasolid_periodic_bsurface_face_reads_whole`. Our writer still
+  writes such a face split in two (non-periodic B-surfaces).
 - [x] verified 5166e6dd (qa 07:06: arcdwg drawing, Dimension (d) on the Top view's R10 corner: hover tan arc, picked → the light-blue reference is the quarter arc only, R10 preview from its centre; tickets/dwg-arc-ref-5166.png) dx P3 DWG-ARC-REF-FULL-CIRCLE a picked arc is highlighted as a whole circle: qa-scratch/arcdwg.noshape (tickets/arcdwg.py: 60×40×10 block, one vertical edge R10) › drawing, Top view's rounded corner: with Dimension (d) or Arc length, hovering the arc highlights just the arc (tan) with its centre snap (= live), but once it is picked the light-blue reference highlight is drawn as the **full R10 circle** around the corner, three quarters of it over empty sheet and the view's edges (tickets/dwg-arc-ref-full-circle-10ea.png: arc-length previews 15.71 outside / 47.12 conjugate across the chord, then the d hover vs picked). live (behaviours "spec: dx drawing.md D26 / D31–D35", "D21 / D22"): referenced entities show blue as themselves (a hovered arc is drawn orange over its own length). (qa 2026-10-28 23:28, build 10ea49ed)
   dx 10-29: a picked arc's highlight is the arc itself (end to end through its middle), not its whole circle.
 - [x] verified 5166e6dd (qa 07:07: boltdwg iso view, Line to line angular on the two back top edges, 120.0° inside; drag its label up-left past the corner → mid-drag and after release the label sits where dropped, the arc carried round past the left edge to it, value 120.0°; tickets/dwg-angular-label-drag-5166.png) dx P3 DWG-ANGULAR-LABEL-ANGLE a placed angular dimension's label only slides along its bisector: boltdwg iso view, Line to line angular on the two top edges placed at 120.0° below the corner, drag its label to the left of the corner (or above it) → mid-drag the label stays on the bisector (only the radius follows the pointer) and after release it sits below the corner again (tickets/dwg-angular-label-drag-10ea.png; value 120.0° kept = live). live (behaviours "dx (2026-10-28, P2) drawing.md D11", request 1576): the label goes where it is dragged (left sector, above the corner) and the arc is extended round past the edge to reach it, value unchanged. (qa 2026-10-28 23:20, build 10ea49ed)
