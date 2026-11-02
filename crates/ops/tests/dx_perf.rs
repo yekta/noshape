@@ -165,3 +165,56 @@ fn timed_nist_import() {
         report(&format!("NIST import {ext} ({parts} parts)"), runs);
     }
 }
+
+/// Big files (user 11-02): 1000 distinct parts (a 40 × 25 part pattern of
+/// Ø4 × 10 mm pins) exported as STEP, Parasolid and IGES, then each file
+/// imported into a new document; times both ways and checks fidelity (part
+/// count, total volume). `NOSHAPE_BIG_PARTS` changes the count (rows of 40).
+#[test]
+#[ignore]
+fn timed_big_part_imports() {
+    let rows: u32 = std::env::var("NOSHAPE_BIG_PARTS").ok().and_then(|v| v.parse().ok()).map_or(25, |n: u32| n.div_ceil(40).max(1));
+    let n = 40 * rows as usize;
+    let dir = std::env::temp_dir().join(format!("noshape-dx-big-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": dir.join("src.noshape").to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    let region = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[0, 0], [2, 0]] }))["regions"][0]["id"].as_str().unwrap().to_string();
+    let seed = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }))["feature"].as_str().unwrap().to_string();
+    let t = Instant::now();
+    let p = call(&mut ctx, "feature_add", json!({ "type": "linearPattern", "params": {
+        "patternType": "PART", "entities": [format!("body:{seed}.0")],
+        "directionOne": ["plane:right"], "distance": "6 mm", "instanceCount": "40",
+        "directionTwo": ["plane:front"], "distanceTwo": "6 mm", "instanceCountTwo": rows.to_string(), "hasSecondDir": true,
+        "operationType": "NEW" } }));
+    assert_eq!(p["feature_status"]["status"], "Ok", "{p}");
+    report(&format!("big: pattern of {n} parts"), vec![t.elapsed().as_secs_f64() * 1000.0]);
+    let volume = |ctx: &mut Ctx, tab: Option<&str>| {
+        let q = call(ctx, "query_parts", match tab { Some(t) => json!({ "tab": t }), None => json!({}) });
+        let parts = q["parts"].as_array().unwrap().clone();
+        (parts.len(), parts.iter().map(|p| p["volume"].as_f64().unwrap_or(0.0)).sum::<f64>())
+    };
+    let (count, v0) = volume(&mut ctx, None);
+    assert_eq!(count, n);
+    for (format, ext) in [("STEP", "step"), ("PARASOLID", "x_t"), ("IGES", "igs")] {
+        let file = dir.join(format!("big.{ext}"));
+        let t = Instant::now();
+        call(&mut ctx, "export_parts", json!({ "format": format, "file": file.to_str().unwrap() }));
+        report(&format!("big: export {n} parts {ext} ({} MB)", std::fs::metadata(&file).map(|m| m.len() / 1_000_000).unwrap_or(0)), vec![t.elapsed().as_secs_f64() * 1000.0]);
+        let mut ictx = Ctx::new();
+        call(&mut ictx, "document_create", json!({ "path": dir.join(format!("in-{ext}.noshape")).to_str().unwrap() }));
+        let t = Instant::now();
+        let r = call(&mut ictx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
+        let ms = t.elapsed().as_secs_f64() * 1000.0;
+        let studio = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").map(|t| t["name"].as_str().unwrap().to_string()).expect("a Part Studio");
+        let (got, v1) = volume(&mut ictx, Some(&studio));
+        report(&format!("big: import {n} parts {ext} -> {got} parts, volume {:.4} of {:.4}", v1, v0), vec![ms]);
+        // IGES carries surfaces: its parts may come in as sheets.
+        if ext != "igs" {
+            assert_eq!(got, n, "{ext}");
+            assert!((v1 - v0).abs() < v0 * 1e-6, "{ext}: volume {v1} vs {v0}");
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}

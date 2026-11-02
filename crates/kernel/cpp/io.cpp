@@ -12,6 +12,7 @@
 #include <Precision.hxx>
 #include <ShapeFix_Edge.hxx>
 #include <TopExp_Explorer.hxx>
+#include <algorithm>
 #include <array>
 #include <iterator>
 #include <regex>
@@ -31,6 +32,8 @@
 #include <ctime>
 #include <Quantity_Color.hxx>
 #include <STEPCAFControl_Reader.hxx>
+#include <chrono>
+#include <cstdlib>
 #include <DESTEP_Parameters.hxx>
 #include <STEPCAFControl_Writer.hxx>
 #include <STEPControl_Reader.hxx>
@@ -111,6 +114,35 @@ struct Leaf
   std::vector<std::pair<int, Quantity_Color>> faceColors;
 };
 
+// The faces of `s` (TopExp::MapShapes order) with a colour of their own,
+// from its label's sub-shape labels. (Looking each face up by shape searched
+// the whole document: quadratic in the parts, 2.9 s of 4.3 s for 2000.)
+std::vector<std::pair<int, Quantity_Color>> face_colors(const occ::handle<XCAFDoc_ColorTool>& ct, const TDF_Label& ref,
+                                                        const TopoDS_Shape& s)
+{
+  ShapeIMap faces;
+  TopExp::MapShapes(s, TopAbs_FACE, faces);
+  NCollection_Sequence<TDF_Label> subs;
+  XCAFDoc_ShapeTool::GetSubShapes(ref, subs);
+  std::vector<std::pair<int, Quantity_Color>> found;
+  for (int k = 1; k <= subs.Length(); ++k)
+  {
+    Quantity_Color fc;
+    if (!(ct->GetColor(subs(k), XCAFDoc_ColorSurf, fc) || ct->GetColor(subs(k), XCAFDoc_ColorGen, fc)))
+      continue;
+    // A sub-shape label holds one face or several (a shell, a compound).
+    for (TopExp_Explorer e(XCAFDoc_ShapeTool::GetShape(subs(k)), TopAbs_FACE); e.More(); e.Next())
+    {
+      const int i = faces.FindIndex(e.Current());
+      if (i > 0)
+        found.emplace_back(i - 1, fc);
+    }
+  }
+  std::stable_sort(found.begin(), found.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
+  found.erase(std::unique(found.begin(), found.end(), [](const auto& x, const auto& y) { return x.first == y.first; }), found.end());
+  return found;
+}
+
 void collect(const occ::handle<XCAFDoc_ShapeTool>& st, const occ::handle<XCAFDoc_ColorTool>& ct,
              const TDF_Label& label, const TopLoc_Location& loc, const std::string& inheritedName,
              bool inheritedHasColor, const Quantity_Color& inheritedColor, std::vector<Leaf>& out,
@@ -154,26 +186,19 @@ void collect(const occ::handle<XCAFDoc_ShapeTool>& st, const occ::handle<XCAFDoc
   Leaf leaf;
   leaf.shape = here.IsIdentity() ? s : s.Moved(here);
   leaf.name  = name;
+  // The part's own label (`ref`) is its shape's label: no search by shape
+  // (that walks every shape of the document, per part).
   Quantity_Color c3;
-  if (label_color(ct, ref, s, c3))
+  if (label_color(ct, ref, TopoDS_Shape(), c3))
   {
     c        = c3;
     hasColor = true;
   }
   leaf.hasColor = hasColor;
   leaf.color    = c;
-  // Face colours sit on the prototype's sub-shapes; a placed copy keeps
-  // their order.
-  {
-    ShapeIMap faces;
-    TopExp::MapShapes(s, TopAbs_FACE, faces);
-    for (int i = 1; i <= faces.Extent(); ++i)
-    {
-      Quantity_Color fc;
-      if (ct->GetColor(faces(i), XCAFDoc_ColorSurf, fc) || ct->GetColor(faces(i), XCAFDoc_ColorGen, fc))
-        leaf.faceColors.emplace_back(i - 1, fc);
-    }
-  }
+  // Face colours sit on the prototype's sub-shape labels; a placed copy
+  // keeps their order.
+  leaf.faceColors = face_colors(ct, ref, s);
   out.push_back(leaf);
 }
 
@@ -434,11 +459,30 @@ std::unique_ptr<OcShape> bin_from_bytes(rust::Slice<const uint8_t> bytes)
 
 // ---------------------------------------------------------------- STEP
 
+namespace
+{
+// NOSHAPE_IMPORT_TIMING: a reader stage's time on stderr.
+struct StageClock
+{
+  bool                                  on = std::getenv("NOSHAPE_IMPORT_TIMING") != nullptr;
+  std::chrono::steady_clock::time_point t  = std::chrono::steady_clock::now();
+  void                                  lap(const char* what)
+  {
+    if (!on)
+      return;
+    const auto now = std::chrono::steady_clock::now();
+    std::fprintf(stderr, "  occt %s: %.1f ms\n", what, std::chrono::duration<double, std::milli>(now - t).count());
+    t = now;
+  }
+};
+} // namespace
+
 StepImport read_step(rust::Str path)
 {
   const LockedSection locked_section_245;
   std::lock_guard<std::mutex> lock(xde_mutex());
   quiet_messenger();
+  StageClock                  clock;
   const std::string           p = path_str(path);
   StepImport                  out;
   out.shapes = std::make_unique<OcShapeList>();
@@ -458,7 +502,10 @@ StepImport read_step(rust::Str path)
       app->Close(doc);
       fail_io("could not read STEP file " + p);
     }
-    if (r.Transfer(doc))
+    clock.lap("step ReadFile");
+    const bool transferred = r.Transfer(doc);
+    clock.lap("step Transfer");
+    if (transferred)
     {
       occ::handle<XCAFDoc_ShapeTool> st = XCAFDoc_DocumentTool::ShapeTool(doc->Main());
       occ::handle<XCAFDoc_ColorTool> ct = XCAFDoc_DocumentTool::ColorTool(doc->Main());
@@ -490,6 +537,7 @@ StepImport read_step(rust::Str path)
         }
       }
       cafOk = !leaves.empty();
+      clock.lap("step collect");
     }
     app->Close(doc);
   }
@@ -514,6 +562,7 @@ StepImport read_step(rust::Str path)
   if (out.shapes->items.empty())
     fail_io("STEP file contains no shapes: " + p);
   fix_pole_pcurves(out.shapes->items);
+  clock.lap("step pole pcurves");
   return out;
 }
 
@@ -621,21 +670,14 @@ void walk_tree(TreeWalk& w, const TDF_Label& label, const TopLoc_Location& loc,
     leaf.shape = s;
     leaf.name  = label_name(ref).empty() ? name : label_name(ref);
     Quantity_Color c3;
-    if (label_color(w.ct, ref, s, c3))
+    if (label_color(w.ct, ref, TopoDS_Shape(), c3))
     {
       c        = c3;
       hasColor = true;
     }
-    leaf.hasColor = hasColor;
-    leaf.color    = c;
-    ShapeIMap faces;
-    TopExp::MapShapes(s, TopAbs_FACE, faces);
-    for (int i = 1; i <= faces.Extent(); ++i)
-    {
-      Quantity_Color fc;
-      if (w.ct->GetColor(faces(i), XCAFDoc_ColorSurf, fc) || w.ct->GetColor(faces(i), XCAFDoc_ColorGen, fc))
-        leaf.faceColors.emplace_back(i - 1, fc);
-    }
+    leaf.hasColor   = hasColor;
+    leaf.color      = c;
+    leaf.faceColors = face_colors(w.ct, ref, s);
     w.protos.push_back(ref);
     w.parts.push_back(leaf);
   }

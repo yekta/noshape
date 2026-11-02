@@ -61,20 +61,33 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(t) => Some(doc::find_tab(od.doc(), t).map_err(|e| e.with_param("after"))?),
         None => None,
     };
+    // NOSHAPE_IMPORT_TIMING=1: each stage's time on stderr (dx_perf big imports).
+    let timing = std::env::var_os("NOSHAPE_IMPORT_TIMING").is_some();
+    let t0 = std::time::Instant::now();
+    let stage = |what: &str, t: std::time::Instant| {
+        if timing {
+            eprintln!("import stage {what}: {:.1} ms", t.elapsed().as_secs_f64() * 1000.0);
+        }
+    };
     let (inputs, mut errors) = import::read_inputs(&paths, &c, a.bool_or("keep_files", true)?, &units);
+    stage("read", t0);
     if inputs.is_empty() {
         return Err(OpError::param("files", &errors.join("; ")));
     }
     let before: Vec<noshape_model::document::TabId> = od.doc().tabs.iter().map(|t| t.id).collect();
     let desc = import::description(&inputs.label);
+    let t1 = std::time::Instant::now();
     let (first, apply_errors) = od.session.edit_document(&desc, |d| import::apply(d, inputs, &c, after, &units))?;
+    stage("apply + save", t1);
     errors.extend(apply_errors);
     let new_tabs: Vec<serde_json::Value> = od.doc().tabs.iter().filter(|t| !before.contains(&t.id)).map(|t| json!({ "id": t.id.to_string(), "name": t.name, "kind": t.content.kind_name() })).collect();
     // The imported parts of each new Part Studio.
     let studios: Vec<noshape_model::document::TabId> = od.doc().tabs.iter().filter(|t| !before.contains(&t.id) && doc::is_part_studio(&t.content)).map(|t| t.id).collect();
     let mut parts = Vec::new();
+    let t2 = std::time::Instant::now();
     for t in studios {
         let r = od.regenerate(t, None)?;
+        stage("regenerate", t2);
         let name = od.doc().tab(t).map(|x| x.name.clone()).unwrap_or_default();
         for b in &r.display.bodies {
             parts.push(json!({ "tab": name, "id": crate::refs::body_id(&b.id), "name": b.name }));

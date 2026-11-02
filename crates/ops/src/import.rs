@@ -127,8 +127,13 @@ pub fn read_foreign(path: &Path, units: &UnitPrefs) -> anyhow::Result<Foreign> {
         "sldprt" | "par" | "psm" | "prt" | "ipt" => compound(k::read_native_parts(path, k::LengthUnit::Meter)?),
         other => anyhow::bail!("Unsupported file type .{other}"),
     };
+    let t = std::time::Instant::now();
     let parts = if info.is_empty() { String::new() } else { serde_json::to_string(&info)? };
-    Ok(Foreign { brep: String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string(), parts })
+    let brep = String::from_utf8_lossy(&shape.to_brep_bytes()?).to_string();
+    if std::env::var_os("NOSHAPE_IMPORT_TIMING").is_some() {
+        eprintln!("import stage brep text ({} MB): {:.1} ms", brep.len() / 1_000_000, t.elapsed().as_secs_f64() * 1000.0);
+    }
+    Ok(Foreign { brep, parts })
 }
 
 /// Append an Import feature ("Import N") holding `brep` to `ps`.

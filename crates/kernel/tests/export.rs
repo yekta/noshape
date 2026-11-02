@@ -1095,3 +1095,29 @@ fn dump_step_pmi() {
     let Some(p) = std::env::var_os("NOSHAPE_PMI_READ") else { return };
     println!("{:?}", read_step_pmi(std::path::Path::new(&p)).unwrap());
 }
+
+/// Debug aid: the parts, colours and face colours `read_step` gives for
+/// `NOSHAPE_STEP_READ`.
+#[test]
+#[ignore = "debug aid"]
+fn dump_step_colours() {
+    let Some(p) = std::env::var_os("NOSHAPE_STEP_READ") else { return };
+    for s in read_step(std::path::Path::new(&p), LengthUnit::Meter).unwrap() {
+        println!("part {:?} colour {:?} face colours {:?}", s.name, s.color, s.face_colors);
+    }
+}
+
+/// A STEP face's own colour (a STYLED_ITEM on an ADVANCED_FACE; live's
+/// g48 export with one face made red) comes in on that face, the parts keep
+/// theirs. Read from the part's sub-shape labels (not a document-wide
+/// search per face: quadratic, 2.9 s for 2000 parts).
+#[test]
+fn step_face_colour_reads_from_the_parts_sub_shapes() {
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/step/face-colour.step");
+    let parts = read_step(&p, LengthUnit::Meter).unwrap();
+    assert_eq!(parts.len(), 3);
+    let coloured: Vec<_> = parts.iter().filter(|s| !s.face_colors.is_empty()).collect();
+    assert_eq!(coloured.len(), 1);
+    assert_eq!(coloured[0].face_colors, vec![(0, [1.0, 0.0, 0.0])]);
+    assert!(parts.iter().all(|s| s.color.is_some()));
+}
