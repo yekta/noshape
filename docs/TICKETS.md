@@ -1325,6 +1325,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P2 SKETCH-UNDO-REDO-STATE (psui / skasm) in a sketch the toolbar Undo and Redo are always enabled: a Part Studio
+  with nothing to undo, Sketch › Top, draw one line (l, two clicks, Esc), Ctrl+Z, Ctrl+Y, then the sketch's ✕. Live (11-02,
+  qa's tab, qa-scratch/livek/t-skundo.mjs; `[command-id=UNDO_A_CHANGE / REDO_A_CHANGE]`): entering the sketch **both
+  disabled**; after the line Undo enabled / Redo disabled; after Ctrl+Z Undo disabled / Redo enabled; after Ctrl+Y
+  enabled / disabled; after ✕ both disabled and no sketch left. Ours: **both enabled at every step inside the sketch**
+  (and Redo with nothing to redo does nothing), both disabled again after ✕ (qa-scratch/tickets/fl/ub-sk-undo.png: open,
+  in sketch, line, Ctrl+Z, Ctrl+Y, ✕). Scenario ui-parity/sketch-undo-redo-state. (qa 2026-11-02, build 6b4704f2)
 - [ ] P2 ROLLBACK-BAR-UNDO-STEP (psui) moving the rollback bar is an undo step in ours, not in live: a 40 x 30 x 10 box
   (Sketch 1, Extrude 1; nothing undoable after open), click the Extrude 1 row, ArrowUp (bar above Extrude 1), ArrowDown;
   live (11-02, qa's tab, "qa parity vars", toolbar `[command-id=UNDO_A_CHANGE]`): **Undo stays disabled** through both
