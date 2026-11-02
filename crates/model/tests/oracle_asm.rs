@@ -526,7 +526,7 @@ fn fuzz_fixture(name: &str) -> std::path::PathBuf {
 }
 
 /// The assembly batches: (number, seeds).
-const ASM_BATCHES: [(usize, std::ops::RangeInclusive<u64>); 2] = [(1, 1..=20), (2, 21..=50)];
+const ASM_BATCHES: [(usize, std::ops::RangeInclusive<u64>); 3] = [(1, 1..=20), (2, 21..=50), (3, 51..=80)];
 
 /// The batches with ours' answers; batch n written when LIVE_FUZZ_WRITE is
 /// asm-<n>, else checked unchanged (the generator is deterministic).
