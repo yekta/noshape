@@ -567,8 +567,19 @@ vibe3, before (16c76701, benches open with no DOF cached) → after (e37a02d0):
 | evaluate again / add a mate / insert | 6 / 15 / 6 ms | 24 / 38 / 24 ms |
 Against the start (2f715f2d): a1000 regenerate 3693 → 403 ms, first evaluation 327 → 102 ms, drag 20.7 → 4.7 ms.
 
-Next: a1000's regenerate (392 ms): the 40 stacks' least change (two decompositions a round; cheaper maths, an SVD-free fix or one SVD, failed the live oracle by ~2e-6 mm) and each Sub instance's own solve from its stored positions; the remaining drag work, live's A200 / A1000 timings (1741, after its REST
-limit), the overdefinition messages of live 1754 (C).
+Drag step bookkeeping (11-02 07:00, profile of 6000 a1000 drag steps on vibe4: the solve's maths was half a step, the
+rest per-step setup): a drag step's two passes share one Driven, Prepared::solve copies the mates once (borrowed when
+all are enforced), sizes its output maps up front, keeps no Placement copies, drops a dead relation-values pass. vibe3
+a1000 drag: solve 3.5 → 2.5 ms, frame 4.6 → 3.4–3.7 ms (217 → 268–292 fps); a200-live 0.6 ms.
+
+a1000 regenerate (380 ms on vibe3): the bench's stored poses are depth 10's, so the 12 mm side re-solves all 40 stacks
+(365 ms) and the 10 mm side finds them solved (26 ms). Of the 365, ~80 % is the stacks' dense eig(JᵀJ) + SVD in
+least_change (120 unknowns a stack). The block fix (place a mate tree body by body from the ground) changes the answer
+when a parent's free direction could share a child's correction (global least change splits it); asked live which
+(REQUESTS 07:20, P1 "which instances absorb a regenerate's change along a mate chain").
+
+Next: that answer, then the tree placement if live moves the child alone; each Sub instance's own solve from its
+stored positions; live's A1000 timings (1741, after its REST limit), the overdefinition messages of live 1754 (C).
 
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
