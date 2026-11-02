@@ -971,6 +971,28 @@ TopoDS_Shape compact_bspline_edges(const TopoDS_Shape& in)
   return s;
 }
 
+} // namespace
+
+void clamp_edge_ranges(const TopoDS_Shape& s)
+{
+  BRep_Builder b;
+  for (TopExp_Explorer ex(s, TopAbs_EDGE); ex.More(); ex.Next())
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(ex.Current());
+    if (BRep_Tool::Degenerated(e))
+      continue;
+    double                  f, l;
+    occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l);
+    if (c.IsNull() || c->IsPeriodic())
+      continue;
+    const double nf = std::max(f, c->FirstParameter()), nl = std::min(l, c->LastParameter());
+    if ((nf != f || nl != l) && nl > nf)
+      b.Range(e, nf, nl);
+  }
+}
+
+namespace
+{
 void write_step_impl(const OcShapeList& shapes, rust::Slice<const rust::String> names,
                      rust::Slice<const float> colors, rust::Slice<const bool> has_color,
                      rust::Str path, uint8_t schema, uint8_t file_unit, const StepPmi* pmi)

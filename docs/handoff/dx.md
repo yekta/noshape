@@ -44,6 +44,16 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - STEP re-export of imported parts: 25 NIST cap screws took 433 s to read back, now 18.8 s (99 → 16 MB). Each edge
   writes only the part of its B-spline it uses, and a part declares its own tolerance when that is over 1 µm
   (formats.md). The old export's slowness only showed with heavy healed parts (dx_perf `timed_many_heavy_parts`).
+- e29b78e6 turned main red (05:57 UTC note): `imported_nist_parts_write_to_rhino_and_pvz` asserted Rhino results.
+  - The watcher builds on this box without OPENNURBS_ROOT, so it has no Rhino writer; the land check (vibe4,
+    /opt/opennurbs) has one. The failure was deterministic, a build-configuration difference, not flakiness.
+  - The test now skips its Rhino checks when the writer reports "needs openNURBS", as `rhino_breps_are_valid` does.
+    Checked with and without openNURBS.
+- Every export format on imported NIST parts (formats.md "Exporting imported geometry"):
+  - fixed: the Parasolid writer's crash on the cap screws and PVZ's throws;
+  - Rhino now writes 6 of 8;
+  - left: the two cap screws, where OCCT's NurbsConvert throws in `EvalAndUpdateTol` even after `ShapeFix_Shape`.
+    PVZ's same fallback works on them, so compare its order of steps first.
 - To psui: NIST's regeneration after import is 1.7 s, of which the features are 0.12 s and the rest is display
   meshing, mostly the two cap screws' thread faces (B-spline surfaces with dense pcurves).
 

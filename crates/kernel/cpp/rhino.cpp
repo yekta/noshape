@@ -10,7 +10,9 @@
 
 #if defined(NOSHAPE_OPENNURBS)
 
+#include <BRepBuilderAPI_Copy.hxx>
 #include <BRepBuilderAPI_NurbsConvert.hxx>
+#include <ShapeFix_Shape.hxx>
 #include <BRepTools.hxx>
 #include <BRepTools_WireExplorer.hxx>
 #include <BRep_Tool.hxx>
@@ -142,12 +144,41 @@ TopoDS_Shape split_seam_only_faces(const TopoDS_Shape& in)
   return in;
 }
 
-ON_Brep* to_brep(const TopoDS_Shape& in)
+// Every closed face in halves (as the PVZ writer does): a fallback for a
+// healed import whose loops cross a seam without a seam edge (OCCT's
+// periodic surfaces allow it, the clamped NURBS openNURBS gets don't).
+TopoDS_Shape split_closed_faces(const TopoDS_Shape& in)
 {
-  BRepBuilderAPI_NurbsConvert conv(split_seam_only_faces(in), true);
-  if (!conv.IsDone())
-    fail_op("rhino: NURBS conversion failed");
-  const TopoDS_Shape s = conv.Shape();
+  const TopoDS_Shape copy = BRepBuilderAPI_Copy(in, true, false).Shape();
+  clamp_edge_ranges(copy);
+  ShapeUpgrade_ShapeDivideClosed d(copy);
+  d.SetNbSplitPoints(1);
+  d.Perform();
+  return d.Result();
+}
+
+ON_Brep* to_brep(const TopoDS_Shape& in, bool split_closed = false)
+{
+  const TopoDS_Shape split = split_closed ? split_closed_faces(in) : split_seam_only_faces(in);
+  TopoDS_Shape       s;
+  try
+  {
+    BRepBuilderAPI_NurbsConvert conv(split, true);
+    if (!conv.IsDone())
+      fail_op("rhino: NURBS conversion failed");
+    s = conv.Shape();
+  }
+  catch (const Standard_Failure&)
+  {
+    // A healed import's p-curve not covering its edge (NIST's cap screws):
+    // repaired (on a copy), then converted.
+    ShapeFix_Shape fix(BRepBuilderAPI_Copy(split, true, false).Shape());
+    fix.Perform();
+    BRepBuilderAPI_NurbsConvert conv(fix.Shape(), true);
+    if (!conv.IsDone())
+      fail_op("rhino: NURBS conversion failed");
+    s = conv.Shape();
+  }
   ON_Brep*           b = new ON_Brep();
   ShapeIMap          verts, edges;
   TopExp::MapShapes(s, TopAbs_VERTEX, verts);
@@ -169,6 +200,10 @@ ON_Brep* to_brep(const TopoDS_Shape& in)
     occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l);
     if (c.IsNull())
       fail_op("rhino: an edge without a 3D curve");
+    // A healed edge's range may run past its (non-periodic) curve's ends
+    // within tolerance: trimmed to the curve.
+    if (!c->IsPeriodic())
+      f = std::max(f, c->FirstParameter()), l = std::min(l, c->LastParameter());
     const int c3 = b->AddEdgeCurve(nurbs_curve(GeomConvert::CurveToBSplineCurve(new Geom_TrimmedCurve(c, f, l))));
     const int v0 = verts.FindIndex(TopExp::FirstVertex(e)) - 1, v1 = verts.FindIndex(TopExp::LastVertex(e)) - 1;
     edge_of[i]   = b->NewEdge(b->m_V[v0], b->m_V[v1], c3, nullptr, BRep_Tool::Tolerance(e)).m_edge_index;
@@ -197,6 +232,8 @@ ON_Brep* to_brep(const TopoDS_Shape& in)
     {
       const TopoDS_Wire& W    = TopoDS::Wire(ew.Current());
       ON_BrepLoop&       loop = b->NewLoop(W.IsSame(outer) ? ON_BrepLoop::outer : ON_BrepLoop::inner, b->m_F[face.m_face_index]);
+      // The loop's curves on the face, each from its edge's end.
+      std::vector<std::pair<TopoDS_Edge, ON_NurbsCurve*>> trims;
       for (BRepTools_WireExplorer we(W, fwd); we.More(); we.Next())
       {
         const TopoDS_Edge&        e = we.Current();
@@ -204,11 +241,76 @@ ON_Brep* to_brep(const TopoDS_Shape& in)
         occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, fwd, f, l);
         if (pc.IsNull())
           fail_op("rhino: an edge without a curve on its face");
+        if (!pc->IsPeriodic())
+          f = std::max(f, pc->FirstParameter()), l = std::min(l, pc->LastParameter());
         ON_NurbsCurve* c2 = nurbs_curve_2d(Geom2dConvert::CurveToBSplineCurve(new Geom2d_TrimmedCurve(pc, f, l)));
-        const bool     rev = e.Orientation() == TopAbs_REVERSED;
-        if (rev)
+        if (e.Orientation() == TopAbs_REVERSED)
           c2->Reverse();
-        const int c2i = b->AddTrimCurve(c2);
+        trims.emplace_back(e, c2);
+      }
+      // On a closed surface OCCT accepts curves a period apart (healed
+      // imports have them: NIST's nut, screws, box); openNURBS wants each
+      // trim to start where the last ended. Shift by whole periods, then
+      // bring the loop back into the surface's domain.
+      const double period[2] = {bs->IsUClosed() ? ns->Domain(0).Length() : 0.0, bs->IsVClosed() ? ns->Domain(1).Length() : 0.0};
+      auto         shift     = [&](ON_NurbsCurve* c, int dir, double by) {
+        ON_3dVector d(0, 0, 0);
+        d[dir] = by;
+        c->Translate(d);
+      };
+      for (size_t k = 1; k < trims.size(); ++k)
+        for (int dir = 0; dir < 2; ++dir)
+        {
+          const double gap = trims[k - 1].second->PointAtEnd()[dir] - trims[k].second->PointAtStart()[dir];
+          if (period[dir] > 0 && std::abs(gap) > 0.5 * period[dir])
+            shift(trims[k].second, dir, std::round(gap / period[dir]) * period[dir]);
+        }
+      for (int dir = 0; dir < 2 && !trims.empty(); ++dir)
+      {
+        if (period[dir] <= 0)
+          continue;
+        ON_BoundingBox box;
+        for (const auto& t : trims)
+          t.second->GetBoundingBox(box, true);
+        const double mid = 0.5 * (box.m_min[dir] + box.m_max[dir]), lo = ns->Domain(dir).Min();
+        const double by  = -std::floor((mid - lo) / period[dir]) * period[dir];
+        if (by != 0)
+          for (const auto& t : trims)
+            shift(t.second, dir, by);
+      }
+      // A seam's curve lies on an edge of the domain; a healed one only
+      // within tolerance (NIST's screws), and openNURBS wants seam trims
+      // isoparametric: its control points go onto that edge.
+      for (const auto& [e, c2] : trims)
+      {
+        if (!BRep_Tool::IsClosed(e, fwd) || BRep_Tool::Degenerated(e))
+          continue;
+        for (int dir = 0; dir < 2; ++dir)
+        {
+          if (period[dir] <= 0)
+            continue;
+          ON_BoundingBox box;
+          c2->GetBoundingBox(box);
+          const ON_Interval dom = ns->Domain(dir);
+          if (box.m_max[dir] - box.m_min[dir] > 1e-3 * dom.Length())
+            continue;
+          const double mid  = 0.5 * (box.m_min[dir] + box.m_max[dir]);
+          const double edge = std::abs(mid - dom.Min()) < std::abs(mid - dom.Max()) ? dom.Min() : dom.Max();
+          if (std::abs(mid - edge) > 1e-3 * dom.Length())
+            continue;
+          for (int k = 0; k < c2->CVCount(); ++k)
+          {
+            ON_4dPoint cv;
+            c2->GetCV(k, cv);
+            cv[dir] = edge * (c2->IsRational() ? cv.w : 1.0);
+            c2->SetCV(k, cv);
+          }
+        }
+      }
+      for (const auto& [e, c2] : trims)
+      {
+        const bool rev = e.Orientation() == TopAbs_REVERSED;
+        const int  c2i = b->AddTrimCurve(c2);
         if (BRep_Tool::Degenerated(e))
         {
           const int vi = verts.FindIndex(TopExp::FirstVertex(e)) - 1;
@@ -222,6 +324,10 @@ ON_Brep* to_brep(const TopoDS_Shape& in)
       }
     }
   }
+  // Healed imports' trims meet only within their edges' tolerance (NIST's
+  // nut: 0.027 apart in u); openNURBS wants each trim to start where the
+  // last one ends.
+  b->MatchTrimEnds();
   b->SetTrimIsoFlags();
   b->SetTrimTypeFlags();
   b->SetTolerancesBoxesAndFlags(true, true, true, true, true, true, true, true);
@@ -239,9 +345,23 @@ void write_rhino(const OcShapeList& shapes, rust::Slice<const rust::String> name
   for (size_t i = 0; i < shapes.items.size(); ++i)
   {
     require_non_null(shapes.items[i], "shape");
-    ON_Brep*        b = to_brep(shapes.items[i]);
-    ON_wString      err;
-    ON_TextLog      log(err);
+    // Healed imports that fail (a throw or an invalid brep) get every closed
+    // face split first.
+    ON_Brep* b = nullptr;
+    try
+    {
+      b = to_brep(shapes.items[i]);
+    }
+    catch (...)
+    {
+    }
+    if (!b || !b->IsValid())
+    {
+      delete b;
+      b = to_brep(shapes.items[i], true);
+    }
+    ON_wString err;
+    ON_TextLog log(err);
     if (!b->IsValid(&log))
     {
       const std::string msg = ON_String(err).Array() ? ON_String(err).Array() : "";

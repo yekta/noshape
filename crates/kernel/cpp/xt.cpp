@@ -32,6 +32,7 @@
 
 #include "internal.hpp"
 
+#include <array>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepTools_Modifier.hxx>
 #include <ShapeCustom_SweptToElementary.hxx>
@@ -1317,17 +1318,26 @@ struct BodyWriter
         fs.push_back(TopoDS::Face(faces(fins[k].face + 1)));
       const double dev = deviation(e, fs);
       if (dev > kPrecision && fs.size() == 2 && !(edge_fit[i] = refit(e, fs[0], fs[1])).IsNull())
-        for (int end = 0; end < 2; ++end)
+      {
+        // The vertices move onto the refitted ends (exact points, closer than
+        // their tolerance); a refit missing either vertex is dropped (it
+        // crashed reading its other end once nulled: an imported thread).
+        std::array<std::pair<int, gp_Pnt>, 2> ends;
+        bool                                  ok = true;
+        for (int end = 0; end < 2 && ok; ++end)
         {
-          // The vertex moves onto the refitted end (exact points, closer than its tolerance).
-          const TopoDS_Vertex v   = end ? TopExp::LastVertex(e) : TopExp::FirstVertex(e);
-          const gp_Pnt        p   = edge_fit[i]->Value(end ? edge_fit[i]->LastParameter() : edge_fit[i]->FirstParameter());
-          const int           vi  = vertices.FindIndex(v) - 1;
-          if (p.Distance(BRep_Tool::Pnt(v)) > BRep_Tool::Tolerance(v))
-            edge_fit[i].Nullify();
-          else if (!vertex_fit.count(vi))
-            vertex_fit[vi] = p.XYZ();
+          const TopoDS_Vertex v = end ? TopExp::LastVertex(e) : TopExp::FirstVertex(e);
+          const gp_Pnt        p = edge_fit[i]->Value(end ? edge_fit[i]->LastParameter() : edge_fit[i]->FirstParameter());
+          ends[end]             = {vertices.FindIndex(v) - 1, p};
+          ok                    = p.Distance(BRep_Tool::Pnt(v)) <= BRep_Tool::Tolerance(v);
         }
+        if (!ok)
+          edge_fit[i].Nullify();
+        else
+          for (const auto& [vi, p] : ends)
+            if (!vertex_fit.count(vi))
+              vertex_fit[vi] = p.XYZ();
+      }
       if (dev > kPrecision && edge_fit[i].IsNull())
         edge_tol[i] = std::max(BRep_Tool::Tolerance(e), 2 * dev);
     }
