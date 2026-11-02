@@ -234,7 +234,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (all three in CI); build with CXXFLAGS=-DNOSHAPE_PORTABLE_BUDGET to try the deadline path on Linux.
 
 ## Rust Boolean (bool)
-- [ ] P1 RUST-SM-CUT-VOLUME (skasm 11-01 03:30, wrong geometry on the Rust Boolean) T2
+- [x] fixed (skasm 11-02 08:30: `sheetmetal_std::qa4_s1_enclosure_as_live` passes on main, 20805.4123 / 61, now in the T1 run) P1 RUST-SM-CUT-VOLUME (skasm 11-01 03:30, wrong geometry on the Rust Boolean) T2
   `sheetmetal_std::qa4_s1_enclosure_as_live` fails on main 67473dfc: the Extrude Remove through the flanged enclosure's
   bends (std's sheet-metal-aware cut) gives 20812.4163 mm³ / 61 faces where live (and the test) has 20805.4123 / 61;
   with `NOSHAPE_BOOL_RUST=0` it passes. It passed at 4e9b054e (20:00, 36/36); the Boolean commits since are bool's

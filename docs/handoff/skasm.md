@@ -608,8 +608,16 @@ Parity (11-02, user: correctness before more speed):
   open 6 + 67 + 14 ms, evaluate again 15 ms, regenerate 65 ms, add a mate 28 ms, drag 2.2–2.4 ms a frame (≈ 430 fps),
   insert 15 ms. Live's A1000 is not being timed (lead 11-02: REST budget for parity questions).
 
+- **Placement order generalised** (11-02 08:30): the next body placed is the one most held (residual rows) by mates to
+  the fixed and already placed bodies, solved against all of them, so a stack closed by consistent redundant mates
+  (a1000's Parallels to the base) goes pin by pin too; a loop one body can't close (a linkage) falls back to the group
+  solve. Trees are placed as before. vibe3 a1000 regenerate 280 → 79 ms (3693 ms at the start of the speed work),
+  a1000-live 66 ms.
+- RUST-SM-CUT-VOLUME closed: sheetmetal_std::qa4_s1_enclosure_as_live passes on main (20805.4123 / 61).
+
 Next: each Sub instance's own solve from its
-stored positions; live's A1000 timings (1741, after its REST limit), the overdefinition messages of live 1754 (C).
+stored positions; whether live keeps a changed PARENT's children in place too (P's sketch moved: does C follow P's
+moved top, or does P's transform absorb it? ours: C follows) — ask live if it matters.
 
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
