@@ -14,7 +14,7 @@ Lead's list (20:15), in order:
    sums in /root/skasm-scratch/fz/*.k; `fz/runall.sh <tag> [ENV=..]` runs all, `fz/cmp.sh <batch> <seed>` one case,
    `fz/tr.sh <seed|probe>` traces the pass): s6 170 mm, s218 95, s236 81, s102 79, s226 58, s209 43, s11 10.
    Asm known: f50 f53 f54 f55 f64 (f64: live turns C 93.9° where the smallest turn, ours, is 90°: no rule yet).
-3. With live (REQUESTS.md, not yet answered at this time): sketch batch 8 (1809-ish line "sketch batch 8",
+3. With live (REQUESTS.md, not yet answered at this time): sketch batch 8 (REQUESTS.md line 1815,
    fuzz/skasm-sketch-8.json → .live.json: copy to crates/sketch/tests/fixtures/live_fuzz/sketch-8.live.json and run
    live_fuzz::live_matches), sketch probes 11 (leave-one-out of s218 / s236 / s226 → sketch-probe-11.live.json,
    compared by live_fuzz::probe_matches; per-case errors via fz/p10.sh-style parsing), asm probes 4 (c1–c7, f54's
