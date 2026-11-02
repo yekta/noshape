@@ -901,12 +901,25 @@ impl Sketch {
             }
             let owns = |s: &Sketch, p: EntityId| group.iter().any(|u| s.entity(*u).is_some_and(|e| e.point_refs().contains(&p)) || s.coincident_with(p).iter().any(|q| s.entity(*u).is_some_and(|e| e.point_refs().contains(q))));
             let (mine, theirs) = if owns(self, pa) && !owns(self, pb) { (pa, pb) } else if owns(self, pb) && !owns(self, pa) { (pb, pa) } else { continue };
-            // Nothing fixed in it, no other distance out of it.
-            let fixed = self.constraints().filter(|c| c.driving).any(|c| {
-                let touches = c.kind.entities().iter().any(|e| owns(self, *e) || group.contains(e));
-                touches && (matches!(c.kind, ConstraintKind::Fix { .. }) || (c.id != *cid && matches!(c.kind, ConstraintKind::Distance { .. } | ConstraintKind::HorizontalDistance { .. } | ConstraintKind::VerticalDistance { .. }) && !c.kind.entities().iter().all(|e| owns(self, *e) || group.contains(e))))
-            });
+            // Nothing fixed in it; other relations out of it only to the
+            // kept loop: then it is placed rigidly onto all of them (live
+            // fuzz s215: a triangle with two distances and an angle to a
+            // slot turns and shifts whole), else shifted.
+            let fixed = self.constraints().filter(|c| c.driving).any(|c| matches!(c.kind, ConstraintKind::Fix { .. }) && c.kind.entities().iter().any(|e| owns(self, *e) || group.contains(e)));
             if fixed || group.iter().any(|u| self.entity(*u).is_some_and(|e| e.external)) {
+                continue;
+            }
+            let outward: Vec<(crate::ids::ConstraintId, Vec<EntityId>)> = cons.iter().filter(|(x, xs)| x != cid && xs.iter().any(|u| group.contains(u)) && xs.iter().any(|u| !group.contains(u))).cloned().collect();
+            let elsewhere = |o: &(crate::ids::ConstraintId, Vec<EntityId>)| o.1.iter().any(|u| !group.contains(u) && !kept_loop.contains(u));
+            let is_distance = |o: &(crate::ids::ConstraintId, Vec<EntityId>)| matches!(self.constraint(o.0).map(|k| &k.kind), Some(ConstraintKind::Distance { .. } | ConstraintKind::HorizontalDistance { .. } | ConstraintKind::VerticalDistance { .. }));
+            if outward.iter().any(|o| elsewhere(o) && is_distance(o)) {
+                continue;
+            }
+            if !outward.is_empty() && !outward.iter().any(elsewhere) {
+                self.place_loop_rigidly(&group, &kept_loop, cons);
+                continue;
+            }
+            if outward.iter().any(|o| !elsewhere(o) && is_distance(o)) {
                 continue;
             }
             let (Some(m), Some(t)) = (self.point(mine), self.point(theirs)) else { continue };
@@ -926,6 +939,78 @@ impl Sketch {
                 if let Some(x) = self.point(p) {
                     let _ = self.set_point(p, x + shift);
                 }
+            }
+        }
+    }
+
+    /// Moves loop `group` as one rigid piece (its shape held by distances
+    /// from two of its vertices) onto its relations to the fixed loop
+    /// `kept`; left as it was when that doesn't solve.
+    fn place_loop_rigidly(&mut self, group: &BTreeSet<EntityId>, kept: &BTreeSet<EntityId>, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)]) {
+        let mut sub = self.clone();
+        let points_of = |s: &Sketch, us: &BTreeSet<EntityId>| -> Vec<EntityId> {
+            let mut v: Vec<EntityId> = us.iter().flat_map(|u| {
+                let mut ps: Vec<EntityId> = s.entity(*u).map(|e| e.point_refs().into_iter().collect()).unwrap_or_default();
+                if ps.is_empty() {
+                    ps.push(*u);
+                }
+                ps
+            }).collect();
+            v.sort_unstable();
+            v.dedup();
+            v
+        };
+        // Relations between the two loops, the loop's shared points.
+        let keep: HashSet<crate::ids::ConstraintId> = cons
+            .iter()
+            .filter(|(c, xs)| {
+                let inter = xs.iter().any(|u| group.contains(u)) && xs.iter().all(|u| group.contains(u) || kept.contains(u)) && !xs.iter().all(|u| group.contains(u));
+                let joint = xs.iter().all(|u| group.contains(u)) && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Coincident { .. }));
+                inter || joint
+            })
+            .map(|(c, _)| *c)
+            .collect();
+        let drop: Vec<crate::ids::ConstraintId> = sub.constraints().map(|c| c.id).filter(|c| !keep.contains(c)).collect();
+        for c in drop {
+            let _ = sub.remove_constraint(c);
+        }
+        for p in points_of(self, kept) {
+            let _ = sub.add_constraint(ConstraintKind::Fix { entity: p });
+        }
+        // The loop held rigid: its distinct vertices at their distances from
+        // two of them (and circles their radii).
+        let mut reps: Vec<(EntityId, DVec2)> = Vec::new();
+        for p in points_of(self, group) {
+            let Some(x) = self.point(p) else { continue };
+            if self.kind(p) == Some(EntityKind::Point) && !reps.iter().any(|(_, y)| (*y - x).length() < 1e-9) {
+                reps.push((p, x));
+            }
+        }
+        for u in group {
+            if self.kind(*u) == Some(EntityKind::Circle) && !self.hold_size(&mut sub, *u) {
+                return;
+            }
+        }
+        if reps.len() >= 2 {
+            let (a0, x0) = reps[0];
+            let Some(&(a1, x1)) = reps.iter().max_by(|a, b| (a.1 - x0).length().total_cmp(&(b.1 - x0).length())) else { return };
+            let dist = |s: &mut Sketch, p: EntityId, q: EntityId, d: f64| s.add_constraint(ConstraintKind::Distance { a: p, b: q, value: d, mode: crate::constraints::DistanceMode::Center }).is_ok();
+            if !dist(&mut sub, a0, a1, (x1 - x0).length()) {
+                return;
+            }
+            for &(v, x) in &reps {
+                if v != a0 && v != a1 && !(dist(&mut sub, a0, v, (x - x0).length()) && dist(&mut sub, a1, v, (x - x1).length())) {
+                    return;
+                }
+            }
+        }
+        let opts = SolveOptions { light: group.iter().copied().collect(), analyze: false, constructive: false, ..Default::default() };
+        if !matches!(sub.solve_with(&opts).status, SolveStatus::Solved) {
+            return;
+        }
+        for p in points_of(self, group) {
+            if let Some(x) = sub.point(p) {
+                let _ = self.set_point(p, x);
             }
         }
     }
