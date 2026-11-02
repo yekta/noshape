@@ -297,7 +297,8 @@ fn everyday(seed: u64) -> Case {
         } else {
             1.0
         };
-        match r.below(5) {
+        // (Batch 6 on, seed 381: three more kinds.)
+        match r.below(if seed >= 381 { 8 } else { 5 }) {
             // Corner rectangle (live's tool constraints), width and height.
             0 => {
                 let (w, h) = (r.range(15.0, 50.0), r.range(10.0, 35.0));
@@ -383,7 +384,7 @@ fn everyday(seed: u64) -> Case {
             }
             // Bolt circle: a big circle, three or four equal holes at a
             // distance from its centre.
-            _ => {
+            4 => {
                 let (big, rad, n) = (r.range(15.0, 30.0), r.range(1.5, 4.0), 3 + r.below(2));
                 let pcd = big * r.range(0.55, 0.75);
                 let cb = c.circle(o, big);
@@ -397,6 +398,53 @@ fn everyday(seed: u64) -> Case {
                 for hh in &holes {
                     c.distance(&format!("{cb}.center"), &format!("{hh}.center"), pcd * fp);
                 }
+            }
+            // Washer: two concentric circles, both diameters.
+            5 => {
+                let (outer, inner) = (r.range(10.0, 25.0), r.range(3.0, 8.0));
+                let co = c.circle(o, outer);
+                let ci = c.circle(o + v(r.range(-0.5, 0.5), r.range(-0.5, 0.5)), inner);
+                c.pair("CONCENTRIC", &co, &ci);
+                let (fo, fi) = (f(&mut r), f(&mut r));
+                c.radius(&co, outer * fo, true);
+                c.radius(&ci, inner * fi, true);
+            }
+            // Plate with a hole: an H / V rectangle, width and height, a
+            // circle's diameter and its centre's distances to the left and
+            // bottom sides.
+            6 => {
+                let (w, h) = (r.range(30.0, 50.0), r.range(20.0, 35.0));
+                let p = [o, o + v(w, 0.0), o + v(w, h), o + v(0.0, h)];
+                let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+                for i in 0..4 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+                    c.hv(i % 2 == 0, &l[i]);
+                }
+                let (dx, dy, rad) = (w * r.range(0.3, 0.7), h * r.range(0.3, 0.7), r.range(2.0, 5.0));
+                let hole = c.circle(o + v(dx, dy), rad);
+                let fs: Vec<f64> = (0..5).map(|_| f(&mut r)).collect();
+                c.length(&l[0], w * fs[0]);
+                c.length(&l[1], h * fs[1]);
+                c.radius(&hole, rad * fs[2], true);
+                c.distance(&format!("{hole}.center"), &l[3], dx * fs[3]);
+                c.distance(&format!("{hole}.center"), &l[0], dy * fs[4]);
+            }
+            // D shape: a Horizontal chord and an arc over it, the chord's
+            // length and the arc's radius.
+            _ => {
+                let len = r.range(15.0, 30.0);
+                let rad = len * r.range(0.55, 0.9);
+                let hgt = (rad * rad - len * len / 4.0).sqrt();
+                let l1 = c.line(o + v(-len / 2.0, 0.0), o + v(len / 2.0, 0.0));
+                let start = (-hgt).atan2(len / 2.0);
+                let a2 = c.arc(o + v(0.0, hgt), rad, start, PI - start);
+                c.coincident(&format!("{l1}.end"), &format!("{a2}.start"));
+                c.coincident(&format!("{a2}.end"), &format!("{l1}.start"));
+                c.hv(true, &l1);
+                let (fl, fr) = (f(&mut r), f(&mut r));
+                c.length(&l1, len * fl);
+                // (Never under half the new chord.)
+                c.radius(&a2, (rad * fr).max(len * fl * 0.55), false);
             }
         }
     }
@@ -688,7 +736,7 @@ fn write_batch() {
 }
 
 /// The batches: (number, first seed, rich).
-const BATCHES: [(usize, u64, bool); 5] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true)];
+const BATCHES: [(usize, u64, bool); 6] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true)];
 
 /// Cases in batch `n` (batch 3 on: 40, where positions match least).
 fn batch_size(n: usize) -> usize {
