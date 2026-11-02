@@ -74,6 +74,9 @@ pub struct ListPrefs {
     /// `panelLayoutManager.<user>.feature-dialog.<type>` in localStorage).
     #[serde(default)]
     pub feature_dialog_widths: std::collections::BTreeMap<String, u32>,
+    /// Updates › off: no checks for a new release (crates/app updates.rs).
+    #[serde(default)]
+    pub updates_off: bool,
 }
 
 fn list_prefs_path() -> std::path::PathBuf {
@@ -258,6 +261,7 @@ pub struct PreferencesView {
     theming: Entity<crate::prefs_general::ThemingPrefsView>,
     env_profile: Entity<crate::prefs_general::EnvProfilePrefsView>,
     labs: Entity<crate::prefs_general::LabsPrefsView>,
+    updates: Entity<crate::prefs_general::UpdatesPrefsView>,
     export_rules: Entity<crate::prefs_export_rules::ExportRulesPrefsView>,
     /// Drawings section (drawing_prefs.rs).
     drawings: Entity<crate::drawing_prefs::DrawingPrefsView>,
@@ -307,6 +311,7 @@ impl PreferencesView {
             theming: cx.new(|_| crate::prefs_general::ThemingPrefsView::default()),
             env_profile: cx.new(|_| crate::prefs_general::EnvProfilePrefsView::default()),
             labs: cx.new(|_| crate::prefs_general::LabsPrefsView),
+            updates: cx.new(|_| crate::prefs_general::UpdatesPrefsView),
             export_rules: cx.new(|_| crate::prefs_export_rules::ExportRulesPrefsView),
             drawings: cx.new(|_| crate::drawing_prefs::DrawingPrefsView::new()),
             _subs: subs,
@@ -1091,6 +1096,7 @@ impl Render for PreferencesView {
                 self.materials.clone().into_any_element(),
                 self.export_rules.clone().into_any_element(),
                 self.labs.clone().into_any_element(),
+                self.updates.clone().into_any_element(),
             ]
         };
         v_flex()

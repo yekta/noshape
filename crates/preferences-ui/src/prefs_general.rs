@@ -548,3 +548,39 @@ impl Render for LabsPrefsView {
         )
     }
 }
+
+// ----------------------------------------------------------------- Updates (noshape's own; Onshape is a website)
+
+/// Updates: noshape checks for a new release at launch and every 5 minutes, downloads and verifies it in the
+/// background and installs it on a restart (crates/app updates.rs). This turns that off.
+pub struct UpdatesPrefsView;
+
+impl Render for UpdatesPrefsView {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let pal = p();
+        let on = !ListPrefs::load().updates_off;
+        section(
+            "Updates",
+            None,
+            v_flex()
+                .child(
+                    h_flex()
+                        .id("pref-updates")
+                        .h(px(21.))
+                        .gap(px(3.))
+                        .text_size(px(13.33))
+                        .text_color(pal.text)
+                        .cursor_pointer()
+                        .child(PreferencesView::checkbox_box(on))
+                        .child(tr("Check for updates and download them in the background"))
+                        .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
+                            let mut prefs = ListPrefs::load();
+                            prefs.updates_off = on;
+                            prefs.save();
+                            cx.notify();
+                        })),
+                )
+                .child(div().pl(px(16.)).pt(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0xbbbbbb } else { 0x777777 })).child(tr("A banner says when an update is ready; it is installed when you restart noshape."))),
+        )
+    }
+}

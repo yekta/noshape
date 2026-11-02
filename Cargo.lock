@@ -4596,6 +4596,7 @@ dependencies = [
  "noshape-store",
  "noshape-ui-test-support",
  "noshape-units",
+ "noshape-update",
  "noshape-variable-studio-ui",
  "noshape-workspace-hack",
  "open",
@@ -5136,6 +5137,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "noshape-update"
+version = "0.0.0-dev"
+dependencies = [
+ "base64 0.23.1",
+ "noshape-workspace-hack",
+ "ring",
+ "rustls-pki-types",
+ "rustls-webpki",
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "ureq",
+]
+
+[[package]]
 name = "noshape-variable-studio-ui"
 version = "0.0.0-dev"
 dependencies = [
@@ -5172,6 +5189,7 @@ dependencies = [
  "concurrent-queue",
  "crc32fast",
  "crossbeam-utils",
+ "digest 0.10.7",
  "errno",
  "euclid",
  "event-listener",
@@ -5186,6 +5204,7 @@ dependencies = [
  "half",
  "hashbrown 0.16.1",
  "hashbrown 0.17.1",
+ "http",
  "image",
  "indexmap",
  "libc",
@@ -5202,6 +5221,7 @@ dependencies = [
  "objc2-metal 0.3.2",
  "objc2-quartz-core 0.3.2",
  "once_cell",
+ "percent-encoding",
  "phf 0.11.3",
  "phf 0.13.1",
  "phf_shared 0.11.3",
@@ -5226,6 +5246,7 @@ dependencies = [
  "slotmap",
  "smallvec",
  "stable_deref_trait",
+ "subtle",
  "syn 2.0.119",
  "syn 3.0.9",
  "toml_datetime 1.1.2+spec-1.1.0",
@@ -5240,6 +5261,7 @@ dependencies = [
  "yoke",
  "zerocopy",
  "zerofrom",
+ "zeroize",
  "zvariant",
 ]
 
@@ -6999,6 +7021,7 @@ version = "0.23.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
 dependencies = [
+ "log",
  "once_cell",
  "ring",
  "rustls-pki-types",
@@ -8323,6 +8346,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
+name = "ureq"
+version = "3.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cde93ff05758a36a851a398a772b0b79a82fbe3c186a46f2696baaeaf84c966b"
+dependencies = [
+ "base64 0.23.1",
+ "log",
+ "percent-encoding",
+ "rustls",
+ "rustls-pki-types",
+ "ureq-proto",
+ "utf8-zero",
+ "webpki-roots",
+]
+
+[[package]]
+name = "ureq-proto"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "841583fc36089d7d59419568ae157f43a5a03a2e5a81ba87c77d1596ef46e922"
+dependencies = [
+ "base64 0.23.1",
+ "http",
+ "httparse",
+ "log",
+]
+
+[[package]]
 name = "url"
 version = "2.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8400,6 +8451,12 @@ name = "utf-8"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
+
+[[package]]
+name = "utf8-zero"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8c0a043c9540bae7c578c88f91dda8bd82e59ae27c21baca69c8b191aaf5a6e"
 
 [[package]]
 name = "utf8_iter"
@@ -8745,6 +8802,15 @@ checksum = "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "webpki-roots"
+version = "1.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5f280bbb2b287bc8e7de7e3852945a0ff50d1bbcb5ed42b6c7a568c546df171"
+dependencies = [
+ "rustls-pki-types",
 ]
 
 [[package]]

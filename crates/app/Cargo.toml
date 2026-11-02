@@ -32,6 +32,7 @@ noshape-sketch.workspace = true
 noshape-kernel.workspace = true
 noshape-ops.workspace = true
 noshape-cli.workspace = true
+noshape-update = { path = "../update" }
 noshape-scene.workspace = true
 gpui-kit.workspace = true
 anyhow.workspace = true

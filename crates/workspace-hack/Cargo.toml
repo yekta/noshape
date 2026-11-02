@@ -27,6 +27,7 @@ flate2 = { version = "1", features = ["zlib-rs"] }
 foldhash = { version = "0.2" }
 getrandom-468e82937335b1c9 = { package = "getrandom", version = "0.3", default-features = false, features = ["std"] }
 hashbrown-9067fe90e8c1f593 = { package = "hashbrown", version = "0.17", default-features = false, features = ["default-hasher"] }
+http = { version = "1" }
 image = { version = "0.25", default-features = false, features = ["dds", "exr", "ff", "gif", "hdr", "ico", "jpeg", "pnm", "qoi", "rayon", "tga", "tiff", "webp"] }
 indexmap = { version = "2", features = ["serde"] }
 log = { version = "0.4", default-features = false, features = ["serde", "std"] }
@@ -35,6 +36,8 @@ miniz_oxide = { version = "0.8", features = ["simd"] }
 moxcms = { version = "0.8", features = ["in_place"] }
 num-complex = { version = "0.4", features = ["bytemuck"] }
 num-traits = { version = "0.2", features = ["i128", "libm"] }
+once_cell = { version = "1" }
+percent-encoding = { version = "2" }
 phf-a6292c17cd707f01 = { package = "phf", version = "0.11" }
 phf_shared-a6292c17cd707f01 = { package = "phf_shared", version = "0.11" }
 profiling = { version = "1" }
@@ -86,21 +89,24 @@ typenum = { version = "1", default-features = false, features = ["const-generics
 ahash = { version = "0.8", features = ["compile-time-rng"] }
 bitflags = { version = "2", default-features = false, features = ["std"] }
 codespan-reporting = { version = "0.13" }
+digest = { version = "0.10", features = ["mac", "std"] }
 fastrand = { version = "2" }
 form_urlencoded = { version = "1" }
 half = { version = "2", features = ["num-traits"] }
 libc = { version = "0.2" }
 num-rational = { version = "0.4", default-features = false, features = ["num-bigint-std", "std"] }
-once_cell = { version = "1" }
 phf-594e8ee84c453af0 = { package = "phf", version = "0.13", features = ["macros"] }
 phf_shared-594e8ee84c453af0 = { package = "phf_shared", version = "0.13", default-features = false, features = ["std"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
+quote = { version = "1" }
 rust-embed-utils = { version = "8", default-features = false, features = ["include-exclude"] }
 smallvec = { version = "1", default-features = false, features = ["write"] }
+subtle = { version = "2" }
 syn-7b89eefb6aaa9bf3 = { package = "syn", version = "3", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 uuid = { version = "1", features = ["serde", "v4", "v5", "v7"] }
 yoke = { version = "0.8", features = ["derive"] }
 zerofrom = { version = "0.1", default-features = false, features = ["alloc", "derive"] }
+zeroize = { version = "1", features = ["zeroize_derive"] }
 zvariant = { version = "5", features = ["enumflags2", "gvariant", "serde_bytes", "url"] }
 
 [target.x86_64-unknown-linux-gnu.build-dependencies]
@@ -109,6 +115,7 @@ fastrand = { version = "2" }
 form_urlencoded = { version = "1" }
 libc = { version = "0.2" }
 once_cell = { version = "1" }
+percent-encoding = { version = "2" }
 phf_shared-594e8ee84c453af0 = { package = "phf_shared", version = "0.13", default-features = false, features = ["std"] }
 rust-embed-utils = { version = "8", default-features = false, features = ["include-exclude"] }
 smallvec = { version = "1", default-features = false, features = ["write"] }
@@ -131,7 +138,6 @@ objc2-core-foundation = { version = "0.3", default-features = false, features = 
 objc2-foundation = { version = "0.3" }
 objc2-metal = { version = "0.3", default-features = false, features = ["MTLAccelerationStructureCommandEncoder", "MTLAccelerationStructureTypes", "MTLBlitCommandEncoder", "MTLBlitPass", "MTLBuffer", "MTLCaptureManager", "MTLCaptureScope", "MTLCommandBuffer", "MTLCommandEncoder", "MTLCommandQueue", "MTLComputeCommandEncoder", "MTLComputePass", "MTLComputePipeline", "MTLCounters", "MTLDepthStencil", "MTLDevice", "MTLDrawable", "MTLEvent", "MTLPipeline", "MTLPixelFormat", "MTLRenderCommandEncoder", "MTLRenderPass", "MTLRenderPipeline", "MTLResidencySet", "MTLSampler", "MTLStageInputOutputDescriptor", "MTLTexture", "MTLTypes", "MTLVertexDescriptor", "block2", "std"] }
 objc2-quartz-core = { version = "0.3", default-features = false, features = ["CADisplayLink", "CALayer", "CAMediaTiming", "CAMediaTimingFunction", "CAMetalLayer", "CAOpenGLLayer", "objc2-core-foundation", "objc2-metal", "std"] }
-once_cell = { version = "1" }
 rust-embed-utils = { version = "8", default-features = false, features = ["include-exclude"] }
 rustix = { version = "1", features = ["event", "fs", "net", "pipe", "process", "time"] }
 semver = { version = "1", features = ["serde"] }
@@ -160,7 +166,6 @@ getrandom-9fbad63c4bcf4a8f = { package = "getrandom", version = "0.4", default-f
 gpui-pre-windows = { path = "../../vendor/gpui-pre-windows" }
 half = { version = "2", features = ["num-traits"] }
 hashbrown-986da7b5efc2b80e = { package = "hashbrown", version = "0.16" }
-once_cell = { version = "1" }
 raw-window-handle = { version = "0.6", default-features = false, features = ["std"] }
 rust-embed-utils = { version = "8", default-features = false, features = ["include-exclude"] }
 schemars = { version = "1", features = ["indexmap2"] }

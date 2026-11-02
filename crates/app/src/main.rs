@@ -26,6 +26,7 @@ use noshape_history_ui::{compare_mode, history_panel};
 // The documents page (docs/CRATES.md), under its old path; what it needs of the app: `register_start_hooks`.
 use noshape_start_ui::start_window;
 mod agent_setup;
+mod updates;
 mod cli_mode;
 mod live_server;
 mod doc_dialogs;
@@ -383,7 +384,7 @@ fn register_history_hooks() {
 
 /// What the documents page (noshape-start-ui) needs of the app: a document's window, the build label.
 fn register_start_hooks() {
-    noshape_start_ui::start_hooks::register(noshape_start_ui::start_hooks::Hooks { open_document_window: files::open_document_window, open_document_at: files::open_document_at, build_label, import_dialog: import_dialog::open_for_page });
+    noshape_start_ui::start_hooks::register(noshape_start_ui::start_hooks::Hooks { open_document_window: files::open_document_window, open_document_at: files::open_document_at, build_label, import_dialog: import_dialog::open_for_page, update_banner: updates::banner });
 }
 
 fn main() {
@@ -419,7 +420,13 @@ fn main() {
     register_feature_studio_hooks();
     register_history_hooks();
     register_start_hooks();
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let mut args: Vec<String> = std::env::args().skip(1).collect();
+    // `--reopen <list>`: started by an update's helper with the documents that were open (updates.rs).
+    let reopen = args.iter().position(|a| a == "--reopen").map(|i| {
+        let list = args.get(i + 1).cloned().unwrap_or_default();
+        args.drain(i..(i + 2).min(args.len()));
+        updates::reopen_list(std::path::Path::new(&list))
+    });
     let demo = args.iter().any(|a| a == "--demo");
     let path = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from);
 
@@ -455,8 +462,22 @@ fn main() {
         files::init(cx);
         // Help › Install command line tool… / Connect to coding agents… (and the macOS app menu).
         agent_setup::init(cx);
+        // Updates: checked at launch and every 5 minutes, the banner in the navbar.
+        updates::init(cx);
         noshape_render::perf::milestone("app initialized");
-        if path.is_some() || args.iter().any(|a| a.starts_with("--demo")) {
+        if let Some(docs) = reopen.filter(|d| !d.is_empty()) {
+            let mut opened = 0;
+            for doc in docs {
+                match files::open_document_window(doc.clone(), None, gpu.clone(), cx) {
+                    Ok(_) => opened += 1,
+                    Err(e) => log::error!("could not reopen {}: {e:#}", doc.display()),
+                }
+            }
+            updates::note(&format!("reopened {opened} document(s)"));
+            if cx.windows().is_empty() {
+                files::show_start_window(cx);
+            }
+        } else if path.is_some() || args.iter().any(|a| a.starts_with("--demo")) {
             let path = path.clone().unwrap_or_else(files::new_document_path);
             let initial = if args.iter().any(|a| a == "--demo-drawing-full") {
                 Some(noshape_model::drawing::showcase::showcase_document())
