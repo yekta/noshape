@@ -613,6 +613,11 @@ Parity (11-02, user: correctness before more speed):
   (a1000's Parallels to the base) goes pin by pin too; a loop one body can't close (a linkage) falls back to the group
   solve. Trees are placed as before. vibe3 a1000 regenerate 280 → 79 ms (3693 ms at the start of the speed work),
   a1000-live 66 ms.
+- Tried and dropped (11-02 08:50): the DOF analysis by tree blocks (each joint's 6-column null space carried down its
+  subtree; ~a third of a1000's open is the dense eig). A debug cross-check against the dense analysis failed on
+  chain_drag_follows_in_few_iterations (19 Revolutes): the joints' finite-difference noise grows with the levers (an
+  absolute rank cut over-counts, a relative one drops genuine near-collinear directions). Needs exact joint null spaces
+  (central differences or per-mate analytic freedoms) before it can be identical.
 - RUST-SM-CUT-VOLUME closed: sheetmetal_std::qa4_s1_enclosure_as_live passes on main (20805.4123 / 61).
 
 Next: each Sub instance's own solve from its
