@@ -1468,6 +1468,9 @@ fn audit_cases() -> Vec<(&'static str, Studio)> {
         p.set("destination", q(face_at(&r, DVec3::new(110.0, 0.0, 10.0))));
         p.set("resultType", en("SOLID"));
         p.set("thickness", mm(1.0));
+        // (wrap.fs's editing logic, as live's dialog: Add into the destination's part.)
+        p.set("operationType", en("ADD"));
+        p.set("booleanScope", q(Reference::Body(r.context.bodies[0].id.clone())));
     });
     cases.push(("WR1", s));
     for (name, pitch) in [("HX1", false), ("HX2", true)] {
@@ -1586,8 +1589,41 @@ fn audit_cases() -> Vec<(&'static str, Studio)> {
     cases
 }
 
-/// Live's figures for the audit cases as they come (results-11..13.jsonl).
-const AUDIT_LIVE: &[(&str, Audit)] = &[];
+/// Live's figures for the audit cases (fs-oracle-p1 results-11..13.jsonl, live 1739; a Helix's length as its wire).
+const AUDIT_LIVE: &[(&str, Audit)] = &[
+    ("MF1", Audit { status: "OK", solids: (60000.0, 9800.0, 6, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("MF2", Audit { status: "OK", solids: (52000.0, 9400.0, 6, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("MF3", Audit { status: "OK", solids: (46589.3842, 8600.7489, 6, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("MF4", Audit { status: "OK", solids: (47434.5133, 9120.4425, 7, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("RF1", Audit { status: "OK", solids: (60000.0, 9800.0, 6, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("DF1", Audit { status: "OK", solids: (48000.0, 8800.0, 6, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("DF2", Audit { status: "OK", solids: (48000.0, 8800.0, 6, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("OS1", Audit { status: "OK", solids: (48000.0, 8800.0, 6, 0, 1), sheets: (2400.0, 1, 1), wire: 0.0 }),
+    ("OS2", Audit { status: "OK", solids: (6283.1853, 1884.9556, 3, 0, 1), sheets: (1633.6282, 1, 1), wire: 0.0 }),
+    ("TH1", Audit { status: "OK", solids: (52800.0, 14000.0, 12, 0, 2), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("TH2", Audit { status: "OK", solids: (57600.0, 14400.0, 12, 0, 2), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("EN1", Audit { status: "OK", solids: (12000.0, 3200.0, 6, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("FI1", Audit { status: "OK", solids: (11712.0, 12112.0, 11, 0, 1), sheets: (2400.0, 1, 1), wire: 0.0 }),
+    ("FI2", Audit { status: "WARNING", solids: (11712.0, 12112.0, 11, 0, 1), sheets: (4327.5641, 1, 1), wire: 0.0 }),
+    ("BD1", Audit { status: "OK", solids: (0.0, 0.0, 0, 0, 0), sheets: (896.8494, 1, 1), wire: 0.0 }),
+    ("BD2", Audit { status: "ERROR", solids: (0.0, 0.0, 0, 0, 0), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("RB1", Audit { status: "OK", solids: (12608.0, 12976.0, 15, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("RB2", Audit { status: "OK", solids: (13728.0, 14056.0, 15, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("WR1", Audit { status: "OK", solids: (6335.6853, 1920.9556, 8, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("HX1", Audit { status: "OK", solids: (6283.1853, 1884.9556, 3, 0, 1), sheets: (0.0, 0, 0), wire: 378.420214 }),
+    ("HX2", Audit { status: "OK", solids: (6283.1853, 1884.9556, 3, 0, 1), sheets: (0.0, 0, 0), wire: 378.420214 }),
+    ("SW5", Audit { status: "OK", solids: (574.3832, 599.5159, 4, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("SW6", Audit { status: "OK", solids: (9047.3203, 7602.07, 6, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("LF4", Audit { status: "OK", solids: (5946.8647, 1907.678, 6, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("LF5", Audit { status: "OK", solids: (10888.3011, 3260.9475, 6, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("RV5", Audit { status: "OK", solids: (123398.2237, 19883.1853, 11, 0, 2), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("SH6", Audit { status: "OK", solids: (11421.8583, 11804.6902, 19, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("SH7", Audit { status: "OK", solids: (11147.4191, 11543.0009, 19, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("DR5", Audit { status: "OK", solids: (50125.608, 9103.4825, 6, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("DR5b", Audit { status: "OK", solids: (45932.9856, 8516.2853, 6, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("CH7", Audit { status: "OK", solids: (47722.8719, 8689.3265, 7, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+    ("FL7", Audit { status: "ERROR", solids: (48000.0, 8800.0, 6, 0, 1), sheets: (0.0, 0, 0), wire: 0.0 }),
+];
 
 #[test]
 #[ignore = "T2: the feature-results audit's cases (prints ours; checks those live has answered)"]

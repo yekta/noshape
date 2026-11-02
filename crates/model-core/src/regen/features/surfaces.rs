@@ -529,6 +529,14 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
     if u.len() + v.len() < 2 {
         return crate::regen::eval::err_at(&["uProfilesArray", "vProfilesArray"], "Select edges to specify at least two profiles.");
     }
+    // Live (audit BD2): closed profiles (a square, a circle) are refused.
+    let closed = |es: &[Shape]| -> bool {
+        let pts: Vec<DVec3> = es.iter().filter_map(|e| e.endpoints().ok()).flat_map(|(a, b)| [a, b]).collect();
+        !pts.is_empty() && pts.iter().all(|p| pts.iter().filter(|q| q.distance(*p) < 1e-7).count() >= 2)
+    };
+    if u.iter().chain(&v).any(|es| closed(es)) {
+        return err("Boundary surface profiles should form G1-continuous open chains.");
+    }
     // Live L28: a third profile in a direction is accepted by the list but
     // can't make the network.
     if u.len() > 2 || v.len() > 2 {

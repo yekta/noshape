@@ -233,6 +233,10 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
                 if t <= 0.0 {
                     return err("Thickness must be positive");
                 }
+                let op = ev.enum_("operationType").to_string();
+                // Merged into the part (Add / Remove / Intersect), the wall starts a little into it: a tool only touching
+                // the part along the wrapped face stayed a part of its own (audit WR1: live one part, 8 faces).
+                let into = if op == "NEW" { 0.0 } else { 0.01 * t };
                 let mut tools = Vec::new();
                 for (fi, f) in wrapped.shape.faces().into_iter().enumerate() {
                     // Thicken along the outward normal of the target (flip: inward).
@@ -241,12 +245,11 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
                     let outward = normal_at(&dst, c, dst_ref);
                     let along = fnrm.dot(outward) >= 0.0;
                     let positive = along != ev.bool("oppositeDirection");
-                    let th = k::thicken(&f, if positive { t } else { 0.0 }, if positive { 0.0 } else { t })?;
+                    let th = k::thicken(&f, if positive { t } else { into }, if positive { into } else { t })?;
                     let src_name = wrapped.names.faces.get(fi).cloned().unwrap_or_else(|| face_name(ev, Role::New(fi as u32)));
                     let names = names_from_sources(ev, &th.history, &th.shape, 0, std::slice::from_ref(&src_name), |n| Role::Offset(n.clone()));
                     tools.push(NamedShape::new(th.shape, names));
                 }
-                let op = ev.enum_("operationType").to_string();
                 let scope = super::extrude::scope(ev);
                 ev.apply_operation(tools, &op, scope, BodyKind::Solid)
             } else {

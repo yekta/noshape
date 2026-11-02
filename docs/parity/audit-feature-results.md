@@ -5,6 +5,14 @@ come from the fs oracle (`/root/onshape-research/live/fs-oracle-p1/CASES.md`, re
 and behaviours.md requests; ours from the T1 / T2 tests named. Status: ✅ matches (within live's band or 1e-6) ·
 ≈ differs by less than live's own spread · ❌ differs (in the list below) · ⏳ live's figures asked.
 
+## Batches 11-13 against live (core 11-02 16:00, live 1739; oracle_p1::audit_feature_results checks them)
+
+Match: MF1-4, RF1, DF1-2, OS1-2, TH1-2, EN1, FI1, BD1, RB1-2, SW5, RV5, SH6-7, DR5, CH7; BD2 (closed Boundary profiles
+refused, live's message) and WR1 (Wrap Add one part, 8 faces) fixed 11-02. Differ: FI2 (live builds a G1 Fill with a
+warning, ours fails), HX1 / HX2 (live's helix 378.420 mm long, ours 315.588: to look at), SW6 (5e-5 in volume), LF5
+(2.3e-5), FL7 (live: "Edges must form single chain per part.", ours fillets: its rule asked, 1796). LF4 / DR5b are not
+among our cases yet.
+
 ## Coverage
 
 | Feature | Cases | Status | Where |
