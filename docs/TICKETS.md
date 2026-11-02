@@ -261,13 +261,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   seam edge more (OCCT). The vase's Shells: 5 faces as live, 0.9-1.1 s by OCCT's offset, within 0.7-2.4 mm³ of live.
   Open: (d) rounded rectangle to circle is 1.5 % off live (where the circle is split: live 1788 asked). Loft faces
   lying in a plane are planes (live's 2-section line pairs: PLANE).
-- [ ] P1 COMPOSITE-LATER-FEATURE (psui 11-01 09:27, audit-part-studio A10) a composite part breaks when a later feature edits a
+- [x] P1 COMPOSITE-LATER-FEATURE (psui 11-01 09:27, audit-part-studio A10) a composite part breaks when a later feature edits a
   member: /root/psui-scratch/tickets/composite-fillet-stray-part.noshape (qa5's mkkinds.py: Part 1, Part 2, Composite part
   1 of both, Surface 1, Curve 1; then a 1 mm Fillet on a Part 1 edge and a failing 100 mm Chamfer). query_parts: Part 1
   3997.85 mm³, Part 2 4000, **Composite part 1 3997.85 (Solid, listed under Parts)**, **"Part 3" 4000 mm³ =
   body Fillet 1 .20000**. Without the Fillet / Chamfer the studio lists Parts (2) + Composite parts (1) as live; with the
   Fillet suppressed the composite still lists under Parts. Live (behaviours 219, 1714): members stay separate parts,
   the composite stays in its own section, a fillet on a member changes only that member.
+  core 11-02 15:30: an open composite's compound held the member's edge under the same name, so the Fillet filleted
+  the composite too (it became the filleted part alone, the other member a stray part). Name lookups now skip open
+  composites (their entities are the members'), and after each feature an open composite is made again of its members
+  as they are now. T1 model qa_regressions::a_fillet_on_an_open_composites_member_changes_the_member.
 - [ ] P2 THIN-LOFT-TRIM-ENDS (skasm → core, kernel thicken) a thin loft ignores Trim ends (default ☑): live's loft.fs
   core 11-01 04:20: (a) Trim ends, outward, two profiles: the lofted surface offset along its normals, mitred, cut by
   the profile planes, built directly (kernel thicken_loft_out, ~0.3 s; OCCT Booleans of the offset faces took 6 s):

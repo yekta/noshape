@@ -362,6 +362,37 @@ fn open_composite_keeps_its_members() {
     assert!(comp.composite.as_ref().is_some_and(|i| i.closed) && !comp.mesh.indices.is_empty());
 }
 
+/// P1 COMPOSITE-LATER-FEATURE (psui 11-01): a Fillet on an edge of an open composite's member filleted the composite
+/// too (its compound holds the member's edge under the same name): the composite became the filleted part alone and
+/// the other member a stray "Part 3". Live (behaviours 219, 1714): the members stay parts, the fillet changes that
+/// member only, the composite stays a composite of both.
+#[test]
+fn a_fillet_on_an_open_composites_member_changes_the_member() {
+    let mut t = T::new();
+    t.block();
+    t.block();
+    let r = t.regen();
+    let ids: Vec<_> = r.context.bodies.iter().map(|b| b.id.clone()).collect();
+    let v2 = r.context.bodies[1].shape.volume().unwrap();
+    let c = t.add("compositePart", &[("bodies", q(ids.iter().cloned().map(Reference::Body).collect()))]);
+    let r = t.regen();
+    let part1 = &r.context.bodies[0];
+    let edge = part1.shape.edges().iter().position(|e| e.edge_info().is_ok_and(|i| (i.start.z - i.end.z).abs() > 1e-6)).unwrap();
+    let f = t.add("fillet", &[("entities", q(vec![Reference::Edge((*part1.edges[edge]).clone())])), ("radius", e("1 mm"))]);
+    assert_eq!(t.status(f).0, FeatureStatus::Ok);
+    let r = t.regen();
+    assert_eq!(r.context.bodies.len(), 3, "{:?}", r.context.bodies.iter().map(|b| b.name.clone()).collect::<Vec<_>>());
+    let (p1, p2) = (&r.context.bodies[0], &r.context.bodies[1]);
+    assert_eq!((p1.id.clone(), p2.id.clone()), (ids[0].clone(), ids[1].clone()));
+    assert_eq!(p1.shape.count(noshape_kernel::ShapeType::Face), 7, "Part 1 filleted");
+    assert!((p2.shape.volume().unwrap() - v2).abs() < 1e-15, "Part 2 as it was");
+    let comp = r.context.bodies.iter().find(|b| b.id.feature == c).expect("composite");
+    assert!(comp.composite.as_ref().is_some_and(|i| !i.closed && i.members == ids));
+    // The composite is its members as they are now.
+    let sum = p1.shape.volume().unwrap() + p2.shape.volume().unwrap();
+    assert!((comp.shape.volume().unwrap() - sum).abs() < 1e-12, "{} vs {sum}", comp.shape.volume().unwrap());
+}
+
 /// MOVEFACE-TANGENT (api 10-25, samples/g47-1part.step: a 40 × 20 × 10
 /// block, r 2 vertical and r 4 top fillets): Move face (Offset 5 mm) of the
 /// +X end face moves that face only, the fillets touching it rolled again

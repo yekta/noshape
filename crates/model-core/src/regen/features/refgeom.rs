@@ -361,15 +361,40 @@ pub fn composite_part(ev: &mut EvalCtx) -> FResult<()> {
 /// the feature.
 pub fn make_composite(ev: &mut EvalCtx, idx: &[usize], closed: bool, index: u32) -> FResult<()> {
     let members: Vec<Arc<Body>> = idx.iter().map(|&i| ev.ctx.bodies[i].clone()).collect();
+    let id = BodyId { feature: ev.feature, index };
+    let name = format!("Composite part {}", ev.ctx.bodies.iter().filter(|b| b.name.starts_with("Composite part")).count() + 1);
+    // A new part: the next colour of the rotation (live part-studio/472:
+    // after Part 1 light blue and Part 2 gray, the closed composite is dark
+    // blue #3b61b4).
+    let color = ev.ctx.alloc_color();
+    let body = composite_body(&members, id, name, color, ev.feature, closed);
+    let ids: Vec<BodyId> = members.iter().map(|b| b.id.clone()).collect();
+    // Help (PartStudio__composite_part): Closed consumes the bodies (only the
+    // composite is listed; graphically they are still there); an open
+    // composite leaves them as separate parts "in addition to being part of
+    // the composite part" (live: "Composite test" keeps Part 1 and Part 2).
+    if closed {
+        let pos = idx[0];
+        ev.ctx.bodies.retain(|b| !ids.contains(&b.id));
+        ev.ctx.bodies.insert(pos.min(ev.ctx.bodies.len()), Arc::new(body));
+    } else {
+        // After the members: entity lookups find the members first.
+        ev.ctx.bodies.push(Arc::new(body));
+    }
+    Ok(())
+}
+
+/// A composite part's body: the compound of its members, keeping every member's face, edge and vertex names.
+fn composite_body(members: &[Arc<Body>], id: BodyId, name: String, color: usize, feature: crate::reference::FeatureId, closed: bool) -> Body {
     let compound = Shape::compound(&members.iter().map(|b| b.shape.clone()).collect::<Vec<_>>());
     let nf = compound.count(ShapeType::Face);
     let ne = compound.count(ShapeType::Edge);
     let nv = compound.count(ShapeType::Vertex);
-    let fallback = || Arc::new(crate::reference::TopoName::face(ev.feature, crate::reference::Role::New(0)));
+    let fallback = || Arc::new(crate::reference::TopoName::face(feature, crate::reference::Role::New(0)));
     let mut faces = vec![fallback(); nf];
     let mut edges = vec![fallback(); ne];
     let mut vertices = vec![fallback(); nv];
-    for m in &members {
+    for m in members {
         for (i, f) in m.shape.faces().iter().enumerate() {
             if let (Some(j), Some(n)) = (compound.index_of(f, ShapeType::Face), m.faces.get(i)) {
                 faces[j] = n.clone();
@@ -391,32 +416,39 @@ pub fn make_composite(ev: &mut EvalCtx, idx: &[usize], closed: bool, index: u32)
     } else if members.iter().any(|b| b.kind == BodyKind::Surface) {
         BodyKind::Surface
     } else {
-        members[0].kind
+        members.first().map_or(BodyKind::Solid, |b| b.kind)
     };
-    let id = BodyId { feature: ev.feature, index };
-    let name = format!("Composite part {}", ev.ctx.bodies.iter().filter(|b| b.name.starts_with("Composite part")).count() + 1);
-    // A new part: the next colour of the rotation (live part-studio/472:
-    // after Part 1 light blue and Part 2 gray, the closed composite is dark
-    // blue #3b61b4).
-    let color = ev.ctx.alloc_color();
-    let mut body = Body::new(id, name, kind, compound, faces, color, ev.feature);
+    let mut body = Body::new(id, name, kind, compound, faces, color, feature);
     body.edges = edges;
     body.vertices = vertices;
-    let ids: Vec<BodyId> = members.iter().map(|b| b.id.clone()).collect();
-    // Help (PartStudio__composite_part): Closed consumes the bodies (only the
-    // composite is listed; graphically they are still there); an open
-    // composite leaves them as separate parts "in addition to being part of
-    // the composite part" (live: "Composite test" keeps Part 1 and Part 2).
-    body.composite = Some(crate::display::CompositeInfo { members: ids.clone(), closed });
-    if closed {
-        let pos = idx[0];
-        ev.ctx.bodies.retain(|b| !ids.contains(&b.id));
-        ev.ctx.bodies.insert(pos.min(ev.ctx.bodies.len()), Arc::new(body));
-    } else {
-        // After the members: entity lookups find the members first.
-        ev.ctx.bodies.push(Arc::new(body));
+    body.composite = Some(crate::display::CompositeInfo { members: members.iter().map(|b| b.id.clone()).collect(), closed });
+    body
+}
+
+/// Open composite parts made again of their members as they are now (live 1714: a fillet on a member changes that
+/// member, the composite shows it; features never edit the composite itself, whose lookups go to the members). A
+/// member gone (deleted, consumed) leaves the composite.
+pub fn refresh_open_composites(ctx: &mut crate::regen::context::Context) {
+    let bodies = ctx.bodies.untracked();
+    let mut redo: Vec<(usize, Vec<Arc<Body>>)> = Vec::new();
+    for (i, b) in bodies.iter().enumerate() {
+        let Some(c) = b.composite.as_ref().filter(|c| !c.closed) else { continue };
+        let members: Vec<Arc<Body>> = c.members.iter().filter_map(|id| bodies.iter().find(|m| &m.id == id).cloned()).collect();
+        // Unchanged: the same members, each one's first entity still in the compound.
+        let same = members.len() == c.members.len()
+            && members.iter().all(|m| {
+                let first = [ShapeType::Face, ShapeType::Edge, ShapeType::Vertex].into_iter().find_map(|k| m.shape.sub_shape(k, 0).ok().map(|s| (k, s)));
+                first.is_some_and(|(k, s)| b.shape.index_of(&s, k).is_some())
+            });
+        if !same && !members.is_empty() {
+            redo.push((i, members));
+        }
     }
-    Ok(())
+    for (i, members) in redo {
+        let old = ctx.bodies.untracked()[i].clone();
+        let body = composite_body(&members, old.id.clone(), old.name.clone(), old.color, old.id.feature, false);
+        ctx.bodies.replace_untracked(i, Arc::new(body));
+    }
 }
 
 /// Query variable: validates the name and that a "Selection" query resolves.

@@ -380,7 +380,8 @@ impl Bodies {
     }
     pub fn find_untracked(&self, kind: LookupKind, n: &TopoName) -> Vec<(usize, usize)> {
         let mut out = Vec::new();
-        for (bi, b) in self.v.iter().enumerate() {
+        // (An open composite's entities are its members': features change the members, never the composite.)
+        for (bi, b) in self.v.iter().enumerate().filter(|(_, b)| b.composite.as_ref().is_none_or(|c| c.closed)) {
             let found = match kind {
                 LookupKind::Face => b.find_faces(n),
                 LookupKind::Edge => b.find_edges(n),
@@ -389,6 +390,10 @@ impl Bodies {
             out.extend(found.into_iter().map(|i| (bi, i)));
         }
         out
+    }
+    /// Puts `b` in place of body `i` (the regenerator's own bookkeeping, not features).
+    pub fn replace_untracked(&mut self, i: usize, b: Arc<Body>) {
+        self.v[i] = b;
     }
     /// Index of the body with id `id` (ids are no read: an input whose body ids differ is never reused).
     pub fn position_id(&self, id: &BodyId) -> Option<usize> {

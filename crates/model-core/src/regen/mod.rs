@@ -226,6 +226,7 @@ fn reused(e: &CacheEntry, input: &Context) -> Result<Context, String> {
         _ => x.clone(),
     }).collect();
     out.bodies = bodies.into();
+    features::refgeom::refresh_open_composites(&mut out);
     out.renumber_default_names();
     Ok(out)
 }
@@ -527,6 +528,7 @@ impl Regenerator {
                                     ev.ctx.bodies.retain(|b| !crate::in_context::is_context_feature(b.id.feature));
                                 }
                                 ev.ctx.bodies.track(None);
+                                features::refgeom::refresh_open_composites(&mut ev.ctx);
                                 ev.ctx.renumber_default_names();
                                 // A sketch solved again the same as before keeps its last result, so the features
                                 // after it see the context unchanged (incremental regeneration).
