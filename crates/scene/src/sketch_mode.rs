@@ -7040,6 +7040,31 @@ mod tests {
         assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Vertical { .. })), "the constraint is kept");
     }
 
+    /// Live 1785: a corner rectangle's width typed in the editor (40 -> 50)
+    /// scales the whole rectangle ×1.25 about its centre, the undimensioned
+    /// height too.
+    #[test]
+    fn a_width_typed_in_the_editor_scales_the_rectangle() {
+        let (mut ed, mut d) = editor(Tool::CornerRect);
+        ed.apply_unit_defaults(noshape_units::LengthUnit::Millimeter);
+        click(&mut ed, &mut d, v(0.010, 0.010));
+        click(&mut ed, &mut d, v(0.050, 0.030));
+        let bottom = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).find_map(|e| {
+            let c = d.sketch.curve(e.id)?;
+            ((c.start_point().y - 0.010).abs() < 1e-9 && (c.end_point().y - 0.010).abs() < 1e-9).then_some(e.id)
+        }).expect("the bottom");
+        let len = d.sketch.add_constraint(ConstraintKind::Length { curve: bottom, value: 0.04 }).unwrap();
+        assert!(d.sketch.solve().is_solved());
+        ed.apply_dimension(&mut d, len, "50", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
+        let (mut lo, mut hi) = (DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY));
+        for e in d.sketch.entities().filter(|e| e.kind() == EntityKind::Point && !e.external && !e.construction) {
+            let p = d.sketch.point(e.id).unwrap();
+            lo = lo.min(p);
+            hi = hi.max(p);
+        }
+        assert!((lo - v(0.005, 0.0075)).length() < 1e-9 && (hi - v(0.055, 0.0325)).length() < 1e-9, "{lo:?} {hi:?}");
+    }
+
     /// Live (qa5 dim conflict, SK1): a value the sketch can't be solved with
     /// is taken (the dimension reads it) but the last solved shape stays,
     /// with Onshape's "Sketch could not be solved.".
