@@ -10,27 +10,20 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   `#wall` then Enter doesn't take the first match `#wall_thickness`; live highlights the first match as you type and
   Enter inserts it. Reproduce side by side with live (which field, what Enter does in ours), fix, and make it the
   first scenario of the interaction suite (docs/PARITY-SUITES.md).
-  qa 11-02 23:15 (green bc7d7e9f, Linux; start document qa-scratch/tickets/varac/vardoc.noshape from vardoc.py:
-  #wall_thickness = 2 mm, #width = 30 mm, Extrude 1 10 mm): **the autocomplete and Enter work** when the field's text is
-  selected: double-click Depth (or Ctrl+A), type `#wall` → the list "(x) #wall_thickness 2 mm" (highlighted) / "(x) New
-  variable…", Enter → `#wall_thickness`, the preview 2 mm (tickets/varac/vd-1.png, vd-2.png; also typed at full speed).
-  **The cause is the first click: in live a first click into a dialog number field selects all its text** (behaviours
-  "Focus, click and selection", fields A/B/C: 1st click selects all, 2nd click puts the caret); **ours puts the caret at
-  the click point and selects nothing** (vd-click1.png). So a user who clicks the field once and types `#wall` gets it
-  inserted into the old value: Shell thickness "2.5 mm" clicked after the 2 → "2#wall.5 mm", the list still offers
-  #wall_thickness, Enter → "2#wall_thickness.5 mm" in red (vd-shell.png); Extrude Depth "#wall_thickness" clicked →
-  "#wall_thickn#wall…" (vd-click1-typed.png). On macOS (Cmd+A not used, one click) that is exactly "Enter doesn't take
-  #wall_thickness". Fix: first click (and Tab) into a number field selects all, second click places the caret, as live.
-  qa 23:22: **Tab the same**: Tab from the region field (3 presses: an unseen stop, the direction arrow, then Depth) puts
-  the caret at the start of "#wall_thickness", nothing selected; typing 7 gives "7#wall_thickness" (tickets/varac/vd-tab3.png,
-  vd-tab4.png); live selects all on Tab. The sketch dimension box (opens all selected) and #width + Enter there = live (ƒx 30).
-  Scenarios: qa-scratch/ui-parity/extrude-depth-variable-click-once.json and 8 more around it (draft format README-draft.md).
-  qa 23:38: **live checked today** (qa's tab, Part Studio "qa parity vars" in "noshape mm test": the same two
-  variables + 40 x 30 x 10 box; qa-scratch/livek/t-var.mjs, t-tab.mjs): double-click Extrude 1, one click on Depth →
-  `input.os-param-number` focused with **selectionStart 0, selectionEnd 5 of "10 mm"**; `#wall` → list
-  "*#wall_thickness 2 mm" (active) / "New variable…"; Enter → "#wall_thickness". Tab order from the region field: the
-  end-type select, the direction icon button, **Depth with 0..5 selected**, the ± tolerance toggle — ours has the same
-  first three stops but leaves Depth unselected (live shots live/qa-var-typed.png, qa-var-enter.png).
+  qa 11-02 23:52 (**corrects qa's 23:15 / 23:22 notes, withdrawn**): those runs had the app window **not focused** (Xvfb
+  without a window manager: xdotool clicks don't give the X window focus), and unfocused our number fields put the caret
+  at the click and draw no selection. With `xdotool windowfocus <win>` first, **green 6b4704f2 and the v0.4.22 release
+  both do what live does on Linux**: one click on Depth selects all of "10 mm" (highlighted), `#wall` → "(x)
+  #wall_thickness 2 mm" highlighted / "(x) New variable…", Enter → "#wall_thickness" (selected), the preview at 2 mm;
+  typed at full speed with Enter straight after, the same (qa-scratch/vd-focused.png, v22-focused.png, v22-fast.png;
+  start document qa-scratch/tickets/varac/vardoc.noshape, bin/vardoc.py). **So it doesn't reproduce on Linux: it looks
+  macOS-only.** Live checked today (qa's tab, Part Studio "qa parity vars" in "noshape mm test", qa-scratch/livek/t-var.mjs,
+  t-tab.mjs): one click → selectionStart 0 / End 5 of "10 mm"; `#wall` → "*#wall_thickness 2 mm" / "New variable…";
+  Enter → "#wall_thickness"; Tab order from the region field: end-type select, direction button, Depth (all selected), ±
+  toggle. macOS suspects for psui: `#` typed with Option+3 (UK / many European layouts: the key arrives with ⌥ held or
+  through the input method's insertText, so the list may not open or not get the key), or Return arriving as a
+  different key / through the IME's commit before our list sees it. Needs a run on a Mac (or psui's UI driver on macOS
+  CI) with a non-US layout. Scenario qa-scratch/ui-parity/extrude-depth-variable-click-once.json.
 - [ ] MACOS-GUARD-LOCK (core, CI 41351354303 on agent/ci2 76a61696, macOS arm64 Test, once): the model tests' `all`
   ended with "noshape: the kernel crashed holding a lock; not recoverable" (SIGSEGV) in the custom-feature tests,
   just after `a_cancelled_custom_feature_stops_soon_and_the_studio_is_as_before`. In flight then:
@@ -1325,23 +1318,29 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P3 FEATURE-ROW-ENTER-EDITS (psui) Enter on a selected feature row opens its dialog in ours: click the Extrude 1 row,
+  Enter; live (11-02, qa's tab, livek/t-b1.mjs): **nothing opens** (no dialog; double-click or Edit… opens it); ours:
+  the Extrude 1 dialog opens (qa-scratch/tickets/fl/ubf-esc-enter.png, right). The rest of that run = live: in an
+  edited dialog with "20" typed in Depth, the 1st Escape reverts the field and keeps the dialog, the 2nd cancels it;
+  Backspace on a row deletes it, Ctrl+Z restores; Rename opens with the whole name selected. Scenario
+  ui-parity/feature-row-enter (qa 2026-11-02, build 6b4704f2)
 - [ ] P2 SKETCH-UNDO-REDO-STATE (psui / skasm) in a sketch the toolbar Undo and Redo are always enabled: a Part Studio
   with nothing to undo, Sketch › Top, draw one line (l, two clicks, Esc), Ctrl+Z, Ctrl+Y, then the sketch's ✕. Live (11-02,
   qa's tab, qa-scratch/livek/t-skundo.mjs; `[command-id=UNDO_A_CHANGE / REDO_A_CHANGE]`): entering the sketch **both
   disabled**; after the line Undo enabled / Redo disabled; after Ctrl+Z Undo disabled / Redo enabled; after Ctrl+Y
   enabled / disabled; after ✕ both disabled and no sketch left. Ours: **both enabled at every step inside the sketch**
   (and Redo with nothing to redo does nothing), both disabled again after ✕ (qa-scratch/tickets/fl/ub-sk-undo.png: open,
-  in sketch, line, Ctrl+Z, Ctrl+Y, ✕). Scenario ui-parity/sketch-undo-redo-state. (qa 2026-11-02, build 6b4704f2)
+  in sketch, line, Ctrl+Z, Ctrl+Y, ✕; focused: ubf-sk-undo.png). Scenario ui-parity/sketch-undo-redo-state. (qa 2026-11-02, build 6b4704f2)
 - [ ] P2 ROLLBACK-BAR-UNDO-STEP (psui) moving the rollback bar is an undo step in ours, not in live: a 40 x 30 x 10 box
   (Sketch 1, Extrude 1; nothing undoable after open), click the Extrude 1 row, ArrowUp (bar above Extrude 1), ArrowDown;
   live (11-02, qa's tab, "qa parity vars", toolbar `[command-id=UNDO_A_CHANGE]`): **Undo stays disabled** through both
-  moves; ours: **Undo enabled after the first move**, and Ctrl+Z moves the bar back up (qa-scratch/tickets/fl/ub-undo-bar.png:
+  moves; ours: **Undo enabled after the first move**, and Ctrl+Z moves the bar back up (re-checked with the window focused: tickets/fl/ubf-undo-bar.png; first run ub-undo-bar.png:
   open / after ArrowUp / after ArrowDown). Scenario ui-parity/feature-row-arrow-up-moves-bar. (qa 2026-11-02, build 6b4704f2)
 - [ ] P2 FEATURE-RCLICK-WITH-SELECTION (psui) right-clicking a feature row that isn't selected while another is: click
   Extrude 1, right-click Sketch 1; live: Extrude 1 stays selected and the **multi-selection menu** opens: Add selection to
   folder… · Suppress · Dynamic suppression ▸ · Clear selection · Edit sketch appearance… · Add appearance to feature… ·
   Delete (qa-scratch/tickets/fl/live-menu-other.png); ours: the single-feature Sketch 1 menu (Rename · Edit… · Copy sketch
-  · Show dimensions · … · Roll to here · Edit sketch appearance… · Delete; tickets/fl/ub-menu2.png). Scenario
+  · Show dimensions · … · Roll to here · Edit sketch appearance… · Delete; tickets/fl/ub-menu2.png, focused ubf-menu2.png). Scenario
   ui-parity/feature-row-rclick-other-selected. (qa 2026-11-02, build 6b4704f2)
 - [x] (psui 10-31 13:03: `os_ui::modal_help`, a filled #888 "?" 5 px before the ✕ as live's drawing/90, on Export Drawing and
   Export as DXF/DWG; the Part Studio / assembly Export keeps its "?" beside File name (live document/80), confirmations
