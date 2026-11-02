@@ -1438,7 +1438,15 @@ fn least_change(problem: &Problem, poses: &mut [Frame], free: &[usize], scale: f
                 back[(k * 6 + j, 0)] = v;
             }
         }
-        let mut along = &basis * (basis.transpose() * &back);
+        let proj = basis.transpose() * &back;
+        // What's left along the free directions is the null basis's tilt
+        // (finite differences) leaking the pull-back's mated part: ~1e-8 of
+        // it. Below that, with the mates held, the rounds only chase that
+        // (a1000 regenerate: 11 of 12 rounds at ×0.66 each, 1e-8 → 5e-10).
+        if proj.norm() < 1e-8 * back.norm() && r.iter().all(|v| v.abs() < 1e-12) {
+            break;
+        }
+        let mut along = &basis * proj;
         to_anchor(&mut along, -1.0);
         let along = DVector::from_column_slice(along.as_slice());
         let svd = jac.svd(true, true);
