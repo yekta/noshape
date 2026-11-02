@@ -530,6 +530,22 @@ Fixes so far (5bde395b / 34aa527a):
 Tried and dropped: one SVD instead of the eigendecomposition + SVD per `least_change` round (changes which directions
 count as free near the threshold: the live oracle failed).
 
+A200 against live (live 1741 part 2; live built it by REST with **a Planar alone on each stack pin**, 162 mates, a pattern
+of 7, since it refuses the redundant Parallels; our bench case a200-live is the same; live on its software-GL VM,
+wall clock; ours vibe3, release, median of 3):
+| | Onshape | noshape (a200-live) |
+|---|---|---|
+| open | instance list 12–15 s, graphics stable 22–25 s | 44 ms (load 2.6 + first evaluation 37 + scene 4) |
+| regenerate (Pins depth 10 → 12 mm) | view changes at 12.9 s, stable at 15.6 s | 63 ms |
+| add a mate | 1.9 s to the answer (it overdefined), view at 7.5 s | 14 ms |
+| drag a top pin | one update every 2.3–2.5 s (≈ 0.4 a second) | 0.6 ms a frame (≈ 1700 fps) |
+| insert a pin | 5.0 s | 4.4 ms |
+A1000: live left it for the lead (≈ 2800 more REST calls).
+**Parity gap found (P1, solver):** live refuses consistent redundant mates: Planar + Parallel to the base + Parallel to
+the pin below gives "Mate overdefines the assembly." on the Planar and both Parallels (k ≥ 2), "Mate is not
+consistent." with the default alignment; the add-a-mate test's Parallel between two tops overdefines too. Our solver
+accepts them (all green). Needs a redundancy test from the DOF analysis (a mate whose rows add no rank).
+
 Pattern copies (11-02, user: decide against live; live 1754): Onshape's copies of a patterned (flexible) subassembly
 have no freedom of their own. Their children keep the seed's positions; a drag on any copy's child turns every copy's,
 the seed's too; a mate on a copy's child is solved by moving the seed's child; with the seed free (Planar) a mate on a
