@@ -530,12 +530,29 @@ Fixes so far (5bde395b / 34aa527a):
 Tried and dropped: one SVD instead of the eigendecomposition + SVD per `least_change` round (changes which directions
 count as free near the threshold: the live oracle failed).
 
-Next (biggest first): a1000's regenerate (840 ms) is now the patterned flexible subassembly: its 10 copies' 100 pins
-form one solver group with the seed (followers act at instance level), and that group's dense LM + least change (600
-unknowns, 53 + 260 ms on vibe5) is the critical path while the 40 stacks solve in parallel beside it. Options: solve
-copies after the seed (followers one-way; differs when copies have mates of their own) or a sparse / block solver.
-The drag step's two passes over all 2380 mates (~1 ms each); the first evaluation (240 ms, cold DOF analysis). Live's
-A200 / A1000 numbers (request 1741, after its REST limit) decide the order.
+Pattern copies (11-02, user: decide against live; live 1754): Onshape's copies of a patterned (flexible) subassembly
+have no freedom of their own. Their children keep the seed's positions; a drag on any copy's child turns every copy's,
+the seed's too; a mate on a copy's child is solved by moving the seed's child; with the seed free (Planar) a mate on a
+copy slides the whole pattern; a copy mate that would pull a copy off the pattern overdefines (nothing moves; the new
+mate, the seed's grounding mate and the pattern red: "Mate overdefines the assembly."); copies show no DOF of their own.
+So "seed first, then copies" was wrong; the solver now eliminates copies instead (solver::Driven, e37a02d0): a copy and
+a flexible copy's every child are placed from their seed (and pattern axis) wherever poses change, never unknowns;
+their mates constrain the seeds (finite-difference Jacobian through the placement). a1000's patterned subassembly:
+600 unknowns → the seed's 60. T1 a_patterned_flexible_subassembly_follows_its_seed (fails on the old code: only the
+dragged copy turned). Open (P2): the overdefinition messages and the red pattern of live's (C).
+Also landed: one residual pass for status and convergence (99588045), the drag step's per-mate memo (16c76701).
+
+vibe3, before (16c76701, benches open with no DOF cached) → after (e37a02d0):
+| | a200 | a1000 |
+|---|---|---|
+| open: first evaluation | 77 → 47 ms | 258 → 102 ms |
+| regenerate | 179 → 70 ms | 852 → 403 ms |
+| drag frame | 0.73 → 0.75 ms | 4.1 → 4.7 ms (211 fps; ~0.5 ms of per-step follower work left) |
+| evaluate again / add a mate / insert | 6 / 15 / 6 ms | 24 / 38 / 24 ms |
+Against the start (2f715f2d): a1000 regenerate 3693 → 403 ms, first evaluation 327 → 102 ms, drag 20.7 → 4.7 ms.
+
+Next: the remaining drag work (Driven built three times a step), live's A200 / A1000 timings (1741, after its REST
+limit), the overdefinition messages of live 1754 (C).
 
 ## Next, in order
 Lead 10-27 order: P0/P1 tickets → PLAN 2.7 speed (met; numbers above, live's beside them) → assembly.md 🔧 rows
