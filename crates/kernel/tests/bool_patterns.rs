@@ -867,6 +867,31 @@ fn a_plane_steeper_than_a_cones_rulings() {
     valid_as_occt("45794f15a71f879f", 1e-9);
 }
 
+/// A cone tilted 0.2 rad cut by a box whose side is a plane steeper than its rulings exactly through its apex: where the
+/// plane meets the two rulings in the plane of the axis and its normal is the apex for both (0 along each; it
+/// declined "a plane at an angle to a cone"); its two rulings there. Taken, valid, OCCT's volume and counts.
+#[test]
+fn a_steep_plane_exactly_through_a_cones_apex() {
+    let _ = k::set_working_scale(1000.0);
+    let cone = k::make_cone(&z_frame(DVec3::ZERO), 0.0, 0.005, 0.01, TAU).unwrap();
+    let cone = k::transform(&cone, &k::Transform::Rotate { origin: DVec3::ZERO, axis: DVec3::Y, angle: 0.2 }, true).unwrap().shape;
+    let block = k::make_box_corners(DVec3::new(0.0, -0.01, -0.01), DVec3::new(0.02, 0.01, 0.02)).unwrap();
+    let opts = k::BooleanOptions::default();
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&cone), std::slice::from_ref(&block), &opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&cone), std::slice::from_ref(&block), &opts).expect("OCCT's");
+    k::set_rust_boolean(None);
+    assert!(r.shape.is_valid());
+    let counts = |s: &k::Shape| [k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+    assert_eq!(counts(&r.shape), counts(&o.shape));
+    let (v, w) = (r.shape.volume().unwrap(), o.shape.volume().unwrap());
+    assert!((v - w).abs() <= 1e-9 * w, "volume {v} against OCCT's {w}");
+}
+
 /// Shell's slab common on a part with countersinks (cone apexes) and tilted holes (ellipse edges) (recorded): each
 /// ellipse edge takes its own minor radius (the body's minor radii skipped the apex edges, so an ellipse after one read
 /// another edge's: 0 there made it "a degenerate edge between two vertices", else a wrong ellipse); valid, OCCT's

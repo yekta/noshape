@@ -123,9 +123,9 @@ occ::handle<Geom_Curve> basis_of(const occ::handle<Geom_Curve>& c)
   }
 }
 
-// An ellipse or circle as a cubic B-spline through 129 of its points at its own parameters over one turn (within
-// ~1e-11 of it; its parameters the conic's), else null: the curve swept into an extruded face.
-occ::handle<Geom_BSplineCurve> conic_as_bspline(const occ::handle<Geom_Curve>& c)
+// An ellipse or circle as a cubic B-spline through 129 of its points at its own parameters over one turn from
+// `start` (within ~1e-11 of it; its parameters the conic's), else null: the curve swept into an extruded face.
+occ::handle<Geom_BSplineCurve> conic_as_bspline(const occ::handle<Geom_Curve>& c, double start)
 {
   if (occ::down_cast<Geom_Ellipse>(c).IsNull() && occ::down_cast<Geom_Circle>(c).IsNull())
     return occ::handle<Geom_BSplineCurve>();
@@ -134,7 +134,7 @@ occ::handle<Geom_BSplineCurve> conic_as_bspline(const occ::handle<Geom_Curve>& c
   occ::handle<NCollection_HArray1<double>> prm = new NCollection_HArray1<double>(1, n + 1);
   for (int k = 0; k <= n; ++k)
   {
-    const double t = 2 * M_PI * k / n;
+    const double t = start + 2 * M_PI * k / n;
     pts->SetValue(k + 1, c->Value(t));
     prm->SetValue(k + 1, t);
   }
@@ -433,8 +433,14 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     const occ::handle<Geom_SurfaceOfRevolution>      rvl = occ::down_cast<Geom_SurfaceOfRevolution>(surf);
     // (A sweep of a B-spline only; an extrusion's ellipse or circle as one.)
     occ::handle<Geom_BSplineCurve> swept = occ::down_cast<Geom_BSplineCurve>(basis_of(!ext.IsNull() ? ext->BasisCurve() : !rvl.IsNull() ? rvl->BasisCurve() : occ::handle<Geom_Curve>()));
+    // (The turn the face's parameters are on: a face from pi to 3 pi starts its turn at pi.)
     if (swept.IsNull() && !ext.IsNull())
-      swept = conic_as_bspline(basis_of(ext->BasisCurve()));
+    {
+      double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+      BRepTools::UVBounds(f, u0, u1, v0, v1);
+      const bool first = u0 > -1e-9 && u1 < 2 * M_PI + 1e-9;
+      swept = conic_as_bspline(basis_of(ext->BasisCurve()), first || u1 - u0 > 2 * M_PI + 1e-9 ? 0.0 : u0);
+    }
     // (A hyperbola's or parabola's over the face's range of it, a little more either side.)
     if (swept.IsNull() && !ext.IsNull())
     {

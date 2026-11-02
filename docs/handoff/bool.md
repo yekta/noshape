@@ -41,55 +41,81 @@ Fusing the slabs yours takes first and adding the offset ones after doesn't help
 next reasons: 3.9 → 5.9 s on a dump); one OCCT common of the solid with all slabs as one tool group changes results.
 Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scratch SHELLDUMP=<path without .brep>).
 
-## State (11-02 23:50 UTC): landed, WIP, jobs, next items
-- Landing now: faces' own tolerances (below). Landed before, newest first: 86596b72 (the knurl sweep's regression
-  undone), a4fe7543 (step 3), b3029580 (pool coarse grid), 463a1666 (step 2), e9346814 (step 1).
-- Gate (lead): the knurl sweep, 346 cases, nothing lands that takes fewer than 258. How: build the model test binary
-  of the commit (`NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh cargo test --release -p noshape-model --test all --no-run`),
-  copy it to vibe5 ~/agents/sweep/model-<tag>, then there `BIN=$HOME/agents/sweep/model-<tag> setsid nohup bash
-  ksweep.sh final.txt <tag>.tsv 4 > sweep-<tag>.log 2>&1 &` (~2-3 h on loaded vibe5; /root/bool-scratch/gate.sh <tag>
-  does it all from bool-b, gate2.sh <tag> [worktree] the corpora and shfall only); compare with
-  `python3 /root/bool-scratch/kcmp.py /tmp/tog.tsv <new>.tsv` (vibe5 ~/agents/sweep: tog = 86596b72 258, facetol =
-  the faces' tolerances 262). qa: /root/bool-scratch/cliqa.sh <tag> (release CLI of bool-b built on vibe4, then
-  qa.sh: shellmatrix, boolmatrix, cli-shell-gpf statuses); fmass.py <cli> <doc> prints each feature's status and
-  parts' volume / area (rollback bar below it), NOSHAPE_BOOL_RUST=0 for OCCT's Booleans alone.
+## State (11-03 00:10 UTC): landed, WIP, jobs, next items
+- Landed, newest first: 00bb5718 (faces' own tolerances, below), 86596b72 (the knurl sweep's regression undone),
+  a4fe7543 (step 3), b3029580 (pool coarse grid), 463a1666 (step 2), e9346814 (step 1). Landing next (bool-c, branch
+  bool-uvper): extruded conics a turn on / a steep plane exactly through a cone's apex / pieces projected onto
+  free-form faces (below).
+- Gate (lead): the knurl sweep, 346 cases, nothing lands that takes fewer than 258. How: /root/bool-scratch/sweep.sh
+  <tag> [worktree] (the worktree's model test binary built on vibe5, then ksweep.sh there, detached, ~2 h);
+  gate2.sh <tag> [worktree] runs the corpora (whyall) and shfall on vibe5; v4tests.sh [worktree] the brep lib tests
+  and bool_patterns on vibe4; cliqa.sh <tag> (release CLI of bool-b built on vibe4, then qa.sh: shellmatrix,
+  boolmatrix, cli-shell-gpf statuses). Compare sweeps with `python3 /root/bool-scratch/kcmp.py /tmp/tog.tsv
+  <new>.tsv` (vibe5 ~/agents/sweep: tog = 86596b72 258, facetol 262, uvper2 = bool-c's steps). fmass.py <cli> <doc>
+  prints each feature's status and the parts' volume / area (rollback bar below it); NOSHAPE_BOOL_RUST=0 for OCCT's
+  Booleans alone.
+- Perf: tools/tiers/perf.sh on vibe3 (idle, stable); /root/bool-scratch/perfab.sh <worktree> <A> <B> runs the knurl
+  perf test at two commits (worktree /root/bool-scratch/perfwt, detached). Profiles: syncdbg.sh puts the model
+  tests' sampler into the kernel tests (NOSHAPE_X_SAMPLE=<out> samples the replay's warm noshape Boolean) and adds
+  custom_features::knurl_profile_dbg (NOSHAPE_SAMPLE_OUT, KNURL=diamond); aggregate on vibe4 with ~/agents/profile.py,
+  ~/agents/prof2.py <out> <regex> [depth] (callees under a function), ~/agents/prof3.py (its callers). perf itself is
+  not allowed there (perf_event_paranoid 4). Found: the diamond knurl test's samples are 64 % the test's own volume
+  integration (props_volume), the Boolean ~9 %; corpus case bool-corpus 7482578355c4dd0e (11 faces, 1 free-form
+  tool, 0.7 s): rays against free-form faces (Newton on NURBS derivatives, 24 %), OCCT's sections (22 %, half of it
+  IntTools' tolerance check by PSO), pieces' 2D curve inversion (C2::param_of). Tried and dropped (no gain past
+  vibe3's noise: knurl 9.2 s either way, the free-form corpus cases within +-5 %): NURBS surfaces evaluated on arrays
+  sized to their degrees (16 for 8..15 instead of 26) with each pole read once, first derivatives alone for rays'
+  Newton steps; same_surface checking inside points first. Both gave identical results (corpora and shfall tsvs).
+  Kernel test binaries per commit: /root/bool-scratch/kbin.sh <worktree> <commit> <name> (vibe4 ~/agents/kbin).
 - Detached job (vibe4): `bash bigrun.sh ~/agents/sweep/tog-to.txt ~/agents/sweep/big.txt` (PID 1413654; the 17 sweep
   cases that timed out at 900 s, run with the bool-d model binary of 86596b72, 3600 s limit). Don't rebuild bool-d on
-  vibe4 until big.txt ends with DONE. So far: Ø100 × 100 CP20 45/45 taken in 335 s, CP30 45/30 taken in 493 s, CP30
-  45/45 "a non-manifold result".
-- WIP in /root/bool-scratch/bool-c (branch bool-uvper, on the faces' tolerances, uncommitted, gating as uvper2 with
-  gate2.sh): an extruded ellipse or circle face whose parameters are a turn past the conic's first (pi..3pi: Shell's
-  slabs of tilted holes) gets its swept B-spline over that turn (shfall 9fccb94d: "two edges" -> "a non-manifold
-  result"); a plane steeper than a cone's rulings exactly through its apex (both rulings' points 0 or -0) goes to the
-  apex's rulings (T1 a_steep_plane_exactly_through_a_cones_apex; shfall 80a5941f / 4fca980b, 30 s of OCCT time:
-  "two edges" next); on a free-form face a piece with no curve there (another argument's edge only partly on it, a
-  section of two other faces along it) is projected onto it (`projected_piece`; shfall a5f1e564, 25 s: "two edges"
-  next). Held back (patch /root/bool-scratch/c9f/all-cpp.diff, case /root/bool-scratch/held/d33e88ff*): a new line or
-  circle on a trimmed plane / cylinder / cone face projected (BOPTools_AlgoTools2D) takes 6 corpus cases ("a new
-  edge on a free-form face", 15 s) but corpus2 / direct-corpus b7eb72a8 (Shell's slab fuse of a box with a hole) then
-  differs: vertex history (16 slab corners Deleted against OCCT's Modified: the `deleted_v` rule) and unified 14
-  faces against OCCT's 18. Needs the reason OCCT keeps those vertices apart before it lands.
-- Corpora at the faces' tolerances: 4412 / 5068 cases (the same as 86596b72's run; corpus totals moved by 2), 0
-  differ. Declined by OCCT time (facetol.tsv): an internal face 56 s (5 cases, b25113011a6accb1 x4 and addb9a14: Shell's
-  slab fuses whose tools hold an INTERNAL face of 0.72 mm tolerance and INTERNAL edges in faces; OCCT's result is
-  invalid there anyway, 13 s each), a non-manifold result 17 s (35), a new edge on a free-form face 15 s (6: held
-  above), two edges 13.5 s (11), a point near two vertices 9.5 s (6).
-- Shell's recordings (shfall) at the faces' tolerances: 45 taken, the same 3 differ; declined by OCCT time: two edges
-  41.6 s (11), an edge without its curve on a free-form face 34.2 s (3), a plane at an angle to a cone 30.3 s (2: the
-  apex fix above), an edge on another argument's free-form face 21.9 s (10), a micro edge 19.6 s (1, 47587a8d), nearly
-  on 19.6 s (4), a section without ends 19.4 s (3), a point near two vertices 17.7 s (14).
-- "Two edges leave a vertex in one direction" in 80a5941f / 0acfd0a2 / 9aec1f4b: a NURBS section and a line section
-  (two slabs' faces) 0.4 mm long between one pair of vertices, 84 um apart halfway, one end a vertex of 0.18 mm
-  tolerance: the short-piece rule straightens both (<= 100 tol) into one line. Keeping a piece's curve where it
-  reaches its ends was tried: the NURBS one ends ~0.1 mm from the tolerant vertex's place, so it is still straightened.
-  OCCT keeps both edges there; the arrangement would need both curves with the vertex's tolerance.
-- Next, in order: (1) gate and land bool-c (corpora + shfall, the sweep, bool_patterns); (2) b7eb72a8's vertex history
-  and unify, then land the trimmed-surface projection; (3) the "two edges" slivers above; (4) the 30 TPI knurl with a
-  tolerance that reaches every curve near the point on both faces or none (see the regression section below).
-  Tools: bin/why4.sh (single cases on vibe4), bin/syncdbg.sh [worktree] (bool-a = that worktree + env-gated debug
-  prints from bin/dbgpatch.py: NOSHAPE_X_NM, _ALLP, _PAIR, _SEGS, _TWIN (segments between one pair of vertices),
-  _NOPC (a piece without its curve on a free-form face), _DELV (the deleted-vertex rule)), kbis4.sh / kbisAS.sh.
+  vibe4 until big.txt ends with DONE.
+- Held back (patch /root/bool-scratch/c9f/all-cpp.diff, the analytic_base part; case /root/bool-scratch/held/d33e88ff*
+  with its T1 a_circle_on_a_trimmed_cylinder): a new line or circle on a trimmed plane / cylinder / cone face
+  projected (BOPTools_AlgoTools2D) takes 6 corpus cases ("a new edge on a free-form face", 15 s; every one a circle
+  on a trimmed cylinder) but corpus2 / direct-corpus b7eb72a8 (Shell's slab fuse of an 80 x 50 x 10 box with a
+  Ø20 cylinder face) then differs: 16 slab-corner vertices Deleted against OCCT's Modified (the `deleted_v` rule) and unified
+  14 faces against OCCT's 18: OCCT leaves the Ø20 cylinder wall in 5 faces (125.66 + 2 x 78.54 + 2 x 172.79 mm²)
+  that unify can't merge, ours one face (628.32 mm²). Onshape would show one face; decide whether that may count as
+  equivalent (the replay's `equivalent` rejects a different unify) or find why OCCT's pieces don't merge.
+- Corpora: 4412 / 5068 cases, 0 differ. Declined by OCCT time (nurbs.tsv): an internal face 56 s (5 cases,
+  b25113011a6accb1 x4 and addb9a14: Shell's slab fuses whose tools hold an INTERNAL face of 0.72 mm tolerance and
+  INTERNAL edges in faces; OCCT's result is invalid there anyway, 13 s each), a non-manifold result 17 s (35), a new
+  edge on a free-form face 15 s (6: held above), two edges 13.5 s (11), a point near two vertices 9.5 s (6), a tiny
+  arc 7.3 s (44: e.g. corpus6 b70f339a, a quarter arc of radius 1e-10 m between two vertices of one argument 1.4e-10
+  m apart, not merged as one argument's).
+- Shell's recordings (shfall): 45 taken, the same 3 differ. Top declines by OCCT time after bool-c: two edges (the
+  apex and projection cases move here: 80a5941f, 4fca980b, a5f1e564, 0acfd0a2, 9aec1f4b), an edge on another
+  argument's free-form face (990a7689: a line within the grey band of a sliver face at one end, 51 um off at the
+  other: past the face's tolerance, so declining is right), a micro edge (47587a8d, 19.6 s).
+- "Two edges leave a vertex in one direction", the kinds seen: (a) 80a5941f / 0acfd0a2 / 9aec1f4b: a NURBS section
+  and a line section (two slabs' faces) 0.4 mm long between one pair of vertices, 84 um apart halfway, one end a
+  vertex of 0.18 mm tolerance: the short-piece rule (<= 100 tol) straightens both into one line. Keeping a piece's
+  curve where it reaches its ends doesn't help (the NURBS one ends ~0.1 mm from the tolerant vertex's place); OCCT
+  keeps both edges. (b) corpus2 1ba3f24a: a tolerant edge (0.1 mm) not split at another argument's vertex lying on
+  it 0.14 mm from its end (both vertices of 0.1 mm tolerance, apart by less than the sum, not merged as one): two
+  collinear pieces from one vertex. (c) a5f1e564: collinear overlapping segments after projection. OCCT's PaveFiller
+  sources aren't on this machine (only the installed OCCT in /root/occt).
+- Next, in order: (1) land bool-c once its sweep (vibe5 uvper2.tsv) is >= 258; (2) b7eb72a8 (held projection);
+  (3) the two-edges kinds above; (4) speed: free-form rays (fewer Newton starts per patch), C2::param_of, OCCT's section tolerance check;
+  (5) the 30 TPI knurl's tolerance (see the regression section below). Tools: bin/why4.sh (single cases on vibe4),
+  bin/syncdbg.sh [worktree] (bool-a = that worktree + env-gated debug prints from bin/dbgpatch.py: NOSHAPE_X_NM,
+  _ALLP, _PAIR, _SEGS, _TWIN (segments between one pair of vertices), _NOPC (a piece without its curve on a
+  free-form face), _DELV (the deleted-vertex rule), _PROJ (a failed projection), _TINY (a tiny arc)).
 - Squash only with `git reset --soft $(git merge-base HEAD origin/main)` after a fresh fetch; check `git show --stat`.
+
+## Extruded conics a turn on, a steep plane exactly through a cone's apex, pieces projected onto free-form faces (11-03 00:10 UTC)
+- rust_boolean.cpp to_body: an extruded ellipse or circle face whose parameters lie a turn past the conic's first
+  (pi..3pi: Shell's slabs of tilted holes) gets its swept B-spline over that turn (conic_as_bspline's `start`); its
+  points mapped to the wrong half before (shfall 9fccb94d: "two edges" -> "a non-manifold result").
+- plane_cone_hyperbola: a plane exactly through the apex gives 0 (or -0) along both rulings; it declined "a plane at
+  an angle to a cone" before reaching the apex's rulings (T1 a_steep_plane_exactly_through_a_cones_apex: a cone
+  tilted 0.2 rad cut by a box whose side passes its apex exactly; fails without the fix). shfall 80a5941f and
+  4fca980b (30 s of OCCT time) move on to "two edges".
+- c2_of: on a free-form face, a piece with no curve there (another argument's edge only partly on it, merged with a
+  section; a section of two other faces lying on it) is projected onto it (`projected_piece`, free::projected over
+  the piece, within the tolerance; else the old declines). shfall a5f1e564 (25 s) moves on to "two edges".
+- Corpora decline exactly as before, 0 differ; shfall 45 taken, the same 3 differ; bool_patterns, brep lib pass.
 
 ## Faces' own tolerances (11-02 23:50 UTC)
 - Public type change: brep::Body gains `face_tol` (per face; empty reads as 0). Body::face_tol through the bridge

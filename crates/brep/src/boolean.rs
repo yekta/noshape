@@ -939,14 +939,21 @@ impl Ctx<'_> {
                     // knurl faces' 0.32 um curves into one vertex): straight between its ends there.)
                     return Ok(C2::Seg { a: g.to2(self.p(s.v[0])), b: g.to2(self.p(s.v[1])) });
                 } else {
-                    return Err(Decline("a section on a third face"));
+                    // (Two other faces' section lying on it: projected.)
+                    return self.projected_piece(f, s, su, sv).ok_or(Decline("a section on a third face"));
                 };
                 return Ok(C2::Nurbs { c: free::scaled(&on[k], su, sv), t0, t1 });
             }
             // (Another argument's straight, round, elliptic or B-spline edge lying on it: the one whose curve on it was
             // projected.)
-            let e = edge.or_else(|| self.projected_edge(f, s)).ok_or(Decline("a curve on a free-form face not its own"))?;
-            let (pc, pt0, pt1) = g.pcurves.get(&(e, copy == 1)).ok_or(Decline("an edge without its curve on a free-form face"))?;
+            // (Else a piece lying on it with no curve there (a section of two other faces along it, a piece of
+            // another argument's edge only partly on it): the piece projected.)
+            let Some(e) = edge.or_else(|| self.projected_edge(f, s)) else {
+                return self.projected_piece(f, s, su, sv).ok_or(Decline("a curve on a free-form face not its own"));
+            };
+            let Some((pc, pt0, pt1)) = g.pcurves.get(&(e, copy == 1)) else {
+                return self.projected_piece(f, s, su, sv).ok_or(Decline("an edge without its curve on a free-form face"));
+            };
             let c = free::scaled(pc, su, sv);
             let (a, b) = match s.g {
                 // (Its own curve's piece; another's coincident with it goes by its ends, below.)
@@ -1011,6 +1018,32 @@ impl Ctx<'_> {
             return free::mapped(g, &self.ncurves[id as usize].c, t0, t1);
         }
         g.curve2(self.p(s.v[0]), self.p(s.v[1]), &s.g, copy)
+    }
+
+    /// Segment `s` on free-form face `f` projected onto it, its parameters scaled by `su`, `sv` (None where it leaves
+    /// the face's surface by more than the tolerance).
+    fn projected_piece(&self, f: usize, s: &Seg, su: f64, sv: f64) -> Option<C2> {
+        if matches!(s.g, Geo::Apex { .. }) {
+            return None;
+        }
+        let at = |t: f64| match s.g {
+            Geo::Line => {
+                let (a, b) = (self.p(s.v[0]), self.p(s.v[1]));
+                (a.lerp(b, t), b - a)
+            }
+            Geo::Arc { k, a0, sweep } => {
+                let th = a0 + sweep * t;
+                (k.at(th), (k.y * th.cos() - k.x * th.sin()) * (k.r * sweep))
+            }
+            Geo::Ell { e, t0, sweep, .. } => (e.at(t0 + sweep * t), e.deriv(t0 + sweep * t) * sweep),
+            Geo::Nurbs { id, t0, t1 } => {
+                let d = self.ncurves[id as usize].c.derivs(t0 + (t1 - t0) * t);
+                (d[0], d[1] * (t1 - t0))
+            }
+            Geo::Apex { .. } => (self.p(s.v[0]), DVec3::ZERO),
+        };
+        let c = free::projected(&self.faces[f], &at, 0.0, 1.0, self.tol)?;
+        Some(C2::Nurbs { c: free::scaled(&c, su, sv), t0: 0.0, t1: 1.0 })
     }
 
     /// The edge of another argument, lying on free-form face `f`, whose curve on it was projected (its pieces in `f`
@@ -2397,9 +2430,10 @@ impl Ctx<'_> {
         };
         let (g1, g2) = (up * ca + side * sa, up * ca - side * sa);
         let (Some(s1), Some(s2)) = (on(g1), on(g2)) else { return Err(Decline("a plane at an angle to a cone")) };
-        let (ours, other) = if s1 > 0.0 && s2 < 0.0 {
+        // (Both 0 through the apex.)
+        let (ours, other) = if s1 >= 0.0 && s2 <= 0.0 {
             (apex + g1 * s1, apex + g2 * s2)
-        } else if s2 > 0.0 && s1 < 0.0 {
+        } else if s2 >= 0.0 && s1 <= 0.0 {
             (apex + g2 * s2, apex + g1 * s1)
         } else {
             return Err(Decline("a plane at an angle to a cone"));
