@@ -584,7 +584,7 @@ impl<'a> QueryCx<'a> {
             if snap.sketch && snap.etype == EType::Vertex && let Some(p) = snap.points.first() {
                 let swept = |e: &Ent| {
                     self.shape(e).is_some_and(|s| {
-                        matches!(s.edge_info().map(|i| i.curve), Ok(k::Curve::Line { .. })) && k::make_vertex(*p).ok().and_then(|v| k::distance(&v, &s).ok()).is_some_and(|d| d.distance < 1e-7)
+                        matches!(s.edge_info().map(|i| i.curve), Ok(k::Curve::Line { .. })) && all_on(&s, &[*p], 1e-7)
                     })
                 };
                 out.extend(self.all_with(Some(EType::Edge), true).into_iter().filter(|e| !self.is_sketch(e) && swept(e)));
@@ -599,7 +599,6 @@ impl<'a> QueryCx<'a> {
     /// become a sheet's (extracted surfaces).
     fn tracked(&self, snap: &Snapshot, to_sheets: bool) -> Vec<Ent> {
         const TOL: f64 = 1e-7;
-        let on = |e: &Ent, p: DVec3| self.shape(e).and_then(|s| k::make_vertex(p).ok().and_then(|v| k::distance(&v, &s).ok())).is_some_and(|d| d.distance < TOL);
         // Hidden bodies too: std sheet metal tracks its (hidden) definition.
         self.all_with(Some(snap.etype), true)
             .into_iter()
@@ -610,14 +609,14 @@ impl<'a> QueryCx<'a> {
                 (t == "SOLID") == (snap.body_type == "SOLID") || (to_sheets && snap.body_type == "SOLID" && t == "SHEET")
             })
             .filter(|e| {
-                if snap.points.iter().all(|p| on(e, *p)) {
+                if self.shape(e).is_some_and(|s| all_on(&s, &snap.points, TOL)) {
                     return true;
                 }
                 // A piece of a split face (std Jog clips its face away from the
                 // old face's middle): an inner point on the old face.
                 if let Some(old) = &snap.face
                     && let Some(m) = self.snapshot(e).and_then(|s| s.points.first().copied())
-                    && k::make_vertex(m).ok().and_then(|v| k::distance(&v, old).ok()).is_some_and(|d| d.distance < TOL)
+                    && all_on(old, &[m], TOL)
                 {
                     return true;
                 }
@@ -872,8 +871,32 @@ pub fn relocated_pieces(q: &QueryCx, r: &Reference, snap: &Snapshot) -> Option<V
 }
 
 fn snap_matches(q: &QueryCx, snap: &Snapshot, e: &Ent) -> bool {
-    entity_type_of(e) == snap.etype
-        && q.shape(e).is_some_and(|s| snap.points.iter().all(|p| k::make_vertex(*p).ok().and_then(|v| k::distance(&v, &s).ok()).is_some_and(|d| d.distance < 1e-7)))
+    if entity_type_of(e) != snap.etype {
+        return false;
+    }
+    // An edge or vertex where it was: its snapshot points again (points on it, at the same parameters), so on it;
+    // no distance needed (the common case: most tracked entities didn't move).
+    if matches!(snap.etype, EType::Edge | EType::Vertex) && q.snapshot(e).is_some_and(|c| c.points.len() == snap.points.len() && c.points.iter().zip(&snap.points).all(|(a, b)| a.distance(*b) < 1e-12)) {
+        return true;
+    }
+    let Some(s) = q.shape(e) else { return false };
+    // The very face the snapshot was taken of (unchanged by the operations since): its point lies on it.
+    if snap.face.as_ref().is_some_and(|f| *f == s) {
+        return true;
+    }
+    all_on(&s, &snap.points, 1e-7)
+}
+
+/// Whether every point lies within `tol` of `s`: its bounding box first (it holds the shape: a point farther from it
+/// than `tol` is farther from the shape), the exact distance only then (the kernel's point-to-face distance projects
+/// edges onto planes and classifies: most of std sheet metal's query tracking).
+pub(crate) fn all_on(s: &k::Shape, points: &[DVec3], tol: f64) -> bool {
+    if let Ok(b) = s.bounding_box(false)
+        && points.iter().any(|p| (b.min - DVec3::splat(tol)).cmpgt(*p).any() || p.cmpgt(b.max + DVec3::splat(tol)).any())
+    {
+        return false;
+    }
+    points.iter().all(|p| k::make_vertex(*p).ok().and_then(|v| k::distance(&v, s).ok()).is_some_and(|d| d.distance < tol))
 }
 
 /// A body's faces in Onshape's evaluateQuery order (creation order, live
@@ -1444,7 +1467,7 @@ fn historical(q: &QueryCx, query: &Value) -> Vec<Ent> {
                 let on = |e: &Ent| {
                     let Ent::Edge(b, _) = e else { return false };
                     let body = &q.st.ctx.bodies[*b].id;
-                    q.snapshot(e).and_then(|s| s.points.get(1).copied()).is_some_and(|m| originals.iter().any(|(ob, o)| ob == body && k::make_vertex(m).ok().and_then(|v| k::distance(&v, o).ok()).is_some_and(|d| d.distance < 1e-7)))
+                    q.snapshot(e).and_then(|s| s.points.get(1).copied()).is_some_and(|m| originals.iter().any(|(ob, o)| ob == body && all_on(o, &[m], 1e-7)))
                 };
                 return q.all_with(Some(EType::Edge), true).into_iter().filter(on).collect();
             }
