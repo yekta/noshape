@@ -54,53 +54,53 @@ const GENERAL: &[(&str, &[Row])] = &[
     (
         "Viewport",
         &[
-            Row::Num(Num { key: "ao", label: "Ambient occlusion", get: |g| g.ambient_occlusion, set: |g, v| g.ambient_occlusion = v, min: 0.0, max: 1.0, unit: "%", scale: 100.0, slider: true, hint: "Soft shading where faces meet: corners, crevices, contacts" }),
-            Row::Num(Num { key: "fov", label: "Field of view", get: |g| g.fov_deg, set: |g, v| g.fov_deg = v, min: 20.0, max: 120.0, unit: "deg", scale: 1.0, slider: true, hint: "Perspective camera field of view (Perspective view)" }),
+            Row::Num(Num { key: "ao", label: "Ambient occlusion", get: |g| g.ambient_occlusion, set: |g, v| g.ambient_occlusion = v, min: 0.0, max: 1.0, unit: "%", scale: 100.0, slider: true, hint: "Controls the intensity of ambient occlusion shading." }),
+            Row::Num(Num { key: "fov", label: "Field of view", get: |g| g.fov_deg, set: |g, v| g.fov_deg = v, min: 20.0, max: 120.0, unit: "deg", scale: 1.0, slider: true, hint: "Controls the perspective camera field of view." }),
         ],
     ),
     (
         "Shaded bodies",
         &[
-            Row::Num(Num { key: "lw", label: "Line width", get: |g| g.line_width, set: |g, v| g.line_width = v, min: 0.1, max: 3.0, unit: "px", scale: 1.0, slider: true, hint: "Width of part and surface edges" }),
-            Row::Num(Num { key: "shine", label: "Shininess", get: |g| g.shininess, set: |g, v| g.shininess = v, min: 0.01, max: 1.0, unit: "%", scale: 100.0, slider: true, hint: "Default shininess of shaded surfaces" }),
-            Row::Color(Color { key: "spec", label: "Specular color", get: |g| g.specular, set: |g, v| g.specular = v, hint: "Default highlight color of shaded surfaces" }),
-            Row::Color(Color { key: "interf", label: "Section interference color", get: |g| g.section_interference, set: |g, v| g.section_interference = v, hint: "Where cut parts or surfaces overlap in a section view" }),
+            Row::Num(Num { key: "lw", label: "Line width", get: |g| g.line_width, set: |g, v| g.line_width = v, min: 0.1, max: 3.0, unit: "px", scale: 1.0, slider: true, hint: "Controls the line width of surfaces and edges." }),
+            Row::Num(Num { key: "shine", label: "Shininess", get: |g| g.shininess, set: |g, v| g.shininess = v, min: 0.01, max: 1.0, unit: "%", scale: 100.0, slider: true, hint: "Controls the default shininess of shaded surfaces." }),
+            Row::Color(Color { key: "spec", label: "Specular color", get: |g| g.specular, set: |g, v| g.specular = v, hint: "Controls the default specular color of shaded surfaces." }),
+            Row::Color(Color { key: "interf", label: "Section interference color", get: |g| g.section_interference, set: |g, v| g.section_interference = v, hint: "Controls the default solid parts interference color in section view." }),
         ],
     ),
     (
         "Phantom edges",
         &[
-            Row::Num(Num { key: "pw", label: "Phantom tangent edge width", get: |g| g.phantom_width, set: |g, v| g.phantom_width = v, min: 0.1, max: 3.0, unit: "px", scale: 1.0, slider: true, hint: "Width of tangent edges when they are phantom" }),
-            Row::Color(Color { key: "pc", label: "Phantom tangent edge color", get: |g| g.phantom_color, set: |g, v| g.phantom_color = v, hint: "Color of tangent edges when they are phantom" }),
+            Row::Num(Num { key: "pw", label: "Phantom tangent edge width", get: |g| g.phantom_width, set: |g, v| g.phantom_width = v, min: 0.1, max: 3.0, unit: "px", scale: 1.0, slider: true, hint: "Controls the line width of phantom tangent edges." }),
+            Row::Color(Color { key: "pc", label: "Phantom tangent edge color", get: |g| g.phantom_color, set: |g, v| g.phantom_color = v, hint: "Controls the default color of phantom tangent edges." }),
         ],
     ),
-    ("Mesh bodies", &[Row::Num(Num { key: "mw", label: "Mesh line width", get: |g| g.mesh_line_width, set: |g, v| g.mesh_line_width = v, min: 0.1, max: 3.0, unit: "px", scale: 1.0, slider: true, hint: "Width of mesh surface and edge lines" })]),
+    ("Mesh bodies", &[Row::Num(Num { key: "mw", label: "Mesh line width", get: |g| g.mesh_line_width, set: |g, v| g.mesh_line_width = v, min: 0.1, max: 3.0, unit: "px", scale: 1.0, slider: true, hint: "Controls the line width of mesh surfaces and edges." })]),
 ];
 
 const SKETCH: &[(&str, &[Row])] = &[
     (
         "Active sketches",
         &[
-            Row::Num(Num { key: "slw", label: "Line width", get: |g| g.sketch_line_width, set: |g, v| g.sketch_line_width = v, min: 0.1, max: 3.0, unit: "px", scale: 1.0, slider: true, hint: "Width of the lines of the sketch being edited" }),
-            Row::Color(Color { key: "sc", label: "Constrained color", get: |g| g.sketch_constrained, set: |g, v| g.sketch_constrained = v, hint: "Color of fully constrained lines and points" }),
-            Row::Color(Color { key: "su", label: "Underconstrained color", get: |g| g.sketch_under, set: |g, v| g.sketch_under = v, hint: "Color of underconstrained lines and points" }),
-            Row::Color(Color { key: "suo", label: "Underconstrained occluded color", get: |g| g.sketch_under_occluded, set: |g, v| g.sketch_under_occluded = v, hint: "Color of underconstrained lines and points hidden behind parts" }),
+            Row::Num(Num { key: "slw", label: "Line width", get: |g| g.sketch_line_width, set: |g, v| g.sketch_line_width = v, min: 0.1, max: 3.0, unit: "px", scale: 1.0, slider: true, hint: "Controls the line width of active sketches." }),
+            Row::Color(Color { key: "sc", label: "Constrained color", get: |g| g.sketch_constrained, set: |g, v| g.sketch_constrained = v, hint: "Controls the default color of constrained lines and points." }),
+            Row::Color(Color { key: "su", label: "Underconstrained color", get: |g| g.sketch_under, set: |g, v| g.sketch_under = v, hint: "Controls the default color of underconstrained lines and points." }),
+            Row::Color(Color { key: "suo", label: "Underconstrained occluded color", get: |g| g.sketch_under_occluded, set: |g, v| g.sketch_under_occluded = v, hint: "Controls the default color of underconstrained occluded lines and points." }),
         ],
     ),
     (
         "Inactive sketches",
         &[
-            Row::Num(Num { key: "ilw", label: "Line width", get: |g| g.inactive_line_width, set: |g, v| g.inactive_line_width = v, min: 0.1, max: 3.0, unit: "px", scale: 1.0, slider: true, hint: "Width of the lines of other sketches" }),
-            Row::Color(Color { key: "ic", label: "Color", get: |g| g.inactive_color, set: |g, v| g.inactive_color = v, hint: "Color of the lines and points of other sketches" }),
+            Row::Num(Num { key: "ilw", label: "Line width", get: |g| g.inactive_line_width, set: |g, v| g.inactive_line_width = v, min: 0.1, max: 3.0, unit: "px", scale: 1.0, slider: true, hint: "Controls the line width of inactive sketches." }),
+            Row::Color(Color { key: "ic", label: "Color", get: |g| g.inactive_color, set: |g, v| g.inactive_color = v, hint: "Controls the default color of lines and points in inactive sketches." }),
         ],
     ),
     (
         "Construction lines",
         &[
-            Row::Num(Num { key: "d1", label: "First dash", get: |g| g.construction[0], set: |g, v| g.construction[0] = v, min: 1.0, max: 50.0, unit: "px", scale: 1.0, slider: false, hint: "Length of the first dash of the construction line pattern" }),
-            Row::Num(Num { key: "g1", label: "First gap", get: |g| g.construction[1], set: |g, v| g.construction[1] = v, min: 0.0, max: 50.0, unit: "px", scale: 1.0, slider: false, hint: "Length of the first gap" }),
-            Row::Num(Num { key: "d2", label: "Second dash", get: |g| g.construction[2], set: |g, v| g.construction[2] = v, min: 1.0, max: 50.0, unit: "px", scale: 1.0, slider: false, hint: "Length of the second dash" }),
-            Row::Num(Num { key: "g2", label: "Second gap", get: |g| g.construction[3], set: |g, v| g.construction[3] = v, min: 0.0, max: 50.0, unit: "px", scale: 1.0, slider: false, hint: "Length of the second gap" }),
+            Row::Num(Num { key: "d1", label: "First dash", get: |g| g.construction[0], set: |g, v| g.construction[0] = v, min: 1.0, max: 50.0, unit: "px", scale: 1.0, slider: false, hint: "Controls the length of the first dash in the construction line stipple pattern." }),
+            Row::Num(Num { key: "g1", label: "First gap", get: |g| g.construction[1], set: |g, v| g.construction[1] = v, min: 0.0, max: 50.0, unit: "px", scale: 1.0, slider: false, hint: "Controls the length of the first gap in the construction line stipple pattern." }),
+            Row::Num(Num { key: "d2", label: "Second dash", get: |g| g.construction[2], set: |g, v| g.construction[2] = v, min: 1.0, max: 50.0, unit: "px", scale: 1.0, slider: false, hint: "Controls the length of the second dash in the construction line stipple pattern." }),
+            Row::Num(Num { key: "g2", label: "Second gap", get: |g| g.construction[3], set: |g, v| g.construction[3] = v, min: 0.0, max: 50.0, unit: "px", scale: 1.0, slider: false, hint: "Controls the length of the second gap in the construction line stipple pattern." }),
         ],
     ),
 ];

@@ -193,6 +193,7 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
     cache.hidden_edges.retain(|_, (w, _)| w.strong_count() > 0);
     use crate::builder::{DisplayMode, TangentEdges};
     let mode = opts.display_mode;
+    scene.no_occlusion = matches!(mode, DisplayMode::HiddenLine | DisplayMode::Translucent);
     let mut bodies = 0u32;
     let mut spans = Vec::new();
     for (oi, o) in result.occurrences.iter().enumerate() {
@@ -256,11 +257,11 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                 if dimmed && !opts.pick_dimmed {
                     inst = inst.unpickable();
                 }
-                // The display modes as in the Part Studio (scene_builder): see-through
-                // at 0.35, or unlit faces in the background color (Unshaded).
+                // The display modes as in the Part Studio (scene_builder): front faces see-through at 0.25, or unlit
+                // faces in the background color (Unshaded).
                 if !sketch {
                     inst = match mode {
-                        DisplayMode::Translucent => inst.with_color([color[0], color[1], color[2], color[3].min(0.35)]),
+                        DisplayMode::Translucent => inst.with_color([color[0], color[1], color[2], color[3].min(0.25)]).front_only(),
                         DisplayMode::HiddenLine => inst.with_color(theme::lin(0xffffff)).unlit(),
                         DisplayMode::ShadedWithEdges | DisplayMode::Shaded => inst,
                     };
@@ -316,14 +317,14 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                         None => {
                             let mut l = LineData::default();
                             for pl in &mesh.edges {
-                                l.push_polyline(pl, [90, 90, 90, 140], 0, 1.0, LineSegment::DASHED | LineSegment::ON_TOP);
+                                l.push_polyline(pl, [217, 217, 217, 255], 0, 1.0, 0);
                             }
                             let h = up.upload_lines(&l);
                             cache.hidden_edges.insert(key, (Arc::downgrade(mesh), h.clone()));
                             h
                         }
                     };
-                    scene.instances.push(Instance::new(Drawable::Lines(h)).per_primitive_color().with_transform(t).unpickable().layer(1));
+                    scene.instances.push(Instance::new(Drawable::Lines(h)).per_primitive_color().with_transform(t).unpickable().hidden_only().layer(1));
                 }
                 // A mesh part's triangle lines, as in the Part Studio (not in plain Shaded).
                 if let Some(lines) = cached.mesh_lines.clone().filter(|_| mode != DisplayMode::Shaded) {
@@ -629,7 +630,7 @@ fn push_triad(lines: &mut LineData, f: &Frame, size: f64, width: f32, pick: u32,
 }
 
 pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights, up: &Uploader) -> Scene {
-    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference, hover_outline: false };
+    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference, hover_outline: false, no_occlusion: built.scene.no_occlusion };
     for top in &h.accent_tops {
         for &id in built.picks.faces_of(*top) {
             scene.add_flag(id, state::ACCENT);

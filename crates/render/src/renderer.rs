@@ -600,6 +600,8 @@ struct DrawLists {
     over_transparent: Vec<usize>,
     /// Color pass only: translucent meshes drawn after the lines and points.
     over_lines: Vec<usize>,
+    /// Color pass only: Translucent mode's parts (their front faces blended).
+    front_only: Vec<usize>,
     /// Color pass: `opaque` split in runs drawn without (`true`) or with
     /// the face shader's `discard` (hidden faces, section clipping), as
     /// (end index in `opaque`, solid); see [`DrawLists::order_solid`].
@@ -831,6 +833,7 @@ impl DrawLists {
         self.reflective.clear();
         self.over_transparent.clear();
         self.over_lines.clear();
+        self.front_only.clear();
         self.on_top.clear();
         self.lines.clear();
         self.silhouettes.clear();
@@ -975,6 +978,7 @@ impl DrawLists {
                         self.over_lines.push(i);
                     }
                 }
+                Drawable::Mesh(_) if !pick && inst.front_only && inst.color[3] < 0.999 => self.front_only.push(i),
                 Drawable::Mesh(_) if inst.color[3] >= 0.999 => self.opaque.push(i),
                 Drawable::Mesh(_) => self.transparent.push(i),
                 Drawable::Image(_) if inst.color[3] >= 0.999 => self.images.push(i),
@@ -1007,14 +1011,15 @@ impl DrawLists {
                 self.opaque.clear();
                 self.transparent.clear();
                 self.over_lines.clear();
+                self.front_only.clear();
                 self.on_top.clear();
                 self.reflective.clear();
             }
         }
         self.order_solid(scene, pick);
         let inst = &scene.instances;
-        let Self { opaque, transparent, pick_priority, images, images_faded, reflective, over_transparent, over_lines, on_top, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden, slots, slot_of, .. } = self;
-        let all = [opaque, transparent, pick_priority, reflective, over_transparent, over_lines, on_top, images, images_faded, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden];
+        let Self { opaque, transparent, pick_priority, images, images_faded, reflective, over_transparent, over_lines, front_only, on_top, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden, slots, slot_of, .. } = self;
+        let all = [opaque, transparent, pick_priority, reflective, over_transparent, over_lines, front_only, on_top, images, images_faded, lines, silhouettes, back_silhouettes, points, lines_hidden, points_hidden];
         slots.clear();
         slot_of.clear();
         slot_of.resize(inst.len(), u32::MAX);
@@ -1250,6 +1255,9 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         draw(pass, &previews, &pipelines.mesh_transparent_front);
         draw(pass, &after, &pipelines.mesh_transparent);
         draw(pass, &lists.over_transparent, &pipelines.mesh_opaque);
+        // Translucent mode: each part's front faces, back faces culled (live 11-02: under a plate's top the far wall of
+        // a hole adds a layer, the plate's bottom none).
+        draw(pass, &lists.front_only, &pipelines.mesh_transparent_front);
         // Part outlines over the datum planes and other see-through meshes
         // (live selection/10: the hover outline reads full #ffc685 over a
         // plane; drawn before them it came out washed, (233,208,188)).
@@ -2944,7 +2952,8 @@ impl Renderer {
                 ts.compare = Some(CompareTextures::new(device, compare_layout, width, height, msaa));
             }
         }
-        let ao_strength = req.style.ambient_occlusion;
+        let ao_strength = if req.scene.no_occlusion { 0.0 } else { req.style.ambient_occlusion };
+        let ao_extent = onshape_near_far(&req.camera, req.scene.bounds()).map_or(1.0, |(_, near, far)| (far - near) as f32);
         if ao_strength > 0.001 && self.ao.as_ref().is_none_or(|a| a.msaa != msaa) {
             self.ao = Some(crate::ao::AoPass::new(&self.device, msaa, COLOR_FORMAT));
         }
@@ -3086,7 +3095,7 @@ impl Renderer {
             && let Some(ao) = ao.as_ref()
         {
             let timestamp_writes = timer.as_ref().zip(timer_slot).and_then(|(t, i)| t.writes(i, false, true));
-            let frame = crate::ao::AoFrame { view_proj: Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, strength: ao_strength, timestamp_writes };
+            let frame = crate::ao::AoFrame { view_proj: Mat4::from_cols_array_2d(&globals.view_proj), width, height, strength: ao_strength, extent: ao_extent, timestamp_writes };
             ao.encode(device, queue, &mut encoder, &tex.depth_sample, color_view, frame);
         }
         ts.hover_mask = match hover_outline.as_ref().filter(|_| hover_band) {
@@ -3159,7 +3168,7 @@ impl Renderer {
                 draw_lists(&mut pass, over, &req.scene.instances, pipelines, bind_over, DrawMode { outline, ..Default::default() });
             }
             if let Some(ao) = ao.as_ref().filter(|_| ao_on) {
-                let frame = crate::ao::AoFrame { view_proj: Mat4::from_cols_array_2d(&globals.view_proj), width, height, dpr, strength: ao_strength, timestamp_writes: None };
+                let frame = crate::ao::AoFrame { view_proj: Mat4::from_cols_array_2d(&globals.view_proj), width, height, strength: ao_strength, extent: ao_extent, timestamp_writes: None };
                 ao.encode(device, queue, &mut encoder, &c.over.depth_sample, &c.over.resolve_view, frame);
             }
             // A preview's highlights on the "with" layer, against the frame's

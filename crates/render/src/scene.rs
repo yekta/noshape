@@ -287,6 +287,9 @@ pub struct Instance {
     /// Translucent meshes drawn after the lines and points (color pass): a
     /// drawing's release watermark lies over the ink.
     pub over_lines: bool,
+    /// A see-through part of the Translucent display mode: only its front faces blend over the image (Onshape culls
+    /// the back faces).
+    pub front_only: bool,
     /// Translucent meshes drawn through everything (no depth test or write,
     /// after the transparent meshes, before the lines): FeatureScript debug
     /// faces, which Onshape shows behind the model too.
@@ -408,6 +411,7 @@ impl Instance {
             hidden_only: false,
             over_transparent: false,
             over_lines: false,
+            front_only: false,
             on_top: false,
             pick_only: false,
             pick_behind: false,
@@ -443,6 +447,11 @@ impl Instance {
     /// Draw a translucent mesh after the lines and points ([`Instance::over_lines`]).
     pub fn over_lines(mut self) -> Self {
         self.over_lines = true;
+        self
+    }
+    /// Only the front faces of this translucent mesh show ([`Instance::front_only`]).
+    pub fn front_only(mut self) -> Self {
+        self.front_only = true;
         self
     }
     /// Draw a translucent mesh through all other geometry ([`Instance::on_top`]).
@@ -873,6 +882,8 @@ pub struct Scene {
     /// renderer draws its outline band (hover_outline.rs). A hovered face's
     /// boundary edges carry the same flags but need no band.
     pub hover_outline: bool,
+    /// No ambient occlusion: Onshape darkens shaded opaque faces only (not Hidden line or Translucent).
+    pub no_occlusion: bool,
     pub clip: Option<ClipPlane>,
     /// Up to two more section planes (with `clip`): geometry is removed
     /// where any plane clips it.

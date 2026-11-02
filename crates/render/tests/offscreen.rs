@@ -2176,3 +2176,69 @@ fn culled_silhouettes_draw_as_the_plain_ones() {
     assert!(plain.iter().filter(|&&v| v < 100).count() > 50, "the silhouettes drawn");
     assert_eq!(plain, culled);
 }
+
+/// Translucent mode as live 11-02: only a part's front faces blend, each at 25 % (a box seen from above: its top
+/// over the white background moves each channel a quarter of the way from white to the top's shaded color; the
+/// bottom face behind adds nothing).
+#[test]
+fn translucent_parts_blend_their_front_faces_once() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let mesh = r.upload_mesh(&primitives::box_mesh([-0.05, -0.03, -0.01], [0.05, 0.03, 0.01], 1));
+    let mut cam = Camera { rotation: Camera::look_rotation(glam::DVec3::NEG_Z, glam::DVec3::Y), ..Default::default() };
+    let (w, h) = (200u32, 150u32);
+    cam.fit_box(glam::DVec3::new(-0.05, -0.03, -0.01), glam::DVec3::new(0.05, 0.03, 0.01), w as f64 / h as f64);
+    let mut centre = |inst: Instance| {
+        let scene = Scene { instances: vec![inst], ..Default::default() };
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: false }).unwrap();
+        let o = (((h / 2) * w + w / 2) * 4) as usize;
+        [f.bgra[o + 2] as f32, f.bgra[o + 1] as f32, f.bgra[o] as f32]
+    };
+    let color = [0.45f32, 0.6, 0.75, 1.0];
+    let opaque = centre(Instance::new(Drawable::Mesh(mesh.clone())).with_color(color));
+    let see_through = centre(Instance::new(Drawable::Mesh(mesh)).with_color([color[0], color[1], color[2], 0.25]).front_only());
+    for k in 0..3 {
+        let want = 255.0 - (255.0 - opaque[k]) * 0.25;
+        assert!((see_through[k] - want).abs() <= 2.0, "channel {k}: {see_through:?}, one layer over white is {want} (opaque {opaque:?})");
+    }
+}
+
+/// Ambient occlusion as Onshape's (its pass darkens shaded faces where geometry stands close): the floor beside a
+/// block's foot is darker with the preference on, and not at all when the scene asks for none (Hidden line,
+/// Translucent).
+#[test]
+fn ambient_occlusion_darkens_a_corner_unless_the_scene_has_none() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let floor = r.upload_mesh(&primitives::box_mesh([-0.05, -0.05, -0.01], [0.05, 0.05, 0.0], 1));
+    let block = r.upload_mesh(&primitives::box_mesh([-0.01, -0.01, 0.0], [0.01, 0.01, 0.02], 100));
+    let grey = [0.6f32, 0.6, 0.6, 1.0];
+    let mut scene = Scene { instances: vec![Instance::new(Drawable::Mesh(floor)).with_color(grey), Instance::new(Drawable::Mesh(block)).with_color(grey)], ..Default::default() };
+    let mut cam = Camera { rotation: Camera::rotation_for(StandardView::Isometric), ..Default::default() };
+    let (w, h) = (400u32, 300u32);
+    cam.fit_box(glam::DVec3::new(-0.05, -0.05, -0.01), glam::DVec3::new(0.05, 0.05, 0.02), w as f64 / h as f64);
+    // On the floor just in front of the block's foot (toward the viewer: +x, -y).
+    let p = cam.project(glam::DVec3::new(0.0105, -0.0105, 0.0), glam::DVec2::new(w as f64, h as f64), 0.02).unwrap();
+    let mut lum = |scene: &Scene, ao: f32| {
+        let style = Style { ambient_occlusion: ao, ..Style::default() };
+        let f = r.render(RenderParams { scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &style, pick: false }).unwrap();
+        let o = ((p.y as u32 * w + p.x as u32 + 2) * 4) as usize;
+        f.bgra[o] as i32 + f.bgra[o + 1] as i32 + f.bgra[o + 2] as i32
+    };
+    let (off, on) = (lum(&scene, 0.0), lum(&scene, 0.375));
+    assert!(on + 15 < off, "the corner is darker with occlusion: {on} vs {off}");
+    scene.no_occlusion = true;
+    assert_eq!(lum(&scene, 0.375), off, "no occlusion when the scene has none");
+}

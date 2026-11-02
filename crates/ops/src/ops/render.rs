@@ -210,7 +210,15 @@ fn image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             c.distance = v.distance;
             c
         }
-        None => noshape_scene::png::fit_camera(lo, hi, aspect, view),
+        // As the app's Zoom to fit (Onshape's zoomToFit, padding 1.05).
+        None => {
+            let mut c = noshape_render::Camera::default();
+            if let Some(v) = view {
+                c.set_view(v);
+            }
+            c.fit_box(lo, hi, aspect);
+            c
+        }
     };
     let mut camera = camera;
     // View normal to: looking at the plane's front, its y up (the app's).

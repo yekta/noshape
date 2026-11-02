@@ -118,7 +118,7 @@ pub struct GpuCache {
     bodies: HashMap<usize, (std::sync::Weak<noshape_model::display::MeshBuffers>, Arc<CachedBody>)>,
     /// Colored body meshes keyed by (mesh, colors) pointers.
     colored: HashMap<(usize, usize), ColoredMesh>,
-    /// Hidden-edge overlays (dashed, on top) keyed by mesh pointer.
+    /// Hidden-edge overlays (faded, on top) keyed by mesh pointer.
     hidden_edges: HashMap<usize, (std::sync::Weak<noshape_model::display::MeshBuffers>, LinesHandle)>,
     /// Edges without the tangent ones (and the tangent ones dash-dot) for
     /// the Tangent edges phantom/removed modes, keyed by mesh pointer.
@@ -191,7 +191,7 @@ pub struct SceneOptions {
     /// Per-vertex colors (sRGB) replacing a body's color: analysis maps
     /// and face appearances. Indexed like the body's mesh positions.
     pub vertex_colors: Option<VertexColors>,
-    /// Draw edges hidden behind faces as dashed lines.
+    /// Draw edges hidden behind faces, faded toward the background.
     pub hidden_edges_visible: bool,
     /// How tangent (smooth) edges are drawn.
     pub tangent_edges: TangentEdges,
@@ -306,7 +306,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     let _t = noshape_render::perf::scope("s.build");
     // Live (behaviours "psui (2026-10-27, P2) PS-SECTION overlap"): a Part Studio's section caps are flat
     // interference red where two parts overlap, as an assembly's (the earlier capture saw no overlap).
-    let mut scene = Scene { section_interference: true, ..Default::default() };
+    let mut scene = Scene { section_interference: true, no_occlusion: matches!(opts.display_mode, DisplayMode::HiddenLine | DisplayMode::Translucent), ..Default::default() };
     let mut picks = PickMap::default();
 
     // ---------------------------------------------------------------- bodies
@@ -389,8 +389,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 };
                 let mesh = match opts.display_mode {
                     DisplayMode::ShadedWithEdges | DisplayMode::Shaded => mesh.with_color(color).zebra(opts.zebra.filter(|_| replaced.is_none())).reflection(opts.reflection.clone().filter(|_| replaced.is_none())).ambient(if opts.dims_shown { DIMS_SHOWN_AMBIENT } else { 0.0 }),
-                    // Onshape (part-studio/62): the shaded part at ~35%.
-                    DisplayMode::Translucent => mesh.with_color([color[0], color[1], color[2], color[3].min(0.35)]),
+                    // Onshape's TRANSLUCENT_PASS_ALPHA: the shaded part's front faces at 25 % (live 11-02: a plate's top one
+                    // layer, each channel a quarter of the way from white).
+                    DisplayMode::Translucent => mesh.with_color([color[0], color[1], color[2], color[3].min(0.25)]).front_only(),
                     // Faces drawn flat in the background color hide what is behind
                     // them (live part-studio/61: white, unlit, only the edges show).
                     DisplayMode::HiddenLine => mesh.with_color(theme::lin(0xffffff)).unlit(),
@@ -480,15 +481,17 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                     Some((_, h)) => h.clone(),
                     None => {
                         let mut l = LineData::default();
+                        // Onshape's hidden edge pass: through the part, the edge color mixed 85 % toward the
+                        // background (HIDDEN_LINE_FADE_AMOUNT), solid (live 11-02: light grey, white over faces).
                         for pl in &gmesh.edges {
-                            l.push_polyline(pl, [90, 90, 90, 140], 0, 1.0, LineSegment::DASHED | LineSegment::ON_TOP);
+                            l.push_polyline(pl, [217, 217, 217, 255], 0, 1.0, 0);
                         }
                         let h = up.upload_lines(&l);
                         cache.hidden_edges.insert(key, (Arc::downgrade(gmesh), h.clone()));
                         h
                     }
                 };
-                scene.instances.push(Instance::new(Drawable::Lines(handle)).per_primitive_color().unpickable().layer(1));
+                scene.instances.push(Instance::new(Drawable::Lines(handle)).per_primitive_color().unpickable().hidden_only().layer(1));
             }
             if opts.highlight_boundary && b.kind != BodyKind::Wire {
                 let lines = match cache.boundary.get(&key) {
@@ -981,7 +984,7 @@ pub fn silhouette_edges(m: &noshape_model::display::MeshBuffers) -> SilhouetteDa
 #[allow(clippy::too_many_arguments)]
 pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &[Reference], hover: Option<&Reference>, accent: &[Reference], extra: Vec<Instance>, error: bool, up: &Uploader) -> Scene {
     let _t = noshape_render::perf::scope("s.with_highlights");
-    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference, hover_outline: false };
+    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference, hover_outline: false, no_occlusion: built.scene.no_occlusion };
     let mut overlay_pts = PointData::default();
     let mut overlay_regions: Vec<(MeshData, [f32; 4], bool)> = Vec::new();
     let mut overlay_lines = LineData::default();
