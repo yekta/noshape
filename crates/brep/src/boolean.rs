@@ -3216,14 +3216,13 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         cx.solids[s].lo = cx.solids[s].lo.min(lo);
         cx.solids[s].hi = cx.solids[s].hi.max(hi);
     }
-    // (A tolerant vertex within its own tolerance of it, up to 1 mm (Shell's slabs of a part with 0.18 mm vertices),
-    // as OCCT's.)
+    // (Not a tolerant vertex within its own tolerance of it either: a Shell's common with a vertex 44 um off its face's
+    // plane (tolerance 0.12 mm) came out 3.3e-7 off OCCT's in volume and the Shell failed: qa RUST-SHELL-GPF-REGRESS.)
     for f in 0..cx.faces.len() {
         if let Surf::Plane { n, d, .. } = cx.faces[f].s {
             for &(e, _) in &cx.faces[f].edges {
                 for v in cx.edges[e].v {
-                    let own = if cx.pool.t[v as usize] <= 1e-3 { cx.pool.t[v as usize] } else { 0.0 };
-                    if (n.dot(cx.pool.p[v as usize]) - d).abs() > tol + own {
+                    if (n.dot(cx.pool.p[v as usize]) - d).abs() > tol {
                         return Err(Decline("a face's vertex off its plane"));
                     }
                 }

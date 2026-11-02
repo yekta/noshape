@@ -41,6 +41,13 @@ Fusing the slabs yours takes first and adding the offset ones after doesn't help
 next reasons: 3.9 → 5.9 s on a dump); one OCCT common of the solid with all slabs as one tool group changes results.
 Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scratch SHELLDUMP=<path without .brep>).
 
+## qa's P1 RUST-SHELL-GPF-REGRESS fixed (11-02 10:00 UTC)
+- cli-shell-gpf's Shell 2 failed since d03803a2: its rule taking a tolerant vertex off its face's plane within its
+  own tolerance took one of the Shell's commons (54630d70: a vertex 44 um off, tolerance 0.12 mm), 3.3e-7 off OCCT's
+  in volume, and the Shell failed. The rule is gone (Shell's fuzz recordings: those 4 decline again). Found by
+  recording the regeneration's Booleans (NOSHAPE_RECORD_BOOLEANS) and replaying them against OCCT. T1
+  a_tolerant_vertex_off_its_faces_plane_declines. Shell 2 Ok on a CLI of the fix.
+
 ## From core (11-01 17:00): fins-400's patterns are OCCT's fuse
 Regeneration profile (release, vibe4, NOSHAPE_KERNEL_PROFILE): tests/perf/fins-400.noshape regenerates in 1.6 s,
 of which Linear pattern 2 1026 ms (op_boolean 910: OCCT's General Fuse of the plate with 399 fins, "Building splits

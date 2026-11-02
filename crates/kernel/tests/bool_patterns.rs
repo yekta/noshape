@@ -681,11 +681,19 @@ fn hyperbola_edges_and_a_face_extruded_from_one() {
     valid_as_occt("6abd9f7169b73894", 1e-9);
 }
 
-/// Shell's slab common on a part whose vertices have 0.18 mm tolerances, a vertex 0.12 mm off its face's plane
-/// (recorded): within its own tolerance, as OCCT's (it declined "a face's vertex off its plane").
+/// A Shell's common (qa's cli-shell-gpf, Shell 2; recorded) with a vertex 44 um off its face's plane, its tolerance
+/// 0.12 mm: declined to OCCT (taken within the vertex's tolerance it came out 3.3e-7 off OCCT's in volume, and the
+/// Shell failed: RUST-SHELL-GPF-REGRESS).
 #[test]
-fn a_tolerant_vertex_off_its_faces_plane() {
-    valid_as_occt("f2a83857d9152ede", 1e-9);
+fn a_tolerant_vertex_off_its_faces_plane_declines() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "54630d70bb1b6e23").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    assert!(r.is_err() && why == "a face's vertex off its plane", "taken, or declined otherwise: {why}");
 }
 
 /// Shell's fuse of a part with 47 slabs (recorded; free-form faces among them: op_boolean's tree of fuses two at a
