@@ -3862,16 +3862,20 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                     }
                 }
             }
-            // (The point is on the first curve; the second, a section, may be off it by its error: the vertex's
-            // tolerance reaches it, as OCCT's vertex of two sections (two of a knurl's cylinder sections crossing
-            // 0.64 um apart in space were split at a vertex each).)
-            let w = cx.pool.add(p)?;
+            // (A point on a section has the section's tolerance (OCCT's pave tolerance: a section edge's vertices
+            // have its tolerance): within the sum of its and another vertex's, it is that vertex, OCCT's rule; else a
+            // new vertex of that tolerance, so the curves near it are split there too (a knurl's flank, another
+            // tool's cap and the cylinder: their three sections miss each other by 3 um, one place within 5 um).)
             let reach = sec_tol(&cx, &segs[i]).max(sec_tol(&cx, &segs[j]));
             if reach > tol {
-                let d = cx.seg_param(&segs[j], p).1;
-                if d > tol && d <= reach {
-                    cx.pool.grow(w, d);
+                match cx.pool.find_tol(p, reach)? {
+                    Some(w) => cx.pool.grow(w, reach),
+                    None => {
+                        cx.pool.push_tol(p, reach);
+                    }
                 }
+            } else {
+                cx.pool.add(p)?;
             }
         }
     }
@@ -3912,12 +3916,13 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             let apart = matches!((o.g, s.g), (Geo::Apex { a0, a1 }, Geo::Apex { a0: b0, a1: b1 }) if a0.to_bits() != b0.to_bits() || a1.to_bits() != b1.to_bits());
             // (Of two curve kinds, one course (a line and a B-spline of it): one, its ends apart and the two's points
             // along it together, as OCCT's common block.)
-            // (OCCT's section within its own error of the curve it runs along.)
-            let acc = |g: &Geo| match *g {
-                Geo::Nurbs { id, .. } if cx.ncurves[id as usize].sec.is_some() => cx.ncurves[id as usize].acc,
+            // (OCCT's section within its own tolerance (its pave tolerance, as the crossings on it: section pieces
+            // and the curves they run along within it are one, OCCT's common block) of the curve it runs along.)
+            let stol = |g: &Geo| match *g {
+                Geo::Nurbs { id, .. } if cx.ncurves[id as usize].sec.is_some() => cx.ncurves[id as usize].tol,
                 _ => 0.0,
             };
-            let reach = cx.tol.max(acc(&o.g) + acc(&s.g));
+            let reach = cx.tol.max(stol(&o.g) + stol(&s.g));
             let alike = std::mem::discriminant(&o.g) == std::mem::discriminant(&s.g)
                 || (s.v[0] != s.v[1]
                     && !matches!(o.g, Geo::Apex { .. })
@@ -3929,7 +3934,7 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
             // them is narrower than 100 tol.)
             let together = match (o.g, s.g) {
                 (Geo::Nurbs { id: a, .. }, Geo::Nurbs { id: b, .. }) if a != b && cx.ncurves[a as usize].sec.is_some() && cx.ncurves[b as usize].sec.is_some() => {
-                    let reach = cx.tol.max(cx.ncurves[a as usize].acc + cx.ncurves[b as usize].acc);
+                    let reach = cx.tol.max(stol(&o.g) + stol(&s.g));
                     [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(o, cx.seg_at(&s, t)).1 <= reach)
                         && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(&s, cx.seg_at(o, t)).1 <= reach)
                 }
@@ -3939,7 +3944,13 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
                 // (Pieces of one curve: by their ranges, either way round.)
                 (Geo::Nurbs { id: a, t0: a0, t1: a1 }, Geo::Nurbs { id: b, t0: b0, t1: b1 }) if a == b => {
                     let near = |x: f64, y: f64| (x - y).abs() <= 1e-9 * (1.0 + x.abs());
-                    (near(a0, b0) && near(a1, b1)) || (near(a0, b1) && near(a1, b0))
+                    // (Or overlapping between the same two vertices: one piece, its ends a tolerant vertex's tolerance
+                    // apart along it (a knurl tool's edge from a vertex of 5 um, 3.3 um on).)
+                    let overlap = s.v[0] != s.v[1] && {
+                        let (p0, p1, q0, q1) = (a0.min(a1), a0.max(a1), b0.min(b1), b0.max(b1));
+                        p1.min(q1) - p0.max(q0) > 0.5 * (p1 - p0).min(q1 - q0)
+                    };
+                    overlap || (near(a0, b0) && near(a1, b1)) || (near(a0, b1) && near(a1, b0))
                 }
                 // (Two B-splines otherwise (an input edge and a section, parametrized each its own way): each one's
                 // points on the other's piece, within the grey band of their error.)

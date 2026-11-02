@@ -41,6 +41,32 @@ Fusing the slabs yours takes first and adding the offset ones after doesn't help
 next reasons: 3.9 → 5.9 s on a dump); one OCCT common of the solid with all slabs as one tool group changes results.
 Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scratch SHELLDUMP=<path without .brep>).
 
+## Coincidence by the sections' own tolerance: step 1 (11-02 15:30 UTC)
+- The design (OCCT's semantics): every vertex, edge and section piece has its tolerance; within the sum of two's
+  they are one (vertices merge; a section piece within tolerance of a curve it runs along is that curve, OCCT's
+  common block; a crossing within reach of a vertex is that vertex), consistently everywhere.
+- Step 1, landed: a crossing on a section has the section's tolerance (OCCT's pave tolerance, 5 um on the knurls):
+  found within it (so two crossings within it are one vertex), else a new vertex of that tolerance (so the curves
+  near it split there too); get_sedge's coincidence of a section with a curve (and of two sections) by the
+  sections' tolerance, not their approximation error (as the crossings already reached them, 1d4f8171: some 3 um
+  strips collapsed and others not); two overlapping pieces of one curve between the same two vertices are one.
+  Ø10 × 10 CP12 45/45 taken (it declined "an invalid result"; OCCT's one cut is invalid at 1.16e-6 m³, OCCT groove by
+  groove 6.77883e-7, ours 6.77884e-7). Ø25 × 10 CP30 45/30: 12432 open edges -> 104 (not yet taken). The 11 small
+  knurl recordings otherwise unchanged; corpora 0 differ. T1 a_ten_millimetre_knurl_by_its_sections_tolerance.
+  qa's cli-shell-gpf Shell 2 Ok, shellmatrix (96) and boolmatrix (28) identical to green a65c2b35 (CLI of this).
+- Share now (cases taken; their recorded OCCT time), corpora: bool-corpus 84.8 % (92.8 %), corpus2 86.7 (76.5),
+  corpus3 86.7 (78.8), corpus4 87.0 (69.9), corpus5 87.1 (67.8), corpus6 89.0 (75.9), direct 91.8 (85.9), sh-new2
+  93.0 (90.5); Shell's fuzz recordings (shfall) 20.6 % (3.9 % of their 269 s), 6.7 % (0.3 %) this morning: the
+  expensive ones are the tolerant inputs (bin/share.sh <whyall name>).
+- Tried, not landed: a section's own end vertices with its tolerance too (and an input vertex a section ends at grown
+  to it): the 30 TPI knurl 104 -> 24 open edges, but Ø100 × 10 CP12 (taken before) got 4911 (tool corner edges on
+  the cylinder no longer joined). The 24 left: tool corner edges ending 1 um past the cylinder's seam.
+- Shell's tolerant inputs don't fit this rule as is: on cli-shell-gpf's 54630d70, OCCT keeps an edge's split point
+  15 um from the face's own tolerant vertex (tolerance 0.12 mm) apart from it (an edge of another argument crossing
+  a face: no vertex check there), where ours merges it into the vertex; while for two edges' crossing (b0102269) OCCT
+  merges. OCCT's rule depends on the interference (EE / EF / FF: IsExistingVertex only for sections against the
+  pair's vertices). Next: the pool's merge by interference kind, then the off-plane vertices and overlapping vertices.
+
 ## Planes steeper than a cone's rulings: hyperbolas (11-02 13:50 UTC)
 - "A plane at an angle to a cone" (shfall 5): all hyperbolas (|n · a| below the rulings' slope). Now: its transverse
   axis through the points where the plane meets the two rulings in the plane of the axis and its normal (one on

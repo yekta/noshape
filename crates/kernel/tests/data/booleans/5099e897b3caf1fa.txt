@@ -1,0 +1,18 @@
+op cut
+fuzzy 0e0
+glue off
+unify 0
+parallel 1
+obb 0
+objects 1
+tools 30
+target_faces 3
+valid 0
+volume 0e0
+faces 0
+edges 0
+vertices 0
+history 0000000000000000
+ms 1542.787
+path failed
+error unsupported: noshape's Boolean declined: two edges leave a vertex in one direction

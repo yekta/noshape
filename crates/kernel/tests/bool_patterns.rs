@@ -847,3 +847,22 @@ fn a_plane_steeper_than_a_cones_rulings() {
 fn ellipse_edges_after_a_cones_apex() {
     valid_as_occt("b200c5bfa89fcb3d", 1e-9);
 }
+
+/// A Ø10 × 10 diamond knurl, 12 TPI 45° / 45° (recorded; 30 grooves): where its sections meet within OCCT's own
+/// tolerance of them (5 um: a crossing on a section has it, section pieces and the curves they run along within it are
+/// one), the pieces at the grooves' crossings come out consistent (it declined "an invalid result"). Valid, and the
+/// volume of OCCT's cut groove by groove (6.77883e-7 m³; its one cut of all of them is invalid, 1.16e-6).
+#[test]
+fn a_ten_millimetre_knurl_by_its_sections_tolerance() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "5099e897b3caf1fa").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert!(r.shape.is_valid());
+    let v = r.shape.volume().unwrap();
+    assert!((v - 6.77883072e-7).abs() <= 1e-5 * 6.77883072e-7, "volume {v}");
+}
