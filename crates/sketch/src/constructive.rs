@@ -33,6 +33,93 @@ impl Sketch {
     /// (an entity alone can't meet its constraints to the placed ones); the
     /// sketch may then be partly moved, and the caller restores it.
     pub(crate) fn place_constructively(&mut self, unheld: &HashSet<crate::ids::ConstraintId>) -> bool {
+        // Curves sharing a point entity (the tools' rectangles, polylines)
+        // are placed as if joined by a Coincident: on a copy whose shared
+        // points are split, the positions copied back (a rectangle drawn
+        // with the tool keeps its lower-left corner as one posted does).
+        if let Some(mut split) = self.split_shared_points() {
+            let unheld = split.unheld_constraints(1e-9);
+            if !split.place_constructively(&unheld) {
+                return false;
+            }
+            for e in self.entities().map(|e| e.id).collect::<Vec<_>>() {
+                if let Some(g) = split.entity(e).map(|x| x.geometry.clone())
+                    && let Some(mine) = self.entity_mut_silent(e)
+                {
+                    match (&mut mine.geometry, g) {
+                        (Geometry::Point { pos }, Geometry::Point { pos: q }) => *pos = q,
+                        (Geometry::Circle { radius, .. }, Geometry::Circle { radius: r, .. }) => *radius = r,
+                        _ => {}
+                    }
+                }
+            }
+            self.touch();
+            return true;
+        }
+        self.place_split(unheld)
+    }
+
+    /// This sketch with every point entity shared by several curves given
+    /// one copy per further curve, joined to it by a Coincident; None when
+    /// no point is shared.
+    fn split_shared_points(&self) -> Option<Sketch> {
+        let mut users: HashMap<EntityId, Vec<EntityId>> = HashMap::new();
+        for e in self.entities().filter(|e| e.kind() != EntityKind::Point) {
+            for p in e.point_refs() {
+                users.entry(p).or_default().push(e.id);
+            }
+        }
+        let shared: Vec<(EntityId, Vec<EntityId>)> = users.into_iter().filter(|(_, us)| us.len() > 1).collect();
+        if shared.is_empty() {
+            return None;
+        }
+        let mut out = self.clone();
+        for (p, us) in shared {
+            let pos = self.point(p)?;
+            for &curve in &us[1..] {
+                let q = out.add_point(pos);
+                let e = out.entity_mut_silent(curve)?;
+                let swap = |x: &mut EntityId| {
+                    if *x == p {
+                        *x = q;
+                    }
+                };
+                match &mut e.geometry {
+                    Geometry::Line { start, end } => {
+                        swap(start);
+                        swap(end);
+                    }
+                    Geometry::Arc { center, start, end } | Geometry::EllipticalArc { center, start, end, .. } => {
+                        swap(center);
+                        swap(start);
+                        swap(end);
+                    }
+                    Geometry::Circle { center, .. } | Geometry::Ellipse { center, .. } => swap(center),
+                    Geometry::Conic { start, control, end, .. } => {
+                        swap(start);
+                        swap(control);
+                        swap(end);
+                    }
+                    Geometry::BSpline { control, .. } => control.iter_mut().for_each(swap),
+                    Geometry::FitSpline { points, handles } => {
+                        points.iter_mut().for_each(swap);
+                        if let Some((a, b)) = handles {
+                            swap(a);
+                            swap(b);
+                        }
+                    }
+                    Geometry::Point { .. } => {}
+                }
+                out.add_constraint(ConstraintKind::Coincident { a: p, b: q }).ok()?;
+            }
+        }
+        out.touch();
+        Some(out)
+    }
+
+    /// [`Sketch::place_constructively`] on a sketch whose curves share no
+    /// point entity.
+    fn place_split(&mut self, unheld: &HashSet<crate::ids::ConstraintId>) -> bool {
         // Units: each curve with its points; points of no curve on their own.
         let mut unit_of: HashMap<EntityId, EntityId> = HashMap::new();
         let mut units: Vec<EntityId> = Vec::new();
@@ -224,10 +311,10 @@ impl Sketch {
             // that doesn't hold, the one with most of them; with none, a
             // unit of a constraint that doesn't hold (the member it keeps
             // first); with none at all, everything left stays.
-            // (An own Horizontal / Vertical reads unheld when a shared end
-            // moved, through the solver's aliasing: not a reason of its own,
-            // fuzz s343.)
-            let own_relation = |c: crate::ids::ConstraintId, us: &[EntityId]| us.len() == 1 && self.constraint(c).is_some_and(|k| !k.kind.is_dimension());
+            // (An own Horizontal / Vertical reads unheld when an end's
+            // Coincident partner moved, through the solver's aliasing: not a
+            // reason of its own, fuzz s343; a shared point moved is one.)
+            let own_relation = |c: crate::ids::ConstraintId, us: &[EntityId]| us.len() == 1 && self.constraint(c).is_some_and(|k| !k.kind.is_dimension()) && self.aliased(c);
             let pending = |u: EntityId| cons.iter().filter(|(c, us)| us.contains(&u) && us.iter().all(|x| *x == u || placed.contains(x)) && !holds[c] && !own_relation(*c, us)).count();
             let open: Vec<EntityId> = comp.iter().copied().filter(|u| !placed.contains(u)).collect();
             // Then the unit most joined (shared points, its own
