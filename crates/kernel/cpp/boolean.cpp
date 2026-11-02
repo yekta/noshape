@@ -1691,13 +1691,13 @@ TopoDS_Shape merge_cylinder_bands(const TopoDS_Shape& s, HHist& hist)
 }
 
 // Faces on one cylinder whose frames differ (seams apart, either hand: a hole through a boss in a mirrored plate,
-// the plate's two half walls and the boss's) sharing edges, the group's edges used once two closed chains round it
-// or one loop on a part of it: OCCT's unify merges them by the first face's frame and leaves an open wire (38b2cd00)
-// or stops at two faces (live 1767: each hole's wall one face). Merged here, on a copy: one face on the first one's
-// surface, its curves on it the boundary's (projected, a turn from the seam), round it one new seam where both chains
-// have a vertex at one angle.
+// the plate's two half walls and the boss's), or any such faces with `any_frame` (after USD: those it left apart),
+// sharing edges, the group's edges used once two closed chains round it or one loop on a part of it: OCCT's unify
+// merges them by the first face's frame and leaves an open wire (38b2cd00) or stops at two faces (live 1767: each
+// hole's wall one face). Merged here, on a copy: one face on the first one's surface, its curves on it the
+// boundary's (projected, a turn from the seam), round it one new seam where both chains have a vertex at one angle.
 // The shape unchanged where there's no such group or the merge doesn't come out valid with the same volume.
-TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist)
+TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any_frame)
 {
   auto cyl_of = [](const TopoDS_Face& f, gp_Cylinder& c) {
     TopLoc_Location                      l;
@@ -1756,7 +1756,7 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist)
               apart           = apart || !same_frame(c0, cj);
               g.push_back(j);
             }
-      if (g.size() > 1 && apart)
+      if (g.size() > 1 && (apart || any_frame))
         out.push_back(g);
     }
     (void)s;
@@ -2619,7 +2619,7 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
   TopoDS_Shape groups = s;
   try
   {
-    groups = merge_cylinder_groups(s, hist);
+    groups = merge_cylinder_groups(s, hist, false);
   }
   catch (const Standard_Failure&)
   {
@@ -2633,7 +2633,28 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
     const TopoDS_Shape s2 = usd_kept_volume(s1, hist);
     fail_if_cancelled();
     lap                   = std::make_unique<KernelTimer>("unify.patches");
-    return merge_cylinder_patches(s2, hist);
+    const TopoDS_Shape s3 = merge_cylinder_patches(s2, hist);
+    // Faces on one cylinder USD left apart (one frame, its result depending on the faces' order and wires' starts:
+    // a Shell fuse's walls, 1b121fc3, a face more on ours than on OCCT's), merged as those whose frames differ.
+    fail_if_cancelled();
+    TopoDS_Shape s4 = s3;
+    try
+    {
+      s4 = merge_cylinder_groups(s3, hist, true);
+    }
+    catch (const Standard_Failure&)
+    {
+      return s3;
+    }
+    if (s4.IsSame(s3))
+      return s3;
+    // (Their boundaries' pieces now between one face on each side: joined as USD joins edges.)
+    ShapeUpgrade_UnifySameDomain u(s4, true, false, false);
+    u.Build();
+    fail_if_cancelled();
+    if (!u.History().IsNull())
+      hist->Merge(u.History());
+    return u.Shape();
   }
   fail_if_cancelled();
   ShapeUpgrade_UnifySameDomain u(s1, true, true, false);

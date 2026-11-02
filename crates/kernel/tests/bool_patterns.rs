@@ -754,3 +754,15 @@ fn a_b_spline_edge_past_its_curves_end_unifies() {
     let (v, w) = (u.volume().unwrap(), ours.volume().unwrap());
     assert!((v - w).abs() <= 1e-9 * w.abs(), "volume {v} against {w}");
 }
+
+/// Shell's fuse of 38 slabs (1b121fc3), our result (tests/data/unify): walls on one cylinder in faces of one frame
+/// that USD leaves apart (its result depending on the faces' order and wires' starts). Merged after it as those whose
+/// frames differ: OCCT's counts (32 faces, 77 edges), valid (it stopped at 33 / 80 on ours).
+#[test]
+fn walls_usd_leaves_apart_are_merged_after_it() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/unify/walls-usd-leaves-apart.brep");
+    let ours = k::read_brep(&path).expect("our result");
+    let u = k::unify_same_domain(&ours).expect("unified").shape;
+    assert!(u.is_valid(), "unified invalid");
+    assert_eq!((u.count(k::ShapeType::Face), u.count(k::ShapeType::Edge)), (32, 77));
+}

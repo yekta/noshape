@@ -1155,6 +1155,12 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
   edge a rounding past its curve's end threw (Geom_TrimmedCurve out of range: unify_same_domain failed); now its
   range is kept within a bounded curve's and a failure inside the merge leaves the shape as it was. T1
   a_b_spline_edge_past_its_curves_end_unifies.
+- Then (11-02 10:20): after USD (where periodic faces merged), groups of any frame it left apart are merged the same
+  way and their boundary's pieces joined (USD on edges). 1b121fc3 equivalent now. Left without the decline: 37e806ac
+  and bf976715 unify to 2 edges fewer / more than OCCT's (same faces), 570dfc37's Boolean a vertex fewer. T1
+  walls_usd_leaves_apart_are_merged_after_it (our 1b121fc3 result: 32 / 77 as OCCT's; 33 / 80 without).
+- 11ed9bd7 (qa's cli-shell-gpf, a Fuse of 1 we take): our result unifies to 37 faces against OCCT's 33, before
+  today's merges too (to look at).
 
 ## Knurls: lenses and the corner-edge class are most of what's left (11-02 09:40 UTC)
 - The sweep's 72 declined cases rerun (vibe5 ~/agents/sweep/bad7.tsv): 9 taken, 37 two edges leave a vertex in one
