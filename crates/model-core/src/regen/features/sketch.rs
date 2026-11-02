@@ -198,8 +198,10 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     changed.dedup();
     let last_solved = sk.clone();
     let report = match changed.as_slice() {
+        // One new value (a variable, a configuration): placed as live's
+        // regeneration does (least change), not as an edit in the editor.
         [one] => {
-            let opts = sk.dimension_edit_options(*one);
+            let opts = noshape_sketch::SolveOptions { constructive: true, ..sk.dimension_edit_options(*one) };
             sk.solve_with(&opts)
         }
         // The DOF analysis (fully / under defined) depends on the

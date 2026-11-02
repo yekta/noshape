@@ -50,19 +50,27 @@ fn centerline_dimension_is_twice_the_distance() {
 }
 
 #[test]
-fn length_edit_moves_the_far_end() {
-    // Live (fuzz probes p1 / p2 / q1–q3): a new length moves the line's end
-    // with the larger x; the other stays (not both ends by half).
-    let mut sk = Sketch::new();
-    let l = sk.add_line(v(0.0, 0.0), v(10.0, 0.0));
-    sk.add_constraint(ConstraintKind::Horizontal { a: l, b: None }).unwrap();
-    let d = sk.add_constraint(ConstraintKind::Length { curve: l, value: 10.0 }).unwrap();
-    assert!(sk.solve().is_solved());
-    sk.set_dimension_value(d, 20.0).unwrap();
-    assert!(sk.solve_with(&sk.dimension_edit_options(d)).is_solved());
-    let c = sk.curve(l).unwrap();
-    assert!(c.start_point().x.abs() < 1e-6, "{c:?}");
-    assert!((c.end_point().x - 20.0).abs() < 1e-6, "{c:?}");
+fn length_edit_moves_both_ends_equally() {
+    // Live 1775: a length typed in the editor (10 -> 20) grows a lone line
+    // about its midpoint, drawn either way; a regeneration with the new
+    // value (live's posted probes p1 / q1–q3) moves the end with the larger
+    // x instead.
+    for (a, b) in [(v(0.0, 0.0), v(10.0, 0.0)), (v(10.0, 0.0), v(0.0, 0.0))] {
+        for regen in [false, true] {
+            let mut sk = Sketch::new();
+            let l = sk.add_line(a, b);
+            sk.add_constraint(ConstraintKind::Horizontal { a: l, b: None }).unwrap();
+            let d = sk.add_constraint(ConstraintKind::Length { curve: l, value: 10.0 }).unwrap();
+            assert!(sk.solve().is_solved());
+            sk.set_dimension_value(d, 20.0).unwrap();
+            let opts = SolveOptions { constructive: regen, ..sk.dimension_edit_options(d) };
+            assert!(sk.solve_with(&opts).is_solved());
+            let c = sk.curve(l).unwrap();
+            let (lo, hi) = (c.start_point().x.min(c.end_point().x), c.start_point().x.max(c.end_point().x));
+            let want = if regen { (0.0, 20.0) } else { (-5.0, 15.0) };
+            assert!((lo - want.0).abs() < 1e-6 && (hi - want.1).abs() < 1e-6, "regen {regen}: {c:?}");
+        }
+    }
 }
 
 #[test]
@@ -457,10 +465,12 @@ fn slot_has_live_constraint_set_and_follows_its_width() {
 
 #[test]
 fn corner_rectangle_width_edit_keeps_its_height() {
-    // Live (fuzz probes 3, r1–r10): a lone rectangle keeps its lower-left
-    // corner and its other sides; a new width moves the right side only.
     // The corner rectangle's own constraints (Perpendicular top / left,
     // Parallel pairs, Horizontal top), as ops' e2e configurations drives it.
+    // Regenerated with the new width (live probes 3, r1–r10, posted): it
+    // keeps its lower-left corner and its other sides. Edited in the editor
+    // (live 1775 for a lone line): the width grows about its middle; the
+    // height stays either way.
     for constructive in [false, true] {
         let mut sk = Sketch::new();
         let r = sk.corner_rectangle(v(0.0, 0.0), v(40.0, 20.0));
@@ -471,7 +481,8 @@ fn corner_rectangle_width_edit_keeps_its_height() {
         let opts = if constructive { SolveOptions { constructive: true, ..Default::default() } } else { sk.dimension_edit_options(d) };
         assert!(sk.solve_with(&opts).is_solved());
         let at: Vec<DVec2> = r.points.iter().map(|p| sk.point(*p).unwrap()).collect();
-        let want = [v(0.0, 0.0), v(50.0, 0.0), v(50.0, 20.0), v(0.0, 20.0)];
+        let x0 = if constructive { 0.0 } else { -5.0 };
+        let want = [v(x0, 0.0), v(x0 + 50.0, 0.0), v(x0 + 50.0, 20.0), v(x0, 20.0)];
         for (a, b) in at.iter().zip(want) {
             assert!((*a - b).length() < 1e-6, "constructive {constructive}: {at:?}");
         }
