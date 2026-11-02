@@ -659,6 +659,13 @@ only in its sizes (its leftmost unit whose constraints hold), candidates adjacen
 Equal partner of a dimensioned curve taking that value in its own placement. Also open: s307 (which side a slot's
 new radius keeps: live kept the free top line, the bottom had Horizontal; s201 / s223 disagree on "dimensioned
 neighbour first"), s6 (170), s226 (58), s236 (83), s102 (79), s218 (90).
+14:30: the filleted-rectangle plan landed as `loop_anchors` (a closed loop changing only within itself keeps its
+leftmost unchanged H / V line; its curves next to placed geometry first; `chained_size`: an Equal partner of a
+dimension takes that size and counts as changing): s308, s316, s318, s324, s325 exact; batch 4 now 31/40 on
+positions (s326, s332 only curve colours), batches 1–4 1412 mm. S300 timings unchanged (vibe5). Sent batch 5
+(s341–s380, same everyday generator, new seeds) to check the rules generalise: compare its first answer with batch
+4's first 14/40. Left in batch 4: s321 (two filleted rectangles: the second shifts 2 mm, a keep step on its arcs),
+s307, s319 (26), s303, s331, s334, s335, s340, s320.
 
 ## Speed vs Onshape (user 11-01 evening): big assemblies and sketches
 Cases (T2, `tools/tiers/perf.sh -n 3 -p noshape-ops --test all big_assembly_perf::big_assembly_ -- --ignored --nocapture --test-threads=1`;
