@@ -85,6 +85,18 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
   OCCT's and live 1767's rule (each hole's wall one face); asked live to confirm for this part (REQUESTS 12:20). T1
   a_part_fused_with_its_mirror_unifies_its_holes.
 
+## Knurls: the 30 TPI open edges are triple points (11-02 14:30 UTC)
+- Ø25 × 10 CP30 45/30 with the narrower reach (by the section's error): 2232 open edges, 372 per kind (one per
+  tool). Every piece checked there is classified right by its own point (OCCT's classifier agrees); the faults
+  are the joins. At each tool, where its flank, another tool's cap and the cylinder meet, the three pairwise
+  sections (OCCT's, tolerance 5 um, error 1e-14..2e-9) miss one another by about 3 um: a 3.3 um section piece
+  between two tools' faces at the caps' height lies on the cylinder within 1.5 um, bounded on one face by a strip
+  1.5 um outside the cylinder (dropped) and on the other by a piece inside it (kept). OCCT's own tolerance (5 um)
+  makes those one place; reaching by it everywhere (1d4f8171's rule) collapsed some strips and not others (12k).
+- Next (a design step, not a patch): coincidence by the sections' own tolerance throughout, as OCCT's common blocks:
+  section pieces and edges within a section's tolerance of each other one piece, crossings within it one vertex,
+  so a 3 um strip either exists on every face that bounds it or on none.
+
 ## Knurls: the section reach (11-02 11:30 UTC)
 - The crossing loop lets a crossing reach a section by the section's tolerance (OCCT's pave, 5 um on the 30 TPI
   knurl) and grows vertices up to it (1d4f8171). A tool's corner edge 3 um outside the cylinder then lost the 3 um
