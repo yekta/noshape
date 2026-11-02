@@ -367,6 +367,12 @@ impl Bodies {
         }
         self.find_untracked(kind, n)
     }
+    /// Notes a name lookup made some other way (replayed with [`Bodies::find_untracked`] when the evaluation is reused).
+    pub fn note_lookup(&self, kind: LookupKind, n: &TopoName) {
+        if let Some(r) = &self.reads {
+            r.lookups.lock().push((kind, n.clone()));
+        }
+    }
     pub fn find_untracked(&self, kind: LookupKind, n: &TopoName) -> Vec<(usize, usize)> {
         let mut out = Vec::new();
         for (bi, b) in self.v.iter().enumerate() {

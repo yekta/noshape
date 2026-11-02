@@ -23,6 +23,15 @@ face (3 faces); (2) the direct path's time: 4-6 s, of which OCCT's self-interfer
 BRepExtrema distances 20 s; BRepExtrema_ShapeProximity's tolerance isn't a distance, it flagged pairs 2-4 mm apart);
 Auto also tries OCCT's offset first (0.5-2.5 s, erratic on these faces); (3) live's smooth loft .x_t imports wrong
 (dx ticket XT-PERIODIC-SPLINE-FACE), so no body diff with live yet.
+**Incremental regeneration on by default (11-02 13:10, landing with this note; NOSHAPE_REGEN_REUSE=0 or
+set_reuse(Some(false)) turns it off).** With reuse forced on, model T1 had one failure: a feature whose selection had
+gone missing (engine a_feature_above_the_one_that_made_its_edge_misses_its_edge) kept its cached error after its edge
+came back, because the missing-selection check (eval::drop_missing_regions) scanned the untracked context; its lookups
+are now noted (Bodies::note_lookup) and replayed. Model and ops T1 pass with reuse on; bench_edit_latency_reuse (vibe5,
+profdocs copied to ~/agents/profdocs there) equal to full regenerations on every edit. Misses left (features reading
+all bodies, re-run with their effect unchanged): shell-hang depth edit 30.4 s of 31.3, draft-hang 769 of 1065 ms,
+qa5-mb / rib23 / surf-main ~107 of 110 ms (Fill 1 ...), bracket24's Linear pattern. Next: those reads (Extrude New's
+auto_scope, patterns' feature reads, Fill), NOSHAPE_REUSE_TRACE says where.
 **Edit latency / incremental regeneration (user 11-02 08:00).** Bench ops `regen_profile::bench_edit_latency`
 (perf, profile and qa documents; a warm Regenerator, preview meshes; features that ran again and which had their
 effect unchanged) and `bench_edit_latency_reuse` (the same with reuse, every edit checked against a full

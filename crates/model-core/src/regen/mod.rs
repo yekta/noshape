@@ -170,8 +170,8 @@ thread_local! {
     static REUSE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
-/// Incremental regeneration on or off for this thread's regenerations (`None`: as NOSHAPE_REGEN_REUSE says, off
-/// unless set): a feature whose definition and the inputs it read are unchanged takes its last result instead of
+/// Incremental regeneration on or off for this thread's regenerations (`None`: as NOSHAPE_REGEN_REUSE says, on
+/// unless it is `0`): a feature whose definition and the inputs it read are unchanged takes its last result instead of
 /// running again. Returns the thread's setting before.
 pub fn set_reuse(on: Option<bool>) -> Option<bool> {
     REUSE.with(|r| r.replace(on))
@@ -179,7 +179,7 @@ pub fn set_reuse(on: Option<bool>) -> Option<bool> {
 
 fn reuse_on() -> bool {
     static ENV: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    REUSE.with(|r| r.get()).unwrap_or_else(|| *ENV.get_or_init(|| std::env::var_os("NOSHAPE_REGEN_REUSE").is_some()))
+    REUSE.with(|r| r.get()).unwrap_or_else(|| *ENV.get_or_init(|| !std::env::var("NOSHAPE_REGEN_REUSE").is_ok_and(|v| v.trim() == "0")))
 }
 
 /// `e`'s result for `input` when nothing `e`'s evaluation read differs: the same body ids in the same order, every
@@ -409,8 +409,10 @@ impl Regenerator {
                         }
                         // A crash in here leaves the marker behind (qa DOC-POISON).
                         let _crash_guard = crash_guard::enter(f.id, &f.name);
+                        let mut base = (*ctx).clone();
+                        base.bodies.track(body_reads.clone());
                         // Query variables (`#name` selections) expand against the upstream context.
-                        let expanded = eval::expand_query_variables(params, &ctx);
+                        let expanded = eval::expand_query_variables(params, &base);
                         let params = expanded.as_ref().unwrap_or(params);
                         // Live (qa4 round 5 v3 s8): a sketch region that no longer
                         // exists (its sketch deleted, or moved below) is a missing
@@ -418,14 +420,12 @@ impl Regenerator {
                         // empty-input message ("Select face or sketch region to
                         // extrude.") with "1 missing selection".
                         let own = |id: FeatureId| studio.features.iter().any(|g| g.id == id);
-                        let (pruned, missing) = eval::drop_missing_regions(params, &ctx, &own);
+                        let (pruned, missing) = eval::drop_missing_regions(params, &base, &own);
                         let params = pruned.as_ref().unwrap_or(params);
                         state.missing = missing;
                         // Geometry of Assembly contexts joins the feature's context only
                         // while it is evaluated (never merged, patterned or listed).
                         let uses_context = !studio.contexts.is_empty() && crate::in_context::params_use_context(params, None);
-                        let mut base = (*ctx).clone();
-                        base.bodies.track(body_reads.clone());
                         if uses_context {
                             for (bodies, _) in self.contexts.values() {
                                 base.bodies.extend(bodies.iter().cloned());

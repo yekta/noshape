@@ -229,6 +229,11 @@ pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(Fe
             TopoName::Wire { .. } => false,
         }
     }
+    let found = |kind: LookupKind, n: &TopoName, any: &dyn Fn(&Body) -> bool| {
+        ctx.bodies.note_lookup(kind, n);
+        let bodies = ctx.bodies.untracked();
+        bodies.iter().any(|b| b.has_exact(n)) || bodies.iter().any(|b| any(b))
+    };
     let resolves = |r: &Reference| -> bool {
         match r {
             // A face, edge or vertex of a feature that comes later in the list, or that a feature before this one
@@ -236,9 +241,10 @@ pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(Fe
             // fails with "Select edges or faces to chamfer." and "1 missing selection"; L20 Fillet R7 likewise; a
             // sketch on a face that is gone: "Select a sketch plane." and "1 missing selection").
             // Exact names first: the fuzzy lookups scan a body's entities.
-            Reference::Face(n) if own_topo(n, own) => ctx.bodies.iter().any(|b| b.has_exact(n)) || ctx.bodies.iter().any(|b| !b.find_faces(n).is_empty()),
-            Reference::Edge(n) if own_topo(n, own) => ctx.bodies.iter().any(|b| b.has_exact(n)) || ctx.bodies.iter().any(|b| !b.find_edges(n).is_empty()),
-            Reference::Vertex(n) if own_topo(n, own) => ctx.bodies.iter().any(|b| b.has_exact(n)) || ctx.bodies.iter().any(|b| !b.find_vertices(n).is_empty()),
+            // (Noted as name lookups: an evaluation whose selection went missing is reused only while it still is.)
+            Reference::Face(n) if own_topo(n, own) => found(LookupKind::Face, n, &|b| !b.find_faces(n).is_empty()),
+            Reference::Edge(n) if own_topo(n, own) => found(LookupKind::Edge, n, &|b| !b.find_edges(n).is_empty()),
+            Reference::Vertex(n) if own_topo(n, own) => found(LookupKind::Vertex, n, &|b| !b.find_vertices(n).is_empty()),
             _ => region_or_part_resolves(r, ctx, own),
         }
     };
@@ -250,7 +256,7 @@ pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(Fe
             // A part that doesn't exist at this point of the list (live "(7) Dragging feature rows": a feature
             // moved above the one that made its part fails on its own empty selection, "1 missing selection").
             // Only this studio's own parts: a derived feature lists another studio's.
-            Reference::Body(id) => !own(id.feature) || ctx.body(id).is_some(),
+            Reference::Body(id) => !own(id.feature) || ctx.bodies.position_id(id).is_some(),
             _ => true,
         }
     }
