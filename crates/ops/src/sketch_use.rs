@@ -34,7 +34,7 @@ impl Model<'_> {
         if !found.is_empty() || self.display.context_shapes.is_empty() {
             return found;
         }
-        let ctx = Context { bodies: self.display.context_shapes.clone(), ..Default::default() };
+        let ctx = Context { bodies: (self.display.context_shapes.clone()).into(), ..Default::default() };
         resolve_shapes(&ctx, r)
     }
 

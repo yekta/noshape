@@ -822,7 +822,7 @@ mod tests {
     fn mass_properties_move_each_part_to_the_joint_centre() {
         let a = k::make_box(&k::Plane::xy(), 2.0, 4.0, 6.0).unwrap();
         let b = k::make_box(&k::Plane::new(DVec3::new(10.0, 0.0, 0.0), DVec3::Z, DVec3::X), 2.0, 4.0, 6.0).unwrap();
-        let ctx = Context { bodies: vec![body(0, a), body(1, b)], ..Default::default() };
+        let ctx = Context { bodies: vec![body(0, a), body(1, b)].into(), ..Default::default() };
         let m = mass_properties(&ctx, &[], &|_| None).unwrap();
         assert!((m.volume - 96.0).abs() < 1e-6);
         assert!((m.center_of_mass - DVec3::new(6.0, 2.0, 3.0)).length() < 1e-9);
@@ -842,7 +842,7 @@ mod tests {
     #[test]
     fn mass_property_variance_is_lives() {
         let a = k::make_box(&k::Plane::xy(), 0.06, 0.04, 0.02).unwrap();
-        let ctx = Context { bodies: vec![body(0, a.clone())], ..Default::default() };
+        let ctx = Context { bodies: vec![body(0, a.clone())].into(), ..Default::default() };
         let v = mass_property_variance(&ctx, &[], &|_| Some(8000.0)).unwrap();
         let near = |x: f64, want: f64, rel: f64| (x - want).abs() <= rel * want;
         assert!(near(v.volume * 1e9, 1.321, 0.02), "{v:?}");
@@ -916,7 +916,7 @@ mod tests {
         use crate::reference::{DatumPlane, Inference};
         let shape = k::make_box(&k::Plane::xy(), 0.04, 0.02, 0.01).unwrap();
         let block = body(0, shape.clone());
-        let ctx = Context { bodies: vec![block.clone()], ..Default::default() };
+        let ctx = Context { bodies: vec![block.clone()].into(), ..Default::default() };
         let top = Reference::Plane(DatumPlane::Top);
         let edge = |pred: &dyn Fn(&Shape) -> bool| -> Reference {
             let i = (0..block.edges.len()).find(|&i| pred(&shape.sub_shape(ShapeType::Edge, i).unwrap())).unwrap();
@@ -944,7 +944,7 @@ mod tests {
         assert!((d - 0.005).abs() < 1e-9, "{d}");
         // A circle 3 mm above the Top plane.
         let circle = k::make_circle(DVec3::new(0.0, 0.0, 0.003), DVec3::Z, 0.002).unwrap();
-        let ctx = Context { bodies: vec![body(1, circle.clone())], ..Default::default() };
+        let ctx = Context { bodies: vec![body(1, circle.clone())].into(), ..Default::default() };
         let c = Reference::Edge((*ctx.bodies[0].edges[0]).clone());
         let rows = measure(&ctx, &[c, top]);
         let d = min_dist(&rows).expect("circle + Top: a Min dist");
@@ -975,11 +975,11 @@ mod tests {
     fn surfaces_have_no_mass_properties() {
         let face = k::make_box(&k::Plane::xy(), 2.0, 4.0, 6.0).unwrap().faces()[0].clone();
         let surf = Arc::new(super::super::context::Body::new(BodyId { feature: FeatureId(2), index: 0 }, "Surface 1".into(), crate::display::BodyKind::Surface, face, Vec::new(), 0, FeatureId(2)));
-        let ctx = Context { bodies: vec![surf.clone()], ..Default::default() };
+        let ctx = Context { bodies: vec![surf.clone()].into(), ..Default::default() };
         assert!(mass_properties(&ctx, &[], &|_| None).is_none());
         assert!(mass_properties(&ctx, std::slice::from_ref(&surf.id), &|_| None).is_none());
         let solid = body(0, k::make_box(&k::Plane::xy(), 2.0, 4.0, 6.0).unwrap());
-        let ctx = Context { bodies: vec![surf, solid], ..Default::default() };
+        let ctx = Context { bodies: vec![surf, solid].into(), ..Default::default() };
         assert!((mass_properties(&ctx, &[], &|_| None).unwrap().volume - 48.0).abs() < 1e-9);
     }
 

@@ -279,7 +279,7 @@ impl FsContext {
         let mut st = self.state.lock();
         let mut ctx = std::mem::take(&mut st.ctx);
         let (hidden, shown): (Vec<_>, Vec<_>) = std::mem::take(&mut ctx.bodies).into_iter().partition(|b| st.hidden.contains(&b.id));
-        ctx.bodies = shown;
+        ctx.bodies = (shown).into();
         ctx.fs_hidden_bodies = hidden;
         ctx.fs_attributes = st.attributes.clone();
         ctx.fs_transients = st.persistent.clone();

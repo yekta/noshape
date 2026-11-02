@@ -14,7 +14,7 @@ use std::sync::{Arc, LazyLock};
 
 /// The part of a regenerated standard part (its only body).
 pub fn part_body(r: &RegenResult) -> Option<BodyId> {
-    match r.context.bodies.as_slice() {
+    match &*r.context.bodies {
         [b] => Some(b.id.clone()),
         _ => None,
     }

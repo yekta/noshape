@@ -280,9 +280,172 @@ pub struct PointEntity {
     pub position: DVec3,
 }
 
+/// What a feature's evaluation read of its input's bodies (incremental regeneration: a cached evaluation is reused
+/// when the bodies it read are the very same and every name lookup comes out the same). Bodies by address; any
+/// access to the whole list (iteration, a slice) reads them all.
+#[derive(Default)]
+pub struct BodyReads {
+    pub all: std::sync::atomic::AtomicBool,
+    pub bodies: parking_lot::Mutex<Vec<usize>>,
+}
+
+impl BodyReads {
+    fn read(&self, b: &Arc<Body>) {
+        if self.all.load(std::sync::atomic::Ordering::Relaxed) {
+            return;
+        }
+        let p = Arc::as_ptr(b) as usize;
+        let mut v = self.bodies.lock();
+        if v.last() != Some(&p) {
+            v.push(p);
+        }
+    }
+    fn read_all(&self) {
+        self.all.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+/// A context's bodies: a list, which can note what a feature reads of it ([`BodyReads`]). Single bodies by index
+/// (`bodies[i]`, `get`) are noted one by one; anything else (`iter`, slices, `retain`) as reading them all.
+#[derive(Clone, Default)]
+pub struct Bodies {
+    v: Vec<Arc<Body>>,
+    reads: Option<Arc<BodyReads>>,
+}
+
+impl Bodies {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// Start noting reads into `reads` (`None`: stop).
+    pub fn track(&mut self, reads: Option<Arc<BodyReads>>) {
+        self.reads = reads;
+    }
+    fn all(&self) {
+        if let Some(r) = &self.reads {
+            r.read_all();
+        }
+    }
+    pub fn len(&self) -> usize {
+        self.v.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.v.is_empty()
+    }
+    pub fn get(&self, i: usize) -> Option<&Arc<Body>> {
+        let b = self.v.get(i)?;
+        if let Some(r) = &self.reads {
+            r.read(b);
+        }
+        Some(b)
+    }
+    /// Index of the body with id `id` (ids are no read: an input whose body ids differ is never reused).
+    pub fn position_id(&self, id: &BodyId) -> Option<usize> {
+        self.v.iter().position(|b| &b.id == id)
+    }
+    /// The bodies without noting a read (the regenerator's own bookkeeping, not features).
+    pub fn untracked(&self) -> &[Arc<Body>] {
+        &self.v
+    }
+    pub fn push(&mut self, b: Arc<Body>) {
+        self.v.push(b);
+    }
+    pub fn insert(&mut self, i: usize, b: Arc<Body>) {
+        self.all();
+        self.v.insert(i, b);
+    }
+    pub fn remove(&mut self, i: usize) -> Arc<Body> {
+        self.all();
+        self.v.remove(i)
+    }
+    pub fn retain(&mut self, f: impl FnMut(&Arc<Body>) -> bool) {
+        self.all();
+        self.v.retain(f);
+    }
+    pub fn extend(&mut self, it: impl IntoIterator<Item = Arc<Body>>) {
+        self.v.extend(it);
+    }
+    pub fn append(&mut self, other: &mut Vec<Arc<Body>>) {
+        self.v.append(other);
+    }
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, Arc<Body>> {
+        self.all();
+        self.v.iter_mut()
+    }
+    pub fn to_vec(&self) -> Vec<Arc<Body>> {
+        self.all();
+        self.v.clone()
+    }
+}
+
+impl std::ops::Deref for Bodies {
+    type Target = [Arc<Body>];
+    fn deref(&self) -> &[Arc<Body>] {
+        self.all();
+        &self.v
+    }
+}
+
+impl std::ops::DerefMut for Bodies {
+    fn deref_mut(&mut self) -> &mut [Arc<Body>] {
+        self.all();
+        &mut self.v
+    }
+}
+
+impl std::ops::Index<usize> for Bodies {
+    type Output = Arc<Body>;
+    fn index(&self, i: usize) -> &Arc<Body> {
+        let b = &self.v[i];
+        if let Some(r) = &self.reads {
+            r.read(b);
+        }
+        b
+    }
+}
+
+impl std::ops::IndexMut<usize> for Bodies {
+    fn index_mut(&mut self, i: usize) -> &mut Arc<Body> {
+        if let Some(r) = &self.reads {
+            r.read(&self.v[i]);
+        }
+        &mut self.v[i]
+    }
+}
+
+impl<'a> IntoIterator for &'a Bodies {
+    type Item = &'a Arc<Body>;
+    type IntoIter = std::slice::Iter<'a, Arc<Body>>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.all();
+        self.v.iter()
+    }
+}
+
+impl IntoIterator for Bodies {
+    type Item = Arc<Body>;
+    type IntoIter = std::vec::IntoIter<Arc<Body>>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.all();
+        self.v.into_iter()
+    }
+}
+
+impl FromIterator<Arc<Body>> for Bodies {
+    fn from_iter<I: IntoIterator<Item = Arc<Body>>>(it: I) -> Self {
+        Bodies { v: it.into_iter().collect(), reads: None }
+    }
+}
+
+impl From<Vec<Arc<Body>>> for Bodies {
+    fn from(v: Vec<Arc<Body>>) -> Self {
+        Bodies { v, reads: None }
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct Context {
-    pub bodies: Vec<Arc<Body>>,
+    pub bodies: Bodies,
     pub sketches: Vec<Arc<SketchResult>>,
     /// Sketches a Derived feature brought in from its source: (the Derived
     /// feature, the source sketch's feature id, which the copy keeps).

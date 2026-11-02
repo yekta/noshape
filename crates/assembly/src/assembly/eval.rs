@@ -1106,7 +1106,7 @@ pub fn sketch_wire_result(studio: &RegenResult, sketch: FeatureId) -> Option<Reg
         is_mesh: false,
         face_colors: Vec::new(),
     };
-    ctx.bodies = vec![Arc::new(body)];
+    ctx.bodies = vec![Arc::new(body)].into();
     let mut display = studio.display.clone();
     display.bodies = vec![display_body];
     Some(RegenResult { display, needs_refine: false, context: Arc::new(ctx), cancelled: false, evaluated: Vec::new() })
@@ -1169,7 +1169,7 @@ pub fn flat_result(src: &RegenResult, flat: &BodyId) -> Option<RegenResult> {
         d.edge_refs = vec![Reference::Body(flat.clone()); d.edge_refs.len()];
     }
     let mut ctx: Context = (*src.context).clone();
-    ctx.bodies = vec![Arc::new(body)];
+    ctx.bodies = vec![Arc::new(body)].into();
     ctx.connectors.clear();
     Some(RegenResult { display, needs_refine: false, context: Arc::new(ctx), cancelled: false, evaluated: Vec::new() })
 }
@@ -1184,7 +1184,7 @@ pub fn mirrored_result(src: &RegenResult, body: &BodyId, point: DVec3, normal: D
     let mut nb = b.renamed(b.name.clone());
     nb.shape = shape;
     let mut ctx: Context = (*src.context).clone();
-    ctx.bodies = vec![Arc::new(nb)];
+    ctx.bodies = vec![Arc::new(nb)].into();
     let reflect = |v: DVec3| v - n * (2.0 * v.dot(n));
     for c in &mut ctx.connectors {
         c.origin = point + reflect(c.origin - point);

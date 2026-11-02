@@ -220,7 +220,7 @@ mod tests {
         let nf = shape.count(k::ShapeType::Face);
         let faces: Vec<Arc<TopoName>> = (0..nf).map(|f| Arc::new(TopoName::Face { feature, role: Role::New(f as u32) })).collect();
         let body = Body::new(BodyId { feature, index: 0 }, "Part 1".into(), BodyKind::Solid, shape, faces.clone(), 0, feature);
-        let ctx = crate::regen::context::Context { bodies: vec![Arc::new(body)], ..Default::default() };
+        let ctx = crate::regen::context::Context { bodies: vec![Arc::new(body)].into(), ..Default::default() };
         let face = |i: usize| Reference::Face((*faces[i]).clone());
         for i in 0..nf {
             assert!(!crate::regen::measure::measure(&ctx, &[face(i)]).is_empty(), "face {i}");
