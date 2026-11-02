@@ -201,6 +201,20 @@ document's display mesh is under 0.5 s.
 
 ## In progress
 
+11-02 evening (user: "the audit's remaining items, then Render / appearance, Section view, Measure, menus"): all
+landed or queued, audit-part-studio A26-A30 and M11/M12/M15. Measure: every type against live 1709 (14 pairs; pair
+rules in model-core measure.rs, one type filter measure::row_type for both studios). Section view: several planes
+remove what any plane removes (shader `clipped` / caps, render offscreen test), plane numbers kept, every plane's
+manipulator live, cylinder / cone through the axis (ops studio::section_frame_of_ref). Appearance editor: keystroke
+filters, Enter accepts, Tab order (app-core AppearanceNextField). Manipulators from native evaluators through
+EvalCtx::manipulators with std's keys, a drag running std's change function (std_feature LOGIC_ONLY: change function
+only; STD_EDITING_LOGIC decides editing logic): Fit spline, Ruled surface, Wrap, Frame, Gusset, End cap, Decal, Derived
+(Derived's click set natively: std's rebuilds the source studio). Points manipulators drawn (mod.rs std_points*, 7 px
+dots as live's Frame). Left on core (in the audit M12 row): Offset curve on face trims (Offset and extend scope),
+Bridging curve (std's control points), Edit curve (no triad FeatureManipulator), Loft connection sliders
+(connectionEdgeParameters). wait_until in UI tests now waits 30 s (dx 11-02: a_shelled_face_... failures were all
+from before its 11-01 fix). Render studio is cloud (left out by AGENTS).
+
 11-02: queued e75450f5 (Variable table pass, A24; its MENUS line for "Collapse all tables" came in the next commit:
 e75450f5 alone fails ops coverage), the planes P1 part 1 (FS host Ent::PlaneBody) and part 2 (A25: a feature's
 planes as `Reference::ConstructionPlane`, listed under it with eyes; live 11-02 on "psui planes 1102 ps" in the mm
