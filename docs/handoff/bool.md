@@ -48,6 +48,12 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
   history, merged only when kept). T1 a_merge_after_usd_left_invalid_is_dropped (our 14218a58 result). Found in
   Shell's fuzz recordings on main (the only one differing); bf976715's op_boolean volume confirmed right on main
   (6.1536e-5, T1 occts_tree_of_fuses_keeps_every_tool).
+- 11ed9bd7 (qa's cli-shell-gpf part fused with its mirror, a Fuse we take): our result unified to 37 faces against
+  OCCT's 33: each Ø12 hole's wall stayed in three faces of the two inputs. The group merge made it valid but its
+  volume check (the whole solid's integral, 1e-9) refused it: that integral was 2.9e-7 off with itself; now the new
+  face's share against the group's faces' (they agree to 1e-11 mm³), within 1e-9 of the box's volume. 33 faces, as
+  OCCT's and live 1767's rule (each hole's wall one face); asked live to confirm for this part (REQUESTS 12:20). T1
+  a_part_fused_with_its_mirror_unifies_its_holes.
 
 ## Knurls: the section reach (11-02 11:30 UTC)
 - The crossing loop lets a crossing reach a section by the section's tolerance (OCCT's pave, 5 um on the 30 TPI

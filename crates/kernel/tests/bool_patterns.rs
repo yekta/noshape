@@ -778,3 +778,16 @@ fn a_merge_after_usd_left_invalid_is_dropped() {
     assert!(u.is_valid(), "unified invalid");
     assert_eq!((u.count(k::ShapeType::Face), u.count(k::ShapeType::Edge)), (42, 100));
 }
+
+/// qa's cli-shell-gpf part fused with its mirror (11ed9bd7), our result (tests/data/unify): each Ø12 hole's wall in
+/// three faces of the two inputs (frames apart). The model's unify gives each one face, OCCT's counts (33 faces;
+/// live 1767: a hole's wall one face, mirrored or not); the merge's volume check is on the faces it changes (the whole
+/// solid's integral was 2.9e-7 off with itself and refused it: 37 faces).
+#[test]
+fn a_part_fused_with_its_mirror_unifies_its_holes() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/unify/part-fused-with-its-mirror.brep");
+    let ours = k::read_brep(&path).expect("our result");
+    let u = k::unify_same_domain(&ours).expect("unified").shape;
+    assert!(u.is_valid(), "unified invalid");
+    assert_eq!(u.count(k::ShapeType::Face), 33);
+}

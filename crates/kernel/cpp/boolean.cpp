@@ -1863,10 +1863,16 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any
         const TopoDS_Shape out = rs->Apply(s);
         if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
           return false;
-        GProp_GProps g0, g1;
-        BRepGProp::VolumeProperties(s, g0);
-        BRepGProp::VolumeProperties(out, g1);
-        if (std::abs(g1.Mass() - g0.Mass()) > 1e-9 * std::abs(g0.Mass()))
+        // The volume kept: the new face's share of it against the group's faces' (one integral of each side; the
+        // whole solid's integral is noisier than the change: 2.9e-7 of it on a part fused with its mirror, 11ed9bd7,
+        // where the faces' shares agree to 1e-11 mm³), within 1e-9 of the box's volume.
+        std::vector<TopoDS_Shape> before;
+        for (int j : g)
+          before.push_back(fm(j));
+        Bnd_Box box;
+        BRepBndLib::Add(s, box, false);
+        const double bv = box.IsVoid() ? 0 : std::pow(std::sqrt(box.SquareExtent()), 3);
+        if (std::abs(faces_volume({F.Oriented(a.Orientation())}) - faces_volume(before)) > 1e-9 * bv)
           return false;
         HHist h = rs->History();
         if (h.IsNull())
