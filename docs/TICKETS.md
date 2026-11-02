@@ -258,6 +258,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P2 SHELL-HANG-5 (core 11-02, live 1795): shell-hang's Shell 5 (tests/data/shell/shellhang-shell5-input.step: 3 mm
+  in, two planar faces removed) builds in live in 0.3 s (175040.1025 mm³, 52 faces); ours fails after 17 s: OCCT's offset
+  (any of its intersection modes) gives no solid, the direct construction's corners don't meet (most of the part is
+  thinner than two walls: Parasolid keeps such regions solid and hollows around the openings), the slabs' 128-tool
+  fuse takes 14 s and comes out invalid. T2 probe kernel shell::shellhang_shell5_probe.
+- [ ] P2 FILL-G1-DOME (core 11-02, live 1739 FI2): a Fill G1 to a shelled box's outer side faces builds in live with the
+  warning "Could not meet tangency constraints at highlighted points." (a dome to z 42.97, 4327.5641 mm²: the corners
+  can't be tangent to two perpendicular walls); ours fails ("Cannot create fill surface…"): OCCT's plate throws for
+  these constraints at any tolerance. Needs our own G1 patch (or plate) that relaxes the corners.
 - [x] P1 LOFT-ONE-FACE (core 11-02, live 1782 / 1784): live lofts tangent-continuous sections (hexagons with R5 sketch
   fillets: 6 lines + 6 arcs) into **one** B-spline side face (3 faces, 24 edges, 437833.229 mm³); ours gave a face per
   section edge (14 faces, 437876.286). Now: through three or more sections, or sections of different topology, side
