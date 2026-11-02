@@ -4034,6 +4034,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     // vertex's, which rounding decides (4e-16 off: grows), and then its history says Deleted, not Modified. Ours says
     // Modified (OCCT's where nothing rounds; else an equivalent result), and inside coincident edges of three other
     // arguments Deleted when the vertex is one argument's alone (Shell's slabs meeting: four arguments at a line).
+    // So it does inside two others' where a curved edge of its own argument ends at it (a fillet's or a hole's arc
+    // on the slabs' planes: OCCT's section there merges with the vertex's copy, a second same-domain link its
+    // history doesn't follow; Shell's slab fuses, 2bd15826: 6 vertices); between planes it stays Modified.
     let mut deleted_v: HashSet<u32> = HashSet::default();
     for (&w, es) in &inside_edges {
         let mut args: Vec<u32> = es.iter().map(|&e| cx.edges[e].arg).collect();
@@ -4054,7 +4057,9 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
         }
 
         // (One argument's vertex alone: one already two arguments' (merged with another's first) stays Modified.)
-        if args.len() >= 3 && cx.pool.inputs[w as usize].len() == 1 && es.iter().all(|&e| at(e) == at(es[0])) {
+        let own = cx.pool.inputs[w as usize].first().map(|x| x.0);
+        let curved = || (0..cx.edges.len()).any(|e| Some(cx.edges[e].arg) == own && !matches!(cx.edges[e].g, Geo::Line) && cx.edges[e].v.contains(&w));
+        if (args.len() >= 3 || curved()) && cx.pool.inputs[w as usize].len() == 1 && es.iter().all(|&e| at(e) == at(es[0])) {
             deleted_v.insert(w);
         }
     }

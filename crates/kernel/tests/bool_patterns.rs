@@ -651,3 +651,24 @@ fn an_edge_through_a_tolerant_vertex_off_a_plane_declines() {
 fn a_common_of_two_overlapping_coplanar_faces() {
     as_recorded("0b6e553b104c603b");
 }
+
+/// Shell's slab fuse (recorded): a part's vertex where its hole's or fillet's arc ends lies inside coincident edges of
+/// two slabs. OCCT's history says Deleted for it (its copy, made for the edges, merges again with a section's vertex
+/// there, and PrepareHistory follows one same-domain link only); between planes it says Modified. Ours as OCCT's:
+/// each record (input, relation, output kind) as many times.
+#[test]
+fn a_vertex_at_an_arc_inside_two_slabs_edges_is_deleted_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "a18c862ab40aa82b").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's");
+    k::set_rust_boolean(None);
+    let counts = |x: &k::OpResult| placed_records(x).into_iter().map(|(key, v)| (key, v.len())).collect::<std::collections::BTreeMap<_, _>>();
+    assert_eq!(counts(&r), counts(&o));
+}

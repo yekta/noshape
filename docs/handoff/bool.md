@@ -1109,7 +1109,39 @@ mirhole, halfmir, rust-mirror-min, ...; 22 documents): identical with NOSHAPE_BO
 cli-draft-segv's Part 1, 112330.9947 against 112330.9948 mm³ (9e-10 relative). mirhole 14429.2037 / 7 faces,
 halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHELL-C79E doesn't reproduce (TICKETS).
 
-## Micrometre junctions on knurls: crossings, tiny pieces, rulings (11-02 12:00 UTC)
+## A vertex OCCT's history loses; seams apart is unify's; knurls' "two edges" (11-02 07:10 UTC)
+- "One cylinder in faces of two inputs, their seams apart" guards unify, not the Boolean: on 38b2cd00 (a hole
+  through a boss in a mirrored plate) our faces, edges and pcurves are OCCT's, only the faces' order differs. USD
+  takes the first face of a same-domain group as its reference; with the plate's left-handed half first it leaves
+  a NotClosed wire on the boss's outer wall (OCCT's own result with that face moved first too). Tried in
+  usd_kept_volume (the model's unify where periodic faces merge): every face it made or changed valid (BRepCheck of
+  each alone), else its next start / the reversed order. 38b2cd00 then unifies as OCCT's, but 3059898c and ac44ff44
+  (taken, exact) went to fewer merges than OCCT's (12 faces against 10): their first USD result has a NotClosed wire
+  that Shape::is_valid (the replay's check) doesn't see, on OCCT's result too (plain USD: both invalid). Not landed.
+  Without the decline 16 more cases are taken, 8 unify to fewer merges than OCCT's; declining where USD on a copy is
+  invalid, or where the model's unify needed a second try (declines 74f74741 too, exact), doesn't tell them apart.
+  The decline stays; next: what the model's unify does differently on ours (merge_planar / bands first, face order).
+- bf976715's "wrong volume" (6.154e-5 against 5.755e-5) was the replay's own OCCT run: op_boolean's fuse of the 47
+  slabs, not the app's quick_boolean (plain BRepAlgoAPI_Fuse, recorded 6.154e-5, ours). Plain OCCT, with
+  op_boolean's tool groups (group_disjoint), at the working scale and in parallel all give 6.154e-5 locally; what in
+  op_boolean gives 5.755e-5 is open (a point inside tool 6 is outside its result: a real fault on the fallback path
+  when such a fuse goes there). For direct cases the replay's OCCT run should be quick_boolean's.
+- Seams2's history differences: OCCT's PrepareHistory follows one same-domain link only (FillImagesVertices binds
+  myShapesSD's value, not its end), so an input vertex linked twice says Deleted: copied by UpdateVertex in
+  non-destructive mode (any EV on an input vertex), then that copy merged again in PostTreatFF (a section's vertex
+  there). Ours now says Deleted inside coincident edges of two other arguments where a curved edge of the vertex's
+  own argument ends at it (between planes OCCT's stays Modified: Deleted for all moved ~10 cases per corpus from
+  exact to equivalent). Corpora equivalents 101 -> 73, none new, 0 differ. T1
+  a_vertex_at_an_arc_inside_two_slabs_edges_is_deleted_as_occt.
+- Knurl "two edges leave a vertex in one direction" (Ø100 × 25 CP20 45/45, recorded vibe5
+  ~/agents/bool-corpora/kt-100-25-CP20-45-45): two sections crossing twice 1-4 um apart (a lens between two flanks'
+  sections with the cylinder, apart past tol): both pieces under 100 tol, so both straightened onto one chord. Tried
+  in bool-a: merging such pairs (breaks the flanks: 40k-117k open edges), drawing duplicate chords as arcs through
+  their own midpoints (gets past: 8 lenses alone on the cylinder, their point on a tool's face), a lens kept by its
+  edges' parity (two lenses' edges disagree), and with the period symmetry on the result is 90k open edges (off:
+  none), so the symmetry's state transfer goes wrong here too. Not landed; next after the seams.
+
+## Micrometre junctions on knurls: crossings, tiny pieces, rulings (11-02 05:00 UTC)
 - A crossing of two curves in a face's plane within a section's own tolerance of that section's end is that end,
   its tolerance grown to the point (OCCT's pave); otherwise a new vertex whose tolerance reaches the other curve
   when that is a section off it by its error.
@@ -1127,7 +1159,7 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
   volume; history ordering), 1.3 s vs OCCT's 11.5 s. Ø10 × 10 45/45 now builds but OCCT's checker finds its 0.45 um
   section pieces' curves on the flanks off (InvalidCurveOnSurface): declined as invalid.
 
-## Sections split within their own error (11-02 10:00 UTC)
+## Sections split within their own error (11-02 04:10 UTC)
 - A section (and a section added to a face as its own curve) is split at a pool vertex within its OCCT error
   (`acc`) off it, the ends kept at the Boolean's tolerance (split_reach): two sections crossing in a face's plane are
   that far apart in space at the crossing. Knurl Ø63 × 17 CP12 45/45 taken (7992 faces).
@@ -1141,7 +1173,7 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
   and leaving it at a tiny angle (0 to 35 um along them): OCCT's partial common block, a feature; "a point near two
   vertices": mostly parts with absurd tolerances (vertices of 1.1 m, 7 cm, 4 cm), rightly declined.
 
-## Tolerant faces; Shell's tools at their real tolerances (11-02 09:00 UTC)
+## Tolerant faces; Shell's tools at their real tolerances (11-02 03:40 UTC)
 - rust_boolean.cpp's tolerant-input check: only tolerant faces are checked against the other arguments (nothing in
   a face's grey band, the other's own tolerance counted up to the ordinary); tolerant vertices and edges go by their
   own rule as before. Before, any tolerant face made every tolerant vertex and edge go through the check too, and
@@ -1159,7 +1191,7 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
   6.154e-5 against OCCT's 5.755e-5: a wrong result). So the check guards real faults: next is finding them.
 - Corpora unchanged, 0 differ. Scratch: /root/bool-scratch/bin/syncdbg.sh resets bool-a to bool-b plus the debug.
 
-## A plane nearly along a cylinder; Shell's slab fuses re-measured; seams apart looked at (11-02 07:30 UTC)
+## A plane nearly along a cylinder; Shell's slab fuses re-measured; seams apart looked at (11-02 03:10 UTC)
 - plane_cyl declined planes with |n · a| < 0.25 (within 14.5° of the axis: drafted faces cutting holes); OCCT's
   ellipse is taken down to 1e-3 now. nfall's 9 such taken (OCCT's results), corpus6 +6, 0 differ. T1
   a_plane_a_few_degrees_off_a_cylinders_axis.
@@ -1176,7 +1208,7 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
   at (50, 25, 1.5) mm: ours Modified into a new vertex of tolerance 1e-5, OCCT's keeps the input vertex, tol
   2.1e-7, and says Deleted for that argument), and corpus3 lost one. Reverted; next.
 
-## Fuzz declines: sheets on one torus; a tolerant vertex at its reach (11-02 06:30 UTC)
+## Fuzz declines: sheets on one torus; a tolerant vertex at its reach (11-02 02:50 UTC)
 - "sheets that meet": all 8 left were two sheets on one torus (fillet faces, mirror's overlap tests; one pair
   with the axis reversed): taken as coplanar ones (T1 a_common_of_two_sheets_on_one_torus).
 - "coincident pieces differ" (2 of seed 1195's): a vertex of tolerance 1e-4 lies 1e-4 from the other sheet's edge
@@ -1193,7 +1225,7 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
   entry to op_shell (the dump file 1e-4), so not Shell's methods. Re-measuring the slab fuses over core's 30 seeds
   with this build (vibe5 ~/bool-fuzz/shrun.sh, logs ~/bool-fuzz/sh/err-<seed>.txt).
 
-## The knurls' corner-edge non-manifold class, narrowed (11-02 05:30 UTC)
+## The knurls' corner-edge non-manifold class, narrowed (11-02 02:30 UTC)
 - Ø25 × 10 CP30 45/30 (vibe5 ~/agents/bool-corpora/kg-25-10-CP30-45-30): at 30 TPI a groove's side corner edges
   (flank 0 / 1, flank 2 / 3) run 3 um outside the cylinder (r 12.503). Where two grooves cross (their sections
   coincide at the crossing height z_c), their corner edges cross each other at P (r 12.503, z_c ± 0.28 mm), where
@@ -1209,7 +1241,7 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
   the flank-flank section split at X too (don't merge a crossing into a curve's end when the other curve is split
   there), or treat P's neighbourhood as one vertex on all curves alike.
 
-## qa's NOSHAPE_BOOL_FALLBACK=0 fuzz again; sheets on one cylinder (11-02 04:30 UTC)
+## qa's NOSHAPE_BOOL_FALLBACK=0 fuzz again; sheets on one cylinder (11-02 01:40 UTC)
 - qa's 29 BOOL-DECLINE tickets (seeds 1191-1210 on 45424566: 755 declined calls). The same seeds with a CLI of this
   worktree (vibe4 ~/bool-fuzz/nfrun.sh: clifuzz_nf.py, NOSHAPE_RECORD_FAILED; cases in
   ~/agents/bool-corpora/nf/<seed>, all in nfall): 155 declined calls, by seeds hit: coincident pieces differ 5,
@@ -1252,7 +1284,7 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
   where another groove crosses it (not the whole section along the edge: merging sections into edges within the
   section's own 5 um tolerance didn't change them).
 
-## Shell's slab fuses: offset faces; the seeded sections' cost (11-02 03:00 UTC)
+## Shell's slab fuses: offset faces; the seeded sections' cost (11-02 01:00 UTC)
 - Offset faces (rust_boolean.cpp to_body): a Geom_OffsetSurface is taken as the elementary surface OCCT keeps as its
   equivalent (a plane's, cylinder's, cone's offset), else as a B-spline within 1e-7 of it over the face's parameter
   range (GeomConvert_ApproxSurface, same parameters, so the edges' curves on it stay).
@@ -1276,7 +1308,7 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
   (NOSHAPE_KERNEL_PROFILE's boolean.rust.sections, 18 of the 34 s, counts the seeded calls too; gdb samples on a
   local copy of the test binary found the projections.)
 
-## Knurl sweep: tilted caps, slivers between caps (11-02 02:00 UTC)
+## Knurl sweep: tilted caps, slivers between caps (11-02 00:40 UTC)
 - A tool's plane face 1e-9 to 1e-4 rad off an object's plane face, its edges within the tolerance of that plane, is
   put on it before the pairing (boolean.rs, before `symmetry`): the knurl tools' end caps are 2.3e-8 to 2.8e-5 rad
   off the cylinder's end planes (the sweep's end sections), past plane_plane's 1e-9 parallel test, so not coplanar,
@@ -1297,7 +1329,7 @@ halfmir 7214.6018, rust-mirror-min 1618.9016 / 19: their right values. RUST-SHEL
   one direction"). Slow: Ø10 knurls 50-110 s (3600-8400 faces) on the loaded machine, against 2.8 s for Ø25 × 25;
   to profile.
 
-## Knurl sweep: three more causes fixed (11-02 01:00 UTC)
+## Knurl sweep: three more causes fixed (11-02 00:20 UTC)
 - The boundary crossings for the seeded sections are now the curves' own closest points (Gauss-Newton on the two
   edges from each chord pair within reach), merged within 10 tol: chords of a 48 mm helix edge reach ~12 um, and
   merging within ten reaches made two crossings 70 um apart one (Ø25 × 34 45/45: tools 30, 51 cross 37 um above the
