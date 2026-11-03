@@ -349,3 +349,37 @@ fn large_dimension_changes_converge() {
         assert!((sk.measure(ang).unwrap() - f64::to_radians(deg)).abs() < 1e-9);
     }
 }
+
+
+/// Live 1862 (SKETCH-REDUNDANT-SOLVES): a Ø10 circle Tangent to two
+/// Horizontal lines and the lines' 10 mm Distance dimensioned too can't be
+/// solved, in whatever order they were added; without the Distance it solves.
+#[test]
+fn a_dimension_the_tangencies_already_fix_over_defines() {
+    for order in 0..4 {
+        for with_distance in [true, false] {
+            let mut sk = Sketch::new();
+            let a = sk.add_line(v(0.0, 0.0), v(0.03, 0.0));
+            let b = sk.add_line(v(0.0, 0.01), v(0.03, 0.01));
+            let c = sk.add_circle(v(0.015, 0.005), 0.005);
+            sk.add_constraint(ConstraintKind::Horizontal { a, b: None }).unwrap();
+            sk.add_constraint(ConstraintKind::Horizontal { a: b, b: None }).unwrap();
+            let mut adds = vec![
+                ConstraintKind::Tangent { a, b: c },
+                ConstraintKind::Tangent { a: b, b: c },
+                ConstraintKind::Diameter { curve: c, value: 0.01 },
+                ConstraintKind::Distance { a, b, value: 0.01, mode: DistanceMode::Minimum },
+            ];
+            if !with_distance {
+                adds.pop();
+            }
+            let n = adds.len();
+            adds.rotate_left(order % n);
+            for k in adds {
+                sk.add_constraint(k).unwrap();
+            }
+            let r = sk.solve();
+            assert_eq!(r.is_solved(), !with_distance, "order {order}, distance {with_distance}: {:?}", r.status);
+        }
+    }
+}

@@ -3075,7 +3075,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   learning-center-devon Sketch 3 on a top face (z 50.8): ours x (−1, 0, 0), live (1, 0, 0).
   Ours takes OCCT's plane x (eval.rs raw_plane, Reference::Face). parity_models now counts a sketch frame that isn't
   live's as a difference. /root/dx-scratch/frames.py lists them (CLI against the rebuilt documents). (dx 2026-11-03)
-- [ ] P3 SKETCH-REDUNDANT-SOLVES (skasm; dx's parity suite, models-dx live-hole-row, live 1862) a sketch whose
+- [x] (skasm 11-03 17:44: a dependency that takes in a driving dimension makes that dimension redundant whichever row the rank analysis gives up, so it over-defines as s7's twice-dimensioned radius (not where a curve has collapsed: a height set to 0 still solves); the Slot around a chain no longer adds its offsets' two distances beside the end cap's Ø (they over-defined it). T1 constraints_more::a_dimension_the_tangencies_already_fix_over_defines) P3 SKETCH-REDUNDANT-SOLVES (skasm; dx's parity suite, models-dx live-hole-row, live 1862) a sketch whose
   constraints are redundant but consistent solves in ours (status Ok) where live can't solve it: two Horizontal lines
   (0, 0)–(30, 0) and (0, 10)–(30, 10) mm, a Ø10 circle at (15, 5) Tangent to both, and a 10 mm Distance between the
   lines (implied by the tangents and the Ø10). Live (behaviours "dx (2026-11-03, P3) live hole row Sketch 4"): the

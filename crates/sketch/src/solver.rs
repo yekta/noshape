@@ -1035,6 +1035,23 @@ fn run_weighted(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget], allow
     }
 }
 
+/// The driving dimension equation `eq` comes from, if any.
+fn driving_dimension(sk: &Sketch, sys: &System, eq: u32) -> Option<ConstraintId> {
+    match sys.src[eq as usize] {
+        Src::Constraint(c) => sk.constraint(c).filter(|k| k.driving && k.kind.is_dimension()).map(|_| c),
+        _ => None,
+    }
+}
+
+/// A line of no length or a circle / arc of no radius.
+fn has_collapsed_curve(sk: &Sketch) -> bool {
+    sk.entities().filter_map(|e| sk.curve(e.id)).any(|c| match c {
+        crate::geom::Curve2::Line { a, b } => (b - a).length() < 1e-9,
+        crate::geom::Curve2::Circle { radius, .. } | crate::geom::Curve2::Arc { radius, .. } => radius < 1e-9,
+        _ => false,
+    })
+}
+
 fn analyze(sk: &Sketch, sys: &mut System, out: &Outcome, conflicting: &[ConstraintId]) -> Analysis {
     let np = sys.p.values.len();
     // free flag per variable index
@@ -1043,12 +1060,42 @@ fn analyze(sk: &Sketch, sys: &mut System, out: &Outcome, conflicting: &[Constrai
     let mut dof = 0usize;
     let mut redundant: Vec<ConstraintId> = sys.alias_redundant.clone();
     redundant.extend(out.const_redundant.iter().copied());
+    let mut collapsed: Option<bool> = None;
     for (ci, comp) in out.comps.iter().enumerate() {
         let rows = &out.comp_rows[ci];
         let a = analyze_component(rows, comp.vars.len());
         dof += comp.vars.len() - a.rank;
         for (k, &pv) in comp.vars.iter().enumerate() {
             var_free[out.var_of[pv as usize] as usize] = a.free[k];
+        }
+        // A dependency that takes in a dimension makes that dimension
+        // redundant, whichever row the rank analysis gave up (SKETCH-REDUNDANT-SOLVES,
+        // live 1862: a Ø10 circle Tangent to two lines 10 mm apart, the
+        // 10 mm dimensioned too: "Sketch could not be solved."). Not where a
+        // curve has collapsed: the rank drops there without a redundancy
+        // (live solves a rectangle's height set to 0).
+        if !a.redundant_rows.is_empty() && !a.redundant_rows.iter().any(|ri| driving_dimension(sk, sys, comp.eqs[*ri]).is_some()) {
+            let dims: Vec<usize> = (0..rows.len()).filter(|ri| driving_dimension(sk, sys, comp.eqs[*ri]).is_some()).collect();
+            let without = |skip: &dyn Fn(usize) -> bool| -> Vec<SparseRow> { rows.iter().enumerate().filter(|(k, _)| !skip(*k)).map(|(_, r)| r.clone()).collect() };
+            // (One analysis without any dimension first: the same
+            // deficiency there means none takes part.)
+            let relations = without(&|k| dims.contains(&k));
+            let involved = !dims.is_empty() && rows.len() - a.rank != relations.len() - analyze_component(&relations, comp.vars.len()).rank;
+            let col = involved
+                && *collapsed.get_or_insert_with(|| {
+                    let mut solved = sk.clone();
+                    sys.write_back(&mut solved);
+                    has_collapsed_curve(&solved)
+                });
+            if involved && !col {
+                for &ri in &dims {
+                    if analyze_component(&without(&|k| k == ri), comp.vars.len()).rank == a.rank
+                        && let Some(c) = driving_dimension(sk, sys, comp.eqs[ri])
+                    {
+                        redundant.push(c);
+                    }
+                }
+            }
         }
         for ri in a.redundant_rows {
             if let Src::Constraint(c) = sys.src[comp.eqs[ri] as usize] {

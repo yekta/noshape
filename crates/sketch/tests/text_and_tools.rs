@@ -16,7 +16,8 @@ fn fillet_keeps_length_dimensions_on_trimmed_lines() {
     let _ = sk.add_constraint(ConstraintKind::Fix { entity: p0 }).unwrap();
     let w = sk.add_constraint(ConstraintKind::Length { curve: r.curves[0], value: 4.0 }).unwrap();
     let h = sk.add_constraint(ConstraintKind::Length { curve: r.curves[1], value: 3.0 }).unwrap();
-    let top = sk.add_constraint(ConstraintKind::Length { curve: r.curves[2], value: 4.0 }).unwrap();
+    // (Not the top's length too: with the bottom's it over-defines the
+    // rectangle, as in live.)
     assert!(sk.solve().is_solved());
     // Fillet the top-right corner (right and top lines).
     let corner = r.points[2];
@@ -24,13 +25,13 @@ fn fillet_keeps_length_dimensions_on_trimmed_lines() {
     // The corner survives as a construction "virtual sharp".
     assert!(sk.entity(corner).is_some_and(|e| e.construction), "virtual sharp kept");
     // Dimensions keep their ids and values; the trimmed ones now measure to the sharp.
-    for (cid, val) in [(w, 4.0), (h, 3.0), (top, 4.0)] {
+    for (cid, val) in [(w, 4.0), (h, 3.0)] {
         let c = sk.constraint(cid).expect("dimension kept");
         assert!((c.value().unwrap() - val).abs() < 1e-12, "{c:?}");
     }
     assert!(matches!(sk.constraint(h).unwrap().kind, ConstraintKind::Distance { .. }));
     assert!(matches!(sk.constraint(w).unwrap().kind, ConstraintKind::Length { .. }), "untouched line keeps its length");
-    assert!(res.constraints_removed.iter().all(|c| ![w, h, top].contains(c)));
+    assert!(res.constraints_removed.iter().all(|c| ![w, h].contains(c)));
     let rep = sk.solve();
     assert!(rep.is_solved(), "{rep:?}");
     // Editing the retargeted height still drives the rectangle.

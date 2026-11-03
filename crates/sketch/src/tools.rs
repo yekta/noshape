@@ -981,6 +981,14 @@ impl Sketch {
             let right = self.offset(&chain, -h)?;
             let mut made: Vec<EntityId> = left.created.iter().chain(right.created.iter()).copied().filter(|e| self.kind(*e).is_some_and(|k| k != EntityKind::Point)).collect();
             if !closed {
+                // Live, as for one line: the end cap's Ø sets the width, the
+                // offsets follow it; their own distances would over-define
+                // the slot (SKETCH-REDUNDANT-SOLVES).
+                for c in left.constraints_added.iter().chain(&right.constraints_added) {
+                    if self.constraint(*c).is_some_and(|k| matches!(k.kind, ConstraintKind::Distance { .. })) {
+                        let _ = self.remove_constraint(*c);
+                    }
+                }
                 // Chain end points in traversal order.
                 let (first, ffwd) = items[0];
                 let (last, lfwd) = items[items.len() - 1];
