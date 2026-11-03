@@ -2906,11 +2906,11 @@ export const plates = defineFeature(function(context is Context, id is Id, defin
     }
 }
 
-/// Edges a Boolean subtraction made, as the public Laser Joint finds them for its corner overcuts (live 1830): a notch
-/// cut from a block's edge; its created edges, those on the block, the concave ones.
+/// What a Boolean subtraction creates (std rib.fs and boolean.fs read qCreatedBy(<the Boolean>, FACE / EDGE); the
+/// public Laser Joint finds its corner overcuts' edges so, live 1830): the tools' faces in its result and their edges.
+/// A notch through a block's edge: its 3 walls, their 10 edges, 2 of them concave.
 #[test]
-#[ignore = "T2: probe"]
-fn boolean_created_edges_probe() {
+fn a_subtraction_creates_its_tools_faces() {
     let src = studio(
         r#"
 annotation { "Feature Type Name" : "Notch" }
@@ -2943,5 +2943,5 @@ export const notch = defineFeature(function(context is Context, id is Id, defini
     ps.features.push(f);
     let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions { custom_features: Some(scripts), ..Default::default() });
     assert_ok(&r);
-    print!("{}", custom::run::output_of(fid).unwrap().output);
+    assert_eq!(custom::run::output_of(fid).unwrap().output, "created 10, on the block 10\nconcave 2, faces created 3\n");
 }

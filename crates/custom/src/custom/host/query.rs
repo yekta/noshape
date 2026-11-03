@@ -671,10 +671,16 @@ impl<'a> QueryCx<'a> {
             Some(vec![Arc::from(f.to_string())])
         };
         let face_id = |n: &TopoName| -> Option<(u32, FsId)> {
-            if let Some(op) = self.st.op_of_face(n) {
-                return Some((op.seq, op.id.clone()));
+            let own = match self.st.op_of_face(n) {
+                Some(op) => Some((op.seq, op.id.clone())),
+                None => n.creator().and_then(|f| feature_id(f).map(|i| (0, i))),
+            };
+            // A Boolean that brought it into its target, if later.
+            match (own, self.st.adopted.get(n)) {
+                (Some(o), Some(b)) if b.seq < o.0 => Some(o),
+                (_, Some(b)) => Some((b.seq, b.id.clone())),
+                (o, None) => o,
             }
-            n.creator().and_then(|f| feature_id(f).map(|i| (0, i)))
         };
         let newest = |faces: &[Arc<TopoName>]| faces.iter().filter_map(|f| face_id(f)).max_by_key(|x| x.0).map(|x| x.1);
         match e {

@@ -114,6 +114,9 @@ pub struct CtxState {
     pub merged_creators: HashMap<BodyId, Vec<FsId>>,
     /// The operation that created each body (exact, see `body_creator`).
     pub body_ops: HashMap<BodyId, FsId>,
+    /// Faces a Boolean brought into its targets (its tools' faces): created by the Boolean, as their edges with them
+    /// (std rib.fs, boolean.fs: qCreatedBy(<the Boolean>, FACE / EDGE); the public Laser Joint's overcuts).
+    pub adopted: HashMap<TopoName, OpInfo>,
     /// The operation that made each construction plane (`ConstructionPlane` references; qCreatedBy).
     pub plane_ops: HashMap<Reference, FsId>,
     /// Each operation's bits of its bodies' ids (unique in this feature).
@@ -225,6 +228,7 @@ impl FsContext {
                 ops: HashMap::new(),
                 merged_creators: HashMap::new(),
                 body_ops: HashMap::new(),
+                adopted: HashMap::new(),
                 plane_ops: HashMap::new(),
                 body_bits: BodyBits::default(),
                 touched: HashMap::new(),

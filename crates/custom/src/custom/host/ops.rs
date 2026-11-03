@@ -16,7 +16,7 @@ use noshape_featurescript::interp::{Interp, NativeFn, R};
 use noshape_featurescript::value::Value;
 use noshape_kernel as k;
 use noshape_kernel::{Shape, ShapeType};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
 pub const NATIVES: &[(&str, NativeFn)] = &[
@@ -400,6 +400,8 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         "INTERSECTION" => "BOOLEAN_INTERSECT_FAIL",
         _ => "BOOLEAN_INVALID",
     };
+    // A subtraction's targets and its tools' faces (theirs in its result are the Boolean's).
+    let mut before: Option<(Vec<BodyId>, HashSet<TopoName>)> = None;
     let merged = run_op(i, &cx, &id, failure, |ev| {
         // Onshape's opBoolean on empty selections (live qa5 boolean: a
         // Subtract without Targets reads "Cannot resolve entities.").
@@ -486,6 +488,9 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     ev.ctx.bodies.retain(|b| !tools.contains(&b.id));
                 }
                 let idx: Vec<usize> = targets.iter().filter_map(|id| index(ev, id)).collect();
+                if &*kind == "SUBTRACTION" {
+                    before = Some((targets.clone(), tool_shapes.iter().flat_map(|t| t.names.faces.iter().map(|n| (**n).clone())).collect()));
+                }
                 let op = if &*kind == "SUBTRACTION" { k::BooleanOp::Cut } else { k::BooleanOp::Common };
                 ev.boolean_into(&idx, tool_shapes, op)?;
                 Ok(None)
@@ -494,6 +499,15 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     })?;
     if let Some(all) = merged {
         cx.state.lock().record_merge(&all[0], &all, &id);
+    }
+    if let Some((targets, tools)) = before {
+        let mut st = cx.state.lock();
+        if let Some(op) = st.ops.values().find(|o| o.id == id).cloned() {
+            let new: Vec<TopoName> = st.ctx.bodies.iter().filter(|b| targets.contains(&b.id)).flat_map(|b| b.faces.iter()).filter(|n| tools.contains(&**n) || tools.contains(n.root())).map(|n| (**n).clone()).collect();
+            for n in new {
+                st.adopted.insert(n, op.clone());
+            }
+        }
     }
     Ok(Value::Undefined)
 }
