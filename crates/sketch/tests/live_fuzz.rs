@@ -1557,6 +1557,17 @@ fn a_lever_hangs_on_its_centre_line() {
     assert!(d.is_empty(), "s811: {}", d.join("; "));
 }
 
+/// s875 (batch 18) stays as live answered: the polygon tool's octagon with a
+/// new diameter scales about its circle's centre (Equal chords on a circle
+/// also fit star or skewed polygons). T1.
+#[test]
+fn a_polygon_scales_about_its_circle() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-18.live.json")).unwrap()).unwrap();
+    let ours = batch(1, 875, true);
+    let d = differences(&ours["cases"][0], &live["cases"]["s875"]);
+    assert!(d.is_empty(), "s875: {}", d.join("; "));
+}
+
 /// An L-bracket's rounded inner corner: a new radius alone, a new foot
 /// thickness alone, and both: the foot comes down first, then the fillet grows
 /// (live probes 17 v1-v3; fuzz s835). T1.

@@ -411,7 +411,7 @@ impl Sketch {
 
     /// Places `comp`'s units from what changes outwards (module docs).
     fn place_component(&mut self, comp: &[EntityId], cons: &[(crate::ids::ConstraintId, Vec<EntityId>)], unit_of: &HashMap<EntityId, EntityId>) -> bool {
-        if self.scale_for_chord(comp, cons) {
+        if self.scale_for_chord(comp, cons) || self.scale_for_circle(comp, cons) {
             return true;
         }
         // Lines a point-to-line Distance spans, one resizing: the side the
@@ -1239,6 +1239,60 @@ impl Sketch {
             return false;
         }
         let k = value / now;
+        let mut pts: BTreeSet<EntityId> = BTreeSet::new();
+        for v in comp {
+            let Some(e) = self.entity(*v) else { return false };
+            let refs: Vec<EntityId> = e.point_refs().into_iter().collect();
+            if refs.is_empty() && e.kind() == EntityKind::Point {
+                pts.insert(*v);
+            }
+            pts.extend(refs);
+        }
+        for p in pts {
+            if let Some(x) = self.point(p) {
+                let _ = self.set_point(p, o + (x - o) * k);
+            }
+        }
+        for v in comp {
+            if let Some(e) = self.entity_mut_silent(*v)
+                && let Geometry::Circle { radius, .. } = &mut e.geometry
+            {
+                *radius *= k;
+            }
+        }
+        self.touch();
+        true
+    }
+
+    /// A free component whose one change is a circle's size, with more than
+    /// the circle in it (a polygon on its construction circle): scaled whole
+    /// about the circle's centre (live fuzz s875: the polygon tool's octagon
+    /// keeps its centre and shape). Only when nothing else in it is a
+    /// dimension or fixed.
+    fn scale_for_circle(&mut self, comp: &[EntityId], cons: &[(crate::ids::ConstraintId, Vec<EntityId>)]) -> bool {
+        let unheld = self.unheld_constraints(1e-9);
+        let changes: Vec<&(crate::ids::ConstraintId, Vec<EntityId>)> = cons.iter().filter(|(c, _)| unheld.contains(c)).collect();
+        let [(cid, us)] = changes.as_slice() else { return false };
+        let ([u], Some(c)) = (us.as_slice(), self.constraint(*cid)) else { return false };
+        let target = match c.kind {
+            ConstraintKind::Radius { value, .. } => value,
+            ConstraintKind::Diameter { value, .. } => value / 2.0,
+            _ => return false,
+        };
+        let Some(Geometry::Circle { center, radius }) = self.entity(*u).map(|e| e.geometry.clone()) else { return false };
+        let Some(o) = self.point(center) else { return false };
+        if comp.len() < 2 || radius < 1e-12 || target <= 0.0 {
+            return false;
+        }
+        let set: BTreeSet<EntityId> = comp.iter().copied().collect();
+        let fixed_or_sized = self.constraints().filter(|k| k.driving && k.id != *cid).any(|k| {
+            let touches = cons.iter().any(|(x, us)| *x == k.id && us.iter().any(|v| set.contains(v)));
+            touches && (k.kind.is_dimension() || matches!(k.kind, ConstraintKind::Fix { .. }))
+        });
+        if fixed_or_sized || comp.iter().any(|v| self.entity(*v).is_some_and(|e| e.external)) {
+            return false;
+        }
+        let k = target / radius;
         let mut pts: BTreeSet<EntityId> = BTreeSet::new();
         for v in comp {
             let Some(e) = self.entity(*v) else { return false };
