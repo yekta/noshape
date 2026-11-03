@@ -840,21 +840,23 @@ impl<'a> Translator<'a> {
             Some(([v(lo, 0)?, v(lo, 1)?], [v(hi, 0)?, v(hi, 1)?]))
         };
         let regions: Vec<(&str, Box2)> = g["regions"].as_array()?.iter().filter(|r| r["imprinted"] != true).filter_map(|r| Some((r["id"].as_str()?, bounds(r)?))).collect();
-        let same = |a: f64, b: f64| (a - b).abs() < 1e-6;
         let mut out = Vec::new();
         for [lo, hi] in new {
             // The box's corners in the sketch plane.
             let corners: Vec<[f64; 2]> = (0..8).map(|i| to2([if i & 1 == 0 { lo[0] } else { hi[0] }, if i & 2 == 0 { lo[1] } else { hi[1] }, if i & 4 == 0 { lo[2] } else { hi[2] }])).collect();
             let (min, max) = corners.iter().fold(([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]), |(a, b), p| ([a[0].min(p[0]), a[1].min(p[1])], [b[0].max(p[0]), b[1].max(p[1])]));
+            // Live's box may come from the tessellation (the UI fetch): a
+            // gear's is short of its tips.
+            let tol = 1e-6_f64.max(1e-3 * (max[0] - min[0]).hypot(max[1] - min[1]));
+            let off = |(rl, rh): &Box2| (0..2).map(|i| (rl[i] - min[i]).abs().max((rh[i] - max[i]).abs())).fold(0.0, f64::max);
             // The one with that box (a hole's disc inside the same circle has a smaller one).
-            let exact: Vec<&str> = regions.iter().filter(|(_, (rl, rh))| (0..2).all(|i| same(rl[i], min[i]) && same(rh[i], max[i]))).map(|(id, _)| *id).collect();
-            if let [one] = exact.as_slice() {
-                out.push(one.to_string());
+            if let Some((id, _)) = regions.iter().filter(|(_, b)| off(b) < tol).min_by(|a, b| off(&a.1).total_cmp(&off(&b.1))) {
+                out.push(id.to_string());
                 continue;
             }
-            let inside: Vec<&(&str, Box2)> = regions.iter().filter(|(_, (rl, rh))| (0..2).all(|i| rl[i] > min[i] - 1e-6 && rh[i] < max[i] + 1e-6)).collect();
+            let inside: Vec<&(&str, Box2)> = regions.iter().filter(|(_, (rl, rh))| (0..2).all(|i| rl[i] > min[i] - tol && rh[i] < max[i] + tol)).collect();
             let union = inside.iter().fold(([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]), |(a, b), (_, (rl, rh))| ([a[0].min(rl[0]), a[1].min(rl[1])], [b[0].max(rh[0]), b[1].max(rh[1])]));
-            if inside.len() < 2 || !(0..2).all(|i| same(union.0[i], min[i]) && same(union.1[i], max[i])) {
+            if inside.len() < 2 || off(&union) >= tol {
                 return None;
             }
             out.extend(inside.iter().map(|(id, _)| id.to_string()));

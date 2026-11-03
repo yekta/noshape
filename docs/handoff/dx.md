@@ -94,6 +94,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
   kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
+- 11-03 16:55 translator (runs 35–36, live's 16:04–16:29 refetches synced): a region placed by a part's box takes
+  the closest within 0.1 % of the box (the UI fetch's boxes come from the tessellation: a gear's falls 0.02 mm short
+  of its tips). cf-syncro-rotator 3/3, cf-transform-pattern 12/21, cf-wiring 2/2. Score **24/53, 285/461 (custom
+  6/83)**. The screw / thread / washer creators import studios live can't fetch (403, REQUESTS 1885): they stay
+  custom-compile failures.
 - 11-03 16:45 translator (runs 32–34): regions named by id that make one part (a board split by a line) are the
   regions inside the part's box that fill it; an id-only region query whose sketch has more regions than ids is
   placed by the bodies, not given every region; a sketch's unique vertices are its curves' ends (construction too)
