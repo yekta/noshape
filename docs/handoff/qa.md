@@ -22,6 +22,14 @@ Restart → `noshape --version` 0.4.23 and g34 reopened (qa-scratch/upd423-0c.pn
 VAR-AUTOCOMPLETE-ENTER's psui fixes, CRASH-2045's saved-document fix; not in it: the later sketch undo, feature-row,
 variable-focus fixes (after bdbba238). Release fuzz on v0.4.23 running (/tmp/qa-cfloop69.sh, seeds 2481–2540).
 
+**11-03 17:06: waiting for the 17:00 cut (no Release run yet).** 16:30 list: no blocker (checked 19c09884, then
+51469a47: volume sweep = v0.4.23, 44 ticket documents = 19c09884; a6c9ad94's std-text batch 3 flips no status on the four
+status documents; d55587a0's knurl change: CP12 / CP20 results unchanged, times are machine load (load ≈ 50), not the build).
+SKETCH-TOOL-PICK-SELECTION verified d0526d18 (Extend's recording stale; skasm asked live to re-record). At publish:
+`bash /tmp/qa-relsmoke.sh 0.4.24 v0423`, /tmp/qa-relgui424.sh, /tmp/qa-mem424.sh (both made), the updater app on :149
+(running v0.4.23, PID 2908495). Loops on 19c09884: /tmp/qa-nfloop29.sh (2541–2600), /tmp/qa-gfloop13.sh (2601–2640);
+v0.4.23 /tmp/qa-cfloop70.sh (2641–2700); keep noshape-19c09884 and -0531f66e (CRASH-2045) in keep/x/y.
+
 ## Session 7 (qa, pinned account, from 11-02 22:40; greens bc7d7e9f → 6b4704f2)
 
 - **11-03 08:14:** no release yet. Verified since 07:40: SKETCH-UNDO-REDO-STATE (aeef5eab, = live's recording;
