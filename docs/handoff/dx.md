@@ -73,12 +73,17 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   unpacker change; parity_models prints a "SCORE.md row: | … |" line to paste. drawing.md TB25 verified by tests;
   Insert view shows "Show annotations from model" only for a part (live captures; request withdrawn). Assembly
   layout proposed to live (REQUESTS 11-03 02:15), to build the assembly translator once confirmed.
+- 11-03 06:55: Parasolid export: whole circles / ellipses are ring edges without a vertex (Parasolid's and Onshape's
+  own encoding; a cylinder 3 / 2 / 0 in the file, read back the same; kernel export T1 + T2 parasolid tests pass).
+  Live request filed (dx-xt-ring samples: the old file with vertices, the new one, a cross-hole tube) to confirm
+  Onshape's counts on import. Closed B-spline edges are still split in two (needs periodic curves first: core's
+  LOFT-COAXIAL-CIRCLES-SURFACE, skasm's SKETCH-SPLINE-CENTRIPETAL).
 - 11-03 06:40: live mode now reads the window: before each agent call the app hands the call its tab shown, 3D
   cameras and selections (Part Studio entities, Assembly `inst:` ids; WindowSnapshot in ops/window.rs, provided by
   the workspace through DocModel::window_snapshot), so ui_state reports what the user picked and render_image
   view "window" renders what the window shows (checked in the app: orbit, click the circle → ui_state lists it).
   Drawings' selections too (`view:` / `annotation:` / `table:` / `break:` / `sketch:` / `hatch:` / `image:`; a click on
-  a view → ui_state lists "view:2"). Not yet: drawings' sheet zoom.
+  a view → ui_state lists "view:2") and zoom.
 - 11-03 06:20: live mode checked on green 19f17a18: the app open on a document, `noshape mcp` calls on the same
   path (document_open, sketch, extrude) show in the window at once (3–13 ms per edit), Ctrl+Z in the window undoes
   the extrude and the CLI then lists only Sketch 1. Live requests filed: 1844+ IN-FEATURE-MATE-CONNECTOR UI, one
