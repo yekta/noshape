@@ -179,8 +179,19 @@ pub fn suggest(name: &str) -> Vec<String> {
     if !same_group.is_empty() {
         return same_group;
     }
+    // Ranked by the name's words among the tool's own words, a rare word
+    // weighing more ("mate_add": assembly_mate before feature_add).
     let words: Vec<&str> = name.split('_').filter(|w| w.len() > 2).collect();
-    all.iter().filter(|o| (!verb.is_empty() && o.verb == verb) || words.iter().any(|w| o.tool_name().contains(w))).map(|o| o.tool_name()).take(12).collect()
+    let tokens = |o: &Op| o.tool_name().split('_').map(str::to_string).collect::<Vec<_>>();
+    let has = |o: &Op, w: &str| tokens(o).iter().any(|t| t == w || t.strip_suffix('s') == Some(w) || w.strip_suffix('s') == Some(t.as_str()));
+    let weight = |w: &str| 1.0 / all.iter().filter(|o| has(o, w)).count().max(1) as f64;
+    let mut scored: Vec<(f64, String)> = all
+        .iter()
+        .map(|o| (words.iter().filter(|w| has(o, w)).map(|w| weight(w)).sum::<f64>() + if !verb.is_empty() && o.verb == verb { 0.01 } else { 0.0 }, o.tool_name()))
+        .filter(|(s, _)| *s > 0.0)
+        .collect();
+    scored.sort_by(|a, b| b.0.total_cmp(&a.0));
+    scored.into_iter().map(|(_, n)| n).take(8).collect()
 }
 
 /// "unknown tool `x`" with what is close to it.

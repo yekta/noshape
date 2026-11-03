@@ -5154,6 +5154,11 @@ fn agent_benchmark_p1_fixes() {
     // An unknown tool's error names the close ones; one `part` for set_material.
     let e = try_call(&mut ctx, "ops_describe", json!({ "tools": ["variable_edit"] })).unwrap_err();
     assert!(e.message.contains("variable_set"), "{e:?}");
+    // Ranked by the name's words, the rarer first.
+    for (wrong, first) in [("mate_add", "assembly_mate"), ("version_create", "history_create_version")] {
+        let e = try_call(&mut ctx, "ops_describe", json!({ "tools": [wrong] })).unwrap_err();
+        assert!(e.message.contains(&format!("did you mean: {first},")), "{wrong}: {}", e.message);
+    }
     let m = call(&mut ctx, "part_set_material", json!({ "part": "Part 1", "material": "Aluminum - 6061" }));
     assert!(!m.to_string().contains("error"), "{m}");
     // feature_schema: what the dialog shows; the rest by id.
