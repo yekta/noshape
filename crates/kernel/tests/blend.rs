@@ -1038,8 +1038,17 @@ fn dumped_fillet_faces_probe() {
     }
     // (noshape's own blend as the app has it: on.)
     set_rust_blend(Some(true));
-    let out = fillet_checked(&s, &es, &vec![r; es.len()]).unwrap().shape;
+    let res = fillet_checked(&s, &es, &vec![r; es.len()]).unwrap();
     set_rust_blend(None);
+    let generated = res.history.records.iter().filter(|x| x.relation == Relation::Generated && x.output_kind == ShapeType::Face).count();
+    let un = unify_same_domain(&res.shape).unwrap();
+    println!("generated faces {generated}; unified: {} faces ({})", un.shape.faces().len(), last_unify_path());
+    for f in res.shape.faces() {
+        if let Ok(Surface::Torus { center, axis, major_radius, minor_radius }) = f.face_surface() {
+            println!("torus {:.9?} {:.9?} R {:.9} r {:.9}", center / MM, axis, major_radius / MM, minor_radius / MM);
+        }
+    }
+    let out = res.shape;
     println!("faces {}, volume {:.6}, area {:.6}", out.faces().len(), vol_mm3(&out), out.area().unwrap() / (MM * MM));
     println!("noshape's blend: {:?}, then {:?}", last_blend_decline(), last_rust_decline());
     for (i, f) in out.faces().iter().enumerate() {
@@ -1164,4 +1173,22 @@ fn overlapping_rounds_of_a_narrow_rib_are_their_common() {
     let want = boolean(BooleanOp::Common, &[one(&es[0])], &[one(&es[1])], &BooleanOptions::default()).unwrap().shape;
     assert!((vol_mm3(&r) - vol_mm3(&want)).abs() < 1e-6, "{} {}", vol_mm3(&r), vol_mm3(&want));
     assert!(vol_mm3(&r) < vol_mm3(&one(&es[0])));
+}
+
+/// FILLET-MEETING-FILLETS-ONE-FACE (pulley02-maxwell): a revolved groove 6.35 mm high, both bottom corners R3.175: the
+/// two rounds meet on one torus (the floor goes). OCCT's unify can't tell two tori are one (it intersects them): the
+/// unify gives them one surface first, then merges them: one face, as live's (5 faces).
+#[test]
+fn a_grooves_two_rounds_on_one_torus_unify_to_one_face() {
+    setup();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/blend");
+    let s = read_brep(&dir.join("pulley-groove.brep")).unwrap();
+    let all = s.edges();
+    let r = fillet_checked(&s, &[all[4].clone(), all[7].clone()], &[3.175 * MM; 2]).unwrap().shape;
+    assert_eq!(r.faces().len(), 6);
+    let u = unify_same_domain(&r).unwrap().shape;
+    assert!(u.is_valid());
+    assert_eq!(u.count(ShapeType::Face), 5);
+    assert_eq!(u.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Torus { .. }))).count(), 1);
+    assert!((vol_mm3(&u) - vol_mm3(&r)).abs() < 1e-9 * vol_mm3(&r), "{} {}", vol_mm3(&u), vol_mm3(&r));
 }

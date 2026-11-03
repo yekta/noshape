@@ -414,11 +414,43 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         let t1 = std::time::Instant::now();
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));
+        let (shape, face_names) = match merged_blends(&res) {
+            Some(un) => {
+                let merged = ev.name_result(&[&crate::regen::eval::names_for(&res.shape, face_names)], &un.history, &un.shape, &BTreeMap::new(), None);
+                (un.shape, merged)
+            }
+            None => (res.shape, face_names),
+        };
         let t2 = std::time::Instant::now();
-        ev.replace_body(bi, res.shape, face_names);
+        ev.replace_body(bi, shape, face_names);
         log::debug!("fillet: kernel {:?}, naming {:?}, body {:?} (history records {})", t1 - t0, t2 - t1, t2.elapsed(), res.history.records.len());
     }
     Ok(())
+}
+
+/// Blends that meet on one surface are one face, as Parasolid's (pulley02: a groove's two rounds, each half its
+/// height, meet on one torus): the result unified when only blend faces merge, every other face as it was.
+fn merged_blends(res: &k::OpResult) -> Option<k::OpResult> {
+    let faces = res.shape.faces();
+    let blend: Vec<bool> = (0..faces.len())
+        .map(|i| res.history.records.iter().any(|r| r.relation == k::Relation::Generated && r.output_kind == k::ShapeType::Face && r.output_index as usize == i))
+        .collect();
+    if blend.iter().filter(|b| **b).count() < 2 {
+        return None;
+    }
+    let un = k::unify_same_domain(&res.shape).ok()?;
+    if un.shape.faces().len() >= faces.len() {
+        return None;
+    }
+    // Each result face's faces before (through the unify's history): only blends may share one.
+    let mut from: BTreeMap<u32, Vec<usize>> = BTreeMap::new();
+    for r in &un.history.records {
+        if r.input_kind == k::ShapeType::Face && r.output_kind == k::ShapeType::Face && matches!(r.relation, k::Relation::Modified | k::Relation::Kept) {
+            from.entry(r.output_index).or_default().push(r.input_index as usize);
+        }
+    }
+    let merged_only_blends = from.values().filter(|ins| ins.len() > 1).all(|ins| ins.iter().all(|&i| blend.get(i).copied().unwrap_or(false)));
+    merged_only_blends.then_some(un)
 }
 
 /// Radius law of a variable fillet along one edge: (relative parameter, radius)

@@ -108,6 +108,8 @@
 #include <TopoDS_Compound.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
+#include <Geom_SphericalSurface.hxx>
+#include <Geom_ToroidalSurface.hxx>
 #include <BRepTools_WireExplorer.hxx>
 #include <Geom_ConicalSurface.hxx>
 #include <BRepExtrema_SelfIntersection.hxx>
@@ -2405,6 +2407,117 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any
   return s;
 }
 
+// Adjacent faces on equal tori or spheres (one frame, the same radii) given one surface, on a copy: OCCT's unify
+// tells two tori are one only by intersecting them, which it can't (pulley02's groove: two rounds, each half its
+// height, on one torus, live one face); with one surface it merges them. The shape unchanged when there's no such
+// pair.
+TopoDS_Shape share_equal_surfaces(const TopoDS_Shape& s, HHist& hist)
+{
+  ShapeAncMap ef;
+  unique_ancestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+  auto frame_of = [](const TopoDS_Face& f, gp_Ax3& ax, double& r1, double& r2) {
+    TopLoc_Location                 loc;
+    const occ::handle<Geom_Surface> g = BRep_Tool::Surface(f, loc);
+    if (const occ::handle<Geom_ToroidalSurface> t = occ::down_cast<Geom_ToroidalSurface>(g); !t.IsNull())
+    {
+      const gp_Torus x = t->Torus().Transformed(loc.Transformation());
+      ax = x.Position(), r1 = x.MajorRadius(), r2 = x.MinorRadius();
+      return 1;
+    }
+    if (const occ::handle<Geom_SphericalSurface> p = occ::down_cast<Geom_SphericalSurface>(g); !p.IsNull())
+    {
+      const gp_Sphere x = p->Sphere().Transformed(loc.Transformation());
+      ax = x.Position(), r1 = x.Radius(), r2 = 0;
+      return 2;
+    }
+    return 0;
+  };
+  const double tol = Precision::Confusion();
+  std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>> pairs;
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const ShapeList& fs = ef(i);
+    if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()))
+      continue;
+    const TopoDS_Face a = TopoDS::Face(fs.First()), b = TopoDS::Face(fs.Last());
+    TopLoc_Location   la, lb;
+    if (BRep_Tool::Surface(a, la) == BRep_Tool::Surface(b, lb) && la.IsEqual(lb))
+      continue;
+    gp_Ax3 xa, xb;
+    double a1, a2, b1, b2;
+    const int ka = frame_of(a, xa, a1, a2), kb = frame_of(b, xb, b1, b2);
+    if (ka == 0 || ka != kb || std::abs(a1 - b1) > tol || std::abs(a2 - b2) > tol || xa.Location().Distance(xb.Location()) > tol ||
+        !xa.Direction().IsEqual(xb.Direction(), 1e-9) || !xa.XDirection().IsEqual(xb.XDirection(), 1e-9) || xa.Direct() != xb.Direct())
+      continue;
+    pairs.emplace_back(a, b);
+  }
+  if (pairs.empty())
+    return s;
+  BRepBuilderAPI_Copy cp(s, true, false);
+  const TopoDS_Shape  out = cp.Shape();
+  // Each face's surface: its first partner's, followed through chains of them.
+  NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher> to;
+  auto root = [&](TopoDS_Shape f) {
+    while (const TopoDS_Shape* n = to.Seek(f))
+      f = *n;
+    return f;
+  };
+  for (const auto& [a, b] : pairs)
+  {
+    const TopoDS_Shape ra = root(cp.ModifiedShape(a)), rb = root(cp.ModifiedShape(b));
+    if (!ra.IsSame(rb))
+      to.Bind(rb, ra);
+  }
+  BRep_Builder bld;
+  for (NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher>::Iterator it(to); it.More(); it.Next())
+  {
+    const TopoDS_Face f = TopoDS::Face(it.Key()), g = TopoDS::Face(root(it.Key()));
+    if (!f.Location().IsIdentity() || !g.Location().IsIdentity())
+      continue;
+    TopLoc_Location   lg;
+    const occ::handle<Geom_Surface> sg = BRep_Tool::Surface(g, lg);
+    // Its edges' curves on it, kept by surface: read off the old one, put on the new one (the same parameters).
+    struct OnFace
+    {
+      TopoDS_Edge                e;
+      occ::handle<Geom2d_Curve> c1, c2;
+      double                     a, b;
+    };
+    std::vector<OnFace> curves;
+    ShapeIMap           seen;
+    for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+    {
+      if (seen.Contains(x.Current()))
+        continue;
+      seen.Add(x.Current());
+      OnFace o;
+      o.e  = TopoDS::Edge(x.Current().Oriented(TopAbs_FORWARD));
+      o.c1 = BRep_Tool::CurveOnSurface(o.e, f, o.a, o.b);
+      if (o.c1.IsNull())
+        return s;
+      if (BRep_Tool::IsClosed(o.e, f))
+      {
+        double a2, b2;
+        o.c2 = BRep_Tool::CurveOnSurface(TopoDS::Edge(o.e.Reversed()), f, a2, b2);
+      }
+      curves.push_back(o);
+    }
+    bld.UpdateFace(f, sg, lg, BRep_Tool::Tolerance(f));
+    for (const OnFace& o : curves)
+    {
+      if (o.c2.IsNull())
+        bld.UpdateEdge(o.e, o.c1, sg, lg, BRep_Tool::Tolerance(o.e));
+      else
+        bld.UpdateEdge(o.e, o.c1, o.c2, sg, lg, BRep_Tool::Tolerance(o.e));
+      bld.Range(o.e, sg, lg, o.a, o.b);
+    }
+  }
+  if (hist.IsNull())
+    hist = new BRepTools_History();
+  hist->Merge(new BRepTools_History(to_list({s}), cp));
+  return out;
+}
+
 // Two faces on one cone meeting along two of its lines, each running from
 // the apex (a degenerate edge) to arcs of one circle: a drill tip cut in half
 // and mirrored (or patterned) back onto itself. OCCT's unify gives an invalid
@@ -3206,57 +3319,79 @@ TopoDS_Shape unify_faces_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScop
   {
     groups = s;
   }
-  const TopoDS_Shape s1 = merge_apex_cones(merge_cylinder_bands(groups, hist), hist);
-  fail_if_cancelled();
-  lap                   = std::make_unique<KernelTimer>("unify.usd");
-  if (TopExp_Explorer(s1, TopAbs_SOLID).More() && round_candidates(s1, sc != nullptr ? &next : nullptr))
-  {
-    const TopoDS_Shape s2 = usd_kept_volume(s1, hist);
+  const TopoDS_Shape s0b = merge_apex_cones(merge_cylinder_bands(groups, hist), hist);
+  // The rest, on `s1` with its own history `hist`.
+  auto rest = [&](const TopoDS_Shape& s1, HHist& hist) -> TopoDS_Shape {
     fail_if_cancelled();
-    lap                   = std::make_unique<KernelTimer>("unify.patches");
-    const TopoDS_Shape s3 = merge_cylinder_patches(s2, hist);
-    // Faces on one cylinder USD left apart (one frame, its result depending on the faces' order and wires' starts:
-    // a Shell fuse's walls, 1b121fc3, a face more on ours than on OCCT's), merged as those whose frames differ.
+    lap                   = std::make_unique<KernelTimer>("unify.usd");
+    if (TopExp_Explorer(s1, TopAbs_SOLID).More() && round_candidates(s1, sc != nullptr ? &next : nullptr))
+    {
+      const TopoDS_Shape s2 = usd_kept_volume(s1, hist);
+      fail_if_cancelled();
+      lap                   = std::make_unique<KernelTimer>("unify.patches");
+      const TopoDS_Shape s3 = merge_cylinder_patches(s2, hist);
+      // Faces on one cylinder USD left apart (one frame, its result depending on the faces' order and wires' starts:
+      // a Shell fuse's walls, 1b121fc3, a face more on ours than on OCCT's), merged as those whose frames differ.
+      fail_if_cancelled();
+      // (Its own history, merged only where its result is kept: valid, as USD's edges after it can leave it invalid
+      // (a Shell's common with hyperbola edges, 14218a58: OCCT's result 42 faces valid, ours then 41 invalid).)
+      TopoDS_Shape s4 = s3;
+      HHist        h4;
+      try
+      {
+        s4 = merge_cylinder_groups(s3, h4, true);
+      }
+      catch (const Standard_Failure&)
+      {
+        return s3;
+      }
+      if (s4.IsSame(s3))
+        return s3;
+      // (Their boundaries' pieces now between one face on each side: joined as USD joins edges.)
+      ShapeUpgrade_UnifySameDomain u(s4, true, false, false);
+      u.Build();
+      fail_if_cancelled();
+      if (!BRepCheck_Analyzer(u.Shape()).IsValid())
+        return s3;
+      if (hist.IsNull())
+        hist = new BRepTools_History();
+      if (!h4.IsNull())
+        hist->Merge(h4);
+      if (!u.History().IsNull())
+        hist->Merge(u.History());
+      return u.Shape();
+    }
     fail_if_cancelled();
-    // (Its own history, merged only where its result is kept: valid, as USD's edges after it can leave it invalid
-    // (a Shell's common with hyperbola edges, 14218a58: OCCT's result 42 faces valid, ours then 41 invalid).)
-    TopoDS_Shape s4 = s3;
-    HHist        h4;
-    try
-    {
-      s4 = merge_cylinder_groups(s3, h4, true);
-    }
-    catch (const Standard_Failure&)
-    {
-      return s3;
-    }
-    if (s4.IsSame(s3))
-      return s3;
-    // (Their boundaries' pieces now between one face on each side: joined as USD joins edges.)
-    ShapeUpgrade_UnifySameDomain u(s4, true, false, false);
+    ShapeUpgrade_UnifySameDomain u(s1, true, true, false);
     u.Build();
     fail_if_cancelled();
-    if (!BRepCheck_Analyzer(u.Shape()).IsValid())
-      return s3;
-    if (hist.IsNull())
-      hist = new BRepTools_History();
-    if (!h4.IsNull())
-      hist->Merge(h4);
     if (!u.History().IsNull())
+    {
+      if (hist.IsNull())
+        hist = new BRepTools_History();
       hist->Merge(u.History());
+    }
     return u.Shape();
-  }
-  fail_if_cancelled();
-  ShapeUpgrade_UnifySameDomain u(s1, true, true, false);
-  u.Build();
-  fail_if_cancelled();
-  if (!u.History().IsNull())
+  };
+  // Equal tori and spheres on one surface first, kept where the result is valid (a Shell's common, 14218a58: USD's
+  // merge then left it invalid).
+  HHist              hs;
+  const TopoDS_Shape shared = share_equal_surfaces(s0b, hs);
+  if (!shared.IsSame(s0b))
   {
-    if (hist.IsNull())
-      hist = new BRepTools_History();
-    hist->Merge(u.History());
+    HHist              ht;
+    const TopoDS_Shape r = rest(shared, ht);
+    if (BRepCheck_Analyzer(r).IsValid())
+    {
+      if (hist.IsNull())
+        hist = new BRepTools_History();
+      hist->Merge(hs);
+      if (!ht.IsNull())
+        hist->Merge(ht);
+      return r;
+    }
   }
-  return u.Shape();
+  return rest(s0b, hist);
 }
 
 } // namespace
