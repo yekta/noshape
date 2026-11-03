@@ -1,0 +1,13 @@
+{
+ "name": "view-key-zoom-fit",
+ "about": "f fits the part",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "key",
+   "key": "f"
+  }
+ ]
+}

@@ -1,0 +1,29 @@
+{
+ "name": "measure-two-faces",
+ "about": "click the top face, then the bottom face: the distance",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     0
+    ]
+   }
+  }
+ ]
+}

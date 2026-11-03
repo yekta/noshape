@@ -1,0 +1,19 @@
+{
+ "name": "shortcut-shift-n-rename-part",
+ "about": "click the Part 1 row, Shift+N: inline rename with the name selected",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+n"
+  }
+ ]
+}

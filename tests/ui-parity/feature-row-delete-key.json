@@ -1,0 +1,36 @@
+{
+ "name": "feature-row-delete-key",
+ "about": "click the Extrude 1 row, Delete: deleted at once (no confirmation); mod+z brings it back",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Delete"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ],
+ "expect": [
+  {
+   "live": "behaviours 1199: Delete on a selected feature row deletes it immediately, Ctrl+Z restores it"
+  }
+ ]
+}

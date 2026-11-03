@@ -1,0 +1,19 @@
+{
+ "name": "view-key-iso",
+ "about": "Shift+7 (isometric) after the Top view",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "view_cube": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+7"
+  }
+ ]
+}

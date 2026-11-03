@@ -1,0 +1,27 @@
+{
+ "name": "extrude-end-type-up-to-face",
+ "about": "edit Extrude 1, end type dropdown → Up to face: the dialog's fields change",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Blind"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "Up to face"
+   }
+  }
+ ]
+}

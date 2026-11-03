@@ -1,0 +1,23 @@
+{
+ "name": "shortcut-shift-h-sketches",
+ "about": "Shift+H toggles every sketch's visibility (Sketch 1 consumed, hidden): twice",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+h"
+  },
+  {
+   "do": "key",
+   "key": "shift+h"
+  }
+ ]
+}

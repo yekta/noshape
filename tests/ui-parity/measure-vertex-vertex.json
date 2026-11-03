@@ -1,0 +1,29 @@
+{
+ "name": "measure-vertex-vertex",
+ "about": "two corner vertices: the distance and its X / Y / Z",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "vertex": [
+     0,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "vertex": [
+     40,
+     30,
+     10
+    ]
+   }
+  }
+ ]
+}

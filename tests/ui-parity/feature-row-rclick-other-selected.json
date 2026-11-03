@@ -1,0 +1,21 @@
+{
+ "name": "feature-row-rclick-other-selected",
+ "about": "click the Extrude 1 row, then right-click the Sketch 1 row: which menu, what is selected",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  }
+ ]
+}

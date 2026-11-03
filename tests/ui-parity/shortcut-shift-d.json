@@ -1,0 +1,19 @@
+{
+ "name": "shortcut-shift-d",
+ "about": "shift+d in the Part Studio with nothing selected: Dihedral analysis",
+ "area": "psui",
+ "source": "keyboard-mouse checklist",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+d"
+  }
+ ]
+}

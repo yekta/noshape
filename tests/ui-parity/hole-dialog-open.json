@@ -1,0 +1,15 @@
+{
+ "name": "hole-dialog-open",
+ "about": "Hole tool with nothing selected: the dialog's defaults",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole"
+   }
+  }
+ ]
+}

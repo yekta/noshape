@@ -1,0 +1,15 @@
+{
+ "name": "parts-row-rclick",
+ "about": "right-click Part 1 in the parts list: the part menu",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  }
+ ]
+}

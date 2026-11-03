@@ -1,0 +1,26 @@
+{
+ "name": "feature-row-click-additive",
+ "about": "click Sketch 1, then click Extrude 1 (no modifier): live adds to the selection",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  }
+ ],
+ "expect": [
+  {
+   "live": "HANDOFF-live UI gotchas: tree click is additive selection"
+  }
+ ]
+}

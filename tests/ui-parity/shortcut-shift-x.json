@@ -1,0 +1,19 @@
+{
+ "name": "shortcut-shift-x",
+ "about": "shift+x in the Part Studio with nothing selected: Section view",
+ "area": "psui",
+ "source": "keyboard-mouse checklist",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+x"
+  }
+ ]
+}

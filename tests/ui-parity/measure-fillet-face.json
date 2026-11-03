@@ -1,0 +1,20 @@
+{
+ "name": "measure-fillet-face",
+ "about": "click the R2 fillet face (a quarter cylinder): live reads \"Radius: 2.000 mm\"",
+ "area": "psui",
+ "source": "qa finding 10-30",
+ "start": "block-fillet",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     0.586,
+     9.414
+    ]
+   }
+  }
+ ],
+ "ticket": "MEASURE-PARTIAL-CYL-RADIUS"
+}

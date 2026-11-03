@@ -1,0 +1,29 @@
+{
+ "name": "measure-face-edge",
+ "about": "the top face and the bottom front edge: their distance",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     0,
+     0
+    ]
+   }
+  }
+ ]
+}

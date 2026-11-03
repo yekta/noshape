@@ -1,0 +1,197 @@
+{
+ "empty": {
+  "units": "mm",
+  "features": []
+ },
+ "block": {
+  "units": "mm",
+  "features": [
+   {
+    "type": "newSketch",
+    "name": "Sketch 1",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        0,
+        0
+       ],
+       [
+        40,
+        30
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 1",
+    "params": {
+     "entities": [
+      "Sketch 1 region 0"
+     ],
+     "endBound": "BLIND",
+     "depth": "10 mm",
+     "operationType": "NEW"
+    }
+   }
+  ],
+  "about": "40 x 30 x 10 box on Top at the origin"
+ },
+ "vars": {
+  "units": "mm",
+  "features": [
+   {
+    "type": "assignVariable",
+    "params": {
+     "mode": "ASSIGNED",
+     "variableType": "LENGTH",
+     "name": "wall_thickness",
+     "lengthValue": "2 mm"
+    }
+   },
+   {
+    "type": "assignVariable",
+    "params": {
+     "mode": "ASSIGNED",
+     "variableType": "LENGTH",
+     "name": "width",
+     "lengthValue": "30 mm"
+    }
+   },
+   {
+    "type": "newSketch",
+    "name": "Sketch 1",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        0,
+        0
+       ],
+       [
+        40,
+        30
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 1",
+    "params": {
+     "entities": [
+      "Sketch 1 region 0"
+     ],
+     "endBound": "BLIND",
+     "depth": "10 mm",
+     "operationType": "NEW"
+    }
+   }
+  ],
+  "about": "#wall_thickness = 2 mm, #width = 30 mm, then the box (qa-scratch/tickets/varac/vardoc.py)"
+ },
+ "block-fillet": {
+  "units": "mm",
+  "features": [
+   {
+    "type": "newSketch",
+    "name": "Sketch 1",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        0,
+        0
+       ],
+       [
+        40,
+        30
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 1",
+    "params": {
+     "entities": [
+      "Sketch 1 region 0"
+     ],
+     "endBound": "BLIND",
+     "depth": "10 mm",
+     "operationType": "NEW"
+    }
+   },
+   {
+    "type": "fillet",
+    "name": "Fillet 1",
+    "params": {
+     "entities": [
+      "edge through [20, 0, 10]"
+     ],
+     "radius": "2 mm"
+    }
+   }
+  ],
+  "about": "the box with its front top edge (y = 0, z = 10) filleted R2"
+ },
+ "block-broken": {
+  "units": "mm",
+  "features": [
+   {
+    "type": "newSketch",
+    "name": "Sketch 1",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        0,
+        0
+       ],
+       [
+        40,
+        30
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 1",
+    "params": {
+     "entities": [
+      "Sketch 1 region 0"
+     ],
+     "endBound": "BLIND",
+     "depth": "10 mm",
+     "operationType": "NEW"
+    }
+   },
+   {
+    "type": "fillet",
+    "name": "Fillet 1",
+    "params": {
+     "entities": [
+      "edge through [20, 0, 10]"
+     ],
+     "radius": "2 mm"
+    }
+   },
+   {
+    "op": "reorder",
+    "feature": "Fillet 1",
+    "before": "Extrude 1"
+   }
+  ],
+  "about": "filmiss: Fillet 1 above Extrude 1, so it has a missing selection (red, ⚠)"
+ }
+}

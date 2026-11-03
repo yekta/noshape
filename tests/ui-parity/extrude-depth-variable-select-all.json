@@ -1,0 +1,38 @@
+{
+ "name": "extrude-depth-variable-select-all",
+ "about": "the same with the value selected first (mod+a): #wall + Enter takes the highlighted first match",
+ "area": "psui",
+ "source": "everyday",
+ "start": "vars",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "#wall"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ],
+ "ticket": "VAR-AUTOCOMPLETE-ENTER"
+}

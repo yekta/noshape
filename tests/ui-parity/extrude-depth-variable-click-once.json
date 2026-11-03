@@ -1,0 +1,55 @@
+{
+ "name": "extrude-depth-variable-click-once",
+ "about": "edit Extrude 1, click Depth once, type #wall, Enter: live selects the whole value on the first click, so #wall replaces it and Enter takes #wall_thickness",
+ "area": "psui",
+ "source": "user 11-02 (macOS)",
+ "start": "vars",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "type",
+   "text": "#wall"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ],
+ "ticket": "VAR-AUTOCOMPLETE-ENTER",
+ "expect": [
+  {
+   "after": 2,
+   "field": "Depth",
+   "selection": "all",
+   "live": "behaviours 'Focus, click and selection' (dialog numeric A/B/C): 1st click selects all"
+  },
+  {
+   "after": 3,
+   "list": [
+    "#wall_thickness",
+    "New variable…"
+   ],
+   "highlighted": 0
+  },
+  {
+   "after": 4,
+   "field": "Depth",
+   "text": "#wall_thickness"
+  }
+ ]
+}

@@ -1,0 +1,34 @@
+{
+ "name": "fillet-click-chip-x",
+ "about": "Fillet with one edge, click the chip's ×: the field empties",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+f"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "x",
+    "field": "Entities to fillet"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

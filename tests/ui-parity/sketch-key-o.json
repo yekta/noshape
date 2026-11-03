@@ -1,0 +1,25 @@
+{
+ "name": "sketch-key-o",
+ "about": "in a sketch on Top, o: Offset becomes the active tool",
+ "area": "psui",
+ "source": "keyboard-mouse checklist",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "o"
+  }
+ ]
+}

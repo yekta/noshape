@@ -1,0 +1,27 @@
+{
+ "name": "feature-row-show-dependencies-click-away",
+ "about": "Show dependencies…, then click the empty graphics",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Show dependencies…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  }
+ ]
+}

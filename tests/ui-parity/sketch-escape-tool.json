@@ -1,0 +1,29 @@
+{
+ "name": "sketch-escape-tool",
+ "about": "in a sketch, Line tool, Escape: the tool ends, the sketch stays open",
+ "area": "psui",
+ "source": "everyday",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "name": "shortcut-shift-i-isolate",
+ "about": "click Part 1 in the parts list, Shift+I: the Isolate dialog",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+i"
+  }
+ ]
+}

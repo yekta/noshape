@@ -1,0 +1,21 @@
+{
+ "name": "mass-properties-part",
+ "about": "click Part 1 in the parts list, open Mass properties",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mass properties"
+   }
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "name": "parts-row-hide",
+ "about": "right-click Part 1 › Hide; then the parts list row and the graphics",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Hide"
+   }
+  }
+ ]
+}

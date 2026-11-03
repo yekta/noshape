@@ -1,0 +1,38 @@
+{
+ "name": "shortcut-y-hide-part",
+ "about": "click the top face, y: Part 1 hidden; then Shift+Y with the pointer over where it was",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "y"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   },
+   "ms": 500
+  },
+  {
+   "do": "key",
+   "key": "shift+y"
+  }
+ ]
+}

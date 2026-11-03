@@ -1,0 +1,23 @@
+{
+ "name": "shortcut-p-planes",
+ "about": "p shows / hides every plane",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "key",
+   "key": "p"
+  },
+  {
+   "do": "key",
+   "key": "p"
+  }
+ ]
+}

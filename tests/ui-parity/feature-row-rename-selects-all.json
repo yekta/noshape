@@ -1,0 +1,25 @@
+{
+ "name": "feature-row-rename-selects-all",
+ "about": "right-click Extrude 1 › Rename: the inline name is all selected; Escape keeps the old name",
+ "area": "psui",
+ "source": "qa live check 11-02",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Rename"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

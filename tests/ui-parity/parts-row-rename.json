@@ -1,0 +1,33 @@
+{
+ "name": "parts-row-rename",
+ "about": "right-click Part 1 › Rename, type Base plate, Enter",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Rename"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "Base plate"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

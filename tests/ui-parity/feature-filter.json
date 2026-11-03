@@ -1,0 +1,19 @@
+{
+ "name": "feature-filter",
+ "about": "type Ext in the feature list filter: only matching rows",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Filter by name or type"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Ext"
+  }
+ ]
+}

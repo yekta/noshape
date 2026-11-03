@@ -1,0 +1,38 @@
+{
+ "name": "feature-row-multi-delete-undo",
+ "about": "click Sketch 1, Shift+click Extrude 1, Delete: both go (Parts (0)); one mod+z brings both back",
+ "area": "psui",
+ "source": "qa live check 11-03",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "key",
+   "key": "Delete"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

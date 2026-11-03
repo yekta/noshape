@@ -1,0 +1,24 @@
+{
+ "name": "mod-a-in-part-studio",
+ "about": "mod+a in the Part Studio graphics selects nothing",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  }
+ ],
+ "expect": [
+  {
+   "live": "behaviours 1199: Ctrl+A does nothing in the Part Studio"
+  }
+ ]
+}

@@ -1,0 +1,82 @@
+{
+ "name": "sketch-dimension-variable",
+ "about": "Sketch on Top, rectangle, dimension its bottom edge with #width + Enter: the label shows 30 with the ƒx icon",
+ "area": "psui",
+ "source": "everyday",
+ "start": "vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "g"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     60,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     90,
+     20
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     75,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     75,
+     -8
+    ]
+   }
+  },
+  {
+   "do": "type",
+   "text": "#width"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ],
+ "expect": [
+  {
+   "live": "behaviours 4777: '#var' gives the label 10 with a grey ƒx icon"
+  }
+ ]
+}

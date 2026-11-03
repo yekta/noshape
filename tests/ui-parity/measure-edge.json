@@ -1,0 +1,19 @@
+{
+ "name": "measure-edge",
+ "about": "click the front top edge: its length",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     0,
+     10
+    ]
+   }
+  }
+ ]
+}

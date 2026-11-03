@@ -1,0 +1,26 @@
+{
+ "name": "chamfer-preselected-edge",
+ "about": "click the front top edge, Chamfer tool: the dialog with the edge and Distance",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fillet",
+    "menu": "Chamfer"
+   }
+  }
+ ]
+}

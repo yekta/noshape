@@ -1,0 +1,19 @@
+{
+ "name": "feature-row-f2",
+ "about": "click the Extrude 1 row, F2: live does nothing",
+ "area": "psui",
+ "source": "qa live check 11-03",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "F2"
+  }
+ ]
+}

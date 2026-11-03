@@ -1,0 +1,27 @@
+{
+ "name": "number-field-dblclick-word",
+ "about": "double-click into Depth selects the word under the pointer",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "field": "Depth"
+   }
+  }
+ ],
+ "expect": [
+  {
+   "after": 2,
+   "live": "behaviours 'Focus, click and selection' (dialog numeric A/B/C): double-click selects the word (\"mm\" / \"52.1\")"
+  }
+ ]
+}

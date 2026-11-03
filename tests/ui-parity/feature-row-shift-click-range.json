@@ -1,0 +1,22 @@
+{
+ "name": "feature-row-shift-click-range",
+ "about": "click Sketch 1, Shift+click Extrude 1: both selected",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   },
+   "mods": "shift"
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "name": "measure-face",
+ "about": "click the box top face: the measure readout (area)",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  }
+ ]
+}

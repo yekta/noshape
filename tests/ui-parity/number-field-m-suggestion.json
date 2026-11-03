@@ -1,0 +1,33 @@
+{
+ "name": "number-field-m-suggestion",
+ "about": "type \"1 m\" in Depth: the list (m is a length unit here; in a mass field live offers max / min first and Enter takes max, behaviours 8864), then Enter",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "1 m"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

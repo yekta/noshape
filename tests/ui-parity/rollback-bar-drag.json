@@ -1,0 +1,35 @@
+{
+ "name": "rollback-bar-drag",
+ "about": "drag the rollback bar above Extrude 1, then back to the end",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "rollback_bar": true
+   },
+   "to": {
+    "rollback_to": "Sketch 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "drag",
+   "from": {
+    "rollback_bar": true
+   },
+   "to": {
+    "rollback_to": "Extrude 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

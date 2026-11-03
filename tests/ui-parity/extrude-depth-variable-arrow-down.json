@@ -1,0 +1,37 @@
+{
+ "name": "extrude-depth-variable-arrow-down",
+ "about": "#w lists both variables; Down moves the highlight to the second; Enter takes it",
+ "area": "psui",
+ "source": "everyday",
+ "start": "vars",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "type",
+   "text": "#w"
+  },
+  {
+   "do": "key",
+   "key": "ArrowDown"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

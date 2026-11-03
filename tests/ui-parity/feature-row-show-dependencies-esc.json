@@ -1,0 +1,30 @@
+{
+ "name": "feature-row-show-dependencies-esc",
+ "about": "right-click Extrude 1 › Show dependencies…, then Escape closes the panel",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Show dependencies…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ],
+ "expect": [
+  {
+   "live": "behaviours 1922: Esc closes it; a viewport click does not"
+  }
+ ]
+}

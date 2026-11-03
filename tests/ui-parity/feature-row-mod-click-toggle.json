@@ -1,0 +1,29 @@
+{
+ "name": "feature-row-mod-click-toggle",
+ "about": "click Sketch 1, mod+click Extrude 1, mod+click Extrude 1 again",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   },
+   "mods": "mod"
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   },
+   "mods": "mod"
+  }
+ ]
+}

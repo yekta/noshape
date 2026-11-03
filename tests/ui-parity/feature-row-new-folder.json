@@ -1,0 +1,37 @@
+{
+ "name": "feature-row-new-folder",
+ "about": "select Sketch 1 + Extrude 1, the New folder button, Enter: \"New folder (2)\"",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "New folder"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ],
+ "expect": [
+  {
+   "live": "behaviours 19901: dialog 'Folder name' pre-filled 'New folder'; the row 'New folder (2)'"
+  }
+ ]
+}

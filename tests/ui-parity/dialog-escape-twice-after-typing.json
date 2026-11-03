@@ -1,0 +1,37 @@
+{
+ "name": "dialog-escape-twice-after-typing",
+ "about": "edit Extrude 1, click Depth, type 20, Escape (live: the field reverts, the dialog stays), Escape (live: cancelled)",
+ "area": "psui",
+ "source": "qa live check 11-02",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "type",
+   "text": "20"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

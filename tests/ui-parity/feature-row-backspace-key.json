@@ -1,0 +1,23 @@
+{
+ "name": "feature-row-backspace-key",
+ "about": "the same with Backspace",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Backspace"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

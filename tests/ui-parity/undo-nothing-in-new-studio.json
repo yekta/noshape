@@ -1,0 +1,17 @@
+{
+ "name": "undo-nothing-in-new-studio",
+ "about": "a new Part Studio: mod+z and mod+y with nothing to undo",
+ "area": "psui",
+ "source": "everyday",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "key",
+   "key": "mod+y"
+  }
+ ]
+}

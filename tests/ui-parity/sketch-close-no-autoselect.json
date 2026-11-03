@@ -1,0 +1,58 @@
+{
+ "name": "sketch-close-no-autoselect",
+ "about": "Sketch on Top, rectangle, ✓, Shift+E: nothing pre-selected",
+ "area": "psui",
+ "source": "everyday",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "g"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     40,
+     20
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+e"
+  }
+ ],
+ "expect": [
+  {
+   "live": "behaviours 23694: after the sketch ✓ nothing is selected"
+  }
+ ]
+}

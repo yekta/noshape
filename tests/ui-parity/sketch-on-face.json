@@ -1,0 +1,25 @@
+{
+ "name": "sketch-on-face",
+ "about": "click the box top face, Sketch: the sketch plane is \"Face of Extrude 1\"",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  }
+ ]
+}

@@ -1,0 +1,25 @@
+{
+ "name": "click-empty-clears-selection",
+ "about": "click the top face, then click empty space",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  }
+ ]
+}

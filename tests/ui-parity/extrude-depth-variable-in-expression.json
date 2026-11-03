@@ -1,0 +1,33 @@
+{
+ "name": "extrude-depth-variable-in-expression",
+ "about": "an expression with a variable: #wall_thickness * 3 + Enter",
+ "area": "psui",
+ "source": "everyday",
+ "start": "vars",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "type",
+   "text": "#wall_thickness * 3"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

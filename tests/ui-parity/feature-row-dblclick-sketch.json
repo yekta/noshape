@@ -1,0 +1,15 @@
+{
+ "name": "feature-row-dblclick-sketch",
+ "about": "double-click the Sketch 1 row: the sketch opens for editing, later features rolled back",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  }
+ ]
+}

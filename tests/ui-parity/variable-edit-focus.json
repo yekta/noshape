@@ -1,0 +1,15 @@
+{
+ "name": "variable-edit-focus",
+ "about": "double-click the #wall_thickness = 2 mm row: the Variable dialog opens with Value focused",
+ "area": "psui",
+ "source": "everyday",
+ "start": "vars",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "#wall_thickness = 2 mm"
+   }
+  }
+ ]
+}

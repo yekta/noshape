@@ -1,0 +1,44 @@
+{
+ "name": "extrude-depth-variable-exact",
+ "about": "type a whole variable name #width and Enter",
+ "area": "psui",
+ "source": "everyday",
+ "start": "vars",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "type",
+   "text": "#width"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ],
+ "expect": [
+  {
+   "after": 3,
+   "list": [
+    "#width",
+    "New variable…"
+   ],
+   "highlighted": 0,
+   "live": "behaviours 'Autocomplete while typing': #var shows '(x) #var 10 mm' (highlighted) and '(x) New variable…'"
+  }
+ ]
+}

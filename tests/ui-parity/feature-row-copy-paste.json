@@ -1,0 +1,27 @@
+{
+ "name": "feature-row-copy-paste",
+ "about": "click the Extrude 1 row, mod+c, mod+v: a copy of the feature?",
+ "area": "psui",
+ "source": "qa 11-03 (live asked)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+c"
+  },
+  {
+   "do": "key",
+   "key": "mod+v"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

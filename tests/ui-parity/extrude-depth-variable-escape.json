@@ -1,0 +1,35 @@
+{
+ "name": "extrude-depth-variable-escape",
+ "about": "#wall then Escape: the list closes, the typed text stays, the dialog stays open",
+ "area": "psui",
+ "source": "everyday",
+ "start": "vars",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "type",
+   "text": "#wall"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ],
+ "expect": [
+  {
+   "after": 4,
+   "note": "behaviours 8864: Esc closes only the popup and keeps the text"
+  }
+ ]
+}

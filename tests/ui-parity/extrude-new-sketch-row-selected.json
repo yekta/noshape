@@ -1,0 +1,24 @@
+{
+ "name": "extrude-new-sketch-row-selected",
+ "about": "click the Sketch 1 row, then Shift+E: the dialog opens pre-filled with its region",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+e"
+  }
+ ],
+ "expect": [
+  {
+   "live": "behaviours 23701: with the Sketch 1 row selected, Shift+E opens Extrude pre-filled"
+  }
+ ]
+}

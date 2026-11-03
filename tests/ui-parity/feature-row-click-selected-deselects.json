@@ -1,0 +1,21 @@
+{
+ "name": "feature-row-click-selected-deselects",
+ "about": "click the Extrude 1 row twice: the second click deselects",
+ "area": "psui",
+ "source": "qa live check 11-03",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  }
+ ]
+}

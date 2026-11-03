@@ -1,0 +1,29 @@
+{
+ "name": "number-field-invalid",
+ "about": "type abc + Enter in Depth: red field, the feature unchanged",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "type",
+   "text": "abc"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

@@ -1,0 +1,28 @@
+{
+ "name": "space-clears-selection",
+ "about": "click the top face, then Space",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Space"
+  }
+ ],
+ "expect": [
+  {
+   "live": "behaviours 1199: Space clears the selection"
+  }
+ ]
+}

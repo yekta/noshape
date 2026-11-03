@@ -1,0 +1,23 @@
+{
+ "name": "feature-row-tooltip-error",
+ "about": "rest the pointer on the red Fillet 1 row: the error tooltip",
+ "area": "psui",
+ "source": "qa finding 10-28",
+ "start": "block-broken",
+ "steps": [
+  {
+   "do": "hover",
+   "on": {
+    "feature": "Fillet 1"
+   },
+   "ms": 3000
+  }
+ ],
+ "ticket": "ROW-TOOLTIP-WIDE-PANEL",
+ "expect": [
+  {
+   "after": 1,
+   "tooltip": "Fillet 1 did not regenerate properly: Select edges or faces to fillet.\n1 missing selection"
+  }
+ ]
+}

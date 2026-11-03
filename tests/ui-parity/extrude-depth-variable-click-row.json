@@ -1,0 +1,35 @@
+{
+ "name": "extrude-depth-variable-click-row",
+ "about": "#w, then click the second row of the list",
+ "area": "psui",
+ "source": "everyday",
+ "start": "vars",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "type",
+   "text": "#w"
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "#width"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

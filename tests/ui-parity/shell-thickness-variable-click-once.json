@@ -1,0 +1,44 @@
+{
+ "name": "shell-thickness-variable-click-once",
+ "about": "new Shell, click Shell thickness once, type #wall, Enter (the user's bug in another field)",
+ "area": "psui",
+ "source": "everyday",
+ "start": "vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Shell"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Shell thickness"
+   }
+  },
+  {
+   "do": "type",
+   "text": "#wall"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ],
+ "ticket": "VAR-AUTOCOMPLETE-ENTER"
+}

@@ -1,0 +1,19 @@
+{
+ "name": "shortcut-shift-w",
+ "about": "shift+w in the Part Studio with nothing selected: Revolve",
+ "area": "psui",
+ "source": "keyboard-mouse checklist",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+w"
+  }
+ ]
+}

@@ -1,0 +1,25 @@
+{
+ "name": "section-view-front",
+ "about": "the Section view tool on the Front plane",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Section view"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Front"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

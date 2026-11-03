@@ -1,0 +1,25 @@
+{
+ "name": "feature-row-roll-to-here",
+ "about": "right-click Sketch 1 › Roll to here: the bar below Sketch 1, Extrude 1 rolled back, Parts (0)",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Roll to here"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

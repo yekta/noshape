@@ -1,0 +1,48 @@
+{
+ "name": "feature-row-arrow-up-moves-bar",
+ "about": "click the Extrude 1 row, ArrowUp twice, ArrowDown twice: the rollback bar moves one row per key",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "ArrowUp"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "ArrowUp"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "ArrowDown"
+  },
+  {
+   "do": "key",
+   "key": "ArrowDown"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ],
+ "expect": [
+  {
+   "live": "behaviours 267: ArrowDown/ArrowUp move the rollback bar one row; focused bar #a0c7dd"
+  }
+ ]
+}

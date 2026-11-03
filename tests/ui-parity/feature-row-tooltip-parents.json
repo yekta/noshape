@@ -1,0 +1,22 @@
+{
+ "name": "feature-row-tooltip-parents",
+ "about": "rest the pointer on the Extrude 1 row: its tooltip names its parent sketch",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "hover",
+   "on": {
+    "feature": "Extrude 1"
+   },
+   "ms": 3000
+  }
+ ],
+ "expect": [
+  {
+   "after": 1,
+   "tooltip": "Extrude 1 <- Sketch 1"
+  }
+ ]
+}

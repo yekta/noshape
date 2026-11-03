@@ -1,0 +1,23 @@
+{
+ "name": "shortcut-z-zoom",
+ "about": "z zooms out, Shift+Z zooms in, about the view centre",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "key",
+   "key": "z"
+  },
+  {
+   "do": "key",
+   "key": "shift+z"
+  }
+ ]
+}

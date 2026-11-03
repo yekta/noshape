@@ -1,0 +1,61 @@
+{
+ "name": "chamfer-two-distances",
+ "about": "Chamfer on the front top edge, Two distances, 1 and 2 mm",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fillet",
+    "menu": "Chamfer"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Equal distance",
+    "pick": "Two distances"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Distance 1"
+   }
+  },
+  {
+   "do": "type",
+   "text": "1"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Distance 2"
+   }
+  },
+  {
+   "do": "type",
+   "text": "2"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

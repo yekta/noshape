@@ -1,0 +1,34 @@
+{
+ "name": "number-field-tab-selects-all",
+ "about": "Tab from the region field into Blind / Depth: Depth gets focus with all selected",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Faces and sketch regions to extrude"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Tab"
+  },
+  {
+   "do": "key",
+   "key": "Tab"
+  }
+ ],
+ "expect": [
+  {
+   "live": "behaviours 'Focus, click and selection' (dialog numeric A/B/C): Tab into field selects all"
+  }
+ ]
+}

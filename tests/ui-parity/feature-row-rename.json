@@ -1,0 +1,33 @@
+{
+ "name": "feature-row-rename",
+ "about": "right-click Extrude 1 › Rename, type Base, Enter",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Rename"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "Base"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

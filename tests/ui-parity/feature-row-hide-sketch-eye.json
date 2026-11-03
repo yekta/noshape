@@ -1,0 +1,16 @@
+{
+ "name": "feature-row-hide-sketch-eye",
+ "about": "click the eye of the Sketch 1 row (shows the consumed sketch)",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "eye",
+    "feature": "Sketch 1"
+   }
+  }
+ ]
+}

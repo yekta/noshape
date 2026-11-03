@@ -1,0 +1,77 @@
+{
+ "name": "sketch-dimension-other-unit",
+ "about": "dimension a line with \"1 in\" + Enter: the label 25.4, reopened \"1 in\"",
+ "area": "psui",
+ "source": "everyday",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     25,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     12,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     12,
+     -8
+    ]
+   }
+  },
+  {
+   "do": "type",
+   "text": "1 in"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

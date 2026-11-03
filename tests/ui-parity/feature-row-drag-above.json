@@ -1,0 +1,23 @@
+{
+ "name": "feature-row-drag-above",
+ "about": "drag Fillet 1 above Extrude 1: Fillet 1 turns red with ⚠ (missing selection)",
+ "area": "psui",
+ "source": "qa finding 10-28 (ROW-TOOLTIP-WIDE-PANEL)",
+ "start": "block-fillet",
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "feature": "Fillet 1"
+   },
+   "to": {
+    "feature": "Extrude 1",
+    "edge": "top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

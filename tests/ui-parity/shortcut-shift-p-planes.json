@@ -1,0 +1,23 @@
+{
+ "name": "shortcut-shift-p-planes",
+ "about": "Shift+P hides all construction; again shows it",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+p"
+  },
+  {
+   "do": "key",
+   "key": "shift+p"
+  }
+ ]
+}

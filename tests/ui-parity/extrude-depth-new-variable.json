@@ -1,0 +1,37 @@
+{
+ "name": "extrude-depth-new-variable",
+ "about": "an unknown #nope + Enter offers New variable… and opens the Create variable popup",
+ "area": "psui",
+ "source": "everyday",
+ "start": "vars",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "type",
+   "text": "#nope"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ],
+ "expect": [
+  {
+   "after": 4,
+   "popup": "Create variable",
+   "name": "nope",
+   "live": "behaviours 4289 / 1785"
+  }
+ ]
+}

@@ -1,0 +1,25 @@
+{
+ "name": "feature-filter-clear",
+ "about": "type Ext in the filter, then click its ⊗ (Clear search)",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Filter by name or type"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Ext"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Clear search"
+   }
+  }
+ ]
+}

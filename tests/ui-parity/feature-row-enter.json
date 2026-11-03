@@ -1,0 +1,20 @@
+{
+ "name": "feature-row-enter",
+ "about": "click the Extrude 1 row, Enter: live opens nothing",
+ "area": "psui",
+ "source": "qa finding 11-02 (live checked)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ],
+ "ticket": "FEATURE-ROW-ENTER-EDITS"
+}

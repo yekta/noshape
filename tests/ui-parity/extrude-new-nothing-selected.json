@@ -1,0 +1,13 @@
+{
+ "name": "extrude-new-nothing-selected",
+ "about": "Shift+E with nothing selected: Extrude opens with an empty region field, the ✓ disabled",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "key",
+   "key": "shift+e"
+  }
+ ]
+}

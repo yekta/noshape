@@ -1,0 +1,42 @@
+{
+ "name": "extrude-escape-cancels",
+ "about": "edit Extrude 1, change Depth to 20, Escape: the dialog closes and the edit is dropped",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "type",
+   "text": "20"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ],
+ "expect": [
+  {
+   "live": "live-agent gotcha: Escape in a feature dialog cancels it"
+  }
+ ]
+}

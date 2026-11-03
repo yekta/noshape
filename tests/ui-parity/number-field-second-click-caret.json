@@ -1,0 +1,39 @@
+{
+ "name": "number-field-second-click-caret",
+ "about": "two clicks into Depth: the first selects all, the second puts the caret; typing 5 inserts at the caret",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "type",
+   "text": "5"
+  }
+ ],
+ "expect": [
+  {
+   "after": 3,
+   "field": "Depth",
+   "selection": "caret",
+   "live": "behaviours 'Focus, click and selection' (dialog numeric A/B/C): 2nd click caret at click point"
+  }
+ ]
+}

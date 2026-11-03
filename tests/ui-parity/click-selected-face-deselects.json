@@ -1,0 +1,29 @@
+{
+ "name": "click-selected-face-deselects",
+ "about": "click the top face twice: the second click deselects it",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  }
+ ]
+}

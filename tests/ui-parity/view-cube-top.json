@@ -1,0 +1,25 @@
+{
+ "name": "view-cube-top",
+ "about": "click the view cube's Top face, then the selection count / measure state unchanged",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_cube": "Top"
+   }
+  }
+ ]
+}

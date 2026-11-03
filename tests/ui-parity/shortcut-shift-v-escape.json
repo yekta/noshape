@@ -1,0 +1,23 @@
+{
+ "name": "shortcut-shift-v-escape",
+ "about": "Shift+V opens Named views; one Escape closes it",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+v"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

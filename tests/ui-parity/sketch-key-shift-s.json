@@ -1,0 +1,25 @@
+{
+ "name": "sketch-key-shift-s",
+ "about": "in a sketch on Top, shift+s: Point becomes the active tool",
+ "area": "psui",
+ "source": "keyboard-mouse checklist",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+s"
+  }
+ ]
+}
