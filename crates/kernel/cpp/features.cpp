@@ -38,6 +38,8 @@
 #include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <BRepLib.hxx>
+#include <GeomConvert_SurfToAnaSurf.hxx>
+#include <GeomProjLib.hxx>
 #include <ShapeAnalysis_Edge.hxx>
 #include <TopAbs.hxx>
 #include <BRepLib_FindSurface.hxx>
@@ -3431,6 +3433,127 @@ static double tighten_new_tolerances(const TopoDS_Shape& input, const TopoDS_Sha
   return std::numeric_limits<double>::infinity();
 }
 
+// A blend's new faces that OCCT approximated (B-splines) but that are planes, cylinders, cones, spheres or tori within
+// `accurate` of the part: rebuilt on that surface, as Parasolid makes them (the Spur Gear's root fillets between its
+// root cylinder and an extruded involute are cylinders in live: FILLET-PRISMATIC-CYLINDER). Kept only when the
+// solid stays valid and its volume the same.
+static void analytic_blend_faces(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
+{
+  const KernelTimer timer("blend.analytic");
+  ShapeIMap old;
+  TopExp::MapShapes(input, TopAbs_FACE, old);
+  const double                   tol = accurate(input);
+  // (Its edges fitted to it no finer than OCCT's precision, which 1e-5 of a part in metres is under.)
+  const double                   fit = std::max(tol, 10 * Precision::Confusion());
+  occ::handle<BRepTools_ReShape> rs  = new BRepTools_ReShape();
+  BRep_Builder                   bb;
+  bool                           any = false;
+  for (TopExp_Explorer x(r, TopAbs_FACE); x.More(); x.Next())
+  {
+    const TopoDS_Face f = TopoDS::Face(x.Current().Oriented(TopAbs_FORWARD));
+    if (old.Contains(f))
+      continue;
+    TopLoc_Location                 loc;
+    const occ::handle<Geom_Surface> s = BRep_Tool::Surface(f, loc);
+    if (s.IsNull() || !s->IsKind(STANDARD_TYPE(Geom_BSplineSurface)))
+      continue;
+    GeomConvert_SurfToAnaSurf       conv(s);
+    const occ::handle<Geom_Surface> ana = conv.ConvertToAnalytical(tol);
+    if (ana.IsNull() || conv.Gap() > tol)
+      continue;
+    // Whether the analytic surface runs the other way (its normal, and so its parameters' sense, flipped): then the
+    // new face is reversed, its wires too.
+    BRepAdaptor_Surface sa(f);
+    gp_Pnt              p;
+    gp_Vec              du, dv;
+    sa.D1(0.5 * (sa.FirstUParameter() + sa.LastUParameter()), 0.5 * (sa.FirstVParameter() + sa.LastVParameter()), p, du, dv);
+    GeomAPI_ProjectPointOnSurf pr(p.Transformed(loc.Transformation().Inverted()), ana);
+    if (pr.NbPoints() == 0)
+      continue;
+    double pu = 0, pv = 0;
+    pr.LowerDistanceParameters(pu, pv);
+    GeomLProp_SLProps lp(ana, pu, pv, 1, 1e-9);
+    if (!lp.IsNormalDefined())
+      continue;
+    const bool  flip = lp.Normal().Transformed(loc.Transformation()).Dot(du.Crossed(dv)) < 0;
+    TopoDS_Face nf;
+    bb.MakeFace(nf, ana, loc, BRep_Tool::Tolerance(f));
+    bool ok = true;
+    for (TopoDS_Iterator w(f); w.More() && ok; w.Next())
+    {
+      for (TopExp_Explorer ex(w.Value(), TopAbs_EDGE); ex.More() && ok; ex.Next())
+      {
+        const TopoDS_Edge&            e = TopoDS::Edge(ex.Current());
+        double                        a = 0, b = 0;
+        TopLoc_Location               el;
+        const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, el, a, b);
+        if (c.IsNull())
+        {
+          ok = false;
+          break;
+        }
+        // (In the surface's frame: it is placed by `loc`.)
+        const occ::handle<Geom_Curve>   cl = occ::down_cast<Geom_Curve>(c->Transformed(loc.Transformation().Inverted().Multiplied(el.Transformation())));
+        double                          reached = fit;
+        const occ::handle<Geom2d_Curve> pc      = GeomProjLib::Curve2d(cl, a, b, ana, reached);
+        if (pc.IsNull())
+          ok = false;
+        else
+          bb.UpdateEdge(e, pc, nf, std::max(BRep_Tool::Tolerance(e), reached));
+      }
+      bb.Add(nf, flip ? w.Value().Reversed() : w.Value());
+    }
+    if (!ok)
+      continue;
+    // (Each edge projected alone: on a periodic surface their pieces may lie a period apart; each moved onto the
+    // end of the one before.)
+    const double per_u = ana->IsUPeriodic() ? ana->UPeriod() : 0, per_v = ana->IsVPeriodic() ? ana->VPeriod() : 0;
+    for (TopoDS_Iterator w(nf); w.More() && (per_u > 0 || per_v > 0); w.Next())
+    {
+      bool     first = true;
+      gp_Pnt2d last;
+      for (BRepTools_WireExplorer we(TopoDS::Wire(w.Value()), nf); we.More(); we.Next())
+      {
+        const TopoDS_Edge&        e  = we.Current();
+        double                    a2 = 0, b2 = 0;
+        occ::handle<Geom2d_Curve> c2 = BRep_Tool::CurveOnSurface(e, nf, a2, b2);
+        if (c2.IsNull())
+          break;
+        const bool rev = e.Orientation() == TopAbs_REVERSED;
+        gp_Pnt2d   p0 = c2->Value(rev ? b2 : a2);
+        if (!first)
+        {
+          const double ku = per_u > 0 ? std::round((last.X() - p0.X()) / per_u) : 0, kv = per_v > 0 ? std::round((last.Y() - p0.Y()) / per_v) : 0;
+          if (ku != 0 || kv != 0)
+          {
+            c2 = occ::down_cast<Geom2d_Curve>(c2->Translated(gp_Vec2d(ku * per_u, kv * per_v)));
+            bb.UpdateEdge(e, c2, nf, BRep_Tool::Tolerance(e));
+          }
+        }
+        last  = c2->Value(rev ? a2 : b2);
+        first = false;
+      }
+    }
+    BRepLib::SameParameter(nf, fit);
+    rs->Replace(f, flip ? nf.Reversed() : nf);
+    any = true;
+  }
+  if (!any)
+    return;
+  const TopoDS_Shape out = rs->Apply(r);
+  if (!BRepCheck_Analyzer(out).IsValid())
+    return;
+  GProp_GProps a, b;
+  BRepGProp::VolumeProperties(r, a);
+  BRepGProp::VolumeProperties(out, b);
+  if (std::abs(a.Mass() - b.Mass()) > 1e-9 * std::abs(a.Mass()))
+    return;
+  if (h.IsNull())
+    h = new BRepTools_History();
+  h->Merge(rs->History());
+  r = out;
+}
+
 OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const char* what,
                    const MakeBuild& make)
 {
@@ -3459,6 +3582,7 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
     {
       const KernelTimer timer("blend.finish");
       merge_full_rounds(input, r, h);
+      analytic_blend_faces(input, r, h);
       tighten_new_tolerances(input, r, accurate(input));
       return as_is.finish(r, h);
     }
@@ -3467,7 +3591,10 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
   const Scaled sc(input, checked ? working_scale() : 1.0);
   auto [r, h] = checked_blend(sc.shape, make(sc), checked, size * sc.factor, what);
   if (checked)
+  {
     merge_full_rounds(sc.shape, r, h);
+    analytic_blend_faces(sc.shape, r, h);
+  }
   return sc.finish(r, h);
 }
 

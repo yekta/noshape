@@ -2892,6 +2892,36 @@ fn opposite_extrudes_of_one_circle_make_one_cylinder_face() {
     assert!((volume(&r) - 2261.946711).abs() < 1e-5, "{}", volume(&r));
 }
 
+/// FILLET-PRISMATIC-CYLINDER (live REST on Onshape's Spur Gear: its root fillets are cylinders): a fillet between a
+/// plane and an extruded spline, both along the extrude, is a cylinder of the fillet's radius (OCCT approximates it).
+#[test]
+fn a_fillet_between_extruded_faces_is_a_cylinder() {
+    let mut t = T::new();
+    let mm = |x: f64, y: f64| DVec2::new(x, y) * 1e-3;
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_line(mm(0.0, 0.0), mm(20.0, 0.0));
+    sk.add_fit_spline(&[mm(20.0, 0.0), mm(21.0, 5.0), mm(23.0, 10.0), mm(26.0, 15.0)]).unwrap();
+    sk.add_line(mm(26.0, 15.0), mm(0.0, 15.0));
+    sk.add_line(mm(0.0, 15.0), mm(0.0, 0.0));
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let r = t.regen();
+    let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+    assert_eq!(regions.len(), 1);
+    t.add("extrude", &[("entities", q(regions)), ("depth", e("5 mm")), ("operationType", en("NEW"))]);
+    let corner = t.edges_where(|i| (i.start.truncate() - DVec2::new(0.02, 0.0)).length() < 1e-9 && (i.end.truncate() - DVec2::new(0.02, 0.0)).length() < 1e-9);
+    assert_eq!(corner.len(), 1);
+    let f = t.add("fillet", &[("entities", q(corner)), ("radius", e("2 mm"))]);
+    let r = t.ok(f);
+    let b = &r.context.bodies[0].shape;
+    let cyl: Vec<f64> = b.faces().iter().filter_map(|x| match x.face_surface() {
+        Ok(noshape_kernel::Surface::Cylinder { radius, .. }) => Some(radius),
+        _ => None,
+    }).collect();
+    assert_eq!(b.count(noshape_kernel::ShapeType::Face), 7);
+    assert!(cyl.len() == 1 && (cyl[0] - 2e-3).abs() < 1e-9, "{cyl:?}");
+    assert!(b.is_valid());
+}
+
 /// EXTRUDE-OVERLAP-LINES-FACES (dx's parity suite, bracket120-datenkrake, live 10/24/16 faces/edges/vertices): a
 /// line lying over a rectangle's side splits it in the sketch, but the extruded side is one face (a box: 6/12/8).
 #[test]

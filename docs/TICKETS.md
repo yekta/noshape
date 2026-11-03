@@ -340,7 +340,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   face's edges, split where the sketch's curves cross them (live probe "core imprint probe 1": a Ø10 circle inside
   a 60 × 40 face: 6 edges, 5 vertices; a line across it: 8 / 8). Ours: the sketch's own only (the FS host's
   SketchEdge / SketchPoint entities; the imprinted curves aren't kept in SketchResult).
-- [ ] P2 FILLET-PRISMATIC-CYLINDER (core 11-03, live REST on live 1830's gears) a constant fillet between two faces
+- [x] (core 11-03 07:45: a blend's new B-spline faces that are planes, cylinders, cones, spheres or tori within 1e-5 of the part are rebuilt on that surface, kept when the solid stays valid and its volume the same (features.cpp analytic_blend_faces; ≤ 0.1 ms a blend on live-30-features): the Spur Gear's root fillets are cylinders as live (defaults 100 / changed 121 cylinders, no B-splines; T1 kernel_robustness::a_fillet_between_extruded_faces_is_a_cylinder); the blend corpus as recorded) P2 FILLET-PRISMATIC-CYLINDER (core 11-03, live REST on live 1830's gears) a constant fillet between two faces
   extruded the same way (the Spur Gear's root fillets: the root cylinder and an extruded involute spline) is a
   cylinder in live (qGeometry CYLINDER, evSurfaceDefinition radius 0.378848 / 0.166393 mm); ours an OCCT B-spline
   (custom features' geometry queries see another type). And with centripetal splines (SKETCH-SPLINE-CENTRIPETAL) the
