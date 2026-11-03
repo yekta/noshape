@@ -109,9 +109,6 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
             None => {}
         }
     }
-    if missing > 0 {
-        ev.warnings.push(format!("{missing} projected edge(s) no longer exist"));
-    }
     // Re-section intersected faces so intersection curves follow the model.
     let mut lost = 0;
     for link in &data.intersections {
@@ -122,8 +119,9 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         };
         lost += update_intersection(&mut sk, &link.entities, &curves);
     }
-    if lost > 0 {
-        ev.warnings.push(format!("{lost} intersection curve(s) could not be updated"));
+    // Live (clamp-guillem's Boceto 6): a WARNING, whatever was lost.
+    if missing + lost > 0 {
+        ev.warnings.push("Some external references are missing.".into());
     }
     // Expression-driven dimensions. The ones whose value changes are kept:
     // a single changed dimension solves like an edit in the sketch (only its

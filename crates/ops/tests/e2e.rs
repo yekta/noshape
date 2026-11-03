@@ -618,6 +618,12 @@ fn sketch_use_intersection_and_model_references() {
     call(&mut ctx, "sketch_dimension", json!({ "sketch": s3, "kind": "distance", "entities": [center, edge], "value": "15 mm" }));
     let circle = entities(&mut ctx, &s3, "circle").into_iter().next().unwrap();
     assert!((num(&circle["center"][1]) - 25.0).abs() < 1e-6, "{circle}");
+    // The used edges gone (Extrude 1 suppressed): live's warning on the sketch.
+    let s4 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top", "name": "Uses" }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_use", json!({ "sketch": s4, "references": [top] }));
+    let r = call(&mut ctx, "feature_suppress", json!({ "features": ["Extrude 1"], "suppressed": true }));
+    let uses = r["regeneration"]["features"].as_array().unwrap().iter().find(|f| f["name"] == "Uses").unwrap().clone();
+    assert_eq!((uses["status"].as_str(), uses["message"].as_str()), (Some("Warning"), Some("Some external references are missing.")), "{uses}");
 }
 
 #[test]
