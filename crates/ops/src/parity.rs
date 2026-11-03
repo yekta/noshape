@@ -710,14 +710,28 @@ impl<'a> Translator<'a> {
     /// The regions of the last sketch before feature `k` when `queries` are
     /// as many id-only queries as it has regions.
     fn last_sketch_regions(&mut self, k: usize, queries: &[Value]) -> Option<Vec<String>> {
-        if queries.is_empty() || queries.iter().any(|q| q["queryString"].as_str().is_some_and(|t| !t.trim().is_empty()) || q["deterministicIds"].as_array().is_none_or(|a| a.len() != 1)) {
+        if queries.is_empty() || queries.iter().any(|q| q["queryString"].as_str().is_some_and(|t| !t.trim().is_empty()) || q["deterministicIds"].as_array().is_none_or(|a| a.is_empty())) {
+            return None;
+        }
+        let ids: usize = queries.iter().map(|q| q["deterministicIds"].as_array().map_or(0, Vec::len)).sum();
+        let sketch = self.features[..k].iter().rev().find(|f| f["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketch")))?;
+        let ours = self.feature_ids.get(sketch["featureId"].as_str()?)?.clone();
+        let g = self.call("sketch_get", json!({ "sketch": ours })).ok()?;
+        let regions: Vec<String> = g["regions"].as_array()?.iter().filter(|r| r["imprinted"] != true).filter_map(|r| r["id"].as_str().map(str::to_string)).collect();
+        (regions.len() == ids).then_some(regions)
+    }
+
+    /// A revolve's axis named by id alone: the last sketch's one
+    /// construction line (the usual centreline), if it has exactly one.
+    fn last_sketch_axis(&mut self, k: usize, queries: &[Value]) -> Option<Vec<String>> {
+        if queries.len() != 1 || queries[0]["queryString"].as_str().is_some_and(|t| !t.trim().is_empty()) {
             return None;
         }
         let sketch = self.features[..k].iter().rev().find(|f| f["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketch")))?;
         let ours = self.feature_ids.get(sketch["featureId"].as_str()?)?.clone();
         let g = self.call("sketch_get", json!({ "sketch": ours })).ok()?;
-        let regions: Vec<String> = g["regions"].as_array()?.iter().filter(|r| r["imprinted"] != true).filter_map(|r| r["id"].as_str().map(str::to_string)).collect();
-        (regions.len() == queries.len()).then_some(regions)
+        let lines: Vec<String> = g["entities"].as_array()?.iter().filter(|e| e["type"] == "line" && e["construction"] == true).filter_map(|e| e["id"].as_str().map(str::to_string)).collect();
+        (lines.len() == 1).then_some(lines)
     }
 
     /// The one curve bounding a sketch region, if one does.
@@ -770,6 +784,12 @@ impl<'a> Translator<'a> {
                     && let Some(r) = self.last_sketch_regions(k, &queries)
                 {
                     return Ok(Some(json!(r)));
+                }
+                if p["parameterId"] == "axis"
+                    && ids.is_empty()
+                    && let Some(a) = self.last_sketch_axis(k, &queries)
+                {
+                    return Ok(Some(json!(a)));
                 }
                 if ids.is_empty() {
                     return Err(first);
