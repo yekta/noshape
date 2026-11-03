@@ -550,7 +550,42 @@ impl NurbsCurve {
             }
             t = nt;
         }
-        (t, (self.at(t) - p).length())
+        let d = (self.at(t) - p).length();
+        // (Newton's hardly nearer than the sample (a curve slowing towards its end: its step there out of the range):
+        // the foot between the sample's neighbours, Newton's steps kept between them, else halving.)
+        if d * d < 0.25 * best.1 || t0 >= t1 {
+            return (t, d);
+        }
+        let g_at = |t: f64| {
+            let [c, d1, _] = self.derivs(t);
+            (c - p).dot(d1)
+        };
+        let at_k = |k: usize| t0 + (t1 - t0) * k as f64 / n as f64;
+        let (mut lo, mut hi) = (at_k(best.0.saturating_sub(1)), at_k((best.0 + 1).min(n)));
+        if g_at(lo) >= 0.0 || g_at(hi) <= 0.0 {
+            return (t, d);
+        }
+        let mut u = at_k(best.0);
+        for _ in 0..100 {
+            let [c, d1, d2] = self.derivs(u);
+            let q = c - p;
+            let g = q.dot(d1);
+            let gp = d1.length_squared() + q.dot(d2);
+            if g < 0.0 {
+                lo = u;
+            } else {
+                hi = u;
+            }
+            let nu = u - g / gp;
+            let nu = if gp > 0.0 && nu > lo && nu < hi { nu } else { 0.5 * (lo + hi) };
+            if (nu - u).abs() <= 1e-15 * (1.0 + u.abs()) {
+                u = nu;
+                break;
+            }
+            u = nu;
+        }
+        let du = (self.at(u) - p).length();
+        if du < d { (u, du) } else { (t, d) }
     }
 }
 
@@ -818,5 +853,14 @@ mod tests {
         let foot = s.at(uv.x, uv.y);
         let [_, su, sv, ..] = s.derivs(uv.x, uv.y);
         assert!((q - foot).dot(su).abs() < 1e-12 && (q - foot).dot(sv).abs() < 1e-12 && (d - (q - foot).length()).abs() < 1e-15);
+    }
+
+    #[test]
+    fn a_point_near_the_end_of_a_curve_slowing_down_lies_on_it() {
+        // A straight quadratic 99 times slower at its end than at its start (as a knurl's flank-to-flank section): the
+        // end the nearest sample, Newton's step there out of the range.
+        let c = NurbsCurve { degree: 2, knots: vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0], poles: vec![DVec3::ZERO, DVec3::new(0.99, 0.0, 0.0), DVec3::X], weights: vec![1.0; 3], spans: Default::default() };
+        let (t, d) = c.param_of(DVec3::new(0.999, 1e-6, 0.0));
+        assert!(t < 1.0 && (d - 1e-6).abs() < 1e-12 && (c.at(t).x - 0.999).abs() < 1e-12, "{t} {d}");
     }
 }

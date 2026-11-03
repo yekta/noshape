@@ -111,6 +111,39 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
   custom_features::knurl_feature_b94_tooth_and_helix_angles, KNURL_SIZE / KNURL_PITCH / KNURL_ANGLES).
 - Squash only with `git reset --soft $(git merge-base HEAD origin/main)` after a fresh fetch; check `git show --stat`.
 
+## The knurls' "a non-manifold result": a curve's foot near its end (11-03 14:00 UTC)
+- Ø25 x 10 CP30 45/30 (vibe4 ~/agents/bool-corpora/k25-10-30): every open edge came from one place per tool pair: the
+  triple point of the cylinder and two tools' flanks, found where the cylinder's two sections cross (exact), lay
+  40 nm from the flanks' own section (OCCT's, degree 6, one span, 99 times slower at its end than on average), 17 um
+  before that section's end; NurbsCurve::param_of took the end sample as the nearest and Newton's step there left
+  the range (the distance curves down there: |q| x |c''| > |c'|^2), so the point was "3.8 um off, at the end", the
+  section wasn't split there, the flank's strip outside the cylinder joined its piece inside (a loop running both
+  ways along the cylinder's section) and that piece kept edges nothing else had. Now Newton's result no nearer than
+  a quarter of the sample's distance (squared) is found again between the sample's neighbours (Newton's steps kept
+  inside, else halving). The case is taken: 4.0 s, OCCT 51.7 s, volume 6e-8 relative off OCCT's. T1
+  nurbs::tests::a_point_near_the_end_of_a_curve_slowing_down_lies_on_it. Knurl sweep (vibe5 foot.tsv against fin2):
+  306 -> 313 of the cases both ran; two of the biggest (Ø63 x 100 CP30 80/30, Ø100 x 100 CP20 45/45, 160k-195k faces)
+  died beside three other jobs (memory) and are taken run alone, the same volumes and faces as before. Corpora,
+  Shell's recordings, qa's matrices unchanged.
+- Next of the same family: Ø25 x 71 CP12 45/30 (vibe4 bool-corpora/k25-71-12, 148 open edges): two mirrored grooves'
+  flanks meet in a short curve at the cylinder's end (from the bottom edges' crossing to the ridges' 32 um up) that
+  OCCT's section misses beside the long one it does give; asking again from between the faces' edge crossings that
+  no curve of OCCT's ends at takes it (7.6 s, OCCT 88.5 s; /root/bool-scratch/seed-more.patch, being gated).
+- Not the tolerances after all: the 11-02 rules (a section's 5 um at crossings, its end taken within it) only hid
+  this wrong foot at some points. A group rule tried first (a crossing within a section's tolerance of its end
+  merged with that end, the Boolean done again) cascaded (30 -> 1176 -> 2912 groups) and stayed non-manifold:
+  dropped. Debug switches in bool-a (bin/syncdbg.sh): NOSHAPE_X_NOSYM (no rotational shortcut: the same 2232 open
+  edges, so the symmetry wasn't it), NOSHAPE_X_SPLITP=x,y,z (split decisions of vertices at that radius and height),
+  NOSHAPE_X_XFACE=arg:index (a face's 2D crossings), NOSHAPE_X_TURNV=v0,v1 (a curve's turned chain).
+- C2::param_of (2D) has the same Newton; the same fix is /root/bool-scratch/c2-foot.patch, not applied (no case
+  seen needing it yet).
+
+## CUT-CLOSED-EDGES-SPLIT: core's fix on main covers mine (11-03 13:10 UTC)
+- My seam move (seams.cpp, branch bool-seams-mine d9039ec5, not landed) and core's (e77387ec, 291588e1) overlap; the
+  parity suite on main 56c29f97 already has what mine had and more: bushing2 5/6, clamp-abhil 11/11 (to the end),
+  pipeflange 9/10 (its Fillet 2 is a blend corner, core's note). Mine took bushing2's Extrude 4 to 18/41/25 (main
+  18/42/26, live 18/40/24): no feature more, so not ported.
+
 ## Wrong knurl results on main fixed; split points nearer than the tolerance one vertex (11-03 07:30 UTC)
 - Found: since 86596b72 the knurl sweep's Ø25 x 25 CP20 45/45 was TAKEN WRONG on main: 11811.805 mm³, invalid,
   where OCCT gives 11878.823 (valid); Ø25 x 24 CP12 45/30 invalid (OCCT's volume). Both have over 2000 faces,
