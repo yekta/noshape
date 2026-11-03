@@ -63,6 +63,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - 11-03 01:50: centroid bands; Variable Studio tables (live's `variables` with a studio reference) rebuilt and
   inserted; custom features run from their Feature Studios (features.json `featureStudios`: element id → name +
   source; asked live to include it for the custom-feature phase). T1 parity:: tests: 10.
+- 11-03 02:05: custom's packed-query unpacker fixed (dotted ids: whole-string names, in-string references, `E<i>`):
+  all 5951 packed queries of live's feature lists decode (2499 failed); T2 parity::packed_queries_decode
+  (NOSHAPE_PACKED_DIR=vibe5 ~/agents/dx/dom). Translator: Plane-feature planes in packed form, SWEPT_BODY of any op,
+  CAP_FACE among several caps, nested names only through Booleans. IGES names as live 1818 (406 Name property on
+  export; label on import; " DE<line>" for an unlabelled solid). Live added raw `bodies` to every live.jsonl line
+  (REQUESTS 1828 answered); first documents after ~04:45.
 - Staged for when GET /features reopens (~04:17 UTC): /root/parity/models-dx/{dx-mbd-1721, live-hole-row,
   live-pattern-holes} have live.jsonl (per rollback: parts, bands, boxes, raw bodies; from pm-rollbacks.js); run
   /root/dx-scratch/live/pm-features.sh to add features.json and merge names / statuses, then parity_models on them
