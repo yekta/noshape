@@ -156,6 +156,9 @@ fn sketch_extrude_fillet_pattern_export_render() {
     let list = call(&mut ctx, "feature_list", json!({}));
     let names: Vec<&str> = list["features"].as_array().unwrap().iter().map(|f| f["name"].as_str().unwrap()).collect();
     assert_eq!(names, ["Sketch 1", "Extrude 1", "Fillet 1", "Linear pattern 1"]);
+    // Each feature's regeneration time, their sum as the Regeneration times panel's footer.
+    let times: Vec<f64> = list["features"].as_array().unwrap().iter().map(|f| num(&f["regen_ms"])).collect();
+    assert!(times.iter().all(|t| *t >= 0.0) && (times.iter().sum::<f64>() - num(&list["regen_ms"])).abs() < 0.5, "{list}");
     let hist = call(&mut ctx, "history_list", json!({ "limit": 3 }));
     assert_eq!(hist["history"][0]["description"], "Part Studio 1 :: Insert feature : Linear pattern 1");
 

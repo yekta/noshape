@@ -78,7 +78,7 @@ pub fn ops() -> Vec<Op> {
             group: "feature",
             verb: "list",
             summary: "The feature list: every feature with its status, the parts, failures",
-            description: "Regenerates the Part Studio and reports each feature (id, name, type, status Ok/Info/Warning/Error/Suppressed/RolledBack, error message; custom features their FeatureScript `notices` and `output`), the parts and the rollback bar.",
+            description: "Regenerates the Part Studio and reports each feature (id, name, type, status Ok/Info/Warning/Error/Suppressed/RolledBack, error message; custom features their FeatureScript `notices` and `output`; `regen_ms`, its time in the last regeneration that computed it, as the Regeneration times panel), the parts, the rollback bar and `regen_ms`, the features' total.",
             fields: vec![doc_field(), tab_field()],
             mutates: false,
             destructive: false,
@@ -639,6 +639,15 @@ fn load_custom_types(od: &crate::OpenDoc, type_id: &str) {
 fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let mut r = super::regen_report_all(od, tab)?;
+    // The Regeneration times panel: each feature's time, and their sum as its footer.
+    let display = od.regenerate(tab, None)?.display;
+    let mut total = 0.0;
+    for v in r["features"].as_array_mut().into_iter().flatten() {
+        let ms = display.features.iter().find(|f| v["id"] == f.id.to_string()).map_or(0.0, |f| f64::from(f.time_ms));
+        total += ms;
+        v["regen_ms"] = json!((ms * 10.0).round() / 10.0);
+    }
+    r["regen_ms"] = json!((total * 10.0).round() / 10.0);
     let ps = doc::studio(od.doc(), tab)?;
     r["tab"] = json!({ "id": tab.to_string(), "name": od.doc().tab(tab).map(|t| t.name.clone()) });
     r["folders"] = json!(ps.folders.iter().map(|f| json!({ "id": f.id, "name": f.name, "parent": f.parent, "features": ps.features.iter().filter(|x| x.folder == Some(f.id)).map(|x| x.id.to_string()).collect::<Vec<_>>() })).collect::<Vec<_>>());

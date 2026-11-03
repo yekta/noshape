@@ -23,13 +23,15 @@ struct ModelResult {
     untranslated: Vec<String>,
     /// Full regeneration: ours (reopened) and live's, ms.
     regen_ms: Option<(f64, Option<f64>)>,
+    /// Our slowest features in it (name, ms).
+    slowest: Vec<(String, f64)>,
 }
 
 /// Rebuilds `features` and compares with `live` (live.jsonl lines) after each feature.
 fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelResult {
     let mut ctx = Ctx::new();
     let path = scratch(&format!("{name}.noshape"));
-    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, untranslated: Vec::new(), regen_ms: None };
+    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, untranslated: Vec::new(), regen_ms: None, slowest: Vec::new() };
     // refs.jsonl wins over the geometry read from live's bodydetails.
     let mut all = refs_from_bodies(live);
     all.extend(parse_refs(refs));
@@ -82,6 +84,12 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         && noshape_ops::registry::by_tool_name("query_parts").map(|op| noshape_ops::registry::run(&mut fresh, op, &json!({})).is_ok()).unwrap_or(false);
     if reopened {
         res.regen_ms = Some((t0.elapsed().as_secs_f64() * 1000.0, live.iter().find_map(|l| l["full_regen_ms"].as_f64())));
+        // Its slowest features (the Regeneration times panel's).
+        if let Some(Ok(list)) = noshape_ops::registry::by_tool_name("feature_list").map(|op| noshape_ops::registry::run(&mut fresh, op, &json!({}))) {
+            let mut times: Vec<(String, f64)> = list.value["features"].as_array().into_iter().flatten().filter_map(|f| Some((f["name"].as_str()?.to_string(), f["regen_ms"].as_f64()?))).collect();
+            times.sort_by(|a, b| b.1.total_cmp(&a.1));
+            res.slowest = times.into_iter().take(3).filter(|t| t.1 >= 1.0).collect();
+        }
     }
     res
 }
@@ -143,6 +151,7 @@ fn parity_models() {
             Some((ours, None)) => format!("; reopened and regenerated in {ours:.0} ms"),
             None => String::new(),
         };
+        let speed = if r.slowest.is_empty() { speed } else { format!("{speed} (slowest: {})", r.slowest.iter().map(|(n, ms)| format!("{n} {ms:.0} ms")).collect::<Vec<_>>().join(", ")) };
         println!("{}: {}/{} features match ({} of {} compared){}{speed}", r.name, r.matching, r.compared, r.compared, r.features, r.first.as_ref().map(|f| format!("; first difference: {f}")).unwrap_or_else(|| "; matches to the end".into()));
         for u in &r.untranslated {
             println!("  untranslated: {u}");
@@ -181,7 +190,7 @@ fn parity_models() {
         println!("  cause: {n} × {c}");
     }
     println!("{}", score_row(docs, results.len(), matching, total, &causes));
-    let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "compared": r.compared, "matching": r.matching, "regen_ms": r.regen_ms.map(|(o, l)| json!({ "ours": o, "live": l })), "first_difference": r.first, "untranslated": r.untranslated })).collect();
+    let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "compared": r.compared, "matching": r.matching, "regen_ms": r.regen_ms.map(|(o, l)| json!({ "ours": o, "live": l })), "slowest": r.slowest, "first_difference": r.first, "untranslated": r.untranslated })).collect();
     let _ = std::fs::write(root.with_file_name("report.json"), serde_json::to_string_pretty(&json!({ "documents_matching": docs, "documents": results.len(), "features_matching": matching, "features": total, "causes": causes.iter().map(|(c, n)| json!({ "cause": c, "documents": n })).collect::<Vec<_>>(), "models": report })).unwrap());
     if std::env::var_os("NOSHAPE_PARITY_INDEX").is_some() {
         let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/parity-models/index.json");

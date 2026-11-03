@@ -814,7 +814,7 @@ Examples:
 
 The feature list: every feature with its status, the parts, failures.
 
-Regenerates the Part Studio and reports each feature (id, name, type, status Ok/Info/Warning/Error/Suppressed/RolledBack, error message; custom features their FeatureScript `notices` and `output`), the parts and the rollback bar.
+Regenerates the Part Studio and reports each feature (id, name, type, status Ok/Info/Warning/Error/Suppressed/RolledBack, error message; custom features their FeatureScript `notices` and `output`; `regen_ms`, its time in the last regeneration that computed it, as the Regeneration times panel), the parts, the rollback bar and `regen_ms`, the features' total.
 
 Examples:
 
