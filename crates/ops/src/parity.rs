@@ -518,6 +518,8 @@ impl<'a> Translator<'a> {
                 }
                 Some(json!(path))
             }
+            // A table from another element (Variable's lookup mode): none chosen is nothing to set.
+            "BTMParameterReferenceTable" if p["elementLibraryData"]["elementLibraryId"].as_str().is_none_or(str::is_empty) => None,
             "BTMParameterFeatureList" => {
                 let ids: Vec<String> = p["featureIds"].as_array().into_iter().flatten().filter_map(Value::as_str).map(|id| self.feature_ids.get(id).map(|o| format!("feature:{o}")).ok_or_else(|| format!("feature {id} was not built"))).collect::<Result<_, _>>()?;
                 Some(json!(ids))
@@ -1718,7 +1720,7 @@ fn upgrade(ty: &str, params: &mut Map<String, Value>, unknown: &mut Vec<String>)
                     Some("ANY") => "anyValue",
                     _ => "lengthValue",
                 };
-                params.insert(key.into(), v);
+                params.entry(key).or_insert(v);
             }
         }
         _ => {}
