@@ -808,6 +808,17 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
 ## Requests to the lead (qa, updated 2026-11-03 01:40)
+- **11-03 01:54 state:** greens move fast (dx / skasm / psui); green copies now noshape-69b1816c and noshape-bad1de8e
+  (**keep a copy until the fuzz batches that used it are evaluated**: CRASH-1837-ONCE's binary was deleted too early).
+  Loops: /tmp/qa-nfloop24.sh (bad1de8e, 2041–2080), /tmp/qa-gfloop9.sh (69b1816c, 2001–2040), /tmp/qa-cfloop67.sh (v0.4.22,
+  1901–1960), /tmp/qa-memg.sh (seeds 508 / 685 RSS on 69b1816c → cli/rss*-g69b1816c.txt). Interaction suite: 185
+  scenarios; ours vs live's 29 recordings (/root/parity/ui/live) on green 69b1816c: **19/29 scenarios, 116/130 states**
+  (qa-scratch/uip-69b.log; `tools/ui-parity/run.py --app <green> --display :110 --out <dir> --live /root/parity/ui/live`,
+  pause :110's fuzz first; ~1 in 15 launches panics connecting to X: rerun those). From it: P3 EYE-CLICK-SELECTS-ROW,
+  P2 UIP-DRIVER-GAPS (driver targets / state fields for psui). Also filed tonight: P1 DIALOG-SWITCH-DISCARDS-NEW, P2
+  VARIABLE-EDIT-FOCUS, P2 FEATURE-RCLICK-WITH-SELECTION, P2 SKETCH-UNDO-REDO-STATE, P3 FEATURE-ROW-ENTER-EDITS
+  (unconfirmed), P2 CRASH-1837-ONCE, P2 PARITY-MODELS-DAILY-RUN (dx), 2 BOOL-DECLINE reasons. SCORE.md first line due
+  11-03 evening (models from dx's report.json; see Requests to the lead).
 - **11-03 01:40: SCORE.md's model numbers.** dx's handoff (d821e749b) has qa run `NOSHAPE_RB_LOCAL=1 tools/tiers/rb.sh cargo test -q -p noshape-ops --test all parity::parity_models -- --ignored`, which is a build; qa's rule is never to build. Until you say otherwise qa takes the model line from the report.json dx's own run leaves next to /root/parity/models (and asks dx in its handoff to run it before 11-03 evening). The scenario line qa makes itself: green binary + tools/ui-parity/run.py (no build) against /root/parity/ui/live — 6/28 scenarios, 50/139 states on green 2723f7fb at 01:35.
 - **09:09: a CLI built from each green's commit** (e.g. next to /root/green/noshape as noshape-cli + SHA). qa never builds, and the
   only CLIs on the box are the agents' worktree builds (bool's 07:17, core's 06:35, which held unlanded work at times: a false
