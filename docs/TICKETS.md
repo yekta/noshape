@@ -3026,6 +3026,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   a cylindrical face (mid_axis, that test's picks) has its Z the other way from Onshape's: worth checking (skasm)
   before the op field changes meaning. Also visible in the app: a configured "Flip primary axis" value
   (model-data assembly/config.rs param::FLIP = the internal flag).
+  dx 14:50: live's asm-hinge-live (circle-centre and centroid connectors) agrees with the inverted reading too; asked
+  live for a pin-in-hole Revolute on mid-axis connectors, default and flipped (REQUESTS 11-03 14:50).
 - [x] (core 11-03 11:50: a region's loop that runs along a line and back is cut there into its outer loop and holes (a dead end's pair dropped; eval.rs split_slits): the slit ring extrudes as the plain ring; T1 kernel_robustness::a_region_slit_by_a_line_extrudes) P2 EXTRUDE-SLIT-REGION (core; dx's parity suite 11-03, learning-center-michael) a sketch region bounded on both
   sides by one line doesn't extrude: circles r 75 and r 40 at the origin on Top and a line (40, 0) → (100, 0) mm make
   the ring one region (sketch_get: 12644.91 mm², no hole, the line twice in its boundary); Extrude of it, alone or
