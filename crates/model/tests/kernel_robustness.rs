@@ -3373,3 +3373,34 @@ fn a_boss_on_a_drafted_blocks_top_adds_to_it() {
         assert!((v - v0 - std::f64::consts::PI * 8.0).abs() < 1e-6, "pull {pull}: {v} after {v0}");
     }
 }
+
+/// SKETCH-COLLINEAR-EDGES-MERGE (dx's parity suite, learning-center-frank, exercise-martinl, clamp-guillem): two
+/// collinear lines meeting end to end, where no other curve of the sketch ends but a construction one, are one side
+/// face of the extrude (live 18/48/32); a third line ending there keeps them apart.
+#[test]
+fn collinear_lines_meeting_alone_extrude_as_one_face() {
+    use noshape_kernel::ShapeType::Face;
+    for dangling in [false, true] {
+        let mut t = T::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let p = |sk: &mut noshape_sketch::Sketch, x: f64, y: f64| sk.add_point(DVec2::new(x * 1e-3, y * 1e-3));
+        let (a, o, b, c, d) = (p(&mut sk, -10.0, 0.0), p(&mut sk, 0.0, 0.0), p(&mut sk, 10.0, 0.0), p(&mut sk, 10.0, 10.0), p(&mut sk, -10.0, 10.0));
+        for (u, v) in [(a, o), (o, b), (b, c), (c, d), (d, a)] {
+            sk.add_line_between(u, v).unwrap();
+        }
+        let top = p(&mut sk, 0.0, 10.0);
+        let mirror = sk.add_line_between(o, top).unwrap();
+        sk.set_construction(mirror, true).unwrap();
+        if dangling {
+            let below = p(&mut sk, 0.0, -5.0);
+            sk.add_line_between(o, below).unwrap();
+        }
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let r = t.regen();
+        let regions: Vec<Reference> = r.display.sketches.iter().find(|g| g.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+        assert_eq!(regions.len(), 1);
+        let x = t.add("extrude", &[("entities", q(regions)), ("depth", e("5 mm")), ("operationType", en("NEW"))]);
+        let r = t.ok(x);
+        assert_eq!(r.context.bodies[0].shape.count(Face), if dangling { 7 } else { 6 }, "dangling {dangling}");
+    }
+}

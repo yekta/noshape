@@ -1414,7 +1414,17 @@ pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region
     let merge = |lp: &noshape_sketch::regions::ProfileLoop| -> Vec<(noshape_sketch::regions::ProfileSegment, u32)> {
         use noshape_sketch::regions::ProfileSegment as P;
         let mut out: Vec<(P, u32)> = Vec::new();
+        // The entity each `out` segment ends with (a merged line's last).
+        let mut last: Vec<u32> = Vec::new();
         let legacy = noshape_kernel::legacy_topology();
+        // Where two lines meet, no other curve of the sketch touches.
+        let alone = |p: DVec2, a: u32, b: u32| {
+            s.sketch.entities().filter(|e| !e.construction && e.kind() != noshape_sketch::EntityKind::Point && e.id.0 != a && e.id.0 != b).all(|e| s.sketch.curve(e.id).is_none_or(|c| c.distance(p) > 1e-9))
+        };
+        let joins = |a0: DVec2, b0: DVec2, a: DVec2, b: DVec2, e0: u32, e: u32| {
+            let (d0, d) = ((b0 - a0).normalize_or_zero(), (b - a).normalize_or_zero());
+            (b0 - a).length() < 1e-12 && d0.perp_dot(d).abs() < 1e-9 && d0.dot(d) > 0.0 && (e0 == e || alone(a, e0, e))
+        };
         for (seg, src) in lp.segments.iter().zip(lp.sources.iter()) {
             if let (Some((P::Arc { center: c0, radius: r0, start_angle: s0, end_angle: e0, ccw: w0 }, e_prev)), P::Arc { center, radius, end_angle, ccw, .. }) = (out.last_mut(), seg)
                 && *e_prev == src.entity.0
@@ -1429,26 +1439,26 @@ pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region
                 *e0 = *s0 + sweep_prev + seg_sweep;
                 continue;
             }
-            // Likewise one line's pieces (split where other curves lie over it or end on it): one edge, so one side
-            // face (live: bracket120's bottom face; not in a studio saved before, legacy_topology).
-            if let (Some((P::Line { a: a0, b: b0 }, e_prev)), P::Line { a, b }) = (out.last_mut(), seg)
+            // Likewise one line's pieces (split where other curves lie over it or end on it), and collinear lines
+            // meeting end to end where nothing else of the sketch does: one edge, so one side face (live:
+            // bracket120's bottom face, learning-center-frank's base of two mirrored lines; not in a studio saved
+            // before, legacy_topology).
+            if let (Some((P::Line { a: a0, b: b0 }, _)), P::Line { a, b }, Some(e_last)) = (out.last_mut(), seg, last.last_mut())
                 && !legacy
-                && *e_prev == src.entity.0
-                && (*b0 - *a).length() < 1e-12
-                && (*b0 - *a0).normalize_or_zero().perp_dot((*b - *a).normalize_or_zero()).abs() < 1e-9
+                && joins(*a0, *b0, *a, *b, *e_last, src.entity.0)
             {
                 *b0 = *b;
+                *e_last = src.entity.0;
                 continue;
             }
             out.push((seg.clone(), src.entity.0));
+            last.push(src.entity.0);
         }
         // (The loop may start inside that line.)
         if out.len() > 2
             && !legacy
-            && let (Some((P::Line { a: la, b: lb }, le)), Some((P::Line { a: fa, b: fb }, fe))) = (out.last(), out.first())
-            && le == fe
-            && (*lb - *fa).length() < 1e-12
-            && (*lb - *la).normalize_or_zero().perp_dot((*fb - *fa).normalize_or_zero()).abs() < 1e-9
+            && let (Some((P::Line { a: la, b: lb }, _)), Some((P::Line { a: fa, b: fb }, fe)), Some(le)) = (out.last(), out.first(), last.last())
+            && joins(*la, *lb, *fa, *fb, *le, *fe)
         {
             let a = *la;
             out.pop();
