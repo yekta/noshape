@@ -1,0 +1,3239 @@
+{
+ "note": "Live 2026-11-03 21:17 UTC (posted; client statuses read after), Part Studio \"skasm fuzz 19\" (7f12800b971b88ba7b375469) in \"skasm speed\", posted over REST as batch 11 (POST /features, no UI drags). Points = REST /sketches point entities by their own ids (l1.start, a3.center, ...), so no end-swap fix is needed; radii from the curves. curves = the web client's computed entityStatus per curve (1 = under defined = blue; checked against batch 11, where it agrees with all 287 colour samples), not screenshot colours this time. message = the feature row tooltip; solved = solveStatus 0 and not aborted.",
+ "cases": {
+  "s901": {
+   "feature": "OK",
+   "message": "s901 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     12.03744,
+     1.70041
+    ],
+    "l1.end": [
+     47.013265,
+     1.70041
+    ],
+    "a2.center": [
+     47.013265,
+     5.1114
+    ],
+    "a2.start": [
+     47.013265,
+     1.70041
+    ],
+    "a2.end": [
+     50.424255,
+     5.1114
+    ],
+    "l3.start": [
+     50.424255,
+     5.1114
+    ],
+    "l3.end": [
+     50.424255,
+     20.238146
+    ],
+    "a4.center": [
+     47.013265,
+     20.238146
+    ],
+    "a4.start": [
+     50.424255,
+     20.238146
+    ],
+    "a4.end": [
+     47.013265,
+     23.649136
+    ],
+    "l5.start": [
+     47.013265,
+     23.649136
+    ],
+    "l5.end": [
+     12.03744,
+     23.649136
+    ],
+    "a6.center": [
+     12.03744,
+     20.238146
+    ],
+    "a6.start": [
+     12.03744,
+     23.649136
+    ],
+    "a6.end": [
+     8.62645,
+     20.238146
+    ],
+    "l7.start": [
+     8.62645,
+     20.238146
+    ],
+    "l7.end": [
+     8.62645,
+     5.1114
+    ],
+    "a8.center": [
+     12.03744,
+     5.1114
+    ],
+    "a8.start": [
+     8.62645,
+     5.1114
+    ],
+    "a8.end": [
+     12.03744,
+     1.70041
+    ]
+   },
+   "radii": {
+    "a2": 3.41099,
+    "a4": 3.41099,
+    "a6": 3.41099,
+    "a8": 3.41099
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "a2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "a4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "a6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)",
+    "a8": "under (entityStatus 1)"
+   },
+   "dof_entities": 28
+  },
+  "s902": {
+   "feature": "OK",
+   "message": "s902 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     -0.464656,
+     0.52911
+    ],
+    "l1.end": [
+     39.103646,
+     0.52911
+    ],
+    "l2.start": [
+     39.103646,
+     0.52911
+    ],
+    "l2.end": [
+     39.103646,
+     14.585134
+    ],
+    "a3.center": [
+     32.522713,
+     14.585134
+    ],
+    "a3.start": [
+     39.103646,
+     14.585134
+    ],
+    "a3.end": [
+     32.522713,
+     21.166067
+    ],
+    "l4.start": [
+     32.522713,
+     21.166067
+    ],
+    "l4.end": [
+     -0.464656,
+     21.166067
+    ],
+    "l5.start": [
+     -0.464656,
+     21.166067
+    ],
+    "l5.end": [
+     -0.464656,
+     0.52911
+    ]
+   },
+   "radii": {
+    "a3": 6.580933
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "a3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)"
+   },
+   "dof_entities": 16
+  },
+  "s903": {
+   "feature": "OK",
+   "message": "s903 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     -6.265455,
+     5.948766
+    ],
+    "l1.end": [
+     22.783539,
+     5.948766
+    ],
+    "l2.start": [
+     22.783539,
+     5.948766
+    ],
+    "l2.end": [
+     22.783539,
+     35.522797
+    ],
+    "l3.start": [
+     22.783539,
+     35.522797
+    ],
+    "l3.end": [
+     -6.265455,
+     35.522797
+    ],
+    "l4.start": [
+     -6.265455,
+     35.522797
+    ],
+    "l4.end": [
+     -6.265455,
+     5.948766
+    ],
+    "l5.start": [
+     8.259042,
+     -0.051234
+    ],
+    "l5.end": [
+     8.259042,
+     41.522797
+    ]
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)"
+   },
+   "dof_entities": 15
+  },
+  "s904": {
+   "feature": "OK",
+   "message": "s904 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     9.131221,
+     -0.965161
+    ],
+    "l1.end": [
+     30.199588,
+     -0.965161
+    ],
+    "a2.center": [
+     30.199588,
+     4.190961
+    ],
+    "a2.start": [
+     30.199588,
+     -0.965161
+    ],
+    "a2.end": [
+     30.199588,
+     9.347083
+    ],
+    "l3.start": [
+     30.199588,
+     9.347083
+    ],
+    "l3.end": [
+     9.131221,
+     9.347083
+    ],
+    "a4.center": [
+     9.131221,
+     4.190961
+    ],
+    "a4.start": [
+     9.131221,
+     9.347083
+    ],
+    "a4.end": [
+     9.131221,
+     -0.965161
+    ],
+    "c5.center": [
+     9.131221,
+     4.190961
+    ],
+    "c6.center": [
+     30.199588,
+     4.190961
+    ],
+    "l7.start": [
+     76.238502,
+     -4.846114
+    ],
+    "l7.end": [
+     121.836184,
+     -4.846114
+    ],
+    "l8.start": [
+     76.238502,
+     -4.846114
+    ],
+    "l8.end": [
+     87.538759,
+     39.553819
+    ],
+    "c9.center": [
+     82.118641,
+     -0.275076
+    ]
+   },
+   "radii": {
+    "a2": 5.156122,
+    "a4": 5.156122,
+    "c5": 5.180671,
+    "c6": 5.180671,
+    "c9": 4.571038
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "a2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "a4": "under (entityStatus 1)",
+    "c5": "under (entityStatus 1)",
+    "c6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)",
+    "l8": "under (entityStatus 1)",
+    "c9": "under (entityStatus 1)"
+   },
+   "dof_entities": 26
+  },
+  "s905": {
+   "feature": "OK",
+   "message": "s905 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     5.350809,
+     2.637152
+    ],
+    "l1.end": [
+     5.350809,
+     11.548486
+    ],
+    "l2.start": [
+     5.350809,
+     11.548486
+    ],
+    "l2.end": [
+     16.668196,
+     11.548486
+    ],
+    "l3.start": [
+     16.668196,
+     11.548486
+    ],
+    "l3.end": [
+     16.668196,
+     5.925107
+    ],
+    "l4.start": [
+     16.668196,
+     5.925107
+    ],
+    "l4.end": [
+     56.28485,
+     5.925107
+    ],
+    "l5.start": [
+     56.28485,
+     5.925107
+    ],
+    "l5.end": [
+     56.28485,
+     2.637152
+    ],
+    "l6.start": [
+     56.28485,
+     2.637152
+    ],
+    "l6.end": [
+     5.350809,
+     2.637152
+    ]
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)"
+   },
+   "dof_entities": 18
+  },
+  "s906": {
+   "feature": "OK",
+   "message": "s906 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     -2.89786,
+     -5.693345
+    ],
+    "l1.end": [
+     28.808834,
+     -5.693345
+    ],
+    "l2.start": [
+     28.808834,
+     -5.693345
+    ],
+    "l2.end": [
+     28.808834,
+     29.002397
+    ],
+    "l3.start": [
+     28.808834,
+     29.002397
+    ],
+    "l3.end": [
+     -2.89786,
+     29.002397
+    ],
+    "l4.start": [
+     -2.89786,
+     29.002397
+    ],
+    "l4.end": [
+     -2.89786,
+     -5.693345
+    ],
+    "l5.start": [
+     -2.89786,
+     -5.693345
+    ],
+    "l5.end": [
+     28.808834,
+     29.002397
+    ],
+    "c6.center": [
+     12.955487,
+     11.654526
+    ]
+   },
+   "radii": {
+    "c6": 4.162351
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "c6": "under (entityStatus 1)"
+   },
+   "dof_entities": 17
+  },
+  "s907": {
+   "feature": "OK",
+   "message": "s907 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     8.751363,
+     7.29481
+    ],
+    "l1.end": [
+     45.767704,
+     7.29481
+    ],
+    "l2.start": [
+     45.767704,
+     7.29481
+    ],
+    "l2.end": [
+     27.259533,
+     39.351902
+    ],
+    "l3.start": [
+     27.259533,
+     39.351902
+    ],
+    "l3.end": [
+     8.751363,
+     7.29481
+    ],
+    "l4.start": [
+     87.895493,
+     -7.56417
+    ],
+    "l4.end": [
+     120.219829,
+     -7.56417
+    ],
+    "l5.start": [
+     120.219829,
+     -7.56417
+    ],
+    "l5.end": [
+     120.219829,
+     17.82506
+    ],
+    "l6.start": [
+     120.219829,
+     17.82506
+    ],
+    "l6.end": [
+     87.895493,
+     17.82506
+    ],
+    "l7.start": [
+     87.895493,
+     17.82506
+    ],
+    "l7.end": [
+     87.895493,
+     -7.56417
+    ]
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)"
+   },
+   "dof_entities": 21
+  },
+  "s908": {
+   "feature": "OK",
+   "message": "s908 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     5.753998,
+     -0.417494
+    ],
+    "l1.end": [
+     60.583691,
+     -0.417494
+    ],
+    "l2.start": [
+     60.583691,
+     -0.417494
+    ],
+    "l2.end": [
+     60.583691,
+     26.333489
+    ],
+    "l3.start": [
+     60.583691,
+     26.333489
+    ],
+    "l3.end": [
+     5.753998,
+     26.333489
+    ],
+    "l4.start": [
+     5.753998,
+     26.333489
+    ],
+    "l4.end": [
+     5.753998,
+     -0.417494
+    ],
+    "c5.center": [
+     17.361419,
+     16.779111
+    ],
+    "c6.center": [
+     48.97627,
+     16.779111
+    ],
+    "l7.start": [
+     82.568162,
+     -8.784984
+    ],
+    "l7.end": [
+     129.186774,
+     -8.784984
+    ],
+    "l8.start": [
+     129.186774,
+     -8.784984
+    ],
+    "l8.end": [
+     129.186774,
+     15.046854
+    ],
+    "l9.start": [
+     129.186774,
+     15.046854
+    ],
+    "l9.end": [
+     82.568162,
+     15.046854
+    ],
+    "l10.start": [
+     82.568162,
+     15.046854
+    ],
+    "l10.end": [
+     82.568162,
+     -8.784984
+    ],
+    "l11.start": [
+     82.568162,
+     -8.784984
+    ],
+    "l11.end": [
+     129.186774,
+     15.046854
+    ],
+    "c12.center": [
+     105.877468,
+     3.130935
+    ]
+   },
+   "radii": {
+    "c5": 3.327529,
+    "c6": 3.327529,
+    "c12": 4.769564
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "c5": "under (entityStatus 1)",
+    "c6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)",
+    "l8": "under (entityStatus 1)",
+    "l9": "under (entityStatus 1)",
+    "l10": "under (entityStatus 1)",
+    "l11": "under (entityStatus 1)",
+    "c12": "under (entityStatus 1)"
+   },
+   "dof_entities": 33
+  },
+  "s909": {
+   "feature": "OK",
+   "message": "s909 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     9.438107,
+     -4.266917
+    ],
+    "l1.end": [
+     53.390643,
+     -4.266917
+    ],
+    "l2.start": [
+     53.390643,
+     -4.266917
+    ],
+    "l2.end": [
+     21.294957,
+     7.175997
+    ],
+    "l3.start": [
+     9.438107,
+     -4.266917
+    ],
+    "l3.end": [
+     21.294957,
+     7.175997
+    ],
+    "l4.start": [
+     63.601263,
+     -14.179757
+    ],
+    "l4.end": [
+     86.367619,
+     -14.179757
+    ],
+    "l5.start": [
+     86.367619,
+     -14.179757
+    ],
+    "l5.end": [
+     93.40281,
+     7.472334
+    ],
+    "l6.start": [
+     93.40281,
+     7.472334
+    ],
+    "l6.end": [
+     74.984441,
+     20.854062
+    ],
+    "l7.start": [
+     74.984441,
+     20.854062
+    ],
+    "l7.end": [
+     56.566072,
+     7.472334
+    ],
+    "l8.start": [
+     56.566072,
+     7.472334
+    ],
+    "l8.end": [
+     63.601263,
+     -14.179757
+    ],
+    "c9.center": [
+     74.984441,
+     1.487843
+    ]
+   },
+   "radii": {
+    "c9": 19.366219
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)",
+    "l8": "under (entityStatus 1)",
+    "c9": "under (entityStatus 1)"
+   },
+   "dof_entities": 26
+  },
+  "s910": {
+   "feature": "OK",
+   "message": "s910 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "c1.center": [
+     -6.38208,
+     -7.077322
+    ],
+    "c2.center": [
+     -6.38208,
+     4.644041
+    ],
+    "c3.center": [
+     -16.533078,
+     -12.938003
+    ],
+    "c4.center": [
+     3.768918,
+     -12.938003
+    ],
+    "c5.center": [
+     82.261307,
+     -2.95861
+    ],
+    "c6.center": [
+     82.261307,
+     8.521984
+    ],
+    "c7.center": [
+     70.780713,
+     -2.95861
+    ],
+    "c8.center": [
+     82.261307,
+     -14.439204
+    ],
+    "c9.center": [
+     93.741901,
+     -2.95861
+    ]
+   },
+   "radii": {
+    "c1": 16.110081,
+    "c2": 2.694957,
+    "c3": 2.694957,
+    "c4": 2.694957,
+    "c5": 21.15084,
+    "c6": 3.760353,
+    "c7": 3.760353,
+    "c8": 3.760353,
+    "c9": 3.760353
+   },
+   "curves": {
+    "c1": "under (entityStatus 1)",
+    "c2": "under (entityStatus 1)",
+    "c3": "under (entityStatus 1)",
+    "c4": "under (entityStatus 1)",
+    "c5": "under (entityStatus 1)",
+    "c6": "under (entityStatus 1)",
+    "c7": "under (entityStatus 1)",
+    "c8": "under (entityStatus 1)",
+    "c9": "under (entityStatus 1)"
+   },
+   "dof_entities": 18
+  },
+  "s911": {
+   "feature": "OK",
+   "message": "s911 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     -9.924417,
+     -6.438751
+    ],
+    "l1.end": [
+     26.096999,
+     -6.438751
+    ],
+    "l2.start": [
+     26.096999,
+     -6.438751
+    ],
+    "l2.end": [
+     26.096999,
+     13.284838
+    ],
+    "l3.start": [
+     26.096999,
+     13.284838
+    ],
+    "l3.end": [
+     -9.924417,
+     13.284838
+    ],
+    "l4.start": [
+     -9.924417,
+     13.284838
+    ],
+    "l4.end": [
+     -9.924417,
+     -6.438751
+    ],
+    "l5.start": [
+     68.944233,
+     6.844032
+    ],
+    "l5.end": [
+     81.762832,
+     6.844032
+    ],
+    "a6.center": [
+     75.353532,
+     18.019724
+    ],
+    "a6.start": [
+     81.762832,
+     6.844032
+    ],
+    "a6.end": [
+     68.944233,
+     6.844032
+    ]
+   },
+   "radii": {
+    "a6": 12.883137
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "a6": "under (entityStatus 1)"
+   },
+   "dof_entities": 19
+  },
+  "s912": {
+   "feature": "OK",
+   "message": "s912 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     0.98841,
+     6.210873
+    ],
+    "l1.end": [
+     36.721852,
+     6.210873
+    ],
+    "l2.start": [
+     36.721852,
+     6.210873
+    ],
+    "l2.end": [
+     36.721852,
+     37.696592
+    ],
+    "l3.start": [
+     36.721852,
+     37.696592
+    ],
+    "l3.end": [
+     0.98841,
+     37.696592
+    ],
+    "l4.start": [
+     0.98841,
+     37.696592
+    ],
+    "l4.end": [
+     0.98841,
+     6.210873
+    ],
+    "l5.start": [
+     0.98841,
+     6.210873
+    ],
+    "l5.end": [
+     36.721852,
+     37.696592
+    ],
+    "c6.center": [
+     18.855131,
+     21.953732
+    ],
+    "l7.start": [
+     87.420966,
+     -6.473873
+    ],
+    "l7.end": [
+     119.325797,
+     -6.473873
+    ],
+    "l8.start": [
+     119.325797,
+     -6.473873
+    ],
+    "l8.end": [
+     119.325797,
+     2.961811
+    ],
+    "l9.start": [
+     119.325797,
+     2.961811
+    ],
+    "l9.end": [
+     121.862885,
+     2.961811
+    ],
+    "l10.start": [
+     121.862885,
+     2.961811
+    ],
+    "l10.end": [
+     121.862885,
+     29.993867
+    ],
+    "l11.start": [
+     121.862885,
+     29.993867
+    ],
+    "l11.end": [
+     87.420966,
+     29.993867
+    ],
+    "l12.start": [
+     87.420966,
+     29.993867
+    ],
+    "l12.end": [
+     87.420966,
+     -6.473873
+    ],
+    "c13.center": [
+     106.245948,
+     -1.756031
+    ]
+   },
+   "radii": {
+    "c6": 2.689727,
+    "c13": 2.358921
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "c6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)",
+    "l8": "under (entityStatus 1)",
+    "l9": "under (entityStatus 1)",
+    "l10": "under (entityStatus 1)",
+    "l11": "under (entityStatus 1)",
+    "l12": "under (entityStatus 1)",
+    "c13": "under (entityStatus 1)"
+   },
+   "dof_entities": 37
+  },
+  "s913": {
+   "feature": "OK",
+   "message": "s913 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     -7.057464,
+     -2.285276
+    ],
+    "l1.end": [
+     48.996748,
+     -2.285276
+    ],
+    "l2.start": [
+     48.996748,
+     -2.285276
+    ],
+    "l2.end": [
+     48.996748,
+     39.782371
+    ],
+    "l3.start": [
+     48.996748,
+     39.782371
+    ],
+    "l3.end": [
+     -7.057464,
+     39.782371
+    ],
+    "l4.start": [
+     -7.057464,
+     39.782371
+    ],
+    "l4.end": [
+     -7.057464,
+     -2.285276
+    ],
+    "l5.start": [
+     6.956089,
+     12.204235
+    ],
+    "l5.end": [
+     30.318905,
+     12.204235
+    ],
+    "a6.center": [
+     30.318905,
+     17.2498
+    ],
+    "a6.start": [
+     30.318905,
+     12.204235
+    ],
+    "a6.end": [
+     30.318905,
+     22.295365
+    ],
+    "l7.start": [
+     30.318905,
+     22.295365
+    ],
+    "l7.end": [
+     6.956089,
+     22.295365
+    ],
+    "a8.center": [
+     6.956089,
+     17.2498
+    ],
+    "a8.start": [
+     6.956089,
+     22.295365
+    ],
+    "a8.end": [
+     6.956089,
+     12.204235
+    ]
+   },
+   "radii": {
+    "a6": 5.045565,
+    "a8": 5.045565
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "a6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)",
+    "a8": "under (entityStatus 1)"
+   },
+   "dof_entities": 26
+  },
+  "s914": {
+   "feature": "OK",
+   "message": "s914 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     -3.872221,
+     -3.686779
+    ],
+    "l1.end": [
+     35.813129,
+     -3.686779
+    ],
+    "a2.center": [
+     35.813129,
+     4.837043
+    ],
+    "a2.start": [
+     35.813129,
+     -3.686779
+    ],
+    "a2.end": [
+     35.813129,
+     13.360865
+    ],
+    "l3.start": [
+     35.813129,
+     13.360865
+    ],
+    "l3.end": [
+     -3.872221,
+     13.360865
+    ],
+    "a4.center": [
+     -3.872221,
+     4.837043
+    ],
+    "a4.start": [
+     -3.872221,
+     13.360865
+    ],
+    "a4.end": [
+     -3.872221,
+     -3.686779
+    ]
+   },
+   "radii": {
+    "a2": 8.523822,
+    "a4": 8.523822
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "a2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "a4": "under (entityStatus 1)"
+   },
+   "dof_entities": 14
+  },
+  "s915": {
+   "feature": "OK",
+   "message": "s915 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "a1.center": [
+     5.829104,
+     9.583727
+    ],
+    "a1.start": [
+     8.22815,
+     24.087908
+    ],
+    "a1.end": [
+     8.22815,
+     -4.920454
+    ],
+    "l2.start": [
+     8.22815,
+     -4.920454
+    ],
+    "l2.end": [
+     46.089435,
+     1.341947
+    ],
+    "a3.center": [
+     44.726214,
+     9.583727
+    ],
+    "a3.start": [
+     46.089435,
+     1.341947
+    ],
+    "a3.end": [
+     46.089435,
+     17.825508
+    ],
+    "l4.start": [
+     46.089435,
+     17.825508
+    ],
+    "l4.end": [
+     8.22815,
+     24.087908
+    ],
+    "l5.start": [
+     5.829104,
+     9.583727
+    ],
+    "l5.end": [
+     44.726214,
+     9.583727
+    ],
+    "l6.start": [
+     87.895927,
+     -3.926006
+    ],
+    "l6.end": [
+     140.566005,
+     -3.926006
+    ],
+    "a7.center": [
+     140.566005,
+     5.663666
+    ],
+    "a7.start": [
+     140.566005,
+     -3.926006
+    ],
+    "a7.end": [
+     140.566005,
+     15.253338
+    ],
+    "l8.start": [
+     140.566005,
+     15.253338
+    ],
+    "l8.end": [
+     87.895927,
+     15.253338
+    ],
+    "a9.center": [
+     87.895927,
+     5.663666
+    ],
+    "a9.start": [
+     87.895927,
+     15.253338
+    ],
+    "a9.end": [
+     87.895927,
+     -3.926006
+    ],
+    "c10.center": [
+     87.895927,
+     5.663666
+    ],
+    "c11.center": [
+     140.566005,
+     5.663666
+    ]
+   },
+   "radii": {
+    "a1": 14.701248,
+    "a3": 8.353761,
+    "a7": 9.589672,
+    "a9": 9.589672,
+    "c10": 6.421245,
+    "c11": 6.421245
+   },
+   "curves": {
+    "a1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "a3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)",
+    "a7": "under (entityStatus 1)",
+    "l8": "under (entityStatus 1)",
+    "a9": "under (entityStatus 1)",
+    "c10": "under (entityStatus 1)",
+    "c11": "under (entityStatus 1)"
+   },
+   "dof_entities": 35
+  },
+  "s916": {
+   "feature": "OK",
+   "message": "s916 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     -7.638782,
+     2.297024
+    ],
+    "l1.end": [
+     16.065843,
+     2.297024
+    ],
+    "l2.start": [
+     16.065843,
+     2.297024
+    ],
+    "l2.end": [
+     4.213531,
+     18.920198
+    ],
+    "l3.start": [
+     4.213531,
+     18.920198
+    ],
+    "l3.end": [
+     -7.638782,
+     2.297024
+    ],
+    "l4.start": [
+     78.784044,
+     -19.450869
+    ],
+    "l4.end": [
+     90.139696,
+     -19.450869
+    ],
+    "l5.start": [
+     90.139696,
+     -19.450869
+    ],
+    "l5.end": [
+     95.817522,
+     -9.616586
+    ],
+    "l6.start": [
+     95.817522,
+     -9.616586
+    ],
+    "l6.end": [
+     90.139696,
+     0.217697
+    ],
+    "l7.start": [
+     90.139696,
+     0.217697
+    ],
+    "l7.end": [
+     78.784044,
+     0.217697
+    ],
+    "l8.start": [
+     78.784044,
+     0.217697
+    ],
+    "l8.end": [
+     73.106218,
+     -9.616586
+    ],
+    "l9.start": [
+     73.106218,
+     -9.616586
+    ],
+    "l9.end": [
+     78.784044,
+     -19.450869
+    ],
+    "c10.center": [
+     84.46187,
+     -9.616586
+    ]
+   },
+   "radii": {
+    "c10": 11.355652
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)",
+    "l8": "under (entityStatus 1)",
+    "l9": "under (entityStatus 1)",
+    "c10": "under (entityStatus 1)"
+   },
+   "dof_entities": 29
+  },
+  "s917": {
+   "feature": "OK",
+   "message": "s917 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     -3.928979,
+     0.629579
+    ],
+    "l1.end": [
+     27.235062,
+     0.629579
+    ],
+    "l2.start": [
+     27.235062,
+     0.629579
+    ],
+    "l2.end": [
+     27.235062,
+     9.905049
+    ],
+    "l3.start": [
+     27.235062,
+     9.905049
+    ],
+    "l3.end": [
+     7.920868,
+     9.905049
+    ],
+    "a4.center": [
+     7.920868,
+     14.08264
+    ],
+    "a4.start": [
+     3.743277,
+     14.08264
+    ],
+    "a4.end": [
+     7.920868,
+     9.905049
+    ],
+    "l5.start": [
+     3.743277,
+     14.08264
+    ],
+    "l5.end": [
+     3.743277,
+     34.377216
+    ],
+    "l6.start": [
+     3.743277,
+     34.377216
+    ],
+    "l6.end": [
+     -3.928979,
+     34.377216
+    ],
+    "l7.start": [
+     -3.928979,
+     34.377216
+    ],
+    "l7.end": [
+     -3.928979,
+     0.629579
+    ],
+    "l8.start": [
+     84.507115,
+     -16.734987
+    ],
+    "l8.end": [
+     93.066809,
+     -16.734987
+    ],
+    "l9.start": [
+     93.066809,
+     -16.734987
+    ],
+    "l9.end": [
+     97.346656,
+     -9.322075
+    ],
+    "l10.start": [
+     97.346656,
+     -9.322075
+    ],
+    "l10.end": [
+     93.066809,
+     -1.909163
+    ],
+    "l11.start": [
+     93.066809,
+     -1.909163
+    ],
+    "l11.end": [
+     84.507115,
+     -1.909163
+    ],
+    "l12.start": [
+     84.507115,
+     -1.909163
+    ],
+    "l12.end": [
+     80.227269,
+     -9.322075
+    ],
+    "l13.start": [
+     80.227269,
+     -9.322075
+    ],
+    "l13.end": [
+     84.507115,
+     -16.734987
+    ],
+    "c14.center": [
+     88.786962,
+     -9.322075
+    ]
+   },
+   "radii": {
+    "a4": 4.177591,
+    "c14": 8.559693
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "a4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)",
+    "l8": "under (entityStatus 1)",
+    "l9": "under (entityStatus 1)",
+    "l10": "under (entityStatus 1)",
+    "l11": "under (entityStatus 1)",
+    "l12": "under (entityStatus 1)",
+    "l13": "under (entityStatus 1)",
+    "c14": "under (entityStatus 1)"
+   },
+   "dof_entities": 42
+  },
+  "s918": {
+   "feature": "OK",
+   "message": "s918 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     1.653111,
+     -5.039843
+    ],
+    "l1.end": [
+     54.37001,
+     -5.039843
+    ],
+    "l2.start": [
+     54.37001,
+     -5.039843
+    ],
+    "l2.end": [
+     54.37001,
+     22.472271
+    ],
+    "l3.start": [
+     54.37001,
+     22.472271
+    ],
+    "l3.end": [
+     1.653111,
+     22.472271
+    ],
+    "l4.start": [
+     1.653111,
+     22.472271
+    ],
+    "l4.end": [
+     1.653111,
+     -5.039843
+    ],
+    "c5.center": [
+     15.560059,
+     9.032946
+    ],
+    "c6.center": [
+     43.373956,
+     9.032946
+    ],
+    "l7.start": [
+     15.560059,
+     9.032946
+    ],
+    "l7.end": [
+     43.373956,
+     9.032946
+    ],
+    "a8.center": [
+     79.813164,
+     -5.23776
+    ],
+    "a8.start": [
+     80.956047,
+     6.108107
+    ],
+    "a8.end": [
+     80.956047,
+     -16.583626
+    ],
+    "l9.start": [
+     80.956047,
+     -16.583626
+    ],
+    "l9.end": [
+     135.239738,
+     -11.115564
+    ],
+    "a10.center": [
+     134.64766,
+     -5.23776
+    ],
+    "a10.start": [
+     135.239738,
+     -11.115564
+    ],
+    "a10.end": [
+     135.239738,
+     0.640045
+    ],
+    "l11.start": [
+     135.239738,
+     0.640045
+    ],
+    "l11.end": [
+     80.956047,
+     6.108107
+    ],
+    "l12.start": [
+     79.813164,
+     -5.23776
+    ],
+    "l12.end": [
+     134.64766,
+     -5.23776
+    ],
+    "c13.center": [
+     79.813164,
+     -5.23776
+    ],
+    "c14.center": [
+     134.64766,
+     -5.23776
+    ]
+   },
+   "radii": {
+    "c5": 3.37747,
+    "c6": 3.37747,
+    "a8": 11.403283,
+    "a10": 5.90755,
+    "c13": 5.589061,
+    "c14": 2.912403
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "c5": "under (entityStatus 1)",
+    "c6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)",
+    "a8": "under (entityStatus 1)",
+    "l9": "under (entityStatus 1)",
+    "a10": "under (entityStatus 1)",
+    "l11": "under (entityStatus 1)",
+    "l12": "under (entityStatus 1)",
+    "c13": "under (entityStatus 1)",
+    "c14": "under (entityStatus 1)"
+   },
+   "dof_entities": 40
+  },
+  "s919": {
+   "feature": "OK",
+   "message": "s919 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     9.823945,
+     -8.388119
+    ],
+    "l1.end": [
+     58.008193,
+     -8.388119
+    ],
+    "l2.start": [
+     58.008193,
+     -8.388119
+    ],
+    "l2.end": [
+     58.008193,
+     2.073988
+    ],
+    "l3.start": [
+     58.008193,
+     2.073988
+    ],
+    "l3.end": [
+     26.363774,
+     2.073988
+    ],
+    "l4.start": [
+     26.363774,
+     2.073988
+    ],
+    "l4.end": [
+     26.363774,
+     20.423541
+    ],
+    "l5.start": [
+     26.363774,
+     20.423541
+    ],
+    "l5.end": [
+     9.823945,
+     20.423541
+    ],
+    "l6.start": [
+     9.823945,
+     20.423541
+    ],
+    "l6.end": [
+     9.823945,
+     -8.388119
+    ],
+    "c7.center": [
+     33.565707,
+     -3.157065
+    ]
+   },
+   "radii": {
+    "c7": 2.615527
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)",
+    "c7": "under (entityStatus 1)"
+   },
+   "dof_entities": 20
+  },
+  "s920": {
+   "feature": "OK",
+   "message": "s920 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "c1.center": [
+     -0.782042,
+     -2.831659
+    ],
+    "l2.start": [
+     -13.404327,
+     -2.831659
+    ],
+    "l2.end": [
+     11.840242,
+     -2.831659
+    ],
+    "c3.center": [
+     -13.404327,
+     -2.831659
+    ],
+    "c4.center": [
+     11.840242,
+     -2.831659
+    ]
+   },
+   "radii": {
+    "c1": 19.823282,
+    "c3": 3.643731,
+    "c4": 3.643731
+   },
+   "curves": {
+    "c1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "c3": "under (entityStatus 1)",
+    "c4": "under (entityStatus 1)"
+   },
+   "dof_entities": 9
+  },
+  "s921": {
+   "feature": "OK",
+   "message": "s921 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     4.24419,
+     -4.195581
+    ],
+    "l1.end": [
+     29.897569,
+     -4.195581
+    ],
+    "l2.start": [
+     29.897569,
+     -4.195581
+    ],
+    "l2.end": [
+     34.120708,
+     15.23081
+    ],
+    "l3.start": [
+     34.120708,
+     15.23081
+    ],
+    "l3.end": [
+     8.467329,
+     15.23081
+    ],
+    "l4.start": [
+     4.24419,
+     -4.195581
+    ],
+    "l4.end": [
+     8.467329,
+     15.23081
+    ]
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)"
+   },
+   "dof_entities": 12
+  },
+  "s922": {
+   "feature": "OK",
+   "message": "s922 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "a1.center": [
+     3.354706,
+     -9.850726
+    ],
+    "a1.start": [
+     4.780325,
+     0.71889
+    ],
+    "a1.end": [
+     4.780325,
+     -20.420343
+    ],
+    "l2.start": [
+     4.780325,
+     -20.420343
+    ],
+    "l2.end": [
+     50.242627,
+     -14.288434
+    ],
+    "a3.center": [
+     49.644073,
+     -9.850726
+    ],
+    "a3.start": [
+     50.242627,
+     -14.288434
+    ],
+    "a3.end": [
+     50.242627,
+     -5.413019
+    ],
+    "l4.start": [
+     50.242627,
+     -5.413019
+    ],
+    "l4.end": [
+     4.780325,
+     0.71889
+    ],
+    "l5.start": [
+     3.354706,
+     -9.850726
+    ],
+    "l5.end": [
+     49.644073,
+     -9.850726
+    ]
+   },
+   "radii": {
+    "a1": 10.665326,
+    "a3": 4.477892
+   },
+   "curves": {
+    "a1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "a3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)"
+   },
+   "dof_entities": 17
+  },
+  "s923": {
+   "feature": "OK",
+   "message": "s923 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     -8.632731,
+     0.931465
+    ],
+    "l1.end": [
+     25.39489,
+     0.931465
+    ],
+    "l2.start": [
+     25.39489,
+     0.931465
+    ],
+    "l2.end": [
+     25.39489,
+     9.310048
+    ],
+    "l3.start": [
+     25.39489,
+     9.310048
+    ],
+    "l3.end": [
+     5.879239,
+     9.310048
+    ],
+    "a4.center": [
+     5.879239,
+     13.876446
+    ],
+    "a4.start": [
+     1.312841,
+     13.876446
+    ],
+    "a4.end": [
+     5.879239,
+     9.310048
+    ],
+    "l5.start": [
+     1.312841,
+     13.876446
+    ],
+    "l5.end": [
+     1.312841,
+     38.989406
+    ],
+    "l6.start": [
+     1.312841,
+     38.989406
+    ],
+    "l6.end": [
+     -8.632731,
+     38.989406
+    ],
+    "l7.start": [
+     -8.632731,
+     38.989406
+    ],
+    "l7.end": [
+     -8.632731,
+     0.931465
+    ]
+   },
+   "radii": {
+    "a4": 4.566398
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "a4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)"
+   },
+   "dof_entities": 22
+  },
+  "s924": {
+   "feature": "OK",
+   "message": "s924 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     5.879856,
+     0.372275
+    ],
+    "l1.end": [
+     47.045892,
+     0.372275
+    ],
+    "l2.start": [
+     47.045892,
+     0.372275
+    ],
+    "l2.end": [
+     47.045892,
+     10.22373
+    ],
+    "l3.start": [
+     47.045892,
+     10.22373
+    ],
+    "l3.end": [
+     25.562593,
+     10.22373
+    ],
+    "l4.start": [
+     25.562593,
+     10.22373
+    ],
+    "l4.end": [
+     25.562593,
+     31.937129
+    ],
+    "l5.start": [
+     25.562593,
+     31.937129
+    ],
+    "l5.end": [
+     5.879856,
+     31.937129
+    ],
+    "l6.start": [
+     5.879856,
+     31.937129
+    ],
+    "l6.end": [
+     5.879856,
+     0.372275
+    ],
+    "c7.center": [
+     34.79256,
+     6.313333
+    ],
+    "l8.start": [
+     73.230341,
+     -2.319415
+    ],
+    "l8.end": [
+     121.53581,
+     -2.319415
+    ],
+    "l9.start": [
+     121.53581,
+     -2.319415
+    ],
+    "l9.end": [
+     128.777187,
+     17.718776
+    ],
+    "l10.start": [
+     128.777187,
+     17.718776
+    ],
+    "l10.end": [
+     80.471718,
+     17.718776
+    ],
+    "l11.start": [
+     73.230341,
+     -2.319415
+    ],
+    "l11.end": [
+     80.471718,
+     17.718776
+    ]
+   },
+   "radii": {
+    "c7": 2.970529
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)",
+    "c7": "under (entityStatus 1)",
+    "l8": "under (entityStatus 1)",
+    "l9": "under (entityStatus 1)",
+    "l10": "under (entityStatus 1)",
+    "l11": "under (entityStatus 1)"
+   },
+   "dof_entities": 32
+  },
+  "s925": {
+   "feature": "OK",
+   "message": "s925 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "c1.center": [
+     8.894818,
+     -5.441154
+    ],
+    "c2.center": [
+     8.894818,
+     -5.441154
+    ],
+    "l3.start": [
+     88.440892,
+     3.111563
+    ],
+    "l3.end": [
+     109.492967,
+     3.111563
+    ],
+    "l4.start": [
+     109.492967,
+     3.111563
+    ],
+    "l4.end": [
+     109.492967,
+     24.864428
+    ],
+    "l5.start": [
+     109.492967,
+     24.864428
+    ],
+    "l5.end": [
+     88.440892,
+     24.864428
+    ],
+    "l6.start": [
+     88.440892,
+     24.864428
+    ],
+    "l6.end": [
+     88.440892,
+     3.111563
+    ],
+    "l7.start": [
+     98.96693,
+     -2.888437
+    ],
+    "l7.end": [
+     98.96693,
+     37.044976
+    ]
+   },
+   "radii": {
+    "c1": 19.448078,
+    "c2": 3.447386
+   },
+   "curves": {
+    "c1": "under (entityStatus 1)",
+    "c2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)"
+   },
+   "dof_entities": 19
+  },
+  "s926": {
+   "feature": "OK",
+   "message": "s926 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     -7.665305,
+     1.825173
+    ],
+    "l1.end": [
+     32.625609,
+     1.825173
+    ],
+    "l2.start": [
+     32.625609,
+     1.825173
+    ],
+    "l2.end": [
+     38.11377,
+     27.356713
+    ],
+    "l3.start": [
+     38.11377,
+     27.356713
+    ],
+    "l3.end": [
+     -2.177144,
+     27.356713
+    ],
+    "l4.start": [
+     -7.665305,
+     1.825173
+    ],
+    "l4.end": [
+     -2.177144,
+     27.356713
+    ]
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)"
+   },
+   "dof_entities": 12
+  },
+  "s927": {
+   "feature": "OK",
+   "message": "s927 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     8.866108,
+     3.093647
+    ],
+    "l1.end": [
+     8.866108,
+     26.216775
+    ],
+    "a2.center": [
+     19.138197,
+     26.216775
+    ],
+    "a2.start": [
+     29.410286,
+     26.216775
+    ],
+    "a2.end": [
+     8.866108,
+     26.216775
+    ],
+    "l3.start": [
+     29.410286,
+     26.216775
+    ],
+    "l3.end": [
+     29.410286,
+     13.823118
+    ]
+   },
+   "radii": {
+    "a2": 10.272089
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "a2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)"
+   },
+   "dof_entities": 10
+  },
+  "s928": {
+   "feature": "OK",
+   "message": "s928 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     1.779769,
+     -1.009648
+    ],
+    "l1.end": [
+     1.779769,
+     5.566075
+    ],
+    "l2.start": [
+     1.779769,
+     5.566075
+    ],
+    "l2.end": [
+     23.145459,
+     5.566075
+    ],
+    "l3.start": [
+     23.145459,
+     5.566075
+    ],
+    "l3.end": [
+     23.145459,
+     2.325739
+    ],
+    "l4.start": [
+     23.145459,
+     2.325739
+    ],
+    "l4.end": [
+     59.519773,
+     2.325739
+    ],
+    "l5.start": [
+     59.519773,
+     2.325739
+    ],
+    "l5.end": [
+     59.519773,
+     -1.009648
+    ],
+    "l6.start": [
+     59.519773,
+     -1.009648
+    ],
+    "l6.end": [
+     1.779769,
+     -1.009648
+    ]
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)"
+   },
+   "dof_entities": 18
+  },
+  "s929": {
+   "feature": "OK",
+   "message": "s929 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     -0.364992,
+     6.909477
+    ],
+    "l1.end": [
+     26.883745,
+     6.909477
+    ],
+    "l2.start": [
+     26.883745,
+     6.909477
+    ],
+    "l2.end": [
+     13.259376,
+     30.507575
+    ],
+    "l3.start": [
+     13.259376,
+     30.507575
+    ],
+    "l3.end": [
+     -0.364992,
+     6.909477
+    ],
+    "l4.start": [
+     75.796543,
+     -5.075343
+    ],
+    "l4.end": [
+     100.492595,
+     -5.075343
+    ],
+    "l5.start": [
+     100.492595,
+     -5.075343
+    ],
+    "l5.end": [
+     100.492595,
+     -0.554141
+    ],
+    "l6.start": [
+     100.492595,
+     -0.554141
+    ],
+    "l6.end": [
+     79.417339,
+     -0.554141
+    ],
+    "l7.start": [
+     79.417339,
+     -0.554141
+    ],
+    "l7.end": [
+     79.417339,
+     38.951915
+    ],
+    "l8.start": [
+     79.417339,
+     38.951915
+    ],
+    "l8.end": [
+     105.234415,
+     38.951915
+    ],
+    "l9.start": [
+     105.234415,
+     38.951915
+    ],
+    "l9.end": [
+     105.234415,
+     43.473117
+    ],
+    "l10.start": [
+     105.234415,
+     43.473117
+    ],
+    "l10.end": [
+     75.796543,
+     43.473117
+    ],
+    "l11.start": [
+     75.796543,
+     43.473117
+    ],
+    "l11.end": [
+     75.796543,
+     -5.075343
+    ]
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)",
+    "l8": "under (entityStatus 1)",
+    "l9": "under (entityStatus 1)",
+    "l10": "under (entityStatus 1)",
+    "l11": "under (entityStatus 1)"
+   },
+   "dof_entities": 33
+  },
+  "s930": {
+   "feature": "OK",
+   "message": "s930 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     5.690576,
+     4.384546
+    ],
+    "l1.end": [
+     40.318248,
+     4.384546
+    ],
+    "l2.start": [
+     40.318248,
+     4.384546
+    ],
+    "l2.end": [
+     40.318248,
+     17.577422
+    ],
+    "a3.center": [
+     34.483142,
+     17.577422
+    ],
+    "a3.start": [
+     40.318248,
+     17.577422
+    ],
+    "a3.end": [
+     34.483142,
+     23.412528
+    ],
+    "l4.start": [
+     34.483142,
+     23.412528
+    ],
+    "l4.end": [
+     11.525682,
+     23.412528
+    ],
+    "a5.center": [
+     11.525682,
+     17.577422
+    ],
+    "a5.start": [
+     11.525682,
+     23.412528
+    ],
+    "a5.end": [
+     5.690576,
+     17.577422
+    ],
+    "l6.start": [
+     5.690576,
+     17.577422
+    ],
+    "l6.end": [
+     5.690576,
+     4.384546
+    ],
+    "l7.start": [
+     62.978872,
+     -7.928459
+    ],
+    "l7.end": [
+     83.251434,
+     -7.928459
+    ],
+    "a8.center": [
+     73.115153,
+     8.108297
+    ],
+    "a8.start": [
+     83.251434,
+     -7.928459
+    ],
+    "a8.end": [
+     62.978872,
+     -7.928459
+    ]
+   },
+   "radii": {
+    "a3": 5.835106,
+    "a5": 5.835106,
+    "a8": 18.971604
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "a3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "a5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)",
+    "a8": "under (entityStatus 1)"
+   },
+   "dof_entities": 27
+  },
+  "s931": {
+   "feature": "OK",
+   "message": "s931 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     7.953785,
+     -4.050651
+    ],
+    "l1.end": [
+     14.822322,
+     -4.050651
+    ],
+    "l2.start": [
+     14.822322,
+     -4.050651
+    ],
+    "l2.end": [
+     14.822322,
+     16.847496
+    ],
+    "l3.start": [
+     14.822322,
+     16.847496
+    ],
+    "l3.end": [
+     31.317026,
+     16.847496
+    ],
+    "l4.start": [
+     31.317026,
+     16.847496
+    ],
+    "l4.end": [
+     31.317026,
+     24.623366
+    ],
+    "l5.start": [
+     31.317026,
+     24.623366
+    ],
+    "l5.end": [
+     -8.54092,
+     24.623366
+    ],
+    "l6.start": [
+     -8.54092,
+     24.623366
+    ],
+    "l6.end": [
+     -8.54092,
+     16.847496
+    ],
+    "l7.start": [
+     -8.54092,
+     16.847496
+    ],
+    "l7.end": [
+     7.953785,
+     16.847496
+    ],
+    "l8.start": [
+     7.953785,
+     16.847496
+    ],
+    "l8.end": [
+     7.953785,
+     -4.050651
+    ]
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)",
+    "l8": "under (entityStatus 1)"
+   },
+   "dof_entities": 24
+  },
+  "s932": {
+   "feature": "OK",
+   "message": "s932 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     9.715364,
+     1.522595
+    ],
+    "l1.end": [
+     40.282324,
+     1.522595
+    ],
+    "l2.start": [
+     40.282324,
+     1.522595
+    ],
+    "l2.end": [
+     40.282324,
+     6.07899
+    ],
+    "l3.start": [
+     40.282324,
+     6.07899
+    ],
+    "l3.end": [
+     31.77294,
+     6.07899
+    ],
+    "l4.start": [
+     31.77294,
+     6.07899
+    ],
+    "l4.end": [
+     31.77294,
+     28.136565
+    ],
+    "l5.start": [
+     31.77294,
+     28.136565
+    ],
+    "l5.end": [
+     9.715364,
+     28.136565
+    ],
+    "l6.start": [
+     9.715364,
+     28.136565
+    ],
+    "l6.end": [
+     9.715364,
+     1.522595
+    ]
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)"
+   },
+   "dof_entities": 18
+  },
+  "s933": {
+   "feature": "OK",
+   "message": "s933 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     8.94185,
+     6.81906
+    ],
+    "l1.end": [
+     58.410089,
+     6.81906
+    ],
+    "l2.start": [
+     58.410089,
+     6.81906
+    ],
+    "l2.end": [
+     58.410089,
+     45.809574
+    ],
+    "l3.start": [
+     58.410089,
+     45.809574
+    ],
+    "l3.end": [
+     8.94185,
+     45.809574
+    ],
+    "l4.start": [
+     8.94185,
+     45.809574
+    ],
+    "l4.end": [
+     8.94185,
+     6.81906
+    ],
+    "c5.center": [
+     21.30891,
+     24.030343
+    ],
+    "c6.center": [
+     46.04303,
+     24.030343
+    ],
+    "l7.start": [
+     21.30891,
+     24.030343
+    ],
+    "l7.end": [
+     46.04303,
+     24.030343
+    ]
+   },
+   "radii": {
+    "c5": 4.130708,
+    "c6": 4.130708
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "c5": "under (entityStatus 1)",
+    "c6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)"
+   },
+   "dof_entities": 19
+  },
+  "s934": {
+   "feature": "OK",
+   "message": "s934 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     6.475247,
+     3.781121
+    ],
+    "l1.end": [
+     32.405883,
+     3.781121
+    ],
+    "l2.start": [
+     32.405883,
+     3.781121
+    ],
+    "l2.end": [
+     32.405883,
+     9.521672
+    ],
+    "l3.start": [
+     32.405883,
+     9.521672
+    ],
+    "l3.end": [
+     10.924036,
+     9.521672
+    ],
+    "l4.start": [
+     10.924036,
+     9.521672
+    ],
+    "l4.end": [
+     10.924036,
+     42.31301
+    ],
+    "l5.start": [
+     10.924036,
+     42.31301
+    ],
+    "l5.end": [
+     37.413143,
+     42.31301
+    ],
+    "l6.start": [
+     37.413143,
+     42.31301
+    ],
+    "l6.end": [
+     37.413143,
+     48.053561
+    ],
+    "l7.start": [
+     37.413143,
+     48.053561
+    ],
+    "l7.end": [
+     6.475247,
+     48.053561
+    ],
+    "l8.start": [
+     6.475247,
+     48.053561
+    ],
+    "l8.end": [
+     6.475247,
+     3.781121
+    ]
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)",
+    "l8": "under (entityStatus 1)"
+   },
+   "dof_entities": 24
+  },
+  "s935": {
+   "feature": "OK",
+   "message": "s935 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     -8.069953,
+     -8.652978
+    ],
+    "l1.end": [
+     21.56433,
+     -8.652978
+    ],
+    "l2.start": [
+     21.56433,
+     -8.652978
+    ],
+    "l2.end": [
+     21.56433,
+     9.635834
+    ],
+    "a3.center": [
+     6.747188,
+     9.635834
+    ],
+    "a3.start": [
+     21.56433,
+     9.635834
+    ],
+    "a3.end": [
+     -8.069953,
+     9.635834
+    ],
+    "l4.start": [
+     -8.069953,
+     9.635834
+    ],
+    "l4.end": [
+     -8.069953,
+     -8.652978
+    ]
+   },
+   "radii": {
+    "a3": 14.817142
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "a3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)"
+   },
+   "dof_entities": 13
+  },
+  "s936": {
+   "feature": "OK",
+   "message": "s936 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     -4.022754,
+     9.396962
+    ],
+    "l1.end": [
+     35.119901,
+     9.396962
+    ],
+    "l2.start": [
+     35.119901,
+     9.396962
+    ],
+    "l2.end": [
+     39.68287,
+     17.482024
+    ],
+    "l3.start": [
+     39.68287,
+     17.482024
+    ],
+    "l3.end": [
+     0.540215,
+     17.482024
+    ],
+    "l4.start": [
+     -4.022754,
+     9.396962
+    ],
+    "l4.end": [
+     0.540215,
+     17.482024
+    ],
+    "l5.start": [
+     82.227525,
+     7.992074
+    ],
+    "l5.end": [
+     118.264228,
+     7.992074
+    ],
+    "l6.start": [
+     118.264228,
+     7.992074
+    ],
+    "l6.end": [
+     118.264228,
+     24.737786
+    ],
+    "a7.center": [
+     100.245876,
+     24.737786
+    ],
+    "a7.start": [
+     118.264228,
+     24.737786
+    ],
+    "a7.end": [
+     82.227525,
+     24.737786
+    ],
+    "l8.start": [
+     82.227525,
+     24.737786
+    ],
+    "l8.end": [
+     82.227525,
+     7.992074
+    ]
+   },
+   "radii": {
+    "a7": 18.018352
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)",
+    "a7": "under (entityStatus 1)",
+    "l8": "under (entityStatus 1)"
+   },
+   "dof_entities": 25
+  },
+  "s937": {
+   "feature": "OK",
+   "message": "s937 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     -4.903875,
+     7.351253
+    ],
+    "l1.end": [
+     19.451971,
+     7.351253
+    ],
+    "a2.center": [
+     7.274048,
+     14.210103
+    ],
+    "a2.start": [
+     19.451971,
+     7.351253
+    ],
+    "a2.end": [
+     -4.903875,
+     7.351253
+    ]
+   },
+   "radii": {
+    "a2": 13.97661
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "a2": "under (entityStatus 1)"
+   },
+   "dof_entities": 7
+  },
+  "s938": {
+   "feature": "OK",
+   "message": "s938 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     0.997213,
+     -7.841368
+    ],
+    "l1.end": [
+     39.727922,
+     -7.841368
+    ],
+    "l2.start": [
+     39.727922,
+     -7.841368
+    ],
+    "l2.end": [
+     39.727922,
+     17.018013
+    ],
+    "l3.start": [
+     39.727922,
+     17.018013
+    ],
+    "l3.end": [
+     0.997213,
+     17.018013
+    ],
+    "l4.start": [
+     0.997213,
+     17.018013
+    ],
+    "l4.end": [
+     0.997213,
+     -7.841368
+    ],
+    "l5.start": [
+     20.362568,
+     -13.841368
+    ],
+    "l5.end": [
+     20.362568,
+     23.018012
+    ],
+    "l6.start": [
+     71.630039,
+     -5.42436
+    ],
+    "l6.end": [
+     112.594206,
+     -5.42436
+    ],
+    "l7.start": [
+     112.594206,
+     -5.42436
+    ],
+    "l7.end": [
+     112.594206,
+     21.020924
+    ],
+    "l8.start": [
+     112.594206,
+     21.020924
+    ],
+    "l8.end": [
+     71.630039,
+     21.020924
+    ],
+    "l9.start": [
+     71.630039,
+     21.020924
+    ],
+    "l9.end": [
+     71.630039,
+     -5.42436
+    ],
+    "c10.center": [
+     93.267151,
+     12.977359
+    ]
+   },
+   "radii": {
+    "c10": 2.015137
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)",
+    "l8": "under (entityStatus 1)",
+    "l9": "under (entityStatus 1)",
+    "c10": "under (entityStatus 1)"
+   },
+   "dof_entities": 29
+  },
+  "s939": {
+   "feature": "OK",
+   "message": "s939 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     -2.205362,
+     -3.601415
+    ],
+    "l1.end": [
+     -2.205362,
+     3.267141
+    ],
+    "l2.start": [
+     -2.205362,
+     3.267141
+    ],
+    "l2.end": [
+     10.626089,
+     3.267141
+    ],
+    "l3.start": [
+     10.626089,
+     3.267141
+    ],
+    "l3.end": [
+     10.626089,
+     1.092184
+    ],
+    "l4.start": [
+     10.626089,
+     1.092184
+    ],
+    "l4.end": [
+     36.323478,
+     1.092184
+    ],
+    "l5.start": [
+     36.323478,
+     1.092184
+    ],
+    "l5.end": [
+     36.323478,
+     -3.601415
+    ],
+    "l6.start": [
+     36.323478,
+     -3.601415
+    ],
+    "l6.end": [
+     -2.205362,
+     -3.601415
+    ]
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "l5": "under (entityStatus 1)",
+    "l6": "under (entityStatus 1)"
+   },
+   "dof_entities": 18
+  },
+  "s940": {
+   "feature": "OK",
+   "message": "s940 [Sketch] is not fully defined",
+   "solved": true,
+   "points": {
+    "l1.start": [
+     -2.459755,
+     -2.63326
+    ],
+    "l1.end": [
+     53.974664,
+     -2.63326
+    ],
+    "l2.start": [
+     53.974664,
+     -2.63326
+    ],
+    "l2.end": [
+     53.974664,
+     22.682293
+    ],
+    "l3.start": [
+     53.974664,
+     22.682293
+    ],
+    "l3.end": [
+     -2.459755,
+     22.682293
+    ],
+    "l4.start": [
+     -2.459755,
+     22.682293
+    ],
+    "l4.end": [
+     -2.459755,
+     -2.63326
+    ],
+    "c5.center": [
+     7.276631,
+     10.742514
+    ],
+    "c6.center": [
+     44.238278,
+     10.742514
+    ],
+    "l7.start": [
+     74.209443,
+     -7.210538
+    ],
+    "l7.end": [
+     83.495186,
+     -7.210538
+    ],
+    "l8.start": [
+     83.495186,
+     -7.210538
+    ],
+    "l8.end": [
+     88.138057,
+     0.831151
+    ],
+    "l9.start": [
+     88.138057,
+     0.831151
+    ],
+    "l9.end": [
+     83.495186,
+     8.872841
+    ],
+    "l10.start": [
+     83.495186,
+     8.872841
+    ],
+    "l10.end": [
+     74.209443,
+     8.872841
+    ],
+    "l11.start": [
+     74.209443,
+     8.872841
+    ],
+    "l11.end": [
+     69.566571,
+     0.831151
+    ],
+    "l12.start": [
+     69.566571,
+     0.831151
+    ],
+    "l12.end": [
+     74.209443,
+     -7.210538
+    ],
+    "c13.center": [
+     78.852314,
+     0.831151
+    ],
+    "c14.center": [
+     78.852314,
+     0.831151
+    ]
+   },
+   "radii": {
+    "c5": 3.705604,
+    "c6": 3.705604,
+    "c13": 9.285743,
+    "c14": 4.72391
+   },
+   "curves": {
+    "l1": "under (entityStatus 1)",
+    "l2": "under (entityStatus 1)",
+    "l3": "under (entityStatus 1)",
+    "l4": "under (entityStatus 1)",
+    "c5": "under (entityStatus 1)",
+    "c6": "under (entityStatus 1)",
+    "l7": "under (entityStatus 1)",
+    "l8": "under (entityStatus 1)",
+    "l9": "under (entityStatus 1)",
+    "l10": "under (entityStatus 1)",
+    "l11": "under (entityStatus 1)",
+    "l12": "under (entityStatus 1)",
+    "c13": "under (entityStatus 1)",
+    "c14": "under (entityStatus 1)"
+   },
+   "dof_entities": 38
+  }
+ }
+}
