@@ -454,6 +454,33 @@ fn a_25_by_25_knurl() {
     knurl_as_recorded("ae71f76b6e894374", 1e-8);
 }
 
+/// cf-planetary-gears' cut of a gear's 42 tooth gaps (recorded, one tool of 254 faces): OCCT's result, and no slower
+/// than twice OCCT's time here (the point deep inside the gear's face took 35 distances to each of its 294 curves per
+/// probe curve: 7 s a face, 12.8 s against OCCT's 0.5 s).
+#[test]
+#[ignore = "T2: timed against OCCT"]
+fn a_gears_tooth_gaps_cut_as_fast_as_occts() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "8420b23460cb82ee").expect("the recorded case");
+    let timed = |rust: bool| {
+        k::set_rust_boolean(Some(rust));
+        let t = std::time::Instant::now();
+        let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+        let (ms, path) = (t.elapsed().as_secs_f64() * 1e3, k::last_boolean_path());
+        k::set_rust_boolean(None);
+        (r.expect("the cut"), ms, path)
+    };
+    let _ = timed(true);
+    let (ours, ms, path) = timed(true);
+    let (_, occt_ms, _) = timed(false);
+    assert_eq!(path, "rust");
+    let v = ours.shape.volume().unwrap();
+    assert!(ours.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-9 * c.summary.volume, "volume {v} against OCCT's {}", c.summary.volume);
+    assert_eq!(ours.shape.count(k::ShapeType::Face), c.summary.faces);
+    assert!(ms <= 2.0 * occt_ms, "{ms:.0} ms, OCCT {occt_ms:.0} ms");
+}
+
 /// The Ø25 × 10 CP30 45° / 30° knurl (recorded, 186 grooves): where the cylinder's sections with two grooves' flanks
 /// cross (exactly), the flanks' own section, 99 times slower at its end, passes 40 nm off, 17 um before its end; its
 /// foot there (the end the nearest sample, Newton's step out of the range) read as its end, 3.8 um off, so it wasn't

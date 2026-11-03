@@ -12,6 +12,15 @@ cf-planetary-gears to vibe5 and `NOSHAPE_PARITY_MODELS=<dir> NOSHAPE_PARITY_ONLY
 --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s); boolean.rust.sections 43 s in 45764 calls.
 
+- Fixed, cf-planetary-gears (bool, 11-03 21:50): arrange::deeper (a point deeper inside a piece whose point lies near
+  its face's boundary) took, for each of 7 probes on each loop curve and 5 depths, the distance to every curve of the
+  loop: 35 N² param_of. The gear's end faces (the cylinder's caps, the 42 gaps' 252 curves on them, the gear face's
+  loop 294 curves) took 7 s each, twice per regeneration. Now the nearest curves by their boxes first, none farther
+  than the nearest found (the same distances; curves on a cylinder, with no sure box, always asked): 225 ms a face.
+  The gears' 7 recorded Booleans: all taken, 0 differ, 2.44 s against OCCT's 3.34 s (vibe4). The document on vibe3
+  (idle): before 15.1 s (OCCT 3.0 s), after 2.07 s (OCCT 2.96 s); live 0.54 s. Corpora unchanged, corpus5's small
+  cases -2.7 %. T2 bool_patterns::a_gears_tooth_gaps_cut_as_fast_as_occts (on main before: 12756 ms, OCCT 513 ms).
+
 ## From core (11-02 07:20): two Boolean costs found profiling FeatureScript-driven regenerations
 Sampled warm on vibe4 (model tests' `custom_features::fs_warm_profile` / `sheetmetal_std::fs_sheet_metal_profile`,
 NOSHAPE_SAMPLE_OUT; tests/sampler.rs samples every running thread):
