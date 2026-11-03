@@ -27,6 +27,10 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   after a 400-circle sketch on a face 13 -> 1.1 ms (each run re-triangulated every region).
 - SHELL-SLOW: bop-pairs-gpf-5267's Shell 4 fails after 11–17 s in the slab fuse (TICKETS note 07:10; kernel T2
   shell::slab_fuse_probe with NOSHAPE_SHELL_DUMP_TOOLS); open: how to fail fast without failing shells live builds.
+- Landed 07:56: FILLET-PRISMATIC-CYLINDER (0f6f4d1e: features.cpp analytic_blend_faces; ≤ 0.1 ms a blend on
+  live-30-features) and the sketch display cache.
+- FULL-ROUND-CORNER-SPHERES: a ShapeFix merge of the two sphere patches breaks the solid (TICKETS note 08:00); next
+  is building the lune in UV.
 - Left for others: clamp-hms Extrude 2 and bracket120 Extrude 2 (dx, the translator's region choice);
   CUT-CLOSED-EDGES-SPLIT (bool; the loops' vertices are the seams', an edge join does nothing). Asked live: REQUESTS
   06:15 (sketch mode fill of imprinted pieces, a feature-list pick of a sketch on a face).
