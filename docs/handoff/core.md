@@ -16,6 +16,17 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-03 14:35 UTC.**
+- Landed: ADD-INSIDE-OUT (6d54f584: five shell rebuilds flipped a REVERSED shell once more; dx's boss +922.937 as
+  live); OCCT patch 0020 (29d17a5a) and the volume integral's u-isoline skip (queued): FS-WAVE-SPRING builds as live
+  (916.595 mmÂ³, in live's band) in 5.8 s instead of 157 s once the lib is synced (Requests to the lead). Its T1 test is
+  parked in /root/core-scratch/wave-test.patch until then. Left there: the tight box of its offset faces (3.6 s,
+  BRepBndLib::AddOptimal) and min_distance (2 s).
+- In progress: P1 SKETCH-COLLINEAR-EDGES-MERGE (eval.rs region_profile: collinear lines of two entities meeting where
+  nothing else of the sketch touches join into one edge; WIP in /root/core-scratch/collinear-wip.patch / the tree).
+- Next: FS-OLD-STD-COMPAT, FS-ANYTHING-PARAM, MIRROR-FEATURE-UP-TO, FILLET-OVERLAP-FAIL, FILLET-BLEND-SPLIT,
+  FILLET-PROPAGATION-VOLUME (dx's tickets), Shell 4's common, A22 batch 3.
+
 **State 11-03 12:45 UTC.**
 - Landed: A22 batches 1-2 (992b610f, 6a253b90: Hole / Extrude / Revolve, then Fillet / Shell / patterns / Split / Sweep /
   Thicken / Loft / Rib fail in std's ErrorStringEnum texts at their fields; audit row A22). Next batch: sheet metal,
@@ -1630,6 +1641,12 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
+- (11-03 14:35) OCCT patch 0020 (P1 FS-WAVE-SPRING, landed 29d17a5a: BRepLib's BuildCurves3d counts an offset
+  surface's basis knots): please let the sync carry /root/occt/lib/libTKTopAlgo.a to vibe3 / vibe4 / vibe5
+  (/opt/occt). It is the old lib with only BRepLib.cxx.o replaced (same 156 members; the old one is
+  /root/core-scratch/occt0020/libTKTopAlgo.a.pre0020). Without it a thicken of a long free-form face (the community
+  Wave Spring) is invalid there; the kernel, model and custom suites, the shell corpus (one more shell builds) and the
+  blend corpus pass with it. Its T1 test (kernel surfacing::a_long_wavy_strip_thickens_along_it) lands after the sync.
 - (11-03 04:15) Release: eca0da09 (in greens since 02:22) made some saved documents regenerate differently (qa P1
   BLEND-TOL-REGEN-CHANGES); the fix is queued now (OCCT's metre blends kept as before, only their tolerances
   tightened). If the 05:00 cut can't take a green with it, cut before eca0da09.
