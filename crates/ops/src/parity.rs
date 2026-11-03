@@ -839,12 +839,15 @@ impl<'a> Translator<'a> {
         let tree = noshape_model::custom::host::packed::unpack(packed).ok()?;
         let mut strings = Vec::new();
         packed_strings(&tree, &mut strings);
-        if !strings.iter().any(|s| s == "SKETCH_ENTITY") || strings.iter().any(|s| s == "IMPRINT") {
+        // An imprint edge derived from the sketch's own entity is that entity
+        // here (not an imprinted face: a region).
+        let imprint = strings.iter().any(|s| s == "IMPRINT");
+        if !strings.iter().any(|s| s == "SKETCH_ENTITY") || (imprint && strings.iter().any(|s| s == "FACE" || s == "TOPOLOGY")) {
             return None;
         }
         let mut ops = strings.iter().filter(|s| s.contains(".op") || s.ends_with("Op"));
         let sk = ops.next()?.strip_suffix(".wireOp")?.to_string();
-        if ops.next().is_some() {
+        if ops.next().is_some() || (imprint && strings.iter().any(|s| s.ends_with(".imprint") && *s != format!("{sk}.imprint"))) {
             return None;
         }
         strings.iter().find_map(|e| self.sketch_entities.get(&(sk.clone(), e.clone())).cloned())
