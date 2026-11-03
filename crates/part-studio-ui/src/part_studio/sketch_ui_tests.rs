@@ -452,6 +452,46 @@ fn the_parity_state_reads_dialog_list_and_features(cx: &mut TestAppContext) {
     assert_eq!(state["features"]["rollbackAfter"], "#wall_thickness = 4 mm");
 }
 
+/// Live (ui-parity extrude-depth-variable-escape, 11-03): Esc with the autofill list open closes the list only;
+/// `#wall` and the focus stay in Depth (ours reverted the field and left it).
+#[gpui::test]
+fn escape_closes_only_the_autofill_list(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_wall_thickness(cx, "esc-list");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).display.variables.contains_key("wall_thickness"));
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Extrude dialog").dialog.clone());
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["#", "w", "a", "l", "l"]);
+    let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+    assert!(state["list"].is_object(), "the list is open");
+    keys(cx, window, &["escape"]);
+    let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+    assert!(state["list"].is_null(), "{}", state["list"]);
+    assert_eq!((state["focus"]["label"].as_str(), state["focus"]["text"].as_str()), (Some("Depth"), Some("#wall")), "{}", state["focus"]);
+    assert!(cx.update(|cx| view.read(cx).edit.is_some()), "the dialog stays");
+}
+
+/// Live (ui-parity number-field-bare-number, 11-03): `15` + Enter in Depth commits "15 mm", selected, and no
+/// autofill list opens for its unit.
+#[gpui::test]
+fn a_committed_number_opens_no_list(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_wall_thickness(cx, "commit-no-list");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    draw(cx, window);
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Extrude dialog").dialog.clone());
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["1", "5", "enter"]);
+    draw(cx, window);
+    let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+    assert_eq!(state["focus"]["text"], "15 mm", "{}", state["focus"]);
+    assert_eq!(state["focus"]["all"], true);
+    assert!(state["list"].is_null(), "{}", state["list"]);
+}
+
 /// VAR-AUTOCOMPLETE-ENTER (live behaviours "Focus, click and selection"): the first click into a dialog's number
 /// field selects all its text, so typing replaces it; the second click puts the caret.
 #[gpui::test]

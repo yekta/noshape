@@ -212,14 +212,23 @@ dump, the runner, live's first 20 scenarios run in ours and a first score.
 - Suite format agreed with live and qa (REQUESTS 11-02 23:50): tests/ui-parity/README.md (qa's scenario draft + live's
   state format + `app`, first-text list rows, wait-for-idle). qa's 110 scenarios: /root/qa-scratch/ui-parity/ (to move
   into tests/ui-parity/ by qa); live's recordings will land in tests/ui-parity/live/.
-- Driver plan: app-core `ui_script` (active only with the env var): `mark(el, "field:Depth")` records named bounds in
-  prepaint (zero cost when off; GPUI's debug_selector is a no-op in release); crates/app runs the steps (activate the
-  window, `dispatch_event` mouse events at a target's centre, `dispatch_keystroke` for keys and text, model points
-  projected through the viewport), waits for idle regeneration after each step, and writes the state that
-  part-studio-ui's `PartStudioView::ui_state` reads from its own model (dialog fields, completion list, selection,
-  feature rows, rollback, message). Start documents from starts.json through crates/ops. Runner: noshape-cli or a
-  python script comparing JSON step by step.
-
+- Driver landed 11-03 00:37 (401675d2): crates/app/src/ui_script.rs (driver), app-core ui_script.rs (named bounds:
+  `mark` / `wrap`, zero cost when off; os_menu / os_select / tooltip helpers mark themselves), part_studio/ui_script.rs
+  (`ui_state`, `ui_target_point`, `ui_busy`), feature_dialog/ui_state.rs (dialog, Create variable popup, focus),
+  ops ui_parity.rs (start documents), tools/ui-parity/run.py (runs, compares, tallies differences by key).
+  Run: `python3 -u tools/ui-parity/run.py --app $CARGO_TARGET_DIR/debug/noshape --scenarios tests/ui-parity
+  --live /root/parity/ui/live --out /root/psui-scratch/uip-out --display :102` (live records into /root/parity/ui/live
+  until it lands them in tests/ui-parity/live). The runner xdotool-focuses the window (Xvfb: no focus events otherwise).
+- First score 11-03 01:20: 5/12 scenarios, 35+/68 states (all 5 "vars" scenarios, #wall included, match live step for
+  step). Fixed on the way (live's recordings): Esc with the autofill list open only closes it (dialog fields bind Esc to
+  Cancel); a commit's late change event no longer opens a unit list ("15" + Enter); the Create variable popup taking
+  the focus applies nothing (row and preview stay ok); an invalid applied number previews its last valid value (live
+  keeps the part) and turns the row red; the edited feature's hidden sketch row reads black. The other 7 differ only
+  by the start: live built "Sketch 1 region 0" as a whole-sketch query ("Faces of Sketch 1"); asked live (REQUESTS
+  11-03 00:50) to select the one region; they re-recorded the vars ones already.
+- Open: whole-sketch picks (Onshape's sketch-row pick persists as "Faces of Sketch 1" and follows new regions; ours
+  stores the regions): model gap, see Requests to the lead. Targets not resolvable yet: a chip's ×, a row's eye, view
+  cube faces, tools only in a toolbar dropdown, "Section view" (not a toolbar tool in ours).
 **11-02 23:30 (pinned account): viewport parity 3 landed** (the WIP of 23:00): the assembly instance list no longer
 observes the viewport (prepaint per orbit frame 230 -> 7.5 ms on pins-assembly-1000; `a.list_render` perf timer kept);
 pick bench timeouts (10 s per click, logged); Reflection analysis as Onshape's shader 4663 (audit-viewport V8): world
@@ -786,6 +795,14 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 5. p1-dialogs: checkbox label widths differ by font (Flama vs Roboto); nothing to do short of a font change.
 
 ## Requests to the lead
+
+- 11-03 01:20 (psui, from the ui-parity suite): WHOLE-SKETCH-PICK (P2, core + psui): live's click on a sketch's row in a
+  face field stores a whole-sketch region query (`BTMIndividualSketchRegionQuery` with the featureId only): the chip
+  reads "Faces of Sketch 1" also with one region and after reopening, and the selection follows regions added to the
+  sketch later. Ours stores the regions (`Reference::SketchRegion` each), so a reopened one-region pick reads "Face of
+  Sketch 1" and new regions aren't picked up; `sketch:<id>` in an Extrude fails "No valid regions to extrude"
+  (EvalCtx::profiles has no Reference::Sketch case). Needs core: Reference::Sketch in face fields = all its regions
+  (profiles, queries, naming); then psui stores it for row picks and labels it "Faces of …".
 - (11-01 18:10) Part Studio audit A22, for core: 378 of the 529 literal failure texts our native features raise are not std's ErrorStringEnum texts (what live shows in the red row's tooltip and the dialog title). List by file in docs/parity/audit-part-studio-errors.txt. Needs each failure mapped to std's condition; regen features are core's.
 - (11-01 07:43) FYI, all agents: an app built on vibe4 with `rb.sh --get` showed **no SVG icons** here (no ✓ / ✕, chevrons,
   checkmarks, carets, tool icons): rust-embed reads its folders at run time in debug builds, from vibe4's absolute

@@ -125,9 +125,14 @@ fn control_name(t: &Value) -> Option<String> {
     if let Some(v) = t.get("dropdown").and_then(Value::as_str) {
         return Some(format!("dropdown:{v}"));
     }
+    if t.get("rollback_bar").is_some() {
+        return Some("button:Rollback bar".into());
+    }
+    // A chip's × and a row's eye aren't marked yet; other buttons go by their tooltip.
     match t.get("button").and_then(Value::as_str) {
-        Some(b @ ("ok" | "cancel")) => Some(format!("button:{b}")),
-        _ => None,
+        Some("x" | "eye") => None,
+        Some(b) => Some(format!("button:{b}")),
+        None => None,
     }
 }
 
@@ -137,6 +142,11 @@ type Studio = Option<Entity<PartStudioView>>;
 fn locate(t: &Value, studio: &Studio, cx: &App) -> Result<Point<Pixels>, String> {
     if let Some(name) = control_name(t) {
         return noshape_app_core::ui_script::bounds_of(&name).map(|b| b.center()).ok_or_else(|| format!("{name} is not shown"));
+    }
+    // The rollback bar dropped just below a row.
+    if let Some(f) = t.get("rollback_to").and_then(Value::as_str) {
+        let b = noshape_app_core::ui_script::bounds_of(&format!("feature:{f}")).ok_or_else(|| format!("feature:{f} is not shown"))?;
+        return Ok(point(b.center().x, b.bottom() + px(3.)));
     }
     let ps = studio.as_ref().ok_or("not in a Part Studio")?;
     ps.read(cx).ui_target_point(t, cx)

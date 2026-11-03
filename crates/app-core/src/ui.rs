@@ -457,6 +457,8 @@ pub fn with_user_side_tooltip(row: Stateful<Div>, text: impl Into<SharedString>)
 }
 
 fn tip_with(el: Stateful<Div>, text: SharedString, side: TipSide, user: bool) -> Stateful<Div> {
+    // The parity suite clicks a button by its tooltip.
+    let el = crate::ui_script::mark(el, || format!("button:{text}"));
     let anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
     let pressed: std::rc::Rc<std::cell::Cell<bool>> = Default::default();
     let (a2, p2, p3) = (anchor.clone(), pressed.clone(), pressed.clone());
@@ -661,8 +663,11 @@ pub fn with_tool_tooltip(id: impl Into<ElementId>, title: impl Into<SharedString
 pub fn with_rich_tooltip(id: impl Into<ElementId>, title: impl Into<SharedString>, description: impl Into<SharedString>, el: impl IntoElement) -> AnyElement {
     let anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
     let a2 = anchor.clone();
+    let title: SharedString = title.into();
+    let name = title.clone();
     div()
         .id(id)
+        .map(|d| crate::ui_script::mark(d, || format!("button:{name}")))
         .flex_none()
         .relative()
         .tooltip(rich_tooltip(title, description, anchor))

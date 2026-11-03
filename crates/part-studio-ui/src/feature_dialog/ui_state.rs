@@ -5,6 +5,15 @@
 use super::*;
 use serde_json::{Value, json};
 
+/// `state.focus` for a text field with the keyboard: its text and selection in characters.
+pub fn field_focus(label: &str, st: &InputState) -> Value {
+    let text = st.value().to_string();
+    let sel = st.selected_range();
+    let chars = |b: usize| text.get(..b.min(text.len())).map_or(0, |t| t.chars().count());
+    let (a, b) = (chars(sel.start), chars(sel.end));
+    json!({ "kind": "field", "label": label, "text": text, "selection": [a, b], "all": a == 0 && b == text.chars().count() && b > 0 })
+}
+
 impl FeatureDialog {
     /// The dialog's title as shown.
     pub fn title_text(&self) -> String {
@@ -20,15 +29,60 @@ impl FeatureDialog {
 
     /// The focused field (`state.focus`), if one of this dialog's has the keyboard.
     pub fn ui_focus(&self, window: &Window, cx: &App) -> Option<Value> {
-        let (path, (_, text, sel)) = self.inputs.keys().find_map(|p| self.input_of(p, window, cx).filter(|i| i.0).map(|i| (p.clone(), i)))?;
-        let label = self.spec_for_path(&path).map(|s| crate::i18n::spec(s.label)).unwrap_or(path);
-        let chars = |b: usize| text.get(..b.min(text.len())).map_or(0, |t| t.chars().count());
-        let (a, b) = (chars(sel.start), chars(sel.end));
-        Some(json!({ "kind": "field", "label": label, "text": text, "selection": [a, b], "all": a == 0 && b == text.chars().count() && b > 0 }))
+        if let Some(c) = &self.create_var {
+            return Self::create_var_inputs(c).into_iter().find(|(_, st, _)| st.read(cx).focus_handle(cx).is_focused(window)).map(|(l, st, _)| field_focus(l, st.read(cx)));
+        }
+        let Some(path) = self.inputs.keys().find(|p| self.input_of(p, window, cx).is_some_and(|i| i.0)) else {
+            // No text field has the keyboard: the active selection field has the focus (live).
+            let q = self.active_query.as_deref()?;
+            let label = self.spec_for_path(q).map(|s| crate::i18n::spec(s.label)).unwrap_or_else(|| q.to_string());
+            return Some(json!({ "kind": "field", "label": label, "text": null, "selection": null, "all": false }));
+        };
+        let label = self.spec_for_path(path).map(|s| crate::i18n::spec(s.label)).unwrap_or_else(|| path.clone());
+        Some(field_focus(&label, self.inputs[path].read(cx)))
+    }
+
+    /// The open Create variable popup's inputs, in order: label, input, whether its value is a quantity.
+    fn create_var_inputs(c: &CreateVar) -> Vec<(&'static str, &Entity<InputState>, bool)> {
+        let text = c.configuration && CREATE_CONFIG_KINDS[c.config_kind].0 == "TEXT";
+        if c.configuration {
+            let mut v = vec![("Name", &c.name, false), ("Default", &c.value, !text)];
+            if !text {
+                v.extend([("Minimum", &c.min, true), ("Maximum", &c.max, true)]);
+            }
+            v
+        } else {
+            vec![("Name", &c.name, false), ("Value", &c.value, true), ("Description", &c.description, false)]
+        }
+    }
+
+    /// `state.dialog` while the Create variable popup is open (live: it stands for the dialog).
+    fn create_var_state(&self, c: &CreateVar, window: &Window, cx: &App) -> Value {
+        let mut tabs = vec![json!({ "label": "Feature", "selected": !c.configuration }), json!({ "label": "Configuration", "selected": c.configuration })];
+        let kinds: Vec<(&str, bool)> = if c.configuration {
+            CREATE_CONFIG_KINDS.iter().enumerate().map(|(i, (_, l))| (*l, i == c.config_kind)).collect()
+        } else {
+            CREATE_VAR_KINDS.iter().enumerate().map(|(i, (_, l))| (*l, i == c.kind)).collect()
+        };
+        tabs.extend(kinds.into_iter().map(|(l, on)| json!({ "label": l, "selected": on })));
+        let errors = c.value_errors(&self.units, &self.variables, cx);
+        let fields: Vec<Value> = Self::create_var_inputs(c)
+            .into_iter()
+            .enumerate()
+            .map(|(i, (label, st, quantity))| {
+                let st = st.read(cx);
+                let bad = (i == 0 && c.name_error(cx).is_some()) || (i > 0 && quantity && errors.get(i - 1).copied().unwrap_or(false));
+                json!({ "label": label, "kind": if quantity { "number" } else { "text" }, "text": st.value().to_string(), "focused": st.focus_handle(cx).is_focused(window), "state": if bad { "error" } else { "ok" } })
+            })
+            .collect();
+        json!({ "title": "Create variable", "kind": "create-variable", "tabs": tabs, "fields": fields, "error": null })
     }
 
     /// `state.dialog`.
     pub fn ui_state(&self, window: &Window, cx: &App) -> Value {
+        if let Some(c) = &self.create_var {
+            return self.create_var_state(c, window, cx);
+        }
         let mut tabs = Vec::new();
         let mut fields = Vec::new();
         let values = &self.feature.params;
@@ -42,19 +96,27 @@ impl FeatureDialog {
                 ParamKind::Enum { options, .. } => {
                     let cur = values.enum_(s.id);
                     let text = options.iter().find(|(id, _)| *id == cur).map(|(_, l)| crate::i18n::spec(l)).unwrap_or_default();
-                    fields.push(json!({ "label": label, "kind": "enum", "text": text }));
+                    // A select shows its label only with SHOW_LABEL (Extrude's end type is "Blind" alone).
+                    let label = s.hints.has(Hints::SHOW_LABEL).then_some(label);
+                    fields.push(json!({ "label": label, "kind": "enum", "text": text, "state": "ok" }));
                 }
-                ParamKind::Bool { .. } => fields.push(json!({ "label": label, "kind": "boolean", "checked": values.bool(s.id) })),
+                // A direction flip is a button beside the field before it (live: "toggle").
+                ParamKind::Bool { .. } if s.hints.has(Hints::OPPOSITE_DIRECTION) || s.hints.has(Hints::OPPOSITE_DIRECTION_CIRCULAR) => {
+                    fields.push(json!({ "label": "toggle", "kind": "toggle", "checked": values.bool(s.id), "state": "ok" }))
+                }
+                ParamKind::Bool { .. } => fields.push(json!({ "label": label, "kind": "boolean", "checked": values.bool(s.id), "state": "ok" })),
                 ParamKind::Num(n) => {
                     let expr = values.expr(s.id).map(|e| e.text.clone()).unwrap_or_default();
                     let (focused, text) = match self.input_of(s.id, window, cx) {
                         Some((f, t, _)) => (f, t),
                         None => (false, expr),
                     };
-                    let parse_ok = !self.parse_errors.contains_key(s.id);
-                    let shown = if focused || !parse_ok { None } else { self.converted_text(s.id, *n, &text) };
+                    // As render_inline_value: while typing, the applied text's error shows, not the typed one's.
+                    let editing = focused && self.baselines.get(s.id).is_some_and(|b| *b != text);
+                    let parse_err = if editing { self.baselines.get(s.id).is_some_and(|b| noshape_units::parse(b).is_err()) } else { self.parse_errors.contains_key(s.id) };
+                    let shown = if focused || parse_err { None } else { self.converted_text(s.id, *n, &text) };
                     let applied = self.baselines.get(s.id).cloned().unwrap_or_else(|| text.clone());
-                    let bad = !parse_ok
+                    let bad = parse_err
                         || (!applied.trim().is_empty() && noshape_units::evaluate_as(&applied, n.kind.dim(), &self.units, &self.variables).is_err())
                         || self.out_of_range(s.id, &applied)
                         || self.field_error(s.id).is_some();
@@ -62,19 +124,21 @@ impl FeatureDialog {
                 }
                 ParamKind::Text { .. } => {
                     let (focused, text) = self.input_of(s.id, window, cx).map(|(f, t, _)| (f, t)).unwrap_or_else(|| (false, values.text(s.id).to_string()));
-                    fields.push(json!({ "label": label, "kind": "text", "text": text, "focused": focused }));
+                    fields.push(json!({ "label": label, "kind": "text", "text": text, "focused": focused, "state": "ok" }));
                 }
                 ParamKind::Query { .. } => {
                     let refs = values.query(s.id).to_vec();
                     let items: Vec<String> = self.query_rows(s, &refs).into_iter().map(|r| r.0).collect();
-                    fields.push(json!({ "label": label, "kind": "query", "items": items, "active": self.active_query.as_deref() == Some(s.id) }));
+                    let missing = refs.iter().any(|r| (self.missing)(r)) || self.field_error(s.id).is_some();
+                    fields.push(json!({ "label": label, "kind": "query", "items": items, "active": self.active_query.as_deref() == Some(s.id), "state": if missing { "error" } else { "ok" } }));
                 }
                 _ => {}
             }
         }
-        let error = self.status.as_ref().filter(|s| matches!(s.0, FeatureStatus::Error | FeatureStatus::Warning)).map(|s| s.1.clone());
+        // Errors show as the red title (its tooltip says why); the dialog has no message text of its own.
+        let red = self.applied_value_error().is_some() || matches!(self.status.as_ref().map(|s| s.0), Some(FeatureStatus::Error | FeatureStatus::Warning));
         let kind = if self.feature.type_id == "sketch" { "sketch" } else { "feature" };
-        json!({ "title": self.title_text(), "kind": kind, "tabs": tabs, "fields": fields, "error": error })
+        json!({ "title": self.title_text(), "titleState": if red { "error" } else { "ok" }, "kind": kind, "tabs": tabs, "fields": fields, "error": null })
     }
 
     /// `state.list` for the open autofill list.

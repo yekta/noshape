@@ -22,6 +22,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 mod ui_state;
+pub use ui_state::field_focus;
 
 #[derive(Clone, Debug)]
 pub enum DialogEvent {
@@ -240,6 +241,9 @@ pub struct FeatureDialog {
     pub whole_sketches: std::collections::HashSet<FeatureId>,
     /// Open `#` variable autofill list of a numeric field.
     completion: Option<crate::var_complete::VarCompletion>,
+    /// The field Enter just applied: the input's change event for the last typed key can arrive after the commit
+    /// rewrote the text ("15" → "15 mm") and must not open a list for it.
+    just_applied: Option<String>,
     /// Open "Create variable" popup.
     create_var: Option<CreateVar>,
     /// A field outside the dialog that opened the Create variable popup (the
@@ -392,6 +396,7 @@ impl FeatureDialog {
             grouped_sketches: Default::default(),
             whole_sketches: Default::default(),
             completion: None,
+            just_applied: None,
             create_var: None,
             external_field: None,
             extra: None,
@@ -1320,6 +1325,9 @@ impl FeatureDialog {
         let sub = cx.subscribe_in(&state, window, move |this: &mut FeatureDialog, state, ev: &InputEvent, window, cx| match ev {
             InputEvent::Change => {
                 let text = state.read(cx).value().to_string();
+                // The text just applied (a typed key's change arriving after Enter's commit rewrote it to
+                // "15 mm") is nothing being typed: no list (live ui-parity number-field-bare-number).
+                let applied = this.just_applied.take().is_some_and(|p| p == path_s) && this.baselines.get(&path_s).is_some_and(|b| *b == text);
                 // Number fields wait for their commit before the preview
                 // re-runs (live s2; as qa4's 66563c00); other text applies.
                 if this.spec_for_path(&path_s).is_some_and(|s| matches!(s.kind, ParamKind::Num(_))) {
@@ -1336,7 +1344,7 @@ impl FeatureDialog {
                     ParamKind::Num(n) => Some(n.kind.dim()),
                     _ => None,
                 });
-                this.completion = dim.and_then(|d| crate::var_complete::VarCompletion::compute(&path_s, state.read(cx), &this.variables, Some(d)));
+                this.completion = dim.filter(|_| !applied).and_then(|d| crate::var_complete::VarCompletion::compute(&path_s, state.read(cx), &this.variables, Some(d)));
             }
             InputEvent::PressEnter { shift, .. } => {
                 // Onshape: Enter in a changed field applies the value (the
@@ -1354,10 +1362,14 @@ impl FeatureDialog {
             // go to it.
             InputEvent::Focus => cx.notify(),
             InputEvent::Blur => {
-                // Tab / click-away commits: the value gets its unit (live).
                 this.completion = None;
-                this.commit_number(&path_s, state, window, cx);
-                this.flush_typed(cx);
+                // The Create variable popup taking the keyboard from this field commits nothing: live keeps the
+                // feature as it was while it is open (ui-parity extrude-depth-new-variable).
+                if this.create_var.as_ref().is_none_or(|c| c.path != path_s) {
+                    // Tab / click-away commits: the value gets its unit (live).
+                    this.commit_number(&path_s, state, window, cx);
+                    this.flush_typed(cx);
+                }
                 cx.notify();
             }
         });
@@ -1379,6 +1391,7 @@ impl FeatureDialog {
         self.commit_number(path, state, window, cx);
         let text = state.read(cx).value().to_string();
         self.baselines.insert(path.to_string(), text);
+        self.just_applied = Some(path.to_string());
         state.update(cx, |s, cx| s.select_all(window, cx));
         cx.notify();
         true
@@ -1392,6 +1405,7 @@ impl FeatureDialog {
         let text = state.read(cx).value().to_string();
         state.update(cx, |s, cx| s.set_selected_range(cursor.min(text.len())..cursor.min(text.len()), cx));
         self.baselines.insert(path.to_string(), text);
+        self.just_applied = Some(path.to_string());
         self.flush_typed(cx);
         cx.notify();
     }
@@ -1531,7 +1545,7 @@ impl FeatureDialog {
     fn completion_keys(&self, el: Stateful<Div>, path: &str, cx: &mut Context<Self>) -> Stateful<Div> {
         use gpui_kit::component::input::{Enter, Escape, MoveDown, MoveUp};
         let open = |this: &Self, p: &str| this.completion.as_ref().is_some_and(|c| c.key == p);
-        let (p1, p2, p3, p4, p5) = (path.to_string(), path.to_string(), path.to_string(), path.to_string(), path.to_string());
+        let (p1, p2, p3, p4, p5, p6) = (path.to_string(), path.to_string(), path.to_string(), path.to_string(), path.to_string(), path.to_string());
         el.capture_action(cx.listener(move |this, _: &MoveUp, _, cx| {
             if open(this, &p1) {
                 cx.stop_propagation();
@@ -1571,6 +1585,15 @@ impl FeatureDialog {
         }))
         .capture_action(cx.listener(move |this, _: &Escape, _, cx| {
             if open(this, &p4) {
+                cx.stop_propagation();
+                this.completion = None;
+                cx.notify();
+            }
+        }))
+        // In a dialog field Esc is the dialog's Cancel ("FeatureDialog > Input"): with the list open it only closes
+        // the list, the typed text and the focus stay (live 11-03, ui-parity extrude-depth-variable-escape).
+        .capture_action(cx.listener(move |this, _: &crate::actions::Cancel, _, cx| {
+            if open(this, &p6) {
                 cx.stop_propagation();
                 this.completion = None;
                 cx.notify();
@@ -1904,6 +1927,11 @@ impl FeatureDialog {
     /// and ✓ follow it, never the text being typed.
     fn applied_text(&self, id: &str, typed: &str) -> String {
         if self.inputs.contains_key(id) { self.baselines.get(id).cloned().unwrap_or_else(|| typed.to_string()) } else { typed.to_string() }
+    }
+
+    /// An applied number of the wrong type: the title and the feature's row are red (live).
+    pub fn has_invalid_value(&self) -> bool {
+        self.applied_value_error().is_some()
     }
 
     fn applied_value_error(&self) -> Option<(&'static str, String)> {
@@ -3463,8 +3491,9 @@ impl FeatureDialog {
         // Onshape: an accepted value displays converted to the document
         // units (and an expression its result); focusing shows the text.
         let focused = state.read(cx).focus_handle(cx).is_focused(window);
-        // The text before editing started: Esc reverts to it (see `baselines`).
-        if !focused {
+        // The text before editing started: Esc reverts to it (see `baselines`). The field the Create variable
+        // popup belongs to isn't left: its typed `#name` isn't applied while the popup is open (live).
+        if !focused && self.create_var.as_ref().is_none_or(|c| c.path != path) {
             self.baselines.insert(path.to_string(), text.clone());
         }
         let converted = num.filter(|_| !focused && err.is_none()).and_then(|n| self.converted_text(path, n, &text));

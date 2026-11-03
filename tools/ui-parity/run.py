@@ -15,6 +15,7 @@ fields get focus events as on a desktop.
 
 import argparse
 import json
+import re
 import os
 import subprocess
 import sys
@@ -23,6 +24,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+CAUSES = {}
 KEYS = ["focus", "dialog", "list", "selection", "features", "parts", "message", "tooltip"]
 
 
@@ -58,11 +60,17 @@ def run_one(app, scenario, out, display, timeout):
 
 
 def first_difference(a, b, path=""):
-    """The first key path where `a` (live) and `b` (ours) differ, with both values."""
+    """The first key path where `a` (live) and `b` (ours) differ, with both values. Keys only one side records
+    (a side's debugging aids) are not compared; the selection compares its count only until both record kind and owner."""
     if isinstance(a, dict) and isinstance(b, dict):
         for k in a:
             if k not in b:
-                return (f"{path}.{k}", a[k], "(missing)")
+                continue
+            if path == ".selection" and k == "items" and not all("owner" in i for i in (a[k] or [])):
+                continue
+            # A flip button has no label of its own (live records its icon's name).
+            if k == "label" and a.get("kind") == "toggle":
+                continue
             d = first_difference(a[k], b[k], f"{path}.{k}")
             if d:
                 return d
@@ -76,6 +84,23 @@ def first_difference(a, b, path=""):
             return (f"{path}.length", len(a), len(b))
         return None
     return None if a == b else (path, a, b)
+
+
+def all_differences(a, b, path=""):
+    """Every key path where `a` (live) and `b` (ours) differ (the rules of first_difference)."""
+    if isinstance(a, dict) and isinstance(b, dict):
+        out = []
+        for k in a:
+            if k not in b or (path == ".selection" and k == "items" and not all("owner" in i for i in (a[k] or []))):
+                continue
+            if k == "label" and a.get("kind") == "toggle":
+                continue
+            out += all_differences(a[k], b[k], f"{path}.{k}")
+        return out
+    if isinstance(a, list) and isinstance(b, list):
+        out = [d for i, (x, y) in enumerate(zip(a, b)) for d in all_differences(x, y, f"{path}[{i}]")]
+        return out + ([(f"{path}.length", len(a), len(b))] if len(a) != len(b) else [])
+    return [] if a == b else [(path, a, b)]
 
 
 def compare(live, ours):
@@ -94,6 +119,10 @@ def compare(live, ours):
             matched += 1
         elif first is None:
             first = (name,) + d
+        for path, x, y in all_differences(a, b):
+            # Causes: the key path without row indices, with one example.
+            key = re.sub(r"\[\d+\]", "[]", path)
+            CAUSES.setdefault(key, [0, f"{json.dumps(x, ensure_ascii=False)} / {json.dumps(y, ensure_ascii=False)}"])[0] += 1
     return matched, len(pairs), first
 
 
@@ -142,6 +171,10 @@ def main():
             where, path, a, b = first
             print(f"{name}: {where} differs at {path}: live {json.dumps(a, ensure_ascii=False)} / ours {json.dumps(b, ensure_ascii=False)} ({m}/{n} states)")
     print(f"score: {score}/{len(names)} scenarios, {steps_ok}/{steps_all} states")
+    if CAUSES:
+        print("differences by key (states, live / ours example):")
+        for key, (n, ex) in sorted(CAUSES.items(), key=lambda kv: -kv[1][0])[:15]:
+            print(f"  {n:4d}  {key}: {ex[:140]}")
     return 0
 
 

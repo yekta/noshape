@@ -16,11 +16,7 @@ impl PartStudioView {
         let focus = if let Some(f) = dialog.and_then(|d| d.ui_focus(window, cx)) {
             f
         } else if let Some(st) = dim_box {
-            let text = st.value().to_string();
-            let sel = st.selected_range();
-            let chars = |b: usize| text.get(..b.min(text.len())).map_or(0, |t| t.chars().count());
-            let (a, b) = (chars(sel.start), chars(sel.end));
-            json!({ "kind": "field", "label": "dimension", "text": text, "selection": [a, b], "all": a == 0 && b == text.chars().count() && b > 0 })
+            crate::feature_dialog::field_focus("dimension", st)
         } else if filter_focused {
             let text = self.ui.filter.as_ref().map(|f| f.0.read(cx).value().to_string()).unwrap_or_default();
             json!({ "kind": "filter", "label": "Filter by name or type", "text": text, "selection": null, "all": false })
@@ -33,8 +29,11 @@ impl PartStudioView {
             .or_else(|| self.ui.cell_completion.as_ref().map(|c| c.ui_state()))
             .or_else(crate::ui_script::open_list);
         let feature_name = |id: FeatureId| self.studio(cx).and_then(|s| s.features.iter().find(|f| f.id == id).map(|f| f.name.clone())).unwrap_or_default();
-        let items: Vec<Value> = self
-            .selection
+        // In a feature dialog the selection is what its active field picked (live).
+        let picked = dialog.map(|d| d.active_refs());
+        let items: Vec<Value> = picked
+            .as_ref()
+            .unwrap_or(&self.selection)
             .iter()
             .map(|r| {
                 let body = |r: &Reference| self.body_of(r).and_then(|b| self.display.body(&b)).map(|b| b.name.clone()).unwrap_or_default();
@@ -54,18 +53,21 @@ impl PartStudioView {
                 };
                 json!({ "kind": kind, "owner": owner })
             })
-            .chain(self.selected_features.iter().filter(|f| !self.selection.contains(&Reference::Feature(**f))).map(|f| json!({ "kind": "FEATURE", "owner": feature_name(*f) })))
+            .chain(self.selected_features.iter().filter(|f| picked.is_none() && !self.selection.contains(&Reference::Feature(**f))).map(|f| json!({ "kind": "FEATURE", "owner": feature_name(*f) })))
             .collect();
+        // The edited row is drawn selected (live marks it selected and editing).
         let (rows, rollback_after) = match self.studio(cx) {
             Some(s) => {
                 let rollback = s.rollback_index();
                 let editing = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
+                let related = self.related_features(cx);
                 let rows: Vec<Value> = s
                     .features
                     .iter()
                     .enumerate()
                     .map(|(i, f)| {
-                        let status = self.display.feature_state(f.id).map(|s| s.status);
+                        // As the row draws it: the edited feature is red while its dialog holds an invalid value.
+                        let status = if editing == Some(f.id) && self.edit_invalid(cx) { Some(FeatureStatus::Error) } else { self.display.feature_state(f.id).map(|s| s.status) };
                         let state = if i >= rollback {
                             "rolled-back"
                         } else if f.suppressed {
@@ -79,7 +81,7 @@ impl PartStudioView {
                                 _ => "ok",
                             }
                         };
-                        json!({ "name": self.shown_feature_name(f, cx), "state": state, "selected": self.selected_features.contains(&f.id), "editing": editing == Some(f.id) })
+                        json!({ "name": self.shown_feature_name(f, cx), "state": state, "selected": self.selected_features.contains(&f.id) || editing == Some(f.id), "editing": editing == Some(f.id), "related": related.contains(&f.id), "hidden": f.hidden && !(editing.is_some() && related.contains(&f.id)) })
                     })
                     .collect();
                 let after = rollback.checked_sub(1).and_then(|i| s.features.get(i)).map(|f| self.shown_feature_name(f, cx));

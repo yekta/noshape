@@ -554,7 +554,9 @@ impl PartStudioView {
         let mut ps = self.studio(cx)?.clone();
         let mut upto = None;
         if let Some(e) = &self.edit {
-            let draft = e.dialog.read(cx).feature.clone();
+            // As the title shows it: a value of the wrong type previews its last valid one (live keeps the
+            // part while "abc" is in Depth, ui-parity number-field-invalid).
+            let draft = e.dialog.read(cx).row_feature();
             if e.is_new {
                 let at = e.index.min(ps.features.len());
                 ps.features.insert(at, draft);
@@ -3806,6 +3808,7 @@ impl PartStudioView {
                         // Live (585–590): "New folder", always enabled; the
                         // "Folder name" popup comes first.
                         .tooltip(crate::ui::tooltip("New folder"))
+                        .map(|d| crate::ui_script::mark(d, || "button:New folder".into()))
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             if this.edit.is_some() {
                                 return;
@@ -4539,7 +4542,10 @@ impl PartStudioView {
     /// The open feature dialog can't regenerate (live: its row turns red and
     /// the Features header shows the error icon until it can).
     fn edit_invalid(&self, cx: &App) -> bool {
-        self.edit.as_ref().is_some_and(|e| matches!(e.dialog.read(cx).status.as_ref().map(|s| s.0), Some(FeatureStatus::Error)))
+        self.edit.as_ref().is_some_and(|e| {
+            let d = e.dialog.read(cx);
+            matches!(d.status.as_ref().map(|s| s.0), Some(FeatureStatus::Error)) || d.has_invalid_value()
+        })
     }
 
     fn render_editing_placeholder(&self, slot: (usize, f32), cx: &App) -> AnyElement {
@@ -4637,7 +4643,8 @@ impl PartStudioView {
         let errored = status == FeatureStatus::Error;
         let color = if rolled_back {
             pal.text_rolled_back
-        } else if suppressed || (f.hidden && !failing) {
+        // Live (ui-parity 11-03): while a feature is edited, the hidden sketch its active field picked reads black.
+        } else if suppressed || (f.hidden && !failing && !(related && self.edit.is_some())) {
             pal.text_faint
         } else {
             // Live L27: a warning's row is red like an error's.
