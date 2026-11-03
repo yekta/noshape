@@ -208,3 +208,9 @@ REVOLVED faces "revolved". F8 isn't one in the file (see above).
 
 Open in this sheet after this run: IM2 / IM2b B-spline volumes and faces (kern), the McMaster helix edges, g50 F8 (live EXTRUDED), the two
 zips (as live: not translated), the Meter STL value (live unknown), qa-hang402 (live unknown).
+
+## Re-run 2026-11-03 (dx, green 19f17a18's CLI, the same script, /root/dx-scratch/imp/impmatrix-1103.log)
+All 144 samples of the 11-01 run are identical (every part name, kind, volume to 1e-6 mm³ and face count); two
+samples are new: knurl-d25x25-45-45.x_t (Part 1, 11598.04092 mm³, 4479 faces) and live-30-features.x_t (Part 1,
+60779.484267 mm³, 48 faces = tests/perf/live-30-features.noshape's 60779.484); live values for both unknown. Open
+items unchanged (the 11-01 list).
