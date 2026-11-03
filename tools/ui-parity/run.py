@@ -122,6 +122,14 @@ def normalize_live(state):
     for f in ((state or {}).get("dialog") or {}).get("fields") or []:
         if f.get("kind") == "toggle" and str(f.get("label", "")).startswith("icon:"):
             f["checked"] = not str(f["label"]).endswith("-opposite")
+    # The sketch model is read from live's page once a canvas event touched it: before, its lists are null
+    # ("not recorded", not empty) and aren't compared.
+    sk = (state or {}).get("sketch")
+    if isinstance(sk, dict):
+        for k in ("entities", "constraints", "dimensions"):
+            if sk.get(k) is None:
+                sk.pop(k, None)
+        sk.pop("error", None)
     lst = (state or {}).get("list")
     if isinstance(lst, dict):
         rows = lst.get("rows") or []

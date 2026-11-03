@@ -1060,9 +1060,11 @@ pub fn dimension_edit_text(data: &SketchData, cid: ConstraintId, units: &UnitPre
     let kind = &data.sketch.constraint(cid)?.kind;
     let value = kind.value()? * dim_display_scale(kind);
     let dim = dim_unit(kind);
-    // Live sketch/13, 141, 143: lengths with 6 decimals ("3.51041 in",
-    // "1.725582 in"), angles with 7 ("35.5376823 deg"), zeros trimmed.
-    let precision = if dim == Dim::ANGLE { units.angle_precision.max(7) } else { units.length_precision.max(6) };
+    // Live sketch/13, 141, 143, ui-parity sketch-dimension-*: lengths to
+    // 1e-8 m ("24.49437 mm", "1.725582 in"), angles with 7 decimals
+    // ("35.5376823 deg"), zeros trimmed.
+    let length_decimals = (8.0 + units.length.meters().log10() + 1e-9).floor().max(0.0) as u8;
+    let precision = if dim == Dim::ANGLE { units.angle_precision.max(7) } else { units.length_precision.max(length_decimals) };
     Some(noshape_units::format_quantity_with(Quantity::new(value, dim), units, precision))
 }
 
@@ -1693,6 +1695,12 @@ impl SketchEditor {
             return EditOutcome::none();
         }
         self.cursor = Some(p);
+        // A dimension being placed takes the press (live: ui-parity
+        // sketch-dimension-edit, its value over the line's Horizontal glyph).
+        if self.tool == Tool::Dimension && !self.picks.is_empty() {
+            self.pressed_label = None;
+            self.pressed_glyph = None;
+        }
         // Overlay labels and glyphs take the press first, whatever the tool.
         if let Some((cid, additive, select)) = self.pressed_label.take() {
             // `moved: true` up front suppresses the selection toggle (double-click edit).
@@ -8562,6 +8570,21 @@ mod tests {
         let c = d.sketch.curve(l).unwrap();
         assert!((c.length() - 0.03).abs() < 1e-9);
         assert!(c.end_point().x < c.start_point().x, "negative length flips the line");
+    }
+
+    /// Live (ui-parity sketch-dimension-edit): the placement click lands on
+    /// the line's Horizontal glyph and places the dimension; its box shows
+    /// the length to 1e-8 m ("29.73371 mm").
+    #[test]
+    fn a_dimension_placed_over_a_glyph_opens_its_box() {
+        let (mut ed, mut d) = editor(Tool::Dimension);
+        let l = d.sketch.add_line(v(0.0, 0.0), v(0.0302569196, 0.0));
+        let h = d.sketch.add_constraint(ConstraintKind::Horizontal { a: l, b: None }).unwrap();
+        click(&mut ed, &mut d, v(0.015, 0.0));
+        ed.pressed_glyph = Some((h, l, false));
+        click(&mut ed, &mut d, v(0.015, -0.008));
+        let e = ed.dim_edit.as_ref().expect("placement opens the value box");
+        assert_eq!(e.text, "30.25692 mm");
     }
 
     #[test]

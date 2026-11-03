@@ -17,7 +17,11 @@ impl PartStudioView {
         let focus = if let Some(f) = dialog.and_then(|d| d.ui_focus(window, cx)) {
             f
         } else if let Some(st) = dim_box {
-            crate::feature_dialog::field_focus("dimension", st)
+            // Live: an input outside the dialogs.
+            let mut f = crate::feature_dialog::field_focus("", st);
+            f["kind"] = "other".into();
+            f["label"] = Value::Null;
+            f
         } else if let Some(st) = self.unlabelled_input_focused(window, cx) {
             // A row being renamed, the folder name popup: inputs without a label (live).
             let mut f = crate::feature_dialog::field_focus("", st);
@@ -35,15 +39,23 @@ impl PartStudioView {
             .or_else(|| self.ui.cell_completion.as_ref().map(|c| c.ui_state()))
             .or_else(crate::ui_script::open_list);
         let feature_name = |id: FeatureId| self.studio(cx).and_then(|s| s.features.iter().find(|f| f.id == id).map(|f| f.name.clone())).unwrap_or_default();
-        // In a feature dialog the selection is what its active field picked (live).
-        let picked = dialog.map(|d| d.active_refs());
+        // In a sketch the selection is its own, with what the Dimension tool picked (drawn selected); in a feature
+        // dialog what its active field picked (live).
+        let in_sketch = self.sketch.as_ref().map(|ed| {
+            let f = ed.feature;
+            let picks = if ed.tool == crate::sketch_mode::Tool::Dimension { ed.tool_picks() } else { Vec::new() };
+            ed.selection.iter().chain(&picks).map(|e| Reference::SketchEntity { sketch: f, entity: e.0 }).chain(ed.selected_regions.iter().map(|k| Reference::SketchRegion { sketch: f, key: k.clone() })).chain(ed.model_selection.iter().cloned()).collect::<Vec<_>>()
+        });
+        let picked = in_sketch.or_else(|| dialog.map(|d| d.active_refs()));
         let items: Vec<Value> = picked
             .as_ref()
             .unwrap_or(&self.selection)
             .iter()
             .map(|r| {
                 let (kind, owner) = self.selection_kind_owner(r, cx);
-                json!({ "kind": kind, "owner": owner })
+                // Live gives the open sketch's own entities no owner.
+                let own = matches!(r, Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } if self.sketch.as_ref().is_some_and(|ed| ed.feature == *sketch));
+                json!({ "kind": kind, "owner": if own { Value::Null } else { owner.into() } })
             })
             .chain(self.selected_features.iter().filter(|f| picked.is_none() && !self.selection.contains(&Reference::Feature(**f))).map(|f| json!({ "kind": "FEATURE", "owner": feature_name(*f) })))
             .collect();
@@ -81,7 +93,7 @@ impl PartStudioView {
                         // A new feature's row while its dialog is open (red while it fails, as drawn).
                         super::ListItem::Placeholder => {
                             let state = if self.edit_invalid(cx) { "error" } else { "ok" };
-                            rows.push(json!({ "name": self.placeholder_name(cx), "state": state, "selected": true, "editing": true, "related": false, "hidden": false }));
+                            rows.push(json!({ "name": self.placeholder_name(cx), "state": state, "selected": true, "editing": true, "related": editing.is_some_and(|f| related.contains(&f)), "hidden": false }));
                         }
                         // A new folder's row is related-highlighted until the next click (live ui 10-25 b (1)).
                         super::ListItem::Folder(_, fd) => rows.push(json!({ "name": fd.name, "state": "ok", "selected": self.ui.selected_folder == Some(fd.id), "editing": false, "related": self.ui.fresh_folder == Some(fd.id), "hidden": false })),
@@ -96,6 +108,8 @@ impl PartStudioView {
         };
         let parts: Vec<String> = self.display.bodies.iter().map(|b| b.name.clone()).collect();
         let message = self.message.as_ref().filter(|(_, m)| self.edit.is_some() || m != behaviors::NO_INTERSECTION).map(|(_, m)| m.clone());
+        // The canceled-sketch toast's Restore link is part of its text in live.
+        let message = message.map(|m| if self.canceled_edit.as_ref().is_some_and(|c| c.3 == m) { format!("{m} Restore") } else { m });
         json!({
             "focus": focus,
             "dialog": dialog.map(|d| d.ui_state(window, cx)),
@@ -126,9 +140,14 @@ impl PartStudioView {
     /// lists them (null outside a sketch).
     fn ui_sketch_state(&self, cx: &App) -> Value {
         use noshape_sketch::{ConstraintKind as K, EntityKind};
-        let (Some(ed), Some(data)) = (self.sketch.as_ref(), self.sketch_data(cx)) else { return Value::Null };
+        let Some(data) = self.sketch_data(cx) else { return Value::Null };
+        // The Sketch dialog before its plane is picked: no sketch model yet.
+        let Some(ed) = self.sketch.as_ref() else { return json!({ "tool": null }) };
         let sk = &data.sketch;
-        let tool = (ed.tool != crate::sketch_mode::Tool::Select).then(|| ed.tool.label().split(" (").next().unwrap_or_default().to_string());
+        // The first active toolbar button (live): the tool, else Construction while it is on.
+        let tool = (ed.tool != crate::sketch_mode::Tool::Select)
+            .then(|| crate::ui::onshape_title(ed.tool.label()).split(" (").next().unwrap_or_default().to_string())
+            .or_else(|| ed.construction.then(|| "Construction".to_string()));
         let owned: std::collections::HashSet<_> = sk.entities().filter(|e| e.kind() != EntityKind::Point).flat_map(|e| e.point_refs()).collect();
         let mut entities: Vec<String> = sk
             .entities()

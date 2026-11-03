@@ -83,7 +83,7 @@ A target a side can't find makes that step `"ok": false` with `"error"`; the run
 Every key always present (`null` / `[]` when there is nothing). Texts exactly as shown, trimmed, single spaces.
 ```json
 {
- "focus":   { "kind": "field|dialog-name|filter|search-tools|feature-row|graphics|none",
+ "focus":   { "kind": "field|dialog-name|filter|search-tools|feature-row|graphics|other|none",
               "label": "Depth", "text": "10 mm", "selection": [0, 5], "all": true },
  "dialog":  { "title": "Extrude 1", "kind": "feature|sketch|other",
               "tabs": [{"label": "Solid", "selected": true}, {"label": "Surface", "selected": false}],
@@ -105,7 +105,7 @@ Every key always present (`null` / `[]` when there is nothing). Texts exactly as
 }
 ```
 - `focus.selection`: the field's selected range [start, end] in characters (start = end: the caret); `all`: the
-  whole text is selected.
+  whole text is selected. `other`: an input outside the dialogs (a sketch dimension's value box), no label.
 - `dialog.fields`: only the visible ones, in dialog order; `label` as shown (a query box's placeholder).
 - `list.rows`: each row's first text (`"#wall_thickness"`, not its value); `highlighted`: index into `rows`.
 - `selection.items`: in selection order.

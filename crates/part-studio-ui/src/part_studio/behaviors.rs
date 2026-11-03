@@ -931,6 +931,13 @@ impl PartStudioView {
         let mut out = self.variable_users(cx);
         // A hovered Characteristics row lights up its feature (live tl-99a).
         out.extend(self.ui.insp.hover_feature);
+        // In a sketch: the sketch, while something of it is selected or picked by the Dimension tool (live ui-parity
+        // sketch-delete-line, sketch-circle-dimension).
+        if let Some(ed) = &self.sketch
+            && (!ed.selection.is_empty() || !ed.selected_regions.is_empty() || (ed.tool == crate::sketch_mode::Tool::Dimension && !ed.tool_picks().is_empty()))
+        {
+            out.insert(ed.feature);
+        }
         // In a feature dialog: what its active field picked (live
         // part-studio/440: Part 1 in Transform's field lights up Extrude 1;
         // psui/m-03: not while another field is active).

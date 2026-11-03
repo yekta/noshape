@@ -155,7 +155,8 @@ fn locate(t: &Value, studio: &Studio, cx: &App) -> Result<Point<Pixels>, String>
         return Ok(point(b.center().x, b.bottom() + px(3.)));
     }
     let ps = studio.as_ref().ok_or("not in a Part Studio")?;
-    ps.read(cx).ui_target_point(t, cx)
+    // A pointer is at whole pixels (a mouse's, and Chrome's under live's runner).
+    ps.read(cx).ui_target_point(t, cx).map(|p| point(px(f32::from(p.x).floor()), px(f32::from(p.y).floor())))
 }
 
 /// Presses at `at`, where the pointer already is (a pointer that doesn't move sends no second move: a repeated

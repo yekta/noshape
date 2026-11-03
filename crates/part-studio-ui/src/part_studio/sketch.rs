@@ -761,7 +761,11 @@ impl PartStudioView {
                 // Dimensions and constraints to planes, model edges / vertices and
                 // other sketches: a linked external reference entity stands in.
                 let tool_now = self.sketch.as_ref().map(|s| s.tool);
-                let hovered = match (hovered, self.hover.clone(), tool_now) {
+                // Live (ui-parity sketch-circle-dimension): with a pick held, a click over a plane's area places
+                // the dimension.
+                let placing = tool_now == Some(Tool::Dimension) && self.sketch.as_ref().is_some_and(|s| !s.tool_picks().is_empty());
+                let plane_area = |r: &Reference| matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. });
+                let hovered = match (hovered, self.hover.clone().filter(|r| !(placing && plane_area(r))), tool_now) {
                     (None, Some(r), Some(t @ (Tool::Dimension | Tool::Constraint(_) | Tool::Mirror)))
                         if matches!(r, Reference::Edge(_) | Reference::Vertex(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::Face(_))
                             || matches!(&r, Reference::SketchEntity { sketch, .. } if Some(*sketch) != self.sketch.as_ref().map(|s| s.feature)) =>
