@@ -1,6 +1,6 @@
 {
  "scenario": "extrude-depth-new-variable",
- "recorded": "2026-11-03T08:10:46.105Z",
+ "recorded": "2026-11-03T22:46:04.065Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "acf1ec4af0c76664e24af280",
+  "element": "f8ab167290c20e3e3954c37d",
   "start": "vars",
   "startElement": "b8ec485a274dfffd3859fe57"
  },
@@ -358,7 +358,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 33786
+   "t": 39976
   },
   {
    "step": 2,
@@ -646,7 +646,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 36274
+   "t": 43355
   },
   {
    "step": 3,
@@ -937,7 +937,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 38588
+   "t": 45774
   },
   {
    "step": 4,
@@ -1234,7 +1234,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 40625
+   "t": 47633
   }
  ]
 }

@@ -1,6 +1,6 @@
 {
  "scenario": "extrude-depth-variable-arrow-down",
- "recorded": "2026-11-03T08:11:40.403Z",
+ "recorded": "2026-11-03T22:40:21.068Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "eb57c752e9240a1939875d48",
+  "element": "93ff041a76075d60ae92d767",
   "start": "vars",
   "startElement": "b8ec485a274dfffd3859fe57"
  },
@@ -358,7 +358,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 41148
+   "t": 50959
   },
   {
    "step": 2,
@@ -646,7 +646,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 46861
+   "t": 53707
   },
   {
    "step": 3,
@@ -941,7 +941,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 48852
+   "t": 55703
   },
   {
    "step": 4,
@@ -1236,7 +1236,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 50716
+   "t": 57478
   },
   {
    "step": 5,
@@ -1518,7 +1518,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 52490
+   "t": 59485
   },
   {
    "step": 6,
@@ -1800,7 +1800,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 56782
+   "t": 64036
   }
  ]
 }
