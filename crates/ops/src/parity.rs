@@ -1858,7 +1858,9 @@ impl<'a> Translator<'a> {
 
     /// Our face or edge for live's: of its type, nearest live's point, the
     /// first whose area / length is live's (a face's point is its box
-    /// centre, which may lie in a hole or on an axis), else the nearest.
+    /// centre, which may lie in a hole or on an axis), then the first within
+    /// 0.2 % of it (live's compact fetch sums tessellation facets: a cylinder's
+    /// area 0.04 % low), else the nearest.
     fn nearest(&mut self, kind: &str, r: &LiveRef) -> Option<String> {
         let p = r.point?;
         let mut a = json!({ "kind": kind, "near": mm(p), "limit": 8 });
@@ -1872,13 +1874,32 @@ impl<'a> Translator<'a> {
         if reply[kind].as_array().is_none_or(Vec::is_empty) && r.normal.is_some() {
             // The normal's sense isn't always certain.
             a.as_object_mut().map(|m| m.remove("normal"));
-            reply = self.call("query_entities", a).ok()?;
+            reply = self.call("query_entities", a.clone()).ok()?;
         }
         let found = reply[kind].as_array().cloned().unwrap_or_default();
         let k = per_unit(&reply["units"]);
         let (key, scale) = if kind == "faces" { ("area", k * k) } else { ("length", k) };
-        let same = |e: &&Value| r.measure.zip(e[key].as_f64()).is_some_and(|(m, ours)| (ours * scale - m).abs() <= 1e-5 * m.abs() + 1e-12);
-        found.iter().find(same).or(found.first()).and_then(|e| e["id"].as_str()).map(str::to_string)
+        let within = |tol: f64| move |e: &&Value| r.measure.zip(e[key].as_f64()).is_some_and(|(m, ours)| (ours * scale - m).abs() <= tol * m.abs() + 1e-12);
+        let id = |e: &Value| e["id"].as_str().map(str::to_string);
+        if let Some(e) = found.iter().find(within(1e-5)) {
+            return id(e);
+        }
+        // Within the tolerance, the one whose centroid is nearest live's point
+        // (a disc and a cylinder can have one area); none of the nearest (a
+        // point on an axis is nearer the end faces than a wide cylinder): more
+        // of them.
+        let off = |e: &&Value| f3(&e["centroid"]).map_or(f64::INFINITY, |c| (0..3).map(|i| (c[i] * k - p[i]).powi(2)).sum::<f64>());
+        if let Some(e) = found.iter().filter(within(2e-3)).min_by(|x, y| off(x).total_cmp(&off(y))) {
+            return id(e);
+        }
+        if r.measure.is_some() && found.len() >= 8 {
+            a["limit"] = json!(64);
+            let more = self.call("query_entities", a).ok()?;
+            if let Some(e) = more[kind].as_array().into_iter().flatten().filter(within(2e-3)).min_by(|x, y| off(x).total_cmp(&off(y))) {
+                return id(e);
+            }
+        }
+        found.first().and_then(id)
     }
 
     /// The sketch region of ours with live's area (when given) nearest

@@ -835,13 +835,25 @@ impl Cx<'_> {
     }
 
     fn type_ref(&mut self, q: &QualName, pos: Pos) -> TypeRef {
-        match resolve_type(q, &self.scope.symbols, &self.scope.namespaces) {
+        let found = resolve_type(q, &self.scope.symbols, &self.scope.namespaces).or_else(|| self.old_type_name(q));
+        match found {
             Some(t) => t,
             None => {
                 self.error(pos, format!("Type {q} not found"));
                 TypeRef::Std(StdType::Undefined)
             }
         }
+    }
+
+    /// A module pinned before std 1963 (live compiles them): a type named in another case (`is vector`, FeatureScript
+    /// 369's O-Rings), when exactly one type has that name.
+    fn old_type_name(&self, q: &QualName) -> Option<TypeRef> {
+        if q.ns.is_some() || self.version.is_none_or(|v| v >= 1963) {
+            return None;
+        }
+        let mut found = self.scope.symbols.iter().filter(|(n, s)| s.ty.is_some() && n.eq_ignore_ascii_case(&q.name)).filter_map(|(_, s)| s.ty);
+        let t = found.next()?;
+        found.next().is_none().then_some(t)
     }
 
     fn op_set(&self, name: &str) -> Option<Arc<OverloadSet>> {

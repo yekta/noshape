@@ -7,6 +7,7 @@ causes of difference, each with its ticket.
 | date | green | models | features | scenarios | biggest causes (tickets) |
 |---|---|---|---|---|---|
 | 2026-11-03 | dx 21:29 (run 45; 3 dead-studio documents unscored; prize-wheel-tim refetched, its Hole as live) | 26/55 | 303/480 (custom 7/109) | – |
+| 2026-11-03 | dx 22:49 (run 47: valuesSortedById in feature order, cf-parameter-pattern 9/9; old studios' lowercase types, id-only faces by tessellated area: cf-o-ring-generator 10/11) | 27/55 | 308/480 (custom 12/109) | – |
 
 dx 11-03 18:15: three documents are left out of the model score (tests/parity-models/unscored.json, printed as "not
 scored" by `parity_models`): cf-ansi-washers, cf-socket-head-cap-screw-creator and cf-thread-creator. Their Feature

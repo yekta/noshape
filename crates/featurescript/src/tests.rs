@@ -99,6 +99,22 @@ fn enums_and_types() {
     assert_eq!(run_str("enum S { A, B, }\nfunction f() { return S.B is S; }"), "true");
 }
 
+/// A module pinned before std 1963 may name a type in another case (live compiles FeatureScript 369's O-Rings, `var
+/// … is vector = vector(…)`); a current one may not.
+#[test]
+fn old_modules_name_types_in_any_case() {
+    let compile = |version: u32| {
+        let src = format!("FeatureScript {version};\nimport(path : \"onshape/std/common.fs\", version : \"{version}.0\");\nfunction f() {{ var v is vector = vector(1, 2); return v[1]; }}");
+        compile_module(&unique_path(), &src, &NoImports).map(|m| {
+            let f = m.functions("f").expect("f");
+            to_display(&Interp::new().call_set(&f, vec![]).expect("runs"))
+        })
+    };
+    assert_eq!(compile(369).expect("compiles at 369"), "2");
+    let e = compile(3095).expect_err("an error at 3095");
+    assert!(e.iter().any(|e| e.message == "Type vector not found"), "{e:?}");
+}
+
 #[test]
 fn exceptions() {
     assert_eq!(run_str("function f() { try { throw 'x'; } catch (e) { return e; } }"), "x");

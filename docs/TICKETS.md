@@ -3288,6 +3288,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   no bend: the partial-edge bend from createBendAttribute's attribute is the next step (NOSHAPE_FS_TRACE=1).
   Not the host's: cf-sheet-metal-flange-plus (its Sheet Metal Model Plus studio's import isn't fetched, REQUESTS
   19:19) and cf-sheet-metal-overcut-dogbone (Fold SM 1's edge has no geometry in live's data).
+  dx 11-03 22:49 (owner now): cf-o-ring-generator 6 → 10/11 (custom 0/5 → 4/5): its studio (FeatureScript 369) names
+  `is vector`, which a module pinned before std 1963 may now do (a type in another case, compile.rs old_type_name);
+  and the translator placed its id-only groove faces on the wrong cylinder (live's compact areas are tessellated,
+  0.04 % low; equal-area disc and cylinder): parity.rs nearest. Left: O Ring 5 sits 0.635 mm along the axis from
+  live's: evAxis of Revolve 1's r 38.1 cylinder gives ours x 63.5 (the profile line 0–127 mm's middle), live 62.865
+  (the face's middle after Chamfer 1 trimmed 1.27 mm off its end): live's revolved cylinder origin follows the
+  chamfered face (core: kernel). cf-straight-spline's ErrorStringEnum type error: the studio pins std 1963, whose enum
+  hasn't BOOLEAN_NON_MANIFOLD_RESULT (3095's has); the feature fails on the Boolean anyway (core), left.
   dx 11-03 20:23, cf-straight-spline (54 SAE Straight-Sided Spline features; compiles since dx's enum trailing-comma
   fix): 12 fail `@opBoolean: BOOLEAN_NON_MANIFOLD_RESULT`, then `Type error: value BOOLEAN_NON_MANIFOLD_RESULT cannot be
   enum ErrorStringEnum` (error.fs 149, processError: the host's code isn't one of the served std's); the first one is

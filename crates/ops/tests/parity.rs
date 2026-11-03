@@ -1289,6 +1289,40 @@ fn regions_by_id_that_make_one_part() {
     assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// A face named by id alone whose live area is a tessellation's (0.04 % low)
+/// among faces of one area: a Ø40 × 10 mm cylinder's side (2π·20·10) and its
+/// end discs (π·20²) are all 1256.64 mm²; the side is the one whose centroid
+/// is live's box centre (cf-o-ring-generator's grooves). Offset surface 1 copies
+/// it: a 20 mm-radius sheet 10 mm tall, not a flat disc.
+#[test]
+fn a_face_by_id_among_faces_of_one_area() {
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+          "entities": [circle("c", 0.02, (0.0, 0.0))], "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualSketchRegionQuery-140", "deterministicIds": ["JR1"], "featureId": "FS1", "filterInnerLoops": true, "queryString": "" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "10 mm" }] },
+        { "btType": "BTMFeature-134", "featureType": "offsetSurface", "featureId": "FO1", "name": "Offset surface 1", "parameters": [
+            { "btType": "BTMParameterQueryList-148", "parameterId": "surfacesAndFaces", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JHI"], "queryString": "" }] },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "offset", "expression": "0 mm" }] }
+    ] });
+    let a = 2.0 * std::f64::consts::PI * 0.02 * 0.01 * (1.0 - 4e-4);
+    let face = |id: &str, z0: f64, z1: f64| json!({ "id": id, "area": a, "box": { "min": [-0.02, -0.02, z0], "max": [0.02, 0.02, z1] } });
+    let solid = json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 3, "edges": 2, "vertices": 0, "volume": std::f64::consts::PI * 0.02 * 0.02 * 0.01 });
+    let body = json!([{ "id": "JHD", "type": "SOLID", "faces": [face("JHG", 0.0, 0.0), face("JHI", 0.0, 0.01), face("JHK", 0.01, 0.01)] }]);
+    let sheet = json!({ "name": "Surface 1", "bodyType": "SHEET", "faces": 1, "edges": 2, "vertices": 0, "bbox": { "min": [-0.02, -0.02, 0.0], "max": [0.02, 0.02, 0.01] } });
+    let live = vec![
+        json!({ "index": 0, "status": "OK", "parts": [] }),
+        json!({ "index": 1, "status": "OK", "parts": [solid.clone()], "bodies": body.clone() }),
+        json!({ "index": 2, "status": "OK", "parts": [solid, sheet], "bodies": body }),
+    ];
+    let r = run_model("face-of-one-area", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (3, 3), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
 /// A region named by id alone added to a part (no new body): placed by the
 /// cap it made, a new face flat along the sketch's normal
 /// (cf-sheet-metal-model-plus's Extrude 2).
