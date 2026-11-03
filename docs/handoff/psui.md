@@ -249,6 +249,12 @@ dump, the runner, live's first 20 scenarios run in ours and a first score.
   preselected edge (live's account drops the edge since 04:10), Hole / Revolve remembered values, Shift+P as an undo
   step, a rolled-back variable's " = 0", Fillet moved above its Extrude reading "ok", the second Enter after an
   autofill insertion (new scenario extrude-depth-variable-enter-twice).
+- 11-03 17:30: **114/128 scenarios, 887/932 states** on live's batch (/root/parity/ui/live). Left: 7 fillet-* (live's
+  account drops the preselected edge, REQUESTS 1850 / 15:05), 7 sketch (skasm.md), extrude-end-type-up-to-face (live's
+  start read before its list drew). Fixed since 15:10: the driver's idle check waits for an open dialog's model before
+  the feature and std's editing logic (f0c58b77); and a new feature's preview waits for std's editing logic's first
+  run (a new Extrude on a part face showed its New preview, a separate Part 2, ~0.9 s before it turned Add; now its
+  first preview is Add; `ui.std_logic_first`, the wait is pending as a regeneration).
 - 11-03 15:10: lead P1 (user 17:26 report): the update banner is now a card floating at the bottom centre of every
   window (updates.rs `card`, app-core `os_menu::set_floating`), ✕ hides it for the session; navbar / start window
   slots gone; checked on :102 (start window and a Part Studio, 1280 / 560 / 760). Since 14:00 also: an edge clicked
