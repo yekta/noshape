@@ -307,6 +307,26 @@ impl<'a> Translator<'a> {
         if let Some(r) = self.extrude_name_from_query(text) {
             return r.map(|e| vec![e]);
         }
+        // sketchEntityQuery(id+"F….wireOp", EntityType.EDGE, "<entity>").
+        if let Some(rest) = text.split("sketchEntityQuery(id+\"").nth(1)
+            && let Some((sk, after)) = rest.split_once(".wireOp\"")
+            && let Some(e) = after.split('"').nth(1)
+            && let Some(ours) = self.sketch_entities.get(&(sk.to_string(), e.to_string()))
+        {
+            return Ok(vec![ours.clone()]);
+        }
+        // qCreatedBy(id + "F…", EntityType.BODY): the parts a feature made.
+        if let Some(fid) = text.split("qCreatedBy(id + \"").nth(1).and_then(|r| r.split('"').next())
+            && text.contains("EntityType.BODY")
+        {
+            let ours = self.feature_ids.get(fid).cloned().ok_or_else(|| format!("feature {fid} was not built"))?;
+            let f = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 200 }))?;
+            let mut parts: Vec<String> = f["faces"].as_array().into_iter().flatten().filter_map(|x| x["part"].as_str().map(str::to_string)).collect();
+            parts.dedup();
+            if !parts.is_empty() {
+                return Ok(parts);
+            }
+        }
         // qCreatedBy(makeId("F…"), EntityType.VERTEX): a sketch's points.
         if let Some(sk) = text.split("qCreatedBy(makeId(\"").nth(1).and_then(|r| r.split('"').next())
             && text.contains("EntityType.VERTEX")
@@ -413,7 +433,7 @@ impl<'a> Translator<'a> {
         let is_start = matches!(get("isStart"), Some(Packed::Bool(true)));
         let mut strings = Vec::new();
         packed_strings(&Packed::Map(m.clone()), &mut strings);
-        let op = strings.iter().find_map(|s| s.strip_suffix(".opExtrude"))?.to_string();
+        let (op, revolve) = strings.iter().find_map(|s| s.strip_suffix(".opExtrude").map(|o| (o.to_string(), false)).or_else(|| s.strip_suffix(".opRevolve").map(|o| (o.to_string(), true))))?;
         if name == "SWEPT_BODY" {
             // The part our Extrude made (the part of its faces).
             let Some(ours) = self.feature_ids.get(&op).cloned() else { return Some(Err(format!("SWEPT_BODY: extrude {op} was not built"))) };
@@ -422,7 +442,40 @@ impl<'a> Translator<'a> {
         }
         let sk = strings.iter().find_map(|s| s.strip_suffix(".wireOp"))?.to_string();
         let curves: Vec<Vec<[f64; 2]>> = strings.iter().filter_map(|e| self.curves.get(&(sk.clone(), e.clone())).cloned()).collect();
-        Some(self.extrude_entity(name, is_start, &op, &sk, &curves))
+        Some(if revolve { self.revolve_entity(name, &op, &sk, &curves) } else { self.extrude_entity(name, is_start, &op, &sk, &curves) })
+    }
+
+    /// A Revolve's face or edge by Onshape's name: the face swept by a
+    /// profile curve contains it, the edge swept by a profile vertex is the
+    /// circle through it (ours of the same Revolve nearest that point).
+    fn revolve_entity(&mut self, name: &str, op: &str, sk: &str, curves: &[Vec<[f64; 2]>]) -> Result<String, String> {
+        let ours = self.feature_ids.get(op).cloned().ok_or_else(|| format!("{name}: revolve {op} was not built"))?;
+        let our_sketch = self.feature_ids.get(sk).cloned().ok_or_else(|| format!("{name}: sketch {sk} was not built"))?;
+        let first = curves.first().ok_or_else(|| format!("{name} of {op}: its sketch curves were not translated"))?;
+        let [o, x, y] = match self.frames.get(sk) {
+            Some(f) => *f,
+            None => {
+                let g = self.call("sketch_get", json!({ "sketch": our_sketch }))?;
+                let f = |k: &str| f3(&g["frame"][k]).ok_or("sketch frame");
+                let o = f("origin")?;
+                [o.map(|c| c / 1000.0), f("x")?, f("y")?]
+            }
+        };
+        let world = |p: [f64; 2]| [o[0] + p[0] * x[0] + p[1] * y[0], o[1] + p[0] * x[1] + p[1] * y[1], o[2] + p[0] * x[2] + p[1] * y[2]];
+        let (kind, at, curve) = match name {
+            "SWEPT_EDGE" => {
+                let shared = curves.get(1).and_then(|b| [first[0], first[first.len() - 1]].into_iter().find(|p| [b[0], b[b.len() - 1]].iter().any(|q| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-9)));
+                ("edges", world(shared.unwrap_or(first[0])), Some("circle"))
+            }
+            "SWEPT_FACE" => ("faces", world(if first.len() == 2 { [(first[0][0] + first[1][0]) / 2.0, (first[0][1] + first[1][1]) / 2.0] } else { first[first.len() / 2] }), None),
+            _ => return Err(format!("{name} of a revolve not translated")),
+        };
+        let mut a = json!({ "kind": kind, "created_by": ours, "near": mm(at), "limit": 1 });
+        if let Some(c) = curve {
+            a["curve"] = json!(c);
+        }
+        let r = self.call("query_entities", a)?;
+        r[kind][0]["id"].as_str().map(str::to_string).ok_or_else(|| format!("{name} of {op}: no entity of ours near {:?} mm", mm(at)))
     }
 
     fn extrude_entity(&mut self, name: &str, is_start: bool, op: &str, sk: &str, curves: &[Vec<[f64; 2]>]) -> Result<String, String> {
