@@ -39,6 +39,10 @@ Flanges (s546 / s550 / s565: the spacing changes, the line's start hole stays) a
    drag solve now costs up to 4 solves per step (assembly_perf drives the evaluator directly, not this path). d6's 6.38° isn't the nearest point on the
    ray (ours 12°) nor the target at the start depth (5.4°); live's rotation axis (−0.43, 0.71, 0.56) carries a spin
    the minimal rotation doesn't: probe live's objective (e.g. the same Ball drag from other view directions).
+Asm probes 4 answered (live 1807): closing a coaxial loop of joints over three bodies flags every mate of the loop
+"Mate overdefines the assembly." (any closing type, any order); duplicates on one pair stay OK. Ours matches all 7
+(asm_spec_probes 19/21, known f53par / a3). f54 itself still differs: there live leaves the closing Slider 2 OK and
+flags only Cylindrical 1 / 3, ours flags none (f54 also has C on Slider 1 and D on Cylindrical 2): f54 stays KNOWN.
 Open (P2, need live data, nothing to guess): s6, s102 (probes 10), s218 / s236 / s226 (probes 11: s226's spline
 loop moves rigidly in live; s236's third quad down in live, up in ours; s218's chain turns only through k19), s209 / s11
 (probes 13 sent), s230 (tried keeping the Length side's Equal partner: worse elsewhere), s210 (an Angle with an H line
