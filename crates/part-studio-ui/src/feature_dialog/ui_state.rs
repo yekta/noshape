@@ -137,7 +137,14 @@ impl FeatureDialog {
             // A value drawn beside the row before it (Draft's angle) shows no label of its own.
             let companion = prev.is_some_and(|p| p.hints.has(Hints::FIRST_IN_ROW) && p.hints.has(Hints::DISPLAY_SHORT)) && s.hints.has(Hints::DISPLAY_SHORT);
             prev = Some(s);
-            let label = if companion { Value::Null } else { json!(crate::i18n::spec(s.label)) };
+            // A row drawn with an icon instead of its label (the Hole's diameter, depth, tip angle) reads "" (live).
+            let label = if companion {
+                Value::Null
+            } else if param_icon(self.ty.id, s.id).is_some() {
+                json!("")
+            } else {
+                json!(crate::i18n::spec(s.label))
+            };
             match &s.kind {
                 ParamKind::Enum { options, .. } if s.hints.has(Hints::HORIZONTAL_ENUM) => {
                     let cur = values.enum_(s.id);
@@ -182,6 +189,21 @@ impl FeatureDialog {
                     // Missing picks are red; an empty field the feature's error blames isn't (live: a new Extrude's).
                     let missing = refs.iter().any(|r| (self.missing)(r)) || (!refs.is_empty() && self.field_error(s.id).is_some());
                     fields.push(json!({ "label": label, "kind": "query", "items": items, "active": self.active_query.as_deref() == Some(s.id), "state": if missing { "error" } else { "ok" } }));
+                }
+                // A table (the Hole's type and size): one select per level, its name drawn beside it (live: no label).
+                ParamKind::Lookup { table } => {
+                    let cur = values.lookup(s.id).to_vec();
+                    let mut prefix: Vec<String> = Vec::new();
+                    for level in 0..7 {
+                        let opts = noshape_model::features::hole_tables::table_levels(table, &prefix);
+                        if opts.is_empty() {
+                            break;
+                        }
+                        let chosen = cur.get(level).cloned().or_else(|| noshape_model::features::hole_tables::table_level_default(table, &prefix)).unwrap_or_default();
+                        let text = opts.iter().find(|o| o.0 == chosen).map(|o| o.1.to_string()).unwrap_or_else(|| chosen.clone());
+                        fields.push(json!({ "label": null, "kind": "enum", "text": text, "state": "ok" }));
+                        prefix.push(chosen);
+                    }
                 }
                 // An array: live reads its box's text (its label, its entries and an item array's add button).
                 ParamKind::Array { item, item_label } => {
