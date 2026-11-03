@@ -60,6 +60,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   sheet-metal forms; /root/dx-scratch/pm/models, vibe5 ~/agents/dx/pm-models): every first difference traced so far
   is the dumps' own (custom features, std-content regions built from non-sketch geometry, empty live states), not a
   core bug; real P1 documents still pending.
+- 11-03 01:50: centroid bands; Variable Studio tables (live's `variables` with a studio reference) rebuilt and
+  inserted; custom features run from their Feature Studios (features.json `featureStudios`: element id → name +
+  source; asked live to include it for the custom-feature phase). T1 parity:: tests: 10.
 - Staged for when GET /features reopens (~04:17 UTC): /root/parity/models-dx/{dx-mbd-1721, live-hole-row,
   live-pattern-holes} have live.jsonl (per rollback: parts, bands, boxes, raw bodies; from pm-rollbacks.js); run
   /root/dx-scratch/live/pm-features.sh to add features.json and merge names / statuses, then parity_models on them
