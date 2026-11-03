@@ -69,6 +69,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   CAP_FACE among several caps, nested names only through Booleans. IGES names as live 1818 (406 Name property on
   export; label on import; " DE<line>" for an unlabelled solid). Live added raw `bodies` to every live.jsonl line
   (REQUESTS 1828 answered); first documents after ~04:45.
+- 11-03 02:15: lead's two asks done: core told in docs/handoff/core.md ("From dx (11-03 02:10 UTC)") about the
+  unpacker change; parity_models prints a "SCORE.md row: | … |" line to paste. drawing.md TB25 verified by tests;
+  Insert view shows "Show annotations from model" only for a part (live captures; request withdrawn). Assembly
+  layout proposed to live (REQUESTS 11-03 02:15), to build the assembly translator once confirmed.
 - Staged for when GET /features reopens (~04:17 UTC): /root/parity/models-dx/{dx-mbd-1721, live-hole-row,
   live-pattern-holes} have live.jsonl (per rollback: parts, bands, boxes, raw bodies; from pm-rollbacks.js); run
   /root/dx-scratch/live/pm-features.sh to add features.json and merge names / statuses, then parity_models on them
@@ -487,8 +491,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - From live 1624 (A41 / A44): GD&T on a dimension's value (centred under it) or line (left edge on it) follows the
   dimension (`GdtExtra.on`, a `GdtOn` at the line's end at the dimension line); GD&T and surface finish inside a face
   region take a dot leader (`Leader.dot`; two clicks); surface finish on an extension line stands square to it, away
-  from the value. Still open: a frame dragged off its dimension slides along the dimension line with a leader
-  extension; the extension line lengthening to a surface finish symbol.
+  from the value. (Since done: a frame dragged off its dimension slides along it with a leader, `GdtOn.beside`,
+  test gdt_on_dimension_follows_it; the extension line lengthening to a surface finish symbol, A44.)
 - V28 broken-out panel: [Up to entity | Blind], ☐ Offset (`BrokenOut.offset`, API `offset`), Blind 25 mm / 1 in
   default (API default too). Still open: Exclude from cut, the Spline / Spline point dropdown, ✓ header.
 - CR5: Suggested views of a part with MBD datums keep only the views they need (`mbd::trim_suggested_views`: Front,
