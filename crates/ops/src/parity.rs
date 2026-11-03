@@ -326,6 +326,11 @@ impl<'a> Translator<'a> {
             if INTERNAL.contains(&id) {
                 continue;
             }
+            // A legacy parameter beside its newer version (Hole `style` /
+            // `styleV2`): the newer one counts.
+            if ty == "hole" && (given.contains(&format!("{id}V2").as_str()) || given.contains(&format!("{id}V3").as_str())) {
+                continue;
+            }
             if !known.iter().any(|n| n == id) && ty == "hole" {
                 // A Hole saved by an older std keeps its earlier parameters
                 // beside the V3 ones; tolerances don't change the geometry.
@@ -362,8 +367,23 @@ impl<'a> Translator<'a> {
         if !unknown.is_empty() {
             problems.push(format!("parameters not in noshape's {ty}: {}", unknown.join(", ")));
         }
+        // Parameters Onshape didn't store take the feature's defaults, as
+        // Onshape regenerates them (not our dialog's choices: a Remove
+        // extrude's side, a merge scope).
+        // Except where std treats a missing one otherwise: no `defaultScope`
+        // is "Merge with all" (boolean.fs fills it true).
+        for (id, prop) in schema["params"]["properties"].as_object().into_iter().flatten() {
+            if params.contains_key(id) || given.contains(&id.as_str()) {
+                continue;
+            }
+            let missing = if id == "defaultScope" { Some(json!(true)) } else { prop.get("default").filter(|d| !d.is_null()).cloned() };
+            if let Some(d) = missing {
+                params.insert(id.clone(), d);
+            }
+        }
         let mut args = json!({ "type": ty, "params": params });
-        if let Some(n) = f["name"].as_str() {
+        // "#featureName": Onshape's placeholder for the default name.
+        if let Some(n) = f["name"].as_str().filter(|n| !n.starts_with('#')) {
             args["name"] = json!(n);
         }
         // A parameter we reject: reported, and the feature added without it.
@@ -829,15 +849,15 @@ impl<'a> Translator<'a> {
             "VERTEX" => pick(&self.call("query_entities", json!({ "kind": "vertices", "at": [mm(p)] }))?, "vertices").ok_or_else(|| format!("{id}: no vertex of ours at {:?} mm", mm(p))),
             "BODY" => {
                 let parts = self.call("query_parts", json!({}))?;
-                let q = mm(p);
-                let at = |v: &Value, i: usize| v.as_array().and_then(|a| a.get(i)).and_then(Value::as_f64).unwrap_or(f64::NAN);
+                let k = per_unit(&parts["units"]);
+                let at = |v: &Value, i: usize| v.as_array().and_then(|a| a.get(i)).and_then(Value::as_f64).map_or(f64::NAN, |c| c * k);
                 parts["parts"]
                     .as_array()
                     .into_iter()
                     .flatten()
-                    .find(|b| (0..3).all(|i| at(&b["bounding_box"]["min"], i) - 1e-3 <= at(&q, i) && at(&q, i) <= at(&b["bounding_box"]["max"], i) + 1e-3))
+                    .find(|b| (0..3).all(|i| at(&b["bounding_box"]["min"], i) - 1e-6 <= p[i] && p[i] <= at(&b["bounding_box"]["max"], i) + 1e-6))
                     .and_then(|b| b["id"].as_str().map(str::to_string))
-                    .ok_or_else(|| format!("{id}: no part of ours around {q}"))
+                    .ok_or_else(|| format!("{id}: no part of ours around {:?} mm", p.map(|c| c * 1e3)))
             }
             "SKETCH_REGION" => self.region_at(p, r.measure),
             other => Err(format!("{id}: reference kind {other} not mapped")),
@@ -910,7 +930,7 @@ impl<'a> Translator<'a> {
         let plane_q = f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "sketchPlane").ok_or("no sketchPlane")?;
         let plane = self.param(k, plane_q)?.and_then(|v| v.as_array().and_then(|a| a.first()).cloned()).ok_or("no sketch plane")?;
         let mut args = json!({ "plane": plane });
-        if let Some(n) = f["name"].as_str() {
+        if let Some(n) = f["name"].as_str().filter(|n| !n.starts_with('#')) {
             args["name"] = json!(n);
         }
         let made = self.call("sketch_create", args)?;
