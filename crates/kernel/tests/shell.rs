@@ -1494,7 +1494,15 @@ fn dumped_sweep_shell_probe() {
         println!("{mode:?}: {ms:.0} ms, {} faces, valid {}, {:.6} mm3, {} caps", r.shape.faces().len(), r.shape.is_valid(), vol(&r.shape) * 1e9, caps.len());
         let t0 = std::time::Instant::now();
         let s = shell_solid(&r.shape, &caps, 0.001, ShellSide::Inside, ShellMethod::Auto);
-        println!("  shell {:.0} ms {:?}", t0.elapsed().as_secs_f64() * 1e3, s.map(|s| vol(&s.shape) * 1e9).map_err(|e| e.to_string()));
+        println!("  shell {:.0} ms {:?}", t0.elapsed().as_secs_f64() * 1e3, s.as_ref().map(|s| vol(&s.shape) * 1e9).map_err(|e| e.to_string()));
+        // Each face's display mesh time (NOSHAPE_SWEEP_MESH=<linear deflection, m>).
+        if let (Ok(s), Some(d)) = (&s, std::env::var("NOSHAPE_SWEEP_MESH").ok().and_then(|d| d.parse::<f64>().ok())) {
+            for (i, f) in s.shape.faces().iter().enumerate() {
+                let t0 = std::time::Instant::now();
+                let n = tessellate(f, d, 0.35, false).map(|t| t.indices.len() / 3).unwrap_or(0);
+                println!("  face {i} {} mesh {:.0} ms, {n} triangles", format!("{:?}", f.face_surface().ok()).chars().take(16).collect::<String>(), t0.elapsed().as_secs_f64() * 1e3);
+            }
+        }
     }
 }
 
