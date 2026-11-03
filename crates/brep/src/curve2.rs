@@ -152,6 +152,22 @@ impl C2 {
         }
     }
 
+    /// d/dt of the point at `t` (0..1): [`Self::derivs`]'s first, without the second (a mapped curve's three
+    /// evaluations for it).
+    fn deriv1(&self, t: f64) -> DVec2 {
+        match *self {
+            C2::Mapped { ref c, t0, t1, m } => {
+                let [p, d1, _] = c.derivs(t0 + (t1 - t0) * t);
+                m.map(p, d1).1 * (t1 - t0)
+            }
+            C2::Conic { c, u, v, t0, sweep, m, par, hyp } => {
+                let (p, d1) = conic(c, u, v, t0 + sweep * t, par, hyp);
+                m.map(p, d1 * sweep).1
+            }
+            _ => self.derivs(t).0,
+        }
+    }
+
     /// d/dt and d²/dt² of the point at `t` (0..1).
     fn derivs(&self, t: f64) -> (DVec2, DVec2) {
         match *self {
@@ -222,7 +238,7 @@ impl C2 {
         match *self {
             C2::Seg { a, b } => (b - a).length(),
             C2::Arc { r, sweep, .. } => r * sweep.abs(),
-            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => self.gauss(|t| self.derivs(t).0.length()),
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => self.gauss(|t| self.deriv1(t).length()),
         }
     }
 
@@ -309,7 +325,7 @@ impl C2 {
         match *self {
             C2::Seg { a, b } => (b - a).normalize(),
             C2::Arc { a0, sweep, .. } => dir(a0 + sweep * t).perp() * sweep.signum(),
-            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => self.derivs(t).0.normalize(),
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => self.deriv1(t).normalize(),
         }
     }
 
@@ -333,7 +349,7 @@ impl C2 {
                 let a1 = a0 + sweep;
                 0.5 * (r * r * sweep + r * c.x * (a1.sin() - a0.sin()) - r * c.y * (a1.cos() - a0.cos()))
             }
-            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => self.gauss(|t| 0.5 * self.at(t).perp_dot(self.derivs(t).0)),
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => self.gauss(|t| 0.5 * self.at(t).perp_dot(self.deriv1(t))),
         }
     }
 
@@ -696,7 +712,7 @@ impl C2 {
                     let mut ok = false;
                     for _ in 0..40 {
                         let f = self.at(s) - o.at(t);
-                        let (da, db) = (self.derivs(s).0, -o.derivs(t).0);
+                        let (da, db) = (self.deriv1(s), -o.deriv1(t));
                         let det = da.perp_dot(db);
                         if det.abs() < 1e-300 {
                             break;

@@ -97,12 +97,30 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
   collinear pieces from one vertex. (c) a5f1e564: collinear overlapping segments after projection. OCCT's PaveFiller
   sources aren't on this machine (only the installed OCCT in /root/occt).
 - Next, in order: (1) land bool-c once its sweep (vibe5 uvper2.tsv) is >= 258; (2) b7eb72a8 (held projection);
-  (3) the two-edges kinds above; (4) speed: free-form rays (fewer Newton starts per patch), C2::param_of, OCCT's section tolerance check;
+  (3) the two-edges kinds above; (4) speed: intervals_on's numeric_intersections (each boundary curve's samples once per face), free-form rays (fewer Newton starts per patch), C2::param_of, BRepCheck on built faces only;
   (5) the 30 TPI knurl's tolerance (see the regression section below). Tools: bin/why4.sh (single cases on vibe4),
   bin/syncdbg.sh [worktree] (bool-a = that worktree + env-gated debug prints from bin/dbgpatch.py: NOSHAPE_X_NM,
   _ALLP, _PAIR, _SEGS, _TWIN (segments between one pair of vertices), _NOPC (a piece without its curve on a
   free-form face), _DELV (the deleted-vertex rule), _PROJ (a failed projection), _TINY (a tiny arc)).
 - Squash only with `git reset --soft $(git merge-base HEAD origin/main)` after a fresh fetch; check `git show --stat`.
+
+## 2D curves' first derivative alone (11-03 02:00 UTC)
+- C2::deriv1: a mapped curve's (a 3D NURBS seen in a plane's or cylinder's parameters) or a conic's first derivative
+  in one evaluation; `derivs` makes the second by differences of the first, three evaluations, which the Newton steps
+  of numeric_intersections (most of intervals_on: a fifth of corpus5's noshape time), the curves' lengths, tangents
+  and areas threw away. The same values: corpora and shfall decline exactly as before (identical tsvs). vibe3, corpus5
+  replay, noshape's totals 4316 + 2535 -> 4164 + 2390 ms (-4.3 %; OCCT's 12299 + 10996, unchanged), twice.
+- Timing kit: /root/bool-scratch/abrun.sh <A> <B> <corpus> [runs] builds both commits' kernel test binaries in
+  /root/bool-scratch/perfwt (vibe4 target), copies them to vibe3 and runs ab3.sh there (both land slots held while it
+  runs; corpus5 is in vibe3 ~/bool-kbin). corpus5's aggregate profile (all taken cases, thread samples):
+  IntTools_FaceFace 26 % (5 % its PSO tolerance check), intervals_on 20 %, BRepCheck_Analyzer 11 %, face_pair 7 %,
+  face pieces 6 %, rays 6 %.
+- Tried, not landed: a tiny arc's two vertices (one argument's, within each other's tolerance: corpus6 b70f339a's
+  quarter arc of 1e-10 m) merged as a group and the arc a micro edge: the 8 cases move on to "a point near two
+  vertices" (4) and "an invalid result" (4). Pattern fuses: noshape's Boolean before fuse_slabs makes the 999-tool
+  overlapping patterns (e807533d, 34868dbd) 2.7 -> 1.4 s (fuse_slabs fails at its end there, after 1.7 s of per-slab
+  OCCT fuses), but where fuse_slabs succeeds its result is unified and its history has no solid records and its
+  slab-cut faces Modified: ours differs there (patch /tmp/rustfirst2.diff gone; redo from the note).
 
 ## Extruded conics a turn on, a steep plane exactly through a cone's apex, pieces projected onto free-form faces (11-03 00:10 UTC)
 - rust_boolean.cpp to_body: an extruded ellipse or circle face whose parameters lie a turn past the conic's first
