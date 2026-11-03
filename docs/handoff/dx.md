@@ -83,7 +83,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   the workspace through DocModel::window_snapshot), so ui_state reports what the user picked and render_image
   view "window" renders what the window shows (checked in the app: orbit, click the circle → ui_state lists it).
   Drawings' selections too (`view:` / `annotation:` / `table:` / `break:` / `sketch:` / `hatch:` / `image:`; a click on
-  a view → ui_state lists "view:2") and zoom.
+  a view → ui_state lists "view:2") and zoom. ui_state's `window` (11-03 07:10): the active Part Studio's on-screen
+  state as the interaction suite records it (psui's PartStudioView::ui_state: focus, dialog fields, open list,
+  feature list, message bar), read before each call outside the DocModel update (live_server reads the provider
+  first): checked in the app (Extrude open, Depth "#wa": focus Depth "#wa", the autocomplete rows "#wall").
 - 11-03 06:20: live mode checked on green 19f17a18: the app open on a document, `noshape mcp` calls on the same
   path (document_open, sketch, extrude) show in the window at once (3–13 ms per edit), Ctrl+Z in the window undoes
   the extrude and the CLI then lists only Sketch 1. Live requests filed: 1844+ IN-FEATURE-MATE-CONNECTOR UI, one
