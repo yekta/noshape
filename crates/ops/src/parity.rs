@@ -169,7 +169,34 @@ impl<'a> Translator<'a> {
         for c in doc["configuration"]["configurationParameters"].as_array().into_iter().flatten() {
             t.config_input(c);
         }
+        for table in doc["variables"].as_array().into_iter().flatten().filter(|v| v["variableStudioReference"].is_object()) {
+            t.variable_studio(table);
+        }
         Ok(t)
+    }
+
+    /// A Variable Studio the Part Studio's variables come from (live's
+    /// `variables`, a table with a `variableStudioReference`): ours with the
+    /// same variables, inserted into the Part Studio.
+    fn variable_studio(&mut self, table: &Value) {
+        let made = match self.call("variable_create_studio", json!({})) {
+            Ok(r) => r,
+            Err(e) => {
+                self.notes.push(format!("Variable Studio: {e}"));
+                return;
+            }
+        };
+        let Some(studio) = made["created"]["id"].as_str().map(str::to_string) else { return };
+        for v in table["variables"].as_array().into_iter().flatten() {
+            let (Some(name), Some(value)) = (v["name"].as_str(), v["expression"].as_str().or(v["value"].as_str())) else { continue };
+            let mut args = json!({ "tab": studio, "name": name.trim_start_matches('#'), "value": value });
+            if let Some(kind) = v["type"].as_str() {
+                args["kind"] = json!(kind);
+            }
+            if let Err(e) = self.call("variable_create", args) {
+                self.notes.push(format!("Variable Studio variable {name}: {e}"));
+            }
+        }
     }
 
     /// A configuration input. Variables (#parameterId) as Variable inputs

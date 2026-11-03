@@ -362,3 +362,25 @@ fn differences_use_lives_bands() {
     assert!(d.iter().any(|x| x.contains("7/12/8 faces/edges/vertices, live 6/12/8")) && d.iter().any(|x| x.contains("volume")), "{d:?}");
     assert_eq!(differences(&[live], &[]), ["0 parts, live 1"]);
 }
+
+/// Variables from a Variable Studio (live's `variables` with a studio
+/// reference): ours makes the studio, so the Extrude's "#d" is 20 mm.
+#[test]
+fn variable_studio_variables_are_rebuilt() {
+    let (mut features, mut live, refs) = block_model();
+    features["variables"] = json!([{ "variableStudioReference": { "elementId": "e1" }, "variables": [{ "name": "d", "type": "LENGTH", "expression": "20 mm" }] }]);
+    for f in features["features"].as_array_mut().unwrap() {
+        for p in f["parameters"].as_array_mut().into_iter().flatten() {
+            if p["parameterId"] == "depth" {
+                p["expression"] = json!("#d");
+            }
+        }
+    }
+    for l in &mut live {
+        for p in l["parts"].as_array_mut().into_iter().flatten() {
+            p.as_object_mut().unwrap().remove("area");
+        }
+    }
+    let r = run_model("block-vs", &features, &live, &refs);
+    assert_eq!((r.matching, r.compared), (3, 3), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
