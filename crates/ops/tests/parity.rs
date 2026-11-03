@@ -121,6 +121,14 @@ fn parity_models() {
         if !dir.join("live.jsonl").is_file() {
             let why = ["SKIPPED.txt", "INCOMPLETE.txt"].iter().find_map(|f| std::fs::read_to_string(dir.join(f)).ok()).unwrap_or_default();
             println!("{name}: no live.jsonl, not scored ({})", why.trim());
+            // NOSHAPE_PARITY_UNSCORED=1: still translated, for what isn't.
+            if std::env::var_os("NOSHAPE_PARITY_UNSCORED").is_some()
+                && let Some((features, _, refs)) = read_model(&dir)
+            {
+                for u in run_model(&name, &features, &[], &refs).untranslated {
+                    println!("  untranslated: {u}");
+                }
+            }
             continue;
         }
         let Some((features, live, refs)) = read_model(&dir) else {

@@ -1053,7 +1053,7 @@ impl<'a> Translator<'a> {
                     }
                 }
                 "BTCurveGeometryEllipse" => {
-                    let (cx, cy, a, b, xd, yd) = (num("xCenter"), num("yCenter"), num("majorRadius"), num("minorRadius"), num("xDir"), num("yDir"));
+                    let (cx, cy, a, b, xd, yd) = (num("xCenter"), num("yCenter"), g["majorRadius"].as_f64().or(g["radius"].as_f64()).unwrap_or(0.0), num("minorRadius"), num("xDir"), num("yDir"));
                     let sense = if g["clockwise"].as_bool() == Some(true) { -1.0 } else { 1.0 };
                     let pt = |t: f64| {
                         let (c, s) = (t.cos(), sense * t.sin());
@@ -1548,7 +1548,7 @@ fn sampled(e: &Value) -> Option<Vec<[f64; 2]>> {
             )
         }
         "BTCurveGeometryEllipse" => {
-            let (cx, cy, a, b, xd, yd) = (num("xCenter"), num("yCenter"), num("majorRadius"), num("minorRadius"), num("xDir"), num("yDir"));
+            let (cx, cy, a, b, xd, yd) = (num("xCenter"), num("yCenter"), g["majorRadius"].as_f64().or(g["radius"].as_f64()).unwrap_or(0.0), num("minorRadius"), num("xDir"), num("yDir"));
             let sense = if g["clockwise"].as_bool() == Some(true) { -1.0 } else { 1.0 };
             let (t0, t1) = arc_span(e).unwrap_or((0.0, std::f64::consts::TAU));
             Some(
