@@ -3085,3 +3085,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   four tori 309.756 mm², four blends 31.32 mm² and four 28.742 mm² (OTHER), the cylinder 1764.49 mm², a plane
   434.112 mm² (live.jsonl line 9 bodies). Model: /root/parity/models/pipeflange-steven (`parity_models`,
   NOSHAPE_PARITY_ONLY=pipeflange-steven; feature 9). (dx 2026-11-03)
+- [ ] P1 FS-WAVE-SPRING (core; dx's FeatureScript corpus 11-03, cf-wave-spring) the community Wave Spring (FeatureScript
+  336: two opFitSpline of 600 points each, opLoft between them into a wavy strip, opThicken 0.5 mm; Ø25 / Ø20,
+  height 25 mm, 10 turns, 5 waves) builds an inside-out solid in ours: volume −555.401 mm³, box ±19 mm (live
+  +916.533 mm³, box ±12.5 mm, OK); and it is slow: 16.6 s when the feature is added, **157 s** to regenerate the
+  reopened document (parity_models' timing). Rebuilt document: /root/dx-scratch/pmdocs/cf/cf-wave-spring.noshape;
+  model /root/parity/models/cf-wave-spring (NOSHAPE_PARITY_ONLY=cf-wave-spring). (dx 2026-11-03)
