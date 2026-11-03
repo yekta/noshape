@@ -4,6 +4,7 @@
 mod assembly_perf;
 mod big_assembly_perf;
 mod big_plate_perf;
+mod config_dir;
 mod coverage;
 mod crop_fixtures;
 mod derived_mirror;
