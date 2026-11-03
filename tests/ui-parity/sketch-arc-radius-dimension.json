@@ -1,0 +1,86 @@
+{
+ "name": "sketch-arc-radius-dimension",
+ "about": "a 3 point arc, d on it, place, 8 + Enter: R8",
+ "area": "skasm",
+ "source": "everyday (lead 11-03: sketch everyday use)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "a"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     6
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     6
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     15
+    ]
+   }
+  },
+  {
+   "do": "type",
+   "text": "8"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

@@ -158,7 +158,8 @@ pub fn default_key_bindings() -> Vec<KeyBinding> {
     let view = Some("Workspace && !Input");
     let doc_mod = Some("Workspace");
     let doc = Some("Workspace && !Input");
-    let dlg = Some("FeatureDialog && !Input");
+    // (Not in a sketch, whose own `a` / `q` are the 3 point arc and construction.)
+    let dlg = Some("FeatureDialog && !Input && !Sketch");
     vec![
         // General / document
         KeyBinding::new("secondary-z", Undo, doc_mod),
@@ -351,5 +352,24 @@ mod recent_tab_tests {
         assert!(p.depth_of(&ctx(&["Workspace", "PartStudio", "Input"])).is_some(), "a Part Studio field");
         assert!(p.depth_of(&ctx(&["Workspace", "FeatureStudio", "Input"])).is_none());
         assert!(p.depth_of(&ctx(&["Workspace", "FeatureStudio", "CodePane", "Input"])).is_none());
+    }
+}
+
+#[cfg(test)]
+mod sketch_key_tests {
+    use super::*;
+    use gpui_kit::{Action, KeyContext, Keymap, Keystroke};
+
+    /// In a sketch (its context inside the sketch dialog's), `a` is the 3 point
+    /// arc and `q` construction, not the feature dialog's Flip primary axis /
+    /// Reorient secondary axis (in the app `a` did nothing).
+    #[test]
+    fn a_and_q_in_a_sketch_are_the_arc_and_construction() {
+        let keymap = Keymap::new(default_key_bindings());
+        let stack: Vec<KeyContext> = ["Workspace", "PartStudio", "Sketch", "FeatureDialog"].iter().map(|n| KeyContext::parse(n).unwrap()).collect();
+        for (key, want) in [("a", SketchArc3.name()), ("q", SketchConstruction.name())] {
+            let (found, _) = keymap.bindings_for_input(&[Keystroke::parse(key).unwrap()], &stack);
+            assert_eq!(found.first().map(|b| b.action().name()), Some(want), "{key}");
+        }
     }
 }

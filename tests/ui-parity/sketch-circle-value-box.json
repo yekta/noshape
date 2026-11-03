@@ -1,0 +1,55 @@
+{
+ "name": "sketch-circle-value-box",
+ "about": "circle tool: centre and rim clicks, then type 20, Enter: Ø20",
+ "area": "skasm",
+ "source": "everyday (lead 11-03: sketch everyday use)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "c"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     16,
+     10
+    ]
+   }
+  },
+  {
+   "do": "type",
+   "text": "20"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

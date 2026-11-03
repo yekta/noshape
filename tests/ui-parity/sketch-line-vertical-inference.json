@@ -1,0 +1,47 @@
+{
+ "name": "sketch-line-vertical-inference",
+ "about": "line from (10, 0) to (10.4, 25): the inference makes it vertical",
+ "area": "skasm",
+ "source": "everyday (lead 11-03: sketch everyday use)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10.4,
+     25
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

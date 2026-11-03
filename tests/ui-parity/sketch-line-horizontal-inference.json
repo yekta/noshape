@@ -1,0 +1,47 @@
+{
+ "name": "sketch-line-horizontal-inference",
+ "about": "line from the origin to (30, 0.4): the inference makes it horizontal",
+ "area": "skasm",
+ "source": "everyday (lead 11-03: sketch everyday use)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0.4
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

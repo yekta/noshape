@@ -1,0 +1,48 @@
+{
+ "name": "sketch-line-shift-no-inference",
+ "about": "line from (10, 5) to (40, 5.4) with Shift held on the second click: no horizontal",
+ "area": "skasm",
+ "source": "everyday (lead 11-03: sketch everyday use)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     40,
+     5.4
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

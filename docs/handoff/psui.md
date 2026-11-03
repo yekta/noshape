@@ -899,3 +899,7 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
   synthetic moves; the sketch tools take `hovered` from it. Repro: /root/skasm-scratch/uip/dbg-rect-dim2.json.
 - I added two optional state keys (README "undo", "sketch"; recorded by part_studio/ui_script.rs, compared by run.py
   once live records them).
+- (05:55) Sketch toolbar tools aren't marked for the driver (only the feature toolbar's `tool:` names), and the driver
+  takes `{"tool": X, "menu": Y}` as the tool X itself: sketch tools in dropdowns (3 point circle, Center point arc …)
+  can't be targeted yet; my scenarios use the keys meanwhile. Fixed on the way: in a sketch `a` / `q` were the
+  feature dialog's Flip primary axis / Reorient secondary axis (skasm, app-core actions `dlg` now `!Sketch`).

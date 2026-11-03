@@ -1,0 +1,94 @@
+{
+ "name": "sketch-delete-dimension",
+ "about": "a circle dimensioned Ø12, click the dimension's value, Delete",
+ "area": "skasm",
+ "source": "everyday (lead 11-03: sketch everyday use)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "c"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     5,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "type",
+   "text": "12"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Delete"
+  }
+ ]
+}
