@@ -3121,6 +3121,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   placed) → ours ERROR "Unfilleted edge overlapped by fillet." (no change: 21/46/24, 3665307.7 mm³); live OK,
   44/99/54, 3569327.9 mm³. Model: /root/parity/models/learning-center-michael (`parity_models`,
   NOSHAPE_PARITY_ONLY=learning-center-michael; feature 5). (dx 2026-11-03)
+  core 11-03 17:35: live's eight edges are the R75 end arc, a long side line and the six hole rims (R25 ×2, R12.5 ×4) at
+  both faces; tangent propagation makes 23 (over Fillet 1's end rounds). At R14.485 the R12.5 rims' rounds reach
+  26.985 mm from their axes, past the prong's side walls (25 mm) and end (22.5 mm), so live's rounds overlap and
+  trim each other (allowEdgeOverflow). ChFi3d can't; the part minus the union of each round's removed material (each
+  between its own two faces, extended) comes to ~94750 mm³ removed by hand against live's 95980: the likely way.
+  Fillet 2's input dumps: vibe5 ~/core-lcm/fillet-1.brep / .txt.
 - [x] (core 11-03 13:00: the boss went through boolean.cpp fuse_on_face, which rebuilt the shell from its iterator's faces (already in the solid's orientation) and then flipped the new shell once more by the shell's; a drafted extrude's solid holds its shell REVERSED, so the part came out inside out. The same at four other sites (the unify's ReShape, through holes, the local Boolean, features.cpp's blend rebuild): the shell and solid now FORWARD. dx's document +922.936632 mm³ as live; the Boolean corpus as before (the same 4 of 974 differ without it); T1 model kernel_robustness::a_boss_on_a_drafted_blocks_top_adds_to_it, both pull directions) P1 ADD-INSIDE-OUT (core / bool; dx's parity suite 11-03, cf-parameter-pattern) an Extrude Add of a 2 mm boss
   on the top face of a drafted block leaves the part inside out: volume −922.937 mm³ (query_parts), the magnitude
   live's +922.937. The block: Extrude 1, a 20 × 10 mm rectangle on Top, depth 5 mm (#a / 2), draft 10° (#a deg,
