@@ -90,19 +90,6 @@ pub fn source_bounds(doc: &Document, src: &DrawingSource) -> Option<(DVec3, DVec
     bodies.par_iter().filter_map(|b| b.shape.bounding_box(true).ok()).map(|bb| (bb.min, bb.max)).reduce_with(|(lo, hi), (a, b)| (lo.min(a), hi.max(b)))
 }
 
-/// The largest standard scale at which the suggested views of a model of
-/// `extent` (meters, X Y Z) fit a sheet of `w` x `h` millimeters.
-pub fn suggested_scale(extent: DVec3, w: f64, h: f64) -> f64 {
-    let e = extent.max(DVec3::splat(1e-4)) * 1000.0;
-    // Front (X by Z) and top (X by Y) stacked, right (Y by Z) and the
-    // isometric view (about the diagonal) beside them; 60% of the sheet
-    // leaves room for the title block, gaps and dimensions.
-    let iso = (e.x + e.y) * 0.87;
-    let need_w = e.x + e.y.max(iso);
-    let need_h = e.z + e.y.max(iso * 0.6);
-    SCALES.iter().copied().find(|s| need_w * s <= w * 0.6 && need_h * s <= h * 0.6).unwrap_or(*SCALES.last().expect("scales"))
-}
-
 /// The view frame of a sketch source (looking at the sketch plane).
 pub fn source_frame(doc: &Document, src: &DrawingSource) -> Option<[[f64; 3]; 2]> {
     let f = src.sketch.as_ref()?;
@@ -144,22 +131,20 @@ pub fn create_drawing(template: &DrawingTemplate, source: Option<&DrawingSource>
     if src.flat {
         return flat_drawing(d, src, e, w, h);
     }
-    let s = suggested_scale(hi - lo, w, h);
-    d.sheets[0].scale = s;
-    let iso = (e.x + e.y) * 0.87 * s;
-    // Cell sizes (paper mm): column of the front view, the other column;
-    // row of the front view, the other row.
-    let (fw, ow) = (e.x * s, (e.y * s).max(iso));
-    let (fh, oh) = (e.z * s, (e.y * s).max(iso * 0.6));
-    let gap = 25.0;
-    let (tw, th) = (fw + gap + ow, fh + gap + oh);
-    // Centered in the area above the title block band.
-    let (x0, y0) = ((w - tw) * 0.5, 15.0 + ((h - 15.0) - th).max(0.0) * 0.6);
+    // The Front view (X by Z) fits 30 % of the frame, as a first inserted
+    // view does (live 1898: 3:1, 1:2, 1:3 on ANSI A; 1:1 on A3).
+    d.sheets[0].scale = first_view_scale(d.sheets[0].size, [e.x, e.z]);
+    // Live 1898 (blocks of 20 to 120 mm on ANSI A, and on ISO A3): the four
+    // views' centres don't follow the part: two columns 0.42 of the sheet's
+    // width apart about the frame's centre, two rows 0.3696 of its height
+    // apart about 0.56 of it.
+    let [fx0, _, fx1, _] = d.sheets[0].size.frame_rect();
+    let (xc, yc, dx, dy) = ((fx0 + fx1) * 0.5, 0.56 * h, 0.21 * w, 0.1848 * h);
     let third = d.projection == Projection::ThirdAngle;
     // Third angle: front bottom-left, top above, right to the right.
-    // First angle: front top-right, top below, right view to the left.
-    let (front_x, other_x) = if third { (x0 + fw * 0.5, x0 + fw + gap + ow * 0.5) } else { (x0 + ow + gap + fw * 0.5, x0 + ow * 0.5) };
-    let (front_y, other_y) = if third { (y0 + fh * 0.5, y0 + fh + gap + oh * 0.5) } else { (y0 + oh + gap + fh * 0.5, y0 + oh * 0.5) };
+    // First angle: front top-left, top below, the side view to its right.
+    let (front_x, other_x) = (xc - dx, xc + dx);
+    let (front_y, other_y) = if third { (yc - dy, yc + dy) } else { (yc + dy, yc - dy) };
     // Automatic centermarks as Drawing properties › Views (live asbdt:
     // the suggested Front view marks its hole); projected views copy the
     // front view's, like the Projected view tool.
@@ -233,6 +218,31 @@ mod tests {
             let got = first_view_scale(size, [l, h]);
             assert!((got - want).abs() < 1e-12, "{size:?} {l} x {h}: {got} (live {want})");
         }
+    }
+
+    /// Live 1898: suggested views of blocks (mm) sit at the same spots whatever
+    /// the part, at the scale a first view would take: ANSI A (centres in
+    /// inches) and ISO A3 (mm, first angle: front top-left, top below it).
+    #[test]
+    fn suggested_views_where_lives_are() {
+        let doc = Document::new();
+        let src = DrawingSource { tab: doc.tabs[0].id, part: None, config: ConfigValues::default(), sketch: None, flat: false };
+        let at = |name: &str, e: [f64; 3]| {
+            let d = create_drawing(&template_by_name(name).unwrap(), Some(&src), Some((DVec3::ZERO, DVec3::from(e) / 1000.0)), true, None);
+            (d.sheets[0].scale, d.sheets[0].views.iter().map(|v| v.position).collect::<Vec<_>>())
+        };
+        let near = |a: [f64; 2], b: [f64; 2], k: f64| (a[0] - b[0] * k).abs() < 1e-3 && (a[1] - b[1] * k).abs() < 1e-3;
+        // (front, top, right, isometric)
+        let ansi = [[3.209, 3.1892], [3.209, 6.3308], [7.829, 3.1892], [7.829, 6.3308]];
+        for (e, scale) in [([20.0, 10.0, 5.0], 3.0), ([100.0, 50.0, 20.0], 0.5), ([60.0, 60.0, 120.0], 1.0 / 3.0)] {
+            let (s, p) = at("ANSI A", e);
+            assert!((s - scale).abs() < 1e-12, "{e:?}: {s}");
+            assert!(p.iter().zip(ansi).all(|(a, b)| near(*a, b, 25.4)), "{e:?}: {p:?}");
+        }
+        let (s, p) = at("ISO A3", [100.0, 50.0, 20.0]);
+        assert_eq!(s, 1.0);
+        let iso = [[122.3, 221.2056], [122.3, 111.4344], [298.7, 221.2056], [298.7, 111.4344]];
+        assert!(p.iter().zip(iso).all(|(a, b)| near(*a, b, 1.0)), "{p:?}");
     }
 
     #[test]
