@@ -77,7 +77,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   cameras and selections (Part Studio entities, Assembly `inst:` ids; WindowSnapshot in ops/window.rs, provided by
   the workspace through DocModel::window_snapshot), so ui_state reports what the user picked and render_image
   view "window" renders what the window shows (checked in the app: orbit, click the circle → ui_state lists it).
-  Not yet: drawings' sheet zoom and selection.
+  Drawings' selections too (`view:` / `annotation:` / `table:` / `break:` / `sketch:` / `hatch:` / `image:`; a click on
+  a view → ui_state lists "view:2"). Not yet: drawings' sheet zoom.
 - 11-03 06:20: live mode checked on green 19f17a18: the app open on a document, `noshape mcp` calls on the same
   path (document_open, sketch, extrude) show in the window at once (3–13 ms per edit), Ctrl+Z in the window undoes
   the extrude and the CLI then lists only Sketch 1. Live requests filed: 1844+ IN-FEATURE-MATE-CONNECTOR UI, one
