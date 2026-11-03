@@ -97,7 +97,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   errs is reported; TolerantQuantity parameters (MBD tolerances on a depth) read as their quantity. With core's
   e77387ec: **10/14, 72/93** (clamp-abhil matches to the end). 13:30: a sketch whose frame (origin, x, normal) isn't
   live's `sketches` transformMatrix is a difference (T1 a_sketch_frame_unlike_lives_is_a_difference); three face
-  sketches in the unscored documents differ: SKETCH-FACE-FRAME (core), /root/dx-scratch/frames.py lists them.
+  sketches in the unscored documents differ: SKETCH-FACE-FRAME (core), /root/dx-scratch/frames.py lists them. A region
+  query's sketch is the one whose `.imprint` the query's own operation names (was: the first `.wireOp` in it, which
+  put backback-fix's Sketch 4 on a Top-plane region silently; now "not built", needs live's bodies).
 - 11-03 10:40 assembly phase (lead 09:05: against a small assembly if live's sample is late): `parity::rebuild_assembly`
   takes live's assembly definition (`rootAssembly` + `features` with featureStates) and each Part Studio
   (`studios/<elementId>.json` + `.parts.json`): every studio translated into its own tab, each mate connector's

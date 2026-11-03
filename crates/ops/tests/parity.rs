@@ -928,3 +928,4 @@ fn a_sketch_frame_unlike_lives_is_a_difference() {
     let r = run_model("frame-turned", &features, &live, "");
     assert!(r.first.as_deref().is_some_and(|f| f.contains("feature 0 \"Sketch 1\"") && f.contains("sketch frame")), "{:?}", r.first);
 }
+

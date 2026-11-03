@@ -872,11 +872,11 @@ impl<'a> Translator<'a> {
         if !["SKETCH_ENTITY", "FACE", "TOPOLOGY", "IMPRINT"].iter().all(|w| strings.iter().any(|s| s == w)) {
             return Ok(None);
         }
-        let Some(sk) = strings.iter().find_map(|s| s.strip_suffix(".wireOp")).map(str::to_string) else { return Ok(None) };
+        // The sketch whose imprint the face is (the query's own operation),
+        // else the first sketch named.
+        let sk = root_operation(&tree).and_then(|o| o.strip_suffix(".imprint").map(str::to_string)).or_else(|| strings.iter().find_map(|s| s.strip_suffix(".wireOp")).map(str::to_string));
+        let Some(sk) = sk else { return Ok(None) };
         let mut segments: Vec<[f64; 2]> = strings.iter().filter_map(|e| self.curves.get(&(sk.clone(), e.clone()))).flat_map(|poly| poly.windows(2).flat_map(|w| [w[0], w[1]])).collect();
-        if segments.is_empty() {
-            return Err(format!("region of sketch {sk}: its curves were not translated"));
-        }
         let ours = self.feature_ids.get(&sk).cloned().ok_or_else(|| format!("sketch {sk} was not built"))?;
         let g = self.call("sketch_get", json!({ "sketch": ours }))?;
         let (o, x, y) = (f3(&g["frame"]["origin"]), f3(&g["frame"]["x"]), f3(&g["frame"]["y"]));
@@ -903,6 +903,9 @@ impl<'a> Translator<'a> {
                 face_edges.extend(pieces);
                 derived = true;
             }
+        }
+        if segments.is_empty() {
+            return Err(format!("region of sketch {sk}: its curves were not translated"));
         }
         // Named by the sketch's own curves alone: the region its loops make,
         // whole, though the face's edges split it now (live: knob-tim's
@@ -1848,6 +1851,20 @@ fn packed_strings_of(text: &str) -> Vec<String> {
         packed_strings(&tree, &mut out);
     }
     out
+}
+
+/// A packed query's own operation id (`operationId` of its top map).
+fn root_operation(p: &noshape_model::custom::host::packed::Packed) -> Option<String> {
+    use noshape_model::custom::host::packed::Packed;
+    let Packed::Tagged(_, inner) = p else { return None };
+    let Packed::Map(m) = inner.as_ref() else { return None };
+    let (_, id) = m.iter().find(|(k, _)| matches!(k, Packed::Str(s) if s == "operationId"))?;
+    let Packed::Tagged(_, ids) = id else { return None };
+    let Packed::Array(a) = ids.as_ref() else { return None };
+    match a.first()? {
+        Packed::Str(s) => Some(s.clone()),
+        _ => None,
+    }
 }
 
 /// Every string in a packed query.
