@@ -3362,6 +3362,11 @@ fn ansi_title_block_dates_read_month_day_year() {
     assert_eq!(date(&ansi), "{drawing.date_drawn}");
     assert_eq!(date(&iso), "{drawing.date_drawn}");
     assert_eq!(format::field_format("2026-10-20", "m/d/yyyy"), "10/20/2026");
+    // Live 1857: month and day two digits ("11/03/2026").
+    let mut d = Drawing::default();
+    templates::apply_template(&mut d, 0, &templates::DrawingTemplate::standard("ANSI A", SheetSize::AnsiA, TitleBlockStyle::Ansi, true, Projection::ThirdAngle));
+    d.meta.created = Some("2026-11-03".into());
+    assert_eq!(super::build::field_value(&d, 0, &SheetInfo::default(), &super::views::Sources::new(), "drawing.date_drawn").as_deref(), Some("11/03/2026"));
 }
 
 #[test]
@@ -4820,4 +4825,30 @@ fn dimension_style_extension_lines() {
     assert!((first_hidden[0].0 - 50.0).abs() < 1e-6, "the second (at x 50) stays: {first_hidden:?}");
     let gapped = dim(Some(AnnStyle { geometry_gap: Some(4.0), ..Default::default() }));
     assert!(gapped.iter().all(|(_, y0)| (y0 - 4.0).abs() < 1e-6), "starts 4 mm off the geometry: {gapped:?}");
+}
+
+/// Live 1857 (ANSI_A_INCH DXF): the projection symbol's circles are two
+/// CIRCLEs, r 0.108 and 0.054 in about one centre, 0.135 in left of the
+/// "THIRD ANGLE PROJECTION" line's centre; the title block's other format
+/// lines single LINEs.
+#[test]
+fn ansi_projection_symbol_as_live() {
+    use acadrust::EntityType;
+    let mut d = Drawing::default();
+    templates::apply_template(&mut d, 0, &templates::DrawingTemplate::standard("ANSI A", SheetSize::AnsiA, TitleBlockStyle::Ansi, true, Projection::ThirdAngle));
+    let b = render_sheet(&d, 0, &super::views::Sources::new(), &ViewCache::new(), false).unwrap();
+    let label = b.geometry.texts.iter().find(|t| t.text == "THIRD ANGLE PROJECTION").unwrap().pos[0] / 25.4;
+    let dxf = super::cad_export::to_dxf_version(&b.geometry, 1, acadrust::DxfVersion::AC1014).unwrap();
+    let doc = acadrust::DxfReader::from_reader(std::io::Cursor::new(dxf)).unwrap().read().unwrap();
+    let mut circles: Vec<(f64, f64, f64)> = doc.entities().filter_map(|e| match e {
+        EntityType::Circle(c) if c.common.layer == "TITLE_BLOCK" => Some((c.radius, c.center.x, c.center.y)),
+        _ => None,
+    }).collect();
+    circles.sort_by(|a, b| a.0.total_cmp(&b.0));
+    assert_eq!(circles.len(), 2, "{circles:?}");
+    assert!((circles[0].0 - 0.054).abs() < 1e-9 && (circles[1].0 - 0.108).abs() < 1e-9, "{circles:?}");
+    assert!((circles[0].1 - circles[1].1).abs() < 1e-9 && (circles[0].2 - circles[1].2).abs() < 1e-9);
+    assert!((circles[1].1 - (label - 0.135)).abs() < 1e-6, "{circles:?}, label at {label}");
+    let zones = doc.entities().filter(|e| matches!(e, EntityType::Line(l) if l.common.layer == "BORDER_ZONES")).count();
+    assert_eq!(zones, 4);
 }

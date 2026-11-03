@@ -1031,7 +1031,11 @@ impl SheetGeometry {
         }
         let proj = if projection == Projection::FirstAngle { tr.first_angle } else { tr.third_angle.unwrap_or("THIRD ANGLE PROJECTION") };
         centred(self, left_rows[3], left_rows[4], lab, proj);
-        self.projection_symbol([px(left / 2.0), py(left_rows[4] / 2.0)], projection, left_rows[4] * bh);
+        if iso {
+            self.projection_symbol([px(left / 2.0), py(left_rows[4] / 2.0)], projection, left_rows[4] * bh);
+        } else {
+            self.ansi_projection_symbol([px(left / 2.0), py(left_rows[4] / 2.0)], projection);
+        }
         // Middle: NAME (SIGNATURE) / DATE, DRAWN / CHECKED / APPROVED.
         let heads: Vec<&str> = if iso { vec![tr.name, tr.signature, tr.date] } else { vec![tr.name, tr.date] };
         for (i, h) in heads.iter().enumerate() {
@@ -1145,6 +1149,44 @@ impl SheetGeometry {
         let x1 = (trap_x + len).max(circ_x + big + over);
         self.line([x0, y], [x1, y], LineStyle::Centerline);
         self.line([circ_x, y - big - over], [circ_x, y + big + over], LineStyle::Centerline);
+    }
+
+    /// The ANSI templates' projection symbol centred at `c` (live 1857's
+    /// ANSI_A_INCH DXF, inches): circles r 0.108 / 0.054 with a cross ±0.027
+    /// and lines from 0.054 to 0.135 off their centre; the cone 0.054 from the
+    /// big circle, 0.216 long, half heights 0.054 to 0.108; its axis three
+    /// dashes.
+    fn ansi_projection_symbol(&mut self, c: [f64; 2], projection: Projection) {
+        let i = 25.4;
+        let (big, small, len, gap) = (0.108 * i, 0.054 * i, 0.216 * i, 0.054 * i);
+        let half = (2.0 * big + gap + len) / 2.0;
+        // Third angle: the circles left of the cone; first angle: right.
+        let third = projection != Projection::FirstAngle;
+        let (circ_x, cone_x) = if third { (c[0] - half + big, c[0] - half + 2.0 * big + gap) } else { (c[0] + half - big, c[0] - half) };
+        let y = c[1];
+        let n = 64;
+        for r in [small, big] {
+            let pts = (0..n).map(|k| {
+                let t = k as f64 / n as f64 * std::f64::consts::TAU;
+                [circ_x + r * t.cos(), y + r * t.sin()]
+            });
+            self.lines.push(Polyline2 { points: pts.collect(), style: LineStyle::Thin, closed: true, pick: 0 });
+        }
+        let at = |u: [f64; 2], t: f64| [circ_x + u[0] * t, y + u[1] * t];
+        for u in [[1.0, 0.0], [0.0, 1.0]] {
+            self.line(at(u, small / 2.0), at(u, -small / 2.0), LineStyle::Thin);
+        }
+        for u in [[1.0, 0.0], [0.0, 1.0], [-1.0, 0.0], [0.0, -1.0]] {
+            self.line(at(u, small), at(u, big + small / 2.0), LineStyle::Thin);
+        }
+        // The cone, narrow end towards the circles in third angle.
+        let (narrow, wide) = if third { (cone_x, cone_x + len) } else { (cone_x + len, cone_x) };
+        self.lines.push(Polyline2 { points: vec![[wide, y - big], [wide, y + big], [narrow, y + small], [narrow, y - small]], style: LineStyle::Thin, closed: true, pick: 0 });
+        // Its axis: long, short, long dashes from 0.014 before it to 0.013 past it.
+        let s = if third { 1.0 } else { -1.0 };
+        for (a, b) in [(-0.014, 0.081), (0.097, 0.119), (0.135, 0.229)] {
+            self.line([narrow + s * a * i, y], [narrow + s * b * i, y], LineStyle::Thin);
+        }
     }
 
     /// An inspection item: the number in its border shape, left of `at`

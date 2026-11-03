@@ -999,11 +999,11 @@ pub fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sou
         // Who / when (the local user, today), as Onshape's drawn / changed by.
         "drawing.drawn_by" => drawing.drawn_by.as_deref().unwrap_or(&info.user_name).to_uppercase(),
         "drawing.changed_by" => info.user_name.to_uppercase(),
-        // Live: M/D/YYYY in ANSI drawings ("10/19/2026"), ISO dates otherwise.
+        // Live: MM/DD/YYYY in ANSI drawings ("11/03/2026", 1857), ISO dates otherwise.
         // Date drawn: when the drawing was made (older drawings: today).
         "drawing.date_drawn" | "drawing.changed_date" => {
             let day = if key == "drawing.date_drawn" { drawing.meta.created.clone().unwrap_or_else(format::today) } else { format::today() };
-            if sheet.title_style == super::TitleBlockStyle::Ansi { format::field_format(&day, "m/d/yyyy") } else { day }
+            if sheet.title_style == super::TitleBlockStyle::Ansi { format::field_format(&day, "mm/dd/yyyy") } else { day }
         }
         // Release / metadata properties with no value yet: "----".
         // An unreleased drawing is "In progress" (as parts, `ItemMeta::state`).
@@ -1497,6 +1497,15 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         let lines: Vec<Polyline2> = g.lines.drain(mark_l..).collect();
         for l in lines {
             let n = l.points.len();
+            // A circle (the projection symbol's) stays one line, as live's CIRCLE.
+            if l.closed && n > 8 && matches!(super::cad_fit::fit_curve(&l.points, true, 1e-6), Some(super::cad_fit::FitCurve::Circle { .. })) {
+                let key = super::format_line_key(l.points[0], l.points[n / 2]);
+                if !sheet.format_edit(key).is_some_and(|e| e.deleted) {
+                    g.lines.push(l);
+                    keys.push(Some((key, false)));
+                }
+                continue;
+            }
             let segs = if l.closed { n } else { n.saturating_sub(1) };
             let joined = segs > 1;
             for i in 0..segs {
