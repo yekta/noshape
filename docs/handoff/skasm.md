@@ -1,19 +1,23 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
-## Resume here (2026-11-03 01:00 UTC)
-Landed today so far: g6 far hold + g4 levels (ef2406bc, b06df28d), asm probe reader (107649d9), repeated pointer
-positions not re-solved (sketch + assembly), probes 13 sent (01ce95d2 batch). Unlanded on agent/skasm, waiting for
-vibe3's scene drag numbers before landing (perf.sh sketch_perf at d4eef634 vs main in /root/skasm-scratch/wt-main,
-logs perf3.log / perf-main.log): d725b402 s11 rules, e8789c42 **drag from the drag's start** (live drag probes 12:
-the result depends only on where the drag ends; the editor keeps `drag_origin`, each step solves from it, from the
-last step only when that fails; `Sketch::begin_drag`), d4eef634 fixtures (batch 8 + probes 11 answers), 8171d22d
-transitive aliasing (s485 / s496), f8327a03 chamfer slide (s465), 1d58a872 per-component fallback (s464 / s475).
-Numbers now: drag probes 7 8/8, 9 6/6; edit probes 6/6; probes 1–6 all; batch 8 40/40 on positions; batches 1–8 sum
-1194 mm (was 1325 with batch 8 at the start of the night; batches 1–7 1209 → 1194). Live's single-jump rule (a drag
-with one move after the threshold moves nothing; probes 12 g6b / g6d / g6e) is NOT done: our agent API's drag op
-would then do nothing for a one-point path; decide with an extra step in the op (P3).
-If the scene drag got slower with drag-from-start (main baseline vs d4eef634), keep the from-start only for small
-components or cache the origin's positions instead of cloning (Sketch::drag clones `start` already).
+## Resume here (2026-11-03 01:30 UTC)
+Landed overnight (all on main by dabe8513): sketch drag far hold (g6) and levels + farthest point (g4); drag from the
+drag's start (live drag probes 12: the result depends only on where the drag ends) in dragged components of <= 60
+curves (`Sketch::begin_drag` / `restore_geometry`, editor `drag_origin`; bigger ones step from the last, for speed);
+repeated pointer positions not re-solved (sketch + assembly); constructive: s11 (Equal partner left out of a group,
+touching tie-break, end-carried resized line keeps its direction), transitive aliasing (s485 / s496), chamfer slide
+(s465), per-component fallback (s464 / s475); T2 readers (asm spec probes, probes 11 robust); fixtures batch 8 +
+probes 11. Queued: SKETCH-UNDO-REDO-STATE (P2; sketch toolbar Undo / Redo follow the sketch's history; ticket [x]).
+vibe3 scene sketch_perf, main 689c6070 -> dabe8513: S300 mixed point drag 7.7 -> 6.0 ms, the rest equal (179-curve
+corner 1.11, drag frame 2.8, drag step 2.04 ms). GUI (my build): bolt-circle drag keeps c3, c4 radial from its start
+whatever the path; sketch Undo / Redo greyed on entering, Undo on after a drag.
+Numbers: drag probes 7 8/8, 9 6/6; edit 6/6; probes 1-6 all; batch 8 40/40; batches 1-8 1194 mm (k-sum).
+Open (P2, need live data, nothing to guess): s6, s102 (probes 10), s218 / s236 / s226 (probes 11: s226's spline
+loop moves rigidly in live; s236's third quad down in live, up in ours; s218's chain turns only through k19), s209 / s11
+(probes 13 sent), s230 (tried keeping the Length side's Equal partner: worse elsewhere), s210 (an Angle with an H line
+keeping the H member made s210 worse). Asm: f50 f53 f54 f55 f64; asm probes 4 and slow d6 (asm-drag-3) with live.
+Live's single-jump rule (one drag event after the threshold moves nothing) not done: the agent API's drag op would
+need an extra step first (P3).
 Lead's list (20:15), in order:
 1. Done: dx's X1 (B), other documents' assemblies (27549ea9; note to dx in docs/handoff/dx.md "From skasm (11-02)").
    If dx asks for more (configurations of another document's assembly aren't offered), that comes first.
