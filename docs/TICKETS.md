@@ -3175,7 +3175,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (8e657637 builds in 155 ms), nothing else changes; the blend corpus as recorded. T1 kernel
   surfacing::a_long_wavy_strip_thickens_along_it lands once the lib is synced. The 157 s were the invalid solid's
   meshing (111 s) and mass properties (56 s).
-- [ ] P2 FS-WAVE-SPRING-SPEED (core; from FS-WAVE-SPRING) the Wave Spring feature still takes 5.8 s in ours: its
+- [x] (core 11-03 21:16: the time was boxes: the kernel's tight box pulled its margin in with six distances to the whole shape (2.2 s on the spring), evBox3d did it again (0.4 s each); now against edges and vertices only, once, in the kernel (420a5307 + queued): Wave Spring 1 137 ms, the document 167 ms against live's 740, matching to the end) P2 FS-WAVE-SPRING-SPEED (core; from FS-WAVE-SPRING) the Wave Spring feature still takes 5.8 s in ours: its
   evBox3d (tight) of the thickened strip 3.6 s (OCCT's optimal box on two offset faces over a 595-span B-spline,
   BRepBndLib::AddOptimal) and 2 s of min_distance (6 calls); the thicken itself 90 ms, the volume 1.3 s. Live's time
   not measured yet. (core 11-03)
