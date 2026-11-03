@@ -83,8 +83,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   through later operations (they resolve by live's geometry once refetched) and bracket00's sheet metal.
 - 11-03 06:55: Parasolid export: whole circles / ellipses are ring edges without a vertex (Parasolid's and Onshape's
   own encoding; a cylinder 3 / 2 / 0 in the file, read back the same; kernel export T1 + T2 parasolid tests pass).
-  Live request filed (dx-xt-ring samples: the old file with vertices, the new one, a cross-hole tube) to confirm
-  Onshape's counts on import. Closed B-spline edges are still split in two (needs periodic curves first: core's
+  Live 1855 confirmed it: the new file imports as a native Ø20 × 10 extrude (3 / 2 / 0, 2 ring edges); the old one
+  kept a vertex per circle (3 / 2 / 2). The cross-hole tube's hole loops still import as 3 spline pieces each: that is
+  CUT-CLOSED-EDGES-SPLIT (core) plus our writer splitting a closed B-spline edge. Closed B-spline edges are still split in two (needs periodic curves first: core's
   LOFT-COAXIAL-CIRCLES-SURFACE, skasm's SKETCH-SPLINE-CENTRIPETAL).
 - 11-03 06:40: live mode now reads the window: before each agent call the app hands the call its tab shown, 3D
   cameras and selections (Part Studio entities, Assembly `inst:` ids; WindowSnapshot in ops/window.rs, provided by

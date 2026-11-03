@@ -47,7 +47,7 @@ Kernel test: `imported_nist_parts_write_to_rhino_and_pvz`, `parasolid_writes_an_
 
 | Format | Extensions | Onshape import | ours | Onshape export | ours | Notes |
 |---|---|---|---|---|---|---|
-| Parasolid B-rep | .x_t .x_b (.xmt_txt .xmt_bin) | v10–38.1, parts and assemblies | ✅ | v25–37.0 (38.1 in the dialog) | ✅ | our own reader / writer (kernel xt.cpp); assemblies keep their structure |
+| Parasolid B-rep | .x_t .x_b (.xmt_txt .xmt_bin) | v10–38.1, parts and assemblies | ✅ | v25–37.0 (38.1 in the dialog) | ✅ | our own reader / writer (kernel xt.cpp); assemblies keep their structure; whole circles / ellipses are ring edges without a vertex, as Parasolid writes them (live 1855: our cylinder imports as a native one, 3 faces / 2 edges / 0 vertices) |
 | Parasolid mesh | zip (x_t + xmm_txt / x_b + xmm_bin), .x_b | v28–37 | ⊘ | v28–37 | ⊘ | the XMM mesh format is Siemens' and undocumented |
 | Parasolid mixed model | zip | v32+ | ⊘ | yes | ⊘ | as above |
 | ACIS | .sat (.sab) | up to 2023 1.0 | ✅ | Version 5 | ✅ | |
