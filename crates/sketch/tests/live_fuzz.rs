@@ -1653,15 +1653,17 @@ fn a_lever_hangs_on_its_centre_line() {
 
 /// A V with a circle Tangent to both legs, its angle changed: the slanted leg
 /// turns about the old corner, the circle keeps its contact on it, the
-/// Horizontal leg moves to stay tangent (live probes 17 w1; fuzz s845, s877,
-/// s904). T1.
+/// Horizontal leg moves to stay tangent; a new radius keeps that contact too
+/// (live probes 17 w1 / w2; fuzz s845, s877, s904). T1.
 #[test]
 fn a_v_turns_about_its_circle() {
     let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-probe-17.live.json")).unwrap()).unwrap();
-    let b = probe_batch(probes17().into_iter().filter(|(n, _)| n.starts_with("w1 ")).collect());
-    let case = &b["cases"][0];
-    let d = differences(case, &live["cases"]["w1"]);
-    assert!(d.is_empty(), "w1: {}", d.join("; "));
+    let b = probe_batch(probes17().into_iter().filter(|(n, _)| n.starts_with("w1 ") || n.starts_with("w2 ")).collect());
+    assert_eq!(b["cases"].as_array().unwrap().len(), 2);
+    for case in b["cases"].as_array().unwrap() {
+        let d = differences(case, &live["cases"][case["case"].as_str().unwrap()]);
+        assert!(d.is_empty(), "{}: {}", case["case"], d.join("; "));
+    }
     for (file, seed) in [("sketch-17.live.json", 845), ("sketch-18.live.json", 877), ("sketch-19.live.json", 904)] {
         let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture(file)).unwrap()).unwrap();
         let ours = batch(1, seed, true);

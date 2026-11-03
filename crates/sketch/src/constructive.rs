@@ -1355,13 +1355,30 @@ impl Sketch {
             Some(ConstraintKind::Angle { a, b, value }) => Some((*a, *b, *value)),
             _ => None,
         }).collect();
-        let [(a, b, value)] = angles.as_slice() else { return false };
-        let (a, b, value) = (*a, *b, *value);
         let new_length = |x: EntityId| changes.iter().find(|(_, us)| us.as_slice() == [x]).and_then(|(c, _)| match self.constraint(*c).map(|k| &k.kind) {
             Some(ConstraintKind::Length { value, .. }) => Some(*value),
             _ => None,
         });
-        if changes.len() != 1 + [a, b].iter().filter(|x| new_length(**x).is_some()).count() {
+        // A new radius (live probes 17 w2: the circle keeps its contact on the
+        // slanted leg too).
+        let radii: Vec<(EntityId, f64)> = changes.iter().filter_map(|(c, us)| match (us.as_slice(), self.constraint(*c).map(|k| &k.kind)) {
+            ([u], Some(ConstraintKind::Radius { value, .. })) => Some((*u, *value)),
+            ([u], Some(ConstraintKind::Diameter { value, .. })) => Some((*u, value / 2.0)),
+            _ => None,
+        }).collect();
+        // The lines: the changed Angle's, else the one Angle between two lines.
+        let (a, b, value) = match angles.as_slice() {
+            [x] => *x,
+            [] if radii.len() == 1 => match cons.iter().find_map(|(c, _)| match self.constraint(*c).map(|k| &k.kind) {
+                Some(ConstraintKind::Angle { a, b, value }) => Some((*a, *b, *value)),
+                _ => None,
+            }) {
+                Some(x) => x,
+                None => return false,
+            },
+            _ => return false,
+        };
+        if radii.len() > 1 || changes.len() != angles.len() + radii.len() + [a, b].iter().filter(|x| new_length(**x).is_some()).count() {
             return false;
         }
         let fixed_dir = |x: EntityId| cons.iter().any(|(c, us)| us.as_slice() == [x] && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Horizontal { b: None, .. } | ConstraintKind::Vertical { b: None, .. })));
@@ -1382,6 +1399,10 @@ impl Sketch {
         }
         let (Some(corner), Some(k_end), Some(t_end)) = (self.point(ks), self.point(ke), self.point(te)) else { return false };
         let Some(Geometry::Circle { center, radius }) = self.entity(circle).map(|e| e.geometry.clone()) else { return false };
+        if radii.first().is_some_and(|(u, _)| *u != circle) {
+            return false;
+        }
+        let radius = radii.first().map_or(radius, |(_, r)| *r);
         let Some(c0) = self.point(center) else { return false };
         let (kd, td) = ((k_end - corner).normalize_or_zero(), (t_end - corner).normalize_or_zero());
         if kd == DVec2::ZERO || td == DVec2::ZERO {
@@ -1413,6 +1434,11 @@ impl Sketch {
         }
         for q in self.coincident_class(ks) {
             let _ = self.set_point(q, corner1);
+        }
+        if let Some(e) = self.entity_mut_silent(circle)
+            && let Geometry::Circle { radius: r, .. } = &mut e.geometry
+        {
+            *r = radius;
         }
         self.touch();
         true
