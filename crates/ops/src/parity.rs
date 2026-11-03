@@ -62,6 +62,8 @@ pub struct Translator<'a> {
     curves: HashMap<(String, String), Vec<[f64; 2]>>,
     /// Configuration inputs' default options (`configuration` of features.json).
     config_defaults: HashMap<String, String>,
+    /// Edits the current sketch's constraints and dimensions made (to undo).
+    sketch_edits: usize,
     /// Onshape Feature Studio element id → our Feature Studio tab id.
     studios: HashMap<String, String>,
     /// What isn't translated of the document itself (configuration inputs…).
@@ -154,7 +156,7 @@ impl<'a> Translator<'a> {
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
         let _ = std::fs::remove_file(path);
-        let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, studios: HashMap::new(), notes: Vec::new() };
+        let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, studios: HashMap::new(), notes: Vec::new() };
         t.call("document_create", json!({ "path": path.to_str().ok_or("path")? }))?;
         // Bare numbers in Onshape's expressions are in the document's units.
         let (length, angle) = doc_units(&doc["units"]);
@@ -599,11 +601,20 @@ impl<'a> Translator<'a> {
                 return Ok(points);
             }
         }
-        // qSketchRegion(id + "F…", true): every region of that sketch.
-        if let Some(sk) = text.split("qSketchRegion(id + \"").nth(1).and_then(|r| r.split('"').next()) {
+        // qSketchRegion(id + "F…", filterInnerLoops): the sketch's regions;
+        // with `true` only those not inside another (a region whose curves
+        // all bound another region is one of its holes' insides).
+        if let Some((sk, rest)) = text.split("qSketchRegion(id + \"").nth(1).and_then(|r| r.split_once('"')) {
             let ours = self.feature_ids.get(sk).cloned().ok_or_else(|| format!("sketch {sk} was not built"))?;
             let g = self.call("sketch_get", json!({ "sketch": ours }))?;
-            return Ok(g["regions"].as_array().into_iter().flatten().filter_map(|r| r["id"].as_str().map(str::to_string)).collect());
+            let regions: Vec<&Value> = g["regions"].as_array().into_iter().flatten().collect();
+            let curves = |r: &Value| -> Vec<String> { r["boundary"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(str::to_string)).collect() };
+            let outer_only = rest.trim_start_matches([',', ' ']).starts_with("true");
+            let inner = |r: &Value| {
+                let mine = curves(r);
+                regions.iter().any(|o| o["id"] != r["id"] && o["area"].as_f64() > r["area"].as_f64() && { let theirs = curves(o); mine.iter().all(|c| theirs.contains(c)) })
+            };
+            return Ok(regions.iter().filter(|r| !outer_only || !inner(r)).filter_map(|r| r["id"].as_str().map(str::to_string)).collect());
         }
         Err(format!("query not mapped (no live geometry for {}): {}", if ids.is_empty() { "it".to_string() } else { ids.join(", ") }, text.chars().take(80).collect::<String>()))
     }
@@ -1062,16 +1073,22 @@ impl<'a> Translator<'a> {
         // Constraints and dimensions keep the geometry where Onshape solved
         // it; any that move it (a solve that differs) are taken back.
         let before = self.call("sketch_get", json!({ "sketch": id }))?;
+        let top = |t: &mut Self| t.ctx.doc(None).ok().and_then(|od| od.session.undo_tops().0);
+        let mark = top(self);
+        self.sketch_edits = 0;
         self.constraints(&oid, &id, f, problems);
         self.dimensions(&oid, &id, f, problems);
         let after = self.call("sketch_get", json!({ "sketch": id }))?;
         let moved = sketch_moved(&before, &after);
         if moved > 1e-7 {
-            let old: Vec<&Value> = before["constraints"].as_array().into_iter().flatten().map(|c| &c["id"]).collect();
-            let added: Vec<Value> = after["constraints"].as_array().into_iter().flatten().map(|c| c["id"].clone()).filter(|c| !old.contains(&c)).collect();
-            if !added.is_empty() && self.call("sketch_delete", json!({ "sketch": id, "constraints": added })).is_ok() {
-                problems.push(format!("its constraints and dimensions moved the geometry by up to {:.6} mm: taken back (the geometry stays at Onshape's solve)", moved * 1e3));
+            // Undone back to the edit before them (deleting them would leave
+            // the points moved; some calls make no edit, so not by count).
+            let mut undone = 0;
+            while top(self) != mark && undone <= self.sketch_edits && self.call("history_undo", json!({})).is_ok_and(|u| u["undone"] == true) {
+                undone += 1;
             }
+            let back = self.call("sketch_get", json!({ "sketch": id })).map(|g| sketch_moved(&before, &g)).unwrap_or(f64::NAN);
+            problems.push(format!("its constraints and dimensions moved the geometry by up to {:.6} mm: taken back ({undone} edits undone; {:.6} mm left)", moved * 1e3, back * 1e3));
         }
         let st = self.call("feature_list", json!({}))?;
         let row = st["features"].as_array().into_iter().flatten().find(|x| x["id"] == id).cloned().unwrap_or_default();
@@ -1140,7 +1157,9 @@ impl<'a> Translator<'a> {
             if ours == "coincident" && entities.len() == 2 && entities[0] == entities[1] {
                 continue;
             }
-            if entities.is_empty() || self.call("sketch_constrain", json!({ "sketch": id, "constraint": ours, "entities": entities })).is_err() {
+            let made = !entities.is_empty() && self.call("sketch_constrain", json!({ "sketch": id, "constraint": ours, "entities": entities })).is_ok();
+            self.sketch_edits += usize::from(made);
+            if !made {
                 *missed.entry(format!("{ty} rejected")).or_default() += 1;
             }
         }
@@ -1198,8 +1217,9 @@ impl<'a> Translator<'a> {
             if let Some(v) = value {
                 args["value"] = json!(v);
             }
-            if let Err(e) = self.call("sketch_dimension", args) {
-                problems.push(format!("{ty} dimension: {e}"));
+            match self.call("sketch_dimension", args) {
+                Ok(_) => self.sketch_edits += 1,
+                Err(e) => problems.push(format!("{ty} dimension: {e}")),
             }
         }
     }
