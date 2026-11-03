@@ -1622,7 +1622,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   feature-row-hide-sketch-eye (the box, click Sketch 1's eye): live's recording (/root/parity/ui/live) selection count 0,
   Sketch 1 shown, not selected; ours (green 2723f7fb, qa-scratch/uip-ours) selection 1 (FEATURE Sketch 1), the row selected.
   (qa 2026-11-03, build 2723f7fb)
-- [ ] P2 UIP-DRIVER-GAPS (psui; the interaction suite's noshape side) qa ran all 155 scenarios through NOSHAPE_UI_SCRIPT on
+- [x] fixed a1496903 (psui 11-03 18:30: every gap below done; for qa, three scenarios match only because both runners miss the same step: mass-properties-part and section-view-front click `{"button": …}`s neither app has (Section view… is in the graphics context menu, Mass and section properties among the analysis tools / S toolbar), revolve-type-list opens `{"dropdown": "Full"}` where live's Revolve has a "Full revolve" checkbox: please rewrite them and ask live to re-record) P2 UIP-DRIVER-GAPS (psui; the interaction suite's noshape side) qa ran all 155 scenarios through NOSHAPE_UI_SCRIPT on
   green 2723f7fb (tools/ui-parity/run.py --all, :110; recordings in qa-scratch/uip-ours/): 147 + 7 of 8 rerun recorded, 14
   with a step `ok: false`. qa fixed its own (Plane's field is "Offset distance", Chamfer is its own tool, Variable through
   tool search, Section view / Mass properties as buttons). Left for the driver: targets `{"rollback_bar": true}` (3
