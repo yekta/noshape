@@ -3244,7 +3244,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (xt_read.cpp) takes only two-loop faces; it would need the ring edges' vertices put in a gap between the face's
   other loops and the seam run there. File: /root/parity/models/cf-wiring/imports/6ae9ae35100f83b7021d3619.x_t.
   (dx 2026-11-03)
-- [ ] P2 SKETCH-SPLINE-END-DERIVATIVES (skasm, then dx for the ops field; dx's parity suite 11-03 18:47) a fit spline's
+- [x] (skasm 11-03 22:37: done with dx's c2cd3787 (sketch_draw's start_derivative / end_derivative): a fit spline takes Onshape's derivatives as its end handles, drawn hollow on gray handle lines, a handle drags (the curve reshapes) and dimensions alone as its length (T1 scene sketch_mode::a_spline_handle_drags_and_dimensions, sketch onshape_ux::a_fit_spline_takes_onshapes_end_derivatives)) P2 SKETCH-SPLINE-END-DERIVATIVES (skasm, then dx for the ops field; dx's parity suite 11-03 18:47) a fit spline's
   end-tangent handles (behaviours "Spline": hollow end-tangent handles on gray handle lines) aren't in our sketch
   model: Onshape stores `startDerivativeX/Y` / `endDerivativeX/Y` (and `startHandle`, `endHandle`) on the spline
   geometry, and dragging a handle (or a dimension on it, `….startDerivative` / `….internal` ids) shapes the curve.

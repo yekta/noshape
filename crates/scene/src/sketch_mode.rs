@@ -6583,6 +6583,17 @@ fn glyph_anchor(sk: &Sketch, id: EntityId) -> Option<DVec2> {
 pub fn smart_dimension(sk: &Sketch, ids: &[EntityId], cursor: DVec2) -> Option<ConstraintKind> {
     let kind = |id: EntityId| sk.kind(id);
     let dist = |a: EntityId, b: EntityId| ConstraintKind::Distance { a, b, value: 0.0, mode: DistanceMode::Center };
+    // A spline's end-tangent handle alone: its length (Onshape dimensions
+    // the handle as a line from the spline's end; SKETCH-SPLINE-END-DERIVATIVES).
+    if let [h] = ids
+        && let Some(end) = sk.entities().find_map(|e| {
+            let (h0, h1) = e.spline_handles()?;
+            let (s0, s1) = e.endpoints()?;
+            if *h == h0 { Some(s0) } else if *h == h1 { Some(s1) } else { None }
+        })
+    {
+        return Some(dist(end, *h));
+    }
     match ids {
         [a] => match kind(*a)? {
             EntityKind::Line => {
@@ -8606,6 +8617,29 @@ mod tests {
             let (a, b) = line_of(&sk, l).unwrap();
             assert!((a.y - b.y).abs() < 1e-9);
         }
+    }
+
+    /// SKETCH-SPLINE-END-DERIVATIVES: a spline's end-tangent handle drags
+    /// (the curve's end tangent follows) and dimensions alone as its length,
+    /// which then holds it.
+    #[test]
+    fn a_spline_handle_drags_and_dimensions() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let s = d.sketch.add_fit_spline_with_handles(&[v(0.0, 0.0), v(0.02, 0.01), v(0.04, 0.0)]).unwrap();
+        let (h0, _) = d.sketch.entity(s).unwrap().spline_handles().unwrap();
+        let (start, _) = d.sketch.endpoints(s).unwrap();
+        let hp = d.sketch.point(h0).unwrap();
+        let before = d.sketch.tessellate(s, 1e-5);
+        assert_eq!(d.sketch.pick(hp, PX * 4.0), Some(h0), "the handle picks");
+        drag(&mut ed, &mut d, hp, hp + v(0.0, 0.01));
+        let after = d.sketch.tessellate(s, 1e-5);
+        assert!((d.sketch.point(h0).unwrap() - (hp + v(0.0, 0.01))).length() < 1e-9, "the handle follows the pointer");
+        assert!((after[after.len() / 4] - before[before.len() / 4]).length() > 1e-4, "the curve reshapes");
+        let Some(ConstraintKind::Distance { a, b, .. }) = smart_dimension(&d.sketch, &[h0], hp) else { panic!("a handle's dimension") };
+        assert_eq!((a, b), (start, h0));
+        d.sketch.add_constraint(ConstraintKind::Distance { a, b, value: 0.008, mode: DistanceMode::Center }).unwrap();
+        assert!(d.sketch.solve().is_solved());
+        assert!(((d.sketch.point(h0).unwrap() - d.sketch.point(start).unwrap()).length() - 0.008).abs() < 1e-9);
     }
 
     #[test]
