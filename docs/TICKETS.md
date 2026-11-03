@@ -82,6 +82,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Shell 3 (builds now, core's SHELL-HANG-5 work); the user's four cases pass (knurl 12.5 s, vase, split-and-chamfer,
   Y Ribs); app rows (mirror set, P0 repros, sheet metal, c14) pixel-identical to v0.4.21; seed 508 / 685 memory 788 /
   596 MB. New UI tickets tonight are not regressions (P1 DIALOG-SWITCH-DISCARDS-NEW and the P2 / P3 ones are in v0.4.22 too).
+- **qa 03:19: one regression since: P1 BLEND-TOL-REGEN-CHANGES** (core eca0da09, in greens from bb0934e7 / e89c78de):
+  saved fuzz documents' chamfers now fail and later sketches lose their planes (bop-pairs-cli-segv-152, cli-fillet2-segv);
+  non-fuzz documents and the user's cases unchanged. Not a hold on its own (no real document seen affected), but a cut
+  from **bad1de8e** (the last green without eca0da09) would avoid it; core may fix or revert first. CRASH-2045 still on
+  e89c78de (3 of 4).
 
 ## Release blockers for the 2026-11-02 17:00 release (qa list 16:41 — late, the 16:30 deadline missed; newest green 59cdc1b5)
 - **qa 21:10: v0.4.22 (published 20:51, cut 541958138 + bump) smoked: good.** CLI / app as CLI "0.4.22"; round trip = v0.4.21 (IGES part named "SOLID": IGES-IMPORT-NAME-SOLID, P3); volume sweep = v0.4.21 but **sk211-step89 opens again** (SKETCH-CONSTRUCTIVE-RECURSION fixed on the release); fixed tickets hold; the user's cases pass (knurl 11.2 s; vase 2 mm in 58694.8605 / out 63464.5088; split-and-chamfer one part; Y Ribs 0.4 s); cli-suppress-segv opens and seeds 1222 / 1250 run clean with NOSHAPE_BOOL_RUST=0 (no CI-build crash); the updater delivered it to the v0.4.21 install (above).
