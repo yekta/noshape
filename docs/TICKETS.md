@@ -3042,7 +3042,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   corpus (86 sketches): cap faces x = the sketch's x (+X on ±Z faces); extruded side faces y = +Z, x = y × normal
   (normal −X: x (0, −1, 0); +X: (0, 1, 0); +Y: (−1, 0, 0); −Y: (1, 0, 0); a 98° face: (−0.139, −0.99, 0)); a sheet
   metal flange tilted 30° (bracket00-ira Sketch 2): y along the bend (0, 1, 0), x up the slope (0.866, 0, 0.5). Also
-  cf-hose-routing Sketch 2 on the −X side face of Extrude 1 (x −115): ours x (0, 0, −1), live (0, −1, 0).
+  cf-hose-routing Sketch 2 on the −X side face of Extrude 1 (x −115): ours x (0, 0, −1), live (0, −1, 0);
+  learning-center-devon Sketch 3 on a top face (z 50.8): ours x (−1, 0, 0), live (1, 0, 0).
   Ours takes OCCT's plane x (eval.rs raw_plane, Reference::Face). parity_models now counts a sketch frame that isn't
   live's as a difference. /root/dx-scratch/frames.py lists them (CLI against the rebuilt documents). (dx 2026-11-03)
 - [ ] P3 SKETCH-REDUNDANT-SOLVES (skasm; dx's parity suite, models-dx live-hole-row, live 1862) a sketch whose

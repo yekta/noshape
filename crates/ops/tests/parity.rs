@@ -1035,6 +1035,32 @@ fn a_written_out_region_query() {
     assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// A sketch on an Extrude's end cap named in the written-out form
+/// (makeQuery(… ".opExtrude", "CAP_FACE" … "isStart":false); live:
+/// learning-center-devon's Sketch 2) lies on our Extrude's end cap.
+#[test]
+fn a_written_out_cap_face_query() {
+    let sketch = "FdHX57YE0MI7PDU_0";
+    let side = |s: &str| format!("2i9coyYI-wWEe-o83F-jBj8-nmqTMMu2mK71.{s}");
+    let entities = json!([
+        segment(&side("bottom"), (0.0, 0.0), (0.04, 0.0)),
+        segment(&side("right"), (0.04, 0.0), (0.04, 0.02)),
+        segment(&side("top"), (0.04, 0.02), (0.0, 0.02)),
+        segment(&side("left"), (0.0, 0.02), (0.0, 0.0)),
+    ]);
+    let region = json!({ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": sketch, "queryString": format!("query = qSketchRegion(id + \"{sketch}\", false);") });
+    let block = json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 6, "edges": 12, "vertices": 8, "volume": 0.04 * 0.02 * 0.01 });
+    let (mut features, mut live) = one_extrude(sketch, entities, region, block.clone());
+    let sides = ["bottom", "top", "left", "right"].map(|s| format!("sketchEntityQuery(id+\"{sketch}.wireOp\",EntityType.EDGE,\"{}\")", side(s))).join(",");
+    let cap = format!("query=makeQuery(id+\"FE1.opExtrude\",\"CAP_FACE\",EntityType.FACE,{{\"disambiguationData\":[originalSetDisambiguation([{sides}])],\"isStart\":false}});");
+    features["features"].as_array_mut().unwrap().push(json!({ "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS2", "name": "Sketch 2",
+        "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JHK"], "queryString": cap }] }],
+        "entities": [circle("c", 0.005, (0.02, 0.01))], "constraints": [] }));
+    live.push(json!({ "index": 2, "status": "OK", "parts": [block] }));
+    let r = run_model("written-out-cap", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (3, 3), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
 /// qSketchRegion(…, true) leaves out every region inside another's hole,
 /// rings nested in a bore too (live: bearing-block-takumi).
 #[test]

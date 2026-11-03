@@ -1303,6 +1303,9 @@ impl<'a> Translator<'a> {
     /// Extrude through the same sketch geometry. Used when live's geometry
     /// for the id is missing.
     fn extrude_name_from_query(&mut self, text: &str) -> Option<Result<String, String>> {
+        if let Some(r) = self.written_extrude_name(text) {
+            return Some(r);
+        }
         let packed = text.split("qCompressed(1.0,\"").nth(1)?.split('"').next()?;
         let tree = noshape_model::custom::host::packed::unpack(packed).ok()?;
         self.extrude_name_from_tree(&tree)
@@ -1374,6 +1377,34 @@ impl<'a> Translator<'a> {
         let sk = strings.iter().find_map(|s| s.strip_suffix(".wireOp"))?.to_string();
         let curves: Vec<Vec<[f64; 2]>> = strings.iter().filter_map(|e| self.curves.get(&(sk.clone(), e.clone())).cloned()).collect();
         Some(if revolve { self.revolve_entity(name, &op, &sk, &curves) } else { self.extrude_entity(name, is_start, &op, &sk, &curves) })
+    }
+
+    /// The written-out form (`makeQuery(id + "F….opExtrude", "CAP_FACE",
+    /// EntityType.FACE, {… sketchEntityQuery(id + "<sketch>.wireOp", …,
+    /// "<entity>") …, "isStart" : false})`; learning-center-devon).
+    fn written_extrude_name(&mut self, text: &str) -> Option<Result<String, String>> {
+        let rest = text.trim_start_matches("query=").trim_start().strip_prefix("makeQuery(id+\"")?;
+        let (op, rest) = rest.split_once('"')?;
+        let name = rest.split('"').nth(1)?;
+        if !["CAP_FACE", "SWEPT_FACE", "CAP_EDGE", "SWEPT_EDGE"].contains(&name) {
+            return None;
+        }
+        let (op, revolve) = match (op.strip_suffix(".opExtrude"), op.strip_suffix(".opRevolve")) {
+            (Some(o), _) => (o, false),
+            (_, Some(o)) => (o, true),
+            _ => return None,
+        };
+        let mut sk = None;
+        let mut curves = Vec::new();
+        for q in text.split("sketchEntityQuery(id+\"").skip(1) {
+            let (s, after) = q.split_once(".wireOp\"")?;
+            let e = after.split('"').nth(1)?;
+            sk = Some(s.to_string());
+            curves.extend(self.curves.get(&(s.to_string(), e.to_string())).cloned());
+        }
+        let sk = sk?;
+        let is_start = text.contains("\"isStart\":true");
+        Some(if revolve { self.revolve_entity(name, op, &sk, &curves) } else { self.extrude_entity(name, is_start, op, &sk, &curves) })
     }
 
     /// The edge between faces `a` and `b`; else (a cut split one of them,
