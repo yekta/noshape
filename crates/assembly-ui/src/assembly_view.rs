@@ -148,6 +148,8 @@ pub mod mass;
 mod agent_window;
 #[path = "assembly_reflection.rs"]
 mod reflection;
+#[path = "assembly_ui_state.rs"]
+mod ui_state;
 #[path = "assembly_config.rs"]
 mod config_panel;
 #[path = "assembly_toolbar.rs"]
@@ -3365,7 +3367,14 @@ impl AssemblyView {
 
     // ------------------------------------------------------------ render: list
 
+    /// An instance's list row, a ui-parity target (`instance:<name>`).
     fn instance_row(&self, node: Option<&InstanceNode>, inst: Option<&Instance>, path: Vec<InstanceId>, depth: usize, cx: &mut Context<Self>) -> AnyElement {
+        let name = inst.map(|i| i.name.clone()).or_else(|| node.map(|n| n.name.clone())).unwrap_or_default();
+        let row = self.instance_row_inner(node, inst, path, depth, cx);
+        crate::ui_script::wrap(row, || format!("instance:{name}"))
+    }
+
+    fn instance_row_inner(&self, node: Option<&InstanceNode>, inst: Option<&Instance>, path: Vec<InstanceId>, depth: usize, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let top = path[0];
         let is_top = path.len() == 1;
@@ -4042,7 +4051,13 @@ impl AssemblyView {
     }
 
     /// A mate's row in Mate features (None when the filter hides it).
+    /// A mate's list row, a ui-parity target (`mate:<name>`).
     fn mate_list_row(&self, m: &Mate, result: &AssemblyResult, labeler: &ConnectorLabeler, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let name = m.name.clone();
+        self.mate_list_row_inner(m, result, labeler, cx).map(|row| crate::ui_script::wrap(row, || format!("mate:{name}")))
+    }
+
+    fn mate_list_row_inner(&self, m: &Mate, result: &AssemblyResult, labeler: &ConnectorLabeler, cx: &mut Context<Self>) -> Option<AnyElement> {
         let st = result.mates.iter().find(|s| s.id == m.id);
         let ok = st.is_none_or(|s| s.ok);
         let inactive = m.suppressed || st.is_some_and(|s| s.inactive);

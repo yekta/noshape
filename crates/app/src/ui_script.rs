@@ -57,6 +57,15 @@ pub fn prepare() -> PathBuf {
     doc
 }
 
+/// Whether the scenario's start has an assembly (it opens on that tab).
+fn opens_on_assembly() -> bool {
+    let path = scenario_path();
+    let Ok(scenario) = read_json(&path) else { return false };
+    let name = scenario["start"].as_str().unwrap_or("empty");
+    let starts = std::env::var_os("NOSHAPE_UI_STARTS").map(PathBuf::from).unwrap_or_else(|| path.with_file_name("starts.json"));
+    read_json(&starts).is_ok_and(|s| s[name].get("assembly").is_some())
+}
+
 /// A key name of the scenario format as a GPUI keystroke ("Enter", "mod+z", "shift+e", "#").
 fn keystroke(key: &str) -> Option<Keystroke> {
     let parts: Vec<&str> = key.split('+').collect();
@@ -146,7 +155,7 @@ fn control_name(t: &Value) -> Option<String> {
     if let (Some(tool), Some(_)) = (t.get("tool").and_then(Value::as_str), t.get("menu")) {
         return Some(format!("caret:{tool}"));
     }
-    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown"].iter().find_map(|k| t.get(*k).and_then(Value::as_str).map(|v| format!("{k}:{v}")))
+    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate"].iter().find_map(|k| t.get(*k).and_then(Value::as_str).map(|v| format!("{k}:{v}")))
 }
 
 type Studio = Option<Entity<PartStudioView>>;
@@ -219,7 +228,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                 sleep(cx, 120).await;
                 let busy = match studio(cx) {
                     Some(ps) => cx.update(|_, cx| ps.read(cx).ui_busy()).unwrap_or(false),
-                    None => true,
+                    None => ws.update(cx, |w, _| w.active_assembly()).ok().flatten().is_none(),
                 };
                 if !busy || t.elapsed() > Duration::from_secs(30) {
                     break;
@@ -227,9 +236,16 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             }
             sleep(cx, 400).await;
         };
+        // (An assembly tab's state when no Part Studio is shown: skasm's
+        // assembly scenarios.)
         let state = |cx: &mut AsyncWindowContext| -> Value {
-            let Some(ps) = studio(cx) else { return json!({ "error": "no Part Studio shown" }) };
-            cx.update(|window, cx| ps.read(cx).ui_state(window, cx)).unwrap_or(Value::Null)
+            if let Some(ps) = studio(cx) {
+                return cx.update(|window, cx| ps.read(cx).ui_state(window, cx)).unwrap_or(Value::Null);
+            }
+            match ws.update(cx, |w, _| w.active_assembly()).ok().flatten() {
+                Some(a) => cx.update(|_, cx| a.read(cx).ui_state(cx)).unwrap_or(Value::Null),
+                None => json!({ "error": "no Part Studio or Assembly shown" }),
+            }
         };
         // The state with the tooltip drawn now (a redraw notes it).
         let read = async |cx: &mut AsyncWindowContext| -> Value {
@@ -250,6 +266,11 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                     ps.update(cx, |p, cx| p.ui_redraw(cx));
                     window.refresh();
                 });
+            } else if let Some(a) = ws.update(cx, |w, _| w.active_assembly()).ok().flatten() {
+                let _ = cx.update(|window, cx| {
+                    a.update(cx, |a, cx| a.ui_redraw(cx));
+                    window.refresh();
+                });
             }
             sleep(cx, 150).await;
         };
@@ -265,6 +286,10 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         }
         if !active {
             eprintln!("UI-SCRIPT warning: the window is not active, fields get no focus events");
+        }
+        // A start with an assembly opens on it (README "start").
+        if opens_on_assembly() {
+            let _ = ws.update_in(cx, |w, window, cx| w.activate_named("Assembly 1", window, cx));
         }
         settle(cx).await;
         let start = read(cx).await;

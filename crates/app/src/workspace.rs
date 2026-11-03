@@ -382,6 +382,21 @@ impl Workspace {
         }
     }
 
+    /// The active tab's Assembly view, if it is one (ui-parity driver).
+    pub(crate) fn active_assembly(&self) -> Option<Entity<AssemblyView>> {
+        match self.active.and_then(|t| self.views.get(&t)) {
+            Some(TabView::Assembly(v)) => Some(v.clone()),
+            _ => None,
+        }
+    }
+
+    /// Opens the first tab named `name` (ui-parity driver); false if none.
+    pub(crate) fn activate_named(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some(tab) = self.doc.read(cx).session.doc.tabs.iter().find(|t| t.name == name).map(|t| t.id) else { return false };
+        self.activate(tab, window, cx);
+        true
+    }
+
     /// A key no binding took while a navbar or tab bar control has the focus
     /// (after Tab left a dialog, or a click on a tab): Onshape's shortcuts
     /// are document-wide, so it goes to the active tab's editor. Tab, Enter,

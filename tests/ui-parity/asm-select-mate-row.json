@@ -1,0 +1,25 @@
+{
+ "name": "asm-select-mate-row",
+ "about": "an assembly (live 1907's pin Revolute'd into a fixed block): click the mate's row, then the pin's row, then Escape: what the selection and the list rows show",
+ "area": "skasm",
+ "source": "lead 11-03: assembly scenarios",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "mate": "Revolute 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

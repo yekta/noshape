@@ -193,5 +193,119 @@
    }
   ],
   "about": "filmiss: Fillet 1 above Extrude 1, so it has a missing selection (red, ⚠)"
+ },
+ "pin-block": {
+  "units": "mm",
+  "features": [
+   {
+    "type": "newSketch",
+    "name": "Sketch 1",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        -20,
+        -20
+       ],
+       [
+        20,
+        20
+       ]
+      ]
+     },
+     {
+      "circle": [
+       [
+        0,
+        0
+       ],
+       [
+        5,
+        0
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 1",
+    "params": {
+     "entities": [
+      "Sketch 1 region 1"
+     ],
+     "endBound": "BLIND",
+     "depth": "20 mm",
+     "operationType": "NEW"
+    }
+   },
+   {
+    "type": "newSketch",
+    "name": "Sketch 2",
+    "plane": "Top",
+    "shapes": [
+     {
+      "circle": [
+       [
+        60,
+        0
+       ],
+       [
+        65,
+        0
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 2",
+    "params": {
+     "entities": [
+      "Sketch 2 region 0"
+     ],
+     "endBound": "BLIND",
+     "depth": "30 mm",
+     "operationType": "NEW"
+    }
+   }
+  ],
+  "assembly": {
+   "instances": [
+    {
+     "part": "Part 1",
+     "fixed": true
+    },
+    {
+     "part": "Part 2"
+    }
+   ],
+   "mates": [
+    {
+     "type": "Revolute",
+     "name": "Revolute 1",
+     "a": {
+      "instance": "Part 2 <1>",
+      "face": [
+       65,
+       0,
+       15
+      ],
+      "inference": "mid_axis"
+     },
+     "b": {
+      "instance": "Part 1 <1>",
+      "face": [
+       5,
+       0,
+       10
+      ],
+      "inference": "mid_axis"
+     }
+    }
+   ]
+  }
  }
 }
