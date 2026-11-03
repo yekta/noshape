@@ -407,9 +407,11 @@ impl DrawingEditor {
                         cx.notify();
                     }))),
                 )
-                // Assemblies have no model annotations (live drawing/1106).
-                .when(is_asm, |d| d.child(div().h(px(3.))))
-                .when(!is_asm, |d| d.child(
+                // Only a part's view offers its model annotations: not an
+                // assembly's (live drawing/1106), not a whole Part Studio's
+                // (live 1812; parts: 1408, behaviours qa5 bracket, psb cfg).
+                .when(is_asm || part.is_none(), |d| d.child(div().h(px(3.))))
+                .when(!is_asm && part.is_some(), |d| d.child(
                     div().px(px(6.)).pt(px(3.)).pb(px(6.)).child(crate::drawing_chrome::DrCheckbox::new("div-model-ann").label("Show annotations from model").checked(self.insert.model_annotations).on_click(cx.listener(|this, on: &bool, _, cx| {
                         this.insert.model_annotations = *on;
                         cx.notify();
