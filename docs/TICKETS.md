@@ -2990,6 +2990,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   `primaryAxisAlignment: true` gets the unflipped mate. The parity translator inverts it for now. Proposed: the op
   field is the dialog's (true = flipped, as live), converted at the ops boundary; mate_flip.rs's
   "The CLI's flip_primary is the model's" tests (skasm) turned over with it. (dx 2026-11-03)
+  dx 10:05, before changing it: mate_flip.rs editing_a_mate_between_free_parts_moves_the_pin_back_upright reproduces
+  live's REST mate "flipPrimary false" with ours `false` (Z opposed), while skb's captures (face centroids, edge
+  centres) and dx's 7 assembly parity cases all need ours = !primaryAxisAlignment. Both hold only if our connector on
+  a cylindrical face (mid_axis, that test's picks) has its Z the other way from Onshape's: worth checking (skasm)
+  before the op field changes meaning. Also visible in the app: a configured "Flip primary axis" value
+  (model-data assembly/config.rs param::FLIP = the internal flag).
 - [ ] P2 EXTRUDE-SLIT-REGION (core; dx's parity suite 11-03, learning-center-michael) a sketch region bounded on both
   sides by one line doesn't extrude: circles r 75 and r 40 at the origin on Top and a line (40, 0) → (100, 0) mm make
   the ring one region (sketch_get: 12644.91 mm², no hole, the line twice in its boundary); Extrude of it, alone or
