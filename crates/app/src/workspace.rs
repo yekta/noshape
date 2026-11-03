@@ -177,7 +177,11 @@ impl Workspace {
                     s.selection.insert(*tab, v.selection.iter().map(noshape_ops::refs::to_id).collect());
                     v.viewport.clone()
                 }
-                TabView::Assembly(v) => v.read(cx).viewport.clone(),
+                TabView::Assembly(v) => {
+                    let v = v.read(cx);
+                    s.selection.insert(*tab, v.selected_instances().iter().map(|i| format!("inst:{}", i.0)).collect());
+                    v.viewport.clone()
+                }
                 _ => continue,
             };
             let vp = viewport.read(cx);

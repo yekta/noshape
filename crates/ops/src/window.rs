@@ -251,7 +251,7 @@ pub struct WindowSnapshot {
     pub active_tab: Option<TabId>,
     /// 3D tabs' cameras and graphics area sizes (logical pixels).
     pub cameras: BTreeMap<TabId, (Camera, DVec2)>,
-    /// Part Studios' selections (entity ids).
+    /// Selections: a Part Studio's entity ids, an Assembly's `inst:` ids.
     pub selection: BTreeMap<TabId, Vec<String>>,
 }
 

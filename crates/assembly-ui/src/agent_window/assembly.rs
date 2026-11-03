@@ -36,6 +36,11 @@ impl AssemblyView {
         }
     }
 
+    /// The selected instances (live mode's window snapshot).
+    pub fn selected_instances(&self) -> &[noshape_model::assembly::InstanceId] {
+        &self.selected
+    }
+
     /// The selection (ui_select): instances, or Clear selection.
     pub fn agent_select(&mut self, sel: Selected, cx: &mut Context<Self>) {
         self.clear_selection();
