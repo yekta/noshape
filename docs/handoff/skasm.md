@@ -9,6 +9,18 @@ owner). 04:50: s555 fixed (pair rung: the changed leg with its joined Equal part
 batch 10 38/40; 05:00 s547 fixed (corner arcs slide early); 05:15 s556 fixed: batch 10 40/40; batch 11 (s581–s620, all 17 kinds) 40/40 on its first answer (live 1846). Next: the P2 fuzz list (s6, s102, s218, s236, s226, s209, s230, s210; f54 for assemblies). Older state
 follows.
 
+06:00 (lead 11-03: parity suite scenarios for everyday sketch use): the suite's state has two more keys, `undo`
+and `sketch` (README; PartStudioView::ui_sketch_state / ui_undo_state; run.py compares them once live records them:
+asked in REQUESTS "two more state keys"). 19 new scenarios tests/ui-parity/sketch-* (generator
+/root/skasm-scratch/scen/gen.py): inference (H / V / close on start / midpoint / on a line / Shift), value boxes (line,
+circle, rectangle: two clicks then type), Escape mid-line, Enter with no tool, undo / redo of a line and a trim,
+extend, box select + Delete, trim by drag, arc radius and point-to-point dimensions, delete a dimension. Found and
+fixed on the way: `a` / `q` in a sketch were taken by the feature dialog's keys (landed 641a3846); the Origin's hidden
+stand-in made an undo step (queued). Known driver gaps (psui's, noted in docs/handoff/psui.md): the Dimension /
+constraint tools' curve picks don't resolve in driver runs (hover), sketch toolbar tools aren't marked (no dropdown
+tools). Next: once live records the keys, run `tools/ui-parity/run.py --app … sketch-…` and fix the differences in
+my area first; meanwhile the P2 fuzz list.
+
 ## State at 01:30 UTC
 Landed overnight (all on main by dabe8513): sketch drag far hold (g6) and levels + farthest point (g4); drag from the
 drag's start (live drag probes 12: the result depends only on where the drag ends) in dragged components of <= 60
