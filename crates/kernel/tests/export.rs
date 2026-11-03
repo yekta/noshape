@@ -245,8 +245,9 @@ fn iges_header() {
 /// Parts' names and colours in IGES as Onshape writes them (live
 /// qa5-iges-header.igs: the name in the solid's, edge list's and vertex
 /// list's labels, the colour a Color Definition the solid and its faces
-/// point to), read back; an unnamed solid has no name (qa
-/// IGES-IMPORT-NAME-SOLID: XDE named it "SOLID").
+/// point to, the whole name as a Name property), read back as live reads
+/// them: the label; an unnamed solid " DE" and its directory line (live 1818;
+/// qa IGES-IMPORT-NAME-SOLID: XDE named it "SOLID").
 #[test]
 fn iges_part_names_and_colours() {
     let dir = std::env::temp_dir().join(format!("noshape-igs-names-{}", std::process::id()));
@@ -265,8 +266,12 @@ fn iges_part_names_and_colours() {
     // Back-pointers right-aligned as Onshape's ("      1P", not "0000001P").
     assert!(colour[64..72].starts_with(' '), "{colour}");
     let back = read_iges_parts(&path, LengthUnit::Meter).unwrap();
+    // The full name also as a Name property (406 form 15), as live's.
+    assert!(text.lines().any(|l| l.starts_with("406,1,6HPart 1")), "a 406 Name property");
     let names: Vec<Option<&str>> = back.iter().map(|p| p.name.as_deref()).collect();
-    assert_eq!(names, [Some("Part 1"), Some("Part 2"), None]);
+    assert_eq!(&names[..2], [Some("Part 1"), Some("Part 2")]);
+    // Live names a solid without a label " DE" and its directory line (1818).
+    assert!(names[2].is_some_and(|n| n.starts_with(" DE") && n.len() == 12 && n.trim_start_matches(" DE").trim().parse::<u32>().is_ok()), "{names:?}");
     assert!(back[0].color.is_some_and(|c| (c[1] - 0.4).abs() < 1e-3) && back[1].color.is_none() && back[2].color.is_some(), "{:?}", back.iter().map(|p| p.color).collect::<Vec<_>>());
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -1349,4 +1354,15 @@ fn step_face_colour_reads_from_the_parts_sub_shapes() {
     assert_eq!(coloured.len(), 1);
     assert_eq!(coloured[0].face_colors, vec![(0, [1.0, 0.0, 0.0])]);
     assert!(parts.iter().all(|s| s.color.is_some()));
+}
+
+/// Live's IGES of a part named "Long bracket part name 1": the 186 label
+/// holds "Long bra", a 406 Name property the whole name; live imports it as
+/// "Long bra" (request 1818), and so do we.
+#[test]
+fn iges_from_live_takes_the_label() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/iges/live-long-name.igs");
+    let parts = read_iges_parts(&path, LengthUnit::Meter).unwrap();
+    let names: Vec<Option<&str>> = parts.iter().map(|p| p.name.as_deref()).collect();
+    assert_eq!(names, [Some("Long bra")]);
 }

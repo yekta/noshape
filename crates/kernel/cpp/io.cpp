@@ -37,6 +37,7 @@
 #include <IGESData_IGESEntity.hxx>
 #include <Interface_InterfaceModel.hxx>
 #include <IGESData_IGESModel.hxx>
+#include <IGESBasic_Name.hxx>
 #include <IGESBasic_SingularSubfigure.hxx>
 #include <IGESBasic_SubfigureDef.hxx>
 #include <IGESGeom_TransformationMatrix.hxx>
@@ -1096,19 +1097,31 @@ StepTree read_iges_tree(rust::Str path)
     app->Close(doc);
     fail_io("could not read IGES file " + p);
   }
-  // Each labelled solid's name by its transferred shape (XDE leaves an
-  // instanced one unnamed: live's assembly IGES, 1755).
+  // Each solid's name by its transferred shape, as live names it (1818):
+  // its 8-character label (not a longer Name property, which XDE prefers),
+  // or " DE" and its directory line when it has none. (XDE also leaves an
+  // instanced solid unnamed: live's assembly IGES, 1755.)
   std::map<const TopoDS_TShape*, std::string> labelled;
   const occ::handle<Transfer_TransientProcess>& tp = r.WS()->TransferReader()->TransientProcess();
   for (int i = 1; !read.IsNull() && i <= read->NbEntities(); ++i)
-    if (const occ::handle<IGESSolid_ManifoldSolid> e = occ::down_cast<IGESSolid_ManifoldSolid>(read->Value(i)); !e.IsNull() && e->HasShortLabel())
+    if (const occ::handle<IGESSolid_ManifoldSolid> e = occ::down_cast<IGESSolid_ManifoldSolid>(read->Value(i)); !e.IsNull())
       if (const occ::handle<Transfer_Binder> b = tp->Find(e); !b.IsNull())
         if (const TopoDS_Shape sh = TransferBRep::ShapeResult(b); !sh.IsNull())
         {
-          TCollection_AsciiString n = e->ShortLabel()->String();
-          n.LeftAdjust();
-          n.RightAdjust();
-          labelled[sh.TShape().get()] = n.ToCString();
+          std::string name;
+          if (e->HasShortLabel())
+          {
+            TCollection_AsciiString n = e->ShortLabel()->String();
+            n.LeftAdjust();
+            n.RightAdjust();
+            name = n.ToCString();
+          }
+          if (name.empty())
+          {
+            const std::string de = std::to_string(2 * i - 1);
+            name = " DE" + std::string(de.size() < 9 ? 9 - de.size() : 0, ' ') + de;
+          }
+          labelled[sh.TShape().get()] = name;
         }
   occ::handle<XCAFDoc_ShapeTool>  st = XCAFDoc_DocumentTool::ShapeTool(doc->Main());
   occ::handle<XCAFDoc_ColorTool>  ct = XCAFDoc_DocumentTool::ColorTool(doc->Main());
@@ -1174,7 +1187,7 @@ StepTree read_iges_tree(rust::Str path)
     for (const char* t : {"COMPOUND", "COMPSOLID", "SOLID", "SHELL", "FACE", "WIRE", "EDGE", "VERTEX", "SHAPE"})
       made_up = made_up || l.name == t || l.name.rfind("=>", 0) == 0;
     std::string name = made_up ? std::string() : l.name;
-    for (TopExp_Explorer ex(l.shape, TopAbs_SOLID); name.empty() && !labelled.empty(); )
+    for (TopExp_Explorer ex(l.shape, TopAbs_SOLID); !labelled.empty();)
     {
       // The part itself, else its (first) solid: a subfigure is a compound.
       const TopoDS_Shape& sh = ex.More() ? ex.Current() : l.shape;
@@ -1233,6 +1246,12 @@ std::vector<occ::handle<IGESData_IGESEntity>> name_iges_solids(IGESControl_Write
       const std::string                           cut   = name.substr(0, 8);
       const occ::handle<TCollection_HAsciiString> label = new TCollection_HAsciiString((std::string(8 - cut.size(), ' ') + cut).c_str());
       solid->SetLabel(label, 0);
+      // The whole name as a Name property (406 form 15) the solid points
+      // to, as live's (readers take the label; live 1818).
+      occ::handle<IGESBasic_Name> full = new IGESBasic_Name();
+      full->Init(1, new TCollection_HAsciiString(name.c_str()));
+      w.Model()->AddEntity(full);
+      solid->AddProperty(full);
       if (!shell.IsNull() && shell->NbFaces() > 0 && shell->Face(1)->NbLoops() > 0 && shell->Face(1)->Loop(1)->NbEdges() > 0)
         if (const occ::handle<IGESSolid_EdgeList> edges = occ::down_cast<IGESSolid_EdgeList>(shell->Face(1)->Loop(1)->Edge(1)); !edges.IsNull())
         {
