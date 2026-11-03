@@ -1,101 +1,552 @@
 [
-  {
-    "name": "bracket03-mattie",
-    "document": "aabb47e0dcda25f3ba234dfe",
-    "workspace": "ae027ad026b2b9384a8b7049",
-    "element": "e5c4939220f5ac6198c94c0f",
-    "url": "https://cad.onshape.com/documents/aabb47e0dcda25f3ba234dfe/w/ae027ad026b2b9384a8b7049/e/e5c4939220f5ac6198c94c0f",
-    "title": "bracket03",
-    "original": "https://cad.onshape.com/documents/a44ca3bcc4f59953a11867c9/w/dc2084dcd72d846c23d3e4ac/e/9410c5afaaf41211cabc734d"
-  },
-  {
-    "name": "bracket120-datenkrake",
-    "document": "5c98120406d44ed8112cdda9",
-    "workspace": "b2ce05d854d45fd5c79343af",
-    "element": "e91f433c2a14dabb44ed310f",
-    "url": "https://cad.onshape.com/documents/5c98120406d44ed8112cdda9/w/b2ce05d854d45fd5c79343af/e/e91f433c2a14dabb44ed310f",
-    "title": "bracket120",
-    "original": "https://cad.onshape.com/documents/45460a11122a108de7b73831/w/12a29c2855ed220395267fb3/e/2d8c97335255454c7b8266e6"
-  },
-  {
-    "name": "bushing2-0-joshua",
-    "document": "1fe6ef63776dec3a523828ba",
-    "workspace": "2380b70d36a891279045371e",
-    "element": "9433a84ba43ab4631bc46b99",
-    "url": "https://cad.onshape.com/documents/1fe6ef63776dec3a523828ba/w/2380b70d36a891279045371e/e/9433a84ba43ab4631bc46b99",
-    "title": "Bushing2.0",
-    "original": "https://cad.onshape.com/documents/1e283d51e8f758d257c55592/w/95b1d9ccabf0bc2712d173ad/e/d0dd4e5215baf125deb59020"
-  },
-  {
-    "name": "clamp-abhil",
-    "document": "3ae4527e66d5be0c9d0e5512",
-    "workspace": "1883ba38e6b794f63981ef23",
-    "element": "435bdeb4217ec333259f71b2",
-    "url": "https://cad.onshape.com/documents/3ae4527e66d5be0c9d0e5512/w/1883ba38e6b794f63981ef23/e/435bdeb4217ec333259f71b2",
-    "title": "clamp",
-    "original": "https://cad.onshape.com/documents/955e319ee28d507bdb788095/w/9759f95c178d24d3e13968a4/e/7f3719e7afcc2286348e072b"
-  },
-  {
-    "name": "clamp-hms",
-    "document": "8dd3a998bce922c8eca6741b",
-    "workspace": "785d9f43d80d813e2ea83ec7",
-    "element": "b7a09b907b9de67e3aa3ea62",
-    "url": "https://cad.onshape.com/documents/8dd3a998bce922c8eca6741b/w/785d9f43d80d813e2ea83ec7/e/b7a09b907b9de67e3aa3ea62",
-    "title": "clamp",
-    "original": "https://cad.onshape.com/documents/a4944914d3907a43b61e4f76/w/2521cbd94ae8f4e599b025b6/e/1269d9dcada9df2dfb118fc6"
-  },
-  {
-    "name": "flange-josh",
-    "document": "eec4b07b3a992915df10ed9e",
-    "workspace": "de72c4ccad41dfbcd14a698f",
-    "element": "1c45e455e14b88e68d4af684",
-    "url": "https://cad.onshape.com/documents/eec4b07b3a992915df10ed9e/w/de72c4ccad41dfbcd14a698f/e/1c45e455e14b88e68d4af684",
-    "title": "flange",
-    "original": "https://cad.onshape.com/documents/e53c0eadaa4e6df968bddef9/w/b458d3115d0ed6a8e56bc4f9/e/0956a6a9c151e9af5aa6b6e6"
-  },
-  {
-    "name": "flange-walter",
-    "document": "81befbdec8612d46730d8ce9",
-    "workspace": "2f4902c604d6fa77bffc71b0",
-    "element": "747344c9fedbb4c982001b1c",
-    "url": "https://cad.onshape.com/documents/81befbdec8612d46730d8ce9/w/2f4902c604d6fa77bffc71b0/e/747344c9fedbb4c982001b1c",
-    "title": "flange",
-    "original": "https://cad.onshape.com/documents/d7081a03c9b774ac8e4c025a/w/5662a9df7e0f3a06136e5919/e/2cd00fd4014e6063129259f1"
-  },
-  {
-    "name": "knob-tim",
-    "document": "1f2eeaf35c5f586b4859001c",
-    "workspace": "f8e8cbbe4c97d232ebb51300",
-    "element": "32984cf39eff168276303876",
-    "url": "https://cad.onshape.com/documents/1f2eeaf35c5f586b4859001c/w/f8e8cbbe4c97d232ebb51300/e/32984cf39eff168276303876",
-    "title": "knob",
-    "original": "https://cad.onshape.com/documents/e829acc0f26797fbeb212fdd/w/dfb5f0b660bc3f04936bcfb4/e/2f1c61ee9abdc336747e7f58"
-  },
-  {
-    "name": "mounting-plate-giana",
-    "document": "47f6d400ba1bd1f5979cfe90",
-    "workspace": "a8bfe48f78e4acb2eaeab0cd",
-    "element": "98b72542b023b8af4761f5bd",
-    "url": "https://cad.onshape.com/documents/47f6d400ba1bd1f5979cfe90/w/a8bfe48f78e4acb2eaeab0cd/e/98b72542b023b8af4761f5bd",
-    "title": "mounting plate",
-    "original": "https://cad.onshape.com/documents/8ca2581bf1d63e75c943de2f/w/851fc8b35d2c29aea3a170d3/e/a336eb5a7e2a047c323158de"
-  },
-  {
-    "name": "pipeflange-steven",
-    "document": "6116172aac8bf921b90dda4d",
-    "workspace": "f263b810d455d3ded81f21d3",
-    "element": "1ee672a9df44bae44f36bd61",
-    "url": "https://cad.onshape.com/documents/6116172aac8bf921b90dda4d/w/f263b810d455d3ded81f21d3/e/1ee672a9df44bae44f36bd61",
-    "title": "pipeFlange",
-    "original": "https://cad.onshape.com/documents/2ff3876e843f40f90844514a/w/b6f550d62abfd3d0ae41aea6/e/3d877b38db42c265f4d738a1"
-  },
-  {
-    "name": "untitled-document-chris",
-    "document": "435360f2c69d9c6b7681298d",
-    "workspace": "b5021707307c3d238aa3ddeb",
-    "element": "2e475ac608d97c94198204a8",
-    "url": "https://cad.onshape.com/documents/435360f2c69d9c6b7681298d/w/b5021707307c3d238aa3ddeb/e/2e475ac608d97c94198204a8",
-    "title": "Untitled document",
-    "original": "https://cad.onshape.com/documents/8f35c5a91d33e0107c4cc00b/w/c615b2e75d24860fcd79ef04/e/05e9e3934f8e39f04ce1e2fb"
-  }
+ {
+  "name": "bearing-block-takumi",
+  "document": "cf57c556d9dc2b4606dc7772",
+  "workspace": "15d9123b88e2b091ae2d9511",
+  "element": "95518baa47cd2f26924dd654",
+  "url": "https://cad.onshape.com/documents/cf57c556d9dc2b4606dc7772/w/15d9123b88e2b091ae2d9511/e/95518baa47cd2f26924dd654",
+  "title": "bearing block",
+  "original": "https://cad.onshape.com/documents/8a8ce85efa1e1ecb5a66612c/w/07558406e0012c0805b10e9e/e/370e72c6d5de16d762b1c71c"
+ },
+ {
+  "name": "bracket03-mattie",
+  "document": "aabb47e0dcda25f3ba234dfe",
+  "workspace": "ae027ad026b2b9384a8b7049",
+  "element": "e5c4939220f5ac6198c94c0f",
+  "url": "https://cad.onshape.com/documents/aabb47e0dcda25f3ba234dfe/w/ae027ad026b2b9384a8b7049/e/e5c4939220f5ac6198c94c0f",
+  "title": "bracket03",
+  "original": "https://cad.onshape.com/documents/a44ca3bcc4f59953a11867c9/w/dc2084dcd72d846c23d3e4ac/e/9410c5afaaf41211cabc734d"
+ },
+ {
+  "name": "bracket120-datenkrake",
+  "document": "5c98120406d44ed8112cdda9",
+  "workspace": "b2ce05d854d45fd5c79343af",
+  "element": "e91f433c2a14dabb44ed310f",
+  "url": "https://cad.onshape.com/documents/5c98120406d44ed8112cdda9/w/b2ce05d854d45fd5c79343af/e/e91f433c2a14dabb44ed310f",
+  "title": "bracket120",
+  "original": "https://cad.onshape.com/documents/45460a11122a108de7b73831/w/12a29c2855ed220395267fb3/e/2d8c97335255454c7b8266e6"
+ },
+ {
+  "name": "bushing2-0-joshua",
+  "document": "1fe6ef63776dec3a523828ba",
+  "workspace": "2380b70d36a891279045371e",
+  "element": "9433a84ba43ab4631bc46b99",
+  "url": "https://cad.onshape.com/documents/1fe6ef63776dec3a523828ba/w/2380b70d36a891279045371e/e/9433a84ba43ab4631bc46b99",
+  "title": "Bushing2.0",
+  "original": "https://cad.onshape.com/documents/1e283d51e8f758d257c55592/w/95b1d9ccabf0bc2712d173ad/e/d0dd4e5215baf125deb59020"
+ },
+ {
+  "name": "cf-ansi-washers",
+  "document": "24db5fa0e9eb1590e2f70f59",
+  "workspace": "c2aa2bb4bac5f18d4ef1386b",
+  "element": "b1e6d9056fde976693daa6e2",
+  "url": "https://cad.onshape.com/documents/24db5fa0e9eb1590e2f70f59/w/c2aa2bb4bac5f18d4ef1386b/e/b1e6d9056fde976693daa6e2",
+  "title": "PP-Washers-Beta",
+  "original": "https://cad.onshape.com/documents/867babd232327bab6de5d8ec",
+  "custom": true
+ },
+ {
+  "name": "cf-belt",
+  "document": "a9d0e0bd2321b0182f6c16b2",
+  "workspace": "9383317680d55212777f2737",
+  "element": "5a71ec46612b4f48fcabe24e",
+  "url": "https://cad.onshape.com/documents/a9d0e0bd2321b0182f6c16b2/w/9383317680d55212777f2737/e/5a71ec46612b4f48fcabe24e",
+  "title": "Belt - Custom feature",
+  "original": "https://cad.onshape.com/documents/57886eace4b0e425c1ef548a",
+  "custom": true
+ },
+ {
+  "name": "cf-circular-pattern",
+  "document": "92398c7fd61fa71dac79c706",
+  "workspace": "4dc0848e93363848fe451424",
+  "element": "74d90773c93c6132f733c677",
+  "url": "https://cad.onshape.com/documents/92398c7fd61fa71dac79c706/w/4dc0848e93363848fe451424/e/74d90773c93c6132f733c677",
+  "title": "FeatureScript Circular Pattern (Mahir)",
+  "original": "https://cad.onshape.com/documents/57b7740ce4b002b1d76d73b8",
+  "custom": true
+ },
+ {
+  "name": "cf-curve-pattern-normal",
+  "document": "4bf8de8b9ae1a5fa830a06d2",
+  "workspace": "e16dec993d329b90fe3f0074",
+  "element": "cf6a97b968e283be2ba37e2e",
+  "url": "https://cad.onshape.com/documents/4bf8de8b9ae1a5fa830a06d2/w/e16dec993d329b90fe3f0074/e/cf6a97b968e283be2ba37e2e",
+  "title": "FeatureScript Curve Pattern Normal (Mahir)",
+  "original": "https://cad.onshape.com/documents/57ef018093832a1090983bfe",
+  "custom": true
+ },
+ {
+  "name": "cf-drive-train-generator",
+  "document": "fe2d10f1fe826b696d434360",
+  "workspace": "06f1c245db481b438a4af5b3",
+  "element": "69c3ebb4a92dbfbf453e849e",
+  "url": "https://cad.onshape.com/documents/fe2d10f1fe826b696d434360/w/06f1c245db481b438a4af5b3/e/69c3ebb4a92dbfbf453e849e",
+  "title": "FeatureScript Drive Train Generator",
+  "original": "https://cad.onshape.com/documents/6527d86ca7126bbe5b04ca08",
+  "custom": true
+ },
+ {
+  "name": "cf-fix-pcb",
+  "document": "9c6633efbda73badc08fb52a",
+  "workspace": "11adbf70a79ac266ed7ac716",
+  "element": "5dc1c886456a1263d8a78626",
+  "url": "https://cad.onshape.com/documents/9c6633efbda73badc08fb52a/w/11adbf70a79ac266ed7ac716/e/5dc1c886456a1263d8a78626",
+  "title": "Fix PCB",
+  "original": "https://cad.onshape.com/documents/9a9b81d17d4b69e58ad9b0b0",
+  "custom": true
+ },
+ {
+  "name": "cf-hose-routing",
+  "document": "ddf0b4f694bbe2b132d4afd3",
+  "workspace": "a289acf89aad2cf3aae6d08f",
+  "element": "b32b87f3629e9584a5a25667",
+  "url": "https://cad.onshape.com/documents/ddf0b4f694bbe2b132d4afd3/w/a289acf89aad2cf3aae6d08f/e/b32b87f3629e9584a5a25667",
+  "title": "Hose Routing - Public FeatureScript",
+  "original": "https://cad.onshape.com/documents/54d06a3b8abd1fcb0daba26b/",
+  "custom": true
+ },
+ {
+  "name": "cf-linear-pattern-with-seed-location",
+  "document": "2da7d164357c87237ba26189",
+  "workspace": "1047bdacc140a84d52db8d8c",
+  "element": "268614bca02f1531137a47eb",
+  "url": "https://cad.onshape.com/documents/2da7d164357c87237ba26189/w/1047bdacc140a84d52db8d8c/e/268614bca02f1531137a47eb",
+  "title": "FeatureScript Linear Pattern (Mahir)",
+  "original": "https://cad.onshape.com/documents/57b77f0de4b0a399ffb138eb",
+  "custom": true
+ },
+ {
+  "name": "cf-metric-keys",
+  "document": "b316cfc2ac89056de46b9f92",
+  "workspace": "e78170c05b8ebecbdd8a4c86",
+  "element": "4b26e6a29369e17b2e0dea34",
+  "url": "https://cad.onshape.com/documents/b316cfc2ac89056de46b9f92/w/e78170c05b8ebecbdd8a4c86/e/4b26e6a29369e17b2e0dea34",
+  "title": "FeatureScript Metric Keys",
+  "original": "https://cad.onshape.com/documents/06f4d2c9a0d032207955bba4",
+  "custom": true
+ },
+ {
+  "name": "cf-o-ring-generator",
+  "document": "455fa5f6d76ff6c4d23370ba",
+  "workspace": "6f708aa20818b0b22af33c72",
+  "element": "3c585683ec185c102c29fde6",
+  "url": "https://cad.onshape.com/documents/455fa5f6d76ff6c4d23370ba/w/6f708aa20818b0b22af33c72/e/3c585683ec185c102c29fde6",
+  "title": "O-Rings",
+  "original": "https://cad.onshape.com/documents/ae242486af63d55695d994a6",
+  "custom": true
+ },
+ {
+  "name": "cf-parameter-pattern",
+  "document": "18fabfd6ea0da5a08af128f2",
+  "workspace": "e1197f6c8feaee5e30957306",
+  "element": "7a9e65d0d0213c7c183f58be",
+  "url": "https://cad.onshape.com/documents/18fabfd6ea0da5a08af128f2/w/e1197f6c8feaee5e30957306/e/7a9e65d0d0213c7c183f58be",
+  "title": "Parameter pattern",
+  "original": "https://cad.onshape.com/documents/d66ea5fec7a939e866ecbd6f",
+  "custom": true
+ },
+ {
+  "name": "cf-planetary-gears",
+  "document": "8f9bc2afab71ccd02c2f4cb0",
+  "workspace": "21161aa699f5c92eaffe3bbb",
+  "element": "2eb242483c6832066bf5b6e1",
+  "url": "https://cad.onshape.com/documents/8f9bc2afab71ccd02c2f4cb0/w/21161aa699f5c92eaffe3bbb/e/2eb242483c6832066bf5b6e1",
+  "title": "FeatureScript Planetary (Epicyclic) Gears",
+  "original": "https://cad.onshape.com/documents/b55a80bb510b8ff5cb20fd9a",
+  "custom": true
+ },
+ {
+  "name": "cf-pocket-holes",
+  "document": "b1b4d7b4b9f6afdfc5de534f",
+  "workspace": "208692f0a95aa4b5e1a58faf",
+  "element": "a332870651c4aa207417d8c9",
+  "url": "https://cad.onshape.com/documents/b1b4d7b4b9f6afdfc5de534f/w/208692f0a95aa4b5e1a58faf/e/a332870651c4aa207417d8c9",
+  "title": "FeatureScript Pocket Holes",
+  "original": "https://cad.onshape.com/documents/5789a3c4e4b0e65410faa582",
+  "custom": true
+ },
+ {
+  "name": "cf-point-pattern",
+  "document": "0e39bb0e24749debc4b946e6",
+  "workspace": "82d016b5dbf73c1c70bbc763",
+  "element": "edc75f60a4c1f11e6af89a64",
+  "url": "https://cad.onshape.com/documents/0e39bb0e24749debc4b946e6/w/82d016b5dbf73c1c70bbc763/e/edc75f60a4c1f11e6af89a64",
+  "title": "FeatureScript Point Pattern",
+  "original": "https://cad.onshape.com/documents/9fca78cb66a0bc83e359eb3e",
+  "custom": true
+ },
+ {
+  "name": "cf-setback-fillet",
+  "document": "aa4a8554ce142671fa0a21d8",
+  "workspace": "fbb6229705f107706f34b52d",
+  "element": "e2b1fea11b6a41ff66469ba3",
+  "url": "https://cad.onshape.com/documents/aa4a8554ce142671fa0a21d8/w/fbb6229705f107706f34b52d/e/e2b1fea11b6a41ff66469ba3",
+  "title": "FeatureScript Setback Fillet (Mahir)",
+  "original": "https://cad.onshape.com/documents/833dffabd805010ce935bee2",
+  "custom": true
+ },
+ {
+  "name": "cf-sheet-metal-flange-plus",
+  "document": "499a955e0ef27f1044498acb",
+  "workspace": "3b32ae0e899d64b1e1398723",
+  "element": "28b1ac70a7dbc22ba08a248b",
+  "url": "https://cad.onshape.com/documents/499a955e0ef27f1044498acb/w/3b32ae0e899d64b1e1398723/e/28b1ac70a7dbc22ba08a248b",
+  "title": "Sheet Metal Flange Plus (MBartlett)",
+  "original": "https://cad.onshape.com/documents/b4b180faf4fe467356a58c21",
+  "custom": true
+ },
+ {
+  "name": "cf-sheet-metal-hem",
+  "document": "277fa08ab276997332c93905",
+  "workspace": "1a5359ac9be82a06aeb9de09",
+  "element": "a1d14a66bd69d873375f9b36",
+  "url": "https://cad.onshape.com/documents/277fa08ab276997332c93905/w/1a5359ac9be82a06aeb9de09/e/a1d14a66bd69d873375f9b36",
+  "title": "Sheet Metal Hem Plus",
+  "original": "https://cad.onshape.com/documents/9190d114354a31d33ed2eb4f",
+  "custom": true
+ },
+ {
+  "name": "cf-sheet-metal-model-plus",
+  "document": "910da143eef0ac351556e67d",
+  "workspace": "63d8220751206f16680685ce",
+  "element": "d858a331c9cfd934e89f753f",
+  "url": "https://cad.onshape.com/documents/910da143eef0ac351556e67d/w/63d8220751206f16680685ce/e/d858a331c9cfd934e89f753f",
+  "title": "Sheet Metal Model Plus (MBartlett)",
+  "original": "https://cad.onshape.com/documents/a39db7615a2a945ffb7076c3",
+  "custom": true
+ },
+ {
+  "name": "cf-sheet-metal-overcut-dogbone",
+  "document": "2c0d4de970503584e91ca919",
+  "workspace": "9e90f3640cf7215d71c432ab",
+  "element": "2b332740a206810f469390da",
+  "url": "https://cad.onshape.com/documents/2c0d4de970503584e91ca919/w/9e90f3640cf7215d71c432ab/e/2b332740a206810f469390da",
+  "title": "Sheet Metal Overcut / Dogbone (MBartlett)",
+  "original": "https://cad.onshape.com/documents/b99915c0b73924ca981bc57f",
+  "custom": true
+ },
+ {
+  "name": "cf-sheet-metal-shaped-flange",
+  "document": "5606cc65ff5e647846abaeaf",
+  "workspace": "afaa03bcf83e5e80f153ed30",
+  "element": "fdbc69478259884c454bae20",
+  "url": "https://cad.onshape.com/documents/5606cc65ff5e647846abaeaf/w/afaa03bcf83e5e80f153ed30/e/fdbc69478259884c454bae20",
+  "title": "Sheet Metal Shaped Flange (MBartlett)",
+  "original": "https://cad.onshape.com/documents/602655eff016f183fc184978",
+  "custom": true
+ },
+ {
+  "name": "cf-socket-head-cap-screw-creator",
+  "document": "90044e96de9c0737a10c25b9",
+  "workspace": "2b854e7e572dedde554193c7",
+  "element": "783ac3c802037b05234d771c",
+  "url": "https://cad.onshape.com/documents/90044e96de9c0737a10c25b9/w/2b854e7e572dedde554193c7/e/783ac3c802037b05234d771c",
+  "title": "PP-CapScrews-Beta",
+  "original": "https://cad.onshape.com/documents/2d7e0a6b68c2039da4221ebc",
+  "custom": true
+ },
+ {
+  "name": "cf-spur-gear",
+  "document": "8354763efd53b98b340fa080",
+  "workspace": "7cb60ab53ee7a50bad19997e",
+  "element": "17c4c61777d09ec57a2d2de6",
+  "url": "https://cad.onshape.com/documents/8354763efd53b98b340fa080/w/7cb60ab53ee7a50bad19997e/e/17c4c61777d09ec57a2d2de6",
+  "title": "Spur Gear - Custom feature",
+  "original": "https://cad.onshape.com/documents/5742c8cde4b06c68b362d748",
+  "custom": true
+ },
+ {
+  "name": "cf-straight-spline",
+  "document": "99d2b5c66622e15847dfabf3",
+  "workspace": "2dac78d276b50a314e0af025",
+  "element": "0bcb209c436831dd509eb4b4",
+  "url": "https://cad.onshape.com/documents/99d2b5c66622e15847dfabf3/w/2dac78d276b50a314e0af025/e/0bcb209c436831dd509eb4b4",
+  "title": "FeatureScript Straight Spline Feature",
+  "original": "https://cad.onshape.com/documents/5848a5f5f680f5104c2bb48d",
+  "custom": true
+ },
+ {
+  "name": "cf-syncro-rotator",
+  "document": "31ae3d9264ce0d19ac23e2b8",
+  "workspace": "4b75fd46a057d52d24653920",
+  "element": "35a86721e9d2b3f4bb773093",
+  "url": "https://cad.onshape.com/documents/31ae3d9264ce0d19ac23e2b8/w/4b75fd46a057d52d24653920/e/35a86721e9d2b3f4bb773093",
+  "title": "Syncro rotation",
+  "original": "https://cad.onshape.com/documents/a0adddcc041efb15f8c3ad2a",
+  "custom": true
+ },
+ {
+  "name": "cf-thread-creator",
+  "document": "9fa9648a55cc0e601f4dd279",
+  "workspace": "48fb1f0c7f4e632cd8b14b28",
+  "element": "beb8ce8145d64290bd63affa",
+  "url": "https://cad.onshape.com/documents/9fa9648a55cc0e601f4dd279/w/48fb1f0c7f4e632cd8b14b28/e/beb8ce8145d64290bd63affa",
+  "title": "PP_ThreadCreator Beta",
+  "original": "https://cad.onshape.com/documents/6b640a407d78066bd5e41c7a",
+  "custom": true
+ },
+ {
+  "name": "cf-transform-pattern",
+  "document": "4d039bf495859a4b08194763",
+  "workspace": "f23ba8fc2d69c831f09833bd",
+  "element": "01649231a84135694afb8f40",
+  "url": "https://cad.onshape.com/documents/4d039bf495859a4b08194763/w/f23ba8fc2d69c831f09833bd/e/01649231a84135694afb8f40",
+  "title": "Transform pattern",
+  "original": "https://cad.onshape.com/documents/25a0a6dfaa76e64574a5e0db",
+  "custom": true
+ },
+ {
+  "name": "cf-wave-spring",
+  "document": "379835bcc79b0c83ddce8197",
+  "workspace": "2e09f94867ff68fe2adcb620",
+  "element": "6732e58f933252135e7f551a",
+  "url": "https://cad.onshape.com/documents/379835bcc79b0c83ddce8197/w/2e09f94867ff68fe2adcb620/e/6732e58f933252135e7f551a",
+  "title": "Wave Spring - Custom feature",
+  "original": "https://cad.onshape.com/documents/5720a838e4b0c6d25c8c1ff1",
+  "custom": true
+ },
+ {
+  "name": "cf-wiring",
+  "document": "d4a05f3a58044859a8ff12ba",
+  "workspace": "65bf26d5e114524f95e0bedb",
+  "element": "f6f2bd105389bb12471542ba",
+  "url": "https://cad.onshape.com/documents/d4a05f3a58044859a8ff12ba/w/65bf26d5e114524f95e0bedb/e/f6f2bd105389bb12471542ba",
+  "title": "FeatureScript Wiring",
+  "original": "https://cad.onshape.com/documents/6dff8f67e2ef0b33193a10d2",
+  "custom": true
+ },
+ {
+  "name": "clamp-abhil",
+  "document": "3ae4527e66d5be0c9d0e5512",
+  "workspace": "1883ba38e6b794f63981ef23",
+  "element": "435bdeb4217ec333259f71b2",
+  "url": "https://cad.onshape.com/documents/3ae4527e66d5be0c9d0e5512/w/1883ba38e6b794f63981ef23/e/435bdeb4217ec333259f71b2",
+  "title": "clamp",
+  "original": "https://cad.onshape.com/documents/955e319ee28d507bdb788095/w/9759f95c178d24d3e13968a4/e/7f3719e7afcc2286348e072b"
+ },
+ {
+  "name": "clamp-guillem",
+  "document": "9aa596a2caa24c858e49062e",
+  "workspace": "20b515408fad5ab3de2d8518",
+  "element": "573ee229200fd18cc14cf5c5",
+  "url": "https://cad.onshape.com/documents/9aa596a2caa24c858e49062e/w/20b515408fad5ab3de2d8518/e/573ee229200fd18cc14cf5c5",
+  "title": "clamp",
+  "original": "https://cad.onshape.com/documents/240aa54f7392ff0f5dc6e5b4/w/fa012b34b639b21c21667f9d/e/5fc441420022a5ed348ec406"
+ },
+ {
+  "name": "clamp-hms",
+  "document": "8dd3a998bce922c8eca6741b",
+  "workspace": "785d9f43d80d813e2ea83ec7",
+  "element": "b7a09b907b9de67e3aa3ea62",
+  "url": "https://cad.onshape.com/documents/8dd3a998bce922c8eca6741b/w/785d9f43d80d813e2ea83ec7/e/b7a09b907b9de67e3aa3ea62",
+  "title": "clamp",
+  "original": "https://cad.onshape.com/documents/a4944914d3907a43b61e4f76/w/2521cbd94ae8f4e599b025b6/e/1269d9dcada9df2dfb118fc6"
+ },
+ {
+  "name": "exercise-anthony",
+  "document": "1aa0ac40a349f93b61813c71",
+  "workspace": "92878cee795465648523e1f4",
+  "element": "9ae85a300a065704fe3402db",
+  "url": "https://cad.onshape.com/documents/1aa0ac40a349f93b61813c71/w/92878cee795465648523e1f4/e/9ae85a300a065704fe3402db",
+  "title": "exercise",
+  "original": "https://cad.onshape.com/documents/196ee5c7748521a68be0c833/w/728fecfd430e47273ddd8cec/e/63e2c155cbee25836d7c5d27"
+ },
+ {
+  "name": "exercise-chino",
+  "document": "af9d0d715dc3f0f91f7de380",
+  "workspace": "eba63a67c4f827c8fdae41b7",
+  "element": "eda1e5c47a22846a8d6d90c0",
+  "url": "https://cad.onshape.com/documents/af9d0d715dc3f0f91f7de380/w/eba63a67c4f827c8fdae41b7/e/eda1e5c47a22846a8d6d90c0",
+  "title": "exercise",
+  "original": "https://cad.onshape.com/documents/5d9c48538fe4c3eb4a626f3c/w/45540e6ce83a4d7a5dc831b0/e/f70ea3b8d9240b675c94dc28"
+ },
+ {
+  "name": "exercise-evana",
+  "document": "eaf2bc0e010f7c841c4bbc9c",
+  "workspace": "fe3053a38d27de692a79f7c8",
+  "element": "3588a04d08bc1d33b779437b",
+  "url": "https://cad.onshape.com/documents/eaf2bc0e010f7c841c4bbc9c/w/fe3053a38d27de692a79f7c8/e/3588a04d08bc1d33b779437b",
+  "title": "exercise",
+  "original": "https://cad.onshape.com/documents/f9d69cbee9f6dcabf5f1fe10/w/3d8f42c12b5b9a4b0f976fba/e/8ae9ed961ddd7c8b2647be40"
+ },
+ {
+  "name": "exercise-jan",
+  "document": "1650f766a838f8ef8bc0d7f9",
+  "workspace": "e95acad020a2fc6f09a83ae8",
+  "element": "6db21de5c122a982c261c1a1",
+  "url": "https://cad.onshape.com/documents/1650f766a838f8ef8bc0d7f9/w/e95acad020a2fc6f09a83ae8/e/6db21de5c122a982c261c1a1",
+  "title": "exercise",
+  "original": "https://cad.onshape.com/documents/d5a5aaca81c9ef34dd8f9327/w/88455b6c00e52614cc16d99d/e/819a8576255bbcfdd9177431"
+ },
+ {
+  "name": "exercise-jonathan",
+  "document": "b67210ca03c8c7da0af90366",
+  "workspace": "c15e1ec34ebbd9bd3b75e5e7",
+  "element": "b9850c557e427d8f1cf1b85e",
+  "url": "https://cad.onshape.com/documents/b67210ca03c8c7da0af90366/w/c15e1ec34ebbd9bd3b75e5e7/e/b9850c557e427d8f1cf1b85e",
+  "title": "exercise",
+  "original": "https://cad.onshape.com/documents/248c47c607fbe3a909daad4d/w/e12483a51ba0c24fc5316e2e/e/c84b2b90791a325e09de4bbf"
+ },
+ {
+  "name": "exercise-martinl",
+  "document": "3a4d27bcb8751072b40c4b9f",
+  "workspace": "b1e1b5aef46cd6c71187b694",
+  "element": "ff626d99cf8faf3f6e95f45c",
+  "url": "https://cad.onshape.com/documents/3a4d27bcb8751072b40c4b9f/w/b1e1b5aef46cd6c71187b694/e/ff626d99cf8faf3f6e95f45c",
+  "title": "exercise",
+  "original": "https://cad.onshape.com/documents/3d2e796c608cb08c9f73d768/w/0329ea027759431f5a6f766c/e/d1d708cd67f1d62e7c4f9b04"
+ },
+ {
+  "name": "flange-josh",
+  "document": "eec4b07b3a992915df10ed9e",
+  "workspace": "de72c4ccad41dfbcd14a698f",
+  "element": "1c45e455e14b88e68d4af684",
+  "url": "https://cad.onshape.com/documents/eec4b07b3a992915df10ed9e/w/de72c4ccad41dfbcd14a698f/e/1c45e455e14b88e68d4af684",
+  "title": "flange",
+  "original": "https://cad.onshape.com/documents/e53c0eadaa4e6df968bddef9/w/b458d3115d0ed6a8e56bc4f9/e/0956a6a9c151e9af5aa6b6e6"
+ },
+ {
+  "name": "flange-walter",
+  "document": "81befbdec8612d46730d8ce9",
+  "workspace": "2f4902c604d6fa77bffc71b0",
+  "element": "747344c9fedbb4c982001b1c",
+  "url": "https://cad.onshape.com/documents/81befbdec8612d46730d8ce9/w/2f4902c604d6fa77bffc71b0/e/747344c9fedbb4c982001b1c",
+  "title": "flange",
+  "original": "https://cad.onshape.com/documents/d7081a03c9b774ac8e4c025a/w/5662a9df7e0f3a06136e5919/e/2cd00fd4014e6063129259f1"
+ },
+ {
+  "name": "knob-jason",
+  "document": "a26dcd4146b15fba175e4c91",
+  "workspace": "88f9f65af392f9533de16803",
+  "element": "c03532a9cfa293b9c9ae943c",
+  "url": "https://cad.onshape.com/documents/a26dcd4146b15fba175e4c91/w/88f9f65af392f9533de16803/e/c03532a9cfa293b9c9ae943c",
+  "title": "knob",
+  "original": "https://cad.onshape.com/documents/73844184194da638891f700c/w/282ee5a20f409f8988c0abbd/e/1659cdc686adfbecf2c89c38"
+ },
+ {
+  "name": "knob-kraut",
+  "document": "f866a21a3e35de9352d89aa7",
+  "workspace": "db0de59fd1f168f058bbe2e5",
+  "element": "91c4456ef16c14fb9a0bf19e",
+  "url": "https://cad.onshape.com/documents/f866a21a3e35de9352d89aa7/w/db0de59fd1f168f058bbe2e5/e/91c4456ef16c14fb9a0bf19e",
+  "title": "knob",
+  "original": "https://cad.onshape.com/documents/8f9211b0068e350dba9b3e33/w/480fbc778753aaa3349d3309/e/0f8e9543f791596f15b797e9"
+ },
+ {
+  "name": "knob-tim",
+  "document": "1f2eeaf35c5f586b4859001c",
+  "workspace": "f8e8cbbe4c97d232ebb51300",
+  "element": "32984cf39eff168276303876",
+  "url": "https://cad.onshape.com/documents/1f2eeaf35c5f586b4859001c/w/f8e8cbbe4c97d232ebb51300/e/32984cf39eff168276303876",
+  "title": "knob",
+  "original": "https://cad.onshape.com/documents/e829acc0f26797fbeb212fdd/w/dfb5f0b660bc3f04936bcfb4/e/2f1c61ee9abdc336747e7f58"
+ },
+ {
+  "name": "learning-center-devon",
+  "document": "f22e85ac35175feb16348482",
+  "workspace": "2ba9473e0f164ee781b451bd",
+  "element": "4e2e0d0ca5ffd3494b3b7e83",
+  "url": "https://cad.onshape.com/documents/f22e85ac35175feb16348482/w/2ba9473e0f164ee781b451bd/e/4e2e0d0ca5ffd3494b3b7e83",
+  "title": "Learning Center",
+  "original": "https://cad.onshape.com/documents/7d774d3e073ca8545d84cdb2/w/87eb90f875bc0d80be837a85/e/baf4abc4a742ea9674cf51b2"
+ },
+ {
+  "name": "learning-center-frank",
+  "document": "6c2402f7e0c4b980782a065d",
+  "workspace": "eb0d3ab3f0b99a21a5ac0430",
+  "element": "b049dfa47aa83764426c4192",
+  "url": "https://cad.onshape.com/documents/6c2402f7e0c4b980782a065d/w/eb0d3ab3f0b99a21a5ac0430/e/b049dfa47aa83764426c4192",
+  "title": "Learning Center",
+  "original": "https://cad.onshape.com/documents/d35728dbfdd169bd0732bc3f/w/5707afb6c1b7d9f3fdc92885/e/de67c4338acc48a9b615609c"
+ },
+ {
+  "name": "learning-center-ivan",
+  "document": "07b0c1341d1096ce4ab7b025",
+  "workspace": "10fb8d84a2167d2ab0161cef",
+  "element": "4a927e1e54e0dfbc6dc114b7",
+  "url": "https://cad.onshape.com/documents/07b0c1341d1096ce4ab7b025/w/10fb8d84a2167d2ab0161cef/e/4a927e1e54e0dfbc6dc114b7",
+  "title": "Learning Center",
+  "original": "https://cad.onshape.com/documents/d49a0e8d0a9f0e3a6c6e74d2/w/f11d6160eaf40393c27764bb/e/357ed608d043be00856d2943"
+ },
+ {
+  "name": "learning-center-michael",
+  "document": "7569bf41a9023c4ce9429b41",
+  "workspace": "be2e426ef2427673edf8dd07",
+  "element": "3a262abaefdcea0fd38f3729",
+  "url": "https://cad.onshape.com/documents/7569bf41a9023c4ce9429b41/w/be2e426ef2427673edf8dd07/e/3a262abaefdcea0fd38f3729",
+  "title": "Learning center",
+  "original": "https://cad.onshape.com/documents/b11d15bcc9384f4276d34e24/w/eb169024017eb59d3e1963ff/e/e3f2a7ec1547dd79856bbdc5"
+ },
+ {
+  "name": "motor-mount-jack",
+  "document": "e59c1d78d6c5534e1704e76e",
+  "workspace": "149f81e57737ebc0ee459051",
+  "element": "fda37b8bb59dc8363ae12f8b",
+  "url": "https://cad.onshape.com/documents/e59c1d78d6c5534e1704e76e/w/149f81e57737ebc0ee459051/e/fda37b8bb59dc8363ae12f8b",
+  "title": "motor mount",
+  "original": "https://cad.onshape.com/documents/655f74aa857557af7f1bebc8/w/07646da836d7e43cd234d5f2/e/4a4a59bf089fa4bf10d81156"
+ },
+ {
+  "name": "mounting-plate-giana",
+  "document": "47f6d400ba1bd1f5979cfe90",
+  "workspace": "a8bfe48f78e4acb2eaeab0cd",
+  "element": "98b72542b023b8af4761f5bd",
+  "url": "https://cad.onshape.com/documents/47f6d400ba1bd1f5979cfe90/w/a8bfe48f78e4acb2eaeab0cd/e/98b72542b023b8af4761f5bd",
+  "title": "mounting plate",
+  "original": "https://cad.onshape.com/documents/8ca2581bf1d63e75c943de2f/w/851fc8b35d2c29aea3a170d3/e/a336eb5a7e2a047c323158de"
+ },
+ {
+  "name": "pillow-block-maysa",
+  "document": "e2147c44a204679265caa988",
+  "workspace": "fab34dc92e548a5b89d57b84",
+  "element": "7106ae5359160c9a4c5002ad",
+  "url": "https://cad.onshape.com/documents/e2147c44a204679265caa988/w/fab34dc92e548a5b89d57b84/e/7106ae5359160c9a4c5002ad",
+  "title": "pillow block",
+  "original": "https://cad.onshape.com/documents/3ce69ed5cfa2686aa79c4a81/w/1d1fafd6f2adae9f57b114ea/e/d480e06637d7391c3931c96a"
+ },
+ {
+  "name": "pipeflange-steven",
+  "document": "6116172aac8bf921b90dda4d",
+  "workspace": "f263b810d455d3ded81f21d3",
+  "element": "1ee672a9df44bae44f36bd61",
+  "url": "https://cad.onshape.com/documents/6116172aac8bf921b90dda4d/w/f263b810d455d3ded81f21d3/e/1ee672a9df44bae44f36bd61",
+  "title": "pipeFlange",
+  "original": "https://cad.onshape.com/documents/2ff3876e843f40f90844514a/w/b6f550d62abfd3d0ae41aea6/e/3d877b38db42c265f4d738a1"
+ },
+ {
+  "name": "prize-wheel-tim",
+  "document": "dd06c4daad64b3ff3d49363d",
+  "workspace": "70b153d6c6b0524fba823b94",
+  "element": "ffa360ed983e2eaedc325a6d",
+  "url": "https://cad.onshape.com/documents/dd06c4daad64b3ff3d49363d/w/70b153d6c6b0524fba823b94/e/ffa360ed983e2eaedc325a6d",
+  "title": "prize wheel",
+  "original": "https://cad.onshape.com/documents/92523d570013c42b0d069bcf/w/5b04e646eb4c868334711974/e/dddb48adf1afacae7f2265be"
+ },
+ {
+  "name": "pulley02-maxwell",
+  "document": "a6e44f0ca892659358b877ec",
+  "workspace": "c02c87a7bd3ed30d4f952179",
+  "element": "c81df3a5c07809049856b594",
+  "url": "https://cad.onshape.com/documents/a6e44f0ca892659358b877ec/w/c02c87a7bd3ed30d4f952179/e/c81df3a5c07809049856b594",
+  "title": "Pulley02",
+  "original": "https://cad.onshape.com/documents/47b6e8e3e03b3532c7a341d3/w/db735a6b96405c83eae9031b/e/805665697fc617fbce5c413b"
+ },
+ {
+  "name": "stef-radijator-nlukic",
+  "document": "fce516a1380f70c9a488383d",
+  "workspace": "099a90b11dad96edc6d30767",
+  "element": "863eb74dccee032c22e31114",
+  "url": "https://cad.onshape.com/documents/fce516a1380f70c9a488383d/w/099a90b11dad96edc6d30767/e/863eb74dccee032c22e31114",
+  "title": "stef-radijator",
+  "original": "https://cad.onshape.com/documents/6a3d486b14715606a45430f6/w/2fe0f216d054c733fef2dd98/e/038469feb2f0d2951cc3d98e"
+ },
+ {
+  "name": "untitled-document-chris",
+  "document": "435360f2c69d9c6b7681298d",
+  "workspace": "b5021707307c3d238aa3ddeb",
+  "element": "2e475ac608d97c94198204a8",
+  "url": "https://cad.onshape.com/documents/435360f2c69d9c6b7681298d/w/b5021707307c3d238aa3ddeb/e/2e475ac608d97c94198204a8",
+  "title": "Untitled document",
+  "original": "https://cad.onshape.com/documents/8f35c5a91d33e0107c4cc00b/w/c615b2e75d24860fcd79ef04/e/05e9e3934f8e39f04ce1e2fb"
+ }
 ]
