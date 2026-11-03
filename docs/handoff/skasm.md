@@ -1,6 +1,17 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
-## Resume here (2026-11-03 04:20 UTC)
+## Resume here (2026-11-03 11:40 UTC)
+Waiting on live (REQUESTS): **1866 (P1)** Perpendicular vs Vertical for a vertical line from a midpoint / across
+Line-tool horizontals (13 states in 3 sketch scenarios; plus Extend's and Slot's picked line in the selection: drawn
+selected or not); **batch 13** (s661–s700); **09:40 (P2)** ball drags for d6's objective. When they answer:
+1866: implement the rule in crates/sketch/src/inference.rs (woken H / V lines are skipped today: "add nothing over the
+H/V hints"), rerun `tools/ui-parity/run.py --app … --live /root/parity/ui/live sketch-line-from-midpoint sketch-undo-trim
+sketch-trim-drag sketch-extend-to-line sketch-slot-on-line`; batch 13: copy the .live.json into
+crates/sketch/tests/fixtures/live_fuzz/ and run live_fuzz::live_matches (369 of 430 match now; list in
+/root/skasm-scratch/fz/new6.txt). Suites now: my 25 sketch recordings 20/25 (the rest: 1866's Perpendicular in 3, Extend's and Slot's selection in 2), qa's 33 32/33 (live
+timing). Open fuzz: s653 (see 11:05). Older state follows.
+
+## 2026-11-03 04:20 UTC
 Since 01:30, landed: assembly drag from the drag's start (`drag_substeps`), s548 slide, batch 9 / 10 / probes 13 / asm
 probes 4 / asm drag 3 fixtures, SKETCH-UNDO-REDO-STATE reopen (history starts when the sketch editor opens),
 SKETCH-TANGENT-SPLINE-CIRCLE (queued: circle / arc Tangent to an unjoined fit spline = contact, EqKind::FitContact;
