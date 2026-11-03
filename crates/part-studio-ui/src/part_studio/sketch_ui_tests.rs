@@ -234,6 +234,36 @@ fn picking_the_sketch_plane_is_not_an_undo_step(cx: &mut TestAppContext) {
     assert_eq!(state(cx), (false, true));
 }
 
+/// The Origin's hidden stand-in (made when a line's first click snaps to the
+/// origin) isn't an undo step: live's Undo stays off after that click and an
+/// Escape; a drawn line still is a step.
+#[gpui::test]
+fn the_origins_hidden_point_is_not_an_undo_step(cx: &mut TestAppContext) {
+    use noshape_model::params::ParamValue;
+    let (_window, view) = sketch_with(cx, "sk-undo-origin", Tool::Line);
+    let f = cx.update(|cx| view.read(cx).edit.as_ref().unwrap().dialog.read(cx).feature.clone());
+    let mut history = super::super::DraftHistory::new(&f);
+    let with = |f: &noshape_model::Feature, edit: &dyn Fn(&mut noshape_model::sketch_feature::SketchData)| {
+        let mut g = f.clone();
+        if let Some(ParamValue::Sketch(d)) = g.params.get("sketch").cloned() {
+            let mut d = d;
+            edit(&mut d);
+            g.params.set("sketch", ParamValue::Sketch(d));
+        }
+        g
+    };
+    let hidden = with(&f, &|d| {
+        crate::sketch_mode::origin_point(&mut d.sketch);
+    });
+    assert!(!history.checkpoint(&hidden));
+    assert_eq!(history.can(), (false, false));
+    let line = with(&hidden, &|d| {
+        d.sketch.add_line(DVec2::new(0.0, 0.0), DVec2::new(0.03, 0.0));
+    });
+    assert!(history.checkpoint(&line));
+    assert_eq!(history.can(), (true, false));
+}
+
 /// `=#len` in a Line's value box (a Variable `len` = 42 mm before the
 /// sketch): Enter makes a 42 mm dimension driven by the variable.
 #[gpui::test]

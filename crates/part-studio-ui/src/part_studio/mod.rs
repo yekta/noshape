@@ -244,6 +244,13 @@ impl DraftHistory {
         if *current == self.last {
             return false;
         }
+        // A sketch's hidden stand-ins (the Origin's point, made when a first
+        // click snaps to it) aren't a step: nothing shows (live: Undo stays
+        // off after a line's first click on the origin).
+        if only_hidden_added(&self.last, current) {
+            self.last = current.clone();
+            return false;
+        }
         let prev = std::mem::replace(&mut self.last, current.clone());
         self.undo.push(prev);
         if self.undo.len() > Self::LIMIT {
@@ -273,6 +280,29 @@ impl DraftHistory {
     pub fn can(&self) -> (bool, bool) {
         (!self.undo.is_empty() || self.dragging, !self.redo.is_empty())
     }
+}
+
+/// Whether `b` is `a` with only reference-only sketch entities added.
+fn only_hidden_added(a: &Feature, b: &Feature) -> bool {
+    let (Some(ParamValue::Sketch(x)), Some(ParamValue::Sketch(y))) = (a.params.get("sketch"), b.params.get("sketch")) else { return false };
+    let shown = |d: &noshape_model::sketch_feature::SketchData| d.sketch.entities().filter(|e| !e.reference_only).cloned().collect::<Vec<_>>();
+    let rest = |f: &Feature| {
+        let mut g = f.clone();
+        g.params.set("sketch", ParamValue::Bool(false));
+        g
+    };
+    let data = |d: &noshape_model::sketch_feature::SketchData| {
+        let mut v = serde_json::to_value(d).unwrap_or_default();
+        if let Some(o) = v.as_object_mut() {
+            o.remove("sketch");
+        }
+        v
+    };
+    y.sketch.entities().any(|e| e.reference_only)
+        && shown(x) == shown(y)
+        && x.sketch.constraints().eq(y.sketch.constraints())
+        && data(x) == data(y)
+        && rest(a) == rest(b)
 }
 
 /// Measurements of the current selection: (selection, labelled results).
