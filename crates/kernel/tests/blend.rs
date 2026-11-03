@@ -875,11 +875,11 @@ fn rust_rolling_ball_corners_are_occts() {
     }
 }
 
-/// A drafted pocket's floor loop R2 over its slanted corner rounds R3 (the concave form of 1686 (c)): one face per
-/// corner, valid, no degenerated edge.
+/// A drafted pocket's floor loop R2 over its slanted corner rounds R3 (the concave form of 1686 (c), live 1826): 23
+/// faces, each corner one face of 10.158244513 mm², the volume in live's band (40308.406618 [40303.107547,
+/// 40313.705689]).
 #[test]
-#[ignore = "T2: probe (live's figures not asked yet)"]
-fn drafted_pocket_floor_loop_probe() {
+fn a_drafted_pockets_floor_loop_over_its_corner_rounds_is_lives() {
     setup();
     let b = bx([0.0; 3], [60.0, 40.0, 20.0]);
     let p = cut(&b, &bx([15.0, 10.0, 8.0], [45.0, 30.0, 21.0])).unwrap().shape;
@@ -890,23 +890,22 @@ fn drafted_pocket_floor_loop_probe() {
     assert_eq!(slanted.len(), 4);
     let d = fillet_checked(&d, &slanted, &[3.0 * MM; 4]).unwrap().shape;
     let floor = edges_where(&d, |i| (i.start.z - 8.0 * MM).abs() < 1e-6 * MM && (i.end.z - 8.0 * MM).abs() < 1e-6 * MM);
-    println!("floor loop {} edges", floor.len());
     let r = fillet_checked(&d, &floor, &vec![2.0 * MM; floor.len()]).unwrap().shape;
-    let degenerate = r.edges().iter().filter(|e| e.edge_info().unwrap().degenerated).count();
-    println!("valid {}, {} faces, {} degenerated edges, {:.6} mm3", r.is_valid(), r.faces().len(), degenerate, vol_mm3(&r));
-    for f in r.faces() {
-        let bb = f.bounding_box(true).unwrap();
-        if bb.min.x > 40.0 * MM && bb.min.y > 25.0 * MM && bb.max.z < 11.0 * MM {
-            println!("  {} area {:.7} box {:.5?} .. {:.5?}", format!("{:?}", f.face_surface().ok()).chars().take(30).collect::<String>(), f.area().unwrap() / (MM * MM), bb.min / MM, bb.max / MM);
-        }
-    }
+    assert!(r.is_valid());
+    assert!(r.edges().iter().all(|e| !e.edge_info().unwrap().degenerated));
+    assert_eq!(r.faces().len(), 23);
+    let v = vol_mm3(&r);
+    assert!((40303.107547..40313.705689).contains(&v), "{v}");
+    let corner = r.faces().into_iter().find(|f| f.bounding_box(true).is_ok_and(|bb| bb.min.x > 42.0 * MM && bb.min.y > 27.0 * MM && bb.max.z < 10.0 * MM)).unwrap();
+    assert!((corner.area().unwrap() / (MM * MM) - 10.158244513).abs() < 1e-5, "{}", corner.area().unwrap() / (MM * MM));
 }
 
-/// The drafted block of 1686 (c) with slanted rounds smaller than the top loop's (R1 under R2, the drafted form of
-/// 1686 (a)): what OCCT's corner is.
+/// The drafted block of 1686 (c) with slanted rounds smaller than the top loop's (R1 under R2, live 1831): each corner
+/// is the R1 ball rolling between the R2 cylinders from where the slanted R1 axis meets its spine up to the top face's
+/// corner, 2.989487134 mm² (OCCT's patch 3.605); 18 faces; the volume in live's band (44437.600073 [44426.355232,
+/// 44448.844913]).
 #[test]
-#[ignore = "T2: probe"]
-fn drafted_small_corner_rounds_under_the_top_loop_probe() {
+fn drafted_small_corner_rounds_under_the_top_loop_are_lives() {
     setup();
     let b = bx([0.0; 3], [60.0, 40.0, 20.0]);
     let sides: Vec<Shape> = b.faces().into_iter().filter(|f| f.bounding_box(false).is_ok_and(|bb| bb.max.z - bb.min.z > 1.0 * MM)).collect();
@@ -915,14 +914,12 @@ fn drafted_small_corner_rounds_under_the_top_loop_probe() {
     let d = fillet_checked(&d, &slanted, &[1.0 * MM; 4]).unwrap().shape;
     let top = edges_where(&d, |i| i.start.z > 19.99 * MM && i.end.z > 19.99 * MM);
     let r = fillet_checked(&d, &top, &vec![2.0 * MM; top.len()]).unwrap().shape;
-    let degenerate = r.edges().iter().filter(|e| e.edge_info().unwrap().degenerated).count();
-    println!("top loop {} edges; valid {}, {} faces, {} degenerated edges, {:.6} mm3", top.len(), r.is_valid(), r.faces().len(), degenerate, vol_mm3(&r));
-    for f in r.faces() {
-        let bb = f.bounding_box(true).unwrap();
-        if bb.min.x > 50.0 * MM && bb.min.y > 30.0 * MM {
-            println!("  {} area {:.7} box {:.5?} .. {:.5?}", format!("{:?}", f.face_surface().ok()).chars().take(30).collect::<String>(), f.area().unwrap() / (MM * MM), bb.min / MM, bb.max / MM);
-        }
-    }
+    assert!(r.is_valid());
+    assert_eq!(r.faces().len(), 18);
+    let v = vol_mm3(&r);
+    assert!((44426.355232..44448.844913).contains(&v), "{v}");
+    let corner = r.faces().into_iter().find(|f| f.bounding_box(true).is_ok_and(|bb| bb.min.x > 56.0 * MM && bb.min.y > 36.0 * MM && bb.min.z > 18.0 * MM)).unwrap();
+    assert!((corner.area().unwrap() / (MM * MM) - 2.989487134).abs() < 1e-5, "{}", corner.area().unwrap() / (MM * MM));
 }
 
 /// The largest vertex tolerance of a shape (its B-rep text).

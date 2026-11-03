@@ -16,6 +16,18 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-03 03:05.**
+- Landed: blend tolerances (eca0da09). Queued: public custom features (1a506c3d: typeless cap queries return every cap
+  entity, imported file tabs are FeatureScript 1). Live 1830's sources are in /root/parity/featurescript (vibe5
+  ~/agents/parity-fs; T2 custom_features::public_*_as_live with NOSHAPE_PARITY_FS): Spur Gear 152 faces as live but
+  -0.34 % (the sketch solver's tangent circle: skasm ticket SKETCH-TANGENT-SPLINE-CIRCLE), Fillet/Chamfer Everything
+  exact but the full round's corners (FULL-ROUND-CORNER-SPHERES), Laser Joint's defaults exact, its overcuts fail
+  (FS-BOOLEAN-CREATED: our Booleans create no edges / faces for qCreatedBy; live asked REQUESTS 03:00: implement as
+  live answers, host/query.rs `created_by`).
+- Loft section parameters (live 1829): coaxial sections are plain chord length (ours exact); offset / turned sections
+  use an unidentified average (live's B 0.405561, C 0.270279; no mean, harmonic, geometric, per-column fraction fits).
+  Left as is.
+
 **State 11-03 02:15.**
 - Landed: the whole-result cache (1e5ae181). Landing: OCCT's blends in metres (scaled_blend's as-is try, slab-local
   blends, the fallbacks) leave ChFi3d's 1e-4 m on what they make: `tighten_new_tolerances` sets new vertices / edges /

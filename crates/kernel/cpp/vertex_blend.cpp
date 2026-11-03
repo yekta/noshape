@@ -68,6 +68,9 @@ struct Corner
   gp_Pnt q;
   gp_Vec b, n;
   double l0 = 0, R = 0, Rc = 0;
+  // Where the spine starts: 0 when the Rc cylinder is square to the R axes, else where its slanted axis meets the
+  // spine (a drafted block's corners, live 1831).
+  double th0 = 0;
   Cyl    c1, c2;
 
   gp_Pnt spine(double th) const { return q.Translated(b * (l0 * std::cos(th)) + n * ((R - Rc) * std::sin(th))); }
@@ -220,18 +223,36 @@ bool corner_of(const TopoDS_Face& F, const ShapeAncMap& e2f, double tol, Corner&
   if (gp_Lin(k.c2.axis).Distance(k.q) > tol)
     return false;
   const Cyl& cc = cyls[small];
-  if (gp_Vec(cc.axis.Direction()).Crossed(n).Magnitude() > 1e-7)
+  // b: from q towards the Rc axis, in the axes' plane; the spine's half-width there l0 (R - Rc from both R axes).
+  const gp_Vec dl(cc.axis.Direction());
+  gp_Vec       ql(k.q, cc.axis.Location());
+  ql -= dl * ql.Dot(dl);
+  const gp_Vec inplane = ql - n * ql.Dot(n);
+  if (inplane.Magnitude() < tol)
     return false;
-  const gp_Vec qa(k.q, cc.axis.Location());
-  const gp_Vec inplane = qa - n * qa.Dot(n);
-  k.l0                 = inplane.Magnitude();
-  if (k.l0 < tol)
+  k.b               = inplane.Normalized();
+  const double sin1 = k.b.Crossed(d1).Magnitude(), sin2 = k.b.Crossed(d2).Magnitude();
+  if (sin1 < 1e-6 || std::abs(sin1 - sin2) > 1e-7)
     return false;
-  k.b = inplane / k.l0;
-  // The corner axis is R - Rc from both R axes.
-  const gp_Pnt s0 = k.q.Translated(k.b * k.l0);
-  if (std::abs(gp_Lin(k.c1.axis).Distance(s0) - (k.R - k.Rc)) > tol || std::abs(gp_Lin(k.c2.axis).Distance(s0) - (k.R - k.Rc)) > tol)
+  k.l0 = (k.R - k.Rc) / sin1;
+  // The Rc axis lies in the plane of b and n (the bisector); where it meets the spine (u / l0)² + (v / (R - Rc))² = 1.
+  const gp_Vec side = k.b.Crossed(n);
+  const gp_Vec qp(k.q, cc.axis.Location());
+  if (std::abs(dl.Dot(side)) > 1e-7 || std::abs(qp.Dot(side)) > tol)
     return false;
+  // (In units of R - Rc.)
+  const double h = k.R - k.Rc, L = k.l0 / h, u0 = qp.Dot(k.b) / h, v0 = qp.Dot(n) / h, du = dl.Dot(k.b), dv = dl.Dot(n);
+  const double qa = du * du / (L * L) + dv * dv, qb = 2 * (u0 * du / (L * L) + v0 * dv), qc = u0 * u0 / (L * L) + v0 * v0 - 1,
+               disc = qb * qb - 4 * qa * qc;
+  // (Square to the axes the line touches the spine at 0: a double root, rounding may make it slightly negative.)
+  if (disc < -1e-4 || qa < 1e-12)
+    return false;
+  std::vector<double> starts;
+  for (double sgn : {-1.0, 1.0})
+  {
+    const double t = (-qb + sgn * std::sqrt(std::max(0.0, disc))) / (2 * qa);
+    starts.push_back(std::atan2(v0 + t * dv, (u0 + t * du) / L));
+  }
   // n towards the face's point; F's vertices where the ball puts them.
   std::vector<gp_Pnt> vs;
   for (TopExp_Explorer ev(F, TopAbs_VERTEX); ev.More(); ev.Next())
@@ -246,16 +267,19 @@ bool corner_of(const TopoDS_Face& F, const ShapeAncMap& e2f, double tol, Corner&
   if (vs.size() != 3)
     return false;
   for (int sign : {1, -1})
-  {
-    k.n             = n * sign;
-    const Section b = section_at(k, 0), t = section_at(k, M_PI / 2);
-    int           found = 0;
-    for (const gp_Pnt& want : {b.a, b.c, t.a})
-      for (const gp_Pnt& v : vs)
-        found += v.Distance(want) < tol * 10;
-    if (found == 3)
-      return true;
-  }
+    for (double th : starts)
+    {
+      // (The other side of the plane: the spine angle mirrored.)
+      k.n             = n * sign;
+      k.th0           = sign * th;
+      const Section b = section_at(k, k.th0), t = section_at(k, M_PI / 2);
+      int           found = 0;
+      for (const gp_Pnt& want : {b.a, b.c, t.a})
+        for (const gp_Pnt& v : vs)
+          found += v.Distance(want) < tol * 10;
+      if (found == 3 && k.th0 < M_PI / 2 - 1e-6 && k.th0 > -M_PI / 4)
+        return true;
+    }
   return false;
 }
 
@@ -490,11 +514,11 @@ TopoDS_Shape exact_vertex_blends(const TopoDS_Shape& s, occ::handle<BRepTools_Hi
         continue;
       occ::handle<Geom_BSplineSurface> surf;
       for (int n = 64; n <= 256 && surf.IsNull(); n *= 2)
-        surf = blend_surface([&k](double th) { return section_at(k, th); }, 0, M_PI / 2, n, tol * 0.25);
+        surf = blend_surface([&k](double th) { return section_at(k, th); }, k.th0, M_PI / 2, n, tol * 0.25);
       if (surf.IsNull())
         continue;
       const double            etol = std::max(tol, Precision::Confusion()); // edge / vertex tolerances
-      BRepBuilderAPI_MakeFace mf(surf, 0, M_PI / 2, 0, 1, etol);
+      BRepBuilderAPI_MakeFace mf(surf, k.th0, M_PI / 2, 0, 1, etol);
       if (!mf.IsDone())
         continue;
       TopoDS_Face nf = mf.Face();
@@ -503,11 +527,12 @@ TopoDS_Shape exact_vertex_blends(const TopoDS_Shape& s, occ::handle<BRepTools_Hi
         BRepAdaptor_Surface an(nf, false);
         gp_Pnt              p;
         gp_Vec              du, dv;
-        an.D1(M_PI / 4, 0.5, p, du, dv);
+        const double mid = 0.5 * (k.th0 + M_PI / 2);
+        an.D1(mid, 0.5, p, du, dv);
         gp_Vec nn = du.Crossed(dv);
         if (nf.Orientation() == TopAbs_REVERSED)
           nn.Reverse();
-        if (nn.Dot(gp_Vec(k.spine(M_PI / 4), p)) < 0)
+        if (nn.Dot(gp_Vec(k.spine(mid), p)) < 0)
           nf.Reverse();
       }
       // Each new edge replaces the old edge with the same ends; it gets a
