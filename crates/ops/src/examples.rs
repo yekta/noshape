@@ -154,7 +154,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("material_library_export", &[r##"{"tab": "Material Library 1", "path": "/tmp/materials.csv"}"##]),
     // queries, analysis, render
     ("query_parts", &[r##"{}"##]),
-    ("query_entities", &[r##"{"kind": "faces", "surface": "plane", "normal": [0, 0, 1]}"##, r##"{"kind": "edges", "created_by": "Extrude 1"}"##, r##"{"kind": "edges", "direction": [0, 0, 1]}"##, r##"{"kind": "edges", "at": [[0, 0, 3], [80, 0, 3], [40, 44, 6]]}"##, r##"{"kind": "faces", "context": true, "surface": "plane"}"##]),
+    ("query_entities", &[r##"{"kind": "faces", "surface": "plane", "normal": [0, 0, 1]}"##, r##"{"kind": "edges", "created_by": "Extrude 1"}"##, r##"{"kind": "edges", "direction": [0, 0, 1]}"##, r##"{"kind": "edges", "at": [[0, 0, 3], [80, 0, 3], [40, 44, 6]]}"##, r##"{"kind": "faces", "context": true, "surface": "plane"}"##, r##"{"kind": "edges", "of": ["face:…"]}"##]),
     ("query_datums", &[r##"{}"##]),
     ("query_measure", &[r##"{"entities": ["face:…", "face:…"]}"##]),
     ("query_mass_properties", &[r##"{}"##, r##"{"parts": ["Part 1"]}"##]),

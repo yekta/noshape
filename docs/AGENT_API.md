@@ -5745,6 +5745,7 @@ Examples:
 {"kind": "edges", "direction": [0, 0, 1]}
 {"kind": "edges", "at": [[0, 0, 3], [80, 0, 3], [40, 44, 6]]}
 {"kind": "faces", "context": true, "surface": "plane"}
+{"kind": "edges", "of": ["face:…"]}
 ```
 
 | field | type | | description |
