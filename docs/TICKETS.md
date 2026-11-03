@@ -3249,6 +3249,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   live 276 ms); prize-wheel-tim, motor-mount-jack, cf-spur-gear, exercise-martinl within ×2.3. Rerun:
   `NOSHAPE_PARITY_ONLY=<name>` parity_models (docs/handoff/dx.md); rebuilt documents in vibe5 ~/tmp/noshape-parity-<pid>/.
   (dx 2026-11-03)
+  core 11-03 19:30: cf-hose-routing: our opFitSpline read its derivatives by the chord length, Onshape's are by the
+  spline's parameter on [0, 1]: the hoses' splines hooked at their ends (bend radius ~2 mm under the hose's 3 mm, the
+  pipe folding there), 0.390 m long where live's are 0.417 m. Fixed (landing, ops_harness check). The Shell after it:
+  OCCT's offset still times out; a new path for smooth walls (OCCT's simple offset of the kept faces, rims on the
+  removed planes, offsets as B-splines: 0.5 s a hose) is parked in /root/core-scratch/smooth-shell-wip.patch: it
+  declines on these hoses because our sweep twists its frame back and forth along the straight pieces (the u = 0 line
+  0.25 mm off its plane, parameter speed ×3), which leaves an inconsistent seam. Next: the sweep's frame on lines, then
+  the patch. Probes: kernel shell::dumped_sweep_shell_probe (NOSHAPE_SWEEP_CASE, vibe5 ~/core-hose3/sweep-*).
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet

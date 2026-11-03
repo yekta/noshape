@@ -16,6 +16,15 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-03 19:30 UTC.**
+- Landed / queued since 16:20: MIRROR-FEATURE-UP-TO (a19a1254: touching features' faces patterned as one tool),
+  opFitSpline derivatives by [0, 1] (queued; PARITY-SPEED's cf-hose-routing). FILLET-OVERLAP-FAIL analysed (TICKETS:
+  overlapping rounds, the union-of-removals approach), not started.
+- In progress: P1 PARITY-SPEED cf-hose-routing (TICKETS note): the sweep's frame twisting on straight path pieces,
+  then /root/core-scratch/smooth-shell-wip.patch (shell.cpp by_smooth; `git apply` it, its debug prints trimmed).
+- Next: PARITY-SPEED's knob-jason (Fillet 2 3.3 s) and cf-planetary-gears (12.8 s; check FILLET-BLEND-SPLIT's retry
+  cost there), FILLET-31S-FAIL, FS-WAVE-SPRING-SPEED, FILLET-OVERLAP-FAIL.
+
 **State 11-03 16:12 UTC.**
 - Landed / queued since 15:38: FILLET-BLEND-SPLIT (c79eba86: a lone edge's fillet that ChFi3d walks in two pieces is
   built again with tolerances ten times tighter; cf-planetary-gears 111 / 75 / 255 faces as live; T1 kernel
