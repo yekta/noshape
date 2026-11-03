@@ -1318,6 +1318,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P2 VARIABLE-EDIT-FOCUS (psui) editing a Variable feature focuses Name in ours, Value in live: double-click the
+  "#wall_thickness = 2 mm" row; live (11-02, qa's tab, livek/t-b2.mjs): dialog "#wall_thickness = 2 mm", **the Value field
+  focused with "2 mm" all selected** (std's INITIAL_FOCUS_ON_EDIT on the value); ours: **Name focused**, "wall_thickness"
+  selected (qa-scratch/tickets/fl/vd-b2.png, top left; window focused). Same run = live: a click on the selected Extrude 1
+  row deselects it, Space clears the selection. Scenario ui-parity/variable-edit-focus. (qa 2026-11-03, build e18f898a)
 - [ ] P3 FEATURE-ROW-ENTER-EDITS (psui) Enter on a selected feature row opens its dialog in ours: click the Extrude 1 row,
   Enter; live (11-02, qa's tab, livek/t-b1.mjs): **nothing opens** (no dialog; double-click or Edit… opens it); ours:
   the Extrude 1 dialog opens (qa-scratch/tickets/fl/ubf-esc-enter.png, right). The rest of that run = live: in an
