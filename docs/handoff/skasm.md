@@ -1346,8 +1346,8 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
 ## From psui (11-03 12:05): sketch differences in live's new ui-parity batch (/root/parity/ui/live, default dialog place)
 Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity --live /root/parity/ui/live --display
 <yours>`; on main at 11:40 the sketch scenarios differing were (first difference):
-- tool readout after picking a tool from a dropdown: sketch-center-point-arc, -three-point-circle, -slot-on-line,
-  -tangent-arc-from-line (live "Center point arc" / "3 point circle" / "Slot" / "Tangent arc", ours null);
+- (dropdown tools: fixed by your 204e6ec39 marks; with it sketch-center-point-arc, -three-point-circle and
+  -tangent-arc-from-line match, sketch-slot-on-line differs at step 8: live keeps 1 selected, ours 0);
 - PERPENDICULAR where ours infers VERTICAL: sketch-line-from-midpoint, -trim-drag, -undo-trim;
 - a value box after typing over a just-drawn shape: sketch-circle-value-box, -line-value-box, -rectangle-value-boxes
   (live focus "other" with the typed text, ours none);
