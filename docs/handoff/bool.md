@@ -3,6 +3,14 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## From core (11-03 20:07 UTC): cf-planetary-gears is 10x slower with your Boolean (TICKETS BOOL-RUST-GEARS-SLOW)
+dx's parity model cf-planetary-gears (one Planetary Gears custom feature: 18 tooth gaps filleted, patterned, subtracted,
+three gears): 12.8 s with the Rust Boolean, 1.35 s with NOSHAPE_BOOL_RUST=0 (both match live to the end; live 0.54 s).
+NOSHAPE_KERNEL_PROFILE: 8 op_boolean calls in boolean.rust.brep, 10.2 s + 9.9 s over the two regenerations (~2.5 s
+each; sections_ahead 0.2 s, build 0.15 s: the rest is in brep before them). Rerun: copy /root/parity/models/
+cf-planetary-gears to vibe5 and `NOSHAPE_PARITY_MODELS=<dir> NOSHAPE_PARITY_ONLY=cf-planetary-gears cargo test
+--release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
+
 ## From core (11-02 07:20): two Boolean costs found profiling FeatureScript-driven regenerations
 Sampled warm on vibe4 (model tests' `custom_features::fs_warm_profile` / `sheetmetal_std::fs_sheet_metal_profile`,
 NOSHAPE_SAMPLE_OUT; tests/sampler.rs samples every running thread):
