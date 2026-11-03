@@ -15,7 +15,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   dimension_box_enter_inserts_the_highlighted_variable, a_first_click_into_a_number_field_selects_all. qa's first-click
   and Tab findings are an Xvfb artifact: a window that was never activated (no window manager) gets no focus events,
   so select-on-focus never runs; with `xdotool windowfocus` (or any real desktop) one click selects all as live (Tab
-  goes through the same select-on-focus).)
+  goes through the same select-on-focus). psui 11-03 12:20, live's recording extrude-depth-variable-enter-twice
+  corrects (3): the inserted text isn't applied (Undo stays off); the next Enter applies it (selected, an undo step,
+  the dialog stays) and the one after accepts; an Enter whose entry changes nothing (`#width`, `1 in`) applies at once.)
   P1 VAR-AUTOCOMPLETE-ENTER (psui, user 11-02 23:30, v0.4.2x on macOS) in a dialog's number field, typing
   `#wall` then Enter doesn't take the first match `#wall_thickness`; live highlights the first match as you type and
   Enter inserts it. Reproduce side by side with live (which field, what Enter does in ours), fix, and make it the

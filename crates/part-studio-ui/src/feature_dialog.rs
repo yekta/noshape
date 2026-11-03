@@ -255,6 +255,8 @@ pub struct FeatureDialog {
     press_applies_typed: bool,
     /// The change just made is no undo step (`take_no_undo_step`).
     no_undo_step: bool,
+    /// The text an autofill insertion left in a field: its change event opens no list.
+    quiet_text: Option<String>,
     /// The value an edited feature opens with the keyboard in (INITIAL_FOCUS_ON_EDIT on a number or text).
     edit_focus: Option<&'static str>,
     /// Open "Create variable" popup.
@@ -412,6 +414,7 @@ impl FeatureDialog {
             just_applied: None,
             press_applies_typed: false,
             no_undo_step: false,
+            quiet_text: None,
             edit_focus: None,
             focus_dialog_pending: false,
             keyboard_left: false,
@@ -1375,7 +1378,8 @@ impl FeatureDialog {
                 let text = state.read(cx).value().to_string();
                 // The text just applied (a typed key's change arriving after Enter's commit rewrote it to
                 // "15 mm") is nothing being typed: no list (live ui-parity number-field-bare-number).
-                let applied = this.just_applied.take().is_some_and(|p| p == path_s) && this.baselines.get(&path_s).is_some_and(|b| *b == text);
+                let applied = (this.just_applied.take().is_some_and(|p| p == path_s) && this.baselines.get(&path_s).is_some_and(|b| *b == text))
+                    || this.quiet_text.take().is_some_and(|t| t == text);
                 // Number and text fields wait for their commit before the preview re-runs (live s2; as qa4's
                 // 66563c00; a Variable's name: ui-parity new-variable-then-use-at-once).
                 if this.spec_for_path(&path_s).is_some_and(|s| matches!(s.kind, ParamKind::Num(_) | ParamKind::Text { .. })) {
@@ -1446,6 +1450,8 @@ impl FeatureDialog {
         self.baselines.insert(path.to_string(), text);
         self.just_applied = Some(path.to_string());
         state.update(cx, |s, cx| s.select_all(window, cx));
+        // A value that doesn't evaluate is no undo step (live ui-parity number-field-invalid).
+        self.no_undo_step |= self.typed_pending && self.value_errors().any(|(id, _)| id == path);
         cx.notify();
         true
     }
@@ -1463,18 +1469,10 @@ impl FeatureDialog {
         cx.notify();
     }
 
-    /// The field's value after Enter inserted an autofill entry: committed
-    /// like Enter, the cursor left where the insertion put it.
-    fn commit_inserted(&mut self, path: &str, state: &Entity<InputState>, window: &mut Window, cx: &mut Context<Self>) {
-        let cursor = state.read(cx).cursor();
-        self.commit_number(path, state, window, cx);
-        let text = state.read(cx).value().to_string();
-        state.update(cx, |s, cx| s.set_selected_range(cursor.min(text.len())..cursor.min(text.len()), cx));
-        self.baselines.insert(path.to_string(), text);
-        self.just_applied = Some(path.to_string());
-        // Live (ui-parity extrude-depth-variable-*): the insertion applies the value but Undo stays off.
-        self.no_undo_step |= self.typed_pending;
-        self.flush_typed(cx);
+    /// Enter inserted an autofill entry: the text only, as typed (live ui-parity extrude-depth-variable-enter-twice:
+    /// nothing applied, Undo off; the next Enter applies it); no list opens for it.
+    fn note_inserted(&mut self, state: &Entity<InputState>, cx: &mut Context<Self>) {
+        self.quiet_text = Some(state.read(cx).value().to_string());
         cx.notify();
     }
 
@@ -1550,12 +1548,12 @@ impl FeatureDialog {
             return;
         }
         let Some(state) = self.inputs.get(&c.key).cloned() else { return };
-        // An entry taken from the list is no undo step (live ui-parity extrude-depth-variable-click-row).
+        // An entry taken from the list is typed text until the field commits (live ui-parity
+        // extrude-depth-variable-click-row: Undo stays off).
         if let Some(text) = c.accept(index, &state, window, cx)
             && self.set_text_value(&c.key, text)
         {
-            self.no_undo_step = true;
-            self.changed(cx);
+            self.typed_pending = true;
         }
         cx.notify();
     }
@@ -1654,9 +1652,9 @@ impl FeatureDialog {
                 // next Enter accepts the dialog; when the entry changes nothing (behaviours 7040, `7 mm`) the
                 // same Enter commits the field, its text selected.
                 if inserts {
-                    this.commit_inserted(&p3, &state, window, cx);
-                } else {
-                    this.apply_on_enter(&p3, &state, window, cx);
+                    this.note_inserted(&state, cx);
+                } else if this.apply_on_enter(&p3, &state, window, cx) {
+                    this.flush_typed(cx);
                 }
             }
         }))

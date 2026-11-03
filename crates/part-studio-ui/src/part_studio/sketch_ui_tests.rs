@@ -537,9 +537,15 @@ fn dialog_field_enter_inserts_the_highlighted_variable(cx: &mut TestAppContext) 
     assert_eq!(dialog.update(cx, |d, cx| d.field_text("depth", cx)).as_deref(), Some("#wall_thickness"));
     assert_eq!(dialog.update(cx, |d, cx| d.field_selection("depth", cx)), Some(15..15), "the cursor after the insertion");
     assert!(cx.update(|cx| view.read(cx).edit.is_some()), "the dialog stays");
-    assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (false, false), "no undo step (live ui-parity extrude-depth-variable-click-once)");
+    assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (false, false), "inserted, not applied (live ui-parity extrude-depth-variable-enter-twice)");
+    assert!(cx.update(|cx| dialog.read(cx).ui_list().is_none()), "no list for the inserted text");
     keys(cx, window, &["enter"]);
-    assert!(cx.update(|cx| view.read(cx).edit.is_none()), "the next Enter accepts it");
+    assert!(cx.update(|cx| view.read(cx).edit.is_some()), "the next Enter applies it, the dialog stays");
+    assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (true, false));
+    assert_eq!(dialog.update(cx, |d, cx| d.field_selection("depth", cx)), Some(0..15), "selected");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    keys(cx, window, &["enter"]);
+    assert!(cx.update(|cx| view.read(cx).edit.is_none()), "the third accepts");
 }
 
 /// The parity suite's state (tests/ui-parity/README.md) reads the open dialog, its focused field, the autofill
