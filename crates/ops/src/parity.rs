@@ -723,6 +723,7 @@ impl<'a> Translator<'a> {
         let frame = self.frames.get(&sk).copied();
         // A piece of the face the sketch is on is named by the face's edges too: other sketches' curves they came from
         // ("<sketch>.wireOp" … sketchEntityId), into this sketch's plane.
+        let mut derived = false;
         if let Some([fo, fx, fy]) = frame {
             let mut of: Option<&str> = None;
             for w in strings.windows(2) {
@@ -736,15 +737,28 @@ impl<'a> Translator<'a> {
                     [(0..3).map(|i| world[i] * fx[i]).sum::<f64>(), (0..3).map(|i| world[i] * fy[i]).sum::<f64>()]
                 };
                 segments.extend(poly.windows(2).flat_map(|p| [to_here(&p[0]), to_here(&p[1])]));
+                derived = true;
             }
         }
+        // Named by the sketch's own curves alone: the region its loops make,
+        // whole, though the face's edges split it now (live: knob-tim's
+        // Extrude 2 adds the whole circle over a hexagonal hole). Ours: its
+        // key without the imprinted edges' segments (entity ids from 2^30).
+        let whole = |id: &str| -> String {
+            if derived {
+                return id.to_string();
+            }
+            let Some((head, keys)) = id.rsplit_once(':') else { return id.to_string() };
+            let kept: Vec<&str> = keys.split(',').enumerate().filter(|(i, k)| *i == 0 || k.parse::<u64>().is_ok_and(|v| v < 1 << 31)).map(|(_, k)| k).collect();
+            format!("{head}:{}", kept.join(","))
+        };
         // Onshape names the region by enough of its boundary curves to tell
         // it apart (TOPOLOGY): ours whose boundary has them all.
         let named: Vec<String> = strings.iter().filter_map(|e| self.sketch_entities.get(&(sk.clone(), e.clone())).cloned()).collect();
         let all: Vec<Value> = g["regions"].as_array().cloned().unwrap_or_default();
         let bounded: Vec<Value> = all.iter().filter(|r| !named.is_empty() && named.iter().all(|e| r["boundary"].as_array().is_some_and(|b| b.iter().any(|x| x == e)))).cloned().collect();
         if let [only] = bounded.as_slice() {
-            return Ok(only["id"].as_str().map(str::to_string));
+            return Ok(only["id"].as_str().map(whole));
         }
         // Else (several share them, or none known): the one inside those curves.
         let regions = if bounded.is_empty() { all } else { bounded };
@@ -767,7 +781,7 @@ impl<'a> Translator<'a> {
                 best = Some((area, id.to_string()));
             }
         }
-        best.map(|b| Some(b.1)).ok_or_else(|| format!("no region of ours inside sketch {sk}'s curves {:?}", strings.iter().filter(|e| self.curves.contains_key(&(sk.clone(), (*e).clone()))).collect::<Vec<_>>()))
+        best.map(|b| Some(whole(&b.1))).ok_or_else(|| format!("no region of ours inside sketch {sk}'s curves {:?}", strings.iter().filter(|e| self.curves.contains_key(&(sk.clone(), (*e).clone()))).collect::<Vec<_>>()))
     }
 
     /// A sketch curve or point named by its Onshape id (packed
