@@ -2640,3 +2640,308 @@ fn fs_warm_profile() {
     });
     eprintln!("fs warm: {:.2?}", t.elapsed());
 }
+
+/// A public custom feature's run against live's: what, its parameters, live's two figures (a volume band, or two
+/// parts' volumes), live's faces.
+type LiveCase<'a> = (&'a str, &'a [(&'a str, ParamValue)], [f64; 2], usize);
+
+/// Onshape's public "Spur Gear" custom feature (live 1830; its source in /root/parity/featurescript/spur-gear or
+/// NOSHAPE_PARITY_FS, not in the repo): defaults, then 40 teeth, module 2 mm, depth 10 mm, a Ø8 mm centre hole; live's volume bands and faces.
+#[test]
+#[ignore = "T2: needs /root/parity/featurescript"]
+fn public_spur_gear_as_live() {
+    let dir = std::env::var("NOSHAPE_PARITY_FS").unwrap_or_else(|_| "/root/parity/featurescript".into());
+    let Ok(src) = std::fs::read_to_string(format!("{dir}/spur-gear/Spur_gear_Feature_Studio.fs")) else { return };
+    let mut doc = Document::new();
+    // Its icon and image elements as file tabs, the imports pointed at them (as the document translator does).
+    let mut src = src;
+    if std::env::var_os("SPUR_PRINT").is_some() {
+        src = src.replace("        opFillet(context, id + \"fillet\", {\n                    \"entities\" : filletEdges,", "        println(\"root fillet radius \" ~ toString(rootFilletRadius) ~ \" edges \" ~ size(evaluateQuery(context, filletEdges)));\n        opFillet(context, id + \"fillet\", {\n                    \"entities\" : filletEdges,");
+    }
+    for (element, name) in [("84e649fcf78ef2cf627fcf5e", "icon.png"), ("043497848f0f1de8551a633b", "image.png")] {
+        let file = doc.add_tab(name, TabContent::File(noshape_model::file_tab::FileTab::new(name, b"\x89PNG", 0)));
+        src = src.replace(element, &file.to_string());
+    }
+    let tab = doc.add_tab("Spur gear Feature Studio", TabContent::FeatureStudio(FeatureStudio::new(&src)));
+    let scripts = DocumentScripts::from_document(&doc);
+    for (_, name, c) in scripts.studios() {
+        assert!(!c.has_errors(), "{name}: {:?}", c.diagnostics);
+    }
+    let units = UnitPrefs::default();
+    let opts = RegenOptions { custom_features: Some(scripts.clone()), ..Default::default() };
+    // (live: defaults 2418.047787 mm³ [2416.588367, 2419.507207], 152 faces; changed 4045.886707 [4029.017193,
+    // 4062.756220], 203 faces)
+    let cases: [LiveCase; 2] = [
+        ("defaults", &[], [2416.588367, 2419.507207], 152),
+        ("changed", &[("numTeeth", expr("40")), ("module", expr("2 mm")), ("gearDepth", expr("10 mm")), ("centerHole", ParamValue::Bool(true)), ("centerHoleDia", expr("8 mm"))], [4029.017193, 4062.756220], 203),
+    ];
+    for (what, params, band, faces) in cases {
+        let mut ps = PartStudio::new();
+        let mut f = ps.new_feature(&custom::type_id(tab, "SpurGear"), &units).unwrap();
+        for (k, v) in params {
+            f.params.set(k, v.clone());
+        }
+        ps.features.push(f);
+        let t = std::time::Instant::now();
+        let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        let ms = t.elapsed().as_secs_f64() * 1e3;
+        assert_ok(&r);
+        let v = total_volume(&r) * 1e9;
+        let n: usize = r.context.bodies.iter().map(|b| b.shape.faces().len()).sum();
+        println!("spur gear {what}: {v:.6} mm3 (live {band:?}), {n} faces (live {faces}), {} parts {:?}, {ms:.0} ms", r.context.bodies.len(), r.display.bodies.iter().map(|b| b.name.clone()).collect::<Vec<_>>());
+        let mut kinds: std::collections::BTreeMap<String, (usize, f64)> = Default::default();
+        for f in r.context.bodies.iter().flat_map(|b| b.shape.faces()) {
+            let k: String = format!("{:?}", f.face_surface().ok()).chars().take(12).collect();
+            let e = kinds.entry(k).or_default();
+            e.0 += 1;
+            e.1 += f.area().unwrap_or(0.0) * 1e6;
+        }
+        println!("  faces by type (count, mm2): {kinds:?}");
+        for o in custom::run::outputs().values() {
+            print!("{}", o.output);
+        }
+        assert!(v >= band[0] && v <= band[1] && n == faces, "{what}: {v} mm3, {n} faces");
+    }
+}
+
+/// An older Feature Studio (Onshape's public Spur Gear is at 1576) imports a file tab (its icon): the imported element
+/// has no version to be newer than it. A cap query without an entity type is every cap entity (2 faces, 8 edges, 8
+/// vertices of an extruded square), so qNonCapEntity's edges are the 4 along the extrude (the gear's root fillet).
+#[test]
+fn older_studios_import_files_and_non_cap_edges_leave_the_caps() {
+    let mut doc = Document::new();
+    let img = doc.add_tab("icon.png", TabContent::File(noshape_model::file_tab::FileTab::new("icon.png", b"\x89PNG", 0)));
+    let src = format!(
+        "FeatureScript 1576;\nimport(path : \"onshape/std/geometry.fs\", version : \"1576.0\");\nicon::import(path : \"{img}\", version : \"0\");\n{}",
+        r#"
+annotation { "Feature Type Name" : "Caps", "Icon" : icon::BLOB_DATA }
+export const caps = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        const sketch = newSketchOnPlane(context, id + "sk", { "sketchPlane" : plane(vector(0, 0, 0) * meter, vector(0, 0, 1)) });
+        skRectangle(sketch, "r", { "firstCorner" : vector(0, 0) * meter, "secondCorner" : vector(0.01, 0.01) * meter });
+        skSolve(sketch);
+        opExtrude(context, id + "ex", { "entities" : qSketchRegion(id + "sk"), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : 0.01 * meter });
+        println(size(evaluateQuery(context, qNonCapEntity(id + "ex", EntityType.EDGE))));
+        println(size(evaluateQuery(context, qCapEntity(id + "ex", CapType.EITHER))));
+    });
+"#
+    );
+    let fs = doc.add_tab("Feature Studio 1", TabContent::FeatureStudio(FeatureStudio::new(&src)));
+    let scripts = DocumentScripts::from_document(&doc);
+    let compiled = scripts.studios().find(|(t, _, _)| *t == fs).unwrap().2.clone();
+    assert!(!compiled.has_errors(), "{:?}", compiled.diagnostics);
+    let units = UnitPrefs::default();
+    let mut host = PartStudio::new();
+    let f = host.new_feature(&custom::type_id(fs, "caps"), &units).unwrap();
+    let fid = f.id;
+    host.features.push(f);
+    let opts = RegenOptions { custom_features: Some(scripts), ..Default::default() };
+    let r = Regenerator::new().regenerate(&host, &ConfigValues::default(), &units, &opts);
+    assert_ok(&r);
+    assert_eq!(custom::run::output_of(fid).unwrap().output, "4\n18\n");
+}
+
+/// A public custom feature's Feature Studios (live 1830's folder: the main `.fs` and its `import_<doc8>_<element8>.fs`
+/// imports) as tabs of one document, each import pointed at its tab (as the document translator does); the main
+/// studio's tab and the document.
+fn public_feature_document(dir: &str, main: &str) -> Option<(Document, noshape_model::TabId)> {
+    let mut sources: Vec<(String, String)> = Vec::new();
+    for e in std::fs::read_dir(dir).ok()? {
+        let p = e.ok()?.path();
+        let name = p.file_name()?.to_string_lossy().to_string();
+        if name.ends_with(".fs") && (name == main || name.starts_with("import_")) {
+            sources.push((name, std::fs::read_to_string(&p).ok()?));
+        }
+    }
+    let mut doc = Document::new();
+    let tabs: Vec<(String, noshape_model::TabId)> = sources.iter().map(|(n, _)| (n.clone(), doc.add_tab(n, TabContent::FeatureStudio(FeatureStudio::new(""))))).collect();
+    // Imports of no fetched Feature Studio are its icons and images: file tabs.
+    let elements: Vec<&str> = tabs.iter().filter_map(|(n, _)| n.strip_prefix("import_").and_then(|r| r.split('_').nth(1)).map(|e| e.trim_end_matches(".fs"))).collect();
+    let mut files: Vec<(String, noshape_model::TabId)> = Vec::new();
+    for (_, src) in &sources {
+        for (i, _) in src.match_indices("path : \"") {
+            let rest = &src[i + 8..];
+            let path = &rest[..rest.find('"').unwrap_or(0)];
+            let last = path.rsplit('/').next().unwrap_or(path);
+            if !path.starts_with("onshape/") && !elements.iter().any(|e| last.starts_with(e)) && !files.iter().any(|(p, _)| p == path) {
+                files.push((path.to_string(), doc.add_tab("icon.png", TabContent::File(noshape_model::file_tab::FileTab::new("icon.png", b"\x89PNG", 0)))));
+            }
+        }
+    }
+    let mut main_tab = None;
+    for ((name, src), (_, tab)) in sources.iter().zip(&tabs) {
+        // `import(path : "<doc>/<workspace>/<element>"` or `"<element>"`: the element's tab.
+        let mut out = src.clone();
+        for (other, t) in &tabs {
+            let Some(element) = other.strip_prefix("import_").and_then(|r| r.split('_').nth(1)).map(|e| e.trim_end_matches(".fs")) else { continue };
+            for (i, _) in src.match_indices("path : \"") {
+                let rest = &src[i + 8..];
+                let path = &rest[..rest.find('"').unwrap_or(0)];
+                if path.rsplit('/').next().is_some_and(|last| last.starts_with(element)) {
+                    out = out.replace(&format!("path : \"{path}\""), &format!("path : \"{t}\""));
+                }
+            }
+        }
+        for (path, t) in &files {
+            out = out.replace(&format!("path : \"{path}\""), &format!("path : \"{t}\""));
+        }
+        if let Some(TabContent::FeatureStudio(f)) = doc.tab_mut(*tab).map(|t| &mut t.content) {
+            f.source = out;
+        }
+        if name == main {
+            main_tab = Some(*tab);
+        }
+    }
+    Some((doc, main_tab?))
+}
+
+/// "Fillet/Chamfer Everything" (public, live 1830) on a 40 × 30 × 10 mm block: its defaults (fillet 5 mm) and a 2 mm
+/// chamfer; live's volume bands and faces.
+#[test]
+#[ignore = "T2: needs /root/parity/featurescript"]
+fn public_fillet_everything_as_live() {
+    let dir = std::env::var("NOSHAPE_PARITY_FS").unwrap_or_else(|_| "/root/parity/featurescript".into());
+    let Some((mut doc, tab)) = public_feature_document(&format!("{dir}/fillet-everything"), "filletChamferEverything.fs.fs") else { return };
+    let block = doc.add_tab("Block", TabContent::FeatureStudio(FeatureStudio::new(&studio(
+        r#"
+annotation { "Feature Type Name" : "Block" }
+export const block = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        fCuboid(context, id + "b", { "corner1" : vector(0, 0, 0) * meter, "corner2" : vector(40, 30, 10) * millimeter });
+    });
+"#,
+    ))));
+    let scripts = DocumentScripts::from_document(&doc);
+    for (_, name, c) in scripts.studios() {
+        assert!(!c.has_errors(), "{name}: {:?}", c.diagnostics);
+    }
+    let units = UnitPrefs::default();
+    let opts = RegenOptions { custom_features: Some(scripts.clone()), ..Default::default() };
+    let cases: [LiveCase; 2] = [
+        ("defaults", &[], [10450.111593, 10451.067592], 10),
+        ("chamfer 2 mm", &[("feature", ParamValue::Enum("CHAMFER".into())), ("width", expr("2 mm"))], [11402.160060, 11403.173274], 26),
+    ];
+    for (what, params, band, faces) in cases {
+        let mut ps = PartStudio::new();
+        ps.features.push(ps.new_feature(&custom::type_id(block, "block"), &units).unwrap());
+        let mut f = ps.new_feature(&custom::type_id(tab, "filletEverything"), &units).unwrap();
+        for (k, v) in params {
+            f.params.set(k, v.clone());
+        }
+        ps.features.push(f);
+        let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        assert_ok(&r);
+        let v = total_volume(&r) * 1e9;
+        let n: usize = r.context.bodies.iter().map(|b| b.shape.faces().len()).sum();
+        println!("fillet everything {what}: {v:.6} mm3 (live {band:?}), {n} faces (live {faces})");
+        // (The defaults' R5 is a full round on the 10 mm block: live's 4 corners are one face each, ours two
+        // spheres: TICKETS FULL-ROUND-CORNER-SPHERES.)
+        assert!(v >= band[0] && v <= band[1] && (n == faces || what == "defaults"), "{what}: {v} mm3, {n} faces");
+    }
+}
+
+/// "FeatureScript Laser Joint" (public, live 1830): a 100 × 50 × 5 mm base on Top and a 100 × 5 × 50 tab standing in
+/// it; defaults (3 pins), then 5 pins with Ø1 mm overcuts; live's volumes and faces of both parts.
+#[test]
+#[ignore = "T2: needs /root/parity/featurescript"]
+fn public_laser_joint_as_live() {
+    let dir = std::env::var("NOSHAPE_PARITY_FS").unwrap_or_else(|_| "/root/parity/featurescript".into());
+    let Some((mut doc, tab)) = public_feature_document(&format!("{dir}/laser-joint"), "Laser_Joint.fs") else { return };
+    if std::env::var_os("LASER_PRINT").is_some()
+        && let Some(TabContent::FeatureStudio(f)) = doc.tab_mut(tab).map(|t| &mut t.content)
+    {
+        f.source = f.source.replace("    if (definition.overcut)\n    {\n        if (size(evaluateQuery(context, tabGeometry.edges)) > 0)", "    println(\"tab edges \" ~ size(evaluateQuery(context, tabGeometry.edges)) ~ \", base edges \" ~ size(evaluateQuery(context, baseGeometry.edges)));\n    if (definition.overcut)\n    {\n        if (size(evaluateQuery(context, tabGeometry.edges)) > 0)");
+    }
+    let plates = doc.add_tab("Plates", TabContent::FeatureStudio(FeatureStudio::new(&studio(
+        r#"
+annotation { "Feature Type Name" : "Plates" }
+export const plates = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        fCuboid(context, id + "base", { "corner1" : vector(0, 0, 0) * meter, "corner2" : vector(100, 50, 5) * millimeter });
+        fCuboid(context, id + "tab", { "corner1" : vector(0, 0, 0) * meter, "corner2" : vector(100, 5, 50) * millimeter });
+    });
+"#,
+    ))));
+    let scripts = DocumentScripts::from_document(&doc);
+    for (_, name, c) in scripts.studios() {
+        assert!(!c.has_errors(), "{name}: {:?}", c.diagnostics);
+    }
+    let units = UnitPrefs::default();
+    let opts = RegenOptions { custom_features: Some(scripts.clone()), ..Default::default() };
+    // (live: [base, tab] volumes in mm³ and faces each)
+    let cases: [LiveCase; 2] = [
+        ("defaults", &[], [23499.999999999956, 24000.00000000001], 14),
+        ("5 pins, overcuts", &[("numPins", expr("5")), ("overcut", ParamValue::Bool(true))], [23605.403147843117, 23883.18092562094], 30),
+    ];
+    for (what, params, want, faces) in cases {
+        let mut ps = PartStudio::new();
+        ps.features.push(ps.new_feature(&custom::type_id(plates, "plates"), &units).unwrap());
+        let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        assert_ok(&r);
+        let (base, tab_body) = (r.context.bodies[0].id.clone(), r.context.bodies[1].id.clone());
+        let mut f = ps.new_feature(&custom::type_id(tab, "laserJoint"), &units).unwrap();
+        f.params.set("tab", ParamValue::Query(vec![Reference::Body(tab_body)]));
+        f.params.set("base", ParamValue::Query(vec![Reference::Body(base)]));
+        for (k, v) in params {
+            f.params.set(k, v.clone());
+        }
+        ps.features.push(f);
+        let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &opts);
+        for o in custom::run::outputs().values() {
+            print!("{}", o.output);
+        }
+        assert_ok(&r);
+        let got: Vec<(f64, usize)> = r.context.bodies.iter().map(|b| (b.shape.volume().unwrap() * 1e9, b.shape.faces().len())).collect();
+        println!("laser joint {what}: {got:?} (live {want:?}, {faces} faces each)");
+        assert!(got.len() == 2 && got.iter().zip(want).all(|((v, n), w)| (v - w).abs() < 1e-6 * w && *n == faces), "{what}: {got:?}");
+    }
+}
+
+/// Edges a Boolean subtraction made, as the public Laser Joint finds them for its corner overcuts (live 1830): a notch
+/// cut from a block's edge; its created edges, those on the block, the concave ones.
+#[test]
+#[ignore = "T2: probe"]
+fn boolean_created_edges_probe() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Notch" }
+export const notch = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        fCuboid(context, id + "a", { "corner1" : vector(0, 0, 0) * meter, "corner2" : vector(100, 50, 5) * millimeter });
+        fCuboid(context, id + "b", { "corner1" : vector(40, -1, -1) * millimeter, "corner2" : vector(60, 10, 6) * millimeter });
+        opBoolean(context, id + "sub", { "tools" : qCreatedBy(id + "b", EntityType.BODY), "targets" : qCreatedBy(id + "a", EntityType.BODY), "operationType" : BooleanOperationType.SUBTRACTION });
+        const created = qCreatedBy(id + "sub", EntityType.EDGE);
+        const owned = qOwnedByBody(created, qCreatedBy(id + "a", EntityType.BODY));
+        println("created " ~ size(evaluateQuery(context, created)) ~ ", on the block " ~ size(evaluateQuery(context, owned)));
+        var concave = 0;
+        for (var e in evaluateQuery(context, owned))
+            if (evEdgeConvexity(context, { "edge" : e }) == EdgeConvexityType.CONCAVE)
+                concave += 1;
+        println("concave " ~ concave ~ ", faces created " ~ size(evaluateQuery(context, qCreatedBy(id + "sub", EntityType.FACE))));
+    });
+"#,
+    );
+    let mut doc = Document::new();
+    let fs = doc.add_tab("Feature Studio 1", TabContent::FeatureStudio(FeatureStudio::new(&src)));
+    let scripts = DocumentScripts::from_document(&doc);
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&custom::type_id(fs, "notch"), &units).unwrap();
+    let fid = f.id;
+    ps.features.push(f);
+    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions { custom_features: Some(scripts), ..Default::default() });
+    assert_ok(&r);
+    print!("{}", custom::run::output_of(fid).unwrap().output);
+}

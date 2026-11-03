@@ -345,6 +345,22 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   offsets only, and that green copy was already replaced, so not symbolized), the step log beside it. **Not reproduced**
   in 8 reruns: green 107649d9 ×2, with NOSHAPE_BOOL_RUST=0 ×1, v0.4.22 ×1, green daaaab03 ×4 — all 106 steps. A heap
   corruption that shows 1 in 9: worth a run under ASan / the guard trace if one is cheap. (qa 2026-11-03, build e18f898a)
+- [ ] P2 FULL-ROUND-CORNER-SPHERES (core 11-03, live 1830's Fillet/Chamfer Everything) R5 on every edge of a 40 x 30 x
+  10 mm block (a full round): our volume is live's (10450.5889 mm³ in its band) but 14 faces to live's 10: each corner is
+  two spheres of one centre where live has one face (merge_full_rounds merges the cylinders only; a sphere pair's seam
+  and pole edges defeat the rebuild). T2 custom_features::public_fillet_everything_as_live.
+- [ ] P1 FS-BOOLEAN-CREATED (core 11-03, live 1830's Laser Joint) qCreatedBy(<a Boolean's id>, EDGE / FACE) is empty in
+  ours, so the public Laser Joint's corner overcuts (concave edges the pin cuts made) find nothing and fail "Cannot
+  resolve entities." (its defaults match live exactly: 23500 / 24000 mm³, 14 faces each). Live asked what a Boolean
+  creates (REQUESTS 03:00). T2 custom_features::public_laser_joint_as_live, boolean_created_edges_probe.
+- [ ] P2 SKETCH-TANGENT-SPLINE-CIRCLE (skasm; found by core 11-03 running Onshape's public Spur Gear, live 1830) a
+  construction circle constrained tangent to a fixed circle and to two fixed fitted splines solves to the wrong circle:
+  the gear's root-fillet circle (createTooth: skCircle "fillet" at regionPoint r 0.1 mm, TANGENT to "dedendum" r 11.25 and
+  to "spline1" / "spline2", the involutes fitted through 30 points each, all three FIXed) comes out r 0.2864 mm; the
+  circle tangent to the root circle and both flanks is r 0.5683 mm, centred on the gap's axis at x 11.818 (computed from
+  the feature's own points, either spline end condition). The gear is then 2409.86 mm³ against live's 2418.05 [2416.59,
+  2419.51] (faces 152 as live). T2 model custom_features::public_spur_gear_as_live (SPUR_PRINT=1 prints the radius;
+  sources in /root/parity/featurescript, vibe5 ~/agents/parity-fs via NOSHAPE_PARITY_FS).
 - [ ] P2 SHELL-HANG-5 (core 11-02, live 1795): shell-hang's Shell 5 (tests/data/shell/shellhang-shell5-input.step: 3 mm
   in, two planar faces removed) builds in live in 0.3 s (175040.1025 mm³, 52 faces); ours fails after 17 s: OCCT's offset
   (any of its intersection modes) gives no solid, the direct construction's corners don't meet (most of the part is

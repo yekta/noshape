@@ -1077,13 +1077,20 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
             let Some(id) = id_of(query.get("featureId")) else { return Ok(Vec::new()) };
             let cap = query.get("capType").as_str().unwrap_or_else(|| "EITHER".into());
             let faces: Vec<Ent> = q.all(Some(EType::Face)).into_iter().filter(|e| q.cap_of(e).is_some_and(|(c, op)| has_prefix(&op, &id) && (&*cap == "EITHER" || c == &*cap))).collect();
+            // Without an entity type: every cap entity, faces, their edges and vertices (qNonCapEntity subtracts
+            // them from a feature's edges; the Spur Gear's root fillet takes the non-cap edges).
             match entity_type {
-                None | Some(EType::Face) => faces,
-                Some(t) => {
-                    let mut out = Vec::new();
+                Some(EType::Face) => faces,
+                t => {
+                    let mut out = if t.is_none() { faces.clone() } else { Vec::new() };
                     for f in &faces {
                         let (edges, verts) = q.boundary(f);
-                        out.extend(if t == EType::Edge { edges } else if t == EType::Vertex { verts } else { q.owner(f).into_iter().collect() });
+                        match t {
+                            None => out.extend(edges.into_iter().chain(verts)),
+                            Some(EType::Edge) => out.extend(edges),
+                            Some(EType::Vertex) => out.extend(verts),
+                            Some(_) => out.extend(q.owner(f)),
+                        }
                     }
                     uniq(out)
                 }

@@ -71,12 +71,14 @@ enum Importable {
 }
 
 /// The module an imported tab stands for. Part Studios' `build` sits on
-/// line 6, which is what Onshape prints for it ("<function 6>").
+/// line 6, which is what Onshape prints for it ("<function 6>"). Version 1:
+/// an imported element is no newer than any Feature Studio importing it
+/// (Onshape's public Spur Gear, at 1576, imports its icon).
 fn imported_source(tab: impl std::fmt::Display, what: Importable) -> String {
     match what {
-        Importable::File => format!("FeatureScript 3095;\nexport const BLOB_DATA = @blobData(\"{tab}\");\nexport const processedForeingDataInfo = @processedForeignDataInfo(\"{tab}\");\n"),
-        Importable::PartStudio => format!("FeatureScript 3095;\n\n\n\n\nexport const build = function(configuration)\n{{\n    return @buildPartStudio(\"{tab}\", configuration);\n}};\n"),
-        Importable::VariableStudio => "FeatureScript 3095;\n".to_string(),
+        Importable::File => format!("FeatureScript 1;\nexport const BLOB_DATA = @blobData(\"{tab}\");\nexport const processedForeingDataInfo = @processedForeignDataInfo(\"{tab}\");\n"),
+        Importable::PartStudio => format!("FeatureScript 1;\n\n\n\n\nexport const build = function(configuration)\n{{\n    return @buildPartStudio(\"{tab}\", configuration);\n}};\n"),
+        Importable::VariableStudio => "FeatureScript 1;\n".to_string(),
     }
 }
 

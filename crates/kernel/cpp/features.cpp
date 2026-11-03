@@ -3320,12 +3320,6 @@ void merge_full_rounds(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
   h = compose(input, h, step);
 }
 
-// OCCT's blend in metres leaves its approximation tolerance (1e-4: 0.1 mm) on the edges, vertices and faces it makes;
-// they get what they need instead (shell-hang: Chamfer 4's 0.1 mm vertices made every later Shell's slab fuse come
-// out broken). Returns the largest tolerance a new vertex needs (its distance to the curves ending at it, on the
-// edges and on the faces): where OCCT's corners really are that far off, the caller blends at the working scale. The
-// input's own sub-shapes, shared with it, never change; a vertex of theirs that would need more: infinity, and the
-// result as it was.
 // A sub-shape's tolerance set (BRep_Builder's updates only raise it).
 static void set_tolerance(const TopoDS_Shape& x, double t)
 {
@@ -3337,6 +3331,12 @@ static void set_tolerance(const TopoDS_Shape& x, double t)
     occ::down_cast<BRep_TFace>(x.TShape())->Tolerance(t);
 }
 
+// OCCT's blend in metres leaves its approximation tolerance (1e-4: 0.1 mm) on the edges, vertices and faces it makes;
+// they get what they need instead (shell-hang: Chamfer 4's 0.1 mm vertices made every later Shell's slab fuse come
+// out broken). Returns the largest tolerance a new vertex needs (its distance to the curves ending at it, on the
+// edges and on the faces): where OCCT's corners really are that far off, the caller blends at the working scale. The
+// input's own sub-shapes, shared with it, never change; a vertex of theirs that would need more: infinity, and the
+// result as it was.
 static double tighten_new_tolerances(const TopoDS_Shape& input, const TopoDS_Shape& r)
 {
   ShapeIMap old;
