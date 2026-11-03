@@ -95,7 +95,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   an_assembly_is_rebuilt_as_lives. skasm's live "p1807 c6" (two parts, two Revolutes): **1/1 as live, mates
   2/2**. Needed on the way: `qContainsPoint(qSketchRegion(makeId(sketch)), point)` (the region holding the point),
   through sketch_get's new `at` (only the regions holding a sketch or model point; e2e sketch_regions_at_a_point).
-  Not yet: subassemblies, explicit mate connectors' offsets, mate limits / offsets, live's per-studio refs.
+  11:30: mates keep live's stored flip (ours inverted: AGENT-FLIP-PRIMARY-INVERTED), secondary axis (quarter turns
+  PLUS_X, PLUS_Y, MINUS_X, MINUS_Y) and offset (x / y / z / rotation about rotationType); a connector whose query
+  isn't read is found from live's frame (rootAssembly.features matedEntities `mateConnectorCS`, part coordinates: the
+  edge / face / vertex whose center / centroid / midpoint / position is there). Cases from skb's captures added
+  (/root/dx-scratch/asm/make-skb.py: Fastened flips a / b / c / flipped-start, Revolute offset both pick orders; the
+  hole-plate studio hand-written): **7/7 as live, mates 8/8**. Not yet: subassemblies, explicit Mate connector
+  features' own offsets, limits, live's per-studio refs (studios/<eid>.live.jsonl).
 - 11-03 09:10 STL units (lead's question): live reads a unitless STL in the **document's length unit** (import dialog
   Units defaults to it: Millimeter in a mm document, Inch in an inch one; behaviours G35 / G35b); ours does the same.
   Our export_parts' STL default is Meter / Binary (as live's REST translation, "Units = meters"), so a mm part
