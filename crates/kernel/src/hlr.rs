@@ -116,8 +116,10 @@ impl SegGrid {
     }
 }
 
-/// Remove the parts of hidden polylines that lie on visible sharp/outline
-/// lines (within `tol`): such lines are drawn visible only.
+/// Remove the parts of hidden polylines, and of visible tangent edges, that
+/// lie on visible sharp/outline lines (within `tol`): such lines are drawn
+/// visible only (live 1857: a fillet's tangent edge under the outline
+/// circle isn't drawn twice).
 pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64) -> Vec<ProjectedEdge> {
     let mut vis: Vec<(DVec2, DVec2)> = Vec::new();
     for e in &edges {
@@ -129,7 +131,8 @@ pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64) -> Vec<Pr
             }
         }
     }
-    if vis.is_empty() || !edges.iter().any(|e| e.visibility == Visibility::Hidden) {
+    let covered = |e: &ProjectedEdge| e.visibility == Visibility::Hidden || e.class == EdgeClass::Smooth;
+    if vis.is_empty() || !edges.iter().any(covered) {
         return edges;
     }
     let (mut lo, mut hi) = (DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY));
@@ -148,7 +151,7 @@ pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64) -> Vec<Pr
     let mut out = Vec::with_capacity(edges.len());
     let mut cand: Vec<u32> = Vec::new();
     for e in edges {
-        if e.visibility == Visibility::Visible {
+        if !covered(&e) {
             out.push(e);
             continue;
         }
@@ -467,6 +470,18 @@ mod tests {
         assert_eq!(merge_fragments(e, 1e-9).len(), 3);
         let e = vec![outline(vec![[0.0, 0.0], [0.0, 4.0]]), outline(vec![[0.0, 4.0], [0.0, 10.0]]), outline(arc([0.0, 0.0], 3.0, 0.0, 1.0)), outline(arc([0.0, 0.0], 3.0, 1.0, 2.0))];
         assert_eq!(merge_fragments(e, 1e-9).len(), 2);
+    }
+
+    /// A tangent edge lying on a visible outline isn't drawn a second time;
+    /// where it leaves the outline it stays (live 1857, knob-tim's top view).
+    #[test]
+    fn tangent_under_visible_is_dropped() {
+        let mut tangent = pe(true, &[[-5.0, 0.0], [15.0, 0.0]], Some(2));
+        tangent.class = EdgeClass::Smooth;
+        let r = drop_covered_hidden(vec![pe(true, &[[0.0, 0.0], [10.0, 0.0]], Some(1)), tangent], 1e-6);
+        let left: Vec<_> = r.iter().filter(|e| e.class == EdgeClass::Smooth).map(|e| (e.polyline[0].x, e.polyline[e.polyline.len() - 1].x)).collect();
+        assert_eq!(left.len(), 2, "{left:?}");
+        assert!(left.iter().all(|(a, b)| a.max(*b) <= 1e-9 || a.min(*b) >= 10.0 - 1e-9), "{left:?}");
     }
 
     #[test]
