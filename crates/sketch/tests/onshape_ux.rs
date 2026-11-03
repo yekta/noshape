@@ -879,3 +879,26 @@ fn spur_gear_root_circles_as_live() {
     let (c, r) = spur_gear_root_circle(40.0, 2.0, 80.0);
     assert!((r - 1.06204944).abs() < 1e-5 && (c - v(38.56204944, 0.0)).length() < 1e-5, "40 teeth, module 2: centre {c} mm, r {r} mm");
 }
+
+/// A fit spline takes Onshape's stored end derivatives (per unit of its 0–1
+/// centripetal parameter, live 1777): the curve's ends have exactly them, with
+/// or without handles before (SKETCH-SPLINE-END-DERIVATIVES; dx's
+/// cf-curve-pattern-normal Sketch 2: (-0.304, 0) and (-0.242, 0) m).
+#[test]
+fn a_fit_spline_takes_onshapes_end_derivatives() {
+    let pts = [v(0.0, 0.0), v(0.04, 0.03), v(0.09, 0.01)];
+    let (d0, d1) = (v(-0.304, 0.0), v(-0.242, 0.0));
+    for with_handles in [false, true] {
+        let mut sk = Sketch::new();
+        let s = if with_handles { sk.add_fit_spline_with_handles(&pts) } else { sk.add_fit_spline(&pts) }.unwrap();
+        sk.set_fit_spline_end_derivatives(s, d0, d1).unwrap();
+        let Some(Curve2::Nurbs(nb)) = sk.curve(s) else { panic!("not a NURBS") };
+        let (a, b) = nb.domain();
+        let ends = (nb.eval_ders(a)[1] * (b - a), nb.eval_ders(b)[1] * (b - a));
+        assert!((ends.0 - d0).length() < 1e-9 && (ends.1 - d1).length() < 1e-9, "{ends:?}");
+        assert!((nb.eval_ders(a)[0] - pts[0]).length() < 1e-12 && (nb.eval_ders(b)[0] - pts[2]).length() < 1e-12);
+    }
+    let mut sk = Sketch::new();
+    let line = sk.add_line(v(0.0, 0.0), v(0.01, 0.0));
+    assert!(sk.set_fit_spline_end_derivatives(line, d0, d1).is_err());
+}

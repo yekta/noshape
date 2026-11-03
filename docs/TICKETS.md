@@ -3231,6 +3231,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   y -70.9..91.4 / z 0..103 mm where live's is -85.1..105.6 / -14.2..103; cf-sheet-metal-model-plus's Sketch 1 too.
   Once the sketch has it: sketch_draw `spline` takes `start_derivative` / `end_derivative` (dx), and the parity
   translator passes them.
+  skasm 11-03: the sketch has it: `Sketch::set_fit_spline_end_derivatives(id, start, end)` (DVec2s in metres per
+  unit of the 0–1 parameter, exactly the posted startDerivativeX/Y, endDerivativeX/Y) places the spline's end
+  handles for them (adds them to a spline drawn without); the curve's ends then have those derivatives (T1
+  onshape_ux::a_fit_spline_takes_onshapes_end_derivatives). Left for dx: the sketch_draw field and the translator.
 - [ ] P1 PARITY-CUSTOM-RUN-FAILURES (core; dx's parity suite run 42, 11-03 19:33) the corpus's community features
   whose inputs translate whole but fail in our host, with the Monitor's first error (featurestudio_monitor on the
   translated documents: `NOSHAPE_PARITY_SAVE=<dir>` keeps them, NOSHAPE_PARITY_ONLY=<name>; copies of all in

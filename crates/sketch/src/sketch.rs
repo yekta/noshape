@@ -450,6 +450,35 @@ impl Sketch {
         self.add_entity(Geometry::FitSpline { points: ids, handles: Some((h0, h1)) }, false, false)
     }
 
+    /// Gives an open fit spline the end derivatives `start`, `end` (per unit
+    /// of its 0–1 centripetal parameter, as Onshape stores
+    /// `startDerivative` / `endDerivative`): its end handles placed for them,
+    /// added if it had none.
+    pub fn set_fit_spline_end_derivatives(&mut self, id: EntityId, start: DVec2, end: DVec2) -> Result<()> {
+        let Some(Geometry::FitSpline { points, handles }) = self.entity(id).map(|e| e.geometry.clone()) else {
+            return Err(SketchError::InvalidGeometry("end derivatives need a fit spline".into()));
+        };
+        if points.len() < 2 || points.first() == points.last() {
+            return Err(SketchError::InvalidGeometry("end derivatives need an open fit spline".into()));
+        }
+        let pts: Vec<DVec2> = points.iter().map(|p| self.point(*p).ok_or(SketchError::UnknownEntity(*p))).collect::<Result<_>>()?;
+        let (hp0, hp1) = crate::nurbs::handles_for_ends(&pts, start, end);
+        match handles {
+            Some((h0, h1)) => {
+                self.set_point(h0, hp0)?;
+                self.set_point(h1, hp1)?;
+            }
+            None => {
+                let (h0, h1) = (self.add_point(hp0), self.add_point(hp1));
+                if let Some(e) = self.entity_mut_silent(id) {
+                    e.geometry = Geometry::FitSpline { points, handles: Some((h0, h1)) };
+                }
+                self.touch();
+            }
+        }
+        Ok(())
+    }
+
     /// Interpolating spline through `points` whose last point repeats the
     /// first, once: periodic (see [`Nurbs::interpolate`]).
     pub fn add_closed_fit_spline(&mut self, points: &[DVec2]) -> Result<EntityId> {
