@@ -3046,6 +3046,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Sources in /root/parity/models/<name>/studios/ (live's fetch, not in the repo); run `parity::parity_feature_studios`
   (T2, NOSHAPE_PARITY_MODELS). Score 13/34 studios compile; the other 18 failures are imports of elements live
   hasn't fetched yet (asked). (dx 2026-11-03)
+  dx 12:20, at run time (featurestudio_monitor on the rebuilt documents): cf-circular-pattern and
+  cf-linear-pattern-with-seed-location (FeatureScript 392) call `checkInput(context, id, definition, false)` →
+  "Function checkInput with 4 argument(s) not found" (std 392's patternUtils had it; 1963 hasn't), so their Face /
+  Feature / Part Pattern features fail "Error regenerating." where live's build.
 - [ ] P2 FS-EDITOR-IMPORT-NOTICES (psui) the Feature Studio editor's notices (feature-studio-ui studio_notices,
   fs_notices document_notices) compile the source alone, so a studio importing another tab (`import(path : "<tab
   id>", …)`) shows "Imported element … not found" though its Part Studios regenerate with it; live's editor
@@ -3068,3 +3072,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   pull direction flipped); Extrude 2 (Add, Blind 2 mm, scope Part 1) of a sketch region on its top face. Everything
   downstream (here a parameter pattern) sees a negative solid. Repro: /root/dx-scratch/tickets/negative-volume-add.noshape
   (features as live's; query_parts after Extrude 2), model /root/parity/models/cf-parameter-pattern. (dx 2026-11-03)
+- [ ] P2 FS-ANYTHING-PARAM (core / custom; dx's FeatureScript corpus 11-03, cf-parameter-pattern) an `isAnything`
+  parameter in an array item (Parameter pattern's `varArray[i].valueArray`, live's expression "[15,20,25]") reaches
+  the feature as the string "[15,20,25]", not the array: `size(definition.varArray[0].valueArray)` → "Call
+  size(string) does not match size(array) or (map)" (line 25), "Error regenerating."; live builds the pattern.
+  Agent API side: feature_get shows `"valueArray": "[15,20,25]"` (the expression), as the dialog would keep it; the
+  host should evaluate it. Rebuilt document: /root/dx-scratch/pmdocs/cf/cf-parameter-pattern.noshape
+  (featurestudio_monitor). (dx 2026-11-03)
