@@ -252,7 +252,9 @@ dump, the runner, live's first 20 scenarios run in ours and a first score.
 - 11-03 15:10: lead P1 (user 17:26 report): the update banner is now a card floating at the bottom centre of every
   window (updates.rs `card`, app-core `os_menu::set_floating`), ✕ hides it for the session; navbar / start window
   slots gone; checked on :102 (start window and a Part Studio, 1280 / 560 / 760). Since 14:00 also: an edge clicked
-  at its midpoint lights up its feature (fillet-asymmetric-toggle).
+  at its midpoint lights up its feature (fillet-asymmetric-toggle); the midpoint snaps only after the pointer moves
+  (ours turned a still pointer's edge into its midpoint on any hover update: Fillet / Chamfer then opened empty
+  about half the time). fillet-* / chamfer-* now differ only by live's account dropping the edge (REQUESTS 15:05).
 - 11-03 14:00: driver: the empty-graphics target avoids the open dialog, planes and sketch curves (it hit the Sketch
   dialog); every scenario (274) runs with all steps found; the 76 using `empty` rechecked. Live resumed 13:58; I
   compare each new recording as it lands (a Monitor running run.py per new file on :102).
