@@ -347,6 +347,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   /root/parity/models (`parity_models`, NOSHAPE_PARITY_ONLY=<name>). The same with NOSHAPE_BOOL_RUST=0 (OCCT's cut).
   What it changes beyond counts (dx 11-03): a click picks one piece where live picks the loop; a Fillet (r 1,
   tangent propagation on) of one piece still rounds the whole loop (−8.5 mm³) but as 3 faces (5 → 8 faces), live 1.
+  core 11-03 08:40 (tried, not kept): UnifySameDomain on edges only with B-splines concatenated, wherever a vertex joins
+  just two curved edges between the same two faces, after the face unify: no change on the three models (their
+  loops' vertices are where the cylinders' seam edges cross them, three edges each, so nothing to join; live's
+  faces have no seams) and two bool_patterns volumes moved. One closed edge per loop needs the seams moved onto one
+  point of the loop (or off it).
 - [ ] P2 FILLET-SPLIT-EDGE-FACES (core; dx's parity suite 11-03) a Fillet of edges a groove cut in two makes one face
   per piece and more: bracket03-mattie Fillet 1 (r 3 mm, tangent propagation, four 7 mm corner edges, each beside
   its other half across a 6 mm groove; Onshape's query keeps both halves): live 22/60/40 faces/edges/vertices, one
