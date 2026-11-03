@@ -56,6 +56,30 @@ fn ellipse_axis_dimension_reads_its_diameter() {
     assert_eq!(values, ["Ø30", "Ø12"], "{st}");
 }
 
+/// An angle dimension measures the quadrant its `label` is in, as the
+/// Dimension tool's cursor picks it (the parity translator places Onshape's
+/// 120° this way).
+#[test]
+fn angle_dimension_label_picks_the_quadrant() {
+    let mut ctx = Ctx::new();
+    let path = scratch("angle-quadrant.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+    let sketch = sk["sketch"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "shapes": [{ "tool": "line", "points": [[0, 0], [50, 0]] }, { "tool": "line", "points": [[0, 10], [30, 50]] }] }));
+    let lines: Vec<String> = r["created"].as_array().unwrap().iter().filter(|e| e["type"] == "line").map(|e| e["id"].as_str().unwrap().to_string()).collect();
+    let angles = |ctx: &mut Ctx| -> Vec<String> {
+        let st = call(ctx, "sketch_get", json!({ "sketch": sketch }));
+        st["constraints"].as_array().unwrap().iter().filter(|c| c["type"] == "Angle").map(|c| c["value"].as_str().unwrap_or("").to_string()).collect()
+    };
+    // Lines at 0° and 53.13°: the obtuse quadrant is 126.87°.
+    call(&mut ctx, "sketch_dimension", json!({ "sketch": sketch, "kind": "angle", "entities": lines, "label": [-20, 10] }));
+    call(&mut ctx, "sketch_dimension", json!({ "sketch": sketch, "kind": "angle", "entities": lines, "label": [40, 10] }));
+    let a = angles(&mut ctx);
+    assert_eq!(a.len(), 2, "{a:?}");
+    assert!(a[0].starts_with("126.87") && a[1].starts_with("53.13"), "{a:?}");
+}
+
 #[test]
 fn sketch_extrude_fillet_pattern_export_render() {
     let mut ctx = Ctx::new();

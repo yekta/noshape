@@ -508,3 +508,56 @@ fn packed_queries_decode() {
     println!("packed queries: {total}, failed {}", failed.len());
     assert!(failed.is_empty(), "{failed:#?}");
 }
+
+/// Onshape's constraints keep a sketch where Onshape solved it: a clockwise
+/// arc (ours runs the other way, its ends mapped by position) tangent to two
+/// lines and dimensioned, a centre-point rectangle's MIDPOINT between two of
+/// its corners, an arc whose end parameter wraps past 2π (π → 0, the lower
+/// half) and a distance to a circle's far side. Nothing moves, nothing is
+/// taken back, and the wrapping arc's half disc lies below its chord.
+#[test]
+fn onshapes_constraints_dont_move_the_sketch() {
+    let line = |id: &str, p: [f64; 2], d: [f64; 2], t: [f64; 2]| json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "startParam": t[0], "endParam": t[1], "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": p[0], "pntY": p[1], "dirX": d[0], "dirY": d[1] } });
+    let arc = |id: &str, c: [f64; 2], r: f64, cw: bool, t: [f64; 2]| json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "centerId": format!("{id}.center"), "startParam": t[0], "endParam": t[1], "geometry": { "btType": "BTCurveGeometryCircle-115", "xCenter": c[0], "yCenter": c[1], "radius": r, "xDir": 1.0, "yDir": 0.0, "clockwise": cw } });
+    let s = |id: &str, v: &str| json!({ "btType": "BTMParameterString-149", "parameterId": id, "value": v });
+    let q = |id: &str, e: &str| json!({ "btType": "BTMParameterQuantity-147", "parameterId": id, "expression": e });
+    let c = |ty: &str, params: Vec<Value>| json!({ "btType": "BTMSketchConstraint-2", "constraintType": ty, "parameters": params });
+    let pi = std::f64::consts::PI;
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=dummyQuery(id+\"Top.planeOp\",EntityType.FACE);" }] }],
+          "entities": [
+              arc("a", [-0.05, 0.0], 0.007, true, [-pi / 2.0, pi / 2.0]),
+              line("t", [-0.05, 0.007], [-1.0, 0.0], [0.0, 0.02]),
+              line("l", [-0.07, 0.007], [0.0, -1.0], [0.0, 0.014]),
+              line("b", [-0.07, -0.007], [1.0, 0.0], [0.0, 0.02]),
+              arc("w", [0.02, 0.0], 0.005, false, [pi, 0.0]),
+              line("chord", [0.025, 0.0], [-1.0, 0.0], [0.0, 0.01]),
+              line("r.top", [0.05, 0.01], [1.0, 0.0], [-0.01, 0.01]),
+              line("r.right", [0.06, 0.0], [0.0, -1.0], [-0.01, 0.01]),
+              line("r.bottom", [0.05, -0.01], [1.0, 0.0], [-0.01, 0.01]),
+              line("r.left", [0.04, 0.0], [0.0, 1.0], [-0.01, 0.01]),
+              { "btType": "BTMSketchPoint-158", "entityId": "r.middle", "isConstruction": true, "x": 0.05, "y": 0.0 }
+          ],
+          "constraints": [
+              c("TANGENT", vec![s("localFirst", "a"), s("localSecond", "t")]),
+              c("TANGENT", vec![s("localFirst", "a"), s("localSecond", "b")]),
+              c("COINCIDENT", vec![s("localFirst", "a.start"), s("localSecond", "t.start")]),
+              c("COINCIDENT", vec![s("localFirst", "b.end"), s("localSecond", "a.end")]),
+              c("HORIZONTAL", vec![s("localFirst", "t")]),
+              c("VERTICAL", vec![s("localFirst", "l")]),
+              c("RADIUS", vec![s("localFirst", "a"), q("length", "7 mm")]),
+              c("MIDPOINT", vec![s("localMidpoint", "r.middle"), s("localEntity1", "r.top.start"), s("localEntity2", "r.bottom.end")]),
+              c("DISTANCE", vec![s("localFirst", "a"), s("localSecond", "l"), s("direction", "MINIMUM"), q("length", "27 mm")])
+          ] }
+    ] });
+    let mut ctx = Ctx::new();
+    let path = scratch("constraints-stay.noshape");
+    let mut t = Translator::open(&mut ctx, &path, &features, Default::default()).unwrap();
+    let step = t.step(0);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    // The wrapping arc's region: a half disc (39.27 mm²) centred below y = 0.
+    let half = g["regions"].as_array().unwrap().iter().find(|r| (r["area"].as_f64().unwrap() - 0.5 * pi * 25.0).abs() < 1e-3).unwrap_or_else(|| panic!("{}", g["regions"]));
+    assert!(half["center"][1].as_f64().unwrap() < 0.0, "{half}");
+}
