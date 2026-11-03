@@ -371,6 +371,21 @@ impl Sketch {
                 }
             }
         }
+        // Lines with new Lengths of their own sharing their lowest point (a
+        // rounded-corner rectangle made wider and taller): that corner stays
+        // first (live probes 19 rr3 / rr6, fuzz s830 / s893).
+        if held.is_empty() {
+            let resized: Vec<EntityId> = comp.iter().copied().filter(|u| self.kind(*u) == Some(EntityKind::Line) && cons.iter().any(|(c, us)| us.as_slice() == [*u] && unheld.contains(c) && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Length { .. })))).collect();
+            let anchors: Vec<EntityId> = resized.iter().filter_map(|u| self.anchor(*u)).collect();
+            let shared = anchors.len() >= 2 && anchors.iter().all(|a| *a == anchors[0] || self.coincident_class(anchors[0]).contains(a));
+            if shared
+                && let Some(mut sub) = self.sub_sketch(comp, cons, &|_| true, &BTreeSet::from([anchors[0]]))
+                && matches!(sub.solve_with(&opts).status, SolveStatus::Solved)
+            {
+                held.insert(anchors[0]);
+                done = Some(sub);
+            }
+        }
         // A T's resized stem: its corner at the side whose height is
         // dimensioned stays first (live probes 17 u1-u5).
         if held.is_empty() {

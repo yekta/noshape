@@ -1,0 +1,341 @@
+{
+ "note": "Live 2026-11-03 ~21:15 UTC, Part Studio \"skasm probes 19\" (348e3cd959d129a9363a1d59) in \"skasm speed\"; each case POSTed as is on Top (POST /features, no UI); points = REST /sketches point entities by their own ids (l1.start \u2026), so no end-swap fix is needed. ours was not read before posting.",
+ "cases": {
+  "rr1": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "a3.center": [
+     36.5,
+     20.5
+    ],
+    "a3.end": [
+     36.5,
+     24.0
+    ],
+    "a3.start": [
+     40.0,
+     20.5
+    ],
+    "l1.end": [
+     40.0,
+     0.0
+    ],
+    "l1.start": [
+     0,
+     0
+    ],
+    "l2.end": [
+     40.0,
+     20.5
+    ],
+    "l2.start": [
+     40.0,
+     0.0
+    ],
+    "l4.end": [
+     0,
+     24.0
+    ],
+    "l4.start": [
+     36.5,
+     24.0
+    ],
+    "l5.end": [
+     0,
+     0
+    ],
+    "l5.start": [
+     0,
+     24.0
+    ]
+   }
+  },
+  "rr2": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "a3.center": [
+     30.5,
+     26.5
+    ],
+    "a3.end": [
+     30.5,
+     30.0
+    ],
+    "a3.start": [
+     34.0,
+     26.5
+    ],
+    "l1.end": [
+     34.0,
+     0
+    ],
+    "l1.start": [
+     0,
+     0
+    ],
+    "l2.end": [
+     34.0,
+     26.5
+    ],
+    "l2.start": [
+     34.0,
+     0
+    ],
+    "l4.end": [
+     -0.0,
+     30.0
+    ],
+    "l4.start": [
+     30.5,
+     30.0
+    ],
+    "l5.end": [
+     0,
+     0
+    ],
+    "l5.start": [
+     -0.0,
+     30.0
+    ]
+   }
+  },
+  "rr3": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "a3.center": [
+     36.5,
+     26.5
+    ],
+    "a3.end": [
+     36.5,
+     30.0
+    ],
+    "a3.start": [
+     40.0,
+     26.5
+    ],
+    "l1.end": [
+     40.0,
+     0.0
+    ],
+    "l1.start": [
+     0,
+     0
+    ],
+    "l2.end": [
+     40.0,
+     26.5
+    ],
+    "l2.start": [
+     40.0,
+     0.0
+    ],
+    "l4.end": [
+     -0.0,
+     30.0
+    ],
+    "l4.start": [
+     36.5,
+     30.0
+    ],
+    "l5.end": [
+     0,
+     0
+    ],
+    "l5.start": [
+     -0.0,
+     30.0
+    ]
+   }
+  },
+  "rr4": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "a3.center": [
+     36.5,
+     20.5
+    ],
+    "a3.end": [
+     36.5,
+     24.0
+    ],
+    "a3.start": [
+     40.0,
+     20.5
+    ],
+    "a5.center": [
+     3.5,
+     20.5
+    ],
+    "a5.end": [
+     0,
+     20.5
+    ],
+    "a5.start": [
+     3.5,
+     24.0
+    ],
+    "l1.end": [
+     40.0,
+     0.0
+    ],
+    "l1.start": [
+     0,
+     0
+    ],
+    "l2.end": [
+     40.0,
+     20.5
+    ],
+    "l2.start": [
+     40.0,
+     0.0
+    ],
+    "l4.end": [
+     3.5,
+     24.0
+    ],
+    "l4.start": [
+     36.5,
+     24.0
+    ],
+    "l6.end": [
+     0,
+     0
+    ],
+    "l6.start": [
+     0,
+     20.5
+    ]
+   }
+  },
+  "rr5": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "a3.center": [
+     30.5,
+     26.5
+    ],
+    "a3.end": [
+     30.5,
+     30.0
+    ],
+    "a3.start": [
+     34.0,
+     26.5
+    ],
+    "a5.center": [
+     3.5,
+     26.5
+    ],
+    "a5.end": [
+     -0.0,
+     26.5
+    ],
+    "a5.start": [
+     3.5,
+     30.0
+    ],
+    "l1.end": [
+     34.0,
+     0
+    ],
+    "l1.start": [
+     0,
+     0
+    ],
+    "l2.end": [
+     34.0,
+     26.5
+    ],
+    "l2.start": [
+     34.0,
+     0
+    ],
+    "l4.end": [
+     3.5,
+     30.0
+    ],
+    "l4.start": [
+     30.5,
+     30.0
+    ],
+    "l6.end": [
+     0,
+     0
+    ],
+    "l6.start": [
+     -0.0,
+     26.5
+    ]
+   }
+  },
+  "rr6": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "a3.center": [
+     36.5,
+     26.5
+    ],
+    "a3.end": [
+     36.5,
+     30.0
+    ],
+    "a3.start": [
+     40.0,
+     26.5
+    ],
+    "a5.center": [
+     3.5,
+     26.5
+    ],
+    "a5.end": [
+     -0.0,
+     26.5
+    ],
+    "a5.start": [
+     3.5,
+     30.0
+    ],
+    "l1.end": [
+     40.0,
+     0.0
+    ],
+    "l1.start": [
+     0,
+     0
+    ],
+    "l2.end": [
+     40.0,
+     26.5
+    ],
+    "l2.start": [
+     40.0,
+     0.0
+    ],
+    "l4.end": [
+     3.5,
+     30.0
+    ],
+    "l4.start": [
+     36.5,
+     30.0
+    ],
+    "l6.end": [
+     0,
+     0
+    ],
+    "l6.start": [
+     -0.0,
+     26.5
+    ]
+   }
+  }
+ }
+}

@@ -1651,6 +1651,24 @@ fn a_lever_hangs_on_its_centre_line() {
     assert!(d.is_empty(), "s811: {}", d.join("; "));
 }
 
+/// A rounded-corner rectangle made wider, taller or both keeps its lower-left
+/// corner (live probes 19; fuzz s830 / s893). T1.
+#[test]
+fn a_rounded_rectangle_keeps_its_lower_left_corner() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-probe-19.live.json")).unwrap()).unwrap();
+    let b = probe_batch(probes19());
+    for case in b["cases"].as_array().unwrap() {
+        let d = differences(case, &live["cases"][case["case"].as_str().unwrap()]);
+        assert!(d.is_empty(), "{}: {}", case["case"], d.join("; "));
+    }
+    for (file, seed) in [("sketch-17.live.json", 830), ("sketch-18.live.json", 893)] {
+        let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture(file)).unwrap()).unwrap();
+        let ours = batch(1, seed, true);
+        let d = differences(&ours["cases"][0], &live["cases"][format!("s{seed}")]);
+        assert!(d.is_empty(), "s{seed}: {}", d.join("; "));
+    }
+}
+
 /// s892 (batch 18) stays as live answered: a Z's bottom flange narrows and
 /// its web thickens: the flange keeps its outer end and carries the web, the
 /// thickness after (the Distance's dimensioned side isn't kept first when a
