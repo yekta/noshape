@@ -13,7 +13,7 @@
 use super::sheetmetal_util::*;
 use crate::naming::Name;
 use crate::reference::{Reference, Source};
-use crate::regen::eval::{EvalCtx, FResult, NamedShape, Profile, err, sweep_names};
+use crate::regen::eval::{EvalCtx, FResult, FeatureError, NamedShape, Profile, err, err_at, sweep_names};
 use crate::sheetmetal::{Bend, BendKind, BendReliefStyle, SheetMetalData, Wall};
 use glam::{DVec2, DVec3};
 use noshape_kernel as k;
@@ -39,6 +39,8 @@ pub struct EdgeFrame {
     pub p1: DVec3,
     /// Name of the selected edge (identity of the created faces).
     pub name: Name,
+    /// "flange" or "hem", for the error texts.
+    pub op: &'static str,
 }
 
 impl EdgeFrame {
@@ -55,11 +57,11 @@ impl EdgeFrame {
 }
 
 /// Build the frame of edge `ei` of body `bi`.
-pub fn edge_frame(ev: &EvalCtx, data: &SheetMetalData, bi: usize, ei: usize, opposite: bool) -> FResult<EdgeFrame> {
+pub fn edge_frame(ev: &EvalCtx, data: &SheetMetalData, bi: usize, ei: usize, opposite: bool, op: &'static str) -> FResult<EdgeFrame> {
     let body = &ev.ctx.bodies[bi];
     let t = data.thickness;
     let edge = body.shape.sub_shape(ShapeType::Edge, ei)?;
-    let Some((p0, p1)) = line_of(&edge) else { return err("Flange and hem edges must be linear") };
+    let Some((p0, p1)) = line_of(&edge) else { return err_at(&["edges"], format!("Only linear edges can be used to {op}.")) };
     let len = (p1 - p0).length();
     if len < 1e-9 {
         return err("Selected edge is too short");
@@ -68,19 +70,19 @@ pub fn edge_frame(ev: &EvalCtx, data: &SheetMetalData, bi: usize, ei: usize, opp
     let ef = body.shape.edge_faces()?;
     let faces = ef.get(ei).cloned().unwrap_or_default();
     if faces.len() != 2 {
-        return err("Select an edge on the boundary of a sheet metal wall");
+        return err_at(&["edges"], format!("Cannot create {op} on an edge that is a joint, fillet, chamfer, or internal to the sheet metal model."));
     }
     let (fa, fb) = (faces[0] as usize, faces[1] as usize);
     let (wa, wb) = (data.wall_of_face(&body.faces[fa]), data.wall_of_face(&body.faces[fb]));
     let (wall_face, side_face, (wall, on_ref)) = match (wa, wb) {
-        (Some(_), Some(_)) => return err("The edge is a joint between two walls (use Make joint)"),
+        (Some(_), Some(_)) => return err_at(&["edges"], format!("Cannot create {op} on an edge that is a joint, fillet, chamfer, or internal to the sheet metal model.")),
         (Some(w), None) => (fa, fb, w),
         (None, Some(w)) => (fb, fa, w),
         (None, None) => {
             if data.bend_of_face(&body.faces[fa]).is_some() || data.bend_of_face(&body.faces[fb]).is_some() {
-                return err("The edge is next to a bend; select a free edge of a wall");
+                return err_at(&["edges"], format!("Cannot create {op} on a bend."));
             }
-            return err("Select an edge of a sheet metal wall");
+            return err_at(&["edges"], format!("Cannot create {op} on an edge that is a joint, fillet, chamfer, or internal to the sheet metal model."));
         }
     };
     let wf = body.shape.sub_shape(ShapeType::Face, wall_face)?;
@@ -92,7 +94,7 @@ pub fn edge_frame(ev: &EvalCtx, data: &SheetMetalData, bi: usize, ei: usize, opp
     }
     let v = if opposite { -nw } else { nw };
     let o = if opposite { p0 - nw * t } else { p0 };
-    Ok(EdgeFrame { bi, wall, on_ref, inner_is_wall_face: !opposite, o, u, v, d, len, p0, p1, name: body.edges[ei].clone() })
+    Ok(EdgeFrame { bi, wall, on_ref, inner_is_wall_face: !opposite, o, u, v, d, len, p0, p1, name: body.edges[ei].clone(), op })
 }
 
 /// Cross-section and placement of one flange/hem.
@@ -163,7 +165,7 @@ pub fn build(ev: &mut EvalCtx, ef: &EdgeFrame, g: &FlangeGeom, data: &mut SheetM
     // Bend + wall cross-section.
     let (sa, sb) = g.s_flange;
     if sb - sa < 1e-9 {
-        return err("The flange has no width (adjacent corners overlap)");
+        return if ef.op == "hem" { err("Cannot create hem.") } else { err_at(&["edges"], "Cannot create automatic miter between selected edges.") };
     }
     let c = g.center();
     let (pi, po) = g.bend_end(t);
@@ -196,7 +198,7 @@ pub fn build(ev: &mut EvalCtx, ef: &EdgeFrame, g: &FlangeGeom, data: &mut SheetM
     let tool = NamedShape::new(res.shape, names);
     let (shape, names) = bool_named(ev, k::BooleanOp::Fuse, &cur, &[tool])?;
     if solid_count(&shape) != 1 {
-        return err("The flange does not connect to the part");
+        return err_at(&["edges"], format!("Cannot create {}.", ef.op));
     }
     cur = NamedShape::new(shape, names);
     // Automatic bend reliefs where the base continues past the flange ends.
@@ -269,13 +271,13 @@ pub fn relief_size(data: &SheetMetalData, radius: f64) -> (BendReliefStyle, f64,
 }
 
 /// A resolved edge selection: (body, edge index).
-fn resolve_edges(ev: &EvalCtx, id: &str) -> FResult<Vec<(usize, usize)>> {
+fn resolve_edges(ev: &EvalCtx, id: &str, op: &str) -> FResult<Vec<(usize, usize)>> {
     let refs = ev.query(id);
     let mut out = Vec::new();
     for r in refs {
-        let got = resolve_flange_edge(ev, r)?;
+        let got = resolve_flange_edge(ev, r, op)?;
         if got.is_empty() && matches!(r, Reference::Edge(_) | Reference::Face(_)) {
-            return err("A selected edge no longer exists");
+            return err_at(&["edges"], format!("Select edges to {op}."));
         }
         for g in got {
             if !out.contains(&g) {
@@ -299,7 +301,7 @@ fn flange_angle(ev: &EvalCtx, ef: &EdgeFrame) -> FResult<f64> {
     let in_uv = |x: DVec3| DVec2::new(x.dot(ef.u), x.dot(ef.v));
     let theta = match ev.enum_("angleControlType") {
         "ALIGN_GEOMETRY" => {
-            let r = ev.query("parallelEntity").first().ok_or_else(|| fe("Select an entity the flange is parallel to"))?;
+            let r = ev.query("parallelEntity").first().ok_or_else(|| crate::regen::eval::FeatureError::at(&["parallelEntity"], "Select an entity to align to."))?;
             let plane = match r {
                 Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::Face(_) => ev.resolve_plane(r).map(|p| p.normal),
                 _ => None,
@@ -307,13 +309,13 @@ fn flange_angle(ev: &EvalCtx, ef: &EdgeFrame) -> FResult<f64> {
             let f = match plane {
                 Some(m) => m.cross(ef.d),
                 None => {
-                    let e = ev.resolve_direction(r).ok_or_else(|| fe("The parallel entity has no direction"))?;
+                    let e = ev.resolve_direction(r).ok_or_else(|| crate::regen::eval::FeatureError::at(&["parallelEntity"], "Select an entity to align to."))?;
                     e - ef.d * e.dot(ef.d)
                 }
             };
             let mut f2 = in_uv(f);
             if f2.length() < 1e-9 {
-                return err("The flange cannot be parallel to the selected entity");
+                return err_at(&["edges", "parallelEntity"], if plane.is_some() { "Flange edge and alignment plane must be parallel." } else { "Flange edge and alignment edge cannot be parallel." });
             }
             if f2.y < 0.0 || (f2.y.abs() < 1e-12 && f2.x < 0.0) {
                 f2 = -f2;
@@ -321,11 +323,11 @@ fn flange_angle(ev: &EvalCtx, ef: &EdgeFrame) -> FResult<f64> {
             f2.y.atan2(f2.x)
         }
         "ANGLE_FROM_DIRECTION" => {
-            let r = ev.query("directionEntity").first().ok_or_else(|| fe("Select a direction"))?;
-            let e = ev.resolve_direction(r).ok_or_else(|| fe("The direction entity has no direction"))?;
+            let r = ev.query("directionEntity").first().ok_or_else(|| crate::regen::eval::FeatureError::at(&["directionEntity"], "Select an entity to align from."))?;
+            let e = ev.resolve_direction(r).ok_or_else(|| crate::regen::eval::FeatureError::at(&["directionEntity"], "Select an entity to align from."))?;
             let e2 = in_uv(e);
             if e2.length() < 1e-9 {
-                return err("The direction is parallel to the edge");
+                return crate::regen::eval::err_at(&["edges", "directionEntity"], "Flange edge and alignment direction cannot be parallel.");
             }
             let a = ev.angle("angleFromDirection")?;
             let mut th = e2.y.atan2(e2.x) + if ev.bool("angleFromDirectionOppositeAngle") { -a } else { a };
@@ -340,7 +342,11 @@ fn flange_angle(ev: &EvalCtx, ef: &EdgeFrame) -> FResult<f64> {
         _ => ev.angle("bendAngle")?,
     };
     if theta < 1e-6 || theta > PI - 1e-6 {
-        return err("The flange angle must be between 0 and 180 degrees");
+        return match ev.enum_("angleControlType") {
+            "ALIGN_GEOMETRY" => err_at(&["edges", "parallelEntity"], "Cannot create flange with a 0 degree bend angle."),
+            "ANGLE_FROM_DIRECTION" => err_at(&["edges", "directionEntity"], "Cannot create flange with a 0 degree bend angle."),
+            _ => err_at(&["bendAngle"], "Error regenerating: a parameter is out of range."),
+        };
     }
     Ok(theta)
 }
@@ -349,7 +355,7 @@ fn flange_angle(ev: &EvalCtx, ef: &EdgeFrame) -> FResult<f64> {
 fn flange_straight(ev: &EvalCtx, ef: &EdgeFrame, angle: f64, r: f64, t: f64, u_t: f64) -> FResult<f64> {
     let limit = ev.enum_("limitType");
     let ls = if limit == "UP_TO_ENTITY" || limit == "UP_TO_ENTITY_OFFSET" {
-        let ent = ev.query("limitEntity").first().ok_or_else(|| fe("Select an entity to extend the flange up to"))?;
+        let ent = ev.query("limitEntity").first().ok_or_else(|| crate::regen::eval::FeatureError::at(&["limitEntity"], "Cannot resolve limit entity for flange end condition."))?;
         let c = DVec2::new(u_t, r);
         let po2 = c + DVec2::from_angle(angle - FRAC_PI_2) * (r + t);
         let po = ef.at(po2.x, po2.y, ef.len * 0.5);
@@ -359,11 +365,11 @@ fn flange_straight(ev: &EvalCtx, ef: &EdgeFrame, angle: f64, r: f64, t: f64, u_t
         } else if let Some(p) = ev.resolve_plane(ent) {
             let den = f.dot(p.normal);
             if den.abs() < 1e-9 {
-                return err("The up to entity is parallel to the flange");
+                return crate::regen::eval::err_at(&["limitEntity"], "Cannot create flange up to selected entity.");
             }
             (p.origin - po).dot(p.normal) / den
         } else {
-            return err("Up to entity must be a face, plane or vertex");
+            return crate::regen::eval::err_at(&["limitEntity"], "Cannot resolve limit entity for flange end condition.");
         };
         if limit == "UP_TO_ENTITY_OFFSET" {
             let o = ev.length("offset")?;
@@ -374,27 +380,27 @@ fn flange_straight(ev: &EvalCtx, ef: &EdgeFrame, angle: f64, r: f64, t: f64, u_t
         ev.length("distance")? - (r + t) * tan_half(angle)
     };
     if ls <= 1e-9 {
-        return err("The flange is too short for its bend");
+        return if limit == "BLIND" { err("Cannot create flange.") } else { err_at(&["oppositeDirection"], "Flange direction is opposite of limit entity.") };
     }
     Ok(ls)
 }
 
 /// Partial flange bounds along the edge.
 fn partial_bounds(ev: &EvalCtx, ef: &EdgeFrame) -> FResult<(f64, f64)> {
-    let bound = |ty: &str, dist: &str, ent: &str, off: &str, flip: &str| -> FResult<f64> {
+    let bound = |ty: &str, dist: &str, ent: &'static str, off: &str, flip: &str| -> FResult<f64> {
         match ev.enum_(ty) {
             "UP_TO_ENTITY" | "UP_TO_ENTITY_OFFSET" => {
-                let r = ev.query(ent).first().ok_or_else(|| fe("Select a bounding entity"))?;
+                let r = ev.query(ent).first().ok_or_else(|| FeatureError::at(&[ent], "Select a limit entity for flange bound."))?;
                 let mut s = if let Some(q) = ev.resolve_vertex_point(r) {
                     ef.param(q)
                 } else if let Some(p) = ev.resolve_plane(r) {
                     let den = ef.d.dot(p.normal);
                     if den.abs() < 1e-9 {
-                        return err("The bounding entity is parallel to the edge");
+                        return err_at(&[ent], "Limit entity for flange bound cannot be parallel to flange edge.");
                     }
                     (p.origin - ef.o).dot(p.normal) / den
                 } else {
-                    return err("Bounding entity must be a plane or vertex");
+                    return err_at(&[ent], "Limit entity for flange bound must be a vertex or plane.");
                 };
                 if ev.is(ty, "UP_TO_ENTITY_OFFSET") {
                     let o = ev.length(off)?;
@@ -423,8 +429,11 @@ fn partial_bounds(ev: &EvalCtx, ef: &EdgeFrame) -> FResult<(f64, f64)> {
         }
     }
     let (a, b) = (a.min(b), a.max(b));
-    if a < -1e-9 || b > ef.len + 1e-9 || b - a < 1e-9 {
-        return err("Partial flange bounds are outside the edge");
+    if a < -1e-9 || b > ef.len + 1e-9 {
+        return err("Cannot extend partial flange beyond base edge.");
+    }
+    if b - a < 1e-9 {
+        return err("Cannot create zero width partial flange.");
     }
     Ok((a.max(0.0), b.min(ef.len)))
 }
@@ -455,24 +464,24 @@ fn shorten_corners(frames: &[EdgeFrame], geoms: &mut [FlangeGeom], gap: f64) {
 
 pub fn flange(ev: &mut EvalCtx) -> FResult<()> {
     if ev.query("edges").is_empty() {
-        return err("Select edges or side faces to flange");
+        return crate::regen::eval::err_at(&["edges"], "Select edges to flange.");
     }
-    let edges = resolve_edges(ev, "edges")?;
+    let edges = resolve_edges(ev, "edges", "flange")?;
     if edges.is_empty() {
-        return err("Selected edges no longer exist");
+        return crate::regen::eval::err_at(&["edges"], "Select edges to flange.");
     }
     for (bi, eis) in by_body(&edges).into_iter().rev() {
         let mut data = (*active_data(ev, bi)?).clone();
         let t = data.thickness;
         let r = if ev.bool("useDefaultRadius") { data.radius } else { ev.length("bendRadius")? };
         if r <= 0.0 {
-            return err("Bend radius must be positive");
+            return crate::regen::eval::err_at(&["bendRadius"], "Error regenerating: a parameter is out of range.");
         }
         let opposite = ev.bool("oppositeDirection");
         let mut frames = Vec::new();
         let mut geoms = Vec::new();
         for &ei in &eis {
-            let ef = edge_frame(ev, &data, bi, ei, opposite)?;
+            let ef = edge_frame(ev, &data, bi, ei, opposite, "flange")?;
             let angle = flange_angle(ev, &ef)?;
             let u_t = alignment_offset(ev.enum_("flangeAlignment"), angle, r, t);
             let straight = flange_straight(ev, &ef, angle, r, t, u_t)?;
@@ -493,7 +502,7 @@ pub fn flange(ev: &mut EvalCtx) -> FResult<()> {
 /// Tear drop: bend angle and straight length for a total length and tip gap.
 fn tear_drop(r: f64, t: f64, gap: f64, total: f64) -> FResult<(f64, f64)> {
     if gap >= r {
-        return err("The tear drop gap is too large for the inner radius");
+        return crate::regen::eval::err_at(&["tipGap"], "Cannot create hem, decrease gap.");
     }
     let eval = |th: f64| -> (f64, f64) {
         let psi = th - FRAC_PI_2;
@@ -503,7 +512,7 @@ fn tear_drop(r: f64, t: f64, gap: f64, total: f64) -> FResult<(f64, f64)> {
     };
     let (mut lo, mut hi) = (PI + 1e-4, 1.5 * PI);
     if eval(hi).1 > total {
-        return err("The hem is too short; increase the total length");
+        return crate::regen::eval::err_at(&["length"], "Cannot create hem, increase total length.");
     }
     for _ in 0..200 {
         let mid = 0.5 * (lo + hi);
@@ -512,18 +521,18 @@ fn tear_drop(r: f64, t: f64, gap: f64, total: f64) -> FResult<(f64, f64)> {
     let th = 0.5 * (lo + hi);
     let (ls, _) = eval(th);
     if ls <= 1e-9 {
-        return err("The hem is too short; increase the total length");
+        return crate::regen::eval::err_at(&["length"], "Cannot create hem, increase total length.");
     }
     Ok((th, ls))
 }
 
 pub fn hem(ev: &mut EvalCtx) -> FResult<()> {
     if ev.query("edges").is_empty() {
-        return err("Select edges or side faces to hem");
+        return crate::regen::eval::err_at(&["edges"], "Select edges to hem.");
     }
-    let edges = resolve_edges(ev, "edges")?;
+    let edges = resolve_edges(ev, "edges", "hem")?;
     if edges.is_empty() {
-        return err("Selected edges no longer exist");
+        return crate::regen::eval::err_at(&["edges"], "Select edges to hem.");
     }
     for (bi, eis) in by_body(&edges).into_iter().rev() {
         let mut data = (*active_data(ev, bi)?).clone();
@@ -533,7 +542,7 @@ pub fn hem(ev: &mut EvalCtx) -> FResult<()> {
             "ROLLED" => {
                 let a = ev.angle("angle")?;
                 if !(PI - 1e-9..2.0 * PI).contains(&a) {
-                    return err("Rolled hem angle must be between 180 and 360 degrees");
+                    return crate::regen::eval::err_at(&["angle"], "Error regenerating: a parameter is out of range.");
                 }
                 // A bend, so the bend K factor (the Rolled K factor is for rolled walls, Onshape
                 // Help "Sheet metal model"; std's host develops it with the model's K factor).
@@ -549,19 +558,19 @@ pub fn hem(ev: &mut EvalCtx) -> FResult<()> {
                 let r = if ev.bool("useMinimalGapForStraight") { data.minimal_clearance * 0.5 } else { ev.length("innerRadius")? };
                 let ls = ev.length("length")? - (r + t);
                 if ls <= 1e-9 {
-                    return err("The hem is too short; increase the total length");
+                    return crate::regen::eval::err_at(&["length"], "Cannot create hem, increase total length.");
                 }
                 (PI, r, ls, BendKind::Hem, data.k_factor)
             }
         };
         if r <= 0.0 {
-            return err("Hem radius must be positive");
+            return crate::regen::eval::err_at(&["innerRadius"], "Error regenerating: a parameter is out of range.");
         }
         let u_t = if ev.is("hemAlignment", "IN_PLACE") { 0.0 } else { -(r + t) };
         let mut frames = Vec::new();
         let mut geoms = Vec::new();
         for &ei in &eis {
-            let ef = edge_frame(ev, &data, bi, ei, ev.bool("oppositeDirection"))?;
+            let ef = edge_frame(ev, &data, bi, ei, ev.bool("oppositeDirection"), "hem")?;
             let s = (0.0, ef.len);
             geoms.push(FlangeGeom { angle, radius: r, k_factor, u_t, straight, s_flange: s, s_trim: s, kind, relief: true });
             frames.push(ef);

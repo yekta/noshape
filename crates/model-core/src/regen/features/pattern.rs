@@ -240,7 +240,7 @@ fn chain_path(edges: &[SourcedEdge]) -> FResult<Path> {
                 None
             }
         }) else {
-            return err("The pattern path must be a connected chain of edges");
+            return crate::regen::eval::err_at(&["edges"], "Edges do not form a continuous path.");
         };
         let mut s = rest.remove(i);
         match how {
@@ -263,7 +263,7 @@ fn chain_path(edges: &[SourcedEdge]) -> FResult<Path> {
         }
     }
     if chain.len() < 2 {
-        return err("The pattern path is degenerate");
+        return crate::regen::eval::err_at(&["edges"], "Edges do not form a continuous path.");
     }
     Ok(Path::new(chain))
 }
@@ -615,7 +615,7 @@ fn faces_tool(ev: &EvalCtx, body: &Body, faces: &[usize]) -> FResult<FaceTool> {
     let mut caps: Vec<Shape> = Vec::new();
     if !boundary.is_empty() {
         for w in k::edges_to_wires(&Shape::compound(&boundary), 1e-6)? {
-            let cap = k::make_face_from_wire(&w, true).map_err(|_| fe("These faces can't be patterned: their boundary is not planar"))?;
+            let cap = k::make_face_from_wire(&w, true).map_err(|_| fe("Failed to create pattern, check input."))?;
             caps.push(cap);
         }
     }
@@ -661,14 +661,14 @@ fn faces_tool(ev: &EvalCtx, body: &Body, faces: &[usize]) -> FResult<FaceTool> {
         .collect();
     // Boss or pocket: probe just outside the body at the first face.
     let f0 = &face_shapes[0];
-    let p = point_on_face(f0).ok_or_else(|| fe("Pattern failed: degenerate face"))?;
-    let (_, n) = face_normal_near(f0, p).ok_or_else(|| fe("Pattern failed: degenerate face"))?;
+    let p = point_on_face(f0).ok_or_else(|| fe("Failed to create pattern, check input."))?;
+    let (_, n) = face_normal_near(f0, p).ok_or_else(|| fe("Failed to create pattern, check input."))?;
     let size = solid.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0);
     let q = p + n.normalize() * (size * 1e-4).max(1e-7);
     let add = match solid.classify_point(q, 1e-9)? {
         k::PointClass::Inside => false,
         k::PointClass::Outside => true,
-        _ => return err("Pattern failed: could not tell whether the faces add or remove material"),
+        _ => return err("Failed to create pattern, check input."),
     };
     Ok(FaceTool { shape: solid, names, add })
 }
@@ -1475,7 +1475,7 @@ fn reapply_features(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance
         seeds.push(fd);
     }
     if seeds.is_empty() {
-        return err("None of the selected features can be re-applied");
+        return crate::regen::eval::err_at(&["instanceFunction"], "Select features to pattern.");
     }
     // Add / Remove features: each instance's tool is made against the model
     // before the pattern (as New), then all go into one boolean. Linear in

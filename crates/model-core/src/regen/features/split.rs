@@ -35,7 +35,7 @@ fn resolve_tool(ev: &EvalCtx, r: &Reference, trimmed: bool) -> FResult<Tool> {
     };
     match r {
         Reference::Body(id) => {
-            let b = ev.ctx.body(id).ok_or_else(|| fe("The split tool no longer exists"))?;
+            let b = ev.ctx.body(id).ok_or_else(|| crate::regen::eval::FeatureError::at(&["tool"], "Select entity to split with."))?;
             if b.kind != BodyKind::Surface {
                 return err("Incorrect input for tool type.");
             }
@@ -47,7 +47,7 @@ fn resolve_tool(ev: &EvalCtx, r: &Reference, trimmed: bool) -> FResult<Tool> {
             Ok(Tool { names: names_for(&b.shape, faces), shape: b.shape.clone(), plane: None, body: Some(b.id.clone()) })
         }
         Reference::Face(_) => {
-            let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(r)).first().ok_or_else(|| fe("The split face no longer exists"))?;
+            let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(r)).first().ok_or_else(|| crate::regen::eval::FeatureError::at(&["tool"], "Select entity to split with."))?;
             let b = &ev.ctx.bodies[bi];
             let f = b.shape.sub_shape(ShapeType::Face, fi)?;
             if !trimmed && let Some(pl) = f.face_plane()? {
@@ -57,7 +57,7 @@ fn resolve_tool(ev: &EvalCtx, r: &Reference, trimmed: bool) -> FResult<Tool> {
             Ok(Tool { names: names_for(&f, faces), shape: f, plane: None, body: None })
         }
         _ => {
-            let frame = ev.resolve_plane(r).ok_or_else(|| fe("The split tool could not be resolved"))?;
+            let frame = ev.resolve_plane(r).ok_or_else(|| crate::regen::eval::FeatureError::at(&["tool"], "Select entity to split with."))?;
             plane_tool(kernel_plane(&frame))
         }
     }
@@ -236,7 +236,7 @@ fn split_faces(ev: &mut EvalCtx) -> FResult<()> {
             .or_else(|| (!curves.is_empty()).then_some(DVec3::Z))
     } else {
         match ev.query("directionQuery").first() {
-            Some(r) => Some(ev.resolve_direction(r).ok_or_else(|| fe("The projection direction could not be resolved"))?),
+            Some(r) => Some(ev.resolve_direction(r).ok_or_else(|| crate::regen::eval::FeatureError::at(&["directionQuery"], "Select edge projection direction for split."))?),
             None if curves.is_empty() => None,
             None => return crate::regen::eval::err_at(&["directionQuery"], "Select edge projection direction for split."),
         }

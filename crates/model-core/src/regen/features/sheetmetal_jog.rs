@@ -20,22 +20,22 @@ fn jog_offset(ev: &EvalCtx, t: f64, fc: DVec3, up: DVec3) -> FResult<f64> {
     let anchor = ev.enum_("bendOffsetAnchor");
     match ev.enum_("offsetType") {
         "UP_TO_ENTITY" => {
-            let Some(r) = ev.query("jogLimit").first() else { return err("Select the entity to jog up to") };
+            let Some(r) = ev.query("jogLimit").first() else { return crate::regen::eval::err_at(&["jogLimit"], "Cannot resolve entities.") };
             let p = match r {
                 Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => ev.resolve_plane(r).map(|f| f.origin).or_else(|| {
                     let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(r)).first()?;
                     ev.face_shape(bi, fi).ok()?.centroid().ok()
                 }),
                 Reference::Edge(_) => {
-                    let (bi, ei) = *ev.resolve_edges(std::slice::from_ref(r)).first().ok_or_else(|| fe("The jog limit no longer exists"))?;
+                    let (bi, ei) = *ev.resolve_edges(std::slice::from_ref(r)).first().ok_or_else(|| crate::regen::eval::FeatureError::at(&["jogLimit"], "Cannot resolve entities."))?;
                     ev.edge_shape(bi, ei)?.endpoints().ok().map(|(a, b)| (a + b) * 0.5)
                 }
                 _ => ev.resolve_vertex_point(r),
             };
-            let Some(p) = p else { return err("The jog limit no longer exists") };
+            let Some(p) = p else { return crate::regen::eval::err_at(&["jogLimit"], "Cannot resolve entities.") };
             let mut d = (p - fc).dot(up);
             if d < -1e-9 {
-                return err("The jog bends away from the selected entity; use Opposite angle");
+                return err("Jog could not be created with the bend angle direction and target entity selection.");
             }
             if ev.bool("jogLimitOffset") {
                 let o = ev.length("jogLimitDistance")?;
@@ -86,7 +86,7 @@ pub fn jog(ev: &mut EvalCtx) -> FResult<()> {
     }
     let t = data.thickness;
     let body = ev.ctx.bodies[bi].clone();
-    let Some((_, on_ref)) = data.wall_of_face(&body.faces[fi]) else { return err("Select a planar face of a sheet metal wall") };
+    let Some((_, on_ref)) = data.wall_of_face(&body.faces[fi]) else { return crate::regen::eval::err_at(&["face"], "Select a planar sheet metal face.") };
     let fc = body.shape.sub_shape(ShapeType::Face, fi)?.centroid()?;
     let offset = jog_offset(ev, t, fc, up)?;
     // Offset of two adjacent bends (no wall between them): R(1-cos) + (R+T)(1-cos).
@@ -119,13 +119,13 @@ pub fn jog(ev: &mut EvalCtx) -> FResult<()> {
             add_material(ev, bi, &mut data, lp, wdir, n, w0 + 2.0 * ba + wall + t, extra, &body.faces[fi])?;
         }
         // The selected face may have been split by the insertion.
-        face_through(ev, bi, &data, w, on_ref, lp + wdir * (w0 + ba * 0.5), n).ok_or_else(|| fe("The face to jog could not be found after adding material"))?
+        face_through(ev, bi, &data, w, on_ref, lp + wdir * (w0 + ba * 0.5), n).ok_or_else(|| fe("Failed to create jog transition area."))?
     };
     let (w2, _) = bend_core(ev, bi, fi, &mut data, &spec1)?;
     // Second bend on the moved wall, on the same sheet side.
     let probe = lp2 + wdir2 * (ba * 0.5);
     let Some(f2) = face_through(ev, bi, &data, w2, on_ref, probe, n2) else {
-        return err("The jogged wall is too short for the second bend");
+        return crate::regen::eval::err_at(&["face", "bendReference"], "Could not imprint the bend line on the face.");
     };
     bend_core(ev, bi, f2, &mut data, &spec2).map_err(|e| fe(format!("Second jog bend: {}", e.message)))?;
     put_data(ev, bi, data);
@@ -145,12 +145,12 @@ fn add_material(ev: &mut EvalCtx, bi: usize, data: &mut SheetMetalData, lp: DVec
     let (hs, hn) = bool_named(ev, k::BooleanOp::Cut, &named, &[cut_far])?;
     let (ms, mn) = bool_named(ev, k::BooleanOp::Cut, &named, &[cut_near])?;
     if hs.count(ShapeType::Solid) == 0 || ms.count(ShapeType::Solid) == 0 {
-        return err("The face is too short to add material for the jog");
+        return err("Failed to create jog transition area.");
     }
     let side = |p: DVec3| (p - lp).dot(wdir);
     let ends: Vec<Shape> = hs.faces().into_iter().filter(|f| plane_of(f).is_some_and(|(c, nn)| nn.cross(wdir).length() < 1e-9 && (side(c) - s_ins).abs() < 1e-7)).collect();
     if ends.is_empty() {
-        return err("The face is too short to add material for the jog");
+        return err("Failed to create jog transition area.");
     }
     let mv = DMat4::from_translation(wdir * extra);
     let moved = k::transform(&ms, &k::Transform::Matrix(mv), true)?;
@@ -167,7 +167,7 @@ fn add_material(ev: &mut EvalCtx, bi: usize, data: &mut SheetMetalData, lp: DVec
     let held = crate::regen::eval::NamedShape::new(hs, hn);
     let (shape, names) = bool_named(ev, k::BooleanOp::Fuse, &held, &tools)?;
     if solid_count(&shape) != 1 {
-        return err("Adding material for the jog failed");
+        return err("Failed to create jog transition area.");
     }
     ev.replace_body(bi, shape, names);
     // Bridge faces in the wall planes join the wall they extend; far bends

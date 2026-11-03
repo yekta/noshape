@@ -40,7 +40,7 @@ pub fn thicknesses(ev: &EvalCtx) -> FResult<(f64, f64)> {
         std::mem::swap(&mut t1, &mut t2);
     }
     if !(t1 >= 0.0 && t2 >= 0.0) || t1 + t2 <= 1e-9 {
-        return err("The wall thickness must be positive");
+        return crate::regen::eval::err_at(if ev.bool("midplane") { &["thickness"] } else { &["thickness1", "thickness2"] }, "Error regenerating: a parameter is out of range.");
     }
     Ok((t1, t2))
 }
@@ -181,7 +181,7 @@ pub fn wall_wires(ev: &EvalCtx, refs: &[Reference]) -> FResult<Vec<(Shape, Plane
 }
 
 fn wire_frame(w: &Shape) -> FResult<PlaneFrame> {
-    let pl = w.find_plane(1e-6)?.ok_or_else(|| fe("The wall curves must lie in one plane"))?;
+    let pl = w.find_plane(1e-6)?.ok_or_else(|| fe("Selected entities should lay in parallel planes."))?;
     Ok(PlaneFrame { origin: pl.origin, x: pl.unit_x(), y: pl.unit_normal().cross(pl.unit_x()), normal: pl.unit_normal() })
 }
 
@@ -202,11 +202,11 @@ fn offset(w: &Shape, d: f64, open: bool) -> FResult<Shape> {
         && let Ok(k::Curve::Circle { center, axis, radius, .. }) = e.edge_curve()
     {
         if radius + d <= 1e-12 {
-            return err("The wall offset failed (thickness too large?)");
+            return err("Failed to create the shape - offset value for the first direction is too large.");
         }
         return Ok(k::make_wire(&[k::make_circle(center, axis, radius + d)?])?);
     }
-    let r = k::offset_wire_2d(w, d, k::JoinType::Intersection, open).or_else(|_| k::offset_wire_2d(w, d, k::JoinType::Arc, open)).map_err(kerr("The wall offset failed (thickness too large?)"))?;
+    let r = k::offset_wire_2d(w, d, k::JoinType::Intersection, open).or_else(|_| k::offset_wire_2d(w, d, k::JoinType::Arc, open)).map_err(kerr("Failed to create the shape - offset value for the first direction is too large."))?;
     let r = r.wires().into_iter().next().unwrap_or(r);
     Ok(r)
 }
@@ -230,9 +230,9 @@ pub fn wall_loops(w: &Shape, t_out: f64, t_in: f64) -> FResult<(Shape, Shape)> {
     let s = if grow { 1.0 } else { -1.0 };
     let outer = if t_out > 0.0 { offset(w, s * t_out, false)? } else { w.clone() };
     let inner = if t_in > 0.0 {
-        let i = offset(w, -s * t_in, false)?;
+        let i = offset(w, -s * t_in, false).map_err(|_| fe("Failed to create the shape - offset value for the second direction is too large."))?;
         if area_of(&i) <= 1e-18 {
-            return err("The wall is too thick for the profile");
+            return err("Failed to create the shape - offset value for the second direction is too large.");
         }
         i
     } else {
@@ -244,7 +244,7 @@ pub fn wall_loops(w: &Shape, t_out: f64, t_in: f64) -> FResult<(Shape, Shape)> {
 /// Thin wall around a closed loop.
 fn closed_wall(frame: &PlaneFrame, w: &Shape, sources: &[SourcedEdge], t_out: f64, t_in: f64, key: Source) -> FResult<Profile> {
     let (outer, inner) = wall_loops(w, t_out, t_in)?;
-    let face = k::make_face(&kernel_plane(frame), &outer, std::slice::from_ref(&inner)).map_err(kerr("Could not build the thin wall"))?;
+    let face = k::make_face(&kernel_plane(frame), &outer, std::slice::from_ref(&inner)).map_err(kerr("Failed to create sheet body from source and offset wire."))?;
     let edge_sources = tag_sources(&face, &outer, &inner, sources, None);
     Ok(Profile { shape: face, frame: *frame, edge_sources, key, from_face: false })
 }
@@ -279,7 +279,7 @@ fn left_of(e: &Shape, n: DVec3) -> FResult<(DVec3, DVec3)> {
     let t = e.tangent_at(t_mid)?;
     let left = n.cross(t).normalize_or_zero();
     if left.length_squared() < 0.5 {
-        return err("The wall curves must lie in the wall plane");
+        return err("Selected entities should lay in parallel planes.");
     }
     Ok((m, left))
 }
@@ -312,7 +312,7 @@ fn offset_side(w: &Shape, d: f64, m: DVec3, left: DVec3) -> FResult<Shape> {
     if straight {
         return Ok(w.translated(left * d)?);
     }
-    err("The wall offset failed (thickness too large?)")
+    err("Failed to create the shape - offset value for the first direction is too large.")
 }
 
 /// A thin loft's wall loop around an open planar chain: its offsets `t1` to
@@ -334,10 +334,10 @@ pub fn open_wall_loop(w: &Shape, reference: Option<DVec3>, t1: f64, t2: f64) -> 
     let first = w.edges()[0].clone();
     let (m, left) = left_of(&first, normal)?;
     let o1 = offset_side(w, t1, m, -left)?;
-    let o2 = offset_side(w, t2, m, left)?;
-    let (ws, we) = ends(w).ok_or_else(|| fe("The wall chain is not open"))?;
+    let o2 = offset_side(w, t2, m, left).map_err(|_| fe("Failed to create the shape - offset value for the second direction is too large."))?;
+    let (ws, we) = ends(w).ok_or_else(|| fe("Failed to thicken lofted body, check thickness."))?;
     let pair = |o: &Shape| -> FResult<(DVec3, DVec3)> {
-        let (a, b) = ends(o).ok_or_else(|| fe("The wall offset is not an open chain"))?;
+        let (a, b) = ends(o).ok_or_else(|| fe("Failed to thicken lofted body, check thickness."))?;
         Ok(if a.distance(ws) + b.distance(we) <= a.distance(we) + b.distance(ws) { (a, b) } else { (b, a) })
     };
     let (o1s, o1e) = pair(&o1)?;
@@ -349,7 +349,7 @@ pub fn open_wall_loop(w: &Shape, reference: Option<DVec3>, t1: f64, t2: f64) -> 
     let wires = k::edges_to_wires(&Shape::compound(&edges), 1e-6)?;
     match wires.as_slice() {
         [one] => Ok(Some((one.clone(), o1s, normal))),
-        _ => err("Could not build the thin wall (self-intersecting offset?)"),
+        _ => err("Failed to thicken lofted body, check thickness."),
     }
 }
 
@@ -358,10 +358,10 @@ fn open_wall(frame: &PlaneFrame, w: &Shape, sources: &[SourcedEdge], t1: f64, t2
     let first = sources.first().map(|s| s.shape.clone()).unwrap_or_else(|| w.edges()[0].clone());
     let (m, left) = left_of(&first, frame.normal)?;
     let o1 = offset_side(w, t1, m, left)?;
-    let o2 = offset_side(w, t2, m, -left)?;
-    let (ws, we) = ends(w).ok_or_else(|| fe("The wall chain is not open"))?;
+    let o2 = offset_side(w, t2, m, -left).map_err(|_| fe("Failed to create the shape - offset value for the second direction is too large."))?;
+    let (ws, we) = ends(w).ok_or_else(|| fe("Failed to perform an offset wire operation."))?;
     let pair = |o: &Shape| -> FResult<(DVec3, DVec3)> {
-        let (a, b) = ends(o).ok_or_else(|| fe("The wall offset is not an open chain"))?;
+        let (a, b) = ends(o).ok_or_else(|| fe("Failed to perform an offset wire operation."))?;
         Ok(if a.distance(ws) + b.distance(we) <= a.distance(we) + b.distance(ws) { (a, b) } else { (b, a) })
     };
     let (o1s, o1e) = pair(&o1)?;
@@ -375,9 +375,9 @@ fn open_wall(frame: &PlaneFrame, w: &Shape, sources: &[SourcedEdge], t1: f64, t2
     let wires = k::edges_to_wires(&Shape::compound(&edges), 1e-6)?;
     let outline = match wires.as_slice() {
         [one] => one.clone(),
-        _ => return err("Could not build the thin wall (self-intersecting offset?)"),
+        _ => return err("Failed to create sheet body from source and offset wire."),
     };
-    let face = k::make_face(&kernel_plane(frame), &outline, &[]).map_err(kerr("Could not build the thin wall"))?;
+    let face = k::make_face(&kernel_plane(frame), &outline, &[]).map_err(kerr("Failed to create sheet body from source and offset wire."))?;
     let edge_sources = tag_sources(&face, &o1, &o2, sources, Some((ws, we)));
     Ok(Profile { shape: face, frame: *frame, edge_sources, key, from_face: false })
 }

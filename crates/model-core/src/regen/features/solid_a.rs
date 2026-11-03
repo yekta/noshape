@@ -1312,7 +1312,7 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
             Reference::SketchEntity { sketch, .. } | Reference::Sketch(sketch) => ev.ctx.sketch(*sketch).map(|s| s.frame),
             _ => None,
         })
-        .ok_or_else(|| fe("Rib profiles must be sketch curves"))?;
+        .ok_or_else(|| crate::regen::eval::FeatureError::at(&["profiles"], "Select sketch profiles to create the ribs."))?;
     let edges = resolve_curves(ev, refs)?;
     let wires = wires_from(&edges)?;
     if wires.is_empty() {

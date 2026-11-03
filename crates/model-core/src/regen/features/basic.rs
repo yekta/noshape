@@ -137,18 +137,24 @@ pub fn variable(ev: &mut EvalCtx) -> FResult<()> {
             "LENGTH" => {
                 let refs = ev.query("lengthEntities").to_vec();
                 if refs.is_empty() {
-                    return err("Select edges to measure");
+                    return crate::regen::eval::err_at(&["lengthEntities"], "Select entities to measure.");
                 }
                 measure::total_length(&ev.ctx, &refs)
             }
             "DIAMETER" => {
-                let Some(r) = ev.query("diameterEntity").first().cloned() else { return err("Select a circular edge, cylinder or sphere") };
-                let d = measure::entity_diameter(&ev.ctx, &r).ok_or_else(|| crate::regen::eval::FeatureError::new("Select a circular edge, cylinder or sphere".to_string()))?;
+                let Some(r) = ev.query("diameterEntity").first().cloned() else { return crate::regen::eval::err_at(&["diameterEntity"], "Select entity to measure.") };
+                let d = measure::entity_diameter(&ev.ctx, &r).ok_or_else(|| crate::regen::eval::FeatureError::new("Unable to find geometry with a diameter in query.".to_string()))?;
                 if ev.bool("radius") { d / 2.0 } else { d }
             }
             _ => {
                 let refs = ev.query("entityCouple").to_vec();
-                let [a, b] = refs.as_slice() else { return err("Select two entities to measure between") };
+                let [a, b] = refs.as_slice() else {
+                    return match refs.len() {
+                        0 => crate::regen::eval::err_at(&["entityCouple"], "Select the first entity to measure between."),
+                        1 => err("Select the second entity to measure between."),
+                        _ => err("Only two entities can be selected for distance measurement."),
+                    };
+                };
                 let d = measure::entity_distance(&ev.ctx, a, b, ev.is("minmax", "MAXIMUM")).ok_or_else(|| crate::regen::eval::FeatureError::new("Could not measure between the selections".to_string()))?;
                 // std variable.fs selectDistanceComponent: the value along the
                 // chosen axis, whether or not the Axis measurements group is
@@ -159,7 +165,7 @@ pub fn variable(ev: &mut EvalCtx) -> FResult<()> {
                     "Z" => d.delta.z.abs(),
                     "CUSTOM" => {
                         let Some(r) = ev.query("customDirection").first().cloned() else { return err(crate::regen::custom_features::error_text("VARIABLE_SELECT_CUSTOM_DIRECTION")) };
-                        let dir = ev.resolve_direction(&r).ok_or_else(|| crate::regen::eval::FeatureError::new("Could not resolve the custom direction".to_string()))?;
+                        let dir = ev.resolve_direction(&r).ok_or_else(|| crate::regen::eval::FeatureError::at(&["customDirection"], "Select custom direction.".to_string()))?;
                         d.delta.dot(dir.normalize_or_zero()).abs()
                     }
                     _ => d.distance,

@@ -129,7 +129,7 @@ pub fn curve_edges(ev: &EvalCtx, refs: &[Reference]) -> FResult<Vec<Shape>> {
 
 /// Faces selected directly, via sheet/solid bodies, or as plane references
 /// (planes become large planar faces).
-pub fn face_shapes(ev: &EvalCtx, refs: &[Reference], with_planes: bool) -> FResult<Vec<Shape>> {
+pub fn face_shapes(ev: &EvalCtx, refs: &[Reference], with_planes: bool, field: &'static str) -> FResult<Vec<Shape>> {
     let mut out = Vec::new();
     for r in refs {
         let one = std::slice::from_ref(r);
@@ -137,7 +137,7 @@ pub fn face_shapes(ev: &EvalCtx, refs: &[Reference], with_planes: bool) -> FResu
             Reference::Face(_) => {
                 let found = ev.resolve_faces(one);
                 if found.is_empty() {
-                    return err("A selected face no longer exists");
+                    return crate::regen::eval::err_at(&[field], "Cannot resolve entities.");
                 }
                 for (bi, fi) in found {
                     out.push(ev.face_shape(bi, fi)?);
@@ -146,14 +146,14 @@ pub fn face_shapes(ev: &EvalCtx, refs: &[Reference], with_planes: bool) -> FResu
             Reference::Body(_) => {
                 let found = ev.resolve_bodies(one);
                 if found.is_empty() {
-                    return err("A selected body no longer exists");
+                    return crate::regen::eval::err_at(&[field], "Cannot resolve entities.");
                 }
                 for bi in found {
                     out.extend(ev.ctx.bodies[bi].shape.faces());
                 }
             }
             Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::MateConnector { .. } | Reference::Implicit { .. } if with_planes => {
-                let Some(f) = ev.resolve_plane(r) else { return err("A selected plane no longer exists") };
+                let Some(f) = ev.resolve_plane(r) else { return crate::regen::eval::err_at(&[field], "Cannot resolve entities.") };
                 let ext = ev.model_extent() * 2.0;
                 out.push(k::make_plane_face(&kernel_plane(&f), -ext, ext, -ext, ext)?);
             }
@@ -334,7 +334,7 @@ pub fn order_chain(edges: &[Shape], tol: f64) -> FResult<Vec<(Shape, bool)>> {
                 None
             }
         });
-        let Some((j, rev)) = next else { return err("Selected edges must form one connected chain") };
+        let Some((j, rev)) = next else { return crate::regen::eval::err_at(&["edges"], "Selected edges do not form a continuous chain.") };
         used[j] = true;
         cur = if rev { ends[j].0 } else { ends[j].1 };
         out.push((edges[j].clone(), rev));

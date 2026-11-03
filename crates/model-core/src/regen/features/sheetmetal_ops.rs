@@ -12,7 +12,7 @@ use super::sheetmetal_util::*;
 use crate::naming::Name;
 use crate::reference::{Reference, Role, TopoName};
 use crate::regen::context::Body;
-use crate::regen::eval::{EvalCtx, FResult, NamedShape, err, sweep_names};
+use crate::regen::eval::{EvalCtx, FResult, FeatureError, NamedShape, err, sweep_names};
 use crate::sheetmetal::{Bend, BendKind, BendReliefStyle, Rip, SheetMetalData, Wall};
 use glam::{DMat4, DVec3};
 use noshape_kernel as k;
@@ -108,14 +108,14 @@ fn split_bend_sides(ev: &mut EvalCtx, bi: usize, inner: &Name, outer: &Name) -> 
 pub fn bend_corner(ev: &mut EvalCtx, bi: usize, data: &mut SheetMetalData, parent: usize, child: usize, r: f64, kf: f64) -> FResult<()> {
     let t = data.thickness;
     if r <= 0.0 {
-        return err("Bend radius must be positive");
+        return crate::regen::eval::err_at(&["radius"], "Error regenerating: a parameter is out of range.");
     }
     let body = ev.ctx.bodies[bi].clone();
     let edges = corner_edges(&body, data, parent, child);
     let convex: Vec<usize> = edges.iter().filter(|e| e.1).map(|e| e.0).collect();
     let concave: Vec<usize> = edges.iter().filter(|e| !e.1).map(|e| e.0).collect();
     if convex.len() != 1 || concave.len() != 1 {
-        return err("The walls must meet in one sharp corner to make a bend");
+        return crate::regen::eval::err_at(&["entities"], "Cannot add joint joining selected entities.");
     }
     let (eo, ei) = (convex[0], concave[0]);
     let shapes = [body.shape.sub_shape(ShapeType::Edge, eo)?, body.shape.sub_shape(ShapeType::Edge, ei)?];
@@ -127,11 +127,11 @@ pub fn bend_corner(ev: &mut EvalCtx, bi: usize, data: &mut SheetMetalData, paren
     split_bend_sides(ev, bi, &inner_name, &outer_name)?;
     let nb = ev.ctx.bodies[bi].clone();
     let inner = faces_named(&nb, std::slice::from_ref(&inner_name));
-    let Some(&fi) = inner.first() else { return err("The bend faces were not created") };
+    let Some(&fi) = inner.first() else { return crate::regen::eval::err_at(&["entities"], "Cannot add joint joining selected entities.") };
     let face = nb.shape.sub_shape(ShapeType::Face, fi)?;
-    let k::Surface::Cylinder { origin, axis, .. } = face.face_surface()? else { return err("The bend is not cylindrical") };
+    let k::Surface::Cylinder { origin, axis, .. } = face.face_surface()? else { return crate::regen::eval::err_at(&["entities"], "Cannot add joint joining selected entities.") };
     let (Some((pa, na)), Some((cb, nbn))) = (wall_plane(&nb, &data.walls[parent]), wall_plane(&nb, &data.walls[child])) else {
-        return err("The walls of the bend could not be found");
+        return crate::regen::eval::err_at(&["entities"], "Cannot add joint joining selected entities.");
     };
     let axis = axis.normalize();
     let ext = extent_along(&face, origin, axis);
@@ -199,14 +199,14 @@ pub fn rip_corners(ev: &mut EvalCtx, bi: usize, data: &mut SheetMetalData, cuts:
     for (ci, cut) in cuts.iter().enumerate() {
         let edges = corner_edges(&body, data, cut.a, cut.b);
         let Some(&(key_edge, _)) = edges.first() else {
-            return err("The walls must meet in a sharp corner to rip");
+            return crate::regen::eval::err_at(&["entities"], "Cannot add joint joining selected entities.");
         };
         let (Some((pa, na)), Some((pb, nb))) = (wall_frame(&body, &data.walls[cut.a]), wall_frame(&body, &data.walls[cut.b])) else {
-            return err("Rip walls must be planar");
+            return crate::regen::eval::err_at(&["entities"], "Cannot create joint between non planar walls.");
         };
         let ec = na.cross(nb);
         if ec.length() < 1e-9 {
-            return err("The rip corner is degenerate");
+            return crate::regen::eval::err_at(&["entities"], "Cannot add joint joining selected entities.");
         }
         let e = ec.normalize();
         // The definition planes' common line: a point on both.
@@ -277,7 +277,7 @@ pub fn rip_corners(ev: &mut EvalCtx, bi: usize, data: &mut SheetMetalData, cuts:
         }
     }
     if tools.is_empty() {
-        return err("The rip could not be made");
+        return crate::regen::eval::err_at(&["entities"], "Cannot add joint joining selected entities.");
     }
     let tool_names: Vec<Name> = tools.iter().flat_map(|t| t.names.faces.iter().cloned()).collect();
     let (shape, names) = bool_named(ev, k::BooleanOp::Cut, &body_named(&body), &tools)?;
@@ -437,7 +437,7 @@ fn unbend(ev: &mut EvalCtx, bi: usize, bend: &Bend) -> FResult<()> {
     names.extend(bend.outer_faces.iter().cloned());
     let mut idx = faces_named(&body, &names);
     if idx.is_empty() {
-        return err("The bend faces no longer exist");
+        return crate::regen::eval::err_at(&["entity"], "Select a joint from an active sheet metal model.");
     }
     // The bend's own pieces of the side faces (split_bend_sides): the planar
     // faces touching both its inner and outer cylinders.
@@ -471,14 +471,14 @@ fn resolve_one(ev: &EvalCtx, r: &Reference) -> Option<(usize, usize, bool)> {
 pub fn make_joint(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("entities").to_vec();
     if refs.is_empty() {
-        return err("Select the sharp edge between two walls");
+        return crate::regen::eval::err_at(&["entities"], "Selected edges should be from the same active sheet metal model.");
     }
     // Onshape (live G34c, G34d): picks at an existing joint (a rip's cut
     // faces or their edges, a bend) fail first; then picks on more than one
     // part.
     let mut parts: Vec<usize> = Vec::new();
     for r in &refs {
-        let Some((bi, si, is_face)) = resolve_one(ev, r) else { return err("A selected entity no longer exists") };
+        let Some((bi, si, is_face)) = resolve_one(ev, r) else { return crate::regen::eval::err_at(&["entities"], "Selected edges should be from the same active sheet metal model.") };
         let body = &ev.ctx.bodies[bi];
         if let Some(data) = ev.ctx.sheet_metal.get(&body.id) {
             let faces: Vec<usize> = if is_face { vec![si] } else { body.shape.edge_faces()?.get(si).map(|f| f.iter().map(|&x| x as usize).collect()).unwrap_or_default() };
@@ -495,21 +495,21 @@ pub fn make_joint(ev: &mut EvalCtx) -> FResult<()> {
     }
     let mut corner: Option<(usize, usize, usize)> = None;
     for r in &refs {
-        let Some((bi, si, is_face)) = resolve_one(ev, r) else { return err("A selected entity no longer exists") };
+        let Some((bi, si, is_face)) = resolve_one(ev, r) else { return crate::regen::eval::err_at(&["entities"], "Selected edges should be from the same active sheet metal model.") };
         if is_face {
             return err("Joining walls by side faces is not supported; select the sharp edge where the walls meet");
         }
         let data = active_data(ev, bi)?;
         let Some((wa, wb)) = walls_at_edge(&ev.ctx.bodies[bi], &data, si) else {
-            return err("Select a sharp edge between two walls (walls that do not touch cannot be joined yet)");
+            return crate::regen::eval::err_at(&["entities"], "Cannot add joint joining selected entities.");
         };
         let key = (bi, wa.min(wb), wa.max(wb));
         if corner.is_some_and(|c| c != key) {
-            return err("Both edges must belong to the same corner");
+            return crate::regen::eval::err_at(&["entities"], "Cannot add joint joining selected entities.");
         }
         corner = Some(key);
     }
-    let Some((bi, wa, wb)) = corner else { return err("Select the sharp edge between two walls") };
+    let Some((bi, wa, wb)) = corner else { return crate::regen::eval::err_at(&["entities"], "Selected edges should be from the same active sheet metal model.") };
     let mut data = (*active_data(ev, bi)?).clone();
     if ev.is("joint", "BEND") {
         let r = if ev.bool("useDefaultRadius") { data.radius } else { ev.length("radius")? };
@@ -524,8 +524,8 @@ pub fn make_joint(ev: &mut EvalCtx) -> FResult<()> {
 }
 
 pub fn modify_joint(ev: &mut EvalCtx) -> FResult<()> {
-    let Some(r) = ev.query("entity").first().cloned() else { return err("Select a bend or rip") };
-    let Some((bi, si, is_face)) = resolve_one(ev, &r) else { return err("The selected joint no longer exists") };
+    let Some(r) = ev.query("entity").first().cloned() else { return crate::regen::eval::err_at(&["entity"], "Select a joint from an active sheet metal model.") };
+    let Some((bi, si, is_face)) = resolve_one(ev, &r) else { return crate::regen::eval::err_at(&["entity"], "Select a joint from an active sheet metal model.") };
     let mut data = (*active_data(ev, bi)?).clone();
     let body = ev.ctx.bodies[bi].clone();
     let bend = if is_face {
@@ -565,9 +565,9 @@ pub fn modify_joint(ev: &mut EvalCtx) -> FResult<()> {
         }
         None => {
             if is_face {
-                return err("Select a bend face or a joint edge");
+                return crate::regen::eval::err_at(&["entity"], "Select a joint from an active sheet metal model.");
             }
-            let Some((wa, wb)) = walls_at_edge(&body, &data, si) else { return err("The selection is not a sheet metal joint") };
+            let Some((wa, wb)) = walls_at_edge(&body, &data, si) else { return crate::regen::eval::err_at(&["entity"], "Select a joint from an active sheet metal model.") };
             match ty.as_str() {
                 "BEND" => bend_corner(ev, bi, &mut data, wa.min(wb), wa.max(wb), r_new, k_new)?,
                 "RIP" => {
@@ -590,11 +590,11 @@ pub fn modify_joint(ev: &mut EvalCtx) -> FResult<()> {
 pub fn tab(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("tabFaces");
     if refs.is_empty() {
-        return err("Select tab profile regions or faces");
+        return crate::regen::eval::err_at(&["tabFaces"], "Select a face for the tab.");
     }
     let profiles = ev.profiles(refs)?;
     if profiles.is_empty() {
-        return err("No valid tab profiles");
+        return crate::regen::eval::err_at(&["tabFaces"], "Select a face for the tab.");
     }
     let scope: Vec<(usize, usize)> = ev.resolve_faces(ev.query("booleanUnionScope"));
     let offset = ev.length("booleanOffset").unwrap_or(0.0);
@@ -620,7 +620,7 @@ pub fn tab(ev: &mut EvalCtx) -> FResult<()> {
                 }
             }
         }
-        let Some((bi, wi, on_ref, n)) = found else { return err("The tab must lie in the plane of a sheet metal wall") };
+        let Some((bi, wi, on_ref, n)) = found else { return crate::regen::eval::err_at(&["tabFaces"], "Highlighted tabs have no parallel wall to join.") };
         let mut data = (*active_data(ev, bi)?).clone();
         let t = data.thickness;
         let res = k::extrude(&p.shape, -n * t)?;
@@ -667,7 +667,7 @@ pub fn tab(ev: &mut EvalCtx) -> FResult<()> {
         let body = ev.ctx.bodies[bi].clone();
         let (shape, names) = bool_named(ev, k::BooleanOp::Fuse, &body_named(&body), &[prism])?;
         if solid_count(&shape) != 1 {
-            return err("The tab does not touch the wall");
+            return crate::regen::eval::err_at(&["tabFaces"], "No tabs meet the selected sheet metal.");
         }
         ev.replace_body(bi, shape, names);
         let nb = ev.ctx.bodies[bi].clone();
@@ -705,20 +705,20 @@ pub struct BendInputs {
 
 /// Resolve the face, bend line, angle, radius and K factor of a Bend or Jog.
 pub fn bend_inputs(ev: &EvalCtx) -> FResult<BendInputs> {
-    let Some(fr) = ev.query("face").first().cloned() else { return err("Select the sheet metal face to bend") };
-    let Some(&(bi, fi)) = ev.resolve_faces(std::slice::from_ref(&fr)).first() else { return err("The face to bend no longer exists") };
+    let Some(fr) = ev.query("face").first().cloned() else { return crate::regen::eval::err_at(&["face"], "Select a planar sheet metal face.") };
+    let Some(&(bi, fi)) = ev.resolve_faces(std::slice::from_ref(&fr)).first() else { return crate::regen::eval::err_at(&["face"], "Select a planar sheet metal face.") };
     let data = (*active_data(ev, bi)?).clone();
     let body = ev.ctx.bodies[bi].clone();
     if data.wall_of_face(&body.faces[fi]).is_none() {
-        return err("Select a planar face of a sheet metal wall");
+        return crate::regen::eval::err_at(&["face"], "Select a planar sheet metal face.");
     }
     let face = body.shape.sub_shape(ShapeType::Face, fi)?;
-    let Some((fc, n)) = plane_of(&face) else { return err("The face to bend must be planar") };
-    let Some(lr) = ev.query("bendReference").first() else { return err("Select a bend line") };
-    let Some((lp, ld)) = ev.resolve_axis(lr) else { return err("The bend line is not a line") };
+    let Some((fc, n)) = plane_of(&face) else { return crate::regen::eval::err_at(&["face"], "Select a planar sheet metal face.") };
+    let Some(lr) = ev.query("bendReference").first() else { return crate::regen::eval::err_at(&["bendReference"], "Select a line.") };
+    let Some((lp, ld)) = ev.resolve_axis(lr) else { return crate::regen::eval::err_at(&["bendReference"], "Select a line.") };
     let ld = ld - n * ld.dot(n);
     if ld.length() < 1e-9 {
-        return err("The bend line is perpendicular to the face");
+        return crate::regen::eval::err_at(&["bendReference"], "The bend line is perpendicular to the sheet metal face.");
     }
     let d = ld.normalize();
     let lp = lp - n * (lp - fc).dot(n);
@@ -733,11 +733,12 @@ pub fn bend_inputs(ev: &EvalCtx) -> FResult<BendInputs> {
     let theta = match ev.enum_("angleControlType") {
         "ALIGN_GEOMETRY" | "ANGLE_FROM_DIRECTION" => {
             let id = if ev.is("angleControlType", "ALIGN_GEOMETRY") { "parallelEntity" } else { "directionEntity" };
-            let r = ev.query(id).first().ok_or_else(|| fe("Select a direction"))?;
-            let e = ev.resolve_direction(r).ok_or_else(|| fe("The selected entity has no direction"))?;
+            let missing = || if id == "parallelEntity" { FeatureError::at(&["parallelEntity"], "Select a parallel entity.") } else { FeatureError::at(&["directionEntity"], "Select a direction.") };
+            let r = ev.query(id).first().ok_or_else(missing)?;
+            let e = ev.resolve_direction(r).ok_or_else(missing)?;
             let (x, y) = (e.dot(wdir), e.dot(up));
             if (x * x + y * y).sqrt() < 1e-9 {
-                return err("The direction is parallel to the bend line");
+                return crate::regen::eval::err_at(&[id], "Angle control entity is not acceptable.");
             }
             let mut th = y.atan2(x);
             if ev.is("angleControlType", "ANGLE_FROM_DIRECTION") {
@@ -752,12 +753,16 @@ pub fn bend_inputs(ev: &EvalCtx) -> FResult<BendInputs> {
         _ => ev.angle("bendAngle")?,
     };
     if theta <= 1e-6 || theta >= 2.0 * std::f64::consts::PI - 1e-6 {
-        return err("The bend angle is too small");
+        return match ev.enum_("angleControlType") {
+            "ALIGN_GEOMETRY" => crate::regen::eval::err_at(&["parallelEntity"], "Angle control entity is not acceptable."),
+            "ANGLE_FROM_DIRECTION" => crate::regen::eval::err_at(&["directionEntity", "angleFromDirection"], "Angle control entity is not acceptable."),
+            _ => crate::regen::eval::err_at(&["bendAngle"], "Error regenerating: a parameter is out of range."),
+        };
     }
     let r = if ev.bool("useDefaultRadius") { data.radius } else { ev.length("bendRadius")? };
     let kf = if ev.bool("useDefaultKFactor") { data.k_factor } else { ev.real("kFactor")? };
     if r <= 0.0 {
-        return err("Bend radius must be positive");
+        return crate::regen::eval::err_at(&["bendRadius"], "Error regenerating: a parameter is out of range.");
     }
     Ok(BendInputs { bi, fi, data, lp, wdir, up, n, theta, r, kf })
 }
@@ -816,9 +821,9 @@ impl BendSpec {
 /// metal model. Returns the new (moving) wall and the folding transform.
 pub fn bend_core(ev: &mut EvalCtx, bi: usize, fi: usize, data: &mut SheetMetalData, spec: &BendSpec) -> FResult<(usize, DMat4)> {
     let body = ev.ctx.bodies[bi].clone();
-    let Some((w, on_ref)) = data.wall_of_face(&body.faces[fi]) else { return err("Select a planar face of a sheet metal wall") };
+    let Some((w, on_ref)) = data.wall_of_face(&body.faces[fi]) else { return crate::regen::eval::err_at(&["face"], "Select a planar sheet metal face.") };
     let face = body.shape.sub_shape(ShapeType::Face, fi)?;
-    let Some((fc, n)) = plane_of(&face) else { return err("The face to bend must be planar") };
+    let Some((fc, n)) = plane_of(&face) else { return crate::regen::eval::err_at(&["face"], "Select a planar sheet metal face.") };
     let BendSpec { lp, wdir, up, theta, r, kf, w0, kbase, .. } = *spec;
     let t = data.thickness;
     let ba = spec.allowance(t);
@@ -829,12 +834,12 @@ pub fn bend_core(ev: &mut EvalCtx, bi: usize, fi: usize, data: &mut SheetMetalDa
     // The strip that becomes the bend must be part of this wall only.
     let strip = k::common(&body.shape, &oriented_box(lp, wdir, n, [w0, w0 + ba], [-big, big], [-big, big])?)?.shape;
     if strip.count(ShapeType::Solid) == 0 {
-        return err("The bend line does not cross the face");
+        return crate::regen::eval::err_at(&["bendReference"], "The bend line did not divide the sheet metal into at least two parts.");
     }
     for v in strip.vertices() {
         let h = (v.vertex_point()? - fc).dot(n);
         if h > 1e-7 || h < -t - 1e-7 {
-            return err("The bend region crosses other walls; only flat regions can be bent");
+            return err("Cannot bend in that region.");
         }
     }
     let named = body_named(&body);
@@ -843,7 +848,7 @@ pub fn bend_core(ev: &mut EvalCtx, bi: usize, fi: usize, data: &mut SheetMetalDa
     let (hs, hn) = bool_named(ev, k::BooleanOp::Cut, &named, &[cut_h])?;
     let (ms, mn) = bool_named(ev, k::BooleanOp::Cut, &named, &[cut_m])?;
     if hs.count(ShapeType::Solid) == 0 || ms.count(ShapeType::Solid) == 0 {
-        return err("The bend line must split the face into two parts");
+        return crate::regen::eval::err_at(&["bendReference"], "The bend line did not divide the sheet metal into at least two parts.");
     }
     // Bend region: revolve the held part's end faces.
     let (axis_pt, a, m) = spec.fold(t);
@@ -853,7 +858,7 @@ pub fn bend_core(ev: &mut EvalCtx, bi: usize, fi: usize, data: &mut SheetMetalDa
         .filter(|f| plane_of(f).is_some_and(|(c, nn)| nn.cross(wdir).length() < 1e-9 && (side(c) - w0).abs() < 1e-7))
         .collect();
     if ends.is_empty() {
-        return err("The bend line does not cross the face");
+        return crate::regen::eval::err_at(&["bendReference"], "The bend line did not divide the sheet metal into at least two parts.");
     }
     let mut tools = Vec::new();
     for e in &ends {
@@ -877,7 +882,7 @@ pub fn bend_core(ev: &mut EvalCtx, bi: usize, fi: usize, data: &mut SheetMetalDa
     let held = NamedShape::new(hs, hn);
     let (shape, names) = bool_named(ev, k::BooleanOp::Fuse, &held, &tools)?;
     if solid_count(&shape) != 1 {
-        return err("The bent part is not connected");
+        return err("Cannot bend the face, most likely because it introduces a collision.");
     }
     ev.replace_body(bi, shape, names);
     // Update the sheet metal model.
@@ -1017,8 +1022,8 @@ pub fn cut_relief(ev: &mut EvalCtx, bi: usize, b: &Bend, t: f64, s_end: f64, sig
 }
 
 pub fn bend_relief(ev: &mut EvalCtx) -> FResult<()> {
-    let Some(r) = ev.query("bendRelief").first().cloned() else { return err("Select a vertex or edge at the end of a bend") };
-    let Some((bi, p)) = point_of(ev, &r) else { return err("The selected bend relief corner no longer exists") };
+    let Some(r) = ev.query("bendRelief").first().cloned() else { return crate::regen::eval::err_at(&["bendRelief"], "Select a bend relief to modify.") };
+    let Some((bi, p)) = point_of(ev, &r) else { return crate::regen::eval::err_at(&["bendRelief"], "Select a bend relief to modify.") };
     let data = (*active_data(ev, bi)?).clone();
     let t = data.thickness;
     let mut best: Option<(usize, f64, f64, f64)> = None;
@@ -1031,7 +1036,7 @@ pub fn bend_relief(ev: &mut EvalCtx) -> FResult<()> {
             }
         }
     }
-    let Some((i, _, s_end, sign)) = best else { return err("The selection is not at the end of a bend") };
+    let Some((i, _, s_end, sign)) = best else { return crate::regen::eval::err_at(&["bendRelief"], "Selection is not a bend relief.") };
     let b = data.bends[i].clone();
     let style_id = ev.enum_("bendReliefStyle").to_string();
     let style = BendReliefStyle::from_id(&style_id);
@@ -1058,7 +1063,7 @@ pub fn bend_relief(ev: &mut EvalCtx) -> FResult<()> {
 pub fn corner_break(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("entities").to_vec();
     if refs.is_empty() {
-        return err("Select corners (vertices or edges through the thickness) to fillet or chamfer");
+        return crate::regen::eval::err_at(&["entities"], "Select sheet metal edges or vertices to fillet or chamfer.");
     }
     let mut groups: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
     for r in &refs {
@@ -1086,14 +1091,14 @@ pub fn corner_break(ev: &mut EvalCtx) -> FResult<()> {
                     }
                 }
                 if !hit {
-                    return err("The selected vertex is not a sheet metal corner");
+                    return err("Selected sheet metal entities do not specify a corner.");
                 }
             }
             _ => {}
         }
     }
     if groups.is_empty() {
-        return err("Selected corners no longer exist");
+        return crate::regen::eval::err_at(&["entities"], "Select sheet metal edges or vertices to fillet or chamfer.");
     }
     let fillet = !ev.is("blendType", "CHAMFER");
     for (bi, mut edges) in groups.into_iter().rev() {

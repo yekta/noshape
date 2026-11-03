@@ -40,15 +40,15 @@ fn locations(ev: &EvalCtx) -> FResult<Vec<(DVec3, DVec3, DVec3)>> {
     for r in ev.query("locations") {
         match r {
             Reference::SketchEntity { sketch, .. } => {
-                let Some(p) = ev.resolve_vertex_point(r) else { return err("A selected form location no longer exists") };
-                let Some(s) = ev.ctx.sketch(*sketch) else { return err("A selected form location no longer exists") };
+                let Some(p) = ev.resolve_vertex_point(r) else { return crate::regen::eval::err_at(&["locations"], "Select a location to place the form feature.") };
+                let Some(s) = ev.ctx.sketch(*sketch) else { return crate::regen::eval::err_at(&["locations"], "Select a location to place the form feature.") };
                 out.push((p, s.frame.x, s.frame.normal));
             }
             _ => match ev.resolve_connector(r) {
                 Some(c) => out.push((c.origin, c.x, c.z)),
                 None => match ev.resolve_vertex_point(r) {
                     Some(p) => out.push((p, DVec3::X, DVec3::Z)),
-                    None => return err("A selected form location no longer exists"),
+                    None => return crate::regen::eval::err_at(&["locations"], "Select a location to place the form feature."),
                 },
             },
         }
@@ -59,13 +59,13 @@ fn locations(ev: &EvalCtx) -> FResult<Vec<(DVec3, DVec3, DVec3)>> {
 pub fn form(ev: &mut EvalCtx) -> FResult<()> {
     let tab = ev.params.text("formPartStudio").trim().to_string();
     if tab.is_empty() {
-        return err("Select the Part Studio of the form tool");
+        return crate::regen::eval::err_at(&["formPartStudio"], "Select Part Studio with configuration parameter thickness and tools marked by Tag feature.");
     }
     let Some(provider) = ev.derived.clone() else { return err("Form tools are not available in this context") };
-    let Some(src) = provider.context(&tab) else { return err("The form Part Studio could not be regenerated (deleted, or a circular reference)") };
+    let Some(src) = provider.context(&tab) else { return crate::regen::eval::err_at(&["formPartStudio"], "Failed to import form tools. Check configuration parameters and use Tag feature to mark the tool bodies.") };
     let locs = locations(ev)?;
     if locs.is_empty() {
-        return err("Select form locations (sketch points or mate connectors on a sheet metal face)");
+        return crate::regen::eval::err_at(&["locations"], "Select a location to place the form feature.");
     }
     // Tool parts and origin.
     let (adds, removes, origin) = match src.form_tools.last() {
@@ -113,7 +113,7 @@ pub fn form(ev: &mut EvalCtx) -> FResult<()> {
         let mut data = (*active_data(ev, bi)?).clone();
         let t = data.thickness;
         let body = ev.ctx.bodies[bi].clone();
-        let Some((wall, on_ref)) = data.wall_of_face(&body.faces[fi]) else { return err("Form locations must lie on sheet metal wall faces") };
+        let Some((wall, on_ref)) = data.wall_of_face(&body.faces[fi]) else { return crate::regen::eval::err_at(&["locations"], "Cannot place a form feature on a hole or form face.") };
         // The form sits on the face whose outward normal is the location's Z.
         let o = if z.dot(n) < 0.0 { o + z * t } else { o };
         let m = frame_matrix(o, x, z) * from;
@@ -133,7 +133,7 @@ pub fn form(ev: &mut EvalCtx) -> FResult<()> {
             cur = NamedShape::new(shape, names);
         }
         if solid_count(&cur.shape) != 1 {
-            return err("The form splits the part or does not touch it");
+            return err("Form parts to add and remove must intersect sheet metal part and cannot cut side walls, rolled walls, rips, joints, or corners.");
         }
         ev.replace_body(bi, cur.shape, cur.names.faces);
         // Footprint for the flat pattern, in the wall's reference plane.
@@ -194,8 +194,8 @@ pub fn form(ev: &mut EvalCtx) -> FResult<()> {
 // ------------------------------------------------------------------ corner
 
 pub fn corner(ev: &mut EvalCtx) -> FResult<()> {
-    let Some(r) = ev.query("corner").first().cloned() else { return err("Select a vertex or edge of a corner where two bends meet") };
-    let Some((bi, p)) = super::sheetmetal_ops::point_of(ev, &r) else { return err("The selected corner no longer exists") };
+    let Some(r) = ev.query("corner").first().cloned() else { return crate::regen::eval::err_at(&["corner"], "Select a corner to modify.") };
+    let Some((bi, p)) = super::sheetmetal_ops::point_of(ev, &r) else { return crate::regen::eval::err_at(&["corner"], "Select a corner to modify.") };
     let mut data = (*active_data(ev, bi)?).clone();
     let t = data.thickness;
     // Bend ends near the selection.
@@ -219,7 +219,7 @@ pub fn corner(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     let Some((ea, eb)) = pair else {
-        return err("The selection is not a corner between two bends of one wall (use Bend relief at a single bend end)");
+        return crate::regen::eval::err_at(&["corner"], "Sheet metal corner not found.");
     };
     let (b1, b2) = (data.bends[ea.0].clone(), data.bends[eb.0].clone());
     // Corner of the two tangent lines on the parent's reference side.
@@ -229,7 +229,7 @@ pub fn corner(ev: &mut EvalCtx) -> FResult<()> {
     let (a, bb, c, d, e) = (d1.dot(d1), d1.dot(d2), d2.dot(d2), d1.dot(w), d2.dot(w));
     let den = a * c - bb * bb;
     if den.abs() < 1e-12 {
-        return err("The bends of the corner are parallel");
+        return crate::regen::eval::err_at(&["corner"], "Sheet metal corner not found.");
     }
     let s1 = (bb * e - c * d) / den;
     let s2 = (a * e - bb * d) / den;
@@ -259,14 +259,14 @@ pub fn corner(ev: &mut EvalCtx) -> FResult<()> {
         "SIZED_ROUND" | "ROUND" => {
             let r = if style == "ROUND" { ev.real("cornerReliefScale")? * half_diag } else { ev.length("roundReliefDiameter")? * 0.5 };
             if r <= 0.0 {
-                return err("The corner relief size must be positive");
+                return crate::regen::eval::err_at(if style == "ROUND" { &["cornerReliefScale"] } else { &["roundReliefDiameter"] }, "Error regenerating: a parameter is out of range.");
             }
             (seg_circle(r), (0..64).map(|i| DVec2::from_angle(i as f64 / 64.0 * std::f64::consts::TAU) * r).collect())
         }
         _ => {
             let w = if style == "RECTANGLE" { ev.real("cornerReliefScale")? * ba1.max(ba2) } else { ev.length("squareReliefWidth")? };
             if w <= 0.0 {
-                return err("The corner relief size must be positive");
+                return crate::regen::eval::err_at(if style == "RECTANGLE" { &["cornerReliefScale"] } else { &["squareReliefWidth"] }, "Error regenerating: a parameter is out of range.");
             }
             let h = w * 0.5;
             (seg_square(w), vec![DVec2::new(-h, -h), DVec2::new(h, -h), DVec2::new(h, h), DVec2::new(-h, h)])

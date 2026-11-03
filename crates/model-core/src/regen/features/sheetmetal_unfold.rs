@@ -135,7 +135,7 @@ pub fn recognize(ev: &mut EvalCtx) -> FResult<()> {
     for bi in idx.into_iter().rev() {
         let mut bi = bi;
         if ev.ctx.bodies[bi].kind != crate::display::BodyKind::Solid {
-            return err("Only solid parts can be recognized as sheet metal");
+            return crate::regen::eval::err_at(&["bodies"], "Selected parts cannot be recognized as sheet metal.");
         }
         if ev.bool("keepInputParts") {
             let b = ev.ctx.bodies[bi].clone();
@@ -422,7 +422,7 @@ pub fn unfold(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("entitiesToUnfold").to_vec();
     let mut todo: Vec<usize> = selected_bends(ev, bi, &data, &refs, all).into_iter().filter(|&i| !data.bends[i].flat).collect();
     if todo.is_empty() {
-        return err("No folded bends to unfold in the selection");
+        return crate::regen::eval::err_at(&["partToUnfold", "entitiesToUnfold"], "Nothing to unfold.");
     }
     let hold = hold_wall(ev, bi, &data);
     let depth = wall_depth(&data, hold);
@@ -444,7 +444,7 @@ pub fn unfold(ev: &mut EvalCtx) -> FResult<()> {
         // Near side: the side of the hold wall.
         let parent_side = side_walls(&data, b.parent, i);
         if parent_side.contains(&child) {
-            return err("A bend inside a closed loop of walls cannot be unfolded (add a rip)");
+            return err("Sheet metal model cannot be unfolded.");
         }
         let child_near = !parent_side.contains(&hold) && depth[child] < depth[b.parent];
         let far_walls = if child_near { parent_side } else { side_walls(&data, child, i) };
@@ -508,9 +508,9 @@ pub fn unfold(ev: &mut EvalCtx) -> FResult<()> {
 pub fn refold(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("toRefold").to_vec();
     if refs.is_empty() {
-        return err("Select the unfolded parts or bends to refold");
+        return crate::regen::eval::err_at(&["toRefold"], "Selected parts should be from the same active sheet metal model.");
     }
-    let Some(bi) = body_of_selection(ev, &["toRefold"]) else { return err("The selection no longer exists") };
+    let Some(bi) = body_of_selection(ev, &["toRefold"]) else { return crate::regen::eval::err_at(&["toRefold"], "Selected parts should be from the same active sheet metal model.") };
     let mut data = (*active_data(ev, bi)?).clone();
     let t = data.thickness;
     let whole = refs.iter().any(|r| matches!(r, Reference::Body(_)));
@@ -556,7 +556,7 @@ pub fn refold(ev: &mut EvalCtx) -> FResult<()> {
         let Some(child) = b.child else { continue };
         let far_walls = side_walls(&data, child, i);
         if far_walls.contains(&b.parent) {
-            return err("A bend inside a closed loop of walls cannot be refolded");
+            return err("Sheet metal model cannot be unfolded.");
         }
         let key = Arc::new(TopoName::face(feature, Role::New(900 + i as u32)));
         let ba = b.allowance(t);

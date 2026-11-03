@@ -542,7 +542,7 @@ fn propagate_tangent_faces(shape: &Shape, seed: &[usize], pull: DVec3, angle: f6
 pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
     let swept = ev.is("crossSection", "SWEPT_PROFILE");
     let spine_dir = if swept {
-        let Some(r) = ev.query("spine").first() else { return err("Select the spine of the swept profile") };
+        let Some(r) = ev.query("spine").first() else { return crate::regen::eval::err_at(&["spine"], "Select spine of blend.") };
         Some(ev.resolve_axis(r).ok_or_else(|| fe("The spine must be a straight edge"))?.1)
     } else {
         None
@@ -700,7 +700,7 @@ pub fn modify_fillet(ev: &mut EvalCtx) -> FResult<()> {
     }
     let groups = by_body(ev.resolve_faces(refs));
     if groups.is_empty() {
-        return err("The selected faces no longer exist");
+        return crate::regen::eval::err_at(&["faces"], "Select fillet faces to modify.");
     }
     for (bi, fillet_faces) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
@@ -711,7 +711,7 @@ pub fn modify_fillet(ev: &mut EvalCtx) -> FResult<()> {
         for &ff in &fillet_faces {
             let surf = faces[ff].face_surface()?;
             if matches!(surf, k::Surface::Plane(_)) {
-                return err("Select non-planar fillet faces");
+                return err("Could not identify filleted faces.");
             }
             let mut tangent: Vec<usize> = Vec::new();
             for (ei, fs) in ef.iter().enumerate() {
@@ -730,13 +730,13 @@ pub fn modify_fillet(ev: &mut EvalCtx) -> FResult<()> {
             }
             if change {
                 if tangent.len() != 2 {
-                    return err("Only fillets between two tangent faces can be modified");
+                    return err("Could not modify selected fillets.");
                 }
                 supports.push((tangent[0], tangent[1], body.faces[ff].clone()));
             }
         }
         let del: Vec<Shape> = fillet_faces.iter().map(|f| faces[*f].clone()).collect();
-        let res = k::delete_faces(&body.shape, &del).map_err(kerr("Removing the fillet failed"))?;
+        let res = k::delete_faces(&body.shape, &del).map_err(kerr("Could not modify selected fillets."))?;
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), None);
         if !change {
@@ -759,7 +759,7 @@ pub fn modify_fillet(ev: &mut EvalCtx) -> FResult<()> {
             }
         }
         if edges.is_empty() {
-            return err("Could not find the edges to re-fillet");
+            return err("Could not modify selected fillets.");
         }
         let healed = crate::regen::eval::names_for(&res.shape, face_names);
         let shapes: Vec<Shape> = edges.iter().filter_map(|e| res.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();

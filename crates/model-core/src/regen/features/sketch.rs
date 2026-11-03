@@ -20,7 +20,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         return crate::regen::eval::err_at(&["sketchPlane"], NO_SKETCH_PLANE);
     };
     let Some(frame) = ev.resolve_plane(plane_ref) else {
-        return err("The sketch plane could not be found");
+        return err("Select a sketch plane.");
     };
     let data = match ev.params.get("sketch") {
         Some(ParamValue::Sketch(d)) => d.clone(),

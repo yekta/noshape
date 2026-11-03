@@ -32,7 +32,7 @@ pub fn derived_configuration(params: &crate::params::ParamValues) -> crate::conf
 pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
     let tab = ev.params.text("partStudio").trim().to_string();
     if tab.is_empty() {
-        return err("Select a Part Studio to derive from");
+        return crate::regen::eval::err_at(&["partStudio"], "Select entities from another Part Studio.");
     }
     let Some(provider) = ev.derived.clone() else {
         return err("Derived parts are not available in this context");
@@ -100,7 +100,7 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
         };
         match found {
             Some(c) => frame_matrix(c.origin, c.x, c.z),
-            None if src.connectors.is_empty() => return err("The source Part Studio has no mate connectors to place by"),
+            None if src.connectors.is_empty() => return err("No mate connectors were derived from base Part Studio."),
             None => return err(format!("The source Part Studio has no mate connector named \"{id}\"")),
         }
     } else {
@@ -166,7 +166,7 @@ pub fn import_derived(ev: &mut EvalCtx) -> FResult<()> {
     // parts that are gone fail.
     // Live ("psb (10-26 a)" D3): only a sketch picked brings no parts.
     if n == 0 && wanted.iter().any(|b| b.index != u32::MAX) {
-        return err("The selected parts no longer exist in the source Part Studio");
+        return crate::regen::eval::err_at(&["partStudio"], "Cannot resolve entities.");
     }
     // A whole studio brings its sketches too (live "qa5 derived" (1)/(4): the
     // Derived row's ▸ lists them; deriving chosen parts brings none). They
@@ -230,7 +230,7 @@ pub fn derived_mirror(ev: &mut EvalCtx) -> FResult<()> {
 pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
     let data = ev.params.text("blobData").trim().to_string();
     if data.is_empty() {
-        return err("The imported file's data is missing from this document");
+        return err("Part import failed.");
     }
     let shapes: Vec<k::Shape> = if data.starts_with("DBRep_DrawableShape") || data.starts_with("CASCADE Topology") {
         vec![k::Shape::from_brep_bytes(data.as_bytes())?]
@@ -301,7 +301,7 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     if tools.is_empty() && open_groups.is_empty() && wires.is_empty() {
-        return err("The imported file contains no parts or surfaces");
+        return err("Part import failed.");
     }
     // "Join adjacent surfaces": sew the surface bodies along shared edges
     // (closed results become solids).
@@ -332,7 +332,7 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
         ev.add_new_bodies(NamedShape::new(p, names), kind, next)?;
         next += 1;
         if ev.ctx.bodies.len() == before {
-            return Err(FeatureError::new("Import failed"));
+            return Err(FeatureError::new("Part import failed."));
         }
         Ok(())
     };
@@ -367,7 +367,7 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
         }
         let idx: Vec<usize> = (before..ev.ctx.bodies.len()).collect();
         if idx.is_empty() {
-            return Err(FeatureError::new("Import failed"));
+            return Err(FeatureError::new("Part import failed."));
         }
         super::refgeom::make_composite(ev, &idx, true, 30_000 + gi as u32)?;
     }
@@ -483,7 +483,7 @@ pub fn decal(ev: &mut EvalCtx) -> FResult<()> {
     let size = bytes.as_ref().map(|b| crate::regen::custom_features::image_size(b));
     let Some((Some(iw), Some(ih), _)) = size else { return err_at(&["image"], "Select image for decal") };
     if iw > 4096 || ih > 4096 {
-        return err_at(&["image"], "Inserted image exceeds 4k x 4k size limit");
+        return err_at(&["image"], "Inserted image exceeds 4K x 4K size limit");
     }
     let angle = ev.angle("angle")? * if ev.bool("angleOppositeDirection") { -1.0 } else { 1.0 };
     let (mut w, mut h) = (ev.length("width")?, ev.length("height")?);

@@ -215,7 +215,7 @@ fn origin_csys(ev: &EvalCtx, r: &Reference, inference: &str, secondary: &[Refere
             }
             Ok(Csys::new(DVec3::ZERO, DVec3::Z, Some(DVec3::X)))
         }
-        _ => err("Select a vertex, edge, face or mate connector for the origin"),
+        _ => err("Failed to resolve mate connector origin."),
     }
 }
 
@@ -325,7 +325,7 @@ pub fn point(ev: &mut EvalCtx) -> FResult<()> {
     let p = if ev.is("pointType", "MESH_POINT") {
         DVec3::new(ev.length("x")?, ev.length("y")?, ev.length("z")?)
     } else {
-        let Some(&(bi, ei)) = ev.resolve_edges(ev.query("entities")).first() else { return err("Select an edge") };
+        let Some(&(bi, ei)) = ev.resolve_edges(ev.query("entities")).first() else { return err("Cannot resolve entities.") };
         let e = ev.edge_shape(bi, ei)?;
         let info = e.edge_info()?;
         let t = ev.real("parameter")?.clamp(0.0, 1.0);

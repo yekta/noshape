@@ -342,7 +342,7 @@ pub fn project_curves(ev: &mut EvalCtx) -> FResult<()> {
         if tools.is_empty() {
             return crate::regen::eval::err_at(&["dropTools"], "Cannot resolve entities.");
         }
-        let targets = face_shapes(ev, ev.query("targets"), true)?;
+        let targets = face_shapes(ev, ev.query("targets"), true, "targets")?;
         if targets.is_empty() {
             return crate::regen::eval::err_at(&["targets"], "Cannot resolve entities.");
         }
@@ -588,8 +588,8 @@ pub fn composite_curve(ev: &mut EvalCtx) -> FResult<()> {
 }
 
 pub fn intersection_curve(ev: &mut EvalCtx) -> FResult<()> {
-    let g1 = face_shapes(ev, ev.query("group1"), true)?;
-    let g2 = face_shapes(ev, ev.query("group2"), true)?;
+    let g1 = face_shapes(ev, ev.query("group1"), true, "group1")?;
+    let g2 = face_shapes(ev, ev.query("group2"), true, "group2")?;
     if g1.is_empty() || g2.is_empty() {
         return crate::regen::eval::err_at(if g1.is_empty() { &["group1"] } else { &["group2"] }, "Cannot resolve entities.");
     }
@@ -674,7 +674,7 @@ fn ray_hit(ev: &EvalCtx, r: &Reference, p: DVec3, t: DVec3) -> FResult<Option<f6
     }
     let shapes = match r {
         Reference::Edge(_) => curve_edges(ev, std::slice::from_ref(r))?,
-        _ => face_shapes(ev, std::slice::from_ref(r), false)?,
+        _ => face_shapes(ev, std::slice::from_ref(r), false, "extendTo")?,
     };
     if shapes.is_empty() {
         return Ok(None);
@@ -756,7 +756,7 @@ pub fn trim_curve(ev: &mut EvalCtx) -> FResult<()> {
                         }
                     }
                 }
-                _ => tools.extend(face_shapes(ev, std::slice::from_ref(r), true)?),
+                _ => tools.extend(face_shapes(ev, std::slice::from_ref(r), true, "trimTo")?),
             }
         }
         if tools.is_empty() {
@@ -861,7 +861,7 @@ pub fn offset_curve(ev: &mut EvalCtx) -> FResult<()> {
     if d < 1e-12 {
         return crate::regen::eval::err_at(&["distance"], "Error regenerating: a parameter is out of range.");
     }
-    let targets = face_shapes(ev, ev.query("targets"), false)?;
+    let targets = face_shapes(ev, ev.query("targets"), false, "targets")?;
     let edges: Vec<Shape> = found.iter().map(|&(bi, ei)| ev.edge_shape(bi, ei)).collect::<FResult<_>>()?;
     // Candidate faces: targets, else the faces adjacent to the first edge.
     let face = if let Some(f) = targets.first() {

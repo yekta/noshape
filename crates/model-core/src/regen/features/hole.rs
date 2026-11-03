@@ -552,7 +552,7 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
             other => return err(format!("Unsupported hole termination {other}")),
         };
         if h.is_nan() || h <= 1e-9 {
-            return err("The hole has zero depth (check the termination and direction)");
+            return crate::regen::eval::err_at(&["scope"], "None of the holes intersected a part.");
         }
         // Live L61: with an offset the Depth field shows the shaft depth less
         // the offset (4.092 for a 6.092 shaft and a 2 mm offset).
@@ -816,13 +816,13 @@ fn tip_len(angle: Option<f64>, r: f64) -> f64 {
 /// Distance along `dir` from `s` to an "up to" entity.
 fn up_to_depth(ev: &EvalCtx, r: &Reference, s: DVec3, dir: DVec3) -> FResult<f64> {
     if let Reference::Face(_) = r {
-        let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(r)).first().ok_or_else(|| fe("The hole end face no longer exists"))?;
+        let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(r)).first().ok_or_else(|| crate::regen::eval::FeatureError::at(&["endBoundEntity"], "Select an entity or mate connector to terminate the hole."))?;
         let face = ev.face_shape(bi, fi)?;
         if let Some(pl) = face.face_plane()? {
             let n = pl.unit_normal();
             let den = dir.dot(n);
             if den.abs() < 1e-12 {
-                return err("The hole end face is parallel to the hole");
+                return crate::regen::eval::err_at(&["scope"], "None of the holes intersected a part.");
             }
             return Ok((pl.origin - s).dot(n) / den);
         }
@@ -832,7 +832,7 @@ fn up_to_depth(ev: &EvalCtx, r: &Reference, s: DVec3, dir: DVec3) -> FResult<f64
         if t.is_finite() {
             return Ok(t);
         }
-        return err("The hole doesn't reach the end face");
+        return crate::regen::eval::err_at(&["scope"], "None of the holes intersected a part.");
     }
     if let Some(p) = ev.resolve_vertex_point(r) {
         return Ok((p - s).dot(dir));
@@ -842,7 +842,7 @@ fn up_to_depth(ev: &EvalCtx, r: &Reference, s: DVec3, dir: DVec3) -> FResult<f64
     {
         return Ok((q - s).dot(dir));
     }
-    err("The hole end entity could not be resolved")
+    crate::regen::eval::err_at(&["endBoundEntity"], "Select an entity or mate connector to terminate the hole.")
 }
 
 // ------------------------------------------------------------------ external thread
@@ -853,11 +853,11 @@ fn up_to_depth(ev: &EvalCtx, r: &Reference, s: DVec3, dir: DVec3) -> FResult<f64
 pub fn external_thread(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("entities");
     if refs.is_empty() {
-        return err("Select circular edges of cylinders to thread");
+        return crate::regen::eval::err_at(&["entities"], "Select one or more cylinder edges.");
     }
     let edges = ev.resolve_edges(refs);
     if edges.is_empty() {
-        return err("The selected edges no longer exist");
+        return crate::regen::eval::err_at(&["entities"], "Select one or more cylinder edges.");
     }
     let mut radius: Option<f64> = None;
     // Per edge: body, circle centre and axis, and the thread's cylindrical face.
@@ -869,30 +869,30 @@ pub fn external_thread(ev: &mut EvalCtx) -> FResult<()> {
                 if let Some(r0) = radius
                     && (r0 - r).abs() > 1e-7
                 {
-                    return err("All thread edges must have the same diameter");
+                    return err("Diameters must be equal.");
                 }
                 radius = Some(r);
                 (center, axis.normalize())
             }
-            _ => return err("Thread edges must be circular"),
+            _ => return err("Unable to find a thread boundary."),
         };
         if !ev.ctx.bodies[bi].shape.edge_faces().ok().and_then(|ef| ef.get(ei).map(|f| f.len() == 2)).unwrap_or(false) {
-            return err("Thread edges must be edges of a solid");
+            return err("Unable to find a thread boundary.");
         }
         let cyl = ev.ctx.bodies[bi].shape.ancestors(ShapeType::Edge, ei, ShapeType::Face).unwrap_or_default().into_iter().find(|&fi| {
             ev.ctx.bodies[bi].shape.sub_shape(ShapeType::Face, fi).ok().and_then(|f| f.face_surface().ok()).is_some_and(|s| matches!(s, k::Surface::Cylinder { .. }))
         });
         let Some(cyl) = cyl else {
-            return err("Thread edges must bound a cylindrical face");
+            return err("Unable to find a thread boundary.");
         };
         threads.push((ev.ctx.bodies[bi].id.clone(), center, axis, radius.unwrap_or_default(), cyl));
     }
     let path = ht::complete_path(ht::TABLE_EXTERNAL_THREAD, ev.params.lookup("branchOfStandard"));
     if ht::table_values(ht::TABLE_EXTERNAL_THREAD, &path).is_none() {
-        return err("Select a thread standard and size");
+        return crate::regen::eval::err_at(&["branchOfStandard"], "Invalid parameter value.");
     }
     if ev.is("depthType", "Blind") && ev.length("threadDepth")? <= 0.0 {
-        return err("Thread length must be positive");
+        return crate::regen::eval::err_at(&["threadDepth"], "Error regenerating: a parameter is out of range.");
     }
     if ev.is("depthType", "Blind") && !ev.bool("addUndercut") && ev.bool("splitFace") {
         let depth = ev.length("threadDepth")?;
@@ -916,8 +916,8 @@ fn split_thread_face(ev: &mut EvalCtx, id: &BodyId, center: DVec3, axis: DVec3, 
     if far.abs() <= depth + 1e-9 {
         return Ok(());
     }
-    let circle = k::make_circle(center + axis * depth.copysign(far), axis, r).map_err(kerr("Thread failed"))?;
-    let res = k::imprint(&body.shape, &[circle]).map_err(kerr("Thread failed"))?;
+    let circle = k::make_circle(center + axis * depth.copysign(far), axis, r).map_err(kerr("Tool entity cannot split the selected part/face."))?;
+    let res = k::imprint(&body.shape, &[circle]).map_err(kerr("Tool entity cannot split the selected part/face."))?;
     let res_solid = if body.kind == BodyKind::Solid { res.shape.solids().into_iter().next().unwrap_or(res.shape.clone()) } else { res.shape.clone() };
     if res_solid.count(ShapeType::Face) <= body.shape.count(ShapeType::Face) {
         return Ok(());

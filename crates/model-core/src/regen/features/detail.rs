@@ -480,7 +480,7 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<()> {
     let mut at_vertex: Vec<(glam::DVec3, f64)> = Vec::new();
     for item in ev.params.array("vertexSettings") {
         let Some(r) = item.query("vertex").first() else { continue };
-        let Some(p) = ev.resolve_vertex_point(r) else { return err("A selected vertex no longer exists") };
+        let Some(p) = ev.resolve_vertex_point(r) else { return crate::regen::eval::err_at(&["vertexSettings"], "Select vertices on fillet chain.") };
         at_vertex.push((p, ev.eval_num_in(item, "vertexRadius", NumKind::Length)?));
     }
     for r in ev.query("vertices") {

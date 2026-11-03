@@ -21,7 +21,7 @@ use std::collections::BTreeMap;
 pub fn sheet_metal_start(ev: &mut EvalCtx) -> FResult<()> {
     let t = ev.length("thickness")?;
     if t <= 0.0 {
-        return err("Thickness must be positive");
+        return crate::regen::eval::err_at(&["thickness"], "Error regenerating: a parameter is out of range.");
     }
     match ev.enum_("process") {
         "EXTRUDE" => extrude(ev, t),
@@ -77,7 +77,7 @@ impl Elem {
             Elem::Arc { center, radius, start_angle, sweep } => {
                 let r = if sweep > 0.0 { radius - d } else { radius + d };
                 if r <= 1e-9 {
-                    return err("A bend or arc radius is smaller than the sheet thickness");
+                    return err("Sheet metal model contains faces that cannot be thickened.");
                 }
                 Elem::Arc { center, radius: r, start_angle, sweep }
             }
@@ -151,7 +151,7 @@ enum Src {
 fn extrude(ev: &mut EvalCtx, t: f64) -> FResult<()> {
     let refs = ev.query("sketchCurves");
     if refs.is_empty() {
-        return err("Select sketch curves to extrude");
+        return crate::regen::eval::err_at(&["sketchCurves"], "Select sketch curves to extrude.");
     }
     let mut sketch: Option<FeatureId> = None;
     let mut items = Vec::new();
@@ -161,8 +161,8 @@ fn extrude(ev: &mut EvalCtx, t: f64) -> FResult<()> {
             return err("Select curves from a single sketch");
         }
         sketch = Some(*s);
-        let sk = ev.ctx.sketch(*s).ok_or_else(|| FeatureError::new("The sketch no longer exists"))?;
-        let Some(curve) = sk.sketch.curve(noshape_sketch::EntityId(*entity)) else { return err("A selected sketch curve no longer exists") };
+        let sk = ev.ctx.sketch(*s).ok_or_else(|| crate::regen::eval::FeatureError::at(&["sketchCurves"], "Select sketch curves to extrude."))?;
+        let Some(curve) = sk.sketch.curve(noshape_sketch::EntityId(*entity)) else { return crate::regen::eval::err_at(&["sketchCurves"], "Select sketch curves to extrude.") };
         use noshape_sketch::Curve2 as C;
         let e = match curve {
             C::Line { a, b } => Elem::Line { a, b },
@@ -177,8 +177,8 @@ fn extrude(ev: &mut EvalCtx, t: f64) -> FResult<()> {
         };
         items.push((e, *entity));
     }
-    let Some(sketch) = sketch else { return err("Select sketch curves to extrude") };
-    let frame = ev.ctx.sketch(sketch).map(|s| s.frame).ok_or_else(|| FeatureError::new("The sketch no longer exists"))?;
+    let Some(sketch) = sketch else { return crate::regen::eval::err_at(&["sketchCurves"], "Select sketch curves to extrude.") };
+    let frame = ev.ctx.sketch(sketch).map(|s| s.frame).ok_or_else(|| crate::regen::eval::FeatureError::at(&["sketchCurves"], "Select sketch curves to extrude."))?;
     let first = items.first().map(|(e, s)| (e.start(), *s));
     let (path, closed) = chain(items)?;
     // Material on the extruded sheet's normal side, tangent × extrude direction
@@ -210,13 +210,13 @@ fn extrude(ev: &mut EvalCtx, t: f64) -> FResult<()> {
         let r = if inside { radius + t } else { radius };
         let theta = (-ti).dot(tj).clamp(-1.0, 1.0).acos();
         if theta < 1e-6 {
-            return err("Sketch curves fold back on themselves");
+            return err("Sheet metal model cannot be built.");
         }
         let dist = r / (theta * 0.5).tan();
         let len_i = (p - a0).length();
         let len_j = (b1 - p).length();
         if dist > len_i + 1e-12 || dist > len_j + 1e-12 {
-            return err("Bend radius is too large for the wall lengths");
+            return err("Sheet metal model cannot be built.");
         }
         let t0 = p - ti * dist;
         let t1 = p + tj * dist;
@@ -394,7 +394,7 @@ fn extrude(ev: &mut EvalCtx, t: f64) -> FResult<()> {
 fn thicken(ev: &mut EvalCtx, t: f64) -> FResult<()> {
     let refs = ev.query("regions");
     if refs.is_empty() {
-        return err("Select faces or sketch regions to thicken");
+        return crate::regen::eval::err_at(&["regions"], "Cannot resolve entities.");
     }
     let flip = ev.bool("oppositeDirection");
     let mut tools = Vec::new();
@@ -429,7 +429,7 @@ fn thicken(ev: &mut EvalCtx, t: f64) -> FResult<()> {
         }
     }
     if tools.is_empty() {
-        return err("Nothing to thicken");
+        return crate::regen::eval::err_at(&["regions"], "Cannot resolve entities.");
     }
     let before = ev.ctx.bodies.len();
     ev.apply_operation(tools, "NEW", None, BodyKind::Solid)?;
@@ -625,7 +625,7 @@ pub fn sheet_metal_end(ev: &mut EvalCtx) -> FResult<()> {
     } else {
         let idx = ev.resolve_bodies(refs);
         if idx.is_empty() {
-            return err("Select sheet metal parts to finish");
+            return crate::regen::eval::err_at(&["sheetMetalParts"], "Select one or more sheet metal parts.");
         }
         idx.into_iter().map(|i| ev.ctx.bodies[i].id.clone()).collect()
     };
@@ -639,7 +639,7 @@ pub fn sheet_metal_end(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     if !any && !refs.is_empty() {
-        return err("The selected parts are not active sheet metal models");
+        return crate::regen::eval::err_at(&["sheetMetalParts"], "At least one selected part should be from an active sheet metal model.");
     }
     Ok(())
 }

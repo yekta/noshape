@@ -169,8 +169,8 @@ fn side_end(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3, first: bool) 
     match bound.as_str() {
         "UP_TO_VERTEX" => {
             let Some(r) = ev.query(vertex_id).first() else { return crate::regen::eval::err_at(&[vertex_id], "Select a vertex or mate connector to terminate the revolve.") };
-            let q = ev.resolve_vertex_point(r).ok_or_else(|| fe("Up to vertex no longer exists"))?;
-            let a = angle_to(origin, axis, profile_point(p)?, q).ok_or_else(|| fe("The vertex lies on the revolve axis"))?;
+            let q = ev.resolve_vertex_point(r).ok_or_else(|| FeatureError::at(&[vertex_id], "Select a vertex or mate connector to terminate the revolve."))?;
+            let a = angle_to(origin, axis, profile_point(p)?, q).ok_or_else(|| fe("Could not create revolve with provided bounds. Check input."))?;
             let a = a - off;
             if a <= 1e-9 {
                 return err("Could not create revolve with provided bounds. Check input.");
@@ -181,7 +181,7 @@ fn side_end(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3, first: bool) 
             let Some(r) = ev.query(face_id).first() else { return crate::regen::eval::err_at(&[face_id], "Select a face to terminate the revolve.") };
             let target = match r {
                 Reference::Face(_) => {
-                    let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(r)).first().ok_or_else(|| fe("Up to face no longer exists"))?;
+                    let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(r)).first().ok_or_else(|| FeatureError::at(&[face_id], "Select a face to terminate the revolve."))?;
                     let f = ev.face_shape(bi, fi)?;
                     match f.face_plane()? {
                         // Planar faces bound like their (large) plane.
@@ -190,7 +190,7 @@ fn side_end(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3, first: bool) 
                     }
                 }
                 _ => {
-                    let f = ev.resolve_plane(r).ok_or_else(|| fe("Select a face or plane"))?;
+                    let f = ev.resolve_plane(r).ok_or_else(|| FeatureError::at(&[face_id], "Select a face to terminate the revolve."))?;
                     big_face(ev, &kernel_plane(&f))?
                 }
             };
@@ -198,7 +198,7 @@ fn side_end(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3, first: bool) 
         }
         "UP_TO_BODY" => {
             let Some(r) = ev.query(body_id).first() else { return crate::regen::eval::err_at(&[body_id], "Select a part to terminate the revolve.") };
-            let bi = *ev.resolve_bodies(std::slice::from_ref(r)).first().ok_or_else(|| fe("Up to part no longer exists"))?;
+            let bi = *ev.resolve_bodies(std::slice::from_ref(r)).first().ok_or_else(|| FeatureError::at(&[body_id], "Select a part to terminate the revolve."))?;
             Ok(Side::Tool(rot_back(ev.ctx.bodies[bi].shape.clone())?))
         }
         "UP_TO_NEXT" => {
@@ -251,7 +251,7 @@ fn revolve_side(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3, side: Sid
                 .solids()
                 .into_iter()
                 .find(|s| matches!(s.classify_point(probe, 1e-9), Ok(k::PointClass::Inside)))
-                .ok_or_else(|| fe("Revolve up to failed: the bounding entity does not stop the revolve"))?;
+                .ok_or_else(|| fe("Could not create revolve with provided bounds. Check input."))?;
             if piece.volume().unwrap_or(0.0) >= res.shape.volume().unwrap_or(0.0) * (1.0 - 1e-6) {
                 return err("Could not create revolve with provided bounds. Check input.");
             }

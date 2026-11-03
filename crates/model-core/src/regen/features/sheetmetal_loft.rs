@@ -21,7 +21,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 /// Ordered polyline of a profile selection: (points, closed).
-fn profile_polyline(ev: &EvalCtx, id: &str, chordal: f64) -> FResult<(Vec<DVec3>, bool)> {
+fn profile_polyline(ev: &EvalCtx, id: &'static str, chordal: f64) -> FResult<(Vec<DVec3>, bool)> {
     let refs = ev.query(id);
     if refs.is_empty() {
         return err(format!("Select {}", if id == "profile1" { "the first profile" } else { "the second profile" }));
@@ -34,7 +34,7 @@ fn profile_polyline(ev: &EvalCtx, id: &str, chordal: f64) -> FResult<(Vec<DVec3>
         edges.extend(p.shape.wires().first().map(|w| w.edges()).unwrap_or_default());
     }
     if edges.is_empty() {
-        return err("Profiles must be edges, sketch curves, regions or faces");
+        return crate::regen::eval::err_at(&[id], "Select profiles for sheet metal loft.");
     }
     let scale = edges.iter().filter_map(|e| e.bounding_box(false).ok()).map(|b| b.diagonal()).fold(0.0f64, f64::max).max(1e-6);
     let chain = order_chain(&edges, scale * 1e-7)?;
@@ -75,7 +75,7 @@ fn profile_polyline(ev: &EvalCtx, id: &str, chordal: f64) -> FResult<(Vec<DVec3>
         }
     }
     if clean.len() < 2 {
-        return err("A profile has too few points");
+        return err("Could not create sheet metal loft with the given inputs.");
     }
     Ok((clean, closed))
 }
@@ -155,13 +155,13 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         None => ev.length("thickness")?,
     };
     if t <= 0.0 {
-        return err("Thickness must be positive");
+        return crate::regen::eval::err_at(&["thickness"], "Error regenerating: a parameter is out of range.");
     }
     let chordal = ev.length("chordalTolerance").unwrap_or(1e-3).max(1e-6);
     let (p1, c1) = profile_polyline(ev, "profile1", chordal)?;
     let (mut p2, c2) = profile_polyline(ev, "profile2", chordal)?;
     if c1 != c2 {
-        return err("Both profiles must be open, or both closed");
+        return err("All profiles must be open or all profiles must be closed.");
     }
     if p1.len() != p2.len() {
         return err(format!(
@@ -240,7 +240,7 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
             let along = (other[0] - p[0]).normalize_or_zero();
             let x = d.cross(along).cross(d).normalize_or_zero();
             if x.length() < 0.5 {
-                return err("A profile is degenerate");
+                return err("Profiles cannot point directly towards or away from each other.");
             }
             x
         } else {
@@ -275,7 +275,7 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
                 }
                 _ => None,
             };
-            out.push(q.ok_or_else(|| fe("The loft facets meet at a degenerate joint"))?);
+            out.push(q.ok_or_else(|| fe("Sheet metal loft failed."))?);
         }
         Ok(out)
     };
@@ -283,7 +283,7 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         // Mitred against the wall's other side (a sharp corner the bend rounds).
         Some(a) => {
             let d = (p1[1] - p1[0]).normalize();
-            p1.iter().map(|p| three_planes([(*p + normals[0] * t, normals[0]), (*p + a.material * t, a.material), (*p, d)]).ok_or_else(|| fe("The loft is parallel to the wall it is added to"))).collect::<FResult<Vec<_>>>()?
+            p1.iter().map(|p| three_planes([(*p + normals[0] * t, normals[0]), (*p + a.material * t, a.material), (*p, d)]).ok_or_else(|| fe("Sheet metal loft failed."))).collect::<FResult<Vec<_>>>()?
         }
         None => offset_corners(&p1, e1)?,
     };
@@ -319,7 +319,7 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
     let before = ev.ctx.bodies.len();
     ev.apply_operation(vec![NamedShape::new(solid, names)], "NEW", None, BodyKind::Solid)?;
     if ev.ctx.bodies.len() <= before {
-        return err("The sheet metal loft produced no part");
+        return err("Sheet metal loft failed.");
     }
     let bi = ev.ctx.bodies.len() - 1;
     let mut data = model_from_params(ev, t)?;

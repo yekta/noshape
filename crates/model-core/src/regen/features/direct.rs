@@ -222,7 +222,7 @@ fn limit_point(ev: &EvalCtx, id: &str) -> FResult<(DVec3, Option<DVec3>)> {
 pub fn move_rigid(ev: &mut EvalCtx, bi: usize, faces: &[usize], m: &DMat4) -> FResult<()> {
     let body = ev.ctx.bodies[bi].clone();
     let shapes: Vec<Shape> = faces.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
-    let healed = k::delete_faces(&body.shape, &shapes).map_err(kerr("Move face failed (the faces could not be removed from the part)"))?;
+    let healed = k::delete_faces(&body.shape, &shapes).map_err(kerr("Could not transform selected faces as requested."))?;
     let h_names = ev.name_result(&[&body.shape_names()], &healed.history, &healed.shape, &BTreeMap::new(), None);
     let healed_n = crate::regen::eval::names_for(&healed.shape, h_names);
     let (v0, v1) = (body.shape.volume()?, healed.shape.volume()?);
@@ -230,7 +230,7 @@ pub fn move_rigid(ev: &mut EvalCtx, bi: usize, faces: &[usize], m: &DMat4) -> FR
     // The region the faces bound (material removed by a pocket, or a boss).
     let region = if pocket { k::cut(&healed.shape, &body.shape)? } else { k::cut(&body.shape, &healed.shape)? };
     if region.shape.count(ShapeType::Solid) == 0 {
-        return err("The selected faces don't bound a region that can be moved");
+        return err("Could not transform selected faces as requested.");
     }
     let r_names = ev.name_result(&[&ShapeNames::default(), &body.shape_names()], &region.history, &region.shape, &BTreeMap::new(), None);
     let r_named = crate::regen::eval::names_for(&region.shape, r_names);
@@ -439,7 +439,7 @@ fn face_slab(f: &Shape, d: f64) -> FResult<Shape> {
             return Ok(r.shape);
         }
     }
-    err("The face could not be offset")
+    err("Could not offset selected faces as requested.")
 }
 
 /// Move face (offset) by booleans, where OCCT's offset fails: each face's slab
@@ -464,7 +464,7 @@ fn offset_by_booleans(ev: &mut EvalCtx, bi: usize, faces: &[usize], dist: f64) -
     // The face moved through the far side: the cut leaves an empty solid.
     let mut pieces: Vec<_> = crate::regen::eval::split_solids(&un.shape, &names, Some(ev.feature)).into_iter().filter(|p| volume(&p.shape) > 0.0).collect();
     if pieces.is_empty() {
-        return err("Nothing is left of the part");
+        return err("Could not offset selected faces as requested.");
     }
     let key = |p: &crate::regen::eval::NamedShape| -> (f64, [f64; 3]) {
         let v = volume(&p.shape);
@@ -512,7 +512,7 @@ fn move_face_create(ev: &mut EvalCtx, ty: &str, dir: Option<DVec3>, rotation: Op
         }
     }
     if sources.is_empty() {
-        return err("Select faces, surfaces or sketch regions");
+        return crate::regen::eval::err_at(&["surfacesAndFaces"], "Select faces, surfaces, or sketch regions to offset from.");
     }
     let mut faces = Vec::new();
     let mut names = Vec::new();
@@ -522,7 +522,7 @@ fn move_face_create(ev: &mut EvalCtx, ty: &str, dir: Option<DVec3>, rotation: Op
             ("TRANSLATE", Some(d), _) => f.translated(d * ev.length("translationDistance")? * sign)?,
             _ => {
                 let d = ev.length("offsetDistance")? * sign;
-                if d.abs() < 1e-12 { f.clone() } else { k::offset_shape(f, d, k::JoinType::Arc).map_err(kerr("The face could not be offset"))?.shape }
+                if d.abs() < 1e-12 { f.clone() } else { k::offset_shape(f, d, k::JoinType::Arc).map_err(kerr("Could not offset selected faces as requested."))?.shape }
             }
         };
         for g in out.faces() {
@@ -634,7 +634,7 @@ fn replace_with(ev: &mut EvalCtx, bi: usize, fi_name: &Name, template: &Shape) -
         return Ok(());
     }
     let dir = if s > 0.0 { n } else { -n };
-    let prism = k::extrude_up_to(&face, dir, template, 0.0).map_err(kerr("The face could not be extended to the template (it must cover the whole face)"))?;
+    let prism = k::extrude_up_to(&face, dir, template, 0.0).map_err(kerr("Surface to replace with needs to extend size of faces."))?;
     let tool_names: Vec<Name> = (0..prism.shape.count(ShapeType::Face) as u32).map(|i| Arc::new(TopoName::face(feature, Role::Generated(Arc::new(TopoName::Split { parent: fi_name.clone(), by: feature, ordinal: i as u16 }))))).collect();
     let tool = crate::regen::eval::NamedShape::new(prism.shape, tool_names);
     let op = if s > 0.0 { k::BooleanOp::Fuse } else { k::BooleanOp::Cut };
@@ -644,7 +644,7 @@ fn replace_with(ev: &mut EvalCtx, bi: usize, fi_name: &Name, template: &Shape) -
     let rn = crate::regen::eval::names_for(&res.shape, names);
     let names = ev.name_result(&[&rn], &un.history, &un.shape, &BTreeMap::new(), None);
     if un.shape.count(ShapeType::Solid) == 0 {
-        return err("Replacing the face removed the whole part");
+        return err("Could not replace faces as requested.");
     }
     ev.replace_body(bi, un.shape, names);
     Ok(())

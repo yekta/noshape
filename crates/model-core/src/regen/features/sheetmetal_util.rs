@@ -47,7 +47,7 @@ pub fn model_from_params(ev: &EvalCtx, t: f64) -> FResult<SheetMetalData> {
     d.corner_relief = ev.enum_("defaultCornerStyle").to_string();
     d.flip_direction_up = ev.bool("flipDirectionUp");
     if d.radius <= 0.0 {
-        return err("Bend radius must be positive");
+        return crate::regen::eval::err_at(&["radius"], "Error regenerating: a parameter is out of range.");
     }
     Ok(d)
 }
@@ -236,7 +236,7 @@ pub fn relief_segments(style: BendReliefStyle, u_deep: f64, u_top: f64, s0: f64,
 
 /// Resolve the single (body, edge) of an edge reference, or the long edge
 /// of a side face reference (preferring the edge on the reference side).
-pub fn resolve_flange_edge(ev: &EvalCtx, r: &crate::reference::Reference) -> FResult<Vec<(usize, usize)>> {
+pub fn resolve_flange_edge(ev: &EvalCtx, r: &crate::reference::Reference, op: &str) -> FResult<Vec<(usize, usize)>> {
     use crate::reference::Reference;
     match r {
         Reference::Edge(_) => Ok(ev.resolve_edges(std::slice::from_ref(r))),
@@ -267,7 +267,7 @@ pub fn resolve_flange_edge(ev: &EvalCtx, r: &crate::reference::Reference) -> FRe
                 }
                 match best {
                     Some((ei, _, _)) => out.push((bi, ei)),
-                    None => return err("Selected side face is not on the free edge of a sheet metal wall"),
+                    None => return crate::regen::eval::err_at(&["edges"], format!("Cannot create {op} on an edge that is a joint, fillet, chamfer, or internal to the sheet metal model.")),
                 }
             }
             Ok(out)
