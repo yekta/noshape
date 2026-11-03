@@ -341,6 +341,28 @@ impl<'a> Translator<'a> {
         self.query(k, q)
     }
 
+    /// The entity whose implicit connector of `inference` (Onshape's
+    /// EntityInferenceType) lies at `origin` (part coordinates, metres): an
+    /// assembly's connector found from live's frame when its query isn't read.
+    pub fn connector_entity(&mut self, inference: &str, origin: [f64; 3]) -> Result<String, String> {
+        let (kind, key) = match inference {
+            "CENTER" | "TOP_AXIS_POINT" | "MID_AXIS_POINT" | "BOTTOM_AXIS_POINT" => ("edges", "center"),
+            "MID_POINT" => ("edges", "midpoint"),
+            "POINT" => ("vertices", "position"),
+            _ => ("faces", "centroid"),
+        };
+        let r = self.call("query_entities", json!({ "kind": kind, "near": mm(origin), "limit": 50 }))?;
+        let k = per_unit(&r["units"]);
+        let at = |e: &Value| (0..3).map(|i| e[key][i].as_f64().map_or(f64::INFINITY, |c| (c * k - origin[i]).abs())).fold(0.0, f64::max);
+        r[kind]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|e| at(e) <= 1e-6)
+            .find_map(|e| e["id"].as_str().map(str::to_string))
+            .ok_or_else(|| format!("no {} of ours with its {key} at {:?} mm", &kind[..kind.len() - 1], origin.map(|c| c * 1e3)))
+    }
+
     /// Places an instance of the assembly tab `assembly` where live has its occurrence:
     /// `transform` row-major 4×4, metres (the assembly definition's
     /// `occurrences[].transform`).
@@ -2251,6 +2273,18 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             }
         }
     }
+    // Live's frame of each mate's connectors (part coordinates), in the
+    // mate's pick order: where a connector is when its query isn't read.
+    let mut connector_origins: HashMap<String, [f64; 3]> = HashMap::new();
+    for m in root["features"].as_array().into_iter().flatten() {
+        let Some(f) = features.iter().find(|f| f["featureId"] == m["id"]) else { continue };
+        let picks = f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "mateConnectorsQuery").and_then(|p| p["queries"].as_array());
+        for (q, e) in picks.into_iter().flatten().zip(m["featureData"]["matedEntities"].as_array().into_iter().flatten()) {
+            if let (Some(id), Some(o)) = (q["featureId"].as_str(), f3(&e["mateConnectorCS"]["origin"])) {
+                connector_origins.insert(id.to_string(), o);
+            }
+        }
+    }
     // Each Part Studio into its own tab; the connectors' entities resolved on it.
     let mut tabs: HashMap<String, String> = HashMap::new();
     let mut part_names: HashMap<(String, String), String> = HashMap::new();
@@ -2271,15 +2305,24 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 res.differences.push(format!("{name} › {}: {} ({})", step.name, step.status.as_deref().unwrap_or(""), step.message.as_deref().unwrap_or("")));
             }
         }
-        for (id, (path, _, q)) in &connectors {
-            if path.first().map(|i| element_of(i)) == Some(element.clone()) {
-                match t.resolve(q) {
-                    Ok(ids) if !ids.is_empty() => {
-                        entities.insert(id.clone(), ids[0].clone());
-                    }
-                    Ok(_) => res.untranslated.push(format!("mate connector {id}: its entity resolved to nothing")),
-                    Err(e) => res.untranslated.push(format!("mate connector {id}: {e}")),
+        for (id, (path, inference, q)) in &connectors {
+            if path.first().map(|i| element_of(i)) != Some(element.clone()) {
+                continue;
+            }
+            let found = match t.resolve(q) {
+                Ok(ids) if !ids.is_empty() => Ok(ids[0].clone()),
+                Ok(_) => Err("its entity resolved to nothing".to_string()),
+                Err(e) => Err(e),
+            };
+            let found = match (found, connector_origins.get(id)) {
+                (Err(_), Some(o)) => t.connector_entity(inference, *o),
+                (found, _) => found,
+            };
+            match found {
+                Ok(e) => {
+                    entities.insert(id.clone(), e);
                 }
+                Err(e) => res.untranslated.push(format!("mate connector {id}: {e}")),
             }
         }
         tabs.insert(element.clone(), name);
@@ -2365,7 +2408,32 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             res.untranslated.push(format!("{name}: its connectors not translated"));
             continue;
         };
-        match placer.call("assembly_mate", json!({ "tab": "Assembly 1", "type": ty, "a": a, "b": b, "name": name })) {
+        let mut args = json!({ "tab": "Assembly 1", "type": ty, "a": a, "b": b, "name": name });
+        // As stored: the flip, the secondary axis's quarter turns, the offset.
+        // (Ours true = Z axes aligned: live's primaryAxisAlignment false.)
+        if let Some(flip) = par("primaryAxisAlignment").and_then(|p| p["value"].as_bool()) {
+            args["flip_primary"] = json!(!flip);
+        }
+        if let Some(turns) = par("secondaryAxisAlignment").and_then(|p| p["value"].as_str()).and_then(|v| ["PLUS_X", "PLUS_Y", "MINUS_X", "MINUS_Y"].iter().position(|x| *x == v)) {
+            args["reorient_secondary"] = json!(turns);
+        }
+        if par("mateOffsetEnabled").is_some_and(|p| p["value"] == true) {
+            let expr = |id: &str, unit: &str| par(id).map(|p| p["expression"].as_str().map(str::to_string).unwrap_or_else(|| format!("{} {unit}", p["value"].as_f64().unwrap_or(0.0))));
+            let mut offset = json!({});
+            for (axis, id) in [("x", "mateOffsetDistanceX"), ("y", "mateOffsetDistanceY"), ("z", "mateOffsetDistanceZ")] {
+                if let Some(e) = expr(id, "m") {
+                    offset[axis] = json!(e);
+                }
+            }
+            if let Some(e) = expr("rotation", "rad") {
+                offset["rotation"] = json!(e);
+            }
+            args["offset"] = offset;
+            if let Some(axis) = par("rotationType").and_then(|p| p["value"].as_str()).and_then(|v| v.strip_prefix("ABOUT_")) {
+                args["rotation_axis"] = json!(axis.to_lowercase());
+            }
+        }
+        match placer.call("assembly_mate", args) {
             Ok(_) => mate_names.push((f["featureId"].as_str().unwrap_or("").to_string(), name)),
             Err(e) => res.untranslated.push(format!("{name}: {e}")),
         }

@@ -2959,3 +2959,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   sheetmetal/flat.rs FlatForm / FlatMark): each form's direction (up = toward the flat's reference side) and the hole
   heads (centre, Ø, side); then dx draws them with drawing.props.flat_lines.
 - [ ] P3 LOFT-COAXIAL-CIRCLES-SURFACE (core; found by dx through live 1811) a Loft through coaxial circles (r 10 at z 0, r 6 at z 15, r 9 at z 30 mm, Solid, defaults) makes its cap edges B-spline curves in ours (live: CIRCLE edges, so a Parasolid export splits each closed cap edge in two and live reads 4 edges / 4 vertices instead of 2 / 0) and its side face reads as a surface of revolution after our export, a non-rational periodic cubic B-spline (130 × 5 poles) in live: the types differ wherever they show (Measure / query_entities `surface`, exports: our Parasolid writes it as a spun surface, which live reads as REVOLVED). Same volume (5156.745 mm³ both, evVolume HIGH). Live's own loft as Parasolid: live/samples/dx-xt-periodic/loft-circles-live.x_t; behaviours "dx (2026-11-02, P3 follow-up to 1808)". (dx 2026-11-03)
+- [ ] P2 AGENT-FLIP-PRIMARY-INVERTED (dx + skasm; found by dx's assembly parity 11-03) assembly_mate / assembly_list
+  `flip_primary` is the solver's internal flag (true = Z axes aligned), the opposite of Onshape's stored
+  `primaryAxisAlignment` and of the dialog's Flip primary axis (live: false = Z aligned, true = flipped; behaviours
+  "Fastened mate: default primary-axis alignment", skb-primary-axis-a/b/c). An agent copying a live mate's
+  `primaryAxisAlignment: true` gets the unflipped mate. The parity translator inverts it for now. Proposed: the op
+  field is the dialog's (true = flipped, as live), converted at the ops boundary; mate_flip.rs's
+  "The CLI's flip_primary is the model's" tests (skasm) turned over with it. (dx 2026-11-03)
