@@ -1453,8 +1453,9 @@ impl SketchEditor {
         if self.tool.draws() {
             // Curves and points the cursor passes over wake up their
             // inferences (a point: alignment, live "skb (10-25) sketch
-            // inference").
-            if let Some(h) = self.hover {
+            // inference"): what lies within 9 px of it (the GPU hover
+            // arrives a move late), else the hover.
+            if let Some(h) = data.sketch.pick(p, self.world_per_px * 9.0).or(self.hover) {
                 self.woken.retain(|e| *e != h);
                 self.woken.insert(0, h);
                 self.woken.truncate(10);

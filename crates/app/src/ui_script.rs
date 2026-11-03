@@ -262,6 +262,10 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         settle(cx).await;
         let start = read(cx).await;
         let mut steps = Vec::new();
+        // Where the pointer is: a click's pointer comes from there in three
+        // moves, as live's runner moves it (what it passes over can wake a
+        // sketch inference).
+        let mut pointer: Option<Point<Pixels>> = None;
         for (i, step) in scenario["steps"].as_array().cloned().unwrap_or_default().into_iter().enumerate() {
             let what = step["do"].as_str().unwrap_or("");
             let mods = modifiers(&step);
@@ -272,7 +276,15 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                 "click" | "dblclick" | "rclick" | "hover" => match cx.update(|_, cx| locate(&target, &ps, cx)).unwrap_or_else(|e| Err(e.to_string())) {
                     Ok(at) => {
                         eprintln!("UI-SCRIPT step {} {what} at ({:.0}, {:.0})", i + 1, f32::from(at.x), f32::from(at.y));
-                        let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: at, pressed_button: None, modifiers: mods }), cx));
+                        let from = pointer.unwrap_or(at);
+                        for k in 1..=3 {
+                            let p = from + (at - from) * (k as f32 / 3.0);
+                            let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: None, modifiers: mods }), cx));
+                            if k < 3 {
+                                sleep(cx, 20).await;
+                            }
+                        }
+                        pointer = Some(at);
                         // The graphics area picks what is under the pointer before the press.
                         sleep(cx, if what == "hover" { step["ms"].as_u64().unwrap_or(1500) } else { 500 }).await;
                         let (button, clicks) = match what {
@@ -296,6 +308,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                                             window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }), cx);
                                             mouse(window, cx, at, MouseButton::Left, Modifiers::default(), 1)
                                         });
+                                        pointer = Some(at);
                                         Ok(())
                                     }
                                     Err(e) => Err(e),
@@ -324,12 +337,17 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                     let to = cx.update(|_, cx| locate(&to, &ps, cx)).unwrap_or_else(|e| Err(e.to_string()));
                     match (from, to) {
                         (Ok(a), Ok(b)) => {
-                            let _ = cx.update(|window, cx| {
-                                window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: a, pressed_button: None, modifiers: mods }), cx);
-                                window.dispatch_event(PlatformInput::MouseDown(MouseDownEvent { button: MouseButton::Left, position: a, modifiers: mods, click_count: 1, first_mouse: false }), cx);
-                            });
-                            for k in 1..=10 {
-                                let p = a + (b - a) * (k as f32 / 10.0);
+                            // (As live's runner: three moves to the start, fifteen to the end.)
+                            let start = pointer.unwrap_or(a);
+                            for k in 1..=3 {
+                                let p = start + (a - start) * (k as f32 / 3.0);
+                                let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: None, modifiers: mods }), cx));
+                                sleep(cx, 20).await;
+                            }
+                            let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseDown(MouseDownEvent { button: MouseButton::Left, position: a, modifiers: mods, click_count: 1, first_mouse: false }), cx));
+                            pointer = Some(b);
+                            for k in 1..=15 {
+                                let p = a + (b - a) * (k as f32 / 15.0);
                                 let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: Some(MouseButton::Left), modifiers: mods }), cx));
                                 sleep(cx, 30).await;
                             }

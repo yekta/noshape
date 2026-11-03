@@ -161,6 +161,33 @@ pub struct Inference {
     pub priority: u8,
 }
 
+/// Whether a constraint holds line `l`'s direction: its own Horizontal /
+/// Vertical or Fix, or a Parallel / Perpendicular to a line so held (a
+/// rectangle's sides); an external line's is held too.
+fn direction_held(sk: &Sketch, l: EntityId) -> bool {
+    let mut seen = vec![l];
+    let mut i = 0;
+    while let Some(&x) = seen.get(i) {
+        i += 1;
+        if sk.entity(x).is_some_and(|e| e.external) {
+            return true;
+        }
+        for c in sk.constraints() {
+            match c.kind {
+                ConstraintKind::Horizontal { a, b: None } | ConstraintKind::Vertical { a, b: None } | ConstraintKind::Fix { entity: a } if a == x => return true,
+                ConstraintKind::Parallel { a, b } | ConstraintKind::Perpendicular { a, b } if a == x || b == x => {
+                    let o = if a == x { b } else { a };
+                    if !seen.contains(&o) {
+                        seen.push(o);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    false
+}
+
 fn excluded(sk: &Sketch, ctx: &InferenceContext, id: EntityId) -> bool {
     if ctx.exclude.contains(&id) {
         return true;
@@ -309,18 +336,37 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                 let diff = (x - target).rem_euclid(PI);
                 diff.min(PI - diff) <= tol
             };
+            // Square to a woken line (the pointer passed over it: the line
+            // it starts on or crosses; not one joined at the anchor) whose
+            // direction a constraint holds: Perpendicular to it instead of
+            // Horizontal / Vertical (live 1866: on a free line, Vertical).
+            let square_to = |horizontal: bool| {
+                ctx.woken.iter().copied().find(|&w| {
+                    !excluded(sk, ctx, w)
+                        && !ctx.anchor_point.is_some_and(|ap| sk.entity(w).and_then(|e| e.endpoints()).is_some_and(|(s, e)| s == ap || e == ap))
+                        && matches!(sk.curve(w), Some(Curve2::Line { a: la, b: lb }) if { let t = (lb - la).normalize_or_zero(); if horizontal { t.y.abs() > 1.0 - 1e-12 } else { t.x.abs() > 1.0 - 1e-12 } })
+                        && direction_held(sk, w)
+                })
+            };
+            let line_kind = |horizontal: bool| match square_to(horizontal) {
+                Some(w) => (InferenceKind::Perpendicular, Some(w), AutoConstraint::PerpendicularTo(w)),
+                None if horizontal => (InferenceKind::Horizontal, None, AutoConstraint::HorizontalLine),
+                None => (InferenceKind::Vertical, None, AutoConstraint::VerticalLine),
+            };
             if near(ang, 0.0) {
-                push(&mut out, InferenceKind::Horizontal, DVec2::new(cursor.x, a.y), None, Some(a), vec![AutoConstraint::HorizontalLine], 2);
+                let (kind, on, c) = line_kind(true);
+                push(&mut out, kind, DVec2::new(cursor.x, a.y), on, Some(a), vec![c], 2);
                 // A horizontal line ending in vertical alignment with a woken
                 // point takes both (live: Horizontal + Vertical with it).
                 if let Some((_, vp, vpos)) = best_v {
-                    push(&mut out, InferenceKind::AlignVertical, DVec2::new(vpos.x, a.y), Some(vp), Some(vpos), vec![AutoConstraint::HorizontalLine, AutoConstraint::VerticalWith(vp)], 1);
+                    push(&mut out, InferenceKind::AlignVertical, DVec2::new(vpos.x, a.y), Some(vp), Some(vpos), vec![c, AutoConstraint::VerticalWith(vp)], 1);
                 }
             }
             if near(ang, PI / 2.0) {
-                push(&mut out, InferenceKind::Vertical, DVec2::new(a.x, cursor.y), None, Some(a), vec![AutoConstraint::VerticalLine], 2);
+                let (kind, on, c) = line_kind(false);
+                push(&mut out, kind, DVec2::new(a.x, cursor.y), on, Some(a), vec![c], 2);
                 if let Some((_, hp, hpos)) = best_h {
-                    push(&mut out, InferenceKind::AlignHorizontal, DVec2::new(a.x, hpos.y), Some(hp), Some(hpos), vec![AutoConstraint::VerticalLine, AutoConstraint::HorizontalWith(hp)], 1);
+                    push(&mut out, InferenceKind::AlignHorizontal, DVec2::new(a.x, hpos.y), Some(hp), Some(hpos), vec![c, AutoConstraint::HorizontalWith(hp)], 1);
                 }
             }
             // woken lines (not attached to the anchor): parallel / perpendicular
@@ -403,6 +449,36 @@ mod tests {
 
     fn v(x: f64, y: f64) -> DVec2 {
         DVec2::new(x, y)
+    }
+
+    /// Live 1866: a line started on (or drawn across) a woken line whose
+    /// direction a constraint holds (the Line tool's Horizontal, a
+    /// rectangle's sides) and square to it is Perpendicular to it; on a free
+    /// line, Vertical; a chain's corner (the lines joined at the anchor)
+    /// stays Vertical; a line the pointer never passed over doesn't count.
+    #[test]
+    fn square_to_a_held_line_is_perpendicular() {
+        let mut sk = Sketch::new();
+        let held = sk.add_line(v(0.0, 0.0), v(4.0, 0.0));
+        sk.add_constraint(ConstraintKind::Horizontal { a: held, b: None }).unwrap();
+        let free = sk.add_line(v(0.0, 2.0), v(4.0, 2.0));
+        let up = |sk: &Sketch, base: EntityId, y: f64| {
+            let ctx = InferenceContext { tool: SketchTool::Line, anchor: Some(v(2.0, y)), snap_radius: 0.05, woken: vec![base], ..Default::default() };
+            infer(sk, v(2.01, y + 1.5), &ctx).into_iter().next().unwrap()
+        };
+        let r = up(&sk, held, 0.0);
+        assert_eq!((r.kind, r.constraints.clone()), (InferenceKind::Perpendicular, vec![AutoConstraint::PerpendicularTo(held)]));
+        assert!((r.position.x - 2.0).abs() < 1e-12);
+        assert_eq!(up(&sk, free, 2.0).kind, InferenceKind::Vertical);
+        // From the held line's end, as a chain: Vertical.
+        let (_, end) = sk.endpoints(held).unwrap();
+        let ctx = InferenceContext { tool: SketchTool::Line, anchor: Some(v(4.0, 0.0)), anchor_point: Some(end), snap_radius: 0.05, woken: vec![held], ..Default::default() };
+        assert_eq!(infer(&sk, v(4.01, 1.5), &ctx)[0].kind, InferenceKind::Vertical);
+        // Across it, woken on the way: Perpendicular; not woken: Vertical.
+        let across = InferenceContext { tool: SketchTool::Line, anchor: Some(v(1.0, -1.0)), snap_radius: 0.05, woken: vec![held], ..Default::default() };
+        assert_eq!(infer(&sk, v(1.01, 1.0), &across)[0].constraints, vec![AutoConstraint::PerpendicularTo(held)]);
+        let unwoken = InferenceContext { woken: Vec::new(), ..across };
+        assert_eq!(infer(&sk, v(1.01, 1.0), &unwoken)[0].kind, InferenceKind::Vertical);
     }
 
     #[test]
