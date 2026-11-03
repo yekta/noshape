@@ -74,6 +74,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-03 05:00 release (qa early notes 02:25, newest green bad1de8e; final list at 04:30)
+- **No regression against v0.4.22 known so far** — nothing to stop the cut for. The one P0 found tonight, **CRASH-2045**
+  (Core section: deleting a feature of fuzz seed 2045's document crashes 4–5 runs in 5 with the Rust Boolean on), is
+  **already in the published v0.4.22** (4 of 5 there too), so a new release doesn't make it worse; it should be fixed
+  first thing. On greens up to bad1de8e: volume sweep and the 44 ticket documents = v0.4.22 except cli-shell-gpf's
+  Shell 3 (builds now, core's SHELL-HANG-5 work); the user's four cases pass (knurl 12.5 s, vase, split-and-chamfer,
+  Y Ribs); app rows (mirror set, P0 repros, sheet metal, c14) pixel-identical to v0.4.21; seed 508 / 685 memory 788 /
+  596 MB. New UI tickets tonight are not regressions (P1 DIALOG-SWITCH-DISCARDS-NEW and the P2 / P3 ones are in v0.4.22 too).
+
 ## Release blockers for the 2026-11-02 17:00 release (qa list 16:41 — late, the 16:30 deadline missed; newest green 59cdc1b5)
 - **qa 21:10: v0.4.22 (published 20:51, cut 541958138 + bump) smoked: good.** CLI / app as CLI "0.4.22"; round trip = v0.4.21 (IGES part named "SOLID": IGES-IMPORT-NAME-SOLID, P3); volume sweep = v0.4.21 but **sk211-step89 opens again** (SKETCH-CONSTRUCTIVE-RECURSION fixed on the release); fixed tickets hold; the user's cases pass (knurl 11.2 s; vase 2 mm in 58694.8605 / out 63464.5088; split-and-chamfer one part; Y Ribs 0.4 s); cli-suppress-segv opens and seeds 1222 / 1250 run clean with NOSHAPE_BOOL_RUST=0 (no CI-build crash); the updater delivered it to the v0.4.21 install (above).
 - **qa 21:00: the in-app updater works, v0.4.21 → v0.4.22 (Linux, install.sh install).** The v0.4.21 app on :149 (installed 18:26, g34 open) fetched the feed at 20:56:51 — 5 min after v0.4.22 published (20:51:51) — downloaded noshape-0.4.22-linux-x86_64.tar.gz and staged it (`~/.config/noshape/updates/staged-0.4.22`), and the navbar's middle showed **"Updated — restart to finish" with Restart and What's new** (qa-scratch/upd-2057*.png; the "downloading n%" phase finished between screenshots). A click on Restart: the app quit, `~/.local/bin/noshape --version` = **0.4.22**, and a new process `noshape --reopen …/updates/reopen.json` reopened g34 within 25 s, no banner (qa-scratch/upd-after-restart.png). Not covered here: the .deb (pkexec), Windows, macOS. The 0.4.22 app stays on :149 for the 05:00 release (PID 1965288). v0.4.22 smoke running.
