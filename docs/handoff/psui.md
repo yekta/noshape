@@ -254,7 +254,10 @@ dump, the runner, live's first 20 scenarios run in ours and a first score.
   start read before its list drew). Fixed since 15:10: the driver's idle check waits for an open dialog's model before
   the feature and std's editing logic (f0c58b77); and a new feature's preview waits for std's editing logic's first
   run (a new Extrude on a part face showed its New preview, a separate Part 2, ~0.9 s before it turned Add; now its
-  first preview is Add; `ui.std_logic_first`, the wait is pending as a regeneration).
+  first preview is Add; `ui.std_logic_first`, the wait is pending as a regeneration). 18:10: an edge's feature is
+  the latest of its two faces' creators (ops `edge_creator(n, ps)`; was the second face by name: a fillet's tangent
+  edge lit Extrude 1; x40 measure-fillet-face matches). The x40-only recordings (94 not re-recorded): 81/94, all
+  13 known (Hole / Revolve remembered values, preselected edges, "#width = 0", x40 dialog place, revolve-dialog-axis).
 - 11-03 15:10: lead P1 (user 17:26 report): the update banner is now a card floating at the bottom centre of every
   window (updates.rs `card`, app-core `os_menu::set_floating`), ✕ hides it for the session; navbar / start window
   slots gone; checked on :102 (start window and a Part Studio, 1280 / 560 / 760). Since 14:00 also: an edge clicked
