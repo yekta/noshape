@@ -673,6 +673,24 @@ fn fs_mesh_pick(i: MeshOut) -> @location(0) u32 {
     return i.pick;
 }
 
+// Datum planes in the pick pass: the depth scaled toward the far end (reverse Z: 0 is far), so planes keep their
+// order among themselves while every part in front of or behind them still wins.
+struct PlanePickOut {
+    @location(0) id: u32,
+    @builtin(frag_depth) depth: f32,
+};
+
+@fragment
+fn fs_mesh_pick_plane(i: MeshOut) -> PlanePickOut {
+    load_inst(i.slot);
+    let st = state_of(i.pick);
+    if ((st & (HIDDEN | NO_PICK)) != 0u || clipped(i.world)) { discard; }
+    var o: PlanePickOut;
+    o.id = select(i.pick, 0u, inst.params.z == 0u);
+    o.depth = i.pos.z * 0.001;
+    return o;
+}
+
 // ---------------------------------------------------------------- lines
 
 struct LineIn {

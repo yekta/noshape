@@ -4566,10 +4566,11 @@ impl PartStudioView {
 
     /// The open feature dialog can't regenerate (live: its row turns red and
     /// the Features header shows the error icon until it can).
-    /// The feature being edited uses feature `id` (its sketch, a plane): live shows such a hidden sketch while the
-    /// dialog is open (ui-parity extrude-surface-tab, feature-row-dblclick-sketch).
+    /// The existing feature being edited uses feature `id` (its sketch, a plane): rolled back to before it, the
+    /// model doesn't consume such a hidden sketch and live shows it (ui-parity extrude-surface-tab); a new
+    /// feature's picks leave it hidden (extrude-new-sketch-row-selected).
     fn edit_uses(&self, id: FeatureId, cx: &App) -> bool {
-        let Some(e) = &self.edit else { return false };
+        let Some(e) = self.edit.as_ref().filter(|e| !e.is_new) else { return false };
         fn uses(values: &noshape_model::params::ParamValues, id: FeatureId) -> bool {
             values.0.values().any(|v| match v {
                 ParamValue::Query(q) => q.iter().any(|r| r.depends_on() == Some(id)),

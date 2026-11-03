@@ -248,9 +248,10 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             let result: Result<(), String> = match what {
                 "click" | "dblclick" | "rclick" | "hover" => match cx.update(|_, cx| locate(&target, &ps, cx)).unwrap_or_else(|e| Err(e.to_string())) {
                     Ok(at) => {
+                        eprintln!("UI-SCRIPT step {} {what} at ({:.0}, {:.0})", i + 1, f32::from(at.x), f32::from(at.y));
                         let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: at, pressed_button: None, modifiers: mods }), cx));
                         // The graphics area picks what is under the pointer before the press.
-                        sleep(cx, if what == "hover" { step["ms"].as_u64().unwrap_or(1500) } else { 300 }).await;
+                        sleep(cx, if what == "hover" { step["ms"].as_u64().unwrap_or(1500) } else { 500 }).await;
                         let (button, clicks) = match what {
                             "rclick" => (MouseButton::Right, 1),
                             "dblclick" => (MouseButton::Left, 2),

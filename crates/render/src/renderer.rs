@@ -1189,8 +1189,9 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         return;
     }
     if pick {
-        // Transparent geometry (datum planes) first and without depth
-        // writes: opaque parts behind it win the pick.
+        // Transparent geometry (datum planes) first, their depth pushed far
+        // back: opaque parts behind them win the pick, the nearest plane wins
+        // among planes (Onshape; ours took the last drawn: Front over Top).
         // Unlit ones (datum planes) before lit see-through faces (in-context
         // geometry, transparent parts), so a face wins over a plane at the
         // same pixel (Onshape).
@@ -1205,7 +1206,7 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
             return;
         }
         let (behind, lines): (Vec<usize>, Vec<usize>) = lists.lines.iter().partition(|&&i| instances[i].pick_behind);
-        draw(pass, &flat, &pipelines.mesh_pick_transparent);
+        draw(pass, &flat, &pipelines.mesh_pick_plane);
         draw(pass, &behind, &pipelines.line_pick_behind);
         draw(pass, &lit, &pipelines.mesh_pick_transparent);
         draw(pass, &lists.opaque, &pipelines.mesh_pick);
@@ -1905,6 +1906,7 @@ struct Pipelines {
     point_hidden: Lazy,
     mesh_pick: Lazy,
     mesh_pick_transparent: Lazy,
+    mesh_pick_plane: Lazy,
     /// Visible-depth samples: pick ids with true depth (no bias).
     mesh_sample: Lazy,
     mesh_pick_priority: Lazy,
@@ -1949,6 +1951,7 @@ impl Pipelines {
             &self.point_hidden,
             &self.mesh_pick,
             &self.mesh_pick_transparent,
+            &self.mesh_pick_plane,
             &self.mesh_sample,
             &self.mesh_pick_priority,
             &self.line_pick,
@@ -2569,6 +2572,9 @@ impl Renderer {
         let point_hidden = lazy(LayoutKind::Main, P { label: "point-hidden", vs: "vs_point", fs: "fs_point", buffers: POINT_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: POINT_DEPTH_BIAS, samples: msaa }, PLAIN);
         let mesh_pick = lazy(LayoutKind::Main, P { label: "mesh-pick", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: 1 }, PLAIN);
         let mesh_pick_transparent = lazy(LayoutKind::Main, P { label: "mesh-pick-t", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((false, ge)), bias: none, samples: 1 }, PLAIN);
+        // Datum planes: depth written scaled far back (fs_mesh_pick_plane), so the nearest plane wins among
+        // planes and any part still wins over them.
+        let mesh_pick_plane = lazy(LayoutKind::Main, P { label: "mesh-pick-plane", vs: "vs_mesh", fs: "fs_mesh_pick_plane", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: 1 }, PLAIN);
         let mesh_sample = lazy(LayoutKind::Main, P { label: "mesh-sample", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: 1 }, PLAIN);
         let mesh_pick_priority = lazy(LayoutKind::Main, P { label: "mesh-pick-p", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: priority, samples: 1 }, PLAIN);
         let line_pick = lazy(LayoutKind::Main, P { label: "line-pick", vs: "vs_line", fs: "fs_line_pick", buffers: LINE_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: 1 }, PLAIN);
@@ -2604,6 +2610,7 @@ impl Renderer {
             point_hidden,
             mesh_pick,
             mesh_pick_transparent,
+            mesh_pick_plane,
             mesh_sample,
             mesh_pick_priority,
             line_pick,

@@ -569,6 +569,52 @@ fn a_line_in_an_edge_on_plane_picks_over_the_plane() {
     assert_eq!(at(-0.01), 1, "below the line the plane's edge picks the plane");
 }
 
+/// Overlapping datum planes pick the nearest (live ui-parity: Top where it lies in front of Front; ours took the
+/// plane drawn last), a part behind the planes still wins over them, and its faces and edges pick as before.
+#[test]
+fn the_nearest_plane_wins_the_pick_and_parts_still_win_over_planes() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let (w, h) = (200u32, 150u32);
+    let mut cam = Camera::default();
+    cam.set_view(StandardView::Front);
+    cam.fit_sphere(glam::DVec3::ZERO, 0.03, w as f64 / h as f64);
+    // Two planes facing the viewer: id 1 in front (y = 0), id 2 behind it (y = 0.01), drawn last.
+    let plane = |y: f32, id: u32| {
+        let e = 0.02f32;
+        MeshData { positions: vec![[-e, y, -e], [e, y, -e], [e, y, e], [-e, y, e]], normals: vec![[0.0, -1.0, 0.0]; 4], pick_ids: vec![id; 4], indices: vec![0, 1, 2, 0, 2, 3] }
+    };
+    // A part behind both planes on the right (a pick id per face from 10) with an edge (id 4) along its left side.
+    let part = primitives::box_mesh([0.005, 0.02, -0.005], [0.015, 0.03, 0.005], 10);
+    let mut edge = LineData::default();
+    edge.push_polyline(&[[0.005, 0.02, -0.005], [0.005, 0.02, 0.005]], [0, 0, 0, 255], 4, 2.0, 0);
+    let scene = Scene {
+        instances: vec![
+            Instance::new(Drawable::Mesh(r.upload_mesh(&plane(0.0, 1)))).with_color([0.8, 0.85, 0.9, 0.2]).unlit().layer(5),
+            Instance::new(Drawable::Mesh(r.upload_mesh(&plane(0.01, 2)))).with_color([0.8, 0.85, 0.9, 0.2]).unlit().layer(5),
+            Instance::new(Drawable::Mesh(r.upload_mesh(&part))).with_color([0.6, 0.7, 0.8, 1.0]),
+            Instance::new(Drawable::Lines(r.upload_lines(&edge))).with_color([0.0, 0.0, 0.0, 1.0]).layer(10),
+        ],
+        ..Default::default()
+    };
+    let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: true }).unwrap();
+    let pick = f.pick.unwrap();
+    let vp = glam::DVec2::new(w as f64, h as f64);
+    let at = |x: f64, z: f64| {
+        let s = cam.project(glam::DVec3::new(x, 0.0, z), vp, 0.03).unwrap();
+        pick.id_at(s.x as i32, s.y as i32).unwrap_or(0)
+    };
+    assert_eq!(at(-0.01, 0.0), 1, "where the planes overlap the nearer one picks");
+    assert!((10..16).contains(&at(0.011, 0.0)), "the part behind the planes picks its face: {}", at(0.011, 0.0));
+    assert_eq!(at(0.005, 0.0), 4, "and its edge");
+}
+
 /// GPU-TEST-SEGV: renderers made and dropped on many threads at once (tests in one binary run in parallel) share
 /// the process's one device; each renders its frame. With a Vulkan instance and device per renderer, lavapipe
 /// crashed the process now and then inside libvulkan.

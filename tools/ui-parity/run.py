@@ -113,6 +113,9 @@ def normalize_live(state):
     focus = (state or {}).get("focus")
     if isinstance(focus, dict) and focus.get("text") == "on" and focus.get("selection") == [None, None]:
         focus["text"], focus["selection"] = None, None
+    # The bubble's close button is part of live's text ("Select a sketch plane × Close").
+    if isinstance((state or {}).get("message"), str):
+        state["message"] = state["message"].removesuffix("× Close").strip()
     lst = (state or {}).get("list")
     if isinstance(lst, dict):
         rows = lst.get("rows") or []

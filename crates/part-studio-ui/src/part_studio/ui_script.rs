@@ -129,6 +129,42 @@ impl PartStudioView {
         }
     }
 
+    /// A point of plane `p`'s rectangle in front of every other shown plane and part, near its labelled corner.
+    fn visible_plane_point(&self, p: &noshape_model::display::PlaneDisplay, cx: &App) -> Option<DVec3> {
+        let vp = self.viewport.read(cx);
+        let mut grid: Vec<(f64, f64)> = (-6..=6).flat_map(|i| (-6..=6).map(move |j| (i as f64 * 0.15, j as f64 * 0.15))).collect();
+        grid.sort_by(|a, b| ((a.0 + 0.8).hypot(a.1 - 0.8)).total_cmp(&(b.0 + 0.8).hypot(b.1 - 0.8)));
+        grid.into_iter().map(|(u, v)| p.corner(u, v)).find(|w| {
+            let Some(at) = vp.project(*w) else { return false };
+            let (o, d) = vp.ray(at);
+            let depth = (*w - o).dot(d.normalize());
+            let plane_in_front = self.display.planes.iter().filter(|q| !q.hidden && q.reference != p.reference).any(|q| {
+                let f = &q.frame;
+                let denom = d.normalize().dot(f.normal);
+                if denom.abs() < 1e-9 {
+                    return false;
+                }
+                let t = (f.origin - o).dot(f.normal) / denom;
+                let local = f.to_local(o + d.normalize() * t) - q.center;
+                // Level with this plane (where they cross) counts as covered: the pick can go either way there.
+                t > 0.0 && t < depth * (1.0 + 1e-6) && local.x.abs() <= q.half_width && local.y.abs() <= q.half_height
+            });
+            let part_in_front = noshape_model::interaction::entities_along_ray(&self.display, o, d, 0.0, &|_| false, 1).first().is_some_and(|h| h.depth < depth - 1e-9);
+            // Clear of the other planes' outlines too: the pick takes a line within its radius.
+            let near_outline = self.display.planes.iter().filter(|q| !q.hidden && q.reference != p.reference).any(|q| {
+                let c = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)].map(|(u, v)| vp.project(q.corner(u, v)));
+                (0..4).any(|k| match (c[k], c[(k + 1) % 4]) {
+                    (Some(a), Some(b)) => {
+                        let t = ((at - a).dot(b - a) / (b - a).length_squared().max(1e-9)).clamp(0.0, 1.0);
+                        (a + (b - a) * t).distance(at) < 15.0
+                    }
+                    _ => false,
+                })
+            });
+            !plane_in_front && !part_in_front && !near_outline
+        })
+    }
+
     /// The focused rename or folder name input, if any.
     fn unlabelled_input_focused<'a>(&self, window: &Window, cx: &'a App) -> Option<&'a InputState> {
         let inputs = self.renaming.as_ref().map(|r| &r.1).into_iter().chain(self.folder_prompt.as_ref().map(|f| &f.0)).chain(self.ui.part_renaming.as_ref().map(|r| &r.1)).chain(self.ui.dg_renaming.as_ref().map(|r| &r.1));
@@ -167,8 +203,7 @@ impl PartStudioView {
         }
         let world = if let Some(name) = t.get("plane").and_then(Value::as_str) {
             let p = self.display.planes.iter().find(|p| p.name == name && !p.hidden).ok_or_else(|| format!("no shown plane {name}"))?;
-            // Inside the rectangle near its labelled corner, clear of the other planes.
-            p.corner(-0.85, 0.85)
+            self.visible_plane_point(p, cx).ok_or_else(|| format!("plane {name} is covered everywhere"))?
         } else if t.get("origin").is_some() {
             DVec3::ZERO
         } else if let Some(p) = t.get("sketch_point") {
