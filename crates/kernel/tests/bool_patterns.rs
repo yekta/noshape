@@ -892,6 +892,15 @@ fn a_steep_plane_exactly_through_a_cones_apex() {
     assert!((v - w).abs() <= 1e-9 * w, "volume {v} against OCCT's {w}");
 }
 
+/// A cut of a threaded rod (recorded): its cylinder's faces between the thread's turns go round between rulings at one
+/// angle (helical strips, no seam), th0 there with the rulings its loop runs up on the far side (it declined "a
+/// cylinder face without curved edges"); a piece's end a tolerance round the axis past a turn is not across the
+/// seam (3e-7 rad on Ø9.4). Valid, OCCT's counts and volume.
+#[test]
+fn a_threaded_rods_helical_faces() {
+    valid_as_occt("308a667d2f24d313", 1e-9);
+}
+
 /// Shell's slab common on a part with countersinks (cone apexes) and tilted holes (ellipse edges) (recorded): each
 /// ellipse edge takes its own minor radius (the body's minor radii skipped the apex edges, so an ellipse after one read
 /// another edge's: 0 there made it "a degenerate edge between two vertices", else a wrong ellipse); valid, OCCT's

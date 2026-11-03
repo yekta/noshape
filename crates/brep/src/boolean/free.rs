@@ -259,7 +259,7 @@ pub(super) fn mapped(g: &GFace, c: &Arc<NurbsCurve>, t0: f64, t1: f64) -> R<C2> 
         Surf::Plane { origin, u, v, .. } => Map::Plane { origin, u, v },
         Surf::Cyl { o, a, x, y, r, flip, th0, .. } => {
             let mid = g.to2(c.at(0.5 * (t0 + t1))).x;
-            Map::Cyl { o, a, x, y, r, flip, th0, mid }
+            Map::Cyl { o, a, x, y, r, flip, th0, mid, eps: g.seam_eps() }
         }
         Surf::Nurbs { .. } => return Err(Decline("a curve on a free-form face")),
     };

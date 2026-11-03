@@ -1762,8 +1762,12 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
       continue;
     double a = 0, z = 0, v1 = 0, v2 = 0;
     BRepTools::UVBounds(fs[i], a, z, v1, v2);
-    // (An end a rounding past a whole turn, 1e-7 radians: not across it.)
-    if (z - a < 2 * M_PI - 1e-6 && std::floor((a + 1e-7) / (2 * M_PI)) != std::floor((z - 1e-7) / (2 * M_PI)))
+    // (An end a rounding past a whole turn, 1e-7 radians or the tolerance round the axis: not across it (a thread's
+    // helical face going round between rulings 3e-7 rad apart).)
+    const occ::handle<Geom_CylindricalSurface> scyl = occ::down_cast<Geom_CylindricalSurface>(sf);
+    const double radius = !scyl.IsNull() ? scyl->Radius() : occ::down_cast<Geom_ConicalSurface>(sf)->RefRadius();
+    const double round_off = radius > 1e-9 ? std::max(1e-7, tol / radius) : 1e-7;
+    if (z - a < 2 * M_PI - 1e-6 && std::floor((a + round_off) / (2 * M_PI)) != std::floor((z - round_off) / (2 * M_PI)))
       return "a piece across its surface's seam angle";
     if (z - a > 2 * M_PI + 1e-6)
       return "a face's curves over more than a turn";

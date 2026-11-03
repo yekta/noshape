@@ -104,6 +104,19 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
   free-form face), _DELV (the deleted-vertex rule), _PROJ (a failed projection), _TINY (a tiny arc)).
 - Squash only with `git reset --soft $(git merge-base HEAD origin/main)` after a fresh fetch; check `git show --stat`.
 
+## Faces going round between rulings: threads (11-03 03:20 UTC)
+- A part of a cylinder or cone with no gap in the angles its boundary covers (a thread's helical face: no seam,
+  rulings at one angle where the turns end) declined "a cylinder face without curved edges". Now th0 is the
+  rulings' angle; the rulings its loop runs up along v (outer loops counter-clockwise) are on the far side
+  (`GFace::right`, mapped at th0 + 2π by copy 1 in curve2, which now honours copy 1 on any cylinder), seam_at cuts
+  sections there as on a whole one, and points within the tolerance round the axis of th0 are at it
+  (`GFace::wrap_eps`, `Map::Cyl::eps`; 1e-9 rad elsewhere as before: the rulings and helices end 3e-7 rad apart on
+  Ø9.4). rust_boolean.cpp: a made piece's end a rounding past a whole turn may be the tolerance round the axis
+  (max(1e-7 rad, tol / radius)), not only 1e-7 rad.
+- Corpora +10 taken (4422 / 5068), 0 differ: the thread cut 308a667d in 4 corpora, 8e092266, c3080039, and 4 of
+  corpus5's "a piece across its surface's seam angle" (09bfbb3a, 36b1c191, 57ff5444, 5f3ce726); shfall unchanged.
+  T1 a_threaded_rods_helical_faces (recorded, 327 KB).
+
 ## 2D curves' first derivative alone (11-03 02:00 UTC)
 - C2::deriv1: a mapped curve's (a 3D NURBS seen in a plane's or cylinder's parameters) or a conic's first derivative
   in one evaluation; `derivs` makes the second by differences of the first, three evaluations, which the Newton steps

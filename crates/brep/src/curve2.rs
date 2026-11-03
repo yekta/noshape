@@ -27,11 +27,12 @@ pub(crate) enum C2 {
 
 /// A face's map from 3D to its parameter plane (the Boolean's own): a plane's frame, or a cylinder's or cone's
 /// (axis origin and direction, angle frame, scale `r`, `flip`: heights the other way, angles from `th0` through
-/// 2π; `mid`: the curve's x halfway, which says on which side of the angles' ends its ends are).
+/// 2π; `mid`: the curve's x halfway, which says on which side of the angles' ends its ends are; `eps`: the angle
+/// within which a point is at those ends).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum Map {
     Plane { origin: DVec3, u: DVec3, v: DVec3 },
-    Cyl { o: DVec3, a: DVec3, x: DVec3, y: DVec3, r: f64, flip: bool, th0: f64, mid: f64 },
+    Cyl { o: DVec3, a: DVec3, x: DVec3, y: DVec3, r: f64, flip: bool, th0: f64, mid: f64, eps: f64 },
 }
 
 impl Map {
@@ -44,10 +45,10 @@ impl Map {
     pub fn at_seam(&self, p: DVec3) -> bool {
         match *self {
             Map::Plane { .. } => false,
-            Map::Cyl { o, x, y, th0, .. } => {
+            Map::Cyl { o, x, y, th0, eps, .. } => {
                 let w = p - o;
                 let th = (w.dot(y).atan2(w.dot(x)) - th0).rem_euclid(TAU);
-                th <= 1e-9 || th >= TAU - 1e-9
+                th <= eps || th >= TAU - eps
             }
         }
     }
@@ -58,14 +59,13 @@ impl Map {
     pub fn map_on(&self, p: DVec3, d: DVec3, end: Option<bool>) -> (DVec2, DVec2) {
         match *self {
             Map::Plane { origin, u, v } => (DVec2::new((p - origin).dot(u), (p - origin).dot(v)), DVec2::new(d.dot(u), d.dot(v))),
-            Map::Cyl { o, a, x, y, r, flip, th0, mid } => {
+            Map::Cyl { o, a, x, y, r, flip, th0, mid, eps } => {
                 let w = p - o;
                 let (wx, wy) = (w.dot(x), w.dot(y));
                 let mut th = th0 + (wy.atan2(wx) - th0).rem_euclid(TAU);
                 let dth = (wx * d.dot(y) - wy * d.dot(x)) / (wx * wx + wy * wy);
                 // At the angles' ends: the side the curve is on (where it goes from there, or comes from; else the
                 // side of its middle).
-                let eps = 1e-9;
                 let at_end = (th - th0).abs() <= eps || (th - th0 - TAU).abs() <= eps;
                 let into = match end {
                     Some(e) if at_end && (r * dth).abs() > 1e-6 * d.length() => Some(if e { -dth } else { dth }),
@@ -987,7 +987,7 @@ mod tests {
             weights: (0..9).map(|k| if k % 2 == 0 { 1.0 } else { h }).collect(),
             spans: Default::default(),
         };
-        let m = Map::Cyl { o: DVec3::ZERO, a: DVec3::Z, x: DVec3::X, y: DVec3::Y, r: 1.0, flip: false, th0: 0.0, mid: PI };
+        let m = Map::Cyl { o: DVec3::ZERO, a: DVec3::Z, x: DVec3::X, y: DVec3::Y, r: 1.0, flip: false, th0: 0.0, mid: PI, eps: 1e-9 };
         let up = C2::Mapped { c: std::sync::Arc::new(c), t0: 0.0, t1: 1.0, m };
         assert!(up.start().distance(DVec2::new(0.0, 0.0)) < 1e-12, "{:?}", up.start());
         assert!(up.end().distance(DVec2::new(TAU, 0.8)) < 1e-12, "{:?}", up.end());

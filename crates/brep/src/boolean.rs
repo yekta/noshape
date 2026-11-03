@@ -243,6 +243,10 @@ struct GFace {
     bound: std::sync::OnceLock<R<Vec<C2>>>,
     /// Each of those curves' sample points, made when first asked for (curves crossing it: `intervals_on`).
     bound_pts: std::sync::OnceLock<Vec<std::sync::OnceLock<Vec<DVec2>>>>,
+    /// A part of a cylinder or cone going round between rulings at th0 (a thread's helical face): the rulings on
+    /// the far side, at th0 + 2π, and the angle within which a point is at th0 (the Boolean's tolerance's).
+    right: Vec<usize>,
+    wrap_eps: f64,
     lo: DVec3,
     hi: DVec3,
     /// A NURBS face's surface, its edges' curves on it (by edge, a seam's second: OCCT's, in its own parameters,
@@ -299,6 +303,11 @@ impl GFace {
         }
     }
 
+    /// The angle within which a point is at its angles' ends (th0).
+    fn seam_eps(&self) -> f64 {
+        self.wrap_eps.max(1e-9)
+    }
+
     /// The curve `g` from `p0` (in 3D) in this face's parameter plane, `copy` 1 for the right side of a seam.
     fn curve2(&self, p0: DVec3, p1: DVec3, g: &Geo, copy: usize) -> R<C2> {
         match (&self.s, g) {
@@ -326,7 +335,7 @@ impl GFace {
                 // (Seen along the axis its centre is off it: mapped point by point, on the side of its middle at
                 // the face's seam; a hyperbola of a plane at an angle to the axis too.)
                 let mid = self.to2(e.at(t0 + 0.5 * sweep)).x;
-                let m = Map::Cyl { o, a, x, y, r, flip, th0, mid };
+                let m = Map::Cyl { o, a, x, y, r, flip, th0, mid, eps: self.seam_eps() };
                 if e.par {
                     return Ok(C2::Conic { c: e.c, u: e.x / (4.0 * e.a), v: e.y, t0, sweep, m, par: true, hyp: false });
                 }
@@ -353,12 +362,13 @@ impl GFace {
                     self.to2(p0)
                 };
                 // At the start of its angles (rounding may give the end).
-                let (at0, at1) = ((q0.x - r * th0).abs() <= 1e-9 * r.max(1.0), (q0.x - r * (th0 + TAU)).abs() <= 1e-9 * r.max(1.0));
+                let near = (1e-9 * r.max(1.0)).max(self.wrap_eps * r);
+                let (at0, at1) = ((q0.x - r * th0).abs() <= near, (q0.x - r * (th0 + TAU)).abs() <= near);
                 if at1 {
                     q0.x = r * th0;
                 }
-                let seam = *full && (at0 || at1);
-                if seam && copy == 1 {
+                // (A seam's right side, or a ruling on the far side of a face going round between rulings.)
+                if (at0 || at1) && copy == 1 {
                     q0.x = r * (th0 + TAU);
                 }
                 match g {
@@ -910,6 +920,7 @@ impl Ctx<'_> {
     /// (a piece of), whose curve on a free-form face is OCCT's).
     fn c2_of(&self, f: usize, s: &Seg, copy: usize, edge: Option<usize>) -> R<C2> {
         let g = &self.faces[f];
+        let copy = if edge.is_some_and(|e| g.right.contains(&e)) { 1 } else { copy };
         if let (Geo::Apex { a0, .. }, Surf::Cyl { full: false, .. }) = (s.g, &g.s)
             && a0.is_nan()
         {
@@ -1625,13 +1636,17 @@ impl Ctx<'_> {
 
     /// Where `path` (a circle about face `f`'s axis) crosses `f`'s seam, if `f` goes round.
     fn seam_at(&self, f: usize, path: &Path) -> Option<DVec3> {
+        // (A face going round between rulings at th0 too.)
+        if matches!(self.faces[f].s, Surf::Cyl { full: false, .. }) && self.faces[f].right.is_empty() {
+            return None;
+        }
         match (path.clone(), &self.faces[f].s) {
-            (Path::Circle(k), Surf::Cyl { o, a, x, y, r0, k: slope, th0, full: true, .. }) => {
+            (Path::Circle(k), Surf::Cyl { o, a, x, y, r0, k: slope, th0, .. }) => {
                 let h = (k.c - *o).dot(*a);
                 Some(*o + *a * h + (*x * th0.cos() + *y * th0.sin()) * (r0 + slope * h))
             }
-            (Path::Ellipse(e), Surf::Cyl { th0, full: true, .. }) if e.open() => self.hyp_at_angle(f, &e, *th0).map(|t| e.at(t)),
-            (Path::Ellipse(e), Surf::Cyl { th0, full: true, .. }) => Some(e.at(self.ell_at_angle(f, &e, *th0))),
+            (Path::Ellipse(e), Surf::Cyl { th0, .. }) if e.open() => self.hyp_at_angle(f, &e, *th0).map(|t| e.at(t)),
+            (Path::Ellipse(e), Surf::Cyl { th0, .. }) => Some(e.at(self.ell_at_angle(f, &e, *th0))),
             _ => None,
         }
     }
@@ -3393,7 +3408,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 Some(fs) => free::nurbs_surf(fs, uvbox, f.reversed),
                 None => s,
             };
-            cx.faces.push(GFace { arg: a, index: i as u32, t: body.face_tol.get(i).copied().unwrap_or(0.0), solid: usize::MAX, s, edges, bound: Default::default(), bound_pts: Default::default(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default(), hulls: Default::default(), inner: body.face_inner_edges.iter().filter(|x| x[0] as usize == i).map(|x| first_edge[ai] + x[1] as usize).collect() });
+            cx.faces.push(GFace { arg: a, index: i as u32, t: body.face_tol.get(i).copied().unwrap_or(0.0), solid: usize::MAX, s, edges, bound: Default::default(), bound_pts: Default::default(), right: Vec::new(), wrap_eps: 0.0, lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default(), hulls: Default::default(), inner: body.face_inner_edges.iter().filter(|x| x[0] as usize == i).map(|x| first_edge[ai] + x[1] as usize).collect() });
         }
         for (i, s) in body.solids.iter().enumerate() {
             let si = cx.solids.len();
@@ -3500,7 +3515,34 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                     }
                 }
             }
-            let Some(th0) = gap(&covered) else { return Err(Decline("a cylinder face without curved edges")) };
+            let th0 = match gap(&covered) {
+                Some(th0) => th0,
+                None => {
+                    // Going round (a thread's helical face): between its rulings at one angle, th0 there; those
+                    // its loop runs up (along its parameters' v) are on the far side.
+                    let Surf::Cyl { a, flip, r, .. } = cx.faces[f].s else { unreachable!() };
+                    let angle = |p: DVec3| (p - o).dot(y).atan2((p - o).dot(x));
+                    let rulings: Vec<(usize, bool)> = cx.faces[f].edges.iter().copied().filter(|&(e, _)| cx.edges[e].g == Geo::Line).collect();
+                    let Some(&(e0, _)) = rulings.first() else { return Err(Decline("a cylinder face without curved edges")) };
+                    let th0 = angle(cx.p(cx.edges[e0].v[0]));
+                    let at = |p: DVec3| ((angle(p) - th0 + PI).rem_euclid(TAU) - PI).abs() * r <= tol;
+                    if rulings.len() < 2 || !rulings.iter().all(|&(e, _)| cx.edges[e].v.iter().all(|&w| at(cx.p(w)))) {
+                        return Err(Decline("a cylinder face without curved edges"));
+                    }
+                    let up = |(e, rev): (usize, bool)| {
+                        let [v0, v1] = cx.edges[e].v;
+                        let d = (cx.p(v1) - cx.p(v0)).dot(a) * if rev { -1.0 } else { 1.0 };
+                        if flip { -d > 0.0 } else { d > 0.0 }
+                    };
+                    let right: Vec<usize> = rulings.iter().copied().filter(|&x| up(x)).map(|x| x.0).collect();
+                    if right.is_empty() || right.len() == rulings.len() {
+                        return Err(Decline("a cylinder face without curved edges"));
+                    }
+                    cx.faces[f].right = right;
+                    cx.faces[f].wrap_eps = tol / r;
+                    th0
+                }
+            };
             if let Surf::Cyl { th0: t, .. } = &mut cx.faces[f].s {
                 *t = th0;
             }
