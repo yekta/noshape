@@ -1061,6 +1061,43 @@ fn a_written_out_cap_face_query() {
     assert_eq!((r.matching, r.compared), (3, 3), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// A part named by id alone (live's UI fetch lists bodies by id) is ours
+/// whose box is nearest live's, not the first whose box holds its centre:
+/// a disc in a ring's hole is the disc (exercise-jan's pattern copies
+/// inside the part they ring).
+#[test]
+fn a_part_by_id_is_the_one_with_its_box() {
+    let pi = std::f64::consts::PI;
+    let region = |sk: &str| json!({ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": sk, "queryString": format!("query = qSketchRegion(id + \"{sk}\", true);") });
+    let top = json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }]);
+    let extrude = |id: &str, sk: &str| json!({ "btType": "BTMFeature-134", "featureType": "extrude", "featureId": id, "name": id, "parameters": [
+        { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+        { "btType": "BTMParameterEnum-145", "parameterId": "operationType", "value": "NEW" },
+        { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [region(sk)] },
+        { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+        { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "10 mm" }] });
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1", "parameters": top, "entities": [circle("o", 0.03, (0.0, 0.0)), circle("i", 0.02, (0.0, 0.0))], "constraints": [] },
+        extrude("FE1", "FS1"),
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS2", "name": "Sketch 2", "parameters": top, "entities": [circle("d", 0.005, (0.0, 0.0))], "constraints": [] },
+        extrude("FE2", "FS2"),
+        { "btType": "BTMFeature-134", "featureType": "deleteBodies", "featureId": "FD", "name": "Delete part 1", "parameters": [
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JHH"], "queryString": "" }] }] }
+    ] });
+    let ring = json!({ "partId": "JHD", "name": "Part 1", "bodyType": "SOLID", "faces": 4, "edges": 4, "vertices": 0, "volume": pi * (0.03 * 0.03 - 0.02 * 0.02) * 0.01, "bbox": { "min": [-0.03, -0.03, 0.0], "max": [0.03, 0.03, 0.01] } });
+    let disc = json!({ "partId": "JHH", "name": "Part 2", "bodyType": "SOLID", "faces": 3, "edges": 2, "vertices": 0, "volume": pi * 0.005 * 0.005 * 0.01, "bbox": { "min": [-0.005, -0.005, 0.0], "max": [0.005, 0.005, 0.01] } });
+    let ids = |id: &str| json!({ "id": id, "type": "SOLID", "faces": [{ "id": format!("{id}f") }], "edges": [{ "id": format!("{id}e") }], "vertexCount": 0 });
+    let live = vec![
+        json!({ "index": 0, "status": "OK", "parts": [] }),
+        json!({ "index": 1, "status": "OK", "parts": [ring], "bodies": [ids("JHD")] }),
+        json!({ "index": 2, "status": "OK", "parts": [ring], "bodies": [ids("JHD")] }),
+        json!({ "index": 3, "status": "OK", "parts": [ring, disc], "bodies": [ids("JHD"), ids("JHH")] }),
+        json!({ "index": 4, "status": "OK", "parts": [ring], "bodies": [ids("JHD")] }),
+    ];
+    let r = run_model("part-by-id", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (5, 5), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
 /// qSketchRegion(…, true) leaves out every region inside another's hole,
 /// rings nested in a bore too (live: bearing-block-takumi).
 #[test]

@@ -1562,7 +1562,12 @@ impl<'a> Translator<'a> {
                 let at = |v: &Value, i: usize| v.as_array().and_then(|a| a.get(i)).and_then(Value::as_f64).map_or(f64::NAN, |c| c * k);
                 // The part whose box holds live's point, else the nearest box
                 // (an earlier difference changed the part; that shows already).
-                let off = |b: &Value| (0..3).map(|i| (at(&b["bounding_box"]["min"], i) - p[i]).max(p[i] - at(&b["bounding_box"]["max"], i)).max(0.0).powi(2)).sum::<f64>().sqrt();
+                // With live's box known: the part whose box is nearest it (a
+                // pattern's copies lie inside the box of the part they ring).
+                let off = |b: &Value| match r.bbox {
+                    Some([lo, hi]) => (0..3).map(|i| (at(&b["bounding_box"]["min"], i) - lo[i]).powi(2) + (at(&b["bounding_box"]["max"], i) - hi[i]).powi(2)).sum::<f64>().sqrt(),
+                    None => (0..3).map(|i| (at(&b["bounding_box"]["min"], i) - p[i]).max(p[i] - at(&b["bounding_box"]["max"], i)).max(0.0).powi(2)).sum::<f64>().sqrt(),
+                };
                 parts["parts"]
                     .as_array()
                     .into_iter()
