@@ -156,6 +156,8 @@ pub struct SheetGeometry {
     pub cad: Vec<super::cad_layers::CadSpan>,
     /// Text styles of the DXF / DWG export by kind of text (`cad_layers`).
     pub cad_text_styles: Vec<super::cad_layers::CadTextStyleSpan>,
+    /// Texts the DXF / DWG export writes as one MTEXT (`cad_layers`).
+    pub cad_mtext: Vec<super::cad_layers::CadMtext>,
     /// Hatched sections, written as HATCH entities by the DXF / DWG export.
     pub hatches: Vec<super::cad_layers::HatchRegion>,
     /// Element groups the DXF / DWG export writes as one object
@@ -991,15 +993,49 @@ impl SheetGeometry {
         // Where live's templates put each text (samples/tpl-*.dxf, asb 10-24
         // "template frames"; the same fractions of the block at every size):
         // labels hang from their top left, notes from their top centre,
-        // values sit on their centre. Lines of a block are 5/3 of the text
-        // height apart (MTEXT's spacing).
+        // values sit on their centre. Each is one MTEXT of live's width (a
+        // fraction of the block's) whose lines are 5/3 of the text height
+        // apart; values also have their cell's height and an empty one is
+        // an empty MTEXT (live writes " ").
         let at = |u: (f64, f64), v: f64| [px(pick(u.0, u.1)), py(v)];
-        let block = |g: &mut Self, p: [f64; 2], h: f64, lines: &[String], anchor: Anchor| {
-            for (i, l) in lines.iter().enumerate().filter(|(_, l)| !l.is_empty()) {
+        let wide = |w: (f64, f64)| pick(w.0, w.1) * bw;
+        // (`wrapped`: one paragraph wrapped into `lines`.)
+        let block = |g: &mut Self, p: [f64; 2], h: f64, lines: &[String], anchor: Anchor, w: (f64, f64), wrapped: bool| {
+            let t0 = g.texts.len();
+            for (i, l) in lines.iter().enumerate() {
                 g.text([p[0], p[1] - i as f64 * h * 5.0 / 3.0], h, l.clone(), anchor);
             }
+            g.cad_mtext_since(t0, wide(w), 0.0, wrapped);
         };
-        let label = |g: &mut Self, u: (f64, f64), v: f64, t: &str, h: f64| g.text(at(u, v), h, t.to_string(), Anchor::TopLeft);
+        let note = |g: &mut Self, p: [f64; 2], h: f64, t: &str, anchor: Anchor, w: (f64, f64)| block(g, p, h, &[t.to_string()], anchor, w, false);
+        let label = |g: &mut Self, u: (f64, f64), v: f64, t: &str, h: f64, w: (f64, f64)| note(g, at(u, v), h, t, Anchor::TopLeft, w);
+        // A field's value on its spot (several lines stack about it), in
+        // Onshape-Standard-Fields; `dh` its cell's height in the block.
+        let field = |g: &mut Self, spot: [f64; 2], h: f64, v: &str, w: (f64, f64), dh: f64| {
+            let lines: Vec<&str> = v.split('\n').filter(|l| !l.is_empty()).collect();
+            let n = lines.len() as f64;
+            let t0 = g.texts.len();
+            for (i, l) in lines.iter().enumerate() {
+                g.text([spot[0], spot[1] + ((n - 1.0) / 2.0 - i as f64) * h * 1.6], h, l.to_string(), Anchor::Center);
+            }
+            if lines.is_empty() {
+                g.text(spot, h, String::new(), Anchor::Center);
+            }
+            // (Several lines: one MTEXT each, about the spot.)
+            for i in t0..g.texts.len() {
+                g.cad_mtext.push(super::cad_layers::CadMtext { texts: i..i + 1, width: wide(w), height: dh * bh, wrapped: false });
+            }
+            g.cad_text_style_since(t0, super::cad_layers::CadTextStyle::Fields);
+        };
+        // A field's value and the cell it edits.
+        let value_in = |g: &mut Self, cell: [f64; 4], spot: [f64; 2], key: &str, h: f64, w: (f64, f64), dh: f64| {
+            let v = value_of(key, sheet.title_field(key).unwrap_or(""));
+            let t0 = g.texts.len();
+            field(g, spot, h, &v, w, dh);
+            let [u0, v0, u1, v1] = cell;
+            let (xa, xb, ya, yb) = (px(u0).min(px(u1)), px(u0).max(px(u1)), py(v0).min(py(v1)), py(v0).max(py(v1)));
+            g.title_cells.push((key.to_string(), [xa, ya, xb, yb], t0..g.texts.len()));
+        };
         // Left: tolerance notes, standard notes, projection.
         let units = sheet.title_field("Units").filter(|u| !u.is_empty()).unwrap_or(if iso { "MILLIMETERS" } else { "INCHES" });
         let word = match units {
@@ -1008,18 +1044,19 @@ impl SheetGeometry {
             u => u,
         };
         let unless_h = lab * tr.unless_h;
+        let (left_w, half_w) = ((0.19358, 0.18447), (0.09679, 0.09224));
         // Live wraps at the full cell width (the text may touch the border).
-        block(self, at((0.00435, 0.00414), 0.9712), unless_h, &wrap_text(&tr.unless.replace("{u}", if en { units } else { word }), unless_h, left * bw), Anchor::TopLeft);
+        block(self, at((0.00435, 0.00414), 0.9712), unless_h, &wrap_text(&tr.unless.replace("{u}", if en { units } else { word }), unless_h, left * bw), Anchor::TopLeft, left_w, true);
         // ANSI in inches: the decimal tolerances (right-aligned by their
         // leading spaces) and the fractional one; ANSI in millimetres and ISO
         // only the angular one.
         let inches = !iso && units == "INCHES";
         if inches {
-            block(self, at((0.00435, 0.00414), 0.8512), lab, &["    .XX = ±.0-", "  .XXX = ±.00-", ".XXXX = ±.000-"].map(String::from), Anchor::TopLeft);
+            block(self, at((0.00435, 0.00414), 0.8512), lab, &["    .XX = ±.0-", "  .XXX = ±.00-", ".XXXX = ±.000-"].map(String::from), Anchor::TopLeft, half_w, false);
         }
         let fractional = if inches { tr.fractional.unwrap_or("FRACTIONAL = ±") } else { "" };
-        block(self, at((0.10268, 0.09784), 0.85407), 0.9 * lab, &[String::new(), tr.angular.to_string(), fractional.to_string()], Anchor::TopLeft);
-        label(self, (0.00435, 0.00414), 0.6592, tr.surface_finish, lab * tr.surface_h);
+        block(self, at((0.10268, 0.09784), 0.85407), 0.9 * lab, &[String::new(), tr.angular.to_string(), fractional.to_string()], Anchor::TopLeft, half_w, false);
+        label(self, (0.00435, 0.00414), 0.6592, tr.surface_finish, lab * tr.surface_h, half_w);
         // The surface finish mark after the label (live: from (0.54, 0.918) in
         // ANSI A's inches, scaled with the block; long translations push it
         // right).
@@ -1029,69 +1066,65 @@ impl SheetGeometry {
         self.lines.push(Polyline2 { points: vec![sf(0.0, 0.918), sf(0.03, 0.866), sf(0.093, 0.9752), sf(0.159, 0.9752)], style: LineStyle::Thin, closed: false, pick: 0 });
         let note_u = (0.09877, 0.09412);
         // 1.3 L, smaller in some languages (live).
-        self.text(at(note_u, 0.49453), 1.3 * lab * tr.dns_h, tr.do_not_scale.to_string(), Anchor::TopCenter);
-        block(self, at(note_u, 0.3872), lab, &wrap_text(tr.break_edges, lab, left * bw), Anchor::TopCenter);
+        note(self, at(note_u, 0.49453), 1.3 * lab * tr.dns_h, tr.do_not_scale, Anchor::TopCenter, left_w);
+        block(self, at(note_u, 0.3872), lab, &wrap_text(tr.break_edges, lab, left * bw), Anchor::TopCenter, left_w, true);
         let proj = if projection == Projection::FirstAngle { tr.first_angle } else { tr.third_angle.unwrap_or("THIRD ANGLE PROJECTION") };
-        self.text(at(note_u, 0.2512), lab, proj.to_string(), Anchor::TopCenter);
+        note(self, at(note_u, 0.2512), lab, proj, Anchor::TopCenter, left_w);
         self.projection_symbol([px(pick(note_u.0, note_u.1)), py(0.0992)], projection, bh / 38.1);
-        // Middle: NAME (SIGNATURE) / DATE, DRAWN / CHECKED / APPROVED.
-        let date_u = (0.45679, 0.48824);
-        label(self, (0.30064, 0.27473), 0.9712, tr.name, lab);
+        // Middle: NAME (SIGNATURE) / DATE, DRAWN / CHECKED / APPROVED, two
+        // more (empty) rows, MATERIAL / FINISH.
+        let (name_u, date_u) = ((0.35802, 0.31765), (0.45679, 0.48824));
+        let (name_w, date_w) = ((0.12346, 0.09412), (0.07407, 0.05882));
+        // (ISO: SIGNATURE first, live's order.)
         if iso {
-            self.text(at((0.0, 0.41176), 0.9712), lab, tr.signature.to_string(), Anchor::TopCenter);
+            note(self, at((0.0, 0.41176), 0.9712), lab, tr.signature, Anchor::TopCenter, (0.0, 0.09224));
         }
-        self.text(at(date_u, 0.9712), lab, tr.date.to_string(), Anchor::TopCenter);
-        // A field's value on its spot (several lines stack about it); the
-        // cell it edits.
-        let value_in = |g: &mut Self, cell: [f64; 4], spot: [f64; 2], key: &str, h: f64| {
-            let v = value_of(key, sheet.title_field(key).unwrap_or(""));
-            let lines: Vec<&str> = v.split('\n').filter(|l| !l.is_empty()).collect();
-            let n = lines.len() as f64;
-            let t0 = g.texts.len();
-            for (i, l) in lines.iter().enumerate() {
-                g.text([spot[0], spot[1] + ((n - 1.0) / 2.0 - i as f64) * h * 1.6], h, l.to_string(), Anchor::Center);
-            }
-            let [u0, v0, u1, v1] = cell;
-            let (xa, xb, ya, yb) = (px(u0).min(px(u1)), px(u0).max(px(u1)), py(v0).min(py(v1)), py(v0).max(py(v1)));
-            g.title_cells.push((key.to_string(), [xa, ya, xb, yb], t0..g.texts.len()));
-        };
+        label(self, (0.30064, 0.27473), 0.9712, tr.name, lab, (0.12099, 0.09224));
+        note(self, at(date_u, 0.9712), lab, tr.date, Anchor::TopCenter, (0.07259, 0.05765));
         // (label, its keys, its label's and its values' heights in the block)
         let fields: [(&str, &str, &str, f64, f64); 3] = [(tr.drawn, "Drawn by", "Drawn date", 0.8512, 0.82), (tr.checked, "Checked by", "Checked date", 0.7312, 0.70), (tr.approved, "Approved by", "Approved date", 0.6112, 0.58)];
         let dc = cols.len() - 2;
         for (r, (l, name, date, lv, v)) in fields.iter().enumerate() {
-            label(self, (0.20188, 0.19238), *lv, l, lab * tr.signoff_h);
-            value_in(self, [cols[1], rows[r + 2], cols[2], rows[r + 1]], at((0.35802, 0.31765), *v), name, 0.84 * lab);
-            value_in(self, [cols[dc], rows[r + 2], cols[dc + 1], rows[r + 1]], at(date_u, *v), date, 0.84 * lab);
+            label(self, (0.20188, 0.19238), *lv, l, lab * tr.signoff_h, (0.09679, 0.08071));
+            value_in(self, [cols[1], rows[r + 2], cols[2], rows[r + 1]], at(name_u, *v), name, 0.84 * lab, name_w, 0.12);
+            value_in(self, [cols[dc], rows[r + 2], cols[dc + 1], rows[r + 1]], at(date_u, *v), date, 0.84 * lab, date_w, 0.12);
         }
-        label(self, (0.20188, 0.19238), 0.2512, tr.material, lab);
-        label(self, (0.35002, 0.35708), 0.2512, tr.finish, lab);
-        value_in(self, [cols[0], 0.0, split, rows[6] - 0.08], at((0.2716, 0.27059), 0.14), "Material", 1.5 * lab);
-        value_in(self, [split, 0.0, mid, rows[6] - 0.08], at((0.41975, 0.43529), 0.14), "Finish", 1.5 * lab);
+        for v in [0.46, 0.34] {
+            field(self, at((0.24691, 0.22941), v), 1.5 * lab, "", (0.09877, 0.08235), 0.12);
+            field(self, at(name_u, v), 0.84 * lab, "", name_w, 0.12);
+            field(self, at(date_u, v), 0.84 * lab, "", date_w, 0.12);
+        }
+        let mat_w = (0.14519, 0.16141);
+        // (Each label then its value, live's order.)
+        label(self, (0.20188, 0.19238), 0.2512, tr.material, lab, mat_w);
+        value_in(self, [cols[0], 0.0, split, rows[6] - 0.08], at((0.2716, 0.27059), 0.14), "Material", 1.5 * lab, (0.14815, 0.16471), 0.28);
+        label(self, (0.35002, 0.35708), 0.2512, tr.finish, lab, mat_w);
+        value_in(self, [split, 0.0, mid, rows[6] - 0.08], at((0.41975, 0.43529), 0.14), "Finish", 1.5 * lab, (0.14815, 0.16471), 0.28);
         // Right: the (empty) top row, TITLE (three lines), SIZE / DWG NO. /
         // REV., SCALE / WEIGHT / SHEET (live: no text in the top row).
-        label(self, (0.49817, 0.52179), 0.7212, tr.title, lab);
+        label(self, (0.49817, 0.52179), 0.7212, tr.title, lab, (0.06049, 0.05765));
         {
             let v = value_of("Title", sheet.title_field("Title").unwrap_or(""));
             let t0 = self.texts.len();
             for (i, l) in v.split('\n').filter(|l| !l.is_empty()).enumerate() {
-                self.text(at((0.74691, 0.75882), 0.67 - 0.126 * i as f64), 2.4 * lab, l.to_string(), Anchor::Center);
+                field(self, at((0.74691, 0.75882), 0.67 - 0.126 * i as f64), 2.4 * lab, l, (0.45679, 0.43529), 0.126);
             }
             self.title_cells.push(("Title".to_string(), [px(mid), py(right_rows[2]), x1, py(right_rows[1])], t0..self.texts.len()));
         }
         let small = 0.8 * lab;
-        label(self, (0.4973, 0.52096), 0.30693, tr.size, small);
-        label(self, (0.55903, 0.57978), 0.30693, tr.dwg_no, small);
-        label(self, (0.95409, 0.95625), 0.30693, tr.rev, small);
+        label(self, (0.4973, 0.52096), 0.30693, tr.size, small, (0.06049, 0.05765));
         let size = value_of("Size", sheet.title_field("Size").unwrap_or(""));
-        self.text(at((0.52469, 0.54706), 0.23), 3.0 * lab, size, Anchor::Center);
-        value_in(self, [size_cols[0], right_rows[3], size_cols[1], right_rows[2] - 0.05], at((0.75309, 0.76471), 0.23), "Part number", 3.0 * lab);
-        value_in(self, [size_cols[1], right_rows[3], 1.0, right_rows[2] - 0.05], at((0.97778, 0.97882), 0.23), "Revision", 3.0 * lab);
-        label(self, (0.4973, 0.52096), 0.10693, tr.scale, small);
-        label(self, (0.60594, 0.62449), 0.10693, tr.weight, small);
-        label(self, (0.83063, 0.83861), 0.10693, tr.sheet, small);
-        value_in(self, [mid + 0.03, 0.0, scale_cols[0], right_rows[3] - 0.03], at((0.55309, 0.57412), 0.065), "Scale", 1.8 * lab);
-        value_in(self, [scale_cols[0], 0.0, scale_cols[1], right_rows[3] - 0.03], at((0.71481, 0.72824), 0.065), "Weight", 1.8 * lab);
-        value_in(self, [scale_cols[1] + 0.03, 0.0, 1.0, right_rows[3] - 0.03], at((0.91852, 0.92235), 0.065), "Sheet", 1.8 * lab);
+        field(self, at((0.52469, 0.54706), 0.23), 3.0 * lab, &size, (0.06173, 0.05882), 0.2);
+        label(self, (0.55903, 0.57978), 0.30693, tr.dwg_no, small, (0.38716, 0.36894));
+        value_in(self, [size_cols[0], right_rows[3], size_cols[1], right_rows[2] - 0.05], at((0.75309, 0.76471), 0.23), "Part number", 3.0 * lab, (0.39506, 0.37647), 0.2);
+        label(self, (0.95409, 0.95625), 0.30693, tr.rev, small, (0.0484, 0.04612));
+        value_in(self, [size_cols[1], right_rows[3], 1.0, right_rows[2] - 0.05], at((0.97778, 0.97882), 0.23), "Revision", 3.0 * lab, (0.04444, 0.04235), 0.2);
+        label(self, (0.4973, 0.52096), 0.10693, tr.scale, small, (0.10647, 0.10146));
+        value_in(self, [mid + 0.03, 0.0, scale_cols[0], right_rows[3] - 0.03], at((0.55309, 0.57412), 0.065), "Scale", 1.8 * lab, (0.09877, 0.09412), 0.13);
+        label(self, (0.60594, 0.62449), 0.10693, tr.weight, small, (0.2202, 0.20984));
+        value_in(self, [scale_cols[0], 0.0, scale_cols[1], right_rows[3] - 0.03], at((0.71481, 0.72824), 0.065), "Weight", 1.8 * lab, (0.22469, 0.21412), 0.13);
+        label(self, (0.83063, 0.83861), 0.10693, tr.sheet, small, (0.16938, 0.16141));
+        value_in(self, [scale_cols[1] + 0.03, 0.0, 1.0, right_rows[3] - 0.03], at((0.91852, 0.92235), 0.065), "Sheet", 1.8 * lab, (0.16296, 0.15529), 0.13);
     }
 
     /// The continuation block (live samples/drw2-l-sheet2.dxf, ANSI A in

@@ -149,6 +149,19 @@ pub struct CadTextStyleSpan {
     pub style: CadTextStyle,
 }
 
+/// Texts written as one MTEXT, as live's title blocks are: its lines joined
+/// by ^J from the first's anchor (an empty line kept), or by spaces when they
+/// are one paragraph wrapped (`wrapped`: the MTEXT's width wraps it); `width`
+/// its reference width (group 41) and `height` its defined height (46; 0:
+/// none).
+#[derive(Clone, Debug, PartialEq)]
+pub struct CadMtext {
+    pub texts: std::ops::Range<usize>,
+    pub width: f64,
+    pub height: f64,
+    pub wrapped: bool,
+}
+
 /// Lines, texts and fills of one export layer (last span wins).
 #[derive(Clone, Debug, PartialEq)]
 pub struct CadSpan {
@@ -194,6 +207,19 @@ impl SheetGeometry {
         if t0 < self.texts.len() {
             self.cad_text_styles.push(CadTextStyleSpan { texts: t0..self.texts.len(), style });
         }
+    }
+
+    /// Write the texts from `t0` as one MTEXT `width` wide, `height` its
+    /// defined height (0: none), `wrapped`: one paragraph.
+    pub fn cad_mtext_since(&mut self, t0: usize, width: f64, height: f64, wrapped: bool) {
+        if t0 < self.texts.len() {
+            self.cad_mtext.push(CadMtext { texts: t0..self.texts.len(), width, height, wrapped });
+        }
+    }
+
+    /// The MTEXT text `i` belongs to, if one was set.
+    pub fn cad_mtext_of(&self, i: usize) -> Option<&CadMtext> {
+        self.cad_mtext.iter().rev().find(|m| m.texts.contains(&i))
     }
 
     /// Text style of text `i` (None: Onshape-Standard / -Bold).

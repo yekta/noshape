@@ -4827,6 +4827,35 @@ fn dimension_style_extension_lines() {
     assert!(gapped.iter().all(|(_, y0)| (y0 - 4.0).abs() < 1e-6), "starts 4 mm off the geometry: {gapped:?}");
 }
 
+/// Live's tpl-ANSI_A_INCH.dxf: the title block's texts are 44 MTEXTs, a
+/// wrapped note one paragraph ("UNLESS … INCHES"), a block of lines joined
+/// by ^J (an empty first line kept), each the width live gives it, values
+/// in Onshape-Standard-Fields with their cell's height, an empty cell " ".
+#[test]
+fn title_block_mtexts_as_lives() {
+    use acadrust::EntityType;
+    let mut d = Drawing::default();
+    templates::apply_template(&mut d, 0, &templates::DrawingTemplate::standard("ANSI A", SheetSize::AnsiA, TitleBlockStyle::Ansi, true, Projection::ThirdAngle));
+    let b = render_sheet(&d, 0, &super::views::Sources::new(), &ViewCache::new(), false).unwrap();
+    let dxf = super::cad_export::to_dxf_version(&b.geometry, 1, acadrust::DxfVersion::AC1032).unwrap();
+    let raw = String::from_utf8_lossy(&dxf);
+    assert!(raw.contains("\n^JANGULAR = ± °^JFRACTIONAL = ±\r\n") || raw.contains("\n^JANGULAR = ± °^JFRACTIONAL = ±\n"), "angular block");
+    assert!(raw.contains("    .XX = ±.0-^J  .XXX = ±.00-^J.XXXX = ±.000-"), "tolerance block");
+    let doc = acadrust::DxfReader::from_reader(std::io::Cursor::new(dxf)).unwrap().read().unwrap();
+    let m: Vec<_> = doc.entities().filter_map(|e| match e {
+        EntityType::MText(m) if m.common.layer == "TITLE_BLOCK" => Some(m.clone()),
+        _ => None,
+    }).collect();
+    assert_eq!(m.len(), 44);
+    let find = |t: &str| m.iter().find(|x| x.value == t).unwrap_or_else(|| panic!("no MTEXT `{t}`"));
+    let unless = find("UNLESS OTHERWISE SPECIFIED, DIMENSIONS ARE IN INCHES");
+    assert!((unless.rectangle_width - 1.176).abs() < 1e-3, "{}", unless.rectangle_width);
+    let sheet = find("1 of 1");
+    assert_eq!(sheet.style, "Onshape-Standard-Fields");
+    assert!((sheet.rectangle_width - 0.99).abs() < 1e-3 && (sheet.rectangle_height.unwrap_or(0.0) - 0.195).abs() < 1e-3);
+    assert_eq!(m.iter().filter(|x| x.value == " ").count(), 11, "empty cells");
+}
+
 /// An unset revision reads "-" in the drawing (live drw2 10-21 h), a
 /// placeholder: gone where placeholders are hidden (PDF and image exports;
 /// live's tpl-ANSI_A_INCH.pdf has no "-", its DXF has).
@@ -4837,7 +4866,8 @@ fn an_unset_revision_is_a_placeholder() {
     let revision = |d: &Drawing| {
         let b = render_sheet(d, 0, &super::views::Sources::new(), &ViewCache::new(), false).unwrap();
         // The REV. value's spot (live: 10.504, 0.725 in).
-        b.geometry.texts.iter().filter(|t| (t.pos[0] - 10.504 * 25.4).abs() < 0.01 && (t.pos[1] - 0.725 * 25.4).abs() < 0.01).map(|t| t.text.clone()).collect::<Vec<_>>()
+        // (An empty cell keeps an empty text: live's DXF writes it.)
+        b.geometry.texts.iter().filter(|t| (t.pos[0] - 10.504 * 25.4).abs() < 0.01 && (t.pos[1] - 0.725 * 25.4).abs() < 0.01 && !t.text.is_empty()).map(|t| t.text.clone()).collect::<Vec<_>>()
     };
     assert_eq!(revision(&d), ["-"]);
     d.props.hide_placeholder = true;

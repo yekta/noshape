@@ -366,7 +366,7 @@ pub fn to_dxf_sheets(sheets: &[(String, SheetGeometry, [f64; 2])], insunits: u8,
     }
     let mut doc = cad_document_sheets(sheets, insunits, version)?;
     strip_layouts_r14(&mut doc, version);
-    DxfWriter::new(&doc).write_to_vec().map_err(|e| e.to_string())
+    DxfWriter::new(&doc).write_to_vec().map(caret_breaks).map_err(|e| e.to_string())
 }
 
 /// Release 13 / 14 DXF has no layouts (LAYOUT objects came with 2000): live
@@ -391,7 +391,8 @@ pub fn to_dwg_sheets(sheets: &[(String, SheetGeometry, [f64; 2])], insunits: u8,
     if version <= DxfVersion::AC1009 {
         return to_dwg(&r12_sheets(sheets), insunits, version);
     }
-    let doc = cad_document_sheets(sheets, insunits, version)?;
+    let mut doc = cad_document_sheets(sheets, insunits, version)?;
+    dwg_breaks(&mut doc);
     DwgWriter::write_to_vec(&doc).map_err(|e| e.to_string())
 }
 
@@ -781,12 +782,24 @@ impl Sheet<'_> {
                 };
                 format!("{{\\pxq{};{font}{text}}}", paragraph_align(t.anchor))
             }
-            TextIn::Space => mtext_value(&t.text),
+            // Several texts of one MTEXT (a title block's), an empty one " ".
+            TextIn::Space => match self.g.cad_mtext_of(ti) {
+                Some(m) => {
+                    let v: Vec<String> = m.texts.clone().map(|i| mtext_value(&self.g.texts[i].text)).collect();
+                    let v = v.join(&if m.wrapped { " ".to_string() } else { MTEXT_BREAK.to_string() });
+                    if v.is_empty() { " ".to_string() } else { v }
+                }
+                None => mtext_value(&t.text),
+            },
             TextIn::Cell { aligned: true, .. } => format!("{{\\pxq{};{}}}", paragraph_align(t.anchor), mtext_value(&t.text)),
             TextIn::Cell { .. } => format!("{{{}}}", mtext_value(&t.text)),
         };
         e.height = t.height * self.k;
         e.rotation = t.angle;
+        if let (TextIn::Space, Some(m)) = (kind, self.g.cad_mtext_of(ti)) {
+            e.rectangle_width = m.width * self.k;
+            e.rectangle_height = (m.height > 0.0).then_some(m.height * self.k);
+        }
         let at = match kind {
             TextIn::Symbol(o) => [t.pos[0] - o[0], t.pos[1] - o[1]],
             _ => t.pos,
@@ -1127,7 +1140,8 @@ fn add_sheet(doc: &mut CadDocument, g: &SheetGeometry, k: f64, layout: Option<&s
     for fi in (0..g.fills.len()).filter(|i| fo[*i].is_none()) {
         sh.fill(doc, fi, owner, false)?;
     }
-    for ti in (0..g.texts.len()).filter(|i| to[*i].is_none()) {
+    // (An MTEXT of several texts from its first.)
+    for ti in (0..g.texts.len()).filter(|i| to[*i].is_none() && g.cad_mtext_of(*i).is_none_or(|m| m.texts.start == *i)) {
         sh.text(doc, ti, owner, TextIn::Space)?;
     }
     Ok(())
@@ -1324,6 +1338,42 @@ pub fn to_dxf_r12(g: &SheetGeometry, insunits: u8) -> String {
     s
 }
 
+/// The line break of an MTEXT of several texts (`CadMtext`): written as
+/// live's `^J` in DXF (acadrust escapes a literal caret), `\P` in DWG.
+const MTEXT_BREAK: char = '\u{E00A}';
+
+/// DXF bytes with [`MTEXT_BREAK`] as `^J`.
+fn caret_breaks(dxf: Vec<u8>) -> Vec<u8> {
+    let mark = MTEXT_BREAK.to_string();
+    let mark = mark.as_bytes();
+    if !dxf.windows(mark.len()).any(|w| w == mark) {
+        return dxf;
+    }
+    let mut out = Vec::with_capacity(dxf.len());
+    let mut i = 0;
+    while i < dxf.len() {
+        if dxf[i..].starts_with(mark) {
+            out.extend_from_slice(b"^J");
+            i += mark.len();
+        } else {
+            out.push(dxf[i]);
+            i += 1;
+        }
+    }
+    out
+}
+
+/// A DWG's MTEXTs with [`MTEXT_BREAK`] as `\P`.
+fn dwg_breaks(doc: &mut CadDocument) {
+    for e in doc.entities_mut() {
+        if let EntityType::MText(m) = e
+            && m.value.contains(MTEXT_BREAK)
+        {
+            m.value = m.value.replace(MTEXT_BREAK, "\\P");
+        }
+    }
+}
+
 /// A DXF file of `version` (Release 11-12 is [`to_dxf_r12`]).
 pub fn to_dxf_file(g: &SheetGeometry, insunits: u8, version: DxfVersion) -> Result<Vec<u8>, String> {
     if version <= DxfVersion::AC1009 {
@@ -1346,7 +1396,8 @@ pub fn to_dwg(g: &SheetGeometry, insunits: u8, version: DxfVersion) -> Result<Ve
 }
 
 pub fn to_dwg_pages(pages: &[SheetGeometry], insunits: u8, version: DxfVersion) -> Result<Vec<u8>, String> {
-    let doc = cad_document_pages(pages, insunits, version)?;
+    let mut doc = cad_document_pages(pages, insunits, version)?;
+    dwg_breaks(&mut doc);
     DwgWriter::write_to_vec(&doc).map_err(|e| e.to_string())
 }
 
@@ -1354,7 +1405,7 @@ pub fn to_dwg_pages(pages: &[SheetGeometry], insunits: u8, version: DxfVersion) 
 pub fn to_dxf_version(g: &SheetGeometry, insunits: u8, version: DxfVersion) -> Result<Vec<u8>, String> {
     let mut doc = cad_document(g, insunits, version)?;
     strip_layouts_r14(&mut doc, version);
-    DxfWriter::new(&doc).write_to_vec().map_err(|e| e.to_string())
+    DxfWriter::new(&doc).write_to_vec().map(caret_breaks).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

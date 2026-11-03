@@ -108,6 +108,8 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
     let mut tk: Vec<Option<CadLayer>> = Vec::new();
     // Text styles of the kept texts (exploded text has none).
     let mut ts: Vec<Option<super::cad_layers::CadTextStyle>> = Vec::new();
+    // The MTEXT each kept text is part of (its index, width, height).
+    let mut tm: Vec<Option<(usize, f64, f64, bool)>> = Vec::new();
     // CAD objects (dimensions) per element, kept the same way.
     let (mut lo, text_obj, mut fo) = g.cad_members_of();
     let mut to: Vec<Option<usize>> = Vec::new();
@@ -135,6 +137,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
             tl.push(layer);
             tk.push(kind);
             ts.push(g.cad_text_style(i));
+            tm.push(g.cad_mtext.iter().rposition(|m| m.texts.contains(&i)).map(|k| (k, g.cad_mtext[k].width, g.cad_mtext[k].height, g.cad_mtext[k].wrapped)));
             to.push(obj);
             tf.push(g.text_font(i).cloned());
             continue;
@@ -181,6 +184,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
         filter(&mut fk, &keep_f);
         filter(&mut tk, &keep_t);
         filter(&mut ts, &keep_t);
+        filter(&mut tm, &keep_t);
         lo.resize(keep_l.len(), None);
         filter(&mut lo, &keep_l);
         filter(&mut fo, &keep_f);
@@ -209,6 +213,7 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
     out.cad = kind_runs([&lk, &tk, &fk], |[lines, texts, fills], layer| super::cad_layers::CadSpan { lines, texts, fills, layer });
     out.cad_members = kind_runs([&lo, &to, &fo], |[lines, texts, fills], obj| super::cad_objects::CadMember { lines, texts, fills, obj });
     out.cad_text_styles = runs(&ts).into_iter().map(|(texts, style)| super::cad_layers::CadTextStyleSpan { texts, style }).collect();
+    out.cad_mtext = runs(&tm).into_iter().map(|(texts, (_, width, height, wrapped))| super::cad_layers::CadMtext { texts, width, height, wrapped }).collect();
     out.fonts = runs(&tf).into_iter().map(|(texts, font)| FontSpan { texts, font }).collect();
     out
 }
@@ -517,7 +522,8 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
             pair(&mut s, 0, "SEQEND");
         }
     }
-    for (ti, t) in g.texts.iter().enumerate().filter(|(ti, t)| !stroked(g, *ti, t)) {
+    // (An empty title block cell is no TEXT.)
+    for (ti, t) in g.texts.iter().enumerate().filter(|(ti, t)| !stroked(g, *ti, t) && !t.text.is_empty()) {
         pair(&mut s, 0, "TEXT");
         pair(&mut s, 8, g.cad_text_layer(ti).name(true));
         if let Some(c) = g.text_color(ti) {
