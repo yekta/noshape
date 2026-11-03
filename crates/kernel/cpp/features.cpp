@@ -3334,9 +3334,8 @@ static void set_tolerance(const TopoDS_Shape& x, double t)
 // OCCT's blend in metres leaves its approximation tolerance (1e-4: 0.1 mm) on the edges, vertices and faces it makes;
 // they get what they need instead (shell-hang: Chamfer 4's 0.1 mm vertices made every later Shell's slab fuse come
 // out broken). Returns the largest tolerance a new vertex needs (its distance to the curves ending at it, on the
-// edges and on the faces): where OCCT's corners really are that far off, the caller blends at the working scale. The
-// input's own sub-shapes, shared with it, never change; a vertex of theirs that would need more: infinity, and the
-// result as it was.
+// edges and on the faces). The input's own sub-shapes, shared with it, never change; a vertex of theirs that would
+// need more: infinity, and the result as it was.
 static double tighten_new_tolerances(const TopoDS_Shape& input, const TopoDS_Shape& r)
 {
   ShapeIMap old;
@@ -3445,15 +3444,14 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
       const KernelTimer timer("blend.as_is_check");
       valid = ok && valid_changed(input, r);
     }
-    // Kept where OCCT's corners are within 1e-5 of the part's size of where they should be.
+    // Kept (documents regenerate as before: a blend at the working scale may have other faces, and later features'
+    // references would move, qa BLEND-TOL-REGEN-CHANGES), its new tolerances what they need.
     if (valid)
     {
       const KernelTimer timer("blend.finish");
       merge_full_rounds(input, r, h);
-      Bnd_Box box;
-      BRepBndLib::Add(input, box);
-      if (tighten_new_tolerances(input, r) <= 1e-5 * std::sqrt(box.SquareExtent()))
-        return as_is.finish(r, h);
+      tighten_new_tolerances(input, r);
+      return as_is.finish(r, h);
     }
   }
   const KernelTimer timer("blend.scaled");
