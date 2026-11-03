@@ -865,6 +865,17 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- 11-03 18:40 (psui): P2 IN-FEATURE-MATE-CONNECTOR needs core first. Live answered (behaviours "IN-FEATURE-MATE-
+  CONNECTOR", request 1851): Hole's mate connector side button on, a face click makes a connector that lives inside
+  the Hole (features.json `subFeatures`), chip "Mate connector", nothing in the feature or parts lists. Proposed model
+  shape for core: `Feature.sub_features: Vec<Feature>` (serde default, skipped when empty), each a mateConnector
+  evaluated just before its feature in regen/mod.rs's loop (in the feature's cache key; failures go to the
+  feature's state), its connector keyed by the sub-feature's id so `Reference::MateConnector { feature: sub.id, .. }`
+  works unchanged; suppressing / deleting the feature takes its subs; the ops feature add/update params take them
+  (and the parity translator then stops building them as features before). Once that's in I do the UI: the side
+  button's on state (os-active, rgb 234), face hover inference points + triad, the chip with its icon ("Mate connector
+  (Click to edit)") opening the nested "Mate connector" panel (On entity / Origin entity / Realign / Move X Y Z /
+  Rotate about Z / angle), the chip's right-click "Clear all".
 - 11-03 15:10 (psui, seen while checking the update card): the start window at 560 px wide lays itself over itself:
   the "Details" panel's header and icon cover "Owned by me", "+ Add" and the list (shot
   /root/psui-scratch/start-560-overlap.png). Not from the card (the same without it); start-ui isn't mine.
