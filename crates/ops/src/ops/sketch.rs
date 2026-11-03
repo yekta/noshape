@@ -623,7 +623,10 @@ fn switch_list(v: Option<&Value>, param: &str) -> Result<Vec<usize>, OpError> {
 /// `switches`: the line tool's Shift+A before those clicks.
 #[allow(clippy::too_many_arguments)]
 fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, points: &[Value], sides: Option<u64>, construction: bool, switches: &[usize]) -> Result<(), OpError> {
-    let tool = DRAW_TOOLS.iter().find(|x| x.0 == name).map(|x| x.1).ok_or_else(|| OpError::param(&format!("{p}tool"), "unknown drawing tool"))?;
+    let tool = DRAW_TOOLS.iter().find(|x| x.0 == name).map(|x| x.1).ok_or_else(|| {
+        let names: Vec<&str> = DRAW_TOOLS.iter().map(|t| t.0).collect();
+        OpError::param(&format!("{p}tool"), &format!("`{name}` is not a drawing tool{}; tools: {}", crate::error::did_you_mean(name, names.iter().copied()), names.join(", ")))
+    })?;
     let frame = t.frame;
     let points = points.iter().enumerate().map(|(i, v)| click_value(v, units, &frame).map_err(|e| e.with_param(format!("{p}points[{i}]")))).collect::<Result<Vec<_>, _>>()?;
     if points.is_empty() {
@@ -672,7 +675,10 @@ fn constrain(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let mut t = target(od, tab, a)?;
     let name = a.str("constraint")?;
-    let c = CONSTRAINTS.iter().find(|x| x.0 == name).map(|x| x.1).ok_or_else(|| OpError::param("constraint", "unknown constraint"))?;
+    let c = CONSTRAINTS.iter().find(|x| x.0 == name).map(|x| x.1).ok_or_else(|| {
+        let names: Vec<&str> = CONSTRAINTS.iter().map(|c| c.0).collect();
+        OpError::param("constraint", &format!("`{name}` is not a constraint{}; constraints: {}", crate::error::did_you_mean(name, names.iter().copied()), names.join(", ")))
+    })?;
     let pierce = c == ConstraintTool::Pierce;
     let given = a.array("entities")?.iter().enumerate().map(|(i, v)| parse_entity(v, &mut t, true, pierce).map_err(|e| e.with_param(format!("entities[{i}]")))).collect::<Result<Vec<_>, _>>()?;
     // The entities are a selection, as in the UI: each once.

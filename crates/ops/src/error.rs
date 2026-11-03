@@ -83,3 +83,30 @@ impl From<anyhow::Error> for OpError {
         OpError::new(code, m)
     }
 }
+
+/// " (did you mean `x`?)" for the option closest to `given` (at most two
+/// edits away, or one that starts with it), else "".
+pub fn did_you_mean<'a>(given: &str, options: impl IntoIterator<Item = &'a str>) -> String {
+    fn edits(a: &str, b: &str) -> usize {
+        let b: Vec<char> = b.chars().collect();
+        let mut row: Vec<usize> = (0..=b.len()).collect();
+        for (i, ca) in a.chars().enumerate() {
+            let mut prev = row[0];
+            row[0] = i + 1;
+            for (j, cb) in b.iter().enumerate() {
+                let cur = row[j + 1];
+                row[j + 1] = (prev + usize::from(ca != *cb)).min(row[j] + 1).min(cur + 1);
+                prev = cur;
+            }
+        }
+        row[b.len()]
+    }
+    let g = given.to_lowercase();
+    options
+        .into_iter()
+        .map(|o| (edits(&g, &o.to_lowercase()), o))
+        .filter(|(d, o)| *d <= 2 || (g.len() >= 3 && o.to_lowercase().starts_with(&g)))
+        .min_by_key(|(d, _)| *d)
+        .map(|(_, o)| format!(" (did you mean `{o}`?)"))
+        .unwrap_or_default()
+}

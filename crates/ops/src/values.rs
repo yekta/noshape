@@ -30,7 +30,8 @@ pub fn apply(specs: &[ParamSpec], values: &mut ParamValues, params: &serde_json:
                 continue;
             }
             let known: Vec<&str> = specs.iter().filter(|s| !matches!(s.kind, ParamKind::Sketch)).map(|s| s.id).collect();
-            return Err(OpError::param(k, &format!("unknown parameter; this feature's parameters are: {}", known.join(", "))));
+            let hint = crate::error::did_you_mean(k, known.iter().copied());
+            return Err(OpError::param(k, &format!("unknown parameter `{k}`{hint}; this feature's parameters are: {}", known.join(", "))));
         };
         let pv = from_json(s, v, units, doc).map_err(|e| e.under(k).with_param_if_none(k))?;
         // Changing a legacy parameter the dialog never shows, beside the one

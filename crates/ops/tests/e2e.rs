@@ -5789,3 +5789,23 @@ fn every_export_format_imports_back() {
     }
     eprintln!("format matrix:\n  {}", rows.join("\n  "));
 }
+
+/// A mistyped name gets the list and the nearest option (agent usability):
+/// arguments, enum values, feature parameters, drawing tools, formats.
+#[test]
+fn mistyped_names_get_the_options_and_a_suggestion() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("typos.noshape").to_str().unwrap() }));
+    let e = try_call(&mut ctx, "query_entities", json!({ "kind": "face" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("kind"));
+    assert!(e.message.contains("`face` is not one of: faces, edges, vertices (did you mean `faces`?)"), "{}", e.message);
+    let e = try_call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "depht": "10 mm" } })).unwrap_err();
+    assert!(e.message.starts_with("unknown parameter `depht` (did you mean `depth`?)"), "{}", e.message);
+    let e = try_call(&mut ctx, "query_entities", json!({ "kinds": "faces" })).unwrap_err();
+    assert!(e.message.starts_with("unknown argument (did you mean `kind`?)"), "{}", e.message);
+    call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+    let e = try_call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "shapes": [{ "tool": "cirle", "points": [[0, 0], [5, 0]] }] })).unwrap_err();
+    assert!(e.message.starts_with("`cirle` is not a drawing tool (did you mean `circle`?); tools: line,"), "{}", e.message);
+    let e = try_call(&mut ctx, "export_parts", json!({ "format": "STP", "file": scratch("typo.stp").to_str().unwrap() })).unwrap_err();
+    assert!(e.message.starts_with("`STP` is not one of: PARASOLID, ACIS, STEP,") && e.message.ends_with("(did you mean `STEP`?)"), "{}", e.message);
+}

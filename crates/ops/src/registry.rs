@@ -230,9 +230,24 @@ pub fn run(ctx: &mut Ctx, op: &'static Op, args: &Value) -> Result<OpOutput, OpE
     for k in obj.keys() {
         if !op.fields.iter().any(|f| f.name == k) {
             let known: Vec<&str> = op.fields.iter().map(|f| f.name).collect();
-            return Err(OpError::param(k, &format!("unknown argument; `{}` takes: {}", op.tool_name(), known.join(", "))));
+            let hint = crate::error::did_you_mean(k, known.iter().copied());
+            return Err(OpError::param(k, &format!("unknown argument{hint}; `{}` takes: {}", op.tool_name(), known.join(", "))));
         }
     }
+    // A string field outside its listed values, when the op fails: the
+    // options and the nearest (ops take some other spellings, e.g. a tab
+    // kind's display name or a format's file extension).
+    let off_list = || {
+        op.fields.iter().find_map(|f| {
+            let (options, given) = (f.schema.get("enum")?.as_array()?, obj.get(f.name)?.as_str()?);
+            let names: Vec<&str> = options.iter().filter_map(Value::as_str).collect();
+            let norm = |s: &str| s.chars().filter(|c| c.is_alphanumeric()).collect::<String>().to_lowercase();
+            (!names.is_empty() && !names.iter().any(|o| norm(o) == norm(given))).then(|| {
+                let hint = crate::error::did_you_mean(given, names.iter().copied());
+                OpError::param(f.name, &format!("`{given}` is not one of: {}{hint}", names.join(", ")))
+            })
+        })
+    };
     for f in op.fields.iter().filter(|f| f.required) {
         if obj.get(f.name).is_none_or(Value::is_null) {
             return Err(OpError::param(f.name, &format!("required: {}", f.description)));
@@ -244,10 +259,12 @@ pub fn run(ctx: &mut Ctx, op: &'static Op, args: &Value) -> Result<OpOutput, OpE
     }
     // Window actions are the last call's (the app takes them after it).
     ctx.ui_requests.clear();
-    (op.run)(ctx, &Args { op, value: args }).map(|mut out| {
-        tidy_numbers(&mut out.value);
-        out
-    })
+    (op.run)(ctx, &Args { op, value: args })
+        .map(|mut out| {
+            tidy_numbers(&mut out.value);
+            out
+        })
+        .map_err(|e| off_list().unwrap_or(e))
 }
 
 /// Reply numbers without floating-point noise: 12 significant digits,

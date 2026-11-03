@@ -288,6 +288,9 @@ pub(crate) fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let units = od.doc().settings.units;
     let k = len_scale(&units);
     let kind = a.str("kind")?;
+    if !["faces", "edges", "vertices"].contains(&kind) {
+        return Err(OpError::param("kind", "faces, edges or vertices"));
+    }
     let r = od.regenerate(tab, None)?;
     let ps = crate::doc::studio(od.doc(), tab)?.clone();
     let names = |f: Option<noshape_model::reference::FeatureId>| f.and_then(|f| ps.feature(f)).map(|f| f.name.clone());

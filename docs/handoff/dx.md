@@ -48,6 +48,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   translate whole except custom features and 4 Hole parameters (locationSignatures, holeDepthMultiple: not in std
   1963; check live's current std before a ticket). Live's README (/root/parity/models/README.md) has no raw `bodies`
   per line: asked again (REQUESTS 11-03 00:20); the names above cover Extrude / Revolve references without it.
+- Agent usability (11-03 01:10): a mistyped argument / feature parameter / drawing tool / constraint / enum value gets
+  the options and "did you mean" (error::did_you_mean); a failing op with a field outside its listed values answers
+  with that (ops still take their other spellings: tab kind display names, format extensions); query_entities
+  rejects an unknown kind (it returned nothing). e2e mistyped_names_get_the_options_and_a_suggestion.
 - Staged for when GET /features reopens (~04:17 UTC): /root/parity/models-dx/{dx-mbd-1721, live-hole-row,
   live-pattern-holes} have live.jsonl (per rollback: parts, bands, boxes, raw bodies; from pm-rollbacks.js); run
   /root/dx-scratch/live/pm-features.sh to add features.json and merge names / statuses, then parity_models on them

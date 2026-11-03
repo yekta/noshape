@@ -49,7 +49,10 @@ pub fn ops() -> Vec<Op> {
 
 fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let label = a.str("format")?;
-    let format = PartFormat::ALL.into_iter().find(|f| f.label().eq_ignore_ascii_case(label) || f.ext().eq_ignore_ascii_case(label)).ok_or_else(|| OpError::param("format", "unknown format"))?;
+    let format = PartFormat::ALL.into_iter().find(|f| f.label().eq_ignore_ascii_case(label) || f.ext().eq_ignore_ascii_case(label)).ok_or_else(|| {
+        let names: Vec<&str> = PartFormat::ALL.iter().map(|f| f.label()).collect();
+        OpError::param("format", &format!("`{label}` is not an export format{}; formats: {}", crate::error::did_you_mean(label, names.iter().copied()), names.join(", ")))
+    })?;
     let mut s = ExportSettings::default();
     let Some(row) = PartFormat::list(false).iter().position(|f| *f == format) else {
         return Err(OpError::param("format", "RHINO export is not in this build (it needs openNURBS; releases have it)"));
