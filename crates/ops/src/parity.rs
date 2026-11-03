@@ -573,8 +573,12 @@ impl<'a> Translator<'a> {
         // A custom feature: its namespace names the Feature Studio ("e<element id>::m<microversion>").
         // "e<element>::m<microversion>", or another document's version
         // "d<document>::v<version>::e<element>::m<microversion>".
+        // The studio at the microversion the feature was made with
+        // (studios/<eid>@<microversion>.fs) when live fetched it, else its head.
         let element = |n: &str| n.split("::").find_map(|p| p.strip_prefix('e')).map(str::to_string);
-        let custom = f["namespace"].as_str().filter(|n| !n.is_empty()).map(|n| match element(n).and_then(|e| self.studios.get(&e)) {
+        let version = |n: &str| n.split("::").find_map(|p| p.strip_prefix('m')).map(str::to_string);
+        let studio = |n: &str| element(n).and_then(|e| version(n).and_then(|m| self.studios.get(&format!("{e}@{m}"))).or_else(|| self.studios.get(&e)));
+        let custom = f["namespace"].as_str().filter(|n| !n.is_empty()).map(|n| match studio(n) {
             // Ours: `custom:<tab id>:<feature name>` (model-data custom::type_id).
             Some(tab) => Ok(format!("custom:{tab}:{ty}")),
             None => Err(format!("custom feature `{ty}` from a Feature Studio not in features.json ({n})")),

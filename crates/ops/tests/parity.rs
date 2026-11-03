@@ -727,6 +727,24 @@ export const thrower = defineFeature(function(context is Context, id is Id, defi
     assert!(r.std_pins.is_empty(), "1963 is served as pinned: {:?}", r.std_pins);
 }
 
+/// A custom feature made with an older version of its studio (namespace
+/// `e<eid>::m<mv>`) is built from studios/<eid>@<mv>.fs when live fetched
+/// that version: its parameters are that version's (cf-curve-pattern-normal).
+#[test]
+fn a_custom_feature_uses_the_studio_version_it_pins() {
+    let studio = |param: &str| format!("FeatureScript 1963;\nimport(path : \"onshape/std/geometry.fs\", version : \"1963.0\");\n\nannotation {{ \"Feature Type Name\" : \"Counter\" }}\nexport const counter = defineFeature(function(context is Context, id is Id, definition is map)\n    precondition\n    {{\n        annotation {{ \"Name\" : \"Count\" }}\n        isInteger(definition.{param}, POSITIVE_COUNT_BOUNDS);\n    }}\n    {{}});\n");
+    let dir = scratch("studio-version");
+    std::fs::create_dir_all(dir.join("studios")).unwrap();
+    std::fs::write(dir.join("studios/0aaa.fs"), studio("count")).unwrap();
+    std::fs::write(dir.join("studios/0aaa@m1.fs"), studio("oldCount")).unwrap();
+    let features = json!({ "features": [{ "btType": "BTMFeature-134", "featureType": "counter", "namespace": "e0aaa::mm1", "featureId": "FC", "name": "Counter 1", "parameters": [
+        { "btType": "BTMParameterQuantity-147", "parameterId": "oldCount", "expression": "3", "isInteger": true }] }] });
+    std::fs::write(dir.join("features.json"), features.to_string()).unwrap();
+    let (features, live, refs) = read_model(&dir).unwrap();
+    let r = run_model("studio-version", &features, &live, &refs);
+    assert!(!r.untranslated.iter().any(|u| u.contains("oldCount") || u.contains("not built")), "{:?}", r.untranslated);
+}
+
 /// A file a studio imports (its icon) that live fetched (studios/<eid>.blob
 /// named in <eid>.json) is imported as that file, no placeholder; one not
 /// fetched gets the placeholder and a note.
