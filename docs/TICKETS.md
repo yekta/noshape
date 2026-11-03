@@ -74,7 +74,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
-## Release blockers for the 2026-11-03 05:00 release (qa early notes 02:25, newest green bad1de8e; final list at 04:30)
+## Release blockers for the 2026-11-03 05:00 release (qa list 04:15, newest green 8d4a5b85)
+- **qa 04:15: no blocker; nothing qa knows needs the cut stopped.** Checked on green 04b98258: CLI round trip = v0.4.22;
+  volume sweep and the 44 ticket documents = v0.4.22 except the fuzz documents BLEND-TOL-REGEN-CHANGES lists (P1, core
+  eca0da09; no real document seen affected; a cut from bad1de8e would leave it out, and with it tonight's psui / skasm
+  UI fixes); the user's four cases pass (knurl 12.5 s 11598.041, vase, split-and-chamfer, Y Ribs); app rows identical
+  to v0.4.21 (e89c78de). Open P0 CRASH-2045 is in v0.4.22 and back to v0.4.18, not new. After the release: the artifact
+  checks, smoke, the updater on :149.
 - **No regression against v0.4.22 known so far** — nothing to stop the cut for. The one P0 found tonight, **CRASH-2045**
   (Core section: deleting a feature of fuzz seed 2045's document crashes 4–5 runs in 5 with the Rust Boolean on), is
   **already in the published v0.4.22** (4 of 5 there too), so a new release doesn't make it worse; it should be fixed
