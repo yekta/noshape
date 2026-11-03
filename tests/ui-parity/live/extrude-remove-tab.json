@@ -1,6 +1,6 @@
 {
  "scenario": "extrude-remove-tab",
- "recorded": "2026-11-03T14:22:06.043Z",
+ "recorded": "2026-11-03T19:52:48.128Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "daa0440132a5a5579a0036b3",
+  "element": "e013f91ee0f6bf8b9418dadb",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -73,6 +73,9 @@
     }
    },
    "ok": true,
+   "hover": [
+    "JHK"
+   ],
    "at": [
     1168,
     484
@@ -129,7 +132,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 40978
+   "t": 61841
   },
   {
    "step": 2,
@@ -426,7 +429,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 46582
+   "t": 72612
   },
   {
    "step": 3,
@@ -724,7 +727,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 53031
+   "t": 77282
   },
   {
    "step": 4,
@@ -1031,7 +1034,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 57399
+   "t": 81523
   },
   {
    "step": 5,
@@ -1332,7 +1335,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 59226
+   "t": 83454
   },
   {
    "step": 6,
@@ -1635,7 +1638,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 62330
+   "t": 87116
   },
   {
    "step": 7,
@@ -1938,7 +1941,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 69484
+   "t": 91559
   },
   {
    "step": 8,
@@ -2002,7 +2005,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 72070
+   "t": 98944
   },
   {
    "step": 9,
@@ -2066,7 +2069,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 76295
+   "t": 103455
   }
  ]
 }

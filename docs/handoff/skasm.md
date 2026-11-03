@@ -1392,6 +1392,10 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   no change and doesn't start the line; the second then starts one (left pending at (0,20)). Through the UI tests'
   clicks (helper or window events) the same steps on Top make the line, so it's the tool state the rectangle leaves
   (its value boxes?) eating the next tool's first click on the real input path. Yours (sketch tools).
+- 11-03 20:00 (psui): sketch-fully-defined, re-recorded: now differs at step 13. Dimension tool, the right line picked
+  (click at its midpoint [30, 10]), then a click at [38, 10]: live picks the **Right plane** there (selection: the
+  line + PLANE Right, no dimension placed yet; the plane's square covers that point in the view), ours sees no plane
+  and places the line's length (20.18). Dimension picks of a default plane in sketch mode: yours.
 - 11-03 17:30 (psui): sketch-fully-defined step 5: live 0 entities after a Rectangle click on the origin and one at
   sketch_point [30, 20], ours 4 (the rectangle). Probably live's runner (a `sketch_point` target that doesn't exist
   yet); yours to judge.

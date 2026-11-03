@@ -1,6 +1,6 @@
 {
  "scenario": "sketch-fully-defined",
- "recorded": "2026-11-03T16:36:19.271Z",
+ "recorded": "2026-11-03T19:40:30.330Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "4b95ad7b5146ae7bdd851fdf",
+  "element": "d5dadcd8d62f66ef58fe741f",
   "start": "empty",
   "startElement": "16c3ef729d456774c1da81b8"
  },
@@ -139,7 +139,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 174234
+   "t": 32735
   },
   {
    "step": 2,
@@ -245,7 +245,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 202709
+   "t": 38767
   },
   {
    "step": 3,
@@ -345,7 +345,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 208802
+   "t": 41406
   },
   {
    "step": 4,
@@ -356,9 +356,12 @@
     }
    },
    "ok": true,
+   "hover": [
+    "IB"
+   ],
    "at": [
-    89,
-    183
+    1082,
+    519
    ],
    "state": {
     "focus": {
@@ -450,7 +453,7 @@
      "dimensions": []
     }
    },
-   "t": 225018
+   "t": 48180
   },
   {
    "step": 5,
@@ -464,6 +467,7 @@
     }
    },
    "ok": true,
+   "hover": [],
    "at": [
     1206,
     515
@@ -553,12 +557,27 @@
     "tooltip": null,
     "sketch": {
      "tool": "Corner rectangle",
-     "entities": [],
-     "constraints": [],
+     "entities": [
+      "line",
+      "line",
+      "line",
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL",
+      "PARALLEL",
+      "PARALLEL",
+      "PERPENDICULAR"
+     ],
      "dimensions": []
     }
    },
-   "t": 249484
+   "t": 54473
   },
   {
    "step": 6,
@@ -652,12 +671,27 @@
     "tooltip": null,
     "sketch": {
      "tool": null,
-     "entities": [],
-     "constraints": [],
+     "entities": [
+      "line",
+      "line",
+      "line",
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL",
+      "PARALLEL",
+      "PARALLEL",
+      "PERPENDICULAR"
+     ],
      "dimensions": []
     }
    },
-   "t": 254274
+   "t": 56378
   },
   {
    "step": 7,
@@ -751,12 +785,27 @@
     "tooltip": null,
     "sketch": {
      "tool": "Dimension",
-     "entities": [],
-     "constraints": [],
+     "entities": [
+      "line",
+      "line",
+      "line",
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL",
+      "PARALLEL",
+      "PARALLEL",
+      "PERPENDICULAR"
+     ],
      "dimensions": []
     }
    },
-   "t": 259534
+   "t": 58317
   },
   {
    "step": 8,
@@ -770,6 +819,9 @@
     }
    },
    "ok": true,
+   "hover": [
+    "JFB"
+   ],
    "at": [
     1127,
     532
@@ -777,6 +829,143 @@
    "state": {
     "focus": {
      "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": null,
+       "id": "JFB"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Dimension",
+     "entities": [
+      "line",
+      "line",
+      "line",
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL",
+      "PARALLEL",
+      "PARALLEL",
+      "PERPENDICULAR"
+     ],
+     "dimensions": []
+    }
+   },
+   "t": 62906
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "click",
+    "on": {
+     "sketch_point": [
+      15,
+      -8
+     ]
+    }
+   },
+   "ok": true,
+   "hover": [],
+   "at": [
+    1113,
+    544
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "29.48001 mm",
+     "selection": [
+      0,
+      11
+     ],
+     "all": true
     },
     "dialog": {
      "title": "Sketch 1",
@@ -859,126 +1048,33 @@
     "tooltip": null,
     "sketch": {
      "tool": "Dimension",
-     "entities": [],
-     "constraints": [],
-     "dimensions": []
-    }
-   },
-   "t": 288780
-  },
-  {
-   "step": 9,
-   "do": {
-    "do": "click",
-    "on": {
-     "sketch_point": [
-      15,
-      -8
+     "entities": [
+      "line",
+      "line",
+      "line",
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL",
+      "PARALLEL",
+      "PARALLEL",
+      "PERPENDICULAR"
+     ],
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 29.480009,
+       "expression": null
+      }
      ]
     }
    },
-   "ok": true,
-   "at": [
-    1113,
-    544
-   ],
-   "state": {
-    "focus": {
-     "kind": "none"
-    },
-    "dialog": {
-     "title": "Sketch 1",
-     "titleState": "ok",
-     "kind": "sketch",
-     "tabs": [],
-     "fields": [
-      {
-       "label": "Sketch plane",
-       "kind": "query",
-       "items": [
-        "Top plane"
-       ],
-       "active": false,
-       "state": "ok"
-      },
-      {
-       "label": "Disable imprinting",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      }
-     ],
-     "error": null,
-     "ok": "enabled"
-    },
-    "dialogs": [
-     {
-      "title": "Sketch 1",
-      "titleState": "ok",
-      "kind": "sketch",
-      "tabs": [],
-      "fields": [
-       {
-        "label": "Sketch plane",
-        "kind": "query",
-        "items": [
-         "Top plane"
-        ],
-        "active": false,
-        "state": "ok"
-       },
-       {
-        "label": "Disable imprinting",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       }
-      ],
-      "error": null,
-      "ok": "enabled"
-     }
-    ],
-    "list": null,
-    "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "PLANE",
-       "owner": "Front",
-       "id": "JCC"
-      }
-     ]
-    },
-    "features": {
-     "rows": [
-      {
-       "name": "Sketch 1",
-       "state": "ok",
-       "selected": true,
-       "editing": true,
-       "related": false,
-       "hidden": false,
-       "cls": "edited selected"
-      }
-     ],
-     "rollbackAfter": "Sketch 1"
-    },
-    "parts": [],
-    "partsHeading": "Parts (0)",
-    "undo": {
-     "undo": true,
-     "redo": false
-    },
-    "message": null,
-    "tooltip": null,
-    "sketch": {
-     "tool": "Dimension",
-     "entities": [],
-     "constraints": [],
-     "dimensions": []
-    }
-   },
-   "t": 312533
+   "t": 69961
   },
   {
    "step": 10,
@@ -989,7 +1085,14 @@
    "ok": true,
    "state": {
     "focus": {
-     "kind": "none"
+     "kind": "other",
+     "tag": "input",
+     "text": "30",
+     "selection": [
+      2,
+      2
+     ],
+     "all": false
     },
     "dialog": {
      "title": "Sketch 1",
@@ -1045,14 +1148,8 @@
     ],
     "list": null,
     "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "PLANE",
-       "owner": "Front",
-       "id": "JCC"
-      }
-     ]
+     "count": 0,
+     "items": []
     },
     "features": {
      "rows": [
@@ -1078,12 +1175,33 @@
     "tooltip": null,
     "sketch": {
      "tool": "Dimension",
-     "entities": [],
-     "constraints": [],
-     "dimensions": []
+     "entities": [
+      "line",
+      "line",
+      "line",
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL",
+      "PARALLEL",
+      "PARALLEL",
+      "PERPENDICULAR"
+     ],
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 29.480009,
+       "expression": null
+      }
+     ]
     }
    },
-   "t": 315025
+   "t": 71947
   },
   {
    "step": 11,
@@ -1150,14 +1268,8 @@
     ],
     "list": null,
     "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "PLANE",
-       "owner": "Front",
-       "id": "JCC"
-      }
-     ]
+     "count": 0,
+     "items": []
     },
     "features": {
      "rows": [
@@ -1183,12 +1295,33 @@
     "tooltip": null,
     "sketch": {
      "tool": "Dimension",
-     "entities": [],
-     "constraints": [],
-     "dimensions": []
+     "entities": [
+      "line",
+      "line",
+      "line",
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL",
+      "PARALLEL",
+      "PARALLEL",
+      "PERPENDICULAR"
+     ],
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 30,
+       "expression": "30 mm"
+      }
+     ]
     }
    },
-   "t": 317677
+   "t": 74865
   },
   {
    "step": 12,
@@ -1202,6 +1335,9 @@
     }
    },
    "ok": true,
+   "hover": [
+    "JFN"
+   ],
    "at": [
     1189,
     530
@@ -1264,8 +1400,14 @@
     ],
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": null,
+       "id": "JFN"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -1274,9 +1416,9 @@
        "state": "ok",
        "selected": true,
        "editing": true,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": "edited selected"
+       "cls": "related-highlight edited selected"
       }
      ],
      "rollbackAfter": "Sketch 1"
@@ -1287,16 +1429,37 @@
      "undo": true,
      "redo": false
     },
-    "message": "A constraint must involve something from the sketch. × Close",
+    "message": null,
     "tooltip": null,
     "sketch": {
      "tool": "Dimension",
-     "entities": [],
-     "constraints": [],
-     "dimensions": []
+     "entities": [
+      "line",
+      "line",
+      "line",
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL",
+      "PARALLEL",
+      "PARALLEL",
+      "PERPENDICULAR"
+     ],
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 30,
+       "expression": "30 mm"
+      }
+     ]
     }
    },
-   "t": 339424
+   "t": 80469
   },
   {
    "step": 13,
@@ -1310,6 +1473,9 @@
     }
    },
    "ok": true,
+   "hover": [
+    "JEC"
+   ],
    "at": [
     1212,
     537
@@ -1372,8 +1538,13 @@
     ],
     "list": null,
     "selection": {
-     "count": 1,
+     "count": 2,
      "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": null,
+       "id": "JFN"
+      },
       {
        "kind": "PLANE",
        "owner": "Right",
@@ -1388,9 +1559,9 @@
        "state": "ok",
        "selected": true,
        "editing": true,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": "edited selected"
+       "cls": "related-highlight edited selected"
       }
      ],
      "rollbackAfter": "Sketch 1"
@@ -1401,16 +1572,37 @@
      "undo": true,
      "redo": false
     },
-    "message": "A constraint must involve something from the sketch. × Close",
+    "message": null,
     "tooltip": null,
     "sketch": {
      "tool": "Dimension",
-     "entities": [],
-     "constraints": [],
-     "dimensions": []
+     "entities": [
+      "line",
+      "line",
+      "line",
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL",
+      "PARALLEL",
+      "PARALLEL",
+      "PERPENDICULAR"
+     ],
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 30,
+       "expression": "30 mm"
+      }
+     ]
     }
    },
-   "t": 352393
+   "t": 85292
   },
   {
    "step": 14,
@@ -1477,8 +1669,13 @@
     ],
     "list": null,
     "selection": {
-     "count": 1,
+     "count": 2,
      "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": null,
+       "id": "JFN"
+      },
       {
        "kind": "PLANE",
        "owner": "Right",
@@ -1493,9 +1690,9 @@
        "state": "ok",
        "selected": true,
        "editing": true,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": "edited selected"
+       "cls": "related-highlight edited selected"
       }
      ],
      "rollbackAfter": "Sketch 1"
@@ -1506,16 +1703,37 @@
      "undo": true,
      "redo": false
     },
-    "message": "A constraint must involve something from the sketch. × Close",
+    "message": null,
     "tooltip": null,
     "sketch": {
      "tool": "Dimension",
-     "entities": [],
-     "constraints": [],
-     "dimensions": []
+     "entities": [
+      "line",
+      "line",
+      "line",
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL",
+      "PARALLEL",
+      "PARALLEL",
+      "PERPENDICULAR"
+     ],
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 30,
+       "expression": "30 mm"
+      }
+     ]
     }
    },
-   "t": 354572
+   "t": 87263
   },
   {
    "step": 15,
@@ -1582,8 +1800,13 @@
     ],
     "list": null,
     "selection": {
-     "count": 1,
+     "count": 2,
      "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": null,
+       "id": "JFN"
+      },
       {
        "kind": "PLANE",
        "owner": "Right",
@@ -1598,9 +1821,9 @@
        "state": "ok",
        "selected": true,
        "editing": true,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": "edited selected"
+       "cls": "related-highlight edited selected"
       }
      ],
      "rollbackAfter": "Sketch 1"
@@ -1611,16 +1834,37 @@
      "undo": true,
      "redo": false
     },
-    "message": "A constraint must involve something from the sketch. × Close",
+    "message": null,
     "tooltip": null,
     "sketch": {
      "tool": "Dimension",
-     "entities": [],
-     "constraints": [],
-     "dimensions": []
+     "entities": [
+      "line",
+      "line",
+      "line",
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL",
+      "PARALLEL",
+      "PARALLEL",
+      "PERPENDICULAR"
+     ],
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 30,
+       "expression": "30 mm"
+      }
+     ]
     }
    },
-   "t": 356449
+   "t": 89095
   },
   {
    "step": 16,
@@ -1710,16 +1954,37 @@
      "undo": true,
      "redo": false
     },
-    "message": "A constraint must involve something from the sketch. × Close",
+    "message": null,
     "tooltip": null,
     "sketch": {
      "tool": null,
-     "entities": [],
-     "constraints": [],
-     "dimensions": []
+     "entities": [
+      "line",
+      "line",
+      "line",
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL",
+      "PARALLEL",
+      "PARALLEL",
+      "PERPENDICULAR"
+     ],
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 30,
+       "expression": "30 mm"
+      }
+     ]
     }
    },
-   "t": 360368
+   "t": 91094
   }
  ]
 }

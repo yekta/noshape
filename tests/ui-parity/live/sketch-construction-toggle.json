@@ -1,6 +1,6 @@
 {
  "scenario": "sketch-construction-toggle",
- "recorded": "2026-11-03T17:38:02.061Z",
+ "recorded": "2026-11-03T19:39:25.553Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "82ac1a771801901f466f6469",
+  "element": "05bfbb5ebe8c299c4a26b53b",
   "start": "empty",
   "startElement": "16c3ef729d456774c1da81b8"
  },
@@ -139,7 +139,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 201677
+   "t": 32295
   },
   {
    "step": 2,
@@ -245,7 +245,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 212140
+   "t": 36785
   },
   {
    "step": 3,
@@ -345,7 +345,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 215442
+   "t": 39692
   },
   {
    "step": 4,
@@ -456,7 +456,7 @@
      "dimensions": []
     }
    },
-   "t": 229801
+   "t": 44578
   },
   {
    "step": 5,
@@ -570,7 +570,7 @@
      "dimensions": []
     }
    },
-   "t": 310369
+   "t": 50117
   },
   {
    "step": 6,
@@ -674,7 +674,7 @@
      "dimensions": []
     }
    },
-   "t": 317126
+   "t": 51886
   },
   {
    "step": 7,
@@ -753,8 +753,14 @@
     ],
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": null,
+       "id": "JFB"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -763,9 +769,9 @@
        "state": "ok",
        "selected": true,
        "editing": true,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": "edited selected"
+       "cls": "related-highlight edited selected"
       }
      ],
      "rollbackAfter": "Sketch 1"
@@ -790,7 +796,7 @@
      "dimensions": []
     }
    },
-   "t": 329446
+   "t": 55682
   },
   {
    "step": 8,
@@ -857,8 +863,14 @@
     ],
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": null,
+       "id": "JFB"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -867,9 +879,9 @@
        "state": "ok",
        "selected": true,
        "editing": true,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": "edited selected"
+       "cls": "related-highlight edited selected"
       }
      ],
      "rollbackAfter": "Sketch 1"
@@ -885,7 +897,7 @@
     "sketch": {
      "tool": "Construction",
      "entities": [
-      "line"
+      "construction line"
      ],
      "constraints": [
       "COINCIDENT",
@@ -894,7 +906,7 @@
      "dimensions": []
     }
    },
-   "t": 331289
+   "t": 58122
   }
  ]
 }
