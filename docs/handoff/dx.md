@@ -73,6 +73,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   unpacker change; parity_models prints a "SCORE.md row: | … |" line to paste. drawing.md TB25 verified by tests;
   Insert view shows "Show annotations from model" only for a part (live captures; request withdrawn). Assembly
   layout proposed to live (REQUESTS 11-03 02:15), to build the assembly translator once confirmed.
+- 11-03 04:30 FIRST REAL RUN (REST open 04:13): /root/parity/models-dx (dx mbd 1721, live hole row, live pattern
+  holes; fetched by pm-rollbacks.js + pm-features.sh): 2/3 documents match to the end, 20/21 features. Fixed on the
+  way: missing parameters take the feature's defaults (REST-made features store few; a missing defaultScope is Merge
+  with all), #featureName placeholder, units in the BODY lookup. The one difference: live hole row's Sketch 4 is a
+  REST-built over-defined sketch (live WARNING; ours makes the conflicting dimension driven, as our tool does): the
+  translator's limit, no ticket. CAVEAT for my own fetches: massproperties / boundingboxes ignore rollbackBarIndex
+  and boundingboxes ignored my partId (live sets the bar with POST /features/rollback); my staged lines keep counts
+  per rollback and measures only on the last line. Live's corpus (/root/parity/models) comes from live's fetch.js.
 - Walk 11-03 03:35 on green 10060012 (:105, boltdwg): Insert view of the whole Part Studio has no "Show annotations
   from model" row, of Part 1 it has (as live); View scale read "1:1" without "(Sheet)" on a drawing from before the
   scale_shown flag: fixed (a sheet with views counts). No regressions.
