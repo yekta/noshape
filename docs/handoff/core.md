@@ -16,6 +16,15 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-03 03:35.**
+- Landed since 03:05: public custom features (1a506c3d), the drafted R1-under-R2 corner (285ae4f4: corner_of's spine
+  starts where a slanted Rc axis meets it, live 1831's 2.989487 mm² exactly) with the concave pocket as T1 (live 1826).
+- End-of-day walk (green 10060012, 03:10): live-30-features opens and regenerates clean in the app (a fresh HOME: the
+  shared one's panel width is qa's fuzz's); the user's smooth and sharp vases end to end through the CLI: lofts and all
+  six Shells OK, smooth 5.6-8.2 s / sharp 5.7-6.9 s per feature add at load ~25 (sharp was 13-24 s at 16:35). No
+  regressions found.
+- Waiting on live: FS-BOOLEAN-CREATED (REQUESTS 03:00).
+
 **State 11-03 03:05.**
 - Landed: blend tolerances (eca0da09). Queued: public custom features (1a506c3d: typeless cap queries return every cap
   entity, imported file tabs are FeatureScript 1). Live 1830's sources are in /root/parity/featurescript (vibe5
