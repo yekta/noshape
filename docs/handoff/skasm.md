@@ -27,7 +27,7 @@ the circle keeps its contact on it at the old distance from the old corner, the 
 tangent (so the corner slides along the new leg by r/tan(θ0/2) − r/tan(θ/2)). Ours keeps the Horizontal leg (the
 Angle's direction rule) and fits the circle in: needs the circle placed from its contact on the turned leg before the
 kept leg, an exception to the Angle keep when a circle touches both legs. Done (`turn_v_about_circle`): w1, s845, s877, s904
-match; 647 of 710, probes 17 10/15. Probes 18 answered (20:46): V: the corner moves only with the circle tangent to both legs (w4 no circle, w5 one
+match; 647 of 710, probes 17 10/15. Batch 20 answered (22:24): 40/40 on the first answer; batches 1-20 687 of 750. Probes 18 answered (20:46): V: the corner moves only with the circle tangent to both legs (w4 no circle, w5 one
 tangent: corner kept, as ours); w1's answer = the circle's centre kept, then everything translated (−1.905, 1.94) mm:
 the translation unexplained. w6 is our harness's: Onshape's ANGLE has clockwise / aligned / flipped and live honours
 `clockwise: false` (CCW from the first line), so a V drawn the other way round flips; real documents store the drawn
