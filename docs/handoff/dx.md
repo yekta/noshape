@@ -85,7 +85,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   own encoding; a cylinder 3 / 2 / 0 in the file, read back the same; kernel export T1 + T2 parasolid tests pass).
   Live 1855 confirmed it: the new file imports as a native Ø20 × 10 extrude (3 / 2 / 0, 2 ring edges); the old one
   kept a vertex per circle (3 / 2 / 2). The cross-hole tube's hole loops still import as 3 spline pieces each: that is
-  CUT-CLOSED-EDGES-SPLIT (core) plus our writer splitting a closed B-spline edge. Closed B-spline edges are still split in two (needs periodic curves first: core's
+  CUT-CLOSED-EDGES-SPLIT (core). 11-03 08:20: a closed B-spline edge that is periodic (or closed with a tangent
+  seam) is written whole as a periodic B-curve on a ring edge too: live's closed-spline part round-trips 3 / 2 / 0
+  (was 3 / 4 / 4; T1 export::parasolid_writes_closed_edges_as_rings). Our own closed sketch spline still has a
+  corner at its seam (skasm's SKETCH-SPLINE-CENTRIPETAL) and is split. Closed B-spline edges are still split in two (needs periodic curves first: core's
   LOFT-COAXIAL-CIRCLES-SURFACE, skasm's SKETCH-SPLINE-CENTRIPETAL).
 - 11-03 06:40: live mode now reads the window: before each agent call the app hands the call its tab shown, 3D
   cameras and selections (Part Studio entities, Assembly `inst:` ids; WindowSnapshot in ops/window.rs, provided by

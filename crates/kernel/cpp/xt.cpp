@@ -591,7 +591,7 @@ struct Writer
 
   // B_CURVE + NURBS_CURVE from a non-periodic B-spline (3D or 2D poles).
   int b_curve(int owner, const std::vector<double>& poles, int dim, bool rational, int degree, int npoles,
-              const NCollection_Array1<double>& knots, const NCollection_Array1<int>& mults, bool closed)
+              const NCollection_Array1<double>& knots, const NCollection_Array1<int>& mults, bool closed, bool periodic = false)
   {
     const int idx = alloc(), id = next_id++;
     const int nurbs = alloc();
@@ -599,7 +599,7 @@ struct Writer
     int       mult  = 0;
     const int kn    = knot_nodes(knots, mults, mult);
     Node&     nc    = add(136, nurbs);
-    nc.fields       = {fn(degree), fd(npoles), fn(dim), fd(knots.Length()), fu(1), fl(false), fl(closed), fl(rational),
+    nc.fields       = {fn(degree), fd(npoles), fn(dim), fd(knots.Length()), fu(1), fl(periodic), fl(closed || periodic), fl(rational),
                        fu(1),      fp(verts),  fp(mult), fp(kn)};
     Node& b = add(134, idx);
     geom_head(b, id, owner, '+');
@@ -608,7 +608,9 @@ struct Writer
     return idx;
   }
 
-  int b_curve_3d(int owner, const occ::handle<Geom_BSplineCurve>& c)
+  // `periodic`: c is a periodic curve made non-periodic in Parasolid's form
+  // (unclamped, its first degree poles repeated at the end), as the surfaces.
+  int b_curve_3d(int owner, const occ::handle<Geom_BSplineCurve>& c, bool periodic = false)
   {
     const bool          rat = c->IsRational();
     std::vector<double> p;
@@ -620,7 +622,7 @@ struct Writer
       if (rat)
         p.push_back(w);
     }
-    return b_curve(owner, p, rat ? 4 : 3, rat, c->Degree(), c->NbPoles(), c->Knots(), c->Multiplicities(), c->IsClosed());
+    return b_curve(owner, p, rat ? 4 : 3, rat, c->Degree(), c->NbPoles(), c->Knots(), c->Multiplicities(), c->IsClosed(), periodic);
   }
 };
 
@@ -727,6 +729,38 @@ occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surfac
   if (!up && !vp)
     return nullptr;
   return ps;
+}
+
+// A closed edge's B-spline as a ring edge's curve (Parasolid writes a closed
+// spline edge whole, without a vertex: live 1836): periodic already, or closed
+// with a tangent seam and made so. Null for anything else (it is split).
+occ::handle<Geom_BSplineCurve> ring_bspline(const occ::handle<Geom_Curve>& curve, double f, double l)
+{
+  occ::handle<Geom_BSplineCurve> b = occ::down_cast<Geom_BSplineCurve>(basis_curve(curve));
+  if (b.IsNull() || b->Value(f).Distance(b->Value(l)) > kPrecision)
+    return nullptr;
+  if (b->IsPeriodic())
+    return std::abs(l - f - b->Period()) < 1e-9 * std::max(1.0, b->Period()) ? occ::down_cast<Geom_BSplineCurve>(b->Copy()) : nullptr;
+  const double u0 = b->FirstParameter(), u1 = b->LastParameter();
+  if (std::abs(f - u0) > 1e-9 || std::abs(l - u1) > 1e-9)
+    return nullptr;
+  gp_Pnt p0, p1;
+  gp_Vec d0, d1;
+  b->D1(u0, p0, d0);
+  b->D1(u1, p1, d1);
+  if ((d0 - d1).Magnitude() > 1e-6 * std::max(1.0, d0.Magnitude()))
+    return nullptr;
+  occ::handle<Geom_BSplineCurve> p = occ::down_cast<Geom_BSplineCurve>(b->Copy());
+  try
+  {
+    p->SetPeriodic();
+    p->RemoveKnot(1, p->Multiplicity(1) - 1, kPrecision);
+  }
+  catch (const Standard_Failure&)
+  {
+    return nullptr;
+  }
+  return p;
 }
 
 // ---------------------------------------------------------------- body
@@ -1028,6 +1062,11 @@ struct BodyWriter
       const gp_Ax2 a = el->Position();
       Node&        nd = head(32, idx);
       nd.fields.insert(nd.fields.end(), {fv(a.Location().XYZ()), fv(a.Direction().XYZ()), fv(a.XDirection().XYZ()), ff(el->MajorRadius()), ff(el->MinorRadius())});
+    }
+    else if (occ::handle<Geom_BSplineCurve> r = ring_bspline(c, f, l))
+    {
+      r->SetNotPeriodic();
+      idx = w.b_curve_3d(owner, r, true);
     }
     else
     {
@@ -1425,8 +1464,8 @@ struct BodyWriter
       occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l);
       while (auto t = occ::down_cast<Geom_TrimmedCurve>(c))
         c = t->BasisCurve();
-      const bool whole = a.IsSame(b) && edge_tol[i] == 0 && edge_fit[i].IsNull() && (!occ::down_cast<Geom_Circle>(c).IsNull() || !occ::down_cast<Geom_Ellipse>(c).IsNull())
-                         && std::abs(l - f - 2 * M_PI) < 1e-9;
+      const bool conic = (!occ::down_cast<Geom_Circle>(c).IsNull() || !occ::down_cast<Geom_Ellipse>(c).IsNull()) && std::abs(l - f - 2 * M_PI) < 1e-9;
+      const bool whole = a.IsSame(b) && edge_tol[i] == 0 && edge_fit[i].IsNull() && (conic || !ring_bspline(c, f, l).IsNull());
       if (!whole)
       {
         ring[vertices.FindIndex(a) - 1] = false;
@@ -1780,7 +1819,7 @@ TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, bool periodic_splin
     occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l);
     while (auto t = occ::down_cast<Geom_TrimmedCurve>(c))
       c = t->BasisCurve();
-    closed = c.IsNull() || (occ::down_cast<Geom_Circle>(c).IsNull() && occ::down_cast<Geom_Ellipse>(c).IsNull());
+    closed = c.IsNull() || (occ::down_cast<Geom_Circle>(c).IsNull() && occ::down_cast<Geom_Ellipse>(c).IsNull() && ring_bspline(c, f, l).IsNull());
   }
   if (closed)
   {

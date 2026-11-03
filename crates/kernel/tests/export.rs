@@ -1286,6 +1286,35 @@ fn parasolid_periodic_bsurface_face_reads_whole() {
     assert!(s.is_valid());
 }
 
+/// Live's closed sketch spline extruded 10 mm (request 1836: 3 faces, 2
+/// edges, 0 vertices; its caps one closed B-curve each, ring edges): written
+/// back each cap is still one edge without a vertex (they were split in two,
+/// 4 edges / 4 vertices), the volume the same. Also a cylinder: its circles
+/// are rings (live 1855).
+#[test]
+fn parasolid_writes_closed_edges_as_rings() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let spline = read_parasolid(&dir.join("closed-spline-live.x_t"), LengthUnit::Millimeter).unwrap();
+    let cylinder = extrude(&make_face_from_wire(&make_wire(&[make_circle(DVec3::ZERO, DVec3::Z, 10.0).unwrap()]).unwrap(), true).unwrap(), DVec3::new(0.0, 0.0, 10.0)).unwrap().shape;
+    let out = std::env::temp_dir().join(format!("noshape-xt-rings-{}", std::process::id()));
+    std::fs::create_dir_all(&out).unwrap();
+    for (name, s) in [("closed-spline", spline), ("cylinder", cylinder)] {
+        let shown = |s: &Shape| {
+            let t = s.shown_topology().unwrap();
+            (s.count(ShapeType::Face), t.edges.iter().filter(|e| **e).count(), t.vertices.iter().filter(|v| **v).count())
+        };
+        assert_eq!(shown(&s), (3, 2, 0), "{name}: read");
+        let path = out.join(format!("{name}.x_t"));
+        write_parasolid(&path, std::slice::from_ref(&s), LengthUnit::Millimeter, false).unwrap();
+        let back = read_parasolid(&path, LengthUnit::Millimeter).unwrap();
+        assert_eq!(shown(&back), (3, 2, 0), "{name}: written back");
+        let (a, b) = (volume_properties(&s).unwrap().mass, volume_properties(&back).unwrap().mass);
+        assert!((a - b).abs() < 1e-6 * a, "{name}: {a} vs {b}");
+        assert!(back.is_valid(), "{name}");
+    }
+    let _ = std::fs::remove_dir_all(&out);
+}
+
 /// Written back, a face going round a periodic B-surface (the vase's side
 /// face, as in live's file) or one closed with a tangent seam (a loft between
 /// circles) stays one face: no seam, not split. `NOSHAPE_XT_SAMPLES=<dir>`
