@@ -1293,6 +1293,8 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   together (or tell core it should stay as it is).
 
 ## Requests to the lead
+- (11-03 12:10) I stopped a ui-parity run by pattern and it also killed **psui's** suite run (/root/psui-scratch/uip-new56.log stops at sketch-circle-value-box, 12:10:44). Sorry: please tell psui to rerun it. I now kill only the PIDs I start.
+
 - 11-03 05:08: model `custom_features::fs_errors_match_onshape` failed once in the land queue (missing "units.fs 558:5
   Precondition of operator< failed …") on a fixture-and-docs change of mine; it passes on vibe5 on the same tree and
   the retry landed (b523880e): a flaky FS error-text test (not my area).
