@@ -660,13 +660,15 @@ impl<'a> Translator<'a> {
         let is_start = matches!(get("isStart"), Some(Packed::Bool(true)));
         let mut strings = Vec::new();
         packed_strings(&Packed::Map(m.clone()), &mut strings);
-        let (op, revolve) = strings.iter().find_map(|s| s.strip_suffix(".opExtrude").map(|o| (o.to_string(), false)).or_else(|| s.strip_suffix(".opRevolve").map(|o| (o.to_string(), true))))?;
         if name == "SWEPT_BODY" {
+            // Whatever made it (opExtrude, opRevolve, opThicken…): the feature's part.
+            let op = strings.iter().find_map(|s| s.rsplit_once(".op").map(|(f, _)| f.to_string()))?;
             // The part our Extrude made (the part of its faces).
-            let Some(ours) = self.feature_ids.get(&op).cloned() else { return Some(Err(format!("SWEPT_BODY: extrude {op} was not built"))) };
+            let Some(ours) = self.feature_ids.get(&op).cloned() else { return Some(Err(format!("SWEPT_BODY: feature {op} was not built"))) };
             let r = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 1 }));
             return Some(r.and_then(|f| f["faces"][0]["part"].as_str().map(str::to_string).ok_or_else(|| format!("SWEPT_BODY of {op}: no part of ours"))));
         }
+        let (op, revolve) = strings.iter().find_map(|s| s.strip_suffix(".opExtrude").map(|o| (o.to_string(), false)).or_else(|| s.strip_suffix(".opRevolve").map(|o| (o.to_string(), true))))?;
         let sk = strings.iter().find_map(|s| s.strip_suffix(".wireOp"))?.to_string();
         let curves: Vec<Vec<[f64; 2]>> = strings.iter().filter_map(|e| self.curves.get(&(sk.clone(), e.clone())).cloned()).collect();
         Some(if revolve { self.revolve_entity(name, &op, &sk, &curves) } else { self.extrude_entity(name, is_start, &op, &sk, &curves) })
