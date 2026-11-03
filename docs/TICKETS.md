@@ -1533,7 +1533,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
-- [ ] P3 NEW-DIALOG-UNDO-STEP (psui) opening a new feature's dialog enables Undo in ours: with the box's top face selected,
+- [x] fixed dbd2f298 (psui 11-03: what the editing logic fills in on opening is no step; UI test what_the_dialog_fills_in_on_opening_is_no_undo_step; ui-parity extrude-remove-tab matches) P3 NEW-DIALOG-UNDO-STEP (psui) opening a new feature's dialog enables Undo in ours: with the box's top face selected,
   Shift+E. Live's recordings (extrude-remove-tab, boolean-union-two-parts, new-extrude-then-other-tool; /root/parity/ui/live):
   the Extrude 2 dialog opens with Undo **off**; it turns on at the first change in the dialog (the Remove tab). Ours (green
   7d35f2cb, qa-scratch/uip-score3/): Undo on as soon as the dialog opens. (qa 2026-11-03 08:04, build 7d35f2cb)
