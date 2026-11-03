@@ -808,6 +808,16 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
 ## Requests to the lead (qa, updated 2026-11-03 01:40)
+- **11-03 04:15:** 05:00 list written (no blocker). Found since 02:00: **P0 CRASH-2045** (a 43-feature fuzz document
+  crashes the CLI / app on regeneration 2–5 runs in 5, Rust Boolean on; in v0.4.18–v0.4.22 too; gdb: a later fillet's
+  input shape already corrupt; repro tickets/crash2045/del1.py), **P1 BLEND-TOL-REGEN-CHANGES** (core eca0da09: fuzz
+  documents' chamfers / sketches now fail), SKETCH-UNDO-REDO-STATE reopened (Undo enabled on entering), verified
+  EYE-CLICK-SELECTS-ROW / FEATURE-RCLICK-WITH-SELECTION. The watch now also stops on NFFUZZ (deaths in
+  cli/nfloop.summary; it missed seed 2045 before). Interaction suite on green db0aedd0 against live's 82 recordings:
+  **37/82 scenarios, 254/453 states** (qa-scratch/uip-score1.log) — psui reports 47/72 on its own later run. 225
+  scenarios in tests/ui-parity. Next: the 05:00 Release run's artifact (cli-suppress-segv 22 parts, seeds 1222 / 1250
+  Rust off), relsmoke at publish (`bash /tmp/qa-relsmoke.sh 0.4.23 v0422`), GUI rows (sed /tmp/qa-relgui421.sh), memory,
+  the updater on :149; then SCORE.md's first line in the evening.
 - **11-03 01:54 state:** greens move fast (dx / skasm / psui); green copies now noshape-69b1816c and noshape-bad1de8e
   (**keep a copy until the fuzz batches that used it are evaluated**: CRASH-1837-ONCE's binary was deleted too early).
   Loops: /tmp/qa-nfloop24.sh (bad1de8e, 2041–2080), /tmp/qa-gfloop9.sh (69b1816c, 2001–2040), /tmp/qa-cfloop67.sh (v0.4.22,
