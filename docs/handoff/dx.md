@@ -73,6 +73,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   unpacker change; parity_models prints a "SCORE.md row: | … |" line to paste. drawing.md TB25 verified by tests;
   Insert view shows "Show annotations from model" only for a part (live captures; request withdrawn). Assembly
   layout proposed to live (REQUESTS 11-03 02:15), to build the assembly translator once confirmed.
+- Walk 11-03 03:35 on green 10060012 (:105, boltdwg): Insert view of the whole Part Studio has no "Show annotations
+  from model" row, of Part 1 it has (as live); View scale read "1:1" without "(Sheet)" on a drawing from before the
+  scale_shown flag: fixed (a sheet with views counts). No regressions.
 - Staged for when GET /features reopens (~04:17 UTC): /root/parity/models-dx/{dx-mbd-1721, live-hole-row,
   live-pattern-holes} have live.jsonl (per rollback: parts, bands, boxes, raw bodies; from pm-rollbacks.js); run
   /root/dx-scratch/live/pm-features.sh to add features.json and merge names / statuses, then parity_models on them

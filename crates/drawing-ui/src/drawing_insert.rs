@@ -232,7 +232,9 @@ impl DrawingEditor {
         let Tool::InsertView { source, orientation, part } = self.tool.clone() else { return None };
         let pal = p();
         let ed = cx.entity();
-        let (sheet_scale, scale_shown) = (self.current_sheet().scale, self.current_sheet().scale_shown);
+        // "(Sheet)" once the sheet has had a view (documents from before the
+        // flag have views without it).
+        let (sheet_scale, scale_shown) = (self.drawing_sheet().scale, self.drawing_sheet().scale_shown || !self.drawing_sheet().views.is_empty());
         let label = |text: &'static str| div().w(px(105.)).flex_none().text_size(px(12.)).text_color(pal.text).child(text);
         // Items from `user_from` on are user content (parts, named views,
         // positions, display states): never translated.
