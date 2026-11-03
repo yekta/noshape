@@ -319,8 +319,8 @@ fn everyday(seed: u64) -> Case {
         };
         // (Batch 6 on, seed 381: three more kinds; batch 7 on, seed 421,
         // three more; batch 8 on, seed 461, three more; batch 10 on, seed
-        // 541, three more.)
-        match r.below(if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
+        // 541, three more; batch 12 on, seed 621, three more.)
+        match r.below(if seed >= 621 { 20 } else if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
             // Corner rectangle (live's tool constraints), width and height.
             0 => {
                 let (w, h) = (r.range(15.0, 50.0), r.range(10.0, 35.0));
@@ -639,6 +639,60 @@ fn everyday(seed: u64) -> Case {
                 c.length(&cl, (2.0 * half * fs).min(rb * fb * 1.5));
                 c.radius(&h1, rh * fh, true);
             }
+            // T profile: eight H / V lines, the flange's two overhangs
+            // Equal; the flange's width and thickness, the stem's width and
+            // height.
+            17 => {
+                let (w, t, sw, sh) = (r.range(30.0, 50.0), r.range(4.0, 8.0), r.range(6.0, 12.0), r.range(15.0, 30.0));
+                let x0 = (w - sw) / 2.0;
+                let p = [o + v(x0, 0.0), o + v(x0 + sw, 0.0), o + v(x0 + sw, sh), o + v(w, sh), o + v(w, sh + t), o + v(0.0, sh + t), o + v(0.0, sh), o + v(x0, sh)];
+                let l: Vec<String> = (0..8).map(|i| c.line(p[i], p[(i + 1) % 8])).collect();
+                for i in 0..8 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 8]));
+                    c.hv(i % 2 == 0, &l[i]);
+                }
+                c.pair("EQUAL", &l[2], &l[6]);
+                let fs: Vec<f64> = (0..4).map(|_| f(&mut r)).collect();
+                c.length(&l[4], w * fs[0]);
+                c.length(&l[3], t * fs[1]);
+                c.length(&l[0], (sw * fs[2]).min(w * fs[0] * 0.6));
+                c.length(&l[1], sh * fs[3]);
+            }
+            // U bend (a sweep path): two Vertical legs joined over the top
+            // by an arc Tangent to both; the legs' lengths and the radius.
+            18 => {
+                let (h1, h2, rad) = (r.range(15.0, 35.0), r.range(10.0, 30.0), r.range(5.0, 12.0));
+                let l1 = c.line(o, o + v(0.0, h1));
+                let a2 = c.arc(o + v(rad, h1), rad, 0.0, PI);
+                let l3 = c.line(o + v(2.0 * rad, h1), o + v(2.0 * rad, h1 - h2));
+                c.coincident(&format!("{l1}.end"), &format!("{a2}.end"));
+                c.coincident(&format!("{a2}.start"), &format!("{l3}.start"));
+                c.pair("TANGENT", &l1, &a2);
+                c.pair("TANGENT", &a2, &l3);
+                c.hv(false, &l1);
+                c.hv(false, &l3);
+                let (f1, f2, fr) = (f(&mut r), f(&mut r), f(&mut r));
+                c.length(&l1, h1 * f1);
+                c.length(&l3, h2 * f2);
+                c.radius(&a2, rad * fr, false);
+            }
+            // Stepped shaft's half profile (for a Revolve): six H / V lines
+            // on a Horizontal axis line; both radii, the first step's
+            // length and the whole length.
+            19 => {
+                let (r1, r2, l1, len) = (r.range(6.0, 12.0), r.range(3.0, 5.5), r.range(10.0, 25.0), r.range(35.0, 60.0));
+                let p = [o, o + v(0.0, r1), o + v(l1, r1), o + v(l1, r2), o + v(len, r2), o + v(len, 0.0)];
+                let l: Vec<String> = (0..6).map(|i| c.line(p[i], p[(i + 1) % 6])).collect();
+                for i in 0..6 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 6]));
+                    c.hv(i % 2 == 1, &l[i]);
+                }
+                let fs: Vec<f64> = (0..4).map(|_| f(&mut r)).collect();
+                c.length(&l[0], r1 * fs[0]);
+                c.length(&l[4], (r2 * fs[1]).min(r1 * fs[0] * 0.8));
+                c.length(&l[1], l1 * fs[2]);
+                c.length(&l[5], (len * fs[3]).max(l1 * fs[2] * 1.3));
+            }
             // D shape: a Horizontal chord and an arc over it, the chord's
             // length and the arc's radius.
             _ => {
@@ -940,13 +994,17 @@ fn fixture(name: &str) -> std::path::PathBuf {
 #[test]
 #[ignore = "T2: live fuzz batch"]
 fn write_batch() {
+    // (LIVE_FUZZ_WRITE=<n>: batch n only.)
+    let only = std::env::var("LIVE_FUZZ_WRITE").ok().and_then(|v| v.parse::<usize>().ok());
     for (n, first, rich) in BATCHES {
-        check_batch(n, first, rich);
+        if only.is_none_or(|o| o == n) {
+            check_batch(n, first, rich);
+        }
     }
 }
 
 /// The batches: (number, first seed, rich).
-const BATCHES: [(usize, u64, bool); 11] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true)];
+const BATCHES: [(usize, u64, bool); 12] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true), (12, 621, true)];
 
 /// Batch 8's s464 / s475 stay as live answered: a component the pass can't
 /// close (a hexagon) takes the least change on its own, the rounded
