@@ -322,8 +322,8 @@ fn everyday(seed: u64) -> Case {
         // 541, three more; batch 12 on, seed 621, three more; batch 13 on,
         // seed 661, three more; batch 14 on, seed 701, three more; batch 15
         // on, seed 741, three more; batch 16 on, seed 781, three more; batch
-        // 17 on, seed 821, three more.)
-        match r.below(if seed >= 821 { 35 } else if seed >= 781 { 32 } else if seed >= 741 { 29 } else if seed >= 701 { 26 } else if seed >= 661 { 23 } else if seed >= 621 { 20 } else if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
+        // 17 on, seed 821, three more; batch 18 on, seed 861, three more.)
+        match r.below(if seed >= 861 { 38 } else if seed >= 821 { 35 } else if seed >= 781 { 32 } else if seed >= 741 { 29 } else if seed >= 701 { 26 } else if seed >= 661 { 23 } else if seed >= 621 { 20 } else if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
             // Corner rectangle (live's tool constraints), width and height.
             0 => {
                 let (w, h) = (r.range(15.0, 50.0), r.range(10.0, 35.0));
@@ -1043,6 +1043,86 @@ fn everyday(seed: u64) -> Case {
                 c.length(&b, l2 * fs[2]);
                 c.radius(&circle, rad * fs[3], false);
             }
+            // Right triangle with its right-angle corner filleted: a
+            // Horizontal and a Vertical leg, the hypotenuse, the arc Tangent
+            // to both legs; both legs' lengths and the radius.
+            35 => {
+                let (a, b, rad) = (r.range(25.0, 45.0), r.range(20.0, 40.0), r.range(3.0, 7.0));
+                let l1 = c.line(o + v(rad, 0.0), o + v(a, 0.0));
+                let l2 = c.line(o + v(a, 0.0), o + v(0.0, b));
+                let l3 = c.line(o + v(0.0, b), o + v(0.0, rad));
+                let a4 = c.arc(o + v(rad, rad), rad, PI, 1.5 * PI);
+                c.coincident(&format!("{l1}.end"), &format!("{l2}.start"));
+                c.coincident(&format!("{l2}.end"), &format!("{l3}.start"));
+                c.coincident(&format!("{l3}.end"), &format!("{a4}.start"));
+                c.coincident(&format!("{a4}.end"), &format!("{l1}.start"));
+                c.pair("TANGENT", &l3, &a4);
+                c.pair("TANGENT", &a4, &l1);
+                c.hv(true, &l1);
+                c.hv(false, &l3);
+                let fs: Vec<f64> = (0..3).map(|_| f(&mut r)).collect();
+                c.length(&l1, (a - rad) * fs[0]);
+                c.length(&l3, (b - rad) * fs[1]);
+                c.radius(&a4, (rad * fs[2]).min((a - rad) * fs[0] * 0.5), false);
+            }
+            // Octagon as the polygon tool draws it: eight Equal sides, their
+            // corners on a construction circle, the bottom side Horizontal;
+            // the circle's diameter.
+            36 => {
+                let rad = r.range(8.0, 20.0);
+                let p: Vec<DVec2> = (0..8).map(|i| o + DVec2::from_angle(-FRAC_PI_2 - PI / 8.0 + i as f64 * PI / 4.0) * rad).collect();
+                let l: Vec<String> = (0..8).map(|i| c.line(p[i], p[(i + 1) % 8])).collect();
+                let circle = c.circle(o, rad);
+                c.construction(&circle);
+                for i in 0..8 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 8]));
+                    c.on_curve(&format!("{}.start", l[i]), &circle);
+                }
+                for i in 1..8 {
+                    c.pair("EQUAL", &l[0], &l[i]);
+                }
+                c.hv(true, &l[0]);
+                let fr = f(&mut r);
+                c.radius(&circle, rad * fr, true);
+            }
+            // Plate with a slot: a corner rectangle (live's tool constraints),
+            // width and height; inside it a Horizontal slot, its centre
+            // distance and radius, its left arc's centre dimensioned from the
+            // left and bottom sides.
+            37 => {
+                let (w, h) = (r.range(40.0, 60.0), r.range(25.0, 40.0));
+                let p = [o, o + v(w, 0.0), o + v(w, h), o + v(0.0, h)];
+                let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+                for i in 0..4 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+                }
+                c.pair("PERPENDICULAR", &l[2], &l[3]);
+                c.pair("PARALLEL", &l[0], &l[2]);
+                c.pair("PARALLEL", &l[3], &l[1]);
+                c.hv(true, &l[2]);
+                let (len, rad) = (w * r.range(0.3, 0.45), h * r.range(0.1, 0.18));
+                let s0 = o + v(w * 0.25, h * 0.5);
+                let m1 = c.line(s0 + v(0.0, -rad), s0 + v(len, -rad));
+                let m2 = c.arc(s0 + v(len, 0.0), rad, -FRAC_PI_2, FRAC_PI_2);
+                let m3 = c.line(s0 + v(len, rad), s0 + v(0.0, rad));
+                let m4 = c.arc(s0, rad, FRAC_PI_2, 3.0 * FRAC_PI_2);
+                c.coincident(&format!("{m1}.end"), &format!("{m2}.start"));
+                c.coincident(&format!("{m2}.end"), &format!("{m3}.start"));
+                c.coincident(&format!("{m3}.end"), &format!("{m4}.start"));
+                c.coincident(&format!("{m4}.end"), &format!("{m1}.start"));
+                for (a, b) in [(&m1, &m2), (&m2, &m3), (&m3, &m4), (&m4, &m1)] {
+                    c.pair("TANGENT", a, b);
+                }
+                c.pair("EQUAL", &m2, &m4);
+                c.hv(true, &m1);
+                let fs: Vec<f64> = (0..6).map(|_| f(&mut r)).collect();
+                c.length(&l[0], w * fs[0]);
+                c.length(&l[1], h * fs[1]);
+                c.distance(&format!("{m4}.center"), &format!("{m2}.center"), len * fs[2]);
+                c.radius(&m2, rad * fs[3], false);
+                c.distance(&format!("{m4}.center"), &l[3], w * 0.25 * fs[4]);
+                c.distance(&format!("{m4}.center"), &l[0], h * 0.5 * fs[5]);
+            }
             // D shape: a Horizontal chord and an arc over it, the chord's
             // length and the arc's radius.
             _ => {
@@ -1354,7 +1434,7 @@ fn write_batch() {
 }
 
 /// The batches: (number, first seed, rich).
-const BATCHES: [(usize, u64, bool); 17] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true), (12, 621, true), (13, 661, true), (14, 701, true), (15, 741, true), (16, 781, true), (17, 821, true)];
+const BATCHES: [(usize, u64, bool); 18] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true), (12, 621, true), (13, 661, true), (14, 701, true), (15, 741, true), (16, 781, true), (17, 821, true), (18, 861, true)];
 
 /// Batch 8's s464 / s475 stay as live answered: a component the pass can't
 /// close (a hexagon) takes the least change on its own, the rounded
