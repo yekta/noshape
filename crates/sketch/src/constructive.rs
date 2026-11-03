@@ -472,7 +472,14 @@ impl Sketch {
             // s11: the quad's side follows its moved corner whole and grows
             // to the triangle's side).
             let resized = chained.as_ref().is_some_and(|k| (k.value().unwrap_or(0.0) - self.size(u)).abs() > 1e-9);
-            let ladder: &[(u8, u8)] = if end_carried && resized {
+            // An arc between two H / V lines (a rectangle's rounded corner)
+            // slides them before it's moved whole (live fuzz s547: a new
+            // radius keeps both straight sides).
+            let hv = |x: EntityId| self.kind(x) == Some(EntityKind::Line) && cons.iter().any(|(c, us)| us.as_slice() == [x] && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Horizontal { b: None, .. } | ConstraintKind::Vertical { b: None, .. })));
+            let corner = round && held.len() == 2 && held.iter().all(|x| hv(*x));
+            let ladder: &[(u8, u8)] = if corner {
+                &[(1, 3), (3, 1), (0, 3), (1, 2), (1, 1), (1, 0), (2, 1), (2, 0), (0, 2), (0, 1), (0, 0)]
+            } else if end_carried && resized {
                 &[(1, 1), (0, 1), (1, 2), (1, 0), (0, 2), (0, 0)]
             } else if lower_held.is_some() {
                 &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (2, 1), (2, 0), (0, 2), (0, 1), (3, 1), (0, 0)]

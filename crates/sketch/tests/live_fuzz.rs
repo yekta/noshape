@@ -973,6 +973,11 @@ fn a_rounded_corners_new_radius_shortens_the_side_placed_before_it() {
     let ours = batch(1, 548, true);
     let d = differences(&ours["cases"][0], &live["cases"]["s548"]);
     assert!(d.is_empty(), "s548: {}", d.join("; "));
+    // s547: only the radius changes: both straight sides stay, the arc grows
+    // into the corner (its ends slide along them).
+    let ours = batch(1, 547, true);
+    let d = differences(&ours["cases"][0], &live["cases"]["s547"]);
+    assert!(d.is_empty(), "s547: {}", d.join("; "));
 }
 
 /// Batch 10's s555 stays as live answered: an isosceles triangle's leg
