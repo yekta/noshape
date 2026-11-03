@@ -314,6 +314,20 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P1 BLEND-TOL-REGEN-CHANGES (core; **new on main since v0.4.22, from eca0da09** "OCCT's blends in metres give what they
+  make the tolerances it needs") saved documents regenerate differently, and features that built before now fail: the 44
+  ticket documents (qa-scratch/cli/tixvol-gbad1.out vs tixvol-ge89c78de.out, bin = green bad1de8e vs e89c78de; **the
+  same with NOSHAPE_BOOL_RUST=0**, so not bool's 8e3a8834 / f2b9ef6d): **bop-pairs-cli-segv-152** Chamfer 3 Ok → "Failed to
+  chamfer selections.", then Fillet 2 "2 missing selections", Fillet 3 "1 missing selection", Draft 2 "Select a neutral
+  plane.", Shell 1 "Select faces to remove." (Part 1 87828.610 / 56 faces → 77692.923 / 30); **cli-fillet2-segv** Chamfer 3
+  Ok → "Distance of chamfer on face too large.", **Sketch 3 and Sketch 5 "The sketch plane could not be found"**, Extrude
+  3 "Select face or sketch region to extrude.", while Shell 3 / Fillet 5 now build (Part 2 43411.104 → 17143.110);
+  **cli-suppress-stall** Shell 7 and Fillet 11 now build (Part 1 91042.766 → 7871.363); cli-shell-hang-pre's Shell 5
+  builds (the intended fix); 0.05–1.5 mm³ moves in 6 more (draft-pool-hang-*, cli-draft-hang*, cli-fillet-hang,
+  cli-delete-crash, cli-shell-gpf). Feature statuses: qa-scratch/tickets/<doc>-status-bad1de8e.txt / -e89c78de.txt. All
+  fuzz documents (no live values), and the 19-document volume sweep's non-fuzz ones and the user's cases are unchanged —
+  but an existing document whose Chamfer succeeded and whose later sketches sat on its faces opening with errors is a
+  regression whichever is closer to live. Which side is right for Chamfer 3 (live) is for core. (qa 2026-11-03 03:19, build e89c78de)
 - [ ] P0 CRASH-2045 (core + bool; **in the published v0.4.22 and on green bad1de8e**, Rust Boolean on, the default) deleting a
   feature crashes the CLI / app most of the time: qa-scratch/tickets/crash2045/fz2045-step99.noshape (+ -wal; CLI fuzz seed
   2045's document, 43 features, Part 1 179904.78 mm³), `python3 tickets/crash2045/del1.py <noshape mcp wrapper> <doc>
