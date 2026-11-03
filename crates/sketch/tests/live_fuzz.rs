@@ -1477,6 +1477,24 @@ fn a_lever_hangs_on_its_centre_line() {
     assert!(d.is_empty(), "s811: {}", d.join("; "));
 }
 
+/// An L-bracket's rounded inner corner: a new radius alone, a new foot
+/// thickness alone, and both: the foot comes down first, then the fillet grows
+/// (live probes 17 v1-v3; fuzz s835). T1.
+#[test]
+fn a_rounded_l_resizes_its_foot_before_its_fillet() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-probe-17.live.json")).unwrap()).unwrap();
+    let b = probe_batch(probes17().into_iter().filter(|(n, _)| n.starts_with('v')).collect());
+    assert_eq!(b["cases"].as_array().unwrap().len(), 3);
+    for case in b["cases"].as_array().unwrap() {
+        let d = differences(case, &live["cases"][case["case"].as_str().unwrap()]);
+        assert!(d.is_empty(), "{}: {}", case["case"], d.join("; "));
+    }
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-17.live.json")).unwrap()).unwrap();
+    let ours = batch(1, 835, true);
+    let d = differences(&ours["cases"][0], &live["cases"]["s835"]);
+    assert!(d.is_empty(), "s835: {}", d.join("; "));
+}
+
 /// A T's resized stem keeps its side whose height is dimensioned and the
 /// flange recentres (live probes 17 u1-u5; fuzz s838 / s841 / s857). (Fuzz
 /// s784, a T beside a rectangle, keeps the other side: not followed.) T1.

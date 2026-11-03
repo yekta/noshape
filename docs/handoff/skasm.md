@@ -19,8 +19,8 @@ by its proportions or place only: next probe = s829's own coordinates, then shif
 halved. Probes 17 answered (20:1x, 20:19 fixed u1-u5): a T's resized stem keeps the side whose height is dimensioned (`stem_anchor`
 pins that corner first in `hold_the_base`; the overhangs must point away from the stem, else a flange's top matches
 too): s838 / s841 / s857 fixed, s784 (a T beside a rectangle) keeps the other side and now fails; batches 1-17 565
-of 630, probes 17 8/15. Left from probes 17: v3 (rounded L, radius and foot both: live resizes the foot first, then the
-fillet), w1 / w2 (V with a circle: angle, radius), x1-x4 (s829's trapezoid keeps its right corner at any place or
+of 630, probes 17 8/15. v3 / s835 fixed too (a resized line one line away from a resized corner arc goes first on a rank tie): 566 of 630,
+probes 17 9/15. Left from probes 17: w1 / w2 (V with a circle: angle, radius), x1-x4 (s829's trapezoid keeps its right corner at any place or
 size; the 40/20/20 ones keep the left). Batch 17's other misses, as first noted (tried and reverted at 20:00):
 - s838 / s841 (T, the stem's bottom resized): live keeps the stem's side whose height is dimensioned and the flange
   recentres; but s784 (a T too) keeps the other side. Holding dimensioned units first in `hold_the_base` fixed s838 /

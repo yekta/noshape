@@ -522,7 +522,15 @@ impl Sketch {
                     placed.iter().filter(|x| self.entity(**x).is_some_and(|e| e.construction && e.kind() == EntityKind::Line)).filter_map(|x| self.endpoints(*x)).any(|(a, b)| [a, b].iter().any(|p| *p == c || self.coincident_class(c).contains(p)))
                 }))
             };
-            let rank = |u: EntityId| (pending(u) + chained_change(u) + 100 * skeleton(u) + 50 * on_skeleton(u), adjacent(u), joined(u));
+            // On a tie, a line with a new Length of its own before a curve
+            // (live probes 17 v3: an L-bracket's thinner foot comes down
+            // before its rounded inner corner grows).
+            let own_change = |u: EntityId, radius: bool| cons.iter().any(|(c, us)| us.as_slice() == [u] && !holds[c] && matches!((radius, self.constraint(*c).map(|k| &k.kind)), (false, Some(ConstraintKind::Length { .. })) | (true, Some(ConstraintKind::Radius { .. } | ConstraintKind::Diameter { .. }))));
+            let joined_to = |u: EntityId| -> Vec<EntityId> { cons.iter().filter(|(c, us)| us.contains(&u) && self.connective(*c)).flat_map(|(_, us)| us.iter().copied()).filter(|x| *x != u).collect() };
+            let resized_line = |u: EntityId| {
+                usize::from(self.kind(u) == Some(EntityKind::Line) && own_change(u, false) && joined_to(u).into_iter().filter(|n| self.kind(*n) == Some(EntityKind::Line)).any(|n| joined_to(n).into_iter().any(|a| a != u && matches!(self.kind(a), Some(EntityKind::Arc)) && own_change(a, true))))
+            };
+            let rank = |u: EntityId| (pending(u) + chained_change(u) + 100 * skeleton(u) + 50 * on_skeleton(u), adjacent(u), resized_line(u), joined(u));
             let best = open.iter().map(|u| rank(*u)).max().unwrap();
             // First, a relation between units that doesn't hold, none of
             // them placed: the member it keeps stays as it is (if its own
