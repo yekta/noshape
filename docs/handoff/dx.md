@@ -83,7 +83,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   to run: …" (ours errors where live's built; the first difference then reads "(custom feature failed to run)").
   T1 custom_feature_failures_are_reported_apart. Host / std differences → core tickets. Score now **7/11,
   58/78** (bracket03 matches since core's FILLET-SPLIT-EDGE-FACES fix); SCORE.md row updated.
-- 11-03 12:10 live's new batch (13 more documents, 10 of them with 429 lines): parity_models skips a live.jsonl line
+- 11-03 09:35 live's new batch (13 more documents, 10 of them with 429 lines): parity_models skips a live.jsonl line
   with `"error"` (not compared; the document is "live's fetch incomplete" and not in the documents count, its fetched
   features are), reads face / edge kinds as `{"type": …}`, a plain string, or "undefined" (= not known); translator:
   a region query naming curves that only meet the region (tangent lines' vertices) picks the region whose own curves
@@ -92,15 +92,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   (sketch_get regions now give their `outer` loop; T1 filter_inner_loops_leaves_out_what_a_hole_holds;
   bearing-block-takumi). Score **9/14 documents, 67/93 features** (SCORE.md row replaced). New tickets:
   EXTRUDE-SLIT-REGION (core: learning-center-michael), FILLET-31S-FAIL (core: knob-jason, 31 s then an error).
-  Live told (REQUESTS 12:10) about "undefined" kinds and the refetch. 12:50: a Hole's in-feature connector on the
+  Live told (REQUESTS 09:35) about "undefined" kinds and the refetch. 09:45: a Hole's in-feature connector on the
   face a sketch circle imprints (ours: the region) goes on the circle (same centre and normal), and a connector that
   errs is reported; TolerantQuantity parameters (MBD tolerances on a depth) read as their quantity. With core's
-  e77387ec: **10/14, 72/93** (clamp-abhil matches to the end). 13:30: a sketch whose frame (origin, x, normal) isn't
+  e77387ec: **10/14, 72/93** (clamp-abhil matches to the end). 09:52: a sketch whose frame (origin, x, normal) isn't
   live's `sketches` transformMatrix is a difference (T1 a_sketch_frame_unlike_lives_is_a_difference); three face
   sketches in the unscored documents differ: SKETCH-FACE-FRAME (core), /root/dx-scratch/frames.py lists them. A region
   query's sketch is the one whose `.imprint` the query's own operation names (was: the first `.wireOp` in it, which
   put backback-fix's Sketch 4 on a Top-plane region silently; now "not built", needs live's bodies).
-- 11-03 10:40 assembly phase (lead 09:05: against a small assembly if live's sample is late): `parity::rebuild_assembly`
+- 11-03 09:05 assembly phase (lead 09:05: against a small assembly if live's sample is late): `parity::rebuild_assembly`
   takes live's assembly definition (`rootAssembly` + `features` with featureStates) and each Part Studio
   (`studios/<elementId>.json` + `.parts.json`): every studio translated into its own tab, each mate connector's
   entity query resolved on it (`Translator::resolve`), instances inserted (part by live's partId → name), fixed as
@@ -112,7 +112,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   an_assembly_is_rebuilt_as_lives. skasm's live "p1807 c6" (two parts, two Revolutes): **1/1 as live, mates
   2/2**. Needed on the way: `qContainsPoint(qSketchRegion(makeId(sketch)), point)` (the region holding the point),
   through sketch_get's new `at` (only the regions holding a sketch or model point; e2e sketch_regions_at_a_point).
-  11:30: mates keep live's stored flip (ours inverted: AGENT-FLIP-PRIMARY-INVERTED), secondary axis (quarter turns
+  09:13: mates keep live's stored flip (ours inverted: AGENT-FLIP-PRIMARY-INVERTED), secondary axis (quarter turns
   PLUS_X, PLUS_Y, MINUS_X, MINUS_Y) and offset (x / y / z / rotation about rotationType); a connector whose query
   isn't read is found from live's frame (rootAssembly.features matedEntities `mateConnectorCS`, part coordinates: the
   edge / face / vertex whose center / centroid / midpoint / position is there). Cases from skb's captures added
