@@ -267,6 +267,12 @@ impl DraftHistory {
         self.undo.push(std::mem::replace(&mut self.last, next.clone()));
         Some(next)
     }
+
+    /// (Undo, Redo) would do something (a change mid-gesture isn't recorded
+    /// yet but undoes too).
+    pub fn can(&self) -> (bool, bool) {
+        (!self.undo.is_empty() || self.dragging, !self.redo.is_empty())
+    }
 }
 
 /// Measurements of the current selection: (selection, labelled results).
@@ -1738,6 +1744,11 @@ impl PartStudioView {
         }
         let dialog = e.dialog.clone();
         e.history.checkpoint(&dialog.read(cx).feature);
+    }
+
+    /// (Undo, Redo) of the open dialog's (or sketch's) own history.
+    pub(super) fn draft_history_state(&self) -> (bool, bool) {
+        self.edit.as_ref().map_or((false, false), |e| e.history.can())
     }
 
     /// Ctrl+Z / Ctrl+Y while a feature dialog (or sketch) is open.

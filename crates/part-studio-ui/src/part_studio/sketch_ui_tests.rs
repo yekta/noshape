@@ -166,6 +166,29 @@ fn line_value_box_takes_the_first_key(cx: &mut TestAppContext) {
     assert!(near(&dimensions(cx, &view), &[0.05]), "{:?}", dimensions(cx, &view));
 }
 
+/// SKETCH-UNDO-REDO-STATE (live 11-02, qa's t-skundo): the sketch toolbar's
+/// Undo and Redo follow the sketch's own history: both off on entering it;
+/// after a line Undo on, Redo off; after undoing it Undo off, Redo on; after
+/// redoing it Undo on, Redo off.
+#[gpui::test]
+fn sketch_undo_and_redo_follow_its_history(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "sk-undo", Tool::Line);
+    let state = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).draft_history_state());
+    assert_eq!(state(cx), (false, false));
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (640., 360.));
+    keys(cx, window, &["escape"]);
+    assert_eq!(state(cx), (true, false));
+    let step = |cx: &mut TestAppContext, redo: bool| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.draft_undo(redo, w, cx))).unwrap();
+        draw(cx, window);
+    };
+    step(cx, false);
+    assert_eq!(state(cx), (false, true));
+    step(cx, true);
+    assert_eq!(state(cx), (true, false));
+}
+
 /// `=#len` in a Line's value box (a Variable `len` = 42 mm before the
 /// sketch): Enter makes a 42 mm dimension driven by the variable.
 #[gpui::test]

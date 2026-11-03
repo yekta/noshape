@@ -4024,10 +4024,21 @@ impl PartStudioView {
         let action_btn = |id: &'static str, icon: &'static str, tip: &'static str, action: Box<dyn Action>, cx: &mut Context<Self>| {
             crate::ui::with_tool_tooltip(SharedString::from(format!("{id}-tt")), tip, crate::ui::tool_button(id, icon, false, cx).on_click(move |_, window, cx| window.dispatch_action(action.boxed_clone(), cx)))
         };
+        // Undo / Redo follow the sketch's own history, greyed out with
+        // nothing to undo / redo (live: both off on entering a sketch).
+        let (can_undo, can_redo) = self.draft_history_state();
+        let history_btn = |id: &'static str, icon: &'static str, tip: &'static str, action: Box<dyn Action>, enabled: bool, cx: &mut Context<Self>| {
+            let button = crate::ui::tool_button(id, icon, false, cx).opacity(if enabled { 1.0 } else { 0.4 }).when(!enabled, |b| b.cursor(CursorStyle::OperationNotAllowed));
+            crate::ui::with_tool_tooltip(SharedString::from(format!("{id}-tt")), tip, button.on_click(move |_, window, cx| {
+                if enabled {
+                    window.dispatch_action(action.boxed_clone(), cx);
+                }
+            }))
+        };
         let mut bar = h_flex().flex_initial().min_w_0().overflow_hidden().gap(px(2.));
         bar = bar
-            .child(action_btn("sk-undo", "undo", "Undo (cmd+z/ctrl+z)", Box::new(Undo), cx))
-            .child(action_btn("sk-redo", "redo", "Redo (ctrl+y/shift+cmd+z)", Box::new(Redo), cx))
+            .child(history_btn("sk-undo", "undo", "Undo (cmd+z/ctrl+z)", Box::new(Undo), can_undo, cx))
+            .child(history_btn("sk-redo", "redo", "Redo (ctrl+y/shift+cmd+z)", Box::new(Redo), can_redo, cx))
             .child(sep())
             // Extrude / Revolve accept the sketch and pre-select all its regions.
             .child(action_btn("sk-extrude", "extrude", "Extrude (Shift+E)", Box::new(Extrude), cx))
