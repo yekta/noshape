@@ -1414,6 +1414,45 @@ fn transformed_sketch(s: &SketchResult, m: &DMat4) -> SketchResult {
     SketchResult { frame: transform_frame(&s.frame, m), ..s.clone() }
 }
 
+/// A feature re-run as one instance of a feature pattern, transformed by `m` (FeatureScript's FeatureList functions,
+/// std applyPattern's per-instance call): `ev` holds its parameters; the sketches it reads are moved while it runs.
+/// A sketch is solved again (the variables may have changed) and stands in for the original `id`'s, which is
+/// returned for the caller to put back after the instance.
+pub fn rerun_instance(ev: &mut EvalCtx, id: FeatureId, type_id: &str, m: Option<DMat4>) -> FResult<Option<Arc<SketchResult>>> {
+    let Some(eval_fn) = super::evaluator(type_id) else { return err("A picked feature cannot be re-run") };
+    if type_id == "sketch" {
+        eval_fn(ev)?;
+        let Some(k) = ev.ctx.sketches.iter().rposition(|s| s.feature == ev.feature) else { return err("A picked feature cannot be re-run") };
+        let solved = ev.ctx.sketches.remove(k);
+        let mut s = (*solved).clone();
+        s.feature = id;
+        let Some(old) = ev.ctx.sketches.iter_mut().find(|x| x.feature == id) else { return err("A picked feature cannot be re-run") };
+        return Ok(Some(std::mem::replace(old, Arc::new(s))));
+    }
+    let mut moved: Vec<(usize, Arc<SketchResult>)> = Vec::new();
+    if let Some(m) = m {
+        let mut sk = BTreeSet::new();
+        referenced_sketches(ev.params, &mut sk);
+        for (k, s) in ev.ctx.sketches.iter_mut().enumerate() {
+            if sk.contains(&s.feature) {
+                moved.push((k, s.clone()));
+                *s = Arc::new(transformed_sketch(s, &m));
+            }
+        }
+        ev.xform = Some(match ev.xform {
+            Some(outer) => m * outer,
+            None => m,
+        });
+    }
+    let r = eval_fn(ev);
+    for (k, s) in moved {
+        if let Some(slot) = ev.ctx.sketches.get_mut(k) {
+            *slot = s;
+        }
+    }
+    r.map(|()| None)
+}
+
 /// Re-run the selected features for every instance (see the module docs).
 fn reapply_features(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance]) -> FResult<()> {
     if ev.features.is_empty() {

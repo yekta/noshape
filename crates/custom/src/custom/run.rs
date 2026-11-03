@@ -115,7 +115,18 @@ fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev
                 let refs = values.query(&d.id);
                 query_of_refs(cx, refs)
             }
-            ParamKindFs::FeatureList { .. } => host::feature_list_value(values.query(&d.id)),
+            ParamKindFs::FeatureList { .. } => {
+                let refs = values.query(&d.id);
+                let picked: Vec<_> = refs.iter().filter_map(crate::reference::Reference::depends_on).collect();
+                let mut st = cx.state.lock();
+                for f in ev.features.iter().filter(|f| picked.contains(&f.id)) {
+                    if !st.feature_defs.iter().any(|g| g.id == f.id) {
+                        st.feature_defs.push(f.clone());
+                    }
+                }
+                drop(st);
+                host::feature_list_value(refs, Some(cx))
+            }
             ParamKindFs::Array { items, .. } => {
                 let mut arr = Vec::new();
                 for it in values.array(&d.id) {

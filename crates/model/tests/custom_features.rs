@@ -3035,3 +3035,61 @@ export const sumCube = defineFeature(function(context is Context, id is Id, defi
     assert_ok(&r);
     assert!((total_volume(&r) - 0.01f64.powi(3)).abs() < 1e-12, "{}", total_volume(&r));
 }
+
+/// FS-FEATURE-LIST-RERUN (dx's FeatureScript corpus, cf-parameter-pattern): a FeatureList parameter's functions re-run
+/// the picked features under std applyPattern, with the variables set at the time and each instance's transform;
+/// the picked sketch is solved again for each instance.
+#[test]
+fn feature_list_functions_rerun_the_picked_features() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Depth pattern" }
+export const depthPattern = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Features" }
+        definition.features is FeatureList;
+    }
+    {
+        for (var k = 1; k <= 2; k += 1)
+        {
+            setVariable(context, "w", (10 + 5 * k) * millimeter);
+            applyPattern(context, id + ("p" ~ k), { "patternType" : PatternType.FEATURE, "instanceFunction" : definition.features,
+                    "fullFeaturePattern" : true, "sketchPatternInfo" : "sketches patterned", "transforms" : [transform(vector(30 * k, 0, 0) * millimeter)], "instanceNames" : ["p" ~ k] }, identityTransform());
+        }
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    let mut v = ps.new_feature("assignVariable", &fx.units).unwrap();
+    v.params.set("name", ParamValue::Text("w".into()));
+    v.params.set("variableType", ParamValue::Enum("LENGTH".into()));
+    v.params.set("lengthValue", expr("10 mm"));
+    ps.features.push(v);
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.corner_rectangle(glam::DVec2::ZERO, glam::DVec2::new(0.01, 0.01));
+    let mut s = ps.new_feature("sketch", &fx.units).unwrap();
+    s.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(noshape_model::reference::DatumPlane::Top)]));
+    s.params.set("sketch", ParamValue::Sketch(Box::new(noshape_model::sketch_feature::SketchData { sketch: sk, ..Default::default() })));
+    let sid = s.id;
+    ps.features.push(s);
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    let region: Vec<Reference> = r.display.sketches.iter().find(|g| g.feature == sid).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: sid, key: g.key.clone() }).collect();
+    let mut x = ps.new_feature("extrude", &fx.units).unwrap();
+    x.params.set("entities", ParamValue::Query(region));
+    x.params.set("depth", expr("#w"));
+    let xid = x.id;
+    ps.features.push(x);
+    let mut f = ps.new_feature(&fx.ty("depthPattern"), &fx.units).unwrap();
+    f.params.set("features", ParamValue::Query(vec![Reference::Feature(sid), Reference::Feature(xid)]));
+    ps.features.push(f);
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+    let mut parts: Vec<(f64, f64)> = r.context.bodies.iter().map(|b| (b.shape.bounding_box(false).unwrap().min.x * 1e3, b.shape.volume().unwrap() * 1e9)).collect();
+    parts.sort_by(|a, b| a.0.total_cmp(&b.0));
+    assert_eq!(parts.len(), 3, "{parts:?}");
+    for ((x, v), (x0, v0)) in parts.iter().zip([(0.0, 1000.0), (30.0, 1500.0), (60.0, 2000.0)]) {
+        assert!((x - x0).abs() < 1e-3 && (v - v0).abs() < 1e-6, "{parts:?}");
+    }
+}

@@ -34,8 +34,8 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("addAuxiliaryEntities", noop),
     ("addReferenceCSysFrame", noop),
     ("setPatternData", noop),
-    ("setFeaturePatternInstanceData", noop),
-    ("unsetFeaturePatternInstanceData", noop),
+    ("setFeaturePatternInstanceData", set_feature_pattern_instance_data),
+    ("unsetFeaturePatternInstanceData", unset_feature_pattern_instance_data),
     ("addDebugEntities", add_debug_entities),
     ("isAtVersionOrLater", is_at_version_or_later),
     ("getCurrentVersion", get_current_version),
@@ -67,12 +67,16 @@ fn values_sorted_by_id(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     Ok(Value::array(m.values().cloned().collect()))
 }
 
-/// A FeatureList parameter value: picked feature Id -> feature function.
-pub fn feature_list_value(refs: &[Reference]) -> Value {
+/// A FeatureList parameter value: picked feature Id -> feature function (run in `cx`, when given).
+pub fn feature_list_value(refs: &[Reference], cx: Option<&std::sync::Arc<super::FsContext>>) -> Value {
     let mut m = Map::new();
     for f in refs.iter().filter_map(Reference::depends_on) {
         let id = id_value(&[std::sync::Arc::from(f.to_string())]);
-        let func = noshape_featurescript::interp::native_function("featureListFunction", vec![id.clone()]).unwrap_or_default();
+        let bound = match cx {
+            Some(cx) => vec![cx.value(), id.clone()],
+            None => vec![Value::Undefined, id.clone()],
+        };
+        let func = noshape_featurescript::interp::native_function("featureListFunction", bound).unwrap_or_default();
         m.insert(id, func);
     }
     Value::map(m).with_tag(super::std_tag("featureList.fs", "FeatureList"))
@@ -89,9 +93,55 @@ pub fn feature_list_refs(v: &Value) -> Vec<Reference> {
         .collect()
 }
 
-/// A picked feature's function: features are not re-run from a FeatureList here.
-fn feature_list_function(i: &mut Interp, _a: Vec<Value>) -> R<Value> {
-    Err(i.error("A picked feature cannot be re-run"))
+/// A picked feature's function (bound to its id), called with an instance id: the feature run again under that id,
+/// with the variables as they are now and the instance's transform (std applyPattern's Reapply).
+fn feature_list_function(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let Ok(cx) = context_arg(i, &a) else { return Err(i.error("A picked feature cannot be re-run")) };
+    let picked = super::convert::id_arg(i, &a, 1)?;
+    let instance = super::convert::id_arg(i, &a, 2)?;
+    let feature = picked.first().and_then(|s| u64::from_str_radix(s.strip_prefix('F')?, 16).ok()).map(crate::reference::FeatureId);
+    let (def, m) = {
+        let st = cx.state.lock();
+        let def = feature.and_then(|f| st.feature_defs.iter().find(|g| g.id == f).cloned());
+        (def, st.instance_transforms.get(&instance).copied())
+    };
+    let Some(def) = def else { return Err(i.error("A picked feature cannot be re-run")) };
+    let params = crate::regen::eval::expand_query_variables(&def.params, &cx.state.lock().ctx).unwrap_or(def.params.clone());
+    // Each picked feature under the instance's id (std calls them all with it), its own id appended.
+    let mut id = instance;
+    id.extend(picked);
+    let original = super::run_op_with(i, &cx, &id, "PATTERN_FEATURE_FAILED", &params, |ev| crate::regen::features::pattern::rerun_instance(ev, def.id, &def.type_id, m))?;
+    if let Some(s) = original {
+        cx.state.lock().replaced_sketches.entry(def.id).or_insert(s);
+    }
+    Ok(Value::Undefined)
+}
+
+/// `@setFeaturePatternInstanceData(context, id, { transform })`: the instance's transform, for the features re-run
+/// under `id`.
+fn set_feature_pattern_instance_data(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let id = super::convert::id_arg(i, &a, 1)?;
+    let def = def_arg(i, &a, 2)?;
+    if let Some(m) = super::convert::transform_of(def.get("transform")) {
+        cx.state.lock().instance_transforms.insert(id, m);
+    }
+    Ok(Value::Undefined)
+}
+
+/// `@unsetFeaturePatternInstanceData(context, id)`: the instance done; sketches its features solved again give way to
+/// the originals.
+fn unset_feature_pattern_instance_data(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let id = super::convert::id_arg(i, &a, 1)?;
+    let mut st = cx.state.lock();
+    st.instance_transforms.remove(&id);
+    for (f, s) in std::mem::take(&mut st.replaced_sketches) {
+        if let Some(slot) = st.ctx.sketches.iter_mut().find(|x| x.feature == f) {
+            *slot = s;
+        }
+    }
+    Ok(Value::Undefined)
 }
 
 /// Whether a feature list contains a sketch feature.

@@ -172,6 +172,12 @@ pub struct CtxState {
     pub split_edges: HashMap<FsId, Vec<(BodyId, noshape_kernel::Shape)>>,
     /// The bodies each `opPattern` instance made, by (operation id, instance name) (`qPatternInstances`).
     pub pattern_instances: HashMap<(FsId, String), Vec<BodyId>>,
+    /// The Part Studio features a FeatureList parameter of this feature picked (their functions re-run them).
+    pub feature_defs: Vec<crate::regen::eval::EffectiveFeature>,
+    /// `setFeaturePatternInstanceData`: each instance id's transform while std's pattern re-runs features under it.
+    pub instance_transforms: HashMap<FsId, DMat4>,
+    /// Sketches a re-run instance solved again: the originals, put back when the instance is done.
+    pub replaced_sketches: HashMap<FeatureId, Arc<crate::regen::context::SketchResult>>,
     /// `opSplitFace` planar tools: a point and normal of each tool's plane
     /// and the midpoints of the edges it cut (tracking a tool face finds
     /// them, std's partial dependency: sheet metal Bend's boundaries).
@@ -250,6 +256,9 @@ impl FsContext {
                 splits: HashMap::new(),
                 split_edges: HashMap::new(),
                 pattern_instances: HashMap::new(),
+                feature_defs: Vec::new(),
+                instance_transforms: HashMap::new(),
+                replaced_sketches: HashMap::new(),
                 split_tools: Vec::new(),
                 split_face_pieces: HashMap::new(),
                 attr_snapshots: HashMap::new(),
