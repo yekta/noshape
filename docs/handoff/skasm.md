@@ -1,6 +1,18 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
-## Resume here (2026-11-03 12:55 UTC)
+## Resume here (2026-11-03 17:25 UTC)
+Since 16:00 landed: Slot's picked curve stays selected while its preview is pending (SKETCH-TOOL-PICK-SELECTION
+closed; Extend's selected line was one live recording's), `hold_the_base` (s653 / s725: a component the pass can't
+place keeps its unchanged units, lowest first; fuzz 487 of 550), angle value boxes read " deg" (queued e6777140).
+Assembly drag probes: done (the rest is live's pointer landing on 5 mm levers, 16:59 note below). Sketch ui-parity
+on my 16:46 build: 54/61 of live's sketch recordings; the 7 left are live-side (4 runner misses asked in REQUESTS
+17:25: `origin` clicks the feature list's Origin row, a flaky line click, a missed Ø10 circle; extend-to-line's
+re-record asked 16:57), psui's extrude-new-sketch-row-selected (Add preview lists "Part 2"; for psui) and the angle
+box (fixed). **Waiting on live: probes 14** (`skasm-sketch-probe-14.live.json`: copy to
+crates/sketch/tests/fixtures/live_fuzz/sketch-probe-14.live.json, run live_fuzz::probe_matches; it settles s747 /
+s753 / s713: which side a point-to-line Distance in one loop keeps). Then batch 16 (everyday profiles).
+
+## 2026-11-03 12:55 UTC
 Live 1866 answered and done (queued b5a2cf4c): a line square to a woken line whose direction a constraint holds is
 Perpendicular to it (inference.rs `direction_held`, `square_to`); wake is now geometric too (9 px pick, the GPU hover
 came a move late); psui's driver moves the pointer like live's runner (3 moves to a click, 15 in a drag). Suites: my
