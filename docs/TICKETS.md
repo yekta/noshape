@@ -1344,6 +1344,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P3 EYE-CLICK-SELECTS-ROW (psui) clicking a feature row's eye (show / hide) also selects the row in ours: scenario
+  feature-row-hide-sketch-eye (the box, click Sketch 1's eye): live's recording (/root/parity/ui/live) selection count 0,
+  Sketch 1 shown, not selected; ours (green 2723f7fb, qa-scratch/uip-ours) selection 1 (FEATURE Sketch 1), the row selected.
+  (qa 2026-11-03, build 2723f7fb)
 - [ ] P2 UIP-DRIVER-GAPS (psui; the interaction suite's noshape side) qa ran all 155 scenarios through NOSHAPE_UI_SCRIPT on
   green 2723f7fb (tools/ui-parity/run.py --all, :110; recordings in qa-scratch/uip-ours/): 147 + 7 of 8 rerun recorded, 14
   with a step `ok: false`. qa fixed its own (Plane's field is "Offset distance", Chamfer is its own tool, Variable through
