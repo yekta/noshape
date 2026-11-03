@@ -325,6 +325,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P2 FILLET-TUBE-BASE-SLOW (core; dx's parity suite 11-03) pipeflange-steven's Fillet 2 (r 8 mm, tangent propagation,
+  the r 16.7 circle where the tube meets the flange's top, concave) takes ~1.6 s of the studio's 1.8–2.0 s regeneration
+  on green 19f17a18's CLI (query_parts with features suppressed from the end: 0.36 s without it; NOSHAPE_BOOL_RUST=0
+  2.45 s); the whole studio regenerates in 0.5 s in the test build. Live's time not measured yet (live.jsonl
+  full_regen_ms pending). Its result also differs: ours 36/83/46 faces/edges/vertices, 18314.95 mm³; live 36/79/40,
+  18329.66 mm³ (after Extrude 3 already differs by split edges, CUT-CLOSED-EDGES-SPLIT). Our document:
+  vibe5:~/tmp/noshape-parity-<pid>/pipeflange-steven.noshape (parity_models, NOSHAPE_PARITY_ONLY=pipeflange-steven).
 - [ ] P2 CUT-CLOSED-EDGES-SPLIT (core / bool; dx's parity suite 11-03) closed edges a cut makes come out in pieces
   with extra vertices: bushing2-0-joshua Extrude 2 (circle r5 at the origin on Top, Remove Through all, into a tube
   r37.5 / r25 × 25 mm symmetric on Front): live 5/6/0 faces/edges/vertices (each loop of the hole one closed edge),
