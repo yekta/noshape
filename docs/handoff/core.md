@@ -16,6 +16,18 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-03 23:21 UTC.**
+- Landed since 22:30: fillet_by_groups (overlapping rounds of edge groups sharing no vertex: each group alone, their
+  common; cf-spur-gear's roots), the dumped-fillet probe prints why noshape's blend declined; queued: equal tori /
+  spheres given one surface before the unify + a fillet's blends unified (FILLET-MEETING-FILLETS-ONE-FACE: pulley02
+  7/7 to the end).
+- Live answered knob-jason (behaviours.md 33414 / 33473, live/core/knob-fillet-1931/): Fillet 1's only wrong faces are
+  the 24 outline tori trimmed short where two tori meet (OCCT's approximated torus/torus corner), Fillet 2's corners
+  are sphere vertex blends. Notes on FILLET-KNOB-JASON-VOLUME / FILLET-31S-FAIL.
+- Next, in order: exact torus/torus corners in noshape's blend (knob Fillet 1; "a corner between blended edges not
+  lines"), general vertex blends (BLEND-RUST; stef-radijator's Fillet 1, knob Fillet 2's spheres), FILLET-OVERLAP-FAIL's
+  overflowing rims, SHELL-SLOW's Shell 4 (offset slab / quadrics past the curl).
+
 **State 11-03 22:10 UTC.**
 - Landed since 20:30: evBox3d's tight box is the kernel's, wires tightened too (FS-WAVE-SPRING-SPEED fixed, 167 ms);
   opBoolean `localizedInFaces` (84a01921: the dogbone overcuts build); opEdgeChange `replaceFace` (queued: the
