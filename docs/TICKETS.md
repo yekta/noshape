@@ -3055,3 +3055,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   entered. Try selecting "Reapply features" option." (25/63/40, 117778.8 mm³); live OK, 32/78/48, 123792.2 mm³ (the
   instances made, Extrude 5's copy up to the same Plane 2 as live does it). Model: /root/parity/models/clamp-hms
   (`parity_models`, NOSHAPE_PARITY_ONLY=clamp-hms; features 9–12). (dx 2026-11-03)
+- [ ] P2 FILLET-OVERLAP-FAIL (core; dx's parity suite 11-03, learning-center-michael) a Fillet r 14.48528 mm of eight
+  edges (the start cap's outline of a 114 mm tall plate made of six sketch regions, live's queries JHh … KMtB, all
+  placed) → ours ERROR "Unfilleted edge overlapped by fillet." (no change: 21/46/24, 3665307.7 mm³); live OK,
+  44/99/54, 3569327.9 mm³. Model: /root/parity/models/learning-center-michael (`parity_models`,
+  NOSHAPE_PARITY_ONLY=learning-center-michael; feature 5). (dx 2026-11-03)

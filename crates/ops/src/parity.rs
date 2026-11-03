@@ -89,6 +89,9 @@ pub struct Translator<'a> {
     /// Custom features' failures, apart from geometry: a Feature Studio
     /// that doesn't compile ("<studio>: failed to compile: …").
     pub custom_failures: Vec<String>,
+    /// Queries of a parameter left out while its others translated (the
+    /// feature's problems).
+    partial: Vec<String>,
     /// Each Feature Studio's pinned std and the one our host serves for it.
     pub std_pins: Vec<(String, u32, u32)>,
 }
@@ -232,7 +235,7 @@ impl<'a> Translator<'a> {
             .flatten()
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), std_pins: Vec::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), std_pins: Vec::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -562,6 +565,7 @@ impl<'a> Translator<'a> {
                 Err(e) => problems.push(format!("{id}: {e}")),
             }
         }
+        problems.append(&mut self.partial);
         if tolerances > 0 {
             problems.push(format!("{tolerances} tolerance / precision fields not translated (no effect on the geometry)"));
         }
@@ -681,17 +685,33 @@ impl<'a> Translator<'a> {
                 self.picked.clear();
                 let queries: Vec<Value> = p["queries"].as_array().cloned().unwrap_or_default();
                 let mut ids = Vec::new();
+                let mut missed = Vec::new();
                 for q in &queries {
                     match self.query(k, q) {
                         Ok(found) => ids.extend(found),
-                        // Regions named by id alone (older documents' queries
-                        // carry no text, and live's bodies have no sketch
-                        // regions): as many as the last sketch has, they are its regions.
-                        Err(e) if ["entities", "surfaceEntities"].contains(&p["parameterId"].as_str().unwrap_or("")) => return self.last_sketch_regions(k, &queries).map(|r| Some(json!(r))).ok_or(e),
-                        Err(e) => return Err(e),
+                        Err(e) => missed.push(match q["deterministicIds"].as_array().filter(|a| !a.is_empty()) {
+                            Some(d) => format!("{} ({})", e, d.iter().filter_map(Value::as_str).collect::<Vec<_>>().join(", ")),
+                            None => e,
+                        }),
                     }
                 }
-                (!ids.is_empty()).then(|| json!(ids))
+                let Some(first) = missed.first().cloned() else { return Ok((!ids.is_empty()).then(|| json!(ids))) };
+                // Regions named by id alone (older documents' queries carry no
+                // text, and live's bodies have no sketch regions): as many as
+                // the last sketch has, they are its regions.
+                if ["entities", "surfaceEntities"].contains(&p["parameterId"].as_str().unwrap_or(""))
+                    && let Some(r) = self.last_sketch_regions(k, &queries)
+                {
+                    return Ok(Some(json!(r)));
+                }
+                if ids.is_empty() {
+                    return Err(first);
+                }
+                // The others as found: a query that finds nothing adds nothing
+                // (in Onshape too), said per query.
+                let param = p["parameterId"].as_str().unwrap_or("").to_string();
+                self.partial.extend(missed.into_iter().map(|e| format!("{param}: one of its queries: {e}")));
+                Some(json!(ids))
             }
             "BTMParameterArray" => {
                 let mut items = Vec::new();
@@ -2034,7 +2054,11 @@ fn our_type(t: Option<&str>) -> Option<String> {
 /// centre (planes: the projection; others: the box centre), edges their
 /// midpoint, vertices their point.
 pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
-    let v3 = |v: &Value| Some([v["x"].as_f64()?, v["y"].as_f64()?, v["z"].as_f64()?]);
+    // bodydetails' `{x, y, z}`, or `[x, y, z]` (live's compact fetch).
+    let xyz = |v: &Value| Some([v["x"].as_f64()?, v["y"].as_f64()?, v["z"].as_f64()?]);
+    let v3 = |v: &Value| xyz(v).or_else(|| f3(v));
+    // A type as `{ "type": … }` or the string alone.
+    let kind = |v: &Value| v["type"].as_str().or(v.as_str()).map(str::to_string);
     let mut out = HashMap::new();
     for line in lines {
         let (Some(k), Some(bodies)) = (line["index"].as_u64(), line["bodies"].as_array()) else { continue };
@@ -2043,15 +2067,24 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
             let mut lo = [f64::INFINITY; 3];
             let mut hi = [f64::NEG_INFINITY; 3];
             for f in b["faces"].as_array().into_iter().flatten() {
-                let (Some(mn), Some(mx)) = (v3(&f["box"]["minCorner"]), v3(&f["box"]["maxCorner"])) else { continue };
+                let (Some(mn), Some(mx)) = (v3(&f["box"]["minCorner"]).or_else(|| v3(&f["box"]["min"])), v3(&f["box"]["maxCorner"]).or_else(|| v3(&f["box"]["max"]))) else { continue };
                 for i in 0..3 {
                     lo[i] = lo[i].min(mn[i]);
                     hi[i] = hi[i].max(mx[i]);
                 }
                 let c = [(mn[0] + mx[0]) / 2.0, (mn[1] + mx[1]) / 2.0, (mn[2] + mx[2]) / 2.0];
                 let s = &f["surface"];
-                let mut r = LiveRef { kind: "FACE".into(), point: Some(c), measure: f["area"].as_f64(), geometry: our_type(s["type"].as_str()), ..Default::default() };
-                if s["type"] == "PLANE"
+                let surface = kind(s);
+                let mut r = LiveRef { kind: "FACE".into(), point: Some(c), measure: f["area"].as_f64(), geometry: our_type(surface.as_deref()), ..Default::default() };
+                // The compact fetch: origin and the outward normal beside the type.
+                if surface.as_deref() == Some("PLANE")
+                    && s.is_string()
+                    && let (Some(o), Some(n)) = (v3(&f["origin"]), v3(&f["normal"]))
+                {
+                    let d: f64 = (0..3).map(|i| (c[i] - o[i]) * n[i]).sum();
+                    r.point = Some([c[0] - d * n[0], c[1] - d * n[1], c[2] - d * n[2]]);
+                    r.normal = Some(n);
+                } else if surface.as_deref() == Some("PLANE")
                     && let (Some(o), Some(n)) = (v3(&s["origin"]), v3(&s["normal"]))
                 {
                     let d: f64 = (0..3).map(|i| (c[i] - o[i]) * n[i]).sum();
@@ -2064,8 +2097,9 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
                 }
             }
             for e in b["edges"].as_array().into_iter().flatten() {
-                if let (Some(id), Some(p)) = (e["id"].as_str(), v3(&e["geometry"]["midPoint"])) {
-                    out.insert((at, id.to_string()), LiveRef { kind: "EDGE".into(), point: Some(p), measure: e["geometry"]["length"].as_f64(), geometry: our_type(e["curve"]["type"].as_str()), ..Default::default() });
+                if let (Some(id), Some(p)) = (e["id"].as_str(), v3(&e["geometry"]["midPoint"]).or_else(|| v3(&e["midPoint"]))) {
+                    let length = e["geometry"]["length"].as_f64().or(e["length"].as_f64());
+                    out.insert((at, id.to_string()), LiveRef { kind: "EDGE".into(), point: Some(p), measure: length, geometry: our_type(kind(&e["curve"]).as_deref()), ..Default::default() });
                 }
             }
             for v in b["vertices"].as_array().into_iter().flatten() {

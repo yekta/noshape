@@ -87,6 +87,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
   kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
+- 11-03 11:41 parity translator: live's refetch writes `bodies` in a compact form (box min / max arrays, surface /
+  curve as strings, edge midPoint / length and vertex point as arrays, plane origin / normal beside): read as well as
+  bodydetails' raw form (3 documents; 6 more are ids only, asked). A parameter's queries that don't map are left out
+  and listed (the others kept, as a query finding nothing adds nothing in Onshape); a first difference whose feature
+  had an unmapped input reads "translation incomplete". Core's fixes moved clamp-hms (to feature 12) and
+  learning-center-michael (to feature 5): new tickets MIRROR-FEATURE-UP-TO, FILLET-OVERLAP-FAIL. Score now
+  11/20, 112/146 (live mid-refetch: documents come and go).
 - 11-03 11:18 live's refetch (21 scored): **11/21, 103/157, custom 0/5**. Translator: a centroid of [0, 0, 0] off the
   part's box centre is massproperties' "no material" (not compared); id-only region queries as many as the last
   sketch's regions are its regions (older documents); a sketch plane named by id alone is ours where live's frame

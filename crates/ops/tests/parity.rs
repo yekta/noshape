@@ -107,7 +107,18 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
             res.matching += 1;
             res.custom_matching += usize::from(step.custom);
         } else if res.first.is_none() {
-            let kind = if failed_run { "custom feature failed to run" } else if step.custom && step.ours.is_none() { "custom feature failed to compile / load" } else { step.feature_type.as_str() };
+            // An input we couldn't place (live's geometry missing or a query
+            // form not translated): the difference may be ours, not the model's.
+            let unmapped = step.problems.iter().any(|p| p.contains("query not mapped") || p.contains("no entity of ours") || p.contains("was not built") || p.contains("not built:"));
+            let kind = if failed_run {
+                "custom feature failed to run"
+            } else if step.custom && step.ours.is_none() {
+                "custom feature failed to compile / load"
+            } else if unmapped {
+                "translation incomplete"
+            } else {
+                step.feature_type.as_str()
+            };
             res.first = Some(format!("feature {k} \"{}\" ({kind}): {}", step.name, diff.join("; ")));
         }
     }
