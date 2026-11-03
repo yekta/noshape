@@ -378,7 +378,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   ours, so the public Laser Joint's corner overcuts (concave edges the pin cuts made) find nothing and fail "Cannot
   resolve entities." (its defaults match live exactly: 23500 / 24000 mm³, 14 faces each). Live asked what a Boolean
   creates (REQUESTS 03:00). T2 custom_features::public_laser_joint_as_live, boolean_created_edges_probe.
-- [ ] P2 SKETCH-TANGENT-SPLINE-CIRCLE (skasm; found by core 11-03 running Onshape's public Spur Gear, live 1830) a
+- [x] 20ca6c36 (skasm 11-03: contact tangency; root fillet r 0.5683, defaults 2417.31 mm3 in live's band; the T2 now reaches its "changed" case (40 teeth, module 2, 8 mm hole): 3670.08 mm3 / 203 faces vs live 4029.02–4062.76, root fillet r 0.675 mm: a separate difference, for the test's owner) P2 SKETCH-TANGENT-SPLINE-CIRCLE (skasm; found by core 11-03 running Onshape's public Spur Gear, live 1830) a
   construction circle constrained tangent to a fixed circle and to two fixed fitted splines solves to the wrong circle:
   the gear's root-fillet circle (createTooth: skCircle "fillet" at regionPoint r 0.1 mm, TANGENT to "dedendum" r 11.25 and
   to "spline1" / "spline2", the involutes fitted through 30 points each, all three FIXed) comes out r 0.2864 mm; the
