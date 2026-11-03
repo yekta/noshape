@@ -322,8 +322,9 @@ fn everyday(seed: u64) -> Case {
         // 541, three more; batch 12 on, seed 621, three more; batch 13 on,
         // seed 661, three more; batch 14 on, seed 701, three more; batch 15
         // on, seed 741, three more; batch 16 on, seed 781, three more; batch
-        // 17 on, seed 821, three more; batch 18 on, seed 861, three more.)
-        match r.below(if seed >= 861 { 38 } else if seed >= 821 { 35 } else if seed >= 781 { 32 } else if seed >= 741 { 29 } else if seed >= 701 { 26 } else if seed >= 661 { 23 } else if seed >= 621 { 20 } else if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
+        // 17 on, seed 821, three more; batch 18 on, seed 861, three more;
+        // batch 19 on, seed 901, three more.)
+        match r.below(if seed >= 901 { 41 } else if seed >= 861 { 38 } else if seed >= 821 { 35 } else if seed >= 781 { 32 } else if seed >= 741 { 29 } else if seed >= 701 { 26 } else if seed >= 661 { 23 } else if seed >= 621 { 20 } else if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
             // Corner rectangle (live's tool constraints), width and height.
             0 => {
                 let (w, h) = (r.range(15.0, 50.0), r.range(10.0, 35.0));
@@ -1123,6 +1124,99 @@ fn everyday(seed: u64) -> Case {
                 c.distance(&format!("{m4}.center"), &l[3], w * 0.25 * fs[4]);
                 c.distance(&format!("{m4}.center"), &l[0], h * 0.5 * fs[5]);
             }
+            // Tombstone: a Horizontal bottom, two Vertical sides and a
+            // half-circle arc over them, Tangent to both; the bottom's and a
+            // side's lengths.
+            38 => {
+                let (w, h) = (r.range(20.0, 40.0), r.range(15.0, 35.0));
+                let rad = w / 2.0;
+                let l1 = c.line(o, o + v(w, 0.0));
+                let l2 = c.line(o + v(w, 0.0), o + v(w, h));
+                let a3 = c.arc(o + v(rad, h), rad, 0.0, PI);
+                let l4 = c.line(o + v(0.0, h), o);
+                c.coincident(&format!("{l1}.end"), &format!("{l2}.start"));
+                c.coincident(&format!("{l2}.end"), &format!("{a3}.start"));
+                c.coincident(&format!("{a3}.end"), &format!("{l4}.start"));
+                c.coincident(&format!("{l4}.end"), &format!("{l1}.start"));
+                c.pair("TANGENT", &l2, &a3);
+                c.pair("TANGENT", &a3, &l4);
+                c.hv(true, &l1);
+                c.hv(false, &l2);
+                c.hv(false, &l4);
+                let (fw, fh) = (f(&mut r), f(&mut r));
+                c.length(&l1, w * fw);
+                c.length(&l4, h * fh);
+            }
+            // Link with holes: a lever (two arcs, two tangent lines, the
+            // centres on a Horizontal construction line) with a hole
+            // Concentric with each arc; the centre distance, the big radius
+            // and both holes' diameters.
+            39 => {
+                let (d, r1) = (r.range(30.0, 60.0), r.range(8.0, 14.0));
+                let r2 = r1 * r.range(0.5, 0.85);
+                let (c1, c2) = (o, o + v(d, 0.0));
+                let nx = (r1 - r2) / d;
+                let th = (1.0 - nx * nx).sqrt().atan2(nx);
+                let n = DVec2::from_angle(th);
+                let nb = v(n.x, -n.y);
+                let a1 = c.arc(c1, r1, th, 2.0 * PI - th);
+                let l2 = c.line(c1 + nb * r1, c2 + nb * r2);
+                let a3 = c.arc(c2, r2, -th, th);
+                let l4 = c.line(c2 + n * r2, c1 + n * r1);
+                c.coincident(&format!("{a1}.end"), &format!("{l2}.start"));
+                c.coincident(&format!("{l2}.end"), &format!("{a3}.start"));
+                c.coincident(&format!("{a3}.end"), &format!("{l4}.start"));
+                c.coincident(&format!("{l4}.end"), &format!("{a1}.start"));
+                for (a, b) in [(&a1, &l2), (&l2, &a3), (&a3, &l4), (&l4, &a1)] {
+                    c.pair("TANGENT", a, b);
+                }
+                let axis = c.line(c1, c2);
+                c.construction(&axis);
+                c.coincident(&format!("{axis}.start"), &format!("{a1}.center"));
+                c.coincident(&format!("{axis}.end"), &format!("{a3}.center"));
+                c.hv(true, &axis);
+                let h1 = c.circle(c1, r1 * 0.5);
+                let h2 = c.circle(c2, r2 * 0.5);
+                c.pair("CONCENTRIC", &a1, &h1);
+                c.pair("CONCENTRIC", &a3, &h2);
+                let fs: Vec<f64> = (0..4).map(|_| f(&mut r)).collect();
+                c.length(&axis, d * fs[0]);
+                c.radius(&a1, r1 * fs[1], false);
+                c.radius(&h1, r1 * 0.5 * fs[2].min(fs[1]), true);
+                c.radius(&h2, (r2 * 0.5 * fs[3]).min(r1 * fs[1] * 0.45), true);
+            }
+            // Plate with two holes in a row: a corner rectangle, width and
+            // height; two Equal holes level with each other, the first's
+            // diameter and distances to the left and bottom sides, their
+            // spacing.
+            40 => {
+                let (w, h) = (r.range(40.0, 60.0), r.range(20.0, 35.0));
+                let p = [o, o + v(w, 0.0), o + v(w, h), o + v(0.0, h)];
+                let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+                for i in 0..4 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+                }
+                c.pair("PERPENDICULAR", &l[2], &l[3]);
+                c.pair("PARALLEL", &l[0], &l[2]);
+                c.pair("PARALLEL", &l[3], &l[1]);
+                c.hv(true, &l[2]);
+                let (x0, y0, gap, rad) = (w * 0.25, h * 0.5, w * 0.5, h * 0.12);
+                let k1 = c.circle(o + v(x0, y0), rad);
+                let k2 = c.circle(o + v(x0 + gap, y0), rad);
+                c.pair("EQUAL", &k1, &k2);
+                let level = c.line(o + v(x0, y0), o + v(x0 + gap, y0));
+                c.construction(&level);
+                c.coincident(&format!("{level}.start"), &format!("{k1}.center"));
+                c.coincident(&format!("{level}.end"), &format!("{k2}.center"));
+                c.hv(true, &level);
+                let fs: Vec<f64> = (0..6).map(|_| f(&mut r)).collect();
+                c.length(&l[0], w * fs[0]);
+                c.length(&l[1], h * fs[1]);
+                c.radius(&k1, rad * fs[2], true);
+                c.distance(&format!("{k1}.center"), &l[3], x0 * fs[3]);
+                c.distance(&format!("{k1}.center"), &l[0], y0 * fs[4]);
+                c.length(&level, gap * fs[5]);
+            }
             // D shape: a Horizontal chord and an arc over it, the chord's
             // length and the arc's radius.
             _ => {
@@ -1434,7 +1528,7 @@ fn write_batch() {
 }
 
 /// The batches: (number, first seed, rich).
-const BATCHES: [(usize, u64, bool); 18] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true), (12, 621, true), (13, 661, true), (14, 701, true), (15, 741, true), (16, 781, true), (17, 821, true), (18, 861, true)];
+const BATCHES: [(usize, u64, bool); 19] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true), (12, 621, true), (13, 661, true), (14, 701, true), (15, 741, true), (16, 781, true), (17, 821, true), (18, 861, true), (19, 901, true)];
 
 /// Batch 8's s464 / s475 stay as live answered: a component the pass can't
 /// close (a hexagon) takes the least change on its own, the rounded
