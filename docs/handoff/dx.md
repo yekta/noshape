@@ -877,7 +877,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   Part Studio crashed the kernel on 3 parts (OCCT 8.0.1 SweptToElementary null face): fixed f2279b3c.
 
 ## Next (in order, after landing)
-0. Model parity suite (top item): the daily run (16:13 UTC, /root/dx-scratch/pm-daily.sh: copies live's corpus to
+0. Model parity suite (top item): assembly phase groundwork landed 11-03 09:00: `Translator::open_in` (a Part
+   Studio into a new tab of the open document; calls taking `tab` get it) and `place` (an instance at live's
+   occurrence transform), T1 a_second_part_studio_goes_into_its_own_tab. Next when live's first assembly arrives
+   (request 1852, layout of 1842): instances by partId (the studio's live.jsonl bodies), mates from BTMMate-64
+   (mate connectors: BTMFeatureQueryWithOccurrence-157 / BTMInferenceQueryWithOccurrence-1083), compare occurrence
+   transforms and mate statuses.
+   Daily: the daily run (16:13 UTC, /root/dx-scratch/pm-daily.sh: copies live's corpus to
    vibe5, runs parity_models, report.json beside the models, prints the SCORE.md row); rerun when live refetches the
    7 documents the REST 429 stopped (INCOMPLETE.txt); every new first difference: translator fix or a ticket for its
    area. Then the next phases as live brings them: assemblies (request filed 11-03 06:15 for one small assembly in
