@@ -71,6 +71,9 @@ Measured on the real path, 03:55's substeps had slowed a1000's drag frame 8.2 ->
 while the steps land (substeps only for turns / held-off drags; poses as before within 1e-6 mm). vibe3 release,
 substeps -> now: a200 in-plane drag 0.89 -> 0.22 ms, off-plane 1.07 -> 1.06, 1000 pins 0.64 -> 0.16, a1000 frame
 10.6 -> 3.7 ms (270 fps).
+GUI note (10:40): on :103 an assembly drag shows no motion until release, in green too: NOSHAPE_PERF shows the drag
+solves running (2–7 ms) but llvmpipe frames taking 3.7–4.1 s (g.submit_to_frame) on the loaded box; not the app.
+Use a fresh NOSHAPE_CONFIG_DIR for GUI checks (the shared config has a feature panel dragged across the window).
 
 ## State at 01:30 UTC
 Landed overnight (all on main by dabe8513): sketch drag far hold (g6) and levels + farthest point (g4); drag from the
