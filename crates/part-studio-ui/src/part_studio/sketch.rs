@@ -4150,6 +4150,35 @@ impl PartStudioView {
         bar.child(crate::ui::tool_group(SharedString::from(format!("skg-c-{key}")), main, caret))
     }
 
+    /// Sketch row menu "Paste into sketch" (live ui-parity feature-row-rclick-sketch): the sketch opens and the
+    /// copied sketch entities (or a copied sketch's) are pasted into it.
+    pub(super) fn paste_into_sketch(&mut self, id: noshape_model::reference::FeatureId, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) else { return };
+        // A copied sketch (Copy sketch) pastes as its entities.
+        let text = match serde_json::from_str::<serde_json::Value>(&text).ok().and_then(|v| v.get("noshape_features").cloned()) {
+            Some(features) => {
+                let sketch = serde_json::from_value::<Vec<noshape_model::partstudio::Feature>>(features).ok().and_then(|fs| {
+                    fs.into_iter().find_map(|f| match f.params.get("sketch") {
+                        Some(noshape_model::ParamValue::Sketch(d)) => Some(d.sketch.clone()),
+                        _ => None,
+                    })
+                });
+                match sketch {
+                    Some(sk) => serde_json::json!({ "noshape_sketch_entities": sk }).to_string(),
+                    None => return,
+                }
+            }
+            None => text,
+        };
+        self.edit_feature(id, window, cx);
+        cx.defer_in(window, move |this, window, cx| {
+            if this.with_sketch(cx, |ed, data| ed.paste_clipboard(data, &text)) == Some(true) {
+                this.regen_sync(window, cx);
+            }
+            cx.notify();
+        });
+    }
+
     fn paste_sketch_entities(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) else { return };
         if self.with_sketch(cx, |ed, data| ed.paste_clipboard(data, &text)) == Some(true) {

@@ -120,7 +120,9 @@ fn control_name(t: &Value) -> Option<String> {
     // A chip's × (`"index"`: which chip, the first by default), a row's eye; other buttons go by their tooltip.
     match t.get("button").and_then(Value::as_str) {
         Some("x") => return t.get("field").and_then(Value::as_str).map(|f| format!("button:x:{f}:{}", t.get("index").and_then(Value::as_u64).unwrap_or(0))),
-        Some("eye") => return t.get("feature").and_then(Value::as_str).map(|f| format!("button:eye:{f}")),
+        Some("eye") => {
+            return t.get("feature").and_then(Value::as_str).map(|f| format!("button:eye:{f}")).or_else(|| t.get("part").and_then(Value::as_str).map(|p| format!("button:eye-part:{p}")));
+        }
         Some(b) => return Some(format!("button:{b}")),
         None => {}
     }

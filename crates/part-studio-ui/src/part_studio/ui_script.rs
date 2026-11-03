@@ -5,6 +5,7 @@
 
 use super::*;
 use glam::{DVec2, DVec3};
+use gpui_kit::component::input::InputState;
 use serde_json::{Value, json};
 
 impl PartStudioView {
@@ -17,6 +18,11 @@ impl PartStudioView {
             f
         } else if let Some(st) = dim_box {
             crate::feature_dialog::field_focus("dimension", st)
+        } else if let Some(st) = self.unlabelled_input_focused(window, cx) {
+            // A row being renamed, the folder name popup: inputs without a label (live).
+            let mut f = crate::feature_dialog::field_focus("", st);
+            f["label"] = Value::Null;
+            f
         } else if filter_focused {
             let text = self.ui.filter.as_ref().map(|f| f.0.read(cx).value().to_string()).unwrap_or_default();
             json!({ "kind": "filter", "label": "Filter by name or type", "text": text, "selection": null, "all": false })
@@ -58,33 +64,41 @@ impl PartStudioView {
         // The edited row is drawn selected (live marks it selected and editing).
         let (rows, rollback_after) = match self.studio(cx) {
             Some(s) => {
-                let rollback = s.rollback_index();
+                // The rows as the list draws them (folders, collapsed ones closed; the bar's place).
+                let (items, rollback) = self.list_items(s, cx);
                 let editing = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
                 let related = self.related_features(cx);
-                let rows: Vec<Value> = s
-                    .features
-                    .iter()
-                    .enumerate()
-                    .map(|(i, f)| {
-                        // As the row draws it: the edited feature is red while its dialog holds an invalid value.
-                        let status = if editing == Some(f.id) && self.edit_invalid(cx) { Some(FeatureStatus::Error) } else { self.display.feature_state(f.id).map(|s| s.status) };
-                        let state = if i >= rollback {
-                            "rolled-back"
-                        } else if f.suppressed {
-                            "suppressed"
-                        } else {
-                            match status {
-                                Some(FeatureStatus::Error) => "error",
-                                Some(FeatureStatus::Warning) => "warning",
-                                Some(FeatureStatus::Info) => "info",
-                                Some(FeatureStatus::Suppressed) => "suppressed",
-                                _ => "ok",
-                            }
-                        };
-                        json!({ "name": self.shown_feature_name(f, cx), "state": state, "selected": self.selected_features.contains(&f.id) || editing == Some(f.id), "editing": editing == Some(f.id), "related": related.contains(&f.id), "hidden": f.hidden && !(editing.is_some() && related.contains(&f.id)) })
-                    })
-                    .collect();
-                let after = rollback.checked_sub(1).and_then(|i| s.features.get(i)).map(|f| self.shown_feature_name(f, cx));
+                let index = |id: FeatureId| s.features.iter().position(|f| f.id == id);
+                let mut rows: Vec<Value> = Vec::new();
+                let mut after = None;
+                for item in &items {
+                    match item {
+                        super::ListItem::Feature(_, id) => {
+                            let (Some(i), Some(f)) = (index(*id), s.feature(*id)) else { continue };
+                            // As the row draws it: the edited feature is red while its dialog holds an invalid value.
+                            let status = if editing == Some(f.id) && self.edit_invalid(cx) { Some(FeatureStatus::Error) } else { self.display.feature_state(f.id).map(|s| s.status) };
+                            let state = if i >= rollback {
+                                "rolled-back"
+                            } else if f.suppressed {
+                                "suppressed"
+                            } else {
+                                match status {
+                                    Some(FeatureStatus::Error) => "error",
+                                    Some(FeatureStatus::Warning) => "warning",
+                                    Some(FeatureStatus::Info) => "info",
+                                    Some(FeatureStatus::Suppressed) => "suppressed",
+                                    _ => "ok",
+                                }
+                            };
+                            rows.push(json!({ "name": self.shown_feature_name(f, cx), "state": state, "selected": self.selected_features.contains(&f.id) || editing == Some(f.id), "editing": editing == Some(f.id), "related": related.contains(&f.id), "hidden": f.hidden && !(editing.is_some() && related.contains(&f.id)) }));
+                        }
+                        // A new folder's row is related-highlighted until the next click (live ui 10-25 b (1)).
+                        super::ListItem::Folder(_, fd) => rows.push(json!({ "name": fd.name, "state": "ok", "selected": self.ui.selected_folder == Some(fd.id), "editing": false, "related": self.ui.fresh_folder == Some(fd.id), "hidden": false })),
+                        // At the top the bar sits under Default geometry (live).
+                        super::ListItem::Rollback(..) => after = Some(rows.last().and_then(|r| r["name"].as_str()).unwrap_or("Default geometry").to_string()),
+                        _ => {}
+                    }
+                }
                 (rows, after)
             }
             None => (Vec::new(), None),
@@ -103,6 +117,12 @@ impl PartStudioView {
         })
     }
 
+    /// The focused rename or folder name input, if any.
+    fn unlabelled_input_focused<'a>(&self, window: &Window, cx: &'a App) -> Option<&'a InputState> {
+        let inputs = self.renaming.as_ref().map(|r| &r.1).into_iter().chain(self.folder_prompt.as_ref().map(|f| &f.0)).chain(self.ui.part_renaming.as_ref().map(|r| &r.1)).chain(self.ui.dg_renaming.as_ref().map(|r| &r.1));
+        inputs.map(|e| e.read(cx)).find(|st| st.focus_handle(cx).is_focused(window))
+    }
+
     /// Where target `t` (a geometry target of tests/ui-parity/README.md)
     /// shows, in window coordinates.
     pub fn ui_target_point(&self, t: &Value, cx: &App) -> Result<Point<Pixels>, String> {
@@ -111,6 +131,28 @@ impl PartStudioView {
             let a = v.as_array()?;
             Some(DVec3::new(a.first()?.as_f64()?, a.get(1)?.as_f64()?, a.get(2).and_then(Value::as_f64).unwrap_or(0.0)) * 1e-3)
         };
+        if let Some(name) = t.get("view_cube").and_then(Value::as_str) {
+            let cell = match name {
+                "Top" => [0, 0, 1],
+                "Bottom" => [0, 0, -1],
+                "Front" => [0, -1, 0],
+                "Back" => [0, 1, 0],
+                "Right" => [1, 0, 0],
+                "Left" => [-1, 0, 0],
+                "Isometric" => [1, -1, 1],
+                _ => return Err(format!("no view cube cell {name}")),
+            };
+            let origin = self.ui.cube_origin.ok_or("the view cube isn't drawn")?;
+            let rot = vp.camera.rotation;
+            // The points the cube's own hit test gives to that cell; their centre (pixels from the widget centre, y up).
+            let hits: Vec<DVec2> = (-25..=25).flat_map(|i| (-25..=25).map(move |j| DVec2::new(i as f64 * 3.0, j as f64 * 3.0))).filter(|p| super::view_cube::widget_hit(rot, *p) == Some(super::view_cube::CubeCell(cell))).collect();
+            if hits.is_empty() {
+                return Err(format!("the view cube's {name} isn't visible"));
+            }
+            let c = hits.iter().sum::<DVec2>() / hits.len() as f64;
+            let center = DVec2::from(noshape_render::overlay::view_cube::CENTER);
+            return Ok(origin + point(px((center.x + c.x) as f32), px((center.y - c.y) as f32)));
+        }
         let world = if let Some(name) = t.get("plane").and_then(Value::as_str) {
             let p = self.display.planes.iter().find(|p| p.name == name && !p.hidden).ok_or_else(|| format!("no shown plane {name}"))?;
             // Inside the rectangle near its labelled corner, clear of the other planes.

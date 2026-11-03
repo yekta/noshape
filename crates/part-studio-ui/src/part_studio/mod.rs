@@ -3087,13 +3087,9 @@ impl PartStudioView {
             .into_any_element()
     }
 
-    /// The features list's rows, in their own cached slice (see `PsSlices`);
-    /// the head is `render_feature_list_head`.
-    fn render_feature_list(&mut self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
-        // The model is only borrowed (not cloned): walk it into what the rows
-        // are, then build them.
-        let Some(studio) = self.studio(cx) else { return div().into_any_element() };
+    /// The feature list's rows in order (folders, features, the rollback bar, …) as drawn, and the rollback
+    /// index they show (editing rolls the model to just after the edited feature).
+    fn list_items(&self, studio: &noshape_model::partstudio::PartStudio, cx: &App) -> (Vec<ListItem>, usize) {
         let n_features = studio.features.len();
         let rollback = studio.rollback_index();
         // Editing a feature rolls the model to just after it: the rows
@@ -3104,7 +3100,6 @@ impl PartStudioView {
             _ => rollback,
         };
         let filtered = self.filtered(cx);
-        let hidden_defaults = studio.hidden_defaults.clone();
         let editing_id = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
         let editing_new_at = self.edit.as_ref().filter(|e| e.is_new).map(|e| e.index);
         // The Folder name popup sits beside the first selected feature, or
@@ -3210,6 +3205,20 @@ impl PartStudioView {
         if prompt_anchor == Some(None) {
             items.push(ListItem::Prompt);
         }
+        (items, rollback)
+    }
+
+    /// The features list's rows, in their own cached slice (see `PsSlices`);
+    /// the head is `render_feature_list_head`.
+    fn render_feature_list(&mut self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        // The model is only borrowed (not cloned): walk it into what the rows
+        // are, then build them.
+        let Some(studio) = self.studio(cx) else { return div().into_any_element() };
+        let (items, rollback) = self.list_items(studio, cx);
+        let filtered = self.filtered(cx);
+        let hidden_defaults = studio.hidden_defaults.clone();
+        let editing_id = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
         let (appearances, first_config_input) = match self.studio(cx) {
             Some(s) => (
                 s.appearances
@@ -3976,6 +3985,7 @@ impl PartStudioView {
             .child(
                 div()
                     .id(SharedString::from(format!("part-eye-{}", b.id)))
+                    .map(|d| crate::ui_script::mark(d, || format!("button:eye-part:{}", b.name)))
                     .mr(px(9.))
                     .when(renaming, |d| d.hidden())
                     .when(!hidden, |d| crate::ui::hover_reveal(d, "part-row"))
@@ -5012,11 +5022,16 @@ impl PartStudioView {
                 let v = view.clone();
                 crate::os_menu::OsMenuItem::new(label.to_string()).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
             };
-            let targets = move |this: &PartStudioView| if this.selected_features.contains(&id) { this.selected_features.clone() } else { vec![id] };
-            let multi = {
-                let this = view.read(cx);
-                this.selected_features.len() > 1 && this.selected_features.contains(&id)
+            // Live (ui-parity feature-row-rclick-other-selected): right-clicking a row outside the selection
+            // keeps the selection and the menu acts on it and the row.
+            let targets = move |this: &PartStudioView| {
+                let mut t = this.selected_features.clone();
+                if !t.contains(&id) {
+                    t.push(id);
+                }
+                t
             };
+            let multi = targets(view.read(cx)).len() > 1;
             // Live (assembly/142): once an expression is set the row offers
             // "Unsuppress" (drops the expression) and "Edit dynamic
             // suppression" in place of Suppress and the submenu.
@@ -5073,7 +5088,7 @@ impl PartStudioView {
                 // kind its own appearance item.
                 let (sketches, others): (Vec<FeatureId>, Vec<FeatureId>) = {
                     let this = view.read(cx);
-                    this.selected_features.iter().copied().partition(|f| this.display.sketches.iter().any(|s| s.feature == *f))
+                    targets(this).into_iter().partition(|f| this.display.sketches.iter().any(|s| s.feature == *f))
                 };
                 let (sketches_shown, planes, sketch_swatch) = {
                     let this = view.read(cx);
@@ -5104,8 +5119,9 @@ impl PartStudioView {
                     // Sketches alone: Hide (or Show) them.
                     let refs: Vec<Reference> = sketches.iter().map(|f| Reference::Feature(*f)).collect();
                     m = m.item(item(if sketches_shown { "Hide" } else { "Show" }, Box::new(move |this, _, cx| this.set_visibility(&refs, sketches_shown, cx))));
-                } else if let Some(&keep) = sketches.first() {
-                    // A sketch with other features: Hide other / all sketches.
+                } else if let Some(&keep) = sketches.first().filter(|_| sketches_shown) {
+                    // A shown sketch with other features: Hide other / all sketches (a hidden one has none, live
+                    // ui-parity feature-row-rclick-other-selected).
                     m = m.item(item("Hide other sketches", Box::new(move |this, _, cx| this.hide_sketches(Some(keep), cx)))).item(item("Hide all sketches", Box::new(|this, _, cx| this.hide_sketches(None, cx))));
                 }
                 if !sketches.is_empty() || planes {
@@ -5187,7 +5203,9 @@ impl PartStudioView {
                 m = m.item(item(&format!("Edit {shown}…"), Box::new(move |this, w, cx| this.edit_feature(sid, w, cx))));
             }
             if is_sketch {
-                m = m.item(item("Copy sketch", Box::new(move |this, _, cx| this.copy_sketch(id, cx))));
+                m = m
+                    .item(item("Copy sketch", Box::new(move |this, _, cx| this.copy_sketch(id, cx))))
+                    .item(item("Paste into sketch", Box::new(move |this, w, cx| this.paste_into_sketch(id, w, cx))));
             }
             if is_sketch || source_sketch.is_some() {
                 m = m.item(item("Show dimensions", Box::new(move |this, w, cx| {

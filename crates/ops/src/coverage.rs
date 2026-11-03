@@ -554,6 +554,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Revolve…", Op("feature_add")),
     ("partStudio:Construction", Op("sketch_set_construction")),
     ("partStudio:Paste inputs", Op("config_copy_inputs")),
+    ("partStudio:Paste into sketch", Op("sketch_copy_entities")),
     ("partStudio:Paste sketch entities", Op("sketch_copy_entities")),
     ("partStudio:Paste sketch", Op("sketch_paste")),
     ("partStudio:Properties…", Op("part_set_properties")),
