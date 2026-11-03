@@ -1004,18 +1004,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   Part Studio crashed the kernel on 3 parts (OCCT 8.0.1 SweptToElementary null face): fixed f2279b3c.
 
 ## Next (in order, after landing)
-0. Model parity suite (top item): assembly phase groundwork landed 11-03 09:00: `Translator::open_in` (a Part
-   Studio into a new tab of the open document; calls taking `tab` get it) and `place` (an instance at live's
-   occurrence transform), T1 a_second_part_studio_goes_into_its_own_tab. Next when live's first assembly arrives
-   (request 1852, layout of 1842): instances by partId (the studio's live.jsonl bodies), mates from BTMMate-64
-   (mate connectors: BTMFeatureQueryWithOccurrence-157 / BTMInferenceQueryWithOccurrence-1083), compare occurrence
-   transforms and mate statuses.
-   Daily: the daily run (16:13 UTC, /root/dx-scratch/pm-daily.sh: copies live's corpus to
-   vibe5, runs parity_models, report.json beside the models, prints the SCORE.md row); rerun when live refetches the
-   7 documents the REST 429 stopped (INCOMPLETE.txt); every new first difference: translator fix or a ticket for its
-   area. Then the next phases as live brings them: assemblies (request filed 11-03 06:15 for one small assembly in
-   1842's layout), sheet metal (bracket00-ira), custom features (featureStudios), spline end derivatives once
-   SKETCH-SPLINE-CENTRIPETAL lands (ours then interpolates as Onshape; the translator must set the handles).
+0. Model parity suite (top item). Assemblies: done (parity_assemblies, NOSHAPE_PARITY_ASSEMBLIES; live's asm-*
+   layout of 1842 with studios/<eid>.json + .live.jsonl; 8/8 with live's asm-hinge-live; rsync /root/parity/models/asm-*
+   and /root/parity/asm-dx/* to vibe5 ~/agents/dx/asm-live first). Daily run 16:13 UTC (/root/dx-scratch/pm-daily.sh).
+   On each live refetch (UI fetch now with face boxes / planes; 18 documents still ids-only at 14:20): rerun, then every
+   new first difference is a translator fix or a ticket. Open asks to live: 1892 (geometry), 13:20 (lagging lines,
+   empty in-feature mate connector queries), 1879 (Hole INFO), 1878 (imports at their versions), 1882 (suggested
+   views), 1835 (explode lines). Translator gaps known: HOLE_FACE other than "tip", constraints to external geometry,
+   PROJECTED / OFFSET / CIRCULAR_PATTERN constraints, spline end derivatives (after SKETCH-SPLINE-CENTRIPETAL).
 1. Import numbers: the remaining ✗ rows of docs/parity/workflow-import-matrix.md (g50 F8 / F19, McMaster helix; kern).
 2. API: render_image of the window camera (image size).
 3. Drawings (P2): selectable PDF compared with live's (dx-pdf-selectable.pdf): one embedded NotoSans CID TrueType
