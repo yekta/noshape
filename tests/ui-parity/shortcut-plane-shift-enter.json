@@ -20,7 +20,7 @@
   {
    "do": "click",
    "on": {
-    "field": "Distance"
+    "field": "Offset distance"
    }
   },
   {

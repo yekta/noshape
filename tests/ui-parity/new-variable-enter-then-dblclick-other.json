@@ -6,10 +6,16 @@
  "start": "block",
  "steps": [
   {
-   "do": "click",
-   "on": {
-    "tool": "Variable"
-   }
+   "do": "key",
+   "key": "alt+c"
+  },
+  {
+   "do": "type",
+   "text": "Variable"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
   },
   {
    "do": "type",

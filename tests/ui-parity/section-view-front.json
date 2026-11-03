@@ -8,7 +8,7 @@
   {
    "do": "click",
    "on": {
-    "tool": "Section view"
+    "button": "Section view"
    }
   },
   {

@@ -14,7 +14,7 @@
   {
    "do": "click",
    "on": {
-    "tool": "Mass properties"
+    "button": "Mass properties"
    }
   }
  ]
