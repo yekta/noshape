@@ -6,7 +6,7 @@ probes 4 / asm drag 3 fixtures, SKETCH-UNDO-REDO-STATE reopen (history starts wh
 SKETCH-TANGENT-SPLINE-CIRCLE (queued: circle / arc Tangent to an unjoined fit spline = contact, EqKind::FitContact;
 the Spur Gear's defaults now in live's band, its "changed" case 3670 vs 4029–4063 mm3 noted in the ticket for its
 owner). 04:50: s555 fixed (pair rung: the changed leg with its joined Equal partner, anchored neighbours held);
-batch 10 38/40. Next, in order: s556 / s547 (rounded corner: height / radius), then the P2 fuzz list. Older state
+batch 10 38/40; 05:00 s547 fixed (corner arcs slide early), 39/40. Next: s556 (height + width), then the P2 fuzz list. Older state
 follows.
 
 ## State at 01:30 UTC
