@@ -808,6 +808,14 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
 ## Requests to the lead (qa, updated 2026-11-03 01:40)
+- **11-03 06:50:** **no release cut yet** (none at 05:00; `gh run list -R yekta/noshape -w Release`); when it comes: the
+  artifact checks, `bash /tmp/qa-relsmoke.sh 0.4.23 v0422`, /tmp/qa-relgui423.sh (made), /tmp/qa-mem423.sh (made), the
+  updater on :149. Since 04:15: BLEND-TOL-REGEN-CHANGES fixed by core 08632c09, verified on 0531f66e; CRASH-2045: core's
+  3fcc69d8 fixes the saved-document repro, but the seed-2045 fuzz session still dies 5 in 10 (gdb: inside malloc /
+  dropping a cached body; tickets/crash2045/gdb-3fcc-*.txt); SKETCH-UNDO-REDO-STATE verified (24d2ebc7). SCORE.md: dx
+  wrote the first row (models 4/11, features 51/78); qa added scenarios 71/112 (be4a7caa). The watch now fires GREEN only
+  for core / bool / psui / skasm commits that aren't handoffs, T2 or ticket notes (dx's translator commits don't change
+  what qa tests). Copies: green/p noshape-0531f66e, -1f446b18; keep/x/y noshape-3fcc69d8 (CRASH-2045 traces).
 - **11-03 04:15:** 05:00 list written (no blocker). Found since 02:00: **P0 CRASH-2045** (a 43-feature fuzz document
   crashes the CLI / app on regeneration 2–5 runs in 5, Rust Boolean on; in v0.4.18–v0.4.22 too; gdb: a later fillet's
   input shape already corrupt; repro tickets/crash2045/del1.py), **P1 BLEND-TOL-REGEN-CHANGES** (core eca0da09: fuzz
