@@ -7,6 +7,21 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 right (7607.301), mirror set and cli-fillet-segv right; published 08:43:30 (all three bundles); the release tarball is byte-identical to the smoked artifact.
 Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfmir2 B P0.
 
+**v0.4.23 (published 10:49, cut d609ce58 = bdbba238 + bump; Release run 41614276445) smoked 11:10: good, no blocker.**
+Artifacts: the published Linux tarball, CLI tarball and .deb are byte-identical to the run's linux-x86_64 artifact;
+SHA256SUMS OK. CLI / app as CLI "0.4.23"; round trip Parasolid / ACIS / STEP / IGES / JT / Rhino 67643.716875 / 18 (=
+v0.4.22); volume sweep and the 44 ticket documents = v0.4.22 except cli-shell-gpf's Shell 3 and cli-shell-hang-pre's
+Shell 5, which build now (core's SHELL-HANG-5 work, expected); cli-suppress-segv 23 parts Rust on / off (= v0.4.22 and
+greens); CRASH-2045's saved document 4 / 4 fine (3fcc69d8 is in; the fuzz session still crashes on that code, ticket open);
+fixed tickets hold (SM-CLOSED-BUTT, RUST-MIRROR-NEGATIVE, CRASH-957, wf-block, slow1151 1.5 s). The user's cases: knurl
+Ø25 × 25 CP12 Ok 9.7 s 11598.041; vase loft 3 faces, Shells 47331.776 / 58694.861 / 63464.509; split-and-chamfer one
+part; Y Ribs Ok. App rows (mirror set, P0 repros, mirror-blind-hole, smA-15, g34, c14) pixel-identical to v0.4.21.
+Memory: seed 508 peak 652 MB, 685 595 MB. **Updater: v0.4.22 → v0.4.23 works**: the installed app on :149 fetched the
+feed at 10:50:32 (1.5 min after publish), staged it at 10:50:39, the navbar showed "Updated — restart to finish",
+Restart → `noshape --version` 0.4.23 and g34 reopened (qa-scratch/upd423-0c.png, upd423-1.png). In it: BLEND-TOL fix,
+VAR-AUTOCOMPLETE-ENTER's psui fixes, CRASH-2045's saved-document fix; not in it: the later sketch undo, feature-row,
+variable-focus fixes (after bdbba238). Release fuzz on v0.4.23 running (/tmp/qa-cfloop69.sh, seeds 2481–2540).
+
 ## Session 7 (qa, pinned account, from 11-02 22:40; greens bc7d7e9f → 6b4704f2)
 
 - **11-03 08:14:** no release yet. Verified since 07:40: SKETCH-UNDO-REDO-STATE (aeef5eab, = live's recording;

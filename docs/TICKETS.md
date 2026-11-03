@@ -75,6 +75,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-03 05:00 release (qa list 04:15, newest green 8d4a5b85)
+- **qa 11:10: v0.4.23 (published 10:49 from bdbba238, the 05:00 cut made late) smoked: good.** Artifacts = the run's; CLI smoke, ticket documents, the user's four cases, app rows, memory all as expected; the updater took v0.4.22 → v0.4.23 on :149. Details at the top of docs/handoff/qa.md.
 - **qa 06:50: BLEND-TOL-REGEN-CHANGES fixed and verified on green 0531f66e** (08632c09): the 44 ticket documents = bad1de8e but the intended Shell 5. CRASH-2045: core's 3fcc69d8 fixes the saved document; the fuzz session still dies 5 in 10 (in every release since v0.4.18 too). No release cut yet at 06:50.
 - **qa 04:15: no blocker; nothing qa knows needs the cut stopped.** Checked on green 04b98258: CLI round trip = v0.4.22;
   volume sweep and the 44 ticket documents = v0.4.22 except the fuzz documents BLEND-TOL-REGEN-CHANGES lists (P1, core
