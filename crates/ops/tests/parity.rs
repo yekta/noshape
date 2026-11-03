@@ -158,7 +158,8 @@ fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
             features["foreignFiles"][id] = json!({ "path": dir.join("imports").join(file).to_string_lossy(), "placed": placed });
         }
     }
-    let live = std::fs::read_to_string(dir.join("live.jsonl")).unwrap_or_default().lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).filter(|l| l.get("index").is_some()).collect();
+    // The states after each feature, and the last line's regeneration times.
+    let live = std::fs::read_to_string(dir.join("live.jsonl")).unwrap_or_default().lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).filter(|l| l.get("index").is_some() || l.get("full_regen_ms").is_some()).collect();
     let refs = std::fs::read_to_string(dir.join("refs.jsonl")).unwrap_or_default();
     Some((features, live, refs))
 }
@@ -324,6 +325,12 @@ fn parity_models() {
     let (custom_matching, custom_total) = results.iter().fold((0, 0), |(m, t), r| (m + r.custom_matching, t + r.custom_compared));
     let custom_failed = results.iter().filter(|r| !r.custom.is_empty()).count();
     println!("parity_models score: {docs}/{} documents match to the end, {matching}/{total} features match; custom features {custom_matching}/{custom_total}, {custom_failed} documents with custom features failing to compile / run", whole.len());
+    // Speed (PLAN 2.7): our regeneration of the reopened document against
+    // the sum of live's features' regeneration times.
+    let mut slower: Vec<(f64, &str, f64, f64)> = results.iter().filter_map(|r| Some((r.list_ms, r.regen_ms?.1?, r.name.as_str()))).filter(|(ours, l, _)| ours > l).map(|(ours, l, n)| (ours / l.max(1.0), n, ours, l)).collect();
+    slower.sort_by(|a, b| b.0.total_cmp(&a.0));
+    let timed = results.iter().filter(|r| r.regen_ms.is_some_and(|t| t.1.is_some())).count();
+    println!("speed: {} of {timed} documents regenerate slower than live{}", slower.len(), slower.iter().map(|(x, n, o, l)| format!("; {n} {o:.0} ms, live {l:.0} ms (×{x:.1})")).collect::<String>());
     // The causes: first differences by feature type and what differed.
     let mut causes: std::collections::BTreeMap<String, usize> = Default::default();
     for f in results.iter().filter_map(|r| r.first.as_deref()) {
