@@ -96,6 +96,26 @@ fn sweep(points: &[[f64; 2]], c: [f64; 2], param: impl Fn([f64; 2]) -> f64) -> O
 
 /// The circle, arc or ellipse a polyline lies on, if it does to within
 /// `tol` (sheet mm). Needs at least 6 distinct points.
+/// A clamped B-spline's degree (3, or less with fewer points) and knots
+/// when `points` are its poles: chord-length parameters averaged (the
+/// NURBS Book 9.8), so the curve follows the points and ends on the first
+/// and last.
+pub fn clamped_knots(points: &[[f64; 2]]) -> (usize, Vec<f64>) {
+    let n = points.len();
+    let p = n.saturating_sub(1).clamp(1, 3);
+    let mut t = vec![0.0; n];
+    for i in 1..n {
+        t[i] = t[i - 1] + (points[i][0] - points[i - 1][0]).hypot(points[i][1] - points[i - 1][1]);
+    }
+    let total = t[n - 1].max(1e-300);
+    let mut knots = vec![0.0; p + 1];
+    for j in 1..n.saturating_sub(p) {
+        knots.push(t[j..j + p].iter().sum::<f64>() / (p as f64 * total));
+    }
+    knots.extend(std::iter::repeat_n(1.0, p + 1));
+    (p, knots)
+}
+
 pub fn fit_curve(points: &[[f64; 2]], closed: bool, tol: f64) -> Option<FitCurve> {
     let mut pts: Vec<[f64; 2]> = points.to_vec();
     pts.dedup_by(|a, b| (a[0] - b[0]).hypot(a[1] - b[1]) < 1e-12);

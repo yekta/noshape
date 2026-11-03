@@ -183,6 +183,10 @@ const VIEW_GEOMETRY: [CadLayer; 9] = [
     CadLayer::BendTangentLines,
 ];
 
+/// Layers of model edges: a curve that is no circle, arc or ellipse is a
+/// SPLINE there (live 1857), a POLYLINE elsewhere (the detail border).
+const MODEL_EDGES: [CadLayer; 7] = [CadLayer::Visible, CadLayer::Hidden, CadLayer::TangentLines, CadLayer::TangentHidden, CadLayer::BendLinesUp, CadLayer::BendLinesDown, CadLayer::BendTangentLines];
+
 /// The OLE streams of a Paintbrush object and the bytes after the frame's
 /// corners, as live writes them (drw2-k-dxf2018 OLE2FRAME).
 const PBRUSH_COMPOBJ: [u8; 77] = [
@@ -686,6 +690,22 @@ impl Sheet<'_> {
                 EntityType::Ellipse(e)
             }
             None if l.points.len() == 2 && !l.closed => EntityType::Line(Line::from_points(p3(l.points[0]), p3(l.points[1]))),
+            // A model edge of another curve: a cubic SPLINE (live 1857's
+            // VISIBLE / TANGENT_LINES), its poles the projected points.
+            None if MODEL_EDGES.contains(&self.g.cad_line_layer(li)) => {
+                let mut pts = l.points.clone();
+                if l.closed {
+                    pts.push(pts[0]);
+                }
+                let (degree, knots) = crate::drawing::cad_fit::clamped_knots(&pts);
+                let mut e = Spline::new();
+                e.degree = degree as i32;
+                (e.flags.closed, e.flags.planar) = (l.closed, true);
+                e.control_points = pts.iter().map(|p| p3(*p)).collect();
+                e.knots = knots;
+                e.normal = Vector3::new(0.0, 0.0, 1.0);
+                EntityType::Spline(e)
+            }
             None => {
                 let continuous = VIEW_GEOMETRY.contains(&self.g.cad_line_layer(li));
                 EntityType::Polyline2D(self.polyline(&l.points, l.closed, continuous))
@@ -1530,6 +1550,30 @@ mod tests {
         assert_eq!(value(5), "{\\pxql;\\fNoto Sans Chinese Simplified Light|b0|i0|c0|p0;N5}");
         assert_eq!(value(6), "{\\pxql;N6}");
         assert_eq!(value(7), "{\\pxql;\\fNoto Sans|b1|i0|c0|p0;N7}");
+    }
+
+    /// A model edge that is no line, circle, arc or ellipse is a cubic SPLINE
+    /// on its layer, ending on the edge's ends (live 1857: pipeflange-steven's
+    /// VISIBLE and TANGENT_LINES); a detail border stays a POLYLINE.
+    #[test]
+    fn free_form_model_edges_are_splines() {
+        let mut g = SheetGeometry::new(279.4, 215.9);
+        let wave: Vec<[f64; 2]> = (0..=40).map(|i| [20.0 + i as f64, 100.0 + 8.0 * (i as f64 * 0.15).sin() + 0.02 * (i * i) as f64]).collect();
+        let m = g.mark();
+        g.lines.push(crate::drawing::sheet::Polyline2 { points: wave.clone(), style: LineStyle::Visible, closed: false, pick: 0 });
+        g.cad_since(m, CadLayer::Visible);
+        let m = g.mark();
+        g.lines.push(crate::drawing::sheet::Polyline2 { points: wave.iter().map(|p| [p[0], p[1] + 50.0]).collect(), style: LineStyle::Thin, closed: false, pick: 0 });
+        g.cad_since(m, CadLayer::DetailViewBorder);
+        let doc = acadrust::DxfReader::from_reader(std::io::Cursor::new(to_dxf_version(&g, 4, DxfVersion::AC1014).unwrap())).unwrap().read().unwrap();
+        let spline = doc.entities().find_map(|e| match e {
+            EntityType::Spline(s) if s.common.layer == "VISIBLE" => Some(s.clone()),
+            _ => None,
+        }).expect("a SPLINE on VISIBLE");
+        assert_eq!((spline.degree, spline.control_points.len(), spline.knots.len()), (3, 41, 45));
+        let ends = [spline.control_points[0], spline.control_points[40]];
+        assert!((ends[0].x - 20.0).abs() < 1e-9 && (ends[1].x - 60.0).abs() < 1e-9 && (ends[1].y - wave[40][1]).abs() < 1e-9, "{ends:?}");
+        assert!(doc.entities().any(|e| matches!(e, EntityType::Polyline2D(p) if p.common.layer == "DETAIL_VIEW_BORDER")));
     }
 
     /// Live drw2-k-dxf2018: a table is an ACAD_TABLE over a *T block (an
