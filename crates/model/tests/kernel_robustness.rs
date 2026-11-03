@@ -3404,3 +3404,28 @@ fn collinear_lines_meeting_alone_extrude_as_one_face() {
         assert_eq!(r.context.bodies[0].shape.count(Face), if dangling { 7 } else { 6 }, "dangling {dangling}");
     }
 }
+
+/// SKETCH-FACE-FRAME (live 1897): a sketch on a planar face takes Onshape's evPlane x, from the face's normal alone
+/// (±Z: +X; else y = +Z in the plane, x = y × normal); a studio saved before keeps OCCT's.
+#[test]
+fn a_sketch_on_a_face_takes_onshapes_frame() {
+    use glam::DVec3;
+    for legacy in [false, true] {
+        let mut t = T::new();
+        t.ps.legacy_face_frames = legacy;
+        let b = t.block(40.0, 20.0, 10.0);
+        t.ok(b);
+        for (at, x, y) in [(DVec3::new(20.0, 10.0, 10.0), DVec3::X, DVec3::Y), (DVec3::new(40.0, 10.0, 5.0), DVec3::Y, DVec3::Z), (DVec3::new(20.0, 0.0, 5.0), DVec3::X, DVec3::Z), (DVec3::new(0.0, 10.0, 5.0), DVec3::NEG_Y, DVec3::Z)] {
+            let face = t.faces_where(|c| (c - at).length() < 1e-6);
+            let s = t.add("sketch", &[("sketchPlane", q(face)), ("sketch", ParamValue::Sketch(Box::default()))]);
+            let r = t.regen();
+            let frame = r.context.sketches.iter().find(|k| k.feature == s).unwrap().frame;
+            if legacy {
+                let f = r.context.bodies[0].shape.faces().into_iter().find(|f| (f.centroid().unwrap() * 1e3 - at).length() < 1e-6).unwrap();
+                assert!(frame.x.abs_diff_eq(f.face_plane().unwrap().unwrap().unit_x(), 1e-9), "face at {at}: OCCT's x");
+            } else {
+                assert!(frame.x.abs_diff_eq(x, 1e-9) && frame.y.abs_diff_eq(y, 1e-9), "face at {at}: {:?} / {:?}", frame.x, frame.y);
+            }
+        }
+    }
+}

@@ -234,6 +234,12 @@ impl PlaneFrame {
         let t = (self.origin - origin).dot(self.normal) / denom;
         Some(origin + dir * t)
     }
+    /// Onshape's x for a planar face of normal `n` (evPlane, live 1897): +X on a face facing ±Z, else the world's +Z
+    /// projected into the plane is y and x = y × n.
+    pub fn face_x(n: DVec3) -> DVec3 {
+        let y = DVec3::Z - n * DVec3::Z.dot(n);
+        if y.length() < 1e-9 { DVec3::X } else { y.normalize().cross(n) }
+    }
     pub const TOP: PlaneFrame = PlaneFrame { origin: DVec3::ZERO, x: DVec3::X, y: DVec3::Y, normal: DVec3::Z };
     pub const FRONT: PlaneFrame = PlaneFrame { origin: DVec3::ZERO, x: DVec3::X, y: DVec3::Z, normal: DVec3::NEG_Y };
     pub const RIGHT: PlaneFrame = PlaneFrame { origin: DVec3::ZERO, x: DVec3::Y, y: DVec3::Z, normal: DVec3::X };

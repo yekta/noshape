@@ -358,7 +358,7 @@ impl Regenerator {
                 (bodies, display)
             });
         }
-        let mut ctx: Arc<Context> = Arc::new(Context::default());
+        let mut ctx: Arc<Context> = Arc::new(Context { legacy_face_frames: studio.legacy_face_frames, ..Default::default() });
         let mut states = Vec::with_capacity(studio.features.len());
         let mut live: Vec<FeatureId> = Vec::new();
         let (mut evaluated, mut cached): (Vec<FeatureId>, usize) = (Vec::new(), 0);

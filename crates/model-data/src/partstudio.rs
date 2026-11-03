@@ -47,13 +47,14 @@ impl Feature {
 /// metal FeatureScript ([`PartStudio::legacy_sheet_metal`]); 6, fillets and
 /// chamfers by noshape's own blends where they build them exactly
 /// ([`PartStudio::legacy_blends`]); 7, the topology clean-ups of 11-03
-/// ([`PartStudio::legacy_topology`]); 0, older studios.
+/// ([`PartStudio::legacy_topology`]); 8, a planar face's frame as Onshape's evPlane gives it
+/// ([`PartStudio::legacy_face_frames`]); 0, older studios.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScopeRule(pub u8);
 
 impl Default for ScopeRule {
     fn default() -> Self {
-        ScopeRule(7)
+        ScopeRule(8)
     }
 }
 
@@ -246,6 +247,10 @@ pub struct PartStudio {
     /// order otherwise: qa MIRROR-PIECE-ORDER-CHANGE).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub legacy_topology: bool,
+    /// Saved with features before planar faces took Onshape's frame (ScopeRule < 8: x from the normal alone, live
+    /// 1897): its faces keep OCCT's plane x, so sketches on them and planes from them stay where they were.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub legacy_face_frames: bool,
     /// Rollback bar position: number of features evaluated (None = all).
     #[serde(default)]
     pub rollback: Option<usize>,
@@ -451,6 +456,10 @@ impl PartStudio {
         // And without the topology clean-ups made since.
         if self.scope_rule.0 < 7 && !self.features.is_empty() {
             self.legacy_topology = true;
+        }
+        // And with OCCT's frames on planar faces.
+        if self.scope_rule.0 < 8 && !self.features.is_empty() {
+            self.legacy_face_frames = true;
         }
         self.scope_rule = ScopeRule::default();
     }

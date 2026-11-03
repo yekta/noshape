@@ -624,7 +624,7 @@ impl<'a> EvalCtx<'a> {
                 let pl = face.face_plane().ok()??;
                 // Sketch origin on a face: world origin projected onto the face plane.
                 let n = pl.unit_normal();
-                let x = pl.unit_x();
+                let x = if self.ctx.legacy_face_frames { pl.unit_x() } else { PlaneFrame::face_x(n) };
                 let origin = n * pl.origin.dot(n);
                 Some(PlaneFrame { origin, x, y: n.cross(x), normal: n })
             }

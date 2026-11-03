@@ -407,7 +407,8 @@ impl<'a> QueryCx<'a> {
                 // Onshape puts the origin at the middle of the face's parameter box (live FS probe:
                 // the 20 mm cube's x=0 face gives (0, 10, 10) mm).
                 let origin = f.uv_bounds().and_then(|[u0, u1, v0, v1]| f.point_at_uv(0.5 * (u0 + u1), 0.5 * (v0 + v1))).unwrap_or(pl.origin);
-                Some(PlaneFrame { origin, x: pl.unit_x(), y: n.cross(pl.unit_x()), normal: n })
+                let x = if ctx.legacy_face_frames { pl.unit_x() } else { PlaneFrame::face_x(n) };
+                Some(PlaneFrame { origin, x, y: n.cross(x), normal: n })
             }
             _ => None,
         }

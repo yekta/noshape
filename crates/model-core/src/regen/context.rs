@@ -541,6 +541,8 @@ impl From<Vec<Arc<Body>>> for Bodies {
 
 #[derive(Clone, Default)]
 pub struct Context {
+    /// The studio's planar faces keep OCCT's plane x ([`crate::partstudio::PartStudio::legacy_face_frames`]).
+    pub legacy_face_frames: bool,
     pub bodies: Bodies,
     pub sketches: Vec<Arc<SketchResult>>,
     /// Sketches a Derived feature brought in from its source: (the Derived
@@ -707,6 +709,7 @@ impl Context {
     /// a new one has to say how it compares.
     pub fn same_but_bodies(&self, o: &Context) -> bool {
         let Context {
+            legacy_face_frames,
             bodies: _,
             sketches,
             derived_sketches,
@@ -742,7 +745,8 @@ impl Context {
         fn same_map<K: PartialEq, V>(a: &BTreeMap<K, Arc<V>>, b: &BTreeMap<K, Arc<V>>) -> bool {
             a.len() == b.len() && a.iter().zip(b).all(|((k, v), (l, w))| k == l && Arc::ptr_eq(v, w))
         }
-        same_arcs(sketches, &o.sketches)
+        *legacy_face_frames == o.legacy_face_frames
+            && same_arcs(sketches, &o.sketches)
             && *derived_sketches == o.derived_sketches
             && *sketch_copies == o.sketch_copies
             && *hidden_sketches == o.hidden_sketches
