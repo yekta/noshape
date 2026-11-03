@@ -3113,7 +3113,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Agent API side: feature_get shows `"valueArray": "[15,20,25]"` (the expression), as the dialog would keep it; the
   host should evaluate it. Rebuilt document: /root/dx-scratch/pmdocs/cf/cf-parameter-pattern.noshape
   (featurestudio_monitor). (dx 2026-11-03)
-- [ ] P2 FS-FEATURE-LIST-RERUN (core / custom; dx's FeatureScript corpus, cf-parameter-pattern, from FS-ANYTHING-PARAM)
+- [x] (core 11-03 15:16: the FeatureList value binds the context and each picked feature's id; called with an instance id it runs that feature's evaluator under the instance id + its own (std calls every picked feature with the same id), with the variables as they are and setFeaturePatternInstanceData's transform (pattern.rs rerun_instance, the sketches it reads moved as Feature pattern's Reapply does); a picked sketch is solved again and stands in for the original until unsetFeaturePatternInstanceData. cf-parameter-pattern's pattern OK as live (4 parts; live's end state asked, REQUESTS 15:16); T1 model custom_features::feature_list_functions_rerun_the_picked_features) P2 FS-FEATURE-LIST-RERUN (core / custom; dx's FeatureScript corpus, cf-parameter-pattern, from FS-ANYTHING-PARAM)
   a FeatureList parameter's feature functions can't be called: the community Parameter pattern hands
   `definition.features` to std's applyPattern as its instanceFunction, which re-runs the picked features once per
   instance with the variables set for it; ours fails "A picked feature cannot be re-run" (host status.rs
