@@ -196,14 +196,6 @@ struct DragState {
     origin: HashMap<InstanceId, Placement>,
 }
 
-/// Substeps a drag step takes from the drag's start to its target: one per
-/// 2 mm the grabbed point moves, at most 4 (one solve doesn't reach a large
-/// turn: live asm drag probe d1 12° off in one, within the pointer's
-/// landing in 4).
-fn drag_substeps(moved: f64) -> usize {
-    ((moved / 0.002).ceil() as usize).clamp(1, 4)
-}
-
 /// Snap mode drag: a connector of one instance dragged onto another's.
 struct SnapDrag {
     top: InstanceId,
@@ -3151,24 +3143,7 @@ impl AssemblyView {
             let solved = cx
                 .background_spawn(async move {
                     let t = std::time::Instant::now();
-                    let mut s = if from.is_empty() {
-                        prepared.solve(&opts)
-                    } else {
-                        let n = drag_substeps(from.iter().zip(&opts.drags).map(|(p0, (_, _, t))| (*t - *p0).length()).fold(0.0, f64::max));
-                        let mut o = opts.clone();
-                        let mut s: Option<noshape_model::assembly::eval::Solved> = None;
-                        for j in 1..=n {
-                            let f = j as f64 / n as f64;
-                            for ((_, _, t), (p0, (_, _, t1))) in o.drags.iter_mut().zip(from.iter().zip(&opts.drags)) {
-                                *t = *p0 + (*t1 - *p0) * f;
-                            }
-                            if let Some(prev) = &s {
-                                o.start = Some(prev.placements.iter().cloned().collect());
-                            }
-                            s = Some(prepared.solve(&o));
-                        }
-                        s.expect("at least one substep")
-                    };
+                    let mut s = if from.is_empty() { prepared.solve(&opts) } else { prepared.solve_drag(&opts, &from) };
                     noshape_render::perf::record("a.drag_solve", t.elapsed());
                     s.dof = dof;
                     s.instance_dof = instance_dof;

@@ -516,6 +516,31 @@ impl Prepared {
         self.solve(&SolveOptions { start: Some(start), locks: np.mate_values.clone(), ..Default::default() })
     }
 
+    /// A pointer drag's step from `opts.start` (the placements when the
+    /// drag started; live asm drag probes 3: the end pose depends only on
+    /// where the drag ends), each dragged point from `from` (where it was
+    /// then) to its target in substeps: one per 2 mm, at most 4 (one solve
+    /// doesn't reach a large turn: live asm drag probe d1 12° off in one,
+    /// within the pointer's landing in 4).
+    pub fn solve_drag(&self, opts: &SolveOptions, from: &[DVec3]) -> Solved {
+        let moved = from.iter().zip(&opts.drags).map(|(p0, (_, _, t))| (*t - *p0).length()).fold(0.0, f64::max);
+        let n = ((moved / 0.002).ceil() as usize).clamp(1, 4);
+        let mut o = opts.clone();
+        let mut s = None;
+        for j in 1..=n {
+            let f = j as f64 / n as f64;
+            for ((_, _, t), (p0, (_, _, t1))) in o.drags.iter_mut().zip(from.iter().zip(&opts.drags)) {
+                *t = *p0 + (*t1 - *p0) * f;
+            }
+            if let Some(prev) = &s {
+                let prev: &Solved = prev;
+                o.start = Some(prev.placements.iter().cloned().collect());
+            }
+            s = Some(self.solve(&o));
+        }
+        s.expect("at least one substep")
+    }
+
     /// Solve from the stored (or `opts.start`) placements.
     pub fn solve(&self, opts: &SolveOptions) -> Solved {
         let pose_of = |id: InstanceId, stored: &Placement| -> Frame {

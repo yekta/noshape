@@ -882,7 +882,7 @@ fn asm_drag_probes_match_live() {
                 DVec3::from(p.translation) + q * local
             };
             let from = place(&built);
-            // As the app drags (assembly_view `drag_substeps`): each step from
+            // As the app drags (`Prepared::solve_drag`): each step from
             // the drag's start, in one substep per 2 mm, at most 4 (live asm
             // drag probes 3: the end pose depends only on where it ends).
             let origin = built.clone();
