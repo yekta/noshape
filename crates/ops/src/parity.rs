@@ -463,6 +463,33 @@ impl<'a> Translator<'a> {
         if let Some(p) = default_plane(text) {
             return Ok(vec![p.to_string()]);
         }
+        // "Created by" selections: a sketch's faces are its regions, a
+        // feature's bodies its parts, else every face / edge it made.
+        if q["btType"].as_str().is_some_and(|t| t.starts_with("BTMIndividualCreatedByQuery"))
+            && let Some(fid) = q["featureId"].as_str()
+        {
+            let ours = self.feature_ids.get(fid).cloned().ok_or_else(|| format!("feature {fid} was not built"))?;
+            let kind = q["entityType"].as_str().unwrap_or("BODY");
+            if kind == "FACE" && let Ok(g) = self.call("sketch_get", json!({ "sketch": ours })) {
+                return Ok(g["regions"].as_array().into_iter().flatten().filter_map(|r| r["id"].as_str().map(str::to_string)).collect());
+            }
+            let (list, field) = match kind {
+                "EDGE" => ("edges", "id"),
+                "VERTEX" => ("vertices", "id"),
+                "FACE" => ("faces", "id"),
+                _ => ("faces", "part"),
+            };
+            let r = self.call("query_entities", json!({ "kind": list, "created_by": ours, "limit": 10000 }))?;
+            let mut ids: Vec<String> = Vec::new();
+            for id in r[list].as_array().into_iter().flatten().filter_map(|e| e[field].as_str()) {
+                if !ids.iter().any(|x| x == id) {
+                    ids.push(id.to_string());
+                }
+            }
+            if !ids.is_empty() {
+                return Ok(ids);
+            }
+        }
         // The default planes' and the Origin's deterministic ids (fixed in
         // every Part Studio), also when the query text is empty.
         if let [id] = ids.as_slice()
