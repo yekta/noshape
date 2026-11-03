@@ -212,6 +212,10 @@ pub(crate) enum EqKind {
     /// Inputs fit points (2n), o0, o1: cross (or dot if `perp`) of the fit
     /// spline's outgoing end tangent with (o1 - o0), normalized.
     FitEndDir { at_end: bool, perp: bool, n: usize },
+    /// A circle (inputs c, r) or arc (c, its start) touching a fit spline at
+    /// S(t) (then t, the fit points, its handles): `which` 0 |S(t) - c| - r,
+    /// 1 (S(t) - c) · S'(t) / |S'(t)|; t within the spline.
+    FitContact { which: u8, arc: bool, handles: bool },
     /// Two fit splines' end directions parallel (perpendicular): inputs the
     /// first's `na` points, then the second's.
     FitFitDir { na: usize, end_a: bool, end_b: bool, perp: bool },
@@ -360,7 +364,7 @@ fn kernel<T: Num>(kind: &EqKind, x: &[T]) -> T {
             let na = a.arity();
             (curv(a, &x[..na]) + curv(b, &x[na..])) * T::cst(*scale)
         }
-        EqKind::SplinePoint { .. } | EqKind::FitPoint { .. } | EqKind::FitEndDir { .. } | EqKind::FitFitDir { .. } | EqKind::CurvatureNum { .. } | EqKind::FlowNum { .. } => {
+        EqKind::SplinePoint { .. } | EqKind::FitPoint { .. } | EqKind::FitEndDir { .. } | EqKind::FitFitDir { .. } | EqKind::FitContact { .. } | EqKind::CurvatureNum { .. } | EqKind::FlowNum { .. } => {
             // only evaluated through `eval_f64`
             T::cst(f64::NAN)
         }
@@ -661,10 +665,58 @@ fn fit_end_grad(x: &[f64], n: usize, handles: bool, at_end: bool, second: bool, 
     Some(v)
 }
 
+/// [`EqKind::FitContact`]'s residual, and its gradient into `g` if given.
+fn fit_contact(x: &[f64], which: u8, arc: bool, handles: bool, g: Option<&mut [f64]>) -> f64 {
+    use glam::DVec2;
+    let c = DVec2::new(x[0], x[1]);
+    let (r, off) = if arc { ((DVec2::new(x[2], x[3]) - c).length(), 4) } else { (x[2], 3) };
+    let t = x[off];
+    let xs = &x[off + 1..];
+    let n = xs.len() / 2 - if handles { 2 } else { 0 };
+    let Some(fd) = FitDiff::new(xs, n, handles) else { return 0.0 };
+    let (a, b) = fd.curve.domain();
+    let tt = t.clamp(a, b);
+    let [p, d1, d2] = fd.curve.eval_ders(tt);
+    let f = |q: &[f64]| {
+        let (p, d1, c) = (DVec2::new(q[0], q[1]), DVec2::new(q[2], q[3]), DVec2::new(q[4], q[5]));
+        if which == 0 {
+            (p - c).length() - q[6]
+        } else {
+            let l = d1.length();
+            if l < 1e-300 { 0.0 } else { (p - c).dot(d1) / l }
+        }
+    };
+    let q = [p.x, p.y, d1.x, d1.y, c.x, c.y, r];
+    let Some(g) = g else { return f(&q) };
+    g.iter_mut().for_each(|v| *v = 0.0);
+    let mut dq = [0.0; 7];
+    let v = small_grad(f, &q, &mut dq);
+    g[0] = dq[4];
+    g[1] = dq[5];
+    if arc {
+        let u = (DVec2::new(x[2], x[3]) - c) / r.max(1e-300);
+        g[2] = dq[6] * u.x;
+        g[3] = dq[6] * u.y;
+        g[0] -= dq[6] * u.x;
+        g[1] -= dq[6] * u.y;
+    } else {
+        g[2] = dq[6];
+    }
+    if t > a && t < b {
+        g[off] = dq[0] * d1.x + dq[1] * d1.y + dq[2] * d2.x + dq[3] * d2.y;
+    }
+    let pr = fd.probes(&[(tt, 0), (tt, 1)]);
+    for i in 0..pr[0].gx.len() {
+        g[off + 1 + i] = dq[0] * pr[0].gx[i] + dq[1] * pr[0].gy[i] + dq[2] * pr[1].gx[i] + dq[3] * pr[1].gy[i];
+    }
+    v
+}
+
 impl Eq {
     /// Residual value. `x` holds the input values in input order.
     pub fn eval(&self, x: &[f64]) -> f64 {
         match &self.kind {
+            EqKind::FitContact { which, arc, handles } => fit_contact(x, *which, *arc, *handles, None),
             EqKind::SplinePoint { comp, curve } => spline_point_eval(curve, *comp as usize, x, None),
             EqKind::FitPoint { comp, handles } => {
                 let n = (x.len() - 3) / 2 - if *handles { 2 } else { 0 };
@@ -711,6 +763,7 @@ impl Eq {
     /// Residual and gradient w.r.t. the inputs (`g.len() == x.len()`).
     pub fn eval_grad(&self, x: &[f64], g: &mut [f64]) -> f64 {
         match &self.kind {
+            EqKind::FitContact { which, arc, handles } => return fit_contact(x, *which, *arc, *handles, Some(g)),
             EqKind::SplinePoint { comp, curve } => return spline_point_eval(curve, *comp as usize, x, Some(g)),
             EqKind::FitPoint { comp, handles } => {
                 g.iter_mut().for_each(|v| *v = 0.0);
@@ -1004,6 +1057,28 @@ impl<'a, L: Lookup> Builder<'a, L> {
         Ok(self.lk.point(p))
     }
 
+    fn fit_contact(&mut self, circle: EntityId, spline: EntityId) -> R {
+        let cc = self.center(circle)?;
+        let (arc, rad): (bool, SmallVec<[u32; 2]>) = match self.radius(circle)? {
+            Rad::Param(r) => (false, SmallVec::from_slice(&[r])),
+            Rad::Dist(_, s) => (true, SmallVec::from_slice(&s)),
+        };
+        let t = self.lk.aux(0);
+        let mut inp = cat(&[&cc, &rad, &[t]]);
+        for p in self.spline_points(spline)? {
+            inp.extend_from_slice(&self.lk.point(p));
+        }
+        let handles = self.sk.entity(spline).and_then(|e| e.spline_handles());
+        if let Some((h0, h1)) = handles {
+            inp.extend_from_slice(&self.lk.point(h0));
+            inp.extend_from_slice(&self.lk.point(h1));
+        }
+        for which in 0..2u8 {
+            self.push(EqKind::FitContact { which, arc, handles: handles.is_some() }, inp.clone());
+        }
+        Ok(())
+    }
+
     fn spline_dir(&self, id: EntityId, at_end: bool) -> Result<Dir, String> {
         match self.geom(id)? {
             Geometry::BSpline { control, .. } => {
@@ -1183,6 +1258,9 @@ impl<'a, L: Lookup> Builder<'a, L> {
                     let l = self.line(a)?;
                     self.dir_rel(dir_s, Dir::Pts(l), false)
                 }
+                // Not joined to the spline: touching it along its length
+                // (`Sketch::compute_hints` gives it the contact's parameter).
+                k if k.is_circular() && kb == EntityKind::FitSpline && !c.aux.is_empty() => self.fit_contact(a, b),
                 k if k.is_circular() => {
                     let cc = self.center(a)?;
                     let p0 = self.spline_end_point(b, h.end_b)?;
@@ -1927,6 +2005,14 @@ mod tests {
                     let mut x = vec![0.02, 0.003, 0.37];
                     x.extend(&fit);
                     check_grad(&Eq { kind: EqKind::FitPoint { comp, handles }, inputs: (0..x.len() as u32).collect() }, &x);
+                }
+                for which in 0..2u8 {
+                    for arc in [false, true] {
+                        let mut x = if arc { vec![0.02, 0.003, 0.025, 0.004] } else { vec![0.02, 0.003, 0.006] };
+                        x.push(0.37);
+                        x.extend(&fit);
+                        check_grad(&Eq { kind: EqKind::FitContact { which, arc, handles }, inputs: (0..x.len() as u32).collect() }, &x);
+                    }
                 }
                 for at_end in [false, true] {
                     let side = CurvSide::Fit { n, at_end, handles };

@@ -551,6 +551,18 @@ impl Sketch {
     }
 
     /// Which end (false = start, true = end) of `a` is closest to entity `b`.
+    /// Whether an end of `a` is an end of `b`: the same point, a
+    /// Coincident pair, or the same place (a circle has no ends).
+    pub(crate) fn ends_meet(&self, a: EntityId, b: EntityId) -> bool {
+        let (Some((a0, a1)), Some((b0, b1))) = (self.entity(a).and_then(|e| e.endpoints()), self.entity(b).and_then(|e| e.endpoints())) else { return false };
+        let joined = |p: EntityId, q: EntityId| {
+            p == q
+                || self.constraints().any(|c| matches!(c.kind, ConstraintKind::Coincident { a, b } if (a == p && b == q) || (a == q && b == p)))
+                || matches!((self.point(p), self.point(q)), (Some(x), Some(y)) if (x - y).length() <= 1e-9 * (1.0 + x.length()))
+        };
+        [a0, a1].iter().any(|p| [b0, b1].iter().any(|q| joined(*p, *q)))
+    }
+
     pub(crate) fn nearest_end(&self, a: EntityId, b: EntityId) -> bool {
         let Some(ea) = self.entity(a) else { return false };
         let Some((s, e)) = ea.endpoints() else { return false };
@@ -602,6 +614,15 @@ impl Sketch {
                 let (a, b, ka, kb) = if tangent_rank(ka) <= tangent_rank(kb) { (*a, *b, ka, kb) } else { (*b, *a, kb, ka) };
                 h.end_a = self.nearest_end(a, b);
                 h.end_b = self.nearest_end(b, a);
+                // A circle or arc Tangent to a fit spline it isn't joined to
+                // touches it along its length (live: the Spur Gear's root
+                // fillet, SKETCH-TANGENT-SPLINE-CIRCLE): the contact's
+                // parameter, from the point nearest the centre.
+                if matches!(kind, K::Tangent { .. }) && ka.is_circular() && kb == EntityKind::FitSpline && !self.ends_meet(a, b)
+                    && let (Some(c), Some(cv)) = (self.center_pos(a), self.curve(b))
+                {
+                    aux.push(cv.closest(c).0);
+                }
                 if ka == EntityKind::Line && kb.is_circular() {
                     if let (Some((p, q)), Some(c)) = (self.line_pts(a), self.center_pos(b)) {
                         h.sign = sgn(signed_line_dist(c, p, q));

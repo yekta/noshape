@@ -788,3 +788,30 @@ fn a_longer_chamfer_slides_its_ends_along_the_sides() {
         assert!((*p - *q).length() < 2e-3, "ours {got:?} live {live:?}");
     }
 }
+
+#[test]
+fn a_circle_tangent_to_two_splines_touches_them_along_their_length() {
+    // SKETCH-TANGENT-SPLINE-CIRCLE (Onshape's public Spur Gear, its tooth
+    // sketch as the FeatureScript host builds it): a root fillet circle
+    // Tangent to the fixed root circle and to the two fixed involute fit
+    // splines it isn't joined to touches the splines along their length
+    // (r 0.5683 mm, on the gap's axis at x 11.818 mm), not at their ends'
+    // normals (r 0.2864 mm before).
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/solve/spur-gear-fillet.json");
+    let mut sk: Sketch = serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap();
+    // (The constraints as `add_constraint` makes them, hints and all.)
+    let ids: Vec<ConstraintId> = sk.constraints().map(|c| c.id).collect();
+    for id in ids {
+        sk.recompute_hints(id).unwrap();
+    }
+    assert!(sk.solve().is_solved());
+    let (centre, r) = sk
+        .entities()
+        .filter_map(|e| match sk.curve(e.id) {
+            Some(Curve2::Circle { center, radius }) if radius < 0.005 => Some((center, radius)),
+            _ => None,
+        })
+        .next()
+        .unwrap();
+    assert!((r * 1e3 - 0.5683).abs() < 1e-3 && (centre * 1e3 - v(11.8183, 0.0)).length() < 1e-3, "centre {:?} mm, r {} mm", centre * 1e3, r * 1e3);
+}
