@@ -862,6 +862,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    XDG_CONFIG_HOME=/root/dx-scratch/xdg.
 
 ## Requests to the lead
+- (11-03 06:20) The land server's target-land-slot3 links noshape_sketch with undefined symbols (mold: "undefined
+  symbol anon.….llvm…" / drop_glue in libnoshape_sketch-e3baaff7b2eb979a.rlib): dx's 4bf79071 (05:49) and e900ed8f
+  (05:55) failed only that way and landed in the next batch on another slot. A clean of that slot's incremental
+  noshape_sketch artifacts would stop it failing other agents' batches too.
 - (11-03 01:15) For qa's SCORE.md: the model suite runs where the models are (this machine):
   `NOSHAPE_RB_LOCAL=1 tools/tiers/rb.sh cargo test -q -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`
   (NOSHAPE_PARITY_MODELS to point elsewhere, NOSHAPE_PARITY_ONLY=<name> for one). It prints per document the first
