@@ -279,7 +279,7 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 On vibe3 (tools/tiers/perf.sh: release, the machine to itself, 3 runs; 10-30 evening at 94056b26). Each is a timed
 T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this machine are superseded.)
 - Sketch drag step, ~200 entities (219 entities, 178 constraints; pointer move + solve + the sketch's regeneration):
-  11-03 17:50 at d9d85e08 (vibe3, 3 runs): **median 2.2 ms** (solve 0.77, regeneration 1.42), worst 5.0-5.4 ms, always
+  11-03 17:31 at d9d85e08 (vibe3, 3 runs): **median 2.2 ms** (solve 0.77, regeneration 1.42), worst 5.0-5.4 ms, always
   step 61 and in the regeneration (the slowest solve 1.1 ms, step 1); target < 8 ms. 10-30 it was 1.37 (solve 0.43,
   regeneration ~0.94), worst 1.64: the solve's +0.34 ms is the drag parity work since 11-02 (dimensioned curves held,
   each step from the drag's start, far geometry kept); the regeneration's +0.5 ms and its step-61 spike are core's
@@ -1317,9 +1317,9 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   together (or tell core it should stay as it is).
 
 ## Requests to the lead
-- (11-03 17:50) Sketch drag step's regeneration (core's regen path): median 1.42 ms (10-30: ~0.94) and one 4 ms step
+- (11-03 17:34) Sketch drag step's regeneration (core's regen path): median 1.42 ms (10-30: ~0.94) and one 4 ms step
   (always step 61 of `sketch_perf::speed_target`, 219 entities); still inside the 8 ms target, but growing.
-- (11-03 17:40) Assembly interaction scenarios: the suite has none (256 psui, 25 skasm sketch); it needs psui's driver
+- (11-03 17:34) Assembly interaction scenarios: the suite has none (256 psui, 25 skasm sketch); it needs psui's driver
   on assembly tabs (ui_state / targets in assembly-ui) and live's runner on an Assembly. I can write the scenarios and
   the assembly-ui side once that's decided.
 - (11-03 12:55, for psui) the ui-parity driver now moves the pointer to each click / drag start in three moves from where it was, and drags in fifteen, as live's runner does (it decides which sketch lines get woken). No other suite result changed in my sketch runs; please rerun yours.
