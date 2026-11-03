@@ -1510,7 +1510,14 @@ struct Builder
         B.Range(E, 0, 0);
       else
       {
-        // The first fin's SP-curve gives the edge its curve and parameter.
+        // The SP-curve on a free-form surface gives the edge its curve and
+        // parameter rather than one on an analytic surface (plane, cylinder,
+        // cone, sphere, torus): lengths and faces as Parasolid measures them
+        // (live: the McMaster screw's thread helices, the flank's curve on
+        // either fin, 159.393 / 159.345 mm and its cylinder 13.912 mm²).
+        const auto analytic = [&](long long sidx) { const int t = r.at_index(sidx).type; return t >= 50 && t <= 54; };
+        if (fins.size() > 1 && analytic(fins[0].s) && !analytic(fins[1].s))
+          std::swap(fins[0], fins[1]);
         B.UpdateEdge(E, fins[0].c, surface(fins[0].s), TopLoc_Location(), etol);
         B.Range(E, fins[0].a, fins[0].b);
         // The 3D curve from it: OCCT's automatic segment count is too few for

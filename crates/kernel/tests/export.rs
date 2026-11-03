@@ -1212,7 +1212,9 @@ fn parasolid_writes_an_imported_thread() {
     write_parasolid(&path, std::slice::from_ref(&screw), LengthUnit::Meter, false).unwrap();
     let back = read_parasolid(&path, LengthUnit::Meter).unwrap();
     let got = volume_properties(&back).unwrap().mass;
-    assert!((got - want).abs() < want * 1e-4, "volume {got} vs {want}");
+    // (Read back, a tolerant edge takes its free-form fin's curve, as
+    // Parasolid measures it: 1.006e-4 off here.)
+    assert!((got - want).abs() < want * 1.5e-4, "volume {got} vs {want}");
     assert_eq!(back.count(ShapeType::Face), screw.count(ShapeType::Face));
     let _ = std::fs::remove_file(&path);
 }
@@ -1284,6 +1286,27 @@ fn parasolid_periodic_bsurface_face_reads_whole() {
     assert_eq!(s.count(ShapeType::Face), 3);
     assert!((v - 437833.229).abs() < 437833.229 * 1e-6, "{v}");
     assert!(s.is_valid());
+}
+
+/// A tolerant edge between an analytic and a free-form face takes the
+/// free-form face's SP-curve (live api 10-24 "IM2b follow-up": the McMaster
+/// screw's thread helices are 159.392935 and 159.3450619 mm; the cylinder's
+/// fins gave 159.394 / 159.325). The file is live's sample (not in the repo).
+#[test]
+#[ignore = "T2: live's sample file /root/onshape-research/live/samples (a vendor's part, never in the repo)"]
+fn a_thread_helix_is_as_long_as_parasolids() {
+    let root = std::env::var("NOSHAPE_LIVE_SAMPLES").unwrap_or_else(|_| "/root/onshape-research/live/samples".into());
+    let path = std::path::Path::new(&root).join("g38b-mcmaster-91274A118.x_t");
+    if !path.is_file() {
+        return;
+    }
+    let s = read_parasolid(&path, LengthUnit::Millimeter).unwrap();
+    // (In mm whichever unit the kernel keeps.)
+    let mm = |l: f64| if l < 1.0 { l * 1000.0 } else { l };
+    let mut long: Vec<f64> = s.edges().iter().filter_map(|e| e.length().ok()).map(mm).filter(|l| (150.0..170.0).contains(l)).collect();
+    long.sort_by(f64::total_cmp);
+    assert_eq!(long.len(), 2, "{long:?}");
+    assert!((long[0] - 159.3450619).abs() < 2e-3 && (long[1] - 159.392935).abs() < 2e-3, "{long:?}");
 }
 
 /// A Parasolid cylinder face between two rings with other loops on it (a fan

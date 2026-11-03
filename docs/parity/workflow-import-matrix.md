@@ -220,3 +220,16 @@ items unchanged (the 11-01 list).
 was the script asking for its tab by a name the .step's import also has (the CLI picked the first tab; a shared name
 is an error naming both ids since cab8e36c). Imported alone the x_t reads as before. New: cf-wiring's fan
 (live's Parasolid export) reads 36 / 82 / 40 and 40 / 88 / 56 faces / edges / vertices, as live.
+
+## Re-run 2026-11-03 20:51 (dx, the open rows of 11-01)
+- **McMaster helix edges ✅**: a tolerant edge now takes its free-form face's SP-curve (Parasolid's; live "api (10-24)
+  IM2b follow-up"): 159.344660 / 159.394088 mm, live 159.3450619 / 159.392935 (were 159.325155 / 159.394088). The
+  screw 254.416792 mm³ (live 254.403780, band; was 254.419624). Its F0 cylinder 13.932682 mm² (live 13.912244; was
+  13.938182): the cylinder's pcurves are the other fin's put on the edge's parameter, still ✗ small. T2 kernel
+  export::a_thread_helix_is_as_long_as_parasolids.
+- **g50 F19 ✅** (4.189385, live 4.1893432: 1e-5 relative, this sheet's ✅). g50 volume 6052.699751 (live 6052.761;
+  was 6052.678152).
+- **g50 F8 ✗** (8.321612, live 8.330890): live keeps it an extruded surface whose trim reaches past the file's
+  B-surface (which pinches to the apex); ours is the B-surface's whole range. Needs the face rebuilt on an extended
+  surface; not done.
+- 141 of 146 samples unchanged; g49 chamfer 1 / 2 +0.0002 / +0.022 mm³ (both in band).
