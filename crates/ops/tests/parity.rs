@@ -779,6 +779,26 @@ fn a_custom_feature_uses_the_studio_version_it_pins() {
     assert!(!r.untranslated.iter().any(|u| u.contains("oldCount") || u.contains("not built")), "{:?}", r.untranslated);
 }
 
+/// A studio importing another at a version (`import(path : "<eid>", version :
+/// "<v>")`) gets studios/<eid>@<v>.fs when live fetched that version, not the
+/// element's head (cf-sheet-metal-hem's sheetMetalUtils): the cube is 10 mm.
+#[test]
+fn a_studio_imports_the_version_it_pins() {
+    let lib = |mm: u32| format!("FeatureScript 3095;\nimport(path : \"onshape/std/common.fs\", version : \"3095.0\");\nexport const SIZE = {mm} * millimeter;\n");
+    let main = "FeatureScript 3095;\nimport(path : \"onshape/std/common.fs\", version : \"3095.0\");\nimport(path : \"0lib\", version : \"v1\");\n\nannotation { \"Feature Type Name\" : \"Cube\" }\nexport const cube = defineFeature(function(context is Context, id is Id, definition is map)\n    precondition {}\n    {\n        fCuboid(context, id + \"cuboid\", { \"corner1\" : vector(0, 0, 0) * meter, \"corner2\" : vector(1, 1, 1) * SIZE });\n    });\n";
+    let dir = scratch("studio-import-version");
+    std::fs::create_dir_all(dir.join("studios")).unwrap();
+    std::fs::write(dir.join("studios/0lib.fs"), lib(5)).unwrap();
+    std::fs::write(dir.join("studios/0lib@v1.fs"), lib(10)).unwrap();
+    std::fs::write(dir.join("studios/0main.fs"), main).unwrap();
+    let features = json!({ "features": [{ "btType": "BTMFeature-134", "featureType": "cube", "namespace": "e0main::m1", "featureId": "FC", "name": "Cube 1", "parameters": [] }] });
+    std::fs::write(dir.join("features.json"), features.to_string()).unwrap();
+    std::fs::write(dir.join("live.jsonl"), json!({ "index": 0, "status": "OK", "parts": [{ "faces": 6, "edges": 12, "vertices": 8, "volume": 1e-6 }] }).to_string()).unwrap();
+    let (features, live, refs) = read_model(&dir).unwrap();
+    let r = run_model("studio-import-version", &features, &live, &refs);
+    assert_eq!((r.matching, r.compared), (1, 1), "first difference: {:?}; untranslated: {:?}; custom: {:?}", r.first, r.untranslated, r.custom);
+}
+
 /// A file a studio imports (its icon) that live fetched (studios/<eid>.blob
 /// named in <eid>.json) is imported as that file, no placeholder; one not
 /// fetched gets the placeholder and a note.

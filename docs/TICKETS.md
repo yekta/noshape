@@ -3294,7 +3294,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   0.04 % low; equal-area disc and cylinder): parity.rs nearest. Left: O Ring 5 sits 0.635 mm along the axis from
   live's: evAxis of Revolve 1's r 38.1 cylinder gives ours x 63.5 (the profile line 0–127 mm's middle), live 62.865
   (the face's middle after Chamfer 1 trimmed 1.27 mm off its end): live's revolved cylinder origin follows the
-  chamfered face (core: kernel). cf-straight-spline's ErrorStringEnum type error: the studio pins std 1963, whose enum
+  chamfered face (core: kernel). 22:57: a studio importing another at a version (sheetMetalUtils at fc6553…) now gets
+  studios/<eid>@<version>.fs; the three sheet-metal documents then stop on std the studios pin and 1963 dropped
+  (SMExtrudeSecondDirectionBoundingType at 975 / 1403, rollSurface.fs at 1024), and the two FeatureScript 392 pattern
+  studios on std 392's checkInput: std 1024 (and 392 if needed) asked of live (REQUESTS, dx 22:57). cf-straight-spline's ErrorStringEnum type error: the studio pins std 1963, whose enum
   hasn't BOOLEAN_NON_MANIFOLD_RESULT (3095's has); the feature fails on the Boolean anyway (core), left.
   dx 11-03 20:23, cf-straight-spline (54 SAE Straight-Sided Spline features; compiles since dx's enum trailing-comma
   fix): 12 fail `@opBoolean: BOOLEAN_NON_MANIFOLD_RESULT`, then `Type error: value BOOLEAN_NON_MANIFOLD_RESULT cannot be

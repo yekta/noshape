@@ -283,7 +283,28 @@ impl<'a> Translator<'a> {
         let (Some(source), Some(tab)) = (studio["source"].as_str().or(studio.as_str()), self.studios.get(element).cloned()) else { return };
         let name = studio["name"].as_str().unwrap_or("Feature Studio 1");
         let mut source = source.to_string();
-        for (other, ours) in &self.studios {
+        // A studio fetched at a version (`<eid>@<version>`, live's file name)
+        // first: the imports of that element at that version.
+        let mut others: Vec<(&String, &String)> = self.studios.iter().collect();
+        others.sort_by_key(|(e, _)| (!e.contains('@'), e.to_string()));
+        for (other, ours) in others {
+            if let Some((e, v)) = other.split_once('@') {
+                for path in [format!("\"{e}\""), format!("/{e}\"")] {
+                    let mut from = 0;
+                    while let Some(at) = source[from..].find(&path).map(|i| i + from) {
+                        let close = at + path.len();
+                        let statement = &source[close..source[close..].find(')').map_or(source.len(), |i| i + close)];
+                        if !statement.contains(&format!("\"{v}\"")) {
+                            from = close;
+                            continue;
+                        }
+                        let open = source[..at + 1].rfind('"').unwrap_or(at);
+                        source.replace_range(open..close, &format!("\"{ours}\""));
+                        from = open + ours.len() + 2;
+                    }
+                }
+                continue;
+            }
             for path in [format!("\"{other}\""), format!("/{other}\"")] {
                 if let Some(at) = source.find(&path) {
                     // The whole path string: from its opening quote.
