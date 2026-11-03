@@ -943,6 +943,12 @@ impl PartStudioView {
         // psui/m-03: not while another field is active).
         let picked = self.edit.as_ref().map(|e| e.dialog.read(cx).active_refs());
         for r in picked.as_ref().unwrap_or(&self.selection) {
+            // A point on an edge (its midpoint, an end) stands for that edge (live ui-parity fillet-asymmetric-toggle:
+            // an edge clicked at its midpoint lights up Extrude 1).
+            let mut r = r;
+            while let Reference::Implicit { on, .. } = r {
+                r = on;
+            }
             match r {
                 Reference::Body(b) => {
                     out.insert(b.feature);

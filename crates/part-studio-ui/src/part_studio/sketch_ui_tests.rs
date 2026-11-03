@@ -1993,3 +1993,19 @@ fn a_curves_graphics_menu_as_live(cx: &mut TestAppContext) {
     ];
     assert_eq!(labels, want);
 }
+
+/// Live (ui-parity fillet-asymmetric-toggle): an edge clicked at its midpoint (an implicit point on it) lights up the
+/// feature that made the edge, as the edge itself does.
+#[gpui::test]
+fn an_edge_midpoint_lights_up_its_feature(cx: &mut TestAppContext) {
+    let (_window, view, _top, _) = block_part(cx, "edge-mid-related");
+    let (edge, maker) = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+        let e = b.edge_refs.first().expect("an edge").clone();
+        let Reference::Edge(n) = &e else { panic!("an edge: {e:?}") };
+        (e.clone(), noshape_ops::studio::edge_creator(n).expect("its feature"))
+    });
+    view.update(cx, |v, _| v.selection = vec![Reference::Implicit { on: Box::new(edge), inference: noshape_model::reference::Inference::Midpoint }]);
+    assert!(cx.update(|cx| view.read(cx).related_features(cx).contains(&maker)));
+}
