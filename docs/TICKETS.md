@@ -393,6 +393,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   seam; the pieces' curves concatenated exactly (3D and on both faces, one parameter: boolean.cpp concat_shifted), so
   volumes stay OCCT's to the bit (bool_patterns' exact cases unchanged); a linear pre-check keeps it ~1 ms over the
   perf documents. Parity 42/57 features. Left: bushing's Extrude 4, pipeflange's Fillet 2 (36/81/42, live 36/79/40).
+  pipeflange's Fillet 2 isn't this: its R8 round the tube's foot runs into the corner holes' countersinks, and OCCT's
+  corner blends there differ from live's in geometry (18314.95 vs 18329.66 mm³), split in two on the +y side only
+  (52.14 + 7.24 mm², −y one 59.38); a blend corner case (kernel T2 blend::dumped_fillet_faces_probe on its dump).
   Extrude 4's two: its notch leaves the tube's end an arc, and the (moved) seam's vertex splits it (at −z on both
   walls); no angle is free of the slots and the notch, so OCCT's seam always splits something there. Matching needs
   the seam-split pieces of one arc counted (shown_topology) and picked as one edge.
