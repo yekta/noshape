@@ -913,8 +913,20 @@ impl<'a> Translator<'a> {
                 }
             }
         }
+        // Constraints and dimensions keep the geometry where Onshape solved
+        // it; any that move it (a solve that differs) are taken back.
+        let before = self.call("sketch_get", json!({ "sketch": id }))?;
         self.constraints(&oid, &id, f, problems);
         self.dimensions(&oid, &id, f, problems);
+        let after = self.call("sketch_get", json!({ "sketch": id }))?;
+        let moved = sketch_moved(&before, &after);
+        if moved > 1e-7 {
+            let old: Vec<&Value> = before["constraints"].as_array().into_iter().flatten().map(|c| &c["id"]).collect();
+            let added: Vec<Value> = after["constraints"].as_array().into_iter().flatten().map(|c| c["id"].clone()).filter(|c| !old.contains(&c)).collect();
+            if !added.is_empty() && self.call("sketch_delete", json!({ "sketch": id, "constraints": added })).is_ok() {
+                problems.push(format!("its constraints and dimensions moved the geometry by up to {:.6} mm: taken back (the geometry stays at Onshape's solve)", moved * 1e3));
+            }
+        }
         let st = self.call("feature_list", json!({}))?;
         let row = st["features"].as_array().into_iter().flatten().find(|x| x["id"] == id).cloned().unwrap_or_default();
         Ok((id, row["status"].as_str().unwrap_or("Ok").to_string(), row["message"].as_str().map(str::to_string)))
@@ -1045,6 +1057,24 @@ impl<'a> Translator<'a> {
             }
         }
     }
+}
+
+/// How far (m) any sketch point moved between two `sketch_get` replies.
+fn sketch_moved(before: &Value, after: &Value) -> f64 {
+    let points = |g: &Value| -> HashMap<String, Vec<f64>> {
+        let k = per_unit(&g["units"]);
+        g["entities"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|e| {
+                let coords: Vec<f64> = ["at", "start", "end", "center"].iter().filter_map(|key| e[*key].as_array()).flatten().filter_map(Value::as_f64).map(|c| c * k).collect();
+                Some((e["id"].as_str()?.to_string(), coords))
+            })
+            .collect()
+    };
+    let (b, a) = (points(before), points(after));
+    b.iter().filter_map(|(id, p)| a.get(id).map(|q| p.iter().zip(q).map(|(x, y)| (x - y).abs()).fold(0.0, f64::max))).fold(0.0, f64::max)
 }
 
 /// Every string in a packed query.
