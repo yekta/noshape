@@ -30,9 +30,10 @@ fn sk211_constraints_on_a_94_point_fit_spline_solve_quickly() {
 }
 
 /// The end of qa's sketch fuzz (seed 211, 200 steps: 438 entities, five fit
-/// splines, 1397 regions). Its regions took 1.5 s (dev build): each curve
-/// pair re-derived a long spline's box, size and samples, and every
-/// half-edge its curve's size, each a tessellation; now ~40 ms.
+/// splines, 1385 regions with centripetal splines). Its regions took 1.5 s
+/// (dev build): each curve pair re-derived a long spline's box, size and
+/// samples, and every half-edge its curve's size, each a tessellation; now
+/// ~40 ms.
 #[test]
 fn fuzz_sketch_regions_quickly() {
     let path = format!("{}/tests/fixtures/solve/fz211-final.json", env!("CARGO_MANIFEST_DIR"));
@@ -41,6 +42,6 @@ fn fuzz_sketch_regions_quickly() {
     let regions = sk.regions();
     let took = t.elapsed();
     eprintln!("{} regions in {took:?}", regions.len());
-    assert_eq!(regions.len(), 1397);
+    assert_eq!(regions.len(), 1385);
     assert!(took < Duration::from_secs(1), "{took:?}");
 }

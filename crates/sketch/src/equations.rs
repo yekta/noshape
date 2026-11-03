@@ -7,7 +7,7 @@ use crate::dual::{Dual, Num, V2};
 use crate::entities::{EntityKind, Geometry};
 use crate::ids::EntityId;
 use crate::linalg::BandLu;
-use crate::nurbs::{chord_params, handle_ends, FitSystem, Nurbs};
+use crate::nurbs::{fit_params, handle_ends, periodic_handles, seam_handles, span_weight, FitSystem, Nurbs};
 use crate::sketch::Sketch;
 use smallvec::SmallVec;
 #[cfg(test)]
@@ -433,6 +433,9 @@ struct FitDiff {
     frame: Nurbs,
     /// Each row's first control point (at the base knots).
     first: Vec<usize>,
+    /// A closed spline without handles: periodic, its seam handles taken
+    /// from the points (their gradient folded back into the points').
+    seam: bool,
 }
 
 /// A value on a fit spline and its gradient with respect to the spline's
@@ -451,13 +454,15 @@ impl FitDiff {
         }
         let pts: Vec<glam::DVec2> = (0..n).map(|i| glam::DVec2::new(x[2 * i], x[2 * i + 1])).collect();
         let handles = handles.then(|| (glam::DVec2::new(x[2 * n], x[2 * n + 1]), glam::DVec2::new(x[2 * n + 2], x[2 * n + 3])));
-        let (ub, total) = chord_params(&pts);
+        let seam = handles.is_none() && periodic_handles(&pts).is_some();
+        let handles = if seam { seam_handles(&pts) } else { handles };
+        let (ub, total) = fit_params(&pts);
         let sys = FitSystem::new(&ub, &pts, handles.map(|(h0, h1)| handle_ends(&pts, h0, h1)));
         let lu = sys.factor()?;
         let curve = sys.solve_with(&lu);
         let frame = sys.frame();
         let first = sys.rows.iter().map(|r| frame.find_span(r.0) - sys.degree).collect();
-        Some(FitDiff { pts, handles, ub, total, sys, lu, curve, frame, first })
+        Some(FitDiff { pts, handles, ub, total, sys, lu, curve, frame, first, seam })
     }
 
     fn row_dot(&self, first: usize, c: &[f64; 4]) -> glam::DVec2 {
@@ -486,40 +491,38 @@ impl FitDiff {
             out.push(Probe { v: self.row_dot(f0, &l), gx: vec![0.0; ni], gy: vec![0.0; ni] });
             ws.push(w);
         }
-        // Coefficient of each chord length in each probe's components.
+        // Coefficient of each span weight in each probe's components.
         let mut cl = vec![vec![DVec2::ZERO; n - 1]; at.len()];
         for (k, (pr, w)) in out.iter_mut().zip(&ws).enumerate() {
             let mut add = |gi: usize, wv: f64| {
                 pr.gx[2 * gi] += wv;
                 pr.gy[2 * gi + 1] += wv;
             };
-            match self.handles {
-                None => (0..n).for_each(|i| add(i, w[i])),
-                Some((h0, h1)) => {
-                    add(0, w[0]);
-                    (1..n - 1).for_each(|i| add(i, w[i + 1]));
-                    add(n - 1, w[nc - 1]);
-                    // d0 = (h0 - P0) 3T / first, d1 = (P[n-1] - h1) 3T / last.
-                    let t = self.total.max(1e-300);
-                    for (end, wv, q, seg) in [(0, w[1], h0 - self.pts[0], 0), (1, w[nc - 2], self.pts[n - 1] - h1, n - 2)] {
-                        let l = (self.pts[seg + 1] - self.pts[seg]).length();
-                        let len = l.max(t * 1e-9);
-                        let s = 3.0 * t / len;
-                        let (hi, pi, sign) = if end == 0 { (n, 0, 1.0) } else { (n + 1, n - 1, -1.0) };
-                        add(hi, sign * wv * s);
-                        add(pi, -sign * wv * s);
-                        if self.total > 1e-300 {
-                            let q = q * wv;
+            // Rows 0 and nc - 1 are the end points, 2..nc - 2 the interior ones.
+            add(0, w[0]);
+            (1..n - 1).for_each(|i| add(i, w[i + 1]));
+            add(n - 1, w[nc - 1]);
+            if let Some((h0, h1)) = self.handles {
+                // d0 = (h0 - P0) 3W / w0, d1 = (P[n-1] - h1) 3W / w[n-2] (W: the weights' sum).
+                let t = self.total.max(1e-300);
+                for (end, wv, q, seg) in [(0, w[1], h0 - self.pts[0], 0), (1, w[nc - 2], self.pts[n - 1] - h1, n - 2)] {
+                    let l = span_weight(self.pts[seg + 1] - self.pts[seg]);
+                    let len = l.max(t * 1e-9);
+                    let s = 3.0 * t / len;
+                    let (hi, pi, sign) = if end == 0 { (n, 0, 1.0) } else { (n + 1, n - 1, -1.0) };
+                    add(hi, sign * wv * s);
+                    add(pi, -sign * wv * s);
+                    if self.total > 1e-300 {
+                        let q = q * wv;
+                        for c in cl[k].iter_mut() {
+                            *c += q * (3.0 / len);
+                        }
+                        let dl = -q * (3.0 * t / (len * len));
+                        if l >= t * 1e-9 {
+                            cl[k][seg] += dl;
+                        } else {
                             for c in cl[k].iter_mut() {
-                                *c += q * (3.0 / len);
-                            }
-                            let dl = -q * (3.0 * t / (len * len));
-                            if l >= t * 1e-9 {
-                                cl[k][seg] += dl;
-                            } else {
-                                for c in cl[k].iter_mut() {
-                                    *c += dl * 1e-9;
-                                }
+                                *c += dl * 1e-9;
                             }
                         }
                     }
@@ -528,7 +531,6 @@ impl FitDiff {
         }
         if self.total > 1e-300 && n > 2 {
             let h = 1e-7;
-            let ends = self.handles.is_some();
             let mut frame = self.frame.clone();
             let mut ub = self.ub.clone();
             // dv/dub_j per probe
@@ -539,17 +541,17 @@ impl FitDiff {
                 s.iter_mut().for_each(|v| *v = [DVec2::ZERO; 2]);
                 for (si, sign) in [1.0, -1.0].into_iter().enumerate() {
                     ub[j] = self.ub[j] + sign * h;
-                    FitSystem::set_knots(&ub, p, ends, &mut frame.knots);
+                    FitSystem::set_knots(&ub, p, &mut frame.knots);
                     if si == 0 {
                         let moved = |k: &usize| frame.knots[*k] != self.sys.knots[*k];
                         let klo = (0..frame.knots.len()).find(moved).unwrap_or(usize::MAX);
                         let khi = (0..frame.knots.len()).rev().find(moved).unwrap_or(0);
                         rows.clear();
-                        rows.extend((0..nc).filter(|&r| self.sys.row_param(r, ends) == Some(j) || (self.first[r] <= khi + 1 && self.first[r] + 2 * p + 2 >= klo)));
+                        rows.extend((0..nc).filter(|&r| self.sys.row_param(r) == Some(j) || (self.first[r] <= khi + 1 && self.first[r] + 2 * p + 2 >= klo)));
                     }
                     for &r in &rows {
                         let (u0, der, _) = self.sys.rows[r];
-                        let u = self.sys.row_param(r, ends).map_or(u0, |k| ub[k]);
+                        let u = self.sys.row_param(r).map_or(u0, |k| ub[k]);
                         let (f, c) = FitSystem::basis_row(&frame, u, der);
                         let rv = self.row_dot(f, &c);
                         for (k, w) in ws.iter().enumerate() {
@@ -566,8 +568,8 @@ impl FitDiff {
                     g[k][j] = (s[k][0] - s[k][1]) / (2.0 * h);
                 }
             }
-            // ub_k = S_k / T: dub_k = (dS_k - ub_k dT) / T, so chord i's
-            // coefficient is (sum of g_k for k > i - sum of g_k ub_k) / T.
+            // ub_k = S_k / W: dub_k = (dS_k - ub_k dW) / W, so weight i's
+            // coefficient is (sum of g_k for k > i - sum of g_k ub_k) / W.
             for k in 0..at.len() {
                 let gamma: DVec2 = (1..n - 1).map(|j| g[k][j] * self.ub[j]).sum();
                 let mut suffix = DVec2::ZERO;
@@ -585,7 +587,8 @@ impl FitDiff {
                     continue;
                 }
                 let e = d / l;
-                let c = cl[k][i];
+                // A weight is the chord's square root.
+                let c = cl[k][i] * (0.5 / l.sqrt());
                 for (gv, cv) in [(&mut pr.gx, c.x), (&mut pr.gy, c.y)] {
                     gv[2 * i + 2] += cv * e.x;
                     gv[2 * i + 3] += cv * e.y;
@@ -594,7 +597,43 @@ impl FitDiff {
                 }
             }
         }
+        if self.seam {
+            self.fold_seam(&mut out);
+        }
         out
+    }
+
+    /// The seam handles' gradient moved onto the points: dh/dP by central
+    /// differences (O(n) per point, the cyclic solve).
+    fn fold_seam(&self, out: &mut [Probe]) {
+        let n = self.pts.len();
+        let size: f64 = self.pts.windows(2).map(|w| (w[1] - w[0]).length()).sum();
+        let h = 1e-7 * size.max(1e-12);
+        let mut pts = self.pts.clone();
+        let mut jac = vec![[0.0; 4]; 2 * n];
+        for i in 0..n {
+            for c in 0..2 {
+                let at = pts[i][c];
+                pts[i][c] = at + h;
+                let hi = seam_handles(&pts);
+                pts[i][c] = at - h;
+                let lo = seam_handles(&pts);
+                pts[i][c] = at;
+                if let (Some(a), Some(b)) = (hi, lo) {
+                    let d = [a.0 - b.0, a.1 - b.1];
+                    jac[2 * i + c] = [d[0].x / (2.0 * h), d[0].y / (2.0 * h), d[1].x / (2.0 * h), d[1].y / (2.0 * h)];
+                }
+            }
+        }
+        for pr in out.iter_mut() {
+            for g in [&mut pr.gx, &mut pr.gy] {
+                let hg = [g[2 * n], g[2 * n + 1], g[2 * n + 2], g[2 * n + 3]];
+                for (j, row) in jac.iter().enumerate() {
+                    g[j] += row.iter().zip(&hg).map(|(a, b)| a * b).sum::<f64>();
+                }
+                g.truncate(2 * n);
+            }
+        }
     }
 }
 
@@ -1992,6 +2031,48 @@ mod tests {
             x.extend([a.0 + 0.003, a.1 + 0.002, b.0 + 0.004, b.1 - 0.001]);
         }
         x
+    }
+
+    /// A closed fit spline (one point first and last: periodic) has the
+    /// gradients of moving that point as one, the copies' summed.
+    #[test]
+    fn closed_fit_spline_gradients_match_finite_differences() {
+        for n in [4usize, 5, 9] {
+            let mut fit = fit_inputs(n - 1, false);
+            fit.extend([fit[0] + 0.004, fit[1] - 0.006]);
+            let (a, b) = (fit[0], fit[1]);
+            fit[0] = 0.5 * (a + fit[2 * n - 2]);
+            fit[1] = 0.5 * (b + fit[2 * n - 1]);
+            fit[2 * n - 2] = fit[0];
+            fit[2 * n - 1] = fit[1];
+            for comp in 0..2u8 {
+                let mut x = vec![0.02, 0.003, 0.37];
+                x.extend(&fit);
+                let eq = Eq { kind: EqKind::FitPoint { comp, handles: false }, inputs: (0..x.len() as u32).collect() };
+                let mut g = vec![0.0; x.len()];
+                eq.eval_grad(&x, &mut g);
+                for i in 3..x.len() {
+                    // The shared point's coordinate moves both copies.
+                    let twin = match i - 3 {
+                        0 | 1 => Some(i + 2 * n - 2),
+                        k if k >= 2 * n - 2 => continue,
+                        _ => None,
+                    };
+                    let h = 1e-7;
+                    let f = |s: f64| {
+                        let mut xx = x.clone();
+                        xx[i] += s;
+                        if let Some(t) = twin {
+                            xx[t] += s;
+                        }
+                        eq.eval(&xx)
+                    };
+                    let fd = (f(h) - f(-h)) / (2.0 * h);
+                    let an = g[i] + twin.map_or(0.0, |t| g[t]);
+                    assert!((fd - an).abs() < 1e-5 * (1.0 + fd.abs()), "n {n} input {i}: fd {fd} vs {an}");
+                }
+            }
+        }
     }
 
     /// The fit spline equations' gradients (SKETCH-SOLVE-SPLINE-SLOW) match

@@ -87,9 +87,10 @@ fn r2004_ellipse_and_spline() {
     assert_eq!(version("r2004_spline.dwg"), "AC1018");
     let d = dwg("r2004_spline.dwg");
     let [DxfEntity::Curve(Curve2::Nurbs(n))] = d.entities.as_slice() else { panic!("{d:?}") };
-    assert_eq!(n.degree, 2);
-    assert_eq!(n.knots, vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0]);
-    assert_eq!(n.ctrl.len(), 3);
+    // Its 3 fit points: the cubic fit spline through them.
+    assert_eq!(n.degree, 3);
+    assert_eq!(n.knots.len(), 9);
+    assert_eq!(n.ctrl.len(), 5);
     assert!(n.weights.is_none());
     assert!(n.is_valid());
     assert!(close2(n.ctrl[0], DVec2::new(28.059004438447758, 8.806772793885493)));

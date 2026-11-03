@@ -26,7 +26,7 @@ pub enum Geometry {
     EllipticalArc { center: EntityId, major: DVec2, minor: f64, start: EntityId, end: EntityId },
     /// Control-point B-spline (optionally rational).
     BSpline { control: Vec<EntityId>, degree: usize, knots: Vec<f64>, weights: Option<Vec<f64>> },
-    /// Interpolating spline through the given points (cubic, chord-length).
+    /// Interpolating spline through the given points (cubic, centripetal).
     /// `handles`: tangent handle points at the start / end (Onshape's white
     /// handles, see [`crate::nurbs::Nurbs::interpolate_with_handles`]).
     /// Without handles the ends are natural.

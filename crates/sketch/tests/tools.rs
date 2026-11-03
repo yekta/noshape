@@ -323,6 +323,28 @@ fn closed_fit_spline_is_smooth_at_the_seam() {
     assert!(near_tip.x.abs() < 2e-3 && (near_tip.y - 0.0775).abs() < 1e-3, "{near_tip}");
 }
 
+/// Live 1777 / 1836 (SKETCH-SPLINE-CENTRIPETAL): a fit spline's knots are
+/// centripetal (cumulative square roots of the chords: s202's p7 has
+/// interior knots 0.3425, 0.6367), and a closed one is periodic (live's
+/// closed spline extruded 10 mm: 19782.85 mm³, a 1978.285 mm² profile).
+#[test]
+fn fit_splines_are_centripetal_and_closed_ones_periodic() {
+    let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+    let pts = [mm(118.591988, -2.29809), mm(128.129138, 7.889517), mm(137.666288, 4.004219), mm(152.043988, -2.29809)];
+    let nb = Nurbs::interpolate_with_ends(&pts, v(0.0146, 0.0615), v(0.0245, -0.0123)).unwrap();
+    let inner: Vec<f64> = nb.knots.iter().copied().filter(|k| *k > 1e-9 && *k < 1.0 - 1e-9).collect();
+    assert!(inner.len() == 2 && (inner[0] - 0.3425).abs() < 1e-4 && (inner[1] - 0.6367).abs() < 1e-4, "{inner:?}");
+    let mut sk = Sketch::new();
+    let ring = [mm(0.0, 0.0), mm(30.0, -10.0), mm(50.0, 15.0), mm(25.0, 35.0), mm(-5.0, 20.0), mm(0.0, 0.0)];
+    let id = sk.add_closed_fit_spline(&ring).unwrap();
+    let c = sk.curve(id).unwrap();
+    let (a, b) = c.domain();
+    let q: Vec<DVec2> = (0..=20000).map(|i| c.point(a + (b - a) * i as f64 / 20000.0)).collect();
+    let area = q.windows(2).map(|w| w[0].perp_dot(w[1])).sum::<f64>().abs() * 0.5 * 1e6;
+    assert!((area - 1978.285).abs() < 0.01, "{area} mm²");
+    assert!((c.tangent(a).normalize() - c.tangent(b).normalize()).length() < 1e-9);
+}
+
 /// Live (behaviours "psb (10-24 j) sketch offset constraints", qa4
 /// OFF-CONSTR): the first pair gets the offset DISTANCE, every other pair an
 /// OFFSET tied to it, so the copies follow their sources when those move and
