@@ -3189,7 +3189,11 @@ impl AssemblyView {
         let found = self.search_found_icon();
         let lit = move |b: Button, icon: &str| b.when(found == Some(icon), |b| b.bg(rgb(0xfcda7f)).border_1().border_color(rgb(0xfab601)));
         // Tooltips: title (+ shortcut), then the description after a pause.
-        let rich = |id: &'static str, tip: &'static str, icon: &str, b: Button| crate::ui::with_rich_tooltip(SharedString::from(format!("tt-{id}")), tip, search::tool_description(icon), b);
+        // (A ui-parity target by its tooltip's name: `tool:Revolute mate`.)
+        let rich = |id: &'static str, tip: &'static str, icon: &str, b: Button| {
+            let el = crate::ui::with_rich_tooltip(SharedString::from(format!("tt-{id}")), tip, search::tool_description(icon), b).into_any_element();
+            crate::ui_script::wrap(el, || format!("tool:{}", tip.split(" (").next().unwrap_or(tip)))
+        };
         let tool = |this: &Self, id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &mut Context<Self>, f: fn(&mut Self, &mut Window, &mut Context<Self>)| {
             let _ = this;
             rich(id, tip, icon, lit(crate::ui::tool_button(id, icon, on, cx), icon).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| f(this, window, cx))))

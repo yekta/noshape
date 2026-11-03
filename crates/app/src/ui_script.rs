@@ -161,7 +161,7 @@ fn control_name(t: &Value) -> Option<String> {
 type Studio = Option<Entity<PartStudioView>>;
 
 /// Where target `t` shows now, in window coordinates.
-fn locate(t: &Value, studio: &Studio, cx: &App) -> Result<Point<Pixels>, String> {
+fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_view::AssemblyView>>, cx: &App) -> Result<Point<Pixels>, String> {
     if let Some(name) = control_name(t) {
         if let Some(b) = noshape_app_core::ui_script::bounds_of(&name) {
             // A row's top or bottom edge (where a dragged row drops above or below it).
@@ -192,9 +192,13 @@ fn locate(t: &Value, studio: &Studio, cx: &App) -> Result<Point<Pixels>, String>
         let b = noshape_app_core::ui_script::bounds_of(&format!("feature:{f}")).ok_or_else(|| format!("feature:{f} is not shown"))?;
         return Ok(point(b.center().x, b.bottom() + px(3.)));
     }
-    let ps = studio.as_ref().ok_or("not in a Part Studio")?;
     // A pointer is at whole pixels (a mouse's, and Chrome's under live's runner).
-    ps.read(cx).ui_target_point(t, cx).map(|p| point(px(f32::from(p.x).floor()), px(f32::from(p.y).floor())))
+    let whole = |p: Point<Pixels>| point(px(f32::from(p.x).floor()), px(f32::from(p.y).floor()));
+    if let Some(ps) = studio.as_ref() {
+        return ps.read(cx).ui_target_point(t, cx).map(whole);
+    }
+    let asm = assembly.as_ref().ok_or("not in a Part Studio or an Assembly")?;
+    asm.read(cx).ui_target_point(t, cx).map(whole)
 }
 
 /// Presses at `at`, where the pointer already is (a pointer that doesn't move sends no second move: a repeated
@@ -304,8 +308,9 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             let target = step.get("on").or_else(|| step.get("from")).cloned().unwrap_or(Value::Null);
             redraw(cx).await;
             let ps = studio(cx);
+            let asm = ws.update(cx, |w, _| w.active_assembly()).ok().flatten();
             let result: Result<(), String> = match what {
-                "click" | "dblclick" | "rclick" | "hover" => match cx.update(|_, cx| locate(&target, &ps, cx)).unwrap_or_else(|e| Err(e.to_string())) {
+                "click" | "dblclick" | "rclick" | "hover" => match cx.update(|_, cx| locate(&target, &ps, &asm, cx)).unwrap_or_else(|e| Err(e.to_string())) {
                     Ok(at) => {
                         eprintln!("UI-SCRIPT step {} {what} at ({:.0}, {:.0})", i + 1, f32::from(at.x), f32::from(at.y));
                         let from = pointer.unwrap_or(at);
@@ -334,7 +339,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                                 sleep(cx, 300).await;
                                 redraw(cx).await;
                                 let row = json!({ row_key: pick });
-                                match cx.update(|_, cx| locate(&row, &ps, cx)).unwrap_or_else(|e| Err(e.to_string())) {
+                                match cx.update(|_, cx| locate(&row, &ps, &asm, cx)).unwrap_or_else(|e| Err(e.to_string())) {
                                     Ok(at) => {
                                         let _ = cx.update(|window, cx| {
                                             window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }), cx);
@@ -365,7 +370,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                     // view" is its "Section view…").
                     Err(e) if what == "click" && target.get("button").and_then(Value::as_str).is_some() => {
                         let name = target["button"].as_str().unwrap_or("").to_string();
-                        match cx.update(|_, cx| locate(&json!({ "button": "Camera and render options" }), &ps, cx)).unwrap_or_else(|e| Err(e.to_string())) {
+                        match cx.update(|_, cx| locate(&json!({ "button": "Camera and render options" }), &ps, &asm, cx)).unwrap_or_else(|e| Err(e.to_string())) {
                             Ok(at) => {
                                 let _ = cx.update(|window, cx| {
                                     window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }), cx);
@@ -373,7 +378,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                                 });
                                 sleep(cx, 300).await;
                                 redraw(cx).await;
-                                let row = cx.update(|_, cx| locate(&json!({ "menu": name }), &ps, cx).or_else(|_| locate(&json!({ "menu": format!("{name}…") }), &ps, cx))).unwrap_or_else(|e| Err(e.to_string()));
+                                let row = cx.update(|_, cx| locate(&json!({ "menu": name }), &ps, &asm, cx).or_else(|_| locate(&json!({ "menu": format!("{name}…") }), &ps, &asm, cx))).unwrap_or_else(|e| Err(e.to_string()));
                                 match row {
                                     Ok(at) => {
                                         let _ = cx.update(|window, cx| {
@@ -399,8 +404,8 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                 },
                 "drag" => {
                     let to = step.get("to").cloned().unwrap_or(Value::Null);
-                    let from = cx.update(|_, cx| locate(&target, &ps, cx)).unwrap_or_else(|e| Err(e.to_string()));
-                    let to = cx.update(|_, cx| locate(&to, &ps, cx)).unwrap_or_else(|e| Err(e.to_string()));
+                    let from = cx.update(|_, cx| locate(&target, &ps, &asm, cx)).unwrap_or_else(|e| Err(e.to_string()));
+                    let to = cx.update(|_, cx| locate(&to, &ps, &asm, cx)).unwrap_or_else(|e| Err(e.to_string()));
                     match (from, to) {
                         (Ok(a), Ok(b)) => {
                             // (As live's runner: three moves to the start, fifteen to the end.)

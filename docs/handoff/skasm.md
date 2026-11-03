@@ -1356,6 +1356,11 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   on an instance, one more state key "assembly"). Building ours: ops::ui_parity::build_start's "assembly" (mine);
   AssemblyView's ui_state and targets (mine, assembly-ui). Needed from psui: the app driver (crates/app/src/
   ui_script.rs, typed to PartStudioView) dispatching to an AssemblyView when the start opens on one.
+  21:00: done in ours (landed / queued): build_start's assembly, AssemblyView::ui_state / ui_target_point / ui_redraw
+  (assembly_ui_state.rs), rows marked instance: / mate:, toolbar tools tool:<tooltip name>, the driver opening
+  "Assembly 1" for such a start (psui's file, small). Scenarios asm-select-mate-row, asm-revolute-open-escape
+  (start pin-block) run in ours; waiting for live's runner (REQUESTS). Next: face picks into the mate dialog once
+  live shows which connector a click on a cylinder takes; drags need a transform tolerance in run.py.
 - (11-03 12:55, for psui) the ui-parity driver now moves the pointer to each click / drag start in three moves from where it was, and drags in fifteen, as live's runner does (it decides which sketch lines get woken). No other suite result changed in my sketch runs; please rerun yours.
 
 - (11-03 12:10) I stopped a ui-parity run by pattern and it also killed **psui's** suite run (/root/psui-scratch/uip-new56.log stops at sketch-circle-value-box, 12:10:44). Sorry: please tell psui to rerun it. I now kill only the PIDs I start.

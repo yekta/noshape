@@ -19,6 +19,29 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// Where target `t` shows now, in window coordinates: `face` / `edge` /
+    /// `vertex` [x, y, z] (mm, assembly coordinates), `origin`.
+    pub fn ui_target_point(&self, t: &Value, cx: &App) -> Result<Point<Pixels>, String> {
+        let vp = self.viewport.read(cx);
+        let mm = |v: &Value| -> Option<DVec3> {
+            let a = v.as_array()?;
+            Some(DVec3::new(a.first()?.as_f64()?, a.get(1)?.as_f64()?, a.get(2)?.as_f64()?) * 1e-3)
+        };
+        let world = if t.get("origin").is_some() {
+            DVec3::ZERO
+        } else if let Some(p) = ["face", "edge", "vertex"].iter().find_map(|k| t.get(*k)) {
+            mm(p).ok_or("a model point: [x, y, z] mm")?
+        } else {
+            return Err(format!("not a geometry target: {t}"));
+        };
+        let at = vp.project(world).ok_or("behind the camera")?;
+        let size = vp.size();
+        if at.x < 0.0 || at.y < 0.0 || at.x > size.x || at.y > size.y {
+            return Err(format!("{t} is outside the graphics area"));
+        }
+        Ok(vp.origin() + point(px(at.x as f32), px(at.y as f32)))
+    }
+
     /// The state the ui-parity runner records after each step.
     pub fn ui_state(&self, cx: &App) -> Value {
         let Some(asm) = self.assembly(cx) else { return json!({ "error": "no assembly" }) };

@@ -1,0 +1,19 @@
+{
+ "name": "asm-revolute-open-escape",
+ "about": "in an assembly (live 1907's pin and block), the Revolute mate tool opens its dialog (its one Mate connectors field active), Escape closes it",
+ "area": "skasm",
+ "source": "lead 11-03: assembly scenarios",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Revolute mate"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
