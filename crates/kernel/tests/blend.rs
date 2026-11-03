@@ -1144,3 +1144,20 @@ fn a_tooth_root_fillet_is_one_face() {
     assert_eq!(out.faces().len(), s.faces().len() + 2);
     assert!((vol_mm3(&out) - 82.94049).abs() < 1e-4, "{}", vol_mm3(&out));
 }
+
+/// cf-spur-gear's root fillets (PARITY-CUSTOM-RUN-FAILURES): R0.72 on both top edges of a 1.2 mm rib, so the rounds
+/// overlap and the rib's top face goes (OCCT fails): each round made alone, the part their common, as Parasolid's.
+#[test]
+fn overlapping_rounds_of_a_narrow_rib_are_their_common() {
+    setup();
+    let part = boolean(BooleanOp::Fuse, &[bx([0.0; 3], [10.0, 10.0, 2.0])], &[bx([4.4, 0.0, 2.0], [5.6, 10.0, 5.0])], &BooleanOptions::default()).unwrap().shape;
+    let es = edges_where(&part, |i| i.start.z > 4.99 * MM && i.end.z > 4.99 * MM && (i.start.y - i.end.y).abs() > 1.0 * MM);
+    assert_eq!(es.len(), 2);
+    let r = fillet_checked(&part, &es, &[0.72 * MM; 2]).unwrap().shape;
+    assert!(r.is_valid());
+    assert_eq!(r.faces().len(), part.faces().len() + 1);
+    let one = |e: &Shape| fillet_checked(&part, std::slice::from_ref(e), &[0.72 * MM]).unwrap().shape;
+    let want = boolean(BooleanOp::Common, &[one(&es[0])], &[one(&es[1])], &BooleanOptions::default()).unwrap().shape;
+    assert!((vol_mm3(&r) - vol_mm3(&want)).abs() < 1e-6, "{} {}", vol_mm3(&r), vol_mm3(&want));
+    assert!(vol_mm3(&r) < vol_mm3(&one(&es[0])));
+}

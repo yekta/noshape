@@ -4176,6 +4176,134 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_past_end_faces(const TopoDS
   }
 }
 
+// Every input shape's images through either history (both from `input`): removed only when both lose it.
+HHist either_path(const TopoDS_Shape& input, const HHist& a, const HHist& b)
+{
+  HHist r = new BRepTools_History();
+  for (TopAbs_ShapeEnum k : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+  {
+    ShapeIMap in;
+    TopExp::MapShapes(input, k, in);
+    for (int i = 1; i <= in.Extent(); ++i)
+    {
+      const TopoDS_Shape& x   = in(i);
+      HHist               one = new BRepTools_History();
+      add_images(a, x, x, one);
+      add_images(b, x, x, one);
+      ShapeIMap seen;
+      bool      any = false;
+      const ShapeList m = one->Modified(x);
+      for (ShapeList::Iterator it(m); it.More(); it.Next())
+      {
+        if (seen.Contains(it.Value()))
+          continue;
+        seen.Add(it.Value());
+        any = true;
+        if (!it.Value().IsSame(x))
+          r->AddModified(x, it.Value());
+      }
+      const ShapeList g = one->Generated(x);
+      for (ShapeList::Iterator it(g); it.More(); it.Next())
+      {
+        r->AddGenerated(x, it.Value());
+        any = true;
+      }
+      if (!any)
+        r->Remove(x);
+    }
+  }
+  return r;
+}
+
+// Rounds of edge groups that share no vertex but overlap (a gear's two root edges 1.24 mm apart at R0.72,
+// cf-spur-gear: the root face goes, OCCT can't trim one round by the other): each group rounded on its own, the part
+// their common, as Parasolid's overlapping rounds are (each round only takes material off by its own edges: convex
+// rounds only). Null when it doesn't apply.
+std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_groups(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es,
+                                                              const std::vector<double>& rs)
+{
+  const size_t        n = es.size();
+  std::vector<size_t> root(n);
+  for (size_t i = 0; i < n; ++i)
+    root[i] = i;
+  auto find = [&](size_t i) {
+    while (root[i] != i)
+      i = root[i] = root[root[i]];
+    return i;
+  };
+  for (size_t i = 0; i < n; ++i)
+    for (size_t j = i + 1; j < n; ++j)
+    {
+      bool shared = false;
+      for (TopExp_Explorer a(es[i], TopAbs_VERTEX); a.More() && !shared; a.Next())
+        for (TopExp_Explorer b(es[j], TopAbs_VERTEX); b.More() && !shared; b.Next())
+          shared = a.Current().IsSame(b.Current());
+      if (shared)
+        root[find(i)] = find(j);
+    }
+  std::vector<std::vector<size_t>> groups;
+  {
+    std::vector<int> slot(n, -1);
+    for (size_t i = 0; i < n; ++i)
+    {
+      const size_t g = find(i);
+      if (slot[g] < 0)
+      {
+        slot[g] = (int)groups.size();
+        groups.emplace_back();
+      }
+      groups[(size_t)slot[g]].push_back(i);
+    }
+  }
+  if (groups.size() < 2)
+    return std::nullopt;
+  try
+  {
+    const double v0  = volume_props(input).Mass();
+    TopoDS_Shape cur = input;
+    HHist        cur_h;
+    for (const std::vector<size_t>& idx : groups)
+    {
+      BRepFilletAPI_MakeFillet mk(input);
+      for (size_t i : idx)
+        mk.Add(rs.size() == es.size() ? rs[i] : rs[0], es[i]);
+      if (!run_guarded([&] { mk.Build(); }) || !mk.IsDone())
+        return std::nullopt;
+      HHist        h       = history_of({input}, mk);
+      TopoDS_Shape rounded = mk.Shape();
+      HHist        corners;
+      rounded = exact_vertex_blends(rounded, corners);
+      if (!corners.IsNull())
+        h = compose(input, h, corners);
+      if (!valid_shape(rounded) || !(volume_props(rounded).Mass() < v0))
+        return std::nullopt;
+      BRepAlgoAPI_Common cm; // (not the two-shape constructor: it builds at once)
+      ShapeList          args, tools;
+      args.Append(cur);
+      tools.Append(rounded);
+      cm.SetArguments(args);
+      cm.SetTools(tools);
+      cm.SetToFillHistory(true);
+      cm.Build(new_cancel_indicator()->Start());
+      if (!cm.IsDone() || cm.HasErrors())
+        return std::nullopt;
+      HHist hc = history_of({cur, rounded}, cm);
+      cur_h    = either_path(input, compose(input, cur_h, hc), compose(input, h, hc));
+      cur      = cm.Shape();
+    }
+    int solids = 0;
+    for (TopExp_Explorer x(cur, TopAbs_SOLID); x.More(); x.Next())
+      ++solids;
+    if (!valid_shape(cur) || solids != 1)
+      return std::nullopt;
+    return std::make_pair(cur, cur_h);
+  }
+  catch (const Standard_Failure&)
+  {
+    return std::nullopt;
+  }
+}
+
 } // namespace
 
 // A fillet wider than the faces it rolls on, which OCCT can't build (live
@@ -5218,6 +5346,11 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     {
       const KernelTimer timer("blend.fallback.past_end_faces");
       past = fillet_past_end_faces(in, es, rs);
+    }
+    if (!past)
+    {
+      const KernelTimer timer("blend.fallback.by_groups");
+      past = fillet_by_groups(in, es, rs);
     }
     if (!past)
     {
