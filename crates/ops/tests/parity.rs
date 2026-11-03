@@ -945,6 +945,36 @@ fn sketch_text_is_placed_as_lives() {
     assert!(c[0] > 0.0 && (angle - 67.5).abs() < 22.5, "centroid {c:?}, {angle}°");
 }
 
+/// Sketch text the size live lays it out (live 1922, cf-fix-pcb's "Embossed
+/// Letters"): its baseline vector is the text's advance width, `ascent` the
+/// capitals' height; live's letters run 103.88 mm (ink) and "b", "d" reach
+/// 9.65 mm above the baseline.
+#[test]
+fn sketch_text_is_the_size_lives_is() {
+    let p = |id: &str, v: Value| json!({ "parameterId": id, "value": v });
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+          "entities": [{ "btType": "BTMSketchTextEntity-1761", "entityId": "txt", "isConstruction": false,
+              "parameters": [p("fontName", json!("OpenSans-Regular.ttf")), p("text", json!("Embossed Letters")), p("mirrorHorizontal", json!(false)), p("mirrorVertical", json!(false))],
+              "baselineStartX": 0.0, "baselineStartY": 0.0, "baselineDirectionX": 0.10595256497860339, "baselineDirectionY": 0.0, "ascent": 0.009144414216279984 }],
+          "constraints": [] }
+    ] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("sketch-text-size.noshape"), &features, Default::default()).unwrap();
+    let step = t.step(0);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    let regions = g["regions"].as_array().unwrap();
+    let (mut lo, mut hi, mut top) = (f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
+    for r in regions {
+        lo = lo.min(r["bounds"]["min"][0].as_f64().unwrap());
+        hi = hi.max(r["bounds"]["max"][0].as_f64().unwrap());
+        top = top.max(r["bounds"]["max"][1].as_f64().unwrap());
+    }
+    assert!((hi - lo - 103.88).abs() < 0.6, "ink width {} mm", hi - lo);
+    assert!((top - 9.65).abs() < 0.1, "tallest letters {top} mm");
+}
+
 /// An Extrude saved before Symmetric was a checkbox (endBound SYMMETRIC):
 /// the block 20 mm deep about the sketch plane.
 #[test]

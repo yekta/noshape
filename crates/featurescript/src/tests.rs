@@ -95,6 +95,8 @@ fn units_from_the_standard_library() {
 fn enums_and_types() {
     let src = "enum E { A, B }\nfunction f() { return [E.B is E, E.A is string, ('A' as E) == E.A, E.A < E.B, try('Z' as E)]; }";
     assert_eq!(run_str(src), "[ true , true , true , true , undefined ]");
+    // A comma after the last value (live compiles cf-straight-spline's enum).
+    assert_eq!(run_str("enum S { A, B, }\nfunction f() { return S.B is S; }"), "true");
 }
 
 #[test]

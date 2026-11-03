@@ -297,7 +297,9 @@ impl<'a> Parser<'a> {
                             let p = self.pos();
                             let v = self.expect_ident()?;
                             values.push((ann, v, p));
-                            if !self.eat_op(Op::Comma) {
+                            // A comma after the last value is allowed (live
+                            // compiles cf-straight-spline's `sixteenSpline, }`).
+                            if !self.eat_op(Op::Comma) || self.is_op(Op::RBrace) {
                                 break;
                             }
                         }

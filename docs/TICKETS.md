@@ -3258,6 +3258,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     can't place yet, so it shows once that is fixed).
   Not the host's: cf-sheet-metal-flange-plus (its Sheet Metal Model Plus studio's import isn't fetched, REQUESTS
   19:19) and cf-sheet-metal-overcut-dogbone (Fold SM 1's edge has no geometry in live's data).
+  dx 11-03 20:23, cf-straight-spline (54 SAE Straight-Sided Spline features; compiles since dx's enum trailing-comma
+  fix): 12 fail `@opBoolean: BOOLEAN_NON_MANIFOLD_RESULT`, then `Type error: value BOOLEAN_NON_MANIFOLD_RESULT cannot be
+  enum ErrorStringEnum` (error.fs 149, processError: the host's code isn't one of the served std's); the first one is
+  31/78/49 faces / edges / vertices, live 31/77/48; and the document regenerates in 59 s, live 7.8 s (PARITY-SPEED).
 - [ ] P1 FS-FEATURE-LIST-NONDETERMINISTIC (core; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our

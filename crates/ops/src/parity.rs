@@ -2147,7 +2147,17 @@ impl<'a> Translator<'a> {
             }
             name.push(c);
         }
-        let mut args = json!({ "sketch": id, "text": param("text").as_str().unwrap_or(""), "corner": [mm(start[0]), mm(start[1])], "height": mm(ascent),
+        // Ours takes the box's height, the font's ascender line. Onshape's
+        // baseline vector is the laid-out text's advance width (live 1922),
+        // so the height is what lays the text out that wide in our font;
+        // else from `ascent`, the capitals' height: font size ascent / 0.72
+        // (Open Sans's ascender 1.069 of it).
+        let text = param("text").as_str().unwrap_or("").to_string();
+        let font = if name.is_empty() { noshape_sketch::text::SKETCH_DEFAULT_FONT.to_string() } else { name.clone() };
+        let advance = noshape_sketch::text::layout_text(&text, &font, style.contains("Bold"), style.contains("Italic")).width;
+        let live_width = dx.hypot(dy);
+        let height = if advance > 1e-9 && live_width > 1e-9 { live_width / advance } else { ascent / 0.72 * 1.069 };
+        let mut args = json!({ "sketch": id, "text": text, "corner": [mm(start[0]), mm(start[1])], "height": mm(height),
             "bold": style.contains("Bold"), "italic": style.contains("Italic"), "flip_horizontal": param("mirrorHorizontal") == true, "flip_vertical": param("mirrorVertical") == true });
         if !name.is_empty() {
             args["font"] = json!(name);
