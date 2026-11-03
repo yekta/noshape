@@ -32,11 +32,11 @@ impl PartStudioView {
     }
 
     /// Feature that created a referenced entity.
-    pub(super) fn creating_feature(&self, r: &Reference) -> Option<FeatureId> {
+    pub(super) fn creating_feature(&self, r: &Reference, cx: &App) -> Option<FeatureId> {
         match r {
             Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } => Some(*sketch),
             Reference::Face(n) => n.creator(),
-            Reference::Edge(n) | Reference::Vertex(n) => super::edge_creator(n),
+            Reference::Edge(n) | Reference::Vertex(n) => super::edge_creator(n, self.studio(cx)?),
             Reference::Body(b) => Some(b.feature),
             Reference::FeaturePlane(f) => Some(*f),
             Reference::MateConnector { feature, .. } => Some(*feature),
@@ -57,7 +57,7 @@ impl PartStudioView {
         let body_name = body.as_ref().and_then(|b| self.display.body(b)).map(|b| b.name.clone()).unwrap_or_else(|| "part".into());
         let has_material = body.as_ref().is_some_and(|b| self.studio(cx).and_then(|s| s.part_properties.get(b)).is_some_and(|p| p.material.is_some()));
         let com_shown = body.as_ref().is_some_and(|b| self.ui.com.as_ref().is_some_and(|(c, _)| c == b));
-        let creator = target_ref.as_ref().and_then(|r| self.creating_feature(r));
+        let creator = target_ref.as_ref().and_then(|r| self.creating_feature(r, cx));
         let studio = self.studio(cx);
         let creator_name = creator.and_then(|id| studio.and_then(|s| s.feature(id)).map(|f| f.name.clone()));
         let sketch_swatch = creator.map(|id| self.sketch_swatch(id, cx));

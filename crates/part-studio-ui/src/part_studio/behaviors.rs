@@ -964,7 +964,7 @@ impl PartStudioView {
                     }
                 }
                 Reference::Edge(n) | Reference::Vertex(n) => {
-                    if let Some(f) = super::edge_creator(n) {
+                    if let Some(f) = self.studio(cx).and_then(|s| super::edge_creator(n, s)) {
                         out.insert(f);
                     }
                 }

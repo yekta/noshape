@@ -628,13 +628,20 @@ mod rename_tests {
 }
 
 
-/// The feature that made an edge or vertex: its faces' (a part corner's
-/// menu starts Edit Extrude 1…, live "ui (10-24 c)").
-pub fn edge_creator(n: &noshape_model::reference::TopoName) -> Option<FeatureId> {
+/// The feature that made an edge or vertex: the latest of its faces' creators in `ps` (a part corner's menu starts
+/// Edit Extrude 1…, live "ui (10-24 c)"; a fillet's tangent edge is Fillet 1's, live ui-parity measure-fillet-face).
+pub fn edge_creator(n: &noshape_model::reference::TopoName, ps: &PartStudio) -> Option<FeatureId> {
+    edge_creator_by(n, |f| ps.features.iter().position(|x| x.id == f))
+}
+
+/// [`edge_creator`] with the features' order given by `order` (creators it doesn't know, a derived or context
+/// feature's, come before those it does).
+pub fn edge_creator_by(n: &noshape_model::reference::TopoName, order: impl Fn(FeatureId) -> Option<usize>) -> Option<FeatureId> {
     use noshape_model::reference::TopoName;
+    let latest = |faces: &[std::sync::Arc<TopoName>]| faces.iter().filter_map(|f| f.creator()).max_by_key(|f| order(*f));
     match n {
-        TopoName::Edge { faces, .. } => faces[1].creator().or_else(|| faces[0].creator()),
-        TopoName::Vertex { faces, .. } => faces.iter().rev().find_map(|f| f.creator()),
+        TopoName::Edge { faces, .. } => latest(faces),
+        TopoName::Vertex { faces, .. } => latest(faces),
         TopoName::Boundary { face, .. } => face.creator(),
         other => other.creator(),
     }
@@ -653,8 +660,9 @@ pub fn missing_reference(doc: &noshape_model::Document, ps: &PartStudio) -> impl
             live.extend(src.features.iter().filter(|g| !g.suppressed).map(|g| g.id));
         }
     }
+    let order: std::collections::HashMap<FeatureId, usize> = ps.features.iter().enumerate().map(|(i, f)| (f.id, i)).collect();
     move |r: &Reference| match r {
-        Reference::Edge(n) | Reference::Vertex(n) => edge_creator(n).is_some_and(|f| !live.contains(&f) && !noshape_model::in_context::is_context_feature(f)),
+        Reference::Edge(n) | Reference::Vertex(n) => edge_creator_by(n, |f| order.get(&f).copied()).is_some_and(|f| !live.contains(&f) && !noshape_model::in_context::is_context_feature(f)),
         r => r.depends_on().is_some_and(|f| !live.contains(&f) && !noshape_model::in_context::is_context_feature(f)),
     }
 }

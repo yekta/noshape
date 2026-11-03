@@ -2004,7 +2004,7 @@ fn an_edge_midpoint_lights_up_its_feature(cx: &mut TestAppContext) {
         let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
         let e = b.edge_refs.first().expect("an edge").clone();
         let Reference::Edge(n) = &e else { panic!("an edge: {e:?}") };
-        (e.clone(), noshape_ops::studio::edge_creator(n).expect("its feature"))
+        (e.clone(), noshape_ops::studio::edge_creator(n, v.studio(cx).expect("the studio")).expect("its feature"))
     });
     view.update(cx, |v, _| v.selection = vec![Reference::Implicit { on: Box::new(edge), inference: noshape_model::reference::Inference::Midpoint }]);
     assert!(cx.update(|cx| view.read(cx).related_features(cx).contains(&maker)));
@@ -2031,4 +2031,39 @@ fn a_new_extrude_on_a_face_never_previews_as_new(cx: &mut TestAppContext) {
     }
     assert_eq!(cx.update(|cx| (dialog.read(cx).feature.params.enum_("operationType").to_string(), view.read(cx).display.bodies.len())), ("ADD".to_string(), 1));
     assert_eq!(most, 1, "no New preview with a second part on the way");
+}
+
+/// Live (ui-parity measure-fillet-face): an edge between an Extrude face and a Fillet face is Fillet 1's (the edge
+/// exists since the later of its faces): selected, it lights up Fillet 1, not Extrude 1.
+#[gpui::test]
+fn a_fillets_tangent_edge_lights_up_the_fillet(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } },
+        { "type": "fillet", "name": "Fillet 1", "params": { "entities": ["edge through [20, 0, 10]"], "radius": "2 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "fillet-tangent-edge", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let (edge, extrude, fillet) = cx.update(|cx| {
+        let v = view.read(cx);
+        let id = |name: &str| v.studio(cx).unwrap().features.iter().find(|f| f.name == name).unwrap().id;
+        let (extrude, fillet) = (id("Extrude 1"), id("Fillet 1"));
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+        let edge = b
+            .edge_refs
+            .iter()
+            .find(|e| match e {
+                Reference::Edge(noshape_model::reference::TopoName::Edge { faces, .. }) => {
+                    let made: Vec<_> = faces.iter().filter_map(|f| f.creator()).collect();
+                    made.contains(&extrude) && made.contains(&fillet)
+                }
+                _ => false,
+            })
+            .expect("a tangent edge of the fillet")
+            .clone();
+        (edge, extrude, fillet)
+    });
+    view.update(cx, |v, _| v.selection = vec![edge]);
+    let related = cx.update(|cx| view.read(cx).related_features(cx));
+    assert!(related.contains(&fillet) && !related.contains(&extrude), "{related:?}");
 }

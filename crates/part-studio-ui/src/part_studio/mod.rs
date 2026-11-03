@@ -1515,7 +1515,7 @@ impl PartStudioView {
                 Reference::Plane(DatumPlane::Front) => "Front plane".into(),
                 Reference::Plane(DatumPlane::Right) => "Right plane".into(),
                 Reference::Face(n) => format!("Face of {}", owner(n.creator()).map(fname).unwrap_or_else(|| "part".into())),
-                Reference::Edge(n) => format!("Edge of {}", owner(edge_creator(n)).map(fname).unwrap_or_else(|| "part".into())),
+                Reference::Edge(n) => format!("Edge of {}", owner(noshape_ops::studio::edge_creator_by(n, |f| names.iter().position(|(i, _)| *i == f))).map(fname).unwrap_or_else(|| "part".into())),
                 // A vertex reads "Vertex of <feature>", named by the latest
                 // feature among its faces' creators (live "qa5 sm" (7): the
                 // inner bend corner of two flanges is "Vertex of Flange 1").
@@ -2621,7 +2621,7 @@ impl PartStudioView {
         }
         let mut creators: Vec<FeatureId> = Vec::new();
         for r in self.selection.iter().filter(|r| matches!(r, Reference::Face(_) | Reference::Edge(_))) {
-            if let Some(f) = self.creating_feature(r).filter(|f| !creators.contains(f)) {
+            if let Some(f) = self.creating_feature(r, cx).filter(|f| !creators.contains(f)) {
                 creators.push(f);
             }
         }
