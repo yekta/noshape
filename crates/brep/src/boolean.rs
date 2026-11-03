@@ -241,6 +241,8 @@ struct GFace {
     edges: Vec<(usize, bool)>,
     /// The same in its parameter plane (a seam twice), made when first asked for ([`Ctx::bound`]).
     bound: std::sync::OnceLock<R<Vec<C2>>>,
+    /// Each of those curves' sample points, made when first asked for (curves crossing it: `intervals_on`).
+    bound_pts: std::sync::OnceLock<Vec<std::sync::OnceLock<Vec<DVec2>>>>,
     lo: DVec3,
     hi: DVec3,
     /// A NURBS face's surface, its edges' curves on it (by edge, a seam's second: OCCT's, in its own parameters,
@@ -1209,8 +1211,10 @@ impl Ctx<'_> {
                 }
             }
         }
-        for b in &bound {
-            for (u, _) in c2.intersections(b, tol) {
+        let samples = std::sync::OnceLock::new();
+        let pts = self.faces[f].bound_pts.get_or_init(|| bound.iter().map(|_| std::sync::OnceLock::new()).collect());
+        for (b, theirs) in bound.iter().zip(pts) {
+            for (u, _) in c2.intersections_with(b, tol, &samples, theirs) {
                 let t = t0 + (t1 - t0) * u;
                 cuts.push((t, End::Point(path.at(t))));
             }
@@ -3389,7 +3393,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 Some(fs) => free::nurbs_surf(fs, uvbox, f.reversed),
                 None => s,
             };
-            cx.faces.push(GFace { arg: a, index: i as u32, t: body.face_tol.get(i).copied().unwrap_or(0.0), solid: usize::MAX, s, edges, bound: Default::default(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default(), hulls: Default::default(), inner: body.face_inner_edges.iter().filter(|x| x[0] as usize == i).map(|x| first_edge[ai] + x[1] as usize).collect() });
+            cx.faces.push(GFace { arg: a, index: i as u32, t: body.face_tol.get(i).copied().unwrap_or(0.0), solid: usize::MAX, s, edges, bound: Default::default(), bound_pts: Default::default(), lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default(), hulls: Default::default(), inner: body.face_inner_edges.iter().filter(|x| x[0] as usize == i).map(|x| first_edge[ai] + x[1] as usize).collect() });
         }
         for (i, s) in body.solids.iter().enumerate() {
             let si = cx.solids.len();

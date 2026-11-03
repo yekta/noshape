@@ -115,6 +115,10 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
   runs; corpus5 is in vibe3 ~/bool-kbin). corpus5's aggregate profile (all taken cases, thread samples):
   IntTools_FaceFace 26 % (5 % its PSO tolerance check), intervals_on 20 %, BRepCheck_Analyzer 11 %, face_pair 7 %,
   face pieces 6 %, rays 6 %.
+- Then (11-03 02:20): crossings of a curve with a face's boundary take the curve's sample points once per face and
+  each boundary curve's once per face (GFace::bound_pts): the same values, corpora / shfall identical; corpus5
+  noshape 6563 -> 6458 ms (-1.6 %, twice). Tried, slower: BRepCheck on the built faces plus the whole without
+  geometric checks (two analyzers: corpus5 +10 %); outcomes were identical (fz1144, gpf too).
 - Tried, not landed: a tiny arc's two vertices (one argument's, within each other's tolerance: corpus6 b70f339a's
   quarter arc of 1e-10 m) merged as a group and the arc a micro edge: the 8 cases move on to "a point near two
   vertices" (4) and "an invalid result" (4). Pattern fuses: noshape's Boolean before fuse_slabs makes the 999-tool

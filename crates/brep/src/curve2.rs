@@ -5,7 +5,7 @@
 use crate::nurbs::NurbsCurve;
 use glam::{DVec2, DVec3};
 use std::f64::consts::TAU;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 /// A segment from `a` to `b`, an arc of the circle (`c`, `r`) from angle `a0` through `sweep` (positive:
 /// counter-clockwise), the curve c + u cos t + v sin t + w t, or the curve c + u cosh t + v sinh t + w atan(k sinh t),
@@ -651,7 +651,14 @@ fn mapped_box(c: &NurbsCurve, t0: f64, t1: f64, m: &Map) -> (DVec2, DVec2) {
 }
 
 impl C2 {
-    fn numeric_intersections(&self, o: &C2, tol: f64) -> Vec<(f64, f64)> {
+    /// Its points at its samples' parameters (k / n).
+    fn sample_points(&self) -> Vec<DVec2> {
+        let n = self.samples();
+        (0..=n).map(|k| self.at(k as f64 / n as f64)).collect()
+    }
+
+    /// (`mine`, `theirs`: the two's sample points, made once for crossings with several curves.)
+    fn numeric_intersections(&self, o: &C2, tol: f64, mine: &OnceLock<Vec<DVec2>>, theirs: &OnceLock<Vec<DVec2>>) -> Vec<(f64, f64)> {
         // (Boxes apart: none.)
         if let (Some(a), Some(b)) = (self.quick_box(), o.quick_box()) {
             let g = 4.0 * tol;
@@ -679,9 +686,9 @@ impl C2 {
             return Vec::new();
         }
         let (na, nb) = (self.samples(), o.samples());
-        let pa: Vec<DVec2> = (0..=na).map(|k| self.at(k as f64 / na as f64)).collect();
-        let pb: Vec<DVec2> = (0..=nb).map(|k| o.at(k as f64 / nb as f64)).collect();
-        let scale = pa.iter().chain(&pb).fold(0.0_f64, |m, p| m.max(p.abs().max_element())).max(1e-9);
+        let pa = mine.get_or_init(|| self.sample_points());
+        let pb = theirs.get_or_init(|| o.sample_points());
+        let scale = pa.iter().chain(pb).fold(0.0_f64, |m, p| m.max(p.abs().max_element())).max(1e-9);
         let mut out: Vec<(f64, f64)> = Vec::new();
         // Runs of 16 chords each, their boxes grown as the chords' below: only runs whose boxes meet are looked at.
         const RUN: usize = 16;
@@ -695,7 +702,7 @@ impl C2 {
                 })
                 .collect()
         };
-        let (ra, rb) = (runs(&pa, na, 4.0 * tol), runs(&pb, nb, 0.0));
+        let (ra, rb) = (runs(pa, na, 4.0 * tol), runs(pb, nb, 0.0));
         let chords = |ia: std::ops::Range<usize>, ib: std::ops::Range<usize>, out: &mut Vec<(f64, f64)>| {
             for i in ia {
                 let (a0, a1) = (pa[i], pa[i + 1]);
@@ -759,8 +766,14 @@ impl C2 {
     /// Parameters (on `self`, on `o`) where the two cross, ends included; none where they run together
     /// (within `tol`: collinear segments, arcs of one circle), which their ends lying on each other show.
     pub fn intersections(&self, o: &C2, tol: f64) -> Vec<(f64, f64)> {
+        self.intersections_with(o, tol, &OnceLock::new(), &OnceLock::new())
+    }
+
+    /// [`Self::intersections`], `mine` and `theirs` the two's sample points, made once for crossings with several
+    /// curves.
+    pub fn intersections_with(&self, o: &C2, tol: f64, mine: &OnceLock<Vec<DVec2>>, theirs: &OnceLock<Vec<DVec2>>) -> Vec<(f64, f64)> {
         if matches!(self, C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. }) || matches!(o, C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. }) {
-            return self.numeric_intersections(o, tol);
+            return self.numeric_intersections(o, tol, mine, theirs);
         }
         let mut out = Vec::new();
         match (self.clone(), o.clone()) {
