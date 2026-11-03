@@ -1,6 +1,6 @@
 {
  "scenario": "sketch-line-value-box",
- "recorded": "2026-11-03T08:35:35.706Z",
+ "recorded": "2026-11-03T22:05:35.154Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "1404643c0135858293d2455b",
+  "element": "47ea3b87edee6deb121ec726",
   "start": "empty",
   "startElement": "16c3ef729d456774c1da81b8"
  },
@@ -139,7 +139,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 49646
+   "t": 60709
   },
   {
    "step": 2,
@@ -152,7 +152,7 @@
    "ok": true,
    "at": [
     1083,
-    617
+    568
    ],
    "state": {
     "focus": {
@@ -245,7 +245,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 60736
+   "t": 68884
   },
   {
    "step": 3,
@@ -345,7 +345,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 63889
+   "t": 73311
   },
   {
    "step": 4,
@@ -359,9 +359,12 @@
     }
    },
    "ok": true,
+   "hover": [
+    "IB"
+   ],
    "at": [
     1082,
-    562
+    519
    ],
    "state": {
     "focus": {
@@ -453,7 +456,7 @@
      "dimensions": []
     }
    },
-   "t": 72172
+   "t": 81955
   },
   {
    "step": 5,
@@ -467,9 +470,10 @@
     }
    },
    "ok": true,
+   "hover": [],
    "at": [
-    1180,
-    591
+    1172,
+    545
    ],
    "state": {
     "focus": {
@@ -566,7 +570,7 @@
      "dimensions": []
     }
    },
-   "t": 80406
+   "t": 89185
   },
   {
    "step": 6,
@@ -579,10 +583,10 @@
     "focus": {
      "kind": "other",
      "tag": "input",
-     "text": "50",
+     "text": "0 mm0",
      "selection": [
-      2,
-      2
+      5,
+      5
      ],
      "all": false
     },
@@ -677,13 +681,124 @@
      "dimensions": []
     }
    },
-   "t": 82591
+   "t": 91285
   },
   {
    "step": 7,
    "do": {
     "do": "key",
     "key": "Enter"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "0 mm0",
+     "selection": [
+      0,
+      5
+     ],
+     "all": true
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Line",
+     "entities": [
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
+     "dimensions": []
+    }
+   },
+   "t": 93065
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "key",
+    "key": "Escape"
    },
    "ok": true,
    "state": {
@@ -778,126 +893,10 @@
       "COINCIDENT",
       "HORIZONTAL"
      ],
-     "dimensions": [
-      {
-       "kind": "LINEAR",
-       "value": 50,
-       "expression": "50 mm"
-      }
-     ]
+     "dimensions": []
     }
    },
-   "t": 86054
-  },
-  {
-   "step": 8,
-   "do": {
-    "do": "key",
-    "key": "Escape"
-   },
-   "ok": true,
-   "state": {
-    "focus": {
-     "kind": "none"
-    },
-    "dialog": {
-     "title": "Sketch 1",
-     "titleState": "ok",
-     "kind": "sketch",
-     "tabs": [],
-     "fields": [
-      {
-       "label": "Sketch plane",
-       "kind": "query",
-       "items": [
-        "Top plane"
-       ],
-       "active": false,
-       "state": "ok"
-      },
-      {
-       "label": "Disable imprinting",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      }
-     ],
-     "error": null,
-     "ok": "enabled"
-    },
-    "dialogs": [
-     {
-      "title": "Sketch 1",
-      "titleState": "ok",
-      "kind": "sketch",
-      "tabs": [],
-      "fields": [
-       {
-        "label": "Sketch plane",
-        "kind": "query",
-        "items": [
-         "Top plane"
-        ],
-        "active": false,
-        "state": "ok"
-       },
-       {
-        "label": "Disable imprinting",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       }
-      ],
-      "error": null,
-      "ok": "enabled"
-     }
-    ],
-    "list": null,
-    "selection": {
-     "count": 0,
-     "items": []
-    },
-    "features": {
-     "rows": [
-      {
-       "name": "Sketch 1",
-       "state": "ok",
-       "selected": true,
-       "editing": true,
-       "related": false,
-       "hidden": false,
-       "cls": "edited selected"
-      }
-     ],
-     "rollbackAfter": "Sketch 1"
-    },
-    "parts": [],
-    "partsHeading": "Parts (0)",
-    "undo": {
-     "undo": true,
-     "redo": false
-    },
-    "message": null,
-    "tooltip": null,
-    "sketch": {
-     "tool": null,
-     "entities": [
-      "line"
-     ],
-     "constraints": [
-      "COINCIDENT",
-      "HORIZONTAL"
-     ],
-     "dimensions": [
-      {
-       "kind": "LINEAR",
-       "value": 50,
-       "expression": "50 mm"
-      }
-     ]
-    }
-   },
-   "t": 88556
+   "t": 96429
   }
  ]
 }

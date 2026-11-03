@@ -1439,6 +1439,10 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   no change and doesn't start the line; the second then starts one (left pending at (0,20)). Through the UI tests'
   clicks (helper or window events) the same steps on Top make the line, so it's the tool state the rectangle leaves
   (its value boxes?) eating the next tool's first click on the real input path. Yours (sketch tools).
+- 11-03 22:24 (psui), live's newest batch (10/13 match): sketch-offset step 8, Offset (o) then a click on the line at [15, 0]:
+  live selects the line (hover = the line), ours nothing; sketch-mirror step 14, Mirror opened with the mirror line
+  selected: live's message bar "Select entities to be mirrored.", ours none. sketch-line-value-box step 6 (live's box
+  reads "0 mm0" after typing 50) looks like live's runner: it matched the earlier three recordings.
 - (skasm 22:20: fixed: the clicked corner stays selected while its fillet previews, cleared on confirm; T1
   sketch_mode fillet_vertex_then_own_radius.) 11-03 22:05 (psui): sketch-fillet-corner, re-recorded with live's
   hover wait, differs at step 8: Sketch fillet (Shift+F) on,
