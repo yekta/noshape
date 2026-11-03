@@ -4529,6 +4529,13 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     if (rust_blend(s, es, sp, {}, r, h))
       return make_result({s.shape}, r, h.get());
   }
+  // OCCT's blends can change their input in place when they fail (qa CRASH-2045: ChFi3d's "TopoDS_UnCompatibleShapes"
+  // left the cached body invalid, and a later operation read freed topology): from here on they run on a copy (the
+  // same sub-shapes in the same order: the history's indices are the input's).
+  BRepBuilderAPI_Copy copy(s.shape, true, false);
+  const TopoDS_Shape  in = copy.Shape();
+  for (TopoDS_Edge& e : es)
+    e = TopoDS::Edge(copy.ModifiedShape(e));
   if (checked)
   {
     const SlabBlend blend = [&](const TopoDS_Shape& slab, const std::vector<int>& idx,
@@ -4549,34 +4556,34 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     };
     TopoDS_Shape out;
     HHist        h;
-    if (blend_in_slabs(s.shape, es, 2 * rmax, blend, out, h))
+    if (blend_in_slabs(in, es, 2 * rmax, blend, out, h))
     {
-      tighten_new_tolerances(s.shape, out, accurate(s.shape));
-      return make_result({s.shape}, out, h.get());
+      tighten_new_tolerances(in, out, accurate(in));
+      return make_result({in}, out, h.get());
     }
   }
   try
   {
-    return scaled_blend(s.shape, checked, rmax, "fillet",
+    return scaled_blend(in, checked, rmax, "fillet",
                         [&](const Scaled& sc) { return fillet_build(sc, es, rs); });
   }
   catch (const std::runtime_error&)
   {
     if (!checked)
       throw;
-    auto past = fillet_split_closed(s.shape, es, rs, rmax);
+    auto past = fillet_split_closed(in, es, rs, rmax);
     if (!past)
-      past = fillet_over_smaller_blends(s.shape, es, rs);
+      past = fillet_over_smaller_blends(in, es, rs);
     if (!past)
-      past = fillet_past_end_faces(s.shape, es, rs);
+      past = fillet_past_end_faces(in, es, rs);
     if (!past)
-      past = fillet_as_cut(s.shape, es, rs);
-    if (!past && fillet_overflows(s.shape, es, rs))
+      past = fillet_as_cut(in, es, rs);
+    if (!past && fillet_overflows(in, es, rs))
       fail_op("fillet failed: unfilleted edge overlapped by fillet");
     if (!past)
       throw;
-    tighten_new_tolerances(s.shape, past->first, accurate(s.shape));
-    return make_result({s.shape}, past->first, past->second.get());
+    tighten_new_tolerances(in, past->first, accurate(in));
+    return make_result({in}, past->first, past->second.get());
   }
 }
 
@@ -4609,9 +4616,12 @@ static OpOut op_fillet_variable_unbudgeted(const OcShape& s, const OcShape& edge
       fail_invalid("variable fillet parameters must be increasing");
     rmax = std::max(rmax, radii[i]);
   }
-  const TopoDS_Edge   e = first_adjacent_face_edge_check(s.shape, edge.shape, "fillet edge");
+  // (OCCT's blend on a copy, as op_fillet's.)
+  BRepBuilderAPI_Copy copy(s.shape, true, false);
+  const TopoDS_Shape  in = copy.Shape();
+  const TopoDS_Edge   e  = TopoDS::Edge(copy.ModifiedShape(first_adjacent_face_edge_check(s.shape, edge.shape, "fillet edge")));
   std::vector<double> ps(params.begin(), params.end()), rs(radii.begin(), radii.end());
-  return scaled_blend(s.shape, checked, rmax, "variable fillet", [&](const Scaled& sc) -> BlendBuild {
+  return scaled_blend(in, checked, rmax, "variable fillet", [&](const Scaled& sc) -> BlendBuild {
     return [&sc, &ps, &rs, e](double scale, TopoDS_Shape& out, HHist& h) {
       NCollection_Array1<gp_Pnt2d> ur(1, (int)ps.size());
       for (size_t i = 0; i < ps.size(); ++i)
@@ -5200,13 +5210,23 @@ static OpOut op_chamfer_unbudgeted(const OcShape& s, const OcShapeList& edges, c
     if (rust_blend(s, es, sp, refs, r, h))
       return make_result({s.shape}, r, h.get());
   }
+  // OCCT's blends can change their input in place when they fail (qa CRASH-2045: ChFi3d's "TopoDS_UnCompatibleShapes"
+  // left the cached body invalid, and a later operation read freed topology): from here on they run on a copy (the
+  // same sub-shapes in the same order: the history's indices are the input's).
+  BRepBuilderAPI_Copy copy(s.shape, true, false);
+  const TopoDS_Shape  in = copy.Shape();
+  for (TopoDS_Edge& e : es)
+    e = TopoDS::Edge(copy.ModifiedShape(e));
+  for (TopoDS_Face& f : fs)
+    if (!f.IsNull())
+      f = TopoDS::Face(copy.ModifiedShape(f));
   // A chamfer into the corner where two fillets meet: Parasolid's blend
   // patch (OCCT's retries "succeed" there with a different solid).
   if (checked && mode == 0)
-    if (auto corner = chamfer_into_fillet_corners(s.shape, es, d1))
+    if (auto corner = chamfer_into_fillet_corners(in, es, d1))
     {
-      tighten_new_tolerances(s.shape, corner->first, accurate(s.shape));
-      return make_result({s.shape}, corner->first, corner->second.get());
+      tighten_new_tolerances(in, corner->first, accurate(in));
+      return make_result({in}, corner->first, corner->second.get());
     }
   if (checked)
   {
@@ -5238,28 +5258,28 @@ static OpOut op_chamfer_unbudgeted(const OcShape& s, const OcShapeList& edges, c
     };
     TopoDS_Shape out;
     HHist        h;
-    if (blend_in_slabs(s.shape, es, 2 * size, blend, out, h))
+    if (blend_in_slabs(in, es, 2 * size, blend, out, h))
     {
-      tighten_new_tolerances(s.shape, out, accurate(s.shape));
-      return make_result({s.shape}, out, h.get());
+      tighten_new_tolerances(in, out, accurate(in));
+      return make_result({in}, out, h.get());
     }
   }
   try
   {
-    return scaled_blend(s.shape, checked, size, "chamfer", make);
+    return scaled_blend(in, checked, size, "chamfer", make);
   }
   catch (const std::runtime_error&)
   {
     // Over the faces of a plain edge: the part cut by the chamfer's plane.
     if (checked)
-      if (auto past = chamfer_as_cut(s.shape, es, fs, mode, d1, d2))
-        return make_result({s.shape}, past->first, past->second.get());
+      if (auto past = chamfer_as_cut(in, es, fs, mode, d1, d2))
+        return make_result({in}, past->first, past->second.get());
     // Onshape reports a chamfer wider than a face it runs over (or than the
     // radius of an arc it follows) separately.
     // Also a chamfer wider than a fillet its edge ends on (live G46: 5 mm on
     // the edge between two R3 fillets).
     ShapeAncMap v2f;
-    TopExp::MapShapesAndAncestors(s.shape, TopAbs_VERTEX, TopAbs_FACE, v2f);
+    TopExp::MapShapesAndAncestors(in, TopAbs_VERTEX, TopAbs_FACE, v2f);
     for (const TopoDS_Edge& e : es)
     {
       BRepAdaptor_Curve c(e);

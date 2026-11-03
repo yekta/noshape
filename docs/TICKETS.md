@@ -337,7 +337,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   its other half across a 6 mm groove; Onshape's query keeps both halves): live 22/60/40 faces/edges/vertices, one
   fillet face per corner spanning z −10…10 (64.89 / 73.15 mm²); ours 34/88/56. Volume equal (26334.64 mm³), area
   9352.88 mm² vs live 9351.62.
-- [x] (core 11-03 04:40: OCCT's blend in metres is kept whenever it is valid, as before eca0da09, and its new tolerances are set to what they need only where its corners are where they should be (within 1e-5 of the part's size; elsewhere as OCCT left them): a blend at the working scale had other faces and moved later features' references (cli-fillet2-segv's Sketch 3 lost its plane), and tighter edges at off corners changed later operations (the askew head bolt's 16th face); bop-pairs-cli-segv-152 and cli-fillet2-segv regenerate as on bad1de8e (87828.610 / 43411.104 mm³), shell-hang's Shell 5 still builds; the blend corpus is as recorded before 11-03) P1 BLEND-TOL-REGEN-CHANGES (core; **new on main since v0.4.22, from eca0da09** "OCCT's blends in metres give what they
+- [x] 08632c09 (core 11-03 04:40: OCCT's blend in metres is kept whenever it is valid, as before eca0da09, and its new tolerances are set to what they need only where its corners are where they should be (within 1e-5 of the part's size; elsewhere as OCCT left them): a blend at the working scale had other faces and moved later features' references (cli-fillet2-segv's Sketch 3 lost its plane), and tighter edges at off corners changed later operations (the askew head bolt's 16th face); bop-pairs-cli-segv-152 and cli-fillet2-segv regenerate as on bad1de8e (87828.610 / 43411.104 mm³), shell-hang's Shell 5 still builds; the blend corpus is as recorded before 11-03) P1 BLEND-TOL-REGEN-CHANGES (core; **new on main since v0.4.22, from eca0da09** "OCCT's blends in metres give what they
   make the tolerances it needs") saved documents regenerate differently, and features that built before now fail: the 44
   ticket documents (qa-scratch/cli/tixvol-gbad1.out vs tixvol-ge89c78de.out, bin = green bad1de8e vs e89c78de; **the
   same with NOSHAPE_BOOL_RUST=0**, so not bool's 8e3a8834 / f2b9ef6d): **bop-pairs-cli-segv-152** Chamfer 3 Ok → "Failed to
@@ -376,6 +376,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 02:46: not the thread count: with NOSHAPE_BOP_PARALLEL=0, RAYON_NUM_THREADS=1, or both, the delete still dies
   3, 3 and 4 runs of 5 (cli/thr2045.out). Runs differ although the input is the same, so something per-process decides
   (iteration order of a randomly seeded hash map, addresses), not timing between threads.
+  core 11-03 05:30: **found**: the document's one Fillet (R12 on edge 16, NOSHAPE_DUMP_OPS fillet-0) alone crashes:
+  OCCT's ChFi3d throws "TopoDS_UnCompatibleShapes: TopoDS_Builder::Add" partway and leaves **its input** broken (valid
+  before, invalid after; freed list nodes in the input solid), and the next attempt (our retries at a hair smaller
+  radius, the working scale, the fallbacks) or a later feature walks the freed topology. With MALLOC_PERTURB_ the
+  fillet alone faults every run (kernel T2 blend::dumped_fillet_repeat_probe, FILLET_CASE). Fix: the fillet's, variable
+  fillet's and chamfer's OCCT paths run on a copy of the cached body (the same sub-shapes in the same order, so the
+  history's indices are the input's): a fault inside the failing ChFi3d is caught by the kernel's guard ("the kernel
+  crashed"), the cached body stays intact, and the document regenerates without dying, 10 runs of 10 (was 2–5 of 5
+  dying). (A copy per attempt was dropped: a history composed through a copy reports untouched faces Modified, which
+  moves persistent names.) Next: the exact
+  OCCT bug (TKFillet / TopOpeBRepBuild adding into the input), an OCCT patch.
 - [ ] P2 CRASH-1837-ONCE (core; seen once) CLI fuzz seed 1837 (`clifuzz_time.py 1837 106`, fallback on, Rust Boolean on) on
   green e18f898a died at **step 98, a delete, "corrupted double-linked list" / "noshape: the kernel aborted; not
   recoverable"** (exit 134, 3.9 s into the step); the stack is in qa-scratch/tickets/crash1837/stderr-g1837.log (frames as

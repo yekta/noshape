@@ -972,3 +972,33 @@ fn a_chamfer_in_metres_keeps_tight_vertices() {
     assert!(max_vertex_tolerance(&r) < 1e-6, "{:e}", max_vertex_tolerance(&r));
     assert!(vol_mm3(&r) < before);
 }
+
+/// A dumped fillet (NOSHAPE_DUMP_OPS: FILLET_CASE=<dir>/fillet-<n>, 0-based edge indices) run FILLET_RUNS times
+/// (default 20): with MALLOC_CHECK_=3 / MALLOC_PERTURB_ a blend that writes past its memory shows (qa CRASH-2045).
+#[test]
+#[ignore = "T2 tool: FILLET_CASE"]
+fn dumped_fillet_repeat_probe() {
+    let Some(case) = std::env::var_os("FILLET_CASE") else { return };
+    let case = std::path::PathBuf::from(case);
+    let s = read_brep(&case.with_extension("brep")).unwrap();
+    let spec = std::fs::read_to_string(case.with_extension("txt")).unwrap();
+    let edges = s.edges();
+    let es: Vec<Shape> = spec.lines().filter_map(|l| l.strip_prefix("edge ")).filter_map(|n| n.trim().parse::<usize>().ok()).map(|n| edges[n].clone()).collect();
+    let head: Vec<&str> = spec.lines().find(|l| l.starts_with("fillet ")).unwrap().split_whitespace().collect();
+    let radii: Vec<f64> = head[4..].iter().map(|r| r.parse().unwrap()).collect();
+    let runs: usize = std::env::var("FILLET_RUNS").ok().and_then(|v| v.parse().ok()).unwrap_or(20);
+    // The model's working scale (regenerations run blends at it).
+    let _ = set_working_scale(std::env::var("FILLET_SCALE").ok().and_then(|v| v.parse().ok()).unwrap_or(1000.0));
+    if std::env::var_os("FILLET_UNCHECKED").is_some() {
+        // One plain OCCT fillet, then the input walked again (a freed sub-shape crashes here).
+        println!("input before: {} faces, {} edges, valid {}", s.faces().len(), s.edges().len(), s.is_valid());
+        let r = fillet_radii(&s, &es, &radii);
+        println!("unchecked: {}", r.map(|r| format!("{:.6} mm3, {} faces", vol_mm3(&r.shape), r.shape.faces().len())).unwrap_or_else(|e| e.to_string()));
+        println!("input after: {} faces, {} edges, valid {}", s.faces().len(), s.edges().len(), s.is_valid());
+        return;
+    }
+    for i in 0..runs {
+        let r = fillet_checked(&s, &es, &radii);
+        println!("run {i}: {}", r.map(|r| format!("{:.6} mm3, {} faces, valid {}", vol_mm3(&r.shape), r.shape.faces().len(), r.shape.is_valid())).unwrap_or_else(|e| e.to_string()));
+    }
+}
