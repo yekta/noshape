@@ -1230,3 +1230,35 @@ fn everyday_concave_shell_times_probe() {
         }
     }
 }
+
+/// The smooth vase's loft against live's (.x_t): the volume in each 5 mm slab, ours - live, to see where the lofts
+/// part between the sections (z 0 / 30 / 60 / 90 / 120).
+#[test]
+#[ignore = "T2: probe"]
+fn smooth_vase_loft_slabs_probe() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let live = read_parasolid(&dir.join("vase-smooth-live-loft.x_t"), LengthUnit::Millimeter).unwrap();
+    let ours = smooth_vase();
+    println!("ours {:.4} mm3, live {:.4} mm3, ours - live {:+.4}", vol(&ours), vol(&live), vol(&ours) - vol(&live));
+    for k in 0..24 {
+        let z = 5.0 * k as f64;
+        let slab = bx([-60.0, -60.0, z], [60.0, 60.0, z + 5.0]);
+        let (a, b) = (vol(&common(&ours, &slab).unwrap().shape), vol(&common(&live, &slab).unwrap().shape));
+        println!("z {z:5.1} .. {:5.1}: ours {a:.4}, live {b:.4}, ours - live {:+.4}", z + 5.0, a - b);
+    }
+}
+
+/// The smooth vase loft's side face, ours and live's: degrees and knots (the section parameters along the loft).
+#[test]
+#[ignore = "T2: probe"]
+fn smooth_vase_loft_knots_probe() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let live = read_parasolid(&dir.join("vase-smooth-live-loft.x_t"), LengthUnit::Millimeter).unwrap();
+    for (who, s) in [("live", live), ("ours", smooth_vase())] {
+        for f in s.faces() {
+            let Ok(b) = f.face_bspline() else { continue };
+            let distinct = |k: &[f64]| { let mut d: Vec<f64> = k.to_vec(); d.dedup_by(|a, b| (*a - *b).abs() < 1e-12); d };
+            println!("{who}: degrees {} x {}, poles {} x {}, rational {}, periodic {} {}\n  u knots {:.6?}\n  v knots {:.6?}", b.u_degree, b.v_degree, b.nu, b.nv, b.weights.is_some(), b.u_periodic, b.v_periodic, distinct(&b.u_knots), distinct(&b.v_knots));
+        }
+    }
+}

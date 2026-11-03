@@ -312,7 +312,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   removed face's own plane past its edges (live's new face in that plane over the face beside it): a kept face meeting
   a removed planar face at a concave edge loses its wall a wall's depth behind the opening and a wall past their shared
   edge. Left (51 / 20 mm³): live extends the holes' cylinder walls up into the pocket (slabs end with their faces), an
-  18 mm³ corner below the opening's end that live keeps, 76 faces to live's 52, live's 0.3 s. 11-03 00:10: the 18 mm³
+  18 mm³ corner below the opening's end that live keeps, 76 faces to live's 52, live's 0.3 s. 11-02 23:10: the 18 mm³
   corner kept as live (a pocket region is open only when a piece of a removed face bounds it, not when it meets one
   along an edge): 175027.28 (live - ours 33.3, ours - live 20.5 mm³), 72 faces; the fuzz corpus unchanged (211 of
   211). Left: live bounds the pocket's front strip by the opening's own plane up to the ceiling (one 380.97 mm² face,
@@ -428,7 +428,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   docs/handoff/core.md).
   core 11-01 08:10, round 9 (rust_boolean.cpp's build of noshape's result checks the cancel): vibe4 at load 64-75
   on 16 cores, cancel at 0.5-20 s: **27-128 ms at every point** (12 points), from 10-19 s before round 1.
-- [x] (core 11-03 00:50: OCCT's two patches per corner, meeting in a degenerated edge whose vertex lay 0.9 mm off the
+- [x] (core 11-02 23:50: OCCT's two patches per corner, meeting in a degenerated edge whose vertex lay 0.9 mm off the
   top face, become live's one face: the R2 ball rolling on the top and the R3 cylinder, its spine the ellipse where
   their offsets meet, ends where each drafted side is tangent to the R3 cylinder (kernel vertex_blend.cpp `Rolling`):
   18 faces, the corner 10.1582457 mm² (live 10.1582447) in live's box, top plane 1733.99850 (live .99847), 44304.984

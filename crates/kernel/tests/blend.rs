@@ -901,3 +901,26 @@ fn drafted_pocket_floor_loop_probe() {
         }
     }
 }
+
+/// The drafted block of 1686 (c) with slanted rounds smaller than the top loop's (R1 under R2, the drafted form of
+/// 1686 (a)): what OCCT's corner is.
+#[test]
+#[ignore = "T2: probe"]
+fn drafted_small_corner_rounds_under_the_top_loop_probe() {
+    setup();
+    let b = bx([0.0; 3], [60.0, 40.0, 20.0]);
+    let sides: Vec<Shape> = b.faces().into_iter().filter(|f| f.bounding_box(false).is_ok_and(|bb| bb.max.z - bb.min.z > 1.0 * MM)).collect();
+    let d = draft(&b, &sides, DVec3::Z, &Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 5f64.to_radians()).unwrap().shape;
+    let slanted = edges_where(&d, |i| (i.start.z - i.end.z).abs() > 1.0 * MM);
+    let d = fillet_checked(&d, &slanted, &[1.0 * MM; 4]).unwrap().shape;
+    let top = edges_where(&d, |i| i.start.z > 19.99 * MM && i.end.z > 19.99 * MM);
+    let r = fillet_checked(&d, &top, &vec![2.0 * MM; top.len()]).unwrap().shape;
+    let degenerate = r.edges().iter().filter(|e| e.edge_info().unwrap().degenerated).count();
+    println!("top loop {} edges; valid {}, {} faces, {} degenerated edges, {:.6} mm3", top.len(), r.is_valid(), r.faces().len(), degenerate, vol_mm3(&r));
+    for f in r.faces() {
+        let bb = f.bounding_box(true).unwrap();
+        if bb.min.x > 50.0 * MM && bb.min.y > 30.0 * MM {
+            println!("  {} area {:.7} box {:.5?} .. {:.5?}", format!("{:?}", f.face_surface().ok()).chars().take(30).collect::<String>(), f.area().unwrap() / (MM * MM), bb.min / MM, bb.max / MM);
+        }
+    }
+}

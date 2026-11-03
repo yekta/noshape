@@ -16,7 +16,7 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
-**State 11-03 00:55.**
+**State 11-02 23:58.**
 - Landed since 22:35: Loft connections (6a3297ac), Offset curve with targets (47c75914) and Offset, extend and split
   (73396503: the extended offset imprinted on the face's body, live 1813's 212.5 + 787.5 mmÂ²), psui's
   p_toggles_every_plane race (88c37bf6: two tests shared one scratch document), Shell pocket timings (14afdf69) and
@@ -1503,7 +1503,7 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
-- (11-02 23:50) For bool (speed, SHELL-HANG-5): shell-hang Shell 5's slab pocket fuses 77 slabs (kernel T2
+- (11-02 23:15) For bool (speed, SHELL-HANG-5): shell-hang Shell 5's slab pocket fuses 77 slabs (kernel T2
   `shell::shellhang_shell5_probe`, NOSHAPE_SHELL_DEBUG=1): noshape's Boolean works 5.8 s on it, then declines "no point
   inside a face piece" and OCCT fuses it in 4.8 s (serial); the following cut (solid - union) declines "a tolerant
   input" (OCCT 1.0 s). Shell 5 takes 13 s by slabs, live 0.3 s: taking that fuse, or declining it at once, is most of
