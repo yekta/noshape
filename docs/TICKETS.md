@@ -1366,6 +1366,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   and direction toggles, ours "End type" / "boolean" — a naming mismatch, not a UI one), focus on the region query field
   when a dialog opens (22). Live's menus carry **"Add comment"** (cloud, left out by design): the comparison should drop
   cloud-only rows so they never count as differences.
+  qa 02:00 on green 69b1816c: **19/29 scenarios, 116/130 states**. One state gap left: after Tab from the region field
+  ours keeps reporting focus on "Faces and sketch regions to extrude" (live: the end-type select, then the direction
+  button), though by hand the focus does move (3 Tabs reach Depth as live): the focus record follows the active query, not
+  the keyboard focus. Live's runner caveat (qa's own CDP runs): key presses after a row click may not reach live's feature
+  list, so live's feature-row-arrow-up-moves-bar / feature-row-enter recordings may show no reaction for that reason.
 - [ ] P1 DIALOG-SWITCH-DISCARDS-NEW (psui) double-clicking another feature while a **new** feature's dialog is open throws
   the new feature away in ours; live keeps it: a box (Sketch 1, Extrude 1), Search tools › Variable, Name
   wall_thickness, Value 2 + Enter (the first Enter applies: the row "#wall_thickness = 2 mm" is in the list, the dialog
