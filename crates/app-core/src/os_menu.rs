@@ -819,8 +819,17 @@ struct MenuLayer(AnyView);
 
 impl Render for MenuLayer {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div().size_full().child(self.0.clone()).children(render_host(window, cx))
+        let floating = FLOATING.get().and_then(|f| f(window, cx));
+        div().size_full().relative().child(self.0.clone()).children(floating).children(render_host(window, cx))
     }
+}
+
+/// What every app window floats above its content, under its menus (the app's update card), set once at startup.
+static FLOATING: std::sync::OnceLock<fn(&Window, &App) -> Option<AnyElement>> = std::sync::OnceLock::new();
+
+/// Draw `f`'s element above every app window's content (its own position inside the window), under the menus.
+pub fn set_floating(f: fn(&Window, &App) -> Option<AnyElement>) {
+    let _ = FLOATING.set(f);
 }
 
 /// The content view of a window opened with [`open_window`] (under the

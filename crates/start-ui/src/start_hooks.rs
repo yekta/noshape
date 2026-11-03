@@ -18,8 +18,6 @@ pub struct Hooks {
     /// Import files…'s "Import to Onshape" modal for these CAD files; Import calls back with the options and whether to
     /// split them into a document each.
     pub import_dialog: fn(Vec<PathBuf>, ImportCallback, &mut Window, &mut App),
-    /// The update banner (the app's updates.rs), when there is one.
-    pub update_banner: fn(&App) -> Option<AnyElement>,
 }
 
 /// What Import does with the modal's options (and "Split into multiple documents").
@@ -50,8 +48,4 @@ pub fn import_dialog(paths: Vec<PathBuf>, on_import: ImportCallback, window: &mu
 
 pub fn build_label() -> String {
     (hooks().build_label)()
-}
-
-pub fn update_banner(cx: &App) -> Option<AnyElement> {
-    HOOKS.get().and_then(|h| (h.update_banner)(cx))
 }

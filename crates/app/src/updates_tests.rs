@@ -1,7 +1,7 @@
-//! The update banner: nothing while there's nothing to say, then each phase's text in its slot, and a list of
-//! documents to reopen read once.
+//! The update card: nothing while there's nothing to say, then each phase floating at the window's bottom centre
+//! (wide and narrow windows), hidden for the session by its ✕; and a list of documents to reopen read once.
 
-use super::{Phase, Updates, banner, reopen_list};
+use super::{Phase, Updates, card, reopen_list};
 use gpui_kit::{AppContext as _, Bounds, IntoElement, ParentElement as _, Point, Render, Styled as _, TestAppContext, Window, WindowBounds, WindowOptions, div, px, size};
 use noshape_update::Release;
 use std::sync::Arc;
@@ -10,29 +10,32 @@ use std::sync::atomic::{AtomicU64, Ordering};
 struct Slot;
 
 impl Render for Slot {
-    fn render(&mut self, _: &mut Window, cx: &mut gpui_kit::Context<Self>) -> impl IntoElement {
-        div().size_full().children(banner(cx))
+    fn render(&mut self, window: &mut Window, cx: &mut gpui_kit::Context<Self>) -> impl IntoElement {
+        div().size_full().relative().children(card(window, cx))
     }
 }
 
 fn set(cx: &mut TestAppContext, phase: Phase) {
     cx.update(|cx| {
         let release = Release { tag: "v0.4.21".into(), notes: "Faster fillets.".into(), page: "https://example.invalid/r".into(), assets: Vec::new() };
-        cx.set_global(Updates { phase, release: Some(release), staged: None, progress: Arc::new((AtomicU64::new(0), AtomicU64::new(0))), failed: Vec::new() });
+        cx.set_global(Updates { phase, release: Some(release), staged: None, progress: Arc::new((AtomicU64::new(0), AtomicU64::new(0))), failed: Vec::new(), dismissed: false });
     });
 }
 
-fn shows(cx: &mut TestAppContext) -> bool {
-    cx.update(|cx| banner(cx).is_some())
+fn shows(cx: &mut TestAppContext, w: gpui_kit::AnyWindowHandle) -> bool {
+    cx.update_window(w, |_, window, cx| card(window, cx).is_some()).unwrap()
 }
 
 #[gpui::test]
-fn the_banner_shows_each_phase(cx: &mut TestAppContext) {
+fn the_card_shows_each_phase_until_closed(cx: &mut TestAppContext) {
     cx.update(gpui_kit::init);
+    let open = |cx: &mut TestAppContext, width: f32| {
+        let bounds = Bounds { origin: Point::default(), size: size(px(width), px(400.)) };
+        cx.update(|cx| gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |_, cx| cx.new(|_| Slot)).unwrap().0)
+    };
+    let (wide, narrow) = (open(cx, 1280.), open(cx, 360.));
     set(cx, Phase::Idle);
-    assert!(!shows(cx), "idle: an empty slot");
-    let bounds = Bounds { origin: Point::default(), size: size(px(900.), px(200.)) };
-    let w = cx.update(|cx| gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |_, cx| cx.new(|_| Slot)).unwrap().0);
+    assert!(!shows(cx, wide), "idle: no card");
     for phase in [Phase::Downloading, Phase::Ready, Phase::Manual, Phase::Failed("the signature doesn't match the file".into())] {
         set(cx, phase.clone());
         if phase == Phase::Downloading {
@@ -42,10 +45,17 @@ fn the_banner_shows_each_phase(cx: &mut TestAppContext) {
                 u.progress.1.store(100, Ordering::Relaxed);
             });
         }
-        assert!(shows(cx), "{phase:?}");
-        // Drawn in a window (layout and paint of its parts).
-        cx.update_window(w, |_, window, cx| window.draw(cx).clear(cx)).unwrap();
+        for w in [wide, narrow] {
+            assert!(shows(cx, w), "{phase:?}");
+            // Drawn in the window (layout and paint of its parts).
+            cx.update_window(w, |_, window, cx| window.draw(cx).clear(cx)).unwrap();
+        }
     }
+    // Its ✕: hidden until the next launch, whatever comes next.
+    cx.update(|cx| cx.global_mut::<Updates>().dismissed = true);
+    assert!(!shows(cx, wide));
+    cx.update(|cx| cx.global_mut::<Updates>().phase = Phase::Ready);
+    assert!(!shows(cx, narrow));
 }
 
 #[test]

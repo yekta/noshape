@@ -1,9 +1,11 @@
 //! In-app updates (crates/update; docs/handoff/cliapp.md "In-app updates"): the release feed is checked at launch and
 //! every 5 minutes (with its ETag: an unchanged answer costs nothing against GitHub's limit), this install's update is
-//! downloaded and verified in the background, and a banner in a fixed slot (the navbar's middle; on the documents
-//! page beside the account menu) says so: "Update available: v…" with the download's progress, then "Updated —
-//! restart to finish" with Restart (the open documents reopen in the new version) and What's new (the release
-//! notes). Preferences › Updates turns it off. A click here always answers at once (AGENTS.md).
+//! downloaded and verified in the background, and a card floating at the bottom centre of every window (above the
+//! content, clear of the navbar and the tab bar; app-core `os_menu::set_floating`) says so: "Update available: v…"
+//! with the download's progress, then "Updated — restart to finish" with Restart (the open documents reopen in the
+//! new version) and What's new (the release notes); its ✕ hides it until the next launch. Onshape has no updater: the
+//! card is ours, in the app's message bubble style. Preferences › Updates turns it off. A click here always answers
+//! at once (AGENTS.md).
 
 use crate::os_ui as os;
 use crate::theme::p;
@@ -39,6 +41,8 @@ struct Updates {
     progress: Arc<(AtomicU64, AtomicU64)>,
     /// Versions that failed this session (not tried again until the app restarts).
     failed: Vec<String>,
+    /// The card's ✕: hidden until the next launch.
+    dismissed: bool,
 }
 
 impl Global for Updates {}
@@ -95,7 +99,7 @@ fn save_feed_cache(c: &FeedCache) {
 
 pub fn init(cx: &mut App) {
     note(&format!("started {} {:?}", crate::VERSION, std::env::args().skip(1).collect::<Vec<_>>()));
-    cx.set_global(Updates { phase: Phase::Idle, release: None, staged: None, progress: Arc::new((AtomicU64::new(0), AtomicU64::new(0))), failed: Vec::new() });
+    cx.set_global(Updates { phase: Phase::Idle, release: None, staged: None, progress: Arc::new((AtomicU64::new(0), AtomicU64::new(0))), failed: Vec::new(), dismissed: false });
     let Some(setup) = setup() else { return };
     let setup = Arc::new(setup);
     cx.spawn(async move |cx| {
@@ -173,7 +177,7 @@ fn download(setup: Arc<Setup>, release: Release, cx: &mut AsyncApp) {
         })
     });
     cx.spawn(async move |cx| {
-        // The banner's percentage, a few times a second while it downloads.
+        // The card's percentage, a few times a second while it downloads.
         let ticker = cx.spawn(async move |cx| loop {
             cx.background_executor().timer(Duration::from_millis(250)).await;
             cx.update(|cx| cx.refresh_windows());
@@ -260,9 +264,12 @@ fn whats_new(window: &mut Window, cx: &mut App) {
     });
 }
 
-/// A small button inside the banner.
-fn banner_button(id: &'static str, label: &'static str, primary: bool) -> Stateful<Div> {
-    let d = div().id(id).flex_none().h(px(20.)).px(px(8.)).flex().items_center().rounded(px(3.)).text_size(px(12.)).cursor_pointer().child(label);
+/// How far the card floats above the window's bottom edge: clear of a document window's tab bar.
+const CARD_BOTTOM: f32 = 40.;
+
+/// A small button inside the card.
+fn card_button(id: &'static str, label: &'static str, primary: bool) -> Stateful<Div> {
+    let d = div().id(id).flex_none().h(px(22.)).px(px(9.)).flex().items_center().rounded(px(3.)).text_size(px(13.)).cursor_pointer().child(label);
     if primary {
         d.bg(gpui_kit::rgb(0x1651b0)).text_color(gpui_kit::rgb_static(0xffffff)).hover(|d| d.bg(gpui_kit::rgb(0x0f3f8f)))
     } else {
@@ -270,57 +277,60 @@ fn banner_button(id: &'static str, label: &'static str, primary: bool) -> Statef
     }
 }
 
-/// The banner, when there's something to say (None: the slot stays empty).
-pub fn banner(cx: &App) -> Option<AnyElement> {
-    let u = cx.try_global::<Updates>()?;
+/// The card's content and look for the update's phase (None: nothing to say).
+fn card_content(u: &Updates) -> Option<(os::BubbleKind, AnyElement)> {
     let v = u.release.as_ref()?.version().to_string();
     let pal = p();
-    let pill = || h_flex()
-        .id("update-banner")
-        .flex_none()
-        .max_w(px(380.))
-        .h(px(26.))
-        .pl(px(10.))
-        .pr(px(4.))
-        .gap(px(8.))
-        .rounded(px(3.))
-        .border_1()
-        .text_size(px(12.))
-        .text_color(pal.text);
-    let info = pill().bg(pal.info_fill).border_color(pal.info_outline);
+    let row = || h_flex().gap(px(10.)).items_center();
     Some(match &u.phase {
         Phase::Idle => return None,
         Phase::Downloading => {
             let (done, total) = (u.progress.0.load(Ordering::Relaxed), u.progress.1.load(Ordering::Relaxed));
             let frac = if total > 0 { (done as f32 / total as f32).clamp(0., 1.) } else { 0. };
-            info.pr(px(10.))
-                .child(div().flex_none().child(format!("Update available: v{v} — downloading {}%", (frac * 100.).round() as u32)))
-                .child(div().flex_none().w(px(60.)).h(px(4.)).rounded(px(2.)).bg(pal.info_outline).child(div().h_full().rounded(px(2.)).bg(gpui_kit::rgb(0x1651b0)).w(px(60. * frac))))
-                .into_any_element()
+            let bar = div().flex_none().w(px(80.)).h(px(4.)).rounded(px(2.)).bg(pal.info_outline).child(div().h_full().rounded(px(2.)).bg(gpui_kit::rgb(0x1651b0)).w(px(80. * frac)));
+            (os::BubbleKind::Info, row().child(div().min_w_0().truncate().child(format!("Update available: v{v} — downloading {}%", (frac * 100.).round() as u32))).child(bar).into_any_element())
         }
-        Phase::Ready => info
-            .child(div().flex_none().child("Updated — restart to finish"))
-            .child(banner_button("update-restart", "Restart", true).on_click(|_, _, cx| restart(cx)))
-            .child(banner_button("update-whats-new", "What's new", false).on_click(|_, window, cx| whats_new(window, cx)))
-            .into_any_element(),
+        Phase::Ready => (
+            os::BubbleKind::Info,
+            row()
+                .child(div().min_w_0().truncate().child("Updated — restart to finish"))
+                .child(card_button("update-restart", "Restart", true).on_click(|_, _, cx| restart(cx)))
+                .child(card_button("update-whats-new", "What's new", false).on_click(|_, window, cx| whats_new(window, cx)))
+                .into_any_element(),
+        ),
         Phase::Manual => {
             let page = u.release.as_ref().map(|r| r.page.clone()).unwrap_or_default();
-            info.child(div().flex_none().child(format!("noshape v{v} is available")))
-                .child(banner_button("update-download", "Download", true).on_click(move |_, _, cx| cx.open_url(&page)))
-                .child(banner_button("update-whats-new", "What's new", false).on_click(|_, window, cx| whats_new(window, cx)))
-                .into_any_element()
+            (
+                os::BubbleKind::Info,
+                row()
+                    .child(div().min_w_0().truncate().child(format!("noshape v{v} is available")))
+                    .child(card_button("update-download", "Download", true).on_click(move |_, _, cx| cx.open_url(&page)))
+                    .child(card_button("update-whats-new", "What's new", false).on_click(|_, window, cx| whats_new(window, cx)))
+                    .into_any_element(),
+            )
         }
         Phase::Failed(e) => {
             let e = e.clone();
-            let shown = format!("Update v{v} not installed: {e}");
-            pill().pr(px(10.))
-                .bg(pal.error_fill)
-                .border_color(pal.error_outline)
-                .child(div().min_w_0().truncate().child(shown))
-                .tooltip(crate::ui::tooltip(e))
-                .into_any_element()
+            (os::BubbleKind::Error, div().id("update-failed").min_w_0().truncate().child(format!("Update v{v} not installed: {e}")).tooltip(crate::ui::tooltip(e)).into_any_element())
         }
     })
+}
+
+/// The card floating at the bottom centre of `window`, when there's something to say and it wasn't closed.
+pub fn card(window: &Window, cx: &App) -> Option<AnyElement> {
+    let u = cx.try_global::<Updates>()?;
+    if u.dismissed {
+        return None;
+    }
+    let (kind, content) = card_content(u)?;
+    let max_w = (window.viewport_size().width - px(20.)).max(px(120.));
+    let bubble = os::message_bubble("update-card", kind, content, |_, _, cx| {
+        cx.global_mut::<Updates>().dismissed = true;
+        cx.refresh_windows();
+    }, cx)
+    .max_w(max_w)
+    .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(3.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }]);
+    Some(div().absolute().left_0().right_0().bottom(px(CARD_BOTTOM)).flex().justify_center().child(deferred(bubble).with_priority(50)).into_any_element())
 }
 
 #[cfg(test)]

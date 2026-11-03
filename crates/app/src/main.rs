@@ -387,7 +387,8 @@ fn register_history_hooks() {
 
 /// What the documents page (noshape-start-ui) needs of the app: a document's window, the build label.
 fn register_start_hooks() {
-    noshape_start_ui::start_hooks::register(noshape_start_ui::start_hooks::Hooks { open_document_window: files::open_document_window, open_document_at: files::open_document_at, build_label, import_dialog: import_dialog::open_for_page, update_banner: updates::banner });
+    noshape_start_ui::start_hooks::register(noshape_start_ui::start_hooks::Hooks { open_document_window: files::open_document_window, open_document_at: files::open_document_at, build_label, import_dialog: import_dialog::open_for_page });
+    noshape_app_core::os_menu::set_floating(updates::card);
 }
 
 fn main() {
@@ -467,7 +468,7 @@ fn main() {
         files::init(cx);
         // Help › Install command line tool… / Connect to coding agents… (and the macOS app menu).
         agent_setup::init(cx);
-        // Updates: checked at launch and every 5 minutes, the banner in the navbar.
+        // Updates: checked at launch and every 5 minutes, a card floating at the bottom of every window.
         updates::init(cx);
         noshape_render::perf::milestone("app initialized");
         if let Some(docs) = reopen.filter(|d| !d.is_empty()) {

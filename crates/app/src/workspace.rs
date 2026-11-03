@@ -657,8 +657,7 @@ impl Workspace {
                         (None, false) => crate::ui::user_text(branch_name).into_any_element(),
                     }))
                     .when(read_only && viewing_version.is_none(), |d| d.child(div().ml_2().px_2().rounded(px(2.)).bg(pal.warning).text_xs().text_color(pal.text).child("VIEWING HISTORY")))
-                    // The update banner's slot (updates.rs): in the free middle, so nothing moves when it shows.
-                    .child(div().flex_1().min_w_0().flex().justify_center().children(crate::updates::banner(cx)))
+                    .child(div().flex_1())
                     .children(self.render_notices_button(cx))
                     .child(self.render_bell(cx))
                     .child(self.render_help_menu(cx)),

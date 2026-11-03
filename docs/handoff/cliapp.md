@@ -118,9 +118,11 @@ PATH, a never-answering check times out, the menu action opens the dialog: it fa
 
 - **What a user sees.** At launch (after 3 s) and every 5 minutes the app asks GitHub's `releases/latest` with the
   last answer's ETag (a 304 doesn't count against the 60-an-hour limit; the cache is `<config>/updates/feed.json`; a
-  403/429 waits as long as GitHub says). A newer release is downloaded in the background; a banner in a fixed slot
-  (the navbar's middle; on the documents page beside the account menu) says "Update available: v… — downloading n%",
-  then "Updated — restart to finish" with Restart and What's new (the release notes, a link to the release page).
+  403/429 waits as long as GitHub says). A newer release is downloaded in the background; a card floating at the
+  bottom centre of every window (start window and documents alike, clear of the navbar and tab bar; app-core
+  `os_menu::set_floating`, the message bubble's look; user 11-03: the navbar slot covered the start window's search)
+  says "Update available: v… — downloading n%", then "Updated — restart to finish" with Restart and What's new (the
+  release notes, a link to the release page); its ✕ hides it until the next launch.
   Restart lists the open documents (`<config>/updates/reopen.json`), starts the helper and quits; the new version
   starts with `--reopen <list>`. Preferences › Updates turns it off. Code: crates/update (no GUI), crates/app
   `updates.rs`.
@@ -149,7 +151,7 @@ PATH, a never-answering check times out, the menu action opens the dialog: it fa
   certificate, signed entry timestamp or log time, another signer (a release tag's, a fork's, a prefix), a trust root
   without the CA or the log are each refused; a local server stands in for GitHub (ETag, rate limit, download,
   tampered download, wrong signer, missing bundle); the Linux helper swaps a binary. crates/app updates_tests: the
-  banner's phases draw; the reopen list is read once.
+  card's phases draw in wide and narrow windows, its ✕ hides it for the session; the reopen list is read once.
 - **The release dry run updates every install** (`.github/release/check_update.py` in release.yml's verify jobs, dry
   runs only: a release build ignores the test feed): the installed app (Linux install.sh under Xvfb, macOS
   /Applications, Windows installed and portable) started with a document and pointed at a local feed serving this

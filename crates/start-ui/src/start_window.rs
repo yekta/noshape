@@ -2322,7 +2322,7 @@ impl StartView {
                     // Live documents/23: the search box is centred between the 220 px left
                     // column and a 388 px right block (x 681–1071 at 1919 px).
                     // The update banner (the app's, start_hooks) beside the account menu, inside the block's fixed width.
-                    .child(div().w(px(388.)).flex_none().flex().justify_end().items_center().gap(px(8.)).pr(px(10.)).children(crate::start_hooks::update_banner(cx)).child(user_menu(cx))),
+                    .child(div().w(px(388.)).flex_none().flex().justify_end().items_center().gap(px(8.)).pr(px(10.)).child(user_menu(cx))),
             )
             .into_any_element()
     }
