@@ -898,11 +898,13 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
   perimeter, area moments).
 
 ## From skasm (11-03 05:35): parity driver and sketch picks
-- `NOSHAPE_UI_SCRIPT` runs of tests/ui-parity/sketch-rectangle-dimension.json (and any sketch scenario whose click
-  picks a curve with the Dimension or a constraint tool) pick nothing: the clicks land on the edge (checked: step 8 at
-  the bottom edge's projection), a 2.5 s `hover` before the click doesn't help, by hand the same steps make the 50 mm
-  dimension. Tools that pick by geometry (Trim) work. So the viewport hover pick doesn't resolve for the driver's
-  synthetic moves; the sketch tools take `hovered` from it. Repro: /root/skasm-scratch/uip/dbg-rect-dim2.json.
+- (06:50, replaces the 05:35 note) Dimension picks do resolve in driver runs; what failed was the placement click:
+  in the start's iso view it lands over a default plane's area or a constraint glyph, which took it (fixed, 60050f25).
+  The driver now clicks at whole pixels (a mouse's, and Chrome's under live's runner).
+- Lengths drawn by clicks can't match live to the digit: live's viewport is 43 px lower and 1 px is ~0.3 mm at the
+  start zoom, so a clicked 30 mm line reads 29.73 in live and 29.99 in ours (sketch-dimension-*, circle-dimension:
+  `.sketch.dimensions[].value` and the box's `focus.text`). For qa: type the length (value box) where a scenario
+  compares a dimension, or the runner compares those within a pixel.
 - I added two optional state keys (README "undo", "sketch"; recorded by part_studio/ui_script.rs, compared by run.py
   once live records them).
 - (05:55) Sketch toolbar tools aren't marked for the driver (only the feature toolbar's `tool:` names), and the driver
