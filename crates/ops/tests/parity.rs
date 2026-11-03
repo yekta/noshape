@@ -591,6 +591,11 @@ fn differences_use_lives_bands() {
     a.face_types = kinds(&[("plane", 5), ("cylinder", 1)]);
     b.face_types = kinds(&[("plane", 5), ("other", 1)]);
     assert_eq!(differences(&[a], &[b]), ["\"Part 1\": faces 1 other, 5 plane, live 1 cylinder, 5 plane"]);
+    // A pattern's instances: the same volume, paired by where their boxes
+    // are (exercise-jan's mirrored instances have equal corner sums).
+    let at = |x: f64, y: f64, volume: f64| PartState { bbox: Some([[x, y, 0.0], [x + 0.01, y + 0.01, 0.05]]), ..part(volume, 6) };
+    let live = [at(0.0253, -0.0213, 1.0e-6), at(-0.0213, 0.0253, 1.0e-6)];
+    assert!(differences(&live, &[at(-0.0213, 0.0253, 1.0e-6), at(0.0253, -0.0213, 1.0e-6 + 1e-17)]).is_empty());
 }
 
 /// Variables from a Variable Studio (live's `variables` with a studio

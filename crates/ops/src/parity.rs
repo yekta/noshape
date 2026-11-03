@@ -2580,13 +2580,17 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
     if live.len() != ours.len() {
         out.push(format!("{} parts, live {}", ours.len(), live.len()));
     }
-    let key = |p: &PartState| (p.volume.unwrap_or(0.0), p.bbox.map(|b| b[0][0] + b[0][1] + b[0][2]).unwrap_or(0.0));
     let mut free: Vec<&PartState> = ours.iter().collect();
     for l in live {
-        let Some(i) = (0..free.len()).min_by(|a, b| {
-            let d = |p: &PartState| ((key(p).0 - key(l).0).abs() / key(l).0.abs().max(1e-12), (key(p).1 - key(l).1).abs());
-            d(free[*a]).partial_cmp(&d(free[*b])).unwrap_or(std::cmp::Ordering::Equal)
-        }) else {
+        // Ours for live's: the same volume (within 1e-6: a pattern's
+        // instances tie), then the nearest box.
+        let d = |p: &PartState| {
+            let (a, b) = (p.volume.unwrap_or(0.0), l.volume.unwrap_or(0.0));
+            let volume = (a - b).abs() / b.abs().max(1e-12);
+            let apart = p.bbox.zip(l.bbox).map_or(0.0, |(x, y)| (0..2).flat_map(|c| (0..3).map(move |i| (x[c][i] - y[c][i]).powi(2))).sum::<f64>().sqrt());
+            (if volume < 1e-6 { 0.0 } else { volume }, apart)
+        };
+        let Some(i) = (0..free.len()).min_by(|a, b| d(free[*a]).partial_cmp(&d(free[*b])).unwrap_or(std::cmp::Ordering::Equal)) else {
             continue;
         };
         let o = free.remove(i);
