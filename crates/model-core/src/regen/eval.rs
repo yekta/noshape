@@ -26,6 +26,11 @@ impl FeatureError {
     pub fn new(m: impl Into<String>) -> Self {
         Self { message: m.into(), warning: false, faulty: Vec::new() }
     }
+
+    /// An error naming the parameters at fault (their fields shown red), as [`err_at`].
+    pub fn at(faulty: &[&'static str], m: impl Into<String>) -> Self {
+        Self { faulty: faulty.to_vec(), ..Self::new(m) }
+    }
 }
 
 impl From<k::KernelError> for FeatureError {

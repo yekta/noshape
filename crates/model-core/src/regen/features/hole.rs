@@ -58,7 +58,8 @@ fn locations(ev: &EvalCtx) -> FResult<Vec<Location>> {
     for (i, r) in refs.iter().enumerate() {
         match r {
             Reference::SketchEntity { sketch, entity } => {
-                let Some(s) = ev.ctx.sketch(*sketch) else { return err("A hole location sketch no longer exists") };
+                // (A location gone is dropped, as from std's query: none left is "No hole points selected.")
+                let Some(s) = ev.ctx.sketch(*sketch) else { continue };
                 let id = noshape_sketch::EntityId(*entity);
                 let p2 = match s.sketch.point(id) {
                     Some(p) => Some(p),
@@ -67,12 +68,12 @@ fn locations(ev: &EvalCtx) -> FResult<Vec<Location>> {
                         _ => None,
                     },
                 };
-                let Some(p2) = p2 else { return err("A hole location no longer exists") };
+                let Some(p2) = p2 else { continue };
                 push(Location { point: s.frame.to_world(p2), normal: s.frame.normal, source: LocSource::Sketch { sketch: *sketch, entity: *entity } });
             }
             Reference::Sketch(sketch) => {
                 // All standalone points and circle centers of the sketch.
-                let Some(s) = ev.ctx.sketch(*sketch) else { return err("A hole location sketch no longer exists") };
+                let Some(s) = ev.ctx.sketch(*sketch) else { continue };
                 let mut used = std::collections::BTreeSet::new();
                 let mut centers = std::collections::BTreeSet::new();
                 for e in s.sketch.entities() {
@@ -95,11 +96,11 @@ fn locations(ev: &EvalCtx) -> FResult<Vec<Location>> {
                 }
             }
             Reference::MateConnector { .. } | Reference::Implicit { .. } => {
-                let c = ev.resolve_connector(r).ok_or_else(|| fe("A hole location mate connector no longer exists"))?;
+                let Some(c) = ev.resolve_connector(r) else { continue };
                 push(Location { point: c.origin, normal: c.z, source: LocSource::Index(i as u32) });
             }
             Reference::Vertex(n) => {
-                let p = ev.resolve_vertex_point(r).ok_or_else(|| fe("A hole location vertex no longer exists"))?;
+                let Some(p) = ev.resolve_vertex_point(r) else { continue };
                 // Normal of a planar face at the vertex.
                 let mut normal = None;
                 for b in &ev.ctx.bodies {
@@ -176,8 +177,9 @@ fn hole_dims(ev: &EvalCtx) -> FResult<HoleDims> {
     let tap_drill = if vals.bool("showTappedDepth") { Some(len("tapDrillDiameterV3")?) } else { None };
     let cbore = if style == "C_BORE" { Some((len("cBoreDiameterV3")?, len("cBoreDepthV3")?)) } else { None };
     let csink = if style == "C_SINK" { Some((len("cSinkDiameterV3")?, ev.eval_num_in(vals, "cSinkAngleV3", crate::params::NumKind::Angle)?)) } else { None };
+    // (Out of the parameter's bounds, as std's precondition says it.)
     if diameter <= 0.0 {
-        return err("Hole diameter must be positive");
+        return crate::regen::eval::err_at(&["holeDiameterV3"], "Error regenerating: a parameter is out of range.");
     }
     // hole.fs checks these before the locations.
     if cbore.is_some_and(|(cd, _)| cd <= diameter) {
@@ -209,7 +211,7 @@ fn hole_profile(d: f64, dims: &HoleDims, h: f64, tip: f64, over: f64) -> FResult
     } else if let Some((sd, sa)) = dims.csink {
         let sr = sd * 0.5;
         if !(sa > 0.0 && sa < std::f64::consts::PI) {
-            return err("Countersink angle must be between 0 and 180 degrees");
+            return crate::regen::eval::err_at(&["cSinkAngleV3"], "Error regenerating: a parameter is out of range.");
         }
         let c = (sr - r) / (sa * 0.5).tan();
         // Live L47: a countersink deeper than the hole is allowed; the cone
@@ -413,7 +415,7 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     let explicit_scope: Vec<usize> = ev.resolve_bodies(ev.query("scope")).into_iter().filter(|i| ev.ctx.bodies[*i].kind == BodyKind::Solid).collect();
     let candidates: Vec<usize> = if explicit_scope.is_empty() { (0..ev.ctx.bodies.len()).filter(|i| ev.ctx.bodies[*i].kind == BodyKind::Solid).collect() } else { explicit_scope.clone() };
     if candidates.is_empty() {
-        return err("There are no parts to cut holes in");
+        return crate::regen::eval::err_at(&["scope"], "No target parts selected for hole.");
     }
     let start_plane = if start_style == "PLANE" {
         let no_start = || crate::regen::eval::err_at(&["startBoundEntity"], "Select a start entity.");
@@ -644,7 +646,7 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         let frame = k::Plane::new(s, -dir, perp(dir));
         let make_tool = |d: f64| -> FResult<NamedShape> {
             let pts = hole_profile(d, &dims, h, tip, over)?;
-            let tool = k::revolve_profile_tool(&pts, &frame).map_err(kerr("Hole failed"))?;
+            let tool = k::revolve_profile_tool(&pts, &frame).map_err(kerr("Hole creates invalid geometry."))?;
             let src = loc.source.clone();
             let names = name_sorted(ev, &tool, |f| [f.centroid().map(|c| (c - s).dot(dir)).unwrap_or(0.0), f.area().unwrap_or(0.0)], |ord| Role::Side(src.face_source(ord)));
             Ok(NamedShape::new(tool, names))

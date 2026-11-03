@@ -44,7 +44,8 @@ fn eval_inner(ev: &mut EvalCtx) -> FResult<()> {
     let t0 = std::time::Instant::now();
     let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::Along(&|f, _| f.normal), false)? } else { ev.profiles(refs)? };
     if profiles.is_empty() {
-        return err("No valid regions to extrude");
+        // (What was picked is gone: std's query is empty.)
+        return crate::regen::eval::err_at(&["entities"], "Select face or sketch region to extrude.");
     }
     let t_profiles = t0.elapsed();
     let mut tools = Vec::new();
@@ -125,7 +126,7 @@ fn end_for(ev: &EvalCtx, bound: &str, depth_id: &str, face_id: &'static str, bod
             let Some(r) = ev.query(face_id).first() else { return err_at(&[face_id], "Select a face to terminate the extrude.") };
             let target = match r {
                 Reference::Face(_) => {
-                    let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(r)).first().ok_or_else(|| crate::regen::eval::FeatureError::new("Up to face no longer exists"))?;
+                    let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(r)).first().ok_or_else(|| crate::regen::eval::FeatureError::at(&[face_id], "Select a face to terminate the extrude."))?;
                     let face = ev.face_shape(bi, fi)?;
                     // A planar face: its plane (live ends a profile reaching past the face's edges on its surface:
                     // dx's EXTRUDE-UP-TO-FACE-BEYOND).
@@ -138,7 +139,7 @@ fn end_for(ev: &EvalCtx, bound: &str, depth_id: &str, face_id: &'static str, bod
                     }
                 }
                 _ => {
-                    let f = ev.resolve_plane(r).ok_or_else(|| crate::regen::eval::FeatureError::new("Select a face or plane"))?;
+                    let f = ev.resolve_plane(r).ok_or_else(|| crate::regen::eval::FeatureError::at(&[face_id], "Select a face to terminate the extrude."))?;
                     let ext = ev.model_extent() * 4.0;
                     k::make_plane_face(&crate::regen::eval::kernel_plane(&f), -ext, ext, -ext, ext)?
                 }
@@ -148,7 +149,7 @@ fn end_for(ev: &EvalCtx, bound: &str, depth_id: &str, face_id: &'static str, bod
         }
         "UP_TO_BODY" => {
             let Some(r) = ev.query(body_id).first() else { return err_at(&[body_id], "Select a part to terminate the extrude.") };
-            let bi = *ev.resolve_bodies(std::slice::from_ref(r)).first().ok_or_else(|| crate::regen::eval::FeatureError::new("Up to part no longer exists"))?;
+            let bi = *ev.resolve_bodies(std::slice::from_ref(r)).first().ok_or_else(|| crate::regen::eval::FeatureError::at(&[body_id], "Select a part to terminate the extrude."))?;
             let s = ev.ctx.bodies[bi].shape.clone();
             Ok(End::UpTo(if off != 0.0 { s.translated(-dir * off)? } else { s }))
         }
@@ -159,7 +160,7 @@ fn end_for(ev: &EvalCtx, bound: &str, depth_id: &str, face_id: &'static str, bod
         }
         "UP_TO_VERTEX" => {
             let Some(r) = ev.query(vertex_id).first() else { return err_at(&[vertex_id], "Select a vertex or mate connector to terminate the extrude.") };
-            let p = ev.resolve_vertex_point(r).ok_or_else(|| crate::regen::eval::FeatureError::new("Up to vertex no longer exists"))?;
+            let p = ev.resolve_vertex_point(r).ok_or_else(|| crate::regen::eval::FeatureError::at(&[vertex_id], "Select a vertex or mate connector to terminate the extrude."))?;
             Ok(End::UpToPoint(p - dir * off))
         }
         other => err(format!("Unsupported end type {other}")),
@@ -363,7 +364,7 @@ fn surface(ev: &mut EvalCtx) -> FResult<()> {
         tools.push(NamedShape::new(res.shape, names));
     }
     if tools.is_empty() {
-        return err("No valid curves to extrude");
+        return crate::regen::eval::err_at(&["surfaceEntities"], "Select sketch curves to extrude.");
     }
     let shapes: Vec<k::Shape> = tools.iter().map(|t| t.shape.clone()).collect();
     let sewn = if shapes.len() > 1 { k::sew(&shapes, 1e-6, false).map(|r| r.shape).unwrap_or_else(|_| k::Shape::compound(&shapes)) } else { shapes[0].clone() };

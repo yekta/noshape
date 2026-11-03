@@ -39,7 +39,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         return crate::regen::eval::err_at(if thin { &["surfaceEntities"] } else { &["entities"] }, if thin { "Select sketch curves to revolve." } else { "Select face or sketch region to revolve." });
     }
     let Some(axis_ref) = ev.query("axis").first() else { return crate::regen::eval::err_at(&["axis"], "Select the axis to revolve around.") };
-    let Some((origin, axis)) = ev.resolve_axis(axis_ref) else { return err("The revolve axis could not be resolved") };
+    let Some((origin, axis)) = ev.resolve_axis(axis_ref) else { return crate::regen::eval::err_at(&["axis"], "Select the axis to revolve around.") };
     // Live "psb (10-24 e)": an open wall's Thickness 1 follows the axis as
     // its edge is directed, not Opposite direction.
     let turning = |f: &crate::display::PlaneFrame, m: DVec3| {
@@ -71,14 +71,14 @@ fn surface(ev: &mut EvalCtx) -> FResult<()> {
     use super::helpers_a::{resolve_curves, wires_from};
     let refs = ev.query("surfaceEntities").to_vec();
     if refs.is_empty() {
-        return err("Select edges or sketch curves to revolve");
+        return crate::regen::eval::err_at(&["surfaceEntities"], "Select sketch curves to revolve.");
     }
     let Some(axis_ref) = ev.query("axis").first() else { return crate::regen::eval::err_at(&["axis"], "Select the axis to revolve around.") };
-    let Some((origin, axis)) = ev.resolve_axis(axis_ref) else { return err("The revolve axis could not be resolved") };
+    let Some((origin, axis)) = ev.resolve_axis(axis_ref) else { return crate::regen::eval::err_at(&["axis"], "Select the axis to revolve around.") };
     let axis = if ev.bool("oppositeDirection") { -axis } else { axis };
     let edges = resolve_curves(ev, &refs)?;
     if edges.is_empty() {
-        return err("Select edges or sketch curves to revolve");
+        return crate::regen::eval::err_at(&["surfaceEntities"], "Select sketch curves to revolve.");
     }
     let x = axis.any_orthonormal_vector();
     let frame = crate::display::PlaneFrame { origin, x, y: axis.cross(x), normal: axis };
@@ -168,17 +168,17 @@ fn side_end(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3, first: bool) 
     };
     match bound.as_str() {
         "UP_TO_VERTEX" => {
-            let Some(r) = ev.query(vertex_id).first() else { return err("Select a vertex to revolve up to") };
+            let Some(r) = ev.query(vertex_id).first() else { return crate::regen::eval::err_at(&[vertex_id], "Select a vertex or mate connector to terminate the revolve.") };
             let q = ev.resolve_vertex_point(r).ok_or_else(|| fe("Up to vertex no longer exists"))?;
             let a = angle_to(origin, axis, profile_point(p)?, q).ok_or_else(|| fe("The vertex lies on the revolve axis"))?;
             let a = a - off;
             if a <= 1e-9 {
-                return err("The revolve offset is larger than the angle to the vertex");
+                return err("Could not create revolve with provided bounds. Check input.");
             }
             Ok(Side::Angle(a))
         }
         "UP_TO_SURFACE" => {
-            let Some(r) = ev.query(face_id).first() else { return err("Select a face to revolve up to") };
+            let Some(r) = ev.query(face_id).first() else { return crate::regen::eval::err_at(&[face_id], "Select a face to terminate the revolve.") };
             let target = match r {
                 Reference::Face(_) => {
                     let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(r)).first().ok_or_else(|| fe("Up to face no longer exists"))?;
@@ -197,14 +197,14 @@ fn side_end(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3, first: bool) 
             Ok(Side::Tool(rot_back(target)?))
         }
         "UP_TO_BODY" => {
-            let Some(r) = ev.query(body_id).first() else { return err("Select a part to revolve up to") };
+            let Some(r) = ev.query(body_id).first() else { return crate::regen::eval::err_at(&[body_id], "Select a part to terminate the revolve.") };
             let bi = *ev.resolve_bodies(std::slice::from_ref(r)).first().ok_or_else(|| fe("Up to part no longer exists"))?;
             Ok(Side::Tool(rot_back(ev.ctx.bodies[bi].shape.clone())?))
         }
         "UP_TO_NEXT" => {
             let solids: Vec<Shape> = ev.ctx.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| b.shape.clone()).collect();
             if solids.is_empty() {
-                return err("Nothing to revolve up to");
+                return err("No available up to next targets.");
             }
             Ok(Side::Tool(rot_back(Shape::compound(&solids))?))
         }
@@ -231,9 +231,9 @@ fn revolve_side(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3, side: Sid
         }
         Side::Tool(tool) => {
             // Almost a full turn, split by the bounding entity.
-            let res = k::revolve(&p.shape, origin, axis, TAU * (1.0 - 1e-4)).map_err(|e| fe(&format!("Revolve failed: {e}")))?;
+            let res = k::revolve(&p.shape, origin, axis, TAU * (1.0 - 1e-4)).map_err(|_| fe("Could not create revolve with provided bounds. Check input."))?;
             let names = names_for(&res.shape, side_names(ev, p, &res, &far_role(p)));
-            let split = k::split(std::slice::from_ref(&res.shape), std::slice::from_ref(&tool), &k::BooleanOptions::default()).map_err(|e| fe(&format!("Revolve up to failed: {e}")))?;
+            let split = k::split(std::slice::from_ref(&res.shape), std::slice::from_ref(&tool), &k::BooleanOptions::default()).map_err(|_| fe("Could not create revolve with provided bounds. Check input."))?;
             // Faces coming from the tool are the new end cap.
             let mut roles = BTreeMap::new();
             for r in &split.history.records {
@@ -253,7 +253,7 @@ fn revolve_side(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3, side: Sid
                 .find(|s| matches!(s.classify_point(probe, 1e-9), Ok(k::PointClass::Inside)))
                 .ok_or_else(|| fe("Revolve up to failed: the bounding entity does not stop the revolve"))?;
             if piece.volume().unwrap_or(0.0) >= res.shape.volume().unwrap_or(0.0) * (1.0 - 1e-6) {
-                return err("The revolve does not reach the bounding entity");
+                return err("Could not create revolve with provided bounds. Check input.");
             }
             let faces = piece
                 .faces()
