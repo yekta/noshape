@@ -76,6 +76,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-03 17:00 release (qa list 15:47, newest green 45c8921d, checked on 19c09884)
+- **qa 15:47: no blocker; nothing qa knows needs the cut stopped.** On green 19c09884 (has every core / bool / psui / skasm
+  change through 15:30): CLI round trip Parasolid / ACIS / STEP / IGES / JT / Rhino 67643.716875 / 18 (= v0.4.23); volume
+  sweep = v0.4.23; **the 44 ticket documents = v0.4.23**, part for part (the day's topology / blend / shell changes keep
+  saved documents as they were: core's legacy-topology rule); the user's four cases pass (knurl Ø25 × 25 CP12 15.9 s
+  11598.041, CP20 41 s on 99e4e70e; vase; split-and-chamfer; Y Ribs). Fixed and verified since v0.4.23: SKETCH-UNDO-
+  REDO-STATE, FEATURE-ROW-ENTER-EDITS, VARIABLE-EDIT-FOCUS, MIRROR-PIECE-ORDER-CHANGE (a regression of the day, fixed);
+  interaction suite 61/63 of live's recordings (two P3 sketch selection details). Fuzz: v0.4.23 release 60 seeds,
+  green 0f6f4d1e 100 seeds (60 fallback-off), 0 deaths. Open, not new: P0 CRASH-2045 (fuzz-session heap corruption, in
+  every release since v0.4.18; the saved document is fixed), P1 DIALOG-SWITCH-DISCARDS-NEW (in v0.4.23 too).
+
 ## Release blockers for the 2026-11-03 05:00 release (qa list 04:15, newest green 8d4a5b85)
 - **qa 11:10: v0.4.23 (published 10:49 from bdbba238, the 05:00 cut made late) smoked: good.** Artifacts = the run's; CLI smoke, ticket documents, the user's four cases, app rows, memory all as expected; the updater took v0.4.22 → v0.4.23 on :149. Details at the top of docs/handoff/qa.md.
 - **qa 06:50: BLEND-TOL-REGEN-CHANGES fixed and verified on green 0531f66e** (08632c09): the 44 ticket documents = bad1de8e but the intended Shell 5. CRASH-2045: core's 3fcc69d8 fixes the saved document; the fuzz session still dies 5 in 10 (in every release since v0.4.18 too). No release cut yet at 06:50.
