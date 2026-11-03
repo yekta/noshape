@@ -104,6 +104,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   primaryAxisAlignment (true = flipped). 1926 prize-wheel-tim: Hole as live, its last difference core's
   CUT-CLOSED-EDGES-SPLIT (seam vertex kept by an Add). Run 45: 26/55, 303/480. Waiting on live: 1917 (PDF text
   offset), sketch wire bodies / in-feature mate connectors (after 04:10 11-04); on core: the tickets above.
+  21:58: a sketch whose used / intersected geometry is gone warns live's "Some external references are missing."
+  (model-core, was "N projected edge(s) no longer exist"; e2e). clamp-guillem's Boceto 6 still differs: live's
+  document lost those references (empty ids), which the translator can't rebuild. clamp-hms waits on live's
+  in-feature mate connector queries; every other first difference is core's (fillets, CUT-CLOSED-EDGES-SPLIT).
 - 11-03 21:03 lead's order (20:10: (a) NOSHAPE_CONFIG_DIR, (b) import ✗ rows, (c) drawings vs live, (d) walk):
   (a) landed 1281b9d9 (crates/ops/tests/config_dir.rs: a constructor before main). Live answers taken first: sketch
   text size (1922; cf-fix-pcb's Extrude 5 volume as live), Suggested views placement and scale (1898; 4 of 4 drawings'
