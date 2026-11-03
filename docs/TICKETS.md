@@ -366,7 +366,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   fuzz documents (no live values), and the 19-document volume sweep's non-fuzz ones and the user's cases are unchanged —
   but an existing document whose Chamfer succeeded and whose later sketches sat on its faces opening with errors is a
   regression whichever is closer to live. Which side is right for Chamfer 3 (live) is for core. (qa 2026-11-03 03:19, build e89c78de)
-- [x] 3fcc69d8 (core 11-03 05:40: the fillet's, variable fillet's and chamfer's OCCT blends run on a copy of the cached body; fz2045-step99 regenerates 10 runs of 10; qa to verify) P0 CRASH-2045 (core + bool; **in the published v0.4.22 and on green bad1de8e**, Rust Boolean on, the default) deleting a
+- [ ] reopened (qa 11-03 06:51: the saved document is fixed on 3fcc69d8, 8 of 8; the seed-2045 fuzz session still dies 5 runs in 10, fallback on 2 in 4 — notes and backtraces below) 3fcc69d8 (core 11-03 05:40: the fillet's, variable fillet's and chamfer's OCCT blends run on a copy of the cached body; fz2045-step99 regenerates 10 runs of 10; qa to verify) P0 CRASH-2045 (core + bool; **in the published v0.4.22 and on green bad1de8e**, Rust Boolean on, the default) deleting a
   feature crashes the CLI / app most of the time: qa-scratch/tickets/crash2045/fz2045-step99.noshape (+ -wal; CLI fuzz seed
   2045's document, 43 features, Part 1 179904.78 mm³), `python3 tickets/crash2045/del1.py <noshape mcp wrapper> <doc>
   'Sketch 2'` (open, feature_delete Sketch 2, query_parts). **Green bad1de8e: SIGSEGV 5 of 5 (and 5 of 6 again); v0.4.22
