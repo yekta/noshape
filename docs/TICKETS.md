@@ -1423,7 +1423,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
-- [ ] P3 EYE-CLICK-SELECTS-ROW (psui) clicking a feature row's eye (show / hide) also selects the row in ours: scenario
+- [x] verified db0aedd0 (qa 11-03 03:35: its scenario matches live's recording step for step, psui's driver on green db0aedd0) P3 EYE-CLICK-SELECTS-ROW (psui) clicking a feature row's eye (show / hide) also selects the row in ours: scenario
   feature-row-hide-sketch-eye (the box, click Sketch 1's eye): live's recording (/root/parity/ui/live) selection count 0,
   Sketch 1 shown, not selected; ours (green 2723f7fb, qa-scratch/uip-ours) selection 1 (FEATURE Sketch 1), the row selected.
   (qa 2026-11-03, build 2723f7fb)
@@ -1487,7 +1487,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   live (11-02, qa's tab, "qa parity vars", toolbar `[command-id=UNDO_A_CHANGE]`): **Undo stays disabled** through both
   moves; ours: **Undo enabled after the first move**, and Ctrl+Z moves the bar back up (re-checked with the window focused: tickets/fl/ubf-undo-bar.png; first run ub-undo-bar.png:
   open / after ArrowUp / after ArrowDown). Scenario ui-parity/feature-row-arrow-up-moves-bar. (qa 2026-11-02, build 6b4704f2)
-- [ ] P2 FEATURE-RCLICK-WITH-SELECTION (psui) right-clicking a feature row that isn't selected while another is: click
+- [x] verified db0aedd0 (qa 11-03 03:35: its scenario matches live's recording step for step, psui's driver on green db0aedd0) P2 FEATURE-RCLICK-WITH-SELECTION (psui) right-clicking a feature row that isn't selected while another is: click
   Extrude 1, right-click Sketch 1; live: Extrude 1 stays selected and the **multi-selection menu** opens: Add selection to
   folder… · Suppress · Dynamic suppression ▸ · Clear selection · Edit sketch appearance… · Add appearance to feature… ·
   Delete (qa-scratch/tickets/fl/live-menu-other.png); ours: the single-feature Sketch 1 menu (Rename · Edit… · Copy sketch
