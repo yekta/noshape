@@ -21,6 +21,17 @@ constraint tools' curve picks don't resolve in driver runs (hover), sketch toolb
 tools). Next: once live records the keys, run `tools/ui-parity/run.py --app … sketch-…` and fix the differences in
 my area first; meanwhile the P2 fuzz list.
 
+06:50: live records `undo` / `sketch` now (behaviours "ui-parity runner (2026-11-03, P1 request 1848)"; null lists =
+not read yet, run.py skips them). Ran the 25 live sketch-* recordings (qa's; mine aren't recorded yet): fixed the
+Dimension tool's placement click (taken by a plane's area / a glyph in the iso start view), the box's 1e-8 m precision
+and the state differences (selection, related row, Construction, tool names; queued 60050f25). Left: **Undo after the
+plane pick** (live's runs: on; qa's earlier check: off; the runner picks Top in the canvas, qa in the list) asked in
+REQUESTS 06:10 with the Construction-button question; clicked lengths differ by a pixel (noted for psui / qa). Score
+before: 0/16, 74/157 states; now every scenario's only differences are that Undo and the pixel values. Next: when live
+answers, fix Undo; when my 19 scenarios are recorded, run them (`run.py --app /root/target-skasm/debug/noshape
+--display :103 --live /root/parity/ui/live --out /root/skasm-scratch/uip <names>`, per-step differences:
+/root/skasm-scratch/uipdiff.py /root/skasm-scratch/uip).
+
 ## State at 01:30 UTC
 Landed overnight (all on main by dabe8513): sketch drag far hold (g6) and levels + farthest point (g4); drag from the
 drag's start (live drag probes 12: the result depends only on where the drag ends) in dragged components of <= 60
