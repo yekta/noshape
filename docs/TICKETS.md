@@ -3139,7 +3139,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   agree with live's to 1e-5, the ring gear (no fillets) matches. Likely OCCT's blend approximation in several
   patches. Rebuilt document: /root/dx-scratch/pmdocs/cf/cf-planetary-gears.noshape; model
   /root/parity/models/cf-planetary-gears (NOSHAPE_PARITY_ONLY=cf-planetary-gears). (dx 2026-11-03)
-- [ ] P1 SKETCH-COLLINEAR-EDGES-MERGE (core; dx's parity suite 11-03, 3 documents) two collinear sketch lines that
+- [x] (core 11-03 14:50: region_profile joins collinear lines of two entities that meet end to end where no other non-construction curve of the sketch touches (a construction one may), as one line's pieces already were; not in studios saved before (legacy_topology). learning-center-frank matches live to the end; exercise-martinl's Extrude 1 as live (its next difference a sketch frame, SKETCH-FACE-FRAME); clamp-guillem past Extrusión 1 (next: Extrusión 3's region). T1 model kernel_robustness::collinear_lines_meeting_alone_extrude_as_one_face, with a dangling line keeping them apart. If live's edge-case answer (REQUESTS 13:30) differs, the rule moves) P1 SKETCH-COLLINEAR-EDGES-MERGE (core; dx's parity suite 11-03, 3 documents) two collinear sketch lines that
   meet end to end, where no other non-construction curve ends, extrude as one side face in live and as two in ours:
   learning-center-frank's Extrude 1 (its profile's base is (−62.5, 0)–(0, 0) and its mirror (62.5, 0)–(0, 0), only
   the construction mirror line ends at the origin): ours 19/51/34 faces/edges/vertices, live 18/48/32;
