@@ -3280,7 +3280,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   removed planes, offsets as B-splines: 0.5 s a hose) is parked in /root/core-scratch/smooth-shell-wip.patch: it
   declines on these hoses because our sweep twists its frame back and forth along the straight pieces (the u = 0 line
   0.25 mm off its plane, parameter speed ×3), which leaves an inconsistent seam. Next: the sweep's frame on lines, then
-  the patch. Probes: kernel shell::dumped_sweep_shell_probe (NOSHAPE_SWEEP_CASE, vibe5 ~/core-hose3/sweep-*).
+  the patch (now landed). Probes: kernel shell::dumped_sweep_shell_probe (NOSHAPE_SWEEP_CASE, vibe5 ~/core-hose3/sweep-*).
+  core 11-03 19:59: landed both: round profiles about the path sweep by the discrete frame (the exact tube, 11789.96
+  mm³), and the smooth-wall Shell path (kernel shell::a_tube_shells_by_its_smooth_offset; the 211-case shell corpus
+  unchanged). cf-hose-routing: each Hose Routing 0.94 s (was 30 s and an error), the document 113 s -> 13 s; the hoses'
+  volume and area as live, their centroid 0.12 mm off (live's splines dip 0.56 mm lower: its 2-point fit isn't quite
+  our cubic Hermite). Left: the 13 s (meshing?), the 0.9 s a hose (live ~0.1 s), the spline shape.
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet
