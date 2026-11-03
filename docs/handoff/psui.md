@@ -249,7 +249,11 @@ dump, the runner, live's first 20 scenarios run in ours and a first score.
   preselected edge (live's account drops the edge since 04:10), Hole / Revolve remembered values, Shift+P as an undo
   step, a rolled-back variable's " = 0", Fillet moved above its Extrude reading "ok", the second Enter after an
   autofill insertion (new scenario extrude-depth-variable-enter-twice).
-- 11-03 13:10: **51/56** on live's new batch (421/436 states); the 5 left are skasm's sketch tools (skasm.md). Since
+- 11-03 13:05: x40 recordings not yet re-recorded (111 psui scenarios): **100/111**; fixed since: New folder keeps the
+  features selected, folder rows read with their count. Left: live-account / start effects (Hole tapped, Revolve Thin,
+  edge preselection, "#width = 0", the x40 dialog place) and revolve-dialog-axis (skasm: the Line tool's first click
+  after a rectangle starts nothing on the real input path, instrumented). Live's batch paused 11:59 for request 1870.
+- 11-03 13:05: **51/56** on live's new batch (421/436 states); the 5 left are skasm's sketch tools (skasm.md). Since
   12:20: feature rows copy / paste nothing (live, my probe), Shift+P hides as an undo step (live 1863).
 - 11-03 12:20: live's new batch (56 recorded, paused 11:59 for request 1870): 35/53 at 11:40; since then the
   autofill rules are live's (an Enter that completes the text only inserts it, the next applies, the next accepts;
@@ -559,8 +563,7 @@ N10. (11-01 01:13) Unchecked rows (user 11-01): keyboard-mouse a / q / k, Ctrl+M
      cursors 53 (count cursor with a dialog), 70 (Isolate / Replace instance / Interference titles), 78, 81, 82 ✅,
      74 ✅ (the Variable Studio pill is live's 60 % #1651b0 with white text, ui::name_pill_on); 46 ✅ (live 1697 + Onshape's bundle: only
      while snapped to a target, as ours). large-models 24: qa5's "Point" was our midpoint target of a full circle, at its seam;
-     live request open (does Onshape offer a midpoint on a closed circular edge?). If not, edge_midpoint should
-     return None for closed edges (behaviors.rs). part-studio 1.26 ✅ (env maps accepted as ours), 1.28 n/a.
+     answered (live 1698: no midpoint on closed edges) and done (behaviors.rs edge_midpoint). part-studio 1.26 ✅ (env maps accepted as ours), 1.28 n/a.
      Dark-mode residual closed 11-01: the Variable type ▾ is live's 8 x 4 caret (os_ui::GLYPH_CARET), checked in both themes.
      dk-993 closed 11-01: the Appearances panel's empty tabs as live 1700 (icons/appearances-empty.svg,
      sketches-empty.svg: our drawings fitted to live's pixels with resvg; /root/psui-scratch/fit/sk.py). core-workflow F18 / F19 = live.
