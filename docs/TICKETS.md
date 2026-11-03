@@ -3079,3 +3079,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Agent API side: feature_get shows `"valueArray": "[15,20,25]"` (the expression), as the dialog would keep it; the
   host should evaluate it. Rebuilt document: /root/dx-scratch/pmdocs/cf/cf-parameter-pattern.noshape
   (featurestudio_monitor). (dx 2026-11-03)
+- [ ] P2 FILLET-PROPAGATION-VOLUME (core; dx's parity suite 11-03, pipeflange-steven) Fillet 2 (r 8 mm, one edge,
+  tangent propagation, circular) after a Fillet 1 and a cut: ours 36/81/42 faces/edges/vertices, 18314.952 mm³;
+  live 36/79/40, 18329.663 mm³ (Δ 14.7 mm³, so not only split edges, see CUT-CLOSED-EDGES-SPLIT). Live's new faces:
+  four tori 309.756 mm², four blends 31.32 mm² and four 28.742 mm² (OTHER), the cylinder 1764.49 mm², a plane
+  434.112 mm² (live.jsonl line 9 bodies). Model: /root/parity/models/pipeflange-steven (`parity_models`,
+  NOSHAPE_PARITY_ONLY=pipeflange-steven; feature 9). (dx 2026-11-03)
