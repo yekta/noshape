@@ -117,6 +117,12 @@ fn parity_models() {
         if let Ok(s) = std::fs::read_to_string(dir.join("source.json")).map(|t| serde_json::from_str::<Value>(&t).unwrap_or(Value::Null)) {
             index.push(json!({ "name": name, "document": s["document"], "workspace": s["workspace"], "element": s["element"], "url": s["url"] }));
         }
+        // Live's fetch skipped or didn't finish it: nothing to compare.
+        if !dir.join("live.jsonl").is_file() {
+            let why = ["SKIPPED.txt", "INCOMPLETE.txt"].iter().find_map(|f| std::fs::read_to_string(dir.join(f)).ok()).unwrap_or_default();
+            println!("{name}: no live.jsonl, not scored ({})", why.trim());
+            continue;
+        }
         let Some((features, live, refs)) = read_model(&dir) else {
             println!("{name}: unreadable features.json");
             continue;

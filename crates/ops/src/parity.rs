@@ -64,6 +64,13 @@ pub struct Translator<'a> {
     config_defaults: HashMap<String, String>,
     /// Edits the current sketch's constraints and dimensions made (to undo).
     sketch_edits: usize,
+    /// The sketch before its constraints, and the first that moved it.
+    sketch_before: Value,
+    /// The open sketch's Onshape (x, y) → ours.
+    sketch_map: SketchMap,
+    /// Onshape's circles and arcs per (sketch, entity): centre and radius (m).
+    circles: HashMap<(String, String), ([f64; 2], f64)>,
+    first_move: Option<String>,
     /// Onshape Feature Studio element id → our Feature Studio tab id.
     studios: HashMap<String, String>,
     /// What isn't translated of the document itself (configuration inputs…).
@@ -156,7 +163,7 @@ impl<'a> Translator<'a> {
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
         let _ = std::fs::remove_file(path);
-        let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, studios: HashMap::new(), notes: Vec::new() };
+        let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), first_move: None, studios: HashMap::new(), notes: Vec::new() };
         t.call("document_create", json!({ "path": path.to_str().ok_or("path")? }))?;
         // Bare numbers in Onshape's expressions are in the document's units.
         let (length, angle) = doc_units(&doc["units"]);
@@ -955,6 +962,9 @@ impl<'a> Translator<'a> {
         };
         let mut shapes = Vec::new();
         let mut local = Vec::new();
+        // Onshape's start and end of each curve (sketch metres): ours may
+        // run the other way (an arc is counter-clockwise).
+        let mut ends: Vec<Option<[[f64; 2]; 2]>> = Vec::new();
         for e in f["entities"].as_array().into_iter().flatten() {
             let eid = e["entityId"].as_str().unwrap_or("").to_string();
             let g = &e["geometry"];
@@ -973,6 +983,7 @@ impl<'a> Translator<'a> {
                 }
                 "BTCurveGeometryCircle" => {
                     let (cx, cy, r, xd, yd) = (num("xCenter"), num("yCenter"), num("radius"), num("xDir"), num("yDir"));
+                    self.circles.insert((oid.clone(), eid.clone()), ([cx, cy], r));
                     let full = e["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketchCurve-")) || e["startParam"].is_null();
                     if full {
                         Some(json!({ "tool": "circle", "points": [at(cx, cy), at(cx + r * xd, cy + r * yd)], "construction": construction }))
@@ -1020,21 +1031,30 @@ impl<'a> Translator<'a> {
                 _ if e["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketchPoint")) => Some(json!({ "tool": "point", "points": [at(e["x"].as_f64().unwrap_or(0.0), e["y"].as_f64().unwrap_or(0.0))], "construction": construction })),
                 _ => None,
             };
-            if let Some(poly) = sampled(e) {
+            let poly = sampled(e);
+            let end_points = poly.as_ref().filter(|p| p.len() >= 2 && !e["startParam"].is_null()).map(|p| [p[0], p[p.len() - 1]]);
+            if let Some(poly) = poly {
                 self.curves.insert((oid.clone(), eid.clone()), poly);
             }
             match shape {
                 Some(s) => {
                     shapes.push(s);
                     local.push(eid);
+                    ends.push(end_points);
                 }
                 None => problems.push(format!("sketch entity {eid}: {} not translated", if gt.is_empty() { e["btType"].as_str().unwrap_or("?") } else { gt })),
             }
         }
         // Curves first, then the free points, so each reply lists ours in
         // Onshape's order.
+        let ours = self.call("sketch_get", json!({ "sketch": id }))?;
+        let k = per_unit(&ours["units"]);
+        let v = |key: &str| -> [f64; 3] { std::array::from_fn(|i| ours["frame"][key][i].as_f64().unwrap_or(0.0)) };
+        self.sketch_map = SketchMap { onshape: frame, ours: [v("origin").map(|c| c * k), v("x"), v("y")], k };
+        let map = self.sketch_map;
         for points in [false, true] {
             let (batch, ids): (Vec<Value>, Vec<String>) = shapes.iter().zip(&local).filter(|(s, _)| (s["tool"] == "point") == points).map(|(s, e)| (s.clone(), e.clone())).unzip();
+            let ends_of: HashMap<&String, [[f64; 2]; 2]> = local.iter().zip(&ends).filter_map(|(e, x)| Some((e, (*x)?))).collect();
             if batch.is_empty() {
                 continue;
             }
@@ -1062,7 +1082,17 @@ impl<'a> Translator<'a> {
                             self.sketch_points.push((oid.clone(), cid.to_string()));
                         }
                     }
-                    for (end, key) in [("start", "start_point"), ("end", "end_point"), ("center", "center_point")] {
+                    // Ours reversed: its start nearer Onshape's end.
+                    let at = |key: &str| Some([c[key][0].as_f64()? * map.k, c[key][1].as_f64()? * map.k]);
+                    let reversed = match (ends_of.get(eid), at("start")) {
+                        (Some([s, e]), Some(p)) => {
+                            let d = |q: [f64; 2]| (q[0] - p[0]).hypot(q[1] - p[1]);
+                            d(map.local(*e)) < d(map.local(*s)) - 1e-9
+                        }
+                        _ => false,
+                    };
+                    let keys = if reversed { [("start", "end_point"), ("end", "start_point"), ("center", "center_point")] } else { [("start", "start_point"), ("end", "end_point"), ("center", "center_point")] };
+                    for (end, key) in keys {
                         if let Some(pid) = c[key].as_str() {
                             self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}")), pid.to_string());
                         }
@@ -1076,6 +1106,8 @@ impl<'a> Translator<'a> {
         let top = |t: &mut Self| t.ctx.doc(None).ok().and_then(|od| od.session.undo_tops().0);
         let mark = top(self);
         self.sketch_edits = 0;
+        self.sketch_before = before.clone();
+        self.first_move = None;
         self.constraints(&oid, &id, f, problems);
         self.dimensions(&oid, &id, f, problems);
         let after = self.call("sketch_get", json!({ "sketch": id }))?;
@@ -1088,7 +1120,8 @@ impl<'a> Translator<'a> {
                 undone += 1;
             }
             let back = self.call("sketch_get", json!({ "sketch": id })).map(|g| sketch_moved(&before, &g)).unwrap_or(f64::NAN);
-            problems.push(format!("its constraints and dimensions moved the geometry by up to {:.6} mm: taken back ({undone} edits undone; {:.6} mm left)", moved * 1e3, back * 1e3));
+            let first = self.first_move.take().unwrap_or_default();
+            problems.push(format!("its constraints and dimensions moved the geometry by up to {:.6} mm (first {first}): taken back ({undone} edits undone; {:.6} mm left)", moved * 1e3, back * 1e3));
         }
         let st = self.call("feature_list", json!({}))?;
         let row = st["features"].as_array().into_iter().flatten().find(|x| x["id"] == id).cloned().unwrap_or_default();
@@ -1125,10 +1158,11 @@ impl<'a> Translator<'a> {
                 }
             };
             let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).and_then(|p| p["value"].as_str().map(str::to_string)).filter(|v| !v.is_empty());
-            // Ours takes the mirror line last, a midpoint's point first.
+            // Ours takes the mirror line last, a midpoint's point last (between
+            // two points: Onshape's centre-point rectangle).
             let order: &[&str] = match ours {
                 "symmetric" => &["localFirst", "localSecond", "localMirror"],
-                "midpoint" => &["localMidpoint", "localFirst", "localEntity1", "localSecond", "localEntity2"],
+                "midpoint" => &["localFirst", "localEntity1", "localSecond", "localEntity2", "localMidpoint"],
                 _ => &["localFirst", "localSecond"],
             };
             let mut entities: Vec<String> = Vec::new();
@@ -1159,12 +1193,108 @@ impl<'a> Translator<'a> {
             }
             let made = !entities.is_empty() && self.call("sketch_constrain", json!({ "sketch": id, "constraint": ours, "entities": entities })).is_ok();
             self.sketch_edits += usize::from(made);
+            if made {
+                self.check_moved(id, || format!("{ty} on {}", c["parameters"].as_array().into_iter().flatten().filter_map(|p| p["value"].as_str()).collect::<Vec<_>>().join(", ")));
+            }
             if !made {
                 *missed.entry(format!("{ty} rejected")).or_default() += 1;
             }
         }
         if !missed.is_empty() {
             problems.push(format!("constraints left to the solved geometry: {}", missed.iter().map(|(k, n)| format!("{n} {k}")).collect::<Vec<_>>().join(", ")));
+        }
+    }
+
+    /// Where an angle dimension's label goes (ours, metres) so it measures
+    /// the quadrant Onshape's does: the one whose angle is the value, or
+    /// else the one Onshape's label is in (`labelAngle` from the vertex,
+    /// behind it when `labelDistance` is negative).
+    fn angle_label(&self, oid: &str, c: &Value, value: Option<&str>) -> Option<[f64; 2]> {
+        let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name);
+        let line = |name: &str| -> Option<([f64; 2], [f64; 2])> {
+            let p = self.curves.get(&(oid.to_string(), par(name)?["value"].as_str()?.to_string()))?;
+            let (a, b) = (p.first()?, p.last()?);
+            let l = (b[0] - a[0]).hypot(b[1] - a[1]);
+            (l > 1e-12).then(|| (*a, [(b[0] - a[0]) / l, (b[1] - a[1]) / l]))
+        };
+        let ((pa, da), (pb, db)) = (line("localFirst")?, line("localSecond")?);
+        let den = da[0] * db[1] - da[1] * db[0];
+        if den.abs() < 1e-9 {
+            return None;
+        }
+        let t = ((pb[0] - pa[0]) * db[1] - (pb[1] - pa[1]) * db[0]) / den;
+        let x = [pa[0] + t * da[0], pa[1] + t * da[1]];
+        let between = (da[0] * db[0] + da[1] * db[1]).clamp(-1.0, 1.0).acos();
+        let prefs = noshape_units::UnitPrefs::default();
+        let want = value.and_then(|v| noshape_units::evaluate_as(v, noshape_units::Dim::ANGLE, &prefs, &noshape_units::EmptyScope).ok()).map(|q| q.value);
+        let num = |name: &str| par(name).and_then(|p| p["expression"].as_str()).and_then(|e| e.split('*').next()?.trim().parse::<f64>().ok());
+        let dir = match want {
+            // Between da and db the angle is `between`; between da and −db its supplement.
+            Some(w) if (w - between).abs() < 1e-6 => [da[0] + db[0], da[1] + db[1]],
+            Some(w) if (w - (std::f64::consts::PI - between)).abs() < 1e-6 => [da[0] - db[0], da[1] - db[1]],
+            _ => {
+                let (a, d) = (num("labelAngle")?, num("labelDistance")?);
+                [d * a.cos(), d * a.sin()]
+            }
+        };
+        let n = dir[0].hypot(dir[1]);
+        if n < 1e-12 {
+            return None;
+        }
+        Some(self.sketch_map.local([x[0] + 0.01 * dir[0] / n, x[1] + 0.01 * dir[1] / n]))
+    }
+
+    /// A distance to a circle or arc measures to its centre, its near side
+    /// or its far side: the one whose length is the value Onshape solved
+    /// (its `halfSpace` sides aren't read).
+    fn circle_mode(&self, oid: &str, c: &Value, value: Option<&str>) -> Option<&'static str> {
+        let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).and_then(|p| p["value"].as_str()).map(str::to_string);
+        let want = noshape_units::evaluate_as(value?, noshape_units::Dim::LENGTH, &noshape_units::UnitPrefs::default(), &noshape_units::EmptyScope).ok()?.value;
+        enum G {
+            Point([f64; 2], f64),
+            Line([f64; 2], [f64; 2]),
+        }
+        let geom = |e: String| -> Option<G> {
+            if let Some((c, r)) = self.circles.get(&(oid.to_string(), e.clone())) {
+                return Some(G::Point(*c, *r));
+            }
+            if let Some(p) = self.curves.get(&(oid.to_string(), e.clone())) {
+                return Some(G::Line(*p.first()?, *p.last()?));
+            }
+            let (base, end) = e.rsplit_once('.')?;
+            let key = (oid.to_string(), base.to_string());
+            match end {
+                "center" => self.circles.get(&key).map(|(c, _)| G::Point(*c, 0.0)),
+                "start" => self.curves.get(&key).and_then(|p| p.first()).map(|p| G::Point(*p, 0.0)),
+                "end" => self.curves.get(&key).and_then(|p| p.last()).map(|p| G::Point(*p, 0.0)),
+                _ => None,
+            }
+        };
+        let (a, b) = (geom(par("localFirst")?)?, geom(par("localSecond")?)?);
+        let to_line = |p: [f64; 2], s: [f64; 2], e: [f64; 2]| {
+            let (dx, dy) = (e[0] - s[0], e[1] - s[1]);
+            ((p[0] - s[0]) * dy - (p[1] - s[1]) * dx).abs() / dx.hypot(dy).max(1e-12)
+        };
+        let (centres, radii) = match (a, b) {
+            (G::Point(p, r), G::Point(q, t)) => ((p[0] - q[0]).hypot(p[1] - q[1]), r + t),
+            (G::Point(p, r), G::Line(s, e)) | (G::Line(s, e), G::Point(p, r)) => (to_line(p, s, e), r),
+            (G::Line(..), G::Line(..)) => return None,
+        };
+        if radii < 1e-12 {
+            return None;
+        }
+        [("center", centres), ("minimum", centres - radii), ("maximum", centres + radii)].into_iter().min_by(|x, y| (x.1 - want).abs().total_cmp(&(y.1 - want).abs())).map(|m| m.0)
+    }
+
+    /// Notes the first constraint or dimension that moved the sketch.
+    fn check_moved(&mut self, id: &str, what: impl FnOnce() -> String) {
+        if self.first_move.is_some() {
+            return;
+        }
+        let Ok(now) = self.call("sketch_get", json!({ "sketch": id })) else { return };
+        let d = sketch_moved(&self.sketch_before, &now);
+        if d > 1e-7 {
+            self.first_move = Some(format!("{} by {:.6} mm", what(), d * 1e3));
         }
     }
 
@@ -1214,14 +1344,46 @@ impl<'a> Translator<'a> {
                 continue;
             }
             let mut args = json!({ "sketch": id, "entities": entities, "kind": kind });
+            if kind == "distance"
+                && let Some(mode) = self.circle_mode(oid, c, value.as_deref())
+            {
+                args["mode"] = json!(mode);
+            }
+            if kind == "angle"
+                && let Some(l) = self.angle_label(oid, c, value.as_deref())
+            {
+                args["label"] = json!(l.map(|x| format!("{} mm", x * 1e3)));
+            }
             if let Some(v) = value {
                 args["value"] = json!(v);
             }
             match self.call("sketch_dimension", args) {
-                Ok(_) => self.sketch_edits += 1,
+                Ok(_) => {
+                    self.sketch_edits += 1;
+                    self.check_moved(id, || format!("{ty} {kind} {} on {}", c["parameters"].as_array().into_iter().flatten().find_map(|p| p["expression"].as_str()).unwrap_or(""), ["localFirst", "localSecond", "localEntity1", "localEntity2"].iter().filter_map(|n| par0(n)).filter(|v| !v.is_empty()).collect::<Vec<_>>().join(", ")));
+                }
                 Err(e) => problems.push(format!("{ty} dimension: {e}")),
             }
         }
+    }
+}
+
+/// An Onshape sketch's frame and ours: Onshape's sketch (x, y) in metres
+/// to ours in metres (the same when Onshape's frame isn't known).
+#[derive(Clone, Copy, Default)]
+struct SketchMap {
+    onshape: Option<[[f64; 3]; 3]>,
+    ours: [[f64; 3]; 3],
+    /// Metres per unit of the sketch ops' replies.
+    k: f64,
+}
+
+impl SketchMap {
+    fn local(&self, [u, w]: [f64; 2]) -> [f64; 2] {
+        let Some([fo, fx, fy]) = self.onshape else { return [u, w] };
+        let [o, x, y] = self.ours;
+        let p: [f64; 3] = std::array::from_fn(|i| fo[i] + u * fx[i] + w * fy[i] - o[i]);
+        [(0..3).map(|i| p[i] * x[i]).sum(), (0..3).map(|i| p[i] * y[i]).sum()]
     }
 }
 

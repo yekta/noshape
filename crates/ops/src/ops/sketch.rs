@@ -142,7 +142,7 @@ pub fn ops() -> Vec<Op> {
                 opt("value", json!({ "type": ["string", "number"] }), "Value or expression. Without it the dimension keeps the measured value, as when the Dimension tool's value box is accepted unchanged."),
                 opt("kind", json!({ "type": "string", "enum": ["auto", "distance", "horizontal_distance", "vertical_distance", "length", "radius", "diameter", "angle", "arc_angle", "centerline"] }), "Dimension kind (default auto)."),
                 opt("mode", json!({ "type": "string", "enum": ["center", "minimum", "maximum"] }), "Distance to a circle/arc measured to its center (default), nearest or farthest point."),
-                opt("label", point.clone(), "Label position in sketch coordinates (also picks the auto kind: above/below two points gives a horizontal distance, beside them a vertical one)."),
+                opt("label", point.clone(), "Label position in sketch coordinates (also picks the auto kind: above/below two points gives a horizontal distance, beside them a vertical one; between two lines, the quadrant an angle measures)."),
             ],
             mutates: true,
             destructive: false,
@@ -767,7 +767,11 @@ fn dimension_kind(kind: &str, ids: &[EntityId], mode: DistanceMode, data: &Sketc
         "diameter" => ConstraintKind::Diameter { curve: one()?, value: 0.0 },
         "angle" => {
             let (a, b) = two()?;
-            ConstraintKind::Angle { a, b, value: 0.0 }
+            // The label picks the quadrant measured, as the Dimension tool's cursor.
+            match label.and_then(|c| sm::smart_dimension(&data.sketch, &[a, b], c)) {
+                Some(k @ ConstraintKind::Angle { .. }) => k,
+                _ => ConstraintKind::Angle { a, b, value: 0.0 },
+            }
         }
         "arc_angle" => ConstraintKind::ArcAngle { arc: one()?, value: 0.0 },
         _ => return Err(OpError::param("kind", "unknown dimension kind")),
