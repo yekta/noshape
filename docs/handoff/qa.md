@@ -42,8 +42,12 @@ status documents; d55587a0's knurl change: CP12 / CP20 results unchanged, times 
 SKETCH-TOOL-PICK-SELECTION verified d0526d18 (Extend's recording stale; skasm asked live to re-record). At publish:
 `bash /tmp/qa-relsmoke.sh 0.4.24 v0423`, /tmp/qa-relgui424.sh, /tmp/qa-mem424.sh (both made), the updater app on :149
 (running v0.4.23, PID 2908495). Loops on 19c09884 (2541–2640, 100 seeds) and v0.4.23 (2641–2700): 0 deaths. Now:
-green 1fda3bc9 /tmp/qa-nfloop30.sh (2821–2880), /tmp/qa-gfloop14.sh (2881–2920); v0.4.24 /tmp/qa-cfloop71.sh (2761–2820);
-keep noshape-1fda3bc9 and -0531f66e (CRASH-2045) in keep/x/y.
+v0.4.24 /tmp/qa-cfloop71.sh (2761–2820); green 444855b1 /tmp/qa-gfloop15.sh (2981–3020); eed2bdc8 /tmp/qa-nfloop32.sh
+(3021–3080, fallback off). Done, 0 deaths: 1fda3bc9 2821–2920, c4d5d8af 2921–2980. keep/x/y: noshape-444855b1, -eed2bdc8,
+-0531f66e (CRASH-2045). Greens since the cut checked (volume sweep = v0.4.23, the 44 ticket documents): 2ac2afb7 (five
+fuzz documents ≤ 1e-6), e9422c1c, c7054fca (vase same), 6d4e3706, eed2bdc8 — no change; knurls same on b3d2e7f0.
+Interaction suite 117/128 on ece6c4c8 (SCORE.md). FS-FEATURE-LIST-NONDETERMINISTIC: id order, repro pair in
+qa-scratch/tickets/fs-flist.
 
 ## Session 7 (qa, pinned account, from 11-02 22:40; greens bc7d7e9f → 6b4704f2)
 
