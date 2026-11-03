@@ -23,6 +23,10 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   Queued: EXTRUDE-OVERLAP-LINES-FACES (one line's pieces one profile edge; bracket120's Extrude 1 as live).
 - Parity models on vibe5: ~/agents/core-parity-models (6 copied from /root/parity/models);
   `NOSHAPE_PARITY_MODELS=$HOME/agents/core-parity-models cargo test -p noshape-ops --test all parity_models -- --ignored --nocapture`.
+- Sketch displays cached per sketch result (regen/display.rs SketchDisplays, Regenerator.sketch_displays): an edit
+  after a 400-circle sketch on a face 13 -> 1.1 ms (each run re-triangulated every region).
+- SHELL-SLOW: bop-pairs-gpf-5267's Shell 4 fails after 11–17 s in the slab fuse (TICKETS note 07:10; kernel T2
+  shell::slab_fuse_probe with NOSHAPE_SHELL_DUMP_TOOLS); open: how to fail fast without failing shells live builds.
 - Left for others: clamp-hms Extrude 2 and bracket120 Extrude 2 (dx, the translator's region choice);
   CUT-CLOSED-EDGES-SPLIT (bool; the loops' vertices are the seams', an edge join does nothing). Asked live: REQUESTS
   06:15 (sketch mode fill of imprinted pieces, a feature-list pick of a sketch on a face).
