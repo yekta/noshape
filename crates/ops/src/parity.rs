@@ -62,6 +62,8 @@ pub struct Translator<'a> {
     curves: HashMap<(String, String), Vec<[f64; 2]>>,
     /// Configuration inputs' default options (`configuration` of features.json).
     config_defaults: HashMap<String, String>,
+    /// Onshape Feature Studio element id → our Feature Studio tab id.
+    studios: HashMap<String, String>,
     /// What isn't translated of the document itself (configuration inputs…).
     pub notes: Vec<String>,
 }
@@ -152,7 +154,7 @@ impl<'a> Translator<'a> {
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
         let _ = std::fs::remove_file(path);
-        let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, notes: Vec::new() };
+        let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, studios: HashMap::new(), notes: Vec::new() };
         t.call("document_create", json!({ "path": path.to_str().ok_or("path")? }))?;
         // Bare numbers in Onshape's expressions are in the document's units.
         let (length, angle) = doc_units(&doc["units"]);
@@ -172,7 +174,30 @@ impl<'a> Translator<'a> {
         for table in doc["variables"].as_array().into_iter().flatten().filter(|v| v["variableStudioReference"].is_object()) {
             t.variable_studio(table);
         }
+        for (element, studio) in doc["featureStudios"].as_object().into_iter().flatten() {
+            t.feature_studio(element, studio);
+        }
         Ok(t)
+    }
+
+    /// A Feature Studio custom features come from (features.json
+    /// `featureStudios`: element id → `{ "name", "source" }`): ours with the
+    /// same FeatureScript, committed.
+    fn feature_studio(&mut self, element: &str, studio: &Value) {
+        let Some(source) = studio["source"].as_str().or(studio.as_str()) else { return };
+        let name = studio["name"].as_str().unwrap_or("Feature Studio 1");
+        let made = self.call("tab_create", json!({ "kind": "featurestudio", "name": name })).and_then(|r| r["tab"]["id"].as_str().map(str::to_string).ok_or_else(|| "no tab id".to_string()));
+        let tab = match made {
+            Ok(t) => t,
+            Err(e) => {
+                self.notes.push(format!("Feature Studio {name}: {e}"));
+                return;
+            }
+        };
+        if let Err(e) = self.call("featurestudio_edit", json!({ "tab": tab, "source": source })).and_then(|_| self.call("featurestudio_commit", json!({ "tab": tab }))) {
+            self.notes.push(format!("Feature Studio {name}: {e}"));
+        }
+        self.studios.insert(element.to_string(), tab);
     }
 
     /// A Variable Studio the Part Studio's variables come from (live's
@@ -275,6 +300,21 @@ impl<'a> Translator<'a> {
     /// A non-sketch feature through feature_add, its parameters by name.
     fn feature(&mut self, k: usize, f: &Value, problems: &mut Vec<String>) -> Result<(String, String, Option<String>), String> {
         let ty = f["featureType"].as_str().ok_or("no featureType")?;
+        // A custom feature: its namespace names the Feature Studio ("e<element id>::m<microversion>").
+        let custom = f["namespace"].as_str().filter(|n| !n.is_empty()).map(|n| match n.strip_prefix('e').and_then(|r| r.split("::").next()).and_then(|e| self.studios.get(e)) {
+            // Ours: `custom:<tab id>:<feature name>` (model-data custom::type_id).
+            Some(tab) => Ok(format!("custom:{tab}:{ty}")),
+            None => Err(format!("custom feature `{ty}` from a Feature Studio not in features.json ({n})")),
+        });
+        let owned;
+        let ty = match custom {
+            Some(Ok(t)) => {
+                owned = t;
+                owned.as_str()
+            }
+            Some(Err(e)) => return Err(e),
+            None => ty,
+        };
         let schema = self.call("feature_schema", json!({ "type": ty, "all": true })).map_err(|e| format!("feature type `{ty}` is not in noshape ({e})"))?;
         let known: Vec<String> = schema["params"]["properties"].as_object().map(|m| m.keys().cloned().collect()).unwrap_or_default();
         let mut params = Map::new();

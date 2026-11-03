@@ -384,3 +384,32 @@ fn variable_studio_variables_are_rebuilt() {
     let r = run_model("block-vs", &features, &live, &refs);
     assert_eq!((r.matching, r.compared), (3, 3), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
+
+/// A custom feature: its Feature Studio's source (features.json
+/// `featureStudios`) becomes ours, and the feature (namespace "e<element>::m…")
+/// runs from it: a 10 mm cube.
+#[test]
+fn a_custom_feature_runs_from_its_feature_studio() {
+    let source = r#"FeatureScript 3095;
+import(path : "onshape/std/common.fs", version : "3095.0");
+
+annotation { "Feature Type Name" : "Cube" }
+export const cube = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Size" }
+        isLength(definition.size, LENGTH_BOUNDS);
+    }
+    {
+        fCuboid(context, id + "cuboid", { "corner1" : vector(0, 0, 0) * meter, "corner2" : vector(1, 1, 1) * definition.size });
+    });
+"#;
+    let features = json!({
+        "featureStudios": { "0123": { "name": "Cubes", "source": source } },
+        "features": [{ "btType": "BTMFeature-134", "featureType": "cube", "namespace": "e0123::m4567", "featureId": "FC", "name": "Cube 1",
+            "parameters": [{ "btType": "BTMParameterQuantity-147", "parameterId": "size", "expression": "10 mm" }] }]
+    });
+    let live = vec![json!({ "index": 0, "status": "OK", "parts": [{ "faces": 6, "edges": 12, "vertices": 8, "volume": 1e-6 }] })];
+    let r = run_model("custom-cube", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (1, 1), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
