@@ -50,8 +50,8 @@ pub fn ops() -> Vec<Op> {
             opt("section", json!({ "type": "array", "items": { "type": "object" }, "maxItems": 3 }), "Section view: up to 3 planes [{\"plane\": a plane / planar face / sketch / mate connector id, or a cylinder or cone face (the plane through its axis), \"offset\": length along its normal (default 0), \"flip\": cut the other side}]; the side the normal points to is cut away. A named `view` keeps its own section unless this is given."),
             opt("section_exclude", json!({ "type": "array", "items": { "type": "string" } }), "Section view › Items to exclude: parts (`body:…`) left whole."),
             opt("view", json!({ "type": "string" }), "isometric (default), front, back, left, right, top, bottom, dimetric, trimetric, the name of a saved named view, or \"window\": the window's camera (as the app shows it in live mode, else as view_camera set it; perspective and fit options then don't apply)."),
-            opt("width", json!({ "type": "integer", "minimum": 16, "maximum": 4096 }), "Pixels (default 800)."),
-            opt("height", json!({ "type": "integer", "minimum": 16, "maximum": 4096 }), "Pixels (default 600)."),
+            opt("width", json!({ "type": "integer", "minimum": 16, "maximum": 4096 }), "Pixels (default 800; with `view` \"window\" the graphics area's width, or its aspect when only `height` is given)."),
+            opt("height", json!({ "type": "integer", "minimum": 16, "maximum": 4096 }), "Pixels (default 600; with `view` \"window\" the graphics area's height, or its aspect when only `width` is given)."),
             opt("display_mode", json!({ "type": "string", "enum": ["shaded_with_edges", "shaded", "hidden_line", "translucent"] }), "Render style (default shaded_with_edges)."),
             opt("show_sketches", json!({ "type": "boolean", "default": true }), "Draw sketches."),
             opt("show_planes", json!({ "type": "boolean", "default": false }), "Draw the default and construction planes."),
@@ -370,8 +370,8 @@ fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, vo: ViewOpti
 }
 
 /// The call's arguments with the window's isolate / transparent and
-/// boundary edges (view_display) for those it doesn't give; None when not
-/// `view: "window"` or nothing to add.
+/// boundary edges (view_display) and its graphics area's size for those it
+/// doesn't give; None when not `view: "window"`.
 fn window_display_args(ctx: &mut Ctx, a: &Args) -> Result<Option<serde_json::Value>, OpError> {
     if a.opt_str("view")? != Some("window") {
         return Ok(None);
@@ -383,17 +383,31 @@ fn window_display_args(ctx: &mut Ctx, a: &Args) -> Result<Option<serde_json::Val
     } else {
         od.tab_of_kind(a.opt_str("tab")?, "Part Studio", crate::doc::is_part_studio)?
     };
-    let Some(d) = od.window.display.get(&tab) else { return Ok(None) };
     let mut v = a.value.clone();
     let Some(m) = v.as_object_mut() else { return Ok(None) };
-    if let Some(iso) = &d.isolate
-        && !m.contains_key("isolate")
-        && !m.contains_key("transparent")
-    {
-        m.insert(if iso.transparent { "transparent" } else { "isolate" }.into(), json!(iso.ids));
+    if let Some(d) = od.window.display.get(&tab) {
+        if let Some(iso) = &d.isolate
+            && !m.contains_key("isolate")
+            && !m.contains_key("transparent")
+        {
+            m.insert(if iso.transparent { "transparent" } else { "isolate" }.into(), json!(iso.ids));
+        }
+        if !assembly && d.highlight_boundary && !m.contains_key("boundary_edges") {
+            m.insert("boundary_edges".into(), json!(true));
+        }
     }
-    if !assembly && d.highlight_boundary && !m.contains_key("boundary_edges") {
-        m.insert("boundary_edges".into(), json!(true));
+    // The image the window shows: its graphics area's size, or its aspect
+    // when one side is given.
+    if let Some(size) = od.window.cameras.get(&tab).map(|c| c.viewport).filter(|s| s.x >= 1.0 && s.y >= 1.0) {
+        let side = |k: &str| m.get(k).and_then(serde_json::Value::as_f64);
+        let (w, h) = match (side("width"), side("height")) {
+            (None, None) => (size.x, size.y),
+            (Some(w), None) => (w, w * size.y / size.x),
+            (None, Some(h)) => (h * size.x / size.y, h),
+            (Some(w), Some(h)) => (w, h),
+        };
+        m.insert("width".into(), json!(w.round() as u64));
+        m.insert("height".into(), json!(h.round() as u64));
     }
     Ok(Some(v))
 }

@@ -5146,6 +5146,11 @@ fn view_camera_menus() {
     assert_eq!(ui["cameras"][0]["projection"], "perspective", "{ui}");
     let img = call(&mut ctx, "render_image", json!({ "view": "window", "width": 64, "height": 40 }));
     assert_eq!(img["view"], "window", "{img}");
+    // Without a size: the graphics area's (1280 × 800); one side keeps its aspect.
+    let img = call(&mut ctx, "render_image", json!({ "view": "window" }));
+    assert_eq!((img["width"].as_u64(), img["height"].as_u64()), (Some(1280), Some(800)), "{img}");
+    let img = call(&mut ctx, "render_image", json!({ "view": "window", "width": 320 }));
+    assert_eq!((img["width"].as_u64(), img["height"].as_u64()), (Some(320), Some(200)), "{img}");
     // A drawing: Zoom in doubles the zoom; Zoom to fit restores it.
     let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
     let tab = d["drawing"].as_str().unwrap().to_string();
