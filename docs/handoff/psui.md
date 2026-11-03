@@ -237,6 +237,12 @@ dump, the runner, live's first 20 scenarios run in ours and a first score.
   focus, folder rows (the list's own walk, `list_items`), rollbackAfter "Default geometry"; targets: view cube cells,
   the parts list eye. Next differences: a select's or checkbox's focus readout, the empty field of a new Extrude
   (ours "error"), focus after Esc, hidden sketch rows while rolled back / editing a sketch.
+- 11-03 07:50: **74/107** (live re-records and drops scenarios as its runner changes; run after every batch). Fixed
+  since 05:00 (all landed): the sketch plane bubble stays; cancelling an unchanged existing sketch shows no toast; a
+  part row double-click renames only on the name; dialog focus rules (tabs, labelled selects, a new active field takes
+  the keyboard, Sketch dialog takes none); folded groups left out of the state. The rest is with live (REQUESTS 11-03
+  03:50, 05:40, 07:10): remembered Hole / Chamfer / Fillet values in its account, plane clicks missing in sketch-*,
+  key delivery after row clicks, selection kind / owner changes, parts list during a preview, ✓ with uncommitted text.
 - 11-03 05:00: 57/101 before the Sketch-dialog focus and "Select a sketch plane" fixes (rerun pending). Landed
   48ed5ca2: overlapping datum planes pick the nearest (planes write a far-scaled depth in the pick pass). Open with
   live (REQUESTS 11-03 03:50): neutral starts (account's remembered Fillet radius 3 mm), select list kind / disabled
