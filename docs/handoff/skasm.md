@@ -31,10 +31,10 @@ Revolute pin drag only spins it: no regressions (screens /root/skasm-scratch/wal
    as a pair, the base held.
 Flanges (s546 / s550 / s565: the spacing changes, the line's start hole stays) already match.
 3. Assembly drags (live 1843, asm-drag-3.live.jsonl): the end pose depends only on where the drag ends (3 paths,
-   bit-identical; d6 B tilted 6.38°). Tried: each step solved from the drag's start (DragState origin, oracle replay
-   from `origin`): d1 1.3° -> 12.2° and d7 1.6° -> 30.5° off: our solver doesn't reach a large turn in one solve from
-   the start. Needs, before from-start: fixed substeps from the start to the target inside each step (still path
-   independent), then measure assembly_perf (200 instances at 60 fps). d6's 6.38° isn't the nearest point on the
+   bit-identical; d6 B tilted 6.38°). Done (03:55): each instance-drag step solves from the drag's start
+   (`DragState::origin`) in `drag_substeps` (one per 2 mm, at most 4; one solve alone left d1 12° off); nested
+   (flexible subassembly) drags still step from the last. GUI: a free block follows the pointer. The background
+   drag solve now costs up to 4 solves per step (assembly_perf drives the evaluator directly, not this path). d6's 6.38° isn't the nearest point on the
    ray (ours 12°) nor the target at the start depth (5.4°); live's rotation axis (−0.43, 0.71, 0.56) carries a spin
    the minimal rotation doesn't: probe live's objective (e.g. the same Ball drag from other view directions).
 Open (P2, need live data, nothing to guess): s6, s102 (probes 10), s218 / s236 / s226 (probes 11: s226's spline
