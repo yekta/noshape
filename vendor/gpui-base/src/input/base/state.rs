@@ -4332,6 +4332,12 @@ impl<M: InputModeKind> EntityInputHandler for InputBaseState<M> {
         // not the platform follows up with `unmark_text`.
         let ends_composition = self.ime_marked_range.is_some();
 
+        // NOSHAPE PATCH: Enter's own text ("\n", after the input passed the key on) is no edit of a one-line
+        // field; stripped to "" it would delete the selection (a dialog's second Enter emptied "20 mm").
+        if self.is_single_line() && !new_text.is_empty() && new_text.chars().all(|c| c == '\n' || c == '\r') {
+            return;
+        }
+
         self.pause_blink_cursor(cx);
 
         // NOTE: The normalization keeps the UTF-16 length, but may change the

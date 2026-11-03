@@ -4885,6 +4885,7 @@ impl PartStudioView {
                 d.child(
                     div()
                         .id(SharedString::from(format!("feat-eye-{}", f.id)))
+                        .map(|d| crate::ui_script::mark(d, || format!("button:eye:{}", f.name)))
                         .when(!hidden, |d| crate::ui::hover_reveal(d, "feature-row"))
                         .cursor_pointer()
                         .child(crate::assets::icon(if hidden { "eye-off" } else { "eye" }, 16., cx))

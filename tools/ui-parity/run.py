@@ -150,6 +150,10 @@ def main():
         out = out_dir / f"{name}.json"
         if not args.compare_only:
             problem = run_one(args.app, scen_dir / f"{name}.json", out, args.display, args.timeout)
+            # The display refusing a new client now and then (Xvfb): once more.
+            if problem and "platform.rs" in problem:
+                time.sleep(2)
+                problem = run_one(args.app, scen_dir / f"{name}.json", out, args.display, args.timeout)
             if problem:
                 print(f"{name}: {problem}")
                 continue

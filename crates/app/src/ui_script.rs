@@ -117,23 +117,17 @@ fn modifiers(step: &Value) -> Modifiers {
 
 /// The name a control target is recorded under (`ui_script::mark`), if it is one.
 fn control_name(t: &Value) -> Option<String> {
-    for k in ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row"] {
-        if let Some(v) = t.get(k).and_then(Value::as_str) {
-            return Some(format!("{k}:{v}"));
-        }
-    }
-    if let Some(v) = t.get("dropdown").and_then(Value::as_str) {
-        return Some(format!("dropdown:{v}"));
+    // A chip's × (`"index"`: which chip, the first by default), a row's eye; other buttons go by their tooltip.
+    match t.get("button").and_then(Value::as_str) {
+        Some("x") => return t.get("field").and_then(Value::as_str).map(|f| format!("button:x:{f}:{}", t.get("index").and_then(Value::as_u64).unwrap_or(0))),
+        Some("eye") => return t.get("feature").and_then(Value::as_str).map(|f| format!("button:eye:{f}")),
+        Some(b) => return Some(format!("button:{b}")),
+        None => {}
     }
     if t.get("rollback_bar").is_some() {
         return Some("button:Rollback bar".into());
     }
-    // A chip's × and a row's eye aren't marked yet; other buttons go by their tooltip.
-    match t.get("button").and_then(Value::as_str) {
-        Some("x" | "eye") => None,
-        Some(b) => Some(format!("button:{b}")),
-        None => None,
-    }
+    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown"].iter().find_map(|k| t.get(*k).and_then(Value::as_str).map(|v| format!("{k}:{v}")))
 }
 
 type Studio = Option<Entity<PartStudioView>>;
@@ -141,7 +135,17 @@ type Studio = Option<Entity<PartStudioView>>;
 /// Where target `t` shows now, in window coordinates.
 fn locate(t: &Value, studio: &Studio, cx: &App) -> Result<Point<Pixels>, String> {
     if let Some(name) = control_name(t) {
-        return noshape_app_core::ui_script::bounds_of(&name).map(|b| b.center()).ok_or_else(|| format!("{name} is not shown"));
+        if let Some(b) = noshape_app_core::ui_script::bounds_of(&name) {
+            return Ok(b.center());
+        }
+        // A field named by part of its label ("Distance" for "Offset distance"), when only one matches.
+        if let Some(f) = name.strip_prefix("field:").map(str::to_lowercase) {
+            let near: Vec<_> = noshape_app_core::ui_script::named("field:").into_iter().filter(|(k, _)| k.to_lowercase().contains(&f)).collect();
+            if let [(_, b)] = near.as_slice() {
+                return Ok(b.center());
+            }
+        }
+        return Err(format!("{name} is not shown"));
     }
     // The rollback bar dropped just below a row.
     if let Some(f) = t.get("rollback_to").and_then(Value::as_str) {
@@ -168,6 +172,8 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         eprintln!("UI-SCRIPT FAIL: not done after {}s", WATCHDOG.as_secs());
         std::process::exit(3);
     });
+    // Live's page (Chrome's viewport on its runner): the same toolbar groups and dialog places.
+    window.resize(size(px(1919.), px(992.)));
     window.activate_window();
     cx.activate(true);
     cx.spawn_in(window, async move |ws, cx| {
@@ -238,7 +244,22 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                             _ => (MouseButton::Left, 1),
                         };
                         let _ = cx.update(|window, cx| mouse(window, cx, at, button, mods, clicks));
-                        Ok(())
+                        // A dropdown step picks its entry from the list it opened.
+                        match step["on"].get("pick").and_then(Value::as_str) {
+                            Some(pick) => {
+                                sleep(cx, 300).await;
+                                redraw(cx).await;
+                                let row = json!({ "list_row": pick });
+                                match cx.update(|_, cx| locate(&row, &ps, cx)).unwrap_or_else(|e| Err(e.to_string())) {
+                                    Ok(at) => {
+                                        let _ = cx.update(|window, cx| mouse(window, cx, at, MouseButton::Left, Modifiers::default(), 1));
+                                        Ok(())
+                                    }
+                                    Err(e) => Err(e),
+                                }
+                            }
+                            None => Ok(()),
+                        }
                     }
                     Err(e) => Err(e),
                 },

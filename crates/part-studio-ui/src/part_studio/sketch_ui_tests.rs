@@ -23,6 +23,11 @@ impl Render for Workspace {
 
 /// A fresh document's Part Studio in a test window, drawn once.
 fn part_studio(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>) {
+    part_studio_from(cx, name, None)
+}
+
+/// A Part Studio built from a ui-parity start (tests/ui-parity/starts.json's form), or a fresh one.
+fn part_studio_from(cx: &mut TestAppContext, name: &str, start: Option<serde_json::Value>) -> (AnyWindowHandle, Entity<PartStudioView>) {
     cx.update(gpui_kit::init);
     // The app's default key bindings (Esc → Cancel, tool keys), without the
     // user's customizations.
@@ -34,7 +39,13 @@ fn part_studio(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("ui.noshape");
     let _ = std::fs::remove_file(&path);
-    let session = crate::session::Session::create(&path, crate::user_units::new_document()).unwrap();
+    let session = match start {
+        Some(start) => {
+            noshape_ops::ui_parity::build_start(&mut noshape_ops::Ctx::new(), &path, &start).unwrap();
+            crate::session::Session::open(&path).unwrap()
+        }
+        None => crate::session::Session::create(&path, crate::user_units::new_document()).unwrap(),
+    };
     let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_))).unwrap().id;
     let gpu = Gpu::headless().unwrap();
     let (window, view) = cx.update(|cx| {
@@ -473,6 +484,29 @@ fn the_parity_state_reads_dialog_list_and_features(cx: &mut TestAppContext) {
     let rows: Vec<&str> = state["features"]["rows"].as_array().unwrap().iter().map(|r| r["name"].as_str().unwrap()).collect();
     assert_eq!(rows, ["#wall_thickness = 4 mm"]);
     assert_eq!(state["features"]["rollbackAfter"], "#wall_thickness = 4 mm");
+}
+
+/// Live (ui-parity extrude-enter-commits): `20` Enter applies "20 mm" and keeps the dialog; the next Enter accepts it.
+#[gpui::test]
+fn enter_applies_then_the_next_enter_accepts(cx: &mut TestAppContext) {
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "enter-enter", Some(block));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let id = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Extrude 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Extrude dialog").dialog.clone());
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["2", "0", "enter"]);
+    assert!(cx.update(|cx| view.read(cx).edit.is_some()), "the first Enter applies");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    keys(cx, window, &["enter"]);
+    assert!(cx.update(|cx| view.read(cx).edit.is_none()), "the second Enter accepts");
 }
 
 /// Live (ui-parity extrude-depth-variable-escape, 11-03): Esc with the autofill list open closes the list only;

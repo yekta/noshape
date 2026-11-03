@@ -178,7 +178,8 @@ impl VarCompletion {
             .take(MAX_ROWS)
             .map(|e| match e {
                 Entry::Variable(n) => format!("#{n}"),
-                Entry::Function(n, args) => format!("{n}({})", args.join(", ")),
+                // Its first text: the placeholders are separate (live reads "max(").
+                Entry::Function(n, _) => format!("{n}("),
                 Entry::Unit(n) | Entry::Constant(n) => n.to_string(),
             })
             .collect();

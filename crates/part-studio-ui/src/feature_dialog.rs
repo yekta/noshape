@@ -2791,6 +2791,7 @@ impl FeatureDialog {
                             .when(!reorder_on, |d| d.child(
                                 div()
                                     .id(SharedString::from(format!("chipx-{path}-{row}")))
+                                    .map(|d| crate::ui_script::mark(d, || format!("button:x:{}:{row}", crate::i18n::spec(s.label))))
                                     // Live (woolsthorpe.css .os-param-selection-list-entry-delete:
                                     // a 20 px cell, 5 px padding, 5 px in): the ink 12 px from
                                     // the field's border (extrude-03, sketch/01).
