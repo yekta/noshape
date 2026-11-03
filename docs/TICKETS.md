@@ -392,6 +392,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   crash on its own (tickets/crash2045/fz2045-step101.noshape: every feature suppressed in turn, fine), so the corruption
   needs the session's history (undo / redo, the regeneration cache). Repro: the seed replay (qa-scratch/bin/clifuzz_nf.py,
   NSCLI = a `<noshape> mcp` wrapper), ~2 min a run.
+  qa 06:34: gdb on green 3fcc69d8, seed 2045 replay ×3 (all three died; tickets/crash2045/gdb-3fcc-*.txt): the first
+  SIGSEGV is **inside malloc** (`_int_malloc` ← Standard::Allocate ← TopOpeBRepBuild SplitEvisoONperiodicF ← ChFi3d_Builder::
+  Compute ← BRepFilletAPI_MakeFillet::Build ← features.cpp:3867 scaled_blend, op_fillet) twice, and once **dropping a
+  cached body** (OcShape::~OcShape ← its IndexedMap clear ← drop of model-core regen::context::Body's Arc): the heap is
+  already corrupt when those run; something writes past a block or frees twice earlier in the session.
   core 11-03 05:30: **found**: the document's one Fillet (R12 on edge 16, NOSHAPE_DUMP_OPS fillet-0) alone crashes:
   OCCT's ChFi3d throws "TopoDS_UnCompatibleShapes: TopoDS_Builder::Add" partway and leaves **its input** broken (valid
   before, invalid after; freed list nodes in the input solid), and the next attempt (our retries at a hair smaller
