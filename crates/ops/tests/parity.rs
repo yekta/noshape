@@ -23,6 +23,10 @@ struct ModelResult {
     untranslated: Vec<String>,
     /// Full regeneration: ours (reopened) and live's, ms.
     regen_ms: Option<(f64, Option<f64>)>,
+    /// Of it, opening the file and regenerating it (feature_list), ms; the
+    /// rest is query_parts' measures.
+    open_ms: f64,
+    list_ms: f64,
     /// Our slowest features in it (name, ms).
     slowest: Vec<(String, f64)>,
 }
@@ -31,7 +35,7 @@ struct ModelResult {
 fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelResult {
     let mut ctx = Ctx::new();
     let path = scratch(&format!("{name}.noshape"));
-    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, untranslated: Vec::new(), regen_ms: None, slowest: Vec::new() };
+    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, untranslated: Vec::new(), regen_ms: None, open_ms: 0.0, list_ms: 0.0, slowest: Vec::new() };
     // refs.jsonl wins over the geometry read from live's bodydetails.
     let mut all = refs_from_bodies(live);
     all.extend(parse_refs(refs));
@@ -80,12 +84,15 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
     // Our full regeneration: the document reopened, its parts queried.
     let mut fresh = Ctx::new();
     let t0 = std::time::Instant::now();
-    let reopened = noshape_ops::registry::by_tool_name("document_open").map(|op| noshape_ops::registry::run(&mut fresh, op, &json!({ "path": path.to_str().unwrap() })).is_ok()).unwrap_or(false)
-        && noshape_ops::registry::by_tool_name("query_parts").map(|op| noshape_ops::registry::run(&mut fresh, op, &json!({})).is_ok()).unwrap_or(false);
-    if reopened {
+    let run = |ctx: &mut Ctx, tool: &str, args: Value| noshape_ops::registry::by_tool_name(tool).is_some_and(|op| noshape_ops::registry::run(ctx, op, &args).is_ok());
+    let opened = run(&mut fresh, "document_open", json!({ "path": path.to_str().unwrap() }));
+    res.open_ms = t0.elapsed().as_secs_f64() * 1000.0;
+    let list = opened.then(|| noshape_ops::registry::by_tool_name("feature_list").map(|op| noshape_ops::registry::run(&mut fresh, op, &json!({})))).flatten();
+    res.list_ms = t0.elapsed().as_secs_f64() * 1000.0 - res.open_ms;
+    if opened && run(&mut fresh, "query_parts", json!({})) {
         res.regen_ms = Some((t0.elapsed().as_secs_f64() * 1000.0, live.iter().find_map(|l| l["full_regen_ms"].as_f64())));
         // Its slowest features (the Regeneration times panel's).
-        if let Some(Ok(list)) = noshape_ops::registry::by_tool_name("feature_list").map(|op| noshape_ops::registry::run(&mut fresh, op, &json!({}))) {
+        if let Some(Ok(list)) = list {
             let mut times: Vec<(String, f64)> = list.value["features"].as_array().into_iter().flatten().filter_map(|f| Some((f["name"].as_str()?.to_string(), f["regen_ms"].as_f64()?))).collect();
             times.sort_by(|a, b| b.1.total_cmp(&a.1));
             res.slowest = times.into_iter().take(3).filter(|t| t.1 >= 1.0).collect();
@@ -147,8 +154,8 @@ fn parity_models() {
         };
         let r = run_model(&name, &features, &live, &refs);
         let speed = match r.regen_ms {
-            Some((ours, Some(l))) => format!("; reopened and regenerated in {ours:.0} ms (live full regeneration {l:.0} ms)"),
-            Some((ours, None)) => format!("; reopened and regenerated in {ours:.0} ms"),
+            Some((ours, Some(l))) => format!("; reopened and regenerated in {ours:.0} ms (open {:.0} ms, regenerate {:.0} ms; live full regeneration {l:.0} ms)", r.open_ms, r.list_ms),
+            Some((ours, None)) => format!("; reopened and regenerated in {ours:.0} ms (open {:.0} ms, regenerate {:.0} ms)", r.open_ms, r.list_ms),
             None => String::new(),
         };
         let speed = if r.slowest.is_empty() { speed } else { format!("{speed} (slowest: {})", r.slowest.iter().map(|(n, ms)| format!("{n} {ms:.0} ms")).collect::<Vec<_>>().join(", ")) };
