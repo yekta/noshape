@@ -4,6 +4,7 @@
 #include "internal.hpp"
 
 #include <BRepAdaptor_Curve.hxx>
+#include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRep_Builder.hxx>
@@ -130,6 +131,45 @@ CurveIndex curve_index(const ShapeIMap& src)
 // not edges in Onshape's topology, so drawn only where they are the outline.
 // A revolve's seam has no continuity flag, so HLR takes it as a sharp edge
 // (qa DWG-REVOLVE-SEAM: a line at a revolved tube's axis in side views).
+// Whether two faces lie on one surface: the same surface object, or the same
+// plane, cylinder, cone, sphere or torus.
+static bool same_surface(const TopoDS_Face& a, const TopoDS_Face& b)
+{
+  TopLoc_Location la, lb;
+  if (BRep_Tool::Surface(a, la).get() == BRep_Tool::Surface(b, lb).get() && la.IsEqual(lb))
+    return true;
+  BRepAdaptor_Surface sa(a, false), sb(b, false);
+  if (sa.GetType() != sb.GetType())
+    return false;
+  const double tol = 1e-7, ang = 1e-9;
+  auto same_axis = [&](const gp_Ax1& x, const gp_Ax1& y) {
+    return x.Direction().IsParallel(y.Direction(), ang) && gp_Lin(x).Distance(y.Location()) < tol;
+  };
+  switch (sa.GetType())
+  {
+  case GeomAbs_Plane:
+  {
+    const gp_Pln p = sa.Plane(), q = sb.Plane();
+    return p.Axis().Direction().IsParallel(q.Axis().Direction(), ang) && p.Distance(q.Location()) < tol;
+  }
+  case GeomAbs_Cylinder:
+    return same_axis(sa.Cylinder().Axis(), sb.Cylinder().Axis()) && std::abs(sa.Cylinder().Radius() - sb.Cylinder().Radius()) < tol;
+  case GeomAbs_Cone:
+    return same_axis(sa.Cone().Axis(), sb.Cone().Axis()) && sa.Cone().Apex().Distance(sb.Cone().Apex()) < tol &&
+           std::abs(std::abs(sa.Cone().SemiAngle()) - std::abs(sb.Cone().SemiAngle())) < ang;
+  case GeomAbs_Sphere:
+    return sa.Sphere().Location().Distance(sb.Sphere().Location()) < tol && std::abs(sa.Sphere().Radius() - sb.Sphere().Radius()) < tol;
+  case GeomAbs_Torus:
+    return same_axis(sa.Torus().Axis(), sb.Torus().Axis()) && sa.Torus().Location().Distance(sb.Torus().Location()) < tol &&
+           std::abs(sa.Torus().MajorRadius() - sb.Torus().MajorRadius()) < tol && std::abs(sa.Torus().MinorRadius() - sb.Torus().MinorRadius()) < tol;
+  default:
+    return false;
+  }
+}
+
+// Edges that aren't edges in Onshape's topology: a face's own seam, and an
+// edge between two faces of one surface (Parasolid keeps such a face whole;
+// live 1857: no line across pipeflange-steven's fillets).
 std::vector<char> seam_edges(const TopoDS_Shape& shape, const ShapeIMap& src)
 {
   TopTools_IndexedDataMapOfShapeListOfShape ef;
@@ -140,9 +180,16 @@ std::vector<char> seam_edges(const TopoDS_Shape& shape, const ShapeIMap& src)
     const int k = ef.FindIndex(src(i));
     if (k == 0)
       continue;
+    const TopoDS_Edge& e = TopoDS::Edge(src(i));
+    std::vector<TopoDS_Face> faces;
     for (const TopoDS_Shape& f : ef(k))
-      if (BRep_Tool::IsClosed(TopoDS::Edge(src(i)), TopoDS::Face(f)))
+    {
+      if (BRep_Tool::IsClosed(e, TopoDS::Face(f)))
         out[(size_t)i - 1] = 1;
+      faces.push_back(TopoDS::Face(f));
+    }
+    if (faces.size() == 2 && !faces[0].IsSame(faces[1]) && same_surface(faces[0], faces[1]))
+      out[(size_t)i - 1] = 1;
   }
   return out;
 }
@@ -236,7 +283,9 @@ void exact_pass(Emitter& em, const occ::handle<HLRBRep_Data>& DS, int typ, bool 
       if (typ == 2)
         todraw = itf.Internal(); // silhouettes computed by the outliner
       else if (typ == 3)
-        todraw = edf.Rg1Line() && !edf.RgNLine() && !itf.OutLine();
+        // A face's own seam isn't a tangent edge (Parasolid's periodic faces
+        // have none; live 1857 draws no line there).
+        todraw = edf.Rg1Line() && !edf.RgNLine() && !itf.OutLine() && !em.seam(src);
       else if (typ == 4)
         todraw = edf.RgNLine() && !itf.OutLine();
       else

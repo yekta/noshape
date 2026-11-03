@@ -170,3 +170,21 @@ fn many_bodies_hide_in_chunks_as_in_one_pass() {
         }
     }
 }
+
+/// An edge between two faces of one plane (two boxes fused side by side,
+/// their top split at x = 0) is no edge in Onshape's topology: the top view
+/// shows the outline only (live 1857: no line across a part's split faces).
+#[test]
+fn an_edge_between_faces_of_one_surface_is_not_drawn() {
+    let a = make_box(&Plane::new(DVec3::new(-20.0, -10.0, 0.0), DVec3::Z, DVec3::X), 20.0, 20.0, 10.0).unwrap();
+    let b = make_box(&Plane::new(DVec3::new(0.0, -10.0, 0.0), DVec3::Z, DVec3::X), 20.0, 20.0, 10.0).unwrap();
+    let s = fuse(&a, &b).unwrap().shape;
+    let tops = s.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Plane(p)) if p.normal.z.abs() > 0.99 && (p.origin.z - 10.0).abs() < 1e-9)).count();
+    assert_eq!(tops, 2, "the fused top stays split (else this test shows nothing)");
+    for exact in [true, false] {
+        let e = project_hlr(&s, -DVec3::Z, DVec3::Y, exact).unwrap();
+        // (A seam's class, which drawings leave out, is allowed.)
+        let across = e.iter().filter(|e| e.visibility == Visibility::Visible && e.class != EdgeClass::Seam && e.polyline.iter().all(|p| p.x.abs() < 1e-6));
+        assert_eq!(across.count(), 0, "exact={exact}:\n{}", dump(&e));
+    }
+}

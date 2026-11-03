@@ -83,6 +83,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   to run: …" (ours errors where live's built; the first difference then reads "(custom feature failed to run)").
   T1 custom_feature_failures_are_reported_apart. Host / std differences → core tickets. Score now **7/11,
   58/78** (bracket03 matches since core's FILLET-SPLIT-EDGE-FACES fix); SCORE.md row updated.
+- 11-03 11:32 drawings: an edge OCCT keeps between two faces of one surface (and a face's own seam) isn't drawn,
+  tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
+  drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
+  kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
 - 11-03 11:18 live's refetch (21 scored): **11/21, 103/157, custom 0/5**. Translator: a centroid of [0, 0, 0] off the
   part's box centre is massproperties' "no material" (not compared); id-only region queries as many as the last
   sketch's regions are its regions (older documents); a sketch plane named by id alone is ours where live's frame
