@@ -3138,8 +3138,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the construction mirror line ends at the origin): ours 19/51/34 faces/edges/vertices, live 18/48/32;
   exercise-martinl's Extrude 1 the same (one pair at the origin); clamp-guillem's Extrusión 1 has two such pairs:
   ours 12/30/20, live 10/24/16. Each pair is exactly one face, three edges and two vertices more in ours. The
-  region (and so the extruded part) looks like it takes the two lines as one edge. Asked live to confirm the edge
-  cases in a scratch sketch (REQUESTS 11-03 13:30). Models in /root/parity/models (NOSHAPE_PARITY_ONLY=<name>);
+  region (and so the extruded part) looks like it takes the two lines as one edge. Live confirmed (behaviours.md
+  "dx / core (2026-11-03, P1 SKETCH-COLLINEAR-EDGES-MERGE)", request 1904): one bottom face and one 40 mm edge (6 /
+  12 / 8), with or without a construction line or a sketch point at the joint; the region highlights as one
+  unbroken loop and clicking the bottom edge picks the whole edge. Models in /root/parity/models (NOSHAPE_PARITY_ONLY=<name>);
   rebuilt documents in /root/dx-scratch/pmdocs/ex/. (dx 2026-11-03)
   The same with regions: motor-mount-jack's Extrude 2 (Remove, qSketchRegion(…, true)) cuts both halves of an
   ellipse (major 22.5 mm) that a line along its major axis splits; live's hole wall is one face (the tube after it:

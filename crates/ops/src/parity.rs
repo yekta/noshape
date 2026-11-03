@@ -101,6 +101,9 @@ pub struct Translator<'a> {
     placeholder: Option<String>,
     /// Each Feature Studio's pinned std and the one our host serves for it.
     pub std_pins: Vec<(String, u32, u32)>,
+    /// Import features' files (features.json `foreignFiles`: foreign id →
+    /// `{ "path", "placed" }`, placed: live's export of the Part Studio).
+    foreign: HashMap<String, Value>,
 }
 
 fn f3(v: &Value) -> Option<[f64; 3]> {
@@ -244,13 +247,14 @@ impl<'a> Translator<'a> {
                 frames.insert(id.to_string(), [[m[3], m[7], m[11]], [m[0], m[4], m[8]], [m[1], m[5], m[9]]]);
             }
         }
+        let foreign = doc["foreignFiles"].as_object().map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default();
         let config_defaults = doc["configuration"]["configurationParameters"]
             .as_array()
             .into_iter()
             .flatten()
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, placeholder: None, std_pins: Vec::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, placeholder: None, std_pins: Vec::new(), foreign })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -478,7 +482,13 @@ impl<'a> Translator<'a> {
             }
             step.problems.extend(problems.into_iter().map(|p| format!("its in-feature {}: {p}", sub["featureType"].as_str().unwrap_or("?"))));
         }
-        let made = if f["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketch")) { self.sketch(k, &f, &mut step.problems) } else { self.feature(k, &f, &mut step.problems) };
+        let made = if f["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketch")) {
+            self.sketch(k, &f, &mut step.problems)
+        } else if f["featureType"] == "importForeign" {
+            self.import_foreign(&f)
+        } else {
+            self.feature(k, &f, &mut step.problems)
+        };
         match made {
             Ok((id, status, message)) => {
                 if let Some(oid) = f["featureId"].as_str() {
@@ -499,6 +509,26 @@ impl<'a> Translator<'a> {
             Err(e) => step.problems.insert(0, format!("not built: {e}")),
         }
         step
+    }
+
+    /// An Import feature: live's file imported as the Import dialog does (a
+    /// Part Studio of its own, its Import feature first), the features
+    /// after it then built in that Part Studio.
+    fn import_foreign(&mut self, f: &Value) -> Result<(String, String, Option<String>), String> {
+        let param = |id: &str| f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == id).cloned().unwrap_or(Value::Null);
+        let id = param("foreignId")["foreignId"].as_str().ok_or("no foreignId")?.to_string();
+        let file = self.foreign.get(&id).cloned().ok_or_else(|| format!("its file {id} not fetched"))?;
+        let path = file["path"].as_str().ok_or_else(|| format!("its file {id}: no path"))?;
+        if !self.feature_ids.is_empty() {
+            return Err("an Import after other features (ours imports into a Part Studio of its own)".into());
+        }
+        let y_up = file["placed"] != true && param("yAxisIsUp")["value"].as_bool() == Some(true);
+        let r = self.call("import_files", json!({ "files": [path], "y_up": y_up, "keep_files": false }))?;
+        self.tab = Some(r["first"].as_str().ok_or("the import made no Part Studio")?.to_string());
+        let list = self.call("feature_list", json!({}))?;
+        let first = &list["features"][0];
+        let ours = first["id"].as_str().ok_or("the import's Part Studio has no feature")?.to_string();
+        Ok((ours, first["status"].as_str().unwrap_or("Ok").to_string(), first["message"].as_str().map(str::to_string)))
     }
 
     /// Our sketch's frame against live's (`sketches`): origin within 1e-9 m,

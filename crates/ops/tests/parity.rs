@@ -148,6 +148,16 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
 fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
     let mut features: Value = serde_json::from_str(&std::fs::read_to_string(dir.join("features.json")).ok()?).ok()?;
     read_studios(dir, &mut features);
+    // Import features' files: imports/<foreign id>.json names the file beside it.
+    for e in std::fs::read_dir(dir.join("imports")).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "json")) {
+        let Some(meta) = std::fs::read_to_string(&e).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()) else { continue };
+        if let (Some(id), Some(file)) = (meta["foreignId"].as_str(), meta["file"].as_str()) {
+            // Live's export of the Part Studio (the upload is gone): already
+            // as the Import feature placed it.
+            let placed = meta["fetchedBy"].as_str().is_some_and(|f| f.contains("translation of the Part Studio"));
+            features["foreignFiles"][id] = json!({ "path": dir.join("imports").join(file).to_string_lossy(), "placed": placed });
+        }
+    }
     let live = std::fs::read_to_string(dir.join("live.jsonl")).unwrap_or_default().lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).filter(|l| l.get("index").is_some()).collect();
     let refs = std::fs::read_to_string(dir.join("refs.jsonl")).unwrap_or_default();
     Some((features, live, refs))
@@ -1096,6 +1106,21 @@ fn a_part_by_id_is_the_one_with_its_box() {
     ];
     let r = run_model("part-by-id", &features, &live, "");
     assert_eq!((r.matching, r.compared), (5, 5), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
+/// An Import feature: live's file (imports/<foreign id>) imported as the
+/// Import dialog does, into a Part Studio of its own (live: cf-wiring); a
+/// file that is live's export of the Part Studio isn't turned Y-up again.
+#[test]
+fn an_import_feature_imports_lives_file() {
+    let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("../kernel/tests/data/shell/closed-spline-live.x_t");
+    let features = json!({ "features": [{ "btType": "BTMFeature-134", "featureType": "importForeign", "featureId": "FI", "name": "Import 1", "parameters": [
+        { "btType": "BTMParameterForeignId-146", "parameterId": "foreignId", "foreignId": "f00" },
+        { "btType": "BTMParameterBoolean-144", "parameterId": "yAxisIsUp", "value": true }] }],
+        "foreignFiles": { "f00": { "path": file.to_string_lossy(), "placed": true } } });
+    let live = vec![json!({ "index": 0, "status": "OK", "parts": [{ "name": "Part 1", "bodyType": "SOLID", "faces": 3, "edges": 2, "vertices": 0 }] })];
+    let r = run_model("import-feature", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (1, 1), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
 /// qSketchRegion(…, true) leaves out every region inside another's hole,
