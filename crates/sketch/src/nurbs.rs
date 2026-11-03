@@ -419,16 +419,21 @@ impl Nurbs {
     }
 
     /// The cubic through `pts` with its knots at their centripetal
-    /// parameters and natural ends ([`FitSystem`]); through a closed polygon
-    /// (the last point is the first) periodic (live 1836).
+    /// parameters and natural ends ([`FitSystem`]).
     pub fn interpolate(pts: &[DVec2]) -> Option<Nurbs> {
         if pts.len() < 2 {
             return None;
         }
-        if let Some((h0, h1)) = periodic_handles(pts) {
-            return Self::interpolate_with_handles(pts, h0, h1);
-        }
         FitSystem::new(&fit_params(pts).0, pts, None).solve()
+    }
+
+    /// The periodic cubic through `pts`, whose last point is the first (live
+    /// 1836: a closed fit spline); else [`Nurbs::interpolate`].
+    pub fn interpolate_periodic(pts: &[DVec2]) -> Option<Nurbs> {
+        match Self::periodic_end_derivative(pts) {
+            Some(d) => Self::interpolate_with_ends(pts, d, d),
+            None => Self::interpolate(pts),
+        }
     }
 
     /// Interpolation through `pts` with tangent handles `h0` (start) and
@@ -658,16 +663,6 @@ pub(crate) fn seam_derivative(pts: &[DVec2]) -> Option<DVec2> {
     let f = (x[0] + x[n - 1] * (beta / gamma)) / den;
     let m = |k: usize| x[k] - z[k] * f;
     Some(slope(0) - (m(0) * 2.0 + m(1 % n)) * (h[0] / 6.0))
-}
-
-/// The handles of the periodic spline through `pts` when the last point is
-/// exactly the first (one point used twice), else None.
-pub(crate) fn periodic_handles(pts: &[DVec2]) -> Option<(DVec2, DVec2)> {
-    let n = pts.len();
-    if n < 4 || pts[0] != pts[n - 1] {
-        return None;
-    }
-    seam_handles(pts)
 }
 
 /// The handles giving the seam derivative of [`seam_derivative`] at both

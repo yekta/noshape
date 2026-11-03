@@ -189,6 +189,7 @@ impl Sketch {
                     Some((h0, h1)) => {
                         Curve2::Nurbs(Nurbs::interpolate_with_handles(&pts, p(*h0)?, p(*h1)?)?)
                     }
+                    None if points.len() > 3 && points.first() == points.last() => Curve2::Nurbs(Nurbs::interpolate_periodic(&pts)?),
                     None => Curve2::Nurbs(Nurbs::interpolate(&pts)?),
                 }
             }

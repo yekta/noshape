@@ -7,7 +7,7 @@ use crate::dual::{Dual, Num, V2};
 use crate::entities::{EntityKind, Geometry};
 use crate::ids::EntityId;
 use crate::linalg::BandLu;
-use crate::nurbs::{fit_params, handle_ends, periodic_handles, seam_handles, span_weight, FitSystem, Nurbs};
+use crate::nurbs::{fit_params, handle_ends, seam_handles, span_weight, FitSystem, Nurbs};
 use crate::sketch::Sketch;
 use smallvec::SmallVec;
 #[cfg(test)]
@@ -58,14 +58,14 @@ pub(crate) enum CurvSpec {
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum CurvSide {
     Spec(CurvSpec),
-    Fit { n: usize, at_end: bool, handles: bool },
+    Fit { n: usize, at_end: bool, ends: FitEnds },
 }
 
 impl CurvSide {
     fn arity(&self) -> usize {
         match self {
             CurvSide::Spec(s) => s.arity(),
-            CurvSide::Fit { n, handles, .. } => 2 * n + if *handles { 4 } else { 0 },
+            CurvSide::Fit { n, ends, .. } => 2 * n + ends.extra(),
         }
     }
 
@@ -73,8 +73,8 @@ impl CurvSide {
     fn curvature(&self, x: &[f64]) -> f64 {
         match self {
             CurvSide::Spec(s) => curv(s, x),
-            CurvSide::Fit { n, at_end, handles } => {
-                let c = if *handles { fit_curve_handles(x, *n) } else { fit_curve(x, *n) };
+            CurvSide::Fit { n, at_end, ends } => {
+                let c = fit_curve(x, *n, *ends);
                 let Some(c) = c else { return 0.0 };
                 let (a, b) = c.domain();
                 let d = c.eval_ders(if *at_end { b } else { a });
@@ -99,9 +99,9 @@ impl CurvSide {
                 g.iter_mut().zip(&gs).for_each(|(a, b)| *a += b);
                 v
             }
-            CurvSide::Fit { n, at_end, handles } => {
+            CurvSide::Fit { n, at_end, ends } => {
                 let s = if *at_end { -1.0 } else { 1.0 };
-                fit_end_grad(x, *n, *handles, *at_end, true, |q| curv_of(glam::DVec2::new(q[0], q[1]), glam::DVec2::new(q[2], q[3]), s), g).unwrap_or(0.0)
+                fit_end_grad(x, *n, *ends, *at_end, true, |q| curv_of(glam::DVec2::new(q[0], q[1]), glam::DVec2::new(q[2], q[3]), s), g).unwrap_or(0.0)
             }
         }
     }
@@ -119,7 +119,7 @@ pub(crate) enum FlowSide {
     /// first `k` control points from that end inward.
     Ctrl { tmpl: Arc<Nurbs>, at_end: bool, k: usize },
     /// A fit spline's end: inputs its points, then its handles.
-    Fit { n: usize, at_end: bool, handles: bool },
+    Fit { n: usize, at_end: bool, ends: FitEnds },
 }
 
 impl FlowSide {
@@ -127,7 +127,7 @@ impl FlowSide {
         match self {
             FlowSide::Const { arc } => if arc.is_some() { 4 } else { 0 },
             FlowSide::Ctrl { k, .. } => 2 * k,
-            FlowSide::Fit { n, handles, .. } => 2 * n + if *handles { 4 } else { 0 },
+            FlowSide::Fit { n, ends, .. } => 2 * n + ends.extra(),
         }
     }
 
@@ -144,8 +144,8 @@ impl FlowSide {
                 }
                 (c, *at_end)
             }
-            FlowSide::Fit { n, at_end, handles } => {
-                let c = if *handles { fit_curve_handles(x, *n) } else { fit_curve(x, *n) };
+            FlowSide::Fit { n, at_end, ends } => {
+                let c = fit_curve(x, *n, *ends);
                 let Some(c) = c else { return (0.0, 0.0) };
                 (c, *at_end)
             }
@@ -208,14 +208,14 @@ pub(crate) enum EqKind {
     /// Inputs p, t, control points: component of S(t) - p (analytic custom gradient).
     SplinePoint { comp: u8, curve: Arc<Nurbs> },
     /// Inputs p, t, fit points: component of S(t) - p (numeric gradient).
-    FitPoint { comp: u8, handles: bool },
+    FitPoint { comp: u8, ends: FitEnds },
     /// Inputs fit points (2n), o0, o1: cross (or dot if `perp`) of the fit
     /// spline's outgoing end tangent with (o1 - o0), normalized.
     FitEndDir { at_end: bool, perp: bool, n: usize },
     /// A circle (inputs c, r) or arc (c, its start) touching a fit spline at
     /// S(t) (then t, the fit points, its handles): `which` 0 |S(t) - c| - r,
     /// 1 (S(t) - c) · S'(t) / |S'(t)|; t within the spline.
-    FitContact { which: u8, arc: bool, handles: bool },
+    FitContact { which: u8, arc: bool, ends: FitEnds },
     /// Two fit splines' end directions parallel (perpendicular): inputs the
     /// first's `na` points, then the second's.
     FitFitDir { na: usize, end_a: bool, end_b: bool, perp: bool },
@@ -404,17 +404,38 @@ fn spline_point_eval(curve: &Nurbs, comp: usize, x: &[f64], grad: Option<&mut [f
     s - p[comp]
 }
 
-/// Fit spline through `n` points followed by its two handle points.
-fn fit_curve_handles(x: &[f64], n: usize) -> Option<Nurbs> {
-    let pts: Vec<glam::DVec2> = (0..n).map(|i| glam::DVec2::new(x[2 * i], x[2 * i + 1])).collect();
-    let h0 = glam::DVec2::new(x[2 * n], x[2 * n + 1]);
-    let h1 = glam::DVec2::new(x[2 * n + 2], x[2 * n + 3]);
-    Nurbs::interpolate_with_handles(&pts, h0, h1)
+/// How a fit spline's ends are set: natural, by its two handle points
+/// (inputs after its points), or periodic (its last point is its first).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum FitEnds {
+    Natural,
+    Handles,
+    Periodic,
 }
 
-fn fit_curve(x: &[f64], n: usize) -> Option<Nurbs> {
+impl FitEnds {
+    pub(crate) fn of(points: &[EntityId], handles: Option<(EntityId, EntityId)>) -> Self {
+        match handles {
+            Some(_) => FitEnds::Handles,
+            None if points.len() > 3 && points.first() == points.last() => FitEnds::Periodic,
+            None => FitEnds::Natural,
+        }
+    }
+
+    /// Inputs after the points.
+    fn extra(self) -> usize {
+        if self == FitEnds::Handles { 4 } else { 0 }
+    }
+}
+
+/// The fit spline through `n` points (then its handles' inputs).
+fn fit_curve(x: &[f64], n: usize, ends: FitEnds) -> Option<Nurbs> {
     let pts: Vec<glam::DVec2> = (0..n).map(|i| glam::DVec2::new(x[2 * i], x[2 * i + 1])).collect();
-    Nurbs::interpolate(&pts)
+    match ends {
+        FitEnds::Natural => Nurbs::interpolate(&pts),
+        FitEnds::Periodic => Nurbs::interpolate_periodic(&pts),
+        FitEnds::Handles => Nurbs::interpolate_with_handles(&pts, glam::DVec2::new(x[2 * n], x[2 * n + 1]), glam::DVec2::new(x[2 * n + 2], x[2 * n + 3])),
+    }
 }
 
 /// A fit spline at its inputs (points, then the two handles if it has
@@ -448,14 +469,17 @@ struct Probe {
 }
 
 impl FitDiff {
-    fn new(x: &[f64], n: usize, handles: bool) -> Option<Self> {
+    fn new(x: &[f64], n: usize, ends: FitEnds) -> Option<Self> {
         if n < 2 {
             return None;
         }
         let pts: Vec<glam::DVec2> = (0..n).map(|i| glam::DVec2::new(x[2 * i], x[2 * i + 1])).collect();
-        let handles = handles.then(|| (glam::DVec2::new(x[2 * n], x[2 * n + 1]), glam::DVec2::new(x[2 * n + 2], x[2 * n + 3])));
-        let seam = handles.is_none() && periodic_handles(&pts).is_some();
-        let handles = if seam { seam_handles(&pts) } else { handles };
+        let seam = ends == FitEnds::Periodic;
+        let handles = match ends {
+            FitEnds::Handles => Some((glam::DVec2::new(x[2 * n], x[2 * n + 1]), glam::DVec2::new(x[2 * n + 2], x[2 * n + 3]))),
+            FitEnds::Periodic => Some(seam_handles(&pts)?),
+            FitEnds::Natural => None,
+        };
         let (ub, total) = fit_params(&pts);
         let sys = FitSystem::new(&ub, &pts, handles.map(|(h0, h1)| handle_ends(&pts, h0, h1)));
         let lu = sys.factor()?;
@@ -638,7 +662,7 @@ impl FitDiff {
 }
 
 /// A point-on-fit-spline gradient: its inputs from the parameter on, handles, probe, S'(t).
-type FitPointGrad = (Vec<f64>, bool, Probe, glam::DVec2);
+type FitPointGrad = (Vec<f64>, FitEnds, Probe, glam::DVec2);
 
 thread_local! {
     /// The last point-on-fit-spline gradient.
@@ -687,8 +711,8 @@ fn curv_of(d1: glam::DVec2, d2: glam::DVec2, s: f64) -> f64 {
 
 /// Fills `g` with a fit spline end's gradient of `f(d1, d2)` (its first and,
 /// if `second`, second derivative at the end).
-fn fit_end_grad(x: &[f64], n: usize, handles: bool, at_end: bool, second: bool, f: impl Fn(&[f64]) -> f64, g: &mut [f64]) -> Option<f64> {
-    let fd = FitDiff::new(x, n, handles)?;
+fn fit_end_grad(x: &[f64], n: usize, ends: FitEnds, at_end: bool, second: bool, f: impl Fn(&[f64]) -> f64, g: &mut [f64]) -> Option<f64> {
+    let fd = FitDiff::new(x, n, ends)?;
     let (a, b) = fd.curve.domain();
     let u = if at_end { b } else { a };
     let at: SmallVec<[(f64, usize); 2]> = if second { [(u, 1), (u, 2)].into_iter().collect() } else { [(u, 1)].into_iter().collect() };
@@ -705,14 +729,14 @@ fn fit_end_grad(x: &[f64], n: usize, handles: bool, at_end: bool, second: bool, 
 }
 
 /// [`EqKind::FitContact`]'s residual, and its gradient into `g` if given.
-fn fit_contact(x: &[f64], which: u8, arc: bool, handles: bool, g: Option<&mut [f64]>) -> f64 {
+fn fit_contact(x: &[f64], which: u8, arc: bool, ends: FitEnds, g: Option<&mut [f64]>) -> f64 {
     use glam::DVec2;
     let c = DVec2::new(x[0], x[1]);
     let (r, off) = if arc { ((DVec2::new(x[2], x[3]) - c).length(), 4) } else { (x[2], 3) };
     let t = x[off];
     let xs = &x[off + 1..];
-    let n = xs.len() / 2 - if handles { 2 } else { 0 };
-    let Some(fd) = FitDiff::new(xs, n, handles) else { return 0.0 };
+    let n = (xs.len() - ends.extra()) / 2;
+    let Some(fd) = FitDiff::new(xs, n, ends) else { return 0.0 };
     let (a, b) = fd.curve.domain();
     let tt = t.clamp(a, b);
     let [p, d1, d2] = fd.curve.eval_ders(tt);
@@ -755,11 +779,11 @@ impl Eq {
     /// Residual value. `x` holds the input values in input order.
     pub fn eval(&self, x: &[f64]) -> f64 {
         match &self.kind {
-            EqKind::FitContact { which, arc, handles } => fit_contact(x, *which, *arc, *handles, None),
+            EqKind::FitContact { which, arc, ends } => fit_contact(x, *which, *arc, *ends, None),
             EqKind::SplinePoint { comp, curve } => spline_point_eval(curve, *comp as usize, x, None),
-            EqKind::FitPoint { comp, handles } => {
-                let n = (x.len() - 3) / 2 - if *handles { 2 } else { 0 };
-                let c = if *handles { fit_curve_handles(&x[3..], n) } else { fit_curve(&x[3..], n) };
+            EqKind::FitPoint { comp, ends } => {
+                let n = (x.len() - 3 - ends.extra()) / 2;
+                let c = fit_curve(&x[3..], n, *ends);
                 let Some(c) = c else { return 0.0 };
                 let (a, b) = c.domain();
                 let p = c.point(x[2].clamp(a, b));
@@ -768,7 +792,7 @@ impl Eq {
             EqKind::FitFitDir { na, end_a, end_b, perp } => {
                 let nb = x.len() / 2 - na;
                 let dir = |xs: &[f64], n: usize, at_end: bool| -> Option<glam::DVec2> {
-                    let c = fit_curve(xs, n)?;
+                    let c = fit_curve(xs, n, FitEnds::Natural)?;
                     let (a, b) = c.domain();
                     Some(c.eval_ders(if at_end { b } else { a })[1])
                 };
@@ -785,7 +809,7 @@ impl Eq {
             }
             EqKind::FlowNum { a, b, g3, scale } => flow_residual(a, b, *g3, x) * scale.powi(if *g3 { 3 } else { 2 }),
             EqKind::FitEndDir { at_end, perp, n } => {
-                let Some(c) = fit_curve(x, *n) else { return 0.0 };
+                let Some(c) = fit_curve(x, *n, FitEnds::Natural) else { return 0.0 };
                 let (a, b) = c.domain();
                 let t = if *at_end { -c.eval_ders(b)[1] } else { c.eval_ders(a)[1] };
                 let o = glam::DVec2::new(x[2 * n + 2] - x[2 * n], x[2 * n + 3] - x[2 * n + 1]);
@@ -802,23 +826,23 @@ impl Eq {
     /// Residual and gradient w.r.t. the inputs (`g.len() == x.len()`).
     pub fn eval_grad(&self, x: &[f64], g: &mut [f64]) -> f64 {
         match &self.kind {
-            EqKind::FitContact { which, arc, handles } => return fit_contact(x, *which, *arc, *handles, Some(g)),
+            EqKind::FitContact { which, arc, ends } => return fit_contact(x, *which, *arc, *ends, Some(g)),
             EqKind::SplinePoint { comp, curve } => return spline_point_eval(curve, *comp as usize, x, Some(g)),
-            EqKind::FitPoint { comp, handles } => {
+            EqKind::FitPoint { comp, ends } => {
                 g.iter_mut().for_each(|v| *v = 0.0);
                 let c = *comp as usize;
                 // A point's two equations come one after the other with the same inputs.
-                let hit = FIT_POINT_LAST.with(|l| l.borrow().as_ref().filter(|(k, h, ..)| *h == *handles && k[..] == x[2..]).map(|(_, _, pr, d)| (pr.clone(), *d)));
+                let hit = FIT_POINT_LAST.with(|l| l.borrow().as_ref().filter(|(k, h, ..)| *h == *ends && k[..] == x[2..]).map(|(_, _, pr, d)| (pr.clone(), *d)));
                 let (pr, d1) = match hit {
                     Some(v) => v,
                     None => {
-                        let n = (x.len() - 3) / 2 - if *handles { 2 } else { 0 };
-                        let Some(fd) = FitDiff::new(&x[3..], n, *handles) else { return 0.0 };
+                        let n = (x.len() - 3 - ends.extra()) / 2;
+                        let Some(fd) = FitDiff::new(&x[3..], n, *ends) else { return 0.0 };
                         let (a, b) = fd.curve.domain();
                         let t = x[2].clamp(a, b);
                         let pr = fd.probes(&[(t, 0)]).remove(0);
                         let d1 = if x[2] > a && x[2] < b { fd.curve.eval_ders(t)[1] } else { glam::DVec2::ZERO };
-                        FIT_POINT_LAST.with(|l| *l.borrow_mut() = Some((x[2..].to_vec(), *handles, pr.clone(), d1)));
+                        FIT_POINT_LAST.with(|l| *l.borrow_mut() = Some((x[2..].to_vec(), *ends, pr.clone(), d1)));
                         (pr, d1)
                     }
                 };
@@ -833,8 +857,8 @@ impl Eq {
                 let s = if *at_end { -1.0 } else { 1.0 };
                 let o = glam::DVec2::new(x[2 * n + 2] - x[2 * n], x[2 * n + 3] - x[2 * n + 1]);
                 let mut go = [0.0; 2];
-                let Some(v) = fit_end_grad(&x[..2 * n], n, false, *at_end, false, |q| dir_rel(glam::DVec2::new(q[0], q[1]) * s, o, perp), &mut g[..2 * n]) else { return 0.0 };
-                let t = FitDiff::new(&x[..2 * n], n, false).map(|fd| {
+                let Some(v) = fit_end_grad(&x[..2 * n], n, FitEnds::Natural, *at_end, false, |q| dir_rel(glam::DVec2::new(q[0], q[1]) * s, o, perp), &mut g[..2 * n]) else { return 0.0 };
+                let t = FitDiff::new(&x[..2 * n], n, FitEnds::Natural).map(|fd| {
                     let (a, b) = fd.curve.domain();
                     fd.curve.eval_ders(if *at_end { b } else { a })[1] * s
                 });
@@ -852,14 +876,14 @@ impl Eq {
                 let (na, perp) = (*na, *perp);
                 let nb = x.len() / 2 - na;
                 let end_dir = |xs: &[f64], n: usize, at_end: bool| {
-                    let c = fit_curve(xs, n)?;
+                    let c = fit_curve(xs, n, FitEnds::Natural)?;
                     let (a, b) = c.domain();
                     Some(c.eval_ders(if at_end { b } else { a })[1])
                 };
                 let (Some(ta), Some(tb)) = (end_dir(&x[..2 * na], na, *end_a), end_dir(&x[2 * na..], nb, *end_b)) else { return 0.0 };
                 let (ga, gb) = g.split_at_mut(2 * na);
-                fit_end_grad(&x[..2 * na], na, false, *end_a, false, |q| dir_rel(glam::DVec2::new(q[0], q[1]), tb, perp), ga);
-                fit_end_grad(&x[2 * na..], nb, false, *end_b, false, |q| dir_rel(ta, glam::DVec2::new(q[0], q[1]), perp), gb);
+                fit_end_grad(&x[..2 * na], na, FitEnds::Natural, *end_a, false, |q| dir_rel(glam::DVec2::new(q[0], q[1]), tb, perp), ga);
+                fit_end_grad(&x[2 * na..], nb, FitEnds::Natural, *end_b, false, |q| dir_rel(ta, glam::DVec2::new(q[0], q[1]), perp), gb);
                 return dir_rel(ta, tb, perp);
             }
             EqKind::FlowNum { a, b, g3, scale } => {
@@ -1107,15 +1131,22 @@ impl<'a, L: Lookup> Builder<'a, L> {
         for p in self.spline_points(spline)? {
             inp.extend_from_slice(&self.lk.point(p));
         }
-        let handles = self.sk.entity(spline).and_then(|e| e.spline_handles());
-        if let Some((h0, h1)) = handles {
+        let ends = self.fit_ends(spline)?;
+        if let Some((h0, h1)) = self.sk.entity(spline).and_then(|e| e.spline_handles()) {
             inp.extend_from_slice(&self.lk.point(h0));
             inp.extend_from_slice(&self.lk.point(h1));
         }
         for which in 0..2u8 {
-            self.push(EqKind::FitContact { which, arc, handles: handles.is_some() }, inp.clone());
+            self.push(EqKind::FitContact { which, arc, ends }, inp.clone());
         }
         Ok(())
+    }
+
+    fn fit_ends(&self, id: EntityId) -> Result<FitEnds, String> {
+        match self.geom(id)? {
+            Geometry::FitSpline { points, handles } => Ok(FitEnds::of(points, *handles)),
+            _ => Err(format!("{id} is not a fit spline")),
+        }
     }
 
     fn spline_dir(&self, id: EntityId, at_end: bool) -> Result<Dir, String> {
@@ -1223,13 +1254,13 @@ impl<'a, L: Lookup> Builder<'a, L> {
                     for cp in self.spline_points(q)? {
                         inp.extend_from_slice(&self.lk.point(cp));
                     }
-                    let handles = self.sk.entity(q).and_then(|e| e.spline_handles());
-                    if let Some((h0, h1)) = handles {
+                    let ends = self.fit_ends(q)?;
+                    if let Some((h0, h1)) = self.sk.entity(q).and_then(|e| e.spline_handles()) {
                         inp.extend_from_slice(&self.lk.point(h0));
                         inp.extend_from_slice(&self.lk.point(h1));
                     }
                     for comp in 0..2u8 {
-                        self.push(EqKind::FitPoint { comp, handles: handles.is_some() }, inp.clone());
+                        self.push(EqKind::FitPoint { comp, ends }, inp.clone());
                     }
                 }
             }
@@ -1432,7 +1463,7 @@ impl<'a, L: Lookup> Builder<'a, L> {
             for p in points.iter().chain(handles.iter().flat_map(|(a, b)| [a, b])) {
                 inp.extend_from_slice(&self.lk.point(*p));
             }
-            return Ok((CurvSide::Fit { n: points.len(), at_end, handles: handles.is_some() }, inp));
+            return Ok((CurvSide::Fit { n: points.len(), at_end, ends: FitEnds::of(points, *handles) }, inp));
         }
         let (s, inp) = self.curv_spec(id, at_end)?;
         Ok((CurvSide::Spec(s), inp))
@@ -1461,7 +1492,7 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 for p in points.iter().chain(handles.iter().flat_map(|(a, b)| [a, b])) {
                     inp.extend_from_slice(&self.lk.point(*p));
                 }
-                Ok((FlowSide::Fit { n: points.len(), at_end, handles: handles.is_some() }, inp))
+                Ok((FlowSide::Fit { n: points.len(), at_end, ends: FitEnds::of(points, *handles) }, inp))
             }
             Geometry::BSpline { .. } | Geometry::Conic { .. } => {
                 let tmpl = self.spline_template(id)?;
@@ -2048,7 +2079,7 @@ mod tests {
             for comp in 0..2u8 {
                 let mut x = vec![0.02, 0.003, 0.37];
                 x.extend(&fit);
-                let eq = Eq { kind: EqKind::FitPoint { comp, handles: false }, inputs: (0..x.len() as u32).collect() };
+                let eq = Eq { kind: EqKind::FitPoint { comp, ends: FitEnds::Periodic }, inputs: (0..x.len() as u32).collect() };
                 let mut g = vec![0.0; x.len()];
                 eq.eval_grad(&x, &mut g);
                 for i in 3..x.len() {
@@ -2081,22 +2112,23 @@ mod tests {
     fn fit_spline_gradients_match_finite_differences() {
         for n in [2usize, 3, 4, 5, 8, 30] {
             for handles in [false, true] {
+                let ends = if handles { FitEnds::Handles } else { FitEnds::Natural };
                 let fit = fit_inputs(n, handles);
                 for comp in 0..2u8 {
                     let mut x = vec![0.02, 0.003, 0.37];
                     x.extend(&fit);
-                    check_grad(&Eq { kind: EqKind::FitPoint { comp, handles }, inputs: (0..x.len() as u32).collect() }, &x);
+                    check_grad(&Eq { kind: EqKind::FitPoint { comp, ends }, inputs: (0..x.len() as u32).collect() }, &x);
                 }
                 for which in 0..2u8 {
                     for arc in [false, true] {
                         let mut x = if arc { vec![0.02, 0.003, 0.025, 0.004] } else { vec![0.02, 0.003, 0.006] };
                         x.push(0.37);
                         x.extend(&fit);
-                        check_grad(&Eq { kind: EqKind::FitContact { which, arc, handles }, inputs: (0..x.len() as u32).collect() }, &x);
+                        check_grad(&Eq { kind: EqKind::FitContact { which, arc, ends }, inputs: (0..x.len() as u32).collect() }, &x);
                     }
                 }
                 for at_end in [false, true] {
-                    let side = CurvSide::Fit { n, at_end, handles };
+                    let side = CurvSide::Fit { n, at_end, ends };
                     let mut x = fit.clone();
                     x.extend([0.0, 0.0, 0.01, 0.002]);
                     let a = CurvSpec::Arc { sign: 1.0 };
