@@ -1497,7 +1497,7 @@ fn edit_hatch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         let color = match a.opt_str("color")? {
             Some(c) => {
                 let h = c.trim().trim_start_matches('#');
-                let v = (h.len() == 6).then(|| u32::from_str_radix(h, 16).ok()).flatten().ok_or_else(|| OpError::param("color", "\"#rrggbb\""))?;
+                let v = (h.len() == 6).then(|| u32::from_str_radix(h, 16).ok()).flatten().ok_or_else(|| OpError::param("color", &format!("`{h}` is not a colour: \"#rrggbb\" (e.g. \"#e51919\")")))?;
                 Some([(v >> 16) as u8, (v >> 8) as u8, v as u8])
             }
             None => None,

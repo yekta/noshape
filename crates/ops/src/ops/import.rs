@@ -39,7 +39,7 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let paths: Vec<PathBuf> = a.array("files")?.iter().enumerate().map(|(i, v)| v.as_str().map(PathBuf::from).ok_or_else(|| OpError::param(&format!("files[{i}]"), "a path"))).collect::<Result<_, _>>()?;
     for (i, p) in paths.iter().enumerate() {
         if !p.is_file() {
-            return Err(OpError::param(&format!("files[{i}]"), "no such file"));
+            return Err(OpError::param(&format!("files[{i}]"), &format!("no such file: {}", p.display())));
         }
     }
     let after = match a.opt_str("after")? {

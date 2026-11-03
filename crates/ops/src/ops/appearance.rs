@@ -230,7 +230,7 @@ fn set_material(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn set_appearance(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let rgb = match a.get("color").expect("required") {
-        Value::String(h) => ap::parse_hex(h).ok_or_else(|| OpError::param("color", "\"#rrggbb\""))?,
+        Value::String(h) => ap::parse_hex(h).ok_or_else(|| OpError::param("color", &format!("`{h}` is not a colour: \"#rrggbb\" (e.g. \"#e51919\") or [r, g, b] from 0 to 255")))?,
         Value::Array(c) if c.len() == 3 => {
             let ch = |i: usize| c[i].as_u64().filter(|v| *v <= 255).map(|v| v as u8).ok_or_else(|| OpError::param("color", "[r, g, b] with 0–255"));
             [ch(0)?, ch(1)?, ch(2)?]
