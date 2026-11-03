@@ -1214,7 +1214,7 @@ Examples:
 | `value` | string or number |  | Value or expression. Without it the dimension keeps the measured value, as when the Dimension tool's value box is accepted unchanged. |
 | `kind` | one of `auto`, `distance`, `horizontal_distance`, `vertical_distance`, `length`, `radius`, `diameter`, `angle`, `arc_angle`, `centerline` |  | Dimension kind (default auto). |
 | `mode` | one of `center`, `minimum`, `maximum` |  | Distance to a circle/arc measured to its center (default), nearest or farthest point. |
-| `label` | array of number or string |  | Label position in sketch coordinates (also picks the auto kind: above/below two points gives a horizontal distance, beside them a vertical one). |
+| `label` | array of number or string |  | Label position in sketch coordinates (also picks the auto kind: above/below two points gives a horizontal distance, beside them a vertical one; between two lines, the quadrant an angle measures). |
 
 #### sketch_set_dimension
 
