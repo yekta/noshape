@@ -167,6 +167,13 @@ fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
 /// the std it pins in its header) and optional <elementId>.json ({ "name", … }),
 /// into `features`' `featureStudios`.
 fn read_studios(dir: &Path, features: &mut Value) {
+    // Files the studios import (icons, CSVs): <eid>.blob, named in <eid>.json.
+    for e in std::fs::read_dir(dir.join("studios")).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "blob")) {
+        let meta: Value = std::fs::read_to_string(e.with_extension("json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or(Value::Null);
+        if let (Some(id), Some(name)) = (e.file_stem().map(|s| s.to_string_lossy().to_string()), meta["name"].as_str()) {
+            features["fileElements"][id.as_str()] = json!({ "path": e.to_string_lossy(), "name": name });
+        }
+    }
     if let Ok(entries) = std::fs::read_dir(dir.join("studios")) {
         for e in entries.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "fs")) {
             let (Some(id), Ok(source)) = (e.file_stem().map(|s| s.to_string_lossy().to_string()), std::fs::read_to_string(&e)) else { continue };
@@ -711,6 +718,29 @@ export const thrower = defineFeature(function(context is Context, id is Id, defi
     assert!(r.custom.iter().any(|c| c.starts_with("Thrower 1: failed to run")), "{:?}", r.custom);
     assert!(r.first.as_deref().is_some_and(|f| f.contains("(custom feature failed to run)")), "{:?}", r.first);
     assert!(r.std_pins.is_empty(), "1963 is served as pinned: {:?}", r.std_pins);
+}
+
+/// A file a studio imports (its icon) that live fetched (studios/<eid>.blob
+/// named in <eid>.json) is imported as that file, no placeholder; one not
+/// fetched gets the placeholder and a note.
+#[test]
+fn a_studios_fetched_icon_is_its_file() {
+    let png: &[u8] = &[
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+        0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0xda, 0x63, 0xf8, 0xcf, 0xc0, 0xf0, 0x1f, 0x00, 0x05, 0x00, 0x01, 0xff, 0x89, 0x99, 0x3d, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+    ];
+    let source = |icon: &str| format!("FeatureScript 1963;\nimport(path : \"onshape/std/geometry.fs\", version : \"1963.0\");\nicon::import(path : \"{icon}\", version : \"0\");\n\nannotation {{ \"Feature Type Name\" : \"Iconic\", \"Icon\" : icon::BLOB_DATA }}\nexport const iconic = defineFeature(function(context is Context, id is Id, definition is map)\n    precondition {{}}\n    {{}});\n");
+    let dir = scratch("studio-icon");
+    std::fs::create_dir_all(dir.join("studios")).unwrap();
+    std::fs::write(dir.join("studios/0aaa.fs"), source("0icn")).unwrap();
+    std::fs::write(dir.join("studios/0icn.blob"), png).unwrap();
+    std::fs::write(dir.join("studios/0icn.json"), r#"{ "kind": "blob", "name": "iconic.png", "mimeType": "image/png" }"#).unwrap();
+    std::fs::write(dir.join("studios/0bbb.fs"), source("0gone")).unwrap();
+    std::fs::write(dir.join("features.json"), json!({ "features": [] }).to_string()).unwrap();
+    let (features, live, refs) = read_model(&dir).unwrap();
+    let r = run_model("studio-icon", &features, &live, &refs);
+    let notes: Vec<&String> = r.untranslated.iter().filter(|u| u.contains("placeholder")).collect();
+    assert!(notes.len() == 1 && notes[0].contains("0gone"), "{:?}", r.untranslated);
 }
 
 /// `NOSHAPE_PACKED_DIR=<dir>`: every packed query (`qCompressed(1.0, "…", id)`)

@@ -213,6 +213,12 @@ impl<'a> Translator<'a> {
         for table in doc["variables"].as_array().into_iter().flatten().filter(|v| v["variableStudioReference"].is_object()) {
             self.variable_studio(table);
         }
+        // Files the studios import (icons, CSVs), as file tabs under their names.
+        for (element, file) in doc["fileElements"].as_object().into_iter().flatten() {
+            if let Err(e) = self.file_element(element, file) {
+                self.notes.push(format!("file {}: {e}", file["name"].as_str().unwrap_or(element)));
+            }
+        }
         // Every tab first: a studio imports another by its element id
         // ("<eid>", or "<did>/<vid>/<eid>" in another document), ours by tab id.
         let studios: Vec<(String, Value)> = doc["featureStudios"].as_object().into_iter().flatten().map(|(e, s)| (e.clone(), s.clone())).collect();
@@ -290,7 +296,8 @@ impl<'a> Translator<'a> {
         // fetched: a placeholder image tab.
         for (ns, path) in blob_imports(&source) {
             let element = path.rsplit('/').next().unwrap_or(&path).to_string();
-            if self.studios.contains_key(&element) {
+            // Fetched (its path already ours) or a studio of the document.
+            if self.studios.contains_key(&element) || self.studios.values().any(|t| *t == element) {
                 continue;
             }
             let Some(image) = self.placeholder_image() else { break };
@@ -307,6 +314,20 @@ impl<'a> Translator<'a> {
     }
 
     /// A 1 × 1 image tab for icons and images live hasn't fetched (made once).
+    /// A file element (live's `<eid>.blob`) imported as a file tab under its
+    /// name; studios' imports of the element then point at it.
+    fn file_element(&mut self, element: &str, file: &Value) -> Result<(), String> {
+        let (Some(path), Some(name)) = (file["path"].as_str(), file["name"].as_str()) else { return Err("no path or name".into()) };
+        let dir = std::env::temp_dir().join(format!("noshape-parity-files-{}-{element}", std::process::id()));
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let named = dir.join(name);
+        std::fs::copy(path, &named).map_err(|e| e.to_string())?;
+        let r = self.call("import_files", json!({ "files": [named.to_string_lossy()] }))?;
+        let tab = r["first"].as_str().ok_or("the import made no tab")?.to_string();
+        self.studios.insert(element.to_string(), tab);
+        Ok(())
+    }
+
     fn placeholder_image(&mut self) -> Option<String> {
         if let Some(t) = &self.placeholder {
             return Some(t.clone());
