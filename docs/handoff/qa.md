@@ -807,7 +807,8 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
 - Shared prefs touched by testing: ~/.config/noshape/preferences.json got `featureDialogWidths.extrude 278` from a resize
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
-## Requests to the lead (qa, updated 2026-10-29 09:09)
+## Requests to the lead (qa, updated 2026-11-03 01:40)
+- **11-03 01:40: SCORE.md's model numbers.** dx's handoff (d821e749b) has qa run `NOSHAPE_RB_LOCAL=1 tools/tiers/rb.sh cargo test -q -p noshape-ops --test all parity::parity_models -- --ignored`, which is a build; qa's rule is never to build. Until you say otherwise qa takes the model line from the report.json dx's own run leaves next to /root/parity/models (and asks dx in its handoff to run it before 11-03 evening). The scenario line qa makes itself: green binary + tools/ui-parity/run.py (no build) against /root/parity/ui/live — 6/28 scenarios, 50/139 states on green 2723f7fb at 01:35.
 - **09:09: a CLI built from each green's commit** (e.g. next to /root/green/noshape as noshape-cli + SHA). qa never builds, and the
   only CLIs on the box are the agents' worktree builds (bool's 07:17, core's 06:35, which held unlanded work at times: a false
   RUST-SHELL-C79E alarm at 07:31 came from one). CLI fuzz of the Rust Boolean on the current main code (bool 024fc02d, a779433f)
