@@ -251,6 +251,8 @@ pub struct WindowSnapshot {
     pub active_tab: Option<TabId>,
     /// 3D tabs' cameras and graphics area sizes (logical pixels).
     pub cameras: BTreeMap<TabId, (Camera, DVec2)>,
+    /// Drawings' zoom.
+    pub sheets: BTreeMap<TabId, SheetView>,
     /// Selections: a Part Studio's entity ids, an Assembly's `inst:` ids, a
     /// drawing's `view:` / `annotation:` / `table:` / `break:` / `sketch:` /
     /// `hatch:` / `image:` ids.
@@ -270,6 +272,7 @@ impl WindowState {
                 vc.set(camera);
             }
         }
+        self.sheets.extend(s.sheets);
         self.selection.extend(s.selection);
     }
 

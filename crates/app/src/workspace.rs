@@ -185,7 +185,9 @@ impl Workspace {
                 TabView::Drawing(v) => {
                     // As the drawing tools name them (drawing_delete's views, annotations, tables…).
                     use noshape_scene::drawing_tools::Sel;
-                    let ids = v.read(cx).selection.iter().filter_map(|s| match s {
+                    let v = v.read(cx);
+                    s.sheets.insert(*tab, noshape_ops::window::SheetView { zoom: v.zoom, center: v.center, size: v.size_px() });
+                    let ids = v.selection.iter().filter_map(|s| match s {
                         Sel::View(id) => Some(format!("view:{}", id.0)),
                         Sel::Annotation(id) => Some(format!("annotation:{id}")),
                         Sel::Table(id) => Some(format!("table:{id}")),
