@@ -247,7 +247,14 @@ dump, the runner, live's first 20 scenarios run in ours and a first score.
   Isolate, Section view, shortcut sheet, Named views, appearance and filter; the driver opens toolbar dropdowns and
   types shift+symbol as X11 does. Left with live (REQUESTS 11-03 08:20 and 1850): fillet-* / chamfer-* after a
   preselected edge (live's account drops the edge since 04:10), Hole / Revolve remembered values, Shift+P as an undo
-  step, a rolled-back variable's " = 0".
+  step, a rolled-back variable's " = 0", Fillet moved above its Extrude reading "ok", the second Enter after an
+  autofill insertion (new scenario extrude-depth-variable-enter-twice).
+- 11-03 09:10: also landed: an autofill insertion applies without an undo step; Ctrl+click on a feature row opens its
+  menu and a click beside an open menu only closes it; flip buttons, toolbar carets and row edges as driver targets;
+  the Hole's icon rows and table levels in the state. Onshape's shortcut page (cad.onshape.com/help, Keyboard
+  shortcuts) confirms Ctrl+C / Ctrl+V copy / paste features (kept, though live's CDP run pasted nothing), ↑ / ↓ only
+  with the bar selected, no Enter-to-edit. Live re-records all 186 scenarios into /root/parity/ui/live (~2 min each,
+  started 08:10); compare with `--live /root/parity/ui/live` as it fills, live-x40 for the rest.
 - 11-03 07:50: **74/107** (live re-records and drops scenarios as its runner changes; run after every batch). Fixed
   since 05:00 (all landed): the sketch plane bubble stays; cancelling an unchanged existing sketch shows no toast; a
   part row double-click renames only on the name; dialog focus rules (tabs, labelled selects, a new active field takes
