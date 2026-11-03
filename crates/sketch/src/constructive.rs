@@ -29,10 +29,12 @@ const MAX_UNITS: usize = 60;
 
 impl Sketch {
     /// Places the entities of every component whose constraints don't hold
-    /// (see the module docs). False when a component can't be placed that way
-    /// (an entity alone can't meet its constraints to the placed ones); the
-    /// sketch may then be partly moved, and the caller restores it.
-    pub(crate) fn place_constructively(&mut self, unheld: &HashSet<crate::ids::ConstraintId>) -> bool {
+    /// (see the module docs). Returns the entities of the components that
+    /// can't be placed that way (an entity alone can't meet its constraints
+    /// to the placed ones): those are left as they were, for the least
+    /// change (live fuzz s464: a hexagon the pass can't close beside a
+    /// rounded rectangle it places as live).
+    pub(crate) fn place_constructively(&mut self, unheld: &HashSet<crate::ids::ConstraintId>) -> Vec<EntityId> {
         // Curves sharing a point entity (the tools' rectangles, polylines)
         // are placed as if joined by a Coincident: on a copy whose shared
         // points are split, the positions copied back (a rectangle drawn
@@ -41,9 +43,7 @@ impl Sketch {
         // copy still shares; qa SKETCH-CONSTRUCTIVE-RECURSION.)
         if let Some(mut split) = self.split_shared_points() {
             let unheld = split.unheld_constraints(1e-9);
-            if !split.place_split(&unheld) {
-                return false;
-            }
+            let left = split.place_split(&unheld);
             for e in self.entities().map(|e| e.id).collect::<Vec<_>>() {
                 if let Some(g) = split.entity(e).map(|x| x.geometry.clone())
                     && let Some(mine) = self.entity_mut_silent(e)
@@ -56,7 +56,7 @@ impl Sketch {
                 }
             }
             self.touch();
-            return true;
+            return left.into_iter().filter(|e| self.entity(*e).is_some()).collect();
         }
         self.place_split(unheld)
     }
@@ -126,7 +126,7 @@ impl Sketch {
 
     /// [`Sketch::place_constructively`] on a sketch whose curves share no
     /// point entity.
-    fn place_split(&mut self, unheld: &HashSet<crate::ids::ConstraintId>) -> bool {
+    fn place_split(&mut self, unheld: &HashSet<crate::ids::ConstraintId>) -> Vec<EntityId> {
         // Units: each curve with its points; points of no curve on their own.
         let mut unit_of: HashMap<EntityId, EntityId> = HashMap::new();
         let mut units: Vec<EntityId> = Vec::new();
@@ -209,6 +209,7 @@ impl Sketch {
         }
         let mut comps: Vec<Vec<EntityId>> = comps.into_values().collect();
         comps.sort_by_key(|c| c[0]);
+        let mut left = Vec::new();
         for comp in comps {
             // Each entity solved on its own: kept to everyday sizes.
             if comp.len() > MAX_UNITS {
@@ -219,11 +220,18 @@ impl Sketch {
             if !comp_cons.iter().any(|(c, _)| unheld.contains(c)) {
                 continue;
             }
+            let own: Vec<EntityId> = comp.iter().flat_map(|u| std::iter::once(*u).chain(self.entity(*u).map(|e| e.point_refs()).unwrap_or_default())).collect();
+            let was: Vec<(EntityId, Geometry)> = own.iter().filter_map(|e| self.entity(*e).map(|x| (*e, x.geometry.clone()))).collect();
             if !self.place_component(&comp, &comp_cons, &unit_of) {
-                return false;
+                for (e, g) in was {
+                    if let Some(x) = self.entity_mut_silent(e) {
+                        x.geometry = g;
+                    }
+                }
+                left.extend(own);
             }
         }
-        true
+        left
     }
 
     /// Whether constraint `c` joins geometry by position (a shared point, a

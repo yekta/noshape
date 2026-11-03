@@ -884,6 +884,21 @@ fn write_batch() {
 /// The batches: (number, first seed, rich).
 const BATCHES: [(usize, u64, bool); 8] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true)];
 
+/// Batch 8's s464 / s475 stay as live answered: a component the pass can't
+/// close (a hexagon) takes the least change on its own, the rounded
+/// rectangle / L-shaped outline beside it stays as the pass placed it
+/// (before, the whole sketch fell back: 12 / 77 mm off). T1: the fixtures'
+/// answers, no live.
+#[test]
+fn a_component_the_pass_cant_close_leaves_the_others_placed() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-8.live.json")).unwrap()).unwrap();
+    for seed in [464, 475] {
+        let ours = batch(1, seed, true);
+        let d = differences(&ours["cases"][0], &live["cases"][format!("s{seed}")]);
+        assert!(d.is_empty(), "s{seed}: {}", d.join("; "));
+    }
+}
+
 /// Cases in batch `n` (batch 3 on: 40, where positions match least).
 fn batch_size(n: usize) -> usize {
     if n >= 3 { 40 } else { 20 }

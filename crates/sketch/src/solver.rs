@@ -1261,14 +1261,14 @@ impl Sketch {
         // solve then finds every constraint held where it put things.
         let unheld = if opts.constructive && opts.light.is_empty() && opts.still.is_empty() { self.unheld_constraints(1e-9) } else { HashSet::new() };
         let rep = if !unheld.is_empty() {
-            let placed = self.place_constructively(&unheld);
+            let left: HashSet<EntityId> = self.place_constructively(&unheld).into_iter().collect();
             let at = self.clone();
             let rep = self.solve_inner(opts);
-            let moved = || self.entities().any(|e| at.entity(e.id).is_none_or(|a| match (&a.geometry, &e.geometry) {
+            let moved = || self.entities().filter(|e| !left.contains(&e.id)).any(|e| at.entity(e.id).is_none_or(|a| match (&a.geometry, &e.geometry) {
                 (Geometry::Point { pos: p }, Geometry::Point { pos: q }) => (*p - *q).length() > 1e-9,
                 _ => false,
             }));
-            if placed && rep.is_solved() && !moved() {
+            if rep.is_solved() && !moved() {
                 rep
             } else {
                 *self = snapshot.clone();
