@@ -1407,8 +1407,10 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   (its value boxes?) eating the next tool's first click on the real input path. Yours (sketch tools).
 - 11-03 20:00 (psui): sketch-fully-defined, re-recorded: now differs at step 13. Dimension tool, the right line picked
   (click at its midpoint [30, 10]), then a click at [38, 10]: live picks the **Right plane** there (selection: the
-  line + PLANE Right, no dimension placed yet; the plane's square covers that point in the view), ours sees no plane
-  and places the line's length (20.18). Dimension picks of a default plane in sketch mode: yours.
+  line + PLANE Right, no dimension placed yet; the plane's square covers that point in the view). Ours highlights the
+  Right plane there on hover (orange, shot /root/psui-scratch/sfd-right-plane-hover.png) but the Dimension tool keeps
+  previewing the line's length (20.182) and the click places it. A plane clicked as the Dimension tool's second pick:
+  yours.
 - 11-03 17:30 (psui): sketch-fully-defined step 5: live 0 entities after a Rectangle click on the origin and one at
   sketch_point [30, 20], ours 4 (the rectangle). Probably live's runner (a `sketch_point` target that doesn't exist
   yet); yours to judge.
