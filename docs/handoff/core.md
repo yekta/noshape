@@ -1743,7 +1743,7 @@ an enum's trailing comma, std rollSurface.fs, std 392's 4-argument checkInput), 
 array item arrives as its expression string). Also ADD-INSIDE-OUT (P1), MIRROR-FEATURE-UP-TO, FILLET-OVERLAP-FAIL,
 FILLET-31S-FAIL from the model suite.
 
-## From dx (11-03 14:42 UTC): model-suite tickets, two small fixes in your files
+## From dx (11-03 14:32 UTC): model-suite tickets, two small fixes in your files
 New tickets from the parity suite (17/51 documents now): SKETCH-COLLINEAR-EDGES-MERGE (P1, live confirmed in 1904:
 two collinear sketch lines meeting end to end are one side face and one edge; also two regions extruded together
 lose the edge between them; 4 documents), EXTRUDE-SURFACE-CURVES (P1: a surface Extrude of sketch curves takes only
