@@ -83,6 +83,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   to run: …" (ours errors where live's built; the first difference then reads "(custom feature failed to run)").
   T1 custom_feature_failures_are_reported_apart. Host / std differences → core tickets. Score now **7/11,
   58/78** (bracket03 matches since core's FILLET-SPLIT-EDGE-FACES fix); SCORE.md row updated.
+- 11-03 12:00 live's refetch (21 scored): **11/21, 103/157, custom 0/5**. Translator: a centroid of [0, 0, 0] off the
+  part's box centre is massproperties' "no material" (not compared); id-only region queries as many as the last
+  sketch's regions are its regions (older documents); a sketch plane named by id alone is ours where live's frame
+  lies (query_datums planes, else a planar face); an id not placed just before a feature is taken from the latest
+  earlier line that has it; a body listed by id alone takes its part's box. Asked live (11:45, 11:55): Hole INFO
+  tooltips, pulley02's empty Revolve line, and 8 documents whose bodies are ids only (no geometry: their later
+  queries can't map until refetched).
 - 11-03 11:20 FeatureScript corpus arriving (32 cf-* documents, studios/ only so far): T2 `parity_feature_studios`
   compiles each document's studios in a new document at their pins (13/34 compile, per-document lines, the commonest
   errors). The translator now makes every studio tab first and points imports of the document's other studios

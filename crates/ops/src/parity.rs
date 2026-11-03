@@ -614,6 +614,41 @@ impl<'a> Translator<'a> {
         Ok((r["feature"].as_str().unwrap_or("").to_string(), st["status"].as_str().unwrap_or("").to_string(), st["message"].as_str().map(str::to_string)))
     }
 
+    /// Our plane (a default plane, a Plane feature's or a planar face) where
+    /// live's frame of sketch `oid` lies: its origin on it, normals parallel.
+    fn plane_at_frame(&mut self, oid: &str) -> Option<String> {
+        let [o, x, y] = *self.frames.get(oid)?;
+        let n = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+        let on = |po: [f64; 3], pn: [f64; 3]| {
+            let parallel = (pn[0] * n[0] + pn[1] * n[1] + pn[2] * n[2]).abs() > 1.0 - 1e-9;
+            parallel && ((o[0] - po[0]) * pn[0] + (o[1] - po[1]) * pn[1] + (o[2] - po[2]) * pn[2]).abs() < 1e-9
+        };
+        // The default planes and Plane features.
+        if let Ok(d) = self.call("query_datums", json!({})) {
+            let k = per_unit(&d["units"]);
+            let found = d["planes"].as_array().into_iter().flatten().find(|p| f3(&p["frame"]["origin"]).zip(f3(&p["frame"]["normal"])).is_some_and(|(po, pn)| on(po.map(|c| c * k), pn)));
+            if let Some(id) = found.and_then(|p| p["id"].as_str()) {
+                return Some(id.to_string());
+            }
+        }
+        let faces = self.call("query_entities", json!({ "kind": "faces", "surface": "plane", "normal": n, "near": mm(o), "limit": 20 })).ok()?;
+        let k = per_unit(&faces["units"]);
+        faces["faces"].as_array()?.iter().find(|f| f3(&f["centroid"]).is_some_and(|c| on(c.map(|v| v * k), n))).and_then(|f| f["id"].as_str().map(str::to_string))
+    }
+
+    /// The regions of the last sketch before feature `k` when `queries` are
+    /// as many id-only queries as it has regions.
+    fn last_sketch_regions(&mut self, k: usize, queries: &[Value]) -> Option<Vec<String>> {
+        if queries.is_empty() || queries.iter().any(|q| q["queryString"].as_str().is_some_and(|t| !t.trim().is_empty()) || q["deterministicIds"].as_array().is_none_or(|a| a.len() != 1)) {
+            return None;
+        }
+        let sketch = self.features[..k].iter().rev().find(|f| f["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketch")))?;
+        let ours = self.feature_ids.get(sketch["featureId"].as_str()?)?.clone();
+        let g = self.call("sketch_get", json!({ "sketch": ours })).ok()?;
+        let regions: Vec<String> = g["regions"].as_array()?.iter().filter(|r| r["imprinted"] != true).filter_map(|r| r["id"].as_str().map(str::to_string)).collect();
+        (regions.len() == queries.len()).then_some(regions)
+    }
+
     /// The one curve bounding a sketch region, if one does.
     fn region_curve(&mut self, region: &str) -> Option<String> {
         let sketch = region.strip_prefix("region:")?.split(':').next()?;
@@ -644,9 +679,17 @@ impl<'a> Translator<'a> {
             "BTMParameterEnum" | "BTMParameterBoolean" | "BTMParameterString" => Some(p["value"].clone()),
             "BTMParameterQueryList" => {
                 self.picked.clear();
+                let queries: Vec<Value> = p["queries"].as_array().cloned().unwrap_or_default();
                 let mut ids = Vec::new();
-                for q in p["queries"].as_array().into_iter().flatten() {
-                    ids.extend(self.query(k, q)?);
+                for q in &queries {
+                    match self.query(k, q) {
+                        Ok(found) => ids.extend(found),
+                        // Regions named by id alone (older documents' queries
+                        // carry no text, and live's bodies have no sketch
+                        // regions): as many as the last sketch has, they are its regions.
+                        Err(e) if ["entities", "surfaceEntities"].contains(&p["parameterId"].as_str().unwrap_or("")) => return self.last_sketch_regions(k, &queries).map(|r| Some(json!(r))).ok_or(e),
+                        Err(e) => return Err(e),
+                    }
                 }
                 (!ids.is_empty()).then(|| json!(ids))
             }
@@ -709,6 +752,13 @@ impl<'a> Translator<'a> {
     fn query(&mut self, k: usize, q: &Value) -> Result<Vec<String>, String> {
         let ids: Vec<String> = q["deterministicIds"].as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect();
         let text = q["queryString"].as_str().unwrap_or("");
+        // Not placed just before feature k (live's line after a sketch has no
+        // bodies): where an earlier line has them all (an id names one entity).
+        let k = if !ids.is_empty() && !ids.iter().all(|id| self.refs.contains_key(&(k, id.clone()))) {
+            (0..k).rev().find(|j| ids.iter().all(|id| self.refs.contains_key(&(*j, id.clone())))).unwrap_or(k)
+        } else {
+            k
+        };
         if !ids.is_empty() && ids.iter().all(|id| self.refs.contains_key(&(k, id.clone()))) {
             let found: Vec<String> = ids.iter().map(|id| self.by_geometry(k, id)).collect::<Result<_, _>>()?;
             // A swept edge a Boolean split: Onshape's query keeps every piece.
@@ -1313,7 +1363,12 @@ impl<'a> Translator<'a> {
     fn sketch(&mut self, k: usize, f: &Value, problems: &mut Vec<String>) -> Result<(String, String, Option<String>), String> {
         let oid = f["featureId"].as_str().unwrap_or("").to_string();
         let plane_q = f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "sketchPlane").ok_or("no sketchPlane")?;
-        let plane = self.param(k, plane_q)?.and_then(|v| v.as_array().and_then(|a| a.first()).cloned()).ok_or("no sketch plane")?;
+        // A plane named by id alone (a Plane feature's, older documents):
+        // ours that lies where live's sketch frame does.
+        let plane = match self.param(k, plane_q) {
+            Ok(v) => v.and_then(|v| v.as_array().and_then(|a| a.first()).cloned()).ok_or("no sketch plane")?,
+            Err(e) => self.plane_at_frame(&oid).map(Value::from).ok_or(e)?,
+        };
         let mut args = json!({ "plane": plane });
         if let Some(n) = f["name"].as_str().filter(|n| !n.starts_with('#')) {
             args["name"] = json!(n);
@@ -2018,6 +2073,11 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
                     out.insert((at, id.to_string()), LiveRef { kind: "VERTEX".into(), point: Some(p), ..Default::default() });
                 }
             }
+            // Its box from its faces', else (bodies listed by id alone) the
+            // line's part of that id.
+            let part = line["parts"].as_array().into_iter().flatten().find(|p| p["partId"] == b["id"]);
+            let part_box = part.and_then(|p| f3(&p["bbox"]["min"]).zip(f3(&p["bbox"]["max"])));
+            let (lo, hi) = if lo[0].is_finite() { (lo, hi) } else { part_box.unwrap_or((lo, hi)) };
             if let Some(id) = b["id"].as_str()
                 && lo[0].is_finite()
             {
@@ -2200,7 +2260,12 @@ pub fn live_parts(line: &Value) -> Vec<PartState> {
             volume_band: band(&p["volume_band"]),
             area_band: band(&p["area_band"]),
             bbox: f3(&p["bbox"]["min"]).zip(f3(&p["bbox"]["max"])).map(|(a, b)| [a, b]),
-            centroid: f3(&p["centroid"]),
+            // massproperties gives [0, 0, 0] for a part without a material
+            // (live README): not known unless the part's box is about the origin.
+            centroid: f3(&p["centroid"]).filter(|c| {
+                let box_centre = f3(&p["bbox"]["min"]).zip(f3(&p["bbox"]["max"])).map(|(a, b)| [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0, (a[2] + b[2]) / 2.0]);
+                *c != [0.0; 3] || box_centre.is_none_or(|m| m.iter().all(|x| x.abs() < 1e-6))
+            }),
             centroid_band: p["centroid_band"].as_array().and_then(|b| Some([f3(b.first()?)?, f3(b.get(1)?)?])),
             face_types: types(p, "faces", "surface"),
             edge_types: types(p, "edges", "curve"),
