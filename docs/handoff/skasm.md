@@ -16,6 +16,11 @@ Open (P2, need live data, nothing to guess): s6, s102 (probes 10), s218 / s236 /
 loop moves rigidly in live; s236's third quad down in live, up in ours; s218's chain turns only through k19), s209 / s11
 (probes 13 sent), s230 (tried keeping the Length side's Equal partner: worse elsewhere), s210 (an Angle with an H line
 keeping the H member made s210 worse). Asm: f50 f53 f54 f55 f64; asm probes 4 and slow d6 (asm-drag-3) with live.
+Tried and dropped tonight (fuzz k-sum worse): keeping a Length side's Equal partner out of the keep step (s230;
+s211 / s228 worse), an Angle with an H / V member keeping that member (s210 32 -> 86), applying turn relations to
+unplaced H / V lines while placing (s226's cause: the quad is placed without its Angle to the loop's Horizontal l2,
+which then can't close; doing that broke 10 everyday cases, s426 / s467 / s489 …). Sent batch 9 (s501–s540) to check
+tonight's rules generalise.
 Live's single-jump rule (one drag event after the threshold moves nothing) not done: the agent API's drag op would
 need an extra step first (P3).
 Lead's list (20:15), in order:
