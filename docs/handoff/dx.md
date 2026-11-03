@@ -73,6 +73,16 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   unpacker change; parity_models prints a "SCORE.md row: | … |" line to paste. drawing.md TB25 verified by tests;
   Insert view shows "Show annotations from model" only for a part (live captures; request withdrawn). Assembly
   layout proposed to live (REQUESTS 11-03 02:15), to build the assembly translator once confirmed.
+- 11-03 09:45 FeatureScript corpus (lead 09:20): parity_models reads a document's Feature Studios from
+  <name>/studios/<elementId>.fs (+ optional .json with "name") as well as features.json `featureStudios`; each is
+  compiled at the std its `FeatureScript N;` pins (our host embeds 1963 and 3095 and serves the nearest: a studio
+  pinned elsewhere is listed "std: <studio> pins std N, served M"); custom features are counted apart
+  ("custom features m/n" per document, "(custom m/n)" in the SCORE.md features column, report.json
+  `custom_features`), and failures are reported apart from geometry: "<studio>: failed to compile: …" (the
+  editor's error notices), "<feature>: failed to compile / load" (its studio didn't define it), "<feature>: failed
+  to run: …" (ours errors where live's built; the first difference then reads "(custom feature failed to run)").
+  T1 custom_feature_failures_are_reported_apart. Host / std differences → core tickets. Score now **7/11,
+  58/78** (bracket03 matches since core's FILLET-SPLIT-EDGE-FACES fix); SCORE.md row updated.
 - 11-03 09:10 STL units (lead's question): live reads a unitless STL in the **document's length unit** (import dialog
   Units defaults to it: Millimeter in a mm document, Inch in an inch one; behaviours G35 / G35b); ours does the same.
   Our export_parts' STL default is Meter / Binary (as live's REST translation, "Units = meters"), so a mm part

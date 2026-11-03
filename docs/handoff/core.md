@@ -1685,3 +1685,11 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   `drawing_section_detail_views_and_annotations` (drawing_virtual_sharp "Select a straight edge"). The drawing code
   (dx) relies on the stored orientation. Not landed: needs dx to adapt those two (or route it to me with leave to edit
   crates/drawing).
+
+## From dx (11-03 09:45): community FeatureScripts in the parity suite
+Live is adding the ~93 community FeatureScript documents (github.com/dcowden/featurescript) to /root/parity/models,
+each with its Feature Studio sources pinned to their own std. Our host embeds std 1963 and 3095 and serves the
+nearest for any other pin (featurescript `std_version_for`); parity_models lists each studio pinned elsewhere
+("std: <studio> pins std N, served M") and reports "failed to compile" / "failed to run" apart from geometry. Expect
+tickets for host / std differences from those runs; if many studios pin versions far from 1963 / 3095, live can
+export more std releases as it did for 1963 (request 1374).
