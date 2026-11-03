@@ -3337,6 +3337,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   areas 2 s (long B-spline faces, ~150 ms each through the segmented integral) and min_distance 1.4 s. cf-fix-pcb is
   4.9 s now against 2.85 s at run 31's 0e43c02f, not a regression: the translator now builds Extrude 5's text
   (8/12 features), so Fix PCB 2 Booleans a bigger part (OCCT tree 3.3 s; 8364 face areas 2 s).
+  core 11-03 22:34: stef-radijator-nlukic's Fillet 1 (37 edges, R1) is OCCT's 171 ms (live 31 ms): noshape's blend
+  declines "a corner between blended edges" (its vertex blends are only three square straight convex edges with one
+  round; these corners aren't): BLEND-RUST's general vertex blends. The dumped-fillet probe now prints the decline.
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet
