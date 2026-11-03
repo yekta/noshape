@@ -1003,23 +1003,18 @@ fn dumped_fillet_repeat_probe() {
     }
 }
 
-/// FULL-ROUND-CORNER-SPHERES: R5 on every edge of a 40 × 30 × 10 block (live 1830's Fillet Everything: 10 faces).
+/// FULL-ROUND-CORNER-SPHERES: R5 on every edge of a 40 × 30 × 10 block (live 1830's Fillet Everything): 10 faces,
+/// each corner one quarter sphere (OCCT's two vertex blends merged), 10450.5896 mm³ in live's band.
 #[test]
-#[ignore = "T2 probe"]
-fn full_round_corner_probe() {
+fn full_round_corners_are_one_sphere_each() {
     setup();
     let b = bx([0.0; 3], [40.0, 30.0, 10.0]);
     let all = edges_where(&b, |_| true);
     let r = fillet_checked(&b, &all, &vec![5.0 * MM; all.len()]).unwrap().shape;
-    println!("faces {}, volume {:.6}", r.faces().len(), vol_mm3(&r));
-    for (i, f) in r.faces().iter().enumerate() {
-        let s = format!("{:?}", f.face_surface().ok()).chars().take(90).collect::<String>();
-        println!("F{i} {s} area {:.4}", f.area().unwrap() / (MM * MM));
-        if s.contains("Sphere") {
-            for e in f.edges() {
-                let x = e.edge_info().unwrap();
-                println!("    edge {:?} degenerated {} {:.3?} -> {:.3?}", format!("{:?}", x.curve).chars().take(40).collect::<String>(), x.degenerated, x.start / MM, x.end / MM);
-            }
-        }
-    }
+    assert!(r.is_valid());
+    let spheres: Vec<f64> = r.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Sphere { .. }))).map(|f| f.area().unwrap() / (MM * MM)).collect();
+    assert_eq!(r.faces().len(), 10, "{spheres:?}");
+    assert!(spheres.len() == 4 && spheres.iter().all(|a| (a - 25.0 * std::f64::consts::PI).abs() < 1e-3), "{spheres:?}");
+    let v = vol_mm3(&r);
+    assert!((10450.111593..=10451.067592).contains(&v), "{v}");
 }

@@ -3322,6 +3322,191 @@ void merge_full_rounds(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
   h = compose(input, h, step);
 }
 
+// A corner's two vertex blends of one sphere (R on every edge of a block as high as 2R: live 1830's Fillet Everything
+// has one face a corner; OCCT's are two, their centres 1e-9 apart, each with a pole edge): one face on a's sphere,
+// built in its parameters (the other edges' curves on it, a new pole edge wherever the boundary passes a pole), so
+// the edges it shares with other faces keep their curves there. Kept when the solid stays valid, its volume the same.
+static void merge_corner_spheres(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
+{
+  const KernelTimer timer("blend.corner_spheres");
+  ShapeAncMap       ef;
+  TopExp::MapShapesAndAncestors(r, TopAbs_EDGE, TopAbs_FACE, ef);
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape();
+  ShapeIMap                      done;
+  BRep_Builder                   bb;
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const ShapeList& fs = ef(i);
+    if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()) || done.Contains(fs.First()) || done.Contains(fs.Last()))
+      continue;
+    const TopoDS_Face   fa = TopoDS::Face(fs.First()), fb = TopoDS::Face(fs.Last());
+    BRepAdaptor_Surface a(fa), b(fb);
+    if (a.GetType() != GeomAbs_Sphere || b.GetType() != GeomAbs_Sphere)
+      continue;
+    const gp_Sphere sa = a.Sphere(), sb = b.Sphere();
+    const double    ra = sa.Radius();
+    if (std::abs(ra - sb.Radius()) > 1e-6 * ra || sa.Location().Distance(sb.Location()) > 1e-6 * ra)
+      continue;
+    occ::handle<NCollection_HSequence<TopoDS_Shape>> es = new NCollection_HSequence<TopoDS_Shape>();
+    for (const TopoDS_Face& f : {fa, fb})
+      for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+        if (!x.Current().IsSame(ef.FindKey(i)) && !BRep_Tool::Degenerated(TopoDS::Edge(x.Current())))
+          es->Append(x.Current());
+    // The edges in a loop, each from where the one before ends.
+    std::vector<TopoDS_Edge> loop;
+    {
+      std::vector<TopoDS_Edge> left;
+      for (int k = 1; k <= es->Length(); ++k)
+        left.push_back(TopoDS::Edge(es->Value(k)));
+      TopoDS_Vertex at;
+      while (!left.empty())
+      {
+        size_t k = 0;
+        if (!at.IsNull())
+          while (k < left.size() && !TopExp::FirstVertex(left[k]).IsSame(at) && !TopExp::LastVertex(left[k]).IsSame(at))
+            ++k;
+        if (k == left.size())
+          break;
+        TopoDS_Edge e = TopoDS::Edge(left[k].Oriented(TopAbs_FORWARD));
+        if (!at.IsNull() && !TopExp::FirstVertex(e).IsSame(at))
+          e.Reverse();
+        at = TopExp::LastVertex(e, true);
+        loop.push_back(e);
+        left.erase(left.begin() + k);
+      }
+      if (loop.size() != (size_t)es->Length() || !TopExp::FirstVertex(loop.front(), true).IsSame(at))
+        continue;
+    }
+    TopLoc_Location                 loc;
+    const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(fa, loc);
+    const double                    tol  = std::max(1e-7 * ra, Precision::Confusion());
+    TopoDS_Face                     nf;
+    bb.MakeFace(nf, surf, loc, BRep_Tool::Tolerance(fa));
+    // Each edge's curve on the sphere, in the wire's order, moved by whole turns onto the one before.
+    struct Piece
+    {
+      TopoDS_Edge               e;
+      occ::handle<Geom2d_Curve> c;
+      double                    a, b;
+      gp_Pnt2d                  p0, p1;
+      TopoDS_Vertex             v1;
+    };
+    std::vector<Piece> pieces;
+    bool               ok = true;
+    for (const TopoDS_Edge& e : loop)
+    {
+      Piece                         p;
+      p.e                           = e;
+      TopLoc_Location               el;
+      const occ::handle<Geom_Curve> c = BRep_Tool::Curve(p.e, el, p.a, p.b);
+      if (c.IsNull())
+      {
+        ok = false;
+        break;
+      }
+      const occ::handle<Geom_Curve> cl = occ::down_cast<Geom_Curve>(c->Transformed(loc.Transformation().Inverted().Multiplied(el.Transformation())));
+      double                        reached = tol;
+      p.c                                   = GeomProjLib::Curve2d(cl, p.a, p.b, surf, reached);
+      if (p.c.IsNull())
+      {
+        ok = false;
+        break;
+      }
+      const bool rev = p.e.Orientation() == TopAbs_REVERSED;
+      p.p0           = p.c->Value(rev ? p.b : p.a);
+      p.p1           = p.c->Value(rev ? p.a : p.b);
+      p.v1           = TopExp::LastVertex(p.e, true);
+      if (!pieces.empty())
+      {
+        const double k = std::round((pieces.back().p1.X() - p.p0.X()) / (2 * M_PI));
+        if (k != 0)
+        {
+          p.c  = occ::down_cast<Geom2d_Curve>(p.c->Translated(gp_Vec2d(2 * M_PI * k, 0)));
+          p.p0 = p.c->Value(rev ? p.b : p.a);
+          p.p1 = p.c->Value(rev ? p.a : p.b);
+        }
+      }
+      pieces.push_back(p);
+    }
+    if (!ok || pieces.size() < 2)
+      continue;
+    // (The last end and the first start may be a turn apart too: then the first pieces come round once more.)
+    TopoDS_Wire w;
+    bb.MakeWire(w);
+    for (size_t k = 0; k < pieces.size() && ok; ++k)
+    {
+      Piece& p = pieces[k];
+      bb.UpdateEdge(p.e, p.c, nf, std::max(BRep_Tool::Tolerance(p.e), tol));
+      bb.Add(w, p.e);
+      const gp_Pnt2d next = pieces[(k + 1) % pieces.size()].p0;
+      // (In radians: 1e-6 of the radius.)
+      if (p.p1.Distance(next) <= 1e-6)
+        continue;
+      // Only at a pole (v = ±π/2) may the boundary jump: there a pole edge runs between the two.
+      if (std::abs(std::abs(p.p1.Y()) - M_PI / 2) > 1e-6 || std::abs(next.Y() - p.p1.Y()) > 1e-6)
+      {
+        ok = false;
+        break;
+      }
+      TopoDS_Edge pole;
+      bb.MakeEdge(pole);
+      bb.Degenerated(pole, true);
+      const double              du = next.X() - p.p1.X();
+      occ::handle<Geom2d_Line> l  = new Geom2d_Line(p.p1, gp_Dir2d(du > 0 ? 1 : -1, 0));
+      bb.UpdateEdge(pole, l, nf, tol);
+      bb.Range(pole, 0, std::abs(du));
+      TopoDS_Vertex v = p.v1;
+      bb.Add(pole, v.Oriented(TopAbs_FORWARD));
+      bb.Add(pole, v.Oriented(TopAbs_REVERSED));
+      bb.Add(w, pole);
+    }
+    if (!ok)
+      continue;
+    w.Closed(true);
+    bb.Add(nf, w);
+    // Material on the wire's left: a negative area means the other way round.
+    GProp_GProps gp;
+    BRepGProp::SurfaceProperties(nf, gp);
+    if (gp.Mass() < 0)
+    {
+      TopoDS_Face again;
+      bb.MakeFace(again, surf, loc, BRep_Tool::Tolerance(fa));
+      bb.Add(again, w.Reversed());
+      nf = again;
+    }
+    // Facing as a did.
+    BRepAdaptor_Surface na(nf);
+    gp_Pnt              pa, pn;
+    gp_Vec              ua, va, un, vn;
+    a.D1(0.5 * (a.FirstUParameter() + a.LastUParameter()), 0.5 * (a.FirstVParameter() + a.LastVParameter()), pa, ua, va);
+    const gp_Vec out_a = ua.Crossed(va) * (fa.Orientation() == TopAbs_REVERSED ? -1.0 : 1.0);
+    const gp_Vec out_n = gp_Vec(sa.Location(), pa) * (na.Sphere().Direct() ? 1.0 : -1.0);
+    TopoDS_Face  merged = nf;
+    merged.Orientation(out_a.Dot(out_n) >= 0 ? TopAbs_FORWARD : TopAbs_REVERSED);
+    rs->Replace(fa, merged);
+    rs->Remove(fb);
+    done.Add(fa);
+    done.Add(fb);
+  }
+  if (done.IsEmpty())
+    return;
+  const TopoDS_Shape out = rs->Apply(r);
+  if (!BRepCheck_Analyzer(out).IsValid())
+    return;
+  GProp_GProps g0, g1;
+  BRepGProp::VolumeProperties(r, g0);
+  BRepGProp::VolumeProperties(out, g1);
+  // (Half of each corner now on the other's sphere, 1e-9 of a metre off: 3e-8 of the volume. A face turned
+  // inside out would change it by much more.)
+  if (std::abs(g0.Mass() - g1.Mass()) > 1e-6 * std::abs(g0.Mass()))
+    return;
+  HHist step = rs->History();
+  for (int i = 1; i <= done.Extent(); i += 2)
+    step->AddModified(done(i + 1), rs->Value(done(i)));
+  r = out;
+  h = compose(input, h, step);
+}
+
 // A sub-shape's tolerance set (BRep_Builder's updates only raise it).
 static void set_tolerance(const TopoDS_Shape& x, double t)
 {
@@ -3582,6 +3767,7 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
     {
       const KernelTimer timer("blend.finish");
       merge_full_rounds(input, r, h);
+      merge_corner_spheres(input, r, h);
       analytic_blend_faces(input, r, h);
       tighten_new_tolerances(input, r, accurate(input));
       return as_is.finish(r, h);
@@ -3593,6 +3779,7 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
   if (checked)
   {
     merge_full_rounds(sc.shape, r, h);
+    merge_corner_spheres(sc.shape, r, h);
     analytic_blend_faces(sc.shape, r, h);
   }
   return sc.finish(r, h);

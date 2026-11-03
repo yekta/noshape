@@ -449,7 +449,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   offsets only, and that green copy was already replaced, so not symbolized), the step log beside it. **Not reproduced**
   in 8 reruns: green 107649d9 ×2, with NOSHAPE_BOOL_RUST=0 ×1, v0.4.22 ×1, green daaaab03 ×4 — all 106 steps. A heap
   corruption that shows 1 in 9: worth a run under ASan / the guard trace if one is cheap. (qa 2026-11-03, build e18f898a)
-- [ ] P2 FULL-ROUND-CORNER-SPHERES (core 11-03, live 1830's Fillet/Chamfer Everything) R5 on every edge of a 40 x 30 x
+- [x] (core 11-03 08:30: a corner's two sphere patches are one face, built on the sphere in its parameters (features.cpp merge_corner_spheres: the other edges' curves on it, a new pole edge where the boundary passes a pole; the shared edges' other curves untouched): 10 faces as live, each corner 78.5398 mm², 10450.5888 mm³ in live's band; T1 kernel blend::full_round_corners_are_one_sphere_each, T2 public_fillet_everything_as_live strict; the blend corpus as recorded) P2 FULL-ROUND-CORNER-SPHERES (core 11-03, live 1830's Fillet/Chamfer Everything) R5 on every edge of a 40 x 30 x
   10 mm block (a full round): our volume is live's (10450.5889 mm³ in its band) but 14 faces to live's 10: each corner is
   two spheres of one centre where live has one face (merge_full_rounds merges the cylinders only; a sphere pair's seam
   and pole edges defeat the rebuild). T2 custom_features::public_fillet_everything_as_live.

@@ -2847,7 +2847,7 @@ export const block = defineFeature(function(context is Context, id is Id, defini
         println!("fillet everything {what}: {v:.6} mm3 (live {band:?}), {n} faces (live {faces})");
         // (The defaults' R5 is a full round on the 10 mm block: live's 4 corners are one face each, ours two
         // spheres: TICKETS FULL-ROUND-CORNER-SPHERES.)
-        assert!(v >= band[0] && v <= band[1] && (n == faces || what == "defaults"), "{what}: {v} mm3, {n} faces");
+        assert!(v >= band[0] && v <= band[1] && n == faces, "{what}: {v} mm3, {n} faces");
     }
 }
 
