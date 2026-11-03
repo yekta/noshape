@@ -3009,6 +3009,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   edges are the translator's picks from Onshape's packed queries (live's geometry lines for this document came back
   429, refetch pending), so which edges live fillets is not confirmed yet; the time to fail is ours either way.
   (dx 2026-11-03)
+  core 11-03 11:30: the 30 s were fillet_past_end_faces's Defeaturing of the two faces at the grip's ends (68 s
+  unbudgeted, and nothing came of it); it has 3 s now (kernel ScopedDeadline): the fillet fails in 3.1 s. OCCT's own
+  attempts fail in 54 ms: R2.5 on both long edges of a 5 mm face, a full round with vertex blends at the rib's ends.
+  Left: building it as live (live's geometry for this document pending, dx).
 - [ ] P2 SKETCH-FACE-FRAME (core; dx's parity suite 11-03) a sketch on a part face gets another x axis than live's in
   3 of the corpus's face sketches (the origin and normal agree; live's frames are features.json `sketches`
   transformMatrix): exercise-martinl Sketch 2 on a −X side face: ours x (0, 0, −1), y (0, −1, 0), live x (0, −1, 0),

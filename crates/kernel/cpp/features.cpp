@@ -3910,7 +3910,21 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_past_end_faces(const TopoDS
       faces.Append(ends(i));
     df.AddFacesToRemove(faces);
     df.SetToFillHistory(true);
-    df.Build(new_cancel_indicator()->Start());
+    {
+      // (3 s at most: removing two faces of a knob's grip took 68 s and gave nothing, dx's FILLET-31S-FAIL.)
+      const KernelTimer    timer("blend.past_end.defeature");
+      const ScopedDeadline step(3.0);
+      try
+      {
+        df.Build(new_cancel_indicator()->Start());
+      }
+      catch (const Standard_Failure&)
+      {
+        return std::nullopt;
+      }
+      if (step.d.hit.load())
+        return std::nullopt;
+    }
     if (!df.IsDone() || df.HasErrors())
       return std::nullopt;
     const TopoDS_Shape full = df.Shape();
@@ -4988,13 +5002,26 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
   {
     if (!checked)
       throw;
-    auto past = fillet_split_closed(in, es, rs, rmax);
+    std::optional<std::pair<TopoDS_Shape, HHist>> past;
+    {
+      const KernelTimer timer("blend.fallback.split_closed");
+      past = fillet_split_closed(in, es, rs, rmax);
+    }
     if (!past)
+    {
+      const KernelTimer timer("blend.fallback.over_smaller");
       past = fillet_over_smaller_blends(in, es, rs);
+    }
     if (!past)
+    {
+      const KernelTimer timer("blend.fallback.past_end_faces");
       past = fillet_past_end_faces(in, es, rs);
+    }
     if (!past)
+    {
+      const KernelTimer timer("blend.fallback.as_cut");
       past = fillet_as_cut(in, es, rs, false);
+    }
     if (!past && fillet_overflows(in, es, rs))
       fail_op("fillet failed: unfilleted edge overlapped by fillet");
     if (!past)
