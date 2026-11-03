@@ -350,14 +350,10 @@ fn surface(ev: &mut EvalCtx) -> FResult<()> {
     let mut tools = Vec::new();
     for (sketch, entity) in &curves {
         let Some(s) = ev.ctx.sketch(*sketch).cloned() else { continue };
-        let id = noshape_sketch::EntityId(*entity);
-        let Some(curve) = s.sketch.curve(id) else { continue };
-        let seg = curve_to_segment(&curve);
-        let Some(seg) = seg else { continue };
-        let edge = k::make_edge_2d(&crate::regen::eval::kernel_plane(&s.frame), &seg)?;
-        let depth = ev.length("depth")?;
+        // Every curve kind (splines and conics too, live: cf-curve-pattern-normal's fit spline).
+        let Some(edge) = super::bshared::sketch_edge(ev, *sketch, *entity)? else { continue };
         let dir = if ev.bool("oppositeDirection") { -s.frame.normal } else { s.frame.normal };
-        let res = k::extrude(&edge, dir * depth)?;
+        let res = sheet_extrude(ev, &edge, &s.frame, dir)?;
         let mut roles = std::collections::BTreeMap::new();
         for (i, _) in res.shape.faces().iter().enumerate() {
             roles.insert(i as u32, crate::reference::Role::Side(crate::reference::Source::Sketch { sketch: *sketch, entity: *entity, segment: i as u16 }));
@@ -373,6 +369,65 @@ fn surface(ev: &mut EvalCtx) -> FResult<()> {
     let names: Vec<_> = tools.iter().flat_map(|t| t.names.faces.clone()).collect();
     let named = if sewn.count(k::ShapeType::Face) == names.len() { NamedShape::new(sewn, names) } else { tools.remove(0) };
     ev.apply_operation(vec![named], "NEW", None, BodyKind::Surface)
+}
+
+/// One curve's sheet with the solid's end conditions (std extrude.fs: opExtrude of the curves): blind, symmetric,
+/// up to a face, part, the next part or a vertex, a starting offset, a second direction and draft.
+fn sheet_extrude(ev: &EvalCtx, edge: &k::Shape, frame: &crate::display::PlaneFrame, dir: DVec3) -> FResult<k::OpResult> {
+    let bound = ev.enum_("endBound").to_string();
+    let end = end_for(ev, &bound, "depth", "endBoundEntityFace", "endBoundEntityBody", "endBoundEntityVertex", "hasOffset", "offsetDistance", "offsetOppositeDirection", dir)?;
+    let draft = if ev.bool("hasDraft") {
+        let a = ev.angle("draftAngle")?;
+        if ev.bool("draftPullDirection") { a } else { -a }
+    } else {
+        0.0
+    };
+    let mut start_shift = DVec3::ZERO;
+    if ev.bool("startOffset") {
+        if ev.is("startOffsetBound", "BLIND") {
+            let d = ev.length("startOffsetDistance")?;
+            start_shift = dir * if ev.bool("startOffsetOppositeDirection") { -d } else { d };
+        } else {
+            let Some(r) = ev.query("startOffsetEntity").first() else { return err_at(&["startOffsetEntity"], "Select a valid entity.") };
+            let t = start_offset_point(ev, r, frame.normal)?;
+            start_shift = dir * ((t - frame.origin).dot(frame.normal) / dir.dot(frame.normal));
+        }
+    }
+    let profile = if start_shift.length() > 0.0 { edge.translated(start_shift)? } else { edge.clone() };
+    // Up to a vertex: as far as its height over the profile's plane (a lone line spans no plane of its own).
+    let origin = frame.origin + start_shift;
+    let flat = |end: End, d: DVec3| match end {
+        End::UpToPoint(pt) => End::Distance((pt - origin).dot(d)),
+        e => e,
+    };
+    let end = flat(end, dir);
+    if ev.bool("symmetric") && matches!(bound.as_str(), "BLIND" | "THROUGH_ALL") {
+        let End::Distance(depth) = end else { unreachable!("symmetric is only offered for blind / through all") };
+        return Ok(k::extrude_between(&profile, -dir * depth * 0.5, dir * depth * 0.5, draft)?);
+    }
+    if !ev.bool("hasSecondDirection") {
+        return one_side(&profile, dir, end, draft);
+    }
+    let away = ev.bool("secondDirectionOppositeDirection") != ev.bool("oppositeDirection");
+    let d2 = if away { -dir } else { dir };
+    let bound2 = ev.enum_("secondDirectionBound").to_string();
+    let end2 = flat(end_for(ev, &bound2, "secondDirectionDepth", "secondDirectionBoundEntityFace", "secondDirectionBoundEntityBody", "secondDirectionBoundEntityVertex", "hasSecondDirectionOffset", "secondDirectionOffsetDistance", "secondDirectionOffsetOppositeDirection", d2)?, d2);
+    let draft2 = if ev.bool("hasSecondDirectionDraft") && d2.dot(dir) < 0.0 {
+        let a = ev.angle("secondDirectionDraftAngle")?;
+        if ev.bool("secondDirectionDraftPullDirection") { a } else { -a }
+    } else {
+        0.0
+    };
+    if let (End::Distance(x1), End::Distance(x2)) = (&end, &end2)
+        && draft == 0.0
+        && draft2 == 0.0
+    {
+        return Ok(k::extrude_between(&profile, d2 * *x2, dir * *x1, 0.0)?);
+    }
+    // Two separately bounded halves, sewn along the curve.
+    let r1 = one_side(&profile, dir, end, draft)?;
+    let r2 = one_side(&profile, d2, end2, draft2)?;
+    Ok(k::sew(&[r1.shape, r2.shape], 1e-6, false)?)
 }
 
 pub fn curve_to_segment(c: &noshape_sketch::Curve2) -> Option<k::Segment2d> {

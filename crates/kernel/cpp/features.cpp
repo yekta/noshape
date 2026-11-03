@@ -100,6 +100,8 @@
 #include <Geom2d_TrimmedCurve.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2dConvert.hxx>
+#include <GeomConvert.hxx>
+#include <Geom_TrimmedCurve.hxx>
 #include <GeomAdaptor_Curve.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS_Compound.hxx>
@@ -557,6 +559,119 @@ OpOut op_prism(const OcShape& profile, P3 start, P3 end, double draft_angle)
   return hb.finish();
 }
 
+// A sheet's free edges split only where the up-to target's seam crossed them (Parasolid's periodic faces have
+// none): each such pair one edge again, its curves (3D and on the face) concatenated exactly. `sheet` when there are
+// none or the result isn't valid.
+static TopoDS_Shape join_target_seam_splits(const TopoDS_Shape& sheet, const TopoDS_Shape& target, HHist& hist)
+{
+  std::vector<TopoDS_Edge> seams;
+  for (TopExp_Explorer f(target, TopAbs_FACE); f.More(); f.Next())
+    for (TopExp_Explorer e(f.Current(), TopAbs_EDGE); e.More(); e.Next())
+      if (BRep_Tool::IsClosed(TopoDS::Edge(e.Current()), TopoDS::Face(f.Current())))
+        seams.push_back(TopoDS::Edge(e.Current()));
+  if (seams.empty())
+    return sheet;
+  TopoDS_Shape out = sheet;
+  for (int round = 0; round < 64; ++round)
+  {
+    ShapeAncMap ve, ef;
+    TopExp::MapShapesAndUniqueAncestors(out, TopAbs_VERTEX, TopAbs_EDGE, ve);
+    TopExp::MapShapesAndUniqueAncestors(out, TopAbs_EDGE, TopAbs_FACE, ef);
+    TopoDS_Edge a, b;
+    TopoDS_Face F;
+    for (int i = 1; i <= ve.Extent() && a.IsNull(); ++i)
+    {
+      if (ve(i).Extent() != 2)
+        continue;
+      const TopoDS_Edge x = TopoDS::Edge(ve(i).First()), y = TopoDS::Edge(ve(i).Last());
+      const ShapeList *fx = ef.Seek(x), *fy = ef.Seek(y);
+      if (x.IsSame(y) || fx == nullptr || fy == nullptr || fx->Extent() != 1 || fy->Extent() != 1 || !fx->First().IsSame(fy->First()))
+        continue;
+      if (BRepAdaptor_Curve(x).GetType() == GeomAbs_Line || BRepAdaptor_Curve(y).GetType() == GeomAbs_Line)
+        continue;
+      const TopoDS_Vertex v = TopoDS::Vertex(ve.FindKey(i));
+      const double        tol = std::max(BRep_Tool::Tolerance(v), 1e-7);
+      bool                on_seam = false;
+      for (const TopoDS_Edge& s : seams)
+      {
+        BRepExtrema_DistShapeShape d(v, s);
+        on_seam = on_seam || (d.IsDone() && d.Value() <= tol);
+      }
+      if (!on_seam)
+        continue;
+      // a runs into v, b out of it.
+      a = TopoDS::Edge(x.Oriented(TopAbs_FORWARD));
+      b = TopoDS::Edge(y.Oriented(TopAbs_FORWARD));
+      if (!TopExp::LastVertex(a).IsSame(v))
+        a.Reverse();
+      if (!TopExp::FirstVertex(b, true).IsSame(v))
+        b.Reverse();
+      F = TopoDS::Face(fx->First());
+    }
+    if (a.IsNull())
+      break;
+    occ::handle<Geom_BSplineCurve>   c3;
+    occ::handle<Geom2d_BSplineCurve> c2;
+    bool                             ok  = true;
+    double                           tol = 0;
+    for (const TopoDS_Edge& e : {a, b})
+    {
+      tol = std::max(tol, BRep_Tool::Tolerance(e));
+      const TopoDS_Edge             fwd = TopoDS::Edge(e.Oriented(TopAbs_FORWARD));
+      double                        f0, l0, f2, l2;
+      TopLoc_Location               loc;
+      const occ::handle<Geom_Curve> c = BRep_Tool::Curve(fwd, loc, f0, l0);
+      const occ::handle<Geom2d_Curve> p = BRep_Tool::CurveOnSurface(fwd, F, f2, l2);
+      if (c.IsNull() || p.IsNull() || std::abs(f2 - f0) > 1e-9 || std::abs(l2 - l0) > 1e-9)
+      {
+        ok = false;
+        break;
+      }
+      occ::handle<Geom_BSplineCurve>   bs = GeomConvert::CurveToBSplineCurve(new Geom_TrimmedCurve(occ::down_cast<Geom_Curve>(c->Transformed(loc.Transformation())), f0, l0));
+      occ::handle<Geom2d_BSplineCurve> b2 = Geom2dConvert::CurveToBSplineCurve(new Geom2d_TrimmedCurve(p, f2, l2));
+      if (e.Orientation() == TopAbs_REVERSED)
+      {
+        bs->Reverse();
+        b2->Reverse();
+      }
+      if (!c3.IsNull() && (bs->StartPoint().Distance(c3->EndPoint()) > tol + Precision::Confusion() || b2->StartPoint().Distance(c2->EndPoint()) > 1e-7))
+      {
+        ok = false;
+        break;
+      }
+      c3 = c3.IsNull() ? bs : concat_shifted<Geom_BSplineCurve, gp_Pnt, NCollection_Array1<gp_Pnt>>(c3, bs);
+      c2 = c2.IsNull() ? b2 : concat_shifted<Geom2d_BSplineCurve, gp_Pnt2d, NCollection_Array1<gp_Pnt2d>>(c2, b2);
+    }
+    if (!ok)
+      break;
+    BRep_Builder B;
+    TopoDS_Edge  E;
+    B.MakeEdge(E, c3, tol);
+    B.Add(E, TopExp::FirstVertex(a, true).Oriented(TopAbs_FORWARD));
+    B.Add(E, TopExp::LastVertex(b, true).Oriented(TopAbs_REVERSED));
+    B.Range(E, c3->FirstParameter(), c3->LastParameter());
+    B.UpdateEdge(E, c2, F, tol);
+    B.Range(E, F, c3->FirstParameter(), c3->LastParameter());
+    B.SameRange(E, true);
+    B.SameParameter(E, true);
+    occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape();
+    rs->Replace(a.Oriented(TopAbs_FORWARD), a.Orientation() == TopAbs_REVERSED ? TopoDS::Edge(E.Reversed()) : E);
+    rs->Remove(b.Oriented(TopAbs_FORWARD));
+    const TopoDS_Shape next = rs->Apply(out);
+    if (next.IsNull() || !BRepCheck_Analyzer(next).IsValid())
+      break;
+    HHist h = rs->History();
+    if (h.IsNull())
+      h = new BRepTools_History();
+    h->AddModified(b.Oriented(TopAbs_FORWARD), E);
+    if (hist.IsNull())
+      hist = new BRepTools_History();
+    hist->Merge(h);
+    out = next;
+  }
+  return out;
+}
+
 OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, double start_offset)
 {
   check_sweepable(profile.shape);
@@ -611,7 +726,33 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
 
   std::vector<TopoDS_Shape> keep;
   bool                      reachesEnd = false;
-  for (TopExp_Explorer e(sp.Shape(), TopAbs_SOLID); e.More(); e.Next())
+  // Curves (no face) extrude to a sheet: its pieces along the start curves are kept, as a solid's along the start cap.
+  const bool sheet = !TopExp_Explorer(profile.shape, TopAbs_FACE).More();
+  if (sheet)
+  {
+    ShapeIMap startEdges, endEdges;
+    for (TopExp_Explorer e(prism.FirstShape(), TopAbs_EDGE); e.More(); e.Next())
+      for (const TopoDS_Shape& img : images_vec(spH, e.Current()))
+        startEdges.Add(img);
+    for (TopExp_Explorer e(prism.LastShape(), TopAbs_EDGE); e.More(); e.Next())
+      for (const TopoDS_Shape& img : images_vec(spH, e.Current()))
+        endEdges.Add(img);
+    for (TopExp_Explorer f(sp.Shape(), TopAbs_FACE); f.More(); f.Next())
+    {
+      bool touchesStart = false, touchesEnd = false;
+      for (TopExp_Explorer e(f.Current(), TopAbs_EDGE); e.More(); e.Next())
+      {
+        touchesStart = touchesStart || startEdges.Contains(e.Current());
+        touchesEnd   = touchesEnd || endEdges.Contains(e.Current());
+      }
+      if (touchesStart && !targetFaces.Contains(f.Current()))
+      {
+        keep.push_back(f.Current());
+        reachesEnd = reachesEnd || touchesEnd;
+      }
+    }
+  }
+  for (TopExp_Explorer e(sp.Shape(), TopAbs_SOLID); e.More() && !sheet; e.Next())
   {
     bool touchesStart = false, touchesEnd = false;
     for (TopExp_Explorer f(e.Current(), TopAbs_FACE); f.More(); f.Next())
@@ -632,6 +773,17 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   if (reachesEnd)
     fail_op("up-to target does not fully bound the extruded profile");
   TopoDS_Shape result = keep.size() == 1 ? keep[0] : compound_of(keep);
+  if (sheet && keep.size() > 1)
+  {
+    BRep_Builder bb;
+    TopoDS_Shell sh;
+    bb.MakeShell(sh);
+    for (const TopoDS_Shape& f : keep)
+      bb.Add(sh, f);
+    result = sh;
+  }
+  if (sheet)
+    result = join_target_seam_splits(result, until.shape, hist);
   // Parasolid's frame of the extruded cylinders (live "core (2026-10-26)"
   // (3)): z back toward the sketch, x gp_Ax2's default, origin on the axis
   // 0.002 mm past the face's far end (Onshape extrudes blind to the target's

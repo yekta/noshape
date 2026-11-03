@@ -617,3 +617,18 @@ fn loft_rect_to_circle_section_probe() {
     }
     println!("volume {:.4} (live 57601.5824); faces {:?}", l.volume().unwrap(), l.faces().iter().map(|f| format!("{:?}", f.face_surface().ok()).chars().take(12).collect::<String>()).collect::<Vec<_>>());
 }
+
+/// EXTRUDE-SURFACE-CURVES (cf-curve-pattern-normal's Extrude 2, live 1/4/4): a curve extruded up to a cylinder lying
+/// under it is one sheet ending on the cylinder; where the cylinder's seam crosses that end the edge stays whole, as
+/// Parasolid's cylinders have no seam.
+#[test]
+fn a_curve_up_to_a_cylinder_ends_in_one_edge_across_its_seam() {
+    // Axis along y, its seam (u = 0) on top.
+    let cyl = make_cylinder(&Plane::new(DVec3::new(0.0, -0.05, 0.0), DVec3::Y, DVec3::Z), 0.02, 0.1, std::f64::consts::TAU).unwrap();
+    let arc = make_interpolated_spline(&[DVec3::new(-0.015, -0.01, 0.04), DVec3::new(0.0, 0.005, 0.04), DVec3::new(0.015, 0.01, 0.04)], &[], false).unwrap();
+    let r = extrude_up_to(&arc, DVec3::NEG_Z, &cyl, 0.0).unwrap().shape;
+    assert!(r.is_valid());
+    assert_eq!((r.count(ShapeType::Face), r.count(ShapeType::Edge), r.count(ShapeType::Vertex)), (1, 4, 4));
+    let low = r.bounding_box(false).unwrap().min.z;
+    assert!(low > 0.0099 && low < 0.02, "{low}");
+}

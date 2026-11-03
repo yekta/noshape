@@ -3429,3 +3429,36 @@ fn a_sketch_on_a_face_takes_onshapes_frame() {
         }
     }
 }
+
+/// EXTRUDE-SURFACE-CURVES (dx's parity suite, cf-curve-pattern-normal): a surface Extrude takes any sketch curve (a
+/// fit spline, an ellipse) and the solid's end conditions: up to a part, symmetric.
+#[test]
+fn a_surface_extrude_of_a_spline_runs_up_to_a_part() {
+    use noshape_kernel::ShapeType::Face;
+    let mut t = T::new();
+    let (_, block) = t.sketch(&[&[(-30.0, -30.0), (30.0, -30.0), (30.0, 30.0), (-30.0, 30.0)]], &[]);
+    let b = t.add("extrude", &[("entities", q(block)), ("depth", e("10 mm")), ("operationType", en("NEW")), ("startOffset", ParamValue::Bool(true)), ("startOffsetDistance", e("20 mm"))]);
+    let r = t.ok(b);
+    let part = Reference::Body(r.context.bodies[0].id.clone());
+    let mut sk = noshape_sketch::Sketch::new();
+    let spline = sk.add_fit_spline(&[DVec2::new(-0.02, 0.0), DVec2::new(-0.005, 0.01), DVec2::new(0.01, -0.01), DVec2::new(0.02, 0.0)]).unwrap();
+    sk.add_ellipse(DVec2::new(0.0, 0.015), DVec2::new(0.008, 0.0), 0.004);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let up = t.add("extrude", &[("bodyType", en("SURFACE")), ("surfaceEntities", q(vec![Reference::SketchEntity { sketch: s, entity: spline.0 }])), ("endBound", en("UP_TO_BODY")), ("endBoundEntityBody", q(vec![part]))]);
+    let r = t.ok(up);
+    let sheet = r.context.bodies.iter().find(|x| x.kind == noshape_model::display::BodyKind::Surface).expect("a surface");
+    let bb = sheet.shape.bounding_box(false).unwrap();
+    assert!((bb.max.z - 0.02).abs() < 1e-6 && bb.min.z.abs() < 1e-6, "{bb:?}");
+    t.set(up, "endBound", en("BLIND"));
+    t.set(up, "symmetric", ParamValue::Bool(true));
+    t.set(up, "depth", e("6 mm"));
+    t.set(up, "surfaceEntities", q(vec![Reference::Sketch(s)]));
+    let r = t.ok(up);
+    let sheets: Vec<_> = r.context.bodies.iter().filter(|x| x.kind == noshape_model::display::BodyKind::Surface).collect();
+    let faces: usize = sheets.iter().map(|x| x.shape.count(Face)).sum();
+    assert!(faces >= 2, "the spline's and the ellipse's sheets: {faces}");
+    for x in &sheets {
+        let bb = x.shape.bounding_box(false).unwrap();
+        assert!((bb.max.z - 0.003).abs() < 1e-6 && (bb.min.z + 0.003).abs() < 1e-6, "{bb:?}");
+    }
+}

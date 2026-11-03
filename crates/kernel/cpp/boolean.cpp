@@ -2810,49 +2810,6 @@ TopoDS_Shape merge_cylinder_patches(const TopoDS_Shape& s, HHist& hist)
 TopoDS_Shape unify_faces_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean);
 TopoDS_Shape unify_seams_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean);
 
-// Two B-splines end to end (the second starting where the first ends), exactly: the same degree (raised), the second's
-// knots shifted onto the first's end (no rescaling, unlike OCCT's CompCurve in 2D), joined C0, its weights scaled to
-// meet. For 3D (Geom) and 2D (Geom2d) curves alike, so curves of one edge keep one parameter.
-template <class Curve, class Pnt, class Arr>
-occ::handle<Curve> concat_shifted(const occ::handle<Curve>& a0, const occ::handle<Curve>& b0)
-{
-  occ::handle<Curve> a = occ::down_cast<Curve>(a0->Copy()), b = occ::down_cast<Curve>(b0->Copy());
-  const int          d = std::max(a->Degree(), b->Degree());
-  a->IncreaseDegree(d);
-  b->IncreaseDegree(d);
-  const double shift = a->LastParameter() - b->FirstParameter();
-  const int    na = a->NbPoles(), nb = b->NbPoles();
-  const int    ka = a->NbKnots(), kb = b->NbKnots();
-  const bool   rational = a->IsRational() || b->IsRational();
-  const double ratio = a->Weight(na) / b->Weight(1);
-  Arr                         poles(1, na + nb - 1);
-  NCollection_Array1<double>  weights(1, na + nb - 1);
-  for (int i = 1; i <= na; ++i)
-  {
-    poles(i)   = a->Pole(i);
-    weights(i) = a->Weight(i);
-  }
-  for (int i = 2; i <= nb; ++i)
-  {
-    poles(na + i - 1)   = b->Pole(i);
-    weights(na + i - 1) = ratio * b->Weight(i);
-  }
-  NCollection_Array1<double> knots(1, ka + kb - 1);
-  NCollection_Array1<int>    mults(1, ka + kb - 1);
-  for (int i = 1; i <= ka; ++i)
-  {
-    knots(i) = a->Knot(i);
-    mults(i) = a->Multiplicity(i);
-  }
-  mults(ka) = d;
-  for (int i = 2; i <= kb; ++i)
-  {
-    knots(ka + i - 1) = b->Knot(i) + shift;
-    mults(ka + i - 1) = b->Multiplicity(i);
-  }
-  return rational ? new Curve(poles, weights, knots, mults, d) : new Curve(poles, knots, mults, d);
-}
-
 // A loop's pieces left meeting at vertices of just two curved edges between the same two faces (where a seam crossed
 // it): one edge, the pieces' curves (3D and on both faces) concatenated exactly, their parameters kept. `s` when
 // there are none or the result isn't valid.
