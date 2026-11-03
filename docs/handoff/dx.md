@@ -48,6 +48,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   translate whole except custom features and 4 Hole parameters (locationSignatures, holeDepthMultiple: not in std
   1963; check live's current std before a ticket). Live's README (/root/parity/models/README.md) has no raw `bodies`
   per line: asked again (REQUESTS 11-03 00:20); the names above cover Extrude / Revolve references without it.
+- Daily walk 11-03 00:40 on green 6944476a (:105): start window, + › Create Drawing (No views; Suggested views greyed
+  from the + menu, as live), the drawing opens into Insert view, Part Studio 1 of live-30-features → 1:2 in the panel
+  and title block while following: as live. Asked live when Insert view shows "Show annotations from model" (REQUESTS
+  11-03 00:45: missing in its 1812 crops, present in 1408 / 1733; ours always shows it). No regressions.
 - Tried on 6 older feature dumps (/root/dx-scratch/pm/models, on vibe5 ~/agents/dx/pm-models): next in the translator:
   configuration inputs and variables (`#HeadHeight`), Onshape-internal parameters (asVersion, defaultsChanged),
   revolveType, constraints on external references (`externalSecond`), splines / ellipses, BTMParameterLookupTablePath
