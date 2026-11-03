@@ -77,6 +77,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-03 17:00 release (qa list 15:47, newest green 45c8921d, checked on 19c09884)
+- **qa 18:00: core's one-face-pattern Feature pattern / mirror (2ac2afb7, after the v0.4.24 cut)**: volume sweep = v0.4.23; of the 44 ticket documents five fuzz documents move by ≤ 0.08 mm³ (≤ 1e-6 relative: bop-pairs-gpf-5267, cli-fillet-hang, cli-suppress-segv Part 5, draft-pool-hang-2133 / -b184), same parts and face counts; within live's band, not a ticket.
 - **qa 16:28: still no blocker on green 51469a47** (FeatureList Reapply, surface Extrude of every curve): volume sweep = v0.4.23, the 44 ticket documents = 19c09884; cf-parameter-pattern and cf-wave-spring build (Part 1 922.9366 / 11 as live at Extrude 2; Wave Spring 916.60 mm³, live 916.53).
 - **qa 15:47: no blocker; nothing qa knows needs the cut stopped.** On green 19c09884 (has every core / bool / psui / skasm
   change through 15:30): CLI round trip Parasolid / ACIS / STEP / IGES / JT / Rhino 67643.716875 / 18 (= v0.4.23); volume
