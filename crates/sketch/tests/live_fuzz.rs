@@ -321,8 +321,8 @@ fn everyday(seed: u64) -> Case {
         // three more; batch 8 on, seed 461, three more; batch 10 on, seed
         // 541, three more; batch 12 on, seed 621, three more; batch 13 on,
         // seed 661, three more; batch 14 on, seed 701, three more; batch 15
-        // on, seed 741, three more.)
-        match r.below(if seed >= 741 { 29 } else if seed >= 701 { 26 } else if seed >= 661 { 23 } else if seed >= 621 { 20 } else if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
+        // on, seed 741, three more; batch 16 on, seed 781, three more.)
+        match r.below(if seed >= 781 { 32 } else if seed >= 741 { 29 } else if seed >= 701 { 26 } else if seed >= 661 { 23 } else if seed >= 621 { 20 } else if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
             // Corner rectangle (live's tool constraints), width and height.
             0 => {
                 let (w, h) = (r.range(15.0, 50.0), r.range(10.0, 35.0));
@@ -902,6 +902,77 @@ fn everyday(seed: u64) -> Case {
                 let fa = f(&mut r);
                 c.length(&l[0], a * fa);
             }
+            // Lever: a big and a small arc joined by two lines Tangent to
+            // both, the centres level; the centre distance and both radii.
+            29 => {
+                let (d, r1) = (r.range(30.0, 60.0), r.range(8.0, 15.0));
+                let r2 = r1 * r.range(0.4, 0.8);
+                let (c1, c2) = (o, o + v(d, 0.0));
+                let nx = (r1 - r2) / d;
+                let th = (1.0 - nx * nx).sqrt().atan2(nx);
+                let n = DVec2::from_angle(th);
+                let nb = v(n.x, -n.y);
+                let a1 = c.arc(c1, r1, th, 2.0 * PI - th);
+                let l2 = c.line(c1 + nb * r1, c2 + nb * r2);
+                let a3 = c.arc(c2, r2, -th, th);
+                let l4 = c.line(c2 + n * r2, c1 + n * r1);
+                c.coincident(&format!("{a1}.end"), &format!("{l2}.start"));
+                c.coincident(&format!("{l2}.end"), &format!("{a3}.start"));
+                c.coincident(&format!("{a3}.end"), &format!("{l4}.start"));
+                c.coincident(&format!("{l4}.end"), &format!("{a1}.start"));
+                for (a, b) in [(&a1, &l2), (&l2, &a3), (&a3, &l4), (&l4, &a1)] {
+                    c.pair("TANGENT", a, b);
+                }
+                let axis = c.line(c1, c2);
+                c.construction(&axis);
+                c.coincident(&format!("{axis}.start"), &format!("{a1}.center"));
+                c.coincident(&format!("{axis}.end"), &format!("{a3}.center"));
+                c.hv(true, &axis);
+                let (fd, f1, f2) = (f(&mut r), f(&mut r), f(&mut r));
+                c.length(&axis, d * fd);
+                c.radius(&a1, r1 * f1, false);
+                c.radius(&a3, (r2 * f2).min(r1 * f1 * 0.9), false);
+            }
+            // Z profile: eight H / V lines, the flanges Equal in width and in
+            // thickness; a flange's width and thickness, the web's height and
+            // its thickness (a Distance from the top flange's corner).
+            30 => {
+                let (a, h, t) = (r.range(10.0, 25.0), r.range(30.0, 50.0), r.range(3.0, 6.0));
+                let p = [o + v(-a, 0.0), o + v(t, 0.0), o + v(t, h - t), o + v(t + a, h - t), o + v(t + a, h), o + v(0.0, h), o + v(0.0, t), o + v(-a, t)];
+                let l: Vec<String> = (0..8).map(|i| c.line(p[i], p[(i + 1) % 8])).collect();
+                for i in 0..8 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 8]));
+                    c.hv(i % 2 == 0, &l[i]);
+                }
+                c.pair("EQUAL", &l[0], &l[4]);
+                c.pair("EQUAL", &l[3], &l[7]);
+                let fs: Vec<f64> = (0..4).map(|_| f(&mut r)).collect();
+                let tw = (t * fs[3]).min(a * fs[0] * 0.5);
+                c.length(&l[0], a * fs[0] + tw);
+                c.length(&l[1], h * fs[1] - t);
+                c.length(&l[7], (t * fs[2]).min(h * fs[1] * 0.25));
+                c.distance(&format!("{}.start", l[5]), &l[1], tw);
+            }
+            // Pentagon as the polygon tool draws it: five Equal sides, their
+            // corners on a construction circle, the bottom side Horizontal;
+            // the circle's diameter.
+            31 => {
+                let rad = r.range(8.0, 20.0);
+                let p: Vec<DVec2> = (0..5).map(|i| o + DVec2::from_angle(-FRAC_PI_2 - PI / 5.0 + i as f64 * 2.0 * PI / 5.0) * rad).collect();
+                let l: Vec<String> = (0..5).map(|i| c.line(p[i], p[(i + 1) % 5])).collect();
+                let circle = c.circle(o, rad);
+                c.construction(&circle);
+                for i in 0..5 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 5]));
+                    c.on_curve(&format!("{}.start", l[i]), &circle);
+                }
+                for i in 1..5 {
+                    c.pair("EQUAL", &l[0], &l[i]);
+                }
+                c.hv(true, &l[0]);
+                let fr = f(&mut r);
+                c.radius(&circle, rad * fr, true);
+            }
             // D shape: a Horizontal chord and an arc over it, the chord's
             // length and the arc's radius.
             _ => {
@@ -1213,7 +1284,7 @@ fn write_batch() {
 }
 
 /// The batches: (number, first seed, rich).
-const BATCHES: [(usize, u64, bool); 15] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true), (12, 621, true), (13, 661, true), (14, 701, true), (15, 741, true)];
+const BATCHES: [(usize, u64, bool); 16] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true), (12, 621, true), (13, 661, true), (14, 701, true), (15, 741, true), (16, 781, true)];
 
 /// Batch 8's s464 / s475 stay as live answered: a component the pass can't
 /// close (a hexagon) takes the least change on its own, the rounded
