@@ -244,7 +244,33 @@ pub struct WindowState {
     pub lists: BTreeMap<TabId, ListState>,
 }
 
+/// What the open window shows (live mode): read before each call, so the
+/// window tools see where the user orbited and what they picked since.
+#[derive(Clone, Debug, Default)]
+pub struct WindowSnapshot {
+    pub active_tab: Option<TabId>,
+    /// 3D tabs' cameras and graphics area sizes (logical pixels).
+    pub cameras: BTreeMap<TabId, (Camera, DVec2)>,
+    /// Part Studios' selections (entity ids).
+    pub selection: BTreeMap<TabId, Vec<String>>,
+}
+
 impl WindowState {
+    /// The window's own state replaces what the calls last set.
+    pub fn sync(&mut self, s: WindowSnapshot) {
+        if s.active_tab.is_some() {
+            self.active_tab = s.active_tab;
+        }
+        for (tab, (camera, viewport)) in s.cameras {
+            let vc = self.cameras.entry(tab).or_insert_with(|| ViewCamera { camera, history: Vec::new(), viewport });
+            vc.viewport = viewport;
+            if vc.camera != camera {
+                vc.set(camera);
+            }
+        }
+        self.selection.extend(s.selection);
+    }
+
     /// What `r` does to the window.
     pub fn apply(&mut self, r: &UiRequest) {
         match r {

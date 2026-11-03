@@ -49,7 +49,7 @@ pub fn ops() -> Vec<Op> {
             opt("tab", s(), "Part Studio or Assembly tab, by name or id. Default: the first Part Studio."),
             opt("section", json!({ "type": "array", "items": { "type": "object" }, "maxItems": 3 }), "Section view: up to 3 planes [{\"plane\": a plane / planar face / sketch / mate connector id, or a cylinder or cone face (the plane through its axis), \"offset\": length along its normal (default 0), \"flip\": cut the other side}]; the side the normal points to is cut away. A named `view` keeps its own section unless this is given."),
             opt("section_exclude", json!({ "type": "array", "items": { "type": "string" } }), "Section view › Items to exclude: parts (`body:…`) left whole."),
-            opt("view", json!({ "type": "string" }), "isometric (default), front, back, left, right, top, bottom, dimetric, trimetric, the name of a saved named view, or \"window\": the window's camera (view_camera; perspective and fit options then don't apply)."),
+            opt("view", json!({ "type": "string" }), "isometric (default), front, back, left, right, top, bottom, dimetric, trimetric, the name of a saved named view, or \"window\": the window's camera (as the app shows it in live mode, else as view_camera set it; perspective and fit options then don't apply)."),
             opt("width", json!({ "type": "integer", "minimum": 16, "maximum": 4096 }), "Pixels (default 800)."),
             opt("height", json!({ "type": "integer", "minimum": 16, "maximum": 4096 }), "Pixels (default 600)."),
             opt("display_mode", json!({ "type": "string", "enum": ["shaded_with_edges", "shaded", "hidden_line", "translucent"] }), "Render style (default shaded_with_edges)."),

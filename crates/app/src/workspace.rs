@@ -161,7 +161,29 @@ impl Workspace {
         if crate::ui_script::enabled() {
             crate::ui_script::start(window, cx);
         }
+        // Live mode: agents' calls see this window's tab, cameras and selection.
+        let me = cx.entity().downgrade();
+        this.doc.update(cx, |dm, _| dm.window_snapshot = Some(Box::new(move |cx: &App| me.upgrade().map(|w| w.read(cx).window_snapshot(cx)).unwrap_or_default())));
         this
+    }
+
+    /// What this window shows, for live-mode calls (`DocModel::window_snapshot`).
+    fn window_snapshot(&self, cx: &App) -> noshape_ops::window::WindowSnapshot {
+        let mut s = noshape_ops::window::WindowSnapshot { active_tab: self.active, ..Default::default() };
+        for (tab, view) in &self.views {
+            let viewport = match view {
+                TabView::PartStudio(v) => {
+                    let v = v.read(cx);
+                    s.selection.insert(*tab, v.selection.iter().map(noshape_ops::refs::to_id).collect());
+                    v.viewport.clone()
+                }
+                TabView::Assembly(v) => v.read(cx).viewport.clone(),
+                _ => continue,
+            };
+            let vp = viewport.read(cx);
+            s.cameras.insert(*tab, (vp.camera, vp.size()));
+        }
+        s
     }
 
     fn sync_tabs(&mut self, window: &mut Window, cx: &mut Context<Self>) {

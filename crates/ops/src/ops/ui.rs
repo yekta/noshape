@@ -25,7 +25,7 @@ pub fn ops() -> Vec<Op> {
             group: "ui",
             verb: "state",
             summary: "The document window's state: the tab shown, panels, the version viewed, compare and repair",
-            description: "What the window shows besides the model: the tab shown (`active_tab`), the version viewed (`viewing`, null: the workspace), the Tab manager (open, search), the drawings whose Sheets panel is open, compare mode (base and target) and the Repair panel. Set by the window tools (tab_activate, tab_manager, history_view, history_compare, history_repair_view, drawing_sheets_panel…); with the app open (live mode) they change its window too.",
+            description: "What the window shows besides the model: the tab shown (`active_tab`), the version viewed (`viewing`, null: the workspace), the Tab manager (open, search), the drawings whose Sheets panel is open, compare mode (base and target) and the Repair panel. Set by the window tools (tab_activate, tab_manager, history_view, history_compare, history_repair_view, drawing_sheets_panel…); with the app open (live mode) they change its window too, and the tab shown, the 3D tabs' cameras and the Part Studios' selections are the window's own (where the user orbited, what they picked).",
             fields: vec![doc_field()],
             mutates: false,
             destructive: false,

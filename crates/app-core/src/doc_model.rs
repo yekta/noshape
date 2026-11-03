@@ -41,7 +41,13 @@ pub struct DocModel {
     /// with the redo list's top at that moment (a later edit replaces it,
     /// dropping the step as live's redo list does).
     client_step: Option<ClientStep>,
+    /// The open window's state (tab shown, cameras, selection), read by the
+    /// live-mode server before each agent call (set by the workspace).
+    pub window_snapshot: Option<WindowSnapshotFn>,
 }
+
+/// What the window shows, read on demand (see [`DocModel::window_snapshot`]).
+pub type WindowSnapshotFn = Box<dyn Fn(&App) -> noshape_ops::window::WindowSnapshot>;
 
 #[derive(Clone, Copy)]
 struct ClientStep {
@@ -83,7 +89,7 @@ impl DocModel {
     /// undo/redo stacks (Onshape's page load; the history stays).
     pub fn new(mut session: Session) -> Self {
         session.forget_undo();
-        Self { session, studio_cache: Default::default(), pending: PendingEdit::default(), client_step: None }
+        Self { session, studio_cache: Default::default(), pending: PendingEdit::default(), client_step: None, window_snapshot: None }
     }
 
     /// Provider giving Derived features access to the other Part Studios.

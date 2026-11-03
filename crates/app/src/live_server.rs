@@ -76,6 +76,10 @@ fn run(ctx: &mut Option<Ctx>, path: &Path, dm: &mut DocModel, tool: &str, args: 
     // before any other edit.
     dm.flush_pending(cx);
     let od = ctx.get_mut(path).expect("adopted");
+    // What the window shows now (the user may have orbited or picked).
+    if let Some(snapshot) = dm.window_snapshot.as_ref().map(|f| f(cx)) {
+        od.window.sync(snapshot);
+    }
     std::mem::swap(&mut od.session, &mut dm.session);
     let r = registry::run(ctx, op, &args);
     let od = ctx.get_mut(path).expect("adopted");

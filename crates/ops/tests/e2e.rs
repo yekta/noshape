@@ -80,6 +80,29 @@ fn angle_dimension_label_picks_the_quadrant() {
     assert!(a[0].starts_with("126.87") && a[1].starts_with("53.13"), "{a:?}");
 }
 
+/// Live mode: what the open window shows (its camera, its selection) is
+/// what ui_state and the window tools see, not what a call last set.
+#[test]
+fn window_snapshot_is_what_the_window_tools_see() {
+    let mut ctx = Ctx::new();
+    let path = scratch("window-snapshot.noshape");
+    let info = call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let tab = info["tabs"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "corner_rectangle", "points": [[0, 0], [20, 10]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": "Sketch 1" }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "5 mm" } }));
+    let face = call(&mut ctx, "query_entities", json!({ "kind": "faces", "normal": [0, 0, 1], "limit": 1 }))["faces"][0]["id"].as_str().unwrap().to_string();
+    let id = noshape_ops::doc::find_tab(ctx.doc(None).unwrap().doc(), &tab).unwrap();
+    let mut snap = noshape_ops::window::WindowSnapshot { active_tab: Some(id), ..Default::default() };
+    snap.cameras.insert(id, (noshape_render::Camera::default(), glam::DVec2::new(800.0, 500.0)));
+    snap.selection.insert(id, vec![face.clone()]);
+    ctx.doc(None).unwrap().window.sync(snap);
+    let st = call(&mut ctx, "ui_state", json!({}));
+    assert_eq!(st["selection"][0]["selected"], json!([face]), "{st}");
+    assert_eq!(st["cameras"].as_array().map(|c| c.len()), Some(1), "{st}");
+}
+
 #[test]
 fn sketch_extrude_fillet_pattern_export_render() {
     let mut ctx = Ctx::new();

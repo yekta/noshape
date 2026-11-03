@@ -5078,7 +5078,7 @@ Examples:
 
 The document window's state: the tab shown, panels, the version viewed, compare and repair.
 
-What the window shows besides the model: the tab shown (`active_tab`), the version viewed (`viewing`, null: the workspace), the Tab manager (open, search), the drawings whose Sheets panel is open, compare mode (base and target) and the Repair panel. Set by the window tools (tab_activate, tab_manager, history_view, history_compare, history_repair_view, drawing_sheets_panel…); with the app open (live mode) they change its window too.
+What the window shows besides the model: the tab shown (`active_tab`), the version viewed (`viewing`, null: the workspace), the Tab manager (open, search), the drawings whose Sheets panel is open, compare mode (base and target) and the Repair panel. Set by the window tools (tab_activate, tab_manager, history_view, history_compare, history_repair_view, drawing_sheets_panel…); with the app open (live mode) they change its window too, and the tab shown, the 3D tabs' cameras and the Part Studios' selections are the window's own (where the user orbited, what they picked).
 
 Examples:
 
@@ -6220,7 +6220,7 @@ Examples:
 | `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
 | `section` | array of object |  | Section view: up to 3 planes [{"plane": a plane / planar face / sketch / mate connector id, or a cylinder or cone face (the plane through its axis), "offset": length along its normal (default 0), "flip": cut the other side}]; the side the normal points to is cut away. A named `view` keeps its own section unless this is given. |
 | `section_exclude` | array of string |  | Section view › Items to exclude: parts (`body:…`) left whole. |
-| `view` | string |  | isometric (default), front, back, left, right, top, bottom, dimetric, trimetric, the name of a saved named view, or "window": the window's camera (view_camera; perspective and fit options then don't apply). |
+| `view` | string |  | isometric (default), front, back, left, right, top, bottom, dimetric, trimetric, the name of a saved named view, or "window": the window's camera (as the app shows it in live mode, else as view_camera set it; perspective and fit options then don't apply). |
 | `width` | integer |  | Pixels (default 800). |
 | `height` | integer |  | Pixels (default 600). |
 | `display_mode` | one of `shaded_with_edges`, `shaded`, `hidden_line`, `translucent` |  | Render style (default shaded_with_edges). |
