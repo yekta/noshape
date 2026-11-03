@@ -4076,9 +4076,10 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_past_end_faces(const TopoDS
     df.AddFacesToRemove(faces);
     df.SetToFillHistory(true);
     {
-      // (3 s at most: removing two faces of a knob's grip took 68 s and gave nothing, dx's FILLET-31S-FAIL.)
+      // (0.5 s at most: removing two faces of a knob's grip took 68 s and gave nothing, dx's FILLET-31S-FAIL; where it
+      // works, 9-13 ms in the blend corpus.)
       const KernelTimer    timer("blend.past_end.defeature");
-      const ScopedDeadline step(3.0);
+      const ScopedDeadline step(0.5);
       try
       {
         df.Build(new_cancel_indicator()->Start());
