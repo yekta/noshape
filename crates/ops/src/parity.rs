@@ -476,6 +476,12 @@ impl<'a> Translator<'a> {
         {
             return Ok(vec![format!("fplane:{ours}")]);
         }
+        // A Plane feature's plane, packed (`DUMMY` of "F….planeOp").
+        if let Some(fid) = packed_strings_of(text).iter().find_map(|s| s.strip_suffix(".planeOp").map(str::to_string))
+            && let Some(ours) = self.feature_ids.get(&fid)
+        {
+            return Ok(vec![format!("fplane:{ours}")]);
+        }
         if let Some(r) = self.region_from_query(text)? {
             return Ok(vec![r]);
         }
@@ -1142,6 +1148,17 @@ fn sketch_moved(before: &Value, after: &Value) -> f64 {
     };
     let (b, a) = (points(before), points(after));
     b.iter().filter_map(|(id, p)| a.get(id).map(|q| p.iter().zip(q).map(|(x, y)| (x - y).abs()).fold(0.0, f64::max))).fold(0.0, f64::max)
+}
+
+/// The strings of a query's packed form (`qCompressed(1.0, "…", id)`), if any.
+fn packed_strings_of(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Some(packed) = text.split("qCompressed(1.0,\"").nth(1).and_then(|r| r.split('"').next())
+        && let Ok(tree) = noshape_model::custom::host::packed::unpack(packed)
+    {
+        packed_strings(&tree, &mut out);
+    }
+    out
 }
 
 /// Every string in a packed query.
