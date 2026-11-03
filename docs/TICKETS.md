@@ -1344,6 +1344,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P2 UIP-DRIVER-GAPS (psui; the interaction suite's noshape side) qa ran all 155 scenarios through NOSHAPE_UI_SCRIPT on
+  green 2723f7fb (tools/ui-parity/run.py --all, :110; recordings in qa-scratch/uip-ours/): 147 + 7 of 8 rerun recorded, 14
+  with a step `ok: false`. qa fixed its own (Plane's field is "Offset distance", Chamfer is its own tool, Variable through
+  tool search, Section view / Mass properties as buttons). Left for the driver: targets `{"rollback_bar": true}` (3
+  scenarios), `{"view_cube": "Top"}` (2), buttons by tooltip (`"New folder"`, `"Clear search"`) — "not a geometry
+  target". Runner: ~1 in 20 launches panics at vendor/gpui-pre-linux/src/linux/platform.rs:366 (the X connection at
+  startup, environment) — a retry would hide it. **State fields the suite needs to see tickets qa filed today:** the
+  toolbar's Undo / Redo enabled state (SKETCH-UNDO-REDO-STATE), and in sketch mode the active tool and the sketch's
+  entities (kinds, construction, count) — the sketch scenarios now only see "Sketch 1" open. (qa 2026-11-03)
 - [ ] P1 DIALOG-SWITCH-DISCARDS-NEW (psui) double-clicking another feature while a **new** feature's dialog is open throws
   the new feature away in ours; live keeps it: a box (Sketch 1, Extrude 1), Search tools › Variable, Name
   wall_thickness, Value 2 + Enter (the first Enter applies: the row "#wall_thickness = 2 mm" is in the list, the dialog
