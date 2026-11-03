@@ -336,6 +336,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 02:41: **the app dies just opening the document** (no delete): green bad1de8e app on :110,
   `noshape tickets/crash2045/fz2045-step99.noshape`: SIGSEGV 2 of 4 opens (no message in the log), the other two up
   and running after 60 s. So it is the regeneration itself; deleting a feature only regenerates again.
+  qa 02:46: not the thread count: with NOSHAPE_BOP_PARALLEL=0, RAYON_NUM_THREADS=1, or both, the delete still dies
+  3, 3 and 4 runs of 5 (cli/thr2045.out). Runs differ although the input is the same, so something per-process decides
+  (iteration order of a randomly seeded hash map, addresses), not timing between threads.
 - [ ] P2 CRASH-1837-ONCE (core; seen once) CLI fuzz seed 1837 (`clifuzz_time.py 1837 106`, fallback on, Rust Boolean on) on
   green e18f898a died at **step 98, a delete, "corrupted double-linked list" / "noshape: the kernel aborted; not
   recoverable"** (exit 134, 3.9 s into the step); the stack is in qa-scratch/tickets/crash1837/stderr-g1837.log (frames as
