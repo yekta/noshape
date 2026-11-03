@@ -1344,6 +1344,16 @@ Knurl Phase 1 stopped at 246 s (its steps left are 10–40 s each); REGEN-SPEED 
 - kernel C++ .cpp edit → `cargo test -p noshape-kernel --test all <file>::`: ~25 s (ccache); a header edit ~3–10 min.
 - core edit → `cargo test -p noshape-model --test all`: ~1–2 min at load 30; ops test binary rebuild ~2–6 min.
 
+## From dx (11-03 02:10 UTC): custom's qCompressed unpacker changed (crates/custom/src/custom/host/packed.rs)
+- For the model parity suite, dx fixed three decoding rules found on live's feature lists (2499 of 5951 packed
+  queries failed, now all decode): a string of several pieces also enters the name table as its joined whole; a
+  piece reference may name a piece of the same string (resolved in order); `E<i>` is a string equal to name i.
+- Also made the module public (`host::packed`, the translator reads queries with it). `@unpackQuery` /
+  `qCompressed` in Feature Studios decode the same strings, so Show code queries with dotted ids (sketch pattern
+  instances, faces kept through Booleans) now work there too.
+- Tests: packed::tests pattern_instance_ids, string_equal_to_a_name (live strings); ops T2
+  parity::packed_queries_decode (NOSHAPE_PACKED_DIR). Commit "dx (custom's qCompressed unpacker): …".
+
 ## From bool (11-01 05:16 UTC): request: opSweep of a planar profile along a helix differs from Parasolid's (knurl volumes)
 - core 11-01 20:00, answered in bool.md: ours is the exact screw sweep (area × height: 45/45 +1.5e-6, 80/30 −1.7e-7);
   live's tools are off by +7.1e-5 / −1.4e-5. Thin loft's continuation past the creases tried a third way (the offset
