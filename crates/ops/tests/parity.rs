@@ -2,7 +2,7 @@
 //! rebuilt feature by feature and compared with live after each feature.
 
 use noshape_ops::Ctx;
-use noshape_ops::parity::{Translator, differences, live_parts, our_parts, parse_refs, refs_from_bodies};
+use noshape_ops::parity::{Translator, differences, rebuild_assembly, live_parts, our_parts, parse_refs, refs_from_bodies};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
@@ -736,4 +736,94 @@ fn a_second_part_studio_goes_into_its_own_tab() {
     let i = &list["instances"][0];
     let near = |v: &Value, want: &[f64]| want.iter().enumerate().all(|(k, w)| (v[k].as_f64().unwrap() - w).abs() < 1e-6);
     assert!(near(&i["translation"], &[100.0, 20.0, 0.0]) && near(&i["rotation"], &[0.0, 0.0, std::f64::consts::FRAC_1_SQRT_2, std::f64::consts::FRAC_1_SQRT_2]), "{i}");
+}
+
+/// Live's assemblies (`<name>/assembly.json` and `<name>/studios/<element>.json`
+/// with `<element>.parts.json`): each rebuilt, its occurrences and mates
+/// compared with live.
+#[test]
+#[ignore = "T2: live's assemblies from /root/parity/asm-dx (other people's work, never in the repo)"]
+fn parity_assemblies() {
+    let root = PathBuf::from(std::env::var("NOSHAPE_PARITY_ASSEMBLIES").unwrap_or_else(|_| "/root/parity/asm-dx".into()));
+    let mut dirs: Vec<PathBuf> = std::fs::read_dir(&root).map(|d| d.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.join("assembly.json").is_file()).collect()).unwrap_or_default();
+    dirs.sort();
+    let read = |p: &Path| std::fs::read_to_string(p).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok());
+    let (mut docs, mut matching, mut mates, mut mates_matching) = (0, 0, 0, 0);
+    for dir in dirs {
+        let name = dir.file_name().unwrap().to_string_lossy().to_string();
+        let Some(asm) = read(&dir.join("assembly.json")) else {
+            println!("{name}: unreadable assembly.json");
+            continue;
+        };
+        let mut studios = Vec::new();
+        for e in std::fs::read_dir(dir.join("studios")).into_iter().flatten().filter_map(|e| e.ok()) {
+            let file = e.file_name().to_string_lossy().to_string();
+            let Some(element) = file.strip_suffix(".json").filter(|s| !s.ends_with(".parts")) else { continue };
+            let (Some(features), Some(parts)) = (read(&e.path()), read(&dir.join("studios").join(format!("{element}.parts.json")))) else { continue };
+            studios.push((element.to_string(), features, parts));
+        }
+        studios.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut ctx = Ctx::new();
+        let r = rebuild_assembly(&mut ctx, &scratch(&format!("asm-{name}")), &asm, &studios);
+        docs += 1;
+        if r.differences.is_empty() && r.untranslated.is_empty() {
+            matching += 1;
+        }
+        mates += r.mates;
+        mates_matching += r.mates_matching;
+        println!("{name}: {}/{} occurrences placed as live, {}/{} mates as live", r.occurrences_matching, r.occurrences, r.mates_matching, r.mates);
+        for d in &r.differences {
+            println!("  difference: {d}");
+        }
+        for u in &r.untranslated {
+            println!("  untranslated: {u}");
+        }
+    }
+    println!("assemblies: {matching}/{docs} as live, mates {mates_matching}/{mates}");
+}
+
+/// An assembly rebuilt from live's definition: a cylinder's two instances,
+/// the first fixed, the second stacked on it by a Revolute (connectors at the
+/// centres of the top and bottom edges) and turned 30° after: placed, fixed
+/// and mated as live, the turn kept.
+#[test]
+fn an_assembly_is_rebuilt_as_lives() {
+    let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "c1", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.004, "xCenter": 0.0, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualCreatedByQuery-137", "featureId": "FS1", "entityType": "FACE" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "20 mm" }] }
+    ] });
+    let parts = json!([{ "partId": "JHD", "name": "Part 1" }]);
+    let connector = |id: &str, instance: &str, z: f64| json!({ "btType": "BTMMateConnector-66", "featureId": id, "implicit": true, "parameters": [
+        { "btType": "BTMParameterQueryWithOccurrenceList-67", "parameterId": "originQuery", "queries": [{ "btType": "BTMInferenceQueryWithOccurrence-1083", "inferenceType": "CENTER", "path": [instance],
+          "entityQuery": format!("query=qContainsPoint(qEverything(EntityType.EDGE), vector(4, 0, {z}) * millimeter);") }] }] });
+    let (c, s) = (std::f64::consts::FRAC_PI_6.cos(), std::f64::consts::FRAC_PI_6.sin());
+    let asm = json!({
+        "rootAssembly": {
+            "instances": [{ "id": "IA", "name": "Part 1 <1>", "type": "Part", "partId": "JHD", "elementId": "E1" }, { "id": "IB", "name": "Part 1 <2>", "type": "Part", "partId": "JHD", "elementId": "E1" }],
+            "occurrences": [
+                { "path": ["IA"], "fixed": true, "transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] },
+                { "path": ["IB"], "fixed": false, "transform": [c, -s, 0, 0, s, c, 0, 0, 0, 0, 1, 0.02, 0, 0, 0, 1] }] },
+        "features": { "features": [{ "btType": "BTMMate-64", "featureId": "M1", "name": "Revolute 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "mateType", "value": "REVOLUTE" },
+            { "btType": "BTMParameterQueryWithOccurrenceList-67", "parameterId": "mateConnectorsQuery", "queries": [{ "featureId": "MA" }, { "featureId": "MB" }] }],
+            "mateConnectors": [connector("MA", "IA", 20.0), connector("MB", "IB", 0.0)] }],
+          "featureStates": { "M1": { "featureStatus": "OK" } } } });
+    let mut ctx = Ctx::new();
+    let (off_studio, off_parts) = (studio.clone(), parts.clone());
+    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly.noshape"), &asm, &[("E1".into(), studio, parts)]);
+    assert!(r.untranslated.is_empty() && r.differences.is_empty(), "{r:?}");
+    assert_eq!((r.occurrences_matching, r.occurrences, r.mates_matching, r.mates), (2, 2, 1, 1));
+    // A place the Revolute doesn't allow: ours solves back onto the mate.
+    let mut off = asm.clone();
+    off["rootAssembly"]["occurrences"][1]["transform"][11] = json!(0.03);
+    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-off.noshape"), &off, &[("E1".into(), off_studio, off_parts)]);
+    assert_eq!(r.occurrences_matching, 1, "{r:?}");
+    assert!(r.differences.iter().any(|d| d.starts_with("Part 1 <2>")), "{r:?}");
 }

@@ -83,6 +83,19 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   to run: …" (ours errors where live's built; the first difference then reads "(custom feature failed to run)").
   T1 custom_feature_failures_are_reported_apart. Host / std differences → core tickets. Score now **7/11,
   58/78** (bracket03 matches since core's FILLET-SPLIT-EDGE-FACES fix); SCORE.md row updated.
+- 11-03 10:40 assembly phase (lead 09:05: against a small assembly if live's sample is late): `parity::rebuild_assembly`
+  takes live's assembly definition (`rootAssembly` + `features` with featureStates) and each Part Studio
+  (`studios/<elementId>.json` + `.parts.json`): every studio translated into its own tab, each mate connector's
+  entity query resolved on it (`Translator::resolve`), instances inserted (part by live's partId → name), fixed as
+  live, placed at live's transforms, mates added between the same connectors (type and inference mapped), then
+  the free occurrences placed at live's transforms again (adding a mate snaps its connectors into line, as the dialog
+  does; live's places are after drags) and compared: each occurrence within 1e-6 m / 1e-6 of the quaternion (our
+  solve pulls a place the mates don't allow back), each mate's OK / error against featureStates. T2
+  `parity_assemblies` over /root/parity/asm-dx (NOSHAPE_PARITY_ASSEMBLIES; rsync to vibe5:agents/dx/asm-dx); T1
+  an_assembly_is_rebuilt_as_lives. skasm's live "p1807 c6" (two parts, two Revolutes): **1/1 as live, mates
+  2/2**. Needed on the way: `qContainsPoint(qSketchRegion(makeId(sketch)), point)` (the region holding the point),
+  through sketch_get's new `at` (only the regions holding a sketch or model point; e2e sketch_regions_at_a_point).
+  Not yet: subassemblies, explicit mate connectors' offsets, mate limits / offsets, live's per-studio refs.
 - 11-03 09:10 STL units (lead's question): live reads a unitless STL in the **document's length unit** (import dialog
   Units defaults to it: Millimeter in a mm document, Inch in an inch one; behaviours G35 / G35b); ours does the same.
   Our export_parts' STL default is Meter / Binary (as live's REST translation, "Units = meters"), so a mm part

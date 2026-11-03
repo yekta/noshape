@@ -1319,6 +1319,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
+| `at` | array of number or string |  | Only the regions holding this point: sketch [x, y], or a model position [x, y, z] projected onto the sketch plane. |
 
 #### sketch_paste
 

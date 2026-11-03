@@ -211,7 +211,7 @@ pub fn ops() -> Vec<Op> {
             verb: "get",
             summary: "A sketch's entities, constraints, dimensions, solve state and regions",
             description: "Entities with ids and geometry (sketch coordinates, workspace units), constraints and dimensions (`dim:…`, value and expression), DOF and status (fully defined, under defined, over defined), regions (`region:…` ids, area, `center` of the outer loop's box, a point `inside` the region, the `boundary` curves) for Extrude / Revolve, and the plane frame.",
-            fields: vec![doc_field(), tab_field(), req("sketch", s(), "Sketch feature id or name.")],
+            fields: vec![doc_field(), tab_field(), req("sketch", s(), "Sketch feature id or name."), opt("at", json!({ "type": "array", "items": { "type": ["number", "string"] }, "minItems": 2, "maxItems": 3 }), "Only the regions holding this point: sketch [x, y], or a model position [x, y, z] projected onto the sketch plane.")],
             mutates: false,
             destructive: false,
             run: get,
@@ -1002,6 +1002,21 @@ fn get(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let t = target(od, tab, a)?;
     let mut v = sketch_state(od, tab, t.id, None)?;
     v["name"] = json!(t.name);
+    // `at`: only the regions holding that point (a click inside a region).
+    if let Some(at) = a.get("at") {
+        let units = od.doc().settings.units;
+        let r = od.regenerate(tab, None)?;
+        let sr = r.context.sketch(t.id).ok_or_else(|| OpError::param("sketch", "the sketch did not solve"))?;
+        let p = click_value(at, &units, &sr.frame).map_err(|e| e.with_param("at"))?;
+        let holding: Vec<bool> = sr.regions.iter().map(|g| g.contains(p)).collect();
+        if let Some(regions) = v["regions"].as_array_mut() {
+            let mut i = 0;
+            regions.retain(|_| {
+                i += 1;
+                holding.get(i - 1).copied().unwrap_or(false)
+            });
+        }
+    }
     Ok(v.into())
 }
 

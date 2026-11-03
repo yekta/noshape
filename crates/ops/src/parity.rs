@@ -334,6 +334,13 @@ impl<'a> Translator<'a> {
         registry::run(self.ctx, op, &args).map(|o| o.value).map_err(|e| e.to_json().to_string())
     }
 
+    /// Our entities for an Onshape query on the finished Part Studio (an
+    /// assembly's mate connector names a part's edge or face this way).
+    pub fn resolve(&mut self, q: &Value) -> Result<Vec<String>, String> {
+        let k = self.features.len();
+        self.query(k, q)
+    }
+
     /// Places an instance of the assembly tab `assembly` where live has its occurrence:
     /// `transform` row-major 4×4, metres (the assembly definition's
     /// `occurrences[].transform`).
@@ -718,13 +725,22 @@ impl<'a> Translator<'a> {
                 return Ok(vec![format!("fplane:{ours}")]);
             }
         }
-        // qContainsPoint(…EntityType.EDGE / FACE / VERTEX…, vector(x, y, z) * unit).
+        // qContainsPoint(…EntityType.EDGE / FACE / VERTEX…, vector(x, y, z) * unit),
+        // or of qSketchRegion(makeId("F…")): the sketch's region holding the point.
         if let Some(rest) = text.split("qContainsPoint(").nth(1)
             && let Some(v) = rest.split("vector(").nth(1)
         {
             let (nums, unit) = v.split_once(')').unwrap_or((v, ""));
             let c: Vec<f64> = nums.split(',').filter_map(|x| x.trim().parse().ok()).collect();
             let scale = if unit.contains("millimeter") { 1e-3 } else if unit.contains("inch") { 0.0254 } else if unit.contains("centimeter") { 1e-2 } else { 1.0 };
+            if let Some(sk) = rest.strip_prefix("qSketchRegion(makeId(\"").and_then(|r| r.split('"').next())
+                && c.len() == 3
+            {
+                let ours = self.feature_ids.get(sk).cloned().ok_or_else(|| format!("sketch {sk} was not built"))?;
+                let g = self.call("sketch_get", json!({ "sketch": ours, "at": mm([c[0] * scale, c[1] * scale, c[2] * scale]) }))?;
+                let found: Vec<String> = g["regions"].as_array().into_iter().flatten().filter(|r| r["imprinted"] != true).filter_map(|r| r["id"].as_str().map(str::to_string)).collect();
+                return if found.is_empty() { Err(format!("no region of sketch {sk} holds live's point")) } else { Ok(found) };
+            }
             let kind = ["EDGE", "FACE", "VERTEX"].into_iter().find(|k| rest.contains(&format!("EntityType.{k}"))).unwrap_or("EDGE");
             if c.len() == 3 {
                 let r = LiveRef { kind: kind.into(), point: Some([c[0] * scale, c[1] * scale, c[2] * scale]), ..Default::default() };
@@ -2128,4 +2144,281 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
         }
     }
     out
+}
+
+/// One assembly rebuilt from live's files (docs/PARITY-SUITES.md §1,
+/// assembly phase; layout of REQUESTS 1842): its Part Studios translated into
+/// tabs, the instances inserted, fixed and placed where live has them, the
+/// mates added between the same connectors; then each occurrence and mate
+/// compared with live.
+#[derive(Debug, Default)]
+pub struct AssemblyResult {
+    pub occurrences: usize,
+    pub occurrences_matching: usize,
+    pub mates: usize,
+    pub mates_matching: usize,
+    /// Differences, first one first.
+    pub differences: Vec<String>,
+    /// What wasn't translated, with the reason.
+    pub untranslated: Vec<String>,
+}
+
+/// Onshape's mate types in assembly_mate's words.
+fn mate_type(t: &str) -> Option<&'static str> {
+    Some(match t {
+        "FASTENED" => "fastened",
+        "REVOLUTE" => "revolute",
+        "SLIDER" => "slider",
+        "CYLINDRICAL" => "cylindrical",
+        "PIN_SLOT" => "pinslot",
+        "PLANAR" => "planar",
+        "BALL" => "ball",
+        "PARALLEL" => "parallel",
+        "TANGENT" => "tangent",
+        "WIDTH" => "width",
+        _ => return None,
+    })
+}
+
+/// Onshape's EntityInferenceType in our words.
+fn inference(t: &str) -> Option<&'static str> {
+    Some(match t {
+        "CENTROID" => "centroid",
+        "CENTER" => "center",
+        "MID_POINT" => "midpoint",
+        "POINT" => "vertex",
+        "TOP_AXIS_POINT" => "top_axis",
+        "MID_AXIS_POINT" => "mid_axis",
+        "BOTTOM_AXIS_POINT" => "bottom_axis",
+        "PART_ORIGIN" => "origin",
+        _ => return None,
+    })
+}
+
+/// A row-major 4×4 transform (metres) as translation (m) and unit quaternion [x, y, z, w].
+fn transform_parts(m: &[f64]) -> Option<([f64; 3], [f64; 4])> {
+    if m.len() < 12 {
+        return None;
+    }
+    let rot = glam::DMat3::from_cols(glam::DVec3::new(m[0], m[4], m[8]), glam::DVec3::new(m[1], m[5], m[9]), glam::DVec3::new(m[2], m[6], m[10]));
+    let q = glam::DQuat::from_mat3(&rot);
+    Some(([m[3], m[7], m[11]], [q.x, q.y, q.z, q.w]))
+}
+
+/// `asm`: live's assembly.json (the assembly definition with "features");
+/// `studios`: element id → (features.json of that Part Studio, its parts list).
+pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(String, Value, Value)]) -> AssemblyResult {
+    let mut res = AssemblyResult::default();
+    let call = |ctx: &mut Ctx, tool: &str, args: Value| -> Result<Value, String> {
+        let op = registry::by_tool_name(tool).ok_or_else(|| format!("no tool {tool}"))?;
+        registry::run(ctx, op, &args).map(|o| o.value).map_err(|e| e.to_json().to_string())
+    };
+    let _ = std::fs::remove_file(path);
+    if let Err(e) = call(ctx, "document_create", json!({ "path": path.to_str().unwrap_or("") })) {
+        res.untranslated.push(format!("document: {e}"));
+        return res;
+    }
+    // Bare numbers are in the document's units: the first Part Studio's.
+    let (length, angle) = studios.first().map(|(_, s, _)| doc_units(&s["units"])).unwrap_or_default();
+    if length.is_some() || angle.is_some() {
+        let mut a = json!({});
+        if let Some(l) = length {
+            a["length_unit"] = json!(l);
+        }
+        if let Some(g) = angle {
+            a["angle_unit"] = json!(g);
+        }
+        if let Err(e) = call(ctx, "document_set_units", a) {
+            res.untranslated.push(format!("units: {e}"));
+        }
+    }
+    let root = &asm["rootAssembly"];
+    let instances: Vec<&Value> = root["instances"].as_array().into_iter().flatten().collect();
+    let element_of = |id: &str| instances.iter().find(|i| i["id"] == id).and_then(|i| i["elementId"].as_str()).unwrap_or("").to_string();
+    // Mate connectors (implicit ones live in their mate's `mateConnectors`):
+    // feature id → (occurrence path, inference, the entity query).
+    let mut connectors: HashMap<String, (Vec<String>, String, Value)> = HashMap::new();
+    let features: Vec<&Value> = asm["features"]["features"].as_array().into_iter().flatten().collect();
+    for f in &features {
+        let all = std::iter::once(*f).chain(f["mateConnectors"].as_array().into_iter().flatten());
+        for mc in all.filter(|m| m["btType"].as_str().is_some_and(|t| t.starts_with("BTMMateConnector"))) {
+            let origin = mc["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "originQuery");
+            let Some(q) = origin.and_then(|p| p["queries"].as_array()).and_then(|q| q.first()) else { continue };
+            let path: Vec<String> = q["path"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(str::to_string)).collect();
+            let query = json!({ "queryString": q["entityQuery"], "deterministicIds": q["deterministicIds"] });
+            if let Some(id) = mc["featureId"].as_str() {
+                connectors.insert(id.to_string(), (path, q["inferenceType"].as_str().unwrap_or("").to_string(), query));
+            }
+        }
+    }
+    // Each Part Studio into its own tab; the connectors' entities resolved on it.
+    let mut tabs: HashMap<String, String> = HashMap::new();
+    let mut part_names: HashMap<(String, String), String> = HashMap::new();
+    let mut entities: HashMap<String, String> = HashMap::new();
+    for (element, studio, parts) in studios {
+        let name = format!("Studio {}", &element[..element.len().min(6)]);
+        let mut t = match Translator::open_in(ctx, &name, studio, HashMap::new()) {
+            Ok(t) => t,
+            Err(e) => {
+                res.untranslated.push(format!("Part Studio {element}: {e}"));
+                continue;
+            }
+        };
+        for k in 0..t.len() {
+            let step = t.step(k);
+            res.untranslated.extend(step.problems.iter().map(|p| format!("{name} › {} ({}): {p}", step.name, step.feature_type)));
+            if step.status.as_deref().is_some_and(|s| s != "Ok") {
+                res.differences.push(format!("{name} › {}: {} ({})", step.name, step.status.as_deref().unwrap_or(""), step.message.as_deref().unwrap_or("")));
+            }
+        }
+        for (id, (path, _, q)) in &connectors {
+            if path.first().map(|i| element_of(i)) == Some(element.clone()) {
+                match t.resolve(q) {
+                    Ok(ids) if !ids.is_empty() => {
+                        entities.insert(id.clone(), ids[0].clone());
+                    }
+                    Ok(_) => res.untranslated.push(format!("mate connector {id}: its entity resolved to nothing")),
+                    Err(e) => res.untranslated.push(format!("mate connector {id}: {e}")),
+                }
+            }
+        }
+        tabs.insert(element.clone(), name);
+        for p in parts.as_array().into_iter().flatten() {
+            if let (Some(pid), Some(pname)) = (p["partId"].as_str(), p["name"].as_str()) {
+                part_names.insert((element.clone(), pid.to_string()), pname.to_string());
+            }
+        }
+    }
+    // The instances, in live's order; ours named as inserted.
+    let mut ours: HashMap<String, String> = HashMap::new();
+    for i in &instances {
+        let (Some(id), Some(element)) = (i["id"].as_str(), i["elementId"].as_str()) else { continue };
+        let Some(tab) = tabs.get(element) else {
+            res.untranslated.push(format!("instance {}: its Part Studio {element} wasn't translated", i["name"]));
+            continue;
+        };
+        let mut args = json!({ "tab": "Assembly 1", "source": tab });
+        if i["type"] == "Part" {
+            match i["partId"].as_str().and_then(|p| part_names.get(&(element.to_string(), p.to_string()))) {
+                Some(n) => args["part"] = json!(n),
+                None => {
+                    res.untranslated.push(format!("instance {}: part {} not in its Part Studio's parts list", i["name"], i["partId"]));
+                    continue;
+                }
+            }
+        }
+        match call(ctx, "assembly_insert", args) {
+            Ok(r) => {
+                if let Some(n) = r["name"].as_str() {
+                    ours.insert(id.to_string(), n.to_string());
+                }
+            }
+            Err(e) => res.untranslated.push(format!("instance {}: {e}", i["name"])),
+        }
+    }
+    // Fixed as live's, placed where live has them.
+    let occurrences: Vec<&Value> = root["occurrences"].as_array().into_iter().flatten().collect();
+    let mut placer = match Translator::new(ctx, &json!({ "features": [] }), HashMap::new()) {
+        Ok(t) => t,
+        Err(e) => {
+            res.untranslated.push(format!("placement: {e}"));
+            return res;
+        }
+    };
+    for o in &occurrences {
+        let Some(name) = o["path"].as_array().and_then(|p| p.last()).and_then(Value::as_str).and_then(|id| ours.get(id)) else { continue };
+        let fixed = o["fixed"] == true;
+        if let Err(e) = placer.call("assembly_set_state", json!({ "tab": "Assembly 1", "instances": [name], "fixed": fixed })) {
+            res.untranslated.push(format!("{name}: fixed: {e}"));
+        }
+        if let Some(m) = o["transform"].as_array().map(|a| a.iter().filter_map(Value::as_f64).collect::<Vec<_>>())
+            && let Err(e) = placer.place("Assembly 1", name, &m)
+        {
+            res.untranslated.push(format!("{name}: placed: {e}"));
+        }
+    }
+    // The mates, between the same connectors.
+    let mut mate_names: Vec<(String, String)> = Vec::new();
+    for f in features.iter().filter(|f| f["btType"].as_str().is_some_and(|t| t.starts_with("BTMMate-"))) {
+        let name = f["name"].as_str().unwrap_or("").to_string();
+        let par = |id: &str| f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == id);
+        let Some(ty) = par("mateType").and_then(|p| p["value"].as_str()).and_then(mate_type) else {
+            res.untranslated.push(format!("{name}: mate type {:?} not mapped", par("mateType").map(|p| &p["value"])));
+            continue;
+        };
+        let ends: Vec<Option<Value>> = par("mateConnectorsQuery")
+            .and_then(|p| p["queries"].as_array())
+            .into_iter()
+            .flatten()
+            .map(|q| {
+                let (path, inf, _) = connectors.get(q["featureId"].as_str()?)?;
+                let instance = ours.get(path.last()?)?;
+                let entity = entities.get(q["featureId"].as_str()?)?;
+                let mut c = json!({ "instance": instance, "entity": entity });
+                if let Some(i) = inference(inf) {
+                    c["inference"] = json!(i);
+                }
+                Some(c)
+            })
+            .collect();
+        let [Some(a), Some(b)] = ends.as_slice() else {
+            res.untranslated.push(format!("{name}: its connectors not translated"));
+            continue;
+        };
+        match placer.call("assembly_mate", json!({ "tab": "Assembly 1", "type": ty, "a": a, "b": b, "name": name })) {
+            Ok(_) => mate_names.push((f["featureId"].as_str().unwrap_or("").to_string(), name)),
+            Err(e) => res.untranslated.push(format!("{name}: {e}")),
+        }
+    }
+    // Adding a mate snaps its connectors into line as the dialog does; live's
+    // places are after any drag since: moved there again, the mates solving.
+    for o in occurrences.iter().filter(|o| o["fixed"] != true) {
+        let Some(name) = o["path"].as_array().and_then(|p| p.last()).and_then(Value::as_str).and_then(|id| ours.get(id)) else { continue };
+        if let Some(m) = o["transform"].as_array().map(|a| a.iter().filter_map(Value::as_f64).collect::<Vec<_>>())
+            && let Err(e) = placer.place("Assembly 1", name, &m)
+        {
+            res.differences.push(format!("{name}: not moved to live's place after the mates: {e}"));
+        }
+    }
+    // Compared with live: each occurrence's place, each mate's status.
+    let list = match placer.call("assembly_list", json!({ "tab": "Assembly 1" })) {
+        Ok(l) => l,
+        Err(e) => {
+            res.differences.push(format!("assembly_list: {e}"));
+            return res;
+        }
+    };
+    let k = per_unit(&list["units"]);
+    for o in &occurrences {
+        res.occurrences += 1;
+        let Some(name) = o["path"].as_array().and_then(|p| p.last()).and_then(Value::as_str).and_then(|id| ours.get(id)) else {
+            res.differences.push(format!("occurrence {}: not inserted", o["path"]));
+            continue;
+        };
+        let Some(i) = list["instances"].as_array().into_iter().flatten().find(|i| i["name"] == name.as_str()) else { continue };
+        let Some((t, q)) = o["transform"].as_array().map(|a| a.iter().filter_map(Value::as_f64).collect::<Vec<_>>()).and_then(|m| transform_parts(&m)) else { continue };
+        let ot: Vec<f64> = (0..3).map(|j| i["translation"][j].as_f64().unwrap_or(f64::NAN) * k).collect();
+        let oq: Vec<f64> = (0..4).map(|j| i["rotation"][j].as_f64().unwrap_or(f64::NAN)).collect();
+        let dt = (0..3).map(|j| (ot[j] - t[j]).abs()).fold(0.0, f64::max);
+        // q and −q are one rotation.
+        let dq = (0..4).map(|j| (oq[j] - q[j]).abs()).fold(0.0, f64::max).min((0..4).map(|j| (oq[j] + q[j]).abs()).fold(0.0, f64::max));
+        if dt <= 1e-6 && dq <= 1e-6 {
+            res.occurrences_matching += 1;
+        } else {
+            res.differences.push(format!("{name}{}: at {:?} mm, rotation {oq:?}; live {:?} mm, {q:?} (off {:.6} mm / {:.2e})", if i["fixed"] == true { " (fixed)" } else { "" }, ot.iter().map(|c| c * 1e3).collect::<Vec<_>>(), t.map(|c| c * 1e3), dt * 1e3, dq));
+        }
+    }
+    let states = &asm["features"]["featureStates"];
+    for (id, name) in &mate_names {
+        res.mates += 1;
+        let live_ok = states[id.as_str()]["featureStatus"].as_str().unwrap_or("OK") == "OK";
+        let Some(m) = list["mates"].as_array().into_iter().flatten().find(|m| m["name"] == name.as_str()) else { continue };
+        let ok = m["ok"] == true;
+        if ok == live_ok {
+            res.mates_matching += 1;
+        } else {
+            res.differences.push(format!("{name}: {}, live {}", if ok { "OK".to_string() } else { format!("error ({})", m["message"].as_str().unwrap_or("")) }, states[id.as_str()]["featureStatus"].as_str().unwrap_or("?")));
+        }
+    }
+    res
 }

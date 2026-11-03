@@ -56,6 +56,22 @@ fn ellipse_axis_dimension_reads_its_diameter() {
     assert_eq!(values, ["Ø30", "Ø12"], "{st}");
 }
 
+/// sketch_get `at`: only the regions holding a sketch point, or a model
+/// point projected onto the sketch plane (Front: sketch y is model Z).
+#[test]
+fn sketch_regions_at_a_point() {
+    let mut ctx = Ctx::new();
+    let sketch = new_sketch(&mut ctx, "regions-at.noshape", "plane:front");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "tool": "circle", "points": [[0, 0], [5, 0]] }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "tool": "circle", "points": [[0, 20], [5, 20]] }));
+    let centers = |v: &Value| v["regions"].as_array().unwrap().iter().map(|r| (num(&r["center"][0]).round(), num(&r["center"][1]).round())).collect::<Vec<_>>();
+    assert_eq!(centers(&call(&mut ctx, "sketch_get", json!({ "sketch": sketch }))).len(), 2);
+    assert_eq!(centers(&call(&mut ctx, "sketch_get", json!({ "sketch": sketch, "at": [1, 19] }))), [(0.0, 20.0)]);
+    assert_eq!(centers(&call(&mut ctx, "sketch_get", json!({ "sketch": sketch, "at": ["1 mm", "0 mm", "1 mm"] }))), [(0.0, 0.0)]);
+    assert_eq!(centers(&call(&mut ctx, "sketch_get", json!({ "sketch": sketch, "at": [0, 0, 20] }))), [(0.0, 20.0)]);
+    assert!(centers(&call(&mut ctx, "sketch_get", json!({ "sketch": sketch, "at": [10, 10] }))).is_empty());
+}
+
 /// A shape whose clicks don't complete it is an error naming the clicks,
 /// also when its one click snapped to the Origin (it drew nothing).
 #[test]
