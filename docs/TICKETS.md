@@ -3231,6 +3231,23 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   y -70.9..91.4 / z 0..103 mm where live's is -85.1..105.6 / -14.2..103; cf-sheet-metal-model-plus's Sketch 1 too.
   Once the sketch has it: sketch_draw `spline` takes `start_derivative` / `end_derivative` (dx), and the parity
   translator passes them.
+- [ ] P1 PARITY-CUSTOM-RUN-FAILURES (core; dx's parity suite run 42, 11-03 19:33) the corpus's community features
+  whose inputs translate whole but fail in our host, with the Monitor's first error (featurestudio_monitor on the
+  translated documents: `NOSHAPE_PARITY_SAVE=<dir>` keeps them, NOSHAPE_PARITY_ONLY=<name>; copies of all in
+  /root/dx-scratch/pmsave/<name>.noshape), each with live building it:
+  - cf-sheet-metal-shaped-flange (Shaped Flange 1, 2): `opEdgeChange: only offset edge changes are supported`
+    (std geomOperations.fs 531, from sheetMetalShapedFlange.fs 176 updateSheetMetalModelForCFlange).
+  - cf-curve-pattern-normal (Curve Pattern Normal 1): `Call clusterPoints(array, number) does not match
+    clusterPoints(array, ValueWithUnits)` (the studio pins std 422, where the tolerance was a number;
+    FS-OLD-STD-COMPAT).
+  - cf-linear-pattern-with-seed-location (Face / Feature / Part Pattern): `Function checkInput with 4 argument(s)
+    not found` (studio at std 392; FS-OLD-STD-COMPAT).
+  - cf-hose-routing (Hose Routing 1–4): `@opShell: SHELL_FAILED` (live: INFO "Smallest Bend radius = 25.9 mm").
+  - cf-setback-fillet (Setback Fillet 1, 2): `@opFillSurface: FILL_SURFACE_NO_EDGES`.
+  - cf-spur-gear (Spur Gear): `@opFillet: FILLET_FAILED` (its root fillets; behind a mate connector the corpus
+    can't place yet, so it shows once that is fixed).
+  Not the host's: cf-sheet-metal-flange-plus (its Sheet Metal Model Plus studio's import isn't fetched, REQUESTS
+  19:19) and cf-sheet-metal-overcut-dogbone (Fold SM 1's edge has no geometry in live's data).
 - [ ] P1 FS-FEATURE-LIST-NONDETERMINISTIC (core; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our

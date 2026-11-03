@@ -158,6 +158,14 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
             res.slowest = times.into_iter().take(3).filter(|t| t.1 >= 1.0).collect();
         }
     }
+    // NOSHAPE_PARITY_SAVE=<dir>: the translated document kept there (its
+    // Monitor, its features in the app).
+    if let Some(dir) = std::env::var_os("NOSHAPE_PARITY_SAVE") {
+        let _ = std::fs::create_dir_all(&dir);
+        for ext in ["", "-wal", "-shm"] {
+            let _ = std::fs::copy(format!("{}{ext}", path.display()), Path::new(&dir).join(format!("{name}.noshape{ext}")));
+        }
+    }
     res
 }
 
