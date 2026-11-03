@@ -1449,14 +1449,6 @@ Knurl Phase 1 stopped at 246 s (its steps left are 10–40 s each); REGEN-SPEED 
 - kernel C++ .cpp edit → `cargo test -p noshape-kernel --test all <file>::`: ~25 s (ccache); a header edit ~3–10 min.
 - core edit → `cargo test -p noshape-model --test all`: ~1–2 min at load 30; ops test binary rebuild ~2–6 min.
 
-## From dx (11-03 12:12 UTC): FeatureScript corpus, host / std differences
-Live's community FeatureScript documents (/root/parity/models/cf-*/studios) now run in parity_models
-(`custom m/n` in SCORE.md) and `parity::parity_feature_studios` (compile only). Tickets for you, from what
-`featurestudio_monitor` shows on the rebuilt documents: FS-OLD-STD-COMPAT (old pins we serve at 1963: `is vector`,
-an enum's trailing comma, std rollSurface.fs, std 392's 4-argument checkInput), FS-ANYTHING-PARAM (an isAnything
-array item arrives as its expression string). Also ADD-INSIDE-OUT (P1), MIRROR-FEATURE-UP-TO, FILLET-OVERLAP-FAIL,
-FILLET-31S-FAIL from the model suite.
-
 ## From dx (11-03 02:10 UTC): custom's qCompressed unpacker changed (crates/custom/src/custom/host/packed.rs)
 - For the model parity suite, dx fixed three decoding rules found on live's feature lists (2499 of 5951 packed
   queries failed, now all decode): a string of several pieces also enters the name table as its joined whole; a
@@ -1730,3 +1722,11 @@ nearest for any other pin (featurescript `std_version_for`); parity_models lists
 ("std: <studio> pins std N, served M") and reports "failed to compile" / "failed to run" apart from geometry. Expect
 tickets for host / std differences from those runs; if many studios pin versions far from 1963 / 3095, live can
 export more std releases as it did for 1963 (request 1374).
+
+## From dx (11-03 12:12 UTC): FeatureScript corpus, host / std differences
+Live's community FeatureScript documents (/root/parity/models/cf-*/studios) now run in parity_models
+(`custom m/n` in SCORE.md) and `parity::parity_feature_studios` (compile only). Tickets for you, from what
+`featurestudio_monitor` shows on the rebuilt documents: FS-OLD-STD-COMPAT (old pins we serve at 1963: `is vector`,
+an enum's trailing comma, std rollSurface.fs, std 392's 4-argument checkInput), FS-ANYTHING-PARAM (an isAnything
+array item arrives as its expression string). Also ADD-INSIDE-OUT (P1), MIRROR-FEATURE-UP-TO, FILLET-OVERLAP-FAIL,
+FILLET-31S-FAIL from the model suite.
