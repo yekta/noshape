@@ -1,6 +1,6 @@
 {
  "name": "sketch-slot",
- "about": "slot tool: two centres and a width",
+ "about": "a line, then the Slot tool (Offset dropdown): click the line, then a width: live wraps a slot around existing curves (behaviours 164)",
  "area": "psui",
  "source": "everyday",
  "start": "empty",
@@ -18,10 +18,8 @@
    }
   },
   {
-   "do": "click",
-   "on": {
-    "tool": "Slot"
-   }
+   "do": "key",
+   "key": "l"
   },
   {
    "do": "click",
@@ -42,10 +40,33 @@
    }
   },
   {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Slot"
+   }
+  },
+  {
    "do": "click",
    "on": {
     "sketch_point": [
-     30,
+     15,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     15,
      5
     ]
    }
