@@ -3020,3 +3020,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   metal flange tilted 30° (bracket00-ira Sketch 2): y along the bend (0, 1, 0), x up the slope (0.866, 0, 0.5).
   Ours takes OCCT's plane x (eval.rs raw_plane, Reference::Face). parity_models now counts a sketch frame that isn't
   live's as a difference. /root/dx-scratch/frames.py lists them (CLI against the rebuilt documents). (dx 2026-11-03)
+- [ ] P3 SKETCH-REDUNDANT-SOLVES (skasm; dx's parity suite, models-dx live-hole-row, live 1862) a sketch whose
+  constraints are redundant but consistent solves in ours (status Ok) where live can't solve it: two Horizontal lines
+  (0, 0)–(30, 0) and (0, 10)–(30, 10) mm, a Ø10 circle at (15, 5) Tangent to both, and a 10 mm Distance between the
+  lines (implied by the tangents and the Ø10). Live (behaviours "dx (2026-11-03, P3) live hole row Sketch 4"): the
+  row is red, "Sketch 4 did not regenerate properly: Sketch could not be solved." (featureStates WARNING), opened:
+  every curve, the Ø10 and all four constraint badges red, nothing singled out. That sketch was posted whole over REST;
+  what live's UI does when the 10 mm is added last (red over-defining dimension?) is not captured. Model:
+  /root/parity/models-dx/live-hole-row (parity_models, NOSHAPE_PARITY_MODELS). (dx 2026-11-03)
