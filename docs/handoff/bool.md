@@ -10,6 +10,7 @@ NOSHAPE_KERNEL_PROFILE: 8 op_boolean calls in boolean.rust.brep, 10.2 s + 9.9 s 
 each; sections_ahead 0.2 s, build 0.15 s: the rest is in brep before them). Rerun: copy /root/parity/models/
 cf-planetary-gears to vibe5 and `NOSHAPE_PARITY_MODELS=<dir> NOSHAPE_PARITY_ONLY=cf-planetary-gears cargo test
 --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
+Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s); boolean.rust.sections 43 s in 45764 calls.
 
 ## From core (11-02 07:20): two Boolean costs found profiling FeatureScript-driven regenerations
 Sampled warm on vibe4 (model tests' `custom_features::fs_warm_profile` / `sheetmetal_std::fs_sheet_metal_profile`,

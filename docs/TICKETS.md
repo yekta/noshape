@@ -3284,6 +3284,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P0 BOOL-RUST-GEARS-SLOW (bool; core 11-03 20:07, from PARITY-SPEED) cf-planetary-gears regenerates in 12.8 s with
   the Rust Boolean and 1.35 s without it (NOSHAPE_BOOL_RUST=0; both match live, live 0.54 s): its 4 subtractions a
   regeneration take ~2.5 s each in boolean.rust.brep. Data and rerun in docs/handoff/bool.md (core 11-03).
+  core 11-03 21:34: the same on cf-straight-spline (54 SAE spline features): 44.2 s with the Rust Boolean, 15.3 s
+  without (both 5/59 features as live; live 7.8 s); boolean.rust.sections 43 s over 45764 calls.
 - [ ] P1 PARITY-SPEED (core; dx's parity suite 11-03 run 31, the runner's new "speed:" line) 10 of the 41 corpus
   documents with live's times regenerate slower than live (ours: the reopened document's regeneration on vibe5;
   live: the sum of its features' regeneration times, live.jsonl's last line). Worst: **cf-hose-routing 116 s vs live
