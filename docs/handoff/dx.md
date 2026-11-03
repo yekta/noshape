@@ -26,6 +26,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - File shapes asked of live (REQUESTS 11-02 23:55): features.json (+ configuration, variables, units, sketches),
   live.jsonl, source.json, refs.jsonl (geometry of every referenced id before its feature). GET /features and POST
   /featurescript are 429 for the account until ~04:45 UTC.
+- 11-03 11:56 translator: sketch entities drawn where live's solve put them (`sketches` geomEntities: lines,
+  circles, arcs, points; stored geometry can lag variables: cf-parameter-pattern); a custom feature's namespace may
+  name another document's studio version (`d…::v…::e…::m…`); id-only regions counted by id; a revolve's id-only axis
+  is the last sketch's one construction line. New ticket ADD-INSIDE-OUT (an Add on a drafted block leaves the part
+  inside out). Score 11/24, 127/181, custom 0/13 (live still refetching; ids-only bodies in 9 documents asked).
 - 11-03 00:10: configuration Variable inputs (#parameterId, default and range) built, configured parameters take the
   default option, Revolve `revolveType` and Variable `value` upgraded as Onshape does, Onshape-internal parameters
   (asVersion, defaultsChanged, computeTransformsWithoutBuiltin) skipped; features without a live.jsonl line are not

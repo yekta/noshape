@@ -6,7 +6,7 @@ causes of difference, each with its ticket.
 
 | date | green | models | features | scenarios | biggest causes (tickets) |
 |---|---|---|---|---|---|
-| 2026-11-03 | (dx 11:43) | 11/20 | 112/146 (custom 0/3) | – | 3× CUT-CLOSED-EDGES-SPLIT family (bool / core: bushing2 Extrude 4, motor-mount-jack Extrude 2, pipeflange Fillet 2); 1× MIRROR-FEATURE-UP-TO (core: clamp-hms); 1× FILLET-OVERLAP-FAIL (core: learning-center-michael); knob-kraut Chamfer 1, cf-circular-pattern's custom pattern and prize-wheel's Hole INFO wait on live (bodies with geometry, the INFO text: REQUESTS 11:12 / 11:15) — dx 11:43: live mid-refetch (documents without live.jsonl are not scored); core's fixes moved clamp-hms and learning-center-michael on; FeatureScript corpus studios 13/34 compile |
+| 2026-11-03 | (dx 11:56) | 11/24 | 127/181 (custom 0/13) | – | 3× CUT-CLOSED-EDGES-SPLIT family (bool / core: bushing2, motor-mount-jack, pipeflange Fillet 2); 1× ADD-INSIDE-OUT (core / bool: cf-parameter-pattern); 1× MIRROR-FEATURE-UP-TO (core: clamp-hms); 1× FILLET-OVERLAP-FAIL (core: learning-center-michael); custom features: studios whose imports live hasn't fetched (cf-belt, cf-o-ring), inputs unmapped until live's bodies have geometry (cf-circular-pattern, cf-linear-pattern…; REQUESTS 11:05 / 11:15) — dx 11:56: live mid-refetch; translator: sketches at live's solved geometry, more id-only queries placed |
 
 qa 11-03 05:55: the scenario column counts the scenarios with a live recording at compare time (112 of 162 runs; live was
 re-recording); the evening run replaces today's numbers. Scenario differences are psui's (its runner reports its own
