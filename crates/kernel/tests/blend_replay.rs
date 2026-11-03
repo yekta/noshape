@@ -300,3 +300,25 @@ fn occt_blend_corpus_time() {
     assert!(n > 0, "no corpus at {}", dir.display());
     println!("occt blend corpus: {n} cases, {total:.0} ms (best of 3 each), {} failed", failed / 3);
 }
+
+/// Blend results with a degenerated edge between two different faces (OCCT's split corner patches: 1686 (c)'s
+/// vertex lay 0.9 mm off its face): which corpus cases still have one, OCCT's blends and ours.
+#[test]
+#[ignore = "T2: the blend corpus (NOSHAPE_BLEND_CORPUS)"]
+fn blend_corpus_pinched_corners() {
+    use noshape_kernel::ShapeType;
+    let dir = std::env::var("NOSHAPE_BLEND_CORPUS").unwrap_or_else(|_| "/root/core-scratch/blend-corpus".into());
+    let dir = Path::new(&dir);
+    let mut found = 0;
+    for name in blend_corpus::cases(dir) {
+        let Some(case) = blend_corpus::load(dir, &name) else { continue };
+        let Ok(r) = blend_corpus::run(&case) else { continue };
+        let Ok(ef) = r.shape.edge_faces() else { continue };
+        let pinched: Vec<usize> = r.shape.edges().iter().enumerate().filter(|(i, e)| e.edge_info().is_ok_and(|x| x.degenerated) && ef.get(*i).is_some_and(|f| f.len() == 2 && f[0] != f[1])).map(|(i, _)| i).collect();
+        if !pinched.is_empty() {
+            found += 1;
+            println!("{name}: {:?}, {} faces, {} pinched edges", case.blend, r.shape.count(ShapeType::Face), pinched.len());
+        }
+    }
+    println!("{found} cases with pinched corners");
+}
