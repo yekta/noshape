@@ -2108,11 +2108,8 @@ impl PartStudioView {
     pub(super) fn isolate(&mut self, mode: IsolateMode, window: &mut Window, cx: &mut Context<Self>) {
         let targets = self.isolate_targets();
         // Live 10-27: Shift+I over a faded part (it takes no hover) does
-        // nothing.
+        // nothing; nor does it with no part at all (ui-parity shortcut-shift-t).
         if targets.is_empty() {
-            if self.ui.isolate.is_none() {
-                self.flash_info("Select or hover over a part first.".into(), cx);
-            }
             return;
         }
         match &mut self.ui.isolate {

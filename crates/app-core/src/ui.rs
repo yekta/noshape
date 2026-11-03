@@ -620,13 +620,15 @@ pub fn menu_tool_item(name: &'static str, icon: &str, shortcut: Option<&'static 
     let icon = icon.to_string();
     gpui_kit::component::menu::PopupMenuItem::element(move |_, cx| {
         let pal = p();
-        h_flex()
+        let row = h_flex()
+            .relative()
             .h(px(32.))
             .w_full()
             .gap(px(4.))
             .child(div().w(px(30.)).flex_none().flex().items_center().justify_center().child(assets::icon(&icon, TOOL_ICON, cx)))
             .child(div().flex_1().text_size(px(14.)).text_color(pal.text).child(name))
-            .children(shortcut.map(shortcut_chips))
+            .children(shortcut.map(shortcut_chips));
+        crate::ui_script::mark(row, || format!("menu:{name}"))
     })
 }
 

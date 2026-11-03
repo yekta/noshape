@@ -85,6 +85,19 @@ fn keystroke(key: &str) -> Option<Keystroke> {
         k if k.len() > 1 && k.starts_with('F') => return Keystroke::parse(&[spec.join("-"), k.to_lowercase()].iter().filter(|s| !s.is_empty()).cloned().collect::<Vec<_>>().join("-")).ok(),
         k => k,
     };
+    // Shift with a symbol key types its shifted symbol (US layout) and, as GPUI reads a keyboard (X11's
+    // keystroke_from_xkb), no shift: shift+/ is "?".
+    const SHIFTED: [(&str, &str); 21] = [
+        ("/", "?"), ("1", "!"), ("2", "@"), ("3", "#"), ("4", "$"), ("5", "%"), ("6", "^"), ("7", "&"), ("8", "*"), ("9", "("), ("0", ")"),
+        ("-", "_"), ("=", "+"), ("[", "{"), ("]", "}"), (";", ":"), ("'", "\""), (",", "<"), (".", ">"), ("`", "~"), ("\\", "|"),
+    ];
+    let name = match SHIFTED.iter().find(|(k, _)| *k == name) {
+        Some((_, shifted)) if spec.iter().any(|m| m == "shift") => {
+            spec.retain(|m| m != "shift");
+            shifted
+        }
+        _ => name,
+    };
     let ch = (name.chars().count() == 1).then(|| name.to_string());
     let upper = ch.as_ref().is_some_and(|c| c.chars().all(char::is_uppercase));
     if upper {
@@ -128,6 +141,10 @@ fn control_name(t: &Value) -> Option<String> {
     }
     if t.get("rollback_bar").is_some() {
         return Some("button:Rollback bar".into());
+    }
+    // A tool in a toolbar dropdown: its caret first (the step then picks the entry).
+    if let (Some(tool), Some(_)) = (t.get("tool").and_then(Value::as_str), t.get("menu")) {
+        return Some(format!("caret:{tool}"));
     }
     ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown"].iter().find_map(|k| t.get(*k).and_then(Value::as_str).map(|v| format!("{k}:{v}")))
 }
@@ -260,12 +277,14 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                             _ => (MouseButton::Left, 1),
                         };
                         let _ = cx.update(|window, cx| mouse(window, cx, at, button, mods, clicks));
-                        // A dropdown step picks its entry from the list it opened.
-                        match step["on"].get("pick").and_then(Value::as_str) {
+                        // A dropdown step picks its entry from the list it opened (a toolbar dropdown: its tool).
+                        let pick = step["on"].get("pick").or_else(|| step["on"].get("tool").and(step["on"].get("menu"))).and_then(Value::as_str);
+                        let row_key = if step["on"].get("pick").is_some() { "list_row" } else { "menu" };
+                        match pick {
                             Some(pick) => {
                                 sleep(cx, 300).await;
                                 redraw(cx).await;
-                                let row = json!({ "list_row": pick });
+                                let row = json!({ row_key: pick });
                                 match cx.update(|_, cx| locate(&row, &ps, cx)).unwrap_or_else(|e| Err(e.to_string())) {
                                     Ok(at) => {
                                         let _ = cx.update(|window, cx| {

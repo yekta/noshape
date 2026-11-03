@@ -698,6 +698,44 @@ fn another_tool_keeps_the_open_feature(cx: &mut TestAppContext) {
     assert_eq!(names(cx).len(), 3, "the unchanged Extrude 1 as it was: {:?}", names(cx));
 }
 
+/// Live (ui-parity shortcut-plane-shift-enter): Shift+Enter in Depth with "20" typed applies it and keeps the
+/// dialog; the next Shift+Enter accepts and opens the next one.
+#[gpui::test]
+fn shift_enter_with_typed_text_applies_it_first(cx: &mut TestAppContext) {
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "shift-enter", Some(block));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let id = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Extrude 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Extrude dialog").dialog.clone());
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["2", "0", "shift-enter"]);
+    assert_eq!(cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.read(cx).feature.id)), Some(id), "the dialog stays");
+    assert_eq!(dialog.update(cx, |d, cx| d.field_text("depth", cx)).as_deref(), Some("20 mm"));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    keys(cx, window, &["shift-enter"]);
+    assert!(cx.update(|cx| view.read(cx).edit.as_ref().is_some_and(|e| e.is_new)), "accepted, a new Extrude open");
+}
+
+/// Live (ui-parity variable-edit-focus): an edited Variable opens with the keyboard in Value, its text selected.
+#[gpui::test]
+fn an_edited_variable_opens_in_its_value(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_wall_thickness(cx, "var-edit-focus");
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let id = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.type_id == "assignVariable").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    draw(cx, window);
+    let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+    assert_eq!((state["focus"]["label"].as_str(), state["focus"]["all"].as_bool()), (Some("Value"), Some(true)), "{}", state["focus"]);
+}
+
 /// Live (ui-parity extrude-depth-variable-escape, 11-03): Esc with the autofill list open closes the list only;
 /// `#wall` and the focus stay in Depth (ours reverted the field and left it).
 #[gpui::test]

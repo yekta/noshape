@@ -32,9 +32,15 @@ impl PartStudioView {
             f["kind"] = "search-tools".into();
             f["label"] = Value::Null;
             f
-        } else if filter_focused {
-            let text = self.ui.filter.as_ref().map(|f| f.0.read(cx).value().to_string()).unwrap_or_default();
-            json!({ "kind": "filter", "label": "Filter by name or type", "text": text, "selection": null, "all": false })
+        } else if let Some(sd) = self.ui.section_dialog.as_ref() {
+            // The Section view panel's active field (live reads it as the focused control).
+            json!({ "kind": "field", "label": if sd.items_active { if sd.include { "Items to include" } else { "Items to exclude" } } else { "Section planes" }, "text": null, "selection": null, "all": false })
+        } else if self.shortcut_sheet.is_some() {
+            json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })
+        } else if let Some(st) = self.ui.filter.as_ref().map(|f| f.0.read(cx)).filter(|_| filter_focused) {
+            let mut f = crate::feature_dialog::field_focus("Filter by name or type", st);
+            f["kind"] = "filter".into();
+            f
         } else {
             json!({ "kind": "none", "label": null, "text": null, "selection": null, "all": false })
         };
@@ -102,6 +108,8 @@ impl PartStudioView {
                         }
                         // A new folder's row is related-highlighted until the next click (live ui 10-25 b (1)).
                         super::ListItem::Folder(_, fd) => rows.push(json!({ "name": fd.name, "state": "ok", "selected": self.ui.selected_folder == Some(fd.id), "editing": false, "related": self.ui.fresh_folder == Some(fd.id), "hidden": false })),
+                        // Rows a filter leaves out show as one "..." row (live ui-parity feature-filter).
+                        super::ListItem::Ellipsis => rows.push(json!({ "name": "...", "state": "ok", "selected": false, "editing": false, "related": false, "hidden": false })),
                         // At the top the bar sits under Default geometry (live).
                         super::ListItem::Rollback(..) => after = Some(rows.last().and_then(|r| r["name"].as_str()).unwrap_or("Default geometry").to_string()),
                         _ => {}
@@ -111,13 +119,20 @@ impl PartStudioView {
             }
             None => (Vec::new(), None),
         };
-        let parts: Vec<String> = self.display.bodies.iter().map(|b| b.name.clone()).collect();
+        // As the list draws them: a run of parts a filter leaves out is one "…" row.
+        let mut parts: Vec<String> = Vec::new();
+        for b in &self.display.bodies {
+            let name = if noshape_model::interaction::filter_row(&self.ui.filter_query, &b.name, b.hidden) == Some(false) { "…" } else { &b.name };
+            if !(name == "…" && parts.last().is_some_and(|p| p == "…")) {
+                parts.push(name.to_string());
+            }
+        }
         let message = self.message.as_ref().filter(|(_, m)| self.edit.is_some() || m != behaviors::NO_INTERSECTION).map(|(_, m)| m.clone());
         // The canceled-sketch toast's Restore link is part of its text in live.
         let message = message.map(|m| if self.canceled_edit.as_ref().is_some_and(|c| c.3 == m) { format!("{m} Restore") } else { m });
         json!({
             "focus": focus,
-            "dialog": dialog.map(|d| d.ui_state(window, cx)),
+            "dialog": dialog.map(|d| d.ui_state(window, cx)).or_else(|| self.isolate_panel_state()),
             "list": list,
             "selection": { "count": items.len(), "items": items },
             "features": { "rows": rows, "rollbackAfter": rollback_after },
@@ -263,8 +278,25 @@ impl PartStudioView {
     }
 
     /// The focused rename or folder name input, if any.
+    /// The Isolate / Make transparent panel as live's state reads it (a dialog frame with no fields of its own).
+    fn isolate_panel_state(&self) -> Option<Value> {
+        let iso = self.ui.isolate.as_ref()?;
+        let title = if iso.mode == super::behaviors::IsolateMode::Isolate { "Isolate" } else { "Make transparent" };
+        Some(json!({ "title": title, "titleState": "ok", "kind": "feature", "tabs": [], "fields": [], "error": null }))
+    }
+
     fn unlabelled_input_focused<'a>(&self, window: &Window, cx: &'a App) -> Option<&'a InputState> {
-        let inputs = self.renaming.as_ref().map(|r| &r.1).into_iter().chain(self.folder_prompt.as_ref().map(|f| &f.0)).chain(self.ui.part_renaming.as_ref().map(|r| &r.1)).chain(self.ui.dg_renaming.as_ref().map(|r| &r.1));
+        let appearance = self.ui.appearance_edit.as_ref().map(|a| std::iter::once(&a.hex).chain(&a.channels).chain(std::iter::once(&a.alpha)));
+        let inputs = self
+            .renaming
+            .as_ref()
+            .map(|r| &r.1)
+            .into_iter()
+            .chain(self.folder_prompt.as_ref().map(|f| &f.0))
+            .chain(self.ui.part_renaming.as_ref().map(|r| &r.1))
+            .chain(self.ui.dg_renaming.as_ref().map(|r| &r.1))
+            .chain(self.named_views.as_ref().map(|n| &n.0))
+            .chain(appearance.into_iter().flatten());
         inputs.map(|e| e.read(cx)).find(|st| st.focus_handle(cx).is_focused(window))
     }
 

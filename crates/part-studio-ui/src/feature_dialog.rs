@@ -253,6 +253,8 @@ pub struct FeatureDialog {
     /// The last press in the dialog came while a field held typed text not yet applied: a click on ✓ then only
     /// applies it (live ui-parity extrude-ok-button: the dialog stays open, a second ✓ closes it).
     press_applies_typed: bool,
+    /// The value an edited feature opens with the keyboard in (INITIAL_FOCUS_ON_EDIT on a number or text).
+    edit_focus: Option<&'static str>,
     /// Open "Create variable" popup.
     create_var: Option<CreateVar>,
     /// A field outside the dialog that opened the Create variable popup (the
@@ -407,6 +409,7 @@ impl FeatureDialog {
             completion: None,
             just_applied: None,
             press_applies_typed: false,
+            edit_focus: None,
             focus_dialog_pending: false,
             keyboard_left: false,
             create_var: None,
@@ -455,8 +458,15 @@ impl FeatureDialog {
     /// INITIAL_FOCUS_ON_EDIT is the active one (uihint.gen.fs), else the
     /// first visible one as for a new feature.
     pub fn focus_for_edit(&mut self) {
-        if let Some(s) = self.ty.params.iter().find(|s| s.is_visible(&self.feature.params) && s.hints.has(Hints::INITIAL_FOCUS_ON_EDIT) && matches!(s.kind, ParamKind::Query { .. })) {
-            self.active_query = Some(s.id.to_string());
+        let Some(s) = self.ty.params.iter().find(|s| s.is_visible(&self.feature.params) && s.hints.has(Hints::INITIAL_FOCUS_ON_EDIT)) else { return };
+        match s.kind {
+            ParamKind::Query { .. } => self.active_query = Some(s.id.to_string()),
+            // A value marked so takes the keyboard, its text selected (live ui-parity variable-edit-focus: Value).
+            ParamKind::Num(_) | ParamKind::Text { .. } => {
+                self.edit_focus = Some(s.id);
+                self.initial_focus_done = true;
+            }
+            _ => {}
         }
     }
 
@@ -643,6 +653,19 @@ impl FeatureDialog {
     /// A dialog without selection fields starts typing in its first text or
     /// number field (Onshape: the Variable dialog opens with Name focused).
     pub fn focus_first_field(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        if let Some(id) = self.edit_focus.take() {
+            let text = match self.feature.params.get(id) {
+                Some(ParamValue::Expr(e)) => e.text.clone(),
+                Some(ParamValue::Text(t)) => t.clone(),
+                _ => String::new(),
+            };
+            let st = self.ensure_input(id, &text, window, cx);
+            st.update(cx, |s, cx| {
+                s.focus(window, cx);
+                s.select_all(window, cx);
+            });
+            return true;
+        }
         // An edited feature's INITIAL_FOCUS_ON_EDIT field (`focus_for_edit`)
         // takes the focus instead of the first list.
         if let Some(id) = self.active_query.clone()
@@ -1335,6 +1358,8 @@ impl FeatureDialog {
             return i.clone();
         }
         let state = cx.new(|cx| InputState::new(window, cx).default_value(initial.to_string()));
+        // The text before any typing (a field focused on opening is never drawn unfocused to record it).
+        self.baselines.entry(path.to_string()).or_insert_with(|| initial.to_string());
         // A text field marked for initial focus (Variable's Name) takes the
         // keyboard when the dialog opens (live).
         if !self.initial_focus_done && self.spec_for_path(path).is_some_and(|s| matches!(s.kind, ParamKind::Text { .. }) && s.hints.has(Hints::INITIAL_FOCUS)) {
@@ -1369,10 +1394,11 @@ impl FeatureDialog {
             InputEvent::PressEnter { shift, .. } => {
                 // Onshape: Enter in a changed field applies the value (the
                 // text stays selected); the next Enter commits the feature.
-                if *shift {
-                    cx.emit(DialogEvent::Accept { repeat: true });
-                } else if this.apply_on_enter(&path_s, state, window, cx) {
+                // Shift+Enter with typed text only applies it too (live ui-parity shortcut-plane-shift-enter).
+                if this.apply_on_enter(&path_s, state, window, cx) {
                     this.flush_typed(cx);
+                } else if *shift {
+                    cx.emit(DialogEvent::Accept { repeat: true });
                 } else if !this.refuse_invalid_enter(&path_s, state, window, cx) {
                     cx.emit(DialogEvent::Accept { repeat: false });
                 }
@@ -4073,7 +4099,7 @@ impl Render for FeatureDialog {
                     .child(div().flex_1())
                     .children(footer_extra)
                     .child(
-                        Self::tab_stop_element(div().id("dlg-help"), &help_focus, Focus::Ring)
+                        Self::tab_stop_element(div().id("dlg-help").map(|d| crate::ui_script::mark(d, || "button:?".into())), &help_focus, Focus::Ring)
                             // Live: a 12 px `#a0a0a0` disc, its centre 1 px
                             // above the slider track, 11 px from the frame's
                             // right edge (dialogs/*-01-open: disc x 449–461).
@@ -4092,8 +4118,11 @@ impl Render for FeatureDialog {
                             .cursor_pointer()
                             .tooltip(crate::ui::tooltip(format!("{} help", self.ty.name)))
                             // Help: the feature's description (offline help).
-                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                                 this.show_help = !this.show_help;
+                                // Live (ui-parity dialog-help-button): the link takes the keyboard.
+                                let h = this.tab_stop("help", cx);
+                                window.focus(&h, cx);
                                 cx.notify();
                             })),
                     ),

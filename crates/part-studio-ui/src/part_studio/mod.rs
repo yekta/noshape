@@ -2990,7 +2990,8 @@ impl PartStudioView {
                             }));
                         }
                         menu
-                    }),
+                    })
+                    .map(|c| crate::ui_script::wrap(c.into_any_element(), || format!("caret:{}", ty.name))),
         )
         .into_any_element()
     }
@@ -3639,13 +3640,14 @@ impl PartStudioView {
                 let of_kind = |b: &noshape_model::display::BodyDisplay| part_section(b) == key;
                 let bodies: Vec<&noshape_model::display::BodyDisplay> = self.display.bodies.iter().filter(|b| of_kind(b)).collect();
                 // Filtered (live 10-27): the parts the query drops are one
-                // "..." row per run; the title keeps counting them all.
+                // "…" row per run (live ui-parity feature-filter: U+2026, the
+                // feature list's is three dots); the title keeps counting them all.
                 let mut rows: Vec<AnyElement> = Vec::new();
                 let mut gap = false;
                 for b in &bodies {
                     if noshape_model::interaction::filter_row(&self.ui.filter_query, &b.name, b.hidden) == Some(false) {
                         if !std::mem::replace(&mut gap, true) {
-                            rows.push(div().h(px(26.)).flex_none().pl(px(23.)).flex().items_center().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::BOLD).text_color(pal.text).child("...").into_any_element());
+                            rows.push(div().h(px(26.)).flex_none().pl(px(23.)).flex().items_center().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::BOLD).text_color(pal.text).child("…").into_any_element());
                         }
                         continue;
                     }
@@ -3819,7 +3821,11 @@ impl PartStudioView {
                                         .justify_center()
                                         .cursor_pointer()
                                         .child(crate::ui::glyph("ui-clear", 7., gpui_kit::rgb_static(0xffffff)))
-                                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.set_filter("", window, cx))),
+                                        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                                            this.set_filter("", window, cx);
+                                            // Live (ui-parity feature-filter-clear): the box loses the keyboard.
+                                            window.focus(&this.focus, cx);
+                                        })),
                                 )
                             }),
                     )
@@ -4105,6 +4111,8 @@ impl PartStudioView {
                     })))
                     .item(item("Edit appearance…", Box::new(move |this, w, cx| {
                         let t = targets(this, &b4);
+                        // Live (ui-parity parts-row-edit-appearance): the parts edited are selected.
+                        this.selection = t.iter().cloned().map(Reference::Body).collect();
                         this.edit_appearance(appearance::EditTarget::Parts(t), w, cx);
                     })))
                     .separator()
