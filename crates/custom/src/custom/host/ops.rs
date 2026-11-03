@@ -403,6 +403,37 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     // A subtraction's targets and its tools' faces (theirs in its result are the Boolean's).
     let mut before: Option<(Vec<BodyId>, HashSet<TopoName>)> = None;
     let merged = run_op(i, &cx, &id, failure, |ev| {
+        // localizedInFaces (std's sheet metal Tab, the community corner overcut): the tool faces (sheet faces or
+        // sketch regions) cut out of the target faces only; the rest of their bodies stay as they were.
+        if &*kind == "SUBTRACTION" && def_bool(&def, "localizedInFaces", false) {
+            let mut tool_faces: Vec<Shape> = Vec::new();
+            for (bi, fi) in ev.resolve_faces(&tool_refs) {
+                tool_faces.push(ev.face_shape(bi, fi)?);
+            }
+            let regions: Vec<Reference> = tool_refs.iter().filter(|r| matches!(r, Reference::SketchRegion { .. })).cloned().collect();
+            if !regions.is_empty() {
+                for p in ev.profiles(&regions)? {
+                    tool_faces.extend(p.shape.faces());
+                }
+            }
+            let targets = by_body(ev.resolve_faces(&target_refs));
+            if tool_faces.is_empty() || targets.is_empty() {
+                return Err(super::code_error("CANNOT_RESOLVE_ENTITIES"));
+            }
+            let tool = Shape::compound(&tool_faces);
+            for (bi, fis) in targets {
+                let faces: Vec<Shape> = fis.iter().filter_map(|&fi| ev.face_shape(bi, fi).ok()).collect();
+                let local = k::boolean(k::BooleanOp::Common, std::slice::from_ref(&tool), &[Shape::compound(&faces)], &k::BooleanOptions::default())?;
+                if local.shape.faces().is_empty() {
+                    continue;
+                }
+                let body = crate::regen::features::helpers_a::body_named(&ev.ctx.bodies[bi]);
+                let res = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&body.shape), &[local.shape], &k::BooleanOptions::default())?;
+                let names = ev.name_result(&[&body.names], &res.history, &res.shape, &BTreeMap::new(), None);
+                ev.replace_body(bi, res.shape, names);
+            }
+            return Ok(None);
+        }
         // Onshape's opBoolean on empty selections (live qa5 boolean: a
         // Subtract without Targets reads "Cannot resolve entities.").
         if ev.resolve_bodies(&tool_refs).is_empty() {

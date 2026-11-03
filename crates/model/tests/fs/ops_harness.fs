@@ -114,6 +114,17 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             opSplitPart(context, sub + "t", { "targets" : qCreatedBy(sub + "c", EntityType.BODY), "tool" : qCreatedBy(makeId("Right"), EntityType.FACE) });
             check("opSplitPart", size(evaluateQuery(context, qCreatedBy(sub + "c", EntityType.BODY))) == 2, [size(evaluateQuery(context, qCreatedBy(sub + "c", EntityType.BODY))), size(evaluateQuery(context, qCreatedBy(sub + "t", EntityType.BODY))), size(evaluateQuery(context, qCreatedBy(sub + "c", EntityType.FACE)))]);
         });
+        step(context, id, "localizedBoolean", function(sub) {
+            // A sketch region cut out of one sheet face only (std's sheet metal Tab): a quarter of the circle on it.
+            fCuboid(context, sub + "b", { "corner1" : vector(0, 0, 600) * mm, "corner2" : vector(20, 20, 610) * mm });
+            opExtractSurface(context, sub + "x", { "faces" : qContainsPoint(qCreatedBy(sub + "b", EntityType.FACE), vector(10, 10, 610) * mm) });
+            const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, 610) * mm, vector(0, 0, 1)) });
+            skCircle(sk, "c", { "center" : vector(20, 20) * mm, "radius" : 5 * mm });
+            skSolve(sk);
+            opBoolean(context, sub + "cut", { "tools" : qCreatedBy(sub + "sk", EntityType.FACE), "targets" : qCreatedBy(sub + "x", EntityType.FACE), "operationType" : BooleanOperationType.SUBTRACTION, "localizedInFaces" : true, "allowSheets" : true });
+            const a = evArea(context, { "entities" : qCreatedBy(sub + "x", EntityType.FACE) });
+            check("opBoolean localizedInFaces", abs(a - (400 - 25 * PI / 4) * mm ^ 2) < 1e-9 * meter ^ 2, a);
+        });
         step(context, id, "extrudeLoftSweep", function(sub) {
             const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, 400) * mm, vector(0, 0, 1)) });
             skCircle(sk, "c", { "center" : vector(0, 0) * mm, "radius" : 5 * mm });

@@ -3264,6 +3264,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - cf-setback-fillet (Setback Fillet 1, 2): `@opFillSurface: FILL_SURFACE_NO_EDGES`.
   - cf-spur-gear (Spur Gear): `@opFillet: FILLET_FAILED` (its root fillets; behind a mate connector the corpus
     can't place yet, so it shows once that is fixed).
+  core 11-03 21:49: cf-hose-routing builds (PARITY-SPEED notes). cf-sheet-metal-overcut-dogbone's Corner Overcuts
+  ran into opBoolean's `localizedInFaces` (sketch regions cut out of one wall face, as std's sheet metal Tab): done
+  (ops_harness localizedBoolean); they build now, Corner Overcut 1 at 11 faces / 10679.31 mm³ against live's 12 /
+  10678.61 (the next difference).
   Not the host's: cf-sheet-metal-flange-plus (its Sheet Metal Model Plus studio's import isn't fetched, REQUESTS
   19:19) and cf-sheet-metal-overcut-dogbone (Fold SM 1's edge has no geometry in live's data).
   dx 11-03 20:23, cf-straight-spline (54 SAE Straight-Sided Spline features; compiles since dx's enum trailing-comma
