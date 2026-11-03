@@ -9,6 +9,15 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 7 (qa, pinned account, from 11-02 22:40; greens bc7d7e9f → 6b4704f2)
 
+- **11-03 00:37:** scenarios are in the repo (tests/ui-parity/, format in its README, agreed by psui / live / qa):
+  151. Add them in qa-scratch/bin/mkscen.py, run it (writes qa-scratch/ui-parity/), then **`cp -n`** the new files into
+  tests/ui-parity/ (others may edit the repo copies; never clobber). Live CDP caveat: key presses after clicking a
+  feature row may not reach live's list (ArrowUp didn't move the bar): read back that each live action took effect;
+  ROLLBACK-BAR-UNDO-STEP was withdrawn for that (live's bar move is an undo step too), FEATURE-ROW-ENTER-EDITS is
+  unconfirmed (REQUESTS asks for a real-keyboard check). Pre-smoke of the release CLI part on green 107649d9
+  (/tmp/qa-presmoke.sh <cli> <tag> <prev>): = v0.4.22 but cli-shell-gpf's Shell 3 (explained); user cases pass.
+  psui's VAR-AUTOCOMPLETE-ENTER fix d5201a3f not yet in a green at 00:37: verify it with
+  new-variable-then-use-at-once (Variable tool, then edit Extrude 1 at once, #wall + Enter).
 - **11-02 23:54 — focus gotcha (cost one wrong ticket note):** under Xvfb (no WM) the app window has no X focus
   after xdotool clicks; then number fields put the caret at the click instead of selecting all and no caret / selection
   is drawn. **Before any UI-behaviour check: `bin/app.sh <binary> <doc> <tag>` then `bin/appfocus.sh <tag>`** (kill with
