@@ -3166,3 +3166,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (Live's box there, ±30.1455 mm past the ±30 block, is the UI fetch's loose client bounds round fillet surfaces,
   not geometry.) Model /root/parity/models/knob-jason (NOSHAPE_PARITY_ONLY=knob-jason); rebuilt document
   /root/dx-scratch/tickets/knob-jason.noshape. (dx 2026-11-03)
+- [ ] P2 FILLET-MEETING-FILLETS-ONE-FACE (core; dx's parity suite 11-03, pulley02-maxwell) two fillets that meet on
+  one surface stay two faces in ours where live's part has one: pulley02's Fillet 1 rounds both bottom corners of a
+  revolved groove 6.35 mm high with r 3.175 mm (1/8 in), so the two fillets meet at the groove's middle on one torus;
+  live's part is 5 faces / 4 edges, ours 6 / 5 (the volume is live's). Live keeps the round groove as one face.
+  Model /root/parity/models/pulley02-maxwell (NOSHAPE_PARITY_ONLY=pulley02-maxwell). (dx 2026-11-03)

@@ -6,7 +6,7 @@ causes of difference, each with its ticket.
 
 | date | green | models | features | scenarios | biggest causes (tickets) |
 |---|---|---|---|---|---|
-| 2026-11-03 | (dx 12:43) | 12/31 | 135/207 (custom 3/25) | – | 3× CUT-CLOSED-EDGES-SPLIT family (bool / core: bushing2, motor-mount-jack) + FILLET-PROPAGATION-VOLUME (pipeflange); 1× ADD-INSIDE-OUT (core / bool: cf-parameter-pattern); 1× MIRROR-FEATURE-UP-TO (clamp-hms); 1× FILLET-OVERLAP-FAIL (learning-center-michael); custom: FS-OLD-STD-COMPAT (checkInput at 392…), FS-ANYTHING-PARAM, FS-WAVE-SPRING (inside out, 157 s), studios' imports and ids-only bodies waiting on live (REQUESTS 11:05 / 11:15) — dx 12:43: live mid-refetch |
+| 2026-11-03 | d3627daf (dx 14:40) | 17/51 | 217/393 (custom 3/50) | – | 10× live's UI fetch without face / edge geometry or with lagging lines (asked, live 1892 / 13:20; half refetched); 4× SKETCH-COLLINEAR-EDGES-MERGE (core: learning-center-frank, exercise-martinl, clamp-guillem, motor-mount-jack); 4× custom studios not compiling (FS-OLD-STD-COMPAT, unfetched imports); 4× fillets (FILLET-PROPAGATION-VOLUME, FILLET-OVERLAP-FAIL, FILLET-KNOB-JASON-VOLUME, FILLET-MEETING-FILLETS-ONE-FACE); 2× SKETCH-FACE-FRAME (cf-hose-routing, learning-center-devon); also CUT-CLOSED-EDGES-SPLIT, MIRROR-FEATURE-UP-TO, EXTRUDE-SURFACE-CURVES, FILLET-BLEND-SPLIT, FS-WAVE-SPRING. Assemblies 8/8, mates 11/11 (with live's asm-hinge-live) |
 
 qa 11-03 05:55: the scenario column counts the scenarios with a live recording at compare time (112 of 162 runs; live was
 re-recording); the evening run replaces today's numbers. Scenario differences are psui's (its runner reports its own

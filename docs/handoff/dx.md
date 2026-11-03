@@ -94,7 +94,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
   kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
-- 11-03 14:25 corpus to 50 documents (runs 25–29, /root/dx-scratch/pm-run*.log): SCORE_LINE.
+- 11-03 14:25 corpus to 50 documents (runs 25–29, /root/dx-scratch/pm-run*.log): **17/51 documents, 217/393 features (custom 3/50)** (run 29, d3627daf; was 12/42, 155/292 at 12:43).
   Fixed in core's area where the fix was one line, with T1 tests: Extrude's second direction flip is against the
   sketch normal (std: away only when the two flips differ; cf-sheet-metal-model-plus), FeatureScript modules
   imported twice in one compile are one module (diamond export imports; cornerOvercut). Agent API: query_entities
