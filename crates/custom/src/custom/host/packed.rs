@@ -6,12 +6,14 @@
 //! * `&<hex length>$<base64>`: the base64 is zlib of the plain form, whose
 //!   length is the hex number.
 //! * plain: `%` then one value. Values: `M<n>` map of n key/value pairs,
-//!   `A<n>` array, `S<parts>$<text>` string, `D<number>`, `F` / `T`
+//!   `A<n>` array, `S<parts>$<text>` string, `E<i>` a string equal to
+//!   name i, `D<number>`, `F` / `T`
 //!   booleans, `B<len>$<name>` a type name followed by the value it tags,
 //!   `C<i>` a type name seen before, followed by its value, `R<i>` a value
 //!   seen before. A string's parts are `.`-joined pieces: `<len>` takes the
 //!   next `len` characters of the text, `-<i>` repeats a piece seen before
-//!   (`S11.6$FbZU2oH5hP9eBC6_0wireOp` is "FbZU2oH5hP9eBC6_0.wireOp").
+//!   (`S11.6$FbZU2oH5hP9eBC6_0wireOp` is "FbZU2oH5hP9eBC6_0.wireOp"; a
+//!   string of several pieces then enters the names as a whole too).
 //!   All counts and indices are hex.
 //! * Two tables: names (type names and string pieces, in order of first
 //!   appearance) for `C` and `-<i>`; values (every value as it completes,
@@ -167,13 +169,13 @@ impl Decoder<'_> {
                 Packed::Array(a)
             }
             b'S' => {
-                // Pieces: lengths of new pieces or `-<index>` of known ones.
-                let mut pieces: Vec<Result<String, usize>> = Vec::new();
+                // Pieces: lengths of new pieces or `-<index>` of known ones
+                // (resolved in order: one may name a piece of this string).
+                let mut pieces: Vec<Result<usize, usize>> = Vec::new();
                 loop {
                     if self.peek() == Some(b'-') {
                         self.pos += 1;
-                        let i = self.hex()?;
-                        pieces.push(Ok(self.name(i)?));
+                        pieces.push(Ok(self.hex()?));
                     } else {
                         pieces.push(Err(self.hex()?));
                     }
@@ -186,7 +188,7 @@ impl Decoder<'_> {
                 let mut parts = Vec::new();
                 for p in pieces {
                     parts.push(match p {
-                        Ok(s) => s,
+                        Ok(i) => self.name(i)?,
                         Err(n) => {
                             let s = self.take(n)?;
                             self.names.push(s.clone());
@@ -194,7 +196,13 @@ impl Decoder<'_> {
                         }
                     });
                 }
-                Packed::Str(parts.join("."))
+                // A string of several pieces is a name too, after them
+                // ("w8Iv0DcwCst0.4.1.0", a sketch pattern instance's id).
+                let whole = parts.join(".");
+                if parts.len() > 1 {
+                    self.names.push(whole.clone());
+                }
+                Packed::Str(whole)
             }
             b'D' => {
                 let start = self.pos;
@@ -206,6 +214,12 @@ impl Decoder<'_> {
             }
             b'F' => Packed::Bool(false),
             b'T' => Packed::Bool(true),
+            // A string equal to a name seen before (an edge "y3ipKFIl9DYz",
+            // a piece of the vertex "y3ipKFIl9DYz.start" before it).
+            b'E' => {
+                let i = self.hex()?;
+                Packed::Str(self.name(i)?)
+            }
             other => return Err(format!("unknown token '{}' at {}", other as char, self.pos - 1)),
         })
     }
@@ -357,5 +371,45 @@ mod tests {
         assert!(m.contains(&(s("isStart"), Packed::Bool(false))));
         assert!(m.contains(&(s("operationId"), id("FyUE18XOUbMicpL_0.opExtrude"))));
         assert!(m.contains(&(s("queryType"), s("CAP_EDGE"))));
+    }
+
+    /// Every string in a decoded value.
+    fn strings(p: &Packed, out: &mut Vec<String>) {
+        match p {
+            Packed::Str(x) => out.push(x.clone()),
+            Packed::Map(m) => m.iter().for_each(|(k, v)| {
+                strings(k, out);
+                strings(v, out);
+            }),
+            Packed::Array(a) => a.iter().for_each(|v| strings(v, out)),
+            Packed::Tagged(_, v) => strings(v, out),
+            _ => {}
+        }
+    }
+
+    /// A sketch circular pattern's instance ids (live, a face kept through a
+    /// Boolean): a string of several pieces is a name as a whole too
+    /// ("rzCcL5lpUiw2.pattern.0.1.0", referred to later), and a piece may
+    /// name a piece of the same string (`S-1b.7.1.1.-1f`: its own "0").
+    #[test]
+    fn pattern_instance_ids() {
+        let p = unpack("%B5$QueryM5Sb$derivedFromA2C0M5S12$disambiguationDataA1M2S12$disambiguationTypeS13$ORIGINAL_DEPENDENCYS9$originalsA1C0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$F2uzFj34xMk6ZGC_0wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdSc$5CdJmfNwB7KuR5C7S4$FACER7R8R9CcA1S11.9$FVQrk0KflLONDRK_0opRevolveRcSa$SWEPT_FACEC0M6R1A1M2R2R3R4A7C0M5R5R6R7R8R9CcA1S11.-e$FwJBJcblpMvVrNY_1RcRdReSc.4$rzCcL5lpUiw2seedC0M5R5R6R7R8R9R1aRcRdReS-1b.7.1.1.-1f$pattern01C0M5R5R6R7R8R9R1aRcRdReS-1b.-1e.-1f.1.-1f$2C0M5R5R6R7R8R9R1aRcRdReS-1b.-1e.-1f.1.-1f$3C0M5R5R6R7R8R9R1aRcRdReS-1b.-1e.-1f.1.-1f$4C0M5R5R6R7R8R9R1aRcRdReS-1b.-1e.-1f.1.-1f$5C0M5R5R6R7R8R9R1aRcRdReSc.-1f$xfFFQy0iFzzaR5R14R7R8S7$isStartFR9CcA1S11.9$FEa45i0JVkiyEoy_1opExtrudeRcS8$CAP_FACER5R14R7R8R9CcA1S-2d.7.9$booleanopBooleanRcS5$MERGE").unwrap();
+        let mut all = Vec::new();
+        strings(&p, &mut all);
+        for want in ["rzCcL5lpUiw2.seed", "rzCcL5lpUiw2.pattern.0.1.0", "rzCcL5lpUiw2.pattern.0.5.0", "FEa45i0JVkiyEoy_1.boolean.opBoolean", "MERGE"] {
+            assert!(all.iter().any(|x| x == want), "{want} in {all:?}");
+        }
+    }
+
+    /// `E<i>`: a string equal to a name seen before (live sheet-metal form:
+    /// the edge "y3ipKFIl9DYz", a piece of the vertex "y3ipKFIl9DYz.start"
+    /// named before it).
+    #[test]
+    fn string_equal_to_a_name() {
+        let p = unpack("%B5$QueryM5Sb$derivedFromC0M6S12$disambiguationDataA1M2S12$disambiguationTypeS13$ORIGINAL_DEPENDENCYS9$originalsA3C0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FjgGg2TDBjDvSvI_0wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdSc$Ot7eIv3bhWERC0M5R5C7S6$VERTEXR7R8R9CcA1S11.-e$FNN6ZgxbzZOZ6f1_1RcRdReSc.5$y3ipKFIl9DYzstartC0M5R5R6R7R8R9R13RcRdReE17R5R6R7R8S7$isStartTR9CcA1S11.9$FlvCs4b5uIkE5Mf_1opThickenRcS8$CAP_EDGER5R6R7R8R9CcA1S11.7$FFz1z24WsfH93BN_2splitOpRcS5$SPLIT").unwrap();
+        let mut all = Vec::new();
+        strings(&p, &mut all);
+        let ids: Vec<&String> = all.windows(2).filter(|w| w[0] == "sketchEntityId").map(|w| &w[1]).collect();
+        assert_eq!(ids, ["Ot7eIv3bhWER", "y3ipKFIl9DYz.start", "y3ipKFIl9DYz"]);
     }
 }

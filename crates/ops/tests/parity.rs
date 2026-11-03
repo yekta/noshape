@@ -413,3 +413,43 @@ export const cube = defineFeature(function(context is Context, id is Id, definit
     let r = run_model("custom-cube", &features, &live, "");
     assert_eq!((r.matching, r.compared), (1, 1), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
+
+/// `NOSHAPE_PACKED_DIR=<dir>`: every packed query (`qCompressed(1.0, "…", id)`)
+/// in the feature lists under `dir` decodes (the translator reads regions and
+/// Onshape's names from them).
+#[test]
+#[ignore = "T2: needs NOSHAPE_PACKED_DIR (feature lists from live, not in the repo)"]
+fn packed_queries_decode() {
+    let Some(dir) = std::env::var_os("NOSHAPE_PACKED_DIR") else { return };
+    fn walk(v: &Value, out: &mut Vec<String>) {
+        match v {
+            Value::String(s) if s.contains("qCompressed(1.0,\"") => out.extend(s.split("qCompressed(1.0,\"").skip(1).filter_map(|r| r.split('"').next()).map(str::to_string)),
+            Value::Array(a) => a.iter().for_each(|x| walk(x, out)),
+            Value::Object(m) => m.values().for_each(|x| walk(x, out)),
+            _ => {}
+        }
+    }
+    let mut files = vec![PathBuf::from(dir)];
+    let (mut total, mut failed) = (0, Vec::new());
+    while let Some(p) = files.pop() {
+        if p.is_dir() {
+            files.extend(std::fs::read_dir(&p).unwrap().filter_map(|e| e.ok().map(|e| e.path())));
+            continue;
+        }
+        // Feature lists only (not excerpts of FeatureScript source).
+        if !p.file_name().is_some_and(|n| n.to_string_lossy().contains("features")) {
+            continue;
+        }
+        let Ok(v) = std::fs::read_to_string(&p).map(|t| serde_json::from_str::<Value>(&t).unwrap_or(Value::Null)) else { continue };
+        let mut packed = Vec::new();
+        walk(&v, &mut packed);
+        for q in packed {
+            total += 1;
+            if let Err(e) = noshape_model::custom::host::packed::unpack(&q) {
+                failed.push(format!("{}: {e}: {}", p.display(), q.chars().take(60).collect::<String>()));
+            }
+        }
+    }
+    println!("packed queries: {total}, failed {}", failed.len());
+    assert!(failed.is_empty(), "{failed:#?}");
+}
