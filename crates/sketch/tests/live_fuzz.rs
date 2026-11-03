@@ -1081,8 +1081,21 @@ fn check_batch(n: usize, first: u64, rich: bool) {
         std::fs::write(&path, serde_json::to_string_pretty(&b).unwrap()).unwrap();
     }
     let stored: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    // (A fit spline's end derivatives as sent are ours of the day: they
+    // moved with centripetal splines, the case didn't.)
+    let sent = |c: &Value| {
+        let mut o = c["onshape"].clone();
+        for e in o["entities"].as_array_mut().into_iter().flatten() {
+            if let Some(g) = e["geometry"].as_object_mut() {
+                for k in ["startDerivativeX", "startDerivativeY", "endDerivativeX", "endDerivativeY"] {
+                    g.remove(k);
+                }
+            }
+        }
+        o
+    };
     for (x, y) in b["cases"].as_array().unwrap().iter().zip(stored["cases"].as_array().unwrap()) {
-        assert_eq!(x["onshape"], y["onshape"], "{}: the generator changed", x["case"]);
+        assert_eq!(sent(x), sent(y), "{}: the generator changed", x["case"]);
     }
     let count = b["cases"].as_array().unwrap().len();
     let solved = b["cases"].as_array().unwrap().iter().filter(|c| c["ours"]["status"] == "solved").count();
