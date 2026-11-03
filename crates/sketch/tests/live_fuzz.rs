@@ -1305,6 +1305,20 @@ fn a_u_bend_grows_about_its_arc_and_a_trapezoid_keeps_its_top() {
     }
 }
 
+/// s653 / s725 (batches 12 / 14) stay as live answered: a T's top widens and
+/// its flange thins: the stem stays whole, the Equal overhangs centre the top
+/// on it and the top comes down (the pass couldn't place it; least change
+/// moved the stem too). T1.
+#[test]
+fn a_t_keeps_its_stem_when_its_top_widens() {
+    for (file, seed) in [("sketch-12.live.json", 653), ("sketch-14.live.json", 725)] {
+        let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture(file)).unwrap()).unwrap();
+        let ours = batch(1, seed, true);
+        let d = differences(&ours["cases"][0], &live["cases"][format!("s{seed}")]);
+        assert!(d.is_empty(), "s{seed}: {}", d.join("; "));
+    }
+}
+
 /// Batch 15's s754 / s769 stay as live answered: a rectangle's two rounded
 /// top corners (Equal arcs) grow: the bottom and the top keep their levels,
 /// the sides shorten and the top shrinks from both ends (the top's far end

@@ -228,7 +228,9 @@ impl Sketch {
                         x.geometry = g;
                     }
                 }
-                left.extend(own);
+                if !self.hold_the_base(&comp, &comp_cons) {
+                    left.extend(own);
+                }
             }
         }
         left
@@ -299,6 +301,43 @@ impl Sketch {
             }
         }
         Some(sub)
+    }
+
+    /// A component the pass couldn't place: its unchanged units held,
+    /// lowest first, each while the rest still solves, then the rest at
+    /// least change (live fuzz s653 / s725: a T's wider top and thinner
+    /// flange keep the whole stem; the Equal overhangs centre the top on it).
+    fn hold_the_base(&mut self, comp: &[EntityId], cons: &[(crate::ids::ConstraintId, Vec<EntityId>)]) -> bool {
+        let unheld = self.unheld_constraints(1e-9);
+        let steady = |u: EntityId| !cons.iter().any(|(c, us)| us.contains(&u) && unheld.contains(c));
+        let low = |u: EntityId| self.anchor(u).and_then(|p| self.point(p)).unwrap_or(DVec2::splat(f64::MAX));
+        let mut base: Vec<EntityId> = comp.iter().copied().filter(|u| steady(*u)).collect();
+        base.sort_by(|a, b| (low(*a).y, low(*a).x).partial_cmp(&(low(*b).y, low(*b).x)).unwrap_or(std::cmp::Ordering::Equal));
+        let opts = SolveOptions { analyze: false, constructive: false, ..Default::default() };
+        let mut held: BTreeSet<EntityId> = BTreeSet::new();
+        let mut done = None;
+        for u in base {
+            let mut with = held.clone();
+            with.insert(u);
+            let Some(mut sub) = self.sub_sketch(comp, cons, &|_| true, &with) else { continue };
+            if matches!(sub.solve_with(&opts).status, SolveStatus::Solved) {
+                held = with;
+                done = Some(sub);
+            }
+        }
+        let Some(sub) = done else { return false };
+        for &u in comp {
+            let Some(e) = self.entity(u) else { continue };
+            for p in e.point_refs().into_iter().chain(std::iter::once(u)) {
+                if let Some(x) = sub.entity(p).map(|x| x.geometry.clone())
+                    && let Some(mine) = self.entity_mut_silent(p)
+                {
+                    mine.geometry = x;
+                }
+            }
+        }
+        self.touch();
+        true
     }
 
     /// Places `comp`'s units from what changes outwards (module docs).
