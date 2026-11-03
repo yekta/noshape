@@ -119,7 +119,7 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
   custom_features::knurl_feature_b94_tooth_and_helix_angles, KNURL_SIZE / KNURL_PITCH / KNURL_ANGLES).
 - Squash only with `git reset --soft $(git merge-base HEAD origin/main)` after a fresh fetch; check `git show --stat`.
 
-## CP30 knurls OCCT can't do (11-03 20:36 UTC): landed d55587a0 and b3d2e7f0, a memory stop queued
+## CP30 knurls OCCT can't do (11-03 20:36 UTC): landed d55587a0, b3d2e7f0 and the memory stop af0547aa
 - d55587a0 (the two families below) landed 16:20; its sweep (ray.tsv vs foot.tsv): 313 -> 329 of 345, none lost.
 - Corpus replays weren't exact: kernel::bool_corpus writes BRepTools text (15 digits), so a replay saw inputs a
   rounding off; on a knurl that flips results (Ø10 x 71 CP30 80/30: the replay took it, the model declined it). Now
@@ -139,7 +139,7 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
 - Landed b3d2e7f0 11-03 20:26 (corpora unchanged 0 differ, Shell's recordings the same, v4tests, qa's matrices; knurl
   sweep corner.tsv against ray.tsv 330 -> 333 of 346, none lost; Ø63 x 100 CP30 45/30 moved from "no clean ray" to
   taken on vibe4, 309589.989 mm³, 160526 faces, 268 s, 10.3 GB peak for the test process (killed on vibe5 beside
-  three other sweep cases; OCCT fails there at its 16 GB budget)). Then (d27ed0c1, queued 20:35) noshape's Boolean
+  three other sweep cases; OCCT fails there at its 16 GB budget)). Then (af0547aa, landed 20:46) noshape's Boolean
   stops past the memory budget as OCCT's does: the stop hook (noshape_should_break) checks the process's resident
   memory every 50 ms on the calling thread (RustMemoryWatch in rust_boolean); the op fails with OCCT's "operation
   stopped: it needed more than N MB of memory" (Ø63 x 100 at NOSHAPE_BOOLEAN_MEMORY_MB=2000: after 26 s). Corpus5
