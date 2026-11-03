@@ -331,6 +331,14 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   off plane (worst 1.19); target 8.33 ms (120 fps). First evaluation 10.7 ms, again 2.8 ms; adding a mate 4.3 ms;
   inserting a pin **2.8 ms** (target ≤ 20 ms). 1000 free pins: drag frame 0.38 ms, insert 1.3 ms.
   `tools/tiers/perf.sh -p noshape-ops --test all assembly_perf:: -- --ignored --nocapture --test-threads=1`.
+- Assembly, 11-03 23:02 (vibe3, 661fdabf, one run each; PLAN 2.7: drag 120 fps at 200 instances, insert ≤ 20 ms at
+  300 mates): assembly_perf 200 / 300: add a mate 3.5 ms, drag frame 0.29 ms (off plane 1.15), insert 1.4 ms; 1000
+  free pins: frame 0.37 ms, insert 2.4 ms. big_assembly_perf (open first evaluation / evaluate again / regenerate /
+  add a mate / drag frame / insert): a200 (378 mates) 37 / 4.9 / 24 / 15 / 0.67 / 5.0 ms; a200-live 36 / 5.2 / 31 /
+  16 / 0.54 / 4.7; a1000 (2380 mates) 79 / 22 / 87 / 38 / 4.2 (240 fps) / 22.4; a1000-live 75 / 16 / 71 / 29 / 3.0 /
+  16. Every PLAN target met at its size; no regression against 11-02's table (a1000 regenerate 403 → 87). a1000's
+  insert (22 ms) is a whole evaluation: on vibe5, prepare 8.5 (instances 3.7, connectors / mates 4.2), solve 5.6,
+  occurrences 0.8: spread, no hotspot; next if wanted: keep the prepared mates across an insert of a free instance.
 - Live (behaviours "speed: skasm sketch and assembly", request 1501; server-solved, one request in flight): sketch
   drag ≈ 400 ms a step at 188 entities (≈ 310 ms at 20) → ours ≈ 4–5 ms (dev build), ~80× faster; adding a
   dimension ≈ 2.2 s and a Coincident ≈ 1.7 s of server solve → ours ≈ 1 ms; assembly drag ≈ 1.2 s a step at 200
