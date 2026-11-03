@@ -1614,6 +1614,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   green dcb0ea5d: the last state still 1 SKETCH_ENTITY), while by hand a click on empty space or on the plane's area clears
   it (live does too): the driver's empty point seems to land on the line or the sketch. The new sketch state (tool,
   entities, constraints, dimensions) works: Enter keeps the Dimension tool, Enter / Esc never leave the sketch = live.
+  qa 11:53: 041a3327 (tools inside dropdowns picked through Search tools) works on green a30088ea: sketch-3-point-arc,
+  -slot, -polygon, -spline, -mirror and circular-pattern-dialog all run with no failed step.
 - [ ] P1 DIALOG-SWITCH-DISCARDS-NEW (psui) double-clicking another feature while a **new** feature's dialog is open throws
   the new feature away in ours; live keeps it: a box (Sketch 1, Extrude 1), Search tools › Variable, Name
   wall_thickness, Value 2 + Enter (the first Enter applies: the row "#wall_thickness = 2 mm" is in the list, the dialog
