@@ -249,6 +249,10 @@ dump, the runner, live's first 20 scenarios run in ours and a first score.
   preselected edge (live's account drops the edge since 04:10), Hole / Revolve remembered values, Shift+P as an undo
   step, a rolled-back variable's " = 0", Fillet moved above its Extrude reading "ok", the second Enter after an
   autofill insertion (new scenario extrude-depth-variable-enter-twice).
+- 11-03 15:10: lead P1 (user 17:26 report): the update banner is now a card floating at the bottom centre of every
+  window (updates.rs `card`, app-core `os_menu::set_floating`), ✕ hides it for the session; navbar / start window
+  slots gone; checked on :102 (start window and a Part Studio, 1280 / 560 / 760). Since 14:00 also: an edge clicked
+  at its midpoint lights up its feature (fillet-asymmetric-toggle).
 - 11-03 14:00: driver: the empty-graphics target avoids the open dialog, planes and sketch curves (it hit the Sketch
   dialog); every scenario (274) runs with all steps found; the 76 using `empty` rechecked. Live resumed 13:58; I
   compare each new recording as it lands (a Monitor running run.py per new file on :102).
@@ -850,6 +854,9 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- 11-03 15:10 (psui, seen while checking the update card): the start window at 560 px wide lays itself over itself:
+  the "Details" panel's header and icon cover "Owned by me", "+ Add" and the list (shot
+  /root/psui-scratch/start-560-overlap.png). Not from the card (the same without it); start-ui isn't mine.
 - 11-03 01:20 (psui, from the ui-parity suite): WHOLE-SKETCH-PICK (P2, core + psui): live's click on a sketch's row in a
   face field stores a whole-sketch region query (`BTMIndividualSketchRegionQuery` with the featureId only): the chip
   reads "Faces of Sketch 1" also with one region and after reopening, and the selection follows regions added to the
