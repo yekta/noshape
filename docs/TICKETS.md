@@ -326,6 +326,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P2 EXTRUDE-UP-TO-FACE-BEYOND (core; dx's parity suite 11-03) Extrude Up to face fails when the profile lies
+  beyond the face's edges: ours "Failed to extrude selections, check input."; live ends it on the face's surface.
+  Repro: a 20 × 20 block (Top, 10 mm); on Top a Ø10 circle at (50, 0); Extrude it, New, Up to face = the block's top
+  face → ours Error (expected a Ø10 × 10 cylinder at (50, 0)). Live: clamp-hms Extrude 2 (the "rectangle hump"
+  pieces on the front face, Up to face = the back face JHO, opposite direction; the piece between the circles above
+  the block's top edge reaches beyond the back face's edges) is OK in live and gives 10/24/16 faces/edges/vertices,
+  145345.65 mm³; ours errors on that one piece (the others are inside the block). Live request filed to confirm
+  the simple repro.
 - [ ] P2 SKETCH-IMPRINT-TOPOLOGY (core 11-03, from SKETCH-FACE-IMPRINT; live behaviours 1747 / ~24081) a sketch on a
   face owns the face's imprinted edges and vertices in live: qCreatedBy(sketch, VERTEX) returns the face's corners
   too (a Hole on qCreatedBy(sketch, VERTEX) fails "Error regenerating." for that), qCreatedBy(sketch, EDGE) the
@@ -2589,7 +2597,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
-- [ ] P2 PARITY-IMPRINT-REGION-QUERY (dx; core 11-03 from SKETCH-FACE-IMPRINT) clamp-hms Extrude 2 still "no region of
+- [x] (dx 11-03 07:55: live's sketch frames are now read (its fetch names them `transformMatrix`), so the face edges
+  map into the sketch; the pieces whose own curves are exactly the named ones, nearest the named face edges, each
+  picked once: clamp-hms Extrude 2 now takes live's 5 pieces and fails only on EXTRUDE-UP-TO-FACE-BEYOND) P2 PARITY-IMPRINT-REGION-QUERY (dx; core 11-03 from SKETCH-FACE-IMPRINT) clamp-hms Extrude 2 still "no region of
   ours inside sketch F4OZBkDrtf9vyuF_1's curves": our "rectangle hump" has live's pieces now (the circles r31 / r18
   and the line split by the side face's edges; sketch_get lists them, "imprinted": true for the face's own pieces),
   but live's TOPOLOGY query names each piece by its sketch curves plus face edges derived from "main rectangle"'s
