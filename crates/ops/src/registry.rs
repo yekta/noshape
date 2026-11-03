@@ -264,6 +264,22 @@ pub fn run(ctx: &mut Ctx, op: &'static Op, args: &Value) -> Result<OpOutput, OpE
             return Err(OpError::param(f.name, &format!("required: {}", f.description)));
         }
     }
+    // A list of the wrong length ([x, y] for [x, y, z]).
+    for f in &op.fields {
+        let Some(n) = obj.get(f.name).and_then(Value::as_array).map(Vec::len) else { continue };
+        let bound = |k: &str| f.schema.get(k).and_then(Value::as_u64).map(|v| v as usize);
+        let (lo, hi) = (bound("minItems"), bound("maxItems"));
+        if lo.is_some_and(|lo| n < lo) || hi.is_some_and(|hi| n > hi) {
+            let want = match (lo, hi) {
+                (Some(lo), Some(hi)) if lo == hi => format!("{lo}"),
+                (Some(lo), Some(hi)) => format!("{lo} to {hi}"),
+                (Some(lo), None) => format!("at least {lo}"),
+                (None, Some(hi)) => format!("at most {hi}"),
+                (None, None) => unreachable!(),
+            };
+            return Err(OpError::param(f.name, &format!("{want} items, got {n} ({})", f.description)));
+        }
+    }
     // Live mode: the document is open in the app; the call runs there.
     if let Some(r) = crate::live::forward(ctx, op, args) {
         return r;
