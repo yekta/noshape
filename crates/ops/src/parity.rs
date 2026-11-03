@@ -1780,8 +1780,9 @@ impl<'a> Translator<'a> {
                 let k = per_unit(&g["units"]);
                 let w: Vec<f64> = (0..3).map(|i| (o[i] + u * x[i] + v * y[i]) * k).collect();
                 let d = (0..3).map(|i| (w[i] - p[i]).powi(2)).sum::<f64>().sqrt();
+                // (1e-3: live's area may come from the region's tessellation.)
                 if let Some(a) = area
-                    && r["area"].as_f64().is_none_or(|ours| (ours * k * k - a).abs() > 1e-6 * a.max(1e-12))
+                    && r["area"].as_f64().is_none_or(|ours| (ours * k * k - a).abs() > 1e-3 * a.max(1e-12))
                 {
                     continue;
                 }
@@ -2649,7 +2650,9 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
                 let c = [(mn[0] + mx[0]) / 2.0, (mn[1] + mx[1]) / 2.0, (mn[2] + mx[2]) / 2.0];
                 let s = &f["surface"];
                 let surface = kind(s);
-                let mut r = LiveRef { kind: "FACE".into(), point: Some(c), measure: f["area"].as_f64(), geometry: our_type(surface.as_deref()), ..Default::default() };
+                // A sketch's line: its faces are its regions.
+                let kind = if line["type"] == "newSketch" { "SKETCH_REGION" } else { "FACE" };
+                let mut r = LiveRef { kind: kind.into(), point: Some(c), measure: f["area"].as_f64(), geometry: our_type(surface.as_deref()), ..Default::default() };
                 // The compact fetch: origin and the outward normal beside the type.
                 if surface.as_deref() == Some("PLANE")
                     && s.is_string()

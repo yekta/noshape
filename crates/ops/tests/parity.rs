@@ -1159,6 +1159,23 @@ fn a_written_out_region_query() {
     assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// A region named by id alone, placed from the sketch's line in live.jsonl
+/// (its region faces: area and box): of two rectangles, the one named
+/// (cf-sheet-metal-model-plus's Extrude 2).
+#[test]
+fn a_region_by_id_from_the_sketch_line() {
+    let rect = |n: &str, x0: f64, x1: f64| [segment(&format!("{n}.b"), (x0, 0.0), (x1, 0.0)), segment(&format!("{n}.r"), (x1, 0.0), (x1, 0.01)), segment(&format!("{n}.t"), (x1, 0.01), (x0, 0.01)), segment(&format!("{n}.l"), (x0, 0.01), (x0, 0.0))];
+    let entities: Vec<Value> = rect("a", 0.0, 0.02).into_iter().chain(rect("b", 0.03, 0.06)).collect();
+    let region = json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JR2"], "queryString": "" });
+    let (features, mut live) = one_extrude("FS1", json!(entities), region, json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 6, "edges": 12, "vertices": 8, "volume": 0.03 * 0.01 * 0.01 }));
+    live[0]["type"] = json!("newSketch");
+    live[0]["bodies"] = json!([{ "id": "JS", "type": "SHEET", "faces": [
+        { "id": "JR1", "area": 0.0002, "box": { "min": [0.0, 0.0, 0.0], "max": [0.02, 0.01, 0.0] } },
+        { "id": "JR2", "area": 0.0003, "box": { "min": [0.03, 0.0, 0.0], "max": [0.06, 0.01, 0.0] } }] }]);
+    let r = run_model("region-by-id", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
 /// A sketch region query live's UI fetch gives without its text (only its
 /// btType, featureId and filterInnerLoops) is qSketchRegion of that sketch
 /// (cf-point-pattern's Extrude 1).
