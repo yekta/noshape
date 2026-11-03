@@ -78,7 +78,9 @@ fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
 /// name with NOSHAPE_PARITY_ONLY): the first feature that differs per
 /// document, what wasn't translated, and the score. Writes report.json next
 /// to the models; NOSHAPE_PARITY_INDEX=1 rewrites tests/parity-models/index.json
-/// from their source.json.
+/// from their source.json. The models are on this machine only: run it here
+/// (NOSHAPE_RB_LOCAL=1 with tools/tiers/rb.sh), or copy them and point
+/// NOSHAPE_PARITY_MODELS at the copy.
 #[test]
 #[ignore = "T2: live's models from /root/parity/models (other people's work, never in the repo)"]
 fn parity_models() {

@@ -1139,6 +1139,9 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
         };
         let o = free.remove(i);
         let who = if l.name.is_empty() { "a part".to_string() } else { format!("\"{}\"", l.name) };
+        if !l.body_type.is_empty() && o.body_type != l.body_type {
+            out.push(format!("{who}: a {} body, live {}", o.body_type, l.body_type));
+        }
         if (o.faces, o.edges, o.vertices) != (l.faces, l.edges, l.vertices) {
             out.push(format!("{who}: {}/{}/{} faces/edges/vertices, live {}/{}/{}", o.faces, o.edges, o.vertices, l.faces, l.edges, l.vertices));
         }
