@@ -119,7 +119,7 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
   custom_features::knurl_feature_b94_tooth_and_helix_angles, KNURL_SIZE / KNURL_PITCH / KNURL_ANGLES).
 - Squash only with `git reset --soft $(git merge-base HEAD origin/main)` after a fresh fetch; check `git show --stat`.
 
-## CP30 knurls OCCT can't do (11-03 19:20 UTC): landed d55587a0, then three more steps (bool-c)
+## CP30 knurls OCCT can't do (11-03 20:36 UTC): landed d55587a0 and b3d2e7f0, a memory stop queued
 - d55587a0 (the two families below) landed 16:20; its sweep (ray.tsv vs foot.tsv): 313 -> 329 of 345, none lost.
 - Corpus replays weren't exact: kernel::bool_corpus writes BRepTools text (15 digits), so a replay saw inputs a
   rounding off; on a knurl that flips results (Ø10 x 71 CP30 80/30: the replay took it, the model declined it). Now
@@ -136,10 +136,15 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
 - OCCT runs out of its 16 GB on every remaining CP30 case (Ø10 x 71 80/30 223 s then fails; Ø100 x 25, Ø63 x 33):
   the user gets an error there today, so each one taken is pure gain; live asked for their values (REQUESTS.md
   17:20).
-- Landing 11-03 20:11 (corpora unchanged 0 differ, Shell's recordings the same, v4tests, qa's matrices; knurl sweep
-  corner.tsv against ray.tsv 330 -> 333 of 346, none lost; Ø63 x 100 CP30 45/30 moved from "no clean ray" to taken
-  on vibe4, 309589.989 mm³, 160526 faces, 268 s, 10.3 GB peak for the test process (killed on vibe5 beside three
-  other sweep cases; OCCT fails there at its 16 GB budget). Request (lead / core): noshape's Boolean has no memory
+- Landed b3d2e7f0 11-03 20:26 (corpora unchanged 0 differ, Shell's recordings the same, v4tests, qa's matrices; knurl
+  sweep corner.tsv against ray.tsv 330 -> 333 of 346, none lost; Ø63 x 100 CP30 45/30 moved from "no clean ray" to
+  taken on vibe4, 309589.989 mm³, 160526 faces, 268 s, 10.3 GB peak for the test process (killed on vibe5 beside
+  three other sweep cases; OCCT fails there at its 16 GB budget)). Then (d27ed0c1, queued 20:35) noshape's Boolean
+  stops past the memory budget as OCCT's does: the stop hook (noshape_should_break) checks the process's resident
+  memory every 50 ms on the calling thread (RustMemoryWatch in rust_boolean); the op fails with OCCT's "operation
+  stopped: it needed more than N MB of memory" (Ø63 x 100 at NOSHAPE_BOOLEAN_MEMORY_MB=2000: after 26 s). Corpus5
+  time unchanged. The sweep on vibe5 (29 GB, 4 at a time) needs 2-3 parallel or a budget for such cases.
+  The steps: noshape's Boolean has no memory
   budget of its own, so a bigger knurl could take the machine's memory rather than fail as OCCT's does.): (1) free::ray_hits: a cell whose middle finds nothing, the ray within its corners' box,
   again from its corner nearest the ray (Ø10 x 71 CP30 80/30: a ray from a 0.2 mm triangle at the knurl's end crosses
   a groove's flank 0.0019 rad from its end at a cell's corner; taken, 5167.836 mm³, 17947 faces, 47 s; T2
