@@ -364,18 +364,33 @@ static OPERATORS: LazyLock<parking_lot::RwLock<Operators>> = LazyLock::new(Defau
 
 #[derive(Default)]
 struct Operators {
-    by_module: HashMap<Arc<str>, Vec<Arc<FnDecl>>>,
+    by_module: HashMap<Arc<str>, Versions>,
     sets: HashMap<&'static str, Arc<OverloadSet>>,
 }
 
-fn register_operators(module: &Arc<str>, decls: Vec<Arc<FnDecl>>) {
+/// A module path's declarations by FeatureScript version: the standard library's modules have one path at every
+/// version (a Feature Studio pinned to an older std loads that release beside ours).
+type Versions = std::collections::BTreeMap<u32, Vec<Arc<FnDecl>>>;
+
+/// The declarations a path contributes: our release's if loaded, else the newest loaded (whatever order modules
+/// were compiled in: tests on two releases at once made overloads change under each other).
+fn chosen(v: &Versions) -> &[Arc<FnDecl>] {
+    v.get(&crate::STD_VERSION).or_else(|| v.values().next_back()).map_or(&[], |d| d.as_slice())
+}
+
+fn register_operators(module: &Arc<str>, version: u32, decls: Vec<Arc<FnDecl>>) {
     let mut ops = OPERATORS.write();
     if decls.is_empty() && !ops.by_module.contains_key(module) {
         return;
     }
-    ops.by_module.insert(module.clone(), decls);
+    let versions = ops.by_module.entry(module.clone()).or_default();
+    // (A Feature Studio's path is one module whatever its header says.)
+    if !module.starts_with(STD_PREFIX) {
+        versions.clear();
+    }
+    versions.insert(version, decls);
     let mut sets: HashMap<&'static str, Vec<Arc<FnDecl>>> = HashMap::new();
-    for d in ops.by_module.values().flatten() {
+    for d in ops.by_module.values().flat_map(chosen) {
         if let Some(name) = operator_name(d.kind) {
             sets.entry(name).or_default().push(d.clone());
         }
@@ -391,19 +406,24 @@ static EXPORTED_FNS: LazyLock<parking_lot::RwLock<ExportedFns>> = LazyLock::new(
 
 #[derive(Default)]
 struct ExportedFns {
-    by_module: HashMap<Arc<str>, Vec<Arc<FnDecl>>>,
+    by_module: HashMap<Arc<str>, Versions>,
     by_name: HashMap<Name, Arc<Vec<Arc<FnDecl>>>>,
     generation: u64,
 }
 
-fn register_exports(module: &Arc<str>, decls: Vec<Arc<FnDecl>>) {
+fn register_exports(module: &Arc<str>, version: u32, decls: Vec<Arc<FnDecl>>) {
     let mut ex = EXPORTED_FNS.write();
     if decls.is_empty() && !ex.by_module.contains_key(module) {
         return;
     }
-    ex.by_module.insert(module.clone(), decls);
+    let versions = ex.by_module.entry(module.clone()).or_default();
+    // (A Feature Studio's path is one module whatever its header says.)
+    if !module.starts_with(STD_PREFIX) {
+        versions.clear();
+    }
+    versions.insert(version, decls);
     let mut by_name: HashMap<Name, Vec<Arc<FnDecl>>> = HashMap::new();
-    for d in ex.by_module.values().flatten() {
+    for d in ex.by_module.values().flat_map(chosen) {
         by_name.entry(d.name.clone()).or_default().push(d.clone());
     }
     ex.by_name = by_name.into_iter().map(|(k, v)| (k, Arc::new(v))).collect();
@@ -657,12 +677,12 @@ fn build_module(path: Arc<str>, ast: Arc<ast::Module>, imports: Vec<Option<Arc<C
     if errors.iter().any(|e| e.level == Level::Error) {
         return Err(errors);
     }
-    register_operators(&path, own_fns.iter().filter(|(d, _)| operator_name(d.kind).is_some()).map(|(d, _)| d.clone()).collect());
+    register_operators(&path, ast.version.unwrap_or(0), own_fns.iter().filter(|(d, _)| operator_name(d.kind).is_some()).map(|(d, _)| d.clone()).collect());
     let exported: Vec<Arc<FnDecl>> = ast.items.iter().filter(|it| it.export).filter_map(|it| match &it.kind {
         TopKind::Function(def) => own_fns.iter().find(|(_, d)| Arc::ptr_eq(d, def)).map(|(decl, _)| decl.clone()),
         _ => None,
     }).filter(|d| operator_name(d.kind).is_none()).collect();
-    register_exports(&path, exported);
+    register_exports(&path, ast.version.unwrap_or(0), exported);
     Ok(CompiledModule { path, version: ast.version, ast, scope, exports: Arc::new(exports), decls, imports: kept, warnings: errors })
 }
 
