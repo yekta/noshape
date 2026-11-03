@@ -882,7 +882,7 @@ fn write_batch() {
 }
 
 /// The batches: (number, first seed, rich).
-const BATCHES: [(usize, u64, bool); 8] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true)];
+const BATCHES: [(usize, u64, bool); 9] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true)];
 
 /// Batch 8's s464 / s475 stay as live answered: a component the pass can't
 /// close (a hexagon) takes the least change on its own, the rounded
