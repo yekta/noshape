@@ -197,7 +197,7 @@ impl Sketch {
 
 impl DragGraph {
     /// The dragged units, when their components are small enough.
-    fn dragged(&self, handles: &[(DragHandle, glam::DVec2)]) -> Option<Vec<EntityId>> {
+    pub(crate) fn dragged(&self, handles: &[(DragHandle, glam::DVec2)]) -> Option<Vec<EntityId>> {
         let mut dragged: Vec<EntityId> = Vec::new();
         for (h, _) in handles {
             let id = match *h {

@@ -1373,11 +1373,13 @@ impl Sketch {
     }
 
     /// Makes the DOF analysis and the drag's relation graph current, so a
-    /// copy taken now (a drag's start, which every step solves from) keeps
-    /// them.
-    pub fn begin_drag(&mut self) {
+    /// copy taken now (a drag's start) keeps them. True when each step
+    /// should solve from that start (live: a drag's result depends only on
+    /// where it ends); false for a dragged component too big for that each
+    /// frame, whose steps go on from the last.
+    pub fn begin_drag(&mut self, handles: &[(DragHandle, DVec2)]) -> bool {
         self.refresh_analysis();
-        self.drag_graph();
+        self.drag_graph().dragged(handles).is_some()
     }
 
     /// Interactive drag: pulls the handles toward their targets while keeping

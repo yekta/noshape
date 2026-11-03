@@ -3326,8 +3326,7 @@ impl SketchEditor {
                 // current, so every step's regeneration reuses it instead of
                 // redoing it (qa SKETCH-DRAG-BIG: 30–50 ms per step on 1000
                 // entities).
-                data.sketch.begin_drag();
-                self.drag_origin = Some(data.sketch.clone());
+                self.drag_origin = data.sketch.begin_drag(&[(handle, p)]).then(|| data.sketch.clone());
                 self.drag = Some(DragState::Geometry { handle, at: None });
                 self.tool_drag(data, p)
             }
@@ -3338,12 +3337,15 @@ impl SketchEditor {
                 // Live: a drag's result depends only on where it ends (drag
                 // probes 12: four paths to one pixel, the same points), so
                 // each step solves from the drag's start (a jump too far for
-                // one solve goes there in steps, `Sketch::drag`).
+                // one solve goes there in steps, `Sketch::drag`); in a big
+                // component from the last step (`Sketch::begin_drag`).
                 if let Some(o) = &self.drag_origin {
                     data.sketch.restore_geometry(o);
                 }
                 data.sketch.drag(&[(handle, p)]);
                 match handle {
+                    // From the last step, a dragged curve moves on from there.
+                    DragHandle::Entity { id, .. } if self.drag_origin.is_none() => self.drag = Some(DragState::Geometry { handle: DragHandle::Entity { id, grab: p }, at: Some(p) }),
                     DragHandle::Entity { .. } => self.drag = Some(DragState::Geometry { handle, at: Some(p) }),
                     DragHandle::Point(id) => {
                         self.drag = Some(DragState::Geometry { handle, at: Some(p) });
