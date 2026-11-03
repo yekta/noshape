@@ -20,7 +20,10 @@ Tried and dropped tonight (fuzz k-sum worse): keeping a Length side's Equal part
 s211 / s228 worse), an Angle with an H / V member keeping that member (s210 32 -> 86), applying turn relations to
 unplaced H / V lines while placing (s226's cause: the quad is placed without its Angle to the loop's Horizontal l2,
 which then can't close; doing that broke 10 everyday cases, s426 / s467 / s489 …). Sent batch 9 (s501–s540) to check
-tonight's rules generalise.
+tonight's rules generalise. Probes 13 answered (live 1824; 3/13 match): s209 keeps the l3 / l4 corner whenever both k6
+(Angle l2–l4) and k11 (Distance l4.end–l3.start) are there, l1 = l4 then take the new length (32.098); just not
+keeping l4 in the keep step made s209 worse (42.9 -> 70.6): the corner has to be what's kept (a point keep, not a
+unit keep). s11's remaining probe differences come from the two Equals together (r11-k10 / k11 match).
 Live's single-jump rule (one drag event after the threshold moves nothing) not done: the agent API's drag op would
 need an extra step first (P3).
 Lead's list (20:15), in order:
