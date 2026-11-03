@@ -3083,7 +3083,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   placed) → ours ERROR "Unfilleted edge overlapped by fillet." (no change: 21/46/24, 3665307.7 mm³); live OK,
   44/99/54, 3569327.9 mm³. Model: /root/parity/models/learning-center-michael (`parity_models`,
   NOSHAPE_PARITY_ONLY=learning-center-michael; feature 5). (dx 2026-11-03)
-- [ ] P1 ADD-INSIDE-OUT (core / bool; dx's parity suite 11-03, cf-parameter-pattern) an Extrude Add of a 2 mm boss
+- [x] (core 11-03 13:20: the boss went through boolean.cpp fuse_on_face, which rebuilt the shell from its iterator's faces (already in the solid's orientation) and then flipped the new shell once more by the shell's; a drafted extrude's solid holds its shell REVERSED, so the part came out inside out. The same at four other sites (the unify's ReShape, through holes, the local Boolean, features.cpp's blend rebuild): the shell and solid now FORWARD. dx's document +922.936632 mm³ as live; the Boolean corpus as before (the same 4 of 974 differ without it); T1 model kernel_robustness::a_boss_on_a_drafted_blocks_top_adds_to_it, both pull directions) P1 ADD-INSIDE-OUT (core / bool; dx's parity suite 11-03, cf-parameter-pattern) an Extrude Add of a 2 mm boss
   on the top face of a drafted block leaves the part inside out: volume −922.937 mm³ (query_parts), the magnitude
   live's +922.937. The block: Extrude 1, a 20 × 10 mm rectangle on Top, depth 5 mm (#a / 2), draft 10° (#a deg,
   pull direction flipped); Extrude 2 (Add, Blind 2 mm, scope Part 1) of a sketch region on its top face. Everything
