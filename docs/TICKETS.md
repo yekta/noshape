@@ -305,6 +305,21 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P0 CRASH-2045 (core + bool; **in the published v0.4.22 and on green bad1de8e**, Rust Boolean on, the default) deleting a
+  feature crashes the CLI / app most of the time: qa-scratch/tickets/crash2045/fz2045-step99.noshape (+ -wal; CLI fuzz seed
+  2045's document, 43 features, Part 1 179904.78 mm³), `python3 tickets/crash2045/del1.py <noshape mcp wrapper> <doc>
+  'Sketch 2'` (open, feature_delete Sketch 2, query_parts). **Green bad1de8e: SIGSEGV 5 of 5 (and 5 of 6 again); v0.4.22
+  release app: 4 of 5 ("corrupted size vs. prev_size" / "free(): invalid next size", "the kernel aborted"); with
+  NOSHAPE_BOOL_RUST=0: 1 of 5 died on bad1de8e, 0 of 2 on v0.4.22.** The runs that live disagree on the result too:
+  Part 1 90652.299 or 179904.78 mm³ for the same delete. Deleting other features of the same document dies as well
+  (cli/delsweep-2045.out: Sketch 2, Extrude 2, Sketch 3, Draft 2, Chamfer 1, Sketch 4, Extrude 4, Fillet 2, Linear
+  pattern 1, Mirror 3, Linear pattern 3, Mirror 5, Sketch 6, Linear pattern 4, Draft 7 died; the rest fine). gdb on
+  bad1de8e (tickets/crash2045/gdb-bt.txt): the first SIGSEGV is on the main thread in
+  `TopoDS_Iterator::updateCurrentShape` ← TopExp_Explorer ← TopExp::MapShapesAndAncestors ← ChFi3d_Builder ←
+  BRepFilletAPI_MakeFillet ← features.cpp:3745 (checked_blend / scaled_blend, op_fillet) ← regen detail.rs:407, i.e. a
+  later Fillet's **input shape is already corrupt** (a freed or overwritten TopoDS tree), so the damage happens earlier in
+  the regeneration; with the Rust Boolean off it is rarer. Found by the fallback-off fuzz (seed 2045 dies at step 101 / 93
+  / 99 on every run, fallback on or off). Probably the same family as P2 CRASH-1837-ONCE. (qa 2026-11-03 02:30, build bad1de8e)
 - [ ] P2 CRASH-1837-ONCE (core; seen once) CLI fuzz seed 1837 (`clifuzz_time.py 1837 106`, fallback on, Rust Boolean on) on
   green e18f898a died at **step 98, a delete, "corrupted double-linked list" / "noshape: the kernel aborted; not
   recoverable"** (exit 134, 3.9 s into the step); the stack is in qa-scratch/tickets/crash1837/stderr-g1837.log (frames as
