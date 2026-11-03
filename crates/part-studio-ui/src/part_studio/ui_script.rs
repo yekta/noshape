@@ -13,7 +13,7 @@ impl PartStudioView {
     pub fn ui_state(&self, window: &Window, cx: &App) -> Value {
         let dialog = self.edit.as_ref().map(|e| e.dialog.read(cx));
         let filter_focused = self.ui.filter.as_ref().is_some_and(|f| f.0.read(cx).focus_handle(cx).is_focused(window));
-        let dim_box = self.dim_input.as_ref().map(|d| d.1.read(cx)).filter(|s| s.focus_handle(cx).is_focused(window));
+        let dim_box = self.dim_input.as_ref().map(|d| d.1.read(cx)).filter(|s| s.focus_handle(cx).is_focused(window)).or_else(|| self.focused_value_box(window, cx));
         let focus = if let Some(f) = dialog.and_then(|d| d.ui_focus(window, cx)) {
             f
         } else if let Some(st) = dim_box {

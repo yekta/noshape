@@ -2179,6 +2179,36 @@ impl SketchEditor {
         probe.is_some_and(|q| (q - mid).dot(n) < 0.0)
     }
 
+    /// A sketch point in screen pixels (itself without a screen map).
+    fn plane_to_screen(&self, p: DVec2) -> DVec2 {
+        let Some((o, ex, ey)) = self.screen_map else { return p };
+        let m = glam::DMat2::from_cols(ex, ey);
+        if m.determinant().abs() < 1e-30 {
+            return p;
+        }
+        m.inverse() * (p - o)
+    }
+
+    fn screen_to_plane(&self, s: DVec2) -> DVec2 {
+        let Some((o, ex, ey)) = self.screen_map else { return s };
+        o + glam::DMat2::from_cols(ex, ey) * s
+    }
+
+    /// An entity's outline in screen pixels (a point: itself).
+    fn screen_outline(&self, sk: &Sketch, id: EntityId) -> Option<Vec<DVec2>> {
+        let pts = match sk.point(id) {
+            Some(p) => vec![p],
+            None => sk.tessellate(id, self.world_per_px),
+        };
+        let pts: Vec<DVec2> = if pts.is_empty() {
+            let bb = sk.entity_bbox(id)?;
+            vec![bb.min, DVec2::new(bb.max.x, bb.min.y), bb.max, DVec2::new(bb.min.x, bb.max.y)]
+        } else {
+            pts
+        };
+        Some(pts.into_iter().map(|p| self.plane_to_screen(p)).collect())
+    }
+
     /// `p` moved onto the nearest pixel centre (unchanged without a screen map).
     pub fn snap_to_pixel(&self, p: DVec2) -> DVec2 {
         let Some((o, ex, ey)) = self.screen_map else { return p };
@@ -3655,15 +3685,18 @@ impl SketchEditor {
                 EditOutcome::changed()
             }
             Some(DragState::Box { start }) => {
-                let (lo, hi) = (start.min(p), start.max(p));
-                if (hi - lo).length() > self.world_per_px * 3.0 {
+                // The box is the screen rectangle the pointer drew (live: in
+                // an iso view it isn't a rectangle on the plane).
+                let (a, b) = (self.plane_to_screen(start), self.plane_to_screen(p));
+                let (lo, hi) = (a.min(b), a.max(b));
+                let px = if self.screen_map.is_some() { 1.0 } else { self.world_per_px };
+                if (hi - lo).length() > px * 3.0 {
                     // Left to right: window (entirely inside); right to left: crossing.
-                    let crossing = p.x < start.x;
-                    let tol = self.world_per_px;
+                    let crossing = b.x < a.x;
                     for e in data.sketch.entities() {
-                        let Some(bb) = data.sketch.entity_bbox(e.id) else { continue };
-                        let inside = bb.min.x >= lo.x && bb.min.y >= lo.y && bb.max.x <= hi.x && bb.max.y <= hi.y;
-                        let hit = inside || (crossing && crosses_box(&data.sketch, e.id, lo, hi, tol));
+                        let Some(pts) = self.screen_outline(&data.sketch, e.id) else { continue };
+                        let inside = pts.iter().all(|q| q.x >= lo.x && q.y >= lo.y && q.x <= hi.x && q.y <= hi.y);
+                        let hit = inside || (crossing && crosses_box(&pts, lo, hi));
                         if hit && self.box_remove {
                             self.selection.retain(|x| *x != e.id);
                         } else if hit && !self.selection.contains(&e.id) {
@@ -5450,14 +5483,13 @@ impl SketchEditor {
             }
             points.points.push(PointSprite { position: w(*q), color: [0xf2, 0xe0, 0x30, 255], pick_id: 0, size: 14.0, style: on_top, _pad: 0 });
         }
-        // Box selection rectangle.
+        // Box selection rectangle (on the screen).
         if let (Some(DragState::Box { start }), Some(end)) = (&self.drag, self.box_end) {
+            let (a, b) = (self.plane_to_screen(*start), self.plane_to_screen(end));
             // Onshape box select: crossing #ffdc74 (right to left), window #789ad1.
-            let color = if end.x < start.x { [0xff, 0xdc, 0x74, 255] } else { [0x78, 0x9a, 0xd1, 255] };
-            let a = *start;
-            let b = end;
-            let pts3: Vec<[f32; 3]> = [a, DVec2::new(b.x, a.y), b, DVec2::new(a.x, b.y), a].iter().map(|p| w(*p)).collect();
-            lines.push_polyline(&pts3, color, 0, 1.0, on_top | if end.x < start.x { LineSegment::DASHED } else { 0 });
+            let color = if b.x < a.x { [0xff, 0xdc, 0x74, 255] } else { [0x78, 0x9a, 0xd1, 255] };
+            let pts3: Vec<[f32; 3]> = [a, DVec2::new(b.x, a.y), b, DVec2::new(a.x, b.y), a].iter().map(|q| w(self.screen_to_plane(*q))).collect();
+            lines.push_polyline(&pts3, color, 0, 1.0, on_top | if b.x < a.x { LineSegment::DASHED } else { 0 });
         }
         // The sketch frame.
         {
@@ -5725,12 +5757,9 @@ fn aligned_square(a: DVec2, b: DVec2, c: DVec2) -> DVec2 {
 }
 
 /// Does entity `id` cross (or lie in) the box `lo`-`hi`?
-fn crosses_box(sk: &Sketch, id: EntityId, lo: DVec2, hi: DVec2, tol: f64) -> bool {
+/// An outline (points in order) touching the box `lo`..`hi`.
+fn crosses_box(pts: &[DVec2], lo: DVec2, hi: DVec2) -> bool {
     let inside = |p: DVec2| p.x >= lo.x && p.y >= lo.y && p.x <= hi.x && p.y <= hi.y;
-    if let Some(p) = sk.point(id) {
-        return inside(p);
-    }
-    let pts = sk.tessellate(id, tol);
     let corners = [lo, DVec2::new(hi.x, lo.y), hi, DVec2::new(lo.x, hi.y)];
     let seg_x = |p: DVec2, q: DVec2, a: DVec2, b: DVec2| {
         let (d1, d2) = (q - p, b - a);
@@ -7962,6 +7991,24 @@ mod tests {
         assert_eq!(ed.picks.len(), 2, "the origin is pickable");
         click(&mut ed, &mut d, v(0.01, 0.03));
         assert!(d.sketch.constraints().any(|c| c.kind.is_dimension()));
+    }
+
+    /// Live (ui-parity sketch-box-select-delete): the box is the screen
+    /// rectangle; in an iso view a window over a line's plane rectangle
+    /// can miss it on the screen.
+    #[test]
+    fn a_box_selects_on_the_screen() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let l = d.sketch.add_line(v(0.0, 0.02), v(0.02, 0.02));
+        // A sheared view: one pixel right is (PX, 0.3 PX) on the plane, one down (0.5 PX, -PX).
+        ed.screen_map = Some((DVec2::ZERO, v(PX, 0.3 * PX), v(0.5 * PX, -PX)));
+        drag(&mut ed, &mut d, v(-0.005, 0.015), v(0.025, 0.025));
+        assert!(!ed.selection.contains(&l), "the plane box holds the line, the screen box doesn't");
+        let (a, b) = (ed.screen_to_plane(ed.plane_to_screen(v(0.0, 0.02)) - DVec2::splat(5.0)), ed.screen_to_plane(ed.plane_to_screen(v(0.02, 0.02)) + DVec2::splat(5.0)));
+        let (lo, hi) = (ed.plane_to_screen(a).min(ed.plane_to_screen(b)), ed.plane_to_screen(a).max(ed.plane_to_screen(b)));
+        let (from, to) = (ed.screen_to_plane(lo), ed.screen_to_plane(hi));
+        drag(&mut ed, &mut d, from, to);
+        assert!(ed.selection.contains(&l), "a screen window around it selects it");
     }
 
     #[test]

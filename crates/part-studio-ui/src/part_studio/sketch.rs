@@ -361,6 +361,12 @@ impl PartStudioView {
         self.ui_ref()?.dim_completion.as_ref().map(|c| c.ui_state())
     }
 
+    /// The sketch's value box (a tool's on-the-fly box, the offset's distance) holding the keyboard.
+    pub(super) fn focused_value_box<'a>(&'a self, window: &Window, cx: &'a App) -> Option<&'a InputState> {
+        let ui = self.ui_ref()?;
+        [&ui.otf_input, &ui.offset_input].into_iter().flatten().map(|b| b.0.read(cx)).find(|s| s.focus_handle(cx).is_focused(window))
+    }
+
     fn ui_ref(&self) -> Option<&SketchUi> {
         self.sketch.as_ref()?.ui.as_ref()?.downcast_ref::<SketchUi>()
     }
@@ -1558,12 +1564,9 @@ impl PartStudioView {
             None => {}
         }
         self.close_otf_input();
-        // The next box (rectangle width, ellipse minor axis) is ready for typing.
-        if self.sketch.as_ref().is_some_and(|s| s.otf.is_some()) {
-            self.open_otf_input(None, window, cx);
-        } else {
-            window.focus(&self.focus, cx);
-        }
+        // The next box (rectangle height, ellipse minor axis) waits on the
+        // canvas as after the click: typing opens it (live).
+        window.focus(&self.focus, cx);
         cx.notify();
     }
 

@@ -312,7 +312,10 @@ fn rectangle_value_boxes_take_width_then_height(cx: &mut TestAppContext) {
     let (window, view) = sketch_with(cx, "rect", Tool::CornerRect);
     click(cx, window, &view, (500., 300.));
     click(cx, window, &view, (650., 400.));
-    keys(cx, window, &["3", "0", "enter", "2", "0", "enter"]);
+    keys(cx, window, &["3", "0", "enter"]);
+    let focus = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)["focus"]["kind"].clone()).unwrap();
+    assert_eq!(focus, "none", "the height box waits on the canvas until typed into (live)");
+    keys(cx, window, &["2", "0", "enter"]);
     assert!(near(&dimensions(cx, &view), &[0.02, 0.03]), "{:?}", dimensions(cx, &view));
 }
 
