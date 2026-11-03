@@ -779,7 +779,8 @@ rust::Vec<double> bounding_box(const OcShape& s, bool optimal)
     fail_invalid("shape has no geometry (void bounding box)");
   double box[6];
   b.Get(box[0], box[1], box[2], box[3], box[4], box[5]);
-  if (optimal && !has_mesh_faces(s.shape) && has_free_form_face(s.shape))
+  // (Wires too: a lone B-spline edge's box has the same margin.)
+  if (optimal && !has_mesh_faces(s.shape) && (has_free_form_face(s.shape) || faces.Extent() == 0))
   {
     const KernelTimer timer("box.tighten");
     tighten_box(s.shape, box);
