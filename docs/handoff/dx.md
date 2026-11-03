@@ -94,6 +94,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
   kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
+- 11-03 12:43 more corpus: FeatureScript host / std gaps found with featurestudio_monitor on the rebuilt documents
+  (FS-OLD-STD-COMPAT: std 392's checkInput; FS-ANYTHING-PARAM; FS-WAVE-SPRING: an inside-out loft + thicken, 157 s;
+  FILLET-PROPAGATION-VOLUME); core told in core.md. Translator: id-only regions picked by the boxes of the parts
+  they made (sketch_get regions now give `bounds`); a feature status live didn't name ("474") isn't compared.
+  Score 12/31, 135/207, custom 3/25. Import features (cf-wiring) wait on live fetching the imported files (asked);
+  then: import_files and go on in the Part Studio it makes.
 - 11-03 11:56 translator: sketch entities drawn where live's solve put them (`sketches` geomEntities: lines,
   circles, arcs, points; stored geometry can lag variables: cf-parameter-pattern); a custom feature's namespace may
   name another document's studio version (`d…::v…::e…::m…`); id-only regions counted by id; a revolve's id-only axis
