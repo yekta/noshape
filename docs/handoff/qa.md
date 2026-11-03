@@ -9,6 +9,40 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 7 (qa, pinned account, from 11-02 22:40; greens bc7d7e9f → 6b4704f2)
 
+- **11-03 07:38:** still no 05:00 release (Release workflow idle since v0.4.22). CRASH-2045 repro binary is
+  **qa-scratch/rel/k/keep/x/y/noshape-0531f66e** (don't delete: later greens' seed-2045 sessions diverge after core's
+  imprint change, so only that binary replays the crash; wrapper tickets/crash2045/wrap-0531f66e.sh). Scenarios: 255 in
+  tests/ui-parity (bin/mkscen.py → bin/uipsync.sh). Loops on green 0531f66e: /tmp/qa-nfloop27.sh (2281–2340),
+  /tmp/qa-gfloop11.sh (2341–2380); v0.4.22 /tmp/qa-cfloop68.sh (2241–2280).
+- **11-03 06:50:** **no release cut yet** (none at 05:00; `gh run list -R yekta/noshape -w Release`); when it comes: the
+  artifact checks, `bash /tmp/qa-relsmoke.sh 0.4.23 v0422`, /tmp/qa-relgui423.sh (made), /tmp/qa-mem423.sh (made), the
+  updater on :149. Since 04:15: BLEND-TOL-REGEN-CHANGES fixed by core 08632c09, verified on 0531f66e; CRASH-2045: core's
+  3fcc69d8 fixes the saved-document repro, but the seed-2045 fuzz session still dies 5 in 10 (gdb: inside malloc /
+  dropping a cached body; tickets/crash2045/gdb-3fcc-*.txt); SKETCH-UNDO-REDO-STATE verified (24d2ebc7). SCORE.md: dx
+  wrote the first row (models 4/11, features 51/78); qa added scenarios 71/112 (be4a7caa). The watch now fires GREEN only
+  for core / bool / psui / skasm commits that aren't handoffs, T2 or ticket notes (dx's translator commits don't change
+  what qa tests). Copies: green/p noshape-0531f66e, -1f446b18; keep/x/y noshape-3fcc69d8 (CRASH-2045 traces).
+- **11-03 04:15:** 05:00 list written (no blocker). Found since 02:00: **P0 CRASH-2045** (a 43-feature fuzz document
+  crashes the CLI / app on regeneration 2–5 runs in 5, Rust Boolean on; in v0.4.18–v0.4.22 too; gdb: a later fillet's
+  input shape already corrupt; repro tickets/crash2045/del1.py), **P1 BLEND-TOL-REGEN-CHANGES** (core eca0da09: fuzz
+  documents' chamfers / sketches now fail), SKETCH-UNDO-REDO-STATE reopened (Undo enabled on entering), verified
+  EYE-CLICK-SELECTS-ROW / FEATURE-RCLICK-WITH-SELECTION. The watch now also stops on NFFUZZ (deaths in
+  cli/nfloop.summary; it missed seed 2045 before). Interaction suite on green db0aedd0 against live's 82 recordings:
+  **37/82 scenarios, 254/453 states** (qa-scratch/uip-score1.log) — psui reports 47/72 on its own later run. 225
+  scenarios in tests/ui-parity. Next: the 05:00 Release run's artifact (cli-suppress-segv 22 parts, seeds 1222 / 1250
+  Rust off), relsmoke at publish (`bash /tmp/qa-relsmoke.sh 0.4.23 v0422`), GUI rows (sed /tmp/qa-relgui421.sh), memory,
+  the updater on :149; then SCORE.md's first line in the evening.
+- **11-03 01:54 state:** greens move fast (dx / skasm / psui); green copies now noshape-69b1816c and noshape-bad1de8e
+  (**keep a copy until the fuzz batches that used it are evaluated**: CRASH-1837-ONCE's binary was deleted too early).
+  Loops: /tmp/qa-nfloop24.sh (bad1de8e, 2041–2080), /tmp/qa-gfloop9.sh (69b1816c, 2001–2040), /tmp/qa-cfloop67.sh (v0.4.22,
+  1901–1960), /tmp/qa-memg.sh (seeds 508 / 685 RSS on 69b1816c → cli/rss*-g69b1816c.txt). Interaction suite: 185
+  scenarios; ours vs live's 29 recordings (/root/parity/ui/live) on green 69b1816c: **19/29 scenarios, 116/130 states**
+  (qa-scratch/uip-69b.log; `tools/ui-parity/run.py --app <green> --display :110 --out <dir> --live /root/parity/ui/live`,
+  pause :110's fuzz first; ~1 in 15 launches panics connecting to X: rerun those). From it: P3 EYE-CLICK-SELECTS-ROW,
+  P2 UIP-DRIVER-GAPS (driver targets / state fields for psui). Also filed tonight: P1 DIALOG-SWITCH-DISCARDS-NEW, P2
+  VARIABLE-EDIT-FOCUS, P2 FEATURE-RCLICK-WITH-SELECTION, P2 SKETCH-UNDO-REDO-STATE, P3 FEATURE-ROW-ENTER-EDITS
+  (unconfirmed), P2 CRASH-1837-ONCE, P2 PARITY-MODELS-DAILY-RUN (dx), 2 BOOL-DECLINE reasons. SCORE.md first line due
+  11-03 evening (models from dx's report.json; see Requests to the lead).
 - **11-03 00:37:** scenarios are in the repo (tests/ui-parity/, format in its README, agreed by psui / live / qa):
   151. Add them in qa-scratch/bin/mkscen.py, run it (writes qa-scratch/ui-parity/), then **`cp -n`** the new files into
   tests/ui-parity/ (others may edit the repo copies; never clobber). Live CDP caveat: key presses after clicking a
@@ -808,40 +842,6 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
 ## Requests to the lead (qa, updated 2026-11-03 01:40)
-- **11-03 07:38:** still no 05:00 release (Release workflow idle since v0.4.22). CRASH-2045 repro binary is
-  **qa-scratch/rel/k/keep/x/y/noshape-0531f66e** (don't delete: later greens' seed-2045 sessions diverge after core's
-  imprint change, so only that binary replays the crash; wrapper tickets/crash2045/wrap-0531f66e.sh). Scenarios: 255 in
-  tests/ui-parity (bin/mkscen.py → bin/uipsync.sh). Loops on green 0531f66e: /tmp/qa-nfloop27.sh (2281–2340),
-  /tmp/qa-gfloop11.sh (2341–2380); v0.4.22 /tmp/qa-cfloop68.sh (2241–2280).
-- **11-03 06:50:** **no release cut yet** (none at 05:00; `gh run list -R yekta/noshape -w Release`); when it comes: the
-  artifact checks, `bash /tmp/qa-relsmoke.sh 0.4.23 v0422`, /tmp/qa-relgui423.sh (made), /tmp/qa-mem423.sh (made), the
-  updater on :149. Since 04:15: BLEND-TOL-REGEN-CHANGES fixed by core 08632c09, verified on 0531f66e; CRASH-2045: core's
-  3fcc69d8 fixes the saved-document repro, but the seed-2045 fuzz session still dies 5 in 10 (gdb: inside malloc /
-  dropping a cached body; tickets/crash2045/gdb-3fcc-*.txt); SKETCH-UNDO-REDO-STATE verified (24d2ebc7). SCORE.md: dx
-  wrote the first row (models 4/11, features 51/78); qa added scenarios 71/112 (be4a7caa). The watch now fires GREEN only
-  for core / bool / psui / skasm commits that aren't handoffs, T2 or ticket notes (dx's translator commits don't change
-  what qa tests). Copies: green/p noshape-0531f66e, -1f446b18; keep/x/y noshape-3fcc69d8 (CRASH-2045 traces).
-- **11-03 04:15:** 05:00 list written (no blocker). Found since 02:00: **P0 CRASH-2045** (a 43-feature fuzz document
-  crashes the CLI / app on regeneration 2–5 runs in 5, Rust Boolean on; in v0.4.18–v0.4.22 too; gdb: a later fillet's
-  input shape already corrupt; repro tickets/crash2045/del1.py), **P1 BLEND-TOL-REGEN-CHANGES** (core eca0da09: fuzz
-  documents' chamfers / sketches now fail), SKETCH-UNDO-REDO-STATE reopened (Undo enabled on entering), verified
-  EYE-CLICK-SELECTS-ROW / FEATURE-RCLICK-WITH-SELECTION. The watch now also stops on NFFUZZ (deaths in
-  cli/nfloop.summary; it missed seed 2045 before). Interaction suite on green db0aedd0 against live's 82 recordings:
-  **37/82 scenarios, 254/453 states** (qa-scratch/uip-score1.log) — psui reports 47/72 on its own later run. 225
-  scenarios in tests/ui-parity. Next: the 05:00 Release run's artifact (cli-suppress-segv 22 parts, seeds 1222 / 1250
-  Rust off), relsmoke at publish (`bash /tmp/qa-relsmoke.sh 0.4.23 v0422`), GUI rows (sed /tmp/qa-relgui421.sh), memory,
-  the updater on :149; then SCORE.md's first line in the evening.
-- **11-03 01:54 state:** greens move fast (dx / skasm / psui); green copies now noshape-69b1816c and noshape-bad1de8e
-  (**keep a copy until the fuzz batches that used it are evaluated**: CRASH-1837-ONCE's binary was deleted too early).
-  Loops: /tmp/qa-nfloop24.sh (bad1de8e, 2041–2080), /tmp/qa-gfloop9.sh (69b1816c, 2001–2040), /tmp/qa-cfloop67.sh (v0.4.22,
-  1901–1960), /tmp/qa-memg.sh (seeds 508 / 685 RSS on 69b1816c → cli/rss*-g69b1816c.txt). Interaction suite: 185
-  scenarios; ours vs live's 29 recordings (/root/parity/ui/live) on green 69b1816c: **19/29 scenarios, 116/130 states**
-  (qa-scratch/uip-69b.log; `tools/ui-parity/run.py --app <green> --display :110 --out <dir> --live /root/parity/ui/live`,
-  pause :110's fuzz first; ~1 in 15 launches panics connecting to X: rerun those). From it: P3 EYE-CLICK-SELECTS-ROW,
-  P2 UIP-DRIVER-GAPS (driver targets / state fields for psui). Also filed tonight: P1 DIALOG-SWITCH-DISCARDS-NEW, P2
-  VARIABLE-EDIT-FOCUS, P2 FEATURE-RCLICK-WITH-SELECTION, P2 SKETCH-UNDO-REDO-STATE, P3 FEATURE-ROW-ENTER-EDITS
-  (unconfirmed), P2 CRASH-1837-ONCE, P2 PARITY-MODELS-DAILY-RUN (dx), 2 BOOL-DECLINE reasons. SCORE.md first line due
-  11-03 evening (models from dx's report.json; see Requests to the lead).
 - **11-03 01:40: SCORE.md's model numbers.** dx's handoff (d821e749b) has qa run `NOSHAPE_RB_LOCAL=1 tools/tiers/rb.sh cargo test -q -p noshape-ops --test all parity::parity_models -- --ignored`, which is a build; qa's rule is never to build. Until you say otherwise qa takes the model line from the report.json dx's own run leaves next to /root/parity/models (and asks dx in its handoff to run it before 11-03 evening). The scenario line qa makes itself: green binary + tools/ui-parity/run.py (no build) against /root/parity/ui/live — 6/28 scenarios, 50/139 states on green 2723f7fb at 01:35.
 - **09:09: a CLI built from each green's commit** (e.g. next to /root/green/noshape as noshape-cli + SHA). qa never builds, and the
   only CLIs on the box are the agents' worktree builds (bool's 07:17, core's 06:35, which held unlanded work at times: a false
