@@ -48,6 +48,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   translate whole except custom features and 4 Hole parameters (locationSignatures, holeDepthMultiple: not in std
   1963; check live's current std before a ticket). Live's README (/root/parity/models/README.md) has no raw `bodies`
   per line: asked again (REQUESTS 11-03 00:20); the names above cover Extrude / Revolve references without it.
+- Staged for when GET /features reopens (~04:17 UTC): /root/parity/models-dx/{dx-mbd-1721, live-hole-row,
+  live-pattern-holes} have live.jsonl (per rollback: parts, bands, boxes, raw bodies; from pm-rollbacks.js); run
+  /root/dx-scratch/live/pm-features.sh to add features.json and merge names / statuses, then parity_models on them
+  (models are on this machine: NOSHAPE_RB_LOCAL=1, or scp to vibe5 ~/agents/dx/ + NOSHAPE_PARITY_MODELS).
 - Daily walk 11-03 00:40 on green 6944476a (:105): start window, + › Create Drawing (No views; Suggested views greyed
   from the + menu, as live), the drawing opens into Insert view, Part Studio 1 of live-30-features → 1:2 in the panel
   and title block while following: as live. Asked live when Insert view shows "Show annotations from model" (REQUESTS
