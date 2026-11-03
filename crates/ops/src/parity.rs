@@ -97,6 +97,8 @@ pub struct Translator<'a> {
     /// Live's solved sketch geometry (`sketches` geomEntities) by (sketch
     /// feature id, entity id).
     solved: HashMap<(String, String), Value>,
+    /// The image tab standing in for icons live hasn't fetched.
+    placeholder: Option<String>,
     /// Each Feature Studio's pinned std and the one our host serves for it.
     pub std_pins: Vec<(String, u32, u32)>,
 }
@@ -248,7 +250,7 @@ impl<'a> Translator<'a> {
             .flatten()
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, std_pins: Vec::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, placeholder: None, std_pins: Vec::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -279,6 +281,18 @@ impl<'a> Translator<'a> {
                 }
             }
         }
+        // An icon or image the studio imports (used only as `ns::BLOB_DATA`
+        // in its annotations, no effect on geometry) that live hasn't
+        // fetched: a placeholder image tab.
+        for (ns, path) in blob_imports(&source) {
+            let element = path.rsplit('/').next().unwrap_or(&path).to_string();
+            if self.studios.contains_key(&element) {
+                continue;
+            }
+            let Some(image) = self.placeholder_image() else { break };
+            source = source.replacen(&format!("{ns}::import(path : \"{path}\""), &format!("{ns}::import(path : \"{image}\""), 1);
+            self.notes.push(format!("Feature Studio {name}: its image {element} (`{ns}::BLOB_DATA`) not fetched: a placeholder"));
+        }
         if let Err(e) = self.call("featurestudio_edit", json!({ "tab": tab, "source": source })).and_then(|_| self.call("featurestudio_commit", json!({ "tab": tab }))) {
             self.notes.push(format!("Feature Studio {name}: {e}"));
         }
@@ -286,6 +300,23 @@ impl<'a> Translator<'a> {
         if let Some(pin) = source.split("FeatureScript").nth(1).and_then(|r| r.trim_start().split(';').next()).and_then(|v| v.trim().parse::<u32>().ok()) {
             self.std_pins.push((name.to_string(), pin, noshape_featurescript::std_version_for(pin)));
         }
+    }
+
+    /// A 1 × 1 image tab for icons and images live hasn't fetched (made once).
+    fn placeholder_image(&mut self) -> Option<String> {
+        if let Some(t) = &self.placeholder {
+            return Some(t.clone());
+        }
+        const PNG: &[u8] = &[
+            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+            0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0xda, 0x63, 0xf8, 0xcf, 0xc0, 0xf0, 0x1f, 0x00, 0x05, 0x00, 0x01, 0xff, 0x89, 0x99, 0x3d, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+        ];
+        let path = std::env::temp_dir().join(format!("noshape-parity-icon-{}.png", std::process::id()));
+        std::fs::write(&path, PNG).ok()?;
+        let r = self.call("import_files", json!({ "files": [path.to_str()?] })).ok()?;
+        let tab = r["first"].as_str()?.to_string();
+        self.placeholder = Some(tab.clone());
+        Some(tab)
     }
 
     /// What the editor's notices call errors, once every studio is in: it
@@ -2082,6 +2113,23 @@ fn packed_strings_of(text: &str) -> Vec<String> {
         && let Ok(tree) = noshape_model::custom::host::packed::unpack(packed)
     {
         packed_strings(&tree, &mut out);
+    }
+    out
+}
+
+/// The namespaced imports (`ns::import(path : "…", …)`) a FeatureScript
+/// source uses only as `ns::BLOB_DATA` (icons, description images).
+fn blob_imports(source: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for (at, _) in source.match_indices("::import(path : \"") {
+        let ns: String = source[..at].chars().rev().take_while(|c| c.is_alphanumeric() || *c == '_').collect::<Vec<_>>().into_iter().rev().collect();
+        let rest = &source[at + "::import(path : \"".len()..];
+        let Some(path) = rest.split('"').next() else { continue };
+        let uses = source.matches(&format!("{ns}::")).count();
+        let blobs = source.matches(&format!("{ns}::BLOB_DATA")).count();
+        if !ns.is_empty() && uses == blobs + 1 && blobs > 0 {
+            out.push((ns, path.to_string()));
+        }
     }
     out
 }

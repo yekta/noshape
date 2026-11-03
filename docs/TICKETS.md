@@ -3064,6 +3064,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   cf-linear-pattern-with-seed-location (FeatureScript 392) call `checkInput(context, id, definition, false)` →
   "Function checkInput with 4 argument(s) not found" (std 392's patternUtils had it; 1963 hasn't), so their Face /
   Feature / Part Pattern features fail "Error regenerating." where live's build.
+  dx 12:46: cf-sheet-metal-model-plus (1403) uses `SMExtrudeSecondDirectionBoundingType` → "Type
+  SMExtrudeSecondDirectionBoundingType not found" (gone from 1963). With icons stood in for, 23/34 studios compile.
 - [ ] P2 FS-EDITOR-IMPORT-NOTICES (psui) the Feature Studio editor's notices (feature-studio-ui studio_notices,
   fs_notices document_notices) compile the source alone, so a studio importing another tab (`import(path : "<tab
   id>", …)`) shows "Imported element … not found" though its Part Studios regenerate with it; live's editor
