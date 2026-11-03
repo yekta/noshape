@@ -645,7 +645,7 @@ fn what_the_dialog_fills_in_on_opening_is_no_undo_step(cx: &mut TestAppContext) 
     cx.update(|cx| dialog.update(cx, |d, cx| d.set_value("symmetric", noshape_model::ParamValue::Bool(true), cx)));
     draw(cx, window);
     assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (true, false), "a change is a step");
-    keys(cx, window, &["ctrl-z"]);
+    keys(cx, window, &["secondary-z"]);
     assert_eq!(op(cx), "ADD", "undo goes back to the opened dialog");
     assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (false, true));
 }
