@@ -101,7 +101,9 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         }
         // An input we couldn't place (live's geometry missing or a query
         // form not translated): the difference may be ours, not the model's.
-        let unmapped = step.problems.iter().any(|p| p.contains("query not mapped") || p.contains("no entity of ours") || p.contains("was not built") || p.contains("not built:"));
+        // (An empty query only when ours then errs: often a leftover
+        // parameter nothing uses.)
+        let unmapped = step.problems.iter().any(|p| p.contains("query not mapped") || p.contains("no entity of ours") || p.contains("was not built") || p.contains("not built:") || (p.contains("an empty query") && ours == "ERROR"));
         // A custom feature that errors where live's doesn't, given all its
         // inputs, failed to run (the FeatureScript host or std), apart from geometry.
         let failed_run = step.custom && step.ours.is_some() && ours == "ERROR" && live_status != "ERROR" && !unmapped;

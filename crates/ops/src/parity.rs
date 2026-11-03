@@ -999,6 +999,9 @@ impl<'a> Translator<'a> {
         }
         let ids: Vec<String> = q["deterministicIds"].as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect();
         let text = q["queryString"].as_str().unwrap_or("");
+        if ids.is_empty() && text.is_empty() && q["btType"].as_str().is_some_and(|t| t.starts_with("BTMIndividualQuery-")) {
+            return Err("an empty query in live's fetch (no ids, no query)".into());
+        }
         // A sketch region query without its text (live's UI fetch): the
         // regions of its sketch, as Onshape writes it.
         let written;
