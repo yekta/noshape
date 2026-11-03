@@ -1,0 +1,4318 @@
+{
+ "note": "Live 2026-11-02 ~23:55 UTC, Part Studio \"skasm probes 11\" (aed154c6c96418ac659f3e0d) in \"skasm speed\"; each case POSTed as is on Top (same posting as probes 10); points from REST /sketches?includeGeometry=true (GET /features and /featurescript are rate-limited). All 30 solve (POST featureStatus OK). q1 (conic) comes back from /sketches as unknownGeometry without points: q1.start / q1.end are filled from their coincident partners (l2.end / l2.start). p1 (spline) start / end = first / last interpolation point. groups_rigid_fit_from_posted: for each group of curves, the best rigid fit (Kabsch, 2D) from the posted points to live's and to ours: rotation in degrees, translation of the centroid in mm, and the largest residual (shape change).",
+ "cases": {
+  "r218-k3": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k3 (HORIZONTAL)",
+   "points": {
+    "l2.start": [
+     31.4786,
+     -1.3524
+    ],
+    "l2.end": [
+     2.7183,
+     -1.3524
+    ],
+    "l3.start": [
+     47.168,
+     1.9632
+    ],
+    "l3.end": [
+     67.168,
+     1.9632
+    ],
+    "a4.start": [
+     67.168,
+     1.9632
+    ],
+    "a4.end": [
+     81.3835,
+     16.1787
+    ],
+    "a4.center": [
+     67.168,
+     16.1787
+    ],
+    "l5.start": [
+     81.3835,
+     16.1787
+    ],
+    "l5.end": [
+     81.3835,
+     40.4027
+    ],
+    "l6.start": [
+     150.4145,
+     -1.3524
+    ],
+    "l6.end": [
+     139.623,
+     15.9831
+    ],
+    "l7.start": [
+     139.623,
+     15.9831
+    ],
+    "l7.end": [
+     112.5926,
+     6.1592
+    ],
+    "l8.start": [
+     112.5926,
+     6.1592
+    ],
+    "l8.end": [
+     104.2942,
+     -15.4112
+    ],
+    "l9.start": [
+     104.2942,
+     -15.4112
+    ],
+    "l9.end": [
+     130.3635,
+     -25.426
+    ],
+    "l10.start": [
+     130.3635,
+     -25.426
+    ],
+    "l10.end": [
+     150.4145,
+     -1.3524
+    ],
+    "q1.end": [
+     31.4786,
+     -1.3524
+    ],
+    "q1.start": [
+     2.7183,
+     -1.3524
+    ]
+   },
+   "radii": {
+    "a4": 14.215528
+   },
+   "groups_rigid_fit_from_posted": {
+    "chain l3/a4/l5": {
+     "live": {
+      "rot_deg": 1.353,
+      "move": [
+       7.418,
+       2.257
+      ],
+      "shape_change": 3.413
+     },
+     "ours": {
+      "rot_deg": 1.938,
+      "move": [
+       4.232,
+       11.012
+      ],
+      "shape_change": 4.635
+     },
+     "max_live_vs_ours": 11.388
+    },
+    "hexagon l6-l10": {
+     "live": {
+      "rot_deg": -2.229,
+      "move": [
+       2.423,
+       1.477
+      ],
+      "shape_change": 3.168
+     },
+     "ours": {
+      "rot_deg": 0.445,
+      "move": [
+       -0.192,
+       0.38
+      ],
+      "shape_change": 3.414
+     },
+     "max_live_vs_ours": 4.035
+    },
+    "q1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       0.0,
+       0.0
+      ],
+      "shape_change": 0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       -0.0,
+       0.0
+      ],
+      "shape_change": 0.0
+     },
+     "max_live_vs_ours": 0.0
+    }
+   }
+  },
+  "r218-k6": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k6 (TANGENT)",
+   "points": {
+    "l2.start": [
+     31.4786,
+     -1.3524
+    ],
+    "l2.end": [
+     2.7183,
+     -1.3524
+    ],
+    "l3.start": [
+     47.2163,
+     0.5743
+    ],
+    "l3.end": [
+     67.168,
+     1.9632
+    ],
+    "a4.start": [
+     67.168,
+     1.9632
+    ],
+    "a4.end": [
+     81.3835,
+     16.1787
+    ],
+    "a4.center": [
+     67.168,
+     16.1787
+    ],
+    "l5.start": [
+     81.3835,
+     16.1787
+    ],
+    "l5.end": [
+     81.3835,
+     40.4027
+    ],
+    "l6.start": [
+     150.4145,
+     -1.3524
+    ],
+    "l6.end": [
+     139.623,
+     15.9831
+    ],
+    "l7.start": [
+     139.623,
+     15.9831
+    ],
+    "l7.end": [
+     112.5926,
+     6.1592
+    ],
+    "l8.start": [
+     112.5926,
+     6.1592
+    ],
+    "l8.end": [
+     106.9044,
+     -15.5118
+    ],
+    "l9.start": [
+     106.9044,
+     -15.5118
+    ],
+    "l9.end": [
+     132.9737,
+     -25.5266
+    ],
+    "l10.start": [
+     132.9737,
+     -25.5266
+    ],
+    "l10.end": [
+     150.4145,
+     -1.3524
+    ],
+    "q1.end": [
+     31.4786,
+     -1.3524
+    ],
+    "q1.start": [
+     2.7183,
+     -1.3524
+    ]
+   },
+   "radii": {
+    "a4": 14.215528
+   },
+   "groups_rigid_fit_from_posted": {
+    "chain l3/a4/l5": {
+     "live": {
+      "rot_deg": 2.292,
+      "move": [
+       7.425,
+       2.058
+      ],
+      "shape_change": 3.524
+     },
+     "ours": {
+      "rot_deg": 0.132,
+      "move": [
+       4.59,
+       11.889
+      ],
+      "shape_change": 3.64
+     },
+     "max_live_vs_ours": 10.729
+    },
+    "hexagon l6-l10": {
+     "live": {
+      "rot_deg": -0.285,
+      "move": [
+       3.467,
+       1.436
+      ],
+      "shape_change": 3.665
+     },
+     "ours": {
+      "rot_deg": 0.445,
+      "move": [
+       -0.192,
+       0.38
+      ],
+      "shape_change": 3.414
+     },
+     "max_live_vs_ours": 4.035
+    },
+    "q1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       0.0,
+       0.0
+      ],
+      "shape_change": 0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       -0.0,
+       0.0
+      ],
+      "shape_change": 0.0
+     },
+     "max_live_vs_ours": 0.0
+    }
+   }
+  },
+  "r218-k7": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k7 (TANGENT)",
+   "points": {
+    "l2.start": [
+     31.4786,
+     -1.3524
+    ],
+    "l2.end": [
+     2.7183,
+     -1.3524
+    ],
+    "l3.start": [
+     47.168,
+     1.9632
+    ],
+    "l3.end": [
+     67.168,
+     1.9632
+    ],
+    "a4.start": [
+     67.168,
+     1.9632
+    ],
+    "a4.end": [
+     81.3835,
+     16.1787
+    ],
+    "a4.center": [
+     67.168,
+     16.1787
+    ],
+    "l5.start": [
+     81.3835,
+     16.1787
+    ],
+    "l5.end": [
+     81.3835,
+     40.4027
+    ],
+    "l6.start": [
+     150.4145,
+     -1.3524
+    ],
+    "l6.end": [
+     139.623,
+     15.9831
+    ],
+    "l7.start": [
+     139.623,
+     15.9831
+    ],
+    "l7.end": [
+     112.5926,
+     6.1592
+    ],
+    "l8.start": [
+     112.5926,
+     6.1592
+    ],
+    "l8.end": [
+     104.2942,
+     -15.4112
+    ],
+    "l9.start": [
+     104.2942,
+     -15.4112
+    ],
+    "l9.end": [
+     130.3635,
+     -25.426
+    ],
+    "l10.start": [
+     130.3635,
+     -25.426
+    ],
+    "l10.end": [
+     150.4145,
+     -1.3524
+    ],
+    "q1.end": [
+     31.4786,
+     -1.3524
+    ],
+    "q1.start": [
+     2.7183,
+     -1.3524
+    ]
+   },
+   "radii": {
+    "a4": 14.215528
+   },
+   "groups_rigid_fit_from_posted": {
+    "chain l3/a4/l5": {
+     "live": {
+      "rot_deg": 1.353,
+      "move": [
+       7.418,
+       2.257
+      ],
+      "shape_change": 3.413
+     },
+     "ours": {
+      "rot_deg": -1.256,
+      "move": [
+       4.337,
+       13.688
+      ],
+      "shape_change": 3.239
+     },
+     "max_live_vs_ours": 15.693
+    },
+    "hexagon l6-l10": {
+     "live": {
+      "rot_deg": -2.229,
+      "move": [
+       2.423,
+       1.477
+      ],
+      "shape_change": 3.168
+     },
+     "ours": {
+      "rot_deg": 0.445,
+      "move": [
+       -0.192,
+       0.38
+      ],
+      "shape_change": 3.414
+     },
+     "max_live_vs_ours": 4.035
+    },
+    "q1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       0.0,
+       0.0
+      ],
+      "shape_change": 0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       -0.0,
+       0.0
+      ],
+      "shape_change": 0.0
+     },
+     "max_live_vs_ours": 0.0
+    }
+   }
+  },
+  "r218-k13": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k13 (EQUAL)",
+   "points": {
+    "l2.start": [
+     31.4786,
+     -1.3524
+    ],
+    "l2.end": [
+     2.7183,
+     -1.3524
+    ],
+    "l3.start": [
+     47.168,
+     1.9632
+    ],
+    "l3.end": [
+     67.168,
+     1.9632
+    ],
+    "a4.start": [
+     67.168,
+     1.9632
+    ],
+    "a4.end": [
+     81.3835,
+     16.1787
+    ],
+    "a4.center": [
+     67.168,
+     16.1787
+    ],
+    "l5.start": [
+     81.3835,
+     16.1787
+    ],
+    "l5.end": [
+     81.3835,
+     40.4027
+    ],
+    "l6.start": [
+     150.4145,
+     -1.3524
+    ],
+    "l6.end": [
+     137.9941,
+     15.3911
+    ],
+    "l7.start": [
+     137.9941,
+     15.3911
+    ],
+    "l7.end": [
+     112.5926,
+     6.1592
+    ],
+    "l8.start": [
+     112.5926,
+     6.1592
+    ],
+    "l8.end": [
+     104.2942,
+     -15.4112
+    ],
+    "l9.start": [
+     104.2942,
+     -15.4112
+    ],
+    "l9.end": [
+     130.3635,
+     -25.426
+    ],
+    "l10.start": [
+     130.3635,
+     -25.426
+    ],
+    "l10.end": [
+     150.4145,
+     -1.3524
+    ],
+    "q1.end": [
+     31.4786,
+     -1.3524
+    ],
+    "q1.start": [
+     2.7183,
+     -1.3524
+    ]
+   },
+   "radii": {
+    "a4": 14.215528
+   },
+   "groups_rigid_fit_from_posted": {
+    "chain l3/a4/l5": {
+     "live": {
+      "rot_deg": 1.353,
+      "move": [
+       7.418,
+       2.257
+      ],
+      "shape_change": 3.413
+     },
+     "ours": {
+      "rot_deg": -0.719,
+      "move": [
+       5.256,
+       12.527
+      ],
+      "shape_change": 2.911
+     },
+     "max_live_vs_ours": 11.693
+    },
+    "hexagon l6-l10": {
+     "live": {
+      "rot_deg": -1.606,
+      "move": [
+       2.097,
+       1.358
+      ],
+      "shape_change": 2.81
+     },
+     "ours": {
+      "rot_deg": 0.319,
+      "move": [
+       0.443,
+       0.41
+      ],
+      "shape_change": 1.973
+     },
+     "max_live_vs_ours": 4.006
+    },
+    "q1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       0.0,
+       0.0
+      ],
+      "shape_change": 0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       -0.0,
+       0.0
+      ],
+      "shape_change": 0.0
+     },
+     "max_live_vs_ours": 0.0
+    }
+   }
+  },
+  "r218-k14": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k14 (ANGLE)",
+   "points": {
+    "l2.start": [
+     31.4786,
+     -1.3524
+    ],
+    "l2.end": [
+     2.7183,
+     -1.3524
+    ],
+    "l3.start": [
+     47.168,
+     1.9632
+    ],
+    "l3.end": [
+     67.168,
+     1.9632
+    ],
+    "a4.start": [
+     67.168,
+     1.9632
+    ],
+    "a4.end": [
+     81.3835,
+     16.1787
+    ],
+    "a4.center": [
+     67.168,
+     16.1787
+    ],
+    "l5.start": [
+     81.3835,
+     16.1787
+    ],
+    "l5.end": [
+     81.3835,
+     40.4027
+    ],
+    "l6.start": [
+     150.4145,
+     -1.3524
+    ],
+    "l6.end": [
+     139.623,
+     15.9831
+    ],
+    "l7.start": [
+     139.623,
+     15.9831
+    ],
+    "l7.end": [
+     112.5926,
+     6.1592
+    ],
+    "l8.start": [
+     112.5926,
+     6.1592
+    ],
+    "l8.end": [
+     106.9044,
+     -15.5118
+    ],
+    "l9.start": [
+     106.9044,
+     -15.5118
+    ],
+    "l9.end": [
+     132.9737,
+     -25.5266
+    ],
+    "l10.start": [
+     132.9737,
+     -25.5266
+    ],
+    "l10.end": [
+     150.4145,
+     -1.3524
+    ],
+    "q1.end": [
+     31.4786,
+     -1.3524
+    ],
+    "q1.start": [
+     2.7183,
+     -1.3524
+    ]
+   },
+   "radii": {
+    "a4": 14.215528
+   },
+   "groups_rigid_fit_from_posted": {
+    "chain l3/a4/l5": {
+     "live": {
+      "rot_deg": 1.353,
+      "move": [
+       7.418,
+       2.257
+      ],
+      "shape_change": 3.413
+     },
+     "ours": {
+      "rot_deg": -22.774,
+      "move": [
+       7.884,
+       4.121
+      ],
+      "shape_change": 3.413
+     },
+     "max_live_vs_ours": 12.574
+    },
+    "hexagon l6-l10": {
+     "live": {
+      "rot_deg": -0.285,
+      "move": [
+       3.467,
+       1.436
+      ],
+      "shape_change": 3.665
+     },
+     "ours": {
+      "rot_deg": 0.445,
+      "move": [
+       -0.192,
+       0.38
+      ],
+      "shape_change": 3.414
+     },
+     "max_live_vs_ours": 4.035
+    },
+    "q1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       0.0,
+       0.0
+      ],
+      "shape_change": 0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       -0.0,
+       0.0
+      ],
+      "shape_change": 0.0
+     },
+     "max_live_vs_ours": 0.0
+    }
+   }
+  },
+  "r218-k15": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k15 (COINCIDENT)",
+   "points": {
+    "l2.start": [
+     31.4786,
+     -1.3524
+    ],
+    "l2.end": [
+     2.7183,
+     -1.3524
+    ],
+    "l3.start": [
+     47.168,
+     1.9632
+    ],
+    "l3.end": [
+     67.168,
+     1.9632
+    ],
+    "a4.start": [
+     67.168,
+     1.9632
+    ],
+    "a4.end": [
+     81.3835,
+     16.1787
+    ],
+    "a4.center": [
+     67.168,
+     16.1787
+    ],
+    "l5.start": [
+     81.3835,
+     16.1787
+    ],
+    "l5.end": [
+     81.3835,
+     40.4027
+    ],
+    "l6.start": [
+     153.4602,
+     -0.2361
+    ],
+    "l6.end": [
+     139.1395,
+     17.2233
+    ],
+    "l7.start": [
+     139.1395,
+     17.2233
+    ],
+    "l7.end": [
+     112.5926,
+     6.1592
+    ],
+    "l8.start": [
+     112.5926,
+     6.1592
+    ],
+    "l8.end": [
+     106.9044,
+     -15.5118
+    ],
+    "l9.start": [
+     106.9044,
+     -15.5118
+    ],
+    "l9.end": [
+     133.4092,
+     -24.3097
+    ],
+    "l10.start": [
+     133.4092,
+     -24.3097
+    ],
+    "l10.end": [
+     153.4602,
+     -0.2361
+    ],
+    "q1.end": [
+     31.4786,
+     -1.3524
+    ],
+    "q1.start": [
+     2.7183,
+     -1.3524
+    ]
+   },
+   "radii": {
+    "a4": 14.215528
+   },
+   "groups_rigid_fit_from_posted": {
+    "chain l3/a4/l5": {
+     "live": {
+      "rot_deg": 1.353,
+      "move": [
+       7.418,
+       2.257
+      ],
+      "shape_change": 3.413
+     },
+     "ours": {
+      "rot_deg": 1.353,
+      "move": [
+       3.605,
+       0.937
+      ],
+      "shape_change": 3.413
+     },
+     "max_live_vs_ours": 4.035
+    },
+    "hexagon l6-l10": {
+     "live": {
+      "rot_deg": 1.013,
+      "move": [
+       4.066,
+       2.151
+      ],
+      "shape_change": 1.743
+     },
+     "ours": {
+      "rot_deg": -0.413,
+      "move": [
+       0.181,
+       0.102
+      ],
+      "shape_change": 1.857
+     },
+     "max_live_vs_ours": 4.948
+    },
+    "q1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       0.0,
+       0.0
+      ],
+      "shape_change": 0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       -3.907,
+       -0.891
+      ],
+      "shape_change": 0.0
+     },
+     "max_live_vs_ours": 4.007
+    }
+   }
+  },
+  "r218-k16": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k16 (ANGLE)",
+   "points": {
+    "l2.start": [
+     31.4786,
+     -1.3524
+    ],
+    "l2.end": [
+     2.7183,
+     -1.3524
+    ],
+    "l3.start": [
+     47.168,
+     1.9632
+    ],
+    "l3.end": [
+     67.168,
+     1.9632
+    ],
+    "a4.start": [
+     67.168,
+     1.9632
+    ],
+    "a4.end": [
+     81.3835,
+     16.1787
+    ],
+    "a4.center": [
+     67.168,
+     16.1787
+    ],
+    "l5.start": [
+     81.3835,
+     16.1787
+    ],
+    "l5.end": [
+     81.3835,
+     40.4027
+    ],
+    "l6.start": [
+     150.4145,
+     -1.3524
+    ],
+    "l6.end": [
+     139.1395,
+     17.2233
+    ],
+    "l7.start": [
+     139.1395,
+     17.2233
+    ],
+    "l7.end": [
+     112.5926,
+     6.1592
+    ],
+    "l8.start": [
+     112.5926,
+     6.1592
+    ],
+    "l8.end": [
+     104.2942,
+     -15.4112
+    ],
+    "l9.start": [
+     104.2942,
+     -15.4112
+    ],
+    "l9.end": [
+     130.3635,
+     -25.426
+    ],
+    "l10.start": [
+     130.3635,
+     -25.426
+    ],
+    "l10.end": [
+     150.4145,
+     -1.3524
+    ],
+    "q1.end": [
+     31.4786,
+     -1.3524
+    ],
+    "q1.start": [
+     2.7183,
+     -1.3524
+    ]
+   },
+   "radii": {
+    "a4": 14.215528
+   },
+   "groups_rigid_fit_from_posted": {
+    "chain l3/a4/l5": {
+     "live": {
+      "rot_deg": 1.353,
+      "move": [
+       7.418,
+       2.257
+      ],
+      "shape_change": 3.413
+     },
+     "ours": {
+      "rot_deg": -2.502,
+      "move": [
+       4.011,
+       12.103
+      ],
+      "shape_change": 3.785
+     },
+     "max_live_vs_ours": 12.143
+    },
+    "hexagon l6-l10": {
+     "live": {
+      "rot_deg": -1.75,
+      "move": [
+       2.326,
+       1.725
+      ],
+      "shape_change": 2.814
+     },
+     "ours": {
+      "rot_deg": 0.887,
+      "move": [
+       -0.153,
+       2.122
+      ],
+      "shape_change": 1.784
+     },
+     "max_live_vs_ours": 4.685
+    },
+    "q1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       0.0,
+       0.0
+      ],
+      "shape_change": 0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       -0.0,
+       0.0
+      ],
+      "shape_change": 0.0
+     },
+     "max_live_vs_ours": 0.0
+    }
+   }
+  },
+  "r218-k17": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k17 (DISTANCE)",
+   "points": {
+    "l2.start": [
+     31.4786,
+     -1.3524
+    ],
+    "l2.end": [
+     2.7183,
+     -1.3524
+    ],
+    "l3.start": [
+     46.4687,
+     3.0023
+    ],
+    "l3.end": [
+     66.4426,
+     1.9817
+    ],
+    "a4.start": [
+     66.4426,
+     1.9817
+    ],
+    "a4.end": [
+     81.3835,
+     16.1787
+    ],
+    "a4.center": [
+     67.168,
+     16.1787
+    ],
+    "l5.start": [
+     81.3835,
+     16.1787
+    ],
+    "l5.end": [
+     81.3835,
+     40.4027
+    ],
+    "l6.start": [
+     150.4145,
+     -1.3524
+    ],
+    "l6.end": [
+     135.8105,
+     17.1383
+    ],
+    "l7.start": [
+     135.8105,
+     17.1383
+    ],
+    "l7.end": [
+     108.7801,
+     7.3144
+    ],
+    "l8.start": [
+     108.7801,
+     7.3144
+    ],
+    "l8.end": [
+     103.0919,
+     -14.3566
+    ],
+    "l9.start": [
+     103.0919,
+     -14.3566
+    ],
+    "l9.end": [
+     129.1613,
+     -24.3715
+    ],
+    "l10.start": [
+     129.1613,
+     -24.3715
+    ],
+    "l10.end": [
+     150.4145,
+     -1.3524
+    ],
+    "q1.end": [
+     31.4786,
+     -1.3524
+    ],
+    "q1.start": [
+     2.7183,
+     -1.3524
+    ]
+   },
+   "radii": {
+    "a4": 14.215528
+   },
+   "groups_rigid_fit_from_posted": {
+    "chain l3/a4/l5": {
+     "live": {
+      "rot_deg": -0.043,
+      "move": [
+       7.111,
+       2.41
+      ],
+      "shape_change": 3.487
+     },
+     "ours": {
+      "rot_deg": 0.56,
+      "move": [
+       9.157,
+       2.984
+      ],
+      "shape_change": 2.694
+     },
+     "max_live_vs_ours": 5.539
+    },
+    "hexagon l6-l10": {
+     "live": {
+      "rot_deg": -1.056,
+      "move": [
+       0.417,
+       2.361
+      ],
+      "shape_change": 1.32
+     },
+     "ours": {
+      "rot_deg": 0.445,
+      "move": [
+       -0.192,
+       0.38
+      ],
+      "shape_change": 3.414
+     },
+     "max_live_vs_ours": 3.043
+    },
+    "q1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       0.0,
+       0.0
+      ],
+      "shape_change": 0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       -0.0,
+       0.0
+      ],
+      "shape_change": 0.0
+     },
+     "max_live_vs_ours": 0.0
+    }
+   }
+  },
+  "r218-k18": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k18 (DISTANCE)",
+   "points": {
+    "l2.start": [
+     31.4786,
+     -1.3524
+    ],
+    "l2.end": [
+     2.7183,
+     -1.3524
+    ],
+    "l3.start": [
+     43.3816,
+     4.1389
+    ],
+    "l3.end": [
+     63.3555,
+     3.1183
+    ],
+    "a4.start": [
+     63.3555,
+     3.1183
+    ],
+    "a4.end": [
+     78.2918,
+     16.9525
+    ],
+    "a4.center": [
+     64.0809,
+     17.3153
+    ],
+    "l5.start": [
+     78.2918,
+     16.9525
+    ],
+    "l5.end": [
+     78.91,
+     41.1686
+    ],
+    "l6.start": [
+     150.4145,
+     -1.3524
+    ],
+    "l6.end": [
+     135.8105,
+     17.1383
+    ],
+    "l7.start": [
+     135.8105,
+     17.1383
+    ],
+    "l7.end": [
+     108.7801,
+     7.3144
+    ],
+    "l8.start": [
+     108.7801,
+     7.3144
+    ],
+    "l8.end": [
+     103.0919,
+     -14.3566
+    ],
+    "l9.start": [
+     103.0919,
+     -14.3566
+    ],
+    "l9.end": [
+     129.1613,
+     -24.3715
+    ],
+    "l10.start": [
+     129.1613,
+     -24.3715
+    ],
+    "l10.end": [
+     150.4145,
+     -1.3524
+    ],
+    "q1.end": [
+     31.4786,
+     -1.3524
+    ],
+    "q1.start": [
+     2.7183,
+     -1.3524
+    ]
+   },
+   "radii": {
+    "a4": 14.215528
+   },
+   "groups_rigid_fit_from_posted": {
+    "chain l3/a4/l5": {
+     "live": {
+      "rot_deg": -0.808,
+      "move": [
+       4.11,
+       3.39
+      ],
+      "shape_change": 3.447
+     },
+     "ours": {
+      "rot_deg": 1.818,
+      "move": [
+       4.023,
+       -0.123
+      ],
+      "shape_change": 4.356
+     },
+     "max_live_vs_ours": 6.441
+    },
+    "hexagon l6-l10": {
+     "live": {
+      "rot_deg": -1.056,
+      "move": [
+       0.417,
+       2.361
+      ],
+      "shape_change": 1.32
+     },
+     "ours": {
+      "rot_deg": 0.445,
+      "move": [
+       -0.192,
+       0.38
+      ],
+      "shape_change": 3.414
+     },
+     "max_live_vs_ours": 3.043
+    },
+    "q1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       0.0,
+       0.0
+      ],
+      "shape_change": 0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       -0.0,
+       0.0
+      ],
+      "shape_change": 0.0
+     },
+     "max_live_vs_ours": 0.0
+    }
+   }
+  },
+  "r218-k19": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k19 (LENGTH)",
+   "points": {
+    "l2.start": [
+     31.4786,
+     -1.3524
+    ],
+    "l2.end": [
+     2.7183,
+     -1.3524
+    ],
+    "l3.start": [
+     47.168,
+     1.9632
+    ],
+    "l3.end": [
+     67.168,
+     1.9632
+    ],
+    "a4.start": [
+     67.168,
+     1.9632
+    ],
+    "a4.end": [
+     81.3835,
+     16.1787
+    ],
+    "a4.center": [
+     67.168,
+     16.1787
+    ],
+    "l5.start": [
+     81.3835,
+     16.1787
+    ],
+    "l5.end": [
+     81.3835,
+     36.1787
+    ],
+    "l6.start": [
+     150.4145,
+     -1.3524
+    ],
+    "l6.end": [
+     139.623,
+     15.9831
+    ],
+    "l7.start": [
+     139.623,
+     15.9831
+    ],
+    "l7.end": [
+     112.5926,
+     6.1592
+    ],
+    "l8.start": [
+     112.5926,
+     6.1592
+    ],
+    "l8.end": [
+     104.2942,
+     -15.4112
+    ],
+    "l9.start": [
+     104.2942,
+     -15.4112
+    ],
+    "l9.end": [
+     130.3635,
+     -25.426
+    ],
+    "l10.start": [
+     130.3635,
+     -25.426
+    ],
+    "l10.end": [
+     150.4145,
+     -1.3524
+    ],
+    "q1.end": [
+     31.4786,
+     -1.3524
+    ],
+    "q1.start": [
+     2.7183,
+     -1.3524
+    ]
+   },
+   "radii": {
+    "a4": 14.215528
+   },
+   "groups_rigid_fit_from_posted": {
+    "chain l3/a4/l5": {
+     "live": {
+      "rot_deg": -0.0,
+      "move": [
+       7.418,
+       1.653
+      ],
+      "shape_change": 0.0
+     },
+     "ours": {
+      "rot_deg": -1.569,
+      "move": [
+       4.253,
+       13.46
+      ],
+      "shape_change": 2.237
+     },
+     "max_live_vs_ours": 13.815
+    },
+    "hexagon l6-l10": {
+     "live": {
+      "rot_deg": -2.229,
+      "move": [
+       2.423,
+       1.477
+      ],
+      "shape_change": 3.168
+     },
+     "ours": {
+      "rot_deg": 0.445,
+      "move": [
+       -0.192,
+       0.38
+      ],
+      "shape_change": 3.414
+     },
+     "max_live_vs_ours": 4.035
+    },
+    "q1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       0.0,
+       0.0
+      ],
+      "shape_change": 0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       -0.0,
+       0.0
+      ],
+      "shape_change": 0.0
+     },
+     "max_live_vs_ours": 0.0
+    }
+   }
+  },
+  "r236-k5": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k5 (HORIZONTAL)",
+   "points": {
+    "l1.start": [
+     -4.4626,
+     -2.5717
+    ],
+    "l1.end": [
+     6.972,
+     -2.0053
+    ],
+    "l2.start": [
+     6.972,
+     -2.0053
+    ],
+    "l2.end": [
+     6.972,
+     11.8975
+    ],
+    "l3.start": [
+     6.972,
+     11.8975
+    ],
+    "l3.end": [
+     -5.1338,
+     10.9785
+    ],
+    "l4.start": [
+     -5.1338,
+     10.9785
+    ],
+    "l4.end": [
+     -4.4626,
+     -2.5717
+    ],
+    "l5.start": [
+     66.9286,
+     5.5344
+    ],
+    "l5.end": [
+     55.4526,
+     15.4686
+    ],
+    "l6.start": [
+     55.4526,
+     15.4686
+    ],
+    "l6.end": [
+     42.9909,
+     4.6293
+    ],
+    "l7.start": [
+     42.9909,
+     4.6293
+    ],
+    "l7.end": [
+     55.5695,
+     -5.774
+    ],
+    "l8.start": [
+     55.5695,
+     -5.774
+    ],
+    "l8.end": [
+     66.9286,
+     5.5344
+    ],
+    "l9.start": [
+     136.3485,
+     -5.0829
+    ],
+    "l9.end": [
+     106.2194,
+     10.7604
+    ],
+    "l10.start": [
+     106.2194,
+     10.7604
+    ],
+    "l10.end": [
+     90.6052,
+     -7.2771
+    ],
+    "l11.start": [
+     90.6052,
+     -7.2771
+    ],
+    "l11.end": [
+     115.9236,
+     -29.1942
+    ],
+    "l12.start": [
+     115.9236,
+     -29.1942
+    ],
+    "l12.end": [
+     136.3485,
+     -5.0829
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "quad1 l1-l4": {
+     "live": {
+      "rot_deg": -1.862,
+      "move": [
+       -1.778,
+       -4.928
+      ],
+      "shape_change": 2.555
+     },
+     "ours": {
+      "rot_deg": -5.157,
+      "move": [
+       -1.022,
+       -0.916
+      ],
+      "shape_change": 1.982
+     },
+     "max_live_vs_ours": 5.228
+    },
+    "quad2 l5-l8": {
+     "live": {
+      "rot_deg": 1.094,
+      "move": [
+       -0.243,
+       -0.256
+      ],
+      "shape_change": 0.938
+     },
+     "ours": {
+      "rot_deg": 0.845,
+      "move": [
+       0.622,
+       0.219
+      ],
+      "shape_change": 1.155
+     },
+     "max_live_vs_ours": 1.808
+    },
+    "quad3 l9-l12": {
+     "live": {
+      "rot_deg": 4.849,
+      "move": [
+       -12.02,
+       -4.812
+      ],
+      "shape_change": 2.776
+     },
+     "ours": {
+      "rot_deg": 3.105,
+      "move": [
+       -10.943,
+       3.479
+      ],
+      "shape_change": 2.66
+     },
+     "max_live_vs_ours": 8.984
+    }
+   }
+  },
+  "r236-k6": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k6 (VERTICAL)",
+   "points": {
+    "l1.start": [
+     -4.2307,
+     0.3943
+    ],
+    "l1.end": [
+     9.5716,
+     0.3943
+    ],
+    "l2.start": [
+     9.5716,
+     0.3943
+    ],
+    "l2.end": [
+     7.9058,
+     14.2801
+    ],
+    "l3.start": [
+     7.9058,
+     14.2801
+    ],
+    "l3.end": [
+     -4.2307,
+     13.3588
+    ],
+    "l4.start": [
+     -4.2307,
+     13.3588
+    ],
+    "l4.end": [
+     -4.2307,
+     0.3943
+    ],
+    "l5.start": [
+     67.4741,
+     4.9585
+    ],
+    "l5.end": [
+     56.5037,
+     15.4484
+    ],
+    "l6.start": [
+     56.5037,
+     15.4484
+    ],
+    "l6.end": [
+     42.9909,
+     4.6293
+    ],
+    "l7.start": [
+     42.9909,
+     4.6293
+    ],
+    "l7.end": [
+     55.5695,
+     -5.774
+    ],
+    "l8.start": [
+     55.5695,
+     -5.774
+    ],
+    "l8.end": [
+     67.4741,
+     4.9585
+    ],
+    "l9.start": [
+     136.2206,
+     -5.6858
+    ],
+    "l9.end": [
+     108.08,
+     10.5887
+    ],
+    "l10.start": [
+     108.08,
+     10.5887
+    ],
+    "l10.end": [
+     91.5925,
+     -6.6542
+    ],
+    "l11.start": [
+     91.5925,
+     -6.6542
+    ],
+    "l11.end": [
+     115.7956,
+     -29.797
+    ],
+    "l12.start": [
+     115.7956,
+     -29.797
+    ],
+    "l12.end": [
+     136.2206,
+     -5.6858
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "quad1 l1-l4": {
+     "live": {
+      "rot_deg": -1.575,
+      "move": [
+       -0.611,
+       -2.396
+      ],
+      "shape_change": 2.154
+     },
+     "ours": {
+      "rot_deg": 4.4,
+      "move": [
+       1.574,
+       -0.62
+      ],
+      "shape_change": 3.241
+     },
+     "max_live_vs_ours": 3.583
+    },
+    "quad2 l5-l8": {
+     "live": {
+      "rot_deg": -0.931,
+      "move": [
+       0.156,
+       -0.405
+      ],
+      "shape_change": 0.675
+     },
+     "ours": {
+      "rot_deg": -1.209,
+      "move": [
+       0.405,
+       -0.008
+      ],
+      "shape_change": 0.771
+     },
+     "max_live_vs_ours": 0.984
+    },
+    "quad3 l9-l12": {
+     "live": {
+      "rot_deg": 2.789,
+      "move": [
+       -11.372,
+       -5.001
+      ],
+      "shape_change": 2.547
+     },
+     "ours": {
+      "rot_deg": -0.934,
+      "move": [
+       -1.979,
+       0.628
+      ],
+      "shape_change": 5.53
+     },
+     "max_live_vs_ours": 11.74
+    }
+   }
+  },
+  "r236-k15": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k15 (ANGLE)",
+   "points": {
+    "l1.start": [
+     -4.9071,
+     4.1022
+    ],
+    "l1.end": [
+     7.8235,
+     4.1022
+    ],
+    "l2.start": [
+     7.8235,
+     4.1022
+    ],
+    "l2.end": [
+     7.8235,
+     17.4454
+    ],
+    "l3.start": [
+     7.8235,
+     17.4454
+    ],
+    "l3.end": [
+     -4.9071,
+     16.479
+    ],
+    "l4.start": [
+     -4.9071,
+     16.479
+    ],
+    "l4.end": [
+     -4.9071,
+     4.1022
+    ],
+    "l5.start": [
+     67.4741,
+     4.9585
+    ],
+    "l5.end": [
+     56.4262,
+     16.4927
+    ],
+    "l6.start": [
+     56.4262,
+     16.4927
+    ],
+    "l6.end": [
+     42.9909,
+     4.6293
+    ],
+    "l7.start": [
+     42.9909,
+     4.6293
+    ],
+    "l7.end": [
+     55.5695,
+     -5.774
+    ],
+    "l8.start": [
+     55.5695,
+     -5.774
+    ],
+    "l8.end": [
+     67.4741,
+     4.9585
+    ],
+    "l9.start": [
+     135.5442,
+     -2.5656
+    ],
+    "l9.end": [
+     109.1842,
+     14.0087
+    ],
+    "l10.start": [
+     109.1842,
+     14.0087
+    ],
+    "l10.end": [
+     91.9555,
+     -2.4937
+    ],
+    "l11.start": [
+     91.9555,
+     -2.4937
+    ],
+    "l11.end": [
+     115.1193,
+     -26.6768
+    ],
+    "l12.start": [
+     115.1193,
+     -26.6768
+    ],
+    "l12.end": [
+     135.5442,
+     -2.5656
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "quad1 l1-l4": {
+     "live": {
+      "rot_deg": -3.202,
+      "move": [
+       -1.407,
+       1.03
+      ],
+      "shape_change": 2.229
+     },
+     "ours": {
+      "rot_deg": -6.628,
+      "move": [
+       -0.777,
+       -1.1
+      ],
+      "shape_change": 2.034
+     },
+     "max_live_vs_ours": 3.432
+    },
+    "quad2 l5-l8": {
+     "live": {
+      "rot_deg": -0.714,
+      "move": [
+       0.136,
+       -0.144
+      ],
+      "shape_change": 0.498
+     },
+     "ours": {
+      "rot_deg": -1.833,
+      "move": [
+       0.406,
+       0.074
+      ],
+      "shape_change": 0.747
+     },
+     "max_live_vs_ours": 0.971
+    },
+    "quad3 l9-l12": {
+     "live": {
+      "rot_deg": 0.946,
+      "move": [
+       -11.343,
+       -1.545
+      ],
+      "shape_change": 2.44
+     },
+     "ours": {
+      "rot_deg": 0.635,
+      "move": [
+       -9.514,
+       0.829
+      ],
+      "shape_change": 2.93
+     },
+     "max_live_vs_ours": 4.288
+    }
+   }
+  },
+  "r236-k16": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k16 (PARALLEL)",
+   "points": {
+    "l1.start": [
+     -4.2307,
+     0.3943
+    ],
+    "l1.end": [
+     7.9058,
+     0.3943
+    ],
+    "l2.start": [
+     7.9058,
+     0.3943
+    ],
+    "l2.end": [
+     7.9058,
+     14.2801
+    ],
+    "l3.start": [
+     7.9058,
+     14.2801
+    ],
+    "l3.end": [
+     -4.2307,
+     13.3588
+    ],
+    "l4.start": [
+     -4.2307,
+     13.3588
+    ],
+    "l4.end": [
+     -4.2307,
+     0.3943
+    ],
+    "l5.start": [
+     67.4741,
+     4.9585
+    ],
+    "l5.end": [
+     56.5037,
+     15.4484
+    ],
+    "l6.start": [
+     56.5037,
+     15.4484
+    ],
+    "l6.end": [
+     42.9909,
+     4.6293
+    ],
+    "l7.start": [
+     42.9909,
+     4.6293
+    ],
+    "l7.end": [
+     55.5695,
+     -5.774
+    ],
+    "l8.start": [
+     55.5695,
+     -5.774
+    ],
+    "l8.end": [
+     67.4741,
+     4.9585
+    ],
+    "l9.start": [
+     136.2206,
+     -5.6858
+    ],
+    "l9.end": [
+     109.5009,
+     11.9887
+    ],
+    "l10.start": [
+     109.5009,
+     11.9887
+    ],
+    "l10.end": [
+     93.0134,
+     -5.2542
+    ],
+    "l11.start": [
+     93.0134,
+     -5.2542
+    ],
+    "l11.end": [
+     115.7956,
+     -29.797
+    ],
+    "l12.start": [
+     115.7956,
+     -29.797
+    ],
+    "l12.end": [
+     136.2206,
+     -5.6858
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "quad1 l1-l4": {
+     "live": {
+      "rot_deg": -3.252,
+      "move": [
+       -1.027,
+       -2.396
+      ],
+      "shape_change": 2.351
+     },
+     "ours": {
+      "rot_deg": -7.436,
+      "move": [
+       -0.449,
+       -1.281
+      ],
+      "shape_change": 2.169
+     },
+     "max_live_vs_ours": 2.916
+    },
+    "quad2 l5-l8": {
+     "live": {
+      "rot_deg": -0.931,
+      "move": [
+       0.156,
+       -0.405
+      ],
+      "shape_change": 0.675
+     },
+     "ours": {
+      "rot_deg": 0.453,
+      "move": [
+       1.943,
+       0.094
+      ],
+      "shape_change": 0.677
+     },
+     "max_live_vs_ours": 2.089
+    },
+    "quad3 l9-l12": {
+     "live": {
+      "rot_deg": 0.838,
+      "move": [
+       -10.661,
+       -4.301
+      ],
+      "shape_change": 2.09
+     },
+     "ours": {
+      "rot_deg": 2.063,
+      "move": [
+       -10.198,
+       2.398
+      ],
+      "shape_change": 2.374
+     },
+     "max_live_vs_ours": 7.14
+    }
+   }
+  },
+  "r236-k17": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k17 (ANGLE)",
+   "points": {
+    "l1.start": [
+     -4.7762,
+     0.9702
+    ],
+    "l1.end": [
+     7.3602,
+     0.9702
+    ],
+    "l2.start": [
+     7.3602,
+     0.9702
+    ],
+    "l2.end": [
+     7.3602,
+     14.8559
+    ],
+    "l3.start": [
+     7.3602,
+     14.8559
+    ],
+    "l3.end": [
+     -4.7762,
+     13.9346
+    ],
+    "l4.start": [
+     -4.7762,
+     13.9346
+    ],
+    "l4.end": [
+     -4.7762,
+     0.9702
+    ],
+    "l5.start": [
+     66.9286,
+     5.5344
+    ],
+    "l5.end": [
+     55.9582,
+     16.0242
+    ],
+    "l6.start": [
+     55.9582,
+     16.0242
+    ],
+    "l6.end": [
+     42.9909,
+     4.6293
+    ],
+    "l7.start": [
+     42.9909,
+     4.6293
+    ],
+    "l7.end": [
+     55.5695,
+     -5.774
+    ],
+    "l8.start": [
+     55.5695,
+     -5.774
+    ],
+    "l8.end": [
+     66.9286,
+     5.5344
+    ],
+    "l9.start": [
+     135.675,
+     -5.11
+    ],
+    "l9.end": [
+     107.5345,
+     11.1645
+    ],
+    "l10.start": [
+     107.5345,
+     11.1645
+    ],
+    "l10.end": [
+     91.047,
+     -6.0784
+    ],
+    "l11.start": [
+     91.047,
+     -6.0784
+    ],
+    "l11.end": [
+     115.2501,
+     -29.2212
+    ],
+    "l12.start": [
+     115.2501,
+     -29.2212
+    ],
+    "l12.end": [
+     135.675,
+     -5.11
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "quad1 l1-l4": {
+     "live": {
+      "rot_deg": -3.252,
+      "move": [
+       -1.573,
+       -1.82
+      ],
+      "shape_change": 2.351
+     },
+     "ours": {
+      "rot_deg": -6.502,
+      "move": [
+       -0.84,
+       -1.062
+      ],
+      "shape_change": 2.028
+     },
+     "max_live_vs_ours": 2.307
+    },
+    "quad2 l5-l8": {
+     "live": {
+      "rot_deg": 0.522,
+      "move": [
+       -0.117,
+       -0.117
+      ],
+      "shape_change": 0.437
+     },
+     "ours": {
+      "rot_deg": 1.448,
+      "move": [
+       0.808,
+       -0.311
+      ],
+      "shape_change": 0.618
+     },
+     "max_live_vs_ours": 1.35
+    },
+    "quad3 l9-l12": {
+     "live": {
+      "rot_deg": 2.789,
+      "move": [
+       -11.917,
+       -4.425
+      ],
+      "shape_change": 2.547
+     },
+     "ours": {
+      "rot_deg": 2.296,
+      "move": [
+       -10.141,
+       2.596
+      ],
+      "shape_change": 2.495
+     },
+     "max_live_vs_ours": 7.483
+    }
+   }
+  },
+  "r236-k18": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k18 (PERPENDICULAR)",
+   "points": {
+    "l1.start": [
+     -4.2307,
+     0.3943
+    ],
+    "l1.end": [
+     7.9058,
+     0.3943
+    ],
+    "l2.start": [
+     7.9058,
+     0.3943
+    ],
+    "l2.end": [
+     7.9058,
+     14.2801
+    ],
+    "l3.start": [
+     7.9058,
+     14.2801
+    ],
+    "l3.end": [
+     -4.2307,
+     13.3588
+    ],
+    "l4.start": [
+     -4.2307,
+     13.3588
+    ],
+    "l4.end": [
+     -4.2307,
+     0.3943
+    ],
+    "l5.start": [
+     67.4741,
+     4.9585
+    ],
+    "l5.end": [
+     56.5037,
+     15.4484
+    ],
+    "l6.start": [
+     56.5037,
+     15.4484
+    ],
+    "l6.end": [
+     42.9909,
+     4.6293
+    ],
+    "l7.start": [
+     42.9909,
+     4.6293
+    ],
+    "l7.end": [
+     55.5695,
+     -5.774
+    ],
+    "l8.start": [
+     55.5695,
+     -5.774
+    ],
+    "l8.end": [
+     67.4741,
+     4.9585
+    ],
+    "l9.start": [
+     136.2206,
+     -5.6858
+    ],
+    "l9.end": [
+     108.3368,
+     10.3395
+    ],
+    "l10.start": [
+     108.3368,
+     10.3395
+    ],
+    "l10.end": [
+     91.5925,
+     -6.6542
+    ],
+    "l11.start": [
+     91.5925,
+     -6.6542
+    ],
+    "l11.end": [
+     115.7956,
+     -29.797
+    ],
+    "l12.start": [
+     115.7956,
+     -29.797
+    ],
+    "l12.end": [
+     136.2206,
+     -5.6858
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "quad1 l1-l4": {
+     "live": {
+      "rot_deg": -3.252,
+      "move": [
+       -1.027,
+       -2.396
+      ],
+      "shape_change": 2.351
+     },
+     "ours": {
+      "rot_deg": -7.436,
+      "move": [
+       -0.449,
+       -1.281
+      ],
+      "shape_change": 2.169
+     },
+     "max_live_vs_ours": 2.916
+    },
+    "quad2 l5-l8": {
+     "live": {
+      "rot_deg": -0.931,
+      "move": [
+       0.156,
+       -0.405
+      ],
+      "shape_change": 0.675
+     },
+     "ours": {
+      "rot_deg": 0.453,
+      "move": [
+       1.943,
+       0.094
+      ],
+      "shape_change": 0.677
+     },
+     "max_live_vs_ours": 2.089
+    },
+    "quad3 l9-l12": {
+     "live": {
+      "rot_deg": 2.653,
+      "move": [
+       -11.308,
+       -5.063
+      ],
+      "shape_change": 2.627
+     },
+     "ours": {
+      "rot_deg": 2.174,
+      "move": [
+       -10.003,
+       2.461
+      ],
+      "shape_change": 2.582
+     },
+     "max_live_vs_ours": 7.939
+    }
+   }
+  },
+  "r236-k19": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k19 (PERPENDICULAR)",
+   "points": {
+    "l1.start": [
+     -4.7762,
+     0.9702
+    ],
+    "l1.end": [
+     7.3602,
+     0.9702
+    ],
+    "l2.start": [
+     7.3602,
+     0.9702
+    ],
+    "l2.end": [
+     7.3602,
+     14.8559
+    ],
+    "l3.start": [
+     7.3602,
+     14.8559
+    ],
+    "l3.end": [
+     -5.416,
+     13.886
+    ],
+    "l4.start": [
+     -5.416,
+     13.886
+    ],
+    "l4.end": [
+     -4.7762,
+     0.9702
+    ],
+    "l5.start": [
+     66.9286,
+     5.5344
+    ],
+    "l5.end": [
+     55.9582,
+     16.0242
+    ],
+    "l6.start": [
+     55.9582,
+     16.0242
+    ],
+    "l6.end": [
+     42.9909,
+     4.6293
+    ],
+    "l7.start": [
+     42.9909,
+     4.6293
+    ],
+    "l7.end": [
+     55.5695,
+     -5.774
+    ],
+    "l8.start": [
+     55.5695,
+     -5.774
+    ],
+    "l8.end": [
+     66.9286,
+     5.5344
+    ],
+    "l9.start": [
+     136.0663,
+     -2.1754
+    ],
+    "l9.end": [
+     107.9258,
+     14.0991
+    ],
+    "l10.start": [
+     107.9258,
+     14.0991
+    ],
+    "l10.end": [
+     91.4383,
+     -3.1439
+    ],
+    "l11.start": [
+     91.4383,
+     -3.1439
+    ],
+    "l11.end": [
+     115.6414,
+     -26.2866
+    ],
+    "l12.start": [
+     115.6414,
+     -26.2866
+    ],
+    "l12.end": [
+     136.0663,
+     -2.1754
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "quad1 l1-l4": {
+     "live": {
+      "rot_deg": -2.536,
+      "move": [
+       -1.733,
+       -1.832
+      ],
+      "shape_change": 2.14
+     },
+     "ours": {
+      "rot_deg": -5.31,
+      "move": [
+       -1.109,
+       -1.084
+      ],
+      "shape_change": 1.841
+     },
+     "max_live_vs_ours": 2.309
+    },
+    "quad2 l5-l8": {
+     "live": {
+      "rot_deg": 0.522,
+      "move": [
+       -0.117,
+       -0.117
+      ],
+      "shape_change": 0.437
+     },
+     "ours": {
+      "rot_deg": 1.526,
+      "move": [
+       0.826,
+       -0.092
+      ],
+      "shape_change": 0.649
+     },
+     "max_live_vs_ours": 1.364
+    },
+    "quad3 l9-l12": {
+     "live": {
+      "rot_deg": 2.789,
+      "move": [
+       -11.526,
+       -1.49
+      ],
+      "shape_change": 2.547
+     },
+     "ours": {
+      "rot_deg": 2.295,
+      "move": [
+       -11.121,
+       2.909
+      ],
+      "shape_change": 2.496
+     },
+     "max_live_vs_ours": 4.668
+    }
+   }
+  },
+  "r236-k20": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k20 (DISTANCE)",
+   "points": {
+    "l1.start": [
+     -2.3355,
+     4.0518
+    ],
+    "l1.end": [
+     10.3951,
+     4.0518
+    ],
+    "l2.start": [
+     10.3951,
+     4.0518
+    ],
+    "l2.end": [
+     10.3951,
+     17.395
+    ],
+    "l3.start": [
+     10.3951,
+     17.395
+    ],
+    "l3.end": [
+     -2.3355,
+     16.4286
+    ],
+    "l4.start": [
+     -2.3355,
+     16.4286
+    ],
+    "l4.end": [
+     -2.3355,
+     4.0518
+    ],
+    "l5.start": [
+     67.4741,
+     4.9585
+    ],
+    "l5.end": [
+     56.5037,
+     15.4484
+    ],
+    "l6.start": [
+     56.5037,
+     15.4484
+    ],
+    "l6.end": [
+     42.9909,
+     4.6293
+    ],
+    "l7.start": [
+     42.9909,
+     4.6293
+    ],
+    "l7.end": [
+     55.5695,
+     -5.774
+    ],
+    "l8.start": [
+     55.5695,
+     -5.774
+    ],
+    "l8.end": [
+     67.4741,
+     4.9585
+    ],
+    "l9.start": [
+     136.3952,
+     -7.1309
+    ],
+    "l9.end": [
+     108.2546,
+     9.1436
+    ],
+    "l10.start": [
+     108.2546,
+     9.1436
+    ],
+    "l10.end": [
+     91.7671,
+     -8.0994
+    ],
+    "l11.start": [
+     91.7671,
+     -8.0994
+    ],
+    "l11.end": [
+     115.9703,
+     -31.2421
+    ],
+    "l12.start": [
+     115.9703,
+     -31.2421
+    ],
+    "l12.end": [
+     136.3952,
+     -7.1309
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "quad1 l1-l4": {
+     "live": {
+      "rot_deg": -3.202,
+      "move": [
+       1.165,
+       0.979
+      ],
+      "shape_change": 2.229
+     },
+     "ours": {
+      "rot_deg": -2.852,
+      "move": [
+       -0.553,
+       3.148
+      ],
+      "shape_change": 3.575
+     },
+     "max_live_vs_ours": 5.635
+    },
+    "quad2 l5-l8": {
+     "live": {
+      "rot_deg": -0.931,
+      "move": [
+       0.156,
+       -0.405
+      ],
+      "shape_change": 0.675
+     },
+     "ours": {
+      "rot_deg": 0.188,
+      "move": [
+       -0.077,
+       0.201
+      ],
+      "shape_change": 0.66
+     },
+     "max_live_vs_ours": 0.874
+    },
+    "quad3 l9-l12": {
+     "live": {
+      "rot_deg": 2.789,
+      "move": [
+       -11.197,
+       -6.446
+      ],
+      "shape_change": 2.547
+     },
+     "ours": {
+      "rot_deg": 2.294,
+      "move": [
+       -11.124,
+       2.912
+      ],
+      "shape_change": 2.496
+     },
+     "max_live_vs_ours": 9.606
+    }
+   }
+  },
+  "r236-k21": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k21 (DISTANCE)",
+   "points": {
+    "l1.start": [
+     -4.2307,
+     0.3943
+    ],
+    "l1.end": [
+     7.9058,
+     0.3943
+    ],
+    "l2.start": [
+     7.9058,
+     0.3943
+    ],
+    "l2.end": [
+     7.9058,
+     14.2801
+    ],
+    "l3.start": [
+     7.9058,
+     14.2801
+    ],
+    "l3.end": [
+     -4.2307,
+     13.3588
+    ],
+    "l4.start": [
+     -4.2307,
+     13.3588
+    ],
+    "l4.end": [
+     -4.2307,
+     0.3943
+    ],
+    "l5.start": [
+     67.4741,
+     4.9585
+    ],
+    "l5.end": [
+     56.5037,
+     15.4484
+    ],
+    "l6.start": [
+     56.5037,
+     15.4484
+    ],
+    "l6.end": [
+     42.9909,
+     4.6293
+    ],
+    "l7.start": [
+     42.9909,
+     4.6293
+    ],
+    "l7.end": [
+     55.5695,
+     -5.774
+    ],
+    "l8.start": [
+     55.5695,
+     -5.774
+    ],
+    "l8.end": [
+     67.4741,
+     4.9585
+    ],
+    "l9.start": [
+     147.0898,
+     -1.0656
+    ],
+    "l9.end": [
+     118.9492,
+     15.2089
+    ],
+    "l10.start": [
+     118.9492,
+     15.2089
+    ],
+    "l10.end": [
+     102.4617,
+     -2.0341
+    ],
+    "l11.start": [
+     102.4617,
+     -2.0341
+    ],
+    "l11.end": [
+     126.6649,
+     -25.1768
+    ],
+    "l12.start": [
+     126.6649,
+     -25.1768
+    ],
+    "l12.end": [
+     147.0898,
+     -1.0656
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "quad1 l1-l4": {
+     "live": {
+      "rot_deg": -3.252,
+      "move": [
+       -1.027,
+       -2.396
+      ],
+      "shape_change": 2.351
+     },
+     "ours": {
+      "rot_deg": -5.615,
+      "move": [
+       -1.888,
+       -0.217
+      ],
+      "shape_change": 1.873
+     },
+     "max_live_vs_ours": 3.369
+    },
+    "quad2 l5-l8": {
+     "live": {
+      "rot_deg": -0.931,
+      "move": [
+       0.156,
+       -0.405
+      ],
+      "shape_change": 0.675
+     },
+     "ours": {
+      "rot_deg": 0.085,
+      "move": [
+       0.031,
+       0.223
+      ],
+      "shape_change": 0.71
+     },
+     "max_live_vs_ours": 0.909
+    },
+    "quad3 l9-l12": {
+     "live": {
+      "rot_deg": 2.789,
+      "move": [
+       -0.503,
+       -0.38
+      ],
+      "shape_change": 2.547
+     },
+     "ours": {
+      "rot_deg": 2.328,
+      "move": [
+       -0.78,
+       -0.364
+      ],
+      "shape_change": 2.483
+     },
+     "max_live_vs_ours": 0.726
+    }
+   }
+  },
+  "r236-k22": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k22 (LENGTH)",
+   "points": {
+    "l1.start": [
+     -4.2307,
+     0.3943
+    ],
+    "l1.end": [
+     7.9058,
+     0.3943
+    ],
+    "l2.start": [
+     7.9058,
+     0.3943
+    ],
+    "l2.end": [
+     7.9058,
+     14.2801
+    ],
+    "l3.start": [
+     7.9058,
+     14.2801
+    ],
+    "l3.end": [
+     -4.2307,
+     13.3588
+    ],
+    "l4.start": [
+     -4.2307,
+     13.3588
+    ],
+    "l4.end": [
+     -4.2307,
+     0.3943
+    ],
+    "l5.start": [
+     67.4741,
+     4.9585
+    ],
+    "l5.end": [
+     56.5037,
+     15.4484
+    ],
+    "l6.start": [
+     56.5037,
+     15.4484
+    ],
+    "l6.end": [
+     42.9909,
+     4.6293
+    ],
+    "l7.start": [
+     42.9909,
+     4.6293
+    ],
+    "l7.end": [
+     55.5695,
+     -5.774
+    ],
+    "l8.start": [
+     55.5695,
+     -5.774
+    ],
+    "l8.end": [
+     67.4741,
+     4.9585
+    ],
+    "l9.start": [
+     136.2206,
+     -5.6858
+    ],
+    "l9.end": [
+     110.8065,
+     13.4401
+    ],
+    "l10.start": [
+     110.8065,
+     13.4401
+    ],
+    "l10.end": [
+     91.5925,
+     -6.6542
+    ],
+    "l11.start": [
+     91.5925,
+     -6.6542
+    ],
+    "l11.end": [
+     115.7956,
+     -29.797
+    ],
+    "l12.start": [
+     115.7956,
+     -29.797
+    ],
+    "l12.end": [
+     136.2206,
+     -5.6858
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "quad1 l1-l4": {
+     "live": {
+      "rot_deg": -3.252,
+      "move": [
+       -1.027,
+       -2.396
+      ],
+      "shape_change": 2.351
+     },
+     "ours": {
+      "rot_deg": -6.502,
+      "move": [
+       -0.84,
+       -1.062
+      ],
+      "shape_change": 2.028
+     },
+     "max_live_vs_ours": 2.913
+    },
+    "quad2 l5-l8": {
+     "live": {
+      "rot_deg": -0.931,
+      "move": [
+       0.156,
+       -0.405
+      ],
+      "shape_change": 0.675
+     },
+     "ours": {
+      "rot_deg": -0.364,
+      "move": [
+       0.386,
+       0.277
+      ],
+      "shape_change": 0.968
+     },
+     "max_live_vs_ours": 1.145
+    },
+    "quad3 l9-l12": {
+     "live": {
+      "rot_deg": 0.856,
+      "move": [
+       -10.69,
+       -4.288
+      ],
+      "shape_change": 0.38
+     },
+     "ours": {
+      "rot_deg": 0.863,
+      "move": [
+       -9.398,
+       3.502
+      ],
+      "shape_change": 0.309
+     },
+     "max_live_vs_ours": 7.94
+    }
+   }
+  },
+  "r236-k23": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k23 (DISTANCE)",
+   "points": {
+    "l1.start": [
+     -8.2598,
+     -1.5469
+    ],
+    "l1.end": [
+     7.9058,
+     -1.5469
+    ],
+    "l2.start": [
+     7.9058,
+     -1.5469
+    ],
+    "l2.end": [
+     7.9058,
+     14.2801
+    ],
+    "l3.start": [
+     7.9058,
+     14.2801
+    ],
+    "l3.end": [
+     -8.2598,
+     13.0529
+    ],
+    "l4.start": [
+     -8.2598,
+     13.0529
+    ],
+    "l4.end": [
+     -8.2598,
+     -1.5469
+    ],
+    "l5.start": [
+     67.4741,
+     4.9585
+    ],
+    "l5.end": [
+     56.5037,
+     15.4484
+    ],
+    "l6.start": [
+     56.5037,
+     15.4484
+    ],
+    "l6.end": [
+     42.9909,
+     4.6293
+    ],
+    "l7.start": [
+     42.9909,
+     4.6293
+    ],
+    "l7.end": [
+     55.5695,
+     -5.774
+    ],
+    "l8.start": [
+     55.5695,
+     -5.774
+    ],
+    "l8.end": [
+     67.4741,
+     4.9585
+    ],
+    "l9.start": [
+     133.7398,
+     -1.4148
+    ],
+    "l9.end": [
+     105.5993,
+     14.8597
+    ],
+    "l10.start": [
+     105.5993,
+     14.8597
+    ],
+    "l10.end": [
+     89.1118,
+     -2.3832
+    ],
+    "l11.start": [
+     89.1118,
+     -2.3832
+    ],
+    "l11.end": [
+     113.3149,
+     -25.526
+    ],
+    "l12.start": [
+     113.3149,
+     -25.526
+    ],
+    "l12.end": [
+     133.7398,
+     -1.4148
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "quad1 l1-l4": {
+     "live": {
+      "rot_deg": -3.164,
+      "move": [
+       -3.042,
+       -3.443
+      ],
+      "shape_change": 0.766
+     },
+     "ours": {
+      "rot_deg": -3.165,
+      "move": [
+       -0.553,
+       -0.345
+      ],
+      "shape_change": 0.783
+     },
+     "max_live_vs_ours": 3.987
+    },
+    "quad2 l5-l8": {
+     "live": {
+      "rot_deg": -0.931,
+      "move": [
+       0.156,
+       -0.405
+      ],
+      "shape_change": 0.675
+     },
+     "ours": {
+      "rot_deg": 0.599,
+      "move": [
+       1.704,
+       0.109
+      ],
+      "shape_change": 1.977
+     },
+     "max_live_vs_ours": 2.79
+    },
+    "quad3 l9-l12": {
+     "live": {
+      "rot_deg": 2.789,
+      "move": [
+       -13.853,
+       -0.73
+      ],
+      "shape_change": 2.547
+     },
+     "ours": {
+      "rot_deg": 2.296,
+      "move": [
+       -11.117,
+       2.905
+      ],
+      "shape_change": 2.496
+     },
+     "max_live_vs_ours": 4.753
+    }
+   }
+  },
+  "r226-k3": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k3 (HORIZONTAL)",
+   "points": {
+    "p1.start": [
+     -7.1025,
+     -3.6225
+    ],
+    "p1.end": [
+     17.07,
+     -5.577
+    ],
+    "p1.interpolationPoints": [
+     [
+      -7.1025,
+      -3.6225
+     ],
+     [
+      14.9936,
+      1.1715
+     ],
+     [
+      17.07,
+      -5.577
+     ]
+    ],
+    "l2.start": [
+     17.07,
+     -5.577
+    ],
+    "l2.end": [
+     -7.1025,
+     -3.6225
+    ],
+    "l3.start": [
+     79.3077,
+     -2.7088
+    ],
+    "l3.end": [
+     59.2904,
+     19.0543
+    ],
+    "l4.start": [
+     59.2904,
+     19.0543
+    ],
+    "l4.end": [
+     43.7568,
+     3.3443
+    ],
+    "l5.start": [
+     43.7568,
+     3.3443
+    ],
+    "l5.end": [
+     53.4482,
+     -17.0479
+    ],
+    "l6.start": [
+     53.4482,
+     -17.0479
+    ],
+    "l6.end": [
+     79.3077,
+     -2.7088
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "loop p1+l2": {
+     "live": {
+      "rot_deg": -4.623,
+      "move": [
+       -10.01,
+       -1.083
+      ],
+      "shape_change": 0.0
+     },
+     "ours": {
+      "rot_deg": -0.17,
+      "move": [
+       -6.47,
+       0.092
+      ],
+      "shape_change": 0.0
+     },
+     "max_live_vs_ours": 4.158
+    },
+    "loop l3-l6": {
+     "live": {
+      "rot_deg": -4.652,
+      "move": [
+       -1.884,
+       0.453
+      ],
+      "shape_change": 3.569
+     },
+     "ours": {
+      "rot_deg": -0.199,
+      "move": [
+       1.267,
+       3.345
+      ],
+      "shape_change": 3.569
+     },
+     "max_live_vs_ours": 5.597
+    }
+   }
+  },
+  "r226-k8": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k8 (ANGLE)",
+   "points": {
+    "p1.start": [
+     -7.1038,
+     -3.6204
+    ],
+    "p1.end": [
+     17.1476,
+     -3.6204
+    ],
+    "p1.interpolationPoints": [
+     [
+      -7.1038,
+      -3.6204
+     ],
+     [
+      14.9936,
+      1.1715
+     ],
+     [
+      17.1476,
+      -3.6204
+     ]
+    ],
+    "l2.start": [
+     17.1476,
+     -3.6204
+    ],
+    "l2.end": [
+     -7.1038,
+     -3.6204
+    ],
+    "l3.start": [
+     79.3064,
+     -2.7067
+    ],
+    "l3.end": [
+     57.6002,
+     17.3724
+    ],
+    "l4.start": [
+     57.6002,
+     17.3724
+    ],
+    "l4.end": [
+     43.3665,
+     -3.0414
+    ],
+    "l5.start": [
+     43.3665,
+     -3.0414
+    ],
+    "l5.end": [
+     54.6866,
+     -19.0832
+    ],
+    "l6.start": [
+     54.6866,
+     -19.0832
+    ],
+    "l6.end": [
+     79.3064,
+     -2.7067
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "loop p1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       -9.972,
+       -0.103
+      ],
+      "shape_change": 0.0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       -3.137,
+       -0.034
+      ],
+      "shape_change": 3.137
+     },
+     "max_live_vs_ours": 9.972
+    },
+    "loop l3-l6": {
+     "live": {
+      "rot_deg": 2.315,
+      "move": [
+       -2.094,
+       -2.073
+      ],
+      "shape_change": 2.987
+     },
+     "ours": {
+      "rot_deg": 0.521,
+      "move": [
+       1.568,
+       0.017
+      ],
+      "shape_change": 3.399
+     },
+     "max_live_vs_ours": 5.477
+    }
+   }
+  },
+  "r226-k9": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k9 (ANGLE)",
+   "points": {
+    "p1.start": [
+     -7.1227,
+     -3.6439
+    ],
+    "p1.end": [
+     17.1286,
+     -3.6439
+    ],
+    "p1.interpolationPoints": [
+     [
+      -7.1227,
+      -3.6439
+     ],
+     [
+      14.9936,
+      1.1715
+     ],
+     [
+      17.1286,
+      -3.6439
+     ]
+    ],
+    "l2.start": [
+     17.1286,
+     -3.6439
+    ],
+    "l2.end": [
+     -7.1227,
+     -3.6439
+    ],
+    "l3.start": [
+     79.2874,
+     -2.7302
+    ],
+    "l3.end": [
+     57.5813,
+     17.3488
+    ],
+    "l4.start": [
+     57.5813,
+     17.3488
+    ],
+    "l4.end": [
+     43.3252,
+     0.3916
+    ],
+    "l5.start": [
+     43.3252,
+     0.3916
+    ],
+    "l5.end": [
+     53.8007,
+     -17.7219
+    ],
+    "l6.start": [
+     53.8007,
+     -17.7219
+    ],
+    "l6.end": [
+     79.2874,
+     -2.7302
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "loop p1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       -9.991,
+       -0.127
+      ],
+      "shape_change": 0.0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       -2.952,
+       -0.031
+      ],
+      "shape_change": 2.952
+     },
+     "max_live_vs_ours": 9.991
+    },
+    "loop l3-l6": {
+     "live": {
+      "rot_deg": -0.815,
+      "move": [
+       -2.336,
+       -0.886
+      ],
+      "shape_change": 2.867
+     },
+     "ours": {
+      "rot_deg": -2.034,
+      "move": [
+       1.476,
+       0.016
+      ],
+      "shape_change": 2.87
+     },
+     "max_live_vs_ours": 4.16
+    }
+   }
+  },
+  "r226-k10": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k10 (ANGLE)",
+   "points": {
+    "p1.start": [
+     -7.1038,
+     -3.6204
+    ],
+    "p1.end": [
+     17.1476,
+     -3.6204
+    ],
+    "p1.interpolationPoints": [
+     [
+      -7.1038,
+      -3.6204
+     ],
+     [
+      14.9936,
+      1.1715
+     ],
+     [
+      17.1476,
+      -3.6204
+     ]
+    ],
+    "l2.start": [
+     17.1476,
+     -3.6204
+    ],
+    "l2.end": [
+     -7.1038,
+     -3.6204
+    ],
+    "l3.start": [
+     79.3064,
+     -2.7067
+    ],
+    "l3.end": [
+     57.6002,
+     17.3724
+    ],
+    "l4.start": [
+     57.6002,
+     17.3724
+    ],
+    "l4.end": [
+     44.7332,
+     2.0673
+    ],
+    "l5.start": [
+     44.7332,
+     2.0673
+    ],
+    "l5.end": [
+     54.6866,
+     -19.0832
+    ],
+    "l6.start": [
+     54.6866,
+     -19.0832
+    ],
+    "l6.end": [
+     79.3064,
+     -2.7067
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "loop p1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       -9.972,
+       -0.103
+      ],
+      "shape_change": 0.0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       -3.1,
+       -0.033
+      ],
+      "shape_change": 3.1
+     },
+     "max_live_vs_ours": 9.972
+    },
+    "loop l3-l6": {
+     "live": {
+      "rot_deg": -1.175,
+      "move": [
+       -1.753,
+       -0.796
+      ],
+      "shape_change": 4.019
+     },
+     "ours": {
+      "rot_deg": 0.329,
+      "move": [
+       1.55,
+       0.016
+      ],
+      "shape_change": 3.426
+     },
+     "max_live_vs_ours": 3.981
+    }
+   }
+  },
+  "r226-k11": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k11 (EQUAL)",
+   "points": {
+    "p1.start": [
+     -5.3265,
+     -0.0437
+    ],
+    "p1.end": [
+     18.9248,
+     -0.0437
+    ],
+    "p1.interpolationPoints": [
+     [
+      -5.3265,
+      -0.0437
+     ],
+     [
+      14.9936,
+      1.1715
+     ],
+     [
+      18.9248,
+      -0.0437
+     ]
+    ],
+    "l2.start": [
+     18.9248,
+     -0.0437
+    ],
+    "l2.end": [
+     -5.3265,
+     -0.0437
+    ],
+    "l3.start": [
+     81.0836,
+     0.87
+    ],
+    "l3.end": [
+     61.7938,
+     18.7139
+    ],
+    "l4.start": [
+     61.7938,
+     18.7139
+    ],
+    "l4.end": [
+     46.9112,
+     1.0113
+    ],
+    "l5.start": [
+     46.9112,
+     1.0113
+    ],
+    "l5.end": [
+     56.4639,
+     -15.5065
+    ],
+    "l6.start": [
+     56.4639,
+     -15.5065
+    ],
+    "l6.end": [
+     81.0836,
+     0.87
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "loop p1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       -8.194,
+       3.473
+      ],
+      "shape_change": 0.0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       -3.148,
+       -0.034
+      ],
+      "shape_change": 3.148
+     },
+     "max_live_vs_ours": 8.914
+    },
+    "loop l3-l6": {
+     "live": {
+      "rot_deg": 0.164,
+      "move": [
+       0.729,
+       1.064
+      ],
+      "shape_change": 3.068
+     },
+     "ours": {
+      "rot_deg": -0.028,
+      "move": [
+       1.574,
+       0.017
+      ],
+      "shape_change": 3.561
+     },
+     "max_live_vs_ours": 3.01
+    }
+   }
+  },
+  "r226-k12": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k12 (COINCIDENT)",
+   "points": {
+    "p1.start": [
+     -7.1038,
+     -3.6204
+    ],
+    "p1.end": [
+     17.1476,
+     -3.6204
+    ],
+    "p1.interpolationPoints": [
+     [
+      -7.1038,
+      -3.6204
+     ],
+     [
+      14.9936,
+      1.1715
+     ],
+     [
+      17.1476,
+      -3.6204
+     ]
+    ],
+    "l2.start": [
+     17.1476,
+     -3.6204
+    ],
+    "l2.end": [
+     -7.1038,
+     -3.6204
+    ],
+    "l3.start": [
+     79.3064,
+     -2.7067
+    ],
+    "l3.end": [
+     57.6002,
+     17.3724
+    ],
+    "l4.start": [
+     57.6002,
+     17.3724
+    ],
+    "l4.end": [
+     43.3833,
+     0.4616
+    ],
+    "l5.start": [
+     43.3833,
+     0.4616
+    ],
+    "l5.end": [
+     54.6866,
+     -19.0832
+    ],
+    "l6.start": [
+     54.6866,
+     -19.0832
+    ],
+    "l6.end": [
+     79.3064,
+     -2.7067
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "loop p1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       -9.972,
+       -0.103
+      ],
+      "shape_change": 0.0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       -3.145,
+       -0.034
+      ],
+      "shape_change": 3.145
+     },
+     "max_live_vs_ours": 9.972
+    },
+    "loop l3-l6": {
+     "live": {
+      "rot_deg": -0.03,
+      "move": [
+       -2.09,
+       -1.197
+      ],
+      "shape_change": 3.569
+     },
+     "ours": {
+      "rot_deg": -0.03,
+      "move": [
+       1.572,
+       0.017
+      ],
+      "shape_change": 3.569
+     },
+     "max_live_vs_ours": 3.859
+    }
+   }
+  },
+  "r226-k13": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k13 (ANGLE)",
+   "points": {
+    "p1.start": [
+     -7.1025,
+     -3.6225
+    ],
+    "p1.end": [
+     17.1489,
+     -3.6225
+    ],
+    "p1.interpolationPoints": [
+     [
+      -7.1025,
+      -3.6225
+     ],
+     [
+      14.9936,
+      1.1715
+     ],
+     [
+      17.1489,
+      -3.6225
+     ]
+    ],
+    "l2.start": [
+     17.1489,
+     -3.6225
+    ],
+    "l2.end": [
+     -7.1025,
+     -3.6225
+    ],
+    "l3.start": [
+     79.3077,
+     -2.7088
+    ],
+    "l3.end": [
+     59.2904,
+     19.0543
+    ],
+    "l4.start": [
+     59.2904,
+     19.0543
+    ],
+    "l4.end": [
+     43.7568,
+     3.3443
+    ],
+    "l5.start": [
+     43.7568,
+     3.3443
+    ],
+    "l5.end": [
+     53.4482,
+     -17.0479
+    ],
+    "l6.start": [
+     53.4482,
+     -17.0479
+    ],
+    "l6.end": [
+     79.3077,
+     -2.7088
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "loop p1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       -9.97,
+       -0.105
+      ],
+      "shape_change": 0.0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       -6.468,
+       0.105
+      ],
+      "shape_change": 0.0
+     },
+     "max_live_vs_ours": 3.508
+    },
+    "loop l3-l6": {
+     "live": {
+      "rot_deg": -4.652,
+      "move": [
+       -1.884,
+       0.453
+      ],
+      "shape_change": 3.569
+     },
+     "ours": {
+      "rot_deg": -0.199,
+      "move": [
+       1.267,
+       3.345
+      ],
+      "shape_change": 3.569
+     },
+     "max_live_vs_ours": 5.597
+    }
+   }
+  },
+  "r226-k14": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k14 (DISTANCE)",
+   "points": {
+    "p1.start": [
+     2.8679,
+     -3.5171
+    ],
+    "p1.end": [
+     27.1192,
+     -3.5171
+    ],
+    "p1.interpolationPoints": [
+     [
+      2.8679,
+      -3.5171
+     ],
+     [
+      14.9936,
+      1.1715
+     ],
+     [
+      27.1192,
+      -3.5171
+     ]
+    ],
+    "l2.start": [
+     27.1192,
+     -3.5171
+    ],
+    "l2.end": [
+     2.8679,
+     -3.5171
+    ],
+    "l3.start": [
+     79.3064,
+     -2.7067
+    ],
+    "l3.end": [
+     57.6002,
+     17.3724
+    ],
+    "l4.start": [
+     57.6002,
+     17.3724
+    ],
+    "l4.end": [
+     43.3833,
+     0.4616
+    ],
+    "l5.start": [
+     43.3833,
+     0.4616
+    ],
+    "l5.end": [
+     54.6866,
+     -19.0832
+    ],
+    "l6.start": [
+     54.6866,
+     -19.0832
+    ],
+    "l6.end": [
+     79.3064,
+     -2.7067
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "loop p1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       0.0,
+       0.0
+      ],
+      "shape_change": 0.0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       0.0,
+       -0.0
+      ],
+      "shape_change": 0.0
+     },
+     "max_live_vs_ours": 0.0
+    },
+    "loop l3-l6": {
+     "live": {
+      "rot_deg": -0.03,
+      "move": [
+       -2.09,
+       -1.197
+      ],
+      "shape_change": 3.569
+     },
+     "ours": {
+      "rot_deg": -0.0,
+      "move": [
+       0.0,
+       -0.0
+      ],
+      "shape_change": 0.0
+     },
+     "max_live_vs_ours": 5.626
+    }
+   }
+  },
+  "r226-k15": {
+   "feature": "OK",
+   "message": "(REST status OK; row tooltip not read, as probes 10)",
+   "left_out": "k15 (LENGTH)",
+   "points": {
+    "p1.start": [
+     -7.1038,
+     -3.6204
+    ],
+    "p1.end": [
+     17.1476,
+     -3.6204
+    ],
+    "p1.interpolationPoints": [
+     [
+      -7.1038,
+      -3.6204
+     ],
+     [
+      14.9936,
+      1.1715
+     ],
+     [
+      17.1476,
+      -3.6204
+     ]
+    ],
+    "l2.start": [
+     17.1476,
+     -3.6204
+    ],
+    "l2.end": [
+     -7.1038,
+     -3.6204
+    ],
+    "l3.start": [
+     79.3064,
+     -2.7067
+    ],
+    "l3.end": [
+     61.413,
+     13.8454
+    ],
+    "l4.start": [
+     61.413,
+     13.8454
+    ],
+    "l4.end": [
+     49.6934,
+     -0.0949
+    ],
+    "l5.start": [
+     49.6934,
+     -0.0949
+    ],
+    "l5.end": [
+     59.0112,
+     -16.2066
+    ],
+    "l6.start": [
+     59.0112,
+     -16.2066
+    ],
+    "l6.end": [
+     79.3064,
+     -2.7067
+    ]
+   },
+   "radii": {},
+   "groups_rigid_fit_from_posted": {
+    "loop p1+l2": {
+     "live": {
+      "rot_deg": 0.0,
+      "move": [
+       -9.972,
+       -0.103
+      ],
+      "shape_change": 0.0
+     },
+     "ours": {
+      "rot_deg": 0.0,
+      "move": [
+       -3.263,
+       -0.035
+      ],
+      "shape_change": 3.263
+     },
+     "max_live_vs_ours": 9.972
+    },
+    "loop l3-l6": {
+     "live": {
+      "rot_deg": -0.03,
+      "move": [
+       1.522,
+       -1.499
+      ],
+      "shape_change": 2.144
+     },
+     "ours": {
+      "rot_deg": -0.03,
+      "move": [
+       1.632,
+       0.018
+      ],
+      "shape_change": 3.303
+     },
+     "max_live_vs_ours": 4.477
+    }
+   }
+  }
+ }
+}
