@@ -1691,6 +1691,23 @@ fn a_studio_imported_twice_is_one_module() {
     }
 }
 
+/// A studio may import another studio of a newer FeatureScript version
+/// (live: cf-drive-train-generator's 608 Drive Train Generator imports the
+/// 1301 Spur Gear at that version and builds); only a newer std is refused.
+#[test]
+fn a_studio_imports_a_newer_studio() {
+    let mut doc = Document::new();
+    let newer = doc.add_tab("newer", TabContent::FeatureStudio(FeatureStudio::new("FeatureScript 3095;\nexport const SIZE = 3;\n")));
+    let older = doc.add_tab("older", TabContent::FeatureStudio(FeatureStudio::new("")));
+    if let Some(TabContent::FeatureStudio(f)) = doc.tab_mut(older).map(|t| &mut t.content) {
+        f.source = format!("FeatureScript 1963;\nexport import(path : \"{newer}\", version : \"0\");\nexport const TWICE = SIZE * 2;\n");
+    }
+    let scripts = DocumentScripts::from_document(&doc);
+    for (tab, name, compiled) in scripts.studios() {
+        assert!(!compiled.has_errors(), "{name} ({tab}): {:?}", compiled.diagnostics);
+    }
+}
+
 /// Feature Studio › Import of other tabs (live dom/fs-import-*): a file
 /// exports BLOB_DATA (its reference-parameter map), a Part Studio `build`;
 /// two un-namespaced file imports clash on BLOB_DATA.

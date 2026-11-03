@@ -341,13 +341,14 @@ fn compile_with(path: Arc<str>, src: &str, resolver: &dyn Resolver, loading: &mu
         errors.push(CompileError { module: path.clone(), pos: Pos::default(), message: "Missing FeatureScript version".into(), parse: false, level: Level::Error });
     }
     for (item, m) in ast.items.iter().zip(&imports) {
-        let (TopKind::Import { path: p, version, .. }, Some(m)) = (&item.kind, m) else { continue };
-        // The standard library is served at the version the import asks for
-        // (we embed one release); other modules have their own header.
-        let v = match p.strip_prefix(STD_PREFIX) {
-            Some(_) => version.split('.').next().and_then(|v| v.parse().ok()).unwrap_or(0),
-            None => m.version.unwrap_or(0),
-        };
+        // Only the standard library at a version newer than the module's
+        // (live: another studio of a newer FeatureScript imports fine,
+        // cf-drive-train-generator's 608 importing a 1301 Spur Gear).
+        let (TopKind::Import { path: p, version, .. }, Some(_)) = (&item.kind, m) else { continue };
+        if !p.starts_with(STD_PREFIX) {
+            continue;
+        }
+        let v = version.split('.').next().and_then(|v| v.parse().ok()).unwrap_or(0);
         if v > own {
             errors.push(CompileError { module: path.clone(), pos: Pos::default(), message: format!("Cannot import a module with FeatureScript version: {v} from module with older version {own}"), parse: false, level: Level::Error });
         }
