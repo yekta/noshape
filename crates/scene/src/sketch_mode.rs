@@ -514,6 +514,8 @@ pub struct SketchEditor {
     /// Entity whose glyphs stay visible briefly after hover ends.
     pub glyph_entity: Option<(EntityId, std::time::Instant)>,
     drag: Option<DragState>,
+    /// The sketch as a geometry drag found it: each step solves from it.
+    drag_origin: Option<Sketch>,
     box_end: Option<DVec2>,
     /// Ctrl held during the box selection: it removes from the selection.
     pub box_remove: bool,
@@ -1128,6 +1130,7 @@ impl SketchEditor {
             hover_pattern: None,
             glyph_entity: None,
             drag: None,
+            drag_origin: None,
             box_end: None,
             box_remove: false,
             drag_snap: None,
@@ -3323,7 +3326,8 @@ impl SketchEditor {
                 // current, so every step's regeneration reuses it instead of
                 // redoing it (qa SKETCH-DRAG-BIG: 30–50 ms per step on 1000
                 // entities).
-                data.sketch.refresh_analysis();
+                data.sketch.begin_drag();
+                self.drag_origin = Some(data.sketch.clone());
                 self.drag = Some(DragState::Geometry { handle, at: None });
                 self.tool_drag(data, p)
             }
@@ -3331,9 +3335,23 @@ impl SketchEditor {
                 if at == Some(p) {
                     return EditOutcome::none();
                 }
-                let _report = data.sketch.drag(&[(handle, p)]);
+                // Live: a drag's result depends only on where it ends (drag
+                // probes 12: four paths to one pixel, the same points), so
+                // each step solves from the drag's start; from the last step
+                // only when that doesn't solve (a jump too far for one solve).
+                let last = self.drag_origin.as_ref().map(|o| std::mem::replace(&mut data.sketch, o.clone()));
+                if !data.sketch.drag(&[(handle, p)]).drag_solved
+                    && let Some(last) = last
+                {
+                    data.sketch = last;
+                    let step = match handle {
+                        DragHandle::Entity { id, grab } => DragHandle::Entity { id, grab: at.unwrap_or(grab) },
+                        h => h,
+                    };
+                    data.sketch.drag(&[(step, p)]);
+                }
                 match handle {
-                    DragHandle::Entity { id, .. } => self.drag = Some(DragState::Geometry { handle: DragHandle::Entity { id, grab: p }, at: Some(p) }),
+                    DragHandle::Entity { .. } => self.drag = Some(DragState::Geometry { handle, at: Some(p) }),
                     DragHandle::Point(id) => {
                         self.drag = Some(DragState::Geometry { handle, at: Some(p) });
                         // Shift suppresses snapping onto other geometry.
@@ -3586,6 +3604,7 @@ impl SketchEditor {
             return out;
         }
         self.press = None;
+        self.drag_origin = None;
         let out = match self.drag.take() {
             Some(DragState::Pending { entity, .. }) => {
                 if let Some(pos) = self.selection.iter().position(|e| *e == entity) {
@@ -7620,6 +7639,55 @@ mod tests {
         assert!(!ed.tool_drag(&mut data, v(0.012, 0.011)).changed);
         assert!(ed.tool_drag(&mut data, v(0.013, 0.011)).changed);
         assert_eq!(data.sketch.point(p), Some(v(0.013, 0.011)));
+    }
+
+    #[test]
+    fn a_drag_ends_where_its_pointer_ends_whatever_the_path() {
+        // Live drag probes 12: a bolt circle's hole dragged to one pixel by
+        // four different paths lands on the same points; the next hole
+        // stays, the last one goes radially onto its circle.
+        use std::f64::consts::{FRAC_PI_2, TAU};
+        let bolt_circle = || {
+            let (mut ed, mut data) = editor(Tool::Select);
+            let sk = &mut data.sketch;
+            let centre_of = |sk: &Sketch, c: EntityId| match sk.entity(c).unwrap().geometry {
+                noshape_sketch::Geometry::Circle { center, .. } => center,
+                _ => unreachable!(),
+            };
+            let big = sk.add_circle(v(0.0, 0.0), 0.02);
+            let holes: Vec<EntityId> = (0..3).map(|i| sk.add_circle(DVec2::from_angle(FRAC_PI_2 + i as f64 * TAU / 3.0) * 0.014, 0.003)).collect();
+            for h in &holes[1..] {
+                sk.add_constraint(ConstraintKind::Equal { a: holes[0], b: *h }).unwrap();
+            }
+            sk.add_constraint(ConstraintKind::Radius { curve: big, value: 0.02 }).unwrap();
+            sk.add_constraint(ConstraintKind::Radius { curve: holes[0], value: 0.003 }).unwrap();
+            let c = centre_of(sk, big);
+            let hc: Vec<EntityId> = holes.iter().map(|h| centre_of(sk, *h)).collect();
+            for h in &hc {
+                sk.add_constraint(ConstraintKind::Distance { a: c, b: *h, value: 0.014, mode: DistanceMode::Center }).unwrap();
+            }
+            assert!(sk.solve().is_solved());
+            ed.tool_down(&mut data, v(0.0, 0.014), Some(hc[0]), false, false);
+            (ed, data, [c, hc[0], hc[1], hc[2]])
+        };
+        let end = v(0.0030736, 0.0162029);
+        let mut results = Vec::new();
+        for path in [vec![v(0.001, 0.015), end], vec![v(0.004, 0.012), v(-0.002, 0.017), end], (1..=25).map(|k| v(0.0, 0.014) + (end - v(0.0, 0.014)) * (k as f64 / 25.0)).collect()] {
+            let (mut ed, mut data, pts) = bolt_circle();
+            for p in path {
+                ed.tool_drag(&mut data, p);
+            }
+            results.push(pts.map(|q| data.sketch.point(q).unwrap()));
+        }
+        for r in &results[1..] {
+            for (a, b) in r.iter().zip(&results[0]) {
+                assert!((*a - *b).length() < 1e-9, "{results:?}");
+            }
+        }
+        let live = [v(-2.9245, 3.5528), v(3.0736, 16.2029), v(-12.1244, -7.0), v(8.5381, -4.4852)];
+        for (p, q) in results[0].iter().zip(&live) {
+            assert!((*p * 1e3 - *q).length() < 1e-3, "ours {:?} live {live:?}", results[0]);
+        }
     }
 
     #[test]

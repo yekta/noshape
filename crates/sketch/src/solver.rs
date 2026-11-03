@@ -1372,6 +1372,14 @@ impl Sketch {
         run(self, opts, &[])
     }
 
+    /// Makes the DOF analysis and the drag's relation graph current, so a
+    /// copy taken now (a drag's start, which every step solves from) keeps
+    /// them.
+    pub fn begin_drag(&mut self) {
+        self.refresh_analysis();
+        self.drag_graph();
+    }
+
     /// Interactive drag: pulls the handles toward their targets while keeping
     /// every constraint satisfied. Fully constrained geometry does not move.
     /// A target the constraints can't reach (or a jump that leaves the

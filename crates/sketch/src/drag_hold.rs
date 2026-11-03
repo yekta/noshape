@@ -137,6 +137,21 @@ impl Sketch {
                 out.extend(e.point_refs().into_iter().map(|p| (p, k)));
             }
         }
+        if out.is_empty() {
+            return out;
+        }
+        // The point farthest from the dragged one stays too (g4: the slot's
+        // lower-left corner, so its left side keeps its x).
+        let from = handles.first().and_then(|(h, _)| match *h {
+            DragHandle::Point(id) => self.point(id),
+            DragHandle::Entity { grab, .. } => Some(grab),
+        });
+        let far = from.and_then(|f| {
+            units.keys().filter_map(|u| self.entity(*u)).flat_map(|e| e.point_refs()).filter(|p| !ids.contains(p)).filter_map(|p| self.point(p).map(|q| (p, (q - f).length()))).max_by(|a, b| a.1.total_cmp(&b.1).then(b.0.cmp(&a.0)))
+        });
+        if let Some((p, _)) = far {
+            out.extend([(p, 0), (p, 1)]);
+        }
         out
     }
 
