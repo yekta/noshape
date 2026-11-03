@@ -229,23 +229,6 @@ pub fn cid_to_gid(map: &BTreeMap<u16, u16>) -> Vec<u8> {
     out
 }
 
-/// A ToUnicode CMap: glyph id → the character it draws.
-pub fn to_unicode(map: &BTreeMap<u16, char>) -> String {
-    let mut s = String::from("/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n");
-    let pairs: Vec<(u16, char)> = map.iter().map(|(g, c)| (*g, *c)).collect();
-    for chunk in pairs.chunks(100) {
-        s.push_str(&format!("{} beginbfchar\n", chunk.len()));
-        for (g, c) in chunk {
-            let mut u = [0u16; 2];
-            let hex: String = c.encode_utf16(&mut u).iter().map(|x| format!("{x:04X}")).collect();
-            s.push_str(&format!("<{g:04X}> <{hex}>\n"));
-        }
-        s.push_str("endbfchar\n");
-    }
-    s.push_str("endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n");
-    s
-}
-
 #[cfg(test)]
 mod tests {
     /// Live's anatomy (samples/dx-pdf-selectable.pdf): the drawn glyphs

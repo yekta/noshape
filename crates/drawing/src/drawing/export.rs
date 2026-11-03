@@ -564,6 +564,12 @@ struct PdfFonts {
     faces: Vec<(noshape_sketch::text::EmbedFace, GlyphsUsed)>,
 }
 
+/// A character's code in an embedded font (live: its Unicode value; the
+/// Basic Multilingual Plane's).
+fn cid_of(c: char) -> u16 {
+    u16::try_from(u32::from(c)).unwrap_or(0xFFFD)
+}
+
 /// Glyph id → (the character it draws, its advance in font units).
 type GlyphsUsed = std::collections::BTreeMap<u16, (char, u16)>;
 
@@ -701,7 +707,9 @@ fn pdf_content(g: &SheetGeometry, ocgs: &mut Vec<super::cad_layers::CadLayer>, f
                 if glyphs.is_empty() {
                     continue;
                 }
-                let hex: String = glyphs.iter().map(|(gid, _, _)| format!("{gid:04X}")).collect();
+                // Live's codes are the characters (CID = Unicode, its
+                // CIDToGIDMap to the glyphs; samples/dx-pdf-selectable.pdf).
+                let hex: String = glyphs.iter().map(|(_, ch, _)| format!("{:04X}", cid_of(*ch))).collect();
                 for (gid, ch, adv) in glyphs {
                     fonts.faces[k].1.entry(*gid).or_insert((*ch, *adv));
                 }
@@ -817,23 +825,16 @@ fn zlib_parallel(data: &[u8]) -> Vec<u8> {
     z
 }
 
-/// The texts a PDF writes in its embedded fonts, read back through their
-/// ToUnicode maps (tests).
+/// The texts a PDF writes in its embedded fonts, read back (tests).
 #[cfg(test)]
 pub(crate) fn pdf_texts(pdf: &[u8]) -> Vec<String> {
     let d = pdf_decoded(pdf);
-    let map: std::collections::HashMap<String, char> = d
-        .lines()
-        .filter_map(|l| {
-            let (g, u) = l.strip_prefix('<')?.split_once("> <")?;
-            Some((g.to_string(), char::from_u32(u32::from_str_radix(u.strip_suffix('>')?, 16).ok()?)?))
-        })
-        .collect();
+    // (The codes are the characters: /ToUnicode /Identity-H.)
     d.lines()
         .filter(|l| l.ends_with("> Tj ET"))
         .map(|l| {
             let hex = &l[l.rfind('<').unwrap_or(0) + 1..l.len() - 7];
-            (0..hex.len() / 4).filter_map(|i| map.get(&hex[4 * i..4 * i + 4])).collect()
+            (0..hex.len() / 4).filter_map(|i| u32::from_str_radix(&hex[4 * i..4 * i + 4], 16).ok().and_then(char::from_u32)).collect()
         })
         .collect()
 }
@@ -905,13 +906,14 @@ pub fn to_pdf_pages_version(pages: &[SheetGeometry], version: &str) -> Vec<u8> {
     // Fonts F2–F12 follow the pages, then the image XObjects (decoded RGB
     // supplied by the caller).
     let font0 = 4 + 2 * pages.len();
-    // The embedded fonts' objects follow the layers (6 each: Type0, CID
-    // font, descriptor, file, ToUnicode, CIDToGIDMap).
+    // The embedded fonts' objects follow the layers (8 each, live's order:
+    // Type0, CIDSystemInfo, DescendantFonts, CID font, W, descriptor,
+    // CIDToGIDMap, file).
     let t0 = ocg0 + ocgs.len();
     let fonts: String = std::iter::once(" /F1 3 0 R".to_string())
         .chain((2..=12).map(|k| format!(" /F{k} {} 0 R", font0 + k - 2)))
         .filter(|_| base14)
-        .chain((0..embedded.faces.len()).map(|k| format!(" /Type0TTF{k} {} 0 R", t0 + 6 * k)))
+        .chain((0..embedded.faces.len()).map(|k| format!(" /Type0TTF{k} {} 0 R", t0 + 8 * k)))
         .collect();
     let mut next = font0 + 11;
     let mut images: Vec<Vec<u8>> = Vec::new();
@@ -941,18 +943,39 @@ pub fn to_pdf_pages_version(pages: &[SheetGeometry], version: &str) -> Vec<u8> {
         objects.push(format!("<< /Type /OCG /Name ({}) >>", l.name(false)).into_bytes());
     }
     for (k, (face, glyphs)) in embedded.faces.iter().enumerate() {
-        let n = t0 + 6 * k;
-        // A compact subset (live's: the drawn glyphs renumbered), the
-        // content's CIDs (original glyph ids) mapped by CIDToGIDMap.
+        let n = t0 + 8 * k;
+        // A compact subset (live's: the drawn glyphs renumbered).
         let used: std::collections::BTreeMap<u16, char> = glyphs.iter().map(|(g, (c, _))| (*g, *c)).collect();
         let (file, gids) = super::pdf_font::subset(face.data, &used).unwrap_or_else(|| (face.data.to_vec(), glyphs.keys().map(|g| (*g, *g)).collect()));
         // Live's subsets are all tagged "AAAAAA".
         let name = format!("AAAAAA+{}", face.postscript_name);
         let u = |v: f64| (v * 1000.0 / face.units_per_em as f64).round() as i64;
-        let widths: String = glyphs.iter().map(|(g, (_, adv))| format!("{g} [{}] ", u(*adv as f64))).collect();
+        // By character code (CID): the subset's glyph, the width.
+        let by_cid: std::collections::BTreeMap<u16, (u16, i64)> = glyphs.iter().map(|(g, (c, adv))| (cid_of(*c), (gids.get(g).copied().unwrap_or(*g), u(*adv as f64)))).collect();
+        // The commonest width is the default (live's /DW 572: Noto Sans's
+        // digits); /W lists the others in runs of codes.
+        let mut counts: std::collections::BTreeMap<i64, usize> = std::collections::BTreeMap::new();
+        for (_, w) in by_cid.values() {
+            *counts.entry(*w).or_default() += 1;
+        }
+        let dw = counts.iter().max_by_key(|(w, n)| (**n, std::cmp::Reverse(**w))).map_or(1000, |(w, _)| *w);
+        let mut widths = String::new();
+        let mut last: Option<u16> = None;
+        for (cid, (_, w)) in by_cid.iter().filter(|(_, (_, w))| *w != dw) {
+            if last.is_some_and(|l| l + 1 == *cid) {
+                widths.truncate(widths.len() - 2);
+                let _ = write!(widths, "{w} ] ");
+            } else {
+                let _ = write!(widths, "{cid} [{w} ] ");
+            }
+            last = Some(*cid);
+        }
         let b = face.bbox;
-        objects.push(format!("<< /Type /Font /Subtype /Type0 /BaseFont /{name} /Encoding /Identity-H /DescendantFonts [{} 0 R] /ToUnicode {} 0 R >>", n + 1, n + 4).into_bytes());
-        objects.push(format!("<< /Type /Font /Subtype /CIDFontType2 /BaseFont /{name} /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor {} 0 R /DW 1000 /W [{widths}] /CIDToGIDMap {} 0 R >>", n + 2, n + 5).into_bytes());
+        objects.push(format!("<< /Type /Font /Subtype /Type0 /BaseFont /{name} /Encoding /Identity-H /ToUnicode /Identity-H /DescendantFonts {} 0 R >>", n + 2).into_bytes());
+        objects.push(b"<< /Registry (Adobe) /Ordering (Identity) /Supplement 0 >>".to_vec());
+        objects.push(format!("[{} 0 R ]", n + 3).into_bytes());
+        objects.push(format!("<< /Type /Font /Subtype /CIDFontType2 /BaseFont /{name} /CIDSystemInfo {} 0 R /W {} 0 R /FontDescriptor {} 0 R /CIDToGIDMap {} 0 R /DW {dw} >>", n + 1, n + 4, n + 5, n + 6).into_bytes());
+        objects.push(format!("[{widths}]").into_bytes());
         objects.push(
             format!(
                 // Live's descriptor: the box's top and bottom as Ascent and Descent, no cap / x height or stem.
@@ -966,14 +989,13 @@ pub fn to_pdf_pages_version(pages: &[SheetGeometry], version: &str) -> Vec<u8> {
                 u(b[3] as f64),
                 u(b[1] as f64),
                 face.family,
-                n + 3
+                n + 7
             )
             .into_bytes(),
         );
+        let map: std::collections::BTreeMap<u16, u16> = by_cid.iter().map(|(c, (g, _))| (*c, *g)).collect();
+        objects.push(flate_stream("", &super::pdf_font::cid_to_gid(&map)));
         objects.push(flate_stream(&format!("/Length1 {} ", file.len()), &file));
-        let map: std::collections::BTreeMap<u16, char> = glyphs.iter().map(|(g, (c, _))| (*g, *c)).collect();
-        objects.push(flate_stream("", super::pdf_font::to_unicode(&map).as_bytes()));
-        objects.push(flate_stream("", &super::pdf_font::cid_to_gid(&gids)));
     }
     let mut out: Vec<u8> = format!("%PDF-{version}\n").into_bytes();
     out.extend_from_slice(b"%\xE2\xE3\xCF\xD3\n");
@@ -1224,6 +1246,10 @@ mod tests {
         assert!(s.contains("/Subtype /CIDFontType2") && s.contains("/BaseFont /AAAAAA+NotoSans /Encoding /Identity-H") && s.contains("/FontWeight 400 /Flags 32 /FontBBox [-556 -273 1321 1048]") && s.contains("/FontFamily (Noto Sans) /FontFile2"), "{s}");
         let base14: Vec<&str> = d.lines().filter(|l| l.starts_with("BT /F")).collect();
         assert!(base14.is_empty(), "no text left in a base-14 font: {base14:?}");
+        // Live's encoding: the codes are the characters (/ToUnicode
+        // /Identity-H), a CIDToGIDMap to the subset's glyphs, the commonest
+        // width as /DW (Noto Sans's digits: 572), its objects apart.
+        assert!(s.contains("/Encoding /Identity-H /ToUnicode /Identity-H /DescendantFonts") && s.contains("/CIDToGIDMap") && s.contains("/DW 572") && s.contains("<< /Registry (Adobe) /Ordering (Identity) /Supplement 0 >>"), "{s}");
         let texts = pdf_texts(&p);
         assert!(texts.iter().any(|t| t == "100"), "{texts:?}");
         assert!(p.len() < 120_000, "a subset, not the whole font: {} B", p.len());
