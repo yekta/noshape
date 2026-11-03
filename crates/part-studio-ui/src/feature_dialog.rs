@@ -246,7 +246,7 @@ pub struct FeatureDialog {
     /// The keyboard left the dialog: a press in the graphics area, or Esc out of a field (live: the page has the
     /// keyboard then, the selection field stays active; `ui_focus`). A press in the dialog or a field's focus
     /// brings it back.
-    pub graphics_pressed: bool,
+    pub keyboard_left: bool,
     /// The field Enter just applied: the input's change event for the last typed key can arrive after the commit
     /// rewrote the text ("15" → "15 mm") and must not open a list for it.
     just_applied: Option<String>,
@@ -404,7 +404,7 @@ impl FeatureDialog {
             completion: None,
             just_applied: None,
             focus_dialog_pending: false,
-            graphics_pressed: false,
+            keyboard_left: false,
             create_var: None,
             external_field: None,
             extra: None,
@@ -1373,7 +1373,7 @@ impl FeatureDialog {
             // has keyboard focus ("two fields are active"), so picks still
             // go to it.
             InputEvent::Focus => {
-                this.graphics_pressed = false;
+                this.keyboard_left = false;
                 cx.notify()
             }
             InputEvent::Blur => {
@@ -2587,7 +2587,11 @@ impl FeatureDialog {
                             .when(selected, |d| d.text_color(pal.emphasis).font_weight(FontWeight::MEDIUM).child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
                             .when(!selected, |d| d.text_color(pal.text).child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.border)).hover(|d| d.text_color(pal.text)))
                             .child(div().min_w_0().truncate().child(crate::ui::spec_text(label)))
-                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_value(&path_s, ParamValue::Enum(id_s.clone()), cx)))
+                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                // A tab takes no keyboard focus (live: the page has it after a tab click).
+                                this.keyboard_left = true;
+                                this.set_value(&path_s, ParamValue::Enum(id_s.clone()), cx)
+                            }))
                     }));
                     h_flex().mx(px(-2.)).mb(px(2.)).child(group).children(flips).into_any_element()
                 } else {
@@ -3596,7 +3600,7 @@ impl FeatureDialog {
                 return;
             }
             cx.stop_propagation();
-            this.graphics_pressed = true;
+            this.keyboard_left = true;
             let base = st_esc.read(cx).value().to_string();
             this.on_text_changed(&p_esc, base, cx);
             cx.notify();
@@ -3824,7 +3828,7 @@ impl Render for FeatureDialog {
             .id("feature-dialog")
             // Clicks on the dialog never reach the graphics area beneath.
             .occlude()
-            .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, _, _| this.graphics_pressed = false))
+            .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, _, _| this.keyboard_left = false))
             .key_context("FeatureDialog")
             .track_focus(&self.focus)
             // Onshape feature dialog frame (§3.9): 220 px, white at 95%, no

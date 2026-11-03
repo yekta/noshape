@@ -1524,7 +1524,7 @@ impl PartStudioView {
             self.draft_checkpoint(cx);
         }
         if press && let Some(e) = &self.edit {
-            e.dialog.update(cx, |d, _| d.graphics_pressed = true);
+            e.dialog.update(cx, |d, _| d.keyboard_left = true);
         }
         if let (ViewportEvent::ToolDown { .. } | ViewportEvent::ToolDrag { .. }, Some(e)) = (ev, &mut self.edit) {
             e.history.dragging = true;
@@ -2390,8 +2390,12 @@ impl PartStudioView {
     fn cancel_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.close_create_selection_of_dialog(cx);
         // Live Onshape: cancelling a sketch shows "Sketch N has been
-        // canceled. Restore" (sketch/68); Restore reopens the draft.
+        // canceled. Restore" (sketch/68); Restore reopens the draft. Not for
+        // an existing sketch left unchanged: nothing is lost (live ui-parity
+        // edit-earlier-feature-final).
+        let changed = self.edit.as_ref().is_some_and(|e| e.is_new || self.studio(cx).and_then(|s| s.features.get(e.index)).is_none_or(|f| *f != e.dialog.read(cx).feature));
         if self.sketch.is_some()
+            && changed
             && let Some(e) = &self.edit
         {
             let feature = e.dialog.read(cx).feature.clone();
