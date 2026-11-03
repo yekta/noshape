@@ -3077,6 +3077,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   unbudgeted, and nothing came of it); it has 3 s now (kernel ScopedDeadline): the fillet fails in 3.1 s. OCCT's own
   attempts fail in 54 ms: R2.5 on both long edges of a 5 mm face, a full round with vertex blends at the rib's ends.
   Left: building it as live (live's geometry for this document pending, dx).
+  core 11-03 22:35: live (behaviours.md "... knob-jason after Fillet 2", request 1932): 81 faces, 26947.696685 mm³; each
+  5 mm vertical edge's R2.5 round (a quarter cylinder 12.87015 mm²) runs between two SPHERE patches (all 24 6.43507
+  mm²) where it meets Fillet 1's tori (re-split into new tori 39.67877 mm²), the lobes' sides cut back (52.09821 /
+  84.95923 mm²): plain vertex blends of three equal rounds, which OCCT's fillet over the earlier rounds can't make.
 - [x] (core 11-03 14:50: live 1897's rule, from the normal alone (±Z: x = +X; else y = +Z projected, x = y × n), for sketches and planes on faces (eval.rs raw_plane) and FeatureScript's evPlane (host query.rs); ScopeRule 8, studios saved with features before keep OCCT's (PartStudio::legacy_face_frames). exercise-martinl and learning-center-devon match live to the end; T1 model kernel_robustness::a_sketch_on_a_face_takes_onshapes_frame. Left: evPlane's origin is the face's box centre in live (ours the parameter box's middle), and sheet metal flanges (bracket00-ira's) untested) P2 SKETCH-FACE-FRAME (core; dx's parity suite 11-03) a sketch on a part face gets another x axis than live's in
   3 of the corpus's face sketches (the origin and normal agree; live's frames are features.json `sketches`
   transformMatrix): exercise-martinl Sketch 2 on a −X side face: ours x (0, 0, −1), y (0, −1, 0), live x (0, −1, 0),
@@ -3223,6 +3227,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (Live's box there, ±30.1455 mm past the ±30 block, is the UI fetch's loose client bounds round fillet surfaces,
   not geometry.) Model /root/parity/models/knob-jason (NOSHAPE_PARITY_ONLY=knob-jason); rebuilt document
   /root/dx-scratch/tickets/knob-jason.noshape. (dx 2026-11-03)
+  core 11-03 22:35: live's exact faces after Fillet 1 (behaviours.md "core (2026-11-03 20:58, P1) knob-jason after
+  Fillet 1", live/core/knob-fillet-1931/): every face as ours to 1e-6 but the 24 outline tori, live's all 47.162567 /
+  78.315557 mm², ours 47.117-47.144 / 78.277-78.297: where two tori meet at a lobe's sharp vertical edge, OCCT's
+  approximated intersection trims them short. Exact torus/torus corners (noshape's blend: "a corner between blended
+  edges not lines") are the fix.
 - [ ] P2 FILLET-MEETING-FILLETS-ONE-FACE (core; dx's parity suite 11-03, pulley02-maxwell) two fillets that meet on
   one surface stay two faces in ours where live's part has one: pulley02's Fillet 1 rounds both bottom corners of a
   revolved groove 6.35 mm high with r 3.175 mm (1/8 in), so the two fillets meet at the groove's middle on one torus;
