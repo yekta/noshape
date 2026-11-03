@@ -7,6 +7,20 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 right (7607.301), mirror set and cli-fillet-segv right; published 08:43:30 (all three bundles); the release tarball is byte-identical to the smoked artifact.
 Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfmir2 B P0.
 
+**v0.4.24 (published 18:19, cut 0c383064 = 45c8921d + lead's secondary-z test fix; Release run 41682389383) smoked
+18:22–18:39: good, no blocker.** Artifacts: the published Linux tarball, CLI tarball and .deb are byte-identical to the
+run's linux-x86_64 artifact; SHA256SUMS OK; 11 assets. CLI / app as CLI "0.4.24"; round trip Parasolid / ACIS / STEP /
+IGES / JT / Rhino 67643.716875 / 18 (= v0.4.23); volume sweep = v0.4.23; the 44 ticket documents = green 19c09884 (the
+16:30 list's); fixed tickets hold (SM-CLOSED-BUTT, RUST-MIRROR-NEGATIVE, CRASH-957, wf-block, cli-shell-gpf, slow1151
+1.5 s). The user's cases: knurl Ø25 × 25 CP12 Ok 9.8 s 11598.041; vase loft 3 faces, Shells 47331.776 / 58694.861 /
+63464.509; split-and-chamfer 4 parts; Y Ribs Ok. App rows pixel-identical to v0.4.23 except loftmir-spline's mass
+properties (8471.586 → 8474.952 mm³): Extrude 1's fit spline is shaped by skasm's centripetal splines (d47ef2763, live
+1777), same with the Rust Boolean on or off — expected; bin/mirsetgui.sh's p0 reference is now gm-p0x-r424.png. Memory:
+seed 508 peak 652 MB, 685 611 MB. **Updater: v0.4.23 → v0.4.24 works**: the app on :149 fetched the feed 18:21:28 (2 min
+after publish), staged 18:21:36, "Updated — restart to finish"; Restart → `noshape --version` 0.4.24, g34 reopened
+(qa-scratch/upd424-0.png, upd424-1.png). Not in it: 51469a47 (surface Extrude), d55587a0 (knurls), 2ac2afb7 (Feature
+pattern faces as one), d0526d18 (Slot selection) — all checked on greens.
+
 **v0.4.23 (published 10:49, cut d609ce58 = bdbba238 + bump; Release run 41614276445) smoked 11:10: good, no blocker.**
 Artifacts: the published Linux tarball, CLI tarball and .deb are byte-identical to the run's linux-x86_64 artifact;
 SHA256SUMS OK. CLI / app as CLI "0.4.23"; round trip Parasolid / ACIS / STEP / IGES / JT / Rhino 67643.716875 / 18 (=
