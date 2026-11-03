@@ -865,8 +865,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 1. Import numbers: the remaining ✗ rows of docs/parity/workflow-import-matrix.md (g50 F8 / F19, McMaster helix; kern).
 2. API: render_image of the window camera (image size).
 3. Drawings (P2): selectable PDF compared with live's (dx-pdf-selectable.pdf): one embedded NotoSans CID TrueType
-   subset "AAAAAA+NotoSans", Identity-H, as live (ours adds a ToUnicode CMap stream where live names Identity-H);
-   flat pattern Counterbore / Countersink / Form styles.
+   subset "AAAAAA+NotoSans", Identity-H, as live (ours adds a ToUnicode CMap stream where live names Identity-H).
+   Next: hidden-line views of the corpus parts against live's (request 11-03 07:20: live's DXF / PDF of
+   pipeflange-steven and knob-tim drawings with suggested views; ours from the translated documents).
 4. Walk the area on each new green (last: 05:45 Variable Studio / configurations; 03:35 drawings) with
    XDG_CONFIG_HOME=/root/dx-scratch/xdg.
 
