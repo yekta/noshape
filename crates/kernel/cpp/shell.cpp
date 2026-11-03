@@ -4366,13 +4366,6 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
   lap("tools");
   if (tools.IsEmpty())
     return false;
-  if (std::getenv("NOSHAPE_TMP_COPY_TOOLS"))
-  {
-    ShapeList copies;
-    for (ShapeList::Iterator it(tools); it.More(); it.Next())
-      copies.Append(BRepBuilderAPI_Copy(it.Value(), true, false).Shape());
-    tools = copies;
-  }
   // Each tool's tolerances its real ones (OCCT's constructions leave nominal ones: faces at 1e-5 to 1e-4 whose
   // real deviation is 1e-7, which made the fuse "a tolerant input" for noshape's Boolean and widened OCCT's), where
   // it shares nothing with the part (no tolerance of the part changes).

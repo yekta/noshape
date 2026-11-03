@@ -1426,6 +1426,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   26-face B-spline sliver slab (7.6 mm³). A fuse that succeeds makes Shell 4 build where live (qa) fails it; the
   target is failing fast: open. Live asked whether it builds Shell 4 (REQUESTS 08:05; the input body as STEP in
   live/samples/core-shell-5267, ours alone: kernel T2 shell::dumped_shell_probe, NOSHAPE_SHELL_CASE, fails in 10.8 s).
+  Live 1860 (09:00): live fails it too, in ~1 s; ours should fail fast. A time limit on the slab fuse won't do: shells
+  that build spend up to 12.8 s there (shell corpus, NOSHAPE_SHELL_DEBUG). Fusing each slab on a copy of its own is
+  15 % faster over the corpus's 211 shells (the slowest 1.5-1.8x) with outcomes and volumes as before, but drops the
+  history from the part's faces to the walls (kernel shell::quadrics_and_slabs_agree): it needs that history
+  composed through the copies; Shell 4 isn't faster with it.
 - [ ] P0 REGEN-SPEED (core 10-29 03:05: met in release on perf.yml run 40796942944 (main 34cbea98): live-30-features full regen 35 / 41 / 53 ms (macOS / Linux / Windows; budget 80, live 171), its Extrude 1 edit commit 34 / 38 / 60 ms (budget 200), big-plate regen 159 / 230 / 306 ms (live 617); qa, please re-measure the GUI commit on a release build, the 301–785 ms were a dev build at load ~30. Was 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left
