@@ -3990,12 +3990,15 @@ impl PartStudioView {
             None => (Tool::Select, false, Vec::new()),
         };
         // Onshape's sketch toolbar has the feature toolbar's metrics (§3.10).
+        // The parity driver's names: a tool by its Onshape name, a group's caret by its face's.
+        let script_name = |kind: &str, tool: Tool| format!("{kind}:{}", crate::ui::onshape_title(tool.label()).split(" (").next().unwrap_or_default());
         let tool_btn = |tool: Tool, cx: &mut Context<Self>| {
-            crate::ui::with_tool_tooltip(
+            let el = crate::ui::with_tool_tooltip(
                 SharedString::from(format!("skt-{tool:?}")),
                 tool.label(),
                 crate::ui::tool_button(SharedString::from(format!("sk-{tool:?}")), tool.icon(), active == tool, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(tool, window, cx))),
-            )
+            );
+            crate::ui_script::wrap(el, || script_name("tool", tool))
         };
         let sep = || crate::ui::tool_separator().into_any_element();
         let group = |bar: gpui_kit::Div, group: &'static [Tool], cx: &mut Context<Self>| -> gpui_kit::Div {
@@ -4011,6 +4014,7 @@ impl PartStudioView {
                 face.label(),
                 crate::ui::split_tool_button(SharedString::from(format!("sk-{face:?}")), face.icon(), active == face, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(face, window, cx))),
             );
+            let main = crate::ui_script::wrap(main, || script_name("tool", face));
             let view = cx.entity();
             let members: Vec<Tool> = group.to_vec();
             let caret = crate::ui::tool_caret(SharedString::from(format!("skm-{:?}", group[0])), cx).dropdown_menu(move |mut menu, window, _| {
@@ -4031,6 +4035,7 @@ impl PartStudioView {
                 }
                 menu
             });
+            let caret = crate::ui_script::wrap(caret.into_any_element(), || script_name("caret", face));
             bar.child(crate::ui::tool_group(SharedString::from(format!("skg-{:?}", group[0])), main, caret))
         };
         let action_btn = |id: &'static str, icon: &'static str, tip: &'static str, action: Box<dyn Action>, cx: &mut Context<Self>| {

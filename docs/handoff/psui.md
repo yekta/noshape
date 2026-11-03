@@ -916,6 +916,10 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
   start zoom, so a clicked 30 mm line reads 29.73 in live and 29.99 in ours (sketch-dimension-*, circle-dimension:
   `.sketch.dimensions[].value` and the box's `focus.text`). For qa: type the length (value box) where a scenario
   compares a dimension, or the runner compares those within a pixel.
+- (08:40) With your `{"tool": X, "menu": Y}` (d41cb3d1), the sketch toolbar's tools and group carets are marked too
+  (`tool:<Onshape name>`, `caret:<face>`; sketch.rs). Your sketch-slot clicks two centres and a width, but live's Slot
+  works on an existing curve (behaviours "spec: skasm sketch Slot tool commit"; mine: sketch-slot-on-line), and your
+  sketch-tangent-arc's `a` is the 3 point arc (mine: sketch-tangent-arc-from-line, via the dropdown).
 - I added two optional state keys (README "undo", "sketch"; recorded by part_studio/ui_script.rs, compared by run.py
   once live records them).
 - (05:55) Sketch toolbar tools aren't marked for the driver (only the feature toolbar's `tool:` names), and the driver
