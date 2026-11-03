@@ -13,6 +13,10 @@ corner 1.11, drag frame 2.8, drag step 2.04 ms). GUI (my build): bolt-circle dra
 whatever the path; sketch Undo / Redo greyed on entering, Undo on after a drag.
 Numbers: drag probes 7 8/8, 9 6/6; edit 6/6; probes 1-6 all; batch 8 40/40; **batch 9 40/40 on its first answer**
 (live 1837, everyday profiles s501–s540 with tonight's rules); batches 1-9 1194 mm (k-sum, all in batches 1-3).
+End-of-day walk (02:20, green 8254441b, has tonight's drag work): sketch on Top (Undo / Redo greyed on entering; N
+then N again flips to Bottom as live), corner rectangle with live's glyphs, corner drag (Undo on after), assembly
+Revolute pin drag only spins it: no regressions (screens /root/skasm-scratch/walk1103/). Sent batch 10 (s541–s580,
+3 new kinds: isosceles triangle, one rounded corner, two-hole flange).
 Open (P2, need live data, nothing to guess): s6, s102 (probes 10), s218 / s236 / s226 (probes 11: s226's spline
 loop moves rigidly in live; s236's third quad down in live, up in ours; s218's chain turns only through k19), s209 / s11
 (probes 13 sent), s230 (tried keeping the Length side's Equal partner: worse elsewhere), s210 (an Angle with an H line
