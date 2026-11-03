@@ -200,6 +200,40 @@ fn sketch_undo_and_redo_follow_its_history(cx: &mut TestAppContext) {
     assert_eq!(state(cx), (true, false));
 }
 
+/// SKETCH-UNDO-REDO-STATE reopened (qa 11-03): a sketch started with no
+/// plane, Top then picked: Undo still off (picking the plane isn't a step),
+/// and off again after the only line is undone.
+#[gpui::test]
+fn picking_the_sketch_plane_is_not_an_undo_step(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "sk-undo-plane");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selection.clear();
+            v.start_feature("sketch", w, cx);
+        });
+    })
+    .unwrap();
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    draw(cx, window);
+    cx.update_window(window, |_, _, cx| {
+        let dialog = view.read(cx).edit.as_ref().unwrap().dialog.clone();
+        dialog.update(cx, |d, cx| d.add_pick(Reference::Plane(DatumPlane::Top), cx));
+    })
+    .unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some());
+    let state = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).draft_history_state());
+    assert_eq!(state(cx), (false, false));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+    draw(cx, window);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (640., 360.));
+    keys(cx, window, &["escape"]);
+    assert_eq!(state(cx), (true, false));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.draft_undo(false, w, cx))).unwrap();
+    draw(cx, window);
+    assert_eq!(state(cx), (false, true));
+}
+
 /// `=#len` in a Line's value box (a Variable `len` = 42 mm before the
 /// sketch): Enter makes a 42 mm dimension driven by the variable.
 #[gpui::test]

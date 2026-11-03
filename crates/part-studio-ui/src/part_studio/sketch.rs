@@ -295,6 +295,12 @@ impl PartStudioView {
                     self.sketch_fillet_radius = Some(ed.fillet_radius);
                 }
                 self.sketch = Some(SketchEditor::new(id, frame));
+                // The sketch's history starts here: picking its plane isn't
+                // a step (live: Undo off on entering the sketch, and off
+                // again once its only line is undone).
+                if let Some(e) = &mut self.edit {
+                    e.history = super::DraftHistory::new(&e.dialog.read(cx).feature);
+                }
                 let length = self.doc.read(cx).session.doc.settings.units.length;
                 let pending = self.sketch_pending_options.take();
                 if let Some(ed) = &mut self.sketch {
