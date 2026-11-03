@@ -134,11 +134,40 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let k = len_scale(&units);
     let r = regenerate_configured(od, tab, a)?;
     let ps = crate::doc::studio(od.doc(), tab)?;
+    // Each part's volume, area and box at once (each a whole-body
+    // integration or distance search: ~350 ms in a row for a filleted part).
+    let bodies = &r.context.bodies;
+    let volumes: Vec<std::sync::OnceLock<Option<noshape_kernel::MassProperties>>> = bodies.iter().map(|_| Default::default()).collect();
+    let areas: Vec<std::sync::OnceLock<Option<f64>>> = bodies.iter().map(|_| Default::default()).collect();
+    let boxes: Vec<std::sync::OnceLock<Option<noshape_kernel::BoundingBox>>> = bodies.iter().map(|_| Default::default()).collect();
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let tasks = 3 * bodies.len();
+    let workers = std::thread::available_parallelism().map_or(4, |n| n.get()).min(tasks);
+    std::thread::scope(|scope| {
+        for _ in 0..workers {
+            scope.spawn(|| {
+                loop {
+                    let t = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    if t >= tasks {
+                        break;
+                    }
+                    let b = &bodies[t / 3];
+                    match t % 3 {
+                        0 => _ = volumes[t / 3].set(matches!(b.kind, noshape_model::display::BodyKind::Solid).then(|| noshape_kernel::volume_properties(&b.shape).ok()).flatten()),
+                        1 => _ = areas[t / 3].set(b.shape.area().ok()),
+                        _ => _ = boxes[t / 3].set(b.shape.bounding_box(true).ok()),
+                    }
+                }
+            });
+        }
+    });
+    let measures = volumes.into_iter().zip(areas).zip(boxes).map(|((v, a), bb)| (v.into_inner().flatten(), a.into_inner().flatten(), bb.into_inner().flatten()));
     let out: Vec<Value> = r
         .context
         .bodies
         .iter()
-        .map(|b| {
+        .zip(measures)
+        .map(|(b, (volume, area, bbox))| {
             let d = r.display.body(&b.id);
             let shown = b.shape.shown_topology().unwrap_or_default();
             let mut v = json!({
@@ -156,16 +185,14 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 let s = |c: f32| crate::appearance::lin_to_srgb(c);
                 v["color"] = json!(format!("#{:02x}{:02x}{:02x}", s(d.color[0]), s(d.color[1]), s(d.color[2])));
             }
-            if matches!(b.kind, noshape_model::display::BodyKind::Solid)
-                && let Ok(mp) = noshape_kernel::volume_properties(&b.shape)
-            {
+            if let Some(mp) = volume {
                 v["volume"] = json!(r6(mp.mass * k * k * k));
                 v["centroid"] = pt(mp.center, k);
             }
-            if let Ok(area) = b.shape.area() {
+            if let Some(area) = area {
                 v["surface_area"] = json!(r6(area * k * k));
             }
-            if let Ok(bb) = b.shape.bounding_box(true) {
+            if let Some(bb) = bbox {
                 v["bounding_box"] = json!({ "min": pt(bb.min, k), "max": pt(bb.max, k) });
             }
             if let Some(p) = ps.part_properties.get(&b.id) {
