@@ -1177,6 +1177,9 @@ pub struct ModelEdge {
     /// Not an edge in Onshape's topology: the seam of a periodic face or a
     /// degenerated edge ([`noshape_kernel::Shape::shown_topology`]).
     pub seam: bool,
+    /// Its curve is free-form (a B-spline or other), not a line, circle or
+    /// ellipse.
+    pub freeform: bool,
 }
 
 impl ModelEdge {
@@ -2459,6 +2462,7 @@ struct ProjBody<'a> {
 fn model_edge(body: &Arc<Body>, edge_index: usize, frame: &ViewFrame, topo: &BodyTopo) -> Option<ModelEdge> {
     let e = body.shape.sub_shape(ShapeType::Edge, edge_index).ok()?;
     let info = e.edge_info().ok()?;
+    let freeform = !matches!(info.curve, Curve::Line { .. } | Curve::Circle { .. } | Curve::Ellipse { .. });
     let geom = match info.curve {
         Curve::Line { .. } => EdgeGeom::Line { a: frame.project(info.start), b: frame.project(info.end) },
         Curve::Circle { center, axis, radius, .. } => {
@@ -2500,7 +2504,7 @@ fn model_edge(body: &Arc<Body>, edge_index: usize, frame: &ViewFrame, topo: &Bod
     }
     // Not an edge in Onshape (a seam or degenerated edge; a sheet's boundary is one).
     let seam = !topo.shown.edges.get(edge_index).copied().unwrap_or(true);
-    Some(ModelEdge { body: body.id.clone(), name: body.edges[edge_index].clone(), geom, ends, seam })
+    Some(ModelEdge { body: body.id.clone(), name: body.edges[edge_index].clone(), geom, ends, seam, freeform })
 }
 
 /// Axes of (at least half) cylindrical faces perpendicular to the view

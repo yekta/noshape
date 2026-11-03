@@ -1657,6 +1657,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     for piece in map_polyline(&pl, &e.points) {
                         g.lines.push(Polyline2 { points: piece, style, closed: false, pick });
                     }
+                    if e.model.and_then(|m| geo.model_edges.get(m as usize)).is_some_and(|me| me.freeform) {
+                        g.freeform_lines.extend(l0..g.lines.len());
+                    }
                     if v.editing_edges && (marked || !e.visible) {
                         let lines = l0..g.lines.len();
                         if marked {
@@ -2795,6 +2798,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     }
     // Mirrors aren't views of this sheet (not picked, not listed).
     placements.retain(|p| !p.id.is_ghost());
+    // Looked up by binary search on export.
+    g.freeform_lines.sort_unstable();
+    g.freeform_lines.dedup();
     BuiltSheet { geometry: g, picks: picks.table, placements, resolved, dangling, lost, tables: table_layouts, title_rect, title_cells }
 }
 

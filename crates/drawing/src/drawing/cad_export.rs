@@ -677,7 +677,10 @@ impl Sheet<'_> {
         };
         let layer = self.g.cad_line_layer(li).name(self.upper).to_string();
         let (p3, k) = (|p| self.p3(p), self.k);
-        let mut e = match fit_curve(&l.points, l.closed, FIT_TOL) {
+        // A free-form model edge stays a spline though it looks like an
+        // ellipse (live 1857: a fillet's B-spline edges are SPLINEs).
+        let free = l.points.len() > 2 && self.g.freeform_lines.binary_search(&li).is_ok();
+        let mut e = match if free { None } else { fit_curve(&l.points, l.closed, FIT_TOL) } {
             Some(FitCurve::Circle { center, radius }) => EntityType::Circle(Circle::from_center_radius(p3(center), radius * k)),
             Some(FitCurve::Arc { center, radius, start, end }) => {
                 let mut e = Arc::new();
@@ -1557,8 +1560,9 @@ mod tests {
 
     /// A model edge that is no line, circle, arc or ellipse is a cubic SPLINE
     /// on its layer, ending on the edge's ends (live 1857: pipeflange-steven's
-    /// VISIBLE and TANGENT_LINES); a detail border stays a POLYLINE; a
-    /// centermark's lines carry their linetypes.
+    /// VISIBLE and TANGENT_LINES), also where its points look like an
+    /// ellipse when its curve is free-form; a detail border stays a POLYLINE;
+    /// a centermark's lines carry their linetypes.
     #[test]
     fn free_form_model_edges_are_splines() {
         let mut g = SheetGeometry::new(279.4, 215.9);
@@ -1573,12 +1577,21 @@ mod tests {
         g.line([100.0, 50.0], [102.0, 50.0], LineStyle::Thin);
         g.line([103.0, 50.0], [120.0, 50.0], LineStyle::Centerline);
         g.cad_since(m, CadLayer::Centermarks);
+        // An ellipse's points: an ELLIPSE, unless its model edge is free-form.
+        let ellipse: Vec<[f64; 2]> = (0..=24).map(|i| i as f64 * std::f64::consts::PI / 24.0).map(|t| [200.0 + 20.0 * t.cos(), 100.0 + 8.0 * t.sin()]).collect();
+        let m = g.mark();
+        g.lines.push(crate::drawing::sheet::Polyline2 { points: ellipse.clone(), style: LineStyle::Visible, closed: false, pick: 0 });
+        g.lines.push(crate::drawing::sheet::Polyline2 { points: ellipse.iter().map(|p| [p[0], p[1] - 40.0]).collect(), style: LineStyle::Visible, closed: false, pick: 0 });
+        g.cad_since(m, CadLayer::Visible);
+        g.freeform_lines.push(m.0 + 1);
         let doc = acadrust::DxfReader::from_reader(std::io::Cursor::new(to_dxf_version(&g, 4, DxfVersion::AC1014).unwrap())).unwrap().read().unwrap();
         let spline = doc.entities().find_map(|e| match e {
             EntityType::Spline(s) if s.common.layer == "VISIBLE" => Some(s.clone()),
             _ => None,
         }).expect("a SPLINE on VISIBLE");
         assert_eq!((spline.degree, spline.control_points.len(), spline.knots.len()), (3, 41, 45));
+        assert_eq!(doc.entities().filter(|e| matches!(e, EntityType::Ellipse(_))).count(), 1);
+        assert_eq!(doc.entities().filter(|e| matches!(e, EntityType::Spline(s) if s.control_points.len() == 25)).count(), 1);
         let ends = [spline.control_points[0], spline.control_points[40]];
         assert!((ends[0].x - 20.0).abs() < 1e-9 && (ends[1].x - 60.0).abs() < 1e-9 && (ends[1].y - wave[40][1]).abs() < 1e-9, "{ends:?}");
         assert!(doc.entities().any(|e| matches!(e, EntityType::Polyline2D(p) if p.common.layer == "DETAIL_VIEW_BORDER")));

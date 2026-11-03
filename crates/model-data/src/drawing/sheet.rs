@@ -134,6 +134,9 @@ pub struct SheetGeometry {
     /// (help exporting_a_drawing: "Strikethrough text needs Version 2013").
     pub struck_texts: Vec<std::ops::Range<usize>>,
     pub strike_lines: Vec<usize>,
+    /// Lines of model edges whose curve is free-form (no line, circle or
+    /// ellipse): CAD files write them as splines, whatever shape they make.
+    pub freeform_lines: Vec<usize>,
     /// Colored areas drawn under all the ink (pending revision rows).
     pub backdrops: Vec<(Vec<[f64; 2]>, [u8; 3])>,
     /// Translucent areas drawn over all the ink (a release watermark):
