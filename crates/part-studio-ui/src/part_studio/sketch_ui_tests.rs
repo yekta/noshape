@@ -675,6 +675,29 @@ fn row_keys_leave_the_feature_and_the_bar(cx: &mut TestAppContext) {
     assert_eq!(state["features"]["rows"][0]["hidden"], false, "{}", state["features"]);
 }
 
+/// Live (ui-parity new-extrude-then-other-tool, new-variable-enter-then-dblclick-other): another tool, or a double
+/// click on another feature, while a new feature's dialog is open keeps that feature as ✓ would.
+#[gpui::test]
+fn another_tool_keeps_the_open_feature(cx: &mut TestAppContext) {
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "other-tool", Some(block));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let names = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().map(|f| f.name.clone()).collect::<Vec<_>>());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("assignVariable", w, cx))).unwrap();
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Variable dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| d.set_value("name", noshape_model::ParamValue::Text("v1".into()), cx)));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let extrude = cx.update(|cx| view.read(cx).studio(cx).unwrap().features[1].id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(extrude, w, cx))).unwrap();
+    assert_eq!(names(cx).len(), 3, "the variable kept: {:?}", names(cx));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("cPlane", w, cx))).unwrap();
+    assert_eq!(cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.read(cx).feature.type_id.clone())).as_deref(), Some("cPlane"));
+    assert_eq!(names(cx).len(), 3, "the unchanged Extrude 1 as it was: {:?}", names(cx));
+}
+
 /// Live (ui-parity extrude-depth-variable-escape, 11-03): Esc with the autofill list open closes the list only;
 /// `#wall` and the focus stay in Depth (ours reverted the field and left it).
 #[gpui::test]

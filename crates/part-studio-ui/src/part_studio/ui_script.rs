@@ -27,6 +27,11 @@ impl PartStudioView {
             let mut f = crate::feature_dialog::field_focus("", st);
             f["label"] = Value::Null;
             f
+        } else if let Some(st) = self.palette.as_ref().map(|p| p.0.read(cx)).filter(|s| s.focus_handle(cx).is_focused(window)) {
+            let mut f = crate::feature_dialog::field_focus("", st);
+            f["kind"] = "search-tools".into();
+            f["label"] = Value::Null;
+            f
         } else if filter_focused {
             let text = self.ui.filter.as_ref().map(|f| f.0.read(cx).value().to_string()).unwrap_or_default();
             json!({ "kind": "filter", "label": "Filter by name or type", "text": text, "selection": null, "all": false })

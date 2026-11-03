@@ -2047,7 +2047,7 @@ impl PartStudioView {
     // ------------------------------------------------------------ editing
 
     /// A tool's shortcut. Live (ui 10-21 20:00): with a new dialog of the same
-    /// tool already open it changes nothing; another open dialog is replaced.
+    /// tool already open it changes nothing; another open dialog is accepted and replaced.
     fn shortcut_feature(&mut self, type_id: &str, window: &mut Window, cx: &mut Context<Self>) {
         if self.edit.as_ref().is_some_and(|e| e.is_new && e.dialog.read(cx).feature.type_id == type_id) {
             return;
@@ -2067,7 +2067,8 @@ impl PartStudioView {
             let regions = self.finish_sketch(window, cx);
             self.selection = regions;
         } else if self.edit.is_some() {
-            self.cancel_edit(window, cx);
+            // Live (ui-parity new-extrude-then-other-tool): the open feature is kept as with ✓.
+            self.accept_open_dialog(window, cx);
         }
         // Live 10-27 (SECTION-DIALOG-STACK): an open Section view dialog
         // closes as with ✓, the section staying on.
@@ -2122,8 +2123,9 @@ impl PartStudioView {
     }
 
     pub fn edit_feature(&mut self, id: FeatureId, window: &mut Window, cx: &mut Context<Self>) {
+        // Live (ui-parity new-variable-enter-then-dblclick-other): the open feature is kept as with ✓.
         if self.edit.is_some() {
-            self.cancel_edit(window, cx);
+            self.accept_open_dialog(window, cx);
         }
         let Some(studio) = self.studio(cx) else { return };
         let Some(index) = studio.index_of(id) else { return };

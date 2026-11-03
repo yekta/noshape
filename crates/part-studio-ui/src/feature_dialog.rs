@@ -1348,9 +1348,9 @@ impl FeatureDialog {
                 // The text just applied (a typed key's change arriving after Enter's commit rewrote it to
                 // "15 mm") is nothing being typed: no list (live ui-parity number-field-bare-number).
                 let applied = this.just_applied.take().is_some_and(|p| p == path_s) && this.baselines.get(&path_s).is_some_and(|b| *b == text);
-                // Number fields wait for their commit before the preview
-                // re-runs (live s2; as qa4's 66563c00); other text applies.
-                if this.spec_for_path(&path_s).is_some_and(|s| matches!(s.kind, ParamKind::Num(_))) {
+                // Number and text fields wait for their commit before the preview re-runs (live s2; as qa4's
+                // 66563c00; a Variable's name: ui-parity new-variable-then-use-at-once).
+                if this.spec_for_path(&path_s).is_some_and(|s| matches!(s.kind, ParamKind::Num(_) | ParamKind::Text { .. })) {
                     if this.set_text_value(&path_s, text) {
                         this.typed_pending = true;
                         cx.notify();
@@ -1391,6 +1391,7 @@ impl FeatureDialog {
                 if this.create_var.as_ref().is_none_or(|c| c.path != path_s) {
                     // Tab / click-away commits: the value gets its unit (live).
                     this.commit_number(&path_s, state, window, cx);
+                    this.baselines.insert(path_s.clone(), state.read(cx).value().to_string());
                     this.flush_typed(cx);
                 }
                 cx.notify();
@@ -1979,6 +1980,15 @@ impl FeatureDialog {
     /// ui-var/03: "#d = 0 mm").
     fn shown_feature(&self) -> Feature {
         let mut f = self.feature.clone();
+        // Typed text shows in the title and row once committed (live ui-parity new-variable-then-use-at-once: "#? =
+        // 0 mm" while the name is typed).
+        for s in self.ty.params.iter().filter(|s| matches!(s.kind, ParamKind::Text { .. })) {
+            let Some(ParamValue::Text(t)) = self.feature.params.get(s.id) else { continue };
+            let applied = self.applied_text(s.id, t);
+            if applied != *t {
+                f.params.set(s.id, ParamValue::Text(applied));
+            }
+        }
         for s in self.ty.params.iter().filter(|s| matches!(s.kind, ParamKind::Num(_))) {
             let Some(ParamValue::Expr(e)) = self.feature.params.get(s.id) else { continue };
             let applied = self.applied_text(s.id, &e.text);
