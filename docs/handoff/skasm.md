@@ -1203,6 +1203,9 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   together (or tell core it should stay as it is).
 
 ## Requests to the lead
+- 11-03 05:08: model `custom_features::fs_errors_match_onshape` failed once in the land queue (missing "units.fs 558:5
+  Precondition of operator< failed …") on a fixture-and-docs change of mine; it passes on vibe5 on the same tree and
+  the retry landed (b523880e): a flaky FS error-text test (not my area).
 - (11-01 20:30–23:33) main was red on psui's `a_shelled_face_is_highlighted_as_before` (green again at 45424566); the speed stack waited for it.
 - (11-01) Document audit D2: done without dx after all. ops' `drawing::old_state` (the drawing update icon's check) gives the out-of-date drawings; dx FYI: history-ui's Create version and the Workspace protection dialog now call it.
 - (11-01) Audit G31: the assembly (and Part Studio) Mass and section properties "Show calculation variance" needs an
