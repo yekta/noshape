@@ -1,0 +1,64 @@
+{
+ "name": "new-variable-then-use-at-once",
+ "about": "Variable tool, name wall_thickness, value 2 mm, Enter; at once edit Extrude 1 and type #wall + Enter in Depth (psui 11-03: a dialog opened before the variable's regeneration ended listed only New variable…)",
+ "area": "psui",
+ "source": "psui d5201a3f (the user's likely path)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Variable"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Name"
+   }
+  },
+  {
+   "do": "type",
+   "text": "wall_thickness"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Value"
+   }
+  },
+  {
+   "do": "type",
+   "text": "2"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "type",
+   "text": "#wall"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ],
+ "ticket": "VAR-AUTOCOMPLETE-ENTER"
+}

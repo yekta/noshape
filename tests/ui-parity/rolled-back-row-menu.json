@@ -1,0 +1,31 @@
+{
+ "name": "rolled-back-row-menu",
+ "about": "roll to Sketch 1, then right-click the rolled-back Extrude 1: Rename · Add selection to folder… · Suppress · Dynamic suppression · Roll to here · Roll to end · Delete (live; plus Add comment)",
+ "area": "psui",
+ "source": "qa live check 11-03",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Roll to here"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  }
+ ]
+}
