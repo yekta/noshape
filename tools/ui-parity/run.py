@@ -103,6 +103,22 @@ def all_differences(a, b, path=""):
     return [] if a == b else [(path, a, b)]
 
 
+# Cloud features noshape leaves out (AGENTS.md: comments, sharing…): not compared in live's menus.
+CLOUD_ONLY = {"Add comment"}
+
+
+def normalize_live(state):
+    """Live's state in the agreed form: cloud-only menu rows dropped, no highlighted row as null (live: -1)."""
+    lst = (state or {}).get("list")
+    if isinstance(lst, dict):
+        rows = lst.get("rows") or []
+        hl = lst.get("highlighted")
+        hl_row = rows[hl] if isinstance(hl, int) and 0 <= hl < len(rows) else None
+        lst["rows"] = [r for r in rows if r not in CLOUD_ONLY]
+        lst["highlighted"] = lst["rows"].index(hl_row) if hl_row in lst["rows"] else None
+    return state
+
+
 def compare(live, ours):
     """(matched steps, total steps, first difference or None)."""
     pairs = [("start", live.get("start"), ours.get("start"))]
@@ -112,6 +128,7 @@ def compare(live, ours):
         pairs.append((f"step {s.get('step')}", s.get("state"), o.get("state")))
     matched, first = 0, None
     for name, a, b in pairs:
+        a = normalize_live(json.loads(json.dumps(a)))
         a = {k: (a or {}).get(k) for k in KEYS}
         b = {k: (b or {}).get(k) for k in KEYS}
         d = first_difference(a, b)

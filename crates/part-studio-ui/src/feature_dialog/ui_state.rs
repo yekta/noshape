@@ -32,8 +32,19 @@ impl FeatureDialog {
         if let Some(c) = &self.create_var {
             return Self::create_var_inputs(c).into_iter().find(|(_, st, _)| st.read(cx).focus_handle(cx).is_focused(window)).map(|(l, st, _)| field_focus(l, st.read(cx)));
         }
+        // A select's closed field (live: its hidden input, no label), a selection field, a checkbox or a button.
+        if self.selects.values().any(|s| s.read(cx).has_focus(window)) {
+            return Some(json!({ "kind": "field", "label": null, "text": "", "selection": [0, 0], "all": false }));
+        }
+        if let Some((key, _)) = self.tab_stops.iter().find(|(_, h)| h.is_focused(window)) {
+            let label = match key.split_once(':') {
+                Some(("q" | "cb", path)) => self.spec_for_path(path).map(|s| crate::i18n::spec(s.label)),
+                _ => None,
+            };
+            return Some(json!({ "kind": "field", "label": label, "text": null, "selection": null, "all": false }));
+        }
         let Some(path) = self.inputs.keys().find(|p| self.input_of(p, window, cx).is_some_and(|i| i.0)) else {
-            // No text field has the keyboard: the active selection field has the focus (live).
+            // No control has the keyboard: the active selection field has the focus (live).
             let q = self.active_query.as_deref()?;
             let label = self.spec_for_path(q).map(|s| crate::i18n::spec(s.label)).unwrap_or_else(|| q.to_string());
             return Some(json!({ "kind": "field", "label": label, "text": null, "selection": null, "all": false }));

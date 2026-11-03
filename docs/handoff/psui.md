@@ -226,6 +226,11 @@ dump, the runner, live's first 20 scenarios run in ours and a first score.
   keeps the part) and turns the row red; the edited feature's hidden sketch row reads black. The other 7 differ only
   by the start: live built "Sketch 1 region 0" as a whole-sketch query ("Faces of Sketch 1"); asked live (REQUESTS
   11-03 00:50) to select the one region; they re-recorded the vars ones already.
+- Score 11-03 02:00: **25/29 scenarios, 135/141 states** (all live had recorded). Fixed on the way: a dialog's second
+  Enter didn't accept (Enter's own "\n" replaced the selected value: gpui-base patch), Tab's focus readout, autofill
+  function rows ("max("). The 4 left are live-runner artifacts (keys after a row click don't reach Onshape's list under
+  CDP; sketch dialog kind) — REQUESTS 11-03 02:00. Runner normalizes cloud-only menu rows (Add comment) and -1
+  highlights.
 - Open: whole-sketch picks (Onshape's sketch-row pick persists as "Faces of Sketch 1" and follows new regions; ours
   stores the regions): model gap, see Requests to the lead. Targets not resolvable yet: a chip's ×, a row's eye, view
   cube faces, tools only in a toolbar dropdown, "Section view" (not a toolbar tool in ours).

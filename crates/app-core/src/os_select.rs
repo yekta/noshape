@@ -127,6 +127,11 @@ impl OsSelect {
         self.focus.get_or_insert_with(|| cx.focus_handle().tab_stop(true)).clone()
     }
 
+    /// The closed field has the keyboard (a Tab stop).
+    pub fn has_focus(&self, window: &Window) -> bool {
+        self.focus.as_ref().is_some_and(|f| f.is_focused(window))
+    }
+
     pub fn is_open(&self) -> bool {
         self.search.is_some()
     }
