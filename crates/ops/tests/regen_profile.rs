@@ -792,3 +792,28 @@ fn tolerance_by_feature() {
     }
     let _ = std::fs::remove_file(&copy);
 }
+
+/// A document's bodies after one feature written as BREP (NOSHAPE_BODY_DOC, NOSHAPE_BODY_UPTO = the feature's name):
+/// `<doc>.<feature>.<i>.brep`, for kernel probes.
+#[test]
+#[ignore = "T2 tool: NOSHAPE_BODY_DOC"]
+fn bodies_after_feature() {
+    let (Ok(path), Ok(upto)) = (std::env::var("NOSHAPE_BODY_DOC"), std::env::var("NOSHAPE_BODY_UPTO")) else { return };
+    let tmp = std::env::temp_dir().join(format!("noshape-bodies-{}.noshape", std::process::id()));
+    std::fs::copy(&path, &tmp).unwrap();
+    let s = noshape_ops::session::Session::open(&tmp).unwrap();
+    let units = s.doc.settings.units;
+    for tab in &s.doc.tabs {
+        let TabContent::PartStudio(ps) = &tab.content else { continue };
+        let Some(k) = ps.features.iter().position(|f| f.name == upto) else { continue };
+        let mut p = ps.clone();
+        p.features.truncate(k + 1);
+        let r = Regenerator::new().regenerate(&p, &ConfigValues::default(), &units, &RegenOptions::default());
+        for (i, b) in r.context.bodies.iter().enumerate() {
+            let out = format!("{path}.{upto}.{i}.brep");
+            noshape_kernel::write_brep(&b.shape, std::path::Path::new(&out)).unwrap();
+            println!("wrote {out}");
+        }
+    }
+    let _ = std::fs::remove_file(&tmp);
+}

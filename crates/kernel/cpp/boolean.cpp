@@ -1690,6 +1690,218 @@ TopoDS_Shape merge_cylinder_bands(const TopoDS_Shape& s, HHist& hist)
   return s;
 }
 
+// A cylinder band between two end circles whose seam runs into its other edges (a hole through a tube across the
+// tube's seam: the hole's loops split where the seam meets them, dx's CUT-CLOSED-EDGES-SPLIT; Parasolid's faces have no
+// seams, live's loops are whole): the seam moved to the widest angle no other edge reaches, the end circles' vertices
+// with it, the other edges the face's inner wires. One face at a time; the shape unchanged where nothing applies or
+// the result isn't valid with the same volume.
+TopoDS_Shape move_seams_off_holes(const TopoDS_Shape& s, HHist& hist)
+{
+  for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More(); fx.Next())
+  {
+    const TopoDS_Face                    a = TopoDS::Face(fx.Current().Oriented(TopAbs_FORWARD));
+    TopLoc_Location                      la;
+    occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(a, la));
+    if (cs.IsNull())
+      continue;
+    const gp_Cylinder ca = cs->Cylinder().Transformed(la.Transformation());
+    // Its seams, end circles (closed edges round the axis) and the rest.
+    std::vector<TopoDS_Edge> seams, ends, rest;
+    ShapeIMap                seen;
+    bool                     ok = true;
+    for (TopExp_Explorer x(a, TopAbs_EDGE); x.More() && ok; x.Next())
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+      if (seen.Contains(e))
+        continue;
+      seen.Add(e);
+      if (BRep_Tool::IsClosed(e, a))
+      {
+        seams.push_back(e);
+        continue;
+      }
+      TopoDS_Vertex v0, v1;
+      TopExp::Vertices(e, v0, v1);
+      BRepAdaptor_Curve c(e);
+      if (!v0.IsNull() && v0.IsSame(v1) && c.GetType() == GeomAbs_Circle && c.Circle().Axis().Direction().IsParallel(ca.Axis().Direction(), 1e-9))
+        ends.push_back(e);
+      else
+        rest.push_back(e);
+    }
+    if (seams.empty() || ends.size() != 2 || rest.empty())
+      continue;
+    // Only where a seam meets the other edges.
+    ShapeIMap rest_v;
+    for (const TopoDS_Edge& e : rest)
+      for (TopExp_Explorer v(e, TopAbs_VERTEX); v.More(); v.Next())
+        rest_v.Add(v.Current());
+    bool touches = false;
+    for (const TopoDS_Edge& e : seams)
+      for (TopExp_Explorer v(e, TopAbs_VERTEX); v.More() && !touches; v.Next())
+        touches = rest_v.Contains(v.Current());
+    if (!touches)
+      continue;
+    double u0, u1, v0f, v1f;
+    BRepTools::UVBounds(a, u0, u1, v0f, v1f);
+    if (std::abs(u1 - u0 - 2 * M_PI) > 1e-9)
+      continue;
+    // The angles the other edges cover (their curves on the face, sampled): the new seam in the widest gap.
+    std::vector<double> us;
+    for (const TopoDS_Edge& e : rest)
+    {
+      double                          f2, l2;
+      const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, a, f2, l2);
+      if (pc.IsNull())
+      {
+        ok = false;
+        break;
+      }
+      for (int k = 0; k <= 32; ++k)
+        us.push_back(u0 + std::fmod(std::fmod(pc->Value(f2 + (l2 - f2) * k / 32.0).X() - u0, 2 * M_PI) + 2 * M_PI, 2 * M_PI));
+    }
+    if (!ok || us.empty())
+      continue;
+    std::sort(us.begin(), us.end());
+    double gap = us.front() + 2 * M_PI - us.back(), alpha = us.back() + gap / 2;
+    for (size_t k = 0; k + 1 < us.size(); ++k)
+      if (us[k + 1] - us[k] > gap)
+      {
+        gap   = us[k + 1] - us[k];
+        alpha = us[k] + gap / 2;
+      }
+    if (gap < 1e-3)
+      continue;
+    const double  r = ca.Radius();
+    const gp_Ax3& A = ca.Position();
+    auto          v_of = [&](const TopoDS_Edge& e) {
+      BRepAdaptor_Curve c(e);
+      double            u, v;
+      ElSLib::Parameters(ca, c.Value(c.FirstParameter()), u, v);
+      return v;
+    };
+    const bool   first_low = v_of(ends[0]) < v_of(ends[1]);
+    const double lo = v_of(ends[first_low ? 0 : 1]), hi = v_of(ends[first_low ? 1 : 0]);
+    BRep_Builder B;
+    double       tol = BRep_Tool::Tolerance(a);
+    for (const TopoDS_Edge& e : ends)
+      tol = std::max(tol, BRep_Tool::Tolerance(e));
+    // The end circles again, their vertex at alpha, their parameter the cylinder's u.
+    const gp_Dir n = gp_Dir(gp_Vec(A.XDirection()).Crossed(gp_Vec(A.YDirection())));
+    auto         ring = [&](double v, TopoDS_Vertex& vx) {
+      B.MakeVertex(vx, ElSLib::Value(alpha, v, ca), tol);
+      occ::handle<Geom_Circle> circ = new Geom_Circle(gp_Ax2(A.Location().Translated(gp_Vec(A.Direction()) * v), n, A.XDirection()), r);
+      TopoDS_Edge              e;
+      B.MakeEdge(e, circ, tol);
+      B.Add(e, vx.Oriented(TopAbs_FORWARD));
+      B.Add(e, vx.Oriented(TopAbs_REVERSED));
+      B.Range(e, alpha, alpha + 2 * M_PI);
+      return e;
+    };
+    TopoDS_Vertex     vlo, vhi;
+    const TopoDS_Edge low = ring(lo, vlo), top = ring(hi, vhi);
+    occ::handle<Geom_Line> line = new Geom_Line(ElSLib::Value(alpha, lo, ca), A.Direction());
+    TopoDS_Edge            seam;
+    B.MakeEdge(seam, line, tol);
+    B.Add(seam, vlo.Oriented(TopAbs_FORWARD));
+    B.Add(seam, vhi.Oriented(TopAbs_REVERSED));
+    B.Range(seam, 0, hi - lo);
+    // (On a copy of the surface: the edges keep their curves on the old face, whatever comes of this.)
+    TopoDS_Face F;
+    B.MakeFace(F, occ::down_cast<Geom_Surface>(BRep_Tool::Surface(a, la)->Copy()), la, BRep_Tool::Tolerance(a));
+    B.UpdateEdge(low, new Geom2d_Line(gp_Pnt2d(0, lo), gp_Dir2d(1, 0)), F, tol);
+    B.Range(low, F, alpha, alpha + 2 * M_PI);
+    B.UpdateEdge(top, new Geom2d_Line(gp_Pnt2d(0, hi), gp_Dir2d(1, 0)), F, tol);
+    B.Range(top, F, alpha, alpha + 2 * M_PI);
+    B.UpdateEdge(seam, new Geom2d_Line(gp_Pnt2d(alpha + 2 * M_PI, lo), gp_Dir2d(0, 1)), new Geom2d_Line(gp_Pnt2d(alpha, lo), gp_Dir2d(0, 1)), F, tol);
+    B.Range(seam, F, 0, hi - lo);
+    TopoDS_Wire W;
+    B.MakeWire(W);
+    B.Add(W, low);
+    B.Add(W, seam.Oriented(TopAbs_FORWARD));
+    B.Add(W, top.Reversed());
+    B.Add(W, seam.Oriented(TopAbs_REVERSED));
+    B.Add(F, W);
+    // The other edges, as the face uses them, a whole number of turns into (alpha, alpha + 2 pi), in loops.
+    std::vector<TopoDS_Edge> uses;
+    for (TopoDS_Iterator w(a); w.More(); w.Next())
+      for (TopoDS_Iterator x(w.Value()); x.More(); x.Next())
+        for (const TopoDS_Edge& e : rest)
+          if (x.Value().IsSame(e))
+            uses.push_back(TopoDS::Edge(x.Value()));
+    for (const TopoDS_Edge& e : rest)
+    {
+      double                    f2, l2;
+      occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, a, f2, l2);
+      const double              um = pc->Value(0.5 * (f2 + l2)).X();
+      const double              k  = std::floor((alpha + 2 * M_PI - um) / (2 * M_PI));
+      if (k != 0)
+        pc = occ::down_cast<Geom2d_Curve>(pc->Translated(gp_Vec2d(2 * M_PI * k, 0)));
+      B.UpdateEdge(e, pc, F, BRep_Tool::Tolerance(e));
+      B.Range(e, F, f2, l2);
+    }
+    std::vector<bool> used(uses.size(), false);
+    for (size_t k = 0; k < uses.size() && ok; ++k)
+    {
+      if (used[k])
+        continue;
+      TopoDS_Wire hole;
+      B.MakeWire(hole);
+      size_t              at    = k;
+      const TopoDS_Vertex start = TopExp::FirstVertex(uses[k], true);
+      while (ok)
+      {
+        used[at] = true;
+        B.Add(hole, uses[at]);
+        const TopoDS_Vertex end = TopExp::LastVertex(uses[at], true);
+        if (end.IsSame(start))
+          break;
+        size_t next = uses.size();
+        for (size_t j = 0; j < uses.size() && next == uses.size(); ++j)
+          if (!used[j] && TopExp::FirstVertex(uses[j], true).IsSame(end))
+            next = j;
+        if (next == uses.size())
+          ok = false;
+        at = next;
+      }
+      hole.Closed(true);
+      B.Add(F, hole);
+    }
+    if (!ok || !BRepCheck_Analyzer(F).IsValid())
+      continue;
+    occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+    rs->Replace(a, F);
+    for (size_t k = 0; k < 2; ++k)
+    {
+      const TopoDS_Edge&  old   = ends[k];
+      const TopoDS_Edge&  made  = (k == 0) == first_low ? low : top;
+      BRepAdaptor_Curve   old_c(old);
+      const bool          same  = old_c.Circle().Axis().Direction().Dot(gp_Vec(n)) > 0;
+      rs->Replace(old.Oriented(TopAbs_FORWARD), same ? made : TopoDS::Edge(made.Reversed()));
+    }
+    const TopoDS_Shape out = rs->Apply(s);
+    if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+      continue;
+    GProp_GProps g0, g1;
+    BRepGProp::VolumeProperties(s, g0);
+    BRepGProp::VolumeProperties(out, g1);
+    // (The same faces bounded otherwise: only the integration's noise, 3e-6 of the volume with the loops' B-splines.)
+    if (std::abs(g1.Mass() - g0.Mass()) > 1e-5 * std::abs(g0.Mass()))
+      continue;
+    if (hist.IsNull())
+      hist = new BRepTools_History();
+    HHist h = rs->History();
+    if (h.IsNull())
+      h = new BRepTools_History();
+    if (h->Modified(a).IsEmpty())
+      h->AddModified(a, F);
+    for (const TopoDS_Edge& e : seams)
+      h->Remove(e);
+    hist->Merge(h);
+    return move_seams_off_holes(out, hist);
+  }
+  return s;
+}
+
 // Faces on one cylinder whose frames differ (seams apart, either hand: a hole through a boss in a mirrored plate,
 // the plate's two half walls and the boss's), or any such faces with `any_frame` (after USD: those it left apart),
 // sharing edges, the group's edges used once two closed chains round it or one loop on a part of it: OCCT's unify
@@ -2592,7 +2804,66 @@ TopoDS_Shape merge_cylinder_patches(const TopoDS_Shape& s, HHist& hist)
 
 // The unify, looking only in `sc` when given (UnifyScope); `clean` (when
 // given) says whether the result has nothing more to merge.
+TopoDS_Shape unify_faces_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean);
+
+// A loop's pieces left meeting at vertices of just two curved edges between the same two faces (once a seam moved off
+// them): joined, B-splines concatenated. `s` when there are none or the result isn't valid with the same volume.
+TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist)
+{
+  ShapeAncMap ve, ef;
+  unique_ancestors(s, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  unique_ancestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+  bool any = false;
+  for (int i = 1; i <= ve.Extent() && !any; ++i)
+  {
+    const ShapeList& es = ve(i);
+    if (es.Extent() != 2)
+      continue;
+    const TopoDS_Edge a = TopoDS::Edge(es.First()), b = TopoDS::Edge(es.Last());
+    if (BRep_Tool::Degenerated(a) || BRep_Tool::Degenerated(b) || BRepAdaptor_Curve(a).GetType() == GeomAbs_Line || BRepAdaptor_Curve(b).GetType() == GeomAbs_Line)
+      continue;
+    const ShapeList *fa = ef.Seek(a), *fb = ef.Seek(b);
+    any = fa != nullptr && fb != nullptr && fa->Extent() == 2 && fb->Extent() == 2 &&
+          ((fa->First().IsSame(fb->First()) && fa->Last().IsSame(fb->Last())) || (fa->First().IsSame(fb->Last()) && fa->Last().IsSame(fb->First())));
+  }
+  if (!any)
+    return s;
+  const KernelTimer            timer("unify.loop_pieces");
+  BRepBuilderAPI_Copy          cp(s, true, false);
+  ShapeUpgrade_UnifySameDomain u(cp.Shape(), true, false, true);
+  u.Build();
+  if (u.Shape().IsSame(cp.Shape()) || !BRepCheck_Analyzer(u.Shape()).IsValid())
+    return s;
+  GProp_GProps g0, g1;
+  BRepGProp::VolumeProperties(s, g0);
+  BRepGProp::VolumeProperties(u.Shape(), g1);
+  if (std::abs(g1.Mass() - g0.Mass()) > 1e-5 * std::abs(g0.Mass()))
+    return s;
+  if (hist.IsNull())
+    hist = new BRepTools_History();
+  hist->Merge(new BRepTools_History(to_list(std::vector<TopoDS_Shape>{s}), cp));
+  hist->Merge(u.History());
+  return u.Shape();
+}
+
 TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean)
+{
+  const TopoDS_Shape s = unify_faces_in(s0, hist, sc, clean);
+  if (!TopExp_Explorer(s, TopAbs_SOLID).More())
+    return s;
+  TopoDS_Shape moved;
+  {
+    const KernelTimer timer("unify.seams");
+    moved = move_seams_off_holes(s, hist);
+  }
+  if (moved.IsSame(s))
+    return s;
+  if (clean != nullptr)
+    *clean = false;
+  return join_loop_pieces(moved, hist);
+}
+
+TopoDS_Shape unify_faces_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean)
 {
   if (clean != nullptr)
     *clean = false;

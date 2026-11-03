@@ -1119,7 +1119,7 @@ pub fn thicken(ev: &mut EvalCtx) -> FResult<()> {
     // The slabs' and fills' faces on one plane are one face (live L17: 8).
     for t in tools.iter_mut() {
         let un = k::unify_same_domain(&t.shape)?;
-        if un.shape.count(ShapeType::Face) < t.shape.count(ShapeType::Face) {
+        if crate::regen::eval::unify_merged(&t.shape, &un.shape) {
             let before = crate::regen::eval::names_for(&t.shape, t.names.faces.clone());
             let names = ev.name_result(&[&before], &un.history, &un.shape, &BTreeMap::new(), None);
             *t = NamedShape::new(un.shape, names);
@@ -1384,7 +1384,7 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
             // Like Parasolid, the rib's faces on the part's surfaces are the
             // part's (live "kern (10-23 23:00)" R1: 11 faces).
             let un = k::unify_same_domain(&res.shape)?;
-            let (shape, names) = if un.shape.count(ShapeType::Face) < res.shape.count(ShapeType::Face) {
+            let (shape, names) = if crate::regen::eval::unify_merged(&res.shape, &un.shape) {
                 let before = crate::regen::eval::names_for(&res.shape, names);
                 let names = ev.name_result(&[&before], &un.history, &un.shape, &BTreeMap::new(), None);
                 (un.shape, names)

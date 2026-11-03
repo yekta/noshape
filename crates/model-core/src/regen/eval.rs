@@ -957,7 +957,7 @@ impl<'a> EvalCtx<'a> {
         // surface are one face (qa5 SF2: two adjacent regions extruded, 6
         // faces, no seam).
         let unified = k::unify_same_domain(&res.shape)?;
-        if unified.shape.count(ShapeType::Face) < res.shape.count(ShapeType::Face) {
+        if unify_merged(&res.shape, &unified.shape) {
             let before = unify_input_names(face_names);
             let names = self.name_result(&[&before], &unified.history, &unified.shape, &BTreeMap::new(), None);
             return Ok(split_solids(&unified.shape, &names, Some(self.feature)));
@@ -1083,7 +1083,7 @@ impl<'a> EvalCtx<'a> {
             // the boolean: a block added flush with a face leaves one face.
             let unified = k::unify_same_domain(&res.shape)?;
             let t_unified = t0.elapsed();
-            let (res, face_names) = if unified.shape.count(ShapeType::Face) < res.shape.count(ShapeType::Face) {
+            let (res, face_names) = if unify_merged(&res.shape, &unified.shape) {
                 let before = unify_input_names(face_names);
                 let names = self.name_result(&[&before], &unified.history, &unified.shape, &BTreeMap::new(), None);
                 (unified, names)
@@ -1159,7 +1159,7 @@ impl<'a> EvalCtx<'a> {
         let arg_refs: Vec<&ShapeNames> = args.iter().collect();
         let face_names = self.name_result(&arg_refs, &res.history, &res.shape, &BTreeMap::new(), None);
         let unified = k::unify_same_domain(&res.shape)?;
-        let (shape, face_names) = if unified.shape.count(ShapeType::Face) < res.shape.count(ShapeType::Face) {
+        let (shape, face_names) = if unify_merged(&res.shape, &unified.shape) {
             let before = unify_input_names(face_names);
             let names = self.name_result(&[&before], &unified.history, &unified.shape, &BTreeMap::new(), None);
             (unified.shape, names)
@@ -1541,6 +1541,11 @@ pub fn sweep_names(ev: &EvalCtx, profile: &Profile, res: &k::OpResult, start_cap
     }
     let empty = ShapeNames::default();
     ev.name_result(&[&empty], &res.history, &res.shape, &roles, None)
+}
+
+/// Whether a unify merged anything: faces, or edges only (a hole's loop in pieces across a seam made whole).
+pub fn unify_merged(before: &Shape, after: &Shape) -> bool {
+    after.count(ShapeType::Face) < before.count(ShapeType::Face) || after.count(ShapeType::Edge) < before.count(ShapeType::Edge)
 }
 
 /// Whether the tools can account for a cut that leaves nothing of `target`

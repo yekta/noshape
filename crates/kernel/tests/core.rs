@@ -573,3 +573,42 @@ fn mass_property_bounds_are_small_and_cover_every_value() {
     let b = mass_property_bounds(&edges[0], PropsKind::Linear).unwrap();
     assert!(b.mass >= 0.0 && b.mass < 1e-12, "a line's length ±{}", b.mass);
 }
+
+/// CUT-CLOSED-EDGES-SPLIT (dx's bushing2-0-joshua, live 5/6/0: each loop of the hole one closed edge): a tube r37.5 /
+/// r25 along y, its seam at +z, an r5 hole down z through its top wall; noshape's Boolean and OCCT's.
+#[test]
+fn a_hole_across_a_tubes_seam_leaves_whole_loops() {
+    let mm = 1e-3;
+    let frame = Plane::new(glam::DVec3::new(0.0, -12.5 * mm, 0.0), glam::DVec3::Y, glam::DVec3::Z);
+    let tube = cut(&make_cylinder(&frame, 37.5 * mm, 25.0 * mm, 2.0 * PI).unwrap(), &make_cylinder(&frame, 25.0 * mm, 25.0 * mm, 2.0 * PI).unwrap()).unwrap().shape;
+    let hole = make_cylinder(&Plane::new(glam::DVec3::ZERO, glam::DVec3::Z, glam::DVec3::X), 5.0 * mm, 50.0 * mm, 2.0 * PI).unwrap();
+    for rust in [true, false] {
+        set_rust_boolean(Some(rust));
+        let r = unify_same_domain(&cut(&tube, &hole).unwrap().shape).unwrap().shape;
+        set_rust_boolean(None);
+        assert!(r.is_valid());
+        let shown = r.shown_topology().unwrap();
+        let counts = (r.faces().len(), shown.edges.iter().filter(|e| **e).count(), shown.vertices.iter().filter(|v| **v).count());
+        assert_eq!(counts, (5, 6, 0), "rust {rust}");
+        let v = volume_properties(&r).unwrap().mass / (mm * mm * mm);
+        assert!((v - 60374.1).abs() < 0.5, "{v}");
+    }
+}
+
+/// A BREP's counts as Onshape's and its edges (NOSHAPE_BREP_EDGES = the file).
+#[test]
+#[ignore = "T2 probe: NOSHAPE_BREP_EDGES"]
+fn brep_edges_probe() {
+    let Ok(path) = std::env::var("NOSHAPE_BREP_EDGES") else { return };
+    let mm = 1e-3;
+    let r = read_brep(std::path::Path::new(&path)).unwrap();
+    let shown = r.shown_topology().unwrap();
+    println!("{} / {} / {}", r.faces().len(), shown.edges.iter().filter(|e| **e).count(), shown.vertices.iter().filter(|v| **v).count());
+    for (i, f) in r.faces().iter().enumerate() {
+        println!("F{i} {}", format!("{:?}", f.face_surface().ok()).chars().take(110).collect::<String>());
+    }
+    for (i, e) in r.edges().iter().enumerate() {
+        let x = e.edge_info().unwrap();
+        println!("  E{i} shown {} {} {:.3?} -> {:.3?} len {:.4}", shown.edges[i], format!("{:?}", x.curve).chars().take(10).collect::<String>(), x.start / mm, x.end / mm, x.length / mm);
+    }
+}
