@@ -3047,7 +3047,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   unbudgeted, and nothing came of it); it has 3 s now (kernel ScopedDeadline): the fillet fails in 3.1 s. OCCT's own
   attempts fail in 54 ms: R2.5 on both long edges of a 5 mm face, a full round with vertex blends at the rib's ends.
   Left: building it as live (live's geometry for this document pending, dx).
-- [ ] P2 SKETCH-FACE-FRAME (core; dx's parity suite 11-03) a sketch on a part face gets another x axis than live's in
+- [x] (core 11-03 14:50: live 1897's rule, from the normal alone (±Z: x = +X; else y = +Z projected, x = y × n), for sketches and planes on faces (eval.rs raw_plane) and FeatureScript's evPlane (host query.rs); ScopeRule 8, studios saved with features before keep OCCT's (PartStudio::legacy_face_frames). exercise-martinl and learning-center-devon match live to the end; T1 model kernel_robustness::a_sketch_on_a_face_takes_onshapes_frame. Left: evPlane's origin is the face's box centre in live (ours the parameter box's middle), and sheet metal flanges (bracket00-ira's) untested) P2 SKETCH-FACE-FRAME (core; dx's parity suite 11-03) a sketch on a part face gets another x axis than live's in
   3 of the corpus's face sketches (the origin and normal agree; live's frames are features.json `sketches`
   transformMatrix): exercise-martinl Sketch 2 on a −X side face: ours x (0, 0, −1), y (0, −1, 0), live x (0, −1, 0),
   y (0, 0, 1) (turned 90°); exercise-martinl Sketch 3 on the top face (z 11): ours x (−1, 0, 0), live (1, 0, 0);
