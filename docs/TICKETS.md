@@ -347,7 +347,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   /root/parity/models (`parity_models`, NOSHAPE_PARITY_ONLY=<name>). The same with NOSHAPE_BOOL_RUST=0 (OCCT's cut).
   What it changes beyond counts (dx 11-03): a click picks one piece where live picks the loop; a Fillet (r 1,
   tangent propagation on) of one piece still rounds the whole loop (−8.5 mm³) but as 3 faces (5 → 8 faces), live 1.
-  core 11-03 08:40 (tried, not kept): UnifySameDomain on edges only with B-splines concatenated, wherever a vertex joins
+  core 11-03 06:38 (tried, not kept): UnifySameDomain on edges only with B-splines concatenated, wherever a vertex joins
   just two curved edges between the same two faces, after the face unify: no change on the three models (their
   loops' vertices are where the cylinders' seam edges cross them, three edges each, so nothing to join; live's
   faces have no seams) and two bool_patterns volumes moved. One closed edge per loop needs the seams moved onto one
@@ -357,7 +357,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   its other half across a 6 mm groove; Onshape's query keeps both halves): live 22/60/40 faces/edges/vertices, one
   fillet face per corner spanning z −10…10 (64.89 / 73.15 mm²); ours 34/88/56. Volume equal (26334.64 mm³), area
   9352.88 mm² vs live 9351.62.
-  core 11-03 09:00 (looked, not fixed): ours is 8 fillet cylinders (31.54 / 34.43 mm², one per 7 mm piece) and 8
+  core 11-03 06:45 (looked, not fixed): ours is 8 fillet cylinders (31.54 / 34.43 mm², one per 7 mm piece) and 8
   sliver planes (0.002 / 0.02 mm²) where they end on the groove's floor and ceiling (z ±3); live's 4 faces are one
   cylinder per corner over both pieces (a face in two pieces, which OCCT doesn't make), and each is ~0.4 mm longer
   than our two together (64.89 vs 2 × 31.54 = 63.08). Next: why ours stops short of the groove planes (the
@@ -2130,7 +2130,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   untitled-document-chris Sketch 2 (one 15 mm line across a face): Extrude 2 Remove picks the face piece on one side
   of it. Ours: no such region, "Select face or sketch region to extrude.". Models in /root/parity/models (run
   `parity_models` with NOSHAPE_PARITY_ONLY=clamp-hms, docs/PARITY-SUITES.md).
-  core 11-03 07:50 (queued): **live's rule** (core's REST probe, Part Studio "core imprint probe 1" in "live 1812
+  core 11-03 06:20: **live's rule** (core's REST probe, Part Studio "core imprint probe 1" in "live 1812
   drawing scale"): the face's edges (outer and holes) split the sketch's own regions, and the face's pieces outside
   them are sketch faces too (qCreatedBy(sketch, FACE)), but **qSketchRegion is only the pieces inside the sketch's
   own loops** (a Ø10 circle inside the face: faces 78.54 + 2321.46 mm², qSketchRegion 1; a line across: 1200 + 1200,
@@ -2144,7 +2144,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   imprinted edges and vertices yet. Live 1852 (behaviours "core (2026-11-03, P1 SKETCH-FACE-IMPRINT)") confirms the
   rest as ours: a feature-list pick takes the circle only ("Faces of A inside"), the face piece is picked by hovering
   the face ("Face of A inside"), sketch mode shades neither at rest. Cost: +12 ms for 400 circles on a face.
-- [x] (core 11-03 08:10: one line's pieces in a region's boundary are one profile edge, as one circle's arcs were: the box is 6/12/8 (T1 kernel_robustness::a_line_over_a_profiles_side_leaves_it_one_face) and bracket120's Extrude 1 matches live; its Extrude 2 (Add of two regions) then differs: 10003.57 mm³ vs live 7948.5, the regions picked, for dx) P2 EXTRUDE-OVERLAP-LINES-FACES (skasm + core; dx's parity suite 11-03) sketch lines lying over a profile's edge
+- [x] (core 11-03 06:30: one line's pieces in a region's boundary are one profile edge, as one circle's arcs were: the box is 6/12/8 (T1 kernel_robustness::a_line_over_a_profiles_side_leaves_it_one_face) and bracket120's Extrude 1 matches live; its Extrude 2 (Add of two regions) then differs: 10003.57 mm³ vs live 7948.5, the regions picked, for dx) P2 EXTRUDE-OVERLAP-LINES-FACES (skasm + core; dx's parity suite 11-03) sketch lines lying over a profile's edge
   split its side face: bracket120-datenkrake Extrude 1 (an L profile whose bottom edge at y = 0 is overlapped by
   short lines and a small rectangle's edge): live 10/24/16 faces/edges/vertices, ours 14/36/24, the bottom side in
   5 faces. Repro without live: rectangle (0,0)–(100,50) on Top plus a line (40,0)–(60,0), Extrude the region 10 mm →
