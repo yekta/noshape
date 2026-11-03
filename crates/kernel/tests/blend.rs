@@ -1036,8 +1036,12 @@ fn dumped_fillet_faces_probe() {
         let x = e.edge_info().unwrap();
         println!("edge {:.4?} -> {:.4?}", x.start / MM, x.end / MM);
     }
+    // (noshape's own blend as the app has it: on.)
+    set_rust_blend(Some(true));
     let out = fillet_checked(&s, &es, &vec![r; es.len()]).unwrap().shape;
+    set_rust_blend(None);
     println!("faces {}, volume {:.6}, area {:.6}", out.faces().len(), vol_mm3(&out), out.area().unwrap() / (MM * MM));
+    println!("noshape's blend: {:?}, then {:?}", last_blend_decline(), last_rust_decline());
     for (i, f) in out.faces().iter().enumerate() {
         let c = f.centroid().unwrap() / MM;
         let a = f.area().unwrap() / (MM * MM);
