@@ -228,7 +228,7 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
     let result_type = ev.enum_("resultType").to_string();
     match result_type.as_str() {
         "IMPRINT" => {
-            let Some((bi, _)) = dst_face else { return err("Split needs a target face of a part") };
+            let Some((bi, _)) = dst_face else { return err("Trim and Imprint require the destination to be defined by a face.") };
             let body = ev.ctx.bodies[bi].clone();
             let edges: Vec<Shape> = out_faces.iter().flat_map(|f| f.edges()).collect();
             let imp = k::imprint(&body.shape, &edges).map_err(|_| fe("Failed to imprint edges onto destination face."))?;
@@ -255,7 +255,7 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
             if rt == "SOLID" {
                 let t = ev.length("thickness")?;
                 if t <= 0.0 {
-                    return err("Thickness must be positive");
+                    return crate::regen::eval::err_at(&["thickness"], "Error regenerating: a parameter is out of range.");
                 }
                 let op = ev.enum_("operationType").to_string();
                 // Merged into the part (Add / Remove / Intersect), the wall starts a little into it: a tool only touching
@@ -288,10 +288,10 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
 pub fn isocline(ev: &mut EvalCtx) -> FResult<()> {
     let faces = ev.resolve_faces(ev.query("faces"));
     if faces.is_empty() {
-        return err("Select faces for the isocline");
+        return crate::regen::eval::err_at(&["faces"], "Select faces to create isoclines.");
     }
-    let Some(dr) = ev.query("direction").first() else { return err("Select a direction") };
-    let Some(mut dir) = ev.resolve_direction(dr) else { return err("The selected direction no longer exists") };
+    let Some(dr) = ev.query("direction").first() else { return crate::regen::eval::err_at(&["direction"], "Select direction to create isoclines.") };
+    let Some(mut dir) = ev.resolve_direction(dr) else { return crate::regen::eval::err_at(&["direction"], "Select direction to create isoclines.") };
     if ev.bool("oppositeDirection") {
         dir = -dir;
     }
@@ -308,7 +308,7 @@ pub fn isocline(ev: &mut EvalCtx) -> FResult<()> {
             ev.warnings.push("No isocline at this angle on the selected faces".into());
             return Ok(());
         }
-        return err("No isocline at this angle on the selected faces");
+        return err("The given faces do not have isoclines for the given direction and angle.");
     }
     if split {
         for (bi, edges) in by_body.into_iter().rev() {
@@ -344,7 +344,7 @@ pub fn constrained_surface(ev: &mut EvalCtx) -> FResult<()> {
     if mesh {
         let refs = ev.query("meshes");
         if refs.is_empty() {
-            return err("Select mesh faces or bodies");
+            return crate::regen::eval::err_at(&["meshes"], "Select a mesh face or body.");
         }
         let mut faces: Vec<Shape> = ev.resolve_faces(refs).into_iter().map(|(b, f)| ev.face_shape(b, f)).collect::<FResult<_>>()?;
         let bodies: Vec<Reference> = refs.iter().filter(|r| matches!(r, Reference::Body(_))).cloned().collect();
@@ -363,7 +363,7 @@ pub fn constrained_surface(ev: &mut EvalCtx) -> FResult<()> {
     } else {
         for item in ev.params.array("vertices") {
             let Some(r) = item.query("vertex").first() else { continue };
-            let Some(p) = ev.resolve_vertex_point(r) else { return err("A selected vertex no longer exists") };
+            let Some(p) = ev.resolve_vertex_point(r) else { return crate::regen::eval::err_at(&["vertices"], "Select at least three distinct points.") };
             let i = push(&mut points, p);
             if let Some(nr) = item.query("normal").first() {
                 let Some(mut nv) = ev.resolve_direction(nr) else { return err("A selected normal no longer exists") };
@@ -375,7 +375,7 @@ pub fn constrained_surface(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     if points.len() < 3 {
-        return err("Select at least three points (vertices) to fit a surface");
+        return crate::regen::eval::err_at(&["vertices"], "Select at least three distinct points.");
     }
     let tol = ev.length("tolerance").unwrap_or(1e-5).max(1e-9);
     let opts = k::SurfaceFitOptions { tolerance: tol, interpolate: !mesh, smooth: ev.is("optimize", "SMOOTH") };

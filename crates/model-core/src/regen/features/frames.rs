@@ -207,7 +207,7 @@ fn chain_paths(mut edges: Vec<(Shape, Name)>) -> FResult<Vec<FramePath>> {
     }
     for p in &pts {
         if pts.iter().filter(|q| (**q - *p).length() < tol).count() > 2 {
-            return err("Frame paths must not branch");
+            return err("A path cannot contain branches.");
         }
     }
     while !edges.is_empty() {
@@ -312,7 +312,7 @@ fn path_edges(ev: &EvalCtx) -> FResult<Vec<(Shape, Name)>> {
 fn resolve_profile(ev: &EvalCtx, text: &str) -> FResult<(FrameProfile, Shape)> {
     let text = text.trim();
     if text.is_empty() {
-        return err("Select a frame profile (for example \"SHS 40x40x3\" or the name of a profile sketch)");
+        return crate::regen::eval::err_at(&["profileSketch"], "Select profile.");
     }
     if let Some(s) = ev.ctx.sketches.iter().find(|s| s.name == text).cloned() {
         // Regions that are not holes of other regions; use the largest.
@@ -334,7 +334,7 @@ fn resolve_profile(ev: &EvalCtx, text: &str) -> FResult<(FrameProfile, Shape)> {
                 keep.push(f.clone());
             }
         }
-        let face = keep.into_iter().max_by(|a, b| a.area().unwrap_or(0.0).total_cmp(&b.area().unwrap_or(0.0))).ok_or_else(|| fe("The profile sketch has no regions"))?;
+        let face = keep.into_iter().max_by(|a, b| a.area().unwrap_or(0.0).total_cmp(&b.area().unwrap_or(0.0))).ok_or_else(|| fe("Profile should have at least one region."))?;
         let plane = crate::regen::eval::kernel_plane(&s.frame);
         let to_xy = k::Transform::frame_to_frame(&plane, &k::Plane::xy());
         let face = face.transformed(&to_xy)?;
@@ -433,7 +433,7 @@ pub fn frame(ev: &mut EvalCtx) -> FResult<()> {
     let (profile, canon) = resolve_profile(ev, &text)?;
     let edges = path_edges(ev)?;
     if edges.is_empty() {
-        return err("Select edges, curves or vertices defining the frame path");
+        return crate::regen::eval::err_at(&["selections"], "Select sweep paths.");
     }
     let paths = chain_paths(edges)?;
     let feature = ev.feature;
@@ -624,7 +624,7 @@ pub fn frame(ev: &mut EvalCtx) -> FResult<()> {
                 }
                 let (sh, nm) = bool_named(ev, k::BooleanOp::Cut, &cur, &tools)?;
                 if sh.count(ShapeType::Solid) == 0 {
-                    return err("A frame segment was fully trimmed away");
+                    return err("Failed to trim some segments.");
                 }
                 cur = NamedShape::new(sh, nm);
             }
@@ -637,7 +637,7 @@ pub fn frame(ev: &mut EvalCtx) -> FResult<()> {
                 let role = if at_start { Role::CapStart(Some(Source::Topo(path.segs[i].name.clone()))) } else { Role::CapEnd(Some(Source::Topo(path.segs[i].name.clone()))) };
                 let tool = tool_named(tool_shape, |_| face(feature, role.clone()));
                 let (sh, nm) = bool_named(ev, k::BooleanOp::Cut, &built[i], &[tool])?;
-                built[i] = largest_piece(&sh, &nm).ok_or_else(|| fe("A coped frame segment was fully removed"))?;
+                built[i] = largest_piece(&sh, &nm).ok_or_else(|| fe("Failed to trim some segments."))?;
             }
         }
         // Trim to parts.
@@ -645,7 +645,7 @@ pub fn frame(ev: &mut EvalCtx) -> FResult<()> {
             for si in [0usize, n - 1] {
                 let tools: Vec<NamedShape> = trim_bodies.iter().map(|s| tool_named(s.clone(), |_| face(feature, Role::CapEnd(Some(Source::Topo(path.segs[si].name.clone())))))).collect();
                 let (sh, nm) = bool_named(ev, k::BooleanOp::Cut, &built[si], &tools)?;
-                built[si] = largest_piece(&sh, &nm).ok_or_else(|| fe("A frame segment was fully trimmed away"))?;
+                built[si] = largest_piece(&sh, &nm).ok_or_else(|| fe("Failed to trim some segments."))?;
             }
         }
         // Parts: one per segment, tangent runs merged if requested.
@@ -707,9 +707,9 @@ pub fn frame_trim(ev: &mut EvalCtx) -> FResult<()> {
     if ev.is("trimType", "FACE") {
         let targets = ev.resolve_bodies(ev.query("targets"));
         if targets.is_empty() {
-            return err("Select parts to trim");
+            return crate::regen::eval::err_at(&["targets"], "Select frame segments to trim.");
         }
-        let Some(r) = ev.query("tool").first() else { return err("Select a face or plane to trim to") };
+        let Some(r) = ev.query("tool").first() else { return crate::regen::eval::err_at(&["tool"], "Select face, plane, or mate connector to trim to.") };
         let Some(p) = ev.resolve_plane(r) else { return err("Only planar faces, planes and mate connectors can be used to trim") };
         if ev.bool("useToolExtents") {
             ev.warnings.push("Trim to face boundaries is not applied; the face's plane is used".into());
@@ -722,14 +722,14 @@ pub fn frame_trim(ev: &mut EvalCtx) -> FResult<()> {
             let bx = oriented_box(p.origin, ex, removed.cross(ex), [-big, big], [-big, big], [0.0, big])?;
             let tool = tool_named(bx, |i| face(feature, Role::New(i)));
             let (sh, nm) = bool_named(ev, k::BooleanOp::Cut, &super::sheetmetal_util::body_named(&body), &[tool])?;
-            let piece = largest_piece(&sh, &nm).ok_or_else(|| fe("A part was fully trimmed away"))?;
+            let piece = largest_piece(&sh, &nm).ok_or_else(|| fe("Failed to trim some segments."))?;
             set_body(ev, bi, piece);
         }
         return Ok(());
     }
     let groups: Vec<Vec<usize>> = ev.params.array("frameGroups").iter().map(|g| ev.resolve_bodies(g.query("frames"))).collect();
     if groups.iter().filter(|g| !g.is_empty()).count() < 2 {
-        return err("Select at least two groups of frames to trim against each other");
+        return err("Select at least two frame groups.");
     }
     let originals: Vec<Shape> = ev.ctx.bodies.iter().map(|b| b.shape.clone()).collect();
     for gi in 1..groups.len() {
@@ -774,20 +774,20 @@ fn is_cap(n: &TopoName) -> bool {
 pub fn gusset(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("edges").to_vec();
     if refs.is_empty() {
-        return err("Select edges at frame junctions for the gussets");
+        return crate::regen::eval::err_at(&["edges"], "Select linear edge on the frame segment cut face to create gusset.");
     }
     let len = ev.length("length")?;
     let th = ev.length("thickness")?;
     if len <= 0.0 || th <= 0.0 {
-        return err("Gusset length and thickness must be positive");
+        return crate::regen::eval::err_at(&["length", "thickness"], "Error regenerating: a parameter is out of range.");
     }
     let feature = ev.feature;
     let mut count = 0u32;
     for r in refs.iter().rev() {
-        let Some(&(bi, ei)) = ev.resolve_edges(std::slice::from_ref(r)).first() else { return err("A selected edge no longer exists") };
+        let Some(&(bi, ei)) = ev.resolve_edges(std::slice::from_ref(r)).first() else { return crate::regen::eval::err_at(&["edges"], "Select linear edge on the frame segment cut face to create gusset.") };
         let body = ev.ctx.bodies[bi].clone();
         let edge = body.shape.sub_shape(ShapeType::Edge, ei)?;
-        let Some((p, q)) = super::sheetmetal_util::line_of(&edge) else { return err("Gusset edges must be linear") };
+        let Some((p, q)) = super::sheetmetal_util::line_of(&edge) else { return err("Cannot fit a gusset for the highlighted edge(s).") };
         let e = (q - p).normalize();
         let m = (p + q) * 0.5;
         let ename = body.edges[ei].clone();
@@ -830,14 +830,14 @@ pub fn gusset(ev: &mut EvalCtx) -> FResult<()> {
                 }
             }
         }
-        let Some((d1, d2)) = pair else { return err("Cannot fit a gusset at the selected edge (two adjacent frame faces are needed)") };
+        let Some((d1, d2)) = pair else { return err("Cannot fit a gusset for the highlighted edge(s).") };
         let (d1, d2) = if ev.bool("shouldFlipBaseSides") { (d2, d1) } else { (d1, d2) };
         let pts: Vec<DVec3> = if ev.is("gussetType", "RECTANGLE") {
             let far = m + d1 * len + d2 * len;
             if ev.bool("chamfer") {
                 let c = ev.length("chamferSize")?;
                 if c >= len {
-                    return err("The chamfer size exceeds the gusset size");
+                    return err("Chamfer size cannot exceed the gusset size.");
                 }
                 vec![m, m + d1 * len, far - d2 * c, far - d1 * c, m + d2 * len]
             } else {
@@ -894,16 +894,16 @@ pub fn gusset(ev: &mut EvalCtx) -> FResult<()> {
 pub fn end_cap(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("faces").to_vec();
     if refs.is_empty() {
-        return err("Select open end faces of frame segments");
+        return crate::regen::eval::err_at(&["faces"], "Select frame segment start or end face to create endcap.");
     }
     let feature = ev.feature;
     let t = ev.length("thickness")?;
     let ptype = ev.enum_("profileType").to_string();
     for (count, r) in refs.iter().enumerate() {
-        let Some(&(bi, fi)) = ev.resolve_faces(std::slice::from_ref(r)).first() else { return err("A selected face no longer exists") };
+        let Some(&(bi, fi)) = ev.resolve_faces(std::slice::from_ref(r)).first() else { return crate::regen::eval::err_at(&["faces"], "Select frame segment start or end face to create endcap.") };
         let body = ev.ctx.bodies[bi].clone();
         let f = body.shape.sub_shape(ShapeType::Face, fi)?;
-        let Some(pl) = f.face_plane()? else { return err("End cap faces must be planar") };
+        let Some(pl) = f.face_plane()? else { return crate::regen::eval::err_at(&["faces"], "Invalid selection. Select either end or start face of frame segment to build a cap.") };
         let n = pl.unit_normal();
         let fname = body.faces[fi].clone();
         let frame_plane = k::Plane::new(f.centroid()?, n, pl.unit_x());
@@ -914,7 +914,7 @@ pub fn end_cap(ev: &mut EvalCtx) -> FResult<()> {
         let (profile_face, start_shift, dir) = match ptype.as_str() {
             "INTERNAL" => {
                 if wires.len() != 2 {
-                    return err("Internal end caps need a hollow profile with exactly one inner boundary");
+                    return crate::regen::eval::err_at(&["faces"], "Only frame segments with one internal profile can be capped.");
                 }
                 let inner = wires.into_iter().find(|w| !w.is_same(&outer)).ok_or_else(|| fe("The face has no inner boundary"))?;
                 let mut fc = k::make_face_from_wire(&inner, true)?;
@@ -1026,7 +1026,7 @@ pub fn end_cap(ev: &mut EvalCtx) -> FResult<()> {
 pub fn cutlist(ev: &mut EvalCtx) -> FResult<()> {
     let ids: Option<Vec<BodyId>> = if ev.bool("selectAllFrames") { None } else { Some(ev.resolve_bodies(ev.query("frames")).into_iter().map(|i| ev.ctx.bodies[i].id.clone()).collect()) };
     if ids.as_ref().is_some_and(|v| v.is_empty()) {
-        return err("Select frames for the cut list");
+        return crate::regen::eval::err_at(&["frames"], "Select frames to create a cutlist");
     }
     let rows = cut_list(&ev.ctx, ids.as_deref());
     if rows.is_empty() {

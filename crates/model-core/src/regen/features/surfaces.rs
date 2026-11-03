@@ -315,20 +315,20 @@ pub fn extend_surface(ev: &mut EvalCtx) -> FResult<()> {
     bodies.sort_unstable();
     bodies.dedup();
     if bodies.is_empty() {
-        return err("Select a surface or its boundary edges");
+        return crate::regen::eval::err_at(&["entities"], "Select a surface or boundary edges to move.");
     }
     let d = ev.length("extendDistance")? * if ev.bool("oppositeDirection") { -1.0 } else { 1.0 };
     for bi in bodies {
         let b = ev.ctx.bodies[bi].clone();
         if b.kind != BodyKind::Surface {
-            return err("Move boundary works on surfaces only");
+            return crate::regen::eval::err_at(&["entities"], "No boundary edges found to move.");
         }
         let faces = b.shape.faces();
         if faces.len() != 1 || faces[0].face_plane()?.is_none() {
             return err("Move boundary currently supports single planar surfaces only (all boundary edges moved)");
         }
         let face = &faces[0];
-        let outer = face.wires().into_iter().next().ok_or_else(|| FeatureError::new("Surface has no boundary"))?;
+        let outer = face.wires().into_iter().next().ok_or_else(|| crate::regen::eval::FeatureError::at(&["entities"], "No boundary edges found to move."))?;
         // A kernel failure reads as Onshape's EXTEND_FAILED ("Unable to move
         // selected entities."), not the kernel's own text (qa5 SF5).
         let failed = |_| FeatureError::new(crate::regen::custom_features::error_text("EXTEND_FAILED"));
@@ -652,13 +652,13 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
 pub fn ruled_surface(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("edges");
     if refs.is_empty() {
-        return err("Select edges for the ruled surface");
+        return crate::regen::eval::err_at(&["edges"], "Select edges and curves to create a ruled surface.");
     }
     // Vertex overrides: (vertex position, item) - applied at matching edge ends.
     let mut overrides: Vec<(DVec3, crate::params::ParamValues)> = Vec::new();
     for item in ev.params.array("vertexOverrides") {
         let Some(r) = item.query("vertex").first() else { continue };
-        let Some(p) = ev.resolve_vertex_point(r) else { return err("A vertex override no longer exists") };
+        let Some(p) = ev.resolve_vertex_point(r) else { return err("Cannot resolve entities.") };
         overrides.push((p, item.clone()));
     }
     let edge_refs: Vec<(Shape, Source)> = {
@@ -679,8 +679,8 @@ pub fn ruled_surface(ev: &mut EvalCtx) -> FResult<()> {
     let dist = ev.length("distance")? * if ev.bool("oppositeDirection") { -1.0 } else { 1.0 };
     let vector = match ty.as_str() {
         "ALIGNED_WITH_VECTOR" | "ANGLE_FROM_VECTOR" => {
-            let Some(r) = ev.query("axis").first() else { return err("Select a direction") };
-            Some(ev.resolve_direction(r).ok_or_else(|| FeatureError::new("Select a direction"))?.normalize())
+            let Some(r) = ev.query("axis").first() else { return crate::regen::eval::err_at(&["axis"], "Select a direction to create a ruled surface.") };
+            Some(ev.resolve_direction(r).ok_or_else(|| crate::regen::eval::FeatureError::at(&["axis"], "Select a direction to create a ruled surface."))?.normalize())
         }
         _ => None,
     };
@@ -699,7 +699,7 @@ pub fn ruled_surface(ev: &mut EvalCtx) -> FResult<()> {
                 .find(|f| k::distance(f, e).map(|d| d.distance < 1e-6).unwrap_or(false))
                 .cloned()
                 .or_else(|| super::surfaces::adjacent_face(ev, e));
-            Some(f.ok_or_else(|| FeatureError::new("Select reference faces for normal or tangent ruled surfaces"))?)
+            Some(f.ok_or_else(|| FeatureError::new("Only sketch and face edges can be used for normal and tangent ruled surface."))?)
         } else {
             None
         };
@@ -774,17 +774,17 @@ pub fn ruled_surface(ev: &mut EvalCtx) -> FResult<()> {
             let t = tangents[end].normalize_or(DVec3::X);
             let ovr = item.enum_("overrideType").to_string();
             let target = if ovr == "UP_TO_VERTEX" {
-                let Some(b) = item.query("boundaryOverride").first().and_then(|r| ev.resolve_vertex_point(r)) else { return err("Select the vertex to rule up to") };
+                let Some(b) = item.query("boundaryOverride").first().and_then(|r| ev.resolve_vertex_point(r)) else { return crate::regen::eval::err_at(&["vertexOverrides"], "Select vertex to create ruled surface to.") };
                 b - p
             } else {
                 let d_len = ev.eval_num_in(item, "distanceOverride", crate::params::NumKind::Length)? * if item.bool("oppositeDirectionOverride") { -1.0 } else { 1.0 };
                 let dir = match ovr.as_str() {
                     "ALIGNED_WITH_VECTOR" => {
-                        let Some(r) = item.query("axisOverride").first() else { return err("Select the override direction") };
-                        ev.resolve_direction(r).ok_or_else(|| FeatureError::new("The override direction no longer exists"))?.normalize()
+                        let Some(r) = item.query("axisOverride").first() else { return crate::regen::eval::err_at(&["vertexOverrides"], "Select a direction to create a ruled surface.") };
+                        ev.resolve_direction(r).ok_or_else(|| crate::regen::eval::FeatureError::at(&["vertexOverrides"], "Select a direction to create a ruled surface."))?.normalize()
                     }
                     _ => {
-                        let f = face.as_ref().cloned().or_else(|| super::surfaces::adjacent_face(ev, e)).ok_or_else(|| FeatureError::new("Normal and tangent overrides need a reference face"))?;
+                        let f = face.as_ref().cloned().or_else(|| super::surfaces::adjacent_face(ev, e)).ok_or_else(|| crate::regen::eval::FeatureError::at(&["vertexOverrides"], "Normal and tangent overrides not supported when top level is aligned with vector."))?;
                         let nrm = f.normal_at_point(p)?;
                         let base = if ovr == "NORMAL" { nrm } else { nrm.cross(t).normalize_or(nrm) };
                         let a = ev.eval_num_in(item, "angleOverride", crate::params::NumKind::Angle)? * if item.bool("oppositeAngleOverride") { -1.0 } else { 1.0 };

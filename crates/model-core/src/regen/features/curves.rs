@@ -114,7 +114,7 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
     } else {
         let mut end_frac = None;
         let height = if ev.is("endType", "END_POINT") {
-            let Some(p) = ev.query("endPoint").first().and_then(|r| ev.resolve_vertex_point(r)) else { return err("Select an end point") };
+            let Some(p) = ev.query("endPoint").first().and_then(|r| ev.resolve_vertex_point(r)) else { return err("Cannot resolve entities.") };
             let mut h = (p - base).dot(z);
             // helix.fs: on a face the end point must be level with the face's
             // end (on an axis the point sets the height).
@@ -153,7 +153,7 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
         let raw = if path == "PITCH" {
             let p = ev.length("helicalPitch")?;
             if p < 1e-12 {
-                return err("Pitch must be positive");
+                return crate::regen::eval::err_at(&["helicalPitch"], "Error regenerating: a parameter is out of range.");
             }
             height / p
         } else {
@@ -179,7 +179,7 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
         return flat_spiral(ev, base, z, x, r0, revs, left_handed, &path);
     }
     if revs < 1e-9 {
-        return err("Revolutions must be positive");
+        return crate::regen::eval::err_at(&["revolutions"], "Error regenerating: a parameter is out of range.");
     }
     // helix.fs: a zero start radius with an end radius swaps the ends (live
     // L33: a conical spiral out from the axis); both zero fails.
@@ -224,26 +224,26 @@ pub fn helix(ev: &mut EvalCtx) -> FResult<()> {
 #[allow(clippy::too_many_arguments)]
 fn flat_spiral(ev: &mut EvalCtx, base: DVec3, z: DVec3, x: DVec3, r0: f64, revs: f64, left_handed: bool, path: &str) -> FResult<()> {
     let r1 = if ev.is("endType", "END_POINT") {
-        let Some(p) = ev.query("endPoint").first().and_then(|r| ev.resolve_vertex_point(r)) else { return err("Select an end point") };
+        let Some(p) = ev.query("endPoint").first().and_then(|r| ev.resolve_vertex_point(r)) else { return err("Cannot resolve entities.") };
         let radial = p - base - z * (p - base).dot(z);
         radial.length()
     } else if ev.bool("endRadToggle") {
         ev.length("endRadius")?
     } else {
-        return err("A flat spiral (height 0) needs an end radius or end point");
+        return crate::regen::eval::err_at(&["height"], "Error regenerating: a parameter is out of range.");
     };
     let dr = r1 - r0;
     let revs = if path == "PITCH" {
         let p = ev.length("helicalPitch")?;
         if p < 1e-12 {
-            return err("Pitch must be positive");
+            return crate::regen::eval::err_at(&["helicalPitch"], "Error regenerating: a parameter is out of range.");
         }
         dr.abs() / p
     } else {
         revs
     };
     if revs < 1e-9 || dr.abs() < 1e-12 {
-        return err("A flat spiral needs revolutions and different start and end radii");
+        return crate::regen::eval::err_at(&["revolutions"], "Error regenerating: a parameter is out of range.");
     }
     let y = z.cross(x);
     let sgn = if left_handed { -1.0 } else { 1.0 };
@@ -265,7 +265,7 @@ pub fn fit_spline(ev: &mut EvalCtx) -> FResult<()> {
     let edge = if ev.is("fitType", "EDGES") {
         let edges = curve_edges(ev, ev.query("edges"))?;
         if edges.is_empty() {
-            return err("Select edges to fit");
+            return crate::regen::eval::err_at(&["edges"], "Select tangent continuous edges to be approximated by a spline.");
         }
         let chain = order_chain(&edges, 1e-6)?;
         let closed = {
@@ -283,7 +283,7 @@ pub fn fit_spline(ev: &mut EvalCtx) -> FResult<()> {
         for r in refs {
             match ev.resolve_vertex_point(r) {
                 Some(p) => pts.push(p),
-                None => return err("A selected vertex no longer exists"),
+                None => return crate::regen::eval::err_at(&["vertices"], "Select at least two vertices to make a spline."),
             }
         }
         pts.dedup_by(|a, b| (*a - *b).length() < 1e-9);
@@ -292,20 +292,20 @@ pub fn fit_spline(ev: &mut EvalCtx) -> FResult<()> {
             pts.pop();
         }
         if closed && pts.len() < 3 {
-            return err("A closed spline needs at least three points");
+            return crate::regen::eval::err_at(&["vertices"], "Select at least three vertices to make a closed spline.");
         }
         if pts.len() < 2 {
-            return err("Select at least two points");
+            return crate::regen::eval::err_at(&["vertices"], "Select at least two vertices to make a spline.");
         }
         let mut tangents = Vec::new();
         if !closed {
             // The picked direction and the magnitude, negated by its flip (std).
-            let dir = |id: &str, mag: &str, flip: &str| -> FResult<Option<(DVec3, f64)>> {
+            let dir = |id: &'static str, mag: &'static str, flip: &str| -> FResult<Option<(DVec3, f64)>> {
                 let Some(r) = ev.query(id).first() else { return Ok(None) };
-                let d = ev.resolve_direction(r).ok_or_else(|| FeatureError::new("Could not evaluate the end direction"))?;
+                let d = ev.resolve_direction(r).ok_or_else(|| FeatureError::at(&[id], "Cannot evaluate tangency for end condition."))?;
                 let m = ev.real(mag)?;
                 if m.abs() < 1e-12 {
-                    return err("End magnitude can't be zero");
+                    return crate::regen::eval::err_at(&[mag], if mag.starts_with("start") { "Start magnitude cannot be 0." } else { "End magnitude cannot be 0." });
                 }
                 Ok(Some((d.normalize_or_zero(), m * if ev.bool(flip) { -1.0 } else { 1.0 })))
             };
@@ -340,15 +340,15 @@ pub fn project_curves(ev: &mut EvalCtx) -> FResult<()> {
     if ev.is("curveProjectionType", "CURVE_TO_FACE") {
         let tools = curve_edges(ev, ev.query("dropTools"))?;
         if tools.is_empty() {
-            return err("Select edges to project");
+            return crate::regen::eval::err_at(&["dropTools"], "Cannot resolve entities.");
         }
         let targets = face_shapes(ev, ev.query("targets"), true)?;
         if targets.is_empty() {
-            return err("Select target faces");
+            return crate::regen::eval::err_at(&["targets"], "Cannot resolve entities.");
         }
         let dir = if ev.is("projectionType", "DIRECTION") {
-            let Some(r) = ev.query("directionQuery").first() else { return err("Select a projection direction") };
-            let d = ev.resolve_direction(r).ok_or_else(|| FeatureError::new("Select a projection direction"))?;
+            let Some(r) = ev.query("directionQuery").first() else { return crate::regen::eval::err_at(&["directionQuery"], "Cannot resolve entities.") };
+            let d = ev.resolve_direction(r).ok_or_else(|| crate::regen::eval::FeatureError::at(&["directionQuery"], "Cannot resolve entities."))?;
             Some(if ev.bool("oppositeDirection") { -d } else { d })
         } else {
             None
@@ -361,7 +361,7 @@ pub fn project_curves(ev: &mut EvalCtx) -> FResult<()> {
         }
         let wires = chain_wires(&projected)?;
         if wires.is_empty() {
-            return err("The edges do not project onto the targets");
+            return err("No projections found with current selections.");
         }
         return add_wire_bodies(ev, wires);
     }
@@ -374,22 +374,22 @@ pub fn project_curves(ev: &mut EvalCtx) -> FResult<()> {
         for r in refs {
             let Reference::SketchEntity { sketch: s, entity } = r else { continue };
             if sketch.is_some_and(|x| x != *s) {
-                return err("Each selection must come from a single sketch");
+                return crate::regen::eval::err_at(&[id], "The curves in each list must be from the same sketch.");
             }
             sketch = Some(*s);
             if let Some(e) = sketch_edge(ev, *s, *entity)? {
                 edges.push(e);
             }
         }
-        let Some(s) = sketch else { return err("Select edges of two sketches") };
-        let frame = ev.ctx.sketch(s).map(|x| x.frame).ok_or_else(|| FeatureError::new("Sketch no longer exists"))?;
+        let Some(s) = sketch else { return crate::regen::eval::err_at(&[id], "Cannot resolve entities.") };
+        let frame = ev.ctx.sketch(s).map(|x| x.frame).ok_or_else(|| FeatureError::at(&[id], "Cannot resolve entities."))?;
         if edges.is_empty() {
-            return err("Select sketch curves");
+            return crate::regen::eval::err_at(&[id], "Cannot resolve entities.");
         }
         sets.push((frame, edges));
     }
     if sets[0].0.normal.cross(sets[1].0.normal).length() < 1e-9 {
-        return err("Sketch planes can't be parallel");
+        return err("The sketches cannot be parallel.");
     }
     let ext = ev.model_extent() * 2.0;
     let mut prisms = Vec::new();
@@ -404,7 +404,7 @@ pub fn project_curves(ev: &mut EvalCtx) -> FResult<()> {
     let sec = k::section(&prisms[0], &prisms[1])?;
     let wires = chain_wires(&sec.shape.edges())?;
     if wires.is_empty() {
-        return err("The sketch projections do not intersect");
+        return err("Error regenerating.");
     }
     add_wire_bodies(ev, wires)
 }
@@ -450,7 +450,16 @@ fn edge_tangent_at(e: &Shape, pos: DVec3, toward: Option<DVec3>) -> FResult<DVec
     Ok(t * if sign == 0.0 { 1.0 } else { sign })
 }
 
-fn bridge_side(ev: &EvalCtx, refs: &[Reference], other: Option<DVec3>, param: Option<f64>) -> FResult<Option<Side>> {
+/// One end of a bridging curve from `field`'s selections (side1 the start, side2 the end).
+fn bridge_side(ev: &EvalCtx, field: &'static str, refs: &[Reference], other: Option<DVec3>, param: Option<f64>) -> FResult<Option<Side>> {
+    // std bridgingCurve.fs: a selection that no longer resolves leaves the side empty.
+    let gone = || {
+        FeatureError::at(&[field], if field == "side1" {
+            "Select a vertex or edge at the start position, and optionally an edge or face with the starting direction/curvature."
+        } else {
+            "Select a vertex or edge at the ending position, and optionally an edge or face with the ending direction/curvature."
+        })
+    };
     let mut point = None;
     let mut edge = None;
     let mut face = None;
@@ -458,16 +467,16 @@ fn bridge_side(ev: &EvalCtx, refs: &[Reference], other: Option<DVec3>, param: Op
     for r in refs {
         match r {
             Reference::MateConnector { .. } | Reference::Implicit { .. } => {
-                let c = ev.resolve_connector(r).ok_or_else(|| FeatureError::new("A selected mate connector no longer exists"))?;
+                let c = ev.resolve_connector(r).ok_or_else(gone)?;
                 point = Some(c.origin);
                 mc_z = Some(c.z);
             }
             Reference::Edge(_) => {
-                let &(bi, ei) = ev.resolve_edges(std::slice::from_ref(r)).first().ok_or_else(|| FeatureError::new("A selected edge no longer exists"))?;
+                let &(bi, ei) = ev.resolve_edges(std::slice::from_ref(r)).first().ok_or_else(gone)?;
                 edge = Some(ev.edge_shape(bi, ei)?);
             }
             Reference::Face(_) => {
-                let &(bi, fi) = ev.resolve_faces(std::slice::from_ref(r)).first().ok_or_else(|| FeatureError::new("A selected face no longer exists"))?;
+                let &(bi, fi) = ev.resolve_faces(std::slice::from_ref(r)).first().ok_or_else(gone)?;
                 face = Some(ev.face_shape(bi, fi)?);
             }
             Reference::SketchEntity { sketch, entity } => match ev.resolve_vertex_point(r) {
@@ -502,7 +511,7 @@ fn bridge_side(ev: &EvalCtx, refs: &[Reference], other: Option<DVec3>, param: Op
         return Ok(Some(Side { pos: p, tangent: t }));
     }
     if face.is_some() {
-        return err("Select a vertex or edge together with the face");
+        return crate::regen::eval::err_at(&[field], "Select a vertex or an edge on each side.");
     }
     Ok(point.map(|pos| Side { pos, tangent: None }))
 }
@@ -521,20 +530,20 @@ pub fn bridging_curve(ev: &mut EvalCtx) -> FResult<()> {
     }
     let (q1, q2) = (ev.query("side1"), ev.query("side2"));
     if q1.is_empty() {
-        return err("Select the start of the bridging curve");
+        return crate::regen::eval::err_at(&["side1"], "Select a vertex or edge at the start position, and optionally an edge or face with the starting direction/curvature.");
     }
     if q2.is_empty() {
-        return err("Select the end of the bridging curve");
+        return crate::regen::eval::err_at(&["side2"], "Select a vertex or edge at the ending position, and optionally an edge or face with the ending direction/curvature.");
     }
     let edit_pos = ev.bool("editEdgePositions");
     let p1 = if edit_pos { Some(ev.real("startEdgeParameter")?) } else { None };
     let p2 = if edit_pos { Some(ev.real("endEdgeParameter")?) } else { None };
     let hint2 = rough_position(ev, q2);
-    let s1 = bridge_side(ev, q1, hint2, p1)?.ok_or_else(|| FeatureError::new("Select a vertex, edge or mate connector for the start"))?;
-    let s2 = bridge_side(ev, q2, Some(s1.pos), p2)?.ok_or_else(|| FeatureError::new("Select a vertex, edge or mate connector for the end"))?;
+    let s1 = bridge_side(ev, "side1", q1, hint2, p1)?.ok_or_else(|| crate::regen::eval::FeatureError::at(&["side1"], "Select a vertex or edge at the start position, and optionally an edge or face with the starting direction/curvature."))?;
+    let s2 = bridge_side(ev, "side2", q2, Some(s1.pos), p2)?.ok_or_else(|| crate::regen::eval::FeatureError::at(&["side2"], "Select a vertex or edge at the ending position, and optionally an edge or face with the ending direction/curvature."))?;
     let chord = (s2.pos - s1.pos).length();
     if chord < 1e-9 {
-        return err("Start and end positions are identical");
+        return err("Bridging curve start and end points must be distinct.");
     }
     let (m1, m2) = if ev.is("method", "MAGNITUDE_BIAS") {
         let m = ev.real("magnitude")?;
@@ -572,7 +581,7 @@ pub fn bridging_curve(ev: &mut EvalCtx) -> FResult<()> {
 pub fn composite_curve(ev: &mut EvalCtx) -> FResult<()> {
     let edges = curve_edges(ev, ev.query("edges"))?;
     if edges.is_empty() {
-        return err("Select edges or curves");
+        return crate::regen::eval::err_at(&["edges"], "At least one edge is required.");
     }
     let wires = chain_wires(&edges)?;
     add_wire_bodies(ev, wires)
@@ -582,15 +591,15 @@ pub fn intersection_curve(ev: &mut EvalCtx) -> FResult<()> {
     let g1 = face_shapes(ev, ev.query("group1"), true)?;
     let g2 = face_shapes(ev, ev.query("group2"), true)?;
     if g1.is_empty() || g2.is_empty() {
-        return err("Select faces, surfaces or parts in both groups");
+        return crate::regen::eval::err_at(if g1.is_empty() { &["group1"] } else { &["group2"] }, "Cannot resolve entities.");
     }
     if g1.iter().any(|a| g2.iter().any(|b| a.is_same(b))) {
-        return err("A face can't be in both groups");
+        return err("Selections must be unique.");
     }
     let sec = k::section(&Shape::compound(&g1), &Shape::compound(&g2))?;
     let wires = chain_wires(&sec.shape.edges())?;
     if wires.is_empty() {
-        return err("The selections do not intersect");
+        return err("No intersections found with current selections.");
     }
     add_wire_bodies(ev, wires)
 }
@@ -640,7 +649,7 @@ fn wire_body_indices(ev: &EvalCtx) -> FResult<Vec<usize>> {
     let refs = ev.query("wires");
     let idx: Vec<usize> = ev.resolve_bodies(refs).into_iter().filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Wire).collect();
     if idx.is_empty() {
-        return err("Select curves to adjust");
+        return crate::regen::eval::err_at(&["wires"], "Select a curve to adjust.");
     }
     Ok(idx)
 }
@@ -693,7 +702,7 @@ pub fn trim_curve(ev: &mut EvalCtx) -> FResult<()> {
                     }
                 }
                 if !best.is_finite() {
-                    return err("The extended curve does not reach the selected entity");
+                    return err("Curve extension does not intersect boundary.");
                 }
                 best
             } else {
@@ -727,7 +736,7 @@ pub fn trim_curve(ev: &mut EvalCtx) -> FResult<()> {
     // Trim: split at the boundary entities and keep the piece nearest the help point.
     let refs = ev.query("trimTo");
     if refs.is_empty() {
-        return err("Select entities to trim to");
+        return crate::regen::eval::err_at(&["trimTo"], "Select a boundary to trim to.");
     }
     for bi in bodies {
         let shape = ev.ctx.bodies[bi].shape.clone();
@@ -736,7 +745,7 @@ pub fn trim_curve(ev: &mut EvalCtx) -> FResult<()> {
             match r {
                 Reference::Edge(_) | Reference::SketchEntity { .. } if ev.resolve_vertex_point(r).is_none() => tools.extend(curve_edges(ev, std::slice::from_ref(r))?),
                 Reference::Vertex(_) | Reference::SketchEntity { .. } | Reference::Origin => {
-                    let q = ev.resolve_vertex_point(r).ok_or_else(|| FeatureError::new("A selected vertex no longer exists"))?;
+                    let q = ev.resolve_vertex_point(r).ok_or_else(|| crate::regen::eval::FeatureError::at(&["trimTo"], "Select a boundary to trim to."))?;
                     let d = k::distance(&shape, &k::make_vertex(q)?)?;
                     tools.push(k::make_vertex(d.point_a)?);
                 }
@@ -751,12 +760,12 @@ pub fn trim_curve(ev: &mut EvalCtx) -> FResult<()> {
             }
         }
         if tools.is_empty() {
-            return err("Select entities to trim to");
+            return crate::regen::eval::err_at(&["trimTo"], "Select a boundary to trim to.");
         }
         let res = k::split(std::slice::from_ref(&shape), &tools, &k::BooleanOptions::default())?;
         let pieces = chain_split_pieces(&res.shape, &tools)?;
         if pieces.len() < 2 {
-            return err("The curve does not intersect the trim entities");
+            return err("Curve does not intersect boundary.");
         }
         let anchor = match help {
             Some(h) => h,
@@ -842,15 +851,15 @@ pub fn offset_curve(ev: &mut EvalCtx) -> FResult<()> {
     let extend = split || ev.is("scope", "OFFSET_AND_EXTEND");
     let refs = ev.query("edges");
     if refs.is_empty() {
-        return err("Select edges to offset");
+        return crate::regen::eval::err_at(&["edges"], "Select edges to offset.");
     }
     let found = ev.resolve_edges(refs);
     if found.is_empty() {
-        return err("The selected edges no longer exist");
+        return crate::regen::eval::err_at(&["edges"], "Select edges to offset.");
     }
     let d = ev.length("distance")?;
     if d < 1e-12 {
-        return err("Offset distance must be positive");
+        return crate::regen::eval::err_at(&["distance"], "Error regenerating: a parameter is out of range.");
     }
     let targets = face_shapes(ev, ev.query("targets"), false)?;
     let edges: Vec<Shape> = found.iter().map(|&(bi, ei)| ev.edge_shape(bi, ei)).collect::<FResult<_>>()?;
@@ -863,7 +872,7 @@ pub fn offset_curve(ev: &mut EvalCtx) -> FResult<()> {
         let ef = b.shape.edge_faces()?;
         let adj = ef.get(ei).cloned().unwrap_or_default();
         let pick = if ev.bool("oppositeDirection") { adj.get(1).or(adj.first()) } else { adj.first() };
-        let Some(&fi) = pick else { return err("Select target faces") };
+        let Some(&fi) = pick else { return crate::regen::eval::err_at(&["edges"], "Offset only works on non-curve edges.") };
         b.shape.sub_shape(ShapeType::Face, fi as usize)?
     };
     if face.face_plane()?.is_none() {
@@ -1001,7 +1010,7 @@ fn chain_point_at_length(edges: &[Shape], s: f64) -> FResult<(DVec3, DVec3)> {
 fn trim_offset(ev: &mut EvalCtx, wire: &Shape, edges: &[Shape]) -> FResult<Shape> {
     let (start, end) = edges.first().zip(edges.last()).map(|(f, l)| (f.endpoints().map(|x| x.0), l.endpoints().map(|x| x.1))).ok_or_else(|| FeatureError::new("Unable to trim to specifications."))?;
     if (start? - end?).length() < 1e-9 {
-        return err("Cannot trim a closed curve.");
+        return err("Cannot trim closed offset curve.");
     }
     let s0 = ev.length("startTrim")?;
     let s1 = if ev.bool("equalTrim") { s0 } else { ev.length("endTrim")? };
@@ -1065,7 +1074,7 @@ fn extend_to_face_boundary(edges: &mut Vec<Shape>, face: &Shape, extent: f64) ->
 // ------------------------------------------------------------------ isoparametric curve
 
 pub fn isoparametric_curve(ev: &mut EvalCtx) -> FResult<()> {
-    let Some(&(bi, fi)) = ev.resolve_faces(ev.query("face")).first() else { return err("Select a face") };
+    let Some(&(bi, fi)) = ev.resolve_faces(ev.query("face")).first() else { return crate::regen::eval::err_at(&["face"], "Select face to create isoparametric curve.") };
     let face = ev.face_shape(bi, fi)?;
     let [u0, u1, v0, v1] = face.uv_bounds()?;
     let along_u = ev.is("directionType", "U_DIRECTION");
@@ -1078,7 +1087,7 @@ pub fn isoparametric_curve(ev: &mut EvalCtx) -> FResult<()> {
     } else {
         let items = ev.params.array("uvParamList");
         if items.is_empty() {
-            return err("Add positions for the curves");
+            return err("Select an option for position.");
         }
         for item in items {
             if item.bool("selectPoint") {
@@ -1124,14 +1133,14 @@ pub fn edit_curve(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("wire");
     let edges = curve_edges(ev, refs)?;
     if edges.is_empty() {
-        return err("Select a curve to edit");
+        return crate::regen::eval::err_at(&["wire"], "Select curves.");
     }
     let single_body = match refs {
         [r @ Reference::Body(_)] => ev.resolve_bodies(std::slice::from_ref(r)).first().copied().filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Wire),
         _ => None,
     };
     if single_body.is_none() && edges.len() > 1 && !ev.bool("approximate") {
-        return err("Editing several curves requires Approximate");
+        return crate::regen::eval::err_at(&["wire"], "Input curve has multiple edges. It needs to be reapproximated.");
     }
     let chain = order_chain(&edges, 1e-6)?;
     let ends = sample_chain(&chain, 1)?;
@@ -1149,11 +1158,11 @@ pub fn edit_curve(ev: &mut EvalCtx) -> FResult<()> {
             "XZPLANE" => (DVec3::ZERO, DVec3::Y),
             "XYPLANE" => (DVec3::ZERO, DVec3::Z),
             "CUSTOM" => {
-                let Some(r) = ev.query("referencePlane").first() else { return err("Select a reference plane") };
-                let f = ev.resolve_plane(r).ok_or_else(|| FeatureError::new("Could not resolve the reference plane"))?;
+                let Some(r) = ev.query("referencePlane").first() else { return crate::regen::eval::err_at(&["referencePlane"], "Select reference plane.") };
+                let f = ev.resolve_plane(r).ok_or_else(|| FeatureError::new("Cannot resolve plane."))?;
                 (f.origin, f.normal)
             }
-            _ => best_fit_plane(&pts).ok_or_else(|| FeatureError::new("Could not find a best fit plane"))?,
+            _ => best_fit_plane(&pts).ok_or_else(|| crate::regen::eval::FeatureError::at(&["wire"], "Cannot compute best fit plane."))?,
         };
         for p in &mut pts {
             *p -= n * (*p - o).dot(n);
@@ -1190,7 +1199,7 @@ pub fn edit_curve(ev: &mut EvalCtx) -> FResult<()> {
 /// perpendicular), V = N x U.
 fn edit_control_points(ev: &EvalCtx, wire: &Shape) -> FResult<Shape> {
     let edges = wire.edges();
-    let [edge] = edges.as_slice() else { return err("Editing control points needs a single curve (use Approximate for several edges)") };
+    let [edge] = edges.as_slice() else { return crate::regen::eval::err_at(&["wire"], "Input curve has multiple edges. It needs to be reapproximated.") };
     let mut d = edge.edge_bspline()?;
     let n = d.poles.len();
     let orig = d.poles.clone();
@@ -1243,7 +1252,7 @@ fn edit_control_points(ev: &EvalCtx, wire: &Shape) -> FResult<Shape> {
         let w = ev.eval_num_in(item, "weight", crate::params::NumKind::Real).unwrap_or(1.0);
         if (w - 1.0).abs() > 1e-12 {
             if w <= 0.0 {
-                return err("Control point weights must be positive");
+                return crate::regen::eval::err_at(&["controlPointEdits"], "Error regenerating: a parameter is out of range.");
             }
             let ws = d.weights.get_or_insert_with(|| vec![1.0; n]);
             ws[i] *= w;
@@ -1320,7 +1329,7 @@ pub fn routing_curve(ev: &mut EvalCtx) -> FResult<()> {
             "CURVE" => {
                 let edges = curve_edges(ev, item.query("curve"))?;
                 if edges.is_empty() {
-                    return err("Select a curve for each curve-referenced point");
+                    return crate::regen::eval::err_at(&["points"], "No curve selected.");
                 }
                 let samples = sample_chain(&order_chain(&edges, 1e-6)?, 64)?;
                 let t = ev.eval_num_in(item, "curveParameter", crate::params::NumKind::Real)?.clamp(0.0, 1.0);
@@ -1456,7 +1465,7 @@ pub fn filleted_polyline(pts: &[DVec3], r: &[f64], closed: bool) -> FResult<Shap
     for i in 0..if closed { n } else { n - 1 } {
         let j = (i + 1) % n;
         if trim(i) + trim(j) > (pts[j] - pts[i]).length() + 1e-12 {
-            return err("Bend radius is too large for the routing curve segments");
+            return err("Cannot create bend at given point.");
         }
     }
     let mut edges = Vec::new();
