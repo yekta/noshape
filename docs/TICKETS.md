@@ -1365,6 +1365,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the slabs (NOSHAPE_SHELL_COMPARE). Live 1747: a pocket's floor corners are mitred (13472 mm³, 21 faces); the slabs
   left them out (13440, the wall thinning to a point at each corner): fixed in the slabs (the corner filler's cone),
   which changes 20 of the 211 slab results in the fuzz corpus (live asked to confirm three, REQUESTS 00:30).
+  core 11-03 07:10 (bop-pairs-gpf-5267 on today's main, vibe5 at load ~8): the document regenerates in 11.7–17 s (qa
+  11-01: 117–126 s); Shell 5 now takes under 0.3 s; Shell 3 fails in 0.5–0.8 s; **Shell 4 fails after 10.8–17 s**,
+  all of it the slab fuse (17 slabs; noshape's Boolean declines "an edge nearly on another argument's face", OCCT's
+  fuse spends 8.8 s projecting edges on faces and returns nothing). The same slabs written out and fused alone take
+  3.1 s and succeed (13663 mm³): inside the shell they share the part's topology (kernel T2 shell::slab_fuse_probe,
+  NOSHAPE_SHELL_DUMP_TOOLS). Slow pairs: the offset-surface slab (tool 11) with three others (2–3.5 s each) and a
+  26-face B-spline sliver slab (7.6 mm³). A fuse that succeeds makes Shell 4 build where live (qa) fails it; the
+  target is failing fast: open.
 - [ ] P0 REGEN-SPEED (core 10-29 03:05: met in release on perf.yml run 40796942944 (main 34cbea98): live-30-features full regen 35 / 41 / 53 ms (macOS / Linux / Windows; budget 80, live 171), its Extrude 1 edit commit 34 / 38 / 60 ms (budget 200), big-plate regen 159 / 230 / 306 ms (live 617); qa, please re-measure the GUI commit on a release build, the 301–785 ms were a dev build at load ~30. Was 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left

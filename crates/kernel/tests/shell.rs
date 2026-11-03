@@ -1367,3 +1367,32 @@ fn corpus_32fd_against_live_probe() {
         }
     }
 }
+
+/// A shell's slab fuse that OCCT spends seconds on (NOSHAPE_FUSE_DIR: the `tool<k>.brep` NOSHAPE_SHELL_DUMP_TOOLS
+/// wrote, NOSHAPE_FUSE_N of them): the whole fuse timed, then every pair's.
+#[test]
+#[ignore = "T2 probe: NOSHAPE_FUSE_DIR"]
+fn slab_fuse_probe() {
+    let Ok(dir) = std::env::var("NOSHAPE_FUSE_DIR") else { return };
+    let n: usize = std::env::var("NOSHAPE_FUSE_N").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
+    let tools: Vec<Shape> = (0..n).map(|k| read_brep(std::path::Path::new(&format!("{dir}/tool{k}.brep"))).unwrap()).collect();
+    for (k, t) in tools.iter().enumerate() {
+        let kinds: Vec<String> = t.faces().iter().map(|f| format!("{:?}", f.face_surface().ok()).chars().take(8).collect()).collect();
+        println!("tool {k}: {:.6} mm3, {} faces {:?}", vol(t) * 1e9, t.faces().len(), kinds);
+    }
+    set_working_scale(1000.0);
+    let opts = BooleanOptions::default();
+    let t = std::time::Instant::now();
+    let all = fuse_all(&tools, &opts);
+    println!("all {n}: {:.0} ms, {:?}", t.elapsed().as_secs_f64() * 1e3, all.as_ref().map(|r| vol(&r.shape) * 1e9).map_err(|e| e.to_string()));
+    for i in 0..n {
+        for j in i + 1..n {
+            let t = std::time::Instant::now();
+            let r = fuse_all(&[tools[i].clone(), tools[j].clone()], &opts);
+            let ms = t.elapsed().as_secs_f64() * 1e3;
+            if ms > 200.0 || r.is_err() {
+                println!("pair {i} {j}: {ms:.0} ms, {:?}", r.as_ref().map(|r| vol(&r.shape) * 1e9).map_err(|e| e.to_string()));
+            }
+        }
+    }
+}
