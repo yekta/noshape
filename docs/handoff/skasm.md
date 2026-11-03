@@ -71,6 +71,16 @@ Measured on the real path, 03:55's substeps had slowed a1000's drag frame 8.2 ->
 while the steps land (substeps only for turns / held-off drags; poses as before within 1e-6 mm). vibe3 release,
 substeps -> now: a200 in-plane drag 0.89 -> 0.22 ms, off-plane 1.07 -> 1.06, 1000 pins 0.64 -> 0.16, a1000 frame
 10.6 -> 3.7 ms (270 fps).
+11:30: sketch batch 12 answered (live 1872): 36/40 on the first answer; s622 / s645 fixed (an H / V line joined at
+both ends with no size takes a neighbour's change: rung (1,1) before (0,3)); batches 1-12 368 of 430. Left: s653 (a T
+whose stem and top both change: live keeps the stem bottom and grows the two Equal overhangs l8 / l12 by half the
+top's change each, the left underside keeping its level; ours carries l8 whole before the top is placed, the top
+grows only leftward, the stem bottom can't close, the whole component falls back. Tried: the lowest of tied resizing
+lines first (places the stem first, as live, but changes no result): needs the overhangs, top and their Equal placed
+as one group) and s633 (stepped shaft, the same fallback). Trace: /root/skasm-scratch/fz/tr2.sh <seed> (points per
+placement). Driver: a tool not on the toolbar goes through Search tools (qa's sketch-slot ran with "tool:Slot is not
+shown"). New recordings: 6 dropdown scenarios + arc-radius match; slot-on-line differs only in selection after the
+slot (live keeps 1 selected).
 GUI note (10:40): on :103 an assembly drag shows no motion until release, in green too: NOSHAPE_PERF shows the drag
 solves running (2–7 ms) but llvmpipe frames taking 3.7–4.1 s (g.submit_to_frame) on the loaded box; not the app.
 Use a fresh NOSHAPE_CONFIG_DIR for GUI checks (the shared config has a feature panel dragged across the window).
