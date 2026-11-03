@@ -429,7 +429,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   10 mm block (a full round): our volume is live's (10450.5889 mm³ in its band) but 14 faces to live's 10: each corner is
   two spheres of one centre where live has one face (merge_full_rounds merges the cylinders only; a sphere pair's seam
   and pole edges defeat the rebuild). T2 custom_features::public_fillet_everything_as_live.
-- [x] (core 11-03 03:50: a subtraction's tools' faces in its result are created by it, with their edges (host `adopted`): the Laser Joint's overcuts as live, 23605.403148 / 23883.180926 mm³, 30 faces each; T1 custom_features::a_subtraction_creates_its_tools_faces; live's own counts asked, REQUESTS 03:00) P1 FS-BOOLEAN-CREATED (core 11-03, live 1830's Laser Joint) qCreatedBy(<a Boolean's id>, EDGE / FACE) is empty in
+- [x] (core 11-03 03:50: a subtraction's tools' faces in its result are created by it, with their edges (host `adopted`): the Laser Joint's overcuts as live, 23605.403148 / 23883.180926 mm³, 30 faces each; T1 custom_features::a_subtraction_creates_its_tools_faces; live 1845's counts all as ours: 10 edges (2 concave), 3 faces, 8 vertices, the tool's faces 0, the block's 7) P1 FS-BOOLEAN-CREATED (core 11-03, live 1830's Laser Joint) qCreatedBy(<a Boolean's id>, EDGE / FACE) is empty in
   ours, so the public Laser Joint's corner overcuts (concave edges the pin cuts made) find nothing and fail "Cannot
   resolve entities." (its defaults match live exactly: 23500 / 24000 mm³, 14 faces each). Live asked what a Boolean
   creates (REQUESTS 03:00). T2 custom_features::public_laser_joint_as_live, boolean_created_edges_probe.

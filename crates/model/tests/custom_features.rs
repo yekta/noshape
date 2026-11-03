@@ -2913,7 +2913,7 @@ export const plates = defineFeature(function(context is Context, id is Id, defin
 
 /// What a Boolean subtraction creates (std rib.fs and boolean.fs read qCreatedBy(<the Boolean>, FACE / EDGE); the
 /// public Laser Joint finds its corner overcuts' edges so, live 1830): the tools' faces in its result and their edges.
-/// A notch through a block's edge: its 3 walls, their 10 edges, 2 of them concave.
+/// A notch through a block's edge: its 3 walls, their 10 edges (2 concave) and 8 vertices, as live 1845.
 #[test]
 fn a_subtraction_creates_its_tools_faces() {
     let src = studio(
@@ -2935,6 +2935,7 @@ export const notch = defineFeature(function(context is Context, id is Id, defini
             if (evEdgeConvexity(context, { "edge" : e }) == EdgeConvexityType.CONCAVE)
                 concave += 1;
         println("concave " ~ concave ~ ", faces created " ~ size(evaluateQuery(context, qCreatedBy(id + "sub", EntityType.FACE))));
+        println("vertices " ~ size(evaluateQuery(context, qCreatedBy(id + "sub", EntityType.VERTEX))) ~ ", the tool's faces " ~ size(evaluateQuery(context, qCreatedBy(id + "b", EntityType.FACE))) ~ ", the block's " ~ size(evaluateQuery(context, qCreatedBy(id + "a", EntityType.FACE))));
     });
 "#,
     );
@@ -2948,5 +2949,6 @@ export const notch = defineFeature(function(context is Context, id is Id, defini
     ps.features.push(f);
     let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions { custom_features: Some(scripts), ..Default::default() });
     assert_ok(&r);
-    assert_eq!(custom::run::output_of(fid).unwrap().output, "created 10, on the block 10\nconcave 2, faces created 3\n");
+    // (live 1845: 10 edges, 2 concave, 3 faces, 8 vertices; the tool's faces 0, the block's 7)
+    assert_eq!(custom::run::output_of(fid).unwrap().output, "created 10, on the block 10\nconcave 2, faces created 3\nvertices 8, the tool's faces 0, the block's 7\n");
 }
