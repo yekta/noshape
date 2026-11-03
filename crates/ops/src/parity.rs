@@ -339,6 +339,13 @@ impl<'a> Translator<'a> {
         if let Some(p) = default_plane(text) {
             return Ok(vec![p.to_string()]);
         }
+        // The default planes' and the Origin's deterministic ids (fixed in
+        // every Part Studio), also when the query text is empty.
+        if let [id] = ids.as_slice()
+            && let Some(p) = [("JDC", "plane:top"), ("JCC", "plane:front"), ("JEC", "plane:right"), ("IB", "origin")].iter().find(|(i, _)| i == id).map(|(_, p)| p)
+        {
+            return Ok(vec![p.to_string()]);
+        }
         // A Plane feature's plane (`dummyQuery(id+"F….planeOp", …)`).
         if let Some(fid) = text.split("id+\"").nth(1).and_then(|r| r.split(".planeOp\"").next()).filter(|f| !f.contains('"'))
             && let Some(ours) = self.feature_ids.get(fid)
