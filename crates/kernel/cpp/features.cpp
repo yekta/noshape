@@ -4433,12 +4433,49 @@ static BlendBuild fillet_build(const Scaled& sc, const std::vector<TopoDS_Edge>&
                                const std::vector<double>& rs)
 {
   return [&sc, &es, &rs](double scale, TopoDS_Shape& out, HHist& h) {
-    BRepFilletAPI_MakeFillet mk(sc.shape);
-    for (size_t i = 0; i < es.size(); ++i)
-      mk.Add(rs[i] * scale * sc.factor, TopoDS::Edge(sc.image(es[i])));
-    mk.Build();
-    if (!mk.IsDone())
+    auto build = [&](BRepFilletAPI_MakeFillet& mk) {
+      for (size_t i = 0; i < es.size(); ++i)
+        mk.Add(rs[i] * scale * sc.factor, TopoDS::Edge(sc.image(es[i])));
+      mk.Build();
+      return mk.IsDone();
+    };
+    // One lone edge's blend in several faces (ChFi3d's walk restarted part way at its default tolerances: the
+    // Planetary Gears' root fillets, 0.5 + 4.6 mm of a 5.1 mm edge; Parasolid's is one face): again with tolerances
+    // ten times tighter. (Not edges meeting other filleted edges: their corners are rebuilt from OCCT's own patches.)
+    auto lone = [&](const TopoDS_Edge& e) {
+      for (TopExp_Explorer v(e, TopAbs_VERTEX); v.More(); v.Next())
+        for (const TopoDS_Edge& o : es)
+          if (!o.IsSame(e))
+            for (TopExp_Explorer w(o, TopAbs_VERTEX); w.More(); w.Next())
+              if (w.Current().IsSame(v.Current()))
+                return false;
+      return true;
+    };
+    auto split = [&](BRepFilletAPI_MakeFillet& mk) {
+      for (const TopoDS_Edge& e : es)
+      {
+        if (!lone(e))
+          continue;
+        int n = 0;
+        for (const TopoDS_Shape& f : mk.Generated(sc.image(e)))
+          n += f.ShapeType() == TopAbs_FACE;
+        if (n > 1)
+          return true;
+      }
       return false;
+    };
+    BRepFilletAPI_MakeFillet mk0(sc.shape);
+    if (!build(mk0))
+      return false;
+    BRepFilletAPI_MakeFillet  mk1(sc.shape);
+    BRepFilletAPI_MakeFillet* mkp = &mk0;
+    if (split(mk0))
+    {
+      mk1.SetParams(1.0e-2, 1.0e-5, 1.0e-6, 1.0e-5, 1.0e-6, 1.0e-3);
+      if (build(mk1) && BRepCheck_Analyzer(mk1.Shape()).IsValid())
+        mkp = &mk1;
+    }
+    BRepFilletAPI_MakeFillet& mk = *mkp;
     out = mk.Shape();
     h   = history_of({sc.shape}, mk);
     // OCCT's patch where the loop runs over smaller corner fillets -> Parasolid's.
