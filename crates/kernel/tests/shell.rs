@@ -983,17 +983,15 @@ fn smooth_vase_loft_probe() {
     println!("smooth vase loft: {} faces, {} edges, {:.4} mm3 (live 437833.2291, {:+.4}), valid {}", s.count(ShapeType::Face), s.count(ShapeType::Edge), vol(&s), vol(&s) - 437833.2291, s.is_valid());
 }
 
-/// A fuzz part's Shell whose free-form slabs OCCT's one fuse got wrong (their union smaller than the largest of them):
-/// fused two at a time, it builds (the shell corpus's 1814db9f; bop-pairs-gpf-5267's Shell 4 the same way, SHELL-SLOW).
+/// The shell corpus's 1814db9f (a fuzz part, its cylindrical face removed, 25 mm inward): live fails it ("Could not
+/// shell part with selections.", 2 ms; live REQUESTS 12:40), and so does ours.
 #[test]
-#[ignore = "T2: 5 s"]
-fn free_form_slabs_fused_two_at_a_time_when_one_fuse_fails() {
+#[ignore = "T2: 4 s"]
+fn a_fuzz_shell_live_refuses_fails() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
     let s = read_brep(&dir.join("corpus-1814-input.brep")).unwrap();
     set_working_scale(1000.0).unwrap();
-    let r = shell_solid(&s, &[s.faces()[5].clone()], 0.025, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
-    assert!(r.is_valid());
-    assert!(vol(&r) > 0.5 * vol(&s) && vol(&r) < vol(&s), "{} of {} mm3", vol(&r) * 1e9, vol(&s) * 1e9);
+    assert!(shell_solid(&s, &[s.faces()[5].clone()], 0.025, ShellSide::Inside, ShellMethod::Auto).is_err());
 }
 
 /// shell-hang's Shell 3 (live 1761: 177929.974087 mm³, 42 faces, one shell, no face meeting itself).

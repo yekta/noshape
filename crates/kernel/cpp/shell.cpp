@@ -4565,25 +4565,6 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     HHist        fu_hist;
     if (!quick_boolean(0, first, rest, bop_parallel(), fu_out, fu_hist))
       return false;
-    // A union smaller than its largest slab or larger than them all: OCCT's one fuse of free-form slabs gone wrong
-    // (bop-pairs-gpf-5267's Shell 4: 0.13 of 13663 mm³); two at a time instead (live's 13663).
-    double vmax = 0, vsum = 0;
-    std::vector<TopoDS_Shape> all;
-    for (ShapeList::Iterator it(tools); it.More(); it.Next())
-    {
-      const double v = volume_of(it.Value());
-      vmax = std::max(vmax, v);
-      vsum += v;
-      all.push_back(it.Value());
-    }
-    const double vu = volume_of(fu_out);
-    if (!(vu >= vmax * (1 - 1e-6) && vu <= vsum * (1 + 1e-6)))
-    {
-      if (dbg)
-        std::fprintf(stderr, "slabs: union %.6g outside [%.6g, %.6g], two at a time\n", vu, vmax, vsum);
-      if (!quick_fuse_tree(all, bop_parallel(), fu_out, fu_hist))
-        return false;
-    }
     union_ = fu_out;
     hu = fu_hist;
   }

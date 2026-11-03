@@ -1452,6 +1452,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   trim away anyway) and, past that, at a vertex of four faces; OCCT's offset gives an empty inner solid. Slabs wholly
   inside the part need no common, but the offset slab isn't (a vertex 10 µm+ outside) and its own common is the empty
   one. Next: the offset slab built so its common works (or none needed), or quadrics past the curl and 4-face vertices.
+  core 11-03 14:45: the two-at-a-time fallback is out again: live fails 1814db9f (one of the three corpus shells it
+  made build: "Could not shell part with selections.", 2 ms, REQUESTS 12:40), and it didn't get Shell 4 through;
+  T2 shell::a_fuzz_shell_live_refuses_fails.
 - [ ] P0 REGEN-SPEED (core 10-29 03:05: met in release on perf.yml run 40796942944 (main 34cbea98): live-30-features full regen 35 / 41 / 53 ms (macOS / Linux / Windows; budget 80, live 171), its Extrude 1 edit commit 34 / 38 / 60 ms (budget 200), big-plate regen 159 / 230 / 306 ms (live 617); qa, please re-measure the GUI commit on a release build, the 301–785 ms were a dev build at load ~30. Was 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left
@@ -3139,7 +3142,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   agree with live's to 1e-5, the ring gear (no fillets) matches. Likely OCCT's blend approximation in several
   patches. Rebuilt document: /root/dx-scratch/pmdocs/cf/cf-planetary-gears.noshape; model
   /root/parity/models/cf-planetary-gears (NOSHAPE_PARITY_ONLY=cf-planetary-gears). (dx 2026-11-03)
-- [x] (core 11-03 14:50: region_profile joins collinear lines of two entities that meet end to end where no other non-construction curve of the sketch touches (a construction one may), as one line's pieces already were; not in studios saved before (legacy_topology). learning-center-frank matches live to the end; exercise-martinl's Extrude 1 as live (its next difference a sketch frame, SKETCH-FACE-FRAME); clamp-guillem past Extrusión 1 (next: Extrusión 3's region). T1 model kernel_robustness::collinear_lines_meeting_alone_extrude_as_one_face, with a dangling line keeping them apart. If live's edge-case answer (REQUESTS 13:30) differs, the rule moves) P1 SKETCH-COLLINEAR-EDGES-MERGE (core; dx's parity suite 11-03, 3 documents) two collinear sketch lines that
+- [x] (core 11-03 14:35: region_profile joins collinear lines of two entities that meet end to end where no other non-construction curve of the sketch touches (a construction one may), as one line's pieces already were; not in studios saved before (legacy_topology). learning-center-frank matches live to the end; exercise-martinl's Extrude 1 as live (its next difference a sketch frame, SKETCH-FACE-FRAME); clamp-guillem past Extrusión 1 (next: Extrusión 3's region). T1 model kernel_robustness::collinear_lines_meeting_alone_extrude_as_one_face, with a dangling line keeping them apart. If live's edge-case answer (REQUESTS 13:30) differs, the rule moves) P1 SKETCH-COLLINEAR-EDGES-MERGE (core; dx's parity suite 11-03, 3 documents) two collinear sketch lines that
   meet end to end, where no other non-construction curve ends, extrude as one side face in live and as two in ours:
   learning-center-frank's Extrude 1 (its profile's base is (−62.5, 0)–(0, 0) and its mirror (62.5, 0)–(0, 0), only
   the construction mirror line ends at the origin): ours 19/51/34 faces/edges/vertices, live 18/48/32;
