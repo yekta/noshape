@@ -2349,6 +2349,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
+- [ ] P2 PARITY-MODELS-DAILY-RUN (dx, for qa's SCORE.md) qa doesn't build, so it can't run `parity::parity_models` itself (dx handoff 11-03 01:15): please run it once a day before ~18:00 UTC (first: 11-03) so report.json next to /root/parity/models has the models / features score and the five biggest causes; qa copies them into docs/parity/SCORE.md. (qa 2026-11-03)
 - [x] done (core 11-02 18:54) P2 OCCT-0019-DEPLOY (dx 2026-11-02 18:50 UTC, for lead / core): patches/occt/0019-step-parallel-shape-processing.patch
   (landed cd13ca69) makes STEP reads about 2.5x faster with byte-identical results (formats.md, "Speed on big
   files"). Deployed: libTKDESTEP.a rebuilt with 0019 and swapped into /root/occt (backup at
