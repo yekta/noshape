@@ -200,8 +200,17 @@ impl<'a> Translator<'a> {
         for table in doc["variables"].as_array().into_iter().flatten().filter(|v| v["variableStudioReference"].is_object()) {
             self.variable_studio(table);
         }
-        for (element, studio) in doc["featureStudios"].as_object().into_iter().flatten() {
+        // Every tab first: a studio imports another by its element id
+        // ("<eid>", or "<did>/<vid>/<eid>" in another document), ours by tab id.
+        let studios: Vec<(String, Value)> = doc["featureStudios"].as_object().into_iter().flatten().map(|(e, s)| (e.clone(), s.clone())).collect();
+        for (element, studio) in &studios {
+            self.feature_studio_tab(element, studio);
+        }
+        for (element, studio) in &studios {
             self.feature_studio(element, studio);
+        }
+        for (element, studio) in &studios {
+            self.feature_studio_check(element, studio);
         }
     }
 
@@ -227,19 +236,33 @@ impl<'a> Translator<'a> {
     }
 
     /// A Feature Studio custom features come from (features.json
-    /// `featureStudios`: element id → `{ "name", "source" }`): ours with the
-    /// same FeatureScript, committed.
-    fn feature_studio(&mut self, element: &str, studio: &Value) {
-        let Some(source) = studio["source"].as_str().or(studio.as_str()) else { return };
+    /// `featureStudios`: element id → `{ "name", "source" }`): its tab.
+    fn feature_studio_tab(&mut self, element: &str, studio: &Value) {
         let name = studio["name"].as_str().unwrap_or("Feature Studio 1");
-        let made = self.call("tab_create", json!({ "kind": "featurestudio", "name": name })).and_then(|r| r["tab"]["id"].as_str().map(str::to_string).ok_or_else(|| "no tab id".to_string()));
-        let tab = match made {
-            Ok(t) => t,
-            Err(e) => {
-                self.notes.push(format!("Feature Studio {name}: {e}"));
-                return;
+        match self.call("tab_create", json!({ "kind": "featurestudio", "name": name })).and_then(|r| r["tab"]["id"].as_str().map(str::to_string).ok_or_else(|| "no tab id".to_string())) {
+            Ok(tab) => {
+                self.studios.insert(element.to_string(), tab);
             }
-        };
+            Err(e) => self.notes.push(format!("Feature Studio {name}: {e}")),
+        }
+    }
+
+    /// Its FeatureScript, imports of the document's other studios pointed
+    /// at their tabs, committed.
+    fn feature_studio(&mut self, element: &str, studio: &Value) {
+        let (Some(source), Some(tab)) = (studio["source"].as_str().or(studio.as_str()), self.studios.get(element).cloned()) else { return };
+        let name = studio["name"].as_str().unwrap_or("Feature Studio 1");
+        let mut source = source.to_string();
+        for (other, ours) in &self.studios {
+            for path in [format!("\"{other}\""), format!("/{other}\"")] {
+                if let Some(at) = source.find(&path) {
+                    // The whole path string: from its opening quote.
+                    let open = source[..at + 1].rfind('"').unwrap_or(at);
+                    let close = at + path.len();
+                    source.replace_range(open..close, &format!("\"{ours}\""));
+                }
+            }
+        }
         if let Err(e) = self.call("featurestudio_edit", json!({ "tab": tab, "source": source })).and_then(|_| self.call("featurestudio_commit", json!({ "tab": tab }))) {
             self.notes.push(format!("Feature Studio {name}: {e}"));
         }
@@ -247,14 +270,19 @@ impl<'a> Translator<'a> {
         if let Some(pin) = source.split("FeatureScript").nth(1).and_then(|r| r.trim_start().split(';').next()).and_then(|v| v.trim().parse::<u32>().ok()) {
             self.std_pins.push((name.to_string(), pin, noshape_featurescript::std_version_for(pin)));
         }
-        // What the editor's notices call errors: it doesn't compile.
+    }
+
+    /// What the editor's notices call errors, once every studio is in: it
+    /// doesn't compile.
+    fn feature_studio_check(&mut self, element: &str, studio: &Value) {
+        let Some(tab) = self.studios.get(element).cloned() else { return };
+        let name = studio["name"].as_str().unwrap_or("Feature Studio 1");
         if let Ok(g) = self.call("featurestudio_get", json!({ "tab": tab })) {
             let errors: Vec<String> = g["notices"].as_array().into_iter().flatten().filter(|n| n["severity"] == "error").map(|n| format!("{} (line {})", n["message"].as_str().unwrap_or("?"), n["line"])).collect();
             if !errors.is_empty() {
                 self.custom_failures.push(format!("{name}: failed to compile: {}", errors.iter().take(3).cloned().collect::<Vec<_>>().join("; ")));
             }
         }
-        self.studios.insert(element.to_string(), tab);
     }
 
     /// A Variable Studio the Part Studio's variables come from (live's

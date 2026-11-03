@@ -3033,3 +3033,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   every curve, the Ø10 and all four constraint badges red, nothing singled out. That sketch was posted whole over REST;
   what live's UI does when the 10 mm is added last (red over-defining dimension?) is not captured. Model:
   /root/parity/models-dx/live-hole-row (parity_models, NOSHAPE_PARITY_MODELS). (dx 2026-11-03)
+- [ ] P2 FS-OLD-STD-COMPAT (core; dx's FeatureScript corpus 11-03, parity_feature_studios) community Feature Studios
+  pinned to old std versions that live compiles and ours doesn't (we serve 1963 for every pin below 3095):
+  cf-o-ring-generator (FeatureScript 369) `var … is vector = vector(…)` → "Type vector not found" (line 103: the
+  lowercase type name, accepted at its pin); cf-straight-spline (455) an enum ending in a trailing comma
+  (`sixteenSpline,\n}`) → "mismatched input '}' expecting ID" (line 14); cf-sheet-metal-hem (1024) imports
+  `onshape/std/rollSurface.fs` at 1024.0 → "Standard library module … does not exist" (gone from 1963 / 3095).
+  Sources in /root/parity/models/<name>/studios/ (live's fetch, not in the repo); run `parity::parity_feature_studios`
+  (T2, NOSHAPE_PARITY_MODELS). Score 13/34 studios compile; the other 18 failures are imports of elements live
+  hasn't fetched yet (asked). (dx 2026-11-03)
+- [ ] P2 FS-EDITOR-IMPORT-NOTICES (psui) the Feature Studio editor's notices (feature-studio-ui studio_notices,
+  fs_notices document_notices) compile the source alone, so a studio importing another tab (`import(path : "<tab
+  id>", …)`) shows "Imported element … not found" though its Part Studios regenerate with it; live's editor
+  resolves imports. The agent API now compiles with the document's tabs (custom::compile_in_document(doc, tab,
+  source), dx 11-03); the editor's background compile needs the document's studios passed in. (dx 2026-11-03)

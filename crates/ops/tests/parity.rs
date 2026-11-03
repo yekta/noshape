@@ -134,9 +134,16 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
 
 fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
     let mut features: Value = serde_json::from_str(&std::fs::read_to_string(dir.join("features.json")).ok()?).ok()?;
-    // The document's own Feature Studios: studios/<elementId>.fs (its source,
-    // the std it pins in its header) and optional <elementId>.json ({ "name", … }),
-    // with features.json's `featureStudios`.
+    read_studios(dir, &mut features);
+    let live = std::fs::read_to_string(dir.join("live.jsonl")).unwrap_or_default().lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).filter(|l| l.get("index").is_some()).collect();
+    let refs = std::fs::read_to_string(dir.join("refs.jsonl")).unwrap_or_default();
+    Some((features, live, refs))
+}
+
+/// The document's own Feature Studios: studios/<elementId>.fs (its source,
+/// the std it pins in its header) and optional <elementId>.json ({ "name", … }),
+/// into `features`' `featureStudios`.
+fn read_studios(dir: &Path, features: &mut Value) {
     if let Ok(entries) = std::fs::read_dir(dir.join("studios")) {
         for e in entries.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "fs")) {
             let (Some(id), Ok(source)) = (e.file_stem().map(|s| s.to_string_lossy().to_string()), std::fs::read_to_string(&e)) else { continue };
@@ -152,9 +159,59 @@ fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
             features["featureStudios"][id.as_str()] = studio;
         }
     }
-    let live = std::fs::read_to_string(dir.join("live.jsonl")).unwrap_or_default().lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).filter(|l| l.get("index").is_some()).collect();
-    let refs = std::fs::read_to_string(dir.join("refs.jsonl")).unwrap_or_default();
-    Some((features, live, refs))
+}
+
+/// Every document's Feature Studios (live's FeatureScript corpus, studios/
+/// fetched before its features): each compiled in a new document at the std
+/// its header pins, as parity_models loads them; per document what fails to
+/// compile and how long it took, then the commonest errors (host / std
+/// differences, core tickets).
+#[test]
+#[ignore = "T2: live's corpus from /root/parity/models (other people's work, never in the repo)"]
+fn parity_feature_studios() {
+    let root = PathBuf::from(std::env::var("NOSHAPE_PARITY_MODELS").unwrap_or_else(|_| "/root/parity/models".into()));
+    let mut dirs: Vec<PathBuf> = std::fs::read_dir(&root).map(|d| d.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.join("studios").is_dir()).collect()).unwrap_or_default();
+    dirs.sort();
+    let (mut studios, mut failed) = (0, 0);
+    let mut errors: std::collections::BTreeMap<String, Vec<String>> = Default::default();
+    for dir in dirs {
+        let name = dir.file_name().unwrap().to_string_lossy().to_string();
+        let mut doc = json!({ "features": [] });
+        read_studios(&dir, &mut doc);
+        let n = doc["featureStudios"].as_object().map(|m| m.len()).unwrap_or(0);
+        if n == 0 {
+            continue;
+        }
+        let mut ctx = Ctx::new();
+        let t0 = std::time::Instant::now();
+        let t = match Translator::open(&mut ctx, &scratch(&format!("fs-{name}.noshape")), &doc, Default::default()) {
+            Ok(t) => t,
+            Err(e) => {
+                println!("{name}: not opened: {e}");
+                continue;
+            }
+        };
+        let ms = t0.elapsed().as_secs_f64() * 1e3;
+        studios += n;
+        failed += t.custom_failures.len();
+        let pins: Vec<String> = t.std_pins.iter().map(|(s, pin, served)| format!("{s} pins {pin}, served {served}")).collect();
+        println!("{name}: {}/{n} Feature Studios compile ({ms:.0} ms; {})", n - t.custom_failures.len(), pins.join(", "));
+        for f in t.custom_failures.iter().chain(&t.notes) {
+            println!("  {f}");
+        }
+        for f in &t.custom_failures {
+            // The first error without its line, numbers as #.
+            let first = f.split("failed to compile: ").nth(1).unwrap_or(f).split(" (line").next().unwrap_or("");
+            let key: String = first.chars().map(|c| if c.is_ascii_digit() { '#' } else { c }).collect();
+            errors.entry(key).or_default().push(name.clone());
+        }
+    }
+    println!("parity_feature_studios: {}/{studios} Feature Studios compile", studios - failed);
+    let mut common: Vec<_> = errors.into_iter().collect();
+    common.sort_by_key(|c| std::cmp::Reverse(c.1.len()));
+    for (e, docs) in common.iter().take(15) {
+        println!("  {} × {e} ({})", docs.len(), docs.iter().take(4).cloned().collect::<Vec<_>>().join(", "));
+    }
 }
 
 /// Every document under /root/parity/models (NOSHAPE_PARITY_MODELS; one

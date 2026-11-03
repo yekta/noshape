@@ -1566,6 +1566,15 @@ export const block = defineFeature(function(context is Context, id is Id, defini
     let bad = call(&mut ctx, "featurestudio_edit", json!({ "source": "FeatureScript 3095;\nexport const x = ;\n" }));
     let err = bad["notices"].as_array().unwrap().iter().find(|n| n["severity"] == "error").unwrap_or_else(|| panic!("{bad}")).clone();
     assert_eq!(err["line"], 2, "{bad}");
+    // A studio importing another tab: its notices resolve the import, as
+    // the editor's (the corpus's studios import each other by element).
+    let lib = call(&mut ctx, "tab_create", json!({ "kind": "featurestudio", "name": "Lib" }))["tab"]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "featurestudio_edit", json!({ "tab": lib, "source": "FeatureScript 3095;\nexport const LIB_WIDTH = 7;\n" }));
+    call(&mut ctx, "featurestudio_commit", json!({ "tab": lib }));
+    let user = call(&mut ctx, "tab_create", json!({ "kind": "featurestudio", "name": "User" }))["tab"]["id"].as_str().unwrap().to_string();
+    let src = format!("FeatureScript 3095;\nimport(path : \"{lib}\", version : \"\");\nexport const W = LIB_WIDTH + 1;\n");
+    let r = call(&mut ctx, "featurestudio_edit", json!({ "tab": user, "source": src }));
+    assert!(r["notices"].as_array().unwrap().iter().all(|n| n["severity"] != "error"), "{r}");
 }
 
 /// Every format the Import dialog takes that we can write: the block is

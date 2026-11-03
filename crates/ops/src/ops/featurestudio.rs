@@ -86,9 +86,9 @@ fn studio(od: &OpenDoc, tab: TabId) -> &noshape_model::custom::FeatureStudio {
 }
 
 /// The editor's notices and the features a source defines (as the editor
-/// compiles it).
-fn compiled(tab: TabId, source: &str) -> (Vec<Value>, Vec<Value>) {
-    let c = noshape_model::custom::compile(tab, source);
+/// compiles it: imports of the document's other tabs resolved).
+fn compiled(doc: &noshape_model::document::Document, tab: TabId, source: &str) -> (Vec<Value>, Vec<Value>) {
+    let c = noshape_model::custom::compile_in_document(doc, tab, source);
     let notices = c
         .diagnostics
         .iter()
@@ -107,7 +107,7 @@ fn compiled(tab: TabId, source: &str) -> (Vec<Value>, Vec<Value>) {
 
 fn describe(od: &OpenDoc, tab: TabId) -> Value {
     let f = studio(od, tab);
-    let (notices, features) = compiled(tab, f.text());
+    let (notices, features) = compiled(od.doc(), tab, f.text());
     let name = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default();
     json!({ "tab": name, "source": f.text(), "uncommitted": f.has_uncommitted(), "notices": notices, "features": features })
 }

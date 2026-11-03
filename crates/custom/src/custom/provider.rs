@@ -108,6 +108,62 @@ impl Resolver for DocResolver<'_> {
     }
 }
 
+/// A document's Feature Studios (tab, name, committed source), the other
+/// tabs a studio can import, and the hash imports make part of the cache key.
+type Importables = (Vec<(TabId, String, String)>, Vec<(TabId, Importable)>, u64);
+
+fn importables(doc: &Document) -> Importables {
+    let sources: Vec<(TabId, String, String)> = doc
+        .ordered_tabs()
+        .into_iter()
+        .filter_map(|t| match &t.content {
+            TabContent::FeatureStudio(fs) => Some((t.id, t.name.clone(), fs.source.clone())),
+            _ => None,
+        })
+        .collect();
+    let others: Vec<(TabId, Importable)> = doc
+        .ordered_tabs()
+        .into_iter()
+        .filter_map(|t| match &t.content {
+            TabContent::File(_) => Some((t.id, Importable::File)),
+            TabContent::PartStudio(_) => Some((t.id, Importable::PartStudio)),
+            TabContent::VariableStudio(_) => Some((t.id, Importable::VariableStudio)),
+            _ => None,
+        })
+        .collect();
+    // Imports may refer to any studio or importable tab: they take part in the cache key.
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for (t, _, s) in &sources {
+        t.hash(&mut h);
+        s.hash(&mut h);
+    }
+    for (t, _) in &others {
+        t.hash(&mut h);
+    }
+    // Imported files' BLOB_DATA is a constant: a changed file recompiles.
+    for t in doc.tabs.iter() {
+        if let TabContent::File(f) = &t.content {
+            (t.id, &f.file_name, f.size, f.uploaded).hash(&mut h);
+        }
+    }
+    let deps = if sources.len() > 1 || !others.is_empty() { h.finish() } else { 0 };
+    (sources, others, deps)
+}
+
+/// Studio `tab` with `source` (the editor's text) compiled as the editor
+/// does: its imports of the document's other tabs resolved.
+pub fn compile_in_document(doc: &Document, tab: TabId, source: &str) -> Arc<CompiledStudio> {
+    let (mut sources, others, deps) = importables(doc);
+    if let Some(s) = sources.iter_mut().find(|s| s.0 == tab) {
+        s.2 = source.to_string();
+    }
+    let compiled = HashMap::new();
+    let resolver = DocResolver { studios: &sources, compiled: &compiled, others: &others };
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    (deps, source).hash(&mut h);
+    compile_with(tab, source, &resolver, if deps == 0 { 0 } else { h.finish() })
+}
+
 /// Every Feature Studio of a document, compiled (cached by source hash).
 /// Creating it also registers the declared feature schemas, so
 /// `features::get("custom:...")` and new-feature creation know them.
@@ -124,40 +180,7 @@ impl DocumentScripts {
     pub fn from_document(doc: &Document) -> Arc<Self> {
         // Regenerations with these scripts evaluate custom features through the host.
         crate::register();
-        let sources: Vec<(TabId, String, String)> = doc
-            .ordered_tabs()
-            .into_iter()
-            .filter_map(|t| match &t.content {
-                TabContent::FeatureStudio(fs) => Some((t.id, t.name.clone(), fs.source.clone())),
-                _ => None,
-            })
-            .collect();
-        let others: Vec<(TabId, Importable)> = doc
-            .ordered_tabs()
-            .into_iter()
-            .filter_map(|t| match &t.content {
-                TabContent::File(_) => Some((t.id, Importable::File)),
-                TabContent::PartStudio(_) => Some((t.id, Importable::PartStudio)),
-                TabContent::VariableStudio(_) => Some((t.id, Importable::VariableStudio)),
-                _ => None,
-            })
-            .collect();
-        // Imports may refer to any studio or importable tab: they take part in the cache key.
-        let mut h = std::collections::hash_map::DefaultHasher::new();
-        for (t, _, s) in &sources {
-            t.hash(&mut h);
-            s.hash(&mut h);
-        }
-        for (t, _) in &others {
-            t.hash(&mut h);
-        }
-        // Imported files' BLOB_DATA is a constant: a changed file recompiles.
-        for t in doc.tabs.iter() {
-            if let TabContent::File(f) = &t.content {
-                (t.id, &f.file_name, f.size, f.uploaded).hash(&mut h);
-            }
-        }
-        let deps = if sources.len() > 1 || !others.is_empty() { h.finish() } else { 0 };
+        let (sources, others, deps) = importables(doc);
         let mut compiled: HashMap<TabId, Arc<CompiledStudio>> = HashMap::new();
         let mut studios = Vec::new();
         for (tab, name, src) in &sources {

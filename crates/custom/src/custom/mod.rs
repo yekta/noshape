@@ -24,7 +24,7 @@ pub mod std_feature;
 pub mod studio;
 pub mod table;
 
-pub use provider::{CustomFeatureProvider, DocumentScripts, external_tab, set_external_tab_loader};
+pub use provider::{CustomFeatureProvider, DocumentScripts, compile_in_document, external_tab, set_external_tab_loader};
 pub use run::evaluate;
 pub use noshape_featurescript::lexer::symbol_occurrences;
 pub use studio::{CompiledStudio, CustomFeatureDef, Diagnostic, ParamDecl, Severity, compile, lookup};
