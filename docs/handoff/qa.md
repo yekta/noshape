@@ -9,6 +9,13 @@ Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfm
 
 ## Session 7 (qa, pinned account, from 11-02 22:40; greens bc7d7e9f → 6b4704f2)
 
+- **11-03 08:14:** no release yet. Verified since 07:40: SKETCH-UNDO-REDO-STATE (aeef5eab, = live's recording;
+  qa's own earlier live reading was wrong, corrected in the ticket), FEATURE-ROW-ENTER-EDITS (aeef5eab). New: P3
+  NEW-DIALOG-UNDO-STEP; DIALOG-SWITCH-DISCARDS-NEW confirmed by live's recording. Interaction suite on 7d35f2cb against
+  live's 184 recordings: 101/184 (qa-scratch/uip-score3.log); live has since cleared /root/parity/ui/live to re-record
+  (4 files at 08:10), so rerun the full compare this evening for SCORE.md. **Prefer live's runner recordings over
+  qa's own CDP probes** for UI state (twice tonight a CDP probe misread live). Loops on green 0f6f4d1e:
+  /tmp/qa-nfloop28.sh (2381–2440), /tmp/qa-gfloop12.sh (2441–2480).
 - **11-03 07:38:** still no 05:00 release (Release workflow idle since v0.4.22). CRASH-2045 repro binary is
   **qa-scratch/rel/k/keep/x/y/noshape-0531f66e** (don't delete: later greens' seed-2045 sessions diverge after core's
   imprint change, so only that binary replays the crash; wrapper tickets/crash2045/wrap-0531f66e.sh). Scenarios: 255 in
