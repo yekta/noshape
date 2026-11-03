@@ -3216,6 +3216,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (xt_read.cpp) takes only two-loop faces; it would need the ring edges' vertices put in a gap between the face's
   other loops and the seam run there. File: /root/parity/models/cf-wiring/imports/6ae9ae35100f83b7021d3619.x_t.
   (dx 2026-11-03)
+- [ ] P2 SKETCH-SPLINE-END-DERIVATIVES (skasm, then dx for the ops field; dx's parity suite 11-03 18:47) a fit spline's
+  end-tangent handles (behaviours "Spline": hollow end-tangent handles on gray handle lines) aren't in our sketch
+  model: Onshape stores `startDerivativeX/Y` / `endDerivativeX/Y` (and `startHandle`, `endHandle`) on the spline
+  geometry, and dragging a handle (or a dimension on it, `….startDerivative` / `….internal` ids) shapes the curve.
+  Ours draws the spline through the fit points only, so a spline with set ends takes another shape: cf-curve-pattern-
+  normal's Sketch 2 (3 fit points, start derivative (-0.304, 0), end (-0.242, 0) m) makes Extrude 2's surface box
+  y -70.9..91.4 / z 0..103 mm where live's is -85.1..105.6 / -14.2..103; cf-sheet-metal-model-plus's Sketch 1 too.
+  Once the sketch has it: sketch_draw `spline` takes `start_derivative` / `end_derivative` (dx), and the parity
+  translator passes them.
 - [ ] P1 FS-FEATURE-LIST-NONDETERMINISTIC (core; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our
