@@ -1610,16 +1610,11 @@ fn drag_probe_batch(n: usize, list: Vec<(String, Case, String, DVec2)>) {
         let end = live.as_ref().and_then(|l| l["cases"][&id]["drag"]["final"].as_array().map(|f| DVec2::new(f[0].as_f64().unwrap(), f[1].as_f64().unwrap()))).unwrap_or(to);
         let p = c.point(&point);
         // As the editor drags: each step from the drag's start (live probes
-        // 12: the result depends only on where the drag ends), from the last
-        // step when that doesn't solve.
+        // 12: the result depends only on where the drag ends).
         let origin = c.sk.clone();
         for k in 1..=25 {
-            let to = [(DragHandle::Point(p), (from + (end - from) * (k as f64 / 25.0)) * MM)];
-            let last = std::mem::replace(&mut c.sk, origin.clone());
-            if !c.sk.drag(&to).drag_solved {
-                c.sk = last;
-                c.sk.drag(&to);
-            }
+            c.sk.restore_geometry(&origin);
+            c.sk.drag(&[(DragHandle::Point(p), (from + (end - from) * (k as f64 / 25.0)) * MM)]);
         }
         json!({"case": id, "what": name, "constraints": c.spec, "onshape": {"entities": c.os_entities, "constraints": c.os_constraints}, "ours": o, "drag": {"point": point, "to": [to.x, to.y], "ours": ours_points(&c)}})
     }).collect();

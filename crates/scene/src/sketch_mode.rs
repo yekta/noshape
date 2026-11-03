@@ -3337,19 +3337,12 @@ impl SketchEditor {
                 }
                 // Live: a drag's result depends only on where it ends (drag
                 // probes 12: four paths to one pixel, the same points), so
-                // each step solves from the drag's start; from the last step
-                // only when that doesn't solve (a jump too far for one solve).
-                let last = self.drag_origin.as_ref().map(|o| std::mem::replace(&mut data.sketch, o.clone()));
-                if !data.sketch.drag(&[(handle, p)]).drag_solved
-                    && let Some(last) = last
-                {
-                    data.sketch = last;
-                    let step = match handle {
-                        DragHandle::Entity { id, grab } => DragHandle::Entity { id, grab: at.unwrap_or(grab) },
-                        h => h,
-                    };
-                    data.sketch.drag(&[(step, p)]);
+                // each step solves from the drag's start (a jump too far for
+                // one solve goes there in steps, `Sketch::drag`).
+                if let Some(o) = &self.drag_origin {
+                    data.sketch.restore_geometry(o);
                 }
+                data.sketch.drag(&[(handle, p)]);
                 match handle {
                     DragHandle::Entity { .. } => self.drag = Some(DragState::Geometry { handle, at: Some(p) }),
                     DragHandle::Point(id) => {

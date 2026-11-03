@@ -78,6 +78,18 @@ impl Sketch {
         }
     }
 
+    /// Puts every entity's geometry back as it is in `from` (a drag's
+    /// start; the same entities), copying only what differs.
+    pub fn restore_geometry(&mut self, from: &Sketch) {
+        for (id, e) in self.entities.iter_mut() {
+            if let Some(was) = from.entities.get(id)
+                && was.geometry != e.geometry
+            {
+                e.geometry.clone_from(&was.geometry);
+            }
+        }
+    }
+
     // ------------------------------------------------------------------
     // queries
 
