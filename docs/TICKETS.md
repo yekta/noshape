@@ -3310,6 +3310,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (bool) and 8364 face areas 2 s (NOSHAPE_KERNEL_PROFILE). stef-radijator-nlukic: three 90 ms bounding boxes, its
   Fillet 1 200 ms. knob-jason's Fillet 1 volume (-3.7 mm³, its first difference): live's per-face areas in live.jsonl
   are tessellated (an untouched cylinder 621.78 against the exact 622.04), so they can't place it.
+  core 11-03 20:51: cf-wave-spring 3.6 -> 1.8 s (tight boxes pulled in against edges only, 420a5307); left there 13 face
+  areas 2 s (long B-spline faces, ~150 ms each through the segmented integral) and min_distance 1.4 s. cf-fix-pcb is
+  4.9 s now against 2.85 s at run 31's 0e43c02f, not a regression: the translator now builds Extrude 5's text
+  (8/12 features), so Fix PCB 2 Booleans a bigger part (OCCT tree 3.3 s; 8364 face areas 2 s).
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet

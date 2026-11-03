@@ -20,6 +20,7 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
 - Landed since 19:45: the smooth-wall Shell path + round profiles swept by the discrete frame (4c7f9ff1;
   cf-hose-routing 113 -> 13 s, its hoses as live), the past-end fillet fallback's 0.5 s budget (queued; knob-jason
   3.9 -> 1.1 s), BOOL-RUST-GEARS-SLOW filed for bool (planetary gears 12.8 s vs 1.35 s without the Rust Boolean).
+- Also 420a5307: tight boxes against edges only (cf-wave-spring 3.6 -> 1.8 s).
 - PARITY-SPEED state per document in its TICKETS notes. Next: FILLET-31S-FAIL (knob-jason Fillet 2: a 5 mm face's
   two edges at R2.5, a full round; vibe5 ~/core-knob/fillet-2.brep / .txt), knob-jason Fillet 1's -3.7 mm³,
   FS-WAVE-SPRING-SPEED, FILLET-OVERLAP-FAIL.
