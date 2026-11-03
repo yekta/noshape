@@ -804,6 +804,10 @@ impl<'a> Translator<'a> {
             let construction = e["isConstruction"].as_bool() == Some(true);
             let gt = g["btType"].as_str().unwrap_or("");
             let num = |k: &str| g[k].as_f64().unwrap_or(0.0);
+            if gt.starts_with("BTCurveGeometryLine") && (e["endParam"].as_f64().unwrap_or(0.0) - e["startParam"].as_f64().unwrap_or(0.0)).abs() < 1e-9 {
+                problems.push(format!("sketch entity {eid}: a line of zero length, left out"));
+                continue;
+            }
             let shape = match gt.split('-').next().unwrap_or("") {
                 "BTCurveGeometryLine" => {
                     let (t0, t1) = (e["startParam"].as_f64().unwrap_or(0.0), e["endParam"].as_f64().unwrap_or(0.0));
@@ -877,18 +881,34 @@ impl<'a> Translator<'a> {
             if batch.is_empty() {
                 continue;
             }
-            let r = self.call("sketch_draw", json!({ "sketch": id, "shapes": batch }))?;
-            let made: Vec<&Value> = r["created"].as_array().into_iter().flatten().filter(|c| (c["type"] == "point") == points).collect();
-            for (eid, c) in ids.iter().zip(made) {
-                if let Some(cid) = c["id"].as_str() {
-                    self.sketch_entities.insert((oid.clone(), eid.clone()), cid.to_string());
-                    if points {
-                        self.sketch_points.push((oid.clone(), cid.to_string()));
+            // One call for them all; if one shape fails, each on its own
+            // (the others still drawn, the failing ones reported).
+            let replies: Vec<(Vec<String>, Value)> = match self.call("sketch_draw", json!({ "sketch": id, "shapes": batch.clone() })) {
+                Ok(r) => vec![(ids, r)],
+                Err(_) => {
+                    let mut out = Vec::new();
+                    for (shape, eid) in batch.iter().zip(&ids) {
+                        match self.call("sketch_draw", json!({ "sketch": id, "shapes": [shape] })) {
+                            Ok(r) => out.push((vec![eid.clone()], r)),
+                            Err(e) => problems.push(format!("sketch entity {eid}: not drawn ({e})")),
+                        }
                     }
+                    out
                 }
-                for (end, key) in [("start", "start_point"), ("end", "end_point"), ("center", "center_point")] {
-                    if let Some(pid) = c[key].as_str() {
-                        self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}")), pid.to_string());
+            };
+            for (ids, r) in &replies {
+                let made: Vec<&Value> = r["created"].as_array().into_iter().flatten().filter(|c| (c["type"] == "point") == points).collect();
+                for (eid, c) in ids.iter().zip(made) {
+                    if let Some(cid) = c["id"].as_str() {
+                        self.sketch_entities.insert((oid.clone(), eid.clone()), cid.to_string());
+                        if points {
+                            self.sketch_points.push((oid.clone(), cid.to_string()));
+                        }
+                    }
+                    for (end, key) in [("start", "start_point"), ("end", "end_point"), ("center", "center_point")] {
+                        if let Some(pid) = c[key].as_str() {
+                            self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}")), pid.to_string());
+                        }
                     }
                 }
             }
