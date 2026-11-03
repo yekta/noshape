@@ -1366,6 +1366,8 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   together (or tell core it should stay as it is).
 
 ## Requests to the lead
+- (11-03 23:03) For dx (drawing): Keyboard shortcuts › Drawing lacks "Edge condition symbol" (Unassigned in live's
+  dom/skasm-prefs-shortcuts-keyboard.txt; ops/src/shortcuts.rs has 57 of live's 58). Every other tab equals live's.
 - (11-03 17:34) Sketch drag step's regeneration (core's regen path): median 1.42 ms (10-30: ~0.94) and one 4 ms step
   (always step 61 of `sketch_perf::speed_target`, 219 entities); still inside the 8 ms target, but growing.
 - (11-03 17:34, 20:41) Assembly interaction scenarios: the suite has none (all 282 start in a Part Studio). Proposed
