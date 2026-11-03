@@ -6,7 +6,7 @@ causes of difference, each with its ticket.
 
 | date | green | models | features | scenarios | biggest causes (tickets) |
 |---|---|---|---|---|---|
-| 2026-11-03 | 834983a7 | 4/11 | 51/78 | 71/112 (396/516 states; green be4a7caa, qa 05:50, live's recordings then) | 2× SKETCH-FACE-IMPRINT (clamp-hms, untitled-document-chris); 2× CUT-CLOSED-EDGES-SPLIT (bushing2-0-joshua, clamp-abhil; pipeflange-steven too); 1× EXTRUDE-OVERLAP-LINES-FACES (bracket120-datenkrake); 1× FILLET-SPLIT-EDGE-FACES (bracket03-mattie) — first run, by dx at 05:05 (7 of live's 18 documents not fetched yet: REST 429) |
+| 2026-11-03 | 8cc55d8e | 6/11 | 56/78 | – | 2× CUT-CLOSED-EDGES-SPLIT (bushing2-0-joshua, pipeflange-steven; clamp-abhil too: 1× hole counts); 1× EXTRUDE-UP-TO-FACE-BEYOND (clamp-hms); 1× FILLET-SPLIT-EDGE-FACES (bracket03-mattie) — dx 08:30 update of the 05:05 row (7 of live's 18 documents not fetched yet: REST 429) |
 
 qa 11-03 05:55: the scenario column counts the scenarios with a live recording at compare time (112 of 162 runs; live was
 re-recording); the evening run replaces today's numbers. Scenario differences are psui's (its runner reports its own

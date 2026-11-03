@@ -73,6 +73,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   unpacker change; parity_models prints a "SCORE.md row: | … |" line to paste. drawing.md TB25 verified by tests;
   Insert view shows "Show annotations from model" only for a part (live captures; request withdrawn). Assembly
   layout proposed to live (REQUESTS 11-03 02:15), to build the assembly translator once confirmed.
+- 11-03 08:30 (lead: PARITY-IMPRINT-REGION-QUERY first, then the corpus's untranslated reasons): the region query
+  was already fixed (07:55, ticked); untranslated reasons tallied over all 18 documents: merge scopes named by a
+  live point outside our changed part (clamp-hms ×5) now take the nearest part; in-feature mate connectors' imprint
+  edges resolve (clamp-abhil); a Hole's locationSignatures / holeDepthMultiple counted as no-effect fields. What is
+  left is geometry-neutral (PROJECTED / OFFSET / CIRCULAR_PATTERN constraint links), behind a first difference
+  (clamp-hms's fillet blended edges) or needs live's refetch (faces named through later operations). qa's line
+  (SCORE.md row updated): `| 2026-11-03 | 8cc55d8e | 6/11 | 56/78 | – | 2× CUT-CLOSED-EDGES-SPLIT; 1× EXTRUDE-UP-TO-FACE-BEYOND;
+  1× FILLET-SPLIT-EDGE-FACES |`; dx's own 3 (models-dx): 2/3, 20/21 (live-hole-row's Sketch 4: REST-built, live
+  WARNING over-defined; ours makes the conflicting dimension driven as our tool does: translator's limit).
 - 11-03 08:10 SCORE NOW **6/11 documents, 56/78 features** (was 4/11, 51/78 at 05:05): bracket120, knob-tim and
   untitled-document-chris match to the end too (translator: live's sketch frames are `transformMatrix` in its fetch;
   a region named by the sketch's own curves is the whole region the face's edges split; a curve several regions
