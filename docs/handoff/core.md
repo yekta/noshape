@@ -16,6 +16,15 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-03 16:12 UTC.**
+- Landed / queued since 15:38: FILLET-BLEND-SPLIT (c79eba86: a lone edge's fillet that ChFi3d walks in two pieces is
+  built again with tolerances ten times tighter; cf-planetary-gears 111 / 75 / 255 faces as live; T1 kernel
+  blend::a_tooth_root_fillet_is_one_face, 500d895f), A22 batch 4 (sheet metal, revolve bounds, thin walls, measure,
+  face groups: 220 texts at their fields; Flange and Hem each in their own words via EdgeFrame::op; face_shapes takes
+  its field). A22's remaining native texts are the mapping's NONE rows (our own limitations, no std text).
+- Next: MIRROR-FEATURE-UP-TO, FILLET-OVERLAP-FAIL, FS-WAVE-SPRING-SPEED (tight box), Shell 4's common,
+  FILLET-PROPAGATION-VOLUME. Waiting on live: FS-OLD-STD-COMPAT, cf-parameter-pattern's end state.
+
 **State 11-03 15:38 UTC.**
 - Landed since 14:35: SKETCH-COLLINEAR-EDGES-MERGE (live 1904's cases), SKETCH-FACE-FRAME (ScopeRule 8,
   PartStudio::legacy_face_frames; evPlane too), FS-ANYTHING-PARAM, FS-FEATURE-LIST-RERUN (FeatureList functions re-run
