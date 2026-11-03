@@ -96,7 +96,7 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
   it 0.14 mm from its end (both vertices of 0.1 mm tolerance, apart by less than the sum, not merged as one): two
   collinear pieces from one vertex. (c) a5f1e564: collinear overlapping segments after projection. OCCT's PaveFiller
   sources aren't on this machine (only the installed OCCT in /root/occt).
-- Next, in order: (1) the three knurls that timed out on vibe5 (fin2) run by hand on vibe4 (logs vibe4 /tmp/kt-*.log, model-fin2); (2) the knurls' remaining "a non-manifold result" (32 of 346). On Ø25 x 10 CP30 45/30
+- Next, in order: (1) done: the three knurls that timed out on vibe5 are taken on vibe4, the same volumes and faces as before, valid; vibe3 (idle) before / after 53a03248: Ø25 x 56 CP12 6.4 / 6.6 s, Ø25 x 30 4.4 / 4.4 s, Ø100 x 71 CP20 80/30 107.6 / 108.7 s (the regroup rounds cost nothing measurable); (2) the knurls' remaining "a non-manifold result" (32 of 346). On Ø25 x 10 CP30 45/30
   (recorded vibe4 ~/agents/bool-corpora/k25-10-30) every groove's own edges near the end faces are split 3.3 um
   from their vertex (tolerance 1e-7) by a new point of tolerance 0 (NOSHAPE_X_SHORT=5e-6 lists them): past the two
   vertices' tolerances, within the 5 um section tolerance OCCT merges by. That is the rule reverted on 11-02 (it cost
