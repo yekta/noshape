@@ -806,6 +806,34 @@ fn onshapes_constraints_dont_move_the_sketch() {
     assert!(half["center"][1].as_f64().unwrap() < 0.0, "{half}");
 }
 
+/// Sketch text as live stores it (BTMSketchTextEntity: its first baseline's
+/// start and direction, the ascent, the font file): the Text tool's box at
+/// that corner and height, turned along the baseline (cf-fix-pcb's Sketch 4).
+#[test]
+fn sketch_text_is_placed_as_lives() {
+    let p = |id: &str, v: Value| json!({ "parameterId": id, "value": v });
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+          "entities": [{ "btType": "BTMSketchTextEntity-1761", "entityId": "txt", "isConstruction": false,
+              "parameters": [p("fontName", json!("OpenSans-Bold.ttf")), p("text", json!("HI")), p("mirrorHorizontal", json!(false)), p("mirrorVertical", json!(false))],
+              "baselineStartX": 0.01, "baselineStartY": 0.005, "baselineDirectionX": 0.006, "baselineDirectionY": 0.006, "ascent": 0.004 }],
+          "constraints": [] }
+    ] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("sketch-text.noshape"), &features, Default::default()).unwrap();
+    let step = t.step(0);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    let points: Vec<[f64; 2]> = g["entities"].as_array().unwrap().iter().flat_map(|e| ["at", "start", "end"].map(|k| e[k].clone())).filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect();
+    assert!(!points.is_empty(), "{g}");
+    // The glyphs lie up and to the right of (10, 5) mm, along 45°.
+    let n = points.len() as f64;
+    let c = [points.iter().map(|q| q[0]).sum::<f64>() / n - 10.0, points.iter().map(|q| q[1]).sum::<f64>() / n - 5.0];
+    let angle = c[1].atan2(c[0]).to_degrees();
+    assert!(c[0] > 0.0 && (angle - 67.5).abs() < 22.5, "centroid {c:?}, {angle}°");
+}
+
 /// An Extrude saved before Symmetric was a checkbox (endBound SYMMETRIC):
 /// the block 20 mm deep about the sketch plane.
 #[test]

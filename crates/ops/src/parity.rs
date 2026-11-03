@@ -1754,6 +1754,7 @@ impl<'a> Translator<'a> {
         // Onshape's start and end of each curve (sketch metres): ours may
         // run the other way (an arc is counter-clockwise).
         let mut ends: Vec<Option<[[f64; 2]; 2]>> = Vec::new();
+        let mut texts: Vec<Value> = Vec::new();
         for e in f["entities"].as_array().into_iter().flatten() {
             // Where live's solve put it (`sketches` geomEntities): stored
             // geometry can lag its variables (cf-parameter-pattern).
@@ -1764,6 +1765,11 @@ impl<'a> Translator<'a> {
             let construction = e["isConstruction"].as_bool() == Some(true);
             let gt = g["btType"].as_str().unwrap_or("");
             let num = |k: &str| g[k].as_f64().unwrap_or(0.0);
+            // Text: placed after the curves (sketch_text).
+            if e["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketchTextEntity")) {
+                texts.push(e.clone());
+                continue;
+            }
             if gt.starts_with("BTCurveGeometryLine") && (e["endParam"].as_f64().unwrap_or(0.0) - e["startParam"].as_f64().unwrap_or(0.0)).abs() < 1e-9 {
                 problems.push(format!("sketch entity {eid}: a line of zero length, left out"));
                 continue;
@@ -1894,6 +1900,11 @@ impl<'a> Translator<'a> {
                 }
             }
         }
+        for t in &texts {
+            if let Err(e) = self.sketch_text(&id, t, map) {
+                problems.push(format!("sketch text {}: {e}", t["entityId"].as_str().unwrap_or("?")));
+            }
+        }
         self.unsnap(&oid, &id, map);
         // Constraints and dimensions keep the geometry where Onshape solved
         // it; any that move it (a solve that differs) are taken back.
@@ -1921,6 +1932,39 @@ impl<'a> Translator<'a> {
         let st = self.call("feature_list", json!({}))?;
         let row = st["features"].as_array().into_iter().flatten().find(|x| x["id"] == id).cloned().unwrap_or_default();
         Ok((id, row["status"].as_str().unwrap_or("Ok").to_string(), row["message"].as_str().map(str::to_string)))
+    }
+
+    /// A text entity as the Text tool makes it: its first baseline's start,
+    /// the ascent as height, the font file's family and style, mirrored as
+    /// live's; turned when its baseline isn't along our x.
+    fn sketch_text(&mut self, id: &str, t: &Value, map: SketchMap) -> Result<(), String> {
+        let param = |name: &str| t["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).map(|p| p["value"].clone()).unwrap_or(Value::Null);
+        let num = |k: &str| t[k].as_f64().ok_or_else(|| format!("no {k}"));
+        let (x, y, dx, dy, ascent) = (num("baselineStartX")?, num("baselineStartY")?, num("baselineDirectionX")?, num("baselineDirectionY")?, num("ascent")?);
+        let (start, ahead) = (map.local([x, y]), map.local([x + dx, y + dy]));
+        let mm = |v: f64| format!("{} mm", v * 1e3);
+        // "OpenSans-BoldItalic.ttf": family "Open Sans", bold, italic.
+        let file = param("fontName").as_str().unwrap_or("").trim_end_matches(".ttf").to_string();
+        let (family, style) = file.split_once('-').unwrap_or((file.as_str(), "Regular"));
+        let mut name = String::new();
+        for (i, c) in family.chars().enumerate() {
+            if i > 0 && c.is_uppercase() && family.chars().nth(i - 1).is_some_and(char::is_lowercase) {
+                name.push(' ');
+            }
+            name.push(c);
+        }
+        let mut args = json!({ "sketch": id, "text": param("text").as_str().unwrap_or(""), "corner": [mm(start[0]), mm(start[1])], "height": mm(ascent),
+            "bold": style.contains("Bold"), "italic": style.contains("Italic"), "flip_horizontal": param("mirrorHorizontal") == true, "flip_vertical": param("mirrorVertical") == true });
+        if !name.is_empty() {
+            args["font"] = json!(name);
+        }
+        let made = self.call("sketch_text", args)?;
+        let angle = (ahead[1] - start[1]).atan2(ahead[0] - start[0]);
+        if angle.abs() > 1e-9 {
+            let created: Vec<String> = made["created"].as_array().into_iter().flatten().filter_map(|c| c["id"].as_str().map(str::to_string)).collect();
+            self.call("sketch_transform", json!({ "sketch": id, "entities": created, "rotate": format!("{angle} rad"), "center": [mm(start[0]), mm(start[1])] }))?;
+        }
+        Ok(())
     }
 
     /// Our line tool's Horizontal / Vertical inference snaps a line live
