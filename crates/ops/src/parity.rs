@@ -798,6 +798,15 @@ impl<'a> Translator<'a> {
                 return Ok(Some(id));
             }
         }
+        // Several share them: the named curve's whole shape decides (a
+        // rectangle's `.left` side alone is on both its inside and the region
+        // beside it; live: bracket120's Extrude 2 takes the rectangle).
+        if bounded.len() > 1 {
+            let shapes: std::collections::BTreeSet<&str> = strings.iter().filter(|e| self.curves.contains_key(&(sk.clone(), (*e).clone()))).filter_map(|e| e.rsplit_once('.').map(|(p, _)| p)).collect();
+            // Each side not named yet, once.
+            let siblings = self.curves.iter().filter(|((s, id), _)| *s == sk && !strings.contains(id) && id.rsplit_once('.').is_some_and(|(p, _)| shapes.contains(p)));
+            segments.extend(siblings.flat_map(|(_, poly)| poly.windows(2).flat_map(|w| [w[0], w[1]])));
+        }
         // Else (several share them, or none known): the one inside those curves.
         let regions = if bounded.is_empty() { all } else { bounded };
         let mut best: Option<(f64, String)> = None;
