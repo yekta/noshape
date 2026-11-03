@@ -426,7 +426,7 @@ impl Sketch {
 
     /// Places `comp`'s units from what changes outwards (module docs).
     fn place_component(&mut self, comp: &[EntityId], cons: &[(crate::ids::ConstraintId, Vec<EntityId>)], unit_of: &HashMap<EntityId, EntityId>) -> bool {
-        if self.scale_for_chord(comp, cons) || self.scale_for_circle(comp, cons) {
+        if self.scale_for_chord(comp, cons) || self.scale_for_circle(comp, cons) || self.turn_v_about_circle(comp, cons) {
             return true;
         }
         // Lines a point-to-line Distance spans, one resizing: the side the
@@ -1336,6 +1336,83 @@ impl Sketch {
             {
                 *radius *= k;
             }
+        }
+        self.touch();
+        true
+    }
+
+    /// A V (two lines from one point, one of them Horizontal / Vertical) with a
+    /// circle Tangent to both, its one change the Angle between the lines: the
+    /// other line turns about the old corner, the circle keeps its contact on
+    /// it at the old distance from that corner, the Horizontal / Vertical line
+    /// moves to stay tangent, both lines keep their lengths (live probes 17 w1,
+    /// fuzz s845 / s877 / s904: the corner slides along the turned line).
+    fn turn_v_about_circle(&mut self, comp: &[EntityId], cons: &[(crate::ids::ConstraintId, Vec<EntityId>)]) -> bool {
+        let unheld = self.unheld_constraints(1e-9);
+        let changes: Vec<&(crate::ids::ConstraintId, Vec<EntityId>)> = cons.iter().filter(|(c, _)| unheld.contains(c)).collect();
+        // The Angle, and maybe the two lines' own Lengths.
+        let angles: Vec<(EntityId, EntityId, f64)> = changes.iter().filter_map(|(c, _)| match self.constraint(*c).map(|k| &k.kind) {
+            Some(ConstraintKind::Angle { a, b, value }) => Some((*a, *b, *value)),
+            _ => None,
+        }).collect();
+        let [(a, b, value)] = angles.as_slice() else { return false };
+        let (a, b, value) = (*a, *b, *value);
+        let new_length = |x: EntityId| changes.iter().find(|(_, us)| us.as_slice() == [x]).and_then(|(c, _)| match self.constraint(*c).map(|k| &k.kind) {
+            Some(ConstraintKind::Length { value, .. }) => Some(*value),
+            _ => None,
+        });
+        if changes.len() != 1 + [a, b].iter().filter(|x| new_length(**x).is_some()).count() {
+            return false;
+        }
+        let fixed_dir = |x: EntityId| cons.iter().any(|(c, us)| us.as_slice() == [x] && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Horizontal { b: None, .. } | ConstraintKind::Vertical { b: None, .. })));
+        let (kept, turned) = match (fixed_dir(a), fixed_dir(b)) {
+            (true, false) => (a, b),
+            (false, true) => (b, a),
+            _ => return false,
+        };
+        let circle = comp.iter().copied().find(|c| {
+            self.kind(*c) == Some(EntityKind::Circle)
+                && [kept, turned].iter().all(|l| cons.iter().any(|(k, us)| us.len() == 2 && us.contains(c) && us.contains(l) && matches!(self.constraint(*k).map(|o| &o.kind), Some(ConstraintKind::Tangent { .. }))))
+        });
+        let (Some(circle), Some((ks, ke)), Some((ts, te))) = (circle, self.endpoints(kept), self.endpoints(turned)) else { return false };
+        // The two lines start at their shared corner.
+        let joined = |p: EntityId, q: EntityId| p == q || self.coincident_class(p).contains(&q);
+        if !joined(ks, ts) || comp.len() != 3 {
+            return false;
+        }
+        let (Some(corner), Some(k_end), Some(t_end)) = (self.point(ks), self.point(ke), self.point(te)) else { return false };
+        let Some(Geometry::Circle { center, radius }) = self.entity(circle).map(|e| e.geometry.clone()) else { return false };
+        let Some(c0) = self.point(center) else { return false };
+        let (kd, td) = ((k_end - corner).normalize_or_zero(), (t_end - corner).normalize_or_zero());
+        if kd == DVec2::ZERO || td == DVec2::ZERO {
+            return false;
+        }
+        // The turned line's new direction: the same sense about the kept one.
+        let sense = kd.perp_dot(td).signum();
+        let u = DVec2::from_angle(kd.to_angle() + sense * value);
+        // The old contact's distance from the corner along the turned line.
+        let t0 = (c0 - corner).dot(td);
+        let contact = corner + u * t0;
+        // The circle on the kept line's side of the turned line.
+        let n = DVec2::new(-u.y, u.x) * -sense;
+        let c1 = contact + n * radius;
+        // The kept line moves parallel to itself, tangent to the circle on its old side.
+        let kn = DVec2::new(-kd.y, kd.x);
+        let side = (c0 - corner).dot(kn).signum();
+        let on_kept = c1 - kn * side * radius;
+        // The new corner: where the kept line meets the turned line.
+        let denom = kd.perp_dot(u);
+        if denom.abs() < 1e-12 {
+            return false;
+        }
+        let s = (contact - on_kept).perp_dot(u) / denom;
+        let corner1 = on_kept + kd * s;
+        let (lk, lt) = (new_length(kept).unwrap_or((k_end - corner).length()), new_length(turned).unwrap_or((t_end - corner).length()));
+        for (p, q) in [(ks, corner1), (ts, corner1), (ke, corner1 + kd * lk), (te, corner1 + u * lt), (center, c1)] {
+            let _ = self.set_point(p, q);
+        }
+        for q in self.coincident_class(ks) {
+            let _ = self.set_point(q, corner1);
         }
         self.touch();
         true
