@@ -1043,6 +1043,20 @@ fn a_rounded_corners_new_radius_shortens_the_side_placed_before_it() {
     assert!(d.is_empty(), "s556: {}", d.join("; "));
 }
 
+/// Batch 12's s622 / s645 stay as live answered: a T profile's right flange
+/// gets thinner: the top comes down, the left flange's side (undimensioned)
+/// shortens and its underside keeps its level (it was carried down whole,
+/// the stem's left side taking the change: 3 mm off before). T1.
+#[test]
+fn a_thinner_flange_keeps_the_other_undersides_level() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-12.live.json")).unwrap()).unwrap();
+    for seed in [622, 645] {
+        let ours = batch(1, seed, true);
+        let d = differences(&ours["cases"][0], &live["cases"][format!("s{seed}")]);
+        assert!(d.is_empty(), "s{seed}: {}", d.join("; "));
+    }
+}
+
 /// Batch 10's s555 stays as live answered: an isosceles triangle's leg
 /// length changed: the base stays, the apex goes straight up (the leg and
 /// its Equal partner placed together, the base held; 16 mm off before). T1.

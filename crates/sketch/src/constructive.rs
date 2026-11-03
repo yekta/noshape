@@ -536,12 +536,18 @@ impl Sketch {
             let hv = |x: EntityId| self.kind(x) == Some(EntityKind::Line) && cons.iter().any(|(c, us)| us.as_slice() == [x] && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Horizontal { b: None, .. } | ConstraintKind::Vertical { b: None, .. })));
             let lines_beside: BTreeSet<EntityId> = cons.iter().filter(|(c, us)| us.contains(&u) && self.connective(*c)).flat_map(|(_, us)| us.iter().copied()).filter(|x| *x != u).collect();
             let corner = round && lines_beside.len() == 2 && lines_beside.iter().all(|x| hv(*x));
+            let joined_both_ends = self.endpoints(u).is_some_and(|(a, b)| !self.coincident_class(a).is_empty() && !self.coincident_class(b).is_empty());
             let ladder: &[(u8, u8)] = if corner {
                 &[(1, 3), (3, 1), (0, 3), (1, 2), (1, 1), (1, 0), (2, 1), (2, 0), (0, 2), (0, 1), (0, 0)]
             } else if end_carried && resized {
                 &[(1, 1), (0, 1), (1, 2), (1, 0), (0, 2), (0, 0)]
             } else if lower_held.is_some() {
                 &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (2, 1), (2, 0), (0, 2), (0, 1), (3, 1), (0, 0)]
+            } else if hv(u) && chained.is_none() && joined_both_ends && !cons.iter().any(|(c, us)| us.as_slice() == [u] && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Length { .. }))) {
+                // An H / V line joined at both ends with no size of its own
+                // takes the change, its neighbours staying (live fuzz s622:
+                // a T's thinner flange keeps the other underside's level).
+                &[(1, 3), (1, 1), (0, 3), (1, 2), (1, 0), (4, 0), (0, 2), (0, 1), (3, 1), (0, 0)]
             } else {
                 &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (4, 0), (0, 2), (0, 1), (3, 1), (0, 0)]
             };
