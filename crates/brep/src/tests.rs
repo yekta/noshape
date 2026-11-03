@@ -387,6 +387,22 @@ fn parallel_curves_leaving_one_vertex_go_by_their_side() {
     assert_eq!(r.len(), 2);
 }
 
+#[test]
+fn a_tiny_arc_at_a_vertex_merges_no_directions() {
+    use crate::curve2::C2;
+    use glam::DVec2;
+    // A unit square split across from the middle of its left side by a 0.1 um quarter arc and a line: the arc's
+    // curvature (1e7) allowed 10 rad of merged directions, the side's two halves (up and down) one ("two edges
+    // leave a vertex in one direction"; a knurl section's curve in a flank's parameters).
+    let r = 1e-7;
+    let pts = [DVec2::ZERO, DVec2::X, DVec2::ONE, DVec2::Y, DVec2::new(0.0, 0.5), DVec2::new(1.0, 0.5), DVec2::new(r, 0.5 + r)];
+    let seg = |a: usize, b: usize| ([a as u32, b as u32], C2::Seg { a: pts[a], b: pts[b] });
+    let arc = ([4, 6], C2::Arc { c: DVec2::new(0.0, 0.5 + r), r, a0: -std::f64::consts::FRAC_PI_2, sweep: std::f64::consts::FRAC_PI_2 });
+    let segs = [seg(0, 1), seg(1, 5), seg(5, 2), seg(2, 3), seg(3, 4), seg(4, 0), arc, seg(6, 5)];
+    let regions = crate::arrange::regions(&pts, &segs).expect("the regions");
+    assert_eq!(regions.len(), 2);
+}
+
 fn segment(a: DVec3, b: DVec3) -> Body {
     Body { vertices: vec![a, b], edges: vec![Edge { v: [0, 1], curve: Curve::Line }], ..Default::default() }
 }

@@ -104,6 +104,24 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
   free-form face), _DELV (the deleted-vertex rule), _PROJ (a failed projection), _TINY (a tiny arc)).
 - Squash only with `git reset --soft $(git merge-base HEAD origin/main)` after a fresh fetch; check `git show --stat`.
 
+## The curvature allowance at a vertex capped (11-03 03:50 UTC)
+- arrange.rs merges the directions of curves leaving a vertex that are within 1e-9 + 1 um x their curvatures
+  (tangent arcs whose start is a tolerance off the tangent point), chained along the sorted list. A knurl section's
+  curve in the flank's parameters can have a curvature of 5.5e6 at its end (its 2D derivative near zero there):
+  5.5 rad of allowance, so the line segments either side of it, leaving in opposite directions, became one
+  direction: "two edges leave a vertex in one direction" (Ø25 x 15 CP12 45/45) and "a non-manifold result"
+  (Ø10 x 25 CP20 80/30). Now the curvature term is at most 1e-3 rad. Both recorded knurls are taken (equivalent:
+  volume 1.6e-9 relative; vibe4 ~/agents/bool-corpora/k25-15 and k10-25; OCCT takes 19.5 s and 35 s on them). Corpora and
+  shfall decline exactly as before. Knurl sweep 261 -> 302 of 346 (no taken case lost; the same 4 invalid
+  results as before: Ø25 x 25 CP20 45/45, Ø63 x 25 CP30 80/30, Ø100 x 25 CP20 80/30, Ø25 x 24 CP12 45/30, all past
+  2000 faces where the build skips BRepCheck: a risk to look at). Spot checks against OCCT (NOSHAPE_BOOL_RUST=0):
+  Ø10 x 25 CP12 45/45 1694.602 mm³ both (8.7 s against OCCT's 60 s), Ø25 x 33 CP30 80/30 15717.845 both (22 s
+  against 302 s), Ø63 x 17 CP30 45/30 52630.845 / .846 (49 s against 202 s). The Ø10 x 25 CP12 recording
+  (k10-25-12, ad64fad8) replays as "differ": volume 1.6e-8 relative, and unified 1817 faces against OCCT's 1830:
+  OCCT's result keeps 13 flank faces split at the cylinder's seam angle (two halves of 0.089 mm² where ours has one
+  of 0.178 mm²) that its unify doesn't merge; Onshape has no seam splits (the default diamond knurl: ours 10362
+  faces, live 10362).
+
 ## Faces going round between rulings: threads (11-03 03:20 UTC)
 - A part of a cylinder or cone with no gap in the angles its boundary covers (a thread's helical face: no seam,
   rulings at one angle where the turns end) declined "a cylinder face without curved edges". Now th0 is the
