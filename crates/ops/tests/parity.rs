@@ -605,3 +605,39 @@ fn an_old_symmetric_extrude_is_read() {
     let r = run_model("old-symmetric", &features, &live, &refs);
     assert_eq!((r.matching, r.features), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
+
+#[test]
+#[ignore = "T2: scratch"]
+fn zz_scratch_strings() {
+    use noshape_model::custom::host::packed::{Packed, unpack};
+    fn walk(p: &Packed, out: &mut Vec<String>) {
+        match p {
+            Packed::Str(s) => out.push(s.clone()),
+            Packed::Map(m) => m.iter().for_each(|(k, v)| {
+                walk(k, out);
+                walk(v, out);
+            }),
+            Packed::Array(a) => a.iter().for_each(|v| walk(v, out)),
+            Packed::Tagged(_, v) => walk(v, out),
+            _ => {}
+        }
+    }
+    let f: Value = serde_json::from_str(&std::fs::read_to_string("/home/ngyekta/agents/dx/live-models/clamp-hms/features.json").unwrap()).unwrap();
+    for feat in f["features"].as_array().unwrap() {
+        if feat["name"] != "Extrude 2" {
+            continue;
+        }
+        for p in feat["parameters"].as_array().unwrap() {
+            if p["parameterId"] != "entities" {
+                continue;
+            }
+            for q in p["queries"].as_array().unwrap() {
+                let text = q["queryString"].as_str().unwrap();
+                let packed = text.split("qCompressed(1.0,\"").nth(1).unwrap().split('"').next().unwrap();
+                let mut out = Vec::new();
+                walk(&unpack(packed).unwrap(), &mut out);
+                println!("{:?}: {:?}", q["deterministicIds"], out);
+            }
+        }
+    }
+}

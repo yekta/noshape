@@ -72,6 +72,8 @@ pub struct Translator<'a> {
     circles: HashMap<(String, String), ([f64; 2], f64)>,
     /// Onshape's ellipses: centre, major direction, radii (m).
     ellipses: HashMap<(String, String), [f64; 6]>,
+    /// Face pieces one selection list already took (each is picked once).
+    picked: std::collections::HashSet<String>,
     first_move: Option<String>,
     /// Onshape Feature Studio element id → our Feature Studio tab id.
     studios: HashMap<String, String>,
@@ -151,7 +153,8 @@ impl<'a> Translator<'a> {
         let features = doc["features"].as_array().ok_or("features.json has no `features`")?.clone();
         let mut frames = HashMap::new();
         for s in doc["sketches"]["sketches"].as_array().into_iter().flatten() {
-            let (Some(id), Some(m)) = (s["featureId"].as_str(), s["sketchMatrix"].as_array()) else { continue };
+            // `sketchMatrix` (older API versions) or `transformMatrix` (live's fetch).
+            let (Some(id), Some(m)) = (s["featureId"].as_str(), s["sketchMatrix"].as_array().or(s["transformMatrix"].as_array())) else { continue };
             let m: Vec<f64> = m.iter().filter_map(Value::as_f64).collect();
             if m.len() == 16 {
                 // Row-major 4×4: columns x, y, normal, origin.
@@ -165,7 +168,7 @@ impl<'a> Translator<'a> {
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
         let _ = std::fs::remove_file(path);
-        let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), first_move: None, studios: HashMap::new(), notes: Vec::new() };
+        let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), first_move: None, studios: HashMap::new(), notes: Vec::new() };
         t.call("document_create", json!({ "path": path.to_str().ok_or("path")? }))?;
         // Bare numbers in Onshape's expressions are in the document's units.
         let (length, angle) = doc_units(&doc["units"]);
@@ -469,6 +472,7 @@ impl<'a> Translator<'a> {
             "BTMParameterNullableQuantity" => Some(json!(p["expression"].as_str().ok_or("no expression")?)),
             "BTMParameterEnum" | "BTMParameterBoolean" | "BTMParameterString" => Some(p["value"].clone()),
             "BTMParameterQueryList" => {
+                self.picked.clear();
                 let mut ids = Vec::new();
                 for q in p["queries"].as_array().into_iter().flatten() {
                     ids.extend(self.query(k, q)?);
@@ -724,6 +728,7 @@ impl<'a> Translator<'a> {
         // A piece of the face the sketch is on is named by the face's edges too: other sketches' curves they came from
         // ("<sketch>.wireOp" … sketchEntityId), into this sketch's plane.
         let mut derived = false;
+        let mut face_edges: Vec<[f64; 2]> = Vec::new();
         if let Some([fo, fx, fy]) = frame {
             let mut of: Option<&str> = None;
             for w in strings.windows(2) {
@@ -736,7 +741,9 @@ impl<'a> Translator<'a> {
                     let world: Vec<f64> = (0..3).map(|i| go[i] + p[0] * gx[i] + p[1] * gy[i] - fo[i]).collect();
                     [(0..3).map(|i| world[i] * fx[i]).sum::<f64>(), (0..3).map(|i| world[i] * fy[i]).sum::<f64>()]
                 };
-                segments.extend(poly.windows(2).flat_map(|p| [to_here(&p[0]), to_here(&p[1])]));
+                let pieces: Vec<[f64; 2]> = poly.windows(2).flat_map(|p| [to_here(&p[0]), to_here(&p[1])]).collect();
+                segments.extend(&pieces);
+                face_edges.extend(pieces);
                 derived = true;
             }
         }
@@ -759,6 +766,37 @@ impl<'a> Translator<'a> {
         let bounded: Vec<Value> = all.iter().filter(|r| !named.is_empty() && named.iter().all(|e| r["boundary"].as_array().is_some_and(|b| b.iter().any(|x| x == e)))).cloned().collect();
         if let [only] = bounded.as_slice() {
             return Ok(only["id"].as_str().map(whole));
+        }
+        // A piece of the face (named by face edges too): the pieces whose own
+        // curves are exactly the named ones, the one nearest those face edges
+        // (each side of a symmetric part names its own edges).
+        if derived && !named.is_empty() {
+            let own = |r: &Value| -> std::collections::BTreeSet<String> {
+                r["boundary"].as_array().into_iter().flatten().filter_map(Value::as_str).filter(|e| e.rsplit(':').next().and_then(|n| n.parse::<u64>().ok()).is_some_and(|n| n < 1 << 30)).map(str::to_string).collect()
+            };
+            let want: std::collections::BTreeSet<String> = named.iter().cloned().collect();
+            let exact: Vec<&Value> = bounded.iter().filter(|r| own(r) == want).collect();
+            let k = per_unit(&g["units"]);
+            let near = |r: &Value| -> f64 {
+                let (u, v) = (r["inside"][0].as_f64().unwrap_or(0.0), r["inside"][1].as_f64().unwrap_or(0.0));
+                let w: Vec<f64> = (0..3).map(|i| (o[i] + u * x[i] + v * y[i]) * k).collect();
+                let p = match frame {
+                    Some([fo, fx, fy]) => [(0..3).map(|i| (w[i] - fo[i]) * fx[i]).sum::<f64>(), (0..3).map(|i| (w[i] - fo[i]) * fy[i]).sum::<f64>()],
+                    None => [u * k, v * k],
+                };
+                face_edges.chunks(2).map(|s| {
+                    let (d, e) = ([s[1][0] - s[0][0], s[1][1] - s[0][1]], [p[0] - s[0][0], p[1] - s[0][1]]);
+                    let t = ((e[0] * d[0] + e[1] * d[1]) / (d[0] * d[0] + d[1] * d[1]).max(1e-30)).clamp(0.0, 1.0);
+                    (e[0] - t * d[0]).hypot(e[1] - t * d[1])
+                }).fold(f64::INFINITY, f64::min)
+            };
+            // A mirrored pair names the same edges: each takes one.
+            let fresh: Vec<&&Value> = exact.iter().filter(|r| r["id"].as_str().is_some_and(|id| !self.picked.contains(id))).collect();
+            let pool = if fresh.is_empty() { exact.iter().collect() } else { fresh };
+            if let Some(id) = pool.iter().min_by(|a, b| near(a).total_cmp(&near(b))).and_then(|r| r["id"].as_str()).map(str::to_string) {
+                self.picked.insert(id.clone());
+                return Ok(Some(id));
+            }
         }
         // Else (several share them, or none known): the one inside those curves.
         let regions = if bounded.is_empty() { all } else { bounded };
