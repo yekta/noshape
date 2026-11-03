@@ -305,6 +305,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P2 CRASH-1837-ONCE (core; seen once) CLI fuzz seed 1837 (`clifuzz_time.py 1837 106`, fallback on, Rust Boolean on) on
+  green e18f898a died at **step 98, a delete, "corrupted double-linked list" / "noshape: the kernel aborted; not
+  recoverable"** (exit 134, 3.9 s into the step); the stack is in qa-scratch/tickets/crash1837/stderr-g1837.log (frames as
+  offsets only, and that green copy was already replaced, so not symbolized), the step log beside it. **Not reproduced**
+  in 8 reruns: green 107649d9 ×2, with NOSHAPE_BOOL_RUST=0 ×1, v0.4.22 ×1, green daaaab03 ×4 — all 106 steps. A heap
+  corruption that shows 1 in 9: worth a run under ASan / the guard trace if one is cheap. (qa 2026-11-03, build e18f898a)
 - [ ] P2 SHELL-HANG-5 (core 11-02, live 1795): shell-hang's Shell 5 (tests/data/shell/shellhang-shell5-input.step: 3 mm
   in, two planar faces removed) builds in live in 0.3 s (175040.1025 mm³, 52 faces); ours fails after 17 s: OCCT's offset
   (any of its intersection modes) gives no solid, the direct construction's corners don't meet (most of the part is
