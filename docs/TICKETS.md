@@ -326,6 +326,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P2 SKETCH-IMPRINT-TOPOLOGY (core 11-03, from SKETCH-FACE-IMPRINT; live behaviours 1747 / ~24081) a sketch on a
+  face owns the face's imprinted edges and vertices in live: qCreatedBy(sketch, VERTEX) returns the face's corners
+  too (a Hole on qCreatedBy(sketch, VERTEX) fails "Error regenerating." for that), qCreatedBy(sketch, EDGE) the
+  face's edges, split where the sketch's curves cross them (live probe "core imprint probe 1": a Ø10 circle inside
+  a 60 × 40 face: 6 edges, 5 vertices; a line across it: 8 / 8). Ours: the sketch's own only (the FS host's
+  SketchEdge / SketchPoint entities; the imprinted curves aren't kept in SketchResult).
 - [ ] P2 FILLET-PRISMATIC-CYLINDER (core 11-03, live REST on live 1830's gears) a constant fillet between two faces
   extruded the same way (the Spur Gear's root fillets: the root cylinder and an extruded involute spline) is a
   cylinder in live (qGeometry CYLINDER, evSurfaceDefinition radius 0.378848 / 0.166393 mm); ours an OCCT B-spline
@@ -2121,7 +2127,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (changed) and 0.378848 (defaults). With live's radius forced (SPUR_RADIUS=0.166393): chord knots 3667.97 mm³,
   centripetal knots 4045.57 (in band, 203 faces as live). With centripetal knots the sketch's tangent circle comes out
   r 1.38 mm (fillet 0.920; live 0.2496 / 0.166393) and our fillet of it fails; defaults' stays right (0.37885).
-- [ ] P1 SKETCH-FACE-IMPRINT (skasm + core; dx's parity suite 11-03) a sketch on a part face imprints in Onshape (unless
+- [x] bd7aba69 (core 11-03 06:37: as live 1852 and the REST probe; leftovers SKETCH-IMPRINT-TOPOLOGY and PARITY-IMPRINT-REGION-QUERY) P1 SKETCH-FACE-IMPRINT (skasm + core; dx's parity suite 11-03) a sketch on a part face imprints in Onshape (unless
   Disable imprinting): its curves split the face, and the pieces bounded partly by the face's own edges are regions to
   pick. Ours: only closed loops of sketch curves are regions (parity/sketch.md 1.14 is ✅ for the checkbox only).
   Live: clamp-hms "rectangle hump" (circles r31 / r18 and a line across them, on the top face of "extrude main
@@ -2571,6 +2577,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
+- [ ] P2 PARITY-IMPRINT-REGION-QUERY (dx; core 11-03 from SKETCH-FACE-IMPRINT) clamp-hms Extrude 2 still "no region of
+  ours inside sketch F4OZBkDrtf9vyuF_1's curves": our "rectangle hump" has live's pieces now (the circles r31 / r18
+  and the line split by the side face's edges; sketch_get lists them, "imprinted": true for the face's own pieces),
+  but live's TOPOLOGY query names each piece by its sketch curves plus face edges derived from "main rectangle"'s
+  lines, and region_from_query's inside test (core added those derived curves, mapped into the sketch's plane)
+  can't tell the candidates apart: the derived lines don't close a loop. untitled-document-chris's one piece works.
 - [ ] P2 PARITY-MODELS-DAILY-RUN (dx, for qa's SCORE.md) qa doesn't build, so it can't run `parity::parity_models` itself (dx handoff 11-03 01:15): please run it once a day before ~18:00 UTC (first: 11-03) so report.json next to /root/parity/models has the models / features score and the five biggest causes; qa copies them into docs/parity/SCORE.md. (qa 2026-11-03) — dx 11-03 05:05: first run done, /root/parity/report.json (4/11 documents, 51/78 features; the causes with their tickets in dx.md's 05:40 entry); /root/dx-scratch/pm-daily.sh runs it daily at 16:13 UTC from dx's session and prints the SCORE.md row.
 - [x] done (core 11-02 18:54) P2 OCCT-0019-DEPLOY (dx 2026-11-02 18:50 UTC, for lead / core): patches/occt/0019-step-parallel-shape-processing.patch
   (landed cd13ca69) makes STEP reads about 2.5x faster with byte-identical results (formats.md, "Speed on big
