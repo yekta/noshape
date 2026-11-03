@@ -319,8 +319,9 @@ fn everyday(seed: u64) -> Case {
         };
         // (Batch 6 on, seed 381: three more kinds; batch 7 on, seed 421,
         // three more; batch 8 on, seed 461, three more; batch 10 on, seed
-        // 541, three more; batch 12 on, seed 621, three more.)
-        match r.below(if seed >= 621 { 20 } else if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
+        // 541, three more; batch 12 on, seed 621, three more; batch 13 on,
+        // seed 661, three more.)
+        match r.below(if seed >= 661 { 23 } else if seed >= 621 { 20 } else if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
             // Corner rectangle (live's tool constraints), width and height.
             0 => {
                 let (w, h) = (r.range(15.0, 50.0), r.range(10.0, 35.0));
@@ -693,6 +694,84 @@ fn everyday(seed: u64) -> Case {
                 c.length(&l[1], l1 * fs[2]);
                 c.length(&l[5], (len * fs[3]).max(l1 * fs[2] * 1.3));
             }
+            // Plate with two holes: an H / V rectangle, width and height,
+            // two Equal holes, the first's diameter and distances to the
+            // left and bottom sides, the second's to the right and bottom.
+            20 => {
+                let (w, h) = (r.range(35.0, 60.0), r.range(20.0, 35.0));
+                let p = [o, o + v(w, 0.0), o + v(w, h), o + v(0.0, h)];
+                let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+                for i in 0..4 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+                    c.hv(i % 2 == 0, &l[i]);
+                }
+                let (dx, dy, rad) = (w * r.range(0.15, 0.3), h * r.range(0.3, 0.7), r.range(2.0, 4.0));
+                let h1 = c.circle(o + v(dx, dy), rad);
+                let h2 = c.circle(o + v(w - dx, dy), rad);
+                c.pair("EQUAL", &h1, &h2);
+                let fs: Vec<f64> = (0..6).map(|_| f(&mut r)).collect();
+                c.length(&l[0], w * fs[0]);
+                c.length(&l[1], h * fs[1]);
+                c.radius(&h1, rad * fs[2], true);
+                c.distance(&format!("{h1}.center"), &l[3], dx * fs[3]);
+                c.distance(&format!("{h1}.center"), &l[0], dy * fs[4]);
+                c.distance(&format!("{h2}.center"), &l[1], dx * fs[5]);
+                c.distance(&format!("{h2}.center"), &l[0], dy);
+            }
+            // Hex nut: the polygon tool's hexagon and a hole Concentric with
+            // its construction circle; both diameters.
+            21 => {
+                let rad = r.range(8.0, 20.0);
+                let p: Vec<DVec2> = (0..6).map(|i| o + DVec2::from_angle(-FRAC_PI_2 - PI / 6.0 + i as f64 * PI / 3.0) * rad).collect();
+                let l: Vec<String> = (0..6).map(|i| c.line(p[i], p[(i + 1) % 6])).collect();
+                let circle = c.circle(o, rad);
+                c.construction(&circle);
+                for i in 0..6 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 6]));
+                    c.on_curve(&format!("{}.start", l[i]), &circle);
+                }
+                for i in 1..6 {
+                    c.pair("EQUAL", &l[0], &l[i]);
+                }
+                c.hv(true, &l[0]);
+                let hole_r = rad * r.range(0.3, 0.55);
+                let hole = c.circle(o, hole_r);
+                c.pair("CONCENTRIC", &hole, &circle);
+                let (fr, fh) = (f(&mut r), f(&mut r));
+                c.radius(&circle, rad * fr, true);
+                c.radius(&hole, (hole_r * fh).min(rad * fr * 0.7), true);
+            }
+            // L-bracket with its inner corner filleted: H / V lines, the
+            // arc Tangent to both inner sides; width, height, both
+            // thicknesses and the radius.
+            22 => {
+                let (w, h, t1, t2, rad) = (r.range(30.0, 50.0), r.range(25.0, 40.0), r.range(5.0, 10.0), r.range(5.0, 10.0), r.range(2.0, 5.0));
+                let l1 = c.line(o, o + v(w, 0.0));
+                let l2 = c.line(o + v(w, 0.0), o + v(w, t1));
+                let l3 = c.line(o + v(w, t1), o + v(t2 + rad, t1));
+                let a4 = c.arc(o + v(t2 + rad, t1 + rad), rad, PI, 1.5 * PI);
+                let l5 = c.line(o + v(t2, t1 + rad), o + v(t2, h));
+                let l6 = c.line(o + v(t2, h), o + v(0.0, h));
+                let l7 = c.line(o + v(0.0, h), o);
+                c.coincident(&format!("{l1}.end"), &format!("{l2}.start"));
+                c.coincident(&format!("{l2}.end"), &format!("{l3}.start"));
+                c.coincident(&format!("{l3}.end"), &format!("{a4}.end"));
+                c.coincident(&format!("{a4}.start"), &format!("{l5}.start"));
+                c.coincident(&format!("{l5}.end"), &format!("{l6}.start"));
+                c.coincident(&format!("{l6}.end"), &format!("{l7}.start"));
+                c.coincident(&format!("{l7}.end"), &format!("{l1}.start"));
+                c.pair("TANGENT", &l3, &a4);
+                c.pair("TANGENT", &a4, &l5);
+                for (l, hz) in [(&l1, true), (&l2, false), (&l3, true), (&l5, false), (&l6, true), (&l7, false)] {
+                    c.hv(hz, l);
+                }
+                let fs: Vec<f64> = (0..5).map(|_| f(&mut r)).collect();
+                c.length(&l1, w * fs[0]);
+                c.length(&l7, h * fs[1]);
+                c.length(&l2, t1 * fs[2]);
+                c.length(&l6, t2 * fs[3]);
+                c.radius(&a4, (rad * fs[4]).min(t1 * fs[2]).min(t2 * fs[3]), false);
+            }
             // D shape: a Horizontal chord and an arc over it, the chord's
             // length and the arc's radius.
             _ => {
@@ -1004,7 +1083,7 @@ fn write_batch() {
 }
 
 /// The batches: (number, first seed, rich).
-const BATCHES: [(usize, u64, bool); 12] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true), (12, 621, true)];
+const BATCHES: [(usize, u64, bool); 13] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true), (12, 621, true), (13, 661, true)];
 
 /// Batch 8's s464 / s475 stay as live answered: a component the pass can't
 /// close (a hexagon) takes the least change on its own, the rounded
