@@ -957,6 +957,14 @@ impl<'a> Translator<'a> {
 
     /// Our reference ids for one Onshape query.
     fn query(&mut self, k: usize, q: &Value) -> Result<Vec<String>, String> {
+        // A mate connector by the feature that made it (a Hole's in-feature
+        // one): its id may name a face too (prize-wheel-tim).
+        if q["btType"].as_str().is_some_and(|t| t.starts_with("BTMIndividualCreatedByQuery"))
+            && q["bodyType"] == "MATE_CONNECTOR"
+            && let Some(ours) = q["featureId"].as_str().and_then(|f| self.feature_ids.get(f))
+        {
+            return Ok(vec![format!("mc:{ours}.0")]);
+        }
         let ids: Vec<String> = q["deterministicIds"].as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect();
         let text = q["queryString"].as_str().unwrap_or("");
         // Not placed just before feature k (live's line after a sketch has no
