@@ -869,6 +869,31 @@ fn std_edge_filters_match_builtin() {
     assert!(report.is_empty(), "edge filters differ from the std:\n{report}");
 }
 
+/// A custom feature defined with std's `defineSheetMetalFeature` (community sheet metal features: the Corner
+/// Overcut of cf-sheet-metal-overcut-dogbone) has its precondition's fields, as one with `defineFeature`.
+#[test]
+fn a_sheet_metal_custom_feature_has_its_fields() {
+    let src = r#"FeatureScript 2241;
+import(path : "onshape/std/geometry.fs", version : "2241.0");
+import(path : "onshape/std/sheetMetalUtils.fs", version : "2241.0");
+annotation { "Feature Type Name" : "Corner Overcut" }
+export const cornerOvercut = defineSheetMetalFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Edges to overcut", "Filter" : EntityType.EDGE }
+        definition.edges is Query;
+        annotation { "Name" : "Diameter" }
+        isLength(definition.diameter, LENGTH_BOUNDS);
+    }
+    {
+    }, {});
+"#;
+    let compiled = custom::compile(TabId(1), src);
+    let def = compiled.feature("cornerOvercut").unwrap_or_else(|| panic!("{:?}", compiled.diagnostics));
+    let ids: Vec<&str> = def.feature_type.params.iter().map(|p| p.id).collect();
+    assert!(ids.contains(&"edges") && ids.contains(&"diameter"), "{ids:?}");
+}
+
 /// A custom feature's compound edge filters take the part's edges, not only sketch curves (LP-DIRECTION-PICK:
 /// `EntityType.EDGE && QueryFilterCompound.ALLOWS_AXIS` and `EntityType.EDGE && GeometryType.LINE` picked nothing
 /// on a part, because EDGE's bits and the other side's met only in SKETCH_EDGE).

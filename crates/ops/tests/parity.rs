@@ -92,7 +92,10 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         }
         // Onshape's words: live's row tooltip ("Fillet 1 did not regenerate
         // properly: …") holds our message.
-        if let Some(m) = line["message"].as_str().filter(|m| !m.is_empty())
+        // (Live's UI fetch reads it as HTML: "&lt;br&gt;" for a custom
+        // feature's "<br>"; cf-planetary-gears.)
+        let unescaped = line["message"].as_str().map(|m| m.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&"));
+        if let Some(m) = unescaped.as_deref().filter(|m| !m.is_empty())
             && !step.message.as_deref().is_some_and(|ours| !ours.is_empty() && m.contains(ours))
         {
             diff.push(format!("message {:?}, live {m:?}", step.message.as_deref().unwrap_or("")));

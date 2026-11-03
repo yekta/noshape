@@ -159,9 +159,11 @@ fn compile_uncached(tab: TabId, source: &str, hash: u64, resolver: &dyn Resolver
     out
 }
 
-/// The lambda passed to `defineFeature(...)`.
+/// The lambda passed to `defineFeature(...)` (or std's
+/// `defineSheetMetalFeature(...)`, which community sheet metal features use:
+/// cf-sheet-metal-overcut-dogbone's Corner Overcut).
 fn feature_lambda(e: &ast::Expr) -> Option<&ast::FnDef> {
-    defined_lambda(e, "defineFeature")
+    defined_lambda(e, "defineFeature").or_else(|| defined_lambda(e, "defineSheetMetalFeature"))
 }
 
 /// The lambda passed to `define(...)` (`defineFeature`, `defineTable`).
