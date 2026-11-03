@@ -26,11 +26,6 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - File shapes asked of live (REQUESTS 11-02 23:55): features.json (+ configuration, variables, units, sketches),
   live.jsonl, source.json, refs.jsonl (geometry of every referenced id before its feature). GET /features and POST
   /featurescript are 429 for the account until ~04:45 UTC.
-- 11-03 11:56 translator: sketch entities drawn where live's solve put them (`sketches` geomEntities: lines,
-  circles, arcs, points; stored geometry can lag variables: cf-parameter-pattern); a custom feature's namespace may
-  name another document's studio version (`d…::v…::e…::m…`); id-only regions counted by id; a revolve's id-only axis
-  is the last sketch's one construction line. New ticket ADD-INSIDE-OUT (an Add on a drafted block leaves the part
-  inside out). Score 11/24, 127/181, custom 0/13 (live still refetching; ids-only bodies in 9 documents asked).
 - 11-03 00:10: configuration Variable inputs (#parameterId, default and range) built, configured parameters take the
   default option, Revolve `revolveType` and Variable `value` upgraded as Onshape does, Onshape-internal parameters
   (asVersion, defaultsChanged, computeTransformsWithoutBuiltin) skipped; features without a live.jsonl line are not
@@ -92,6 +87,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
   kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
+- 11-03 11:56 translator: sketch entities drawn where live's solve put them (`sketches` geomEntities: lines,
+  circles, arcs, points; stored geometry can lag variables: cf-parameter-pattern); a custom feature's namespace may
+  name another document's studio version (`d…::v…::e…::m…`); id-only regions counted by id; a revolve's id-only axis
+  is the last sketch's one construction line. New ticket ADD-INSIDE-OUT (an Add on a drafted block leaves the part
+  inside out). Score 11/24, 127/181, custom 0/13 (live still refetching; ids-only bodies in 9 documents asked).
 - 11-03 11:41 parity translator: live's refetch writes `bodies` in a compact form (box min / max arrays, surface /
   curve as strings, edge midPoint / length and vertex point as arrays, plane origin / normal beside): read as well as
   bodydetails' raw form (3 documents; 6 more are ids only, asked). A parameter's queries that don't map are left out
