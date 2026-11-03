@@ -83,6 +83,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   to run: …" (ours errors where live's built; the first difference then reads "(custom feature failed to run)").
   T1 custom_feature_failures_are_reported_apart. Host / std differences → core tickets. Score now **7/11,
   58/78** (bracket03 matches since core's FILLET-SPLIT-EDGE-FACES fix); SCORE.md row updated.
+- 11-03 12:05 drawings: a tangent edge lying on a visible outline isn't drawn twice (kernel drop_covered_hidden
+  covers visible smooth edges too; knob's top view as live); a free-form model edge (B-spline) is a SPLINE in
+  DXF / DWG even where its points fit an ellipse (SheetGeometry.freeform_lines; pipeflange's tangent edges now
+  SPLINE 31 / ELLIPSE 11, live 34 / 6). Tried and reverted: treating B-splines that run on a circle as circles
+  (live writes those as SPLINE too). Left vs live 1857: view positions (asked), title block MTEXT grouping /
+  attachments (DXF only: live one MTEXT per multi-line block, top-left / top-centre with the cell's width, empty
+  fields as empty MTEXTs).
 - 11-03 11:32 drawings: an edge OCCT keeps between two faces of one surface (and a face's own seam) isn't drawn,
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
