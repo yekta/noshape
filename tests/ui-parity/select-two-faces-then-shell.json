@@ -1,0 +1,35 @@
+{
+ "name": "select-two-faces-then-shell",
+ "about": "click the top and the front face, the Shell tool: both in Faces to remove",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     0,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Shell"
+   }
+  }
+ ]
+}

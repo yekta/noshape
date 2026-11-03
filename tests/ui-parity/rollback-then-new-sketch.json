@@ -1,0 +1,37 @@
+{
+ "name": "rollback-then-new-sketch",
+ "about": "roll to Sketch 1, then Sketch on Top: Sketch 2 goes in above the rolled-back Extrude 1",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Roll to here"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  }
+ ]
+}

@@ -1,0 +1,23 @@
+{
+ "name": "measure-face-then-escape",
+ "about": "click the top face, Escape: the measure readout goes",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

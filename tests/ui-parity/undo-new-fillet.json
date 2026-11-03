@@ -1,0 +1,49 @@
+{
+ "name": "undo-new-fillet",
+ "about": "Fillet the front top edge (✓), mod+z: the fillet goes; mod+y: back",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+f"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "mod+y"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

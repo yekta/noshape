@@ -1,0 +1,23 @@
+{
+ "name": "select-face-then-extrude",
+ "about": "click the top face, Shift+E: Extrude with that face, Add",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+e"
+  }
+ ]
+}

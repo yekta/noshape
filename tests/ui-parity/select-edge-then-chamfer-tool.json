@@ -1,0 +1,25 @@
+{
+ "name": "select-edge-then-chamfer-tool",
+ "about": "click the front top edge, the Chamfer tool: the edge is in it",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Chamfer"
+   }
+  }
+ ]
+}

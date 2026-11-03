@@ -1,0 +1,23 @@
+{
+ "name": "select-face-then-sketch-key",
+ "about": "click the top face, Shift+S: a sketch on that face",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+s"
+  }
+ ]
+}

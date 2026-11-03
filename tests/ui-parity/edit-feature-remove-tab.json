@@ -1,0 +1,25 @@
+{
+ "name": "edit-feature-remove-tab",
+ "about": "edit Extrude 1, click Remove: the dialog's error (nothing to remove from)",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Remove"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

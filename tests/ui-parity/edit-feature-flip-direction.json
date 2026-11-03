@@ -1,0 +1,25 @@
+{
+ "name": "edit-feature-flip-direction",
+ "about": "edit Extrude 1, click the direction arrow next to the end type",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Opposite direction"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

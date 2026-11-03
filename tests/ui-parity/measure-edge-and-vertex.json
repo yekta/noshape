@@ -1,0 +1,29 @@
+{
+ "name": "measure-edge-and-vertex",
+ "about": "click the front top edge, then a far corner vertex: their distance",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "vertex": [
+     40,
+     30,
+     0
+    ]
+   }
+  }
+ ]
+}
