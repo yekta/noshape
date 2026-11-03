@@ -1491,10 +1491,10 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     let tb = if locked { 0 } else { picks.id(PickTarget::TitleBlock) };
     let fp = &drawing.props;
     // A template's format is single lines (live: each frame, zone or title
-    // block line is selected alone): rectangles split into their sides,
-    // which run on half the pen width past the corners so they stay closed.
+    // block line is selected alone): rectangles split into their sides
+    // (square-capped on screen, `square_caps`).
     // The sheet's edits (Delete, Move to) apply by each line's key.
-    let mut keys: Vec<Option<([i64; 4], bool)>> = Vec::new();
+    let mut keys: Vec<Option<[i64; 4]>> = Vec::new();
     if sheet.imported.is_none() {
         let lines: Vec<Polyline2> = g.lines.drain(mark_l..).collect();
         for l in lines {
@@ -1504,12 +1504,11 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 let key = super::format_line_key(l.points[0], l.points[n / 2]);
                 if !sheet.format_edit(key).is_some_and(|e| e.deleted) {
                     g.lines.push(l);
-                    keys.push(Some((key, false)));
+                    keys.push(Some(key));
                 }
                 continue;
             }
             let segs = if l.closed { n } else { n.saturating_sub(1) };
-            let joined = segs > 1;
             for i in 0..segs {
                 let (a, b) = (l.points[i], l.points[(i + 1) % n]);
                 let key = super::format_line_key(a, b);
@@ -1517,7 +1516,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     continue;
                 }
                 g.lines.push(Polyline2 { points: vec![a, b], style: l.style, closed: false, pick: 0 });
-                keys.push(Some((key, joined)));
+                keys.push(Some(key));
             }
         }
     }
@@ -1527,21 +1526,16 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         let l = &mut g.lines[i];
         let in_block = l.points.iter().all(in_tb) && l.style != LineStyle::Border;
         match key {
-            Some((k, _)) => l.pick = if locked { 0 } else { picks.id(PickTarget::FormatLine(k)) },
+            Some(k) => l.pick = if locked { 0 } else { picks.id(PickTarget::FormatLine(k)) },
             None if in_block => l.pick = tb,
             None => {}
         }
         // Formats layers and colors: border frame, zones (dividers), title
         // block; a line moved to another layer takes that one's.
         let own = if in_block { SheetLayer::TitleBlock } else if l.style == LineStyle::Border { SheetLayer::BorderFrame } else { SheetLayer::BorderZones };
-        let layer = key.and_then(|(k, _)| sheet.format_edit(k)).and_then(|e| e.layer).unwrap_or(own);
-        if let (Some((_, true)), Some(w)) = (key, layer.thickness(fp)) {
-            let (a, b) = (l.points[0], l.points[1]);
-            let len = ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2)).sqrt();
-            if len > 1e-9 {
-                let u = [(b[0] - a[0]) / len * w / 2.0, (b[1] - a[1]) / len * w / 2.0];
-                l.points = vec![[a[0] - u[0], a[1] - u[1]], [b[0] + u[0], b[1] + u[1]]];
-            }
+        let layer = key.and_then(|k| sheet.format_edit(k)).and_then(|e| e.layer).unwrap_or(own);
+        if key.is_some() {
+            g.square_caps.push(i);
         }
         g.layers.push(LayerSpan { lines: i..i + 1, texts: 0..0, fills: 0..0, layer });
         if let Some(rgb) = layer.color(fp) {

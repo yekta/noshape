@@ -138,6 +138,10 @@ pub struct SheetGeometry {
     /// Lines of model edges whose curve is free-form (no line, circle or
     /// ellipse): CAD files write them as splines, whatever shape they make.
     pub freeform_lines: Vec<usize>,
+    /// Template format lines (sorted): the screen runs them on half their
+    /// pen width past their ends so corners stay closed; exports keep
+    /// live's exact ends.
+    pub square_caps: Vec<usize>,
     /// Colored areas drawn under all the ink (pending revision rows).
     pub backdrops: Vec<(Vec<[f64; 2]>, [u8; 3])>,
     /// Translucent areas drawn over all the ink (a release watermark):
@@ -968,8 +972,15 @@ impl SheetGeometry {
         // label height L, 0.032 of the block's height (0.048 in on ANSI A,
         // 0.064 in on ISO A3; live asb 10-24 "template frames").
         let lab = 0.032 * bh;
-        // Frame and grid (live 164: thin lines throughout).
-        self.rect(x0, y0, x1, y1, LineStyle::Thin);
+        // Frame and grid (live 164: thin lines throughout). The outline as
+        // live's templates draw it: the left side, the top in three (at the
+        // left and middle columns) and the bottom of the left column; the
+        // rest lies on the sheet's frame.
+        self.line([x0, y0], [x0, y1], LineStyle::Thin);
+        self.line([x0, y0], [px(left), y0], LineStyle::Thin);
+        for (a, b) in [(x0, px(left)), (px(left), px(mid)), (px(mid), x1)] {
+            self.line([a, y1], [b, y1], LineStyle::Thin);
+        }
         self.line([px(left), y0], [px(left), y1], LineStyle::Thin);
         self.line([px(mid), y0], [px(mid), y1], LineStyle::Thin);
         for v in &left_rows[1..left_rows.len() - 1] {

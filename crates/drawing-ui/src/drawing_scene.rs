@@ -178,9 +178,27 @@ fn push_sheet_line(lines: &mut LineData, built: &BuiltSheet, li: usize, zoom: f6
     // Adjust linestyle pens override the style's width and dashes.
     let (width_mm, dashes) = g.line_pen(li);
     let width = pen_px(l.style, width_mm, zoom);
-    for piece in dash(&l.points, l.closed, &dashes, g.line_dash_phase(li)) {
+    let capped;
+    let points = match l.points[..] {
+        [a, b] if zoom > 0.0 && g.square_caps.binary_search(&li).is_ok() => {
+            capped = run_on(a, b, width as f64 / zoom / 2.0);
+            &capped[..]
+        }
+        _ => &l.points[..],
+    };
+    for piece in dash(points, l.closed, &dashes, g.line_dash_phase(li)) {
         push(lines, &piece, color, if picked { l.pick } else { 0 }, width);
     }
+}
+
+/// The line `a`–`b` run on `d` (mm) past both ends.
+fn run_on(a: [f64; 2], b: [f64; 2], d: f64) -> [[f64; 2]; 2] {
+    let len = (b[0] - a[0]).hypot(b[1] - a[1]);
+    if len < 1e-9 {
+        return [a, b];
+    }
+    let u = [(b[0] - a[0]) / len * d, (b[1] - a[1]) / len * d];
+    [[a[0] - u[0], a[1] - u[1]], [b[0] + u[0], b[1] + u[1]]]
 }
 
 /// Sheet texts as filled glyphs (Onshape's sheet text is a filled sans

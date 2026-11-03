@@ -1517,9 +1517,10 @@ fn format_lines_are_picked_deleted_and_moved_alone() {
     let i = side(&built).expect("drawn");
     let layer_of = |b: &build::BuiltSheet, i: usize| b.geometry.layers.iter().find(|s| s.lines.contains(&i)).map(|s| s.layer);
     assert_eq!(layer_of(&built, i), Some(SheetLayer::BorderFrame));
-    // Its ends run past the corners by half the pen (closed corners).
+    // Its ends are the corners (live's DXF); the screen square-caps it.
     let l = &built.geometry.lines[i];
-    assert!(l.points.iter().any(|p| p[1] < fy0) && l.points.iter().any(|p| p[1] > fy1), "{:?}", l.points);
+    assert!(l.points.iter().any(|p| p[1] == fy0) && l.points.iter().any(|p| p[1] == fy1), "{:?}", l.points);
+    assert!(built.geometry.square_caps.binary_search(&i).is_ok());
     drawing.sheets[0].edit_format_line(left, |e| e.layer = Some(SheetLayer::TitleBlock));
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     assert_eq!(layer_of(&built, side(&built).unwrap()), Some(SheetLayer::TitleBlock));
@@ -4967,4 +4968,21 @@ fn ansi_projection_symbol_as_live() {
     assert!((circles[1].1 - (label - 0.135)).abs() < 1e-6, "{circles:?}, label at {label}");
     let zones = doc.entities().filter(|e| matches!(e, EntityType::Line(l) if l.common.layer == "BORDER_ZONES")).count();
     assert_eq!(zones, 4);
+    // Its LINEs end on live's points (no run-on past a corner): the outline
+    // is the left side, the top in three and the left column's bottom; the
+    // surface finish mark's first stroke.
+    let lines: Vec<[f64; 4]> = doc.entities().filter_map(|e| match e {
+        EntityType::Line(l) if l.common.layer == "TITLE_BLOCK" => Some([l.start.x, l.start.y, l.end.x, l.end.y]),
+        _ => None,
+    }).collect();
+    assert_eq!(lines.len(), 43, "live's 43 LINEs");
+    let has = |w: [f64; 4]| lines.iter().any(|l| {
+        let near = |a: &[f64], b: &[f64]| (a[0] - b[0]).abs() < 1e-3 && (a[1] - b[1]).abs() < 1e-3;
+        (near(&l[..2], &w[..2]) && near(&l[2..], &w[2..])) || (near(&l[..2], &w[2..]) && near(&l[2..], &w[..2]))
+    });
+    for w in [[4.564, 0.38, 4.564, 1.88], [4.564, 0.38, 5.764, 0.38], [4.564, 1.88, 5.764, 1.88], [5.764, 1.88, 7.564, 1.88], [7.564, 1.88, 10.639, 1.88], [5.104, 1.298, 5.134, 1.246]] {
+        assert!(has(w), "no LINE {w:?} (in)");
+    }
+    let (x0, x1) = lines.iter().fold((f64::MAX, f64::MIN), |(a, b), l| (a.min(l[0]).min(l[2]), b.max(l[0]).max(l[2])));
+    assert!((x0 - 4.564).abs() < 1e-6 && (x1 - 10.639).abs() < 1e-6, "{x0} – {x1}");
 }
