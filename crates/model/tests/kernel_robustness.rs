@@ -3075,6 +3075,39 @@ fn feature_mirror_of_a_boss_copies_the_boss() {
     assert_eq!(b.count(noshape_kernel::ShapeType::Face), 16);
 }
 
+/// MIRROR-FEATURE-UP-TO (clamp-hms, live OK): a boss of two squares raised
+/// 5 mm, the second square then raised to 10 mm by another Extrude (their
+/// sides merge), both mirrored as features (Reapply off) across Right + 30:
+/// one face pattern of both features' faces as std's, the copy at x 35…55;
+/// 15000 mm³, 20 faces.
+#[test]
+fn feature_mirror_of_a_boss_raised_by_a_second_extrude() {
+    let mut t = T::new();
+    t.block(60.0, 20.0, 10.0);
+    let top = t.faces_where(|c| c.z > 9.999);
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts: Vec<_> = [(5.0, 5.0), (15.0, 5.0), (25.0, 5.0), (25.0, 15.0), (15.0, 15.0), (5.0, 15.0)].iter().map(|(x, y)| sk.add_point(DVec2::new(x * 1e-3, y * 1e-3))).collect();
+    for i in 0..6 {
+        sk.add_line_between(pts[i], pts[(i + 1) % 6]).unwrap();
+    }
+    sk.add_line_between(pts[1], pts[4]).unwrap();
+    let s = t.add("sketch", &[("sketchPlane", q(top)), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let r = t.regen();
+    let regions: Vec<_> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().filter(|g| !g.imprinted).collect();
+    assert_eq!(regions.len(), 2);
+    let region = |g: &&noshape_model::display::SketchRegionDisplay| Reference::SketchRegion { sketch: s, key: g.key.clone() };
+    let right = regions.iter().find(|g| g.positions.iter().all(|p| p[0] > 0.0149)).map(region).unwrap();
+    let both: Vec<Reference> = regions.iter().map(region).collect();
+    let low = t.add("extrude", &[("entities", q(both)), ("depth", e("5 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
+    let high = t.add("extrude", &[("entities", q(vec![right])), ("depth", e("10 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
+    let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Right)])), ("offset", e("30 mm"))]);
+    let m = t.add("mirror", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(low), Reference::Feature(high)])), ("mirrorPlane", q(vec![Reference::FeaturePlane(pl)]))]);
+    let r = t.ok(m);
+    let b = &r.context.bodies[0].shape;
+    assert!((volume(&r) - 15000.0).abs() < 1e-6, "{} mm³, {} faces", volume(&r), b.count(noshape_kernel::ShapeType::Face));
+    assert_eq!(b.count(noshape_kernel::ShapeType::Face), 20);
+}
+
 /// qa MIRROR-BLIND-HOLE-FACES: a half plate with a blind hole centred on
 /// Right, Part mirror Add across Right. The drill tip's two half cones meet
 /// at their apex, where OCCT's UnifySameDomain gives an invalid solid from

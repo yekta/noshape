@@ -887,6 +887,8 @@ fn copy_sketches(ev: &mut EvalCtx, sketches: &[FeatureId], instances: &[Instance
 /// Feature pattern through geometry (face / part patterns of what each
 /// feature created).
 fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance]) -> FResult<()> {
+    let touching = touching_features(ev, feats);
+    let mut patterned: Vec<FeatureId> = Vec::new();
     for &f in feats {
         let mut found = false;
         // Bodies created by the feature: copied as new parts.
@@ -901,24 +903,31 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
                 push_body_colored(ev, BodyId { feature: ev.feature, index }, kind, ns.shape, ns.names.faces, color);
             }
         }
-        // Faces the feature left on other bodies.
+        // Faces the feature left on other bodies, with those of the features
+        // whose faces touch them (patternUtils.fs: one face pattern of every
+        // face the features created; a boss raised by a second Extrude).
+        if patterned.contains(&f) {
+            continue;
+        }
+        let group: Vec<FeatureId> = touching.iter().find(|g| g.contains(&f)).cloned().unwrap_or_else(|| vec![f]);
+        patterned.extend(&group);
         let groups: Vec<(BodyId, Vec<usize>)> = ev
             .ctx
             .bodies
             .iter()
-            .filter(|b| b.id.feature != f && b.id.feature != ev.feature)
+            .filter(|b| !group.contains(&b.id.feature) && b.id.feature != ev.feature)
             .filter_map(|b| {
-                let fs: Vec<usize> = b.faces.iter().enumerate().filter(|(_, n)| n.creator() == Some(f)).map(|(i, _)| i).collect();
+                let fs: Vec<usize> = b.faces.iter().enumerate().filter(|(_, n)| n.creator().is_some_and(|c| group.contains(&c))).map(|(i, _)| i).collect();
                 (!fs.is_empty()).then(|| (b.id.clone(), fs))
             })
             .collect();
         let targets: Vec<usize> = groups.iter().filter_map(|(id, _)| index_of_body(ev, id)).collect();
         if let Some((id, fs)) = groups.first()
             && let Some(bi) = index_of_body(ev, id)
-            && copies_fail(ev, f, &targets, instances)
+            && group.iter().any(|&g| copies_fail(ev, g, &targets, instances))
         {
             let body = ev.ctx.bodies[bi].clone();
-            ev.error_shapes = failed_instances(ev, f, &body, fs, instances);
+            ev.error_shapes = failed_instances(ev, &group, &body, fs, instances);
             return crate::regen::eval::err_at(&["fullFeaturePattern"], SWITCH_TO_PER_INSTANCE);
         }
         for (id, fs) in groups {
@@ -931,7 +940,7 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
             {
                 let body = ev.ctx.bodies[bi].clone();
                 if instances.len() > 1 {
-                    ev.error_shapes = failed_instances(ev, f, &body, &fs, instances);
+                    ev.error_shapes = failed_instances(ev, &group, &body, &fs, instances);
                     return crate::regen::eval::err_at(&["fullFeaturePattern"], SWITCH_TO_PER_INSTANCE);
                 }
                 let caps: Vec<Shape> = fs.iter().filter_map(|&i| body.shape.sub_shape(ShapeType::Face, i).ok()).collect();
@@ -941,12 +950,15 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
                 ev.replace_body(bi, res.shape, names);
                 continue;
             }
-            let merged = index_of_body(ev, &id).and_then(|bi| seed_tool(ev, f).map(|tool| merged_faces(&tool, &ev.ctx.bodies[bi], &fs)));
+            let merged = index_of_body(ev, &id).and_then(|bi| {
+                let tools: Vec<Shape> = group.iter().filter_map(|&g| seed_tool(ev, g)).collect();
+                (!tools.is_empty()).then(|| tools.iter().flat_map(|t| merged_faces(t, &ev.ctx.bodies[bi], &fs)).collect::<BTreeSet<usize>>().into_iter().collect::<Vec<usize>>())
+            });
             if let Some(bi) = index_of_body(ev, &id)
                 && face_pattern_fails(&ev.ctx.bodies[bi], &fs, instances, merged.as_deref())
             {
                 let body = ev.ctx.bodies[bi].clone();
-                ev.error_shapes = failed_instances(ev, f, &body, &fs, instances);
+                ev.error_shapes = failed_instances(ev, &group, &body, &fs, instances);
                 return crate::regen::eval::err_at(&["fullFeaturePattern"], SWITCH_TO_PER_INSTANCE);
             }
             pattern_faces(ev, &id, &fs, instances, false)?;
@@ -963,18 +975,56 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
 /// seed's whole tool body moved there, plus the part's faces the seed merged
 /// into (a coplanar face of the part running on into the tool is the
 /// feature's face too in Parasolid: the user's flush side) moved likewise.
-fn failed_instances(ev: &EvalCtx, f: FeatureId, body: &Body, fs: &[usize], instances: &[Instance]) -> Vec<Shape> {
+fn failed_instances(ev: &EvalCtx, group: &[FeatureId], body: &Body, fs: &[usize], instances: &[Instance]) -> Vec<Shape> {
     let mut ghost: Vec<Shape> = Vec::new();
-    match seed_tool(ev, f) {
-        Some(tool) => {
-            ghost.extend(merged_faces(&tool, body, fs).into_iter().filter_map(|i| body.shape.sub_shape(ShapeType::Face, i).ok()));
-            ghost.push(tool);
-        }
-        None => ghost.extend(fs.iter().filter_map(|&i| body.shape.sub_shape(ShapeType::Face, i).ok())),
+    let tools: Vec<Shape> = group.iter().filter_map(|&g| seed_tool(ev, g)).collect();
+    if tools.is_empty() {
+        ghost.extend(fs.iter().filter_map(|&i| body.shape.sub_shape(ShapeType::Face, i).ok()));
+    }
+    for tool in tools {
+        ghost.extend(merged_faces(&tool, body, fs).into_iter().filter_map(|i| body.shape.sub_shape(ShapeType::Face, i).ok()));
+        ghost.push(tool);
     }
     let seed = Shape::compound(&ghost);
     // Moved, not copied: the ghosts share the seed's geometry and mesh.
     instances.iter().filter_map(|inst| k::transform(&seed, &inst.t, false).ok().map(|r| r.shape)).collect()
+}
+
+/// `feats` in groups whose faces on a part share an edge (each feature alone
+/// when nothing touches).
+fn touching_features(ev: &EvalCtx, feats: &[FeatureId]) -> Vec<Vec<FeatureId>> {
+    let mut root: Vec<usize> = (0..feats.len()).collect();
+    fn find(root: &mut [usize], mut i: usize) -> usize {
+        while root[i] != i {
+            root[i] = root[root[i]];
+            i = root[i];
+        }
+        i
+    }
+    for b in ev.ctx.bodies.iter().filter(|b| !feats.contains(&b.id.feature) && b.id.feature != ev.feature) {
+        let owner: Vec<Option<usize>> = b.faces.iter().map(|n| n.creator().and_then(|c| feats.iter().position(|&f| f == c))).collect();
+        let first = owner.iter().flatten().next();
+        if !owner.iter().flatten().any(|o| Some(o) != first) {
+            continue;
+        }
+        let Ok(ef) = b.shape.edge_faces() else { continue };
+        for faces in ef {
+            let os: Vec<usize> = faces.iter().filter_map(|&fi| owner.get(fi as usize).copied().flatten()).collect();
+            for w in os.windows(2) {
+                let (a, c) = (find(&mut root, w[0]), find(&mut root, w[1]));
+                root[a] = c;
+            }
+        }
+    }
+    let mut groups: Vec<(usize, Vec<FeatureId>)> = Vec::new();
+    for (i, &f) in feats.iter().enumerate() {
+        let r = find(&mut root, i);
+        match groups.iter_mut().find(|g| g.0 == r) {
+            Some(g) => g.1.push(f),
+            None => groups.push((r, vec![f])),
+        }
+    }
+    groups.into_iter().map(|g| g.1).collect()
 }
 
 /// The body's faces (not the feature's own `fs`) that carry on a face of the
