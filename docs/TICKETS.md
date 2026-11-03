@@ -1592,7 +1592,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 08:13: **live's own recording confirms it**: new-extrude-then-other-tool (live runner): after the Boolean tool click
   live's feature list still has "Extrude 2"; ours (green aeef5eab) has "Boolean 1" in its place, Extrude 2 gone.
   (qa-scratch/uip-aee/new-extrude-then-other-tool.json)
-- [ ] P2 VARIABLE-EDIT-FOCUS (psui) editing a Variable feature focuses Name in ours, Value in live: double-click the
+- [x] verified bcb87c5c (qa 11-03 08:53: scenario variable-edit-focus through the driver: focus Value, "2 mm" all selected = live; psui d41cb3d1) P2 VARIABLE-EDIT-FOCUS (psui) editing a Variable feature focuses Name in ours, Value in live: double-click the
   "#wall_thickness = 2 mm" row; live (11-02, qa's tab, livek/t-b2.mjs): dialog "#wall_thickness = 2 mm", **the Value field
   focused with "2 mm" all selected** (std's INITIAL_FOCUS_ON_EDIT on the value); ours: **Name focused**, "wall_thickness"
   selected (qa-scratch/tickets/fl/vd-b2.png, top left; window focused). Same run = live: a click on the selected Extrude 1
