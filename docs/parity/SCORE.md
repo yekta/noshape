@@ -6,7 +6,7 @@ causes of difference, each with its ticket.
 
 | date | green | models | features | scenarios | biggest causes (tickets) |
 |---|---|---|---|---|---|
-| 2026-11-03 | a658fd9a | 7/11 | 58/78 | – | 2× CUT-CLOSED-EDGES-SPLIT (bool: bushing2-0-joshua, pipeflange-steven; clamp-abhil 1× hole counts); 1× EXTRUDE-UP-TO-FACE-BEYOND (core: clamp-hms) — dx 09:45 (bracket03 matches since core's FILLET-SPLIT-EDGE-FACES fix; 7 of live's 18 documents not fetched yet: REST 429; custom features counted as "(custom m/n)" once the FeatureScript corpus arrives) |
+| 2026-11-03 | (dx 12:10) | 9/14 | 67/93 | – | 2× CUT-CLOSED-EDGES-SPLIT (bool: bushing2-0-joshua, pipeflange-steven; clamp-abhil 1× hole counts); 1× EXTRUDE-UP-TO-FACE-BEYOND (core: clamp-hms); 1× EXTRUDE-SLIT-REGION (core: learning-center-michael) — dx 12:10: live's new batch; documents live fetched whole only (10 more have 429 lines: "fetch incomplete", scored after the refetch); bearing-block-takumi and learning-center-ivan match after two region-query fixes in the translator; knob-jason (unscored) has FILLET-31S-FAIL |
 
 qa 11-03 05:55: the scenario column counts the scenarios with a live recording at compare time (112 of 162 runs; live was
 re-recording); the evening run replaces today's numbers. Scenario differences are psui's (its runner reports its own

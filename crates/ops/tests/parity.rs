@@ -37,13 +37,15 @@ struct ModelResult {
     custom: Vec<String>,
     /// Feature Studios whose pinned std ours serves at another version.
     std_pins: Vec<String>,
+    /// Live's lines that carry its fetch's error instead of a state.
+    unfetched: Vec<String>,
 }
 
 /// Rebuilds `features` and compares with `live` (live.jsonl lines) after each feature.
 fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelResult {
     let mut ctx = Ctx::new();
     let path = scratch(&format!("{name}.noshape"));
-    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, untranslated: Vec::new(), regen_ms: None, open_ms: 0.0, list_ms: 0.0, slowest: Vec::new(), custom_compared: 0, custom_matching: 0, custom: Vec::new(), std_pins: Vec::new() };
+    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, untranslated: Vec::new(), regen_ms: None, open_ms: 0.0, list_ms: 0.0, slowest: Vec::new(), custom_compared: 0, custom_matching: 0, custom: Vec::new(), std_pins: Vec::new(), unfetched: Vec::new() };
     // refs.jsonl wins over the geometry read from live's bodydetails.
     let mut all = refs_from_bodies(live);
     all.extend(parse_refs(refs));
@@ -69,6 +71,11 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
             res.custom.push(format!("{}: failed to compile / load: {}", step.name, step.problems.first().map(String::as_str).unwrap_or("not built")));
         }
         let Some(line) = live.iter().find(|l| l["index"].as_u64() == Some(k as u64)) else { continue };
+        // Live's fetch of this rollback failed (`error`, e.g. a 429): nothing to compare.
+        if let Some(e) = line["error"].as_str() {
+            res.unfetched.push(format!("{}: {}", step.name, e.chars().take(120).collect::<String>()));
+            continue;
+        }
         res.compared += 1;
         res.custom_compared += usize::from(step.custom);
         let mut diff = Vec::new();
@@ -200,9 +207,16 @@ fn parity_models() {
             None => String::new(),
         };
         let speed = if r.slowest.is_empty() { speed } else { format!("{speed} (slowest: {})", r.slowest.iter().map(|(n, ms)| format!("{n} {ms:.0} ms")).collect::<Vec<_>>().join(", ")) };
-        println!("{}: {}/{} features match ({} of {} compared){}{speed}", r.name, r.matching, r.compared, r.compared, r.features, r.first.as_ref().map(|f| format!("; first difference: {f}")).unwrap_or_else(|| "; matches to the end".into()));
+        println!("{}: {}/{} features match ({} of {} compared){}{speed}", r.name, r.matching, r.compared, r.compared, r.features, match (&r.first, r.compared) {
+            (Some(f), _) => format!("; first difference: {f}"),
+            (None, 0) => "; nothing compared".into(),
+            (None, _) => "; matches to the end".into(),
+        });
         if r.custom_compared > 0 || !r.custom.is_empty() {
             println!("  custom features: {}/{} match", r.custom_matching, r.custom_compared);
+        }
+        if let Some(first) = r.unfetched.first() {
+            println!("  live's fetch incomplete, not scored as a document: {} of its lines unfetched (first: {first})", r.unfetched.len());
         }
         for c in &r.custom {
             println!("  custom feature {c}");
@@ -215,11 +229,13 @@ fn parity_models() {
         }
         results.push(r);
     }
-    let docs = results.iter().filter(|r| r.first.is_none() && r.compared > 0).count();
+    // Documents live fetched whole; their features and the others' fetched ones are scored.
+    let whole: Vec<&ModelResult> = results.iter().filter(|r| r.unfetched.is_empty() && r.compared > 0).collect();
+    let docs = whole.iter().filter(|r| r.first.is_none()).count();
     let (matching, total) = results.iter().fold((0, 0), |(m, t), r| (m + r.matching, t + r.compared));
     let (custom_matching, custom_total) = results.iter().fold((0, 0), |(m, t), r| (m + r.custom_matching, t + r.custom_compared));
     let custom_failed = results.iter().filter(|r| !r.custom.is_empty()).count();
-    println!("parity_models score: {docs}/{} documents match to the end, {matching}/{total} features match; custom features {custom_matching}/{custom_total}, {custom_failed} documents with custom features failing to compile / run", results.len());
+    println!("parity_models score: {docs}/{} documents match to the end, {matching}/{total} features match; custom features {custom_matching}/{custom_total}, {custom_failed} documents with custom features failing to compile / run", whole.len());
     // The causes: first differences by feature type and what differed.
     let mut causes: std::collections::BTreeMap<String, usize> = Default::default();
     for f in results.iter().filter_map(|r| r.first.as_deref()) {
@@ -248,9 +264,9 @@ fn parity_models() {
     for (c, n) in causes.iter().take(5) {
         println!("  cause: {n} × {c}");
     }
-    println!("{}", score_row(docs, results.len(), matching, total, (custom_matching, custom_total), &causes));
-    let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "compared": r.compared, "matching": r.matching, "regen_ms": r.regen_ms.map(|(o, l)| json!({ "ours": o, "live": l })), "slowest": r.slowest, "first_difference": r.first, "custom_features": { "compared": r.custom_compared, "matching": r.custom_matching, "failures": r.custom, "std": r.std_pins }, "untranslated": r.untranslated })).collect();
-    let _ = std::fs::write(root.with_file_name("report.json"), serde_json::to_string_pretty(&json!({ "documents_matching": docs, "documents": results.len(), "features_matching": matching, "features": total, "causes": causes.iter().map(|(c, n)| json!({ "cause": c, "documents": n })).collect::<Vec<_>>(), "models": report })).unwrap());
+    println!("{}", score_row(docs, whole.len(), matching, total, (custom_matching, custom_total), &causes));
+    let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "compared": r.compared, "matching": r.matching, "regen_ms": r.regen_ms.map(|(o, l)| json!({ "ours": o, "live": l })), "slowest": r.slowest, "first_difference": r.first, "custom_features": { "compared": r.custom_compared, "matching": r.custom_matching, "failures": r.custom, "std": r.std_pins }, "untranslated": r.untranslated, "unfetched": r.unfetched })).collect();
+    let _ = std::fs::write(root.with_file_name("report.json"), serde_json::to_string_pretty(&json!({ "documents_matching": docs, "documents": whole.len(), "features_matching": matching, "features": total, "causes": causes.iter().map(|(c, n)| json!({ "cause": c, "documents": n })).collect::<Vec<_>>(), "models": report })).unwrap());
     if std::env::var_os("NOSHAPE_PARITY_INDEX").is_some() {
         let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/parity-models/index.json");
         std::fs::write(file, serde_json::to_string_pretty(&index).unwrap() + "\n").unwrap();
@@ -826,4 +842,73 @@ fn an_assembly_is_rebuilt_as_lives() {
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-off.noshape"), &off, &[("E1".into(), off_studio, off_parts)]);
     assert_eq!(r.occurrences_matching, 1, "{r:?}");
     assert!(r.differences.iter().any(|d| d.starts_with("Part 1 <2>")), "{r:?}");
+}
+
+/// A sketch on Top of `entities` (Onshape JSON) and one Extrude of `region`
+/// 10 mm, with live's part after it.
+fn one_extrude(sketch: &str, entities: Value, region: Value, live_part: Value) -> (Value, Vec<Value>) {
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": sketch, "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+          "entities": entities, "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [region] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "10 mm" }] }
+    ] });
+    let live = vec![json!({ "index": 0, "status": "OK", "parts": [] }), json!({ "index": 1, "status": "OK", "parts": [live_part] })];
+    (features, live)
+}
+
+fn circle(id: &str, r: f64, (x, y): (f64, f64)) -> Value {
+    json!({ "btType": "BTMSketchCurve-4", "entityId": id, "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": r, "xCenter": x, "yCenter": y, "xDir": 1.0, "yDir": 0.0, "clockwise": false } })
+}
+
+fn segment(id: &str, (x0, y0): (f64, f64), (x1, y1): (f64, f64)) -> Value {
+    let l = ((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0)).sqrt();
+    json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "isConstruction": false, "startParam": 0.0, "endParam": l,
+        "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": x0, "pntY": y0, "dirX": (x1 - x0) / l, "dirY": (y1 - y0) / l } })
+}
+
+/// Onshape's region query names the curves that only touch the region too
+/// (here the two lines tangent to its outer circle, by their vertices):
+/// the region whose own curves are all named, the most of them: the ring,
+/// not the hole's disc or the lobe the lines close (live: learning-center-ivan).
+#[test]
+fn a_region_named_with_the_lines_touching_it() {
+    let sketch = "FcAQM9TMEDshhBS_0";
+    let packed = "%B5$QueryM5S12$disambiguationDataA1M2S12$disambiguationTypeS8$TOPOLOGYS8$entitiesA3A2C0M6Sb$derivedFromC0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FcAQM9TMEDshhBS_0wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdSc$L18uNGDHmDjdR0A1M2R1R2R3A2A2C0M5R4A2R10C0M5R5R6R7R8R9RbRcRdReSc$7fY3O8MfyPDcR5C7S6$VERTEXR7R8R9CcA1S-d.7$imprintRcS9$INTERSECTD-1A2C0M5R4A2R10C0M5R5R6R7R8R9RbRcRdReSc$GbI0NZ1o7OALR5R14R7R8R9R16RcR17D1R5R6R7R8R9R16RcS7$IMPRINTR1fA2C0M6R4R10R0A1M2R1R2R3A2A2R18R1fA2R1eR19R5R6R7R8R9R16RcR24R1fA2C0M5R4C0M5R5R6R7R8R9RbRcRdReSc$43UfA2RP5hC0R5R6R7R8R9R16RcR24R19R5C7S4$FACER7R8R9R16RcR24";
+    let entities = json!([
+        circle("L18uNGDHmDjd", 0.0175, (0.0, 0.0)),
+        circle("43UfA2RP5hC0", 0.01, (0.0, 0.0)),
+        // Tangent at ±60°, meeting at (35, 0) mm.
+        segment("GbI0NZ1o7OAL", (0.00875, 0.0175 * 0.75f64.sqrt()), (0.035, 0.0)),
+        segment("7fY3O8MfyPDc", (0.035, 0.0), (0.00875, -0.0175 * 0.75f64.sqrt())),
+    ]);
+    let region = json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JGu"], "queryString": format!("query=qCompressed(1.0,\"{packed}\",id);") });
+    let ring = std::f64::consts::PI * (0.0175 * 0.0175 - 0.01 * 0.01) * 0.01;
+    let (features, live) = one_extrude(sketch, entities, region, json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 4, "edges": 4, "vertices": 0, "volume": ring }));
+    let r = run_model("touching-lines", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
+/// qSketchRegion(…, true) leaves out every region inside another's hole,
+/// rings nested in a bore too (live: bearing-block-takumi).
+#[test]
+fn filter_inner_loops_leaves_out_what_a_hole_holds() {
+    let entities = json!([
+        segment("b", (-0.03, -0.02), (0.03, -0.02)),
+        segment("r", (0.03, -0.02), (0.03, 0.02)),
+        segment("t", (0.03, 0.02), (-0.03, 0.02)),
+        segment("l", (-0.03, 0.02), (-0.03, -0.02)),
+        circle("bore", 0.008, (0.0, 0.0)),
+        circle("mid", 0.006, (0.0, 0.0)),
+        circle("pin", 0.004, (0.0, 0.0)),
+    ]);
+    let region = json!({ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": "FS1", "filterInnerLoops": true, "queryString": "query = qSketchRegion(id + \"FS1\", true);" });
+    let plate = (0.06 * 0.04 - std::f64::consts::PI * 0.008 * 0.008) * 0.01;
+    let (features, live) = one_extrude("FS1", entities, region, json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 7, "edges": 14, "vertices": 8, "volume": plate }));
+    let r = run_model("inner-loops", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }

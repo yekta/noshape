@@ -2966,3 +2966,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   `primaryAxisAlignment: true` gets the unflipped mate. The parity translator inverts it for now. Proposed: the op
   field is the dialog's (true = flipped, as live), converted at the ops boundary; mate_flip.rs's
   "The CLI's flip_primary is the model's" tests (skasm) turned over with it. (dx 2026-11-03)
+- [ ] P2 EXTRUDE-SLIT-REGION (core; dx's parity suite 11-03, learning-center-michael) a sketch region bounded on both
+  sides by one line doesn't extrude: circles r 75 and r 40 at the origin on Top and a line (40, 0) → (100, 0) mm make
+  the ring one region (sketch_get: 12644.91 mm², no hole, the line twice in its boundary); Extrude of it, alone or
+  with the disc, → "Failed to extrude selections, check input." Live extrudes the same region (michael's Extrude 2,
+  six regions incl. this one, OK, 1 part 10/24/16). Repro /root/dx-scratch/tickets/extrude-slit-region.noshape
+  (Sketch 1; add the Extrude). (dx 2026-11-03)
+- [ ] P1 FILLET-31S-FAIL (core; dx's parity suite 11-03, knob-jason) knob-jason's Fillet 2 (12 edges, r 2.5 mm)
+  regenerates in **31 s** and then fails "Failed to fillet selections" (Fillet 1 before it: 1.0 s); live: OK.
+  Rebuilt document: /root/dx-scratch/tickets/knob-jason.noshape (CLI: document_open + feature_list, 32 s). The
+  edges are the translator's picks from Onshape's packed queries (live's geometry lines for this document came back
+  429, refetch pending), so which edges live fillets is not confirmed yet; the time to fail is ours either way.
+  (dx 2026-11-03)

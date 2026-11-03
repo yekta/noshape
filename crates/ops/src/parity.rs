@@ -786,8 +786,8 @@ impl<'a> Translator<'a> {
             }
         }
         // qSketchRegion(id + "F…", filterInnerLoops): the sketch's regions;
-        // with `true` only those not inside another (a region whose curves
-        // all bound another region with holes is one of those holes' insides).
+        // with `true` none inside another's hole (its outer loop is a hole of
+        // another region; live: bearing-block-takumi's rings in the bore).
         if let Some((sk, rest)) = text.split("qSketchRegion(id + \"").nth(1).and_then(|r| r.split_once('"')) {
             let ours = self.feature_ids.get(sk).cloned().ok_or_else(|| format!("sketch {sk} was not built"))?;
             let g = self.call("sketch_get", json!({ "sketch": ours }))?;
@@ -795,9 +795,14 @@ impl<'a> Translator<'a> {
             let regions: Vec<&Value> = g["regions"].as_array().into_iter().flatten().filter(|r| r["imprinted"] != true).collect();
             let curves = |r: &Value| -> Vec<String> { r["boundary"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(str::to_string)).collect() };
             let outer_only = rest.trim_start_matches([',', ' ']).starts_with("true");
+            let outer = |r: &Value| -> Vec<String> { r["outer"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(str::to_string)).collect() };
             let inner = |r: &Value| {
-                let mine = curves(r);
-                regions.iter().any(|o| o["id"] != r["id"] && o["holes"].as_u64().unwrap_or(0) > 0 && { let theirs = curves(o); mine.iter().all(|c| theirs.contains(c)) })
+                let mine = outer(r);
+                regions.iter().any(|o| {
+                    let theirs = outer(o);
+                    let holes: Vec<String> = curves(o).into_iter().filter(|c| !theirs.contains(c)).collect();
+                    o["id"] != r["id"] && !mine.is_empty() && mine.iter().all(|c| holes.contains(c))
+                })
             };
             return Ok(regions.iter().filter(|r| !outer_only || !inner(r)).filter_map(|r| r["id"].as_str().map(str::to_string)).collect());
         }
@@ -868,6 +873,21 @@ impl<'a> Translator<'a> {
         let bounded: Vec<Value> = all.iter().filter(|r| !named.is_empty() && named.iter().all(|e| r["boundary"].as_array().is_some_and(|b| b.iter().any(|x| x == e)))).cloned().collect();
         if let [only] = bounded.as_slice() {
             return Ok(only["id"].as_str().map(whole));
+        }
+        // None has them all: Onshape names a curve that only meets the
+        // region's edge too (a tangent line's vertex on it; learning-center-ivan's
+        // lobes). The region whose own curves are all named and meet every
+        // other named one, the most of them.
+        if bounded.is_empty() && !derived && !named.is_empty() {
+            let own = |r: &Value| -> Vec<String> { r["boundary"].as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect() };
+            let entity = |id: &str| g["entities"].as_array().into_iter().flatten().find(|e| e["id"] == id).cloned().unwrap_or(Value::Null);
+            let tol = 1e-6 / per_unit(&g["units"]);
+            let meets_all = |b: &[String]| named.iter().filter(|n| !b.contains(n)).all(|n| b.iter().any(|e| curves_meet(&entity(n), &entity(e), tol)));
+            let within: Vec<(usize, &Value)> = all.iter().map(|r| (own(r), r)).filter(|(b, _)| !b.is_empty() && b.iter().all(|e| named.contains(e)) && meets_all(b)).map(|(b, r)| (b.iter().collect::<std::collections::BTreeSet<_>>().len(), r)).collect();
+            let most = within.iter().map(|(n, _)| *n).max().unwrap_or(0);
+            if let [(_, only)] = within.iter().filter(|(n, _)| *n == most).collect::<Vec<_>>().as_slice() {
+                return Ok(only["id"].as_str().map(whole));
+            }
         }
         // A piece of the face (named by face edges too): the pieces whose own
         // curves are exactly the named ones, the one nearest those face edges
@@ -2020,6 +2040,41 @@ fn geometry_kind(t: &str) -> String {
     if ["plane", "cylinder", "cone", "sphere", "torus", "line", "circle", "ellipse"].contains(&t.as_str()) { t } else { "other".into() }
 }
 
+/// Whether two sketch curves (sketch_get entities) cross or touch, within
+/// `tol`: lines, circles and arcs (an arc as its circle); others may.
+fn curves_meet(a: &Value, b: &Value, tol: f64) -> bool {
+    let p = |v: &Value| Some(glam::DVec2::new(v[0].as_f64()?, v[1].as_f64()?));
+    let circle = |e: &Value| -> Option<(glam::DVec2, f64)> {
+        let c = p(&e["center"])?;
+        Some((c, e["radius"].as_f64().or_else(|| Some(p(&e["start"])?.distance(c)))?))
+    };
+    let segment = |e: &Value| Some((p(&e["start"])?, p(&e["end"])?));
+    let to_segment = |q: glam::DVec2, (s, t): (glam::DVec2, glam::DVec2)| {
+        let d = t - s;
+        let u = ((q - s).dot(d) / d.length_squared().max(1e-300)).clamp(0.0, 1.0);
+        q.distance(s + d * u)
+    };
+    match (a["type"].as_str(), b["type"].as_str()) {
+        (Some("line"), Some("line")) => {
+            let (Some(x), Some(y)) = (segment(a), segment(b)) else { return true };
+            let cross = |o: glam::DVec2, p: glam::DVec2, q: glam::DVec2| (p - o).perp_dot(q - o);
+            let proper = cross(x.0, x.1, y.0) * cross(x.0, x.1, y.1) < 0.0 && cross(y.0, y.1, x.0) * cross(y.0, y.1, x.1) < 0.0;
+            proper || [to_segment(y.0, x), to_segment(y.1, x), to_segment(x.0, y), to_segment(x.1, y)].iter().any(|d| *d <= tol)
+        }
+        (Some("line"), Some("circle" | "arc")) | (Some("circle" | "arc"), Some("line")) => {
+            let (l, c) = if a["type"] == "line" { (a, b) } else { (b, a) };
+            let (Some(seg), Some((c, r))) = (segment(l), circle(c)) else { return true };
+            to_segment(c, seg) <= r + tol && seg.0.distance(c).max(seg.1.distance(c)) >= r - tol
+        }
+        (Some("circle" | "arc"), Some("circle" | "arc")) => {
+            let (Some((c1, r1)), Some((c2, r2))) = (circle(a), circle(b)) else { return true };
+            let d = c1.distance(c2);
+            d <= r1 + r2 + tol && d >= (r1 - r2).abs() - tol
+        }
+        _ => true,
+    }
+}
+
 /// Live's parts of one live.jsonl line.
 pub fn live_parts(line: &Value) -> Vec<PartState> {
     let band = |v: &Value| v.as_array().and_then(|a| Some([a.first()?.as_f64()?, a.get(1)?.as_f64()?]));
@@ -2028,7 +2083,10 @@ pub fn live_parts(line: &Value) -> Vec<PartState> {
         let body = line["bodies"].as_array()?.iter().find(|b| b["id"] == p["partId"])?;
         let mut m = std::collections::BTreeMap::new();
         for x in body[list].as_array()? {
-            *m.entry(geometry_kind(x[field]["type"].as_str().unwrap_or(""))).or_default() += 1;
+            // `{"type": "PLANE", …}`, or the type alone in later fetches
+            // ("undefined" there: not known, not compared).
+            let t = x[field]["type"].as_str().or(x[field].as_str()).filter(|t| *t != "undefined")?;
+            *m.entry(geometry_kind(t)).or_default() += 1;
         }
         Some(m)
     };

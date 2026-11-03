@@ -83,6 +83,16 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   to run: …" (ours errors where live's built; the first difference then reads "(custom feature failed to run)").
   T1 custom_feature_failures_are_reported_apart. Host / std differences → core tickets. Score now **7/11,
   58/78** (bracket03 matches since core's FILLET-SPLIT-EDGE-FACES fix); SCORE.md row updated.
+- 11-03 12:10 live's new batch (13 more documents, 10 of them with 429 lines): parity_models skips a live.jsonl line
+  with `"error"` (not compared; the document is "live's fetch incomplete" and not in the documents count, its fetched
+  features are), reads face / edge kinds as `{"type": …}`, a plain string, or "undefined" (= not known); translator:
+  a region query naming curves that only meet the region (tangent lines' vertices) picks the region whose own curves
+  are all named and meet every other named one (T1 a_region_named_with_the_lines_touching_it; learning-center-ivan);
+  `qSketchRegion(…, true)` leaves out every region whose outer loop is another region's hole, nested ones too
+  (sketch_get regions now give their `outer` loop; T1 filter_inner_loops_leaves_out_what_a_hole_holds;
+  bearing-block-takumi). Score **9/14 documents, 67/93 features** (SCORE.md row replaced). New tickets:
+  EXTRUDE-SLIT-REGION (core: learning-center-michael), FILLET-31S-FAIL (core: knob-jason, 31 s then an error).
+  Live told (REQUESTS 12:10) about "undefined" kinds and the refetch.
 - 11-03 10:40 assembly phase (lead 09:05: against a small assembly if live's sample is late): `parity::rebuild_assembly`
   takes live's assembly definition (`rootAssembly` + `features` with featureStates) and each Part Studio
   (`studios/<elementId>.json` + `.parts.json`): every studio translated into its own tab, each mate connector's
