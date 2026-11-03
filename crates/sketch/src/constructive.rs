@@ -1221,6 +1221,17 @@ impl Sketch {
             // kept; s377: nor a slot's Horizontal bottom, its free top is).
             let steady = |v: EntityId| hv(v) == Some(1) && cons.iter().filter(|(_, us)| us.contains(&v)).all(|(c, _)| holds[c]) && self.chained_size(v, cons).is_none() && !alongside(v);
             let lower = |v: EntityId| self.anchor(v).and_then(|p| self.point(p)).unwrap_or(DVec2::splat(f64::MAX));
+            // Only the leftmost Vertical line: when it resizes, the loop keeps
+            // its lower-left corner as a plain one does (live fuzz s662 /
+            // s680: an L-bracket with a filleted inner corner, its height
+            // and width changed, didn't keep the short right side).
+            let leftmost = lp.iter().copied().filter(|v| hv(*v) == Some(1)).min_by(|a, b| {
+                let (p, q) = (lower(*a), lower(*b));
+                (p.x, p.y).partial_cmp(&(q.x, q.y)).unwrap_or(std::cmp::Ordering::Equal)
+            });
+            if leftmost.is_some_and(|v| !steady(v)) {
+                continue;
+            }
             if let Some(a) = lp.iter().copied().filter(|v| steady(*v)).min_by(|a, b| {
                 let (p, q) = (lower(*a), lower(*b));
                 (p.x, p.y).partial_cmp(&(q.x, q.y)).unwrap_or(std::cmp::Ordering::Equal)

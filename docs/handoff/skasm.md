@@ -8,7 +8,7 @@ came a move late); psui's driver moves the pointer like live's runner (3 moves t
 drawn selected or only in the list? live couldn't reproduce Extend's) and live's step-1 timing in sketch-key-shift-q.
 Waiting on live: **batch 13** (s661–s700: copy the .live.json into crates/sketch/tests/fixtures/live_fuzz/, run
 live_fuzz::live_matches; 369 of 430 match now, list in /root/skasm-scratch/fz/new6.txt) and the P2 ball drags (09:40).
-Open fuzz: s653 (see 11:05). Ball drags answered (live 1870, fuzz/skasm-asm-drag-4.live.jsonl): top-view drags toward
+Batch 13 answered (13:40): 38/40 first, 40/40 after the rounded-loop anchor fix (a loop keeps its leftmost Vertical only when that one is steady; else its lower-left corner); batches 1-13 409 of 470 (list /root/skasm-scratch/fz/new7.txt). Open fuzz: s653 (see 11:05). Ball drags answered (live 1870, fuzz/skasm-asm-drag-4.live.jsonl): top-view drags toward
 +x / +y all end at the same 6.38° tilt (corner z 14.97, its plan direction pointing at the pointer) for 5 to 40 mm of
 travel; −y 17.57°, front view 9.13°. 13:30: rule found and queued (1ff7b433): an arcball about the ball's centre
 whose sphere passes through the grabbed point's screen place at half its depth (R² = p0² + (d/2)²), the pointer on

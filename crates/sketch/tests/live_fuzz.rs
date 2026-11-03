@@ -1148,6 +1148,19 @@ fn a_stepped_shafts_step_and_shoulder_follow_together() {
     assert!(d.is_empty(), "s633: {}", d.join("; "));
 }
 
+/// Batch 13's s662 / s680 stay as live answered: an L-bracket with a filleted
+/// inner corner, its width and height changed, keeps its lower-left corner
+/// (the short right side was kept and the bracket shifted: 45 mm off). T1.
+#[test]
+fn a_filleted_l_bracket_keeps_its_lower_left_corner() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-13.live.json")).unwrap()).unwrap();
+    for seed in [662, 680] {
+        let ours = batch(1, seed, true);
+        let d = differences(&ours["cases"][0], &live["cases"][format!("s{seed}")]);
+        assert!(d.is_empty(), "s{seed}: {}", d.join("; "));
+    }
+}
+
 /// Batch 10's s555 stays as live answered: an isosceles triangle's leg
 /// length changed: the base stays, the apex goes straight up (the leg and
 /// its Equal partner placed together, the base held; 16 mm off before). T1.
