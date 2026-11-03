@@ -1353,6 +1353,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   startup, environment) — a retry would hide it. **State fields the suite needs to see tickets qa filed today:** the
   toolbar's Undo / Redo enabled state (SKETCH-UNDO-REDO-STATE), and in sketch mode the active tool and the sketch's
   entities (kinds, construction, count) — the sketch scenarios now only see "Sketch 1" open. (qa 2026-11-03)
+  qa 01:40: compared with live's 28 recordings (/root/parity/ui/live; `run.py --compare-only --live …`): **6/28
+  scenarios, 50/139 states** on green 2723f7fb; the biggest keys: features.rows[].selected (83: live marks the edited
+  feature's row selected, selection.count 1), dialog.fields[] label / kind (81: live `null` / "toggle" for the end-type
+  and direction toggles, ours "End type" / "boolean" — a naming mismatch, not a UI one), focus on the region query field
+  when a dialog opens (22). Live's menus carry **"Add comment"** (cloud, left out by design): the comparison should drop
+  cloud-only rows so they never count as differences.
 - [ ] P1 DIALOG-SWITCH-DISCARDS-NEW (psui) double-clicking another feature while a **new** feature's dialog is open throws
   the new feature away in ours; live keeps it: a box (Sketch 1, Extrude 1), Search tools › Variable, Name
   wall_thickness, Value 2 + Enter (the first Enter applies: the row "#wall_thickness = 2 mm" is in the list, the dialog
