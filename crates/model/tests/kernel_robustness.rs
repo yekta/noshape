@@ -2956,6 +2956,26 @@ fn a_hole_through_a_tube_as_live_and_old_studios_as_they_were() {
     assert_eq!(counts(&t.ok(cut)), (5, 10, 6), "a studio saved before: as it was");
 }
 
+/// EXTRUDE-SLIT-REGION (dx's learning-center-michael, live OK): circles r75 and r40 and a line (40, 0)-(100, 0) on Top
+/// make the ring one region whose boundary runs along the line and back; it extrudes as the plain ring.
+#[test]
+fn a_region_slit_by_a_line_extrudes() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::ZERO, 0.075);
+    sk.add_circle(DVec2::ZERO, 0.04);
+    sk.add_line(DVec2::new(0.04, 0.0), DVec2::new(0.1, 0.0));
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let r = t.regen();
+    let ring: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().filter(|g| (g.area - 0.012644910).abs() < 1e-6).map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+    assert_eq!(ring.len(), 1);
+    let x = t.add("extrude", &[("entities", q(ring)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+    let r = t.ok(x);
+    let v = volume(&r);
+    assert!((v - std::f64::consts::PI * (75.0f64.powi(2) - 40.0f64.powi(2)) * 10.0).abs() < 1e-3, "{v}");
+    assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), 4);
+}
+
 /// EXTRUDE-OVERLAP-LINES-FACES (dx's parity suite, bracket120-datenkrake, live 10/24/16 faces/edges/vertices): a
 /// line lying over a rectangle's side splits it in the sketch, but the extruded side is one face (a box: 6/12/8).
 #[test]

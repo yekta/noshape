@@ -1475,8 +1475,24 @@ pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region
         }
         out
     };
-    let outer_m = merge(&region.outer);
-    let holes_m: Vec<_> = region.holes.iter().map(merge).collect();
+    // A line the loop runs along and back (a slit: a line joining a ring's two circles, live learning-center-michael):
+    // the loop cut there, its pieces the outer loop and holes (a dead end's pair dropped).
+    let mut outer_m = merge(&region.outer);
+    let mut holes_m: Vec<_> = region.holes.iter().map(merge).collect();
+    let pieces = split_slits(outer_m.clone());
+    if pieces.len() > 1 || pieces.first().is_some_and(|p| p.len() != outer_m.len()) {
+        let area = |lp: &[(noshape_sketch::regions::ProfileSegment, u32)]| -> f64 {
+            let pts: Vec<glam::DVec2> = lp.iter().flat_map(|(sg, _)| sg.tessellate(1e-6)).collect();
+            (0..pts.len()).map(|i| pts[i].perp_dot(pts[(i + 1) % pts.len()])).sum::<f64>() * 0.5
+        };
+        let mut pieces: Vec<_> = pieces.into_iter().filter(|p| !p.is_empty()).collect();
+        pieces.sort_by(|a, b| area(b).abs().total_cmp(&area(a).abs()));
+        let mut it = pieces.into_iter();
+        if let Some(first) = it.next() {
+            outer_m = first;
+            holes_m.extend(it);
+        }
+    }
     let outer: Vec<k::Segment2d> = outer_m.iter().map(|(sg, _)| to_segment(sg)).collect();
     let holes: Vec<Vec<k::Segment2d>> = holes_m.iter().map(|h| h.iter().map(|(sg, _)| to_segment(sg)).collect()).collect();
     let tracked = k::make_face_2d_tracked(&plane, &outer, &holes)?;
@@ -1502,6 +1518,22 @@ pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region
         }
     }
     Ok(Profile { shape: tracked.shape, frame: s.frame, edge_sources, key, from_face: false })
+}
+
+/// A loop cut at each line it runs along and back along (a slit): the pieces between, each a loop.
+fn split_slits(lp: Vec<(noshape_sketch::regions::ProfileSegment, u32)>) -> Vec<Vec<(noshape_sketch::regions::ProfileSegment, u32)>> {
+    let n = lp.len();
+    let back = |a: &noshape_sketch::regions::ProfileSegment, b: &noshape_sketch::regions::ProfileSegment| matches!(a, noshape_sketch::regions::ProfileSegment::Line { .. }) && (a.start() - b.end()).length() < 1e-12 && (a.end() - b.start()).length() < 1e-12;
+    for i in 0..n {
+        for j in i + 1..n {
+            if lp[i].1 == lp[j].1 && back(&lp[i].0, &lp[j].0) {
+                let a: Vec<_> = lp[i + 1..j].to_vec();
+                let b: Vec<_> = lp[j + 1..].iter().chain(lp[..i].iter()).cloned().collect();
+                return split_slits(a).into_iter().chain(split_slits(b)).filter(|p| !p.is_empty()).collect();
+            }
+        }
+    }
+    vec![lp]
 }
 
 /// Encode a sketch solver region id into a reference key.
