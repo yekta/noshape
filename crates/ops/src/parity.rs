@@ -388,9 +388,12 @@ impl<'a> Translator<'a> {
         for sub in f["subFeatures"].as_array().into_iter().flatten().filter(|s| s["featureType"] == "mateConnector") {
             let mut problems = Vec::new();
             match self.feature(k, sub, &mut problems) {
-                Ok((id, _, _)) => {
+                Ok((id, status, message)) => {
                     if let Some(oid) = sub["featureId"].as_str() {
                         self.feature_ids.insert(oid.to_string(), id);
+                    }
+                    if status == "Error" {
+                        problems.push(format!("ours errs: {}", message.unwrap_or_default()));
                     }
                     step.problems.push(format!("its in-feature {} built as a feature before it (noshape has none inside a feature)", sub["featureType"].as_str().unwrap_or("?")));
                 }
@@ -514,6 +517,14 @@ impl<'a> Translator<'a> {
         if tolerances > 0 {
             problems.push(format!("{tolerances} tolerance / precision fields not translated (no effect on the geometry)"));
         }
+        // A connector on the face a sketch's circle imprints (ours: the
+        // sketch region): on the circle itself, the same centre and normal.
+        if ty == "mateConnector"
+            && let Some(Value::Array(ids)) = params.get("originQuery").cloned()
+        {
+            let on: Vec<Value> = ids.iter().map(|id| id.as_str().filter(|i| i.starts_with("region:")).and_then(|r| self.region_curve(r)).map(Value::from).unwrap_or_else(|| id.clone())).collect();
+            params.insert("originQuery".into(), Value::Array(on));
+        }
         upgrade(ty, &mut params, &mut unknown);
         if !unknown.is_empty() {
             problems.push(format!("parameters not in noshape's {ty}: {}", unknown.join(", ")));
@@ -555,12 +566,31 @@ impl<'a> Translator<'a> {
         Ok((r["feature"].as_str().unwrap_or("").to_string(), st["status"].as_str().unwrap_or("").to_string(), st["message"].as_str().map(str::to_string)))
     }
 
+    /// The one curve bounding a sketch region, if one does.
+    fn region_curve(&mut self, region: &str) -> Option<String> {
+        let sketch = region.strip_prefix("region:")?.split(':').next()?;
+        let g = self.call("sketch_get", json!({ "sketch": sketch })).ok()?;
+        let r = g["regions"].as_array()?.iter().find(|r| r["id"] == region)?;
+        match r["boundary"].as_array()?.as_slice() {
+            [one] => one.as_str().map(str::to_string),
+            _ => None,
+        }
+    }
+
     /// One Onshape parameter as feature_add takes it (`None`: nothing to set).
     fn param(&mut self, k: usize, p: &Value) -> Result<Option<Value>, String> {
         let ty = p["btType"].as_str().unwrap_or("");
         let kind = ty.split('-').next().unwrap_or(ty);
         Ok(match kind {
             "BTMParameterQuantity" => Some(json!(p["expression"].as_str().ok_or("no expression")?)),
+            // With MBD tolerance fields (no effect on the geometry).
+            "BTMParameterTolerantQuantity" => {
+                let toleranced = p["toleranceParameters"].as_array().into_iter().flatten().any(|t| t["parameterId"] == "toleranceType" && t["value"] != "DEFAULT" && t["value"] != "NONE");
+                if toleranced {
+                    self.notes.push(format!("{}: its tolerance not translated (no effect on the geometry)", p["parameterId"].as_str().unwrap_or("")));
+                }
+                Some(json!(p["expression"].as_str().ok_or("no expression")?))
+            }
             "BTMParameterNullableQuantity" if p["isNull"].as_bool() == Some(true) => None,
             "BTMParameterNullableQuantity" => Some(json!(p["expression"].as_str().ok_or("no expression")?)),
             "BTMParameterEnum" | "BTMParameterBoolean" | "BTMParameterString" => Some(p["value"].clone()),

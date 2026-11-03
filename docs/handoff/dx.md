@@ -92,7 +92,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   (sketch_get regions now give their `outer` loop; T1 filter_inner_loops_leaves_out_what_a_hole_holds;
   bearing-block-takumi). Score **9/14 documents, 67/93 features** (SCORE.md row replaced). New tickets:
   EXTRUDE-SLIT-REGION (core: learning-center-michael), FILLET-31S-FAIL (core: knob-jason, 31 s then an error).
-  Live told (REQUESTS 12:10) about "undefined" kinds and the refetch.
+  Live told (REQUESTS 12:10) about "undefined" kinds and the refetch. 12:50: a Hole's in-feature connector on the
+  face a sketch circle imprints (ours: the region) goes on the circle (same centre and normal), and a connector that
+  errs is reported; TolerantQuantity parameters (MBD tolerances on a depth) read as their quantity. With core's
+  e77387ec: **10/14, 72/93** (clamp-abhil matches to the end).
 - 11-03 10:40 assembly phase (lead 09:05: against a small assembly if live's sample is late): `parity::rebuild_assembly`
   takes live's assembly definition (`rootAssembly` + `features` with featureStates) and each Part Studio
   (`studios/<elementId>.json` + `.parts.json`): every studio translated into its own tab, each mate connector's
