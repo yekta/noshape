@@ -1,6 +1,6 @@
 {
  "scenario": "sketch-circle-at-origin-coincident",
- "recorded": "2026-11-03T17:29:23.947Z",
+ "recorded": "2026-11-03T20:54:22.032Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "746ca36b7e0c44bc851cf726",
+  "element": "1017964964ff703629e726be",
   "start": "empty",
   "startElement": "16c3ef729d456774c1da81b8"
  },
@@ -139,7 +139,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 191875
+   "t": 47754
   },
   {
    "step": 2,
@@ -245,7 +245,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 199424
+   "t": 58355
   },
   {
    "step": 3,
@@ -345,7 +345,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 202788
+   "t": 61731
   },
   {
    "step": 4,
@@ -453,7 +453,7 @@
      "dimensions": []
     }
    },
-   "t": 209382
+   "t": 74990
   },
   {
    "step": 5,
@@ -561,12 +561,12 @@
       "circle"
      ],
      "constraints": [
-      "VERTICAL"
+      "COINCIDENT"
      ],
      "dimensions": []
     }
    },
-   "t": 216429
+   "t": 81520
   },
   {
    "step": 6,
@@ -664,12 +664,12 @@
       "circle"
      ],
      "constraints": [
-      "VERTICAL"
+      "COINCIDENT"
      ],
      "dimensions": []
     }
    },
-   "t": 218663
+   "t": 83319
   }
  ]
 }
