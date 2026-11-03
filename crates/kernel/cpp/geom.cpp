@@ -4,6 +4,7 @@
 
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
+#include <BRep_Builder.hxx>
 #include <algorithm>
 #include <BRepBndLib.hxx>
 #include <OSD_Parallel.hxx>
@@ -677,6 +678,18 @@ bool has_free_form_face(const TopoDS_Shape& s)
 void tighten_box(const TopoDS_Shape& s, double box[6])
 {
   const double gap = 1e3 * Precision::Confusion(), most = 10 * Precision::Confusion();
+  // The overshoot is past edges: their extremes, not the faces' (a long wavy strip's B-spline faces took 2.2 s a box
+  // here, cf-wave-spring; a face's own extreme, OCCT's, is never pulled further than `most` by this).
+  TopoDS_Compound rims;
+  BRep_Builder    rb;
+  rb.MakeCompound(rims);
+  for (TopExp_Explorer e(s, TopAbs_EDGE); e.More(); e.Next())
+    if (!BRep_Tool::Degenerated(TopoDS::Edge(e.Current())))
+      rb.Add(rims, e.Current());
+  for (TopExp_Explorer v(s, TopAbs_VERTEX, TopAbs_EDGE); v.More(); v.Next())
+    rb.Add(rims, v.Current());
+  if (rims.NbChildren() == 0)
+    return;
   const double cx = (box[0] + box[3]) / 2, cy = (box[1] + box[4]) / 2, cz = (box[2] + box[5]) / 2;
   const double half = std::max({box[3] - box[0], box[4] - box[1], box[5] - box[2]}) + 2 * gap;
   for (int axis = 0; axis < 3; ++axis)
@@ -687,7 +700,7 @@ void tighten_box(const TopoDS_Shape& s, double box[6])
       gp_Dir       n(axis == 0 ? 1 : 0, axis == 1 ? 1 : 0, axis == 2 ? 1 : 0);
       gp_Pnt       o(axis == 0 ? at : cx, axis == 1 ? at : cy, axis == 2 ? at : cz);
       const TopoDS_Face plane = BRepBuilderAPI_MakeFace(gp_Pln(o, n), -half, half, -half, half).Face();
-      BRepExtrema_DistShapeShape d(s, plane);
+      BRepExtrema_DistShapeShape d(rims, plane);
       if (!d.IsDone() || d.NbSolution() == 0)
         continue;
       const double exact = side ? at - d.Value() : at + d.Value();
@@ -767,7 +780,10 @@ rust::Vec<double> bounding_box(const OcShape& s, bool optimal)
   double box[6];
   b.Get(box[0], box[1], box[2], box[3], box[4], box[5]);
   if (optimal && !has_mesh_faces(s.shape) && has_free_form_face(s.shape))
+  {
+    const KernelTimer timer("box.tighten");
     tighten_box(s.shape, box);
+  }
   {
     const LockedSection locked_section_715;
     std::lock_guard<std::mutex> g(s.myBoxLock);
