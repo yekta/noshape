@@ -769,6 +769,37 @@ fn ctrl_c_ctrl_v_on_a_feature_row_add_nothing(cx: &mut TestAppContext) {
     assert_eq!(cx.update(|cx| view.read(cx).studio(cx).unwrap().features.len()), 2, "nothing pasted");
 }
 
+/// Live 1863 (ui-parity shortcut-shift-p-planes): Shift+P hides the origin, planes and sketches as an undo step; a
+/// second press isn't a toggle; Ctrl+Z brings back exactly what was hidden (a sketch hidden before stays hidden).
+/// (Live records the second press as an empty step of its own; our store keeps no step that changes nothing.)
+#[gpui::test]
+fn shift_p_hides_construction_one_undo_step_a_press(cx: &mut TestAppContext) {
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "shift-p", Some(block));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let shown = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display.planes.iter().filter(|p| !p.hidden).count());
+    let can_undo = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).doc.read(cx).can_undo());
+    assert_eq!((shown(cx), can_undo(cx)), (3, false));
+    let shift_p = |cx: &mut TestAppContext| cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.hide_construction(w, cx))).unwrap();
+    shift_p(cx);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert_eq!((shown(cx), can_undo(cx)), (0, true), "hidden, a step");
+    shift_p(cx);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert_eq!(shown(cx), 0, "not a toggle");
+    let undo = |cx: &mut TestAppContext| {
+        cx.update(|cx| view.read(cx).doc.clone()).update(cx, |d, cx| d.undo(cx));
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    };
+    undo(cx);
+    assert_eq!(shown(cx), 3, "the planes back");
+    assert!(cx.update(|cx| view.read(cx).studio(cx).unwrap().features[0].hidden), "the extruded sketch stays hidden");
+}
+
 /// Live (ui-parity extrude-depth-variable-escape, 11-03): Esc with the autofill list open closes the list only;
 /// `#wall` and the focus stay in Depth (ours reverted the field and left it).
 #[gpui::test]

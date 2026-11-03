@@ -2082,6 +2082,15 @@ impl PartStudioView {
 
     /// Shift+P: hide all construction geometry (planes, sketches).
     pub(super) fn hide_construction(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // Live 1863: in the Part Studio Shift+P hides the origin, the planes and the sketches, one undo step per
+        // press (not a toggle; Ctrl+Z brings back what that press hid).
+        if self.sketch.is_none() {
+            let mut targets: Vec<Reference> = self.display.planes.iter().map(|p| p.reference.clone()).collect();
+            targets.push(Reference::Origin);
+            targets.extend(self.display.sketches.iter().map(|s| Reference::Feature(s.feature)));
+            self.set_visibility(&targets, true, cx);
+            return;
+        }
         let any_shown = self.opts.show_planes || self.opts.show_sketches;
         self.opts.show_planes = !any_shown;
         self.opts.show_sketches = !any_shown;

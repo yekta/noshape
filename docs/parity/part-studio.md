@@ -67,7 +67,7 @@ Tested = driven in the app on Xvfb (xdotool) and/or covered by unit tests
 | 2.12 | ←→↑↓ rotate 15°, Ctrl 5°, Shift 90° | keyboard_shortcuts | ✅ | 0.4.10+ / 83577e88 10-27 |
 | 2.13 | Ctrl+Shift+←→↑↓ pan (150 px per step) | keyboard_shortcuts; A §6.1 | ✅ (psui 10-27: 150 px per press, as live) | 0.4.10+ / 83577e88 10-27 |
 | 2.14 | P shows/hides planes | keyboard_shortcuts | ✅ | 0.4.10+ / 83577e88 10-27 |
-| 2.15 | Shift+P hides all construction geometry (planes, sketches); again shows it | keyboard_shortcuts | ✅ (app 10-24, = sketch 1.17) | 0.4.10+ / 83577e88 10-27 |
+| 2.15 | Shift+P hides the origin, planes and sketches as an undo step; not a toggle (live 1863: again hides nothing more; Ctrl+Z shows them) | keyboard_shortcuts | ✅ (psui 11-03, T1 shift_p_hides_construction_one_undo_step_a_press; live's second press is an empty undo step, ours none) | 0.4.10+ / 83577e88 10-27 |
 | 2.16 | Y hides the hovered entity's part/sketch/plane (or the selection) | keyboard_shortcuts; View__hide_show | ✅ (psui 10-27: Y hides the part under the pointer, as live) | 0.4.10+ / 83577e88 10-27 |
 | 2.17 | Shift+Y shows hidden entities (selected ones, else all parts) | keyboard_shortcuts; View__hide_show | ✅ (psui 10-27: with nothing selected, Shift+Y shows only the hidden part under the pointer; over empty graphics nothing, as live) | 0.4.10+ / 83577e88 10-27 |
 | 2.18 | Shift+I isolates the hovered/selected parts (others at ~20 %) and clears the selection; over a faded part it does nothing (live 10-27: not cumulative by hover) | keyboard_shortcuts; View__isolate | ✅ | 0.4.10+ / 83577e88 10-27 |
