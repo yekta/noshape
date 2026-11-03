@@ -16,6 +16,22 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-03 15:38 UTC.**
+- Landed since 14:35: SKETCH-COLLINEAR-EDGES-MERGE (live 1904's cases), SKETCH-FACE-FRAME (ScopeRule 8,
+  PartStudio::legacy_face_frames; evPlane too), FS-ANYTHING-PARAM, FS-FEATURE-LIST-RERUN (FeatureList functions re-run
+  the picked features: custom host status.rs feature_list_function + pattern.rs rerun_instance; a picked sketch is
+  solved again), EXTRUDE-SURFACE-CURVES (every curve, every end; op_prism_until's sheet branch and its seam join),
+  FS-WAVE-SPRING (patch 0020, synced by the lead; T1 landed), the two-at-a-time slab fuse reverted (live fails
+  1814db9f), A22 batch 3 (curves / surfaces / surfacing / frames).
+- Parity: learning-center-frank, exercise-martinl, learning-center-devon match live to the end; cf-parameter-pattern
+  builds (live's end state asked, REQUESTS 15:16); cf-curve-pattern-normal's Extrude 2 as live but for live's loose
+  box (dx's compare).
+- Running: a subagent maps A22's sheet metal and small-file texts (/root/core-scratch/a22/map-sm.jsonl; apply with
+  /root/core-scratch/a22/apply.py, edited for the file name). Waiting on live: FS-OLD-STD-COMPAT (std 392 / 1024
+  exports, REQUESTS 15:00), cf-parameter-pattern's end state.
+- Next: FILLET-BLEND-SPLIT, MIRROR-FEATURE-UP-TO (live's rule for a feature mirror's face pattern), FILLET-OVERLAP-FAIL,
+  FS-WAVE-SPRING-SPEED (tight box), Shell 4's common, FILLET-PROPAGATION-VOLUME.
+
 **State 11-03 14:35 UTC.**
 - Landed: ADD-INSIDE-OUT (6d54f584: five shell rebuilds flipped a REVERSED shell once more; dx's boss +922.937 as
   live); OCCT patch 0020 (29d17a5a) and the volume integral's u-isoline skip (queued): FS-WAVE-SPRING builds as live
