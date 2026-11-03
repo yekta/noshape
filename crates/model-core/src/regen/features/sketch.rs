@@ -817,7 +817,8 @@ mod text_expression_tests {
         sk.add_constraint(ConstraintKind::Vertical { a: b, b: None }).unwrap();
         sk.add_constraint(ConstraintKind::Length { curve: a, value: 0.032 }).unwrap();
         sk.add_constraint(ConstraintKind::Equal { a, b }).unwrap();
-        assert!(sk.solve().is_solved());
+        // (Both lengths and the Equal already over-define it, as in live.)
+        assert!(!sk.solve().is_solved());
         sk.set_dimension_value(lb, 0.05).unwrap();
         let mut ps = PartStudio::new();
         let mut f = ps.new_feature("sketch", &units).unwrap();
