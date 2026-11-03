@@ -977,13 +977,20 @@ impl<'a> Translator<'a> {
         let found = self.call("query_entities", json!({ "kind": kind, "created_by": ours, "limit": 200 }))?;
         let k = per_unit(&found["units"]);
         let cands: Vec<(String, [f64; 3])> = found[kind].as_array().into_iter().flatten().filter_map(|e| Some((e["id"].as_str()?.to_string(), f3(&e[key])?.map(|c| c * k)))).collect();
+        // A whole circle's midpoint is its centre: it is over the sketch
+        // curve when the curve's point is a radius from it.
+        let rings: HashMap<String, f64> = found[kind].as_array().into_iter().flatten().filter(|e| e["closed"] == true).filter_map(|e| Some((e["id"].as_str()?.to_string(), e["radius"].as_f64()? * k))).collect();
+        let lateral = |c: &(String, [f64; 3]), p: [f64; 3]| match rings.get(&c.0) {
+            Some(r) => (lateral(c.1, p) - r).abs(),
+            None => lateral(c.1, p),
+        };
         let pick = match name {
             // On the line through the sketch point along the normal; swept
             // faces: the one whose centroid is nearest that line.
-            "SWEPT_EDGE" | "SWEPT_FACE" => cands.iter().min_by(|a, b| lateral(a.1, at).total_cmp(&lateral(b.1, at))),
+            "SWEPT_EDGE" | "SWEPT_FACE" => cands.iter().min_by(|a, b| lateral(a, at).total_cmp(&lateral(b, at))),
             // Caps: over the sketch curve, nearest (start) or farthest (end) along the extrude.
             _ => {
-                let over: Vec<&(String, [f64; 3])> = cands.iter().filter(|c| lateral(c.1, at) < 1e-6 || name == "CAP_FACE").collect();
+                let over: Vec<&(String, [f64; 3])> = cands.iter().filter(|c| lateral(c, at) < 1e-6 || name == "CAP_FACE").collect();
                 let along = |c: &&(String, [f64; 3])| dot(sub(c.1, o), n).abs();
                 let extreme = if is_start { over.iter().map(along).fold(f64::INFINITY, f64::min) } else { over.iter().map(along).fold(f64::NEG_INFINITY, f64::max) };
                 let level: Vec<&(String, [f64; 3])> = over.into_iter().filter(|c| (along(c) - extreme).abs() < 1e-6).collect();
