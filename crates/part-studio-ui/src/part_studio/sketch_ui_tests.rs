@@ -534,6 +534,7 @@ fn dialog_field_enter_inserts_the_highlighted_variable(cx: &mut TestAppContext) 
     assert_eq!(dialog.update(cx, |d, cx| d.field_text("depth", cx)).as_deref(), Some("#wall_thickness"));
     assert_eq!(dialog.update(cx, |d, cx| d.field_selection("depth", cx)), Some(15..15), "the cursor after the insertion");
     assert!(cx.update(|cx| view.read(cx).edit.is_some()), "the dialog stays");
+    assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (false, false), "no undo step (live ui-parity extrude-depth-variable-click-once)");
     keys(cx, window, &["enter"]);
     assert!(cx.update(|cx| view.read(cx).edit.is_none()), "the next Enter accepts it");
 }

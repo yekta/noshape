@@ -253,6 +253,8 @@ pub struct FeatureDialog {
     /// The last press in the dialog came while a field held typed text not yet applied: a click on ✓ then only
     /// applies it (live ui-parity extrude-ok-button: the dialog stays open, a second ✓ closes it).
     press_applies_typed: bool,
+    /// The change just made is no undo step (`take_no_undo_step`).
+    no_undo_step: bool,
     /// The value an edited feature opens with the keyboard in (INITIAL_FOCUS_ON_EDIT on a number or text).
     edit_focus: Option<&'static str>,
     /// Open "Create variable" popup.
@@ -409,6 +411,7 @@ impl FeatureDialog {
             completion: None,
             just_applied: None,
             press_applies_typed: false,
+            no_undo_step: false,
             edit_focus: None,
             focus_dialog_pending: false,
             keyboard_left: false,
@@ -1469,8 +1472,15 @@ impl FeatureDialog {
         state.update(cx, |s, cx| s.set_selected_range(cursor.min(text.len())..cursor.min(text.len()), cx));
         self.baselines.insert(path.to_string(), text);
         self.just_applied = Some(path.to_string());
+        // Live (ui-parity extrude-depth-variable-*): the insertion applies the value but Undo stays off.
+        self.no_undo_step |= self.typed_pending;
         self.flush_typed(cx);
         cx.notify();
+    }
+
+    /// The last change is no step of the dialog's undo history (read once by the Part Studio).
+    pub fn take_no_undo_step(&mut self) -> bool {
+        std::mem::take(&mut self.no_undo_step)
     }
 
     /// One ↑ / ↓ / wheel step of a number field (`quantity_field::step_text`):
@@ -1540,8 +1550,12 @@ impl FeatureDialog {
             return;
         }
         let Some(state) = self.inputs.get(&c.key).cloned() else { return };
-        if let Some(text) = c.accept(index, &state, window, cx) {
-            self.on_text_changed(&c.key, text, cx);
+        // An entry taken from the list is no undo step (live ui-parity extrude-depth-variable-click-row).
+        if let Some(text) = c.accept(index, &state, window, cx)
+            && self.set_text_value(&c.key, text)
+        {
+            self.no_undo_step = true;
+            self.changed(cx);
         }
         cx.notify();
     }

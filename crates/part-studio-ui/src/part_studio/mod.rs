@@ -2253,6 +2253,11 @@ impl PartStudioView {
         }
         let sub = cx.subscribe_in(&dialog, window, |this: &mut Self, _, ev: &DialogEvent, window, cx| match ev {
             DialogEvent::Changed => {
+                if let Some(e) = &mut this.edit
+                    && e.dialog.update(cx, |d, _| d.take_no_undo_step())
+                {
+                    e.history.absorb = true;
+                }
                 // What the editing logic changes at once belongs to the same step.
                 this.auto_operation(cx);
                 this.draft_checkpoint(cx);

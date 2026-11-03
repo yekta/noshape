@@ -1,0 +1,42 @@
+{
+ "name": "extrude-depth-variable-enter-twice",
+ "about": "Edit Extrude 1, type #wall in Depth, Enter inserts #wall_thickness, a second Enter: does it accept the dialog (VAR-AUTOCOMPLETE-ENTER, 11-02) and is the insertion an undo step?",
+ "area": "psui",
+ "ticket": "VAR-AUTOCOMPLETE-ENTER",
+ "source": "psui 11-03 (live's insertion leaves Undo off)",
+ "start": "vars",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "type",
+   "text": "#wall"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
