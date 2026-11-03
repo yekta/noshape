@@ -275,9 +275,12 @@ pub struct TemplateRow {
     pub template: DrawingTemplate,
 }
 
-/// Onshape's standard templates (ISO in millimeters, first angle; ANSI in
-/// inches or millimeters, third angle): (file, sheet setup name, size, inches).
-const ANSI: [(&str, &str, SheetSize, bool); 12] = [
+/// Onshape's standard templates (live's ANSI, ISO and JIS template documents,
+/// behaviours "template frames"): ANSI in inches or millimeters, third angle;
+/// ISO in millimeters, first angle, decimal comma (live ISO_A3.dwt "R2,5");
+/// JIS the ISO block in Japanese, third angle. (file, sheet setup name, size,
+/// inches).
+const ANSI: [(&str, &str, SheetSize, bool); 10] = [
     ("ANSI_A_INCH.dwt", "ANSI A", SheetSize::AnsiA, true),
     ("ANSI_A_MM.dwt", "ANSI A", SheetSize::AnsiA, false),
     ("ANSI_A_Portrait_INCH.dwt", "ANSI A Portrait", SheetSize::AnsiAPortrait, true),
@@ -288,10 +291,23 @@ const ANSI: [(&str, &str, SheetSize, bool); 12] = [
     ("ANSI_C_MM.dwt", "ANSI C", SheetSize::AnsiC, false),
     ("ANSI_D_INCH.dwt", "ANSI D", SheetSize::AnsiD, true),
     ("ANSI_D_MM.dwt", "ANSI D", SheetSize::AnsiD, false),
-    ("ANSI_E_INCH.dwt", "ANSI E", SheetSize::AnsiE, true),
-    ("ANSI_E_MM.dwt", "ANSI E", SheetSize::AnsiE, false),
 ];
-const ISO: [(&str, &str, SheetSize); 5] = [("ISO_A0.dwt", "ISO A0", SheetSize::A0), ("ISO_A1.dwt", "ISO A1", SheetSize::A1), ("ISO_A2.dwt", "ISO A2", SheetSize::A2), ("ISO_A3.dwt", "ISO A3", SheetSize::A3), ("ISO_A4.dwt", "ISO A4", SheetSize::A4)];
+const ISO: [(&str, &str, SheetSize); 6] = [
+    ("ISO_A0.dwt", "ISO A0", SheetSize::A0),
+    ("ISO_A1.dwt", "ISO A1", SheetSize::A1),
+    ("ISO_A2.dwt", "ISO A2", SheetSize::A2),
+    ("ISO_A3.dwt", "ISO A3", SheetSize::A3),
+    ("ISO_A4.dwt", "ISO A4", SheetSize::A4),
+    ("ISO_A4_Portrait.dwt", "ISO A4 Portrait", SheetSize::A4Portrait),
+];
+const JIS: [(&str, &str, SheetSize); 6] = [
+    ("JIS_A0.dwt", "JIS A0", SheetSize::A0),
+    ("JIS_A1.dwt", "JIS A1", SheetSize::A1),
+    ("JIS_A2.dwt", "JIS A2", SheetSize::A2),
+    ("JIS_A3.dwt", "JIS A3", SheetSize::A3),
+    ("JIS_A4.dwt", "JIS A4", SheetSize::A4),
+    ("JIS_A4_Portrait.dwt", "JIS A4 Portrait", SheetSize::A4Portrait),
+];
 
 pub fn template_rows() -> Vec<TemplateRow> {
     let ansi = ANSI.iter().map(|&(file, name, size, inches)| TemplateRow {
@@ -304,9 +320,15 @@ pub fn template_rows() -> Vec<TemplateRow> {
         file,
         document: "noshape ISO Drawing Templates",
         standard: "ISO",
-        template: DrawingTemplate::standard(name, size, TitleBlockStyle::Iso, false, Projection::FirstAngle),
+        template: DrawingTemplate { decimal_comma: true, ..DrawingTemplate::standard(name, size, TitleBlockStyle::Iso, false, Projection::FirstAngle) },
     });
-    ansi.chain(iso).collect()
+    let jis = JIS.iter().map(|&(file, name, size)| TemplateRow {
+        file,
+        document: "noshape JIS Drawing Templates",
+        standard: "JIS",
+        template: DrawingTemplate { decimal_comma: true, language: TitleLanguage::Japanese, ..DrawingTemplate::standard(name, size, TitleBlockStyle::Iso, false, Projection::ThirdAngle) },
+    });
+    ansi.chain(iso).chain(jis).collect()
 }
 
 /// Sheet sizes of the Custom template tab per standard.

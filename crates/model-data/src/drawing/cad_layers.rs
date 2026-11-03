@@ -129,6 +129,8 @@ pub enum CadTextStyle {
     Note,
     /// Hole table tags in the view.
     HoleTag,
+    /// A Japanese title block's and its zones' texts (live JIS_*.dwt).
+    JapaneseFields,
 }
 
 impl CadTextStyle {
@@ -138,6 +140,7 @@ impl CadTextStyle {
             CadTextStyle::ViewLabel => "Onshape-Standard-View-Label",
             CadTextStyle::Note => "Onshape-Standard-NoteStyle",
             CadTextStyle::HoleTag => "Onshape-Standard-Hole-Tag",
+            CadTextStyle::JapaneseFields => "Onshape-Standard-JapaneseFields",
         }
     }
 }

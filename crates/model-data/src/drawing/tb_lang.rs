@@ -268,7 +268,8 @@ impl TitleLanguage {
                 do_not_scale: "図面を拡大縮小しない",
                 break_edges: "すべてのエッジを丸め、バリを取り除きます。",
                 first_angle: "第一角法",
-                third_angle: None,
+                // Live JIS_*.dwt.
+                third_angle: Some("第三角法"),
                 name: "名前",
                 signature: "署名",
                 date: "日付",

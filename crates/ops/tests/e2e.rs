@@ -1182,6 +1182,29 @@ export const block = defineFeature(function(context is Context, id is Id, defini
     }
 }
 
+/// Live's template documents: ANSI A–D (no E), ISO A0–A4 and A4 Portrait,
+/// JIS the same sizes; a JIS drawing's title block in Japanese, third angle,
+/// its texts in Onshape-Standard-JapaneseFields (live tpl-JIS_A3.dxf).
+#[test]
+fn jis_templates_as_lives() {
+    let mut ctx = Ctx::new();
+    let path = scratch("jis-templates.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let t = call(&mut ctx, "drawing_templates", json!({}));
+    let files: Vec<&str> = t["templates"].as_array().unwrap().iter().filter_map(|r| r["file"].as_str()).collect();
+    for f in ["JIS_A0.dwt", "JIS_A4_Portrait.dwt", "ISO_A4_Portrait.dwt", "ANSI_D_MM.dwt"] {
+        assert!(files.contains(&f), "{f}: {files:?}");
+    }
+    assert!(!files.iter().any(|f| f.starts_with("ANSI_E")), "{files:?}");
+    let d = call(&mut ctx, "drawing_create", json!({ "template": "JIS_A3.dwt" }));
+    let out = scratch("jis-a3.dxf");
+    call(&mut ctx, "drawing_export", json!({ "drawing": d["drawing"], "format": "DXF", "file": out.to_str().unwrap(), "version": "2018" }));
+    let dxf = std::fs::read_to_string(&out).unwrap();
+    assert!(dxf.contains("第三角法") && dxf.contains("図面を拡大縮小しない"), "Japanese labels");
+    assert!(!dxf.contains("THIRD ANGLE PROJECTION"));
+    assert!(dxf.matches("Onshape-Standard-JapaneseFields").count() >= 44 + 20, "title block and zone texts in the Japanese style");
+}
+
 #[test]
 fn drawing_views_and_dimensions() {
     let mut ctx = Ctx::new();
@@ -1236,7 +1259,8 @@ fn drawing_views_and_dimensions() {
     let lin_id = lin["annotation"].as_u64().unwrap();
     let ed = call(&mut ctx, "drawing_edit_dimension", json!({ "drawing": tab, "annotation": lin_id, "prefix": "2X ", "precision": 1, "tolerance": "symmetrical", "tolerance_value": 0.1 }));
     let text = ed["annotations"].as_array().unwrap().iter().find(|x| x["id"] == lin_id).unwrap()["text"].as_str().unwrap().to_string();
-    assert!(text.contains("2X") && text.contains("80") && text.contains("±0.1"), "{text}");
+    // (ISO_A3.dwt: a decimal comma, live "30±0,1".)
+    assert!(text.contains("2X") && text.contains("80") && text.contains("±0,1"), "{text}");
     let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
     assert!(hist["history"][0]["description"].as_str().unwrap().ends_with(":: Edit dimension"), "{hist}");
     let ed = call(&mut ctx, "drawing_edit_dimension", json!({ "drawing": tab, "annotation": lin_id, "value": "REF", "tolerance": "None" }));
@@ -1263,14 +1287,15 @@ fn drawing_views_and_dimensions() {
     call(&mut ctx, "drawing_delete", json!({ "drawing": tab, "annotations": [lin_id] }));
     assert!(!ann(&mut ctx).iter().any(|a| a["id"] == cid), "the callout went with its dimension");
     // The dual row: this dimension's dual precision, units and Show/hide
-    // units (live asbdd-9: Ø10 "[0.39 in]").
+    // units (live asbdd-9: Ø10 "[0.39 in]"; this ISO_A3.dwt drawing writes
+    // its decimal comma).
     let dia_id = dia["annotation"].as_u64().unwrap();
     let ed = call(&mut ctx, "drawing_edit_dimension", json!({ "drawing": tab, "annotation": dia_id, "dual": "dual", "dual_precision": 2, "dual_units": "Inches", "dual_show_units": true }));
     let text = ed["annotations"].as_array().unwrap().iter().find(|x| x["id"] == dia_id).unwrap()["text"].as_str().unwrap().to_string();
-    assert!(text.contains("[0.39 in]"), "{text}");
+    assert!(text.contains("[0,39 in]"), "{text}");
     let ed = call(&mut ctx, "drawing_edit_dimension", json!({ "drawing": tab, "annotation": dia_id, "dual_show_units": false }));
     let text = ed["annotations"].as_array().unwrap().iter().find(|x| x["id"] == dia_id).unwrap()["text"].as_str().unwrap().to_string();
-    assert!(text.contains("[0.39]"), "{text}");
+    assert!(text.contains("[0,39]"), "{text}");
     // An isometric base view, and a view projected from it.
     let iv = call(&mut ctx, "drawing_insert_view", json!({ "drawing": tab, "source": "Part Studio 1", "orientation": "isometric", "position": [330, 230], "scale": 1.0 }));
     let base = iv["view"].as_u64().unwrap();
@@ -5789,7 +5814,8 @@ fn hole_table_sizes_are_the_hole_callouts() {
     let t = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["tables"].as_array().unwrap().iter().find(|t| t["id"] == ht["table"]).cloned().unwrap();
     let rows = t["rows"].as_array().unwrap();
     assert_eq!(rows.len(), 3, "{t}");
-    assert!(rows[0][3].as_str().is_some_and(|s| s.starts_with('⌀') && s.contains("6.6") && s.contains("THRU")), "{t}");
+    // (ISO_A3.dwt: a decimal comma.)
+    assert!(rows[0][3].as_str().is_some_and(|s| s.starts_with('⌀') && s.contains("6,6") && s.contains("THRU")), "{t}");
     assert_eq!(rows[0][4], "3", "{t}");
     assert_eq!((rows[1][3].as_str(), rows[2][4].as_str()), (Some(""), Some("")), "merged: {t}");
     // Split hole table below A1 (help drawing_hole_table): the second part
@@ -5799,7 +5825,7 @@ fn hole_table_sizes_are_the_hole_callouts() {
     let part = tables.as_array().unwrap().iter().find(|t| t["id"] == sp["table"]).cloned().unwrap();
     let rows = part["rows"].as_array().unwrap();
     assert_eq!(rows.len(), 2, "{part}");
-    assert!(rows[0][3].as_str().is_some_and(|s| s.contains("6.6")) && rows[0][4] == "3", "{part}");
+    assert!(rows[0][3].as_str().is_some_and(|s| s.contains("6,6")) && rows[0][4] == "3", "{part}");
 }
 
 

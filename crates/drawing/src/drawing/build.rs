@@ -1556,7 +1556,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         let in_block = in_tb(&g.texts[i].pos);
         if in_block {
             g.texts[i].pick = tb;
-            if field_texts.borrow().contains(&g.texts[i].text) {
+            // (The title block tags its own values; this covers the rest.)
+            if g.cad_text_style(i).is_none() && field_texts.borrow().contains(&g.texts[i].text) {
                 g.cad_text_styles.push(super::cad_layers::CadTextStyleSpan { texts: i..i + 1, style: CadTextStyle::Fields });
             }
         }

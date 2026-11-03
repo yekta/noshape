@@ -834,6 +834,9 @@ impl SheetGeometry {
         let format = sheet.format;
         let [fx0, fy0, fx1, fy1] = sheet.size.frame_rect();
         self.rect(fx0, fy0, fx1, fy1, LineStyle::Border);
+        // A Japanese template's texts, the zones' too, are in its Japanese
+        // text style (live JIS_*.dwt).
+        let t0 = self.texts.len();
         if format.border {
             self.add_zones(sheet);
         }
@@ -872,6 +875,9 @@ impl SheetGeometry {
                 }
             }
             style => self.onshape_title_block(sheet, style == TitleBlockStyle::Iso, projection, &value_of),
+        }
+        if sheet.title_language == super::tb_lang::TitleLanguage::Japanese {
+            self.cad_text_style_since(t0, super::cad_layers::CadTextStyle::JapaneseFields);
         }
     }
 
@@ -1000,15 +1006,21 @@ impl SheetGeometry {
         let at = |u: (f64, f64), v: f64| [px(pick(u.0, u.1)), py(v)];
         let wide = |w: (f64, f64)| pick(w.0, w.1) * bw;
         // (`wrapped`: one paragraph wrapped into `lines`.)
-        let block = |g: &mut Self, p: [f64; 2], h: f64, lines: &[String], anchor: Anchor, w: (f64, f64), wrapped: bool| {
+        // (`p` is where an English text of height `h` hangs; `k` scales it
+        // for the language: live hangs a text 0.9 of its height below its
+        // cell's top, a left one 0.55 of it in.)
+        let block = |g: &mut Self, p: [f64; 2], h: f64, k: f64, lines: &[String], anchor: Anchor, w: (f64, f64), wrapped: bool| {
+            let p = [p[0] + if anchor == Anchor::TopLeft { 0.55 * (k - 1.0) * h } else { 0.0 }, p[1] - 0.9 * (k - 1.0) * h];
+            let h = k * h;
             let t0 = g.texts.len();
             for (i, l) in lines.iter().enumerate() {
                 g.text([p[0], p[1] - i as f64 * h * 5.0 / 3.0], h, l.clone(), anchor);
             }
             g.cad_mtext_since(t0, wide(w), 0.0, wrapped);
         };
-        let note = |g: &mut Self, p: [f64; 2], h: f64, t: &str, anchor: Anchor, w: (f64, f64)| block(g, p, h, &[t.to_string()], anchor, w, false);
-        let label = |g: &mut Self, u: (f64, f64), v: f64, t: &str, h: f64, w: (f64, f64)| note(g, at(u, v), h, t, Anchor::TopLeft, w);
+        let note = |g: &mut Self, p: [f64; 2], h: f64, k: f64, t: &str, anchor: Anchor, w: (f64, f64)| block(g, p, h, k, &[t.to_string()], anchor, w, false);
+        let label = |g: &mut Self, u: (f64, f64), v: f64, t: &str, h: f64, w: (f64, f64)| note(g, at(u, v), h, 1.0, t, Anchor::TopLeft, w);
+        let label_k = |g: &mut Self, u: (f64, f64), v: f64, t: &str, k: f64, w: (f64, f64)| note(g, at(u, v), lab, k, t, Anchor::TopLeft, w);
         // A field's value on its spot (several lines stack about it), in
         // Onshape-Standard-Fields; `dh` its cell's height in the block.
         let field = |g: &mut Self, spot: [f64; 2], h: f64, v: &str, w: (f64, f64), dh: f64| {
@@ -1046,17 +1058,17 @@ impl SheetGeometry {
         let unless_h = lab * tr.unless_h;
         let (left_w, half_w) = ((0.19358, 0.18447), (0.09679, 0.09224));
         // Live wraps at the full cell width (the text may touch the border).
-        block(self, at((0.00435, 0.00414), 0.9712), unless_h, &wrap_text(&tr.unless.replace("{u}", if en { units } else { word }), unless_h, left * bw), Anchor::TopLeft, left_w, true);
+        block(self, at((0.00435, 0.00414), 0.9712), lab, tr.unless_h, &wrap_text(&tr.unless.replace("{u}", if en { units } else { word }), unless_h, left * bw), Anchor::TopLeft, left_w, true);
         // ANSI in inches: the decimal tolerances (right-aligned by their
         // leading spaces) and the fractional one; ANSI in millimetres and ISO
         // only the angular one.
         let inches = !iso && units == "INCHES";
         if inches {
-            block(self, at((0.00435, 0.00414), 0.8512), lab, &["    .XX = ±.0-", "  .XXX = ±.00-", ".XXXX = ±.000-"].map(String::from), Anchor::TopLeft, half_w, false);
+            block(self, at((0.00435, 0.00414), 0.8512), lab, 1.0, &["    .XX = ±.0-", "  .XXX = ±.00-", ".XXXX = ±.000-"].map(String::from), Anchor::TopLeft, half_w, false);
         }
         let fractional = if inches { tr.fractional.unwrap_or("FRACTIONAL = ±") } else { "" };
-        block(self, at((0.10268, 0.09784), 0.85407), 0.9 * lab, &[String::new(), tr.angular.to_string(), fractional.to_string()], Anchor::TopLeft, half_w, false);
-        label(self, (0.00435, 0.00414), 0.6592, tr.surface_finish, lab * tr.surface_h, half_w);
+        block(self, at((0.10268, 0.09784), 0.85407), 0.9 * lab, 1.0, &[String::new(), tr.angular.to_string(), fractional.to_string()], Anchor::TopLeft, half_w, false);
+        label_k(self, (0.00435, 0.00414), 0.6592, tr.surface_finish, tr.surface_h, half_w);
         // The surface finish mark after the label (live: from (0.54, 0.918) in
         // ANSI A's inches, scaled with the block; long translations push it
         // right).
@@ -1066,10 +1078,10 @@ impl SheetGeometry {
         self.lines.push(Polyline2 { points: vec![sf(0.0, 0.918), sf(0.03, 0.866), sf(0.093, 0.9752), sf(0.159, 0.9752)], style: LineStyle::Thin, closed: false, pick: 0 });
         let note_u = (0.09877, 0.09412);
         // 1.3 L, smaller in some languages (live).
-        note(self, at(note_u, 0.49453), 1.3 * lab * tr.dns_h, tr.do_not_scale, Anchor::TopCenter, left_w);
-        block(self, at(note_u, 0.3872), lab, &wrap_text(tr.break_edges, lab, left * bw), Anchor::TopCenter, left_w, true);
+        note(self, at(note_u, 0.49453), 1.3 * lab, tr.dns_h, tr.do_not_scale, Anchor::TopCenter, left_w);
+        block(self, at(note_u, 0.3872), lab, 1.0, &wrap_text(tr.break_edges, lab, left * bw), Anchor::TopCenter, left_w, true);
         let proj = if projection == Projection::FirstAngle { tr.first_angle } else { tr.third_angle.unwrap_or("THIRD ANGLE PROJECTION") };
-        note(self, at(note_u, 0.2512), lab, proj, Anchor::TopCenter, left_w);
+        note(self, at(note_u, 0.2512), lab, 1.0, proj, Anchor::TopCenter, left_w);
         self.projection_symbol([px(pick(note_u.0, note_u.1)), py(0.0992)], projection, bh / 38.1);
         // Middle: NAME (SIGNATURE) / DATE, DRAWN / CHECKED / APPROVED, two
         // more (empty) rows, MATERIAL / FINISH.
@@ -1077,15 +1089,15 @@ impl SheetGeometry {
         let (name_w, date_w) = ((0.12346, 0.09412), (0.07407, 0.05882));
         // (ISO: SIGNATURE first, live's order.)
         if iso {
-            note(self, at((0.0, 0.41176), 0.9712), lab, tr.signature, Anchor::TopCenter, (0.0, 0.09224));
+            note(self, at((0.0, 0.41176), 0.9712), lab, 1.0, tr.signature, Anchor::TopCenter, (0.0, 0.09224));
         }
         label(self, (0.30064, 0.27473), 0.9712, tr.name, lab, (0.12099, 0.09224));
-        note(self, at(date_u, 0.9712), lab, tr.date, Anchor::TopCenter, (0.07259, 0.05765));
+        note(self, at(date_u, 0.9712), lab, 1.0, tr.date, Anchor::TopCenter, (0.07259, 0.05765));
         // (label, its keys, its label's and its values' heights in the block)
         let fields: [(&str, &str, &str, f64, f64); 3] = [(tr.drawn, "Drawn by", "Drawn date", 0.8512, 0.82), (tr.checked, "Checked by", "Checked date", 0.7312, 0.70), (tr.approved, "Approved by", "Approved date", 0.6112, 0.58)];
         let dc = cols.len() - 2;
         for (r, (l, name, date, lv, v)) in fields.iter().enumerate() {
-            label(self, (0.20188, 0.19238), *lv, l, lab * tr.signoff_h, (0.09679, 0.08071));
+            label_k(self, (0.20188, 0.19238), *lv, l, tr.signoff_h, (0.09679, 0.08071));
             value_in(self, [cols[1], rows[r + 2], cols[2], rows[r + 1]], at(name_u, *v), name, 0.84 * lab, name_w, 0.12);
             value_in(self, [cols[dc], rows[r + 2], cols[dc + 1], rows[r + 1]], at(date_u, *v), date, 0.84 * lab, date_w, 0.12);
         }
