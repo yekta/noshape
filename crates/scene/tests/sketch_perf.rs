@@ -239,7 +239,10 @@ fn speed_target_200_entity_sketch() {
         steps.push(t.elapsed());
     }
     ed.tool_up(&mut data, from);
-    let (step, edit) = (stats(steps), stats(solves));
+    let slowest = |xs: &[Duration]| xs.iter().enumerate().max_by_key(|(_, d)| **d).map_or(0, |(i, _)| i + 1);
+    let (worst_step, worst_solve) = (slowest(&steps), slowest(&solves));
+    let regens: Vec<Duration> = steps.iter().zip(&solves).map(|(a, b)| a.saturating_sub(*b)).collect();
+    let (step, edit, regen_only) = (stats(steps), stats(solves), stats(regens));
     let full = stats((0..21).map(|_| {
         let mut sk = data.sketch.clone();
         let t = Instant::now();
@@ -247,7 +250,7 @@ fn speed_target_200_entity_sketch() {
         t.elapsed()
     }).collect());
     let ms = |d: Duration| d.as_secs_f64() * 1e3;
-    println!("  drag step: median {:.2} ms (solve {:.2}), worst {:.2} ms", ms(step.median), ms(edit.median), ms(step.worst));
+    println!("  drag step: median {:.2} ms (solve {:.2}, regeneration {:.2}), worst {:.2} ms (step {worst_step}; the slowest solve {:.2} ms, step {worst_solve})", ms(step.median), ms(edit.median), ms(regen_only.median), ms(step.worst), ms(edit.worst));
     println!("  full solve with the DOF analysis: median {:.2} ms, worst {:.2} ms", ms(full.median), ms(full.worst));
     assert!(step.median < SPEED_TARGET, "drag step median {:?}", step.median);
     assert!(full.median < SPEED_TARGET, "full solve median {:?}", full.median);
