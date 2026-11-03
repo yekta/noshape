@@ -98,9 +98,11 @@ pub fn ops() -> Vec<Op> {
                 req("sketch", s(), "Sketch feature id or name."),
                 opt("tool", json!({ "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }), "Drawing tool (required without `shapes`)."),
                 opt("points", json!({ "type": "array", "items": click_point.clone() }), "The clicks, in order: [[x, y], ...] in sketch coordinates, or [[x, y, z], ...] model positions (required without `shapes`)."),
-                opt("shapes", json!({ "type": "array", "items": { "type": "object", "properties": { "tool": { "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }, "points": { "type": "array", "items": click_point.clone() }, "sides": { "type": "integer", "minimum": 3, "maximum": 1000 }, "construction": { "type": "boolean" }, "tangent_arc_switch": { "type": "array", "items": { "type": "integer" } } }, "required": ["tool", "points"] } }), "Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes."),
+                opt("shapes", json!({ "type": "array", "items": { "type": "object", "properties": { "tool": { "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }, "points": { "type": "array", "items": click_point.clone() }, "sides": { "type": "integer", "minimum": 3, "maximum": 1000 }, "construction": { "type": "boolean" }, "tangent_arc_switch": { "type": "array", "items": { "type": "integer" } }, "start_derivative": click_point.clone(), "end_derivative": click_point.clone() }, "required": ["tool", "points"] } }), "Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes."),
                 opt("construction", json!({ "type": "boolean" }), "Make the new geometry construction geometry."),
                 opt("sides", json!({ "type": "integer", "minimum": 3, "maximum": 1000 }), "Polygon sides."),
+                opt("start_derivative", click_point.clone(), "spline: the open spline's derivative at its start, [x, y] (per unit of its 0–1 parameter, as Onshape stores `startDerivative`; its end handle placed for it). With `end_derivative`."),
+                opt("end_derivative", click_point.clone(), "spline: the derivative at its end (Onshape's `endDerivative`). With `start_derivative`."),
                 opt("tangent_arc_switch", json!({ "type": "array", "items": { "type": "integer", "minimum": 1 } }), "line: press the Line/tangent arc switch (Shift+A) before these clicks (0-based): that click draws a tangent arc, then the chain goes on with lines (as in Onshape)."),
             ],
             mutates: true,
@@ -606,18 +608,31 @@ fn draw(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 let sides = obj.get("sides").map(|v| v.as_u64().ok_or_else(|| OpError::param(&format!("{p}sides"), "an integer"))).transpose()?;
                 let construction = obj.get("construction").map(|v| v.as_bool().ok_or_else(|| OpError::param(&format!("{p}construction"), "true or false"))).transpose()?.unwrap_or(false);
                 let switches = switch_list(obj.get("tangent_arc_switch"), &format!("{p}tangent_arc_switch"))?;
-                draw_shape(&mut t, &units, &p, tool, points, sides, construction, &switches)?;
+                let ends = end_derivatives(obj.get("start_derivative"), obj.get("end_derivative"), &units, &p)?;
+                draw_shape(&mut t, &units, &p, tool, points, sides, construction, &switches, ends)?;
             }
         }
         None => {
             let (tool, points) = (a.opt_str("tool")?.ok_or_else(|| OpError::param("tool", "required (or `shapes`)"))?, a.opt_array("points")?.ok_or_else(|| OpError::param("points", "required (or `shapes`)"))?);
             let switches = switch_list(a.get("tangent_arc_switch"), "tangent_arc_switch")?;
-            draw_shape(&mut t, &units, "", tool, points, a.opt_u64("sides")?, a.bool_or("construction", false)?, &switches)?;
+            let ends = end_derivatives(a.get("start_derivative"), a.get("end_derivative"), &units, "")?;
+            draw_shape(&mut t, &units, "", tool, points, a.opt_u64("sides")?, a.bool_or("construction", false)?, &switches, ends)?;
         }
     }
     let (id, tab) = (t.id, t.tab);
     commit(od, t)?;
     Ok(sketch_state(od, tab, id, Some(&before))?.into())
+}
+
+/// `start_derivative` / `end_derivative`: both or neither.
+fn end_derivatives(start: Option<&Value>, end: Option<&Value>, units: &UnitPrefs, p: &str) -> Result<Option<(DVec2, DVec2)>, OpError> {
+    let value = |v: Option<&Value>, name: &str| v.filter(|v| !v.is_null()).map(|v| point_value(v, units).map_err(|e| e.with_param(format!("{p}{name}")))).transpose();
+    match (value(start, "start_derivative")?, value(end, "end_derivative")?) {
+        (Some(a), Some(b)) => Ok(Some((a, b))),
+        (None, None) => Ok(None),
+        (Some(_), None) => Err(OpError::param(&format!("{p}end_derivative"), "required with start_derivative")),
+        (None, Some(_)) => Err(OpError::param(&format!("{p}start_derivative"), "required with end_derivative")),
+    }
 }
 
 /// `tangent_arc_switch`: click indices (None: none).
@@ -633,7 +648,7 @@ fn switch_list(v: Option<&Value>, param: &str) -> Result<Vec<usize>, OpError> {
 /// `sketch_draw` call does (`p`: the parameter prefix for errors).
 /// `switches`: the line tool's Shift+A before those clicks.
 #[allow(clippy::too_many_arguments)]
-fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, points: &[Value], sides: Option<u64>, construction: bool, switches: &[usize]) -> Result<(), OpError> {
+fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, points: &[Value], sides: Option<u64>, construction: bool, switches: &[usize], ends: Option<(DVec2, DVec2)>) -> Result<(), OpError> {
     let tool = DRAW_TOOLS.iter().find(|x| x.0 == name).map(|x| x.1).ok_or_else(|| {
         let names: Vec<&str> = DRAW_TOOLS.iter().map(|t| t.0).collect();
         OpError::param(&format!("{p}tool"), &format!("`{name}` is not a drawing tool{}; tools: {}", crate::error::did_you_mean(name, names.iter().copied()), names.join(", ")))
@@ -674,6 +689,15 @@ fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, poin
         let article = if name.starts_with(['a', 'e', 'i', 'o', 'u']) { "an" } else { "a" };
         let hint = ed.message.clone().unwrap_or_else(|| format!("the clicks didn't complete {article} {name} (see sketch_draw's tool list for the clicks it takes)"));
         return Err(OpError::invalid(format!("nothing was drawn: {hint}")).with_param(format!("{p}points")));
+    }
+    if let Some((start, end)) = ends {
+        if name != "spline" {
+            return Err(OpError::param(&format!("{p}start_derivative"), "the spline tool's"));
+        }
+        let spline = created.iter().copied().find(|e| matches!(t.data.sketch.entity(*e).map(|x| &x.geometry), Some(noshape_sketch::Geometry::FitSpline { .. })));
+        let spline = spline.ok_or_else(|| OpError::param(&format!("{p}points"), "no spline was drawn"))?;
+        t.data.sketch.set_fit_spline_end_derivatives(spline, start, end).map_err(|e| OpError::param(&format!("{p}start_derivative"), &e.to_string()))?;
+        t.data.sketch.solve();
     }
     if construction {
         for e in &created {

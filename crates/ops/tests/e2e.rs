@@ -1182,6 +1182,24 @@ export const block = defineFeature(function(context is Context, id is Id, defini
     }
 }
 
+/// A fit spline with Onshape's end derivatives (sketch_draw `start_derivative` /
+/// `end_derivative`, as Onshape stores them): its end handles where live's are
+/// (cf-curve-pattern-normal's Sketch 2: startHandle x 25.107, endHandle x -32.296 mm).
+#[test]
+fn a_spline_takes_end_derivatives() {
+    let mut ctx = Ctx::new();
+    let path = scratch("spline-ends.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    let points = json!([["74.051873976 mm", "-70.884396716 mm"], [0, 0], ["-74.051873976 mm", "91.370642185 mm"]]);
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "spline", "points": points, "start_derivative": ["-304.11224264883985 mm", "0 mm"], "end_derivative": ["-242.21679513831001 mm", "0 mm"] }));
+    let handles: Vec<[f64; 2]> = r["created"].as_array().unwrap().iter().filter(|e| e["type"] == "point").map(|e| [num(&e["at"][0]), num(&e["at"][1])]).filter(|p| p[0].abs() > 1e-6).collect();
+    let near = |p: [f64; 2]| handles.iter().any(|h| (h[0] - p[0]).abs() < 1e-3 && (h[1] - p[1]).abs() < 1e-3);
+    assert!(near([25.107119551, -70.884396716]) && near([-32.296054065, 91.370642185]), "{handles:?}");
+    let e = try_call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "spline", "points": points, "start_derivative": ["1 mm", "0 mm"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("end_derivative"), "{e:?}");
+}
+
 /// Live's template documents: ANSI A–D (no E), ISO A0–A4 and A4 Portrait,
 /// JIS the same sizes; a JIS drawing's title block in Japanese, third angle,
 /// its texts in Onshape-Standard-JapaneseFields (live tpl-JIS_A3.dxf).

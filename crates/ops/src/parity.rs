@@ -1934,6 +1934,19 @@ impl<'a> Translator<'a> {
         let made = self.call("sketch_create", args)?;
         let id = made["sketch"].as_str().ok_or("sketch_create gave no id")?.to_string();
         let frame = self.frames.get(&oid).copied();
+        // A direction in Onshape's sketch (x, y) → ours ([x, y] mm): through
+        // the model, onto our sketch's axes.
+        let our_axes = (f3(&made["frame"]["x"]), f3(&made["frame"]["y"]));
+        let along = |u: f64, v: f64| -> Value {
+            let (a, b) = match (frame, our_axes) {
+                (Some([_, x, y]), (Some(ox), Some(oy))) => {
+                    let w: [f64; 3] = std::array::from_fn(|i| u * x[i] + v * y[i]);
+                    ((0..3).map(|i| w[i] * ox[i]).sum::<f64>(), (0..3).map(|i| w[i] * oy[i]).sum::<f64>())
+                }
+                _ => (u, v),
+            };
+            json!([format!("{} mm", a * 1000.0), format!("{} mm", b * 1000.0)])
+        };
         // Sketch (x, y) in metres → a sketch_draw point: model mm through
         // Onshape's frame when known, else our frame's mm.
         let at = |u: f64, v: f64| match frame {
@@ -2011,10 +2024,19 @@ impl<'a> Translator<'a> {
                 "BTCurveGeometryInterpolatedSpline" => {
                     let flat: Vec<f64> = g["interpolationPoints"].as_array().into_iter().flatten().filter_map(Value::as_f64).collect();
                     let derivs = ["startDerivativeX", "startDerivativeY", "endDerivativeX", "endDerivativeY"].iter().any(|k| num(k).abs() > 1e-12);
-                    if derivs || g["isPeriodic"].as_bool() == Some(true) {
-                        problems.push(format!("sketch entity {eid}: spline end derivatives / periodic not translated (fit points only)"));
+                    let periodic = g["isPeriodic"].as_bool() == Some(true);
+                    if periodic {
+                        problems.push(format!("sketch entity {eid}: periodic spline not translated (fit points only)"));
                     }
-                    (flat.len() >= 4).then(|| json!({ "tool": "spline", "points": flat.chunks(2).map(|c| at(c[0], c[1])).collect::<Vec<_>>(), "construction": construction }))
+                    (flat.len() >= 4).then(|| {
+                        let mut s = json!({ "tool": "spline", "points": flat.chunks(2).map(|c| at(c[0], c[1])).collect::<Vec<_>>(), "construction": construction });
+                        // Onshape's end derivatives (its handles).
+                        if derivs && !periodic {
+                            s["start_derivative"] = along(num("startDerivativeX"), num("startDerivativeY"));
+                            s["end_derivative"] = along(num("endDerivativeX"), num("endDerivativeY"));
+                        }
+                        s
+                    })
                 }
                 "BTCurveGeometryControlPointSpline" => {
                     let flat: Vec<f64> = g["controlPoints"].as_array().into_iter().flatten().filter_map(Value::as_f64).collect();

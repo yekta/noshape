@@ -1154,6 +1154,8 @@ Examples:
 | `shapes` | array of object |  | Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes. |
 | `construction` | boolean |  | Make the new geometry construction geometry. |
 | `sides` | integer |  | Polygon sides. |
+| `start_derivative` | array of number or string |  | spline: the open spline's derivative at its start, [x, y] (per unit of its 0–1 parameter, as Onshape stores `startDerivative`; its end handle placed for it). With `end_derivative`. |
+| `end_derivative` | array of number or string |  | spline: the derivative at its end (Onshape's `endDerivative`). With `start_derivative`. |
 | `tangent_arc_switch` | array of integer |  | line: press the Line/tangent arc switch (Shift+A) before these clicks (0-based): that click draws a tangent arc, then the chain goes on with lines (as in Onshape). |
 
 #### sketch_constrain
