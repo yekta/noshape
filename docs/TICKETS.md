@@ -34,6 +34,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   through the input method's insertText, so the list may not open or not get the key), or Return arriving as a
   different key / through the IME's commit before our list sees it. Needs a run on a Mac (or psui's UI driver on macOS
   CI) with a non-US layout. Scenario qa-scratch/ui-parity/extrude-depth-variable-click-once.json.
+  qa 11-03: **another path that gives exactly the user's symptom, on Linux too: P1 DIALOG-SWITCH-DISCARDS-NEW** (psui
+  section): a new Variable's dialog left open after its first Enter is thrown away when the user double-clicks the
+  Extrude to use it (live keeps the variable), so #wall then finds nothing. (Note: in live too a Variable made after
+  Extrude 1 sits below it, and a feature sees only variables above it.)
 - [ ] MACOS-GUARD-LOCK (core, CI 41351354303 on agent/ci2 76a61696, macOS arm64 Test, once): the model tests' `all`
   ended with "noshape: the kernel crashed holding a lock; not recoverable" (SIGSEGV) in the custom-feature tests,
   just after `a_cancelled_custom_feature_stops_soon_and_the_studio_is_as_before`. In flight then:
@@ -1334,6 +1338,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P1 DIALOG-SWITCH-DISCARDS-NEW (psui) double-clicking another feature while a **new** feature's dialog is open throws
+  the new feature away in ours; live keeps it: a box (Sketch 1, Extrude 1), Search tools › Variable, Name
+  wall_thickness, Value 2 + Enter (the first Enter applies: the row "#wall_thickness = 2 mm" is in the list, the dialog
+  stays, = live behaviours "Enter in the Variable dialog"), then double-click the Extrude 1 row. Live (11-03, qa's tab,
+  livek/t-varnew.mjs, with a scratch qa_tmp variable since deleted): the Extrude 1 dialog opens and **"#qa_tmp = 2 mm"
+  stays in the feature list** (qa-scratch/tickets/fl/live-varnew-dbl.png); ours (green daaaab03, window focused): the
+  Extrude 1 dialog opens and **the variable is gone, Features (7) → (6)** (tickets/fl/ub-var-switch.png). This may be the
+  user's VAR-AUTOCOMPLETE-ENTER path: make #wall_thickness, Enter once, double-click the Extrude to use it → no such
+  variable, the list offers only New variable…. Scenario ui-parity/new-variable-then-use-at-once. (qa 2026-11-03, build daaaab03)
 - [ ] P2 VARIABLE-EDIT-FOCUS (psui) editing a Variable feature focuses Name in ours, Value in live: double-click the
   "#wall_thickness = 2 mm" row; live (11-02, qa's tab, livek/t-b2.mjs): dialog "#wall_thickness = 2 mm", **the Value field
   focused with "2 mm" all selected** (std's INITIAL_FOCUS_ON_EDIT on the value); ours: **Name focused**, "wall_thickness"
