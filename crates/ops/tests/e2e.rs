@@ -1059,6 +1059,9 @@ fn new_drawing_goes_out_of_date() {
     call(&mut ctx, "feature_edit", json!({ "tab": "Part Studio 1", "feature": "Extrude 1", "params": { "depth": "30 mm" } }));
     let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }));
     assert_eq!(g["out_of_date"], true, "{g}");
+    // A view id that isn't there names the ones that are.
+    let e = try_call(&mut ctx, "drawing_delete", json!({ "drawing": tab, "views": [99] })).expect_err("no view 99");
+    assert_eq!(e.message, "no view 99 on Sheet1; its views: 1, 2, 3, 4", "{}", e.to_json());
 }
 
 /// The first view inserted into an empty drawing is scaled to fit (live

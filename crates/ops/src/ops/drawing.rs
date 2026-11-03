@@ -969,7 +969,7 @@ fn projected_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let d = dr::drawing_of(od.doc(), tab).expect("drawing");
     let sheet = sheet_index(d, a)?;
     match d.sheets[sheet].view(parent) {
-        None => return Err(OpError::param("parent", "no such view on the sheet")),
+        None => return Err(OpError::param("parent", &super::drawing_tools::no_view(&d.sheets[sheet], parent.0))),
         // Help H:projected_view: not from detail views.
         Some(v) if matches!(v.kind, ViewKind::Detail { .. }) => return Err(OpError::param("parent", "Projected views can't be created from detail views")),
         Some(_) => {}

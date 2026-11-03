@@ -828,7 +828,13 @@ pub(super) fn pt_arg(a: &Args, name: &str) -> Result<[f64; 2], OpError> {
 
 pub(super) fn view_arg(t: &Target, a: &Args, name: &str) -> Result<ViewId, OpError> {
     let id = ViewId(a.opt_u64(name)?.ok_or_else(|| OpError::param(name, "a view id (drawing_get)"))?);
-    t.d.sheets[t.sheet].view(id).map(|_| id).ok_or_else(|| OpError::param(name, "no such view on the sheet"))
+    t.d.sheets[t.sheet].view(id).map(|_| id).ok_or_else(|| OpError::param(name, &no_view(&t.d.sheets[t.sheet], id.0)))
+}
+
+/// "no view 9 on Sheet1; its views: 1, 2, 3": a view id that isn't on the sheet.
+pub(super) fn no_view(sheet: &noshape_model::drawing::Sheet, id: u64) -> String {
+    let ids: Vec<String> = sheet.views.iter().map(|v| v.id.0.to_string()).collect();
+    if ids.is_empty() { format!("no view {id} on {}: it has no views", sheet.name) } else { format!("no view {id} on {}; its views: {}", sheet.name, ids.join(", ")) }
 }
 
 fn refused(t: &Target, tool: &str, view: ViewId, param: &str) -> Result<(), OpError> {
@@ -2480,7 +2486,7 @@ fn delete(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         a.opt_array(k)?.cloned().unwrap_or_default().iter().enumerate().map(|(i, v)| v.as_u64().ok_or_else(|| OpError::param(&format!("{k}[{i}]"), "an id"))).collect()
     };
     for (i, v) in ids("views")?.into_iter().enumerate() {
-        sheet.view(ViewId(v)).ok_or_else(|| OpError::param(&format!("views[{i}]"), "no such view on the sheet"))?;
+        sheet.view(ViewId(v)).ok_or_else(|| OpError::param(&format!("views[{i}]"), &no_view(sheet, v)))?;
         sel.push(Sel::View(ViewId(v)));
     }
     for (i, v) in ids("annotations")?.into_iter().enumerate() {

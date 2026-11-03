@@ -302,7 +302,7 @@ fn copy(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let sheet = &t.d.sheets[t.sheet];
     for (i, v) in views.iter().enumerate() {
         if sheet.view(ViewId(*v)).is_none() {
-            return Err(OpError::param(&format!("views[{i}]"), "no such view on the sheet"));
+            return Err(OpError::param(&format!("views[{i}]"), &super::drawing_tools::no_view(sheet, *v)));
         }
     }
     let clip = if views.is_empty() {
