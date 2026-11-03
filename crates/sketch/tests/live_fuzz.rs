@@ -996,6 +996,18 @@ fn an_isosceles_triangles_new_leg_keeps_the_base() {
     assert!(d.is_empty(), "s555: {}", d.join("; "));
 }
 
+/// Batch 3's s240 stays as live answered: a rectangle with relations only
+/// whose diagonal Distance changes scales about the Distance's first point,
+/// beside a second rectangle tied to it by a Perpendicular (53 mm off
+/// before). T1.
+#[test]
+fn a_free_rectangles_new_diagonal_scales_it_about_its_first_point() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-3.live.json")).unwrap()).unwrap();
+    let ours = batch(1, 240, true);
+    let d = differences(&ours["cases"][0], &live["cases"]["s240"]);
+    assert!(d.is_empty(), "s240: {}", d.join("; "));
+}
+
 /// Cases in batch `n` (batch 3 on: 40, where positions match least).
 fn batch_size(n: usize) -> usize {
     if n >= 3 { 40 } else { 20 }

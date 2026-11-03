@@ -323,6 +323,59 @@ impl Sketch {
             kept.insert(a);
             anchored.extend(self.loop_of(a, cons));
         }
+        // A closed loop whose only change is a Distance between two of its
+        // own points, with no size or Fix of its own, scales about that
+        // Distance's first point and stays (live fuzz s240: a rectangle's
+        // new diagonal keeps the corner it starts from).
+        for &u in comp {
+            if placed.contains(&u) {
+                continue;
+            }
+            let ring = self.ring_of(u, cons);
+            if ring.len() < 3 || !self.closed(&ring) || ring.iter().any(|x| placed.contains(x)) {
+                continue;
+            }
+            let touching: Vec<&(crate::ids::ConstraintId, Vec<EntityId>)> = cons.iter().filter(|(_, us)| us.iter().any(|x| ring.contains(x))).collect();
+            let broken: Vec<&&(crate::ids::ConstraintId, Vec<EntityId>)> = touching.iter().filter(|(c, _)| !holds[c]).collect();
+            let [(cid, us)] = broken.as_slice() else { continue };
+            if !us.iter().all(|x| ring.contains(x)) {
+                continue;
+            }
+            let Some(ConstraintKind::Distance { a, b, value, .. }) = self.constraint(*cid).map(|k| k.kind.clone()) else { continue };
+            let (Some(pa), Some(pb)) = (self.point(a), self.point(b)) else { continue };
+            let sized = touching.iter().any(|(c, us)| *c != *cid && us.iter().all(|x| ring.contains(x)) && self.constraint(*c).is_some_and(|k| k.kind.is_dimension() || matches!(k.kind, ConstraintKind::Fix { .. })));
+            // (Not the two ends of one curve: that's its length, fuzz s5.)
+            let class = |p: EntityId| -> Vec<EntityId> { std::iter::once(p).chain(self.coincident_class(p)).collect() };
+            let (ca, cb) = (class(a), class(b));
+            let one_curve = ring.iter().filter_map(|x| self.entity(*x)).any(|e| {
+                let r = e.point_refs();
+                r.iter().any(|p| ca.contains(p)) && r.iter().any(|p| cb.contains(p))
+            });
+            let now = (pb - pa).length();
+            if one_curve || sized || now < 1e-12 || value <= 0.0 || self.kind(a) != Some(EntityKind::Point) || self.kind(b) != Some(EntityKind::Point) {
+                continue;
+            }
+            let k = value / now;
+            let pts: BTreeSet<EntityId> = ring.iter().filter_map(|x| self.entity(*x)).flat_map(|e| e.point_refs()).collect();
+            for p in pts {
+                if let Some(x) = self.point(p) {
+                    let _ = self.set_point(p, pa + (x - pa) * k);
+                }
+            }
+            for x in &ring {
+                if let Some(e) = self.entity_mut_silent(*x)
+                    && let Geometry::Circle { radius, .. } = &mut e.geometry
+                {
+                    *radius *= k;
+                }
+            }
+            placed.extend(ring.iter().copied());
+            kept.extend(ring.iter().copied());
+            let unheld = self.unheld_constraints(1e-9);
+            for (c, _) in cons {
+                holds.insert(*c, !unheld.contains(c));
+            }
+        }
         while placed.len() < comp.len() {
             // Next: a unit with a constraint to placed units (or of its own)
             // that doesn't hold, the one with most of them; with none, a
