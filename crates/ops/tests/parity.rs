@@ -743,6 +743,28 @@ fn a_studios_fetched_icon_is_its_file() {
     assert!(notes.len() == 1 && notes[0].contains("0gone"), "{:?}", r.untranslated);
 }
 
+/// A point by id whose live geometry is a sketch's point (a sketch line's
+/// wire body) is that sketch point of ours, not the nearest part vertex.
+#[test]
+fn a_sketch_point_by_id() {
+    let pt = |id: &str, x: f64, y: f64| json!({ "btType": "BTMSketchPoint-158", "entityId": id, "isConstruction": false, "x": x, "y": y });
+    let top = json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }]);
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1", "parameters": top, "entities": [pt("p1", 0.01, 0.02), pt("p2", 0.03, 0.0)], "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "cPlane", "featureId": "FP", "name": "Plane 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "cplaneType", "value": "THREE_POINT" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [
+                { "btType": "BTMIndividualQuery-138", "deterministicIds": ["JFE"], "queryString": "" },
+                { "btType": "BTMIndividualQuery-138", "deterministicIds": ["JFI"], "queryString": "" },
+                { "btType": "BTMIndividualQuery-138", "deterministicIds": ["IB"], "queryString": "" }] }] }
+    ] });
+    let wire = json!([{ "id": "JFA", "type": "WIRE", "faces": [], "edges": [], "vertices": [{ "id": "JFE", "point": [0.01, 0.02, 0.0] }, { "id": "JFI", "point": [0.03, 0.0, 0.0] }] }]);
+    let live = vec![json!({ "index": 0, "status": "OK", "parts": [], "bodies": wire }), json!({ "index": 1, "status": "OK", "parts": [] })];
+    let r = run_model("sketch-point-by-id", &features, &live, "");
+    assert!(!r.untranslated.iter().any(|u| u.contains("JFE") || u.contains("JFI")), "{:?}", r.untranslated);
+    assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
 /// `NOSHAPE_PACKED_DIR=<dir>`: every packed query (`qCompressed(1.0, "…", id)`)
 /// in the feature lists under `dir` decodes (the translator reads regions and
 /// Onshape's names from them).

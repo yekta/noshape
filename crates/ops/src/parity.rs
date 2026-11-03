@@ -1660,7 +1660,17 @@ impl<'a> Translator<'a> {
             }
             "FACE" | "PLANE" => self.nearest("faces", &r).ok_or_else(|| format!("{id}: no face of ours at {:?} mm", mm(p))),
             "EDGE" => self.nearest("edges", &r).ok_or_else(|| format!("{id}: no edge of ours at {:?} mm", mm(p))),
-            "VERTEX" => pick(&self.call("query_entities", json!({ "kind": "vertices", "at": [mm(p)] }))?, "vertices").ok_or_else(|| format!("{id}: no vertex of ours at {:?} mm", mm(p))),
+            "VERTEX" => {
+                // A part's vertex there, else a sketch's point (a sketch's
+                // wire body in live's line).
+                let r = self.call("query_entities", json!({ "kind": "vertices", "at": [mm(p)] }))?;
+                let k = per_unit(&r["units"]);
+                let near = r["vertices"][0]["position"].as_array().is_some_and(|c| (0..3).all(|i| (c[i].as_f64().unwrap_or(f64::NAN) * k - p[i]).abs() < 1e-6));
+                match pick(&r, "vertices").filter(|_| near) {
+                    Some(v) => Ok(v),
+                    None => self.sketch_point_at(p).or_else(|| pick(&r, "vertices")).ok_or_else(|| format!("{id}: no vertex of ours at {:?} mm", mm(p))),
+                }
+            }
             "BODY" => {
                 let parts = self.call("query_parts", json!({}))?;
                 let k = per_unit(&parts["units"]);
@@ -1685,6 +1695,24 @@ impl<'a> Translator<'a> {
             "SKETCH_REGION" => self.region_at(p, r.measure),
             other => Err(format!("{id}: reference kind {other} not mapped")),
         }
+    }
+
+    /// A point of one of our sketches at `p` (model, m), within 1e-6 m.
+    fn sketch_point_at(&mut self, p: [f64; 3]) -> Option<String> {
+        let sketches: Vec<String> = self.feature_ids.values().cloned().collect();
+        for s in sketches {
+            let Ok(g) = self.call("sketch_get", json!({ "sketch": s })) else { continue };
+            let k = per_unit(&g["units"]);
+            let (Some(o), Some(x), Some(y)) = (f3(&g["frame"]["origin"]), f3(&g["frame"]["x"]), f3(&g["frame"]["y"])) else { continue };
+            for e in g["entities"].as_array().into_iter().flatten().filter(|e| e["type"] == "point") {
+                let (Some(u), Some(v)) = (e["at"][0].as_f64(), e["at"][1].as_f64()) else { continue };
+                let w: Vec<f64> = (0..3).map(|i| (o[i] + u * x[i] + v * y[i]) * k).collect();
+                if (0..3).all(|i| (w[i] - p[i]).abs() < 1e-6) {
+                    return e["id"].as_str().map(str::to_string);
+                }
+            }
+        }
+        None
     }
 
     /// Our face or edge for live's: of its type, nearest live's point, the
