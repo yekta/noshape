@@ -306,6 +306,35 @@ fn merge_sheet_faces(ev: &mut EvalCtx, bi: usize) -> FResult<()> {
 
 /// Sheets sewn along their shared edges (each connected set one shell);
 /// faces keep their names.
+/// Sheet body `bi`, when its faces close a volume: that solid (its faces keep their names).
+fn close_into_solid(ev: &mut EvalCtx, bi: usize) -> FResult<()> {
+    let body = ev.ctx.bodies[bi].clone();
+    if body.kind != BodyKind::Surface {
+        return Ok(());
+    }
+    let faces = body.shape.faces();
+    let Ok(sewn) = k::sew(&faces, 1e-6, true) else { return Ok(()) };
+    if sewn.shape.count(ShapeType::Solid) == 0 {
+        return Ok(());
+    }
+    let centroids: Vec<Option<DVec3>> = faces.iter().map(|f| f.centroid().ok()).collect();
+    let names: Vec<Name> = sewn
+        .shape
+        .faces()
+        .iter()
+        .map(|f| {
+            let c = f.centroid().ok();
+            centroids.iter().position(|g| matches!((g, c), (Some(g), Some(c)) if g.distance(c) < 1e-7)).and_then(|j| body.faces.get(j).cloned()).unwrap_or_else(|| Arc::new(TopoName::face(ev.feature, Role::New(0))))
+        })
+        .collect();
+    ev.replace_body(bi, sewn.shape, names);
+    // (Just made by replace_body: ours alone.)
+    if let Some(b) = Arc::get_mut(&mut ev.ctx.bodies[bi]) {
+        b.kind = BodyKind::Solid;
+    }
+    Ok(())
+}
+
 fn sew_sheets(sheets: Vec<NamedShape>) -> FResult<Vec<NamedShape>> {
     if sheets.len() < 2 {
         return Ok(sheets);
@@ -395,6 +424,8 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     // false: a sheet union keeps the edges imprinted on its faces (std Jog
     // splits its faces up front, then unions the stretched pieces).
     let erase = def_bool(&def, "eraseImprintedEdges", true);
+    // A sheet union that closes a volume becomes that solid (std's surface joins: Fill, Extrude ADD).
+    let make_solid = def_bool(&def, "makeSolid", false);
     let failure = match &*kind {
         "SUBTRACTION" => "BOOLEAN_SUBTRACT_NO_OP",
         "INTERSECTION" => "BOOLEAN_INTERSECT_FAIL",
@@ -477,6 +508,9 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 stitch_sheet_pieces(ev, &all[0])?;
                 if erase && let Some(bi) = index(ev, &all[0]) {
                     merge_sheet_faces(ev, bi)?;
+                }
+                if make_solid && let Some(bi) = index(ev, &all[0]) {
+                    close_into_solid(ev, bi)?;
                 }
                 Ok(Some(all))
             }
@@ -1182,9 +1216,10 @@ fn op_delete_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let mut fresh = 0u32;
         for (bi, fs) in by_body(ev.resolve_faces(&faces)).into_iter().rev() {
             let body = ev.ctx.bodies[bi].clone();
-            if leave_open && body.kind == BodyKind::Surface {
+            if leave_open {
                 // Just remove the faces; each connected rest is its own sheet
-                // (std sheet metal Bend: the fixed and the moving side).
+                // (std sheet metal Bend: the fixed and the moving side; a
+                // solid opened up, cf-setback-fillet's corners).
                 let keep: Vec<(Shape, Name)> = body.shape.faces().into_iter().enumerate().filter(|(j, _)| !fs.contains(j)).filter_map(|(j, f)| Some((f, body.faces.get(j)?.clone()))).collect();
                 if keep.is_empty() {
                     ev.ctx.bodies.remove(bi);
@@ -1206,6 +1241,10 @@ fn op_delete_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     let names: Vec<Name> = piece.faces().iter().map(|f| name_of(f).unwrap_or_else(|| Arc::new(TopoName::face(ev.feature, Role::New(0))))).collect();
                     if n == 0 {
                         ev.replace_body(bi, piece, names);
+                        // (Just made by replace_body: ours alone.)
+                        if let Some(b) = Arc::get_mut(&mut ev.ctx.bodies[bi]) {
+                            b.kind = BodyKind::Surface;
+                        }
                     } else {
                         push_body(ev, BodyId { feature: ev.feature, index: fresh }, BodyKind::Surface, piece, names);
                         fresh += 1;
@@ -1414,20 +1453,23 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             on.extend(existing.iter().filter(|(a, m, z)| in_plane(*a) && in_plane(*m) && in_plane(*z)).map(|e| e.1));
             tools.push((pl.origin, n, on));
         }
-        Ok((made, tools, pieces, owners))
+        Ok((made, mids, tools, pieces, owners))
     })?;
-    let (new_edges, tools, pieces, owners) = new_edges;
+    let (new_edges, mids, tools, pieces, owners) = new_edges;
     let mut st = cx.state.lock();
     if own_existing {
         // Its edges derive from this split even where it changed nothing
         // (tracking keeps what operations since its start made or changed).
         let seq = st.next_seq;
-        for b in owners {
-            st.touched.insert(b, seq);
+        for b in &owners {
+            st.touched.insert(b.clone(), seq);
         }
     }
     st.split_tools.extend(tools);
     st.split_face_pieces.insert(id.clone(), pieces);
+    if !mids.is_empty() {
+        st.split_face_edges.push((id.clone(), owners.clone(), mids));
+    }
     drop(st);
     Ok(Value::map_from([("splittingEdges", super::query::transient_queries(&cx, &new_edges))]))
 }

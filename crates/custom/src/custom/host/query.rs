@@ -691,6 +691,9 @@ impl<'a> QueryCx<'a> {
             Ent::Origin => Some(vec!["Origin".into()]),
             Ent::Body(b) => self.st.body_creator(&ctx.bodies[*b].id),
             Ent::Face(b, f) => face_id(&ctx.bodies[*b].faces[*f]).map(|x| x.1),
+            // An edge an opSplitFace made (where it lies: its name follows
+            // its faces).
+            Ent::Edge(..) if let Some(op) = self.split_face_edge_op(e) => Some(op),
             // Edges and vertices named without faces (wire and point
             // bodies) were created with their body.
             Ent::Edge(b, i) => match &*ctx.bodies[*b].edges[*i] {
@@ -712,6 +715,19 @@ impl<'a> QueryCx<'a> {
             }
             Ent::Connector(_) | Ent::Point(_) => self.to_ref(e).depends_on().and_then(feature_id),
         }
+    }
+
+    /// The last `opSplitFace` that made edge `e` (its midpoint on one it made, in a body it cut; not a tool lying
+    /// on it).
+    fn split_face_edge_op(&self, e: &Ent) -> Option<FsId> {
+        let Ent::Edge(b, _) = e else { return None };
+        let body = &self.st.ctx.bodies[*b].id;
+        let mut splits = self.st.split_face_edges.iter().rev().filter(|(_, owners, _)| owners.contains(body)).peekable();
+        splits.peek()?;
+        let s = self.shape(e)?;
+        let info = s.edge_info().ok()?;
+        let m = s.point_at((info.first_param + info.last_param) * 0.5).ok()?;
+        splits.find(|(_, _, mids)| mids.iter().any(|p| p.distance(m) < 1e-7)).map(|(id, _, _)| id.clone())
     }
 
     /// Start/end cap role of a face created by an extrude-like operation.

@@ -3153,3 +3153,44 @@ export const depthPattern = defineFeature(function(context is Context, id is Id,
         assert!((x - x0).abs() < 1e-3 && (v - v0).abs() < 1e-6, "{parts:?}");
     }
 }
+
+/// PARITY-CUSTOM-RUN-FAILURES (cf-setback-fillet): the edges an opSplitFace made stay `qCreatedBy` it after
+/// opDeleteFace leaves the body open there (a solid becomes an open sheet, `leaveOpen`); an opFillSurface over them
+/// joined with `makeSolid` closes it again: the 10 mm cube back.
+#[test]
+fn a_split_edge_left_open_is_filled_back_into_a_solid() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Reopen" }
+export const reopen = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCuboid(context, id + "cube", { "corner1" : vector(0, 0, 0) * millimeter, "corner2" : vector(10, 10, 10) * millimeter });
+        const top = qCreatedBy(id + "cube", EntityType.FACE)->qContainsPoint(vector(5, 5, 10) * millimeter);
+        opPlane(context, id + "plane", { "plane" : plane(vector(5, 0, 0) * millimeter, vector(1, 0, 0)), "width" : 20 * millimeter, "height" : 20 * millimeter });
+        opSplitFace(context, id + "split", { "faceTargets" : top, "planeTools" : qCreatedBy(id + "plane", EntityType.FACE) });
+        opDeleteBodies(context, id + "deletePlane", { "entities" : qCreatedBy(id + "plane", EntityType.BODY) });
+        if (size(evaluateQuery(context, qCreatedBy(id + "split", EntityType.EDGE))) != 1)
+            throw "the split made one edge";
+        opDeleteFace(context, id + "open", { "deleteFaces" : qContainsPoint(qEverything(EntityType.FACE), vector(2.5, 5, 10) * millimeter), "includeFillet" : false, "capVoid" : false, "leaveOpen" : true });
+        const cube = qCreatedBy(id + "cube", EntityType.BODY);
+        if (size(evaluateQuery(context, qBodyType(qEverything(EntityType.BODY), BodyType.SHEET))) != 1)
+            throw "left open: a sheet";
+        const laminar = qEdgeTopologyFilter(qEverything(EntityType.EDGE), EdgeTopology.LAMINAR);
+        if (size(evaluateQuery(context, qIntersection([laminar, qCreatedBy(id + "split", EntityType.EDGE)]))) != 1)
+            throw "the split's edge is open and still its";
+        opFillSurface(context, id + "fill", { "edgesG0" : laminar, "edgesG1" : qNothing(), "edgesG2" : qNothing(), "guideVertices" : qNothing() });
+        opBoolean(context, id + "join", { "operationType" : BooleanOperationType.UNION, "allowSheets" : true, "makeSolid" : true,
+                "tools" : qUnion([qCreatedBy(id + "fill", EntityType.BODY), qBodyType(qEverything(EntityType.BODY), BodyType.SHEET)]) });
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    ps.features.push(ps.new_feature(&fx.ty("reopen"), &fx.units).unwrap());
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+    assert_eq!(r.context.bodies.len(), 1, "{:?}", r.context.bodies.iter().map(|b| (b.kind, b.shape.faces().len())).collect::<Vec<_>>());
+    assert_eq!(r.context.bodies[0].kind, noshape_model::display::BodyKind::Solid);
+    assert!((total_volume(&r) - 1e-6).abs() < 1e-12, "{}", total_volume(&r));
+}

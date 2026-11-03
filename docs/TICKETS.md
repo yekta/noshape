@@ -3298,6 +3298,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   studios/<eid>@<version>.fs; the three sheet-metal documents then stop on std the studios pin and 1963 dropped
   (SMExtrudeSecondDirectionBoundingType at 975 / 1403, rollSurface.fs at 1024), and the two FeatureScript 392 pattern
   studios on std 392's checkInput: std 1024 (and 392 if needed) asked of live (REQUESTS, dx 22:57). cf-straight-spline's ErrorStringEnum type error: the studio pins std 1963, whose enum
+  dx 23:17: cf-setback-fillet runs (was FILL_SURFACE_NO_EDGES): the host's opSplitFace edges are qCreatedBy it (by
+  where they lie, in the bodies it cut: names change when opDeleteFace opens the body), opDeleteFace `leaveOpen` on
+  a solid leaves an open sheet (it healed), and opBoolean UNION `makeSolid` makes a sheet that closes a volume a
+  solid (std's surface joins). T1 custom_features::a_split_edge_left_open_is_filled_back_into_a_solid. Its next
+  difference is the fill's shape (area +0.13 %, live's patch bulges 0.008 mm past the box): kernel fill (core).
   hasn't BOOLEAN_NON_MANIFOLD_RESULT (3095's has); the feature fails on the Boolean anyway (core), left.
   dx 11-03 20:23, cf-straight-spline (54 SAE Straight-Sided Spline features; compiles since dx's enum trailing-comma
   fix): 12 fail `@opBoolean: BOOLEAN_NON_MANIFOLD_RESULT`, then `Type error: value BOOLEAN_NON_MANIFOLD_RESULT cannot be
