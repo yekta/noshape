@@ -1365,6 +1365,10 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   no change and doesn't start the line; the second then starts one (left pending at (0,20)). Through the UI tests'
   clicks (helper or window events) the same steps on Top make the line, so it's the tool state the rectangle leaves
   (its value boxes?) eating the next tool's first click on the real input path. Yours (sketch tools).
+- 11-03 15:45, more from live's new batch (all sketch tools, yours): sketch-angular-dimension step 14, the angle value
+  box reads "31.686223 deg" in live (the unit as "deg", 6 decimals), ours "30.5405101°"; sketch-circle-at-origin-
+  coincident step 5 (live 0 entities, ours 1); sketch-circle-dimension step 8 and sketch-construction-toggle step 7
+  (live nothing selected after the step, ours 1).
 - sketch-extend-to-line step 12, same family: live's Extend click leaves the extended line selected (selection 1, the
   sketch row related), ours nothing. Also yours. At 13:10 these and the three PERPENDICULAR inferences (your behaviours
   "skasm (2026-11-03, P1 sketch inference)") are the only differences left in live's 56 new recordings (51/56).
