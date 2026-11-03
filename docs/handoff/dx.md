@@ -94,6 +94,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
   kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
+- 11-03 19:46 lead's order (19:05: item 2 until nothing on our side is left): run 42 = **26/54, 297/421 (custom 7/55)**.
+  Landed: a studio's `defineSheetMetalFeature` features get their fields (custom, e48af5a3; T1
+  custom_features::a_sheet_metal_custom_feature_has_its_fields), live's HTML-escaped messages compared unescaped
+  (cf-planetary-gears 1/1), NOSHAPE_PARITY_SAVE=<dir> keeps the translated documents (their Monitor:
+  featurestudio_monitor; copies in /root/dx-scratch/pmsave). Everything left is someone else's: core
+  PARITY-CUSTOM-RUN-FAILURES (each document's Monitor error), FS-FEATURE-LIST-NONDETERMINISTIC, FS-OLD-STD-COMPAT,
+  fillets / CUT-CLOSED-EDGES-SPLIT; skasm SKETCH-SPLINE-END-DERIVATIVES; psui + core IN-FEATURE-MATE-CONNECTOR; live:
+  sketch wire bodies (IF / JIU / JFB / IJ ids), REQUESTS 1891 (Hole INFO), 19:19 (an unfetched import), 19:36 (sketch
+  text size: cf-fix-pcb), 17:33 (PDF text offset). clamp-guillem stops at its own broken reference (live WARNING).
 - 11-03 18:45 lead's order (18:00): (1) title block DXF text as live's (one MTEXT per block, ^J, cell width and
   height, empty " " cells, Fields style; all 22 of live's template DXFs match MTEXT for MTEXT: /root/dx-scratch/tb/
   allmt.sh) — landed b8bdf7be; the JIS templates, ISO_A4_Portrait, ISO / JIS decimal comma, no ANSI E — landed
