@@ -385,6 +385,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 02:46: not the thread count: with NOSHAPE_BOP_PARALLEL=0, RAYON_NUM_THREADS=1, or both, the delete still dies
   3, 3 and 4 runs of 5 (cli/thr2045.out). Runs differ although the input is the same, so something per-process decides
   (iteration order of a randomly seeded hash map, addresses), not timing between threads.
+  qa 06:28: **core's 3fcc69d8 (blends on a copy of the cached body) fixes the saved-document repro** (green 3fcc69d8: delete
+  Sketch 2 8 of 8 fine, always 179904.78 mm³) **but not the fuzz session**: `clifuzz_nf.py 2045 106` on 3fcc69d8 still dies 5
+  runs of 10 — fallback off 3 / 6 (101 suppress, 99 delete ×2), fallback on (the default) 2 / 4 (100 fillet, 99 delete;
+  "the kernel crashed holding a lock" / "…inside the C library"); seed 1837 fine. The saved step-101 document doesn't
+  crash on its own (tickets/crash2045/fz2045-step101.noshape: every feature suppressed in turn, fine), so the corruption
+  needs the session's history (undo / redo, the regeneration cache). Repro: the seed replay (qa-scratch/bin/clifuzz_nf.py,
+  NSCLI = a `<noshape> mcp` wrapper), ~2 min a run.
   core 11-03 05:30: **found**: the document's one Fillet (R12 on edge 16, NOSHAPE_DUMP_OPS fillet-0) alone crashes:
   OCCT's ChFi3d throws "TopoDS_UnCompatibleShapes: TopoDS_Builder::Add" partway and leaves **its input** broken (valid
   before, invalid after; freed list nodes in the input solid), and the next attempt (our retries at a hair smaller
