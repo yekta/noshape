@@ -905,7 +905,7 @@ impl<'a> Translator<'a> {
                 // Regions named by id alone (older documents' queries carry no
                 // text, and live's bodies have no sketch regions): as many as
                 // the last sketch has, they are its regions.
-                if ["entities", "surfaceEntities"].contains(&p["parameterId"].as_str().unwrap_or(""))
+                if ["entities", "surfaceEntities", "regions", "faceToAdd"].contains(&p["parameterId"].as_str().unwrap_or(""))
                     && let Some(r) = self.last_sketch_regions(k, &queries)
                 {
                     return Ok(Some(json!(r)));
