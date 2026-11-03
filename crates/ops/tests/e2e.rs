@@ -343,6 +343,9 @@ fn configurations() {
     let l = call(&mut ctx, "config_add_input", json!({ "kind": "list", "name": "Size" }));
     let size = l["input"].as_str().unwrap().to_string();
     call(&mut ctx, "config_add_option", json!({ "input": "Size", "name": "Large" }));
+    // A parameter the feature doesn't have is named, with the near one.
+    let e = try_call(&mut ctx, "config_configure", json!({ "feature": ext, "param": "dept", "input": size })).expect_err("no dept");
+    assert!(e.message.starts_with("Extrude 1 has no parameter `dept` (did you mean `depth`?)"), "{}", e.to_json());
     call(&mut ctx, "config_configure", json!({ "feature": ext, "param": "depth", "input": size }));
     call(&mut ctx, "config_set_value", json!({ "feature": ext, "param": "depth", "configuration": "Large", "value": "30 mm" }));
     assert!((volume(&mut ctx) - 40.0 * 20.0 * 10.0).abs() < 1e-3, "default configuration unchanged");
@@ -5517,6 +5520,9 @@ fn assembly_configuration_by_names() {
     let size = call(&mut ctx, "config_add_input", json!({ "kind": "list", "name": "Size" }))["input"].as_str().unwrap().to_string();
     assert_ne!(size, "Size", "the input's id differs from its name");
     call(&mut ctx, "config_add_option", json!({ "input": "Size", "name": "Large" }));
+    // A parameter the feature doesn't have is named, with the near one.
+    let e = try_call(&mut ctx, "config_configure", json!({ "feature": ext, "param": "dept", "input": size })).expect_err("no dept");
+    assert!(e.message.starts_with("Extrude 1 has no parameter `dept` (did you mean `depth`?)"), "{}", e.to_json());
     call(&mut ctx, "config_configure", json!({ "feature": ext, "param": "depth", "input": size }));
     call(&mut ctx, "config_set_value", json!({ "feature": ext, "param": "depth", "configuration": "Large", "value": "30 mm" }));
     let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();

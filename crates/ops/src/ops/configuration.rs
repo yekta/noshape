@@ -610,6 +610,15 @@ fn configure(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if ps.configuration.configured.iter().any(|c| c.feature == feature && c.param == param) {
         return Err(OpError::param("param", "already configured"));
     }
+    // What can't be configured, said by name.
+    let f = ps.feature(feature).expect("found");
+    if param != SUPPRESSED_PARAM && f.params.get(&param).is_none() {
+        let ids: Vec<&str> = f.params.0.keys().map(String::as_str).collect();
+        return Err(OpError::param("param", &format!("{} has no parameter `{param}`{}; its parameters: {}, suppressed", f.name, crate::error::did_you_mean(&param, ids.iter().copied()), ids.join(", "))));
+    }
+    if let Some(i) = ps.configuration.inputs.iter().find(|i| i.id == input && !matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })) {
+        return Err(OpError::param("input", &format!("`{}` is a variable input: a feature parameter takes a List or Checkbox input", i.name)));
+    }
     edit(od, tab, config::CONFIGURE_PARAMETER, |ps| {
         if config::configure_parameter(ps, feature, &param, &input) {
             Ok(json!({ "configured": param }))
