@@ -1277,6 +1277,9 @@ Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_
           gp_Vec2d     d;
           const double t = t0 + h * (kGaussX[i] + 1) / 2;
           c->D1(t, q, d);
+          // (Nothing along a u-isoline: its G would cost a whole inner integral for a zero term.)
+          if (d.Y() == 0)
+            continue;
           const Moments g = G(q.X(), q.Y());
           for (int j = 0; j < 10; ++j)
             total[(size_t)j] += g[(size_t)j] * d.Y() * kGaussW[i] * h / 2;
@@ -1286,7 +1289,7 @@ Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_
   }
   // The boundary's gaps, closed with straight (u, v) segments.
   for (const auto& [p, q] : uv_gaps(f))
-    for (int i = 0; i < 8; ++i)
+    for (int i = 0; i < 8 && q.Y() != p.Y(); ++i)
     {
       const double  t = (kGaussX[i] + 1) / 2;
       const Moments g = G(p.X() + (q.X() - p.X()) * t, p.Y() + (q.Y() - p.Y()) * t);
