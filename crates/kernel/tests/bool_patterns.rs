@@ -454,6 +454,34 @@ fn a_25_by_25_knurl() {
     knurl_as_recorded("ae71f76b6e894374", 1e-8);
 }
 
+/// The Ø25 × 10 CP30 45° / 30° knurl (recorded, 186 grooves): where the cylinder's sections with two grooves' flanks
+/// cross (exactly), the flanks' own section, 99 times slower at its end, passes 40 nm off, 17 um before its end; its
+/// foot there (the end the nearest sample, Newton's step out of the range) read as its end, 3.8 um off, so it wasn't
+/// split there and a flank's strip outside the cylinder joined its piece inside ("a non-manifold result").
+#[test]
+#[ignore = "T2: a 186-groove knurl, its 17762 faces"]
+fn a_25_by_10_knurl_at_30_tpi() {
+    knurl_as_recorded("cdf1714d75779e72", 1e-7);
+}
+
+/// The Ø25 × 71 CP12 45° / 30° knurl (recorded, 74 grooves): two mirrored grooves' flanks meet in a 32 um curve at the
+/// cylinder's end (from their bottom edges' crossing to their ridges') beside the long one OCCT's section gives; it
+/// is asked again from between their edges' crossings no curve ends at.
+#[test]
+#[ignore = "T2: a 74-groove knurl, its 7254 faces"]
+fn a_25_by_71_knurl() {
+    knurl_as_recorded("5c6ea633a4c1e420", 1e-7);
+}
+
+/// The Ø10 × 71 CP12 80° / 30° knurl (recorded, 30 grooves): a ray from a tooth's top crosses a groove's flank at the
+/// corner of a patch an eighth of the flank long, which Newton's steps from the patch's middle leave for the
+/// surface's continuation (the tooth's top read as inside the groove).
+#[test]
+#[ignore = "T2: a 30-groove knurl, 13 s"]
+fn a_10_by_71_knurl() {
+    knurl_as_recorded("613d362cd8436f28", 1e-7);
+}
+
 /// A common keeping a piece of an argument's half circle from its start (recorded): the piece's range from the
 /// edge's own start (its angle a rounding below it went a turn on: "an edge outside its face's range").
 #[test]

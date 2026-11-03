@@ -111,6 +111,30 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
   custom_features::knurl_feature_b94_tooth_and_helix_angles, KNURL_SIZE / KNURL_PITCH / KNURL_ANGLES).
 - Squash only with `git reset --soft $(git merge-base HEAD origin/main)` after a fresh fetch; check `git show --stat`.
 
+## Two more knurl families: a section OCCT misses beside its own, a ray Newton loses (11-03 16:30 UTC)
+- Ø25 x 71 CP12 45/30 (k25-71-12, 148 open edges): two mirrored grooves' flanks meet in a 32 um curve at the
+  cylinder's end (from the bottom edges' crossing to the ridges') that OCCT's section misses beside the long one it
+  gives. occt_sections now also asks again (seeded, as for none) from between the faces' edge crossings no curve of
+  OCCT's ends at, for two copied tools' faces only: for every pair it cost corpus5's small cases +14-18 % (vibe3
+  abrun), limited to copies 0 %. 7.6 s, OCCT 88.5 s.
+- Ø10 x 71 CP12 80/30 (k10-71-12, 4 open edges round one tooth top): the tooth's top read as inside a groove: the ray
+  crosses the groove's flank at the corner of a patch an eighth of the flank long (u 0..1.4e-3, v 0..8.2 in 8 x 8
+  patches), and Newton's steps from the patch's middle went to the surface's continuation outside the face, so the
+  crossing was missed (one hit left, odd). free::ray_hits now, where the middle finds nothing on the face, starts
+  again from the middle of each of the patch's 4 x 4 grid cells the ray passes ahead (seen along the ray, from the
+  25 grid points the patch keeps), the steps kept within a patch of it. Cost on corpus5 0 % (the first version, any
+  grid point near the ray and unleashed steps, +20 %; then +5-7 %). 13 s, OCCT 103 s.
+- Knurl sweep (ray.tsv against foot.tsv): see the commit; none lost. T2 bool_patterns a_25_by_10_knurl_at_30_tpi,
+  a_25_by_71_knurl, a_10_by_71_knurl (recordings in kernel tests/data/booleans).
+- Not the tolerances after all: the 11-02 rules (a section's 5 um at crossings, its end taken within it) only hid
+  this wrong foot at some points. A group rule tried first (a crossing within a section's tolerance of its end
+  merged with that end, the Boolean done again) cascaded (30 -> 1176 -> 2912 groups) and stayed non-manifold:
+  dropped. Debug switches in bool-a (bin/syncdbg.sh): NOSHAPE_X_NOSYM (no rotational shortcut: the same 2232 open
+  edges, so the symmetry wasn't it), NOSHAPE_X_SPLITP=x,y,z (split decisions of vertices at that radius and height),
+  NOSHAPE_X_XFACE=arg:index (a face's 2D crossings), NOSHAPE_X_TURNV=v0,v1 (a curve's turned chain).
+- C2::param_of (2D) has the same Newton; the same fix is /root/bool-scratch/c2-foot.patch, not applied (no case
+  seen needing it yet).
+
 ## The knurls' "a non-manifold result": a curve's foot near its end (11-03 14:00 UTC)
 - Ø25 x 10 CP30 45/30 (vibe4 ~/agents/bool-corpora/k25-10-30): every open edge came from one place per tool pair: the
   triple point of the cylinder and two tools' flanks, found where the cylinder's two sections cross (exact), lay
@@ -125,18 +149,6 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
   306 -> 313 of the cases both ran; two of the biggest (Ø63 x 100 CP30 80/30, Ø100 x 100 CP20 45/45, 160k-195k faces)
   died beside three other jobs (memory) and are taken run alone, the same volumes and faces as before. Corpora,
   Shell's recordings, qa's matrices unchanged.
-- Next of the same family: Ø25 x 71 CP12 45/30 (vibe4 bool-corpora/k25-71-12, 148 open edges): two mirrored grooves'
-  flanks meet in a short curve at the cylinder's end (from the bottom edges' crossing to the ridges' 32 um up) that
-  OCCT's section misses beside the long one it does give; asking again from between the faces' edge crossings that
-  no curve of OCCT's ends at takes it (7.6 s, OCCT 88.5 s; /root/bool-scratch/seed-more.patch, being gated).
-- Not the tolerances after all: the 11-02 rules (a section's 5 um at crossings, its end taken within it) only hid
-  this wrong foot at some points. A group rule tried first (a crossing within a section's tolerance of its end
-  merged with that end, the Boolean done again) cascaded (30 -> 1176 -> 2912 groups) and stayed non-manifold:
-  dropped. Debug switches in bool-a (bin/syncdbg.sh): NOSHAPE_X_NOSYM (no rotational shortcut: the same 2232 open
-  edges, so the symmetry wasn't it), NOSHAPE_X_SPLITP=x,y,z (split decisions of vertices at that radius and height),
-  NOSHAPE_X_XFACE=arg:index (a face's 2D crossings), NOSHAPE_X_TURNV=v0,v1 (a curve's turned chain).
-- C2::param_of (2D) has the same Newton; the same fix is /root/bool-scratch/c2-foot.patch, not applied (no case
-  seen needing it yet).
 
 ## CUT-CLOSED-EDGES-SPLIT: core's fix on main covers mine (11-03 13:10 UTC)
 - My seam move (seams.cpp, branch bool-seams-mine d9039ec5, not landed) and core's (e77387ec, 291588e1) overlap; the

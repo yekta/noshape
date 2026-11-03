@@ -107,7 +107,7 @@ pub(super) struct Patch {
     uv: [f64; 4],
     /// A Bézier piece's (its box its control points'): Newton from a 3 × 3 grid of starts in it.
     piece: bool,
-    /// A Bézier piece's control points (holding it).
+    /// A Bézier piece's control points (holding it); another's 5 × 5 grid of points, row by row in u.
     pts: Vec<DVec3>,
 }
 
@@ -146,15 +146,17 @@ pub(super) fn patches(g: &GFace) -> Vec<Patch> {
         for z in vs.windows(2) {
             let (ua, ub, va, vb) = (w[0], w[1], z[0], z[1]);
             let (mut lo, mut hi) = (DVec3::splat(f64::INFINITY), DVec3::splat(f64::NEG_INFINITY));
-            for i in 0..=4 {
-                for j in 0..=4 {
+            let mut pts = Vec::with_capacity(25);
+            for j in 0..=4 {
+                for i in 0..=4 {
                     let q = ns.at(ua + (ub - ua) * i as f64 / 4.0, va + (vb - va) * j as f64 / 4.0);
                     lo = lo.min(q);
                     hi = hi.max(q);
+                    pts.push(q);
                 }
             }
             let grow = DVec3::splat(0.25 * (hi - lo).length() + 1e-9);
-            out.push(Patch { lo: lo - grow, hi: hi + grow, uv: [ua, ub, va, vb], piece: false, pts: Vec::new() });
+            out.push(Patch { lo: lo - grow, hi: hi + grow, uv: [ua, ub, va, vb], piece: false, pts });
         }
     }
     out
@@ -182,9 +184,8 @@ pub(super) fn ray_hits(ns: &FreeSurface, patches: &Patches, uv: [f64; 4], p: DVe
             }
         }
         let [ua, ub, va, vb] = pa.uv;
-        let starts: &[(f64, f64)] = if pa.piece { &[(0.5, 0.5), (0.1, 0.1), (0.5, 0.1), (0.9, 0.1), (0.1, 0.5), (0.9, 0.5), (0.1, 0.9), (0.5, 0.9), (0.9, 0.9)] } else { &[(0.5, 0.5)] };
-        for &(fu, fv) in starts {
-            let mut uv = DVec2::new(ua + (ub - ua) * fu, va + (vb - va) * fv);
+        // (Newton's from a start: a crossing within the face, on the ray.)
+        let newton = |mut uv: DVec2, leash: bool| -> Option<(DVec2, f64)> {
             let mut t = (ns.at(uv.x, uv.y) - p).dot(r);
             let mut ok = false;
             for _ in 0..40 {
@@ -203,7 +204,7 @@ pub(super) fn ray_hits(ns: &FreeSurface, patches: &Patches, uv: [f64; 4], p: DVe
                     break;
                 }
                 // (A piece's start gone a piece away: the crossing, if any, is another piece's.)
-                if pa.piece && (uv.x < 2.0 * ua - ub || uv.x > 2.0 * ub - ua || uv.y < 2.0 * va - vb || uv.y > 2.0 * vb - va) {
+                if leash && (uv.x < 2.0 * ua - ub || uv.x > 2.0 * ub - ua || uv.y < 2.0 * va - vb || uv.y > 2.0 * vb - va) {
                     break;
                 }
             }
@@ -212,19 +213,52 @@ pub(super) fn ray_hits(ns: &FreeSurface, patches: &Patches, uv: [f64; 4], p: DVe
                 ok = (ns.at(uv.x, uv.y) - p - r * t).length() <= 1e-12;
             }
             if !ok || uv.x < u0 - 1e-12 || uv.x > u1 + 1e-12 || uv.y < v0 - 1e-12 || uv.y > v1 + 1e-12 {
+                return None;
+            }
+            ((ns.at(uv.x, uv.y) - p - r * t).length() <= 1e-9).then_some((uv, t))
+        };
+        let mut add = |h: (DVec2, f64)| {
+            if !out.iter().any(|x| (x.1 - h.1).abs() < 1e-9) {
+                out.push(h);
+            }
+        };
+        let at = |fu: f64, fv: f64| DVec2::new(ua + (ub - ua) * fu, va + (vb - va) * fv);
+        // (On a piece the ray may cross twice (a twisted helical knurl flank's): every start.)
+        if pa.piece {
+            for (fu, fv) in [(0.5, 0.5), (0.1, 0.1), (0.5, 0.1), (0.9, 0.1), (0.1, 0.5), (0.9, 0.5), (0.1, 0.9), (0.5, 0.9), (0.9, 0.9)] {
+                if let Some(h) = newton(at(fu, fv), true) {
+                    add(h);
+                }
+            }
+            continue;
+        }
+        let m = 1e-9 * (1.0 + (ub - ua).abs() + (vb - va).abs());
+        let inside = |uv: DVec2| uv.x >= ua - m && uv.x <= ub + m && uv.y >= va - m && uv.y <= vb + m;
+        if let Some(h) = newton(at(0.5, 0.5), false) {
+            add(h);
+            continue;
+        }
+        // (The middle's steps gone off the face (a long helical flank's eighth, the crossing at its corner): again
+        // from the middle of each cell of its grid the ray passes ahead, seen along the ray (the cell's box grown by a
+        // tenth of its size), the steps kept near the patch.)
+        let (ax, bx) = r.any_orthonormal_pair();
+        let mut seen = [DVec3::ZERO; 25];
+        for (x, &q) in seen.iter_mut().zip(&pa.pts) {
+            *x = DVec3::new((q - p).dot(ax), (q - p).dot(bx), (q - p).dot(r));
+        }
+        for k in 0..16 {
+            let (i, j) = (k % 4, k / 4);
+            let c = [seen[j * 5 + i], seen[j * 5 + i + 1], seen[j * 5 + i + 5], seen[j * 5 + i + 6]];
+            let (lo, hi) = c.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(lo, hi), &x| (lo.min(x), hi.max(x)));
+            let grow = 0.1 * (hi - lo).max_element();
+            if lo.x - grow > 0.0 || lo.y - grow > 0.0 || hi.x + grow < 0.0 || hi.y + grow < 0.0 || hi.z + grow < 0.0 {
                 continue;
             }
-            if (ns.at(uv.x, uv.y) - p - r * t).length() > 1e-9 {
-                continue;
-            }
-            if !out.iter().any(|h| (h.1 - t).abs() < 1e-9) {
-                out.push((uv, t));
-            }
-            // (The crossing in this piece found: no more starts, but on a piece the ray may cross twice (a twisted
-            // helical knurl flank's): its other starts too.)
-            let m = 1e-9 * (1.0 + (ub - ua).abs() + (vb - va).abs());
-            if !pa.piece && uv.x >= ua - m && uv.x <= ub + m && uv.y >= va - m && uv.y <= vb + m {
-                break;
+            if let Some(h) = newton(at((i as f64 + 0.5) / 4.0, (j as f64 + 0.5) / 4.0), true) {
+                add(h);
+                if inside(h.0) {
+                    break;
+                }
             }
         }
     }

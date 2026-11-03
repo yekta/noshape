@@ -1955,13 +1955,17 @@ impl Ctx<'_> {
         Ok(())
     }
 
-    /// OCCT's sections of faces `a` and `b` (argument, face), the empty ones dropped. None where their edges cross
-    /// at two places or more: asked again from between those (a short section OCCT's sampling misses: two knurl
-    /// grooves crossing 44 um above the cylinder's end, where both tools' caps are, their flanks meeting in a 94 um
-    /// curve from the ridges' crossing to the bottom edges').
+    /// OCCT's sections of faces `a` and `b` (argument, face), the empty ones dropped. Where their edges meet at two
+    /// places or more none of them ends at (beside curves of OCCT's, only for two copied tools): asked again from
+    /// between those (a short section OCCT's sampling misses: two knurl grooves crossing 44 um above the cylinder's
+    /// end, where both tools' caps are, their flanks meeting in a 94 um curve from the ridges' crossing to the bottom
+    /// edges'; or beside a long one: two grooves' flanks at the cylinder's end, from the bottom edges' crossing to the
+    /// ridges' 32 um above).
     fn occt_sections(&mut self, src: &dyn SectionSource, a: (u32, u32), b: (u32, u32)) -> R<Vec<SectionCurve>> {
-        let secs: Vec<SectionCurve> = src.sections(a, b)?.into_iter().filter(|c| c.t1 > c.t0).collect();
-        if !secs.is_empty() {
+        let mut secs: Vec<SectionCurve> = src.sections(a, b)?.into_iter().filter(|c| c.t1 > c.t0).collect();
+        // (The edges' meeting points for every pair cost a small Boolean a sixth more.)
+        let copied = |arg: u32| self.copies.get(arg as usize).copied().flatten().is_some();
+        if !secs.is_empty() && !(copied(a.0) && copied(b.0)) {
             return Ok(secs);
         }
         let face = |(arg, index): (u32, u32)| {
@@ -1969,11 +1973,14 @@ impl Ctx<'_> {
             (k < self.faces.len() && (self.faces[k].arg, self.faces[k].index) == (arg, index)).then_some(k)
         };
         let (Some(fa), Some(fb)) = (face(a), face(b)) else { return Ok(secs) };
-        let ends = self.boundaries_meet(fa, fb);
+        let tol = self.tol;
+        let ends: Vec<DVec3> = self.boundaries_meet(fa, fb).into_iter().filter(|q| secs.iter().all(|c| (c.curve.at(c.t0) - *q).length() > 10.0 * tol && (c.curve.at(c.t1) - *q).length() > 10.0 * tol)).collect();
         if ends.len() < 2 || ends.len() > 4 {
             return Ok(secs);
         }
-        Ok(src.seeded(a, b, &ends)?.into_iter().filter(|c| c.t1 > c.t0).collect())
+        let more: Vec<SectionCurve> = src.seeded(a, b, &ends)?.into_iter().filter(|c| c.t1 > c.t0 && secs.iter().all(|o| o.curve.param_of(c.curve.at(0.5 * (c.t0 + c.t1))).1 > 10.0 * tol)).collect();
+        secs.extend(more);
+        Ok(secs)
     }
 
     /// Edge `e` as a polyline of 64 chords, and how far the curve may be from it (the largest of the chords'
