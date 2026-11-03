@@ -1030,12 +1030,23 @@ impl Sketch {
         let own = self.entity(u)?.point_refs();
         let dimensioned = |v: EntityId| self.constraints().any(|c| c.driving && c.kind.is_dimension() && c.kind.entities().as_slice() == [v]);
         let bound = |v: EntityId| self.constraints().any(|c| c.driving && matches!(c.kind, ConstraintKind::Horizontal { a, b: None } | ConstraintKind::Vertical { a, b: None } if a == v));
-        own.iter()
+        let mut ends: Vec<(EntityId, EntityId, DVec2, bool, bool)> = own
+            .iter()
             .flat_map(|p| self.coincident_with(*p).into_iter().map(move |q| (*p, q)))
             .filter_map(|(p, q)| held.iter().find(|v| self.entity(**v).is_some_and(|e| e.point_refs().contains(&q))).map(|v| (*v, p)))
             .filter_map(|(v, p)| self.point(p).map(|x| (v, p, x, dimensioned(v), bound(v))))
-            .min_by(|a, b| b.3.cmp(&a.3).then(a.4.cmp(&b.4)).then(if (a.2.y - b.2.y).abs() > 1e-9 { a.2.y.total_cmp(&b.2.y) } else { a.2.x.total_cmp(&b.2.x) }))
-            .map(|(v, p, _, _, _)| (v, p))
+            .collect();
+        ends.sort_by(|a, b| b.3.cmp(&a.3).then(a.4.cmp(&b.4)).then(if (a.2.y - b.2.y).abs() > 1e-9 { a.2.y.total_cmp(&b.2.y) } else { a.2.x.total_cmp(&b.2.x) }));
+        // Two alike at one level: neither (live fuzz s710: a U bend's arc
+        // grows about its centre, both legs move out).
+        if let [a, b, ..] = ends.as_slice()
+            && a.0 != b.0
+            && (a.3, a.4) == (b.3, b.4)
+            && (a.2.y - b.2.y).abs() <= 1e-9
+        {
+            return None;
+        }
+        ends.first().map(|(v, p, _, _, _)| (*v, *p))
     }
 
     /// A free component whose one change is the distance between an arc's
@@ -1355,6 +1366,20 @@ impl Sketch {
                     if along.abs() > 1e-12 {
                         return if along > 0.0 { a } else { b };
                     }
+                }
+            }
+            // A distance from a point of one to the other line within one
+            // loop: the point's member stays (live fuzz s711 / s713: an isosceles
+            // trapezoid's new height, dimensioned from its top, keeps the
+            // top; s240 scales about the Distance's first point too).
+            if let ConstraintKind::Distance { a: pa, b: pb, .. } = c.kind
+                && self.kind(pa) == Some(EntityKind::Point)
+                && self.kind(pb) == Some(EntityKind::Line)
+                && self.joined_by_points(a, b, cons)
+            {
+                let owns = |u: EntityId| self.entity(u).is_some_and(|e| e.point_refs().contains(&pa)) || self.coincident_with(pa).iter().any(|q| self.entity(u).is_some_and(|e| e.point_refs().contains(q)));
+                if owns(a) != owns(b) {
+                    return if owns(a) { a } else { b };
                 }
             }
             // Structure first: the member with more of its points tied to

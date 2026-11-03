@@ -1229,6 +1229,20 @@ fn a_filleted_l_bracket_keeps_its_lower_left_corner() {
     }
 }
 
+/// Batch 14's s710 / s711 stay as live answered: a U bend's arc between two
+/// alike legs at one level grows about its centre, both legs moving out (the
+/// left leg stayed); an isosceles trapezoid's new height, dimensioned from
+/// its top's corner to its base, keeps the top (the base stayed: 8 mm). T1.
+#[test]
+fn a_u_bend_grows_about_its_arc_and_a_trapezoid_keeps_its_top() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-14.live.json")).unwrap()).unwrap();
+    for seed in [710, 711] {
+        let ours = batch(1, seed, true);
+        let d = differences(&ours["cases"][0], &live["cases"][format!("s{seed}")]);
+        assert!(d.is_empty(), "s{seed}: {}", d.join("; "));
+    }
+}
+
 /// Batch 10's s555 stays as live answered: an isosceles triangle's leg
 /// length changed: the base stays, the apex goes straight up (the leg and
 /// its Equal partner placed together, the base held; 16 mm off before). T1.
