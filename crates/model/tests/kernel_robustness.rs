@@ -2991,6 +2991,24 @@ fn up_to_a_face_past_its_edges_ends_on_its_plane() {
     assert!((v - std::f64::consts::PI * 25.0 * 10.0).abs() < 1e-6, "{v}");
 }
 
+/// A whole sketch in Extrude's faces field (Onshape's whole-sketch region query, a feature-list pick, psui 11-01): all
+/// its regions, as the sketch has them now (a circle added later too).
+#[test]
+fn a_whole_sketch_extrudes_all_its_regions() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::ZERO, 0.005);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let x = t.add("extrude", &[("entities", q(vec![Reference::Sketch(s)])), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+    let r = t.ok(x);
+    assert!((volume(&r) - std::f64::consts::PI * 25.0 * 10.0).abs() < 1e-6, "{}", volume(&r));
+    if let Some(ParamValue::Sketch(d)) = t.ps.feature_mut(s).unwrap().params.0.get_mut("sketch") {
+        d.sketch.add_circle(DVec2::new(0.02, 0.0), 0.005);
+    }
+    let r = t.ok(x);
+    assert_eq!(r.context.bodies.len(), 2, "the circle added later extruded too");
+}
+
 /// EXTRUDE-OVERLAP-LINES-FACES (dx's parity suite, bracket120-datenkrake, live 10/24/16 faces/edges/vertices): a
 /// line lying over a rectangle's side splits it in the sketch, but the extruded side is one face (a box: 6/12/8).
 #[test]

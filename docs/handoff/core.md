@@ -23,6 +23,9 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   fails in 3 s (01040244, kernel ScopedDeadline: a tighter deadline for one step); EXTRUDE-SLIT-REGION (dc70faed);
   queued f4059499: EXTRUDE-UP-TO-FACE-BEYOND (planar Up to face ends on its plane), imprint and overlap lines under
   legacy_topology, the setting carried into rayon work. Parity 4/7 documents, 52/57 features.
+- For psui (its 11-01 note): Reference::Sketch in a face field now means all its regions (EvalCtx::profiles: Extrude,
+  Revolve, … take them as the sketch has them; not the face's imprinted pieces); storing it for row picks and the
+  "Faces of …" label is psui's.
 - Any new topology change that alters saved documents goes under legacy_topology (or a ScopeRule 8 with its own flag).
 - Waiting on live: REQUESTS 09:10 (Shell 4 on the exact body), 11:25 (face frames: SKETCH-FACE-FRAME). Still open:
   Shell 4 fail-fast (no time limit or decline reason separates it from shells that build), clamp-hms Mirror 1 (TICKETS),

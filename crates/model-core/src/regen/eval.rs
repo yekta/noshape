@@ -806,6 +806,15 @@ impl<'a> EvalCtx<'a> {
                     }
                 }
                 Reference::QueryVariable(name) => out.extend(self.profiles(self.query_variable(name))?),
+                // A whole sketch (Onshape's whole-sketch region query, a feature-list pick: "Faces of Sketch 1"): its
+                // regions as they are now, not the face's imprinted pieces (qSketchRegion's).
+                Reference::Sketch(sketch) => {
+                    let Some(s) = self.ctx.sketch(*sketch).cloned() else {
+                        return err("A selected sketch no longer exists");
+                    };
+                    let regions: Vec<Reference> = s.regions.iter().enumerate().filter(|(i, _)| !s.imprinted.get(*i).copied().unwrap_or(false)).map(|(_, g)| Reference::SketchRegion { sketch: *sketch, key: encode_region_key(&g.id) }).collect();
+                    out.extend(self.profiles(&regions)?);
+                }
                 _ => {}
             }
         }
