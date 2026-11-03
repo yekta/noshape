@@ -30,6 +30,9 @@ struct ModelResult {
     list_ms: f64,
     /// Our slowest features in it (name, ms).
     slowest: Vec<(String, f64)>,
+    /// Features at least ×10 and 50 ms slower than live's own time for them:
+    /// (name, ours ms, live ms).
+    slow_features: Vec<(String, f64, f64)>,
     /// Custom features compared and matching, and their failures to
     /// compile / run (apart from geometry differences).
     custom_compared: usize,
@@ -45,7 +48,7 @@ struct ModelResult {
 fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelResult {
     let mut ctx = Ctx::new();
     let path = scratch(&format!("{name}.noshape"));
-    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, untranslated: Vec::new(), regen_ms: None, open_ms: 0.0, list_ms: 0.0, slowest: Vec::new(), custom_compared: 0, custom_matching: 0, custom: Vec::new(), std_pins: Vec::new(), unfetched: Vec::new() };
+    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, untranslated: Vec::new(), regen_ms: None, open_ms: 0.0, list_ms: 0.0, slowest: Vec::new(), slow_features: Vec::new(), custom_compared: 0, custom_matching: 0, custom: Vec::new(), std_pins: Vec::new(), unfetched: Vec::new() };
     // refs.jsonl wins over the geometry read from live's bodydetails.
     let mut all = refs_from_bodies(live);
     all.extend(parse_refs(refs));
@@ -126,6 +129,8 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
             res.first = Some(format!("feature {k} \"{}\" ({kind}): {}", step.name, diff.join("; ")));
         }
     }
+    // Live's regeneration time of each feature, by our feature id.
+    let live_times: std::collections::HashMap<String, f64> = live.iter().find_map(|l| l["per_feature_ms"].as_object()).into_iter().flatten().filter_map(|(id, ms)| Some((t.ours(id)?.to_string(), ms.as_f64()?))).collect();
     drop(t);
     // Our full regeneration: the document reopened, its parts queried.
     let mut fresh = Ctx::new();
@@ -139,6 +144,12 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         res.regen_ms = Some((t0.elapsed().as_secs_f64() * 1000.0, live.iter().find_map(|l| l["full_regen_ms"].as_f64())));
         // Its slowest features (the Regeneration times panel's).
         if let Some(Ok(list)) = list {
+            for f in list.value["features"].as_array().into_iter().flatten() {
+                let (Some(id), Some(name), Some(ours)) = (f["id"].as_str(), f["name"].as_str(), f["regen_ms"].as_f64()) else { continue };
+                if let Some(l) = live_times.get(id).filter(|l| ours >= 10.0 * l.max(1.0) && ours - **l >= 50.0) {
+                    res.slow_features.push((name.to_string(), ours, *l));
+                }
+            }
             let mut times: Vec<(String, f64)> = list.value["features"].as_array().into_iter().flatten().filter_map(|f| Some((f["name"].as_str()?.to_string(), f["regen_ms"].as_f64()?))).collect();
             times.sort_by(|a, b| b.1.total_cmp(&a.1));
             res.slowest = times.into_iter().take(3).filter(|t| t.1 >= 1.0).collect();
@@ -333,6 +344,8 @@ fn parity_models() {
     slower.sort_by(|a, b| b.0.total_cmp(&a.0));
     let timed = results.iter().filter(|r| r.regen_ms.is_some_and(|t| t.1.is_some())).count();
     println!("speed: {} of {timed} documents regenerate slower than live{}", slower.len(), slower.iter().map(|(x, n, o, l)| format!("; {n} {o:.0} ms, live {l:.0} ms (×{x:.1})")).collect::<String>());
+    let slow: Vec<String> = results.iter().flat_map(|r| r.slow_features.iter().map(move |(f, o, l)| format!("{} › {f} {o:.0} ms, live {l:.0} ms", r.name))).collect();
+    println!("speed: {} features ×10 and 50 ms slower than live's{}", slow.len(), slow.iter().map(|s| format!("; {s}")).collect::<String>());
     // The causes: first differences by feature type and what differed.
     let mut causes: std::collections::BTreeMap<String, usize> = Default::default();
     for f in results.iter().filter_map(|r| r.first.as_deref()) {
@@ -364,7 +377,8 @@ fn parity_models() {
     println!("{}", score_row(docs, whole.len(), matching, total, (custom_matching, custom_total), &causes));
     let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "compared": r.compared, "matching": r.matching, "regen_ms": r.regen_ms.map(|(o, l)| json!({ "ours": o, "live": l })), "slowest": r.slowest, "first_difference": r.first, "custom_features": { "compared": r.custom_compared, "matching": r.custom_matching, "failures": r.custom, "std": r.std_pins }, "untranslated": r.untranslated, "unfetched": r.unfetched })).collect();
     let _ = std::fs::write(root.with_file_name("report.json"), serde_json::to_string_pretty(&json!({ "documents_matching": docs, "documents": whole.len(), "features_matching": matching, "features": total, "causes": causes.iter().map(|(c, n)| json!({ "cause": c, "documents": n })).collect::<Vec<_>>(), "models": report,
-        "speed": { "timed": timed, "slower_than_live": slower.iter().map(|(x, n, o, l)| json!({ "document": n, "ours_ms": o.round(), "live_ms": l.round(), "ratio": (x * 10.0).round() / 10.0 })).collect::<Vec<_>>() } })).unwrap());
+        "speed": { "timed": timed, "slower_than_live": slower.iter().map(|(x, n, o, l)| json!({ "document": n, "ours_ms": o.round(), "live_ms": l.round(), "ratio": (x * 10.0).round() / 10.0 })).collect::<Vec<_>>(),
+            "slow_features": results.iter().flat_map(|r| r.slow_features.iter().map(move |(f, o, l)| json!({ "document": r.name, "feature": f, "ours_ms": o.round(), "live_ms": l.round() }))).collect::<Vec<_>>() } })).unwrap());
     if std::env::var_os("NOSHAPE_PARITY_INDEX").is_some() {
         let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/parity-models/index.json");
         std::fs::write(file, serde_json::to_string_pretty(&index).unwrap() + "\n").unwrap();

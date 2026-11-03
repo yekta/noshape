@@ -436,6 +436,11 @@ impl<'a> Translator<'a> {
         registry::run(self.ctx, op, &args).map(|o| o.value).map_err(|e| e.to_json().to_string())
     }
 
+    /// Our feature for live's feature id.
+    pub fn ours(&self, live: &str) -> Option<&str> {
+        self.feature_ids.get(live).map(String::as_str)
+    }
+
     /// Our entities for an Onshape query on the finished Part Studio (an
     /// assembly's mate connector names a part's edge or face this way).
     pub fn resolve(&mut self, q: &Value) -> Result<Vec<String>, String> {
