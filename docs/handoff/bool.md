@@ -96,10 +96,11 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
   it 0.14 mm from its end (both vertices of 0.1 mm tolerance, apart by less than the sum, not merged as one): two
   collinear pieces from one vertex. (c) a5f1e564: collinear overlapping segments after projection. OCCT's PaveFiller
   sources aren't on this machine (only the installed OCCT in /root/occt).
-- Next, in order: (1) check the three knurls that timed out on vibe5 (fin2) by hand on vibe4; (2) the knurls' remaining "a non-manifold result" (32 of 346): a section running
-  within its 5 um tolerance beside another argument's edge on the cylinder (Ø25 x 10 CP30 45/30, recorded
-  vibe4 ~/agents/bool-corpora/k25-10-30: the flank's section with the cylinder 2.5 um from the groove's ridge edge,
-  a sliver piece between; OCCT makes them one common block); (3) b7eb72a8 (held projection); (4) the two-edges kinds
+- Next, in order: (1) the three knurls that timed out on vibe5 (fin2) run by hand on vibe4 (logs vibe4 /tmp/kt-*.log, model-fin2); (2) the knurls' remaining "a non-manifold result" (32 of 346). On Ø25 x 10 CP30 45/30
+  (recorded vibe4 ~/agents/bool-corpora/k25-10-30) every groove's own edges near the end faces are split 3.3 um
+  from their vertex (tolerance 1e-7) by a new point of tolerance 0 (NOSHAPE_X_SHORT=5e-6 lists them): past the two
+  vertices' tolerances, within the 5 um section tolerance OCCT merges by. That is the rule reverted on 11-02 (it cost
+  37 sweep cases); it has to reach every curve near such a point on both faces, or none, and be gated on the sweep; (3) b7eb72a8 (held projection); (4) the two-edges kinds
   above; (5) speed: free-form rays (fewer Newton starts per patch), C2::param_of, OCCT's section tolerance check.
   Tools: bin/why4.sh (single cases on vibe4), bin/syncdbg.sh [worktree] (bool-a = that worktree + env-gated debug
   prints from bin/dbgpatch.py: NOSHAPE_X_NM, _ALLP, _PAIR, _SEGS, _TWIN (segments between one pair of vertices),
