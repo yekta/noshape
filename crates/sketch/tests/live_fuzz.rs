@@ -975,6 +975,17 @@ fn a_rounded_corners_new_radius_shortens_the_side_placed_before_it() {
     assert!(d.is_empty(), "s548: {}", d.join("; "));
 }
 
+/// Batch 10's s555 stays as live answered: an isosceles triangle's leg
+/// length changed: the base stays, the apex goes straight up (the leg and
+/// its Equal partner placed together, the base held; 16 mm off before). T1.
+#[test]
+fn an_isosceles_triangles_new_leg_keeps_the_base() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-10.live.json")).unwrap()).unwrap();
+    let ours = batch(1, 555, true);
+    let d = differences(&ours["cases"][0], &live["cases"]["s555"]);
+    assert!(d.is_empty(), "s555: {}", d.join("; "));
+}
+
 /// Cases in batch `n` (batch 3 on: 40, where positions match least).
 fn batch_size(n: usize) -> usize {
     if n >= 3 { 40 } else { 20 }

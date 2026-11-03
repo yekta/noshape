@@ -477,7 +477,7 @@ impl Sketch {
             } else if lower_held.is_some() {
                 &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (2, 1), (2, 0), (0, 2), (0, 1), (3, 1), (0, 0)]
             } else {
-                &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (0, 2), (0, 1), (3, 1), (0, 0)]
+                &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (4, 0), (0, 2), (0, 1), (3, 1), (0, 0)]
             };
             // The lines that slide: the held neighbours, and placed ones
             // joined to u that no Length fixes (live fuzz s548: a rounded
@@ -496,6 +496,10 @@ impl Sketch {
                 }
             }).collect();
             let mut slid: Vec<EntityId> = Vec::new();
+            // (4: an Equal partner joined to u comes along, the other
+            // neighbours held: live fuzz s555, an isosceles triangle's new leg
+            // length keeps the base, the apex goes straight up.)
+            let partners: Vec<EntityId> = held.iter().copied().filter(|x| cons.iter().any(|(c, us)| us.len() == 2 && us.contains(&u) && us.contains(x) && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Equal { .. })))).collect();
             // Only a change of its own size slides (live fuzz s465: a 45°
             // chamfer's new length; s466 / s489: a parallelogram side with
             // a new angle turns about its start instead).
@@ -508,6 +512,10 @@ impl Sketch {
             'attempts: for &(hold, shape) in ladder.iter().filter(|(h, _)| concentric_first.is_none() || *h == 0) {
                 let hold_neighbours = hold == 1;
                 let slide = hold == 3;
+                let pair = hold == 4;
+                if pair && (partners.is_empty() || !held.iter().any(|x| !partners.contains(x) && cons.iter().any(|(_, us)| us.as_slice() == [*x])) || !cons.iter().any(|(c, us)| us.as_slice() == [u] && !holds[c] && size_dim(*c))) {
+                    continue;
+                }
                 if slide && (sliding.is_empty() || far_ends.is_none() || !own_size_only) {
                     continue;
                 }
@@ -518,6 +526,9 @@ impl Sketch {
                 if hold_neighbours {
                     fixed.extend(held.iter().copied());
                 }
+                if pair {
+                    fixed.extend(held.iter().copied().filter(|x| !partners.contains(x)));
+                }
                 if hold == 2 {
                     fixed.extend(lower_held.map(|(v, _)| v));
                 }
@@ -526,7 +537,13 @@ impl Sketch {
                 if slide {
                     with.extend(sliding.iter().copied());
                 }
-                let keep = |c: crate::ids::ConstraintId, us: &[EntityId]| us.contains(&u) && us.iter().all(|x| with.contains(x)) && (us.iter().all(|x| *x == u || placed.contains(x)) || self.connective(c));
+                if pair {
+                    with.extend(partners.iter().copied());
+                }
+                let keep = |c: crate::ids::ConstraintId, us: &[EntityId]| {
+                    us.iter().all(|x| with.contains(x))
+                        && if pair { us.iter().any(|x| *x == u || partners.contains(x)) } else { us.contains(&u) && (us.iter().all(|x| *x == u || placed.contains(x)) || self.connective(c)) }
+                };
                 let Some(mut sub) = self.sub_sketch_by(cons, &keep, &fixed) else { return false };
                 if shape == 3 && end_carried {
                     continue;
@@ -556,6 +573,9 @@ impl Sketch {
                 }
                 let still = if hold == 2 { lower_held.map(|(_, q)| q) } else { anchor };
                 let mut light = vec![u];
+                if pair {
+                    light.extend(partners.iter().copied());
+                }
                 if slide {
                     for &(n, far) in far_ends.iter().flatten() {
                         if sub.add_constraint(ConstraintKind::Fix { entity: far }).is_err() || !orig.hold_direction(&mut sub, n) {
@@ -579,6 +599,9 @@ impl Sketch {
                     done = Some(sub);
                     if slide {
                         slid = sliding.clone();
+                    }
+                    if pair {
+                        slid = partners.clone();
                     }
                     break 'attempts;
                 }
