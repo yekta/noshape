@@ -41,8 +41,9 @@ variable-focus fixes (after bdbba238). Release fuzz on v0.4.23 running (/tmp/qa-
 status documents; d55587a0's knurl change: CP12 / CP20 results unchanged, times are machine load (load ≈ 50), not the build).
 SKETCH-TOOL-PICK-SELECTION verified d0526d18 (Extend's recording stale; skasm asked live to re-record). At publish:
 `bash /tmp/qa-relsmoke.sh 0.4.24 v0423`, /tmp/qa-relgui424.sh, /tmp/qa-mem424.sh (both made), the updater app on :149
-(running v0.4.23, PID 2908495). Loops on 19c09884: /tmp/qa-nfloop29.sh (2541–2600), /tmp/qa-gfloop13.sh (2601–2640);
-v0.4.23 /tmp/qa-cfloop70.sh (2641–2700); keep noshape-19c09884 and -0531f66e (CRASH-2045) in keep/x/y.
+(running v0.4.23, PID 2908495). Loops on 19c09884 (2541–2640, 100 seeds) and v0.4.23 (2641–2700): 0 deaths. Now:
+green 1fda3bc9 /tmp/qa-nfloop30.sh (2821–2880), /tmp/qa-gfloop14.sh (2881–2920); v0.4.24 /tmp/qa-cfloop71.sh (2761–2820);
+keep noshape-1fda3bc9 and -0531f66e (CRASH-2045) in keep/x/y.
 
 ## Session 7 (qa, pinned account, from 11-02 22:40; greens bc7d7e9f → 6b4704f2)
 
