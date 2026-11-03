@@ -70,6 +70,8 @@ pub struct Translator<'a> {
     sketch_map: SketchMap,
     /// Onshape's circles and arcs per (sketch, entity): centre and radius (m).
     circles: HashMap<(String, String), ([f64; 2], f64)>,
+    /// Onshape's ellipses: centre, major direction, radii (m).
+    ellipses: HashMap<(String, String), [f64; 6]>,
     first_move: Option<String>,
     /// Onshape Feature Studio element id → our Feature Studio tab id.
     studios: HashMap<String, String>,
@@ -163,7 +165,7 @@ impl<'a> Translator<'a> {
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
         let _ = std::fs::remove_file(path);
-        let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), first_move: None, studios: HashMap::new(), notes: Vec::new() };
+        let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), first_move: None, studios: HashMap::new(), notes: Vec::new() };
         t.call("document_create", json!({ "path": path.to_str().ok_or("path")? }))?;
         // Bare numbers in Onshape's expressions are in the document's units.
         let (length, angle) = doc_units(&doc["units"]);
@@ -1070,6 +1072,7 @@ impl<'a> Translator<'a> {
                 }
                 "BTCurveGeometryEllipse" => {
                     let (cx, cy, a, b, xd, yd) = (num("xCenter"), num("yCenter"), g["majorRadius"].as_f64().or(g["radius"].as_f64()).unwrap_or(0.0), num("minorRadius"), num("xDir"), num("yDir"));
+                    self.ellipses.insert((oid.clone(), eid.clone()), [cx, cy, xd, yd, a, b]);
                     let sense = if g["clockwise"].as_bool() == Some(true) { -1.0 } else { 1.0 };
                     let pt = |t: f64| {
                         let (c, s) = (t.cos(), sense * t.sin());
@@ -1220,7 +1223,7 @@ impl<'a> Translator<'a> {
                 "NORMAL" => "normal",
                 "CURVATURE" => "curvature",
                 // Dimensions: `dimensions`.
-                "DISTANCE" | "LENGTH" | "DIAMETER" | "RADIUS" | "ANGLE" | "CENTERLINE_DIMENSION" => continue,
+                "DISTANCE" | "LENGTH" | "DIAMETER" | "RADIUS" | "ANGLE" | "CENTERLINE_DIMENSION" | "MAJOR_DIAMETER" | "MINOR_DIAMETER" => continue,
                 _ => {
                     *missed.entry(format!("{ty} (no counterpart)")).or_default() += 1;
                     continue;
@@ -1447,6 +1450,8 @@ impl<'a> Translator<'a> {
                 "LENGTH" => "length",
                 "DIAMETER" => "diameter",
                 "RADIUS" => "radius",
+                // An ellipse's axis: ours by where the label is.
+                "MAJOR_DIAMETER" | "MINOR_DIAMETER" => "diameter",
                 "ANGLE" => "angle",
                 _ => continue,
             };
@@ -1483,6 +1488,14 @@ impl<'a> Translator<'a> {
                 && let Some(mode) = self.circle_mode(oid, c, value.as_deref())
             {
                 args["mode"] = json!(mode);
+            }
+            if matches!(ty, "MAJOR_DIAMETER" | "MINOR_DIAMETER")
+                && let Some([cx, cy, xd, yd, a, b]) = par0("localFirst").and_then(|e| self.ellipses.get(&(oid.to_string(), e)).copied())
+            {
+                // Beyond the axis' end.
+                let (d, r) = if ty == "MAJOR_DIAMETER" { ([xd, yd], a) } else { ([-yd, xd], b) };
+                let l = self.sketch_map.local([cx + d[0] * (r + 0.005), cy + d[1] * (r + 0.005)]);
+                args["label"] = json!(l.map(|x| format!("{} mm", x * 1e3)));
             }
             if kind == "angle"
                 && let Some(l) = self.angle_label(oid, c, value.as_deref())
