@@ -1,0 +1,16 @@
+--- a/src/ModelingAlgorithms/TKTopAlgo/BRepLib/BRepLib.cxx
++++ b/src/ModelingAlgorithms/TKTopAlgo/BRepLib/BRepLib.cxx
+@@ -278,8 +278,12 @@
+     return aMaxSegment;
+   }
+ 
+-  const occ::handle<Adaptor3d_Surface>& aSurf   = aCurveOnSurface.GetSurface();
++  occ::handle<Adaptor3d_Surface>        aSurf   = aCurveOnSurface.GetSurface();
+   const occ::handle<Adaptor2d_Curve2d>& aCurv2d = aCurveOnSurface.GetCurve();
++  // noshape (patch 0020): an offset surface's knots are its basis surface's (a simple offset's edges on a long
++  // B-spline face got the bare 30 segments and came out far off it: FS-WAVE-SPRING's thicken).
++  while (aSurf->GetType() == GeomAbs_OffsetSurface)
++    aSurf = aSurf->BasisSurface();
+ 
+   double aNbSKnots = 0, aNbC2dKnots = 0;
+ 

@@ -3084,7 +3084,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   placed) → ours ERROR "Unfilleted edge overlapped by fillet." (no change: 21/46/24, 3665307.7 mm³); live OK,
   44/99/54, 3569327.9 mm³. Model: /root/parity/models/learning-center-michael (`parity_models`,
   NOSHAPE_PARITY_ONLY=learning-center-michael; feature 5). (dx 2026-11-03)
-- [x] (core 11-03 13:20: the boss went through boolean.cpp fuse_on_face, which rebuilt the shell from its iterator's faces (already in the solid's orientation) and then flipped the new shell once more by the shell's; a drafted extrude's solid holds its shell REVERSED, so the part came out inside out. The same at four other sites (the unify's ReShape, through holes, the local Boolean, features.cpp's blend rebuild): the shell and solid now FORWARD. dx's document +922.936632 mm³ as live; the Boolean corpus as before (the same 4 of 974 differ without it); T1 model kernel_robustness::a_boss_on_a_drafted_blocks_top_adds_to_it, both pull directions) P1 ADD-INSIDE-OUT (core / bool; dx's parity suite 11-03, cf-parameter-pattern) an Extrude Add of a 2 mm boss
+- [x] (core 11-03 13:00: the boss went through boolean.cpp fuse_on_face, which rebuilt the shell from its iterator's faces (already in the solid's orientation) and then flipped the new shell once more by the shell's; a drafted extrude's solid holds its shell REVERSED, so the part came out inside out. The same at four other sites (the unify's ReShape, through holes, the local Boolean, features.cpp's blend rebuild): the shell and solid now FORWARD. dx's document +922.936632 mm³ as live; the Boolean corpus as before (the same 4 of 974 differ without it); T1 model kernel_robustness::a_boss_on_a_drafted_blocks_top_adds_to_it, both pull directions) P1 ADD-INSIDE-OUT (core / bool; dx's parity suite 11-03, cf-parameter-pattern) an Extrude Add of a 2 mm boss
   on the top face of a drafted block leaves the part inside out: volume −922.937 mm³ (query_parts), the magnitude
   live's +922.937. The block: Extrude 1, a 20 × 10 mm rectangle on Top, depth 5 mm (#a / 2), draft 10° (#a deg,
   pull direction flipped); Extrude 2 (Add, Blind 2 mm, scope Part 1) of a sketch region on its top face. Everything
@@ -3109,6 +3109,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   +916.533 mm³, box ±12.5 mm, OK); and it is slow: 16.6 s when the feature is added, **157 s** to regenerate the
   reopened document (parity_models' timing). Rebuilt document: /root/dx-scratch/pmdocs/cf/cf-wave-spring.noshape;
   model /root/parity/models/cf-wave-spring (NOSHAPE_PARITY_ONLY=cf-wave-spring). (dx 2026-11-03)
+  core 11-03 13:40: the fit splines and the loft are right (±12.5 mm, 1833.2 mm²); OCCT's simple-offset thicken
+  isn't: it builds the offset face's edges on the offset surface with BRepLib::BuildCurves3d, whose default segment
+  count counts a B-spline surface's knots but not those under an offset surface, so 30 segments for a 595-span wavy
+  helix: the edges flew off (box ±22 mm) and the side walls came out as invalid planes. OCCT patch 0020
+  (patches/occt/0020-buildcurve3d-offset-surface-segments.patch, TKTopAlgo): an offset surface's basis knots. With
+  it the strip thickens in 86 ms, valid, ±12.5 mm, 916.6 mm³ (live 916.533); the shell corpus gains one shell
+  (8e657637 builds in 155 ms), nothing else changes; the blend corpus as recorded. T1 kernel
+  surfacing::a_long_wavy_strip_thickens_along_it lands once the lib is synced. The 157 s were the invalid solid's
+  meshing (111 s) and mass properties (56 s).
 - [ ] P2 FILLET-BLEND-SPLIT (core / kernel; dx's FeatureScript corpus 11-03, cf-planetary-gears) a fillet of a
   straight edge between a cylinder and an extruded fit spline comes out as two faces stacked along the edge where
   live's is one: the Planetary Gears feature's root fillets (its gear studio's `opFillet` of each tooth gap's two
