@@ -475,12 +475,17 @@ impl Sketch {
             let ladder: &[(u8, u8)] = if end_carried && resized {
                 &[(1, 1), (0, 1), (1, 2), (1, 0), (0, 2), (0, 0)]
             } else if lower_held.is_some() {
-                &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (2, 1), (2, 0), (0, 2), (0, 1), (0, 0)]
+                &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (2, 1), (2, 0), (0, 2), (0, 1), (3, 1), (0, 0)]
             } else {
                 &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (0, 2), (0, 1), (3, 1), (0, 0)]
             };
-            // Each held neighbour line's end away from u (none: no slide).
-            let far_ends: Option<Vec<(EntityId, EntityId)>> = held.iter().map(|n| {
+            // The lines that slide: the held neighbours, and placed ones
+            // joined to u that no Length fixes (live fuzz s548: a rounded
+            // corner's new radius shortens the side placed before it).
+            let placed_lines: Vec<EntityId> = cons.iter().filter(|(c, us)| us.contains(&u) && self.connective(*c)).flat_map(|(_, us)| us.iter().copied()).filter(|x| *x != u && placed.contains(x) && self.kind(*x) == Some(EntityKind::Line) && !cons.iter().any(|(c, xs)| xs.as_slice() == [*x] && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Length { .. })))).collect::<BTreeSet<_>>().into_iter().collect();
+            let sliding: Vec<EntityId> = held.iter().copied().chain(placed_lines.iter().copied()).collect();
+            // Each sliding line's end away from u (none: no slide).
+            let far_ends: Option<Vec<(EntityId, EntityId)>> = sliding.iter().map(|n| {
                 let (s0, e0) = self.endpoints(*n).filter(|_| self.kind(*n) == Some(EntityKind::Line))?;
                 let mine = self.entity(u).map(|e| e.point_refs()).unwrap_or_default();
                 let near = |p: EntityId| mine.contains(&p) || self.coincident_class(p).iter().any(|q| mine.contains(q));
@@ -494,17 +499,22 @@ impl Sketch {
             // Only a change of its own size slides (live fuzz s465: a 45°
             // chamfer's new length; s466 / s489: a parallelogram side with
             // a new angle turns about its start instead).
-            let size_dim = |c: crate::ids::ConstraintId| matches!(self.constraint(c).map(|k| &k.kind), Some(ConstraintKind::Length { .. }));
+            let size_dim = |c: crate::ids::ConstraintId| matches!(self.constraint(c).map(|k| &k.kind), Some(ConstraintKind::Length { .. } | ConstraintKind::Radius { .. } | ConstraintKind::Diameter { .. }));
             let unheld_mine: Vec<&(crate::ids::ConstraintId, Vec<EntityId>)> = cons.iter().filter(|(c, us)| us.contains(&u) && !holds[c]).collect();
-            let own_size_only = !unheld_mine.is_empty() && unheld_mine.iter().all(|(c, us)| us.as_slice() == [u] && size_dim(*c));
+            // (A joint to a sliding line may read broken: the slide closes it.)
+            let own_size_only = unheld_mine.iter().any(|(c, us)| us.as_slice() == [u] && size_dim(*c))
+                && unheld_mine.iter().all(|(c, us)| (us.as_slice() == [u] && size_dim(*c)) || (self.connective(*c) && us.iter().any(|x| placed_lines.contains(x))));
             // (A Concentric's kept circle doesn't hold the other: it comes.)
             'attempts: for &(hold, shape) in ladder.iter().filter(|(h, _)| concentric_first.is_none() || *h == 0) {
                 let hold_neighbours = hold == 1;
                 let slide = hold == 3;
-                if slide && (held.is_empty() || far_ends.is_none() || !own_size_only) {
+                if slide && (sliding.is_empty() || far_ends.is_none() || !own_size_only) {
                     continue;
                 }
                 let mut fixed = placed.clone();
+                if slide {
+                    fixed.retain(|x| !placed_lines.contains(x));
+                }
                 if hold_neighbours {
                     fixed.extend(held.iter().copied());
                 }
@@ -514,7 +524,7 @@ impl Sketch {
                 let mut with = fixed.clone();
                 with.insert(u);
                 if slide {
-                    with.extend(held.iter().copied());
+                    with.extend(sliding.iter().copied());
                 }
                 let keep = |c: crate::ids::ConstraintId, us: &[EntityId]| us.contains(&u) && us.iter().all(|x| with.contains(x)) && (us.iter().all(|x| *x == u || placed.contains(x)) || self.connective(c));
                 let Some(mut sub) = self.sub_sketch_by(cons, &keep, &fixed) else { return false };
@@ -568,7 +578,7 @@ impl Sketch {
                 if matches!(st, SolveStatus::Solved) {
                     done = Some(sub);
                     if slide {
-                        slid = held.iter().copied().collect();
+                        slid = sliding.clone();
                     }
                     break 'attempts;
                 }

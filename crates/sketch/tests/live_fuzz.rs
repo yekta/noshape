@@ -963,6 +963,18 @@ fn a_component_the_pass_cant_close_leaves_the_others_placed() {
     }
 }
 
+/// Batch 10's s548 stays as live answered: a rectangle with one rounded
+/// corner, its width and radius changed: the left, bottom and top lines keep
+/// their places, the right side (placed before the arc) shortens as the arc
+/// grows into the corner (the side slides; 53 mm off before). T1.
+#[test]
+fn a_rounded_corners_new_radius_shortens_the_side_placed_before_it() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-10.live.json")).unwrap()).unwrap();
+    let ours = batch(1, 548, true);
+    let d = differences(&ours["cases"][0], &live["cases"]["s548"]);
+    assert!(d.is_empty(), "s548: {}", d.join("; "));
+}
+
 /// Cases in batch `n` (batch 3 on: 40, where positions match least).
 fn batch_size(n: usize) -> usize {
     if n >= 3 { 40 } else { 20 }
