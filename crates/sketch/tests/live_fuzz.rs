@@ -1057,6 +1057,18 @@ fn a_thinner_flange_keeps_the_other_undersides_level() {
     }
 }
 
+/// Batch 12's s633 stays as live answered: a stepped shaft's first length
+/// and end radius change: the step and the shoulder (both undimensioned)
+/// follow their resized neighbours together, meeting where those put them
+/// (the step kept its length and the whole profile fell back: 12 mm off). T1.
+#[test]
+fn a_stepped_shafts_step_and_shoulder_follow_together() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-12.live.json")).unwrap()).unwrap();
+    let ours = batch(1, 633, true);
+    let d = differences(&ours["cases"][0], &live["cases"]["s633"]);
+    assert!(d.is_empty(), "s633: {}", d.join("; "));
+}
+
 /// Batch 10's s555 stays as live answered: an isosceles triangle's leg
 /// length changed: the base stays, the apex goes straight up (the leg and
 /// its Equal partner placed together, the base held; 16 mm off before). T1.

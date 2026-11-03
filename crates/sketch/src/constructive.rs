@@ -581,7 +581,14 @@ impl Sketch {
             let own_size_only = unheld_mine.iter().any(|(c, us)| us.as_slice() == [u] && size_dim(*c))
                 && unheld_mine.iter().all(|(c, us)| (us.as_slice() == [u] && size_dim(*c)) || (self.connective(*c) && us.iter().any(|x| placed_lines.contains(x))));
             // (A Concentric's kept circle doesn't hold the other: it comes.)
-            'attempts: for &(hold, shape) in ladder.iter().filter(|(h, _)| concentric_first.is_none() || *h == 0) {
+            // Two such lines meeting, each pulled by placed geometry, are
+            // placed together (live fuzz s633: a stepped shaft's step and
+            // shoulder both follow their resized neighbours, their corner
+            // where those put it).
+            let absorbs = |x: EntityId| hv(x) && self.chained_size(x, cons).is_none() && self.endpoints(x).is_some_and(|(a, b)| !self.coincident_class(a).is_empty() && !self.coincident_class(b).is_empty()) && !cons.iter().any(|(c, us)| us.as_slice() == [x] && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Length { .. })));
+            let pulled = |x: EntityId| cons.iter().any(|(c, us)| us.contains(&x) && us.len() > 1 && self.connective(*c) && us.iter().all(|y| *y == x || placed.contains(y)) && !holds[c]);
+            let paired = absorbs(u) && pulled(u) && lines_beside.iter().any(|x| !placed.contains(x) && absorbs(*x) && pulled(*x));
+            'attempts: for &(hold, shape) in ladder.iter().filter(|(h, _)| (concentric_first.is_none() || *h == 0) && !paired) {
                 let hold_neighbours = hold == 1;
                 let slide = hold == 3;
                 let pair = hold == 4;
