@@ -2331,6 +2331,75 @@ fn drag_probes9() -> Vec<(String, Case, String, DVec2)> {
     out
 }
 
+/// Probes 14 (batches 14 / 15: s711 / s753 keep a trapezoid's top, s747 a C
+/// channel's outer side): which side a point-to-line Distance in one loop
+/// keeps, one change at a time.
+fn probes14() -> Vec<(String, Case)> {
+    let v = DVec2::new;
+    let mut out = Vec::new();
+    let mut add = |name: &str, f: &dyn Fn(&mut Case)| {
+        let mut c = Case::new();
+        f(&mut c);
+        out.push((name.to_string(), c));
+    };
+    // Isosceles trapezoid: base 40, top 20, height 20 (top's start to the base, or `reverse`: base's start to the top).
+    let trapezoid = |c: &mut Case, base: f64, top: f64, height: f64, reverse: bool| {
+        let (b, t, h) = (40.0, 20.0, 20.0);
+        let p = [v(0.0, 0.0), v(b, 0.0), v((b + t) / 2.0, h), v((b - t) / 2.0, h)];
+        let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+        for i in 0..4 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+        }
+        c.hv(true, &l[0]);
+        c.hv(true, &l[2]);
+        c.pair("EQUAL", &l[1], &l[3]);
+        c.length(&l[0], base);
+        c.length(&l[2], top);
+        if reverse {
+            c.distance(&format!("{}.start", l[0]), &l[2], height);
+        } else {
+            c.distance(&format!("{}.start", l[2]), &l[0], height);
+        }
+    };
+    add("q1 trapezoid, height (top's corner to the base) 20 -> 25", &|c| trapezoid(c, 40.0, 20.0, 25.0, false));
+    add("q2 trapezoid, base 40 -> 34", &|c| trapezoid(c, 34.0, 20.0, 20.0, false));
+    add("q3 trapezoid, top 20 -> 26", &|c| trapezoid(c, 40.0, 26.0, 20.0, false));
+    add("q4 trapezoid, height (base's corner to the top) 20 -> 25", &|c| trapezoid(c, 40.0, 20.0, 25.0, true));
+    // C channel: width 25, height 40, flange 5, web 4 (inner web's start to the outer side, or `reverse`: the outer side's start to the inner web).
+    let channel = |c: &mut Case, height: f64, web: f64, reverse: bool| {
+        let (w, h, tw, tf) = (25.0, 40.0, 4.0, 5.0);
+        let p = [v(0.0, 0.0), v(w, 0.0), v(w, tf), v(tw, tf), v(tw, h - tf), v(w, h - tf), v(w, h), v(0.0, h)];
+        let l: Vec<String> = (0..8).map(|i| c.line(p[i], p[(i + 1) % 8])).collect();
+        for i in 0..8 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 8]));
+            c.hv(i % 2 == 0, &l[i]);
+        }
+        c.pair("EQUAL", &l[1], &l[5]);
+        c.length(&l[0], w);
+        c.length(&l[7], height);
+        c.length(&l[1], tf);
+        if reverse {
+            c.distance(&format!("{}.start", l[7]), &l[3], web);
+        } else {
+            c.distance(&format!("{}.start", l[3]), &l[7], web);
+        }
+    };
+    add("q5 C channel, web (inner web's corner to the outer side) 4 -> 6", &|c| channel(c, 40.0, 6.0, false));
+    add("q6 C channel, web (outer side's corner to the inner web) 4 -> 6", &|c| channel(c, 40.0, 6.0, true));
+    add("q7 C channel, height 40 -> 48", &|c| channel(c, 48.0, 4.0, false));
+    add("q8 H / V rectangle 30 x 20, height (top-left corner to the bottom) 20 -> 25", &|c| {
+        let p = [v(0.0, 0.0), v(30.0, 0.0), v(30.0, 20.0), v(0.0, 20.0)];
+        let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+        for i in 0..4 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+            c.hv(i % 2 == 0, &l[i]);
+        }
+        c.length(&l[0], 30.0);
+        c.distance(&format!("{}.start", l[3]), &l[0], 25.0);
+    });
+    out
+}
+
 fn probe_batch(list: Vec<(String, Case)>) -> Value {
     let cases: Vec<Value> = list.into_iter().map(|(name, mut c)| {
         let ours = ours(&mut c);
@@ -2345,7 +2414,7 @@ fn probe_batch(list: Vec<(String, Case)>) -> Value {
 #[test]
 #[ignore = "T2: live fuzz least-change probes"]
 fn probe_matches() {
-    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13())] {
+    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14())] {
         let b = probe_batch(list);
         let path = fixture(&format!("sketch-probe-{n}.json"));
         if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == format!("probe-{n}")) {

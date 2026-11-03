@@ -1,0 +1,3919 @@
+{
+  "units": "mm (Onshape JSON: metres, radians)",
+  "plane": "Top",
+  "cases": [
+    {
+      "case": "q1",
+      "what": "q1 trapezoid, height (top's corner to the base) 20 -> 25",
+      "constraints": [
+        {
+          "first": "l1.end",
+          "second": "l2.start",
+          "id": "k1",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l2.end",
+          "second": "l3.start",
+          "id": "k2",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l3.end",
+          "second": "l4.start",
+          "id": "k3",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l4.end",
+          "second": "l1.start",
+          "id": "k4",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l1",
+          "id": "k5",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l3",
+          "id": "k6",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l2",
+          "second": "l4",
+          "id": "k7",
+          "type": "EQUAL"
+        },
+        {
+          "first": "l1",
+          "mm": 40.0,
+          "id": "k8",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l3",
+          "mm": 20.0,
+          "id": "k9",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l3.start",
+          "second": "l1",
+          "mm": 25.0,
+          "id": "k10",
+          "type": "DISTANCE"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.04,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.0,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l2",
+            "startPointId": "l2.start",
+            "endPointId": "l2.end",
+            "startParam": 0.0,
+            "endParam": 0.022360679774997897,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.04,
+              "pntY": 0.0,
+              "dirX": -0.4472135954999579,
+              "dirY": 0.8944271909999159
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l3",
+            "startPointId": "l3.start",
+            "endPointId": "l3.end",
+            "startParam": 0.0,
+            "endParam": 0.02,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.03,
+              "pntY": 0.02,
+              "dirX": -1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l4",
+            "startPointId": "l4.start",
+            "endPointId": "l4.end",
+            "startParam": 0.0,
+            "endParam": 0.022360679774997897,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.01,
+              "pntY": 0.02,
+              "dirX": -0.4472135954999579,
+              "dirY": -0.8944271909999159
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l2.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k2",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k3",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l4.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k4",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k5",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k6",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "EQUAL",
+            "entityId": "k7",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l4"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k8",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "40.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k9",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "20.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "DISTANCE",
+            "entityId": "k10",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3.start"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "25.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [],
+        "refused": [],
+        "dof": 2,
+        "curves": {
+          "l1": "under",
+          "l2": "under",
+          "l3": "under",
+          "l4": "under"
+        },
+        "points": {
+          "l1.end": [
+            40.0,
+            -5.0
+          ],
+          "l1.start": [
+            0.0,
+            -5.0
+          ],
+          "l2.end": [
+            30.0,
+            20.0
+          ],
+          "l2.start": [
+            40.0,
+            -5.0
+          ],
+          "l3.end": [
+            10.0,
+            20.0
+          ],
+          "l3.start": [
+            30.0,
+            20.0
+          ],
+          "l4.end": [
+            0.0,
+            -5.0
+          ],
+          "l4.start": [
+            10.0,
+            20.0
+          ]
+        },
+        "radii": {}
+      }
+    },
+    {
+      "case": "q2",
+      "what": "q2 trapezoid, base 40 -> 34",
+      "constraints": [
+        {
+          "first": "l1.end",
+          "second": "l2.start",
+          "id": "k1",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l2.end",
+          "second": "l3.start",
+          "id": "k2",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l3.end",
+          "second": "l4.start",
+          "id": "k3",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l4.end",
+          "second": "l1.start",
+          "id": "k4",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l1",
+          "id": "k5",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l3",
+          "id": "k6",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l2",
+          "second": "l4",
+          "id": "k7",
+          "type": "EQUAL"
+        },
+        {
+          "first": "l1",
+          "mm": 34.0,
+          "id": "k8",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l3",
+          "mm": 20.0,
+          "id": "k9",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l3.start",
+          "second": "l1",
+          "mm": 20.0,
+          "id": "k10",
+          "type": "DISTANCE"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.04,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.0,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l2",
+            "startPointId": "l2.start",
+            "endPointId": "l2.end",
+            "startParam": 0.0,
+            "endParam": 0.022360679774997897,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.04,
+              "pntY": 0.0,
+              "dirX": -0.4472135954999579,
+              "dirY": 0.8944271909999159
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l3",
+            "startPointId": "l3.start",
+            "endPointId": "l3.end",
+            "startParam": 0.0,
+            "endParam": 0.02,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.03,
+              "pntY": 0.02,
+              "dirX": -1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l4",
+            "startPointId": "l4.start",
+            "endPointId": "l4.end",
+            "startParam": 0.0,
+            "endParam": 0.022360679774997897,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.01,
+              "pntY": 0.02,
+              "dirX": -0.4472135954999579,
+              "dirY": -0.8944271909999159
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l2.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k2",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k3",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l4.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k4",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k5",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k6",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "EQUAL",
+            "entityId": "k7",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l4"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k8",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "34.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k9",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "20.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "DISTANCE",
+            "entityId": "k10",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3.start"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "20.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [],
+        "refused": [],
+        "dof": 2,
+        "curves": {
+          "l1": "under",
+          "l2": "under",
+          "l3": "under",
+          "l4": "under"
+        },
+        "points": {
+          "l1.end": [
+            34.0,
+            0.0
+          ],
+          "l1.start": [
+            0.0,
+            0.0
+          ],
+          "l2.end": [
+            27.0,
+            20.0
+          ],
+          "l2.start": [
+            34.0,
+            0.0
+          ],
+          "l3.end": [
+            7.0,
+            20.0
+          ],
+          "l3.start": [
+            27.0,
+            20.0
+          ],
+          "l4.end": [
+            0.0,
+            0.0
+          ],
+          "l4.start": [
+            7.0,
+            20.0
+          ]
+        },
+        "radii": {}
+      }
+    },
+    {
+      "case": "q3",
+      "what": "q3 trapezoid, top 20 -> 26",
+      "constraints": [
+        {
+          "first": "l1.end",
+          "second": "l2.start",
+          "id": "k1",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l2.end",
+          "second": "l3.start",
+          "id": "k2",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l3.end",
+          "second": "l4.start",
+          "id": "k3",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l4.end",
+          "second": "l1.start",
+          "id": "k4",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l1",
+          "id": "k5",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l3",
+          "id": "k6",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l2",
+          "second": "l4",
+          "id": "k7",
+          "type": "EQUAL"
+        },
+        {
+          "first": "l1",
+          "mm": 40.0,
+          "id": "k8",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l3",
+          "mm": 26.0,
+          "id": "k9",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l3.start",
+          "second": "l1",
+          "mm": 20.0,
+          "id": "k10",
+          "type": "DISTANCE"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.04,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.0,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l2",
+            "startPointId": "l2.start",
+            "endPointId": "l2.end",
+            "startParam": 0.0,
+            "endParam": 0.022360679774997897,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.04,
+              "pntY": 0.0,
+              "dirX": -0.4472135954999579,
+              "dirY": 0.8944271909999159
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l3",
+            "startPointId": "l3.start",
+            "endPointId": "l3.end",
+            "startParam": 0.0,
+            "endParam": 0.02,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.03,
+              "pntY": 0.02,
+              "dirX": -1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l4",
+            "startPointId": "l4.start",
+            "endPointId": "l4.end",
+            "startParam": 0.0,
+            "endParam": 0.022360679774997897,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.01,
+              "pntY": 0.02,
+              "dirX": -0.4472135954999579,
+              "dirY": -0.8944271909999159
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l2.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k2",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k3",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l4.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k4",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k5",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k6",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "EQUAL",
+            "entityId": "k7",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l4"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k8",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "40.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k9",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "26.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "DISTANCE",
+            "entityId": "k10",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3.start"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "20.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [],
+        "refused": [],
+        "dof": 2,
+        "curves": {
+          "l1": "under",
+          "l2": "under",
+          "l3": "under",
+          "l4": "under"
+        },
+        "points": {
+          "l1.end": [
+            43.0,
+            -0.0
+          ],
+          "l1.start": [
+            3.0,
+            -0.0
+          ],
+          "l2.end": [
+            36.0,
+            20.0
+          ],
+          "l2.start": [
+            43.0,
+            -0.0
+          ],
+          "l3.end": [
+            10.0,
+            20.0
+          ],
+          "l3.start": [
+            36.0,
+            20.0
+          ],
+          "l4.end": [
+            3.0,
+            -0.0
+          ],
+          "l4.start": [
+            10.0,
+            20.0
+          ]
+        },
+        "radii": {}
+      }
+    },
+    {
+      "case": "q4",
+      "what": "q4 trapezoid, height (base's corner to the top) 20 -> 25",
+      "constraints": [
+        {
+          "first": "l1.end",
+          "second": "l2.start",
+          "id": "k1",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l2.end",
+          "second": "l3.start",
+          "id": "k2",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l3.end",
+          "second": "l4.start",
+          "id": "k3",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l4.end",
+          "second": "l1.start",
+          "id": "k4",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l1",
+          "id": "k5",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l3",
+          "id": "k6",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l2",
+          "second": "l4",
+          "id": "k7",
+          "type": "EQUAL"
+        },
+        {
+          "first": "l1",
+          "mm": 40.0,
+          "id": "k8",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l3",
+          "mm": 20.0,
+          "id": "k9",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l1.start",
+          "second": "l3",
+          "mm": 25.0,
+          "id": "k10",
+          "type": "DISTANCE"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.04,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.0,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l2",
+            "startPointId": "l2.start",
+            "endPointId": "l2.end",
+            "startParam": 0.0,
+            "endParam": 0.022360679774997897,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.04,
+              "pntY": 0.0,
+              "dirX": -0.4472135954999579,
+              "dirY": 0.8944271909999159
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l3",
+            "startPointId": "l3.start",
+            "endPointId": "l3.end",
+            "startParam": 0.0,
+            "endParam": 0.02,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.03,
+              "pntY": 0.02,
+              "dirX": -1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l4",
+            "startPointId": "l4.start",
+            "endPointId": "l4.end",
+            "startParam": 0.0,
+            "endParam": 0.022360679774997897,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.01,
+              "pntY": 0.02,
+              "dirX": -0.4472135954999579,
+              "dirY": -0.8944271909999159
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l2.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k2",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k3",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l4.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k4",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k5",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k6",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "EQUAL",
+            "entityId": "k7",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l4"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k8",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "40.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k9",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "20.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "DISTANCE",
+            "entityId": "k10",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1.start"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "25.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [],
+        "refused": [],
+        "dof": 2,
+        "curves": {
+          "l1": "under",
+          "l2": "under",
+          "l3": "under",
+          "l4": "under"
+        },
+        "points": {
+          "l1.end": [
+            40.0,
+            0.0
+          ],
+          "l1.start": [
+            0.0,
+            0.0
+          ],
+          "l2.end": [
+            30.0,
+            25.0
+          ],
+          "l2.start": [
+            40.0,
+            0.0
+          ],
+          "l3.end": [
+            10.0,
+            25.0
+          ],
+          "l3.start": [
+            30.0,
+            25.0
+          ],
+          "l4.end": [
+            0.0,
+            0.0
+          ],
+          "l4.start": [
+            10.0,
+            25.0
+          ]
+        },
+        "radii": {}
+      }
+    },
+    {
+      "case": "q5",
+      "what": "q5 C channel, web (inner web's corner to the outer side) 4 -> 6",
+      "constraints": [
+        {
+          "first": "l1.end",
+          "second": "l2.start",
+          "id": "k1",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l1",
+          "id": "k2",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l2.end",
+          "second": "l3.start",
+          "id": "k3",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l2",
+          "id": "k4",
+          "type": "VERTICAL"
+        },
+        {
+          "first": "l3.end",
+          "second": "l4.start",
+          "id": "k5",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l3",
+          "id": "k6",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l4.end",
+          "second": "l5.start",
+          "id": "k7",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l4",
+          "id": "k8",
+          "type": "VERTICAL"
+        },
+        {
+          "first": "l5.end",
+          "second": "l6.start",
+          "id": "k9",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l5",
+          "id": "k10",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l6.end",
+          "second": "l7.start",
+          "id": "k11",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l6",
+          "id": "k12",
+          "type": "VERTICAL"
+        },
+        {
+          "first": "l7.end",
+          "second": "l8.start",
+          "id": "k13",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l7",
+          "id": "k14",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l8.end",
+          "second": "l1.start",
+          "id": "k15",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l8",
+          "id": "k16",
+          "type": "VERTICAL"
+        },
+        {
+          "first": "l2",
+          "second": "l6",
+          "id": "k17",
+          "type": "EQUAL"
+        },
+        {
+          "first": "l1",
+          "mm": 25.0,
+          "id": "k18",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l8",
+          "mm": 40.0,
+          "id": "k19",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l2",
+          "mm": 5.0,
+          "id": "k20",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l4.start",
+          "second": "l8",
+          "mm": 6.0,
+          "id": "k21",
+          "type": "DISTANCE"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.025,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.0,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l2",
+            "startPointId": "l2.start",
+            "endPointId": "l2.end",
+            "startParam": 0.0,
+            "endParam": 0.005,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.025,
+              "pntY": 0.0,
+              "dirX": 0.0,
+              "dirY": 1.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l3",
+            "startPointId": "l3.start",
+            "endPointId": "l3.end",
+            "startParam": 0.0,
+            "endParam": 0.021,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.025,
+              "pntY": 0.005,
+              "dirX": -1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l4",
+            "startPointId": "l4.start",
+            "endPointId": "l4.end",
+            "startParam": 0.0,
+            "endParam": 0.03,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.004,
+              "pntY": 0.005,
+              "dirX": 0.0,
+              "dirY": 1.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l5",
+            "startPointId": "l5.start",
+            "endPointId": "l5.end",
+            "startParam": 0.0,
+            "endParam": 0.021,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.004,
+              "pntY": 0.035,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l6",
+            "startPointId": "l6.start",
+            "endPointId": "l6.end",
+            "startParam": 0.0,
+            "endParam": 0.005,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.025,
+              "pntY": 0.035,
+              "dirX": 0.0,
+              "dirY": 1.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l7",
+            "startPointId": "l7.start",
+            "endPointId": "l7.end",
+            "startParam": 0.0,
+            "endParam": 0.025,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.025,
+              "pntY": 0.04,
+              "dirX": -1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l8",
+            "startPointId": "l8.start",
+            "endPointId": "l8.end",
+            "startParam": 0.0,
+            "endParam": 0.04,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.04,
+              "dirX": 0.0,
+              "dirY": -1.0
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l2.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k2",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k3",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "VERTICAL",
+            "entityId": "k4",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k5",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l4.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k6",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k7",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l5.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "VERTICAL",
+            "entityId": "k8",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k9",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l5.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l6.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k10",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l5"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k11",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l6.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l7.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "VERTICAL",
+            "entityId": "k12",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l6"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k13",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l7.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l8.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k14",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l7"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k15",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l8.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "VERTICAL",
+            "entityId": "k16",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l8"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "EQUAL",
+            "entityId": "k17",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l6"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k18",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "25.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k19",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l8"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "40.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k20",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "5.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "DISTANCE",
+            "entityId": "k21",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4.start"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l8"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "6.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [],
+        "refused": [],
+        "dof": 3,
+        "curves": {
+          "l1": "under",
+          "l2": "under",
+          "l3": "under",
+          "l4": "under",
+          "l5": "under",
+          "l6": "under",
+          "l7": "under",
+          "l8": "under"
+        },
+        "points": {
+          "l1.end": [
+            23.0,
+            0.0
+          ],
+          "l1.start": [
+            -2.0,
+            0.0
+          ],
+          "l2.end": [
+            23.0,
+            5.0
+          ],
+          "l2.start": [
+            23.0,
+            0.0
+          ],
+          "l3.end": [
+            4.0,
+            5.0
+          ],
+          "l3.start": [
+            23.0,
+            5.0
+          ],
+          "l4.end": [
+            4.0,
+            35.0
+          ],
+          "l4.start": [
+            4.0,
+            5.0
+          ],
+          "l5.end": [
+            25.0,
+            35.0
+          ],
+          "l5.start": [
+            4.0,
+            35.0
+          ],
+          "l6.end": [
+            25.0,
+            40.0
+          ],
+          "l6.start": [
+            25.0,
+            35.0
+          ],
+          "l7.end": [
+            -2.0,
+            40.0
+          ],
+          "l7.start": [
+            25.0,
+            40.0
+          ],
+          "l8.end": [
+            -2.0,
+            0.0
+          ],
+          "l8.start": [
+            -2.0,
+            40.0
+          ]
+        },
+        "radii": {}
+      }
+    },
+    {
+      "case": "q6",
+      "what": "q6 C channel, web (outer side's corner to the inner web) 4 -> 6",
+      "constraints": [
+        {
+          "first": "l1.end",
+          "second": "l2.start",
+          "id": "k1",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l1",
+          "id": "k2",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l2.end",
+          "second": "l3.start",
+          "id": "k3",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l2",
+          "id": "k4",
+          "type": "VERTICAL"
+        },
+        {
+          "first": "l3.end",
+          "second": "l4.start",
+          "id": "k5",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l3",
+          "id": "k6",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l4.end",
+          "second": "l5.start",
+          "id": "k7",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l4",
+          "id": "k8",
+          "type": "VERTICAL"
+        },
+        {
+          "first": "l5.end",
+          "second": "l6.start",
+          "id": "k9",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l5",
+          "id": "k10",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l6.end",
+          "second": "l7.start",
+          "id": "k11",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l6",
+          "id": "k12",
+          "type": "VERTICAL"
+        },
+        {
+          "first": "l7.end",
+          "second": "l8.start",
+          "id": "k13",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l7",
+          "id": "k14",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l8.end",
+          "second": "l1.start",
+          "id": "k15",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l8",
+          "id": "k16",
+          "type": "VERTICAL"
+        },
+        {
+          "first": "l2",
+          "second": "l6",
+          "id": "k17",
+          "type": "EQUAL"
+        },
+        {
+          "first": "l1",
+          "mm": 25.0,
+          "id": "k18",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l8",
+          "mm": 40.0,
+          "id": "k19",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l2",
+          "mm": 5.0,
+          "id": "k20",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l8.start",
+          "second": "l4",
+          "mm": 6.0,
+          "id": "k21",
+          "type": "DISTANCE"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.025,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.0,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l2",
+            "startPointId": "l2.start",
+            "endPointId": "l2.end",
+            "startParam": 0.0,
+            "endParam": 0.005,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.025,
+              "pntY": 0.0,
+              "dirX": 0.0,
+              "dirY": 1.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l3",
+            "startPointId": "l3.start",
+            "endPointId": "l3.end",
+            "startParam": 0.0,
+            "endParam": 0.021,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.025,
+              "pntY": 0.005,
+              "dirX": -1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l4",
+            "startPointId": "l4.start",
+            "endPointId": "l4.end",
+            "startParam": 0.0,
+            "endParam": 0.03,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.004,
+              "pntY": 0.005,
+              "dirX": 0.0,
+              "dirY": 1.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l5",
+            "startPointId": "l5.start",
+            "endPointId": "l5.end",
+            "startParam": 0.0,
+            "endParam": 0.021,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.004,
+              "pntY": 0.035,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l6",
+            "startPointId": "l6.start",
+            "endPointId": "l6.end",
+            "startParam": 0.0,
+            "endParam": 0.005,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.025,
+              "pntY": 0.035,
+              "dirX": 0.0,
+              "dirY": 1.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l7",
+            "startPointId": "l7.start",
+            "endPointId": "l7.end",
+            "startParam": 0.0,
+            "endParam": 0.025,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.025,
+              "pntY": 0.04,
+              "dirX": -1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l8",
+            "startPointId": "l8.start",
+            "endPointId": "l8.end",
+            "startParam": 0.0,
+            "endParam": 0.04,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.04,
+              "dirX": 0.0,
+              "dirY": -1.0
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l2.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k2",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k3",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "VERTICAL",
+            "entityId": "k4",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k5",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l4.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k6",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k7",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l5.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "VERTICAL",
+            "entityId": "k8",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k9",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l5.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l6.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k10",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l5"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k11",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l6.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l7.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "VERTICAL",
+            "entityId": "k12",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l6"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k13",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l7.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l8.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k14",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l7"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k15",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l8.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "VERTICAL",
+            "entityId": "k16",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l8"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "EQUAL",
+            "entityId": "k17",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l6"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k18",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "25.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k19",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l8"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "40.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k20",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "5.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "DISTANCE",
+            "entityId": "k21",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l8.start"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l4"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "6.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [],
+        "refused": [],
+        "dof": 3,
+        "curves": {
+          "l1": "under",
+          "l2": "under",
+          "l3": "under",
+          "l4": "under",
+          "l5": "under",
+          "l6": "under",
+          "l7": "under",
+          "l8": "under"
+        },
+        "points": {
+          "l1.end": [
+            25.0,
+            0.0
+          ],
+          "l1.start": [
+            0.0,
+            0.0
+          ],
+          "l2.end": [
+            25.0,
+            5.0
+          ],
+          "l2.start": [
+            25.0,
+            0.0
+          ],
+          "l3.end": [
+            6.0,
+            5.0
+          ],
+          "l3.start": [
+            25.0,
+            5.0
+          ],
+          "l4.end": [
+            6.0,
+            35.0
+          ],
+          "l4.start": [
+            6.0,
+            5.0
+          ],
+          "l5.end": [
+            25.0,
+            35.0
+          ],
+          "l5.start": [
+            6.0,
+            35.0
+          ],
+          "l6.end": [
+            25.0,
+            40.0
+          ],
+          "l6.start": [
+            25.0,
+            35.0
+          ],
+          "l7.end": [
+            0.0,
+            40.0
+          ],
+          "l7.start": [
+            25.0,
+            40.0
+          ],
+          "l8.end": [
+            0.0,
+            0.0
+          ],
+          "l8.start": [
+            0.0,
+            40.0
+          ]
+        },
+        "radii": {}
+      }
+    },
+    {
+      "case": "q7",
+      "what": "q7 C channel, height 40 -> 48",
+      "constraints": [
+        {
+          "first": "l1.end",
+          "second": "l2.start",
+          "id": "k1",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l1",
+          "id": "k2",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l2.end",
+          "second": "l3.start",
+          "id": "k3",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l2",
+          "id": "k4",
+          "type": "VERTICAL"
+        },
+        {
+          "first": "l3.end",
+          "second": "l4.start",
+          "id": "k5",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l3",
+          "id": "k6",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l4.end",
+          "second": "l5.start",
+          "id": "k7",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l4",
+          "id": "k8",
+          "type": "VERTICAL"
+        },
+        {
+          "first": "l5.end",
+          "second": "l6.start",
+          "id": "k9",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l5",
+          "id": "k10",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l6.end",
+          "second": "l7.start",
+          "id": "k11",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l6",
+          "id": "k12",
+          "type": "VERTICAL"
+        },
+        {
+          "first": "l7.end",
+          "second": "l8.start",
+          "id": "k13",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l7",
+          "id": "k14",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l8.end",
+          "second": "l1.start",
+          "id": "k15",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l8",
+          "id": "k16",
+          "type": "VERTICAL"
+        },
+        {
+          "first": "l2",
+          "second": "l6",
+          "id": "k17",
+          "type": "EQUAL"
+        },
+        {
+          "first": "l1",
+          "mm": 25.0,
+          "id": "k18",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l8",
+          "mm": 48.0,
+          "id": "k19",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l2",
+          "mm": 5.0,
+          "id": "k20",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l4.start",
+          "second": "l8",
+          "mm": 4.0,
+          "id": "k21",
+          "type": "DISTANCE"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.025,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.0,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l2",
+            "startPointId": "l2.start",
+            "endPointId": "l2.end",
+            "startParam": 0.0,
+            "endParam": 0.005,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.025,
+              "pntY": 0.0,
+              "dirX": 0.0,
+              "dirY": 1.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l3",
+            "startPointId": "l3.start",
+            "endPointId": "l3.end",
+            "startParam": 0.0,
+            "endParam": 0.021,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.025,
+              "pntY": 0.005,
+              "dirX": -1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l4",
+            "startPointId": "l4.start",
+            "endPointId": "l4.end",
+            "startParam": 0.0,
+            "endParam": 0.03,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.004,
+              "pntY": 0.005,
+              "dirX": 0.0,
+              "dirY": 1.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l5",
+            "startPointId": "l5.start",
+            "endPointId": "l5.end",
+            "startParam": 0.0,
+            "endParam": 0.021,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.004,
+              "pntY": 0.035,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l6",
+            "startPointId": "l6.start",
+            "endPointId": "l6.end",
+            "startParam": 0.0,
+            "endParam": 0.005,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.025,
+              "pntY": 0.035,
+              "dirX": 0.0,
+              "dirY": 1.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l7",
+            "startPointId": "l7.start",
+            "endPointId": "l7.end",
+            "startParam": 0.0,
+            "endParam": 0.025,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.025,
+              "pntY": 0.04,
+              "dirX": -1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l8",
+            "startPointId": "l8.start",
+            "endPointId": "l8.end",
+            "startParam": 0.0,
+            "endParam": 0.04,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.04,
+              "dirX": 0.0,
+              "dirY": -1.0
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l2.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k2",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k3",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "VERTICAL",
+            "entityId": "k4",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k5",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l4.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k6",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k7",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l5.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "VERTICAL",
+            "entityId": "k8",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k9",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l5.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l6.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k10",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l5"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k11",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l6.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l7.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "VERTICAL",
+            "entityId": "k12",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l6"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k13",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l7.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l8.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k14",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l7"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k15",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l8.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "VERTICAL",
+            "entityId": "k16",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l8"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "EQUAL",
+            "entityId": "k17",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l6"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k18",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "25.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k19",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l8"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "48.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k20",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "5.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "DISTANCE",
+            "entityId": "k21",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4.start"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l8"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "4.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [],
+        "refused": [],
+        "dof": 3,
+        "curves": {
+          "l1": "under",
+          "l2": "under",
+          "l3": "under",
+          "l4": "under",
+          "l5": "under",
+          "l6": "under",
+          "l7": "under",
+          "l8": "under"
+        },
+        "points": {
+          "l1.end": [
+            25.0,
+            0.0
+          ],
+          "l1.start": [
+            0.0,
+            0.0
+          ],
+          "l2.end": [
+            25.0,
+            5.0
+          ],
+          "l2.start": [
+            25.0,
+            0.0
+          ],
+          "l3.end": [
+            4.0,
+            5.0
+          ],
+          "l3.start": [
+            25.0,
+            5.0
+          ],
+          "l4.end": [
+            4.0,
+            43.0
+          ],
+          "l4.start": [
+            4.0,
+            5.0
+          ],
+          "l5.end": [
+            25.0,
+            43.0
+          ],
+          "l5.start": [
+            4.0,
+            43.0
+          ],
+          "l6.end": [
+            25.0,
+            48.0
+          ],
+          "l6.start": [
+            25.0,
+            43.0
+          ],
+          "l7.end": [
+            0.0,
+            48.0
+          ],
+          "l7.start": [
+            25.0,
+            48.0
+          ],
+          "l8.end": [
+            0.0,
+            0.0
+          ],
+          "l8.start": [
+            0.0,
+            48.0
+          ]
+        },
+        "radii": {}
+      }
+    },
+    {
+      "case": "q8",
+      "what": "q8 H / V rectangle 30 x 20, height (top-left corner to the bottom) 20 -> 25",
+      "constraints": [
+        {
+          "first": "l1.end",
+          "second": "l2.start",
+          "id": "k1",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l1",
+          "id": "k2",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l2.end",
+          "second": "l3.start",
+          "id": "k3",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l2",
+          "id": "k4",
+          "type": "VERTICAL"
+        },
+        {
+          "first": "l3.end",
+          "second": "l4.start",
+          "id": "k5",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l3",
+          "id": "k6",
+          "type": "HORIZONTAL"
+        },
+        {
+          "first": "l4.end",
+          "second": "l1.start",
+          "id": "k7",
+          "type": "COINCIDENT"
+        },
+        {
+          "first": "l4",
+          "id": "k8",
+          "type": "VERTICAL"
+        },
+        {
+          "first": "l1",
+          "mm": 30.0,
+          "id": "k9",
+          "type": "LENGTH"
+        },
+        {
+          "first": "l4.start",
+          "second": "l1",
+          "mm": 25.0,
+          "id": "k10",
+          "type": "DISTANCE"
+        }
+      ],
+      "onshape": {
+        "entities": [
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l1",
+            "startPointId": "l1.start",
+            "endPointId": "l1.end",
+            "startParam": 0.0,
+            "endParam": 0.03,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.0,
+              "dirX": 1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l2",
+            "startPointId": "l2.start",
+            "endPointId": "l2.end",
+            "startParam": 0.0,
+            "endParam": 0.02,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.03,
+              "pntY": 0.0,
+              "dirX": 0.0,
+              "dirY": 1.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l3",
+            "startPointId": "l3.start",
+            "endPointId": "l3.end",
+            "startParam": 0.0,
+            "endParam": 0.03,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.03,
+              "pntY": 0.02,
+              "dirX": -1.0,
+              "dirY": 0.0
+            }
+          },
+          {
+            "btType": "BTMSketchCurveSegment-155",
+            "entityId": "l4",
+            "startPointId": "l4.start",
+            "endPointId": "l4.end",
+            "startParam": 0.0,
+            "endParam": 0.02,
+            "geometry": {
+              "btType": "BTCurveGeometryLine-117",
+              "pntX": 0.0,
+              "pntY": 0.02,
+              "dirX": 0.0,
+              "dirY": -1.0
+            }
+          }
+        ],
+        "constraints": [
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k1",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l2.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k2",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k3",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l3.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "VERTICAL",
+            "entityId": "k4",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l2"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k5",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l4.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "HORIZONTAL",
+            "entityId": "k6",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l3"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "COINCIDENT",
+            "entityId": "k7",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4.end"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1.start"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "VERTICAL",
+            "entityId": "k8",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4"
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "LENGTH",
+            "entityId": "k9",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "30.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          },
+          {
+            "btType": "BTMSketchConstraint-2",
+            "constraintType": "DISTANCE",
+            "entityId": "k10",
+            "parameters": [
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localFirst",
+                "value": "l4.start"
+              },
+              {
+                "btType": "BTMParameterString-149",
+                "parameterId": "localSecond",
+                "value": "l1"
+              },
+              {
+                "btType": "BTMParameterEnum-145",
+                "parameterId": "direction",
+                "enumName": "DimensionDirection",
+                "value": "MINIMUM"
+              },
+              {
+                "btType": "BTMParameterQuantity-147",
+                "parameterId": "length",
+                "expression": "25.000000 mm",
+                "isInteger": false,
+                "value": 0,
+                "units": ""
+              }
+            ]
+          }
+        ]
+      },
+      "ours": {
+        "status": "solved",
+        "conflicting": [],
+        "redundant": [],
+        "refused": [],
+        "dof": 2,
+        "curves": {
+          "l1": "under",
+          "l2": "under",
+          "l3": "under",
+          "l4": "under"
+        },
+        "points": {
+          "l1.end": [
+            30.0,
+            0.0
+          ],
+          "l1.start": [
+            0.0,
+            0.0
+          ],
+          "l2.end": [
+            30.0,
+            25.0
+          ],
+          "l2.start": [
+            30.0,
+            0.0
+          ],
+          "l3.end": [
+            0.0,
+            25.0
+          ],
+          "l3.start": [
+            30.0,
+            25.0
+          ],
+          "l4.end": [
+            0.0,
+            0.0
+          ],
+          "l4.start": [
+            0.0,
+            25.0
+          ]
+        },
+        "radii": {}
+      }
+    }
+  ]
+}
