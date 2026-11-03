@@ -70,6 +70,10 @@ fn sketch_regions_at_a_point() {
     assert_eq!(centers(&call(&mut ctx, "sketch_get", json!({ "sketch": sketch, "at": ["1 mm", "0 mm", "1 mm"] }))), [(0.0, 0.0)]);
     assert_eq!(centers(&call(&mut ctx, "sketch_get", json!({ "sketch": sketch, "at": [0, 0, 20] }))), [(0.0, 20.0)]);
     assert!(centers(&call(&mut ctx, "sketch_get", json!({ "sketch": sketch, "at": [10, 10] }))).is_empty());
+    // Each region's outer box.
+    let r = call(&mut ctx, "sketch_get", json!({ "sketch": sketch, "at": [1, 19] }));
+    let b = &r["regions"][0]["bounds"];
+    assert_eq!([num(&b["min"][0]), num(&b["min"][1]), num(&b["max"][0]), num(&b["max"][1])].map(|v| v.round()), [-5.0, 15.0, 5.0, 25.0], "{r}");
 }
 
 /// A shape whose clicks don't complete it is an error naming the clicks,

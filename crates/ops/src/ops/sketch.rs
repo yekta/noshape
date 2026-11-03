@@ -210,7 +210,7 @@ pub fn ops() -> Vec<Op> {
             group: "sketch",
             verb: "get",
             summary: "A sketch's entities, constraints, dimensions, solve state and regions",
-            description: "Entities with ids and geometry (sketch coordinates, workspace units), constraints and dimensions (`dim:…`, value and expression), DOF and status (fully defined, under defined, over defined), regions (`region:…` ids, area, `center` of the outer loop's box, a point `inside` the region, the `boundary` curves and of them the `outer` loop's) for Extrude / Revolve, and the plane frame.",
+            description: "Entities with ids and geometry (sketch coordinates, workspace units), constraints and dimensions (`dim:…`, value and expression), DOF and status (fully defined, under defined, over defined), regions (`region:…` ids, area, `center` of the outer loop's box, a point `inside` the region, the outer loop's `bounds`, the `boundary` curves and of them the `outer` loop's) for Extrude / Revolve, and the plane frame.",
             fields: vec![doc_field(), tab_field(), req("sketch", s(), "Sketch feature id or name."), opt("at", json!({ "type": "array", "items": { "type": ["number", "string"] }, "minItems": 2, "maxItems": 3 }), "Only the regions holding this point: sketch [x, y], or a model position [x, y, z] projected onto the sketch plane.")],
             mutates: false,
             destructive: false,
@@ -513,6 +513,7 @@ pub(super) fn sketch_state(od: &mut OpenDoc, tab: TabId, id: FeatureId, before: 
                 let b = g.outer.bbox();
                 let c = (b.min + b.max) * 0.5;
                 rv["center"] = json!([c.x * k, c.y * k]);
+                rv["bounds"] = json!({ "min": [b.min.x * k, b.min.y * k], "max": [b.max.x * k, b.max.y * k] });
                 let inside = g.interior_point();
                 rv["inside"] = json!([inside.x * k, inside.y * k]);
                 let mut boundary: Vec<String> = std::iter::once(&g.outer).chain(&g.holes).flat_map(|l| l.sources.iter().map(|s| entity_id(id, s.entity))).collect();

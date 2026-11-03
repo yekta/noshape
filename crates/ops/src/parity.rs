@@ -26,6 +26,8 @@ pub struct LiveRef {
     pub measure: Option<f64>,
     /// Surface or curve type in our query_entities words ("plane", "line"…).
     pub geometry: Option<String>,
+    /// A body's box (min, max).
+    pub bbox: Option<[[f64; 3]; 2]>,
 }
 
 /// What became of one Onshape feature.
@@ -158,7 +160,7 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
     for line in text.lines().filter(|l| !l.trim().is_empty()) {
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
         let (Some(k), Some(id)) = (v["index"].as_u64(), v["id"].as_str()) else { continue };
-        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64(), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())) };
+        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64(), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox: None };
         out.insert((k as usize, id.to_string()), r);
     }
     out
@@ -718,7 +720,44 @@ impl<'a> Translator<'a> {
         let ours = self.feature_ids.get(sketch["featureId"].as_str()?)?.clone();
         let g = self.call("sketch_get", json!({ "sketch": ours })).ok()?;
         let regions: Vec<String> = g["regions"].as_array()?.iter().filter(|r| r["imprinted"] != true).filter_map(|r| r["id"].as_str().map(str::to_string)).collect();
-        (regions.len() == ids).then_some(regions)
+        if regions.len() == ids {
+            return Some(regions);
+        }
+        self.regions_of_new_bodies(k, &ours, &g, ids)
+    }
+
+    /// Fewer regions named than the sketch has: the ones whose outer box is
+    /// the box of a part feature `k` made (live's line after it), seen along
+    /// the sketch's normal (an extruded part's footprint).
+    fn regions_of_new_bodies(&mut self, k: usize, _sketch: &str, g: &Value, ids: usize) -> Option<Vec<String>> {
+        let before: std::collections::HashSet<&String> = self.refs.keys().filter(|(j, _)| *j == k).map(|(_, id)| id).collect();
+        let new: Vec<[[f64; 3]; 2]> = self.refs.iter().filter(|((j, id), r)| *j == k + 1 && r.kind == "BODY" && !before.contains(id)).filter_map(|(_, r)| r.bbox).collect();
+        if new.len() != ids {
+            return None;
+        }
+        let unit = per_unit(&g["units"]);
+        let (o, x, y) = (f3(&g["frame"]["origin"])?.map(|c| c * unit), f3(&g["frame"]["x"])?, f3(&g["frame"]["y"])?);
+        let to2 = |p: [f64; 3]| {
+            let d = [p[0] - o[0], p[1] - o[1], p[2] - o[2]];
+            [d[0] * x[0] + d[1] * x[1] + d[2] * x[2], d[0] * y[0] + d[1] * y[1] + d[2] * y[2]]
+        };
+        let regions: Vec<&Value> = g["regions"].as_array()?.iter().filter(|r| r["imprinted"] != true).collect();
+        let mut out = Vec::new();
+        for [lo, hi] in new {
+            // The box's corners in the sketch plane.
+            let corners: Vec<[f64; 2]> = (0..8).map(|i| to2([if i & 1 == 0 { lo[0] } else { hi[0] }, if i & 2 == 0 { lo[1] } else { hi[1] }, if i & 4 == 0 { lo[2] } else { hi[2] }])).collect();
+            let (min, max) = corners.iter().fold(([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]), |(a, b), p| ([a[0].min(p[0]), a[1].min(p[1])], [b[0].max(p[0]), b[1].max(p[1])]));
+            let fits = |r: &&&Value| {
+                let (rmin, rmax) = (&r["bounds"]["min"], &r["bounds"]["max"]);
+                let v = |a: &Value, i: usize| a[i].as_f64().map_or(f64::NAN, |c| c * unit);
+                (0..2).all(|i| (v(rmin, i) - min[i]).abs() < 1e-6 && (v(rmax, i) - max[i]).abs() < 1e-6)
+            };
+            let found: Vec<&&Value> = regions.iter().filter(fits).collect();
+            // The one with that box (a hole's disc inside the same circle has a smaller one).
+            let [one] = found.as_slice() else { return None };
+            out.push(one["id"].as_str()?.to_string());
+        }
+        Some(out)
     }
 
     /// A revolve's axis named by id alone: the last sketch's one
@@ -2206,7 +2245,7 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
             if let Some(id) = b["id"].as_str()
                 && lo[0].is_finite()
             {
-                out.insert((at, id.to_string()), LiveRef { kind: "BODY".into(), point: Some([(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, (lo[2] + hi[2]) / 2.0]), ..Default::default() });
+                out.insert((at, id.to_string()), LiveRef { kind: "BODY".into(), point: Some([(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, (lo[2] + hi[2]) / 2.0]), bbox: Some([lo, hi]), ..Default::default() });
             }
         }
     }
