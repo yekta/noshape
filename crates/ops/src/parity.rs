@@ -1228,6 +1228,15 @@ impl<'a> Translator<'a> {
                 return Ok(Some(id));
             }
         }
+        // Several share them: the one bounded by exactly those (a circle cut
+        // by two chords: its side piece, not the middle; stef-radijator).
+        if bounded.len() > 1 && !derived {
+            let want: std::collections::BTreeSet<&str> = named.iter().map(String::as_str).collect();
+            let exact: Vec<&Value> = bounded.iter().filter(|r| r["boundary"].as_array().into_iter().flatten().filter_map(Value::as_str).collect::<std::collections::BTreeSet<_>>() == want).collect();
+            if let [only] = exact.as_slice() {
+                return Ok(only["id"].as_str().map(whole));
+            }
+        }
         // Several share them: the named curve's whole shape decides (a
         // rectangle's `.left` side alone is on both its inside and the region
         // beside it; live: bracket120's Extrude 2 takes the rectangle).

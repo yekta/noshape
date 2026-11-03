@@ -988,6 +988,26 @@ fn a_region_named_with_the_lines_touching_it() {
     assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// A region named by a circle and one chord across it is the piece they
+/// alone bound, not the middle the other chord closes too (live:
+/// stef-radijator-nlukic's Extrude 1, its packed query for the left piece).
+#[test]
+fn a_region_bounded_by_exactly_the_named_curves() {
+    let packed = "&228$eJxlkFlTwjAUhf/M9VGmCXThsbQBK5TiTXTgiQlNRqJCSykg/npTtnF5Su5yTr6Tu54LTztdHVOXEwrKbOVqYV53sjbFOpa1DElK/0/EsdQ8AJFNslE2mNmrXtemNnob0pBGTurxBShdmb1W/apY2Y7L5Xnp2Ih7Etit4B1g8YBZydJs66I6XuwjZKFIsrEdFKWuTi8nqkchUSHhhLQ86Cs5DUY+3+y6Xnu4mTsHU+ms5F3YNKlORgr4kInoYc7GIhEzrmH7rut8eQZIFM+h/pTZM/3ah7EJ0GkyI0GK7Wsa7IS24zQx0EUPfQywiwvMUaG2+oXx2lTi9OPw9njVcxcyjBnas6jsX8QOupHPPXhhKNj07BHlNsm9avlgVmVl1jXmlj0ZC6tjkYjvyRUASftGRmzlxsSikO6FhTQwJEfq/ABsmtyHJJ2gtbSzk5nbmNE/a0gDJPpE2IF+GLHfs28IR6ms";
+    let r = 0.004 * 2f64.sqrt();
+    let entities = json!([
+        circle("txaOU2zvADi8", r, (0.0, 0.0)),
+        segment("mN49CmAY11hO", (0.004, 0.004), (0.004, -0.004)),
+        segment("bi632aRXlwjJ", (-0.004, 0.004), (-0.004, -0.004)),
+        circle("sFSOufala2gL.0", r + 0.005, (0.0, 0.0)),
+    ]);
+    let region = json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": ["KGOB"], "queryString": format!("query=qCompressed(1.0,\"{packed}\",id);") });
+    let piece = (r * r * (0.004 / r).acos() - 0.004 * (r * r - 0.004 * 0.004).sqrt()) * 0.01;
+    let (features, live) = one_extrude("FdaX8L7Squ963Kq_0", entities, region, json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 4, "edges": 6, "vertices": 4, "volume": piece }));
+    let r = run_model("chord-piece", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
 /// qSketchRegion(…, true) leaves out every region inside another's hole,
 /// rings nested in a bore too (live: bearing-block-takumi).
 #[test]
@@ -1008,8 +1028,6 @@ fn filter_inner_loops_leaves_out_what_a_hole_holds() {
     assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
-/// A sketch whose frame isn't live's is a difference (here live's Top sketch
-/// turned 90°: x along +Y), and none where it is.
 /// A line live solved a hair off horizontal (a patterned hexagon's edge in
 /// exercise-anthony) stays where live has it: our line tool's inferred
 /// Horizontal is dropped, so the triangle's volume is live's.
@@ -1027,6 +1045,8 @@ fn a_line_just_off_horizontal_is_not_snapped() {
     assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// A sketch whose frame isn't live's is a difference (here live's Top sketch
+/// turned 90°: x along +Y), and none where it is.
 #[test]
 fn a_sketch_frame_unlike_lives_is_a_difference() {
     let (mut features, mut live) = one_extrude("FS1", json!([circle("c", 0.01, (0.0, 0.0))]), json!({ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": "FS1", "queryString": "query = qSketchRegion(id + \"FS1\", false);" }), json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 3, "edges": 2, "vertices": 0, "volume": std::f64::consts::PI * 1e-6 }));
