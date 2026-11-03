@@ -304,6 +304,9 @@ impl<'a> Translator<'a> {
         if let Some(e) = self.sketch_entity_from_query(text) {
             return Ok(vec![e]);
         }
+        if let Some(r) = self.extrude_name_from_query(text) {
+            return r.map(|e| vec![e]);
+        }
         // qCreatedBy(makeId("F…"), EntityType.VERTEX): a sketch's points.
         if let Some(sk) = text.split("qCreatedBy(makeId(\"").nth(1).and_then(|r| r.split('"').next())
             && text.contains("EntityType.VERTEX")
@@ -383,6 +386,97 @@ impl<'a> Translator<'a> {
             return None;
         }
         strings.iter().find_map(|e| self.sketch_entities.get(&(sk.clone(), e.clone())).cloned())
+    }
+
+    /// A face, edge or part an Extrude made, by Onshape's name for it
+    /// (packed `CAP_FACE` / `SWEPT_FACE` / `CAP_EDGE` / `SWEPT_EDGE` of
+    /// `….opExtrude` from sketch curves, `SWEPT_BODY`): ours of the same
+    /// Extrude through the same sketch geometry. Used when live's geometry
+    /// for the id is missing.
+    fn extrude_name_from_query(&mut self, text: &str) -> Option<Result<String, String>> {
+        use noshape_model::custom::host::packed::{Packed, unpack};
+        let packed = text.split("qCompressed(1.0,\"").nth(1)?.split('"').next()?;
+        let tree = unpack(packed).ok()?;
+        fn find<'p>(p: &'p Packed, names: &[&str]) -> Option<&'p Vec<(Packed, Packed)>> {
+            match p {
+                Packed::Map(m) if m.iter().any(|(k, v)| matches!(k, Packed::Str(k) if k == "queryType") && matches!(v, Packed::Str(v) if names.contains(&v.as_str()))) => Some(m),
+                Packed::Map(m) => m.iter().find_map(|(_, v)| find(v, names)),
+                Packed::Array(a) => a.iter().find_map(|v| find(v, names)),
+                Packed::Tagged(_, v) => find(v, names),
+                _ => None,
+            }
+        }
+        let names = ["CAP_FACE", "SWEPT_FACE", "CAP_EDGE", "SWEPT_EDGE", "SWEPT_BODY"];
+        let m = find(&tree, &names)?;
+        let get = |key: &str| m.iter().find(|(k, _)| matches!(k, Packed::Str(k) if k == key)).map(|(_, v)| v);
+        let Some(Packed::Str(name)) = get("queryType") else { return None };
+        let is_start = matches!(get("isStart"), Some(Packed::Bool(true)));
+        let mut strings = Vec::new();
+        packed_strings(&Packed::Map(m.clone()), &mut strings);
+        let op = strings.iter().find_map(|s| s.strip_suffix(".opExtrude"))?.to_string();
+        if name == "SWEPT_BODY" {
+            // The part our Extrude made (the part of its faces).
+            let Some(ours) = self.feature_ids.get(&op).cloned() else { return Some(Err(format!("SWEPT_BODY: extrude {op} was not built"))) };
+            let r = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 1 }));
+            return Some(r.and_then(|f| f["faces"][0]["part"].as_str().map(str::to_string).ok_or_else(|| format!("SWEPT_BODY of {op}: no part of ours"))));
+        }
+        let sk = strings.iter().find_map(|s| s.strip_suffix(".wireOp"))?.to_string();
+        let curves: Vec<Vec<[f64; 2]>> = strings.iter().filter_map(|e| self.curves.get(&(sk.clone(), e.clone())).cloned()).collect();
+        Some(self.extrude_entity(name, is_start, &op, &sk, &curves))
+    }
+
+    fn extrude_entity(&mut self, name: &str, is_start: bool, op: &str, sk: &str, curves: &[Vec<[f64; 2]>]) -> Result<String, String> {
+        let ours = self.feature_ids.get(op).cloned().ok_or_else(|| format!("{name}: extrude {op} was not built"))?;
+        let our_sketch = self.feature_ids.get(sk).cloned().ok_or_else(|| format!("{name}: sketch {sk} was not built"))?;
+        if curves.is_empty() {
+            return Err(format!("{name} of {op}: its sketch curves were not translated"));
+        }
+        // Onshape's sketch frame (else ours, the same for default planes).
+        let [o, x, y] = match self.frames.get(sk) {
+            Some(f) => *f,
+            None => {
+                let g = self.call("sketch_get", json!({ "sketch": our_sketch }))?;
+                let f = |k: &str| f3(&g["frame"][k]).ok_or("sketch frame");
+                let o = f("origin")?;
+                [o.map(|c| c / 1000.0), f("x")?, f("y")?]
+            }
+        };
+        let n = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+        let world = |p: [f64; 2]| [o[0] + p[0] * x[0] + p[1] * y[0], o[1] + p[0] * x[1] + p[1] * y[1], o[2] + p[0] * x[2] + p[1] * y[2]];
+        let dot = |a: [f64; 3], b: [f64; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        let sub = |a: [f64; 3], b: [f64; 3]| [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+        // Off the line through `p` along the normal (m), and along it.
+        let lateral = |q: [f64; 3], p: [f64; 3]| {
+            let d = sub(q, p);
+            let a = dot(d, n);
+            ((d[0] - a * n[0]).powi(2) + (d[1] - a * n[1]).powi(2) + (d[2] - a * n[2]).powi(2)).sqrt()
+        };
+        // A line is its two ends; arcs and splines are finely sampled.
+        let mid = |c: &Vec<[f64; 2]>| if c.len() == 2 { [(c[0][0] + c[1][0]) / 2.0, (c[0][1] + c[1][1]) / 2.0] } else { c[c.len() / 2] };
+        let (kind, key, at) = match name {
+            // The edge swept from the vertex the two curves share.
+            "SWEPT_EDGE" => {
+                let shared = curves.first().and_then(|a| curves.get(1).and_then(|b| [a[0], a[a.len() - 1]].into_iter().find(|p| [b[0], b[b.len() - 1]].iter().any(|q| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-9))));
+                ("edges", "midpoint", world(shared.ok_or("SWEPT_EDGE: its curves share no vertex")?))
+            }
+            "SWEPT_FACE" => ("faces", "centroid", world(mid(&curves[0]))),
+            "CAP_EDGE" => ("edges", "midpoint", world(mid(&curves[0]))),
+            _ => ("faces", "centroid", world(mid(&curves[0]))),
+        };
+        let found = self.call("query_entities", json!({ "kind": kind, "created_by": ours, "limit": 200 }))?;
+        let cands: Vec<(String, [f64; 3])> = found[kind].as_array().into_iter().flatten().filter_map(|e| Some((e["id"].as_str()?.to_string(), f3(&e[key])?.map(|c| c / 1000.0)))).collect();
+        let pick = match name {
+            // On the line through the sketch point along the normal; swept
+            // faces: the one whose centroid is nearest that line.
+            "SWEPT_EDGE" | "SWEPT_FACE" => cands.iter().min_by(|a, b| lateral(a.1, at).total_cmp(&lateral(b.1, at))),
+            // Caps: over the sketch curve, nearest (start) or farthest (end) along the extrude.
+            _ => {
+                let over: Vec<&(String, [f64; 3])> = cands.iter().filter(|c| lateral(c.1, at) < 1e-6 || name == "CAP_FACE").collect();
+                let along = |c: &&(String, [f64; 3])| dot(sub(c.1, o), n).abs();
+                if is_start { over.into_iter().min_by(|a, b| along(a).total_cmp(&along(b))) } else { over.into_iter().max_by(|a, b| along(a).total_cmp(&along(b))) }
+            }
+        };
+        pick.map(|c| c.0.clone()).ok_or_else(|| format!("{name} of {op}: no entity of ours matches"))
     }
 
     /// The entity of ours at live's geometry of `id`.
