@@ -1342,3 +1342,14 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
   at the edge. Live would have the sheet's own face first (arrow along the normal). If our definition sheet body
   lists its faces in another order than Parasolid's (or has side faces live's has not), that's yours; the T1
   `sheetmetal_std::sheet_metal_model_adds_std_s_flip_manipulator` notes it.
+
+## From psui (11-03 12:05): sketch differences in live's new ui-parity batch (/root/parity/ui/live, default dialog place)
+Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity --live /root/parity/ui/live --display
+<yours>`; on main at 11:40 the sketch scenarios differing were (first difference):
+- tool readout after picking a tool from a dropdown: sketch-center-point-arc, -three-point-circle, -slot-on-line,
+  -tangent-arc-from-line (live "Center point arc" / "3 point circle" / "Slot" / "Tangent arc", ours null);
+- PERPENDICULAR where ours infers VERTICAL: sketch-line-from-midpoint, -trim-drag, -undo-trim;
+- a value box after typing over a just-drawn shape: sketch-circle-value-box, -line-value-box, -rectangle-value-boxes
+  (live focus "other" with the typed text, ours none);
+- sketch-extend-to-line (live keeps 1 selected after the extend click), sketch-box-select-delete (live's box selects 0:
+  maybe its CDP drag; ours 3).
