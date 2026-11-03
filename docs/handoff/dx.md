@@ -94,6 +94,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
   kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
+- 11-03 14:55 after run 29: Hole tip faces (HOLE_FACE "tip"), sketch text (BTMSketchTextEntity → sketch_text at
+  live's baseline start / ascent / font, turned along its baseline), studio blobs (studios/<eid>.blob → file tabs, no
+  placeholder), a vertex by id that is a sketch point; FeatureScript: only a newer std import is refused (a studio of a
+  newer FeatureScript imports, live's drive-train-generator), T1 a_studio_imports_a_newer_studio. Runner: live's
+  regeneration times now read (the summary line was dropped) and a "speed:" line lists documents slower than live,
+  worst first (knob-jason 3570 ms vs 125 ms; Fillet 2). Asked live for sketch wire bodies and in-feature mate
+  connector queries (13:20 updates) and a mid-axis pin-in-hole assembly (AGENT-FLIP-PRIMARY-INVERTED, 14:50).
+  Walk 14:38 on green add4e920 (:105): Part Studio and a suggested-views drawing of an 80 × 40 × 20 block with a hole
+  (third-angle layout, centre mark, ANSI title block): no regressions.
 - 11-03 14:25 corpus to 50 documents (runs 25–29, /root/dx-scratch/pm-run*.log): **17/51 documents, 217/393 features (custom 3/50)** (run 29, d3627daf; was 12/42, 155/292 at 12:43).
   Fixed in core's area where the fix was one line, with T1 tests: Extrude's second direction flip is against the
   sketch normal (std: away only when the two flips differ; cf-sheet-metal-model-plus), FeatureScript modules

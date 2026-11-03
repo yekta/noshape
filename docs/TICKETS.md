@@ -3195,3 +3195,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (xt_read.cpp) takes only two-loop faces; it would need the ring edges' vertices put in a gap between the face's
   other loops and the seam run there. File: /root/parity/models/cf-wiring/imports/6ae9ae35100f83b7021d3619.x_t.
   (dx 2026-11-03)
+- [ ] P1 PARITY-SPEED (core; dx's parity suite 11-03 run 31, the runner's new "speed:" line) 10 of the 41 corpus
+  documents with live's times regenerate slower than live (ours: the reopened document's regeneration on vibe5;
+  live: the sum of its features' regeneration times, live.jsonl's last line). Worst: **cf-hose-routing 116 s vs live
+  0.49 s**: its four Hose Routing custom features take ~30 s each and then fail "Could not shell part with
+  selections." (live ~100 ms each and OK; opShell of the swept hose, SHELL-SLOW family); **knob-jason 3.6 s vs
+  0.125 s** (Fillet 2 3.3 s, live 22 ms); **cf-planetary-gears 12.4 s vs 0.54 s** (the one Planetary Gears feature:
+  18 tooth gaps filleted, patterned, subtracted, ×3 gears); cf-wave-spring 5.2 s vs 0.59 s (FS-WAVE-SPRING);
+  stef-radijator-nlukic 0.47 s vs 0.074 s (Fillet 1 203 ms, live 31 ms); cf-fix-pcb 2.4 s vs 0.62 s (Fix PCB 2 2.4 s,
+  live 276 ms); prize-wheel-tim, motor-mount-jack, cf-spur-gear, exercise-martinl within ×2.3. Rerun:
+  `NOSHAPE_PARITY_ONLY=<name>` parity_models (docs/handoff/dx.md); rebuilt documents in vibe5 ~/tmp/noshape-parity-<pid>/.
+  (dx 2026-11-03)
