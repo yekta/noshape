@@ -6,7 +6,7 @@ causes of difference, each with its ticket.
 
 | date | green | models | features | scenarios | biggest causes (tickets) |
 |---|---|---|---|---|---|
-| 2026-11-03 | 922a4868 + dx translator (dx 16:55) | 24/53 | 285/461 (custom 6/83) | – | 6× custom studios not compiling (3 import studios live can't fetch: 403, REQUESTS 1885; FS-OLD-STD-COMPAT); 5× fillets (FILLET-PROPAGATION-VOLUME, FILLET-OVERLAP-FAIL, FILLET-KNOB-JASON-VOLUME, FILLET-MEETING-FILLETS-ONE-FACE, FILLET-BLEND-SPLIT); 3× custom features failing to run (core); 2× live's UI fetch without geometry / in-feature mate connector queries (asked, 1892 / 13:20); 1× EXTRUDE-SURFACE-CURVES, MIRROR-FEATURE-UP-TO. Speed: 9 of 44 slower than live (PARITY-SPEED: cf-hose-routing ×211, knob-jason ×29, cf-planetary-gears ×22). |
+| 2026-11-03 | a45c1cc4 (dx daily run 17:40) | 26/57 | 288/466 (custom 7/86) | – | 6× custom studios not compiling (3 import studios live can't fetch: 403, REQUESTS 1885; FS-OLD-STD-COMPAT); 5× fillets (FILLET-PROPAGATION-VOLUME, FILLET-OVERLAP-FAIL, FILLET-KNOB-JASON-VOLUME, FILLET-MEETING-FILLETS-ONE-FACE, FILLET-BLEND-SPLIT); 3× custom features failing to run (core); 2× live's UI fetch without geometry / in-feature mate connector queries (asked, 1892 / 13:20); 1× EXTRUDE-SURFACE-CURVES, MIRROR-FEATURE-UP-TO. Speed: 16 of 44 slower than live (PARITY-SPEED: cf-hose-routing ×230, cf-planetary-gears ×30, knob-jason ×29; vibe5 loaded during the run). |
 
 qa 11-03 05:55: the scenario column counts the scenarios with a live recording at compare time (112 of 162 runs; live was
 re-recording); the evening run replaces today's numbers. Scenario differences are psui's (its runner reports its own
