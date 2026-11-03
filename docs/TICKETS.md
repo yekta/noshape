@@ -427,6 +427,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Compute ← BRepFilletAPI_MakeFillet::Build ← features.cpp:3867 scaled_blend, op_fillet) twice, and once **dropping a
   cached body** (OcShape::~OcShape ← its IndexedMap clear ← drop of model-core regen::context::Body's Arc): the heap is
   already corrupt when those run; something writes past a block or frees twice earlier in the session.
+  qa 07:38: on green 7d35f2cb the seed-2045 session runs clean 10 of 10 (fallback on and off), **but it is a different
+  session**: core's SKETCH-FACE-IMPRINT (bd7aba69) changes the model from step 17 on, so the crash path isn't replayed.
+  The same day's 0531f66e (has 3fcc69d8, before bd7aba69) still dies 4 of 6. Repro binary kept:
+  qa-scratch/rel/k/keep/x/y/noshape-0531f66e, wrapper tickets/crash2045/wrap-0531f66e.sh (NSCLI for bin/clifuzz_nf.py 2045 106).
+  Not verified until the cause is found on that binary (or the session is rebuilt as a saved history).
   core 11-03 05:30: **found**: the document's one Fillet (R12 on edge 16, NOSHAPE_DUMP_OPS fillet-0) alone crashes:
   OCCT's ChFi3d throws "TopoDS_UnCompatibleShapes: TopoDS_Builder::Add" partway and leaves **its input** broken (valid
   before, invalid after; freed list nodes in the input solid), and the next attempt (our retries at a hair smaller
