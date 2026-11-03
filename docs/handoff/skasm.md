@@ -42,6 +42,23 @@ periodic spline takes 120 LM iterations to its plateau instead of 61; per iterat
 23 ms. Spur Gear defaults now in band but 202 faces (OCCT fillet splits each root fillet; noted for core in the
 ticket). Parity suite: 22/30 sketch scenarios, 232/247 states (the rest: lengths clicked a pixel apart).
 
+09:30 (resumed on a new account after the 08:5x limit): landed 0c7380d3 (toolbar tools marked for the driver, 6
+dropdown scenarios). Queued 1fb5937f: sketch box select is the screen rectangle (iso view), the focus state reads a
+sketch value box (psui's ui_script.rs, one line), and after Enter in a rectangle's first box the height box waits on
+the canvas until typed into (live: focus none; ours had focused it). Live's 19 recordings of my scenarios: **13/19,
+194/213 states**. Left: (1) PERPENDICULAR vs VERTICAL for a vertical line from a midpoint / across Line-tool
+horizontals (3 scenarios, 13 states): REQUESTS 1866 (two theories fit: a woken / touched line whose direction is
+already fixed gives Perpendicular, a free one Vertical; and Horizontal still beats Parallel in trim-drag step 9); (2)
+sketch-extend-to-line selection after `x` (1866's addition); (3) sketch-trim-drag step 1 is live's timing (its
+other 18 read "error" there too; asked to re-record). Asked live (09:15) to record the 6 dropdown scenarios. Spline:
+live 1861's 4-point fit (centripetal, natural ends) matched to 1e-6 mm, now in T1 tools::fit_splines_are_centripetal…;
+09:50 gear: live 1830's "changed" gear was REST-made, so its pitch stayed 25 mm (no editGearLogic); our circle stuck
+with the contact stepped past the spline's start (clamped t). Fixed (the spline goes on along its end tangent in
+FitContact): r 0.2495895 = live's, changed 4048.55 mm3 / 203 faces in band (T2 public_spur_gear_as_live still stops
+at the defaults' 202 faces vs 152: core's fillet split). T1 onshape_ux::spur_gear_root_circles_as_live. Run the T2
+with the gear source in the untracked .parity-fs: `rb.sh env NOSHAPE_PARITY_FS=../../.parity-fs cargo test -p
+noshape-model --test all custom_features::public_spur_gear_as_live -- --ignored --nocapture`.
+
 ## State at 01:30 UTC
 Landed overnight (all on main by dabe8513): sketch drag far hold (g6) and levels + farthest point (g4); drag from the
 drag's start (live drag probes 12: the result depends only on where the drag ends) in dragged components of <= 60

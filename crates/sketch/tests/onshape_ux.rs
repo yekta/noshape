@@ -815,3 +815,67 @@ fn a_circle_tangent_to_two_splines_touches_them_along_their_length() {
         .unwrap();
     assert!((r * 1e3 - 0.5683).abs() < 1e-3 && (centre * 1e3 - v(11.8183, 0.0)).length() < 1e-3, "centre {:?} mm, r {} mm", centre * 1e3, r * 1e3);
 }
+
+/// The public Spur Gear's tooth sketch (createTooth: two involute fit
+/// splines, the root circle, a fillet circle Tangent to all three) for
+/// `teeth`, `module` and pitch diameter `pcd` (mm), solved: the fillet
+/// circle's centre and radius (mm).
+fn spur_gear_root_circle(teeth: f64, module: f64, pcd: f64) -> (DVec2, f64) {
+    let mm = 1e-3;
+    let pa = 20f64.to_radians();
+    let (pcd, ded, add) = (pcd * mm, 1.25 * module * mm, module * mm);
+    let base = pcd * pa.cos();
+    let alpha = (pcd * pcd - base * base).sqrt() / base - pa;
+    let beta = (360.0 / (4.0 * teeth)).to_radians() - alpha;
+    let (mut inv1, mut inv2) = (Vec::new(), Vec::new());
+    let mut t = 0.0;
+    while t <= 2.0 {
+        let (ca, sa) = ((t + beta).cos(), (t + beta).sin());
+        let (cab, sab) = ((-beta - t).cos(), (-beta - t).sin());
+        let (p1, p2) = if base >= pcd - 2.0 * ded && t == 0.0 {
+            let r = pcd / 2.0 - ded;
+            (v(r * ca, r * sa), v(r * cab, r * sab))
+        } else {
+            (v(base * 0.5 * (ca + t * sa), base * 0.5 * (sa - t * ca)), v(base * 0.5 * (cab - t * sab), base * 0.5 * (sab + t * cab)))
+        };
+        inv1.push(p1);
+        inv2.push(p2);
+        if p1.length() >= pcd / 2.0 + add {
+            break;
+        }
+        t += 1.0 / 50.0;
+    }
+    let mut sk = Sketch::new();
+    let s1 = sk.add_fit_spline(&inv1).unwrap();
+    let s2 = sk.add_fit_spline(&inv2).unwrap();
+    sk.add_circle(DVec2::ZERO, pcd / 2.0 + add);
+    let dedendum = sk.add_circle(DVec2::ZERO, pcd / 2.0 - ded);
+    let fillet = sk.add_circle(v(pcd / 2.0 - ded / 2.0, 0.0), 0.1 * mm);
+    sk.set_construction(fillet, true).unwrap();
+    for e in [dedendum, s1, s2] {
+        sk.add_constraint(ConstraintKind::Fix { entity: e }).unwrap();
+    }
+    for e in [dedendum, s1, s2] {
+        sk.add_constraint(ConstraintKind::Tangent { a: fillet, b: e }).unwrap();
+    }
+    assert!(sk.solve().is_solved());
+    match sk.curve(fillet) {
+        Some(Curve2::Circle { center, radius }) => (center / mm, radius / mm),
+        c => panic!("{c:?}"),
+    }
+}
+
+/// SKETCH-TANGENT-SPLINE-CIRCLE: the gear's root circles as live's: the
+/// defaults, live 1830's REST-made 40 teeth / module 2 that kept the 25 mm
+/// pitch (live's root fillet r 0.166393 = 2/3 of 0.2495895; the contact near
+/// the spline's start used to step past it and stick: r 1.3237 unsolved),
+/// and live 1861's at an 80 mm pitch.
+#[test]
+fn spur_gear_root_circles_as_live() {
+    let (c, r) = spur_gear_root_circle(25.0, 1.0, 25.0);
+    assert!((r - 0.5683).abs() < 1e-3, "25 teeth, module 1: centre {c} mm, r {r} mm");
+    let (c, r) = spur_gear_root_circle(40.0, 2.0, 25.0);
+    assert!((r - 0.2495895).abs() < 1e-6 && c.y.abs() < 1e-9, "40 teeth, module 2, pitch Ø25: centre {c} mm, r {r} mm");
+    let (c, r) = spur_gear_root_circle(40.0, 2.0, 80.0);
+    assert!((r - 1.06204944).abs() < 1e-5 && (c - v(38.56204944, 0.0)).length() < 1e-5, "40 teeth, module 2: centre {c} mm, r {r} mm");
+}

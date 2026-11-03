@@ -727,7 +727,11 @@ fn fit_contact(x: &[f64], which: u8, arc: bool, ends: FitEnds, g: Option<&mut [f
     let Some(fd) = FitDiff::new(xs, n, ends) else { return 0.0 };
     let (a, b) = fd.curve.domain();
     let tt = t.clamp(a, b);
-    let [p, d1, d2] = fd.curve.eval_ders(tt);
+    // Past an end the spline goes on along its end tangent, so a contact
+    // stepping over the end is pulled back (clamped, t stuck there).
+    let over = t - tt;
+    let [p0, d1, d2] = fd.curve.eval_ders(tt);
+    let (p, d2) = if over == 0.0 { (p0, d2) } else { (p0 + d1 * over, glam::DVec2::ZERO) };
     let f = |q: &[f64]| {
         let (p, d1, c) = (DVec2::new(q[0], q[1]), DVec2::new(q[2], q[3]), DVec2::new(q[4], q[5]));
         if which == 0 {
@@ -753,12 +757,11 @@ fn fit_contact(x: &[f64], which: u8, arc: bool, ends: FitEnds, g: Option<&mut [f
     } else {
         g[2] = dq[6];
     }
-    if t > a && t < b {
-        g[off] = dq[0] * d1.x + dq[1] * d1.y + dq[2] * d2.x + dq[3] * d2.y;
-    }
+    g[off] = dq[0] * d1.x + dq[1] * d1.y + dq[2] * d2.x + dq[3] * d2.y;
     let pr = fd.probes(&[(tt, 0), (tt, 1)]);
     for i in 0..pr[0].gx.len() {
-        g[off + 1 + i] = dq[0] * pr[0].gx[i] + dq[1] * pr[0].gy[i] + dq[2] * pr[1].gx[i] + dq[3] * pr[1].gy[i];
+        let (px, py) = (pr[0].gx[i] + over * pr[1].gx[i], pr[0].gy[i] + over * pr[1].gy[i]);
+        g[off + 1 + i] = dq[0] * px + dq[1] * py + dq[2] * pr[1].gx[i] + dq[3] * pr[1].gy[i];
     }
     v
 }
@@ -2107,10 +2110,11 @@ mod tests {
                     x.extend(&fit);
                     check_grad(&Eq { kind: EqKind::FitPoint { comp, ends }, inputs: (0..x.len() as u32).collect() }, &x);
                 }
+                // (A contact past an end: on the end's tangent line.)
                 for which in 0..2u8 {
-                    for arc in [false, true] {
+                    for (arc, t) in [false, true].into_iter().flat_map(|a| [0.37, -0.1, 1.2].map(|t| (a, t))) {
                         let mut x = if arc { vec![0.02, 0.003, 0.025, 0.004] } else { vec![0.02, 0.003, 0.006] };
-                        x.push(0.37);
+                        x.push(t);
                         x.extend(&fit);
                         check_grad(&Eq { kind: EqKind::FitContact { which, arc, ends }, inputs: (0..x.len() as u32).collect() }, &x);
                     }

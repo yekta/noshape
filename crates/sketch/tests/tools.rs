@@ -326,7 +326,8 @@ fn closed_fit_spline_is_smooth_at_the_seam() {
 /// Live 1777 / 1836 (SKETCH-SPLINE-CENTRIPETAL): a fit spline's knots are
 /// centripetal (cumulative square roots of the chords: s202's p7 has
 /// interior knots 0.3425, 0.6367), and a closed one is periodic (live's
-/// closed spline extruded 10 mm: 19782.85 mm³, a 1978.285 mm² profile).
+/// closed spline extruded 10 mm: 19782.85 mm³, a 1978.285 mm² profile);
+/// with no end derivatives the ends are natural (live 1861).
 #[test]
 fn fit_splines_are_centripetal_and_closed_ones_periodic() {
     let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
@@ -334,6 +335,17 @@ fn fit_splines_are_centripetal_and_closed_ones_periodic() {
     let nb = Nurbs::interpolate_with_ends(&pts, v(0.0146, 0.0615), v(0.0245, -0.0123)).unwrap();
     let inner: Vec<f64> = nb.knots.iter().copied().filter(|k| *k > 1e-9 && *k < 1.0 - 1e-9).collect();
     assert!(inner.len() == 2 && (inner[0] - 0.3425).abs() < 1e-4 && (inner[1] - 0.6367).abs() < 1e-4, "{inner:?}");
+    // Live 1861: skFitSpline through 4 points, no derivatives: centripetal
+    // knots, natural ends, these control points.
+    let nb = Nurbs::interpolate(&[mm(0.0, 0.0), mm(10.0, 2.0), mm(12.0, 10.0), mm(25.0, 12.0)]).unwrap();
+    assert_eq!(nb.degree, 3);
+    let inner: Vec<f64> = nb.knots.iter().copied().filter(|k| *k > 1e-9 && *k < 1.0 - 1e-9).collect();
+    assert!(inner.len() == 2 && (inner[0] - 0.32950028).abs() < 1e-8 && (inner[1] - 0.625795524).abs() < 1e-8, "{inner:?}");
+    let live = [(0.0, 0.0), (4.24206415, -0.117932998), (12.29870301, -0.341914423), (9.459277054, 12.86737159), (19.433440481, 12.310685391), (25.0, 12.0)];
+    assert_eq!(nb.ctrl.len(), live.len());
+    for (c, (x, y)) in nb.ctrl.iter().zip(live) {
+        assert!((*c - mm(x, y)).length() < 1e-9, "{c} vs ({x}, {y}) mm");
+    }
     let mut sk = Sketch::new();
     let ring = [mm(0.0, 0.0), mm(30.0, -10.0), mm(50.0, 15.0), mm(25.0, 35.0), mm(-5.0, 20.0), mm(0.0, 0.0)];
     let id = sk.add_closed_fit_spline(&ring).unwrap();

@@ -476,7 +476,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   ours, so the public Laser Joint's corner overcuts (concave edges the pin cuts made) find nothing and fail "Cannot
   resolve entities." (its defaults match live exactly: 23500 / 24000 mm³, 14 faces each). Live asked what a Boolean
   creates (REQUESTS 03:00). T2 custom_features::public_laser_joint_as_live, boolean_created_edges_probe.
-- [x] 20ca6c36 (skasm 11-03: contact tangency; root fillet r 0.5683, defaults 2417.31 mm3 in live's band; the T2 now reaches its "changed" case (40 teeth, module 2, 8 mm hole): 3670.08 mm3 / 203 faces vs live 4029.02–4062.76, root fillet r 0.675 mm: a separate difference, for the test's owner) P2 SKETCH-TANGENT-SPLINE-CIRCLE (skasm; found by core 11-03 running Onshape's public Spur Gear, live 1830) a
+- [x] 20ca6c36 (skasm 11-03: contact tangency; root fillet r 0.5683, defaults 2417.31 mm3 in live's band; the T2 now reaches its "changed" case (40 teeth, module 2, 8 mm hole): 3670.08 mm3 / 203 faces vs live 4029.02–4062.76, root fillet r 0.675 mm: a separate difference, for the test's owner; 09:50: it was the contact stepping past the spline's start and sticking there (clamped, no gradient): past an end the spline now goes on along its end tangent; that case's sketch circle r 0.2495895 mm, root fillet 0.166393 = live's, 4048.55 mm3 / 203 faces in live's band; live 1830 built it over REST, so its pitch stayed 25 mm (no editing logic); the regen takes 2.9 s, in the fillet (it failed before): for core; T1 onshape_ux::spur_gear_root_circles_as_live with live 1861's 80 mm pitch r 1.06204944) P2 SKETCH-TANGENT-SPLINE-CIRCLE (skasm; found by core 11-03 running Onshape's public Spur Gear, live 1830) a
   construction circle constrained tangent to a fixed circle and to two fixed fitted splines solves to the wrong circle:
   the gear's root-fillet circle (createTooth: skCircle "fillet" at regionPoint r 0.1 mm, TANGENT to "dedendum" r 11.25 and
   to "spline1" / "spline2", the involutes fitted through 30 points each, all three FIXed) comes out r 0.2864 mm; the
@@ -2178,7 +2178,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   equations closed_fit_spline_gradients_match_finite_differences; fuzz k-sum unchanged (1141.67 mm). **For core:**
   the Spur Gear's defaults are now 2418.05 mm³ (in band) but **202 faces** (live 152): each root fillet comes out as
   two BSpline faces (0.295 + 2.621 mm², before one of 3.124); the sketch's tooth outline is 4 curves as before, so
-  it's OCCT's fillet splitting along the new flank. Open: the 40-tooth case's tangent circle is r 0.88 mm (live
+  it's OCCT's fillet splitting along the new flank. Open (fixed 09:50, see SKETCH-TANGENT-SPLINE-CIRCLE): the 40-tooth case's tangent circle is r 0.88 mm (live
   0.2496), so its volume is still out of band. P2 SKETCH-SPLINE-CENTRIPETAL (skasm; dx 11-03 from live 1836 and skasm's own fuzz 1777) Onshape's fit splines use
   centripetal knots (cumulative √chord, std fitSpline.fs "the server uses centripetal knots"; 1777: all 11 open
   splines match to 4 decimals), ours chord length (nurbs.rs `chord_params`), so every spline through the same points
