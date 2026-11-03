@@ -114,8 +114,16 @@ Every key always present (`null` / `[]` when there is nothing). Texts exactly as
 
 ## noshape side
 
-`NOSHAPE_UI_SCRIPT=<scenario.json> NOSHAPE_UI_STATE_OUT=<recording.json> noshape` builds the start document in a
+`NOSHAPE_UI_SCRIPT=<scenario.json> NOSHAPE_UI_STATE_OUT=<recording.json> noshape` (crates/app/src/ui_script.rs;
+starts from `starts.json` beside the scenario or `NOSHAPE_UI_STARTS`) builds the start document in a
 scratch file, opens it, runs the steps through the window's real input path (keys and clicks dispatched to the
 window, targets found by name), writes the recording and exits. The runner compares a recording with
 `live/<name>.json` step by step and names the first step and key that differ; with no argument it runs every
 scenario that has a live recording and prints the score (matched / total).
+
+Run: `tools/ui-parity/run.py --app $CARGO_TARGET_DIR/debug/noshape --display :102 [names…]` (`--all` records every
+scenario, `--compare-only` compares recordings already made). Named controls record their bounds through
+app-core `ui_script::mark` (`tool:`, `field:`, `feature:`, `part:`, `tab:`, `checkbox:`, `dropdown:`, `list_row:`,
+`menu:`, `button:`); geometry targets go through `PartStudioView::ui_target_point`, the state through
+`PartStudioView::ui_state`. Under Xvfb without a window manager the runner focuses the window with xdotool (an
+inactive window gets no focus events, so fields would not select their text on focus).

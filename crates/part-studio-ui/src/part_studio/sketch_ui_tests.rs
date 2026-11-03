@@ -425,6 +425,33 @@ fn dialog_field_enter_inserts_the_highlighted_variable(cx: &mut TestAppContext) 
     assert!(cx.update(|cx| view.read(cx).edit.is_none()), "the next Enter accepts it");
 }
 
+/// The parity suite's state (tests/ui-parity/README.md) reads the open dialog, its focused field, the autofill
+/// list and the feature list as shown.
+#[gpui::test]
+fn the_parity_state_reads_dialog_list_and_features(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_wall_thickness(cx, "uip-state");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).display.variables.contains_key("wall_thickness"));
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Extrude dialog").dialog.clone());
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["#", "w", "a"]);
+    let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+    assert_eq!(state["focus"]["label"], "Depth", "{}", state["focus"]);
+    assert_eq!(state["focus"]["text"], "#wa");
+    assert_eq!(state["focus"]["selection"], serde_json::json!([3, 3]));
+    assert_eq!(state["list"]["rows"], serde_json::json!(["#wall_thickness", "New variable…"]));
+    assert_eq!(state["list"]["highlighted"], 0);
+    assert_eq!(state["dialog"]["title"], "Extrude 1");
+    let tabs: Vec<&str> = state["dialog"]["tabs"].as_array().unwrap().iter().map(|t| t["label"].as_str().unwrap()).collect();
+    assert_eq!(&tabs[..3], ["Solid", "Surface", "Thin"]);
+    let depth = state["dialog"]["fields"].as_array().unwrap().iter().find(|f| f["label"] == "Depth").expect("Depth listed").clone();
+    assert_eq!((depth["kind"].as_str(), depth["text"].as_str(), depth["focused"].as_bool()), (Some("number"), Some("#wa"), Some(true)));
+    let rows: Vec<&str> = state["features"]["rows"].as_array().unwrap().iter().map(|r| r["name"].as_str().unwrap()).collect();
+    assert_eq!(rows, ["#wall_thickness = 4 mm"]);
+    assert_eq!(state["features"]["rollbackAfter"], "#wall_thickness = 4 mm");
+}
+
 /// VAR-AUTOCOMPLETE-ENTER (live behaviours "Focus, click and selection"): the first click into a dialog's number
 /// field selects all its text, so typing replaces it; the second click puts the caret.
 #[gpui::test]

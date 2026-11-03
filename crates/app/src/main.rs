@@ -38,6 +38,7 @@ mod workspace_protection;
 mod doc_panels;
 mod shortcuts;
 mod smoke;
+mod ui_script;
 mod tab_manager;
 mod tab_thumbs;
 mod workspace;
@@ -431,6 +432,8 @@ fn main() {
     });
     let demo = args.iter().any(|a| a == "--demo");
     let path = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from);
+    // A ui-parity scenario opens its own start document.
+    let path = if ui_script::enabled() { Some(ui_script::prepare()) } else { path };
 
     let app = gpui_kit::application().with_assets(assets::AppAssets);
     noshape_render::perf::milestone("GPUI application created");

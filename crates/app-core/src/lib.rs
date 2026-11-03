@@ -52,6 +52,7 @@ pub mod tool_text;
 pub mod toolbar_customize;
 pub mod touch;
 pub mod ui;
+pub mod ui_script;
 pub mod user_units;
 pub mod view_cube;
 pub mod viewport;

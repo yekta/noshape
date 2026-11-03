@@ -21,6 +21,8 @@ use noshape_units::UnitPrefs;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+mod ui_state;
+
 #[derive(Clone, Debug)]
 pub enum DialogEvent {
     /// The draft changed; regenerate the preview.
@@ -1467,6 +1469,61 @@ impl FeatureDialog {
         cx.notify();
     }
 
+    /// What an unfocused number field shows instead of its text: the value
+    /// in the document units (an expression's result), when that differs.
+    fn converted_text(&self, path: &str, n: noshape_model::params::NumSpec, text: &str) -> Option<String> {
+        // An out-of-range value shows as typed (live DEPTH-RANGE: "1e6 mm").
+        if self.completion.is_some() || self.out_of_range(path, text) {
+            return None;
+        }
+        let q = noshape_units::evaluate_as(text, n.kind.dim(), &self.units, &self.variables).ok()?;
+        // Dialog fields write angles "3 deg" (live dialogs/draft-01, hole).
+        let c = noshape_units::format_quantity(q, &self.units).replace('°', " deg");
+        (c.replace(' ', "") != text.trim().replace(' ', "")).then_some(c)
+    }
+
+    /// A selection field's rows as shown: its picks, a sketch's regions or
+    /// vertices picked whole as one "Faces of Sketch 1" / "Vertices of
+    /// Sketch 1" row; each row's label, the picks it stands for, its reference.
+    fn query_rows(&self, s: &ParamSpec, refs: &[Reference]) -> Vec<(String, Vec<usize>, Reference)> {
+        // Every region of a sketch shows as one "Faces of Sketch 1"
+        // row (Onshape, after clicking the sketch in the list).
+        let mut rows: Vec<(String, Vec<usize>, Reference)> = Vec::new();
+        for (k, r) in refs.iter().enumerate() {
+            if let Reference::SketchRegion { sketch, .. } = r {
+                let all: Vec<usize> = refs.iter().enumerate().filter(|(_, x)| matches!(x, Reference::SketchRegion { sketch: s2, .. } if s2 == sketch)).map(|(i, _)| i).collect();
+                let count = (self.sketch_region_count)(*sketch);
+                if (count >= 2 || self.whole_sketches.contains(sketch)) && all.len() == count {
+                    if all[0] == k {
+                        rows.push((format!("Faces of {}", (self.labeler)(&Reference::Sketch(*sketch))), all, Reference::Sketch(*sketch)));
+                    }
+                    continue;
+                }
+            }
+            if let Reference::SketchEntity { sketch, .. } = r {
+                let vertices = (self.sketch_vertices)(*sketch);
+                let all: Vec<usize> = refs.iter().enumerate().filter(|(_, x)| vertices.contains(x)).map(|(i, _)| i).collect();
+                if groups_vertices(self.grouped_sketches.contains(sketch), vertices.len(), all.len()) && all.contains(&k) {
+                    if all[0] == k {
+                        rows.push((format!("Vertices of {}", (self.labeler)(&Reference::Sketch(*sketch))), all, Reference::Sketch(*sketch)));
+                    }
+                    continue;
+                }
+            }
+            // A whole sketch in a curve field (its row clicked) reads
+            // "Edges of Sketch 2" (live Rib: "Edges of Rib sketch").
+            if let (Reference::Sketch(_), ParamKind::Query { filter, .. }) = (r, &s.kind)
+                && filter.intersects(QueryFilter::SKETCH_EDGE)
+                && !filter.intersects(QueryFilter::SKETCH)
+            {
+                rows.push((format!("Edges of {}", (self.labeler)(r)), vec![k], r.clone()));
+                continue;
+            }
+            rows.push(((self.labeler)(r), vec![k], r.clone()));
+        }
+        rows
+    }
+
     /// Key handling while a field's autofill list is open: ↑/↓ move, Enter
     /// inserts, Esc closes. Capture listeners run before the input's own
     /// handling and stop the key there; with no list open for this field
@@ -2410,6 +2467,7 @@ impl FeatureDialog {
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| toggle(this, cx)));
                         div()
                             .id(SharedString::from(format!("cbw-{path}")))
+                            .map(|d| crate::ui_script::mark(d, || format!("checkbox:{}", crate::i18n::spec(s.label))))
                             .min_w_0()
                             .child(Self::tab_stop_element(cb, &focus, Focus::Box))
                             // Right-click > Convert to expression (e.g. `#Length > 3`),
@@ -2469,6 +2527,7 @@ impl FeatureDialog {
                         // others a 1 px #d7d7d7 underline.
                         div()
                             .id(SharedString::from(format!("seg-{path}-{id}")))
+                            .map(|d| crate::ui_script::mark(d, || format!("tab:{}", crate::i18n::spec(label))))
                             .flex_grow(1.)
                             .flex_shrink_0()
                             .min_w_0()
@@ -2497,7 +2556,8 @@ impl FeatureDialog {
                     // Live (dom/dialog-hole.txt "Tip angle"): next to a 26 px icon
                     // the select sits 3 px down in a 31 px row.
                     let icon_row = s.hints.has(Hints::SHOW_LABEL) && param_icon(self.ty.id, s.id).is_some();
-                    let dd = div().id(SharedString::from(format!("sel-{path}"))).flex_1().min_w_0().when(icon_row, |d| d.mt(px(3.))).tooltip(crate::ui::user_tooltip(crate::i18n::spec(s.label))).child(dd);
+                    let cur_shown = options.iter().find(|(id, _)| *id == cur.as_str()).map(|(_, l)| crate::i18n::spec(l)).unwrap_or_default();
+                    let dd = div().id(SharedString::from(format!("sel-{path}"))).map(|d| crate::ui_script::mark(d, || format!("dropdown:{cur_shown}"))).flex_1().min_w_0().when(icon_row, |d| d.mt(px(3.))).tooltip(crate::ui::user_tooltip(crate::i18n::spec(s.label))).child(dd);
                     // Live (dom/dialog-extrude-new.txt): the select fills the dialog's
                     // first 194 px column flush with its left edge (the body has 2 px
                     // padding); flips sit in the 26 px right column.
@@ -2659,41 +2719,7 @@ impl FeatureDialog {
                 // Right-click on a pick: Configure (live psb 10-21 g) after
                 // Clear all, with a configuration input.
                 let pick_configure = (self.configurable_inputs && !self.configure_mode && prefix.is_none() && !s.hints.has(Hints::UNCONFIGURABLE)).then(|| (s.id.to_string(), self.configured.contains(s.id)));
-                // Every region of a sketch shows as one "Faces of Sketch 1"
-                // row (Onshape, after clicking the sketch in the list).
-                let mut rows: Vec<(String, Vec<usize>, Reference)> = Vec::new();
-                for (k, r) in refs.iter().enumerate() {
-                    if let Reference::SketchRegion { sketch, .. } = r {
-                        let all: Vec<usize> = refs.iter().enumerate().filter(|(_, x)| matches!(x, Reference::SketchRegion { sketch: s2, .. } if s2 == sketch)).map(|(i, _)| i).collect();
-                        let count = (self.sketch_region_count)(*sketch);
-                        if (count >= 2 || self.whole_sketches.contains(sketch)) && all.len() == count {
-                            if all[0] == k {
-                                rows.push((format!("Faces of {}", (self.labeler)(&Reference::Sketch(*sketch))), all, Reference::Sketch(*sketch)));
-                            }
-                            continue;
-                        }
-                    }
-                    if let Reference::SketchEntity { sketch, .. } = r {
-                        let vertices = (self.sketch_vertices)(*sketch);
-                        let all: Vec<usize> = refs.iter().enumerate().filter(|(_, x)| vertices.contains(x)).map(|(i, _)| i).collect();
-                        if groups_vertices(self.grouped_sketches.contains(sketch), vertices.len(), all.len()) && all.contains(&k) {
-                            if all[0] == k {
-                                rows.push((format!("Vertices of {}", (self.labeler)(&Reference::Sketch(*sketch))), all, Reference::Sketch(*sketch)));
-                            }
-                            continue;
-                        }
-                    }
-                    // A whole sketch in a curve field (its row clicked) reads
-                    // "Edges of Sketch 2" (live Rib: "Edges of Rib sketch").
-                    if let (Reference::Sketch(_), ParamKind::Query { filter, .. }) = (r, &s.kind)
-                        && filter.intersects(QueryFilter::SKETCH_EDGE)
-                        && !filter.intersects(QueryFilter::SKETCH)
-                    {
-                        rows.push((format!("Edges of {}", (self.labeler)(r)), vec![k], r.clone()));
-                        continue;
-                    }
-                    rows.push(((self.labeler)(r), vec![k], r.clone()));
-                }
+                let rows = self.query_rows(s, &refs);
                 // Lists that may be ordered (`ALLOW_QUERY_ORDER`) with 2+ rows get
                 // the reorder button; in the mode × gives way to the grip.
                 let can_reorder = s.hints.has(Hints::ALLOW_QUERY_ORDER) && rows.len() >= 2;
@@ -2845,6 +2871,7 @@ impl FeatureDialog {
                     .child(
                         div()
                             .id(SharedString::from(format!("q-{path}")))
+                            .map(|d| crate::ui_script::mark(d, || format!("field:{}", crate::i18n::spec(s.label))))
                             .track_focus(&q_focus)
                             .flex_1()
                             .min_w_0()
@@ -3440,14 +3467,7 @@ impl FeatureDialog {
         if !focused {
             self.baselines.insert(path.to_string(), text.clone());
         }
-        let converted = num
-            // An out-of-range value shows as typed (live DEPTH-RANGE: "1e6 mm").
-            .filter(|_| !focused && err.is_none() && self.completion.is_none() && !self.out_of_range(path, &text))
-            .and_then(|n| noshape_units::evaluate_as(&text, n.kind.dim(), &self.units, &self.variables).ok())
-            .map(|q| noshape_units::format_quantity(q, &self.units))
-            // Dialog fields write angles "3 deg" (live dialogs/draft-01, hole).
-            .map(|c| c.replace('°', " deg"))
-            .filter(|c| c.replace(' ', "") != text.trim().replace(' ', ""));
+        let converted = num.filter(|_| !focused && err.is_none()).and_then(|n| self.converted_text(path, n, &text));
         let path_s = path.to_string();
         let st2 = state.clone();
         let st3 = state.clone();
@@ -3545,6 +3565,7 @@ impl FeatureDialog {
                     div()
                         .id(SharedString::from(format!("numf-{path}")))
                         .debug_selector(|| format!("numf-{path}"))
+                        .map(|d| crate::ui_script::mark(d, || format!("field:{}", crate::i18n::spec(s.label))))
                         .border_b_1()
                         .border_color(if invalid { pal.error } else { pal.border })
                         .map(|d| crate::quantity_field::invalid_field_tip(d, invalid, invalid_tip))
@@ -3872,6 +3893,7 @@ impl Render for FeatureDialog {
                             )
                             // Live (dom adv4-a-dialog): ✓ and ✗ are 24 px sprites centred in 28 x 24.
                             .child(crate::assets::icon("dialog-ok", 24., cx))
+                            .map(|b| crate::ui_script::mark(b, || "button:ok".into()))
                             .w(px(28.))
                             .h(px(28.))
                             .p_0()
@@ -3895,6 +3917,7 @@ impl Render for FeatureDialog {
                             .tab_stop(false)
                             .custom(dialog_icon_variant(cx, false))
                             .child(crate::assets::icon("dialog-cancel", 24., cx))
+                            .map(|b| crate::ui_script::mark(b, || "button:cancel".into()))
                             .w(px(28.))
                             .h(px(28.))
                             .p_0()

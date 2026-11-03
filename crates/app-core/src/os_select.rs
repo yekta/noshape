@@ -175,6 +175,7 @@ impl OsSelect {
         if self.search.take().is_none() {
             return;
         }
+        crate::ui_script::note_list(None);
         self._subs.clear();
         self.query.clear();
         // Onshape (osSelect:close): the focus goes back to the focusser.
@@ -233,7 +234,8 @@ impl OsSelect {
                     }
                 }));
         }
-        el
+        let shown = label.to_string();
+        crate::ui_script::mark(el, || format!("dropdown:{shown}"))
             .w_full()
             .h(px(self.height))
             // Live (dialogs/chamfer-01): the value and caret sit 1 px below
@@ -261,11 +263,16 @@ impl OsSelect {
         let accent = gpui_kit::rgb(0x1651b0);
         let m = self.matches();
         let hl = self.highlight.min(m.len().saturating_sub(1));
+        if crate::ui_script::active() {
+            let rows: Vec<String> = m.iter().map(|(i, _)| self.items[*i].1.to_string()).collect();
+            crate::ui_script::note_list(Some(serde_json::json!({ "kind": "dropdown", "rows": rows, "highlighted": hl, "disabled": [] })));
+        }
         let width = self.bounds.get().size.width.max(px(120.));
         let probe = self.list_bounds.clone();
         let pictured = !self.pictures.is_empty();
         let rows = m.into_iter().enumerate().map(|(row, (i, range))| {
             let label = self.items[i].1.clone();
+            let name = label.to_string();
             let picture = self.pictures.get(&self.items[i].0).cloned();
             let on = row == hl;
             let text: AnyElement = match range {
@@ -275,6 +282,7 @@ impl OsSelect {
             };
             div()
                 .id(row)
+                .map(|d| crate::ui_script::mark(d, || format!("list_row:{name}")))
                 .h(px(if pictured { 40. } else { ROW_H }))
                 // Rows keep their height: a long list scrolls (live 7½ rows).
                 .flex_none()

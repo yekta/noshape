@@ -158,6 +158,9 @@ impl Workspace {
         if crate::smoke::enabled() {
             crate::smoke::start(window, cx);
         }
+        if crate::ui_script::enabled() {
+            crate::ui_script::start(window, cx);
+        }
         this
     }
 

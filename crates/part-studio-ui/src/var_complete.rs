@@ -165,6 +165,29 @@ impl VarCompletion {
         Some(Self { key: key.to_string(), range, entries, selected: 0, new_variable: None })
     }
 
+    /// `state.list` of the interaction parity suite: each row's first text, the highlighted one.
+    pub fn ui_state(&self) -> serde_json::Value {
+        serde_json::json!({ "kind": "autocomplete", "rows": self.row_names(), "highlighted": self.selected, "disabled": [] })
+    }
+
+    /// Each row's first text, as shown.
+    fn row_names(&self) -> Vec<String> {
+        let mut rows: Vec<String> = self
+            .entries
+            .iter()
+            .take(MAX_ROWS)
+            .map(|e| match e {
+                Entry::Variable(n) => format!("#{n}"),
+                Entry::Function(n, args) => format!("{n}({})", args.join(", ")),
+                Entry::Unit(n) | Entry::Constant(n) => n.to_string(),
+            })
+            .collect();
+        if self.new_variable.is_some() {
+            rows.push("New variable…".into());
+        }
+        rows
+    }
+
     /// Rows: the entries, then "New variable…".
     fn rows(&self) -> usize {
         self.entries.len().min(MAX_ROWS) + usize::from(self.new_variable.is_some())
@@ -218,10 +241,12 @@ impl VarCompletion {
         let pal = p();
         let (text, faint, active) = (rgb(0x333333), rgb(0x666666), rgb(0xb2ddf6));
         let on_pick = std::rc::Rc::new(on_pick);
+        let names = self.row_names();
         let row = |id: SharedString, i: usize, icon: &str| {
             let on_pick = on_pick.clone();
             h_flex()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, || format!("list_row:{}", names.get(i).map_or("", String::as_str))))
                 .h(px(31.))
                 .p(px(4.))
                 .gap(px(5.))

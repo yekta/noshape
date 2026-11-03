@@ -48,6 +48,7 @@ pub mod sketch_export;
 pub mod sketch_use;
 pub mod studio;
 pub mod tool_search;
+pub mod ui_parity;
 pub mod values;
 pub mod variable_studio;
 pub mod versions;

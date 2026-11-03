@@ -539,9 +539,14 @@ impl Render for OsMenu {
                 // a long label wraps, 18 px lines in a row 2 px padded (22,
                 // 40 for two lines: "Add mate connector to instance origin…").
                 let wraps = plain_menu && !camera && !truncate;
+                let menu_label = match item {
+                    OsMenuItem::Item { label, .. } | OsMenuItem::Submenu { label, .. } => label.split('\t').next().unwrap_or_default().to_string(),
+                    OsMenuItem::Separator => String::new(),
+                };
                 let row = |id: usize| {
                     h_flex()
                         .id(id)
+                        .map(|d| crate::ui_script::mark(d, || format!("menu:{menu_label}")))
                         .relative()
                         .when(wraps, |d| d.min_h(px(row_h)).py(px(2.)).line_height(px(18.)))
                         .when(!wraps, |d| d.h(px(row_h)).whitespace_nowrap())
@@ -739,6 +744,29 @@ pub fn is_open_menu(menu: &WeakEntity<OsMenu>, cx: &App) -> bool {
 /// The open menu's rows (see [`OsMenu::labels`]).
 pub fn open_labels(cx: &App) -> Vec<String> {
     cx.try_global::<OsMenuHost>().and_then(|h| h.0.as_ref()).map(|(_, _, _, m, _)| m.read(cx).labels()).unwrap_or_default()
+}
+
+/// The open menu as the interaction parity suite records it (`state.list`):
+/// its rows (separators left out), the hovered one and the disabled ones.
+pub fn ui_state(cx: &App) -> Option<serde_json::Value> {
+    let (_, _, _, menu, _) = cx.try_global::<OsMenuHost>()?.0.as_ref()?;
+    let m = menu.read(cx);
+    let mut rows = Vec::new();
+    let (mut highlighted, mut disabled) = (None, Vec::new());
+    for (ix, item) in m.items.iter().enumerate() {
+        let (label, off) = match item {
+            OsMenuItem::Item { label, disabled, .. } | OsMenuItem::Submenu { label, disabled, .. } => (label.split('\t').next().unwrap_or_default().to_string(), *disabled),
+            OsMenuItem::Separator => continue,
+        };
+        if m.hovered == Some(ix) {
+            highlighted = Some(rows.len());
+        }
+        if off {
+            disabled.push(rows.len());
+        }
+        rows.push(label);
+    }
+    Some(serde_json::json!({ "kind": "context-menu", "rows": rows, "highlighted": highlighted, "disabled": disabled }))
 }
 
 /// A right-click menu is open (hover tooltips under it should not show).

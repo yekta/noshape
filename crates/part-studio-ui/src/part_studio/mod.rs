@@ -47,6 +47,7 @@ mod shown_dims;
 pub mod toolbar_prefs;
 pub mod view_cube;
 mod view_tools;
+mod ui_script;
 mod in_context;
 pub use in_context::PartStudioEvent;
 
@@ -2901,6 +2902,7 @@ impl PartStudioView {
         // The active tool clicked again keeps its dialog (`start_feature`).
         let main = main.on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.start_feature(id, window, cx)));
         let main = crate::ui::with_rich_tooltip(SharedString::from(format!("tt-{id}")), tooltip, crate::tool_text::description(id).unwrap_or(ty.description), main);
+        let main = crate::ui_script::wrap(main, || format!("tool:{}", ty.name));
         if group.len() <= 1 {
             return main;
         }
@@ -3575,7 +3577,7 @@ impl PartStudioView {
                         continue;
                     }
                     gap = false;
-                    rows.push(self.render_part_row(b, cx));
+                    rows.push(crate::ui_script::wrap(self.render_part_row(b, cx), || format!("part:{}", b.name)));
                 }
                 (title, key, rows, bodies.iter().map(|b| b.id.clone()).collect())
             })
@@ -3714,6 +3716,7 @@ impl PartStudioView {
                     // The whole box takes clicks and shows the I-beam.
                     gpui_kit::base::input::input_frame(
                         div()
+                            .map(|d| crate::ui_script::mark(d, || "field:Filter by name or type".into()))
                             .flex_1()
                             .relative()
                             .h(px(30.))
@@ -3732,6 +3735,7 @@ impl PartStudioView {
                                 d.child(
                                     div()
                                         .id("filter-clear")
+                                        .map(|d| crate::ui_script::mark(d, || "button:Clear search".into()))
                                         .size(px(16.))
                                         .mr(px(4.))
                                         .flex_none()
@@ -3843,7 +3847,13 @@ impl PartStudioView {
             return div().into_any_element();
         };
         let (rolled_back, editing) = (i >= self.row_ctx.rollback, self.row_ctx.editing_id == Some(id));
-        self.render_feature_row(i, &f, rolled_back, editing, slot, cx)
+        let row = self.render_feature_row(i, &f, rolled_back, editing, slot, cx);
+        if !crate::ui_script::active() {
+            return row;
+        }
+        // The parity suite clicks a row by its name or by what it shows ("#w = 2 mm").
+        let shown = self.shown_feature_name(&f, cx);
+        crate::ui_script::wrap(crate::ui_script::wrap(row, || format!("feature:{}", f.name)), || format!("feature:{shown}"))
     }
 
     /// A row of the parts list: click selects (or feeds a dialog's part

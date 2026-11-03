@@ -348,6 +348,11 @@ impl PartStudioView {
         ed.ui.as_mut()?.downcast_mut::<SketchUi>()
     }
 
+    /// The dimension box's open autofill list (`state.list` of the parity suite).
+    pub(super) fn dim_completion_state(&self) -> Option<serde_json::Value> {
+        self.ui_ref()?.dim_completion.as_ref().map(|c| c.ui_state())
+    }
+
     fn ui_ref(&self) -> Option<&SketchUi> {
         self.sketch.as_ref()?.ui.as_ref()?.downcast_ref::<SketchUi>()
     }
