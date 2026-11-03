@@ -182,6 +182,22 @@ impl Workspace {
                     s.selection.insert(*tab, v.selected_instances().iter().map(|i| format!("inst:{}", i.0)).collect());
                     v.viewport.clone()
                 }
+                TabView::Drawing(v) => {
+                    // As the drawing tools name them (drawing_delete's views, annotations, tables…).
+                    use noshape_scene::drawing_tools::Sel;
+                    let ids = v.read(cx).selection.iter().filter_map(|s| match s {
+                        Sel::View(id) => Some(format!("view:{}", id.0)),
+                        Sel::Annotation(id) => Some(format!("annotation:{id}")),
+                        Sel::Table(id) => Some(format!("table:{id}")),
+                        Sel::Break(view, i) => Some(format!("break:{}.{i}", view.0)),
+                        Sel::Sketch(id) => Some(format!("sketch:{id}")),
+                        Sel::Hatch(id) => Some(format!("hatch:{id}")),
+                        Sel::Image(id) => Some(format!("image:{id}")),
+                        _ => None,
+                    });
+                    s.selection.insert(*tab, ids.collect());
+                    continue;
+                }
                 _ => continue,
             };
             let vp = viewport.read(cx);
