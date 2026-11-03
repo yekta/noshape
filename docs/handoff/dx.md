@@ -842,20 +842,19 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   Part Studio crashed the kernel on 3 parts (OCCT 8.0.1 SweptToElementary null face): fixed f2279b3c.
 
 ## Next (in order, after landing)
-0. Import numbers: the remaining ✗ rows of docs/parity/workflow-import-matrix.md (g50 F8 / F19, McMaster helix) and
-   I1 (x_t blend trims). (Configurations C1–C8, Derived DER1–14, Variable Studio VS1–4: all closed in the docs.)
-1. Audit done ("Move annotation" = part_annotation move, landed). Covered elsewhere:
-   Move configuration input (config_reorder_inputs), Hide all instances (assembly_set_state on every instance), Save
-   custom color (any colour is settable), Update material library (material_library_update, this landing).
-2. API: benchmarks done for Variable Studio, in-context, sheet metal (/root/dx-scratch/bench/*.py); a real MCP
-   session (11-03 05:25, /root/dx-scratch/mcp/client.py over `noshape mcp` stdio, green 19f17a18): initialize,
-   tools/list (46 tools, 33 KB), document → sketch → extrude → query → ops_call export STEP, errors with
-   did-you-mean: 10 calls in 0.5 s, all as documented. Next: render_image of the window camera (image size).
-3. Drawings (P2): PDF Selectable text landed 10-27 (embedded TrueType subsets, CID fonts with ToUnicode; same
-   placement as the outlines); open: compare its file size / font object layout with a live Selectable export; ui2's
-   Tables-end and thread tiles checked vs live 10-27 (match); flat pattern Counterbore / Countersink / Form styles.
-4. Re-verify old rows on the green build: workflow-configurations.md C1–C8, workflow-derived.md DER2–DER14 (DER8 works
-   through the API; check the app's Insert panel), workflow-drawing.md D14/D16 (D8, D12 verified 10-27).
+0. Model parity suite (top item): the daily run (16:13 UTC, /root/dx-scratch/pm-daily.sh: copies live's corpus to
+   vibe5, runs parity_models, report.json beside the models, prints the SCORE.md row); rerun when live refetches the
+   7 documents the REST 429 stopped (INCOMPLETE.txt); every new first difference: translator fix or a ticket for its
+   area. Then the next phases as live brings them: assemblies (request filed 11-03 06:15 for one small assembly in
+   1842's layout), sheet metal (bracket00-ira), custom features (featureStudios), spline end derivatives once
+   SKETCH-SPLINE-CENTRIPETAL lands (ours then interpolates as Onshape; the translator must set the handles).
+1. Import numbers: the remaining ✗ rows of docs/parity/workflow-import-matrix.md (g50 F8 / F19, McMaster helix; kern).
+2. API: render_image of the window camera (image size).
+3. Drawings (P2): selectable PDF compared with live's (dx-pdf-selectable.pdf): one embedded NotoSans CID TrueType
+   subset "AAAAAA+NotoSans", Identity-H, as live (ours adds a ToUnicode CMap stream where live names Identity-H);
+   flat pattern Counterbore / Countersink / Form styles.
+4. Walk the area on each new green (last: 05:45 Variable Studio / configurations; 03:35 drawings) with
+   XDG_CONFIG_HOME=/root/dx-scratch/xdg.
 
 ## Requests to the lead
 - (11-03 01:15) For qa's SCORE.md: the model suite runs where the models are (this machine):
