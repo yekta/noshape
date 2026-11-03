@@ -1002,3 +1002,24 @@ fn dumped_fillet_repeat_probe() {
         println!("run {i}: {}", r.map(|r| format!("{:.6} mm3, {} faces, valid {}", vol_mm3(&r.shape), r.shape.faces().len(), r.shape.is_valid())).unwrap_or_else(|e| e.to_string()));
     }
 }
+
+/// FULL-ROUND-CORNER-SPHERES: R5 on every edge of a 40 × 30 × 10 block (live 1830's Fillet Everything: 10 faces).
+#[test]
+#[ignore = "T2 probe"]
+fn full_round_corner_probe() {
+    setup();
+    let b = bx([0.0; 3], [40.0, 30.0, 10.0]);
+    let all = edges_where(&b, |_| true);
+    let r = fillet_checked(&b, &all, &vec![5.0 * MM; all.len()]).unwrap().shape;
+    println!("faces {}, volume {:.6}", r.faces().len(), vol_mm3(&r));
+    for (i, f) in r.faces().iter().enumerate() {
+        let s = format!("{:?}", f.face_surface().ok()).chars().take(90).collect::<String>();
+        println!("F{i} {s} area {:.4}", f.area().unwrap() / (MM * MM));
+        if s.contains("Sphere") {
+            for e in f.edges() {
+                let x = e.edge_info().unwrap();
+                println!("    edge {:?} degenerated {} {:.3?} -> {:.3?}", format!("{:?}", x.curve).chars().take(40).collect::<String>(), x.degenerated, x.start / MM, x.end / MM);
+            }
+        }
+    }
+}
