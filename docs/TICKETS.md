@@ -2057,6 +2057,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
+- [ ] P2 SKETCH-SPLINE-CENTRIPETAL (skasm; dx 11-03 from live 1836 and skasm's own fuzz 1777) Onshape's fit splines use
+  centripetal knots (cumulative √chord, std fitSpline.fs "the server uses centripetal knots"; 1777: all 11 open
+  splines match to 4 decimals), ours chord length (nurbs.rs `chord_params`), so every spline through the same points
+  has another shape; and a spline closed on its first point is periodic in Onshape (1836: one closed BCURVE ring
+  edge per cap, knots −0.166 0 0.206 0.414 0.621 0.834 1 1.206), ours a fit spline with a corner at the seam
+  (sketch_mode.rs `finish_spline` closes with `add_fit_spline`; `add_closed_fit_spline` is periodic but chord
+  length). Check: spline through (0,0), (30,−10), (50,15), (25,35), (−5,20) closed, Extrude 10 mm: live
+  19782.85 mm³ (its x_t, live/samples/dx-xt-periodic/closed-spline-live.x_t, imported in ours; live's massproperties
+  say 19783.47 within its band), a periodic centripetal cubic gives 19782.82, ours (sketch_draw spline ending on
+  the first point) 20348.29.
 - [ ] P1 SKETCH-FACE-IMPRINT (skasm + core; dx's parity suite 11-03) a sketch on a part face imprints in Onshape (unless
   Disable imprinting): its curves split the face, and the pieces bounded partly by the face's own edges are regions to
   pick. Ours: only closed loops of sketch curves are regions (parity/sketch.md 1.14 is ✅ for the checkbox only).
