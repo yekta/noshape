@@ -249,7 +249,11 @@ dump, the runner, live's first 20 scenarios run in ours and a first score.
   preselected edge (live's account drops the edge since 04:10), Hole / Revolve remembered values, Shift+P as an undo
   step, a rolled-back variable's " = 0", Fillet moved above its Extrude reading "ok", the second Enter after an
   autofill insertion (new scenario extrude-depth-variable-enter-twice).
-- 11-03 09:10: also landed: an autofill insertion applies without an undo step; Ctrl+click on a feature row opens its
+- 11-03 12:20: live's new batch (56 recorded, paused 11:59 for request 1870): 35/53 at 11:40; since then the
+  autofill rules are live's (an Enter that completes the text only inserts it, the next applies, the next accepts;
+  an Enter that changes nothing applies; invalid values are no undo step): all 10 autofill / number-field scenarios
+  match. The rest of that batch: sketch (note in skasm.md) and feature-row-copy-paste (kept, Onshape's docs).
+- 11-03 09:10: also landed (the autofill part corrected 12:20, above): Ctrl+click on a feature row opens its
   menu and a click beside an open menu only closes it; flip buttons, toolbar carets and row edges as driver targets;
   the Hole's icon rows and table levels in the state. Onshape's shortcut page (cad.onshape.com/help, Keyboard
   shortcuts) confirms Ctrl+C / Ctrl+V copy / paste features (kept, though live's CDP run pasted nothing), ↑ / ↓ only
