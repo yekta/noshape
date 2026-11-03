@@ -1134,6 +1134,12 @@ fn drawing_views_and_dimensions() {
     block_with_hole(&mut ctx, "drawing.noshape");
     let t = call(&mut ctx, "drawing_templates", json!({}));
     assert!(t["templates"].as_array().unwrap().iter().any(|r| r["name"] == "ISO A3"));
+    // A template by its file name with or without `.dwt`; an unknown one lists them.
+    let stem = call(&mut ctx, "drawing_create", json!({ "template": "ansi_a_mm" }));
+    assert!(stem["drawing"].is_string(), "{stem}");
+    let e = try_call(&mut ctx, "drawing_create", json!({ "template": "ANSI_Q" })).unwrap_err().to_json().to_string();
+    assert!(e.contains("no template `ANSI_Q`") && e.contains("ISO_A3.dwt"), "{e}");
+    call(&mut ctx, "tab_delete", json!({ "tab": stem["drawing"] }));
     let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": true }));
     let tab = d["drawing"].as_str().unwrap().to_string();
     assert!(tab.ends_with("Drawing 1"), "{d}");
@@ -5909,4 +5915,25 @@ fn mistyped_names_get_the_options_and_a_suggestion() {
     assert!(e.message.starts_with("`cirle` is not a drawing tool (did you mean `circle`?); tools: line,"), "{}", e.message);
     let e = try_call(&mut ctx, "export_parts", json!({ "format": "STP", "file": scratch("typo.stp").to_str().unwrap() })).unwrap_err();
     assert!(e.message.starts_with("`STP` is not one of: PARASOLID, ACIS, STEP,") && e.message.ends_with("(did you mean `STEP`?)"), "{}", e.message);
+}
+
+/// Suggested views of a 50 mm part reopened from its file are 1:1 on ANSI A
+/// (live 1857: pipeflange-steven, 50 × 50 × 28 mm; ours took 1:2 from the
+/// fast box, enlarged by its curved faces' poles).
+#[test]
+fn suggested_views_scale_to_the_exact_extent() {
+    let mut ctx = Ctx::new();
+    let sketch = new_sketch(&mut ctx, "exact-extent.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "tool": "circle", "points": [[0, 0], [25, 0]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sketch }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "28 mm" } }));
+    let edges: Vec<String> = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "circle" }))["edges"].as_array().unwrap().iter().map(|e| e["id"].as_str().unwrap().to_string()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": edges, "radius": "5 mm" } }));
+    // Reopened: the shapes as the file keeps them.
+    let mut ctx = Ctx::new();
+    let path = std::env::temp_dir().join(format!("noshape-ops-e2e-{}", std::process::id())).join("exact-extent.noshape");
+    call(&mut ctx, "document_open", json!({ "path": path.to_str().unwrap() }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ANSI_A_INCH.dwt", "suggested_views": true }));
+    let scales: Vec<f64> = d["views"].as_array().unwrap().iter().map(|v| num(&v["scale"])).collect();
+    assert_eq!(scales, [1.0; 4], "{d}");
 }

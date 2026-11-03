@@ -83,14 +83,11 @@ pub fn source_bounds(doc: &Document, src: &DrawingSource) -> Option<(DVec3, DVec
         let hi = pts.fold(glam::DVec2::splat(f64::NEG_INFINITY), |a, p| a.max(*p));
         return Some((lo.extend(0.0), hi.extend(flat.thickness)));
     }
-    for b in model.context.bodies.iter().filter(|b| src.part.as_ref().is_none_or(|p| &b.id == p)) {
-        let Ok(bb) = b.shape.bounding_box(false) else { continue };
-        acc = Some(match acc {
-            None => (bb.min, bb.max),
-            Some((lo, hi)) => (lo.min(bb.min), hi.max(bb.max)),
-        });
-    }
-    acc
+    // The exact boxes: the fast one is enlarged by the curved faces' poles
+    // (pipeflange-steven 66 mm for 50, its views 1:2 where live's are 1:1).
+    use rayon::prelude::*;
+    let bodies: Vec<_> = model.context.bodies.iter().filter(|b| src.part.as_ref().is_none_or(|p| &b.id == p)).collect();
+    bodies.par_iter().filter_map(|b| b.shape.bounding_box(true).ok()).map(|bb| (bb.min, bb.max)).reduce_with(|(lo, hi), (a, b)| (lo.min(a), hi.max(b)))
 }
 
 /// The largest standard scale at which the suggested views of a model of

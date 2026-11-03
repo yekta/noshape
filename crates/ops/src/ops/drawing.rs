@@ -737,7 +737,11 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let rows = dr::template_rows();
     let template = match (a.opt_str("template")?, a.object("custom_template")?) {
         (Some(_), Some(_)) => return Err(OpError::param("custom_template", "give `template` or `custom_template`, not both")),
-        (Some(t), None) => rows.iter().find(|r| r.file.eq_ignore_ascii_case(t)).or_else(|| rows.iter().find(|r| r.template.name.eq_ignore_ascii_case(t))).map(|r| r.template).ok_or_else(|| OpError::param("template", "unknown template (see drawing_templates)"))?,
+        (Some(t), None) => {
+            let file = |r: &&dr::TemplateRow| r.file.eq_ignore_ascii_case(t) || r.file.strip_suffix(".dwt").is_some_and(|stem| stem.eq_ignore_ascii_case(t));
+            let found = rows.iter().find(file).or_else(|| rows.iter().find(|r| r.template.name.eq_ignore_ascii_case(t)));
+            found.map(|r| r.template).ok_or_else(|| OpError::param("template", &format!("no template `{t}`; the templates: {}", rows.iter().map(|r| r.file).collect::<Vec<_>>().join(", "))))?
+        }
         (None, Some(c)) => custom_template(c, metric).map_err(|e| e.under("custom_template"))?,
         // Live drawing/01, qa5 D1: the dialog preselects ANSI_A_INCH.dwt whatever the units.
         (None, None) => rows.iter().find(|r| r.file == "ANSI_A_INCH.dwt").map(|r| r.template).expect("standard template"),

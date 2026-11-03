@@ -83,6 +83,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   to run: …" (ours errors where live's built; the first difference then reads "(custom feature failed to run)").
   T1 custom_feature_failures_are_reported_apart. Host / std differences → core tickets. Score now **7/11,
   58/78** (bracket03 matches since core's FILLET-SPLIT-EDGE-FACES fix); SCORE.md row updated.
+- 11-03 10:20 live 1857 (drawings of pipeflange-steven and knob-tim, DXF / PDF in live/samples/dx-drawing-corpus/):
+  ours made through the agent API from the rebuilt documents, counted per DXF layer (/root/dx-scratch/dxfcount.py).
+  Fixed: suggested views' scale from the parts' exact boxes (the fast box of a reopened pipeflange was 66 mm for 50,
+  its views 1:2; live 1:1; no time cost on the 1000-part drawing, 562 vs 574 ms); drawing_create takes a template
+  file name without `.dwt` and an unknown one lists them. Still different (next): splines written as POLYLINE (live
+  SPLINE), centre marks without live's CENTER / CONTINUOUS linetypes and more of them, title block and border zone
+  entity counts, the knob's visible arcs (ours 2, live 8), view positions (knob Top: ours (83.7, 150.3) mm, live
+  (81.5, 160.8)). STL (1864): our Meter / Binary first default and sticky last choice are live's; nothing to change.
+  Hole-row Sketch 4 (1862): SKETCH-REDUNDANT-SOLVES (skasm).
 - 11-03 09:35 live's new batch (13 more documents, 10 of them with 429 lines): parity_models skips a live.jsonl line
   with `"error"` (not compared; the document is "live's fetch incomplete" and not in the documents count, its fetched
   features are), reads face / edge kinds as `{"type": …}`, a plain string, or "undefined" (= not known); translator:
