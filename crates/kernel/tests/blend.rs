@@ -1068,3 +1068,63 @@ fn fillet_over_a_groove_is_one_face() {
     let want = 2.0 * 3.0 * std::f64::consts::FRAC_PI_2 * 7.0 + 3.0 * (1.0f64 / 6.0).asin() * 6.0;
     assert!(cyl.len() == 1 && (cyl[0] - want).abs() < 1e-4, "{cyl:?}, want {want}");
 }
+
+/// A dumped equal-distance chamfer (NOSHAPE_DUMP_OPS's `chamfer-<n>`; NOSHAPE_CHAMFER_FACES_CASE = its path without
+/// `.brep`): the result's counts, and every vertex where only two edges meet (an edge split where nothing ends).
+#[test]
+#[ignore = "T2 probe: NOSHAPE_CHAMFER_FACES_CASE"]
+fn dumped_chamfer_faces_probe() {
+    let Ok(case) = std::env::var("NOSHAPE_CHAMFER_FACES_CASE") else { return };
+    setup();
+    let s = read_brep(std::path::Path::new(&format!("{case}.brep"))).unwrap();
+    let txt = std::fs::read_to_string(format!("{case}.txt")).unwrap();
+    let idx: Vec<usize> = txt.lines().filter_map(|l| l.strip_prefix("edge ")).map(|v| v.parse().unwrap()).collect();
+    let d: f64 = txt.split(" d1 ").nth(1).and_then(|r| r.split_whitespace().next()).unwrap().parse().unwrap();
+    let all = s.edges();
+    let es: Vec<Shape> = idx.iter().map(|&i| all[i].clone()).collect();
+    let out = chamfer_checked(&s, &es, ChamferSpec::Equal(d), &[]).unwrap().shape;
+    println!("faces {} edges {} vertices {}, volume {:.6}", out.faces().len(), out.edges().len(), out.count(ShapeType::Vertex), vol_mm3(&out));
+    let mut at: std::collections::HashMap<[i64; 3], Vec<String>> = Default::default();
+    for e in out.edges() {
+        let x = e.edge_info().unwrap();
+        for p in [x.start, x.end] {
+            let k = [(p.x / MM * 1e4).round() as i64, (p.y / MM * 1e4).round() as i64, (p.z / MM * 1e4).round() as i64];
+            at.entry(k).or_default().push(format!("{} len {:.4}", format!("{:?}", x.curve).chars().take(10).collect::<String>(), x.length / MM));
+        }
+    }
+    for (k, v) in &at {
+        if v.len() == 2 {
+            println!("two edges at ({:.4}, {:.4}, {:.4}): {v:?}", k[0] as f64 / 1e4, k[1] as f64 / 1e4, k[2] as f64 / 1e4);
+        }
+    }
+}
+
+/// The groove's floor and ceiling edges chamfered 0.5 mm after that fillet (bracket03-mattie's Chamfer 1, live
+/// 58/136/80): no edge is left in two pieces where nothing ends (a vertex of just two lines along one line).
+#[test]
+fn chamfered_groove_edges_stay_whole() {
+    setup();
+    let block = bx([0.0; 3], [40.0, 20.0, 20.0]);
+    let groove = bx([37.5, -1.0, 7.0], [41.0, 21.0, 13.0]);
+    let b = cut(&block, &groove).unwrap().shape;
+    let pieces = edges_where(&b, |i| (i.start.x - 40.0 * MM).abs() < 1e-9 && i.start.y.abs() < 1e-9 && (i.end.x - 40.0 * MM).abs() < 1e-9 && i.end.y.abs() < 1e-9);
+    let f = fillet_checked(&b, &pieces, &[3.0 * MM]).unwrap().shape;
+    // (Its outer rims: not the back wall's concave edges at x 37.5.)
+    let rims = edges_where(&f, |i| [7.0, 13.0].iter().any(|z| (i.start.z - z * MM).abs() < 1e-9 && (i.end.z - z * MM).abs() < 1e-9) && (i.start.x + i.end.x) / 2.0 > 37.6 * MM);
+    assert!(!rims.is_empty());
+    let r = chamfer_checked(&f, &rims, ChamferSpec::Equal(0.5 * MM), &[]).unwrap().shape;
+    assert!(r.is_valid());
+    let mut at: std::collections::HashMap<[i64; 3], Vec<DVec3>> = Default::default();
+    for e in r.edges() {
+        let x = e.edge_info().unwrap();
+        if !matches!(x.curve, Curve::Line { .. }) {
+            continue;
+        }
+        for p in [x.start, x.end] {
+            at.entry([(p.x * 1e7).round() as i64, (p.y * 1e7).round() as i64, (p.z * 1e7).round() as i64]).or_default().push((x.end - x.start).normalize());
+        }
+    }
+    let degree: std::collections::HashMap<[i64; 3], usize> = r.edges().iter().flat_map(|e| { let x = e.edge_info().unwrap(); [x.start, x.end] }).fold(Default::default(), |mut m, p| { *m.entry([(p.x * 1e7).round() as i64, (p.y * 1e7).round() as i64, (p.z * 1e7).round() as i64]).or_insert(0) += 1; m });
+    let split: Vec<_> = at.iter().filter(|(k, d)| degree[*k] == 2 && d.len() == 2 && d[0].cross(d[1]).length() < 1e-9).map(|(k, _)| *k).collect();
+    assert!(split.is_empty(), "{split:?}");
+}

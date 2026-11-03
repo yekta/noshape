@@ -3507,6 +3507,43 @@ static void merge_corner_spheres(const TopoDS_Shape& input, TopoDS_Shape& r, HHi
   h = compose(input, h, step);
 }
 
+// A blend's edges split where nothing ends (a vertex of only two lines, one line, between the same two faces: the
+// chamfered groove of dx's bracket03-mattie, live 58/136/80 to OCCT's 58/144/88) joined into one edge.
+static void join_split_lines(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
+{
+  const KernelTimer timer("blend.join_lines");
+  ShapeAncMap       ve, ef;
+  TopExp::MapShapesAndUniqueAncestors(r, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  TopExp::MapShapesAndUniqueAncestors(r, TopAbs_EDGE, TopAbs_FACE, ef);
+  bool any = false;
+  for (int i = 1; i <= ve.Extent() && !any; ++i)
+  {
+    const ShapeList& es = ve(i);
+    if (es.Extent() != 2)
+      continue;
+    const TopoDS_Edge a = TopoDS::Edge(es.First()), b = TopoDS::Edge(es.Last());
+    BRepAdaptor_Curve ca(a), cb(b);
+    if (ca.GetType() != GeomAbs_Line || cb.GetType() != GeomAbs_Line || !ca.Line().Direction().IsParallel(cb.Line().Direction(), 1e-9) ||
+        ca.Line().Distance(cb.Line().Location()) > Precision::Confusion())
+      continue;
+    const ShapeList *fa = ef.Seek(a), *fb = ef.Seek(b);
+    any = fa != nullptr && fb != nullptr && fa->Extent() == 2 && fb->Extent() == 2 &&
+          ((fa->First().IsSame(fb->First()) && fa->Last().IsSame(fb->Last())) || (fa->First().IsSame(fb->Last()) && fa->Last().IsSame(fb->First())));
+  }
+  if (!any)
+    return;
+  // (On a copy: UnifySameDomain changes its input's shared edges.)
+  BRepBuilderAPI_Copy          cp(r, true, false);
+  ShapeUpgrade_UnifySameDomain u(cp.Shape(), true, false, false);
+  u.Build();
+  if (u.Shape().IsSame(cp.Shape()) || !BRepCheck_Analyzer(u.Shape()).IsValid())
+    return;
+  HHist step = new BRepTools_History(to_list(std::vector<TopoDS_Shape>{r}), cp);
+  step->Merge(u.History());
+  r = u.Shape();
+  h = compose(input, h, step);
+}
+
 // A sub-shape's tolerance set (BRep_Builder's updates only raise it).
 static void set_tolerance(const TopoDS_Shape& x, double t)
 {
@@ -3769,6 +3806,7 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
       merge_full_rounds(input, r, h);
       merge_corner_spheres(input, r, h);
       analytic_blend_faces(input, r, h);
+      join_split_lines(input, r, h);
       tighten_new_tolerances(input, r, accurate(input));
       return as_is.finish(r, h);
     }
@@ -3781,6 +3819,7 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
     merge_full_rounds(sc.shape, r, h);
     merge_corner_spheres(sc.shape, r, h);
     analytic_blend_faces(sc.shape, r, h);
+    join_split_lines(sc.shape, r, h);
   }
   return sc.finish(r, h);
 }
