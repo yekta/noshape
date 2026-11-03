@@ -278,7 +278,7 @@ fn replace(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let r = od.regenerate(src, Some(&config))?;
             match a.opt_str("part")? {
                 Some(p) => {
-                    let b = r.display.bodies.iter().find(|b| matches!(refs::parse_str(p), Some(Reference::Body(id)) if id == b.id) || b.name == p).ok_or_else(|| OpError::param("part", "no such part in the source Part Studio (see query_parts)"))?;
+                    let b = r.display.bodies.iter().find(|b| matches!(refs::parse_str(p), Some(Reference::Body(id)) if id == b.id) || b.name == p).ok_or_else(|| OpError::param("part", &format!("no part `{p}` in the source Part Studio; its parts: {}", r.display.bodies.iter().map(|b| format!("{} ({})", b.name, crate::refs::body_id(&b.id))).collect::<Vec<_>>().join(", "))))?;
                     (InstanceSource::Part { studio: src, body: b.id.clone(), config }, b.name.clone(), Some((r.context.clone(), Some(b.id.clone()))))
                 }
                 None => (InstanceSource::PartStudio { studio: src, config }, src_name, Some((r.context.clone(), None))),

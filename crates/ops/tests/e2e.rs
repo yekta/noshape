@@ -263,6 +263,8 @@ fn assembly_with_mates() {
     assert_eq!(parts["parts"].as_array().unwrap().len(), 2, "{parts}");
     let (block, pin) = (parts["parts"][0]["id"].as_str().unwrap().to_string(), parts["parts"][1]["id"].as_str().unwrap().to_string());
 
+    let e = try_call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 9" })).expect_err("no Part 9");
+    assert!(e.message.starts_with("no part `Part 9` in the source Part Studio; its parts: "), "{}", e.to_json());
     let b = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": block }));
     let block_i = b["instance"].as_str().unwrap().to_string();
     let p = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": pin }));
@@ -1361,6 +1363,8 @@ fn assembly_patterns_bom_interference() {
     let parts = call(&mut ctx, "query_parts", json!({}));
     assert_eq!(parts["parts"].as_array().unwrap().len(), 2, "{parts}");
     let (block, pin) = (parts["parts"][0]["id"].as_str().unwrap().to_string(), parts["parts"][1]["id"].as_str().unwrap().to_string());
+    let e = try_call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 9" })).expect_err("no Part 9");
+    assert!(e.message.starts_with("no part `Part 9` in the source Part Studio; its parts: "), "{}", e.to_json());
     let b = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": block }));
     let block_i = b["instance"].as_str().unwrap().to_string();
     let p = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": pin }));

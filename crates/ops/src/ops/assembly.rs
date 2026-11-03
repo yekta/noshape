@@ -401,7 +401,7 @@ fn insert(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let part = match a.opt_str("part")? {
                 Some(p) => {
                     let r = od.regenerate(src, Some(&config))?;
-                    let b = r.display.bodies.iter().find(|b| matches!(refs::parse_str(p), Some(Reference::Body(id)) if id == b.id) || b.name == p).ok_or_else(|| OpError::param("part", "no such part in the source Part Studio (see query_parts)"))?;
+                    let b = r.display.bodies.iter().find(|b| matches!(refs::parse_str(p), Some(Reference::Body(id)) if id == b.id) || b.name == p).ok_or_else(|| OpError::param("part", &format!("no part `{p}` in the source Part Studio; its parts: {}", r.display.bodies.iter().map(|b| format!("{} ({})", b.name, crate::refs::body_id(&b.id))).collect::<Vec<_>>().join(", "))))?;
                     Some((b.id.clone(), b.name.clone(), b.bounds))
                 }
                 None => None,
