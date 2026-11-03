@@ -20,8 +20,10 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
 - Landed since 20:30: evBox3d's tight box is the kernel's, wires tightened too (FS-WAVE-SPRING-SPEED fixed, 167 ms);
   opBoolean `localizedInFaces` (84a01921: the dogbone overcuts build); opEdgeChange `replaceFace` (queued: the
   Shaped Flange runs). PARITY-SPEED / PARITY-CUSTOM-RUN-FAILURES notes in TICKETS say where each document stands.
-- Next: the Shaped Flange's partial-edge bend in the host's sheet metal rebuild; the dogbone's Corner Overcut 1 (11
-  faces against live's 12, +0.70 mm³); FILLET-31S-FAIL / knob Fillet 1 once live answers (REQUESTS 20:58);
+- Lead 22:30: PARITY-CUSTOM-RUN-FAILURES and FS-FEATURE-LIST-NONDETERMINISTIC are dx's now (the Shaped Flange's bend
+  and the overcut's face count are in its TICKETS notes). Queued: fillet_by_groups (overlapping rounds of separate
+  edge groups).
+- Next: FILLET-31S-FAIL / knob Fillet 1 once live answers (REQUESTS 20:58);
   FILLET-OVERLAP-FAIL; the hoses' meshing (brep::mesh seams, not mine: noted).
 
 **State 11-03 20:21 UTC.**
