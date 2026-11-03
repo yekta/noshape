@@ -746,6 +746,29 @@ fn an_edited_variable_opens_in_its_value(cx: &mut TestAppContext) {
     assert_eq!((state["focus"]["label"].as_str(), state["focus"]["all"].as_bool()), (Some("Value"), Some(true)), "{}", state["focus"]);
 }
 
+/// Live 11-03 (ui-parity feature-row-copy-paste; psui's probe in its own tab: Onshape handles neither key on a
+/// feature row and has no feature paste): Ctrl+C on a selected feature row, then Ctrl+V, adds nothing.
+#[gpui::test]
+fn ctrl_c_ctrl_v_on_a_feature_row_add_nothing(cx: &mut TestAppContext) {
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "row-copy", Some(block));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let id = cx.update(|cx| view.read(cx).studio(cx).unwrap().features[1].id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.click_feature(id, false, cx);
+        w.focus(&v.ui.list_focus, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    keys(cx, window, &["ctrl-c", "ctrl-v"]);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert_eq!(cx.update(|cx| view.read(cx).studio(cx).unwrap().features.len()), 2, "nothing pasted");
+}
+
 /// Live (ui-parity extrude-depth-variable-escape, 11-03): Esc with the autofill list open closes the list only;
 /// `#wall` and the focus stay in Depth (ours reverted the field and left it).
 #[gpui::test]

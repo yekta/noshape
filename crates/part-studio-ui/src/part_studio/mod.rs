@@ -6078,20 +6078,19 @@ impl Render for PartStudioView {
                     window.focus_prev(cx);
                 }
             }))
+            // Live (CTRL-C-PART): Ctrl+C copies a selected part like its menu's "Copy Part 1". Selected feature rows
+            // copy nothing and Ctrl+V pastes no features (live 11-03, psui's probe: Onshape handles neither key there
+            // and has no feature paste; ui-parity feature-row-copy-paste).
             .on_action(cx.listener(|this, _: &Copy, _, cx| {
-                if this.sketch.is_none() {
-                    // Selected features, else the selected part (live: Ctrl+C
-                    // copies a part like its menu's "Copy Part 1", CTRL-C-PART).
-                    if !this.selected_features.is_empty() {
-                        this.copy_selected_features(cx);
-                    } else if let Some(b) = behaviors::part_to_copy(&this.selection, |r| this.body_of(r)) {
-                        this.copy_part(b, cx);
-                    }
+                if this.sketch.is_none()
+                    && let Some(b) = behaviors::part_to_copy(&this.selection, |r| this.body_of(r))
+                {
+                    this.copy_part(b, cx);
                 }
             }))
             .on_action(cx.listener(|this, _: &Paste, _, cx| {
-                if this.sketch.is_none() && this.edit.is_none() && !this.paste_part(cx) {
-                    this.paste_features(cx);
+                if this.sketch.is_none() && this.edit.is_none() {
+                    this.paste_part(cx);
                 }
             }))
             .on_action(cx.listener(Self::on_clear_selection))

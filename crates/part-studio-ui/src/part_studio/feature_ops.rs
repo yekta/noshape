@@ -1,5 +1,5 @@
-//! Feature list operations: copy/paste of features (through the system
-//! clipboard, so features move between documents) and feature folders.
+//! Feature list operations: a copied sketch on the clipboard (the sketch
+//! menu's Copy sketch) and feature folders.
 
 use super::PartStudioView;
 use gpui_kit::component::input::{InputEvent, InputState};
@@ -22,27 +22,6 @@ impl PartStudioView {
         if let Ok(text) = serde_json::to_string(&serde_json::json!({ CLIP_KEY: features })) {
             cx.write_to_clipboard(ClipboardItem::new_string(text));
         }
-    }
-
-    /// Paste features from the clipboard at the rollback bar.
-    pub(super) fn paste_features(&mut self, cx: &mut Context<Self>) {
-        let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) else { return };
-        let Ok(mut v) = serde_json::from_str::<serde_json::Value>(&text) else { return };
-        let Some(Ok(features)) = v.get_mut(CLIP_KEY).map(|f| serde_json::from_value::<Vec<Feature>>(f.take())) else { return };
-        if features.is_empty() {
-            return;
-        }
-        let n = features.len();
-        let ids = self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, &format!("Paste {n} feature{}", if n == 1 { "" } else { "s" }), cx, |ps| {
-                let at = ps.rollback_index();
-                ps.paste_features(&features, at)
-            })
-        });
-        if let Some(ids) = ids {
-            self.selected_features = ids;
-        }
-        cx.notify();
     }
 
     pub(super) fn dissolve_folder(&mut self, folder: u32, cx: &mut Context<Self>) {
