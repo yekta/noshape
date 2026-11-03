@@ -107,7 +107,7 @@ impl PartStudioView {
                             rows.push(json!({ "name": self.placeholder_name(cx), "state": state, "selected": true, "editing": true, "related": editing.is_some_and(|f| related.contains(&f)), "hidden": false }));
                         }
                         // A new folder's row is related-highlighted until the next click (live ui 10-25 b (1)).
-                        super::ListItem::Folder(_, fd) => rows.push(json!({ "name": fd.name, "state": "ok", "selected": self.ui.selected_folder == Some(fd.id), "editing": false, "related": self.ui.fresh_folder == Some(fd.id), "hidden": false })),
+                        super::ListItem::Folder(_, fd) => rows.push(json!({ "name": format!("{} ({})", fd.name, s.folder_count(fd.id)), "state": "ok", "selected": self.ui.selected_folder == Some(fd.id), "editing": false, "related": self.ui.fresh_folder == Some(fd.id), "hidden": false })),
                         // Rows a filter leaves out show as one "..." row (live ui-parity feature-filter).
                         super::ListItem::Ellipsis => rows.push(json!({ "name": "...", "state": "ok", "selected": false, "editing": false, "related": false, "hidden": false })),
                         // At the top the bar sits under Default geometry (live).

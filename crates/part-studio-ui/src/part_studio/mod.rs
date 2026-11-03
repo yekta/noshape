@@ -4255,9 +4255,8 @@ impl PartStudioView {
                 FolderTarget::Part(_) => None,
             })
         });
-        // Live (ui 10-25 b (1)): the new folder's row replaces the selection,
-        // nothing selected, the row related-highlighted until the next click.
-        self.selected_features.clear();
+        // Live (ui 10-25 b (1)): no row shows selected, the new folder's row related-highlighted until the next
+        // click; the features stay selected inside the collapsed folder (live 1844: their part drawn selected).
         self.ui.selected_folder = None;
         self.ui.fresh_folder = made.flatten();
         let fh = self.focus.clone();
