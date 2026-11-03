@@ -1117,9 +1117,9 @@ impl<'a> Translator<'a> {
         // Curves first, then the free points, so each reply lists ours in
         // Onshape's order.
         let ours = self.call("sketch_get", json!({ "sketch": id }))?;
-        let k = per_unit(&ours["units"]);
+        let unit = per_unit(&ours["units"]);
         let v = |key: &str| -> [f64; 3] { std::array::from_fn(|i| ours["frame"][key][i].as_f64().unwrap_or(0.0)) };
-        self.sketch_map = SketchMap { onshape: frame, ours: [v("origin").map(|c| c * k), v("x"), v("y")], k };
+        self.sketch_map = SketchMap { onshape: frame, ours: [v("origin").map(|c| c * unit), v("x"), v("y")], k: unit };
         let map = self.sketch_map;
         for points in [false, true] {
             let (batch, ids): (Vec<Value>, Vec<String>) = shapes.iter().zip(&local).filter(|(s, _)| (s["tool"] == "point") == points).map(|(s, e)| (s.clone(), e.clone())).unzip();
@@ -1177,8 +1177,8 @@ impl<'a> Translator<'a> {
         self.sketch_edits = 0;
         self.sketch_before = before.clone();
         self.first_move = None;
-        self.constraints(&oid, &id, f, problems);
-        self.dimensions(&oid, &id, f, problems);
+        self.constraints(k, &oid, &id, f, problems);
+        self.dimensions(k, &oid, &id, f, problems);
         let after = self.call("sketch_get", json!({ "sketch": id }))?;
         let moved = sketch_moved(&before, &after);
         if moved > 1e-7 {
@@ -1201,7 +1201,7 @@ impl<'a> Translator<'a> {
     /// satisfies them: they keep it so when variables or configurations
     /// change a dimension). Coincidences our inference merged into one point
     /// are skipped; the rest that fail or have no counterpart are counted.
-    fn constraints(&mut self, oid: &str, id: &str, f: &Value, problems: &mut Vec<String>) {
+    fn constraints(&mut self, k: usize, oid: &str, id: &str, f: &Value, problems: &mut Vec<String>) {
         let mut missed: std::collections::BTreeMap<String, usize> = Default::default();
         for c in f["constraints"].as_array().into_iter().flatten() {
             let ty = c["constraintType"].as_str().unwrap_or("");
@@ -1245,12 +1245,9 @@ impl<'a> Translator<'a> {
                 }
             }
             for p in c["parameters"].as_array().into_iter().flatten().filter(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("external"))) {
-                // The Origin (deterministic id IB) is ours too.
-                let origin = p["queries"].as_array().into_iter().flatten().any(|q| q["deterministicIds"].as_array().is_some_and(|ids| ids.len() == 1 && ids[0] == "IB"));
-                if origin {
-                    entities.push("origin".into());
-                } else {
-                    external = true;
+                match self.external_ref(k, p) {
+                    Some(e) => entities.push(e),
+                    None => external = true,
                 }
             }
             if external {
@@ -1271,6 +1268,24 @@ impl<'a> Translator<'a> {
         }
         if !missed.is_empty() {
             problems.push(format!("constraints left to the solved geometry: {}", missed.iter().map(|(k, n)| format!("{n} {k}")).collect::<Vec<_>>().join(", ")));
+        }
+    }
+
+    /// A constraint's or dimension's model geometry (`external…`): the
+    /// Origin, or the one entity of ours its query maps to (the sketch takes
+    /// it in as Use would).
+    fn external_ref(&mut self, k: usize, p: &Value) -> Option<String> {
+        let queries: Vec<Value> = p["queries"].as_array().cloned().unwrap_or_default();
+        let text: String = queries.iter().filter_map(|q| q["queryString"].as_str()).collect();
+        // The Origin: its deterministic id is "IB".
+        let origin = queries.iter().any(|q| q["deterministicIds"].as_array().is_some_and(|ids| ids.len() == 1 && ids[0] == "IB"));
+        if origin || text.contains("Origin") || text.contains("originOp") {
+            return Some("origin".into());
+        }
+        let [q] = queries.as_slice() else { return None };
+        match self.query(k, q) {
+            Ok(ids) if ids.len() == 1 => ids.into_iter().next(),
+            _ => None,
         }
     }
 
@@ -1378,6 +1393,31 @@ impl<'a> Translator<'a> {
         out
     }
 
+    /// The circle side (centre, near, far) of a distance dimension that
+    /// leaves the sketch where it is; each tried one is undone.
+    fn resting_mode(&mut self, id: &str, args: &Value) -> &'static str {
+        let top = |t: &mut Self| t.ctx.doc(None).ok().and_then(|od| od.session.undo_tops().0);
+        let Ok(before) = self.call("sketch_get", json!({ "sketch": id })) else { return "center" };
+        for mode in ["center", "minimum", "maximum"] {
+            let mark = top(self);
+            let mut a = args.clone();
+            a["mode"] = json!(mode);
+            if self.call("sketch_dimension", a).is_err() {
+                continue;
+            }
+            let moved = self.call("sketch_get", json!({ "sketch": id })).map(|g| sketch_moved(&before, &g)).unwrap_or(f64::INFINITY);
+            for _ in 0..4 {
+                if top(self) == mark || self.call("history_undo", json!({})).is_err() {
+                    break;
+                }
+            }
+            if moved <= 1e-7 {
+                return mode;
+            }
+        }
+        "center"
+    }
+
     /// Notes the first constraint or dimension that moved the sketch.
     fn check_moved(&mut self, id: &str, what: impl FnOnce() -> String) {
         if self.first_move.is_some() {
@@ -1392,7 +1432,7 @@ impl<'a> Translator<'a> {
 
     /// The sketch's dimensions with Onshape's expressions (so variables and
     /// configurations drive them).
-    fn dimensions(&mut self, oid: &str, id: &str, f: &Value, problems: &mut Vec<String>) {
+    fn dimensions(&mut self, k: usize, oid: &str, id: &str, f: &Value, problems: &mut Vec<String>) {
         let mut external: std::collections::BTreeMap<String, usize> = Default::default();
         for c in f["constraints"].as_array().into_iter().flatten() {
             let ty = c["constraintType"].as_str().unwrap_or("");
@@ -1417,13 +1457,9 @@ impl<'a> Translator<'a> {
             for n in ["localFirst", "externalFirst", "localSecond", "externalSecond", "localEntity1", "localEntity2"] {
                 if n.starts_with("external") {
                     let Some(ext) = par(n) else { continue };
-                    let text: String = ext["queries"].as_array().into_iter().flatten().filter_map(|q| q["queryString"].as_str()).collect();
-                    // The Origin: its deterministic id is "IB".
-                    let origin_id = ext["queries"].as_array().into_iter().flatten().any(|q| q["deterministicIds"].as_array().is_some_and(|ids| ids.len() == 1 && ids[0] == "IB"));
-                    if origin_id || text.contains("Origin") || text.contains("originOp") {
-                        entities.push("origin".to_string());
-                    } else {
-                        missing = true;
+                    match self.external_ref(k, &ext) {
+                        Some(e) => entities.push(e),
+                        None => missing = true,
                     }
                     continue;
                 }
@@ -1457,6 +1493,13 @@ impl<'a> Translator<'a> {
                 args["value"] = json!(v);
             }
             let driven = c["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"] == "driven" && p["value"] == true);
+            // A distance to a circle whose side isn't known from Onshape's
+            // geometry (the other end is model geometry): the side that
+            // keeps the sketch where it is.
+            let circle = ["localFirst", "localSecond"].iter().filter_map(|n| par0(n)).any(|e| self.circles.contains_key(&(oid.to_string(), e)));
+            if kind == "distance" && circle && args.get("mode").is_none() {
+                args["mode"] = json!(self.resting_mode(id, &args));
+            }
             match self.call("sketch_dimension", args) {
                 Ok(r) => {
                     self.sketch_edits += 1;
