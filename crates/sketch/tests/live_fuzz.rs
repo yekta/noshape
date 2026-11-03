@@ -1557,6 +1557,18 @@ fn a_lever_hangs_on_its_centre_line() {
     assert!(d.is_empty(), "s811: {}", d.join("; "));
 }
 
+/// s892 (batch 18) stays as live answered: a Z's bottom flange narrows and
+/// its web thickens: the flange keeps its outer end and carries the web, the
+/// thickness after (the Distance's dimensioned side isn't kept first when a
+/// line joined to it resizes). T1.
+#[test]
+fn a_z_flange_carries_its_web() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-18.live.json")).unwrap()).unwrap();
+    let ours = batch(1, 892, true);
+    let d = differences(&ours["cases"][0], &live["cases"]["s892"]);
+    assert!(d.is_empty(), "s892: {}", d.join("; "));
+}
+
 /// s875 (batch 18) stays as live answered: the polygon tool's octagon with a
 /// new diameter scales about its circle's centre (Equal chords on a circle
 /// also fit star or skewed polygons). T1.

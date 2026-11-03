@@ -545,7 +545,15 @@ impl Sketch {
                 // line can't stay; the pass then closes, s215 / s219 nearer
                 // live too).
                 let tied = cons.iter().any(|(x, xs)| xs.len() >= 2 && xs.contains(&k) && !holds[x] && xs.iter().any(|y| *y != k && placed.contains(y)));
-                (own_hold(k) && !resized && !tied && self.class_keeps(*c, k, cons) && self.direction_agrees(k, cons)).then_some(k)
+                // Nor one joined to a line whose own Length changes: that
+                // change carries it first (live fuzz s892: a Z's narrower
+                // flange keeps its outer end and takes the web along, the
+                // web's new thickness after).
+                let carried = matches!(self.constraint(*c).map(|o| &o.kind), Some(ConstraintKind::Distance { .. }))
+                    && cons.iter().filter(|(x, xs)| xs.contains(&k) && xs.len() >= 2 && self.connective(*x)).flat_map(|(_, xs)| xs.iter().copied()).filter(|y| *y != k).any(|y| {
+                        self.kind(y) == Some(EntityKind::Line) && cons.iter().any(|(x, xs)| xs.as_slice() == [y] && !holds[x] && matches!(self.constraint(*x).map(|o| &o.kind), Some(ConstraintKind::Length { .. })))
+                    });
+                (own_hold(k) && !resized && !tied && !carried && self.class_keeps(*c, k, cons) && self.direction_agrees(k, cons)).then_some(k)
             });
             // An arc or circle so kept whose Equal chain gives it a new size
             // keeps the end it shares with a neighbour instead: that
