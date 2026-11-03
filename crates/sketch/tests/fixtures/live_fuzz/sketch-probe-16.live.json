@@ -1,0 +1,157 @@
+{
+ "note": "Live 2026-11-03 ~19:58 UTC, Part Studio \"skasm probes 16\" (23fb1b5e2d4ce216d530bbde) in \"skasm speed\"; each case POSTed as is on Top (POST /features, no UI); points = REST /sketches point entities by their own ids (l1.start \u2026), so no end-swap fix is needed. ours was not read before posting.",
+ "cases": {
+  "t1": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     43.0,
+     0
+    ],
+    "l1.start": [
+     3.0,
+     0
+    ],
+    "l2.end": [
+     36.0,
+     20.0
+    ],
+    "l2.start": [
+     43.0,
+     0
+    ],
+    "l3.end": [
+     10.0,
+     20.0
+    ],
+    "l3.start": [
+     36.0,
+     20.0
+    ],
+    "l4.end": [
+     3.0,
+     0
+    ],
+    "l4.start": [
+     10.0,
+     20.0
+    ]
+   }
+  },
+  "t2": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     56.7,
+     6.2
+    ],
+    "l1.start": [
+     16.7,
+     6.2
+    ],
+    "l2.end": [
+     49.7,
+     26.2
+    ],
+    "l2.start": [
+     56.7,
+     6.2
+    ],
+    "l3.end": [
+     23.7,
+     26.2
+    ],
+    "l3.start": [
+     49.7,
+     26.2
+    ],
+    "l4.end": [
+     16.7,
+     6.2
+    ],
+    "l4.start": [
+     23.7,
+     26.2
+    ]
+   }
+  },
+  "t3": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     38.0,
+     0
+    ],
+    "l1.start": [
+     -2.0,
+     0
+    ],
+    "l2.end": [
+     26.0,
+     20.0
+    ],
+    "l2.start": [
+     38.0,
+     0
+    ],
+    "l3.end": [
+     10.0,
+     20.0
+    ],
+    "l3.start": [
+     26.0,
+     20.0
+    ],
+    "l4.end": [
+     -2.0,
+     0
+    ],
+    "l4.start": [
+     10.0,
+     20.0
+    ]
+   }
+  },
+  "t4": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     51.7,
+     6.2
+    ],
+    "l1.start": [
+     11.7,
+     6.2
+    ],
+    "l2.end": [
+     39.7,
+     26.2
+    ],
+    "l2.start": [
+     51.7,
+     6.2
+    ],
+    "l3.end": [
+     23.7,
+     26.2
+    ],
+    "l3.start": [
+     39.7,
+     26.2
+    ],
+    "l4.end": [
+     11.7,
+     6.2
+    ],
+    "l4.start": [
+     23.7,
+     26.2
+    ]
+   }
+  }
+ }
+}

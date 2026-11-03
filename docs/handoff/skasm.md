@@ -13,9 +13,10 @@ outer side, rectangle's bottom): s747 / q5 fixed, fuzz 488 of 550, probes 14 6/8
 top-left corner) every way (q2 / q4, s753, s713): upper, drawn later or shorter? SKETCH-REDUNDANT-SOLVES landed 6d7cfeb3 (a dimension inside a dependency over-defines; chain slots without their offsets' distances); dx's parity_models with and without it: no document changes (cf-parameter-pattern flips 8/9 / 9/9 run to run). Probes 15 answered (18:39): a trapezoid keeps its **shorter** side (upright or inverted, drawn either way, the Distance
 either way); `kept_across` hands such a shape to `hold_the_base` with that side held first (resized: from its lowest
 point, or from the Distance's corner when the other side resizes too: s713). Probes 14 8/8, 15 6/6; fuzz 490 of 550
-(s713, s753 fixed). FUZZ_PROBE takes `14:q2` (names repeat across sets). Batch 16 answered (19:42): 39/40 first, 40/40 now (s811: a construction line with a new Length is placed first, then arcs centred on its ends); batches 1-16 530 of 590. Batch 17 answered (19:54): 33/40 first; batches 1-17 563 of 630. **Waiting on live: probes 16** (sent 20:00: a
-trapezoid's top growing / shrinking at / away from the origin; q3 kept the top's left end, s829 / s713 its dimensioned
-right corner). Batch 17's other misses, each needing its own probes next (tried and reverted at 20:00):
+(s713, s753 fixed). FUZZ_PROBE takes `14:q2` (names repeat across sets). Batch 16 answered (19:42): 39/40 first, 40/40 now (s811: a construction line with a new Length is placed first, then arcs centred on its ends); batches 1-16 530 of 590. Batch 17 answered (19:54): 33/40 first; batches 1-17 563 of 630. Probes 16 answered (20:01): 4/4 match ours (a trapezoid's resized shorter top keeps its left end, at the origin or
+away, growing or shrinking), so s829 (same constraints, same order, symmetric legs; keeps the right corner) differs
+by its proportions or place only: next probe = s829's own coordinates, then shifted / scaled / its top's change
+halved. Batch 17's other misses, each needing its own probes next (tried and reverted at 20:00):
 - s838 / s841 (T, the stem's bottom resized): live keeps the stem's side whose height is dimensioned and the flange
   recentres; but s784 (a T too) keeps the other side. Holding dimensioned units first in `hold_the_base` fixed s838 /
   s857, broke s784 and s841 (564 vs 563): reverted. Keeping a resized line's end at a dimensioned neighbour broke 120.
