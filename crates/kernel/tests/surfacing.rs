@@ -380,3 +380,37 @@ fn fill_g1_live_dome_probe() {
     }
     for e in s.edges() { if let Ok(i) = e.edge_info() { println!("edge {:?} -> {:?}", i.start, i.end); } }
 }
+
+/// FS-WAVE-SPRING (dx's FeatureScript corpus, cf-wave-spring, live +916.533 mm³ in a ±12.5 mm box): the community
+/// Wave Spring's strip (a loft between two 595-point fit splines, ten wavy turns) thickened 0.5 mm stays on the strip.
+/// OCCT's simple offset built its edges on the offset surface with 30 segments and they flew off it (patch 0020).
+#[test]
+fn a_long_wavy_strip_thickens_along_it() {
+    let (ro, ri, th) = (0.0125, 0.010, 0.0005);
+    let (waves, turns) = (5.5, 10.0 - 0.5 / 5.5);
+    let free = (0.025 + 0.02 * 2.0 * th) / (1.0 - 1.0 / (waves * turns) + 1.0 / turns);
+    let wave_h = (free / turns - th) / 2.0 - 0.02 * th;
+    let (mut outer, mut inner) = (Vec::new(), Vec::new());
+    let mut t = 0.0;
+    while t <= 1.0 + 1e-8 {
+        let a = 2.0 * PI * t * turns;
+        let z = wave_h * (waves * a).cos() + free * t;
+        outer.push(DVec3::new(ro * a.cos(), ro * a.sin(), z));
+        inner.push(DVec3::new(ri * a.cos(), ri * a.sin(), z));
+        t += 1.0 / (60.0 * turns);
+    }
+    let a = make_interpolated_spline(&outer, &[], false).unwrap();
+    let b = make_interpolated_spline(&inner, &[], false).unwrap();
+    let strip = loft(&[a, b], &LoftOptions { solid: false, ..Default::default() }).unwrap().shape;
+    let helices: Vec<f64> = strip.edges().iter().map(|e| e.length().unwrap()).filter(|l| *l > 0.1).collect();
+    let r = thicken(&strip, 0.0, th).unwrap().shape;
+    assert!(r.is_valid());
+    // Each helix and its offset, within the wall's reach of each other's length (the 30-segment ones were 10 % short).
+    let mut long: Vec<f64> = r.edges().iter().map(|e| e.length().unwrap()).filter(|l| *l > 0.1).collect();
+    long.sort_by(f64::total_cmp);
+    assert_eq!(long.len(), 4, "{long:?}");
+    for (k, l) in long.iter().enumerate() {
+        let h = if k < 2 { helices.iter().copied().fold(f64::MAX, f64::min) } else { helices.iter().copied().fold(0.0, f64::max) };
+        assert!((l - h).abs() < 0.01 * h, "{} mm beside a {} mm helix", l * 1e3, h * 1e3);
+    }
+}
