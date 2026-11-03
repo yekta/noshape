@@ -1667,6 +1667,30 @@ export const bad = defineTable(function(context is Context, definition is map) r
     assert_eq!(two.iter().map(|t| t.title.as_str()).collect::<Vec<_>>(), ["First"]);
 }
 
+/// A studio imported twice, directly and through another studio that
+/// re-exports it, is one module (cf-sheet-metal-overcut-dogbone's
+/// cornerOvercut: "Duplicate top level symbol name" in ours).
+#[test]
+fn a_studio_imported_twice_is_one_module() {
+    let mut doc = Document::new();
+    let top = doc.add_tab("top", TabContent::FeatureStudio(FeatureStudio::new("")));
+    let mid = doc.add_tab("mid", TabContent::FeatureStudio(FeatureStudio::new("")));
+    let common = doc.add_tab("common", TabContent::FeatureStudio(FeatureStudio::new("FeatureScript 2241;\nexport enum Choice\n{\n    A,\n    B\n}\nexport const SIZE = 3;\n")));
+    let sources = [
+        (top, format!("FeatureScript 2241;\nexport import(path : \"{common}\", version : \"0\");\nimport(path : \"{mid}\", version : \"0\");\nexport function pick() returns Choice\n{{\n    return SIZE > 2 ? Choice.A : Choice.B;\n}}\n")),
+        (mid, format!("FeatureScript 2241;\nexport import(path : \"{common}\", version : \"0\");\nexport const TWICE = SIZE * 2;\n")),
+    ];
+    for (tab, src) in sources {
+        if let Some(TabContent::FeatureStudio(f)) = doc.tab_mut(tab).map(|t| &mut t.content) {
+            f.source = src;
+        }
+    }
+    let scripts = DocumentScripts::from_document(&doc);
+    for (tab, name, compiled) in scripts.studios() {
+        assert!(!compiled.has_errors(), "{name} ({tab}): {:?}", compiled.diagnostics);
+    }
+}
+
 /// Feature Studio › Import of other tabs (live dom/fs-import-*): a file
 /// exports BLOB_DATA (its reference-parameter map), a Part Studio `build`;
 /// two un-namespaced file imports clash on BLOB_DATA.

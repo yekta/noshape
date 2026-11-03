@@ -296,10 +296,12 @@ fn load_std(version: u32, name: &str, cache: &mut StdCache, pending: Option<&Pen
 /// imports load the embedded library; other imports go to `resolver`.
 pub fn compile_module(path: &str, src: &str, resolver: &dyn Resolver) -> Result<Arc<CompiledModule>, Vec<CompileError>> {
     let mut loading = vec![path.to_string()];
-    compile_with(path.into(), src, resolver, &mut loading)
+    compile_with(path.into(), src, resolver, &mut loading, &mut HashMap::new())
 }
 
-fn compile_with(path: Arc<str>, src: &str, resolver: &dyn Resolver, loading: &mut Vec<String>) -> Result<Arc<CompiledModule>, Vec<CompileError>> {
+/// `built`: the modules this compile has made, so a module imported twice
+/// (directly and through another's `export import`) is one module.
+fn compile_with(path: Arc<str>, src: &str, resolver: &dyn Resolver, loading: &mut Vec<String>, built: &mut HashMap<Arc<str>, Arc<CompiledModule>>) -> Result<Arc<CompiledModule>, Vec<CompileError>> {
     let ast = Arc::new(crate::parser::parse(src).map_err(|e| vec![CompileError { module: path.clone(), pos: e.pos, message: e.message, parse: true, level: Level::Error }])?);
     let mut imports = Vec::new();
     for item in &ast.items {
@@ -319,16 +321,17 @@ fn compile_with(path: Arc<str>, src: &str, resolver: &dyn Resolver, loading: &mu
         if loading.iter().any(|l| **l == *canon) {
             return Err(err(format!("Cyclic import of \"{p}\"")));
         }
-        if let Some(m) = resolver.cached(&canon) {
+        if let Some(m) = resolver.cached(&canon).or_else(|| built.get(&canon).cloned()) {
             imports.push(Some(m));
             continue;
         }
         loading.push(canon.to_string());
-        let m = compile_with(canon.clone(), &source, resolver, loading).map_err(|errs| {
+        let m = compile_with(canon.clone(), &source, resolver, loading, built).map_err(|errs| {
             let first = errs.first().map(|e| e.message.clone()).unwrap_or_default();
             err(format!("Imported Feature Studio has errors: {first}"))
         })?;
         loading.pop();
+        built.insert(canon, m.clone());
         imports.push(Some(m));
     }
     // Version checks (Onshape lists them without a position).
