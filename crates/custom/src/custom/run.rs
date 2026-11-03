@@ -150,6 +150,7 @@ fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev
             // A group title is not a parameter; a button is undefined (std isButton).
             ParamKindFs::Group { .. } | ParamKindFs::Button => Value::Undefined,
             ParamKindFs::Anything => match values.get(&d.id) {
+                Some(ParamValue::Text(s)) if !s.starts_with("fs:") => expression_value(ev, s).unwrap_or_else(|| anything_value(s)),
                 Some(ParamValue::Text(s)) => anything_value(s),
                 _ => Value::Undefined,
             },
@@ -547,6 +548,39 @@ pub(crate) fn anything_text(v: &Value) -> Option<String> {
         })
     }
     Some(format!("fs:{}", json(v)?))
+}
+
+/// An `isAnything` parameter written as an expression (live keeps it as a quantity's, Parameter pattern's
+/// "[15,20,25]"): its value, arrays element by element; `None` when it doesn't evaluate.
+fn expression_value(ev: &EvalCtx, text: &str) -> Option<Value> {
+    let t = text.trim();
+    let Some(inner) = t.strip_prefix('[').and_then(|r| r.strip_suffix(']')) else {
+        let q = ev.eval_any(t).ok()?;
+        return Some(if q.dim == noshape_units::Dim::LENGTH {
+            host::length_value(q.value)
+        } else if q.dim == noshape_units::Dim::ANGLE {
+            host::angle_value(q.value)
+        } else {
+            Value::num(q.value)
+        });
+    };
+    // The elements at the top level (commas outside brackets and parentheses).
+    let (mut items, mut depth, mut start) = (Vec::new(), 0i32, 0);
+    for (k, c) in inner.char_indices() {
+        match c {
+            '[' | '(' => depth += 1,
+            ']' | ')' => depth -= 1,
+            ',' if depth == 0 => {
+                items.push(&inner[start..k]);
+                start = k + 1;
+            }
+            _ => {}
+        }
+    }
+    if !inner.trim().is_empty() {
+        items.push(&inner[start..]);
+    }
+    Some(Value::array(items.iter().map(|x| expression_value(ev, x)).collect::<Option<Vec<_>>>()?))
 }
 
 /// [`anything_text`] back to its value (other text is a string).

@@ -2993,3 +2993,45 @@ export const notch = defineFeature(function(context is Context, id is Id, defini
     // (live 1845: 10 edges, 2 concave, 3 faces, 8 vertices; the tool's faces 0, the block's 7)
     assert_eq!(custom::run::output_of(fid).unwrap().output, "created 10, on the block 10\nconcave 2, faces created 3\nvertices 8, the tool's faces 0, the block's 7\n");
 }
+
+/// FS-ANYTHING-PARAM (dx's FeatureScript corpus, cf-parameter-pattern): an `isAnything` parameter in an array item,
+/// kept as live keeps it (a quantity's expression, "[15,20,25]"), reaches the feature as the array it evaluates to.
+#[test]
+fn an_anything_parameter_written_as_an_array_is_one() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Sum cube" }
+export const sumCube = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Rows", "Item name" : "Row" }
+        definition.rows is array;
+        for (var row in definition.rows)
+        {
+            annotation { "Name" : "Values" }
+            isAnything(row.values);
+        }
+    }
+    {
+        var total = 0;
+        for (var row in definition.rows)
+            for (var v in row.values)
+                total += v;
+        fCuboid(context, id + "box", { "corner1" : vector(0, 0, 0) * meter, "corner2" : vector(1, 1, 1) * total * millimeter });
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    let mut f = ps.new_feature(&fx.ty("sumCube"), &fx.units).unwrap();
+    let row = |t: &str| {
+        let mut p = noshape_model::params::ParamValues::default();
+        p.set("values", ParamValue::Text(t.into()));
+        p
+    };
+    f.params.set("rows", ParamValue::Array(vec![row("[1, 2, 3]"), row("[4]")]));
+    ps.features.push(f);
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+    assert!((total_volume(&r) - 0.01f64.powi(3)).abs() < 1e-12, "{}", total_volume(&r));
+}

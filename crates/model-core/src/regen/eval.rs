@@ -486,6 +486,14 @@ impl<'a> EvalCtx<'a> {
         Ok(())
     }
 
+    /// Evaluate an arbitrary expression text, its dimension as written.
+    pub fn eval_any(&self, text: &str) -> FResult<Quantity> {
+        let scope_inner = ContextScope(&self.ctx.variables);
+        let scope_outer = ContextScope(self.outer_vars);
+        let scope = LayeredScope { inner: &scope_inner, outer: &scope_outer };
+        noshape_units::evaluate(text, &scope).map_err(|x| FeatureError::new(format!("{text}: {x}")))
+    }
+
     /// Evaluate an arbitrary expression text with a dimension.
     pub fn eval_text(&self, text: &str, dim: Dim) -> FResult<Quantity> {
         let scope_inner = ContextScope(&self.ctx.variables);
