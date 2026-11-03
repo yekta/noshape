@@ -252,7 +252,9 @@ dump, the runner, live's first 20 scenarios run in ours and a first score.
 - 11-03 12:20: live's new batch (56 recorded, paused 11:59 for request 1870): 35/53 at 11:40; since then the
   autofill rules are live's (an Enter that completes the text only inserts it, the next applies, the next accepts;
   an Enter that changes nothing applies; invalid values are no undo step): all 10 autofill / number-field scenarios
-  match. The rest of that batch: sketch (note in skasm.md) and feature-row-copy-paste (kept, Onshape's docs).
+  match. The rest of that batch: sketch (note in skasm.md; sketch-slot-on-line settled as skasm's: our Slot tool
+  makes the slot on the click, live's selects the line and makes it on Enter) and feature-row-copy-paste (settled
+  12:40 in my own live tab: Onshape copies / pastes nothing for feature rows; ours matches now).
 - 11-03 09:10: also landed (the autofill part corrected 12:20, above): Ctrl+click on a feature row opens its
   menu and a click beside an open menu only closes it; flip buttons, toolbar carets and row edges as driver targets;
   the Hole's icon rows and table levels in the state. Onshape's shortcut page (cad.onshape.com/help, Keyboard

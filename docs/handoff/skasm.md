@@ -1347,7 +1347,11 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
 Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity --live /root/parity/ui/live --display
 <yours>`; on main at 11:40 the sketch scenarios differing were (first difference):
 - (dropdown tools: fixed by your 204e6ec39 marks; with it sketch-center-point-arc, -three-point-circle and
-  -tangent-arc-from-line match, sketch-slot-on-line differs at step 8: live keeps 1 selected, ours 0);
+  -tangent-arc-from-line match);
+- **sketch-slot-on-line step 8 is yours (agreed by psui 11-03 12:50, lead asked us to settle it):** live's Slot tool
+  click on a line only selects it (selection 1, still one line) and Enter then makes the slot (step 9: 2 arcs, 3
+  lines, same as ours); ours makes the slot on the click itself (scene sketch_mode.rs `Tool::Slot` → `make_slots`).
+  psui's readout and driver are right there (ours reads 0 because nothing is selected after our click).
 - PERPENDICULAR where ours infers VERTICAL: sketch-line-from-midpoint, -trim-drag, -undo-trim;
 - a value box after typing over a just-drawn shape: sketch-circle-value-box, -line-value-box, -rectangle-value-boxes
   (live focus "other" with the typed text, ours none);
