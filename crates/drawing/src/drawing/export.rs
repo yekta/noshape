@@ -330,11 +330,11 @@ pub fn to_svg(g: &SheetGeometry) -> String {
         let (x, y) = (t.pos[0], g.height - t.pos[1]);
         let anchor = match t.anchor {
             Anchor::BottomLeft | Anchor::TopLeft => "start",
-            Anchor::BottomCenter | Anchor::Center => "middle",
+            Anchor::BottomCenter | Anchor::Center | Anchor::TopCenter => "middle",
         };
         let baseline = match t.anchor {
             Anchor::Center => r#" dominant-baseline="central""#,
-            Anchor::TopLeft => r#" dominant-baseline="hanging""#,
+            Anchor::TopLeft | Anchor::TopCenter => r#" dominant-baseline="hanging""#,
             _ => "",
         };
         let _ = writeln!(
@@ -533,6 +533,7 @@ pub fn to_dxf_units(g: &SheetGeometry, insunits: u8) -> String {
             Anchor::BottomCenter => (1, 0),
             Anchor::Center => (1, 2),
             Anchor::TopLeft => (0, 3),
+            Anchor::TopCenter => (1, 3),
         };
         if h != 0 || v != 0 {
             pair(&mut s, 72, &h.to_string());
@@ -713,6 +714,7 @@ fn pdf_content(g: &SheetGeometry, ocgs: &mut Vec<super::cad_layers::CadLayer>, f
             Anchor::BottomCenter => (-width / 2.0, 0.0),
             Anchor::Center => (-width / 2.0, -size * 0.35),
             Anchor::TopLeft => (0.0, -size * 0.75),
+            Anchor::TopCenter => (-width / 2.0, -size * 0.75),
         };
         let (c, s) = (t.angle.cos(), t.angle.sin());
         let x = t.pos[0] * pt + dx * c - dy * s;

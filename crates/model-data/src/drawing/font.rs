@@ -243,6 +243,7 @@ fn anchor_offset(anchor: Anchor, width: f64, height: f64) -> [f64; 2] {
         Anchor::BottomCenter => [-width / 2.0, 0.0],
         Anchor::Center => [-width / 2.0, -height / 2.0],
         Anchor::TopLeft => [0.0, -height],
+        Anchor::TopCenter => [-width / 2.0, -height],
     }
 }
 

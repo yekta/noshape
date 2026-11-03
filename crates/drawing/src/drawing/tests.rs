@@ -4827,6 +4827,92 @@ fn dimension_style_extension_lines() {
     assert!(gapped.iter().all(|(_, y0)| (y0 - 4.0).abs() < 1e-6), "starts 4 mm off the geometry: {gapped:?}");
 }
 
+/// An unset revision reads "-" in the drawing (live drw2 10-21 h), a
+/// placeholder: gone where placeholders are hidden (PDF and image exports;
+/// live's tpl-ANSI_A_INCH.pdf has no "-", its DXF has).
+#[test]
+fn an_unset_revision_is_a_placeholder() {
+    let mut d = Drawing::default();
+    templates::apply_template(&mut d, 0, &templates::DrawingTemplate::standard("ANSI A", SheetSize::AnsiA, TitleBlockStyle::Ansi, true, Projection::ThirdAngle));
+    let revision = |d: &Drawing| {
+        let b = render_sheet(d, 0, &super::views::Sources::new(), &ViewCache::new(), false).unwrap();
+        // The REV. value's spot (live: 10.504, 0.725 in).
+        b.geometry.texts.iter().filter(|t| (t.pos[0] - 10.504 * 25.4).abs() < 0.01 && (t.pos[1] - 0.725 * 25.4).abs() < 0.01).map(|t| t.text.clone()).collect::<Vec<_>>()
+    };
+    assert_eq!(revision(&d), ["-"]);
+    d.props.hide_placeholder = true;
+    assert!(revision(&d).is_empty());
+}
+
+/// Live's templates (samples/tpl-ANSI_A_INCH.dxf, tpl-ISO_A3.dxf,
+/// tpl-ANSI_B_INCH.dxf; asb 10-24 "template frames"): the title block's
+/// texts hang where live's MTEXTs do (insertion point, height, attachment),
+/// and the projection symbol scales with the block.
+#[test]
+fn title_block_texts_where_lives_are() {
+    use sheet::Anchor;
+    let geom = |size: SheetSize, style: TitleBlockStyle, projection: Projection| {
+        let s = Sheet { size, title_style: style, ..Default::default() };
+        let (w, h) = size.size_mm();
+        let mut g = sheet::SheetGeometry::new(w, h);
+        g.add_border_and_title_full(&s, projection, &|v: &str| v.to_string());
+        g
+    };
+    // (text, x, y, height, anchor) in the template's unit (`k` mm).
+    let check = |g: &sheet::SheetGeometry, k: f64, want: &[(&str, f64, f64, f64, Anchor)]| {
+        for (text, x, y, h, anchor) in want {
+            // (The nearest of that text: zone labels are letters too.)
+            let t = g.texts.iter().filter(|t| t.text == *text).min_by(|a, b| (a.pos[0] - x * k).hypot(a.pos[1] - y * k).total_cmp(&(b.pos[0] - x * k).hypot(b.pos[1] - y * k))).unwrap_or_else(|| panic!("no `{text}`"));
+            let ok = (t.pos[0] - x * k).abs() < 2e-3 && (t.pos[1] - y * k).abs() < 2e-3 && (t.height - h * k).abs() < 1e-3 && t.anchor == *anchor;
+            assert!(ok, "`{text}`: {:?} {} {:?}, live [{}, {}] {} {anchor:?}", t.pos, t.height, t.anchor, x * k, y * k, h * k);
+        }
+    };
+    let ansi = geom(SheetSize::AnsiA, TitleBlockStyle::Ansi, Projection::ThirdAngle);
+    check(&ansi, 25.4, &[
+        ("UNLESS OTHERWISE SPECIFIED,", 4.5904, 1.8368, 0.048, Anchor::TopLeft),
+        ("    .XX = ±.0-", 4.5904, 1.6568, 0.048, Anchor::TopLeft),
+        ("SURFACE FINISH", 4.5904, 1.3688, 0.048, Anchor::TopLeft),
+        ("DO NOT SCALE DRAWING", 5.164, 1.1218, 0.0624, Anchor::TopCenter),
+        ("BREAK ALL SHARP EDGES AND", 5.164, 0.9608, 0.048, Anchor::TopCenter),
+        ("THIRD ANGLE PROJECTION", 5.164, 0.7568, 0.048, Anchor::TopCenter),
+        ("NAME", 6.3904, 1.8368, 0.048, Anchor::TopLeft),
+        ("DATE", 7.339, 1.8368, 0.048, Anchor::TopCenter),
+        ("APPROVED", 5.7904, 1.2968, 0.048, Anchor::TopLeft),
+        ("MATERIAL", 5.7904, 0.7568, 0.048, Anchor::TopLeft),
+        ("TITLE", 7.5904, 1.4618, 0.048, Anchor::TopLeft),
+        ("DWG NO.", 7.9601, 0.8404, 0.0384, Anchor::TopLeft),
+        ("REV.", 10.3601, 0.8404, 0.0384, Anchor::TopLeft),
+        ("A", 7.7515, 0.725, 0.144, Anchor::Center),
+        ("SHEET", 9.6101, 0.5404, 0.0384, Anchor::TopLeft),
+    ]);
+    let iso = geom(SheetSize::A3, TitleBlockStyle::Iso, Projection::FirstAngle);
+    check(&iso, 1.0, &[
+        ("DO NOT SCALE DRAWING", 214.92, 35.1236, 2.1133, Anchor::TopCenter),
+        ("NAME", 253.9141, 59.337, 1.6256, Anchor::TopLeft),
+        ("SIGNATURE", 283.5, 59.337, 1.6256, Anchor::TopCenter),
+        ("DATE", 300.01, 59.337, 1.6256, Anchor::TopCenter),
+    ]);
+    // Grid lines and the surface finish mark on live's points (ANSI A, in):
+    // the REV. divider, the SIZE / DWG NO. one, the mark's first stroke.
+    let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0] * 25.4).abs() < 2e-3 && (a[1] - b[1] * 25.4).abs() < 2e-3;
+    for (a, b) in [([10.339, 0.575], [10.339, 0.875]), ([7.939, 0.575], [7.939, 0.875]), ([5.104, 1.298], [5.134, 1.246])] {
+        let found = ansi.lines.iter().any(|l| l.points.windows(2).any(|w| (near(w[0], a) && near(w[1], b)) || (near(w[0], b) && near(w[1], a))));
+        assert!(found, "no line {a:?} – {b:?} (in)");
+    }
+    // The symbol's circles: (centre, big radius), live's.
+    let circles = |g: &sheet::SheetGeometry| -> Vec<([f64; 2], f64)> {
+        g.lines.iter().filter(|l| l.closed && l.points.len() == 64).map(|l| {
+            let c = l.points.iter().fold([0.0, 0.0], |a, p| [a[0] + p[0] / 64.0, a[1] + p[1] / 64.0]);
+            (c, (l.points[0][0] - c[0]).hypot(l.points[0][1] - c[1]))
+        }).collect()
+    };
+    let ansi_b = geom(SheetSize::AnsiB, TitleBlockStyle::Ansi, Projection::ThirdAngle);
+    for (g, c, r) in [(&ansi, [5.029 * 25.4, 0.5288 * 25.4], 0.108 * 25.4), (&ansi_b, [9.045 * 25.4, 0.6984 * 25.4], 0.144 * 25.4), (&iso, [219.492, 15.0394], 3.6576)] {
+        let got = circles(g);
+        assert!(got.iter().any(|(p, gr)| (p[0] - c[0]).abs() < 0.01 && (p[1] - c[1]).abs() < 0.01 && (gr - r).abs() < 0.01), "{got:?}, live {c:?} r {r}");
+    }
+}
+
 /// Live 1857 (ANSI_A_INCH DXF): the projection symbol's circles are two
 /// CIRCLEs, r 0.108 and 0.054 in about one centre, 0.135 in left of the
 /// "THIRD ANGLE PROJECTION" line's centre; the title block's other format

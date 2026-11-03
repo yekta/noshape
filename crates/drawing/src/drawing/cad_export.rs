@@ -581,7 +581,7 @@ fn mtext_font_code(f: &super::sheet::TextFont) -> Option<String> {
 /// The MTEXT paragraph alignment code of an anchor (`\pxq?;`).
 fn paragraph_align(a: Anchor) -> char {
     match a {
-        Anchor::BottomCenter | Anchor::Center => 'c',
+        Anchor::BottomCenter | Anchor::Center | Anchor::TopCenter => 'c',
         Anchor::BottomLeft | Anchor::TopLeft => 'l',
     }
 }
@@ -797,6 +797,7 @@ impl Sheet<'_> {
             Anchor::BottomCenter => AttachmentPoint::BottomCenter,
             Anchor::Center => AttachmentPoint::MiddleCenter,
             Anchor::TopLeft => AttachmentPoint::TopLeft,
+            Anchor::TopCenter => AttachmentPoint::TopCenter,
         };
         e.style = match kind {
             TextIn::Dimension => DIM_TEXT_STYLE.0,

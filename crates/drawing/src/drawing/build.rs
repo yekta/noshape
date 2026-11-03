@@ -1012,8 +1012,10 @@ pub fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sou
         "drawing.not_revision_managed" => "False".into(),
         "drawing.description" => drawing.meta.description.clone(),
         "drawing.number" => drawing.meta.number.clone(),
-        // Live: an unset revision reads "-".
-        "drawing.revision" => if drawing.meta.revision.is_empty() { "-".into() } else { drawing.meta.revision.clone() },
+        // Live: an unset revision reads "-", a placeholder (not in its PDF,
+        // samples/tpl-ANSI_A_INCH.pdf; in its DXF).
+        "drawing.revision" if drawing.meta.revision.is_empty() => if drawing.props.hide_placeholder { String::new() } else { "-".into() },
+        "drawing.revision" => drawing.meta.revision.clone(),
         "drawing.revision_description" => String::new(),
         "drawing.inspection_count" => drawing.sheets.iter().flat_map(|s| s.annotations.iter()).filter(|a| a.inspection.is_some()).count().to_string(),
         // Sheet reference properties from the part's Properties.
