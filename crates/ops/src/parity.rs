@@ -654,6 +654,20 @@ impl<'a> Translator<'a> {
             }
         }
         let names = ["CAP_FACE", "SWEPT_FACE", "CAP_EDGE", "SWEPT_EDGE", "SWEPT_BODY"];
+        // Nested in another operation's name: only a Boolean keeps the entity
+        // itself (a pattern's or mirror's COPY is another entity).
+        if let Packed::Tagged(_, top) = &tree
+            && let Packed::Map(tm) = top.as_ref()
+            && !tm.iter().any(|(k, v)| matches!(k, Packed::Str(k) if k == "queryType") && matches!(v, Packed::Str(v) if names.contains(&v.as_str())))
+        {
+            let mut op = Vec::new();
+            if let Some((_, v)) = tm.iter().find(|(k, _)| matches!(k, Packed::Str(k) if k == "operationId")) {
+                packed_strings(v, &mut op);
+            }
+            if !op.iter().any(|o| o.ends_with(".opBoolean")) {
+                return None;
+            }
+        }
         let m = find(&tree, &names)?;
         let get = |key: &str| m.iter().find(|(k, _)| matches!(k, Packed::Str(k) if k == key)).map(|(_, v)| v);
         let Some(Packed::Str(name)) = get("queryType") else { return None };
