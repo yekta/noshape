@@ -1438,7 +1438,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the copies (the history from the part's faces to the walls as before, shell::quadrics_and_slabs_agree): 360 -> 249 s
   over the corpus, 0 differ (core 11-03 10:30, queued). Shell 4 isn't faster with it: still open, failing fast.
   **Live 1870 (11-03 09:35): live BUILDS Shell 4** on the right-scale body (OK, 13661.1 mm³ [13635.2, 13687.1], 28 faces /
-  73 edges / 44 vertices, 627 ms; 1860's "fails" was a body 1000× too small). Ours (core 11-03 13:30): OCCT's one fuse of
+  73 edges / 44 vertices, 627 ms; 1860's "fails" was a body 1000× too small). Ours (core 11-03 12:30): OCCT's one fuse of
   the 17 slabs is wrong (0.13 mm³ at the working scale, 12606 mm³ in metres); two at a time (op_boolean's fuse_tree)
   gives live's 13663 mm³, so by_slabs now fuses two at a time when the one fuse's union is smaller than its largest slab
   or larger than all of them (shell corpus: 1814db9f, ca43c447, df69bc43 now build, nothing else changes; 240 -> 250 s,
