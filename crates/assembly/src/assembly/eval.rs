@@ -528,6 +528,9 @@ impl Prepared {
     /// mates hold off its pointer goes straight to the substeps). Returns
     /// whether this step landed.
     pub fn solve_drag(&self, opts: &SolveOptions, from: &[DVec3], try_one: bool) -> (Solved, bool) {
+        if let Some(turned) = self.ball_drag(opts, from) {
+            return (self.solve(&turned), true);
+        }
         let moved = from.iter().zip(&opts.drags).map(|(p0, (_, _, t))| (*t - *p0).length()).fold(0.0, f64::max);
         let n = ((moved / 0.002).ceil() as usize).clamp(1, 4);
         if try_one || n == 1 {
@@ -553,6 +556,52 @@ impl Prepared {
         let s = s.expect("at least one substep");
         let landed = self.drags_land(&s, opts);
         (s, landed)
+    }
+
+    /// A part whose only mate is a Ball to fixed geometry turns as an arcball
+    /// about the ball's centre (live asm drag probes 4, request 1870: six
+    /// drags within 0.12 mm). The sphere passes through the grabbed point's
+    /// place on the screen at half its depth, R² = |p0|² + (d / 2)², on the
+    /// grabbed point's side; the pointer maps onto it (onto its rim beyond
+    /// R), and the part turns from the grabbed point's place to the
+    /// pointer's. `None`: not such a drag.
+    fn ball_drag(&self, opts: &SolveOptions, from: &[DVec3]) -> Option<SolveOptions> {
+        let ([(id, _, target)], [g0], Some(view)) = (opts.drags.as_slice(), from, opts.drag_view) else { return None };
+        let n = view.normalize_or_zero();
+        let &(b, off) = self.body_of.get(id)?;
+        if n == DVec3::ZERO || self.fixed[b] || !self.relations.is_empty() {
+            return None;
+        }
+        let on: Vec<&SolverMate> = self.mates.iter().map(|(_, _, m)| m).filter(|m| (m.a == b) != (m.b == b) || m.extra.iter().any(|(x, _)| *x == b)).collect();
+        let [m] = on.as_slice() else { return None };
+        let (local, other) = if m.a == b { (m.a_local, m.b) } else { (m.b_local, m.a) };
+        if m.kind != MateType::Ball || !self.fixed[other] {
+            return None;
+        }
+        let stored = self.instances.iter().find(|(i, _)| i == id).map(|(_, p)| *p)?;
+        let start = opts.start.as_ref().and_then(|s| s.get(id)).copied().unwrap_or(stored);
+        let frame = placement_to_frame(&start);
+        let pivot = frame.mul(&off.inverse()).transform_point(local.origin);
+        let flat = |v: DVec3| v - n * v.dot(n);
+        let r0 = *g0 - pivot;
+        let depth = r0.dot(n);
+        let p0 = flat(r0);
+        let radius = (p0.length_squared() + depth * depth / 4.0).sqrt();
+        let side = if depth < 0.0 { -1.0 } else { 1.0 };
+        let on_ball = |p: DVec3| match radius * radius - p.length_squared() {
+            h2 if h2 > 0.0 => p + n * side * h2.sqrt(),
+            _ => p.normalize_or_zero() * radius,
+        };
+        let (v0, v1) = (on_ball(p0), on_ball(flat(*target - pivot)));
+        if v0.length_squared() < 1e-30 || v1.length_squared() < 1e-30 {
+            return None;
+        }
+        let turn = DQuat::from_rotation_arc(v0.normalize(), v1.normalize());
+        let turned = Frame { rotation: turn * frame.rotation, origin: pivot + turn * (frame.origin - pivot) };
+        let mut o = opts.clone();
+        o.drags.clear();
+        o.targets = vec![(*id, frame_to_placement(&turned))];
+        Some(o)
     }
 
     /// Every dragged point of `opts` within 1 µm of its target (of its

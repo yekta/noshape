@@ -1,0 +1,469 @@
+{
+ "parts": "fs-oracle-asm",
+ "method": "as asm batches; then UI drags",
+ "cases": [
+  {
+   "case": "d6a",
+   "instances": [
+    {
+     "name": "A",
+     "part": "BLOCK",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "BLOCK",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Ball",
+     "first": {
+      "instance": "B",
+      "entity": "vertex",
+      "what": "vertex (0,0,0)",
+      "at_mm": [
+       0,
+       0,
+       0
+      ],
+      "inference": "POINT"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "vertex",
+      "what": "vertex (40,20,10)",
+      "at_mm": [
+       40,
+       20,
+       10
+      ],
+      "inference": "POINT"
+     },
+     "flip_primary": false,
+     "name": "Ball 1"
+    }
+   ],
+   "drag": {
+    "inst": "B",
+    "local": [
+     40,
+     20,
+     10
+    ],
+    "moves": [
+     [
+      "top",
+      [
+       4.965101275675103,
+       4.965101275675103
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "case": "d6b",
+   "instances": [
+    {
+     "name": "A",
+     "part": "BLOCK",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "BLOCK",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Ball",
+     "first": {
+      "instance": "B",
+      "entity": "vertex",
+      "what": "vertex (0,0,0)",
+      "at_mm": [
+       0,
+       0,
+       0
+      ],
+      "inference": "POINT"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "vertex",
+      "what": "vertex (40,20,10)",
+      "at_mm": [
+       40,
+       20,
+       10
+      ],
+      "inference": "POINT"
+     },
+     "flip_primary": false,
+     "name": "Ball 1"
+    }
+   ],
+   "drag": {
+    "inst": "B",
+    "local": [
+     40,
+     20,
+     10
+    ],
+    "moves": [
+     [
+      "top",
+      [
+       20.062272333435157,
+       20.062272333435157
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "case": "d6c",
+   "instances": [
+    {
+     "name": "A",
+     "part": "BLOCK",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "BLOCK",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Ball",
+     "first": {
+      "instance": "B",
+      "entity": "vertex",
+      "what": "vertex (0,0,0)",
+      "at_mm": [
+       0,
+       0,
+       0
+      ],
+      "inference": "POINT"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "vertex",
+      "what": "vertex (40,20,10)",
+      "at_mm": [
+       40,
+       20,
+       10
+      ],
+      "inference": "POINT"
+     },
+     "flip_primary": false,
+     "name": "Ball 1"
+    }
+   ],
+   "drag": {
+    "inst": "B",
+    "local": [
+     40,
+     20,
+     10
+    ],
+    "moves": [
+     [
+      "top",
+      [
+       10.005431358557257,
+       0.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "case": "d6d",
+   "instances": [
+    {
+     "name": "A",
+     "part": "BLOCK",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "BLOCK",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Ball",
+     "first": {
+      "instance": "B",
+      "entity": "vertex",
+      "what": "vertex (0,0,0)",
+      "at_mm": [
+       0,
+       0,
+       0
+      ],
+      "inference": "POINT"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "vertex",
+      "what": "vertex (40,20,10)",
+      "at_mm": [
+       40,
+       20,
+       10
+      ],
+      "inference": "POINT"
+     },
+     "flip_primary": false,
+     "name": "Ball 1"
+    }
+   ],
+   "drag": {
+    "inst": "B",
+    "local": [
+     40,
+     20,
+     10
+    ],
+    "moves": [
+     [
+      "top",
+      [
+       0.0,
+       -10.005431358557258
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "case": "d6e",
+   "instances": [
+    {
+     "name": "A",
+     "part": "BLOCK",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "BLOCK",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Ball",
+     "first": {
+      "instance": "B",
+      "entity": "vertex",
+      "what": "vertex (0,0,0)",
+      "at_mm": [
+       0,
+       0,
+       0
+      ],
+      "inference": "POINT"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "vertex",
+      "what": "vertex (40,20,10)",
+      "at_mm": [
+       40,
+       20,
+       10
+      ],
+      "inference": "POINT"
+     },
+     "flip_primary": false,
+     "name": "Ball 1"
+    }
+   ],
+   "drag": {
+    "inst": "B",
+    "local": [
+     40,
+     20,
+     10
+    ],
+    "moves": [
+     [
+      "top",
+      [
+       40.00248938702213,
+       40.00248938702213
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "case": "d6f",
+   "instances": [
+    {
+     "name": "A",
+     "part": "BLOCK",
+     "fixed": true,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    },
+    {
+     "name": "B",
+     "part": "BLOCK",
+     "fixed": false,
+     "start": {
+      "rotate_z_deg": 0.0,
+      "translate_mm": [
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   ],
+   "mates": [
+    {
+     "type": "Ball",
+     "first": {
+      "instance": "B",
+      "entity": "vertex",
+      "what": "vertex (0,0,0)",
+      "at_mm": [
+       0,
+       0,
+       0
+      ],
+      "inference": "POINT"
+     },
+     "second": {
+      "instance": "A",
+      "entity": "vertex",
+      "what": "vertex (40,20,10)",
+      "at_mm": [
+       40,
+       20,
+       10
+      ],
+      "inference": "POINT"
+     },
+     "flip_primary": false,
+     "name": "Ball 1"
+    }
+   ],
+   "drag": {
+    "inst": "B",
+    "local": [
+     40,
+     20,
+     10
+    ],
+    "moves": [
+     [
+      "front",
+      [
+       10.005431358557273,
+       10.005431358557273
+      ]
+     ]
+    ]
+   }
+  }
+ ],
+ "note": "live 1870: d6 (a Ball) dragged once each, 25 steps; from skasm-asm-drag-4.live.jsonl; moves from live's pointer pixels (start / end) times its mm per pixel"
+}

@@ -372,6 +372,49 @@ fn a_drag_step_lands_in_one_solve_when_it_can() {
     assert!((DVec3::from(t.placement(InstanceId(2)).unwrap().translation) - o).length() < 1e-9);
 }
 
+/// Live asm drag probes 4 (request 1870): a block on a Ball to a fixed one
+/// turns as an arcball about the ball's centre: dragged in the top view past
+/// its reach, the grabbed corner points at the pointer in plan and tilts by
+/// asin((d / 2) / R), R² = p0² + (d / 2)² (d: its height over the centre,
+/// p0: its plan offset), whatever the distance.
+#[test]
+fn a_ball_drag_turns_as_an_arcball() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let m = mate(10, MateType::Ball, conn(1, face_with(&r, "CapEnd"), Inference::Centroid), conn(2, face_with(&r, "CapStart"), Inference::Centroid));
+    let asm = Assembly {
+        instances: vec![
+            part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
+            part_instance(2, "Block <2>", f.studios[0], body, DVec3::new(0.0, 0.0, 0.01), false),
+        ],
+        mates: vec![m],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.mates[0].ok, "{:?}", res.mates[0].message);
+    let start: std::collections::HashMap<_, _> = res.solved.placements.iter().cloned().collect();
+    let pose0 = eval::placement_to_frame(&start[&InstanceId(2)]);
+    // The ball's centre: the fixed block's top face centroid; the grabbed point: B's far top corner.
+    let grab_local = DVec3::new(0.04, 0.02, 0.01);
+    let g0 = pose0.transform_point(grab_local);
+    let centre = DVec3::new(0.02, 0.01, 0.01);
+    let (r0, d) = (g0 - centre, (g0 - centre).z);
+    let radius = (r0.x * r0.x + r0.y * r0.y + d * d / 4.0).sqrt();
+    for far in [0.05, 0.2] {
+        let to = g0 + DVec3::new(far, far * 0.5, 0.0);
+        let opts = SolveOptions { drags: vec![(InstanceId(2), grab_local, to)], drag_view: Some(DVec3::Z), start: Some(start.clone()), skip_dof: true, ..Default::default() };
+        let (s, landed) = res.prepared.solve_drag(&opts, &[g0], true);
+        assert!(landed);
+        let pose = eval::placement_to_frame(&s.placement(InstanceId(2)).unwrap());
+        let g = pose.transform_point(grab_local) - centre;
+        let plan = (to - centre).truncate().normalize();
+        assert!((g.truncate().normalize() - plan).length() < 1e-9, "points at the pointer in plan: {g:?}");
+        let tilt = (pose.rotation * DVec3::Z).angle_between(DVec3::Z);
+        assert!((tilt - ((d / 2.0) / radius).asin()).abs() < 1e-9, "{far}: tilt {}°", tilt.to_degrees());
+    }
+}
+
 #[test]
 fn interference_bom_and_explode() {
     let f = doc_with(vec![block_studio()]);

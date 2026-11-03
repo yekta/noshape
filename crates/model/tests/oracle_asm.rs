@@ -842,8 +842,9 @@ fn spec_assembly(parts: &Parts, spec: &serde_json::Value) -> Assembly {
 fn asm_drag_probes_match_live() {
     let mut parts = parts();
     let (mut answered, mut matches) = (0, 0);
-    // Probes 1 (1802: d1-d6), 2 (1803: d7 / d8; d9's four-bar didn't close in live).
-    for n in [1, 2] {
+    // Probes 1 (1802: d1-d6), 2 (1803: d7 / d8; d9's four-bar didn't close in live), 4 (1870: d6's Ball dragged
+    // five ways in the top view, once in the front view).
+    for n in [1, 2, 4] {
     let input: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(fuzz_fixture(&format!("asm-drag-{n}.input.json"))).unwrap()).unwrap();
     let live: Vec<serde_json::Value> = std::fs::read_to_string(fuzz_fixture(&format!("asm-drag-{n}.live.jsonl"))).map(|t| t.lines().filter(|l| !l.trim().is_empty()).filter_map(|l| serde_json::from_str(l).ok()).collect()).unwrap_or_default();
     for case in input["cases"].as_array().unwrap() {
