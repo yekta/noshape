@@ -318,8 +318,9 @@ fn everyday(seed: u64) -> Case {
             1.0
         };
         // (Batch 6 on, seed 381: three more kinds; batch 7 on, seed 421,
-        // three more; batch 8 on, seed 461, three more.)
-        match r.below(if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
+        // three more; batch 8 on, seed 461, three more; batch 10 on, seed
+        // 541, three more.)
+        match r.below(if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
             // Corner rectangle (live's tool constraints), width and height.
             0 => {
                 let (w, h) = (r.range(15.0, 50.0), r.range(10.0, 35.0));
@@ -574,6 +575,69 @@ fn everyday(seed: u64) -> Case {
                 c.length(&l1, b * fb);
                 c.length(&l4, side * fs);
                 c.angle(&l1, &l4, (deg * fa).clamp(35.0, 85.0));
+            }
+            // Isosceles triangle: a Horizontal base, the two legs Equal;
+            // the base's and a leg's lengths.
+            14 => {
+                let (b, hgt) = (r.range(20.0, 45.0), r.range(12.0, 30.0));
+                let p = [o, o + v(b, 0.0), o + v(b / 2.0, hgt)];
+                let l: Vec<String> = (0..3).map(|i| c.line(p[i], p[(i + 1) % 3])).collect();
+                for i in 0..3 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 3]));
+                }
+                c.hv(true, &l[0]);
+                c.pair("EQUAL", &l[1], &l[2]);
+                let leg = (b * b / 4.0 + hgt * hgt).sqrt();
+                let (fb, fl) = (f(&mut r), f(&mut r));
+                c.length(&l[0], b * fb);
+                // (A leg never under half the new base and a little.)
+                c.length(&l[1], (leg * fl).max(b * fb * 0.55));
+            }
+            // Rectangle with its top-right corner rounded: H / V sides, the
+            // arc Tangent to both; width, height and the radius.
+            15 => {
+                let (w, h, rad) = (r.range(25.0, 50.0), r.range(18.0, 35.0), r.range(3.0, 8.0));
+                let l1 = c.line(o, o + v(w, 0.0));
+                let l2 = c.line(o + v(w, 0.0), o + v(w, h - rad));
+                let a3 = c.arc(o + v(w - rad, h - rad), rad, 0.0, FRAC_PI_2);
+                let l4 = c.line(o + v(w - rad, h), o + v(0.0, h));
+                let l5 = c.line(o + v(0.0, h), o);
+                c.coincident(&format!("{l1}.end"), &format!("{l2}.start"));
+                c.coincident(&format!("{l2}.end"), &format!("{a3}.start"));
+                c.coincident(&format!("{a3}.end"), &format!("{l4}.start"));
+                c.coincident(&format!("{l4}.end"), &format!("{l5}.start"));
+                c.coincident(&format!("{l5}.end"), &format!("{l1}.start"));
+                c.pair("TANGENT", &l2, &a3);
+                c.pair("TANGENT", &a3, &l4);
+                c.hv(true, &l1);
+                c.hv(false, &l2);
+                c.hv(true, &l4);
+                c.hv(false, &l5);
+                let (fw, fh, fr) = (f(&mut r), f(&mut r), f(&mut r));
+                c.length(&l1, w * fw);
+                c.length(&l5, h * fh);
+                c.radius(&a3, (rad * fr).min(h * fh * 0.4), false);
+            }
+            // Flange: a circle with two Equal holes at the ends of a
+            // Horizontal construction line through its centre (the centre
+            // at the line's midpoint); both diameters and the holes' spacing.
+            16 => {
+                let (rb, rh) = (r.range(18.0, 30.0), r.range(2.0, 4.0));
+                let half = rb * r.range(0.45, 0.7);
+                let big = c.circle(o, rb);
+                let cl = c.line(o + v(-half, 0.0), o + v(half, 0.0));
+                c.construction(&cl);
+                let h1 = c.circle(o + v(-half, 0.0), rh);
+                let h2 = c.circle(o + v(half, 0.0), rh);
+                c.coincident(&format!("{h1}.center"), &format!("{cl}.start"));
+                c.coincident(&format!("{h2}.center"), &format!("{cl}.end"));
+                c.midpoint(&format!("{big}.center"), &cl);
+                c.hv(true, &cl);
+                c.pair("EQUAL", &h1, &h2);
+                let (fb, fs, fh) = (f(&mut r), f(&mut r), f(&mut r));
+                c.radius(&big, rb * fb, true);
+                c.length(&cl, (2.0 * half * fs).min(rb * fb * 1.5));
+                c.radius(&h1, rh * fh, true);
             }
             // D shape: a Horizontal chord and an arc over it, the chord's
             // length and the arc's radius.
@@ -882,7 +946,7 @@ fn write_batch() {
 }
 
 /// The batches: (number, first seed, rich).
-const BATCHES: [(usize, u64, bool); 9] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true)];
+const BATCHES: [(usize, u64, bool); 10] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true)];
 
 /// Batch 8's s464 / s475 stay as live answered: a component the pass can't
 /// close (a hexagon) takes the least change on its own, the rounded
