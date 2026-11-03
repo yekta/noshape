@@ -726,9 +726,10 @@ pub struct SketchOptions {
 
 impl Default for SketchOptions {
     fn default() -> Self {
-        // Live (sketch/311, a fresh profile: qa4 F1): Show constraints and
-        // Show errors ticked.
-        Self { show_constraints: true, show_expressions: false, show_errors: true }
+        // Live (1940: today's dialog template has Show constraints unticked
+        // for a user who never saved it; sketch/311's ☑ was an older
+        // template): Show errors alone ticked.
+        Self { show_constraints: false, show_expressions: false, show_errors: true }
     }
 }
 
@@ -7210,7 +7211,7 @@ mod tests {
     #[test]
     fn sketch_options_default_as_live() {
         let o = SketchOptions::default();
-        assert!(o.show_constraints && o.show_errors && !o.show_expressions);
+        assert!(!o.show_constraints && o.show_errors && !o.show_expressions);
     }
 
     #[test]

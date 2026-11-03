@@ -3557,7 +3557,12 @@ impl PartStudioView {
                         leader = true;
                         (x, y, -27.0 - 22.0 * kf, -26.0)
                     } else if let Some((nx, ny)) = line_side(g.entity) {
-                        (x + nx * 20.5, y + ny * 20.5, -10.0 - 11.0 * (n - 1.0) + 22.0 * kf, -10.0)
+                        // Shown only because its line is hovered (Show
+                        // constraints off): the row sits ~40 px on the other
+                        // side, above a horizontal line (live 1938).
+                        let hover_only = !show_all && ed.hover == Some(g.entity) && !ed.selection.contains(&g.entity) && !ed.selected_constraints.contains(&g.constraint);
+                        let off = if hover_only { -39.0 } else { 20.5 };
+                        (x + nx * off, y + ny * off, -10.0 - 11.0 * (n - 1.0) + 22.0 * kf, -10.0)
                     } else if g.icon == "flow" {
                         // Live 1716: below the curve on a short grey leader.
                         hang = true;

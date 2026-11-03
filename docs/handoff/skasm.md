@@ -1,6 +1,16 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
-## Resume here (2026-11-03 17:25 UTC)
+## Resume here (2026-11-03 23:22 UTC)
+Lead's 22:3x round: (1) SKETCH-SPLINE-END-DERIVATIVES closed (handles drawn, drag, a handle alone dimensions as its
+length). (2) Assembly speed measured (Speed targets below: every PLAN target met; a1000 insert 22 ms is the worst,
+a whole evaluation, spread). (3) assembly.md: 80 rows never checked against live → 42 now matched to live captures
+(K / T rows equal live's dumps tab by tab; menus, dialogs, Insert, triad, snap, animate); 38 asked of live in one
+session (REQUESTS 23:11). Show constraints now defaults OFF (live 1940: today's template unticked; sketch/311 was an
+older one); a hovered line's badges sit ~40 px above (1938). Batch 20: 40/40 first (687 of 750). Waiting on live:
+the assembly runner (psui 1941 says next), the 38-row capture. Open sketch fuzz: P2 random ones; s784 / s829
+(live's numerics).
+
+## Resume here, earlier
 Since 16:00 landed: Slot's picked curve stays selected while its preview is pending (SKETCH-TOOL-PICK-SELECTION
 closed; Extend's selected line was one live recording's), `hold_the_base` (s653 / s725: a component the pass can't
 place keeps its unchanged units, lowest first; fuzz 487 of 550), angle value boxes read " deg" (queued e6777140).
