@@ -1633,7 +1633,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   entities, constraints, dimensions) works: Enter keeps the Dimension tool, Enter / Esc never leave the sketch = live.
   qa 11:53: 041a3327 (tools inside dropdowns picked through Search tools) works on green a30088ea: sketch-3-point-arc,
   -slot, -polygon, -spline, -mirror and circular-pattern-dialog all run with no failed step.
-- [ ] P1 DIALOG-SWITCH-DISCARDS-NEW (psui) double-clicking another feature while a **new** feature's dialog is open throws
+  psui 11-03 13:40: the `{"empty": true}` spot was the first free grid point from the graphics area's top-left, inside
+  the open Sketch dialog (a click there doesn't reach the graphics); it now goes from the middle outwards, away from
+  the dialog (marked `dialog`) and the sketch's curves: sketch-line-selected-enter-escape ends with nothing selected.
+  All 274 scenarios now run in ours with every step found (rollback bar, view cube, buttons by tooltip, flip arrows,
+  toolbar and sketch dropdowns, row edges).
+- [x] fixed 5dddf1fc (psui 11-03: another tool or a double-click on another row keeps the open feature as ✓ would; T1 another_tool_keeps_the_open_feature; live's new-extrude-then-other-tool and new-variable-* recordings match) P1 DIALOG-SWITCH-DISCARDS-NEW (psui) double-clicking another feature while a **new** feature's dialog is open throws
   the new feature away in ours; live keeps it: a box (Sketch 1, Extrude 1), Search tools › Variable, Name
   wall_thickness, Value 2 + Enter (the first Enter applies: the row "#wall_thickness = 2 mm" is in the list, the dialog
   stays, = live behaviours "Enter in the Variable dialog"), then double-click the Extrude 1 row. Live (11-03, qa's tab,

@@ -242,6 +242,31 @@ impl PartStudioView {
     }
 
     /// A point of plane `p`'s rectangle in front of every other shown plane and part, near its labelled corner.
+    /// A shown plane is under viewport point `at`, or its outline within the pick's reach.
+    fn plane_near(&self, at: DVec2, cx: &App) -> bool {
+        let vp = self.viewport.read(cx);
+        let (o, d) = vp.ray(at);
+        let d = d.normalize();
+        self.display.planes.iter().filter(|q| !q.hidden).any(|q| {
+            let f = &q.frame;
+            let denom = d.dot(f.normal);
+            let inside = denom.abs() > 1e-9 && {
+                let t = (f.origin - o).dot(f.normal) / denom;
+                let local = f.to_local(o + d * t) - q.center;
+                t > 0.0 && local.x.abs() <= q.half_width && local.y.abs() <= q.half_height
+            };
+            let c = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)].map(|(u, v)| vp.project(q.corner(u, v)));
+            let outline = (0..4).any(|k| match (c[k], c[(k + 1) % 4]) {
+                (Some(a), Some(b)) => {
+                    let t = ((at - a).dot(b - a) / (b - a).length_squared().max(1e-9)).clamp(0.0, 1.0);
+                    (a + (b - a) * t).distance(at) < 15.0
+                }
+                _ => false,
+            });
+            inside || outline
+        })
+    }
+
     fn visible_plane_point(&self, p: &noshape_model::display::PlaneDisplay, cx: &App) -> Option<DVec3> {
         let vp = self.viewport.read(cx);
         let mut grid: Vec<(f64, f64)> = (-6..=6).flat_map(|i| (-6..=6).map(move |j| (i as f64 * 0.15, j as f64 * 0.15))).collect();
@@ -343,7 +368,24 @@ impl PartStudioView {
             mm(p).ok_or("a model point: [x, y, z] mm")?
         } else if t.get("empty").is_some() {
             let size = vp.size();
-            let free = (1..8).flat_map(|i| (1..8).map(move |j| DVec2::new(size.x * i as f64 / 8.0, size.y * j as f64 / 8.0))).find(|at| {
+            // From the middle outwards, away from the open dialog (a click there doesn't reach the graphics) and
+            // from the sketch's curves.
+            let dialog = crate::ui_script::bounds_of("dialog");
+            let origin = vp.origin();
+            let mut grid: Vec<DVec2> = (1..8).flat_map(|i| (1..8).map(move |j| DVec2::new(size.x * i as f64 / 8.0, size.y * j as f64 / 8.0))).collect();
+            grid.sort_by(|a, b| (*a - size * 0.5).length().total_cmp(&(*b - size * 0.5).length()));
+            let near_sketch = |at: DVec2| {
+                let Some(ed) = self.sketch.as_ref() else { return false };
+                let Some(data) = self.sketch_data(cx) else { return false };
+                let (o, d) = vp.ray(at);
+                let Some(p) = ed.plane_point(o, d) else { return true };
+                data.sketch.pick(p, ed.world_per_px * 20.0).is_some()
+            };
+            let free = grid.into_iter().find(|at| {
+                let win = origin + point(px(at.x as f32), px(at.y as f32));
+                if dialog.is_some_and(|b| b.dilate(px(10.)).contains(&win)) || near_sketch(*at) || self.plane_near(*at, cx) {
+                    return false;
+                }
                 let (o, d) = vp.ray(*at);
                 noshape_model::interaction::entities_along_ray(&self.display, o, d, 0.0, &|_| false, 1).is_empty()
             });

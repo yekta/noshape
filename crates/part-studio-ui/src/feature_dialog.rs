@@ -3896,6 +3896,7 @@ impl Render for FeatureDialog {
         let renaming = self.renaming.clone();
         v_flex()
             .id("feature-dialog")
+            .map(|d| crate::ui_script::mark(d, || "dialog".into()))
             // Clicks on the dialog never reach the graphics area beneath.
             .occlude()
             .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| {
