@@ -59,6 +59,19 @@ at the defaults' 202 faces vs 152: core's fillet split). T1 onshape_ux::spur_gea
 with the gear source in the untracked .parity-fs: `rb.sh env NOSHAPE_PARITY_FS=../../.parity-fs cargo test -p
 noshape-model --test all custom_features::public_spur_gear_as_live -- --ignored --nocapture`.
 
+10:00: qa's 33 sketch recordings (/root/parity/ui/live-x40): 32/33 (the one: live's step-1 timing, as trim-drag);
+my 25 in /root/parity/ui/live: 19/25 with the value box fix (the rest: 1866's Perpendicular, extend's selection,
+trim-drag's timing, arc-radius recorded before its 08:27 change: asked to re-record). f54 checked: its loop is
+consistent, so ours flags nothing; live flags 2 of 3 there but all 3 in probes 4: no rule from one case, stays KNOWN.
+Sent sketch batch 12 (REQUESTS 09:42; s621–s660, 3 new kinds: T profile, U bend, stepped shaft half; ours 40/40
+solved). Asked live (09:40) for ball drags at 5 distances / 2 views (d6's objective). T2 live_fuzz::write_batch
+passes again (spline end derivatives left out of its check). Assembly drag substeps are now
+`Prepared::solve_drag`, shared by the app, assembly_perf and oracle_asm's drag probes (which had their own loops).
+Measured on the real path, 03:55's substeps had slowed a1000's drag frame 8.2 -> 10.6 ms; now one solve is tried
+while the steps land (substeps only for turns / held-off drags; poses as before within 1e-6 mm). vibe3 release,
+substeps -> now: a200 in-plane drag 0.89 -> 0.22 ms, off-plane 1.07 -> 1.06, 1000 pins 0.64 -> 0.16, a1000 frame
+10.6 -> 3.7 ms (270 fps).
+
 ## State at 01:30 UTC
 Landed overnight (all on main by dabe8513): sketch drag far hold (g6) and levels + farthest point (g4); drag from the
 drag's start (live drag probes 12: the result depends only on where the drag ends) in dragged components of <= 60
