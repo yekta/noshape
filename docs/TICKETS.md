@@ -3157,7 +3157,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   evBox3d (tight) of the thickened strip 3.6 s (OCCT's optimal box on two offset faces over a 595-span B-spline,
   BRepBndLib::AddOptimal) and 2 s of min_distance (6 calls); the thicken itself 90 ms, the volume 1.3 s. Live's time
   not measured yet. (core 11-03)
-- [ ] P2 FILLET-BLEND-SPLIT (core / kernel; dx's FeatureScript corpus 11-03, cf-planetary-gears) a fillet of a
+- [x] (core 11-03 15:56: ChFi3d's walk restarted 0.5 mm into each 5.1 mm root edge at its default tolerances (Tesp 1e-4 …); when a lone edge (no other filleted edge at its ends) comes out in more than one face, features.cpp fillet_build builds again with tolerances ten times tighter: one face, a cylinder there (both walls extrusions). cf-planetary-gears 111 / 75 / 255 faces as live; the blend corpus: one case changes the same way (333e2411: 15 -> 13 faces, −0.0025 mm³), re-recorded; the drafted-block corner cases untouched (their edges meet others)) P2 FILLET-BLEND-SPLIT (core / kernel; dx's FeatureScript corpus 11-03, cf-planetary-gears) a fillet of a
   straight edge between a cylinder and an extruded fit spline comes out as two faces stacked along the edge where
   live's is one: the Planetary Gears feature's root fillets (its gear studio's `opFillet` of each tooth gap's two
   vertical edges, dedendum cylinder × involute) are B-spline faces of 0.668 + 5.913 mm² split at 1/10 of the 5.08 mm
