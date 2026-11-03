@@ -207,6 +207,10 @@ impl<'a> Translator<'a> {
                     tolerances += 1;
                     continue;
                 }
+                // The pre-V2 Hole's standards (std hole.fs: `!isV2` branch).
+                if ["standardTappedOrClearance", "standardBlindInLast"].contains(&id) && given.contains(&"isV2") {
+                    continue;
+                }
                 let stem = id.trim_end_matches("V2");
                 if given.contains(&format!("{stem}V3").as_str()) || given.contains(&format!("{stem}V2").as_str()) && known.iter().any(|n| *n == format!("{stem}V2")) {
                     continue;
