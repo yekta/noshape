@@ -3232,7 +3232,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   78.315557 mm², ours 47.117-47.144 / 78.277-78.297: where two tori meet at a lobe's sharp vertical edge, OCCT's
   approximated intersection trims them short. Exact torus/torus corners (noshape's blend: "a corner between blended
   edges not lines") are the fix.
-- [ ] P2 FILLET-MEETING-FILLETS-ONE-FACE (core; dx's parity suite 11-03, pulley02-maxwell) two fillets that meet on
+- [x] (core 11-03 23:20: OCCT's unify tells two tori are one only by intersecting them (IntPatch, which can't): adjacent faces on equal tori / spheres (frame and radii within confusion) now get one surface first (boolean.cpp share_equal_surfaces, their edges' curves moved over; kept only where the unified result is valid), and the Fillet feature unifies its result where only its blends merge (detail.rs merged_blends). pulley02-maxwell 7/7 to the end; T1 kernel blend::a_grooves_two_rounds_on_one_torus_unify_to_one_face; Boolean corpus as before (the same 4 of 974), blend corpus unchanged) P2 FILLET-MEETING-FILLETS-ONE-FACE (core; dx's parity suite 11-03, pulley02-maxwell) two fillets that meet on
   one surface stay two faces in ours where live's part has one: pulley02's Fillet 1 rounds both bottom corners of a
   revolved groove 6.35 mm high with r 3.175 mm (1/8 in), so the two fillets meet at the groove's middle on one torus;
   live's part is 5 faces / 4 edges, ours 6 / 5 (the volume is live's). Live keeps the round groove as one face.
