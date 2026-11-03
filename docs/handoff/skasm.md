@@ -18,7 +18,9 @@ then N again flips to Bottom as live), corner rectangle with live's glyphs, corn
 Revolute pin drag only spins it: no regressions (screens /root/skasm-scratch/walk1103/). Sent batch 10 (s541–s580,
 3 new kinds: isosceles triangle, one rounded corner, two-hole flange).
 **Batch 10 answered (live 1841): 36/40 on the first answer.** Next (P1, everyday kinds), in order:
-1. s548 / s556 / s547 (rectangle with one rounded corner; width / height / radius change): live keeps the left, bottom
+1. s548 fixed (04:20: placed neighbour lines slide too). Left: s556 / s547 (tried: own-size-first tie-break (orders
+   l5 second but the arc is then carried before the top: no change); the slide rung before carrying for arcs: s547
+   exact but s214 0.4 -> 69, s223, s202, s238 worse). Original note: s548 / s556 / s547 (rectangle with one rounded corner; width / height / radius change): live keeps the left, bottom
    AND top lines' levels (the bottom-left corner), the right side shortens and the arc grows into the corner. Ours
    places l1, carries l2 up whole (shape 3, its length kept), so the bigger arc can't meet l4's level and l4 fails ->
    the whole component falls back to least squares (splits the change about the middle). Needs: an H / V line whose
