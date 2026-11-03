@@ -3127,7 +3127,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   four tori 309.756 mm², four blends 31.32 mm² and four 28.742 mm² (OTHER), the cylinder 1764.49 mm², a plane
   434.112 mm² (live.jsonl line 9 bodies). Model: /root/parity/models/pipeflange-steven (`parity_models`,
   NOSHAPE_PARITY_ONLY=pipeflange-steven; feature 9). (dx 2026-11-03)
-- [ ] P1 FS-WAVE-SPRING (core; dx's FeatureScript corpus 11-03, cf-wave-spring) the community Wave Spring (FeatureScript
+- [x] (core 11-03 15:05: OCCT patch 0020 (29d17a5a, lib synced) and the volume integral's u-isoline skip (acfb0433): the Wave Spring builds as live, 916.595 mm³ / 4402.375 mm² (live 916.533 / 4402.296, in its bands), its feature in 5.8 s instead of 16.6 (157 s reopened); T1 kernel surfacing::a_long_wavy_strip_thickens_along_it; the rest of the time is FS-WAVE-SPRING-SPEED) P1 FS-WAVE-SPRING (core; dx's FeatureScript corpus 11-03, cf-wave-spring) the community Wave Spring (FeatureScript
   336: two opFitSpline of 600 points each, opLoft between them into a wavy strip, opThicken 0.5 mm; Ø25 / Ø20,
   height 25 mm, 10 turns, 5 waves) builds an inside-out solid in ours: volume −555.401 mm³, box ±19 mm (live
   +916.533 mm³, box ±12.5 mm, OK); and it is slow: 16.6 s when the feature is added, **157 s** to regenerate the
@@ -3142,6 +3142,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (8e657637 builds in 155 ms), nothing else changes; the blend corpus as recorded. T1 kernel
   surfacing::a_long_wavy_strip_thickens_along_it lands once the lib is synced. The 157 s were the invalid solid's
   meshing (111 s) and mass properties (56 s).
+- [ ] P2 FS-WAVE-SPRING-SPEED (core; from FS-WAVE-SPRING) the Wave Spring feature still takes 5.8 s in ours: its
+  evBox3d (tight) of the thickened strip 3.6 s (OCCT's optimal box on two offset faces over a 595-span B-spline,
+  BRepBndLib::AddOptimal) and 2 s of min_distance (6 calls); the thicken itself 90 ms, the volume 1.3 s. Live's time
+  not measured yet. (core 11-03)
 - [ ] P2 FILLET-BLEND-SPLIT (core / kernel; dx's FeatureScript corpus 11-03, cf-planetary-gears) a fillet of a
   straight edge between a cylinder and an extruded fit spline comes out as two faces stacked along the edge where
   live's is one: the Planetary Gears feature's root fillets (its gear studio's `opFillet` of each tooth gap's two
