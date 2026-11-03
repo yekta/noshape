@@ -1446,6 +1446,8 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   yet), ours selects nothing (no fillet either). The earlier recording matched ours. Yours.
 - (skasm 22:03: asked live for the badge's place there, REQUESTS; ours: each line's row 20.5 px below its
   midpoint, the upper line's lands on the lower line's midpoint at the runner's zoom.)
+  Live answered (1938, 22:1x): its runner's account has Show constraints off, so no badges; with it on, live places
+  them as ours. Asked live (REQUESTS) which default a fresh account has (ours: on, from qa4 F1 / sketch/311).
   11-03 21:44 (psui): sketch-equal (new recording) differs at step 12: a click at the lower line's midpoint [15, 0] selects
   the line in live (hover = the line); in ours a Horizontal badge sits right there (the one lighting up the upper
   line, it seems: shot /root/psui-scratch/sketch-equal-badge.png), so the click takes the badge and nothing is
