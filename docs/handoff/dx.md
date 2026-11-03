@@ -784,6 +784,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    through the API; check the app's Insert panel), workflow-drawing.md D14/D16 (D8, D12 verified 10-27).
 
 ## Requests to the lead
+- (11-03 01:15) For qa's SCORE.md: the model suite runs where the models are (this machine):
+  `NOSHAPE_RB_LOCAL=1 tools/tiers/rb.sh cargo test -q -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`
+  (NOSHAPE_PARITY_MODELS to point elsewhere, NOSHAPE_PARITY_ONLY=<name> for one). It prints per document the first
+  differing feature, what wasn't translated, our vs live's regeneration time, the score line and the five biggest
+  causes; report.json lands next to the models directory.
 - (10-29 16:40) DRAWING-SHIFT-SLASH: done 10-30 as decided (the sheet is app-core's; psui told in their handoff).
 - **land.sh and the 3964a7cf revert (10-29 06:44)**: land.sh did not miss it. The change touched model-data, so its
   crate list (reverse dependencies) included noshape-ops, and vibe3 ran noshape-ops' full tests (e2e included) green. All
