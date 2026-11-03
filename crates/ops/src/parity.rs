@@ -5,10 +5,11 @@
 //! reports per feature with the reason.
 //!
 //! Queries name Onshape's own entities (`deterministicIds`), which mean
-//! nothing here: each is matched by geometry from `refs.jsonl` (live's
-//! evaluation of every referenced id before the feature), else by the few
-//! forms readable from the query itself (default planes, a sketch's
-//! regions).
+//! nothing here: each is matched by geometry, from the bodydetails live.jsonl
+//! carries or `refs.jsonl`, else read from the query itself: default planes
+//! and the Origin, a sketch's regions and entities, and Onshape's names for
+//! what an Extrude or Revolve made (packed `qCompressed` queries decoded with
+//! the FeatureScript host's unpacker). Units follow the document's.
 
 use crate::{Ctx, registry};
 use serde_json::{Map, Value, json};
@@ -70,8 +71,52 @@ fn f3(v: &Value) -> Option<[f64; 3]> {
     Some([a.first()?.as_f64()?, a.get(1)?.as_f64()?, a.get(2)?.as_f64()?])
 }
 
+/// A point (m) as ops take it, with its unit: right in any workspace units.
 fn mm(p: [f64; 3]) -> Value {
-    json!([p[0] * 1000.0, p[1] * 1000.0, p[2] * 1000.0])
+    json!(p.map(|c| format!("{} mm", c * 1000.0)))
+}
+
+/// Metres per unit of an ops reply's `units.length` ("mm", "in", …).
+fn per_unit(units: &Value) -> f64 {
+    match units["length"].as_str().unwrap_or("mm") {
+        "m" => 1.0,
+        "cm" => 1e-2,
+        "in" => 0.0254,
+        "ft" => 0.3048,
+        "yd" => 0.9144,
+        "um" => 1e-6,
+        _ => 1e-3,
+    }
+}
+
+/// The document's units from features.json's `units` (unit info, either
+/// `{"length": "millimeter"}` or REST's `defaultUnits` list), in set_units' words.
+fn doc_units(u: &Value) -> (Option<&'static str>, Option<&'static str>) {
+    let mut length = u["length"].as_str();
+    let mut angle = u["angle"].as_str();
+    for d in u["defaultUnits"].as_array().into_iter().flatten() {
+        match d["key"].as_str().map(str::to_uppercase).as_deref() {
+            Some("LENGTH") => length = d["value"].as_str(),
+            Some("ANGLE") => angle = d["value"].as_str(),
+            _ => {}
+        }
+    }
+    let l = length.and_then(|l| match l.to_lowercase().as_str() {
+        "millimeter" | "mm" => Some("mm"),
+        "centimeter" | "cm" => Some("cm"),
+        "meter" | "m" => Some("m"),
+        "inch" | "in" => Some("in"),
+        "foot" | "ft" => Some("ft"),
+        "yard" | "yd" => Some("yd"),
+        "micrometer" | "um" => Some("um"),
+        _ => None,
+    });
+    let a = angle.and_then(|a| match a.to_lowercase().as_str() {
+        "degree" | "deg" => Some("deg"),
+        "radian" | "rad" => Some("rad"),
+        _ => None,
+    });
+    (l, a)
 }
 
 /// Parses `refs.jsonl` (one referenced id per line, see the module docs).
@@ -109,6 +154,18 @@ impl<'a> Translator<'a> {
         let _ = std::fs::remove_file(path);
         let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, notes: Vec::new() };
         t.call("document_create", json!({ "path": path.to_str().ok_or("path")? }))?;
+        // Bare numbers in Onshape's expressions are in the document's units.
+        let (length, angle) = doc_units(&doc["units"]);
+        if length.is_some() || angle.is_some() {
+            let mut a = json!({});
+            if let Some(l) = length {
+                a["length_unit"] = json!(l);
+            }
+            if let Some(g) = angle {
+                a["angle_unit"] = json!(g);
+            }
+            t.call("document_set_units", a)?;
+        }
         for c in doc["configuration"]["configurationParameters"].as_array().into_iter().flatten() {
             t.config_input(c);
         }
@@ -458,10 +515,11 @@ impl<'a> Translator<'a> {
         for r in g["regions"].as_array().into_iter().flatten() {
             let (u, v) = (r["inside"][0].as_f64().unwrap_or(0.0), r["inside"][1].as_f64().unwrap_or(0.0));
             // Ours (mm, our frame) → Onshape's sketch plane (m).
-            let w: Vec<f64> = (0..3).map(|i| (o[i] + u * x[i] + v * y[i]) / 1000.0).collect();
+            let k = per_unit(&g["units"]);
+            let w: Vec<f64> = (0..3).map(|i| (o[i] + u * x[i] + v * y[i]) * k).collect();
             let p = match frame {
                 Some([fo, fx, fy]) => [(0..3).map(|i| (w[i] - fo[i]) * fx[i]).sum::<f64>(), (0..3).map(|i| (w[i] - fo[i]) * fy[i]).sum::<f64>()],
-                None => [u / 1000.0, v / 1000.0],
+                None => [u * k, v * k],
             };
             let crossings = segments.chunks(2).filter(|s| (s[0][1] > p[1]) != (s[1][1] > p[1]) && p[0] < s[0][0] + (p[1] - s[0][1]) * (s[1][0] - s[0][0]) / (s[1][1] - s[0][1])).count();
             let area = r["area"].as_f64().unwrap_or(0.0);
@@ -544,7 +602,7 @@ impl<'a> Translator<'a> {
                 let g = self.call("sketch_get", json!({ "sketch": our_sketch }))?;
                 let f = |k: &str| f3(&g["frame"][k]).ok_or("sketch frame");
                 let o = f("origin")?;
-                [o.map(|c| c / 1000.0), f("x")?, f("y")?]
+                [o.map(|c| c * per_unit(&g["units"])), f("x")?, f("y")?]
             }
         };
         let world = |p: [f64; 2]| [o[0] + p[0] * x[0] + p[1] * y[0], o[1] + p[0] * x[1] + p[1] * y[1], o[2] + p[0] * x[2] + p[1] * y[2]];
@@ -577,7 +635,7 @@ impl<'a> Translator<'a> {
                 let g = self.call("sketch_get", json!({ "sketch": our_sketch }))?;
                 let f = |k: &str| f3(&g["frame"][k]).ok_or("sketch frame");
                 let o = f("origin")?;
-                [o.map(|c| c / 1000.0), f("x")?, f("y")?]
+                [o.map(|c| c * per_unit(&g["units"])), f("x")?, f("y")?]
             }
         };
         let n = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
@@ -603,7 +661,8 @@ impl<'a> Translator<'a> {
             _ => ("faces", "centroid", world(mid(&curves[0]))),
         };
         let found = self.call("query_entities", json!({ "kind": kind, "created_by": ours, "limit": 200 }))?;
-        let cands: Vec<(String, [f64; 3])> = found[kind].as_array().into_iter().flatten().filter_map(|e| Some((e["id"].as_str()?.to_string(), f3(&e[key])?.map(|c| c / 1000.0)))).collect();
+        let k = per_unit(&found["units"]);
+        let cands: Vec<(String, [f64; 3])> = found[kind].as_array().into_iter().flatten().filter_map(|e| Some((e["id"].as_str()?.to_string(), f3(&e[key])?.map(|c| c * k)))).collect();
         let pick = match name {
             // On the line through the sketch point along the normal; swept
             // faces: the one whose centroid is nearest that line.
@@ -661,14 +720,16 @@ impl<'a> Translator<'a> {
         if let Some(n) = r.normal {
             a["normal"] = json!(n);
         }
-        let mut found = self.call("query_entities", a.clone()).ok()?[kind].as_array().cloned().unwrap_or_default();
-        if found.is_empty() && r.normal.is_some() {
+        let mut reply = self.call("query_entities", a.clone()).ok()?;
+        if reply[kind].as_array().is_none_or(Vec::is_empty) && r.normal.is_some() {
             // The normal's sense isn't always certain.
             a.as_object_mut().map(|m| m.remove("normal"));
-            found = self.call("query_entities", a).ok()?[kind].as_array().cloned().unwrap_or_default();
+            reply = self.call("query_entities", a).ok()?;
         }
-        let (key, scale) = if kind == "faces" { ("area", 1e6) } else { ("length", 1e3) };
-        let same = |e: &&Value| r.measure.zip(e[key].as_f64()).is_some_and(|(m, ours)| (ours / scale - m).abs() <= 1e-5 * m.abs() + 1e-12);
+        let found = reply[kind].as_array().cloned().unwrap_or_default();
+        let k = per_unit(&reply["units"]);
+        let (key, scale) = if kind == "faces" { ("area", k * k) } else { ("length", k) };
+        let same = |e: &&Value| r.measure.zip(e[key].as_f64()).is_some_and(|(m, ours)| (ours * scale - m).abs() <= 1e-5 * m.abs() + 1e-12);
         found.iter().find(same).or(found.first()).and_then(|e| e["id"].as_str()).map(str::to_string)
     }
 
@@ -685,10 +746,11 @@ impl<'a> Translator<'a> {
             for r in g["regions"].as_array().into_iter().flatten() {
                 let c = &r["center"];
                 let (u, v) = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
-                let w: Vec<f64> = (0..3).map(|i| (o[i] + u * x[i] + v * y[i]) / 1000.0).collect();
+                let k = per_unit(&g["units"]);
+                let w: Vec<f64> = (0..3).map(|i| (o[i] + u * x[i] + v * y[i]) * k).collect();
                 let d = (0..3).map(|i| (w[i] - p[i]).powi(2)).sum::<f64>().sqrt();
                 if let Some(a) = area
-                    && r["area"].as_f64().is_none_or(|ours| (ours * 1e-6 - a).abs() > 1e-6 * a.max(1e-12))
+                    && r["area"].as_f64().is_none_or(|ours| (ours * k * k - a).abs() > 1e-6 * a.max(1e-12))
                 {
                     continue;
                 }
@@ -722,7 +784,7 @@ impl<'a> Translator<'a> {
         // Onshape's frame when known, else our frame's mm.
         let at = |u: f64, v: f64| match frame {
             Some([o, x, y]) => mm([o[0] + u * x[0] + v * y[0], o[1] + u * x[1] + v * y[1], o[2] + u * x[2] + v * y[2]]),
-            None => json!([u * 1000.0, v * 1000.0]),
+            None => json!([format!("{} mm", u * 1000.0), format!("{} mm", v * 1000.0)]),
         };
         let mut shapes = Vec::new();
         let mut local = Vec::new();
@@ -1111,7 +1173,8 @@ pub fn live_parts(line: &Value) -> Vec<PartState> {
 /// Our parts now, SI.
 pub fn our_parts(t: &mut Translator) -> Result<Vec<PartState>, String> {
     let r = t.call("query_parts", json!({}))?;
-    let at = |v: &Value| f3(v).map(|p| p.map(|c| c / 1000.0));
+    let k = per_unit(&r["units"]);
+    let at = |v: &Value| f3(v).map(|p| p.map(|c| c * k));
     Ok(r["parts"]
         .as_array()
         .into_iter()
@@ -1128,8 +1191,8 @@ pub fn our_parts(t: &mut Translator) -> Result<Vec<PartState>, String> {
             faces: p["faces"].as_u64().unwrap_or(0),
             edges: p["edges"].as_u64().unwrap_or(0),
             vertices: p["vertices"].as_u64().unwrap_or(0),
-            volume: p["volume"].as_f64().map(|v| v * 1e-9),
-            area: p["surface_area"].as_f64().map(|a| a * 1e-6),
+            volume: p["volume"].as_f64().map(|v| v * k * k * k),
+            area: p["surface_area"].as_f64().map(|a| a * k * k),
             volume_band: None,
             area_band: None,
             bbox: at(&p["bounding_box"]["min"]).zip(at(&p["bounding_box"]["max"])).map(|(a, b)| [a, b]),

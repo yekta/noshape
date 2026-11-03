@@ -321,3 +321,26 @@ fn extrude_edges_are_read_from_onshapes_names() {
     let r = run_model("packed-names", &features, &live, "");
     assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
+
+/// An inch document (features.json `units`): a bare number is inches, so the
+/// fillet's "0.11811023622" is the same 3 mm, and every measure is compared
+/// in SI whatever our workspace units.
+#[test]
+fn an_inch_documents_bare_numbers_are_inches() {
+    let (mut features, mut live, refs) = block_model();
+    features["units"] = json!({ "length": "inch", "angle": "degree" });
+    for f in features["features"].as_array_mut().unwrap() {
+        for p in f["parameters"].as_array_mut().into_iter().flatten() {
+            if p["parameterId"] == "radius" {
+                p["expression"] = json!("0.11811023622");
+            }
+        }
+    }
+    for l in &mut live {
+        for p in l["parts"].as_array_mut().into_iter().flatten() {
+            p.as_object_mut().unwrap().remove("area");
+        }
+    }
+    let r = run_model("block-inch", &features, &live, &refs);
+    assert_eq!((r.matching, r.compared), (3, 3), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
