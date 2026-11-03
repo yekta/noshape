@@ -1395,6 +1395,18 @@ fn a_distance_in_a_loop_keeps_the_dimensioned_side() {
     }
 }
 
+/// s811 (batch 16) stays as live answered: a lever's centre distance (a
+/// construction line) and its big radius shrink: the line keeps its start, the
+/// small arc's centre comes in with it, then the arcs, then the tangent lines.
+/// T1.
+#[test]
+fn a_lever_hangs_on_its_centre_line() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-16.live.json")).unwrap()).unwrap();
+    let ours = batch(1, 811, true);
+    let d = differences(&ours["cases"][0], &live["cases"]["s811"]);
+    assert!(d.is_empty(), "s811: {}", d.join("; "));
+}
+
 /// A trapezoid keeps its shorter side, whichever way its height's Distance
 /// runs, upright or inverted, drawn from either side (live probes 14 q1-q4,
 /// probes 15); a new length of the longer side centres it under the shorter

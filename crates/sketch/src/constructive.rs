@@ -495,7 +495,21 @@ impl Sketch {
             // In a loop placed round from its anchor, a curve whose Equal
             // partner's dimension resizes it is pending too.
             let chained_change = |u: EntityId| usize::from(anchored.contains(&u) && self.chained_size(u, cons).is_some_and(|k| (k.value().unwrap_or(0.0) - self.size(u)).abs() > 1e-9));
-            let rank = |u: EntityId| (pending(u) + chained_change(u), adjacent(u), joined(u));
+            // A construction line with a new Length of its own goes first:
+            // the profile hangs on it (live fuzz s811: a lever's centre
+            // distance keeps its start, the small arc's centre comes in
+            // before that arc is placed).
+            let skeleton = |u: EntityId| {
+                usize::from(self.entity(u).is_some_and(|e| e.construction && e.kind() == EntityKind::Line) && cons.iter().any(|(c, us)| us.as_slice() == [u] && !holds[c] && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Length { .. }))))
+            };
+            // Then the arcs and circles centred on a placed one's ends.
+            let on_skeleton = |u: EntityId| {
+                let centre = self.entity(u).filter(|e| matches!(e.kind(), EntityKind::Arc | EntityKind::Circle)).and_then(|e| e.center());
+                usize::from(centre.is_some_and(|c| {
+                    placed.iter().filter(|x| self.entity(**x).is_some_and(|e| e.construction && e.kind() == EntityKind::Line)).filter_map(|x| self.endpoints(*x)).any(|(a, b)| [a, b].iter().any(|p| *p == c || self.coincident_class(c).contains(p)))
+                }))
+            };
+            let rank = |u: EntityId| (pending(u) + chained_change(u) + 100 * skeleton(u) + 50 * on_skeleton(u), adjacent(u), joined(u));
             let best = open.iter().map(|u| rank(*u)).max().unwrap();
             // First, a relation between units that doesn't hold, none of
             // them placed: the member it keeps stays as it is (if its own

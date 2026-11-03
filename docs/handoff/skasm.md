@@ -13,7 +13,7 @@ outer side, rectangle's bottom): s747 / q5 fixed, fuzz 488 of 550, probes 14 6/8
 top-left corner) every way (q2 / q4, s753, s713): upper, drawn later or shorter? SKETCH-REDUNDANT-SOLVES landed 6d7cfeb3 (a dimension inside a dependency over-defines; chain slots without their offsets' distances); dx's parity_models with and without it: no document changes (cf-parameter-pattern flips 8/9 / 9/9 run to run). Probes 15 answered (18:39): a trapezoid keeps its **shorter** side (upright or inverted, drawn either way, the Distance
 either way); `kept_across` hands such a shape to `hold_the_base` with that side held first (resized: from its lowest
 point, or from the Distance's corner when the other side resizes too: s713). Probes 14 8/8, 15 6/6; fuzz 490 of 550
-(s713, s753 fixed). FUZZ_PROBE takes `14:q2` (names repeat across sets). **Waiting on live: batch 16** (sent 17:27).
+(s713, s753 fixed). FUZZ_PROBE takes `14:q2` (names repeat across sets). Batch 16 answered (19:42): 39/40 first, 40/40 now (s811: a construction line with a new Length is placed first, then arcs centred on its ends); batches 1-16 530 of 590. Next: batch 17 (more everyday kinds), the P2 random cases.
 
 ## 2026-11-03 12:55 UTC
 Live 1866 answered and done (queued b5a2cf4c): a line square to a woken line whose direction a constraint holds is
