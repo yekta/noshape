@@ -76,6 +76,11 @@ tonight's rules generalise. Probes 13 answered (live 1824; 3/13 match): s209 kee
 (Angle l2–l4) and k11 (Distance l4.end–l3.start) are there, l1 = l4 then take the new length (32.098); just not
 keeping l4 in the keep step made s209 worse (42.9 -> 70.6): the corner has to be what's kept (a point keep, not a
 unit keep). s11's remaining probe differences come from the two Equals together (r11-k10 / k11 match).
+s240 (06:15): live scales the first rectangle (relations only, its diagonal Distance changed) uniformly about the
+Distance's first point; ours can't: `scale_for_chord` wants one changed relation per component and the second
+rectangle (its own Length change) is tied in by a Perpendicular. Tried: any point-to-point Distance scaling its
+component: s235 0 -> 95 mm, probes 6 10 -> 2 (between-loop distances). Needs a per-loop version (a closed loop whose
+only change is a Distance between two of its own points, no sizes of its own).
 Live's single-jump rule (one drag event after the threshold moves nothing) not done: the agent API's drag op would
 need an extra step first (P3).
 Lead's list (20:15), in order:
