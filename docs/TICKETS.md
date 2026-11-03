@@ -2219,6 +2219,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
+- [ ] P3 SKETCH-TOOL-PICK-SELECTION (skasm) a curve clicked with the Slot or Extend tool is selected in live, not in ours:
+  live's ui-parity recordings sketch-slot-on-line (step 8: the line clicked with Slot → selection 1 SKETCH_ENTITY, the slot
+  previews; Enter makes it) and sketch-extend-to-line (step 12: the line clicked with Extend → selection 1) vs ours on
+  green add4e920 (selection 0 at both; the slot's entities and the rest identical). The only two of live's 63 recordings
+  that differ today (61/63 match). (qa 2026-11-03 14:30, build add4e920)
 - [x] skasm 11-03 07:40: fit splines are cubics with their knots at the centripetal parameters (live 1777: s202's
   0.3425 / 0.6367 exact), natural ends without handles (the Spur Gear's root fillet r 0.378848 mm = live's; averaged
   knots gave 0.37885), and a spline through a closed polygon (one point first and last) is periodic (the closed
