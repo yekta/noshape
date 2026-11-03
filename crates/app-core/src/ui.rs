@@ -393,7 +393,10 @@ pub struct PlacedTooltip {
 
 impl Render for PlacedTooltip {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        crate::ui_script::note_tooltip(&self.text);
+        // Noted only when drawn: not under an open right-click menu, nor while pressed.
+        if !crate::os_menu::is_open(cx) && !self.pressed.get() {
+            crate::ui_script::note_tooltip(&self.text);
+        }
         let pal = p();
         let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(2.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }];
         let a = self.anchor;

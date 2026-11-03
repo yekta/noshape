@@ -643,6 +643,7 @@ impl Render for OsMenu {
             .on_mouse_down_out(cx.listener(|this, e: &MouseDownEvent, window, cx| {
                 if !this.contains(e.position, cx) {
                     this.dismiss(window, cx);
+                    cx.set_global(PressClosedMenu(Some(e.position)));
                 }
             }))
             .on_hover(cx.listener(|this, h: &bool, _, cx| {
@@ -769,6 +770,19 @@ pub fn ui_state(cx: &App) -> Option<serde_json::Value> {
     Some(serde_json::json!({ "kind": "context-menu", "rows": rows, "highlighted": highlighted, "disabled": disabled }))
 }
 
+/// Where a press outside the open menu last closed it.
+#[derive(Default)]
+struct PressClosedMenu(Option<Point<Pixels>>);
+
+impl Global for PressClosedMenu {}
+
+/// The click `e` only closed an open menu (its press closed it, at the same place): an element's click handler then
+/// does nothing (live: a click beside an open context menu only closes it).
+pub fn click_closed_menu(e: &ClickEvent, cx: &mut App) -> bool {
+    let ClickEvent::Mouse(m) = e else { return false };
+    cx.default_global::<PressClosedMenu>().0.take() == Some(m.down.position)
+}
+
 /// A right-click menu is open (hover tooltips under it should not show).
 pub fn is_open(cx: &App) -> bool {
     cx.try_global::<OsMenuHost>().is_some_and(|h| h.0.is_some())
@@ -845,6 +859,29 @@ pub trait OsContextMenuExt: InteractiveElement + Sized {
                 open(e.position + point(px(0.), px(2.)), menu, window, cx);
             }
         })
+    }
+
+    /// [`os_context_menu`](Self::os_context_menu) that a Ctrl+click opens too (live: a feature-list row's Ctrl+click
+    /// opens its menu on Linux as on macOS, behaviours "ui-parity runner (2026-11-03, P1 request 1844)").
+    fn os_context_menu_ctrl_click(self, f: impl Fn(OsMenu, &mut Window, &mut Context<OsMenu>) -> OsMenu + 'static) -> Self {
+        let f = Rc::new(f);
+        let g = f.clone();
+        self.capture_any_mouse_down(move |e, window, cx| {
+            if e.button != MouseButton::Left || !e.modifiers.control || e.modifiers.platform {
+                return;
+            }
+            // With a menu open the press only closes it (live ui-parity feature-row-mod-click-toggle).
+            if is_open(cx) {
+                return;
+            }
+            cx.stop_propagation();
+            let g = g.clone();
+            let menu = OsMenu::build(window, cx, move |m, window, cx| g(m, window, cx));
+            if !menu.read(cx).is_empty() {
+                open(e.position + point(px(0.), px(2.)), menu, window, cx);
+            }
+        })
+        .os_context_menu(move |m, window, cx| f(m, window, cx))
     }
 
     /// [`os_context_menu`](Self::os_context_menu) taken in the capture phase,

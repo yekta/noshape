@@ -59,7 +59,8 @@ and noshape through crates/ops. `"empty"` is a new Part Studio in mm.
   `{"dropdown": "Blind", "pick": "Up to next"}`, `{"button": "ok" | "cancel" | "?"}`, a chip's ×
   `{"button": "x", "field": "Entities to fillet"}`, other buttons by tooltip, a row's eye
   `{"button": "eye", "feature": "Sketch 1"}`.
-- `{"feature": "Extrude 1"}`, `{"part": "Part 1"}`, `{"rollback_bar": true}`, `{"rollback_to": "Extrude 1"}`.
+- `{"feature": "Extrude 1"}`, `{"part": "Part 1"}`, `{"rollback_bar": true}`, `{"rollback_to": "Extrude 1"}`; a row's top
+  or bottom edge `{"feature": "Extrude 1", "edge": "top"}` (a drag's drop above or below it).
 - `{"list_row": "#wall_thickness"}`: a row of the open autocomplete / dropdown, by its first text.
 - `{"menu": "Suppress"}`: an item of the open context menu.
 - `{"face": [x, y, z]}`, `{"edge": [x, y, z]}`, `{"vertex": [x, y, z]}`: the entity through that model point (mm),

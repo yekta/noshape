@@ -155,7 +155,12 @@ type Studio = Option<Entity<PartStudioView>>;
 fn locate(t: &Value, studio: &Studio, cx: &App) -> Result<Point<Pixels>, String> {
     if let Some(name) = control_name(t) {
         if let Some(b) = noshape_app_core::ui_script::bounds_of(&name) {
-            return Ok(b.center());
+            // A row's top or bottom edge (where a dragged row drops above or below it).
+            return Ok(match t.get("edge").and_then(Value::as_str) {
+                Some("top") => point(b.center().x, b.top() + px(3.)),
+                Some("bottom") => point(b.center().x, b.bottom() - px(3.)),
+                _ => b.center(),
+            });
         }
         // A field named by part of its label ("Distance" for "Offset distance"), when only one matches.
         if let Some(f) = name.strip_prefix("field:").map(str::to_lowercase) {

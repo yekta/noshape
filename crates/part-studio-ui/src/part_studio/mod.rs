@@ -4640,7 +4640,8 @@ impl PartStudioView {
     /// Feature `id` is the sketch right above a rollback bar the user moved up: live shows it, hidden or not
     /// (behaviours request 1844; `regen::display` draws it).
     fn rolled_to(&self, id: FeatureId, cx: &App) -> bool {
-        self.edit.is_none() && self.studio(cx).and_then(|s| s.rolled_to_sketch()) == Some(id)
+        // Also while a feature added at the bar is open (live ui-parity rollback-then-add-feature).
+        self.edit.as_ref().is_none_or(|e| e.is_new) && self.studio(cx).and_then(|s| s.rolled_to_sketch()) == Some(id)
     }
 
     /// The existing feature being edited uses feature `id` (its sketch, a plane): rolled back to before it, the
@@ -5014,6 +5015,10 @@ impl PartStudioView {
                 }
             }))
             .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
+                // A click that closed a right-click menu does nothing else (live ui-parity feature-row-mod-click-toggle).
+                if crate::os_menu::click_closed_menu(ev, cx) {
+                    return;
+                }
                 // Configure features: the clicked feature opens with its
                 // configurable parameters outlined.
                 if this.ui.configure_pick.is_some() {
@@ -5106,7 +5111,7 @@ impl PartStudioView {
                 self.doc.read(cx).session.doc.tabs.iter().find(|t| t.id.to_string() == key).map(|t| (t.id, t.name.clone()))
             })
             .flatten();
-        row.os_context_menu(move |menu, window, cx| {
+        row.os_context_menu_ctrl_click(move |menu, window, cx| {
             view.update(cx, |this, cx| {
                 if this.ui.list_menu != Some(id) {
                     this.ui.list_menu = Some(id);
