@@ -58,7 +58,7 @@
   {
    "do": "click",
    "on": {
-    "dropdown": "Full"
+    "checkbox": "Full revolve"
    }
   }
  ]

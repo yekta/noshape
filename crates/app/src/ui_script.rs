@@ -162,11 +162,18 @@ fn locate(t: &Value, studio: &Studio, cx: &App) -> Result<Point<Pixels>, String>
                 _ => b.center(),
             });
         }
-        // A field named by part of its label ("Distance" for "Offset distance"), when only one matches.
-        if let Some(f) = name.strip_prefix("field:").map(str::to_lowercase) {
-            let near: Vec<_> = noshape_app_core::ui_script::named("field:").into_iter().filter(|(k, _)| k.to_lowercase().contains(&f)).collect();
-            if let [(_, b)] = near.as_slice() {
-                return Ok(b.center());
+        // A field named by part of its label ("Distance" for "Offset distance"), a button by the words of its tooltip
+        // ("Mass properties" for "Display mass and section properties", as live's runner), when only one matches.
+        for kind in ["field:", "button:"] {
+            if let Some(f) = name.strip_prefix(kind).map(str::to_lowercase) {
+                let has = |k: &str| {
+                    let k = k[kind.len()..].to_lowercase();
+                    if kind == "field:" { k.contains(&f) } else { f.split_whitespace().all(|w| k.split_whitespace().any(|x| x == w)) }
+                };
+                let near: Vec<_> = noshape_app_core::ui_script::named(kind).into_iter().filter(|(k, _)| has(k)).collect();
+                if let [(_, b)] = near.as_slice() {
+                    return Ok(b.center());
+                }
             }
         }
         return Err(format!("{name} is not shown"));
@@ -328,6 +335,40 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                             sleep(cx, 60).await;
                         }
                         Ok(())
+                    }
+                    // A button not on screen: the view cube's Camera and render options menu (live's runner: "Section
+                    // view" is its "Section view…").
+                    Err(e) if what == "click" && target.get("button").and_then(Value::as_str).is_some() => {
+                        let name = target["button"].as_str().unwrap_or("").to_string();
+                        match cx.update(|_, cx| locate(&json!({ "button": "Camera and render options" }), &ps, cx)).unwrap_or_else(|e| Err(e.to_string())) {
+                            Ok(at) => {
+                                let _ = cx.update(|window, cx| {
+                                    window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }), cx);
+                                    mouse(window, cx, at, MouseButton::Left, Modifiers::default(), 1)
+                                });
+                                sleep(cx, 300).await;
+                                redraw(cx).await;
+                                let row = cx.update(|_, cx| locate(&json!({ "menu": name }), &ps, cx).or_else(|_| locate(&json!({ "menu": format!("{name}…") }), &ps, cx))).unwrap_or_else(|e| Err(e.to_string()));
+                                match row {
+                                    Ok(at) => {
+                                        let _ = cx.update(|window, cx| {
+                                            window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }), cx);
+                                            mouse(window, cx, at, MouseButton::Left, Modifiers::default(), 1)
+                                        });
+                                        pointer = Some(at);
+                                        Ok(())
+                                    }
+                                    Err(_) => {
+                                        // Not there either: close the menu again.
+                                        if let Some(ks) = keystroke("Escape") {
+                                            let _ = cx.update(|window, cx| window.dispatch_keystroke(ks, cx));
+                                        }
+                                        Err(e)
+                                    }
+                                }
+                            }
+                            Err(_) => Err(e),
+                        }
                     }
                     Err(e) => Err(e),
                 },
