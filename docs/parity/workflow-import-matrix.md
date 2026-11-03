@@ -214,3 +214,9 @@ All 144 samples of the 11-01 run are identical (every part name, kind, volume to
 samples are new: knurl-d25x25-45-45.x_t (Part 1, 11598.04092 mm³, 4479 faces) and live-30-features.x_t (Part 1,
 60779.484267 mm³, 48 faces = tests/perf/live-30-features.noshape's 60779.484); live values for both unknown. Open
 items unchanged (the 11-01 list).
+
+## Re-run 2026-11-03 15:40 (dx, agent/dx with the hub seam fix, /root/dx-scratch/imp/impmatrix-seam.log)
+145 of 146 samples identical to the morning run. The one "change" (dx-nist-assembly.x_t reading the .step's parts)
+was the script asking for its tab by a name the .step's import also has (the CLI picked the first tab; a shared name
+is an error naming both ids since cab8e36c). Imported alone the x_t reads as before. New: cf-wiring's fan
+(live's Parasolid export) reads 36 / 82 / 40 and 40 / 88 / 56 faces / edges / vertices, as live.
