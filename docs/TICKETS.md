@@ -3052,6 +3052,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (model-data assembly/config.rs param::FLIP = the internal flag).
   dx 14:50: live's asm-hinge-live (circle-centre and centroid connectors) agrees with the inverted reading too; asked
   live for a pin-in-hole Revolute on mid-axis connectors, default and flipped (REQUESTS 11-03 14:50).
+  skasm 11-03 20:11: live answered (behaviours "dx / skasm … AGENT-FLIP-PRIMARY-INVERTED", 1907): on mid-axis
+  connectors (both Z −Z there) live's default mate and `primaryAxisAlignment: false` give the same unturned pin,
+  (−60, 0, −5) mm; ours lands exactly there by default and with `flip_primary` true (T1 mate_flip::
+  a_pin_revoluted_into_a_fixed_block_lands_as_live), and turns it over with false. So our mid-axis connector's Z
+  agrees with Onshape's and ours = !primaryAxisAlignment holds here too: nothing in the model to change; renaming
+  the op field to the dialog's meaning (true = flipped) is dx's call (both live REST mates were posted, not dialog-made).
 - [x] (core 11-03 11:50: a region's loop that runs along a line and back is cut there into its outer loop and holes (a dead end's pair dropped; eval.rs split_slits): the slit ring extrudes as the plain ring; T1 kernel_robustness::a_region_slit_by_a_line_extrudes) P2 EXTRUDE-SLIT-REGION (core; dx's parity suite 11-03, learning-center-michael) a sketch region bounded on both
   sides by one line doesn't extrude: circles r 75 and r 40 at the origin on Top and a line (40, 0) → (100, 0) mm make
   the ring one region (sketch_get: 12644.91 mm², no hole, the line twice in its boundary); Extrude of it, alone or

@@ -350,3 +350,43 @@ fn editing_a_mate_between_free_parts_moves_the_pin_back_upright() {
     assert!(upright(&q) && near([t[0], t[1], t[2]], [-70.0, 20.0, -15.0], 1e-6), "offset 5 mm: t {t:?}, q {q:?}");
     let _ = std::fs::remove_file(&path);
 }
+
+/// Live 1907 (AGENT-FLIP-PRIMARY-INVERTED): a Ø10 × 30 pin Revolute'd into a
+/// fixed 40 × 40 × 20 block's Ø10 hole on both cylinders' mid-axis connectors
+/// lands unturned, its centre on the hole's: (−60, 0, −5) mm, live's default
+/// mate and its `primaryAxisAlignment: false` alike, ours by default and with
+/// the op's `flip_primary` true (the model's flag, !primaryAxisAlignment).
+#[test]
+fn a_pin_revoluted_into_a_fixed_block_lands_as_live() {
+    for flip in [None, Some(true)] {
+        let dir = std::env::temp_dir().join(format!("noshape-flip1907-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("f.noshape");
+        let _ = std::fs::remove_file(&path);
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top", "tab": "Part Studio 1" }))["sketch"].as_str().unwrap().to_string();
+        call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tab": "Part Studio 1", "tool": "corner_rectangle", "points": [[-20, -20], [20, 20]] }));
+        call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tab": "Part Studio 1", "tool": "circle", "points": [[0, 0], [5, 0]] }));
+        let regions = call(&mut ctx, "sketch_get", json!({ "sketch": sk, "tab": "Part Studio 1" }))["regions"].clone();
+        let ring = regions.as_array().unwrap().iter().max_by(|a, b| a["area"].as_f64().partial_cmp(&b["area"].as_f64()).unwrap()).unwrap()["id"].as_str().unwrap().to_string();
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [ring], "depth": "20 mm" }, "tab": "Part Studio 1" }));
+        studio(&mut ctx, "Part Studio 1", json!({ "tool": "circle", "points": [[60, 0], [65, 0]] }), "30 mm");
+        call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+        call(&mut ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>"], "fixed": true }));
+        let pin = json!({ "instance": "Part 2 <1>", "entity": entity_at(&mut ctx, "Part 2 <1>", "faces", [60.0, 0.0, 15.0]), "inference": "mid_axis" });
+        let hole = json!({ "instance": "Part 1 <1>", "entity": entity_at(&mut ctx, "Part 1 <1>", "faces", [0.0, 0.0, 10.0]), "inference": "mid_axis" });
+        let mut args = json!({ "type": "revolute", "a": pin, "b": hole });
+        if let Some(f) = flip {
+            args["flip_primary"] = json!(f);
+        }
+        call(&mut ctx, "assembly_mate", args);
+        let list = call(&mut ctx, "assembly_list", json!({}));
+        let i = list["instances"].as_array().unwrap().iter().find(|i| i["name"] == "Part 2 <1>").unwrap().clone();
+        let f = |k: &str| i[k].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect::<Vec<f64>>();
+        let (t, q) = (f("translation"), f("rotation"));
+        assert!(near([t[0], t[1], t[2]], [-60.0, 0.0, -5.0], 1e-6) && q[0].abs() < 1e-9 && q[1].abs() < 1e-9 && q[2].abs() < 1e-9, "flip {flip:?}: t {t:?} q {q:?}");
+        let _ = std::fs::remove_file(&path);
+    }
+}
