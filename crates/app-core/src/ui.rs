@@ -124,7 +124,7 @@ pub fn text_width(window: &Window, text: &str, size: f32) -> f32 {
 
 pub fn tooltip(text: impl Into<SharedString>) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
     let text: SharedString = text.into();
-    move |window, cx| styled_tooltip(Tooltip::new(text.clone()), window, cx)
+    move |window, cx| styled_tooltip(Tooltip::new(text.clone()), text.clone(), window, cx)
 }
 
 /// [`tooltip`] for user-authored text (a part's or a tab's name): drawn
@@ -133,11 +133,11 @@ pub fn user_tooltip(text: impl Into<SharedString>) -> impl Fn(&mut Window, &mut 
     let text: SharedString = text.into();
     move |window, cx| {
         let t = text.clone();
-        styled_tooltip(Tooltip::element(move |_, _| user_text(t.clone())), window, cx)
+        styled_tooltip(Tooltip::element(move |_, _| user_text(t.clone())), text.clone(), window, cx)
     }
 }
 
-fn styled_tooltip(tip: Tooltip, window: &mut Window, cx: &mut App) -> AnyView {
+fn styled_tooltip(tip: Tooltip, text: SharedString, window: &mut Window, cx: &mut App) -> AnyView {
     {
         let pal = p();
         let tip = tip
@@ -152,18 +152,22 @@ fn styled_tooltip(tip: Tooltip, window: &mut Window, cx: &mut App) -> AnyView {
             .text_size(px(12.))
             .font_weight(FontWeight::MEDIUM)
             .build(window, cx);
-        cx.new(|_| MenuAwareTip(tip)).into()
+        cx.new(|_| MenuAwareTip(tip, text)).into()
     }
 }
 
 /// A tooltip hidden while a context menu is open: a row's tooltip (shown
 /// once the pointer rests on the right-clicked row) was drawn over the
 /// menu's first items, e.g. "Open version Start" over "Open".
-struct MenuAwareTip(AnyView);
+struct MenuAwareTip(AnyView, SharedString);
 
 impl Render for MenuAwareTip {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div().when(!crate::os_menu::is_open(cx), |d| d.child(self.0.clone()))
+        let shown = !crate::os_menu::is_open(cx);
+        if shown {
+            crate::ui_script::note_tooltip(&self.1);
+        }
+        div().when(shown, |d| d.child(self.0.clone()))
     }
 }
 
@@ -242,6 +246,7 @@ const RICH_TOOLTIP_W: f32 = 400.;
 
 impl Render for RichTooltip {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        crate::ui_script::note_tooltip(&self.title);
         let pal = p();
         // Live (part-studio/10, 11; dom/hover-states.json): both states sit
         // 3 px under the tool, centered on it; a 26 px title row, 12 px / 500,
@@ -388,6 +393,7 @@ pub struct PlacedTooltip {
 
 impl Render for PlacedTooltip {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        crate::ui_script::note_tooltip(&self.text);
         let pal = p();
         let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(2.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }];
         let a = self.anchor;

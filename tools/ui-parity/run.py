@@ -143,6 +143,34 @@ def compare(live, ours):
     return matched, len(pairs), first
 
 
+def check_expect(scenario, ours):
+    """qa's `expect` entries (live facts it knows) against our recording: the failed ones, as text."""
+    steps = {s.get("step"): s.get("state") or {} for s in ours.get("steps", [])}
+    failed = []
+    for e in scenario.get("expect", []):
+        st = steps.get(e.get("after"))
+        if st is None:
+            continue
+        focus, dialog, lst = st.get("focus") or {}, st.get("dialog") or {}, st.get("list") or {}
+        checks = []
+        if "tooltip" in e:
+            checks.append(("tooltip", st.get("tooltip") == e["tooltip"], st.get("tooltip")))
+        if "selection" in e:
+            sel = focus.get("selection") or [None, None]
+            ok = focus.get("label") == e.get("field") and (focus.get("all") if e["selection"] == "all" else sel[0] == sel[1])
+            checks.append(("selection", ok, focus))
+        elif "text" in e and "field" in e:
+            f = next((f for f in dialog.get("fields", []) if f.get("label") == e["field"]), {})
+            checks.append(("text", f.get("text") == e["text"], f.get("text")))
+        if "list" in e:
+            checks.append(("list", lst.get("rows") == e["list"] and lst.get("highlighted") == e.get("highlighted", lst.get("highlighted")), lst))
+        if "popup" in e:
+            name = next((f.get("text") for f in dialog.get("fields", []) if f.get("label") == "Name"), None)
+            checks.append(("popup", dialog.get("title") == e["popup"] and name == e.get("name", name), dialog.get("title")))
+        failed += [f"after {e.get('after')} {what}: ours {json.dumps(got, ensure_ascii=False)[:120]}" for what, ok, got in checks if not ok]
+    return failed
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("names", nargs="*")
@@ -175,8 +203,15 @@ def main():
                 print(f"{name}: {problem}")
                 continue
         live = live_dir / f"{name}.json"
+        if not out.exists():
+            print(f"{name}: not run")
+            continue
         if not live.exists():
-            print(f"{name}: recorded ({out}), no live recording")
+            try:
+                failed = check_expect(json.loads((scen_dir / f"{name}.json").read_text()), json.loads(out.read_text()))
+            except (OSError, ValueError) as e:
+                failed = [str(e)]
+            print(f"{name}: recorded, no live recording" + (f"; expect FAILED: {'; '.join(failed)}" if failed else ""))
             continue
         try:
             ours = json.loads(out.read_text())

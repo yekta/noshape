@@ -64,6 +64,32 @@ pub fn open_list() -> Option<serde_json::Value> {
     open_list_slot().lock().ok()?.clone()
 }
 
+fn tooltip_slot() -> &'static Mutex<Option<String>> {
+    static T: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+    T.get_or_init(Default::default)
+}
+
+/// A tooltip drawn now (`state.tooltip`); the driver clears it and redraws before reading.
+pub fn note_tooltip(text: &str) {
+    if !active() {
+        return;
+    }
+    if let Ok(mut t) = tooltip_slot().lock() {
+        *t = Some(text.to_string());
+    }
+}
+
+/// The tooltip drawn since the last [`clear_tooltip`], if any.
+pub fn shown_tooltip() -> Option<String> {
+    tooltip_slot().lock().ok()?.clone()
+}
+
+pub fn clear_tooltip() {
+    if let Ok(mut t) = tooltip_slot().lock() {
+        *t = None;
+    }
+}
+
 /// Forget every recorded control (before a frame that records what shows now).
 pub fn clear() {
     if let Ok(mut m) = bounds().lock() {

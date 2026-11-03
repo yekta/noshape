@@ -198,6 +198,17 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             let Some(ps) = studio(cx) else { return json!({ "error": "no Part Studio shown" }) };
             cx.update(|window, cx| ps.read(cx).ui_state(window, cx)).unwrap_or(Value::Null)
         };
+        // The state with the tooltip drawn now (a redraw notes it).
+        let read = async |cx: &mut AsyncWindowContext| -> Value {
+            noshape_app_core::ui_script::clear_tooltip();
+            let _ = cx.update(|window, _| window.refresh());
+            sleep(cx, 150).await;
+            let mut s = state(cx);
+            if s.is_object() {
+                s["tooltip"] = json!(noshape_app_core::ui_script::shown_tooltip());
+            }
+            s
+        };
         // Every named control painted where it is now.
         let redraw = async |cx: &mut AsyncWindowContext| {
             noshape_app_core::ui_script::clear();
@@ -223,7 +234,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             eprintln!("UI-SCRIPT warning: the window is not active, fields get no focus events");
         }
         settle(cx).await;
-        let start = state(cx);
+        let start = read(cx).await;
         let mut steps = Vec::new();
         for (i, step) in scenario["steps"].as_array().cloned().unwrap_or_default().into_iter().enumerate() {
             let what = step["do"].as_str().unwrap_or("");
@@ -320,7 +331,8 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                 other => Err(format!("unknown step {other}")),
             };
             settle(cx).await;
-            let mut rec = json!({ "step": i + 1, "do": step, "ok": result.is_ok(), "state": state(cx) });
+            let state_now = read(cx).await;
+            let mut rec = json!({ "step": i + 1, "do": step, "ok": result.is_ok(), "state": state_now });
             if let Err(e) = result {
                 eprintln!("UI-SCRIPT step {}: {e}", i + 1);
                 rec["error"] = json!(e);
