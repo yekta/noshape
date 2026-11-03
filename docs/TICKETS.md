@@ -3103,7 +3103,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   id>", …)`) shows "Imported element … not found" though its Part Studios regenerate with it; live's editor
   resolves imports. The agent API now compiles with the document's tabs (custom::compile_in_document(doc, tab,
   source), dx 11-03); the editor's background compile needs the document's studios passed in. (dx 2026-11-03)
-- [ ] P2 MIRROR-FEATURE-UP-TO (core; dx's parity suite 11-03, clamp-hms) a Mirror of features (patternType FEATURE,
+- [x] (core 11-03 17:24: Extrude 5 raises one of Extrude 4's regions, their sides one face; ours face-patterned each feature alone, so Extrude 5's edges against Extrude 4's faces looked unplaceable. Now the features whose faces on a part share an edge are patterned as one tool, as std's doFacePatternBasedFeaturePattern patterns every face the features created at once. clamp-hms 14/15 features as live (Mirror 1 and Fillet 1; the Hole's in-feature mate connectors are the translator's); T1 model kernel_robustness::feature_mirror_of_a_boss_raised_by_a_second_extrude. With dx's 922a4868 (a sketch line's parts keep their faces), Extrude 2's up-to face translates again) P2 MIRROR-FEATURE-UP-TO (core; dx's parity suite 11-03, clamp-hms) a Mirror of features (patternType FEATURE,
   Reapply features off) of Extrude 4 (Add, Blind, from a sketch on Plane 1, an offset of Front) and Extrude 5 (Add,
   Up to surface = Plane 2, another offset of Front) across Front → ours ERROR "Could not create all instances as
   entered. Try selecting "Reapply features" option." (25/63/40, 117778.8 mm³); live OK, 32/78/48, 123792.2 mm³ (the
