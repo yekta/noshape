@@ -868,6 +868,10 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- 11-03 23:14: **134/150 scenarios, 1101/1142 states** (tests/ui-parity/live, kept in sync with /root/parity/ui/live after each
+  live batch). Left: 7 fillet-* (live's account), 8 sketch (notes in skasm.md), extrude-end-type-up-to-face (live's
+  runner). Since 19:00: rolled-back rows aren't reported hidden (variable-edit-focus). Live's batch reads scenarios from
+  /root/qa-scratch/ui-parity (asked to use main's, REQUESTS 11-03 23:14; its sketch-slot ran old steps: not synced).
 - 11-03 18:31 (psui): P2 IN-FEATURE-MATE-CONNECTOR needs core first. Live answered (behaviours "IN-FEATURE-MATE-
   CONNECTOR", request 1851): Hole's mate connector side button on, a face click makes a connector that lives inside
   the Hole (features.json `subFeatures`), chip "Mate connector", nothing in the feature or parts lists. Proposed model
