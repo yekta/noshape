@@ -756,7 +756,17 @@ impl<'a> Translator<'a> {
             _ => {
                 let over: Vec<&(String, [f64; 3])> = cands.iter().filter(|c| lateral(c.1, at) < 1e-6 || name == "CAP_FACE").collect();
                 let along = |c: &&(String, [f64; 3])| dot(sub(c.1, o), n).abs();
-                if is_start { over.into_iter().min_by(|a, b| along(a).total_cmp(&along(b))) } else { over.into_iter().max_by(|a, b| along(a).total_cmp(&along(b))) }
+                let extreme = if is_start { over.iter().map(along).fold(f64::INFINITY, f64::min) } else { over.iter().map(along).fold(f64::NEG_INFINITY, f64::max) };
+                let level: Vec<&(String, [f64; 3])> = over.into_iter().filter(|c| (along(c) - extreme).abs() < 1e-6).collect();
+                // Several caps at that level (separate profiles): the one
+                // over the named curves (its centroid inside them).
+                let segments: Vec<[f64; 2]> = curves.iter().flat_map(|c| c.windows(2).flat_map(|w| [w[0], w[1]])).collect();
+                let inside = |c: &&(String, [f64; 3])| {
+                    let d = sub(c.1, o);
+                    let p = [dot(d, x), dot(d, y)];
+                    segments.chunks(2).filter(|s| (s[0][1] > p[1]) != (s[1][1] > p[1]) && p[0] < s[0][0] + (p[1] - s[0][1]) * (s[1][0] - s[0][0]) / (s[1][1] - s[0][1])).count() % 2 == 1
+                };
+                if name == "CAP_FACE" && level.len() > 1 { level.iter().copied().find(inside).or(level.first().copied()) } else { level.first().copied() }
             }
         };
         pick.map(|c| c.0.clone()).ok_or_else(|| format!("{name} of {op}: no entity of ours matches"))
