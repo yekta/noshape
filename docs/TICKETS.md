@@ -3268,6 +3268,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   ran into opBoolean's `localizedInFaces` (sketch regions cut out of one wall face, as std's sheet metal Tab): done
   (ops_harness localizedBoolean); they build now, Corner Overcut 1 at 11 faces / 10679.31 mm³ against live's 12 /
   10678.61 (the next difference).
+  core 11-03 22:05: cf-sheet-metal-shaped-flange: opEdgeChange's `replaceFace` done (a planar face or a sketch region;
+  ops_harness edgeChangeReplace): Shaped Flange 1 runs, but its flange stays a second part (2 parts, live 1;
+  78922.1 mm³ against 92509.8): next there.
   Not the host's: cf-sheet-metal-flange-plus (its Sheet Metal Model Plus studio's import isn't fetched, REQUESTS
   19:19) and cf-sheet-metal-overcut-dogbone (Fold SM 1's edge has no geometry in live's data).
   dx 11-03 20:23, cf-straight-spline (54 SAE Straight-Sided Spline features; compiles since dx's enum trailing-comma

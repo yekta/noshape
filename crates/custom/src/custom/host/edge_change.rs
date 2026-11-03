@@ -7,7 +7,9 @@
 //! moved corner keeps its outline (live qa5 Hem on G34: the front flange
 //! still runs to x = 60, 9378.1835 mm³). Faces keep their names (and their
 //! edges, named from them, theirs).
-//! `transformList` and `replaceFace` options are not supported yet.
+//! An option's `replaceFace` (a plane) moves its edge onto that face: the line where the face's plane meets it
+//! (std sheet metal's Shaped Flange runs a wall's edge up to the face it adds). `transformList` is not supported
+//! yet.
 
 use super::query::evaluate_refs;
 use super::{context_arg, convert::*, run_op};
@@ -23,26 +25,52 @@ pub const NATIVES: &[(&str, NativeFn)] = &[("opEdgeChange", op_edge_change)];
 
 const TOL: f64 = 1e-7;
 
+/// Where an edge goes: its line moved in its face's plane by this much (outwards when positive), or onto a plane
+/// (origin, normal).
+#[derive(Clone, Copy, Debug)]
+enum Move {
+    Offset(f64),
+    Onto(DVec3, DVec3),
+}
+
 fn op_edge_change(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let id = id_arg(i, &a, 1)?;
     let def = def_arg(i, &a, 2)?;
     let mut options = Vec::new();
     for o in def.get("edgeChangeOptions").as_array().map(|a| a.iter().cloned().collect::<Vec<_>>()).unwrap_or_default() {
-        if !matches!(o.get("transformList"), Value::Undefined) || !matches!(o.get("replaceFace"), Value::Undefined) {
-            return Err(i.error("opEdgeChange: only offset edge changes are supported"));
+        if !matches!(o.get("transformList"), Value::Undefined) {
+            return Err(i.error("opEdgeChange: transformList edge changes are not supported"));
         }
         let edges = evaluate_refs(i, &cx, o.get("edge"))?;
-        options.push((edges, length_of(o.get("offset")).unwrap_or(0.0)));
+        let replace = match o.get("replaceFace") {
+            Value::Undefined => None,
+            f => Some(evaluate_refs(i, &cx, f)?),
+        };
+        options.push((edges, length_of(o.get("offset")).unwrap_or(0.0), replace));
     }
     run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
-        let mut by_body: BTreeMap<usize, BTreeMap<usize, f64>> = BTreeMap::new();
-        for (edges, offset) in &options {
+        let mut by_body: BTreeMap<usize, BTreeMap<usize, Move>> = BTreeMap::new();
+        for (edges, offset, replace) in &options {
             if super::trace_ops() {
-                eprintln!("[fs op] edgeChange {:?} -> {:?} offset {offset}", edges, ev.resolve_edges(edges));
+                eprintln!("[fs op] edgeChange {:?} -> {:?} offset {offset} replace {replace:?}", edges, ev.resolve_edges(edges));
             }
+            let mv = match replace {
+                None => Move::Offset(*offset),
+                Some(refs) => match ev.resolve_faces(refs).first() {
+                    Some(&(fb, fi)) => {
+                        let pl = ev.face_shape(fb, fi)?.face_plane().map_err(fe)?.ok_or_else(|| fe("Only planar faces can replace an edge yet"))?;
+                        Move::Onto(pl.origin, pl.normal.normalize())
+                    }
+                    // A sketch region: its sketch's plane.
+                    None => {
+                        let p = ev.profiles(refs)?.into_iter().next().ok_or_else(|| fe("Cannot resolve the face to replace the edge with"))?;
+                        Move::Onto(p.frame.origin, p.frame.normal.normalize())
+                    }
+                },
+            };
             for (b, e) in ev.resolve_edges(edges) {
-                by_body.entry(b).or_default().insert(e, *offset);
+                by_body.entry(b).or_default().insert(e, mv);
             }
         }
         for (b, offsets) in by_body {
@@ -95,12 +123,12 @@ fn normal(f: &Shape) -> FResult<DVec3> {
     Ok(f.normal_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).map_err(fe)?.normalize())
 }
 
-/// A face loop's corners, side offsets and side edges (see [`face_loop`]).
-type FaceLoop = (Vec<DVec3>, Vec<Option<f64>>, Vec<Option<usize>>);
+/// A face loop's corners, side moves and side edges (see [`face_loop`]).
+type FaceLoop = (Vec<DVec3>, Vec<Option<Move>>, Vec<Option<usize>>);
 
-/// A face's outer loop: corners, the offset of each side (`pts[k]` to
+/// A face's outer loop: corners, the move of each side (`pts[k]` to
 /// `pts[k + 1]`) if it moves, and the index of each side's edge in `all`.
-fn face_loop(f: &Shape, moved: &[(Shape, f64)], all: &[Shape]) -> FResult<FaceLoop> {
+fn face_loop(f: &Shape, moved: &[(Shape, Move)], all: &[Shape]) -> FResult<FaceLoop> {
     let wires = f.wires();
     if wires.len() != 1 {
         return err("Edges of faces with holes cannot be changed yet");
@@ -129,9 +157,9 @@ fn face_loop(f: &Shape, moved: &[(Shape, f64)], all: &[Shape]) -> FResult<FaceLo
 /// The sheet with the edges moved, for each of its faces the index of the
 /// face it was, and for each of its edges the edge it was (on that edge's
 /// line, moved with it).
-fn change_edges(shape: &Shape, offsets: &BTreeMap<usize, f64>) -> FResult<(Shape, Vec<usize>, Vec<Option<usize>>)> {
+fn change_edges(shape: &Shape, offsets: &BTreeMap<usize, Move>) -> FResult<(Shape, Vec<usize>, Vec<Option<usize>>)> {
     let edges = shape.edges();
-    let moved: Vec<(Shape, f64)> = offsets.iter().filter_map(|(e, d)| edges.get(*e).map(|s| (s.clone(), *d))).collect();
+    let moved: Vec<(Shape, Move)> = offsets.iter().filter_map(|(e, d)| edges.get(*e).map(|s| (s.clone(), *d))).collect();
     let faces = shape.faces();
     let mut loops = Vec::new();
     for f in &faces {
@@ -156,7 +184,22 @@ fn change_edges(shape: &Shape, offsets: &BTreeMap<usize, f64>) -> FResult<(Shape
             let (p, q) = (pts[k], pts[(k + 1) % m]);
             let d = (q - p).normalize();
             let out = if ccw { d.cross(*n) } else { n.cross(d) };
-            (p + out * sides[k].unwrap_or(0.0), d)
+            match sides[k] {
+                None => (p, d),
+                Some(Move::Offset(o)) => (p + out * o, d),
+                // Where the face's plane meets the other: the point of it nearest p, the direction along d.
+                Some(Move::Onto(o, m)) => {
+                    let dir = n.cross(m);
+                    if dir.length_squared() < 1e-20 {
+                        return (p, d);
+                    }
+                    let dir = dir.normalize() * if n.cross(m).dot(d) < 0.0 { -1.0 } else { 1.0 };
+                    // Along `out` (in the face's plane, across d) from p to the plane.
+                    let den = out.dot(m);
+                    let s = if den.abs() < 1e-12 { 0.0 } else { (o - p).dot(m) / den };
+                    (p + out * s, dir)
+                }
+            }
         };
         for k in 0..m {
             if let Some(j) = froms[k] {
@@ -172,7 +215,7 @@ fn change_edges(shape: &Shape, offsets: &BTreeMap<usize, f64>) -> FResult<(Shape
             let ((p0, d0), (p1, d1)) = (line(prev), line(k));
             let c = d0.cross(d1);
             if c.length_squared() < 1e-20 {
-                if (sides[prev].unwrap_or(0.0) - sides[k].unwrap_or(0.0)).abs() > TOL {
+                if (p1 - p0).cross(d0).length() > TOL {
                     let at = |q: DVec3, d: DVec3| q + d * (pts[k] - q).dot(d);
                     own.push((pts[k], vec![at(p0, d0), at(p1, d1)]));
                 }

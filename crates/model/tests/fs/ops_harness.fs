@@ -125,6 +125,20 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const a = evArea(context, { "entities" : qCreatedBy(sub + "x", EntityType.FACE) });
             check("opBoolean localizedInFaces", abs(a - (400 - 25 * PI / 4) * mm ^ 2) < 1e-9 * meter ^ 2, a);
         });
+        step(context, id, "edgeChangeReplace", function(sub) {
+            // A sheet's edge run onto another face (std sheet metal's Shaped Flange): 20 x 20 -> 25 x 20.
+            fCuboid(context, sub + "b", { "corner1" : vector(0, 0, 700) * mm, "corner2" : vector(20, 20, 710) * mm });
+            fCuboid(context, sub + "w", { "corner1" : vector(25, 0, 700) * mm, "corner2" : vector(30, 20, 710) * mm });
+            opExtractSurface(context, sub + "x", { "faces" : qContainsPoint(qCreatedBy(sub + "b", EntityType.FACE), vector(10, 10, 710) * mm) });
+            const sheet = qCreatedBy(sub + "x", EntityType.FACE);
+            opEdgeChange(context, sub + "c", { "edgeChangeOptions" : [{
+                            "edge" : qContainsPoint(qCreatedBy(sub + "x", EntityType.EDGE), vector(20, 10, 710) * mm),
+                            "face" : sheet,
+                            "replaceFace" : qContainsPoint(qCreatedBy(sub + "w", EntityType.FACE), vector(25, 10, 705) * mm)
+                        }] });
+            const a = evArea(context, { "entities" : sheet });
+            check("opEdgeChange replaceFace", abs(a - 500 * mm ^ 2) < 1e-9 * meter ^ 2, a);
+        });
         step(context, id, "extrudeLoftSweep", function(sub) {
             const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, 400) * mm, vector(0, 0, 1)) });
             skCircle(sk, "c", { "center" : vector(0, 0) * mm, "radius" : 5 * mm });
