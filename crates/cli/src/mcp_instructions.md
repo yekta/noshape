@@ -18,6 +18,8 @@ Assemblies: a new document has "Assembly 1" (`tab_create` adds more; calls use t
 
 Drawings: `drawing_create` (template, `suggested_views`), then `drawing_get` lists each view (orientation, bounds) with its drawn edges in sheet millimeters; `drawing_dimension` clicks on those coordinates (an edge, a circle, a vertex) and places the text; `drawing_export` writes PDF (PNG to look at the sheet).
 
+Live mode: when the noshape app has the document open, your calls run in its window: edits show at once and land on the user's undo stack, and `ui_state` reports the tab the user is on, their view (camera) and what they selected (entity, `inst:` or drawing ids), so "this face" means their selection; `render_image` with `view` "window" shows what they see.
+
 Workspace protection: `document_protect` makes the current branch refuse model edits (error code `protected`); work on a branch (`history_create_branch`) and `history_merge` it in, or `document_unprotect`.
 
 Values: expressions with units ("25 mm", "1 in", "30 deg", "2 * #t + 1 mm"); a bare number takes the workspace unit. Errors say which parameter is wrong and why.
