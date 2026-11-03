@@ -5,8 +5,9 @@ Since 01:30, landed: assembly drag from the drag's start (`drag_substeps`), s548
 probes 4 / asm drag 3 fixtures, SKETCH-UNDO-REDO-STATE reopen (history starts when the sketch editor opens),
 SKETCH-TANGENT-SPLINE-CIRCLE (queued: circle / arc Tangent to an unjoined fit spline = contact, EqKind::FitContact;
 the Spur Gear's defaults now in live's band, its "changed" case 3670 vs 4029–4063 mm3 noted in the ticket for its
-owner). Next, in order: the batch 10 items below (s556 / s547 rounded corner, s555 isosceles leg), then the P2 fuzz
-list. Older state follows.
+owner). 04:50: s555 fixed (pair rung: the changed leg with its joined Equal partner, anchored neighbours held);
+batch 10 38/40. Next, in order: s556 / s547 (rounded corner: height / radius), then the P2 fuzz list. Older state
+follows.
 
 ## State at 01:30 UTC
 Landed overnight (all on main by dabe8513): sketch drag far hold (g6) and levels + farthest point (g4); drag from the
