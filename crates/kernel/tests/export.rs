@@ -1286,6 +1286,31 @@ fn parasolid_periodic_bsurface_face_reads_whole() {
     assert!(s.is_valid());
 }
 
+/// A Parasolid cylinder face between two rings with other loops on it (a fan
+/// hub with seven blade roots, live's cf-wiring export): its seam runs in a
+/// gap between the roots, so no root edge is cut there; live's counts per
+/// part. The file is live's corpus (not in the repo).
+#[test]
+#[ignore = "T2: live's corpus file /root/parity/models/cf-wiring (other people's work, never in the repo)"]
+fn a_hub_seam_cuts_no_blade_root() {
+    let root = std::env::var("NOSHAPE_PARITY_MODELS").unwrap_or_else(|_| "/root/parity/models".into());
+    let path = std::path::Path::new(&root).join("cf-wiring/imports/6ae9ae35100f83b7021d3619.x_t");
+    if !path.is_file() {
+        return;
+    }
+    let s = read_parasolid(&path, LengthUnit::Millimeter).unwrap();
+    let mut got: Vec<(usize, usize, usize)> = s
+        .solids()
+        .iter()
+        .map(|p| {
+            let t = p.shown_topology().unwrap();
+            (p.count(ShapeType::Face), t.edges.iter().filter(|e| **e).count(), t.vertices.iter().filter(|v| **v).count())
+        })
+        .collect();
+    got.sort();
+    assert_eq!(got, [(36, 82, 40), (40, 88, 56)]);
+}
+
 /// Live's closed sketch spline extruded 10 mm (request 1836: 3 faces, 2
 /// edges, 0 vertices; its caps one closed B-curve each, ring edges): written
 /// back each cap is still one edge without a vertex (they were split in two,

@@ -2017,26 +2017,56 @@ void shift_loop(UnwrappedLoop& L, const TopoDS_Face& F, double du)
   L.end.SetX(L.end.X() + du);
 }
 
+// A face's loops on a u-periodic surface: the two winding once round it
+// (opposite ways) and the others (holes, not winding). False when it has no
+// such pair.
+bool ring_loops(const TopoDS_Face& F, double period, std::vector<TopoDS_Wire>& wires, UnwrappedLoop& A, UnwrappedLoop& Bl, std::vector<size_t>& holes)
+{
+  for (TopExp_Explorer ew(F, TopAbs_WIRE); ew.More(); ew.Next())
+    wires.push_back(TopoDS::Wire(ew.Current()));
+  if (wires.size() < 2)
+    return false;
+  int ia = -1, ib = -1;
+  std::vector<UnwrappedLoop> loops;
+  for (size_t i = 0; i < wires.size(); ++i)
+  {
+    loops.push_back(unwrap_loop(wires[i], F, period));
+    const UnwrappedLoop& L = loops.back();
+    if (!L.ok)
+      return false;
+    if (std::abs(L.turns) == 1 && ia < 0)
+      ia = (int)i;
+    else if (std::abs(L.turns) == 1 && ib < 0)
+      ib = (int)i;
+    else if (L.turns == 0)
+      holes.push_back(i);
+    else
+      return false;
+  }
+  if (ia < 0 || ib < 0 || loops[ia].turns != -loops[ib].turns)
+    return false;
+  A  = loops[ia];
+  Bl = loops[ib];
+  return true;
+}
+
 // A ring face (two loops winding once round a periodic surface, opposite
-// ways, no seam: Parasolid's periodic faces) as OCCT needs it: one loop
-// joined by a seam edge, reusing the face's edges. The seam runs straight in
-// (u, v) between the loops' closest vertices (not along a u iso-line: a face
-// bounded by a helix over many turns would be crossed by one). Null when
-// this doesn't give a valid face.
+// ways, no seam: Parasolid's periodic faces), with any holes, as OCCT needs
+// it: one loop joined by a seam edge, reusing the face's edges. The seam runs
+// straight in (u, v) between the loops' closest vertices (not along a u
+// iso-line: a face bounded by a helix over many turns would be crossed by
+// one). Null when this doesn't give a valid face.
 TopoDS_Face seam_ring(const TopoDS_Face& F, double tol)
 {
   TopLoc_Location                 loc;
   const occ::handle<Geom_Surface> S = BRep_Tool::Surface(F, loc);
   if (S.IsNull() || !S->IsUPeriodic())
     return TopoDS_Face();
-  const double                period = S->UPeriod();
-  std::vector<TopoDS_Wire>    wires;
-  for (TopExp_Explorer ew(F, TopAbs_WIRE); ew.More(); ew.Next())
-    wires.push_back(TopoDS::Wire(ew.Current()));
-  if (wires.size() != 2)
-    return TopoDS_Face();
-  UnwrappedLoop A = unwrap_loop(wires[0], F, period), Bl = unwrap_loop(wires[1], F, period);
-  if (!A.ok || !Bl.ok || std::abs(A.turns) != 1 || A.turns != -Bl.turns)
+  const double             period = S->UPeriod();
+  std::vector<TopoDS_Wire> wires;
+  UnwrappedLoop            A, Bl;
+  std::vector<size_t>      holes;
+  if (!ring_loops(F, period, wires, A, Bl, holes))
     return TopoDS_Face();
   // Vertex pairs by distance in (u, v) (B shifted to be closest).
   struct Pair
@@ -2099,12 +2129,167 @@ TopoDS_Face seam_ring(const TopoDS_Face& F, double tol)
     TopoDS_Face G;
     B.MakeFace(G, S, loc, BRep_Tool::Tolerance(F));
     B.Add(G, W);
+    // The holes inside the turn the seam bounds.
+    const double lo = std::min(a.starts.front().X(), a.end.X()), hi = std::max(a.starts.front().X(), a.end.X());
+    for (size_t h : holes)
+    {
+      UnwrappedLoop L   = unwrap_loop(wires[h], F, period);
+      double        mid = 0;
+      for (const gp_Pnt2d& p : L.starts)
+        mid += p.X() / L.starts.size();
+      shift_loop(L, F, (mid < lo ? std::ceil((lo - mid) / period) : mid > hi ? -std::ceil((mid - hi) / period) : 0.0) * period);
+      B.Add(G, wires[h]);
+    }
     G.Orientation(F.Orientation());
     // The pcurves above were set on F's surface: valid for G too.
     if (BRepCheck_Analyzer(G).IsValid())
       return G;
   }
   return TopoDS_Face();
+}
+
+// A ring face with holes (a hub with blade roots on it): its rings are single
+// circle edges whose one vertex is where the circle starts, so the seam
+// would run there, through any hole across that angle (ShapeFix then cuts
+// the hole's edges at the seam; Parasolid has none). Each ring edge is made
+// again starting where a straight (u, v) path between the rings misses every
+// hole. Circles with line / circle pcurves only (cylinders, cones, their
+// planar caps).
+TopoDS_Shape place_ring_vertices(const TopoDS_Shape& shape)
+{
+  ShapeAncMap edge_faces;
+  TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edge_faces);
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+  bool                           any = false;
+  ShapeIMap                      done;
+  for (TopExp_Explorer ef(shape, TopAbs_FACE); ef.More(); ef.Next())
+  {
+    const TopoDS_Face&              F = TopoDS::Face(ef.Current());
+    TopLoc_Location                 loc;
+    const occ::handle<Geom_Surface> S = BRep_Tool::Surface(F, loc);
+    if (S.IsNull() || !S->IsUPeriodic())
+      continue;
+    const double             period = S->UPeriod();
+    std::vector<TopoDS_Wire> wires;
+    UnwrappedLoop            A, Bl;
+    std::vector<size_t>      holes;
+    if (!ring_loops(F, period, wires, A, Bl, holes) || holes.empty() || A.edges.size() != 1 || Bl.edges.size() != 1)
+      continue;
+    // The holes in (u, v), then a straight path from ring A to ring B that
+    // crosses none (blade roots slant: a seam straight up may not exist).
+    std::vector<std::vector<gp_Pnt2d>> polys;
+    for (size_t h : holes)
+    {
+      std::vector<gp_Pnt2d> poly;
+      for (BRepTools_WireExplorer wx(wires[h], F); wx.More(); wx.Next())
+      {
+        double                          f, l;
+        const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(wx.Current(), F, f, l);
+        if (c.IsNull())
+          continue;
+        const bool fwd = wx.Current().Orientation() != TopAbs_REVERSED;
+        for (int i = 0; i < 16; ++i)
+          poly.push_back(c->Value(fwd ? f + (l - f) * i / 16 : l - (l - f) * i / 16));
+      }
+      if (!poly.empty())
+        polys.push_back(poly);
+    }
+    const auto ring_v = [&](const UnwrappedLoop& L) { return L.starts.front().Y(); };
+    const double va = ring_v(A), vb = ring_v(Bl);
+    const auto crosses = [&](gp_Pnt2d p, gp_Pnt2d q) {
+      for (const auto& poly : polys)
+        for (int k = -2; k <= 2; ++k)
+          for (size_t i = 0; i < poly.size(); ++i)
+          {
+            const gp_Pnt2d a(poly[i].X() + k * period, poly[i].Y()), b(poly[(i + 1) % poly.size()].X() + k * period, poly[(i + 1) % poly.size()].Y());
+            const double   d1 = (q.X() - p.X()) * (a.Y() - p.Y()) - (q.Y() - p.Y()) * (a.X() - p.X());
+            const double   d2 = (q.X() - p.X()) * (b.Y() - p.Y()) - (q.Y() - p.Y()) * (b.X() - p.X());
+            const double   d3 = (b.X() - a.X()) * (p.Y() - a.Y()) - (b.Y() - a.Y()) * (p.X() - a.X());
+            const double   d4 = (b.X() - a.X()) * (q.Y() - a.Y()) - (b.Y() - a.Y()) * (q.X() - a.X());
+            if ((d1 > 0) != (d2 > 0) && (d3 > 0) != (d4 > 0))
+              return true;
+          }
+      return false;
+    };
+    double ua = 0, ub = 0;
+    bool   found = false;
+    for (int j = 0; j <= 36 && !found; ++j)
+      for (int i = 0; i < 72 && !found; ++i)
+        for (int sgn : {1, -1})
+        {
+          const double u1 = period * i / 72, u2 = u1 + sgn * period * j / 72;
+          if (!crosses(gp_Pnt2d(u1, va), gp_Pnt2d(u2, vb)))
+          {
+            ua = u1, ub = u2, found = true;
+            break;
+          }
+        }
+    if (!found)
+      continue;
+    // Already there: nothing to move.
+    const auto at_u = [&](const UnwrappedLoop& L, double u) { return std::abs(std::remainder(L.starts.front().X() - u, period)) < 1e-9; };
+    if (at_u(A, ua) && at_u(Bl, ub))
+      continue;
+    for (const auto& [L, at] : {std::pair<const UnwrappedLoop*, double>{&A, ua}, {&Bl, ub}})
+    {
+      const TopoDS_Edge E = TopoDS::Edge(L->edges.front().Oriented(TopAbs_FORWARD));
+      if (done.Contains(E) || !edge_faces.Contains(E))
+        continue;
+      double                         f, l;
+      const occ::handle<Geom_Curve>  c3 = BRep_Tool::Curve(E, f, l);
+      occ::handle<Geom_Circle>       circle = occ::down_cast<Geom_Circle>(c3);
+      if (circle.IsNull())
+        if (occ::handle<Geom_TrimmedCurve> t = occ::down_cast<Geom_TrimmedCurve>(c3); !t.IsNull())
+          circle = occ::down_cast<Geom_Circle>(t->BasisCurve());
+      double                          pf, pl;
+      const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(E, F, pf, pl);
+      if (circle.IsNull() || pc.IsNull() || std::abs((l - f) - circle->Period()) > 1e-9)
+        continue;
+      // The circle's parameter where the ring's pcurve is at u = at (its u
+      // runs with the parameter one turn: line pcurves).
+      const double u0 = pc->Value(pf).X(), du = pc->Value(pl).X() - u0;
+      if (std::abs(std::abs(du) - period) > 1e-6 * period)
+        continue;
+      double k = (at - u0) / du;
+      k -= std::floor(k);
+      const double t = f + k * (l - f);
+      if (std::abs(k) < 1e-9)
+        continue;
+      // The same circle from t round once, with the old edge's pcurves.
+      BRep_Builder  B;
+      TopoDS_Edge   N;
+      TopoDS_Vertex V;
+      const double  etol = BRep_Tool::Tolerance(E);
+      B.MakeEdge(N, circle, etol);
+      B.Range(N, t, t + (l - f));
+      B.MakeVertex(V, circle->Value(t), etol);
+      B.Add(N, V.Oriented(TopAbs_FORWARD));
+      B.Add(N, V.Oriented(TopAbs_REVERSED));
+      bool ok = true;
+      for (const TopoDS_Shape& g : edge_faces.FindFromKey(E))
+      {
+        const TopoDS_Face&              G = TopoDS::Face(g);
+        double                          gf, gl;
+        const occ::handle<Geom2d_Curve> gc = BRep_Tool::CurveOnSurface(E, G, gf, gl);
+        occ::handle<Geom2d_Curve>       basis = gc;
+        if (occ::handle<Geom2d_TrimmedCurve> tr = occ::down_cast<Geom2d_TrimmedCurve>(gc); !tr.IsNull())
+          basis = tr->BasisCurve();
+        if (basis.IsNull() || (occ::down_cast<Geom2d_Line>(basis).IsNull() && !basis->IsPeriodic()))
+        {
+          ok = false;
+          break;
+        }
+        B.UpdateEdge(N, basis, G, etol);
+      }
+      if (!ok)
+        continue;
+      B.Range(N, t, t + (l - f));
+      done.Add(E);
+      rs->Replace(E, N);
+      any = true;
+    }
+  }
+  return any ? rs->Apply(shape) : shape;
 }
 
 } // namespace
@@ -2160,6 +2345,13 @@ TopoDS_Shape heal_import(TopoDS_Shape out, double tol)
   }
   // Ring faces get their seams here; ShapeFix's (along a u iso-line) cuts a
   // face bounded by a long helix into one piece per turn.
+  try
+  {
+    out = place_ring_vertices(out);
+  }
+  catch (const Standard_Failure&)
+  {
+  }
   {
     occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
     bool                           any = false;
