@@ -1610,10 +1610,13 @@ impl<'a> Translator<'a> {
             match self.call("sketch_dimension", args) {
                 Ok(r) => {
                     self.sketch_edits += 1;
-                    // Onshape's driven (reference) dimension.
-                    if driven
+                    // Onshape's driven (reference) dimension; and a driving one
+                    // that over-defines the sketch stays driving, as stored
+                    // (ours added it driven, as the Dimension tool does).
+                    let over = r.get("warning").is_some();
+                    if driven != over
                         && let Some(d) = r["dimension"].as_str()
-                        && self.call("sketch_dimension_options", json!({ "sketch": id, "dimension": d, "driving": false })).is_ok()
+                        && self.call("sketch_dimension_options", json!({ "sketch": id, "dimension": d, "driving": !driven })).is_ok()
                     {
                         self.sketch_edits += 1;
                     }
