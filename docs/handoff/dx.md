@@ -52,6 +52,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   the options and "did you mean" (error::did_you_mean); a failing op with a field outside its listed values answers
   with that (ops still take their other spellings: tab kind display names, format extensions); query_entities
   rejects an unknown kind (it returned nothing). e2e mistyped_names_get_the_options_and_a_suggestion.
+- 11-03 02:00 translator: sketch geometric constraints applied (then taken back if they or the dimensions move the
+  geometry: it must stay at Onshape's solve), regions picked by their boundary curves (sketch_get `boundary`), a
+  failing batch draw retried shape by shape, zero-length lines left out, document units followed, Hole standards and
+  thread classes, default planes / Origin by id (JDC / JCC / JEC / IB). Runner: body types, row-tooltip messages,
+  regeneration time vs live, five biggest causes. 74 end-state models from older dumps (standard-content parts,
+  sheet-metal forms; /root/dx-scratch/pm/models, vibe5 ~/agents/dx/pm-models): every first difference traced so far
+  is the dumps' own (custom features, std-content regions built from non-sketch geometry, empty live states), not a
+  core bug; real P1 documents still pending.
 - Staged for when GET /features reopens (~04:17 UTC): /root/parity/models-dx/{dx-mbd-1721, live-hole-row,
   live-pattern-holes} have live.jsonl (per rollback: parts, bands, boxes, raw bodies; from pm-rollbacks.js); run
   /root/dx-scratch/live/pm-features.sh to add features.json and merge names / statuses, then parity_models on them
