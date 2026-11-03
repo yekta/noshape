@@ -83,24 +83,24 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   to run: …" (ours errors where live's built; the first difference then reads "(custom feature failed to run)").
   T1 custom_feature_failures_are_reported_apart. Host / std differences → core tickets. Score now **7/11,
   58/78** (bracket03 matches since core's FILLET-SPLIT-EDGE-FACES fix); SCORE.md row updated.
-- 11-03 12:00 live's refetch (21 scored): **11/21, 103/157, custom 0/5**. Translator: a centroid of [0, 0, 0] off the
+- 11-03 11:18 live's refetch (21 scored): **11/21, 103/157, custom 0/5**. Translator: a centroid of [0, 0, 0] off the
   part's box centre is massproperties' "no material" (not compared); id-only region queries as many as the last
   sketch's regions are its regions (older documents); a sketch plane named by id alone is ours where live's frame
   lies (query_datums planes, else a planar face); an id not placed just before a feature is taken from the latest
-  earlier line that has it; a body listed by id alone takes its part's box. Asked live (11:45, 11:55): Hole INFO
+  earlier line that has it; a body listed by id alone takes its part's box. Asked live (11:12, 11:15): Hole INFO
   tooltips, pulley02's empty Revolve line, and 8 documents whose bodies are ids only (no geometry: their later
   queries can't map until refetched).
-- 11-03 11:20 FeatureScript corpus arriving (32 cf-* documents, studios/ only so far): T2 `parity_feature_studios`
+- 11-03 11:05 FeatureScript corpus arriving (32 cf-* documents, studios/ only so far): T2 `parity_feature_studios`
   compiles each document's studios in a new document at their pins (13/34 compile, per-document lines, the commonest
   errors). The translator now makes every studio tab first and points imports of the document's other studios
   (`"<eid>"` or `"<did>/<vid>/<eid>"`) at our tabs; featurestudio_get / _edit notices resolve imports of other tabs
   (custom::compile_in_document; e2e feature_studio_custom_feature). Left: 18 imports of elements live hasn't fetched
-  (REQUESTS 11:20), FS-OLD-STD-COMPAT (core: three old-pin studios), FS-EDITOR-IMPORT-NOTICES (psui).
+  (REQUESTS 11:05), FS-OLD-STD-COMPAT (core: three old-pin studios), FS-EDITOR-IMPORT-NOTICES (psui).
 - 11-03 10:20 live 1857 (drawings of pipeflange-steven and knob-tim, DXF / PDF in live/samples/dx-drawing-corpus/):
   ours made through the agent API from the rebuilt documents, counted per DXF layer (/root/dx-scratch/dxfcount.py).
   Fixed: suggested views' scale from the parts' exact boxes (the fast box of a reopened pipeflange was 66 mm for 50,
   its views 1:2; live 1:1; no time cost on the 1000-part drawing, 562 vs 574 ms); drawing_create takes a template
-  file name without `.dwt` and an unknown one lists them. 10:20–11:05, all as live 1857 now: free-form model edges
+  file name without `.dwt` and an unknown one lists them. 10:20–10:55, all as live 1857 now: free-form model edges
   are cubic SPLINEs in DXF / DWG (were POLYLINEs); automatic centermarks one per hole / boss axis seen end-on, sized
   to its largest cylinder or countersink (hidden ones too), shrunk on small holes at the default sizes, CENTER /
   continuous linetypes; the ANSI projection symbol at live's measures with CIRCLEs; dates MM/DD/YYYY; DXF / DWG keep
