@@ -43,6 +43,8 @@ pub struct Step {
     pub problems: Vec<String>,
     /// A custom feature (Onshape's `namespace` names its Feature Studio).
     pub custom: bool,
+    /// A sketch whose frame (origin, x, normal) isn't live's.
+    pub frame: Option<String>,
 }
 
 pub struct Translator<'a> {
@@ -412,6 +414,9 @@ impl<'a> Translator<'a> {
                 {
                     step.problems.push(format!("suppressed: {e}"));
                 }
+                if f["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketch")) {
+                    step.frame = self.frame_difference(&f, &id);
+                }
                 step.ours = Some(id);
                 step.status = Some(status);
                 step.message = message;
@@ -419,6 +424,21 @@ impl<'a> Translator<'a> {
             Err(e) => step.problems.insert(0, format!("not built: {e}")),
         }
         step
+    }
+
+    /// Our sketch's frame against live's (`sketches`): origin within 1e-9 m,
+    /// x and normal within 1e-9.
+    fn frame_difference(&mut self, f: &Value, ours: &str) -> Option<String> {
+        let [lo, lx, ly] = *self.frames.get(f["featureId"].as_str()?)?;
+        let g = self.call("sketch_get", json!({ "sketch": ours })).ok()?;
+        let k = per_unit(&g["units"]);
+        let (o, x, n) = (f3(&g["frame"]["origin"])?.map(|c| c * k), f3(&g["frame"]["x"])?, f3(&g["frame"]["normal"])?);
+        let ln = [lx[1] * ly[2] - lx[2] * ly[1], lx[2] * ly[0] - lx[0] * ly[2], lx[0] * ly[1] - lx[1] * ly[0]];
+        let off = |a: [f64; 3], b: [f64; 3]| (0..3).map(|i| (a[i] - b[i]).abs()).fold(0.0, f64::max);
+        let r = |v: [f64; 3]| v.map(|c| (c * 1e6).round() / 1e6 + 0.0);
+        (off(o, lo) > 1e-9 || off(x, lx) > 1e-9 || off(n, ln) > 1e-9).then(|| {
+            format!("sketch frame origin {:?} mm, x {:?}, normal {:?}; live {:?} mm, {:?}, {:?}", r(o.map(|c| c * 1e3)), r(x), r(n), r(lo.map(|c| c * 1e3)), r(lx), r(ln))
+        })
     }
 
     /// A non-sketch feature through feature_add, its parameters by name.

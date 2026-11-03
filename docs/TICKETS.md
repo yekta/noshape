@@ -2986,3 +2986,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   edges are the translator's picks from Onshape's packed queries (live's geometry lines for this document came back
   429, refetch pending), so which edges live fillets is not confirmed yet; the time to fail is ours either way.
   (dx 2026-11-03)
+- [ ] P2 SKETCH-FACE-FRAME (core; dx's parity suite 11-03) a sketch on a part face gets another x axis than live's in
+  3 of the corpus's face sketches (the origin and normal agree; live's frames are features.json `sketches`
+  transformMatrix): exercise-martinl Sketch 2 on a −X side face: ours x (0, 0, −1), y (0, −1, 0), live x (0, −1, 0),
+  y (0, 0, 1) (turned 90°); exercise-martinl Sketch 3 on the top face (z 11): ours x (−1, 0, 0), live (1, 0, 0);
+  spike-pump-edward Sketch 8 on a +Y face: ours x (1, 0, 0), y (0, 0, −1), live x (−1, 0, 0), y (0, 0, 1). What it
+  changes: Horizontal / Vertical and typed coordinates in that sketch (the translator's HORIZONTAL between two
+  circle centres in martinl's Sketch 2 moves them 15 mm), the sketch's view orientation. Live's frames across the
+  corpus (86 sketches): cap faces x = the sketch's x (+X on ±Z faces); extruded side faces y = +Z, x = y × normal
+  (normal −X: x (0, −1, 0); +X: (0, 1, 0); +Y: (−1, 0, 0); −Y: (1, 0, 0); a 98° face: (−0.139, −0.99, 0)); a sheet
+  metal flange tilted 30° (bracket00-ira Sketch 2): y along the bend (0, 1, 0), x up the slope (0.866, 0, 0.5).
+  Ours takes OCCT's plane x (eval.rs raw_plane, Reference::Face). parity_models now counts a sketch frame that isn't
+  live's as a difference. /root/dx-scratch/frames.py lists them (CLI against the rebuilt documents). (dx 2026-11-03)

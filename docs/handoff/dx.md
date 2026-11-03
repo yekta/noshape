@@ -95,7 +95,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   Live told (REQUESTS 12:10) about "undefined" kinds and the refetch. 12:50: a Hole's in-feature connector on the
   face a sketch circle imprints (ours: the region) goes on the circle (same centre and normal), and a connector that
   errs is reported; TolerantQuantity parameters (MBD tolerances on a depth) read as their quantity. With core's
-  e77387ec: **10/14, 72/93** (clamp-abhil matches to the end).
+  e77387ec: **10/14, 72/93** (clamp-abhil matches to the end). 13:30: a sketch whose frame (origin, x, normal) isn't
+  live's `sketches` transformMatrix is a difference (T1 a_sketch_frame_unlike_lives_is_a_difference); three face
+  sketches in the unscored documents differ: SKETCH-FACE-FRAME (core), /root/dx-scratch/frames.py lists them.
 - 11-03 10:40 assembly phase (lead 09:05: against a small assembly if live's sample is late): `parity::rebuild_assembly`
   takes live's assembly definition (`rootAssembly` + `features` with featureStates) and each Part Studio
   (`studios/<elementId>.json` + `.parts.json`): every studio translated into its own tab, each mate connector's

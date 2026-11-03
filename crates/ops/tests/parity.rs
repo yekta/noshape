@@ -92,6 +92,7 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         {
             diff.push(format!("message {:?}, live {m:?}", step.message.as_deref().unwrap_or("")));
         }
+        diff.extend(step.frame.clone());
         match our_parts(&mut t) {
             Ok(parts) => diff.extend(differences(&live_parts(line), &parts)),
             Err(e) => diff.push(format!("parts: {e}")),
@@ -911,4 +912,19 @@ fn filter_inner_loops_leaves_out_what_a_hole_holds() {
     let (features, live) = one_extrude("FS1", entities, region, json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 7, "edges": 14, "vertices": 8, "volume": plate }));
     let r = run_model("inner-loops", &features, &live, "");
     assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
+/// A sketch whose frame isn't live's is a difference (here live's Top sketch
+/// turned 90°: x along +Y), and none where it is.
+#[test]
+fn a_sketch_frame_unlike_lives_is_a_difference() {
+    let (mut features, mut live) = one_extrude("FS1", json!([circle("c", 0.01, (0.0, 0.0))]), json!({ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": "FS1", "queryString": "query = qSketchRegion(id + \"FS1\", false);" }), json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 3, "edges": 2, "vertices": 0, "volume": std::f64::consts::PI * 1e-6 }));
+    let frame = |x: [f64; 3], y: [f64; 3]| json!({ "sketches": [{ "featureId": "FS1", "transformMatrix": [x[0], y[0], 0.0, 0.0, x[1], y[1], 0.0, 0.0, x[2], y[2], 1.0, 0.0, 0.0, 0.0, 0.0, 1.0] }] });
+    features["sketches"] = frame([1.0, 0.0, 0.0], [0.0, 1.0, 0.0]);
+    let r = run_model("frame-same", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}", r.first);
+    features["sketches"] = frame([0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]);
+    live[0]["parts"] = json!([]);
+    let r = run_model("frame-turned", &features, &live, "");
+    assert!(r.first.as_deref().is_some_and(|f| f.contains("feature 0 \"Sketch 1\"") && f.contains("sketch frame")), "{:?}", r.first);
 }
