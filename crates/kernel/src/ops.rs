@@ -405,6 +405,15 @@ pub fn legacy_topology() -> bool {
     LEGACY_TOPOLOGY.with(|c| c.get())
 }
 
+/// `f` with [`set_legacy_topology`] as given, the thread's setting back after (work handed to another thread: a
+/// regeneration's parallel profiles and instances).
+pub fn with_legacy_topology<T>(on: bool, f: impl FnOnce() -> T) -> T {
+    let before = set_legacy_topology(on);
+    let out = f();
+    set_legacy_topology(before);
+    out
+}
+
 /// Scale applied to lengths around OCCT's blend algorithms (the checked fillet and chamfer),
 /// process-wide. Their approximation tolerances are absolute and tuned for
 /// millimetre-sized parts: the same part modelled in metres fails (a top-loop

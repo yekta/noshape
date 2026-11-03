@@ -239,8 +239,9 @@ pub struct PartStudio {
     /// split later could take another body id: BLEND-RUST-DEFAULT-REGEN).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub legacy_blends: bool,
-    /// Saved with features before the topology clean-ups of 11-03 (ScopeRule < 7: a blend's analytic faces and
-    /// corner spheres, fillets along split edges, split lines joined, seams moved off holes): it regenerates
+    /// Saved with features before the topology clean-ups of 11-03 (ScopeRule < 7: a sketch on a face imprinting it,
+    /// an extrude's side one face along a line others lie over, a blend's analytic faces and corner spheres, fillets
+    /// along split edges, split lines joined, seams moved off holes): it regenerates
     /// without them, so later features find their parts where they were (a Boolean's pieces come out in another
     /// order otherwise: qa MIRROR-PIECE-ORDER-CHANGE).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]

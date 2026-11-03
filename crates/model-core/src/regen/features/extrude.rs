@@ -54,7 +54,8 @@ fn eval_inner(ev: &mut EvalCtx) -> FResult<()> {
         let dirs = profiles.iter().map(|p| direction(ev, p, thin)).collect::<FResult<Vec<_>>>()?;
         let ev_ro: &EvalCtx = ev;
         use rayon::prelude::*;
-        let made: Vec<FResult<NamedShape>> = profiles.par_iter().zip(dirs.par_iter()).map(|(p, d)| extrude_profile(ev_ro, p, *d)).collect();
+        let legacy = noshape_kernel::legacy_topology();
+        let made: Vec<FResult<NamedShape>> = profiles.par_iter().zip(dirs.par_iter()).map(|(p, d)| noshape_kernel::with_legacy_topology(legacy, || extrude_profile(ev_ro, p, *d))).collect();
         tools = made.into_iter().collect::<FResult<Vec<_>>>()?;
     } else {
         for p in &profiles {

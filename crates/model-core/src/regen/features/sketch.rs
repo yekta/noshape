@@ -269,7 +269,8 @@ fn imprint(ev: &EvalCtx, frame: &crate::display::PlaneFrame, sk: &noshape_sketch
     let plain = |own| (own, Vec::new(), Vec::new());
     use crate::reference::{Reference, Source};
     let Some(plane) = ev.query("sketchPlane").first().cloned() else { return plain(own) };
-    if ev.bool("disableImprinting") {
+    // (Not in a studio saved before imprinting: its references name the regions it had then.)
+    if ev.bool("disableImprinting") || noshape_kernel::legacy_topology() {
         return plain(own);
     }
     // A part's face, or another sketch's region (live 1747: "Face of Sketch 2").

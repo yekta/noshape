@@ -773,7 +773,8 @@ impl<'a> EvalCtx<'a> {
                 regions.push((s, region, Source::Region { sketch: *sketch, key: key.clone() }));
             }
             use rayon::prelude::*;
-            let made: Vec<FResult<Profile>> = regions.into_par_iter().map(|(s, region, key)| region_profile(&s, &region, key)).collect();
+            let legacy = noshape_kernel::legacy_topology();
+            let made: Vec<FResult<Profile>> = regions.into_par_iter().map(|(s, region, key)| noshape_kernel::with_legacy_topology(legacy, || region_profile(&s, &region, key))).collect();
             return made.into_iter().collect();
         }
         let mut out = Vec::new();
@@ -1399,6 +1400,7 @@ pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region
     let merge = |lp: &noshape_sketch::regions::ProfileLoop| -> Vec<(noshape_sketch::regions::ProfileSegment, u32)> {
         use noshape_sketch::regions::ProfileSegment as P;
         let mut out: Vec<(P, u32)> = Vec::new();
+        let legacy = noshape_kernel::legacy_topology();
         for (seg, src) in lp.segments.iter().zip(lp.sources.iter()) {
             if let (Some((P::Arc { center: c0, radius: r0, start_angle: s0, end_angle: e0, ccw: w0 }, e_prev)), P::Arc { center, radius, end_angle, ccw, .. }) = (out.last_mut(), seg)
                 && *e_prev == src.entity.0
@@ -1414,8 +1416,9 @@ pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region
                 continue;
             }
             // Likewise one line's pieces (split where other curves lie over it or end on it): one edge, so one side
-            // face (live: bracket120's bottom face).
+            // face (live: bracket120's bottom face; not in a studio saved before, legacy_topology).
             if let (Some((P::Line { a: a0, b: b0 }, e_prev)), P::Line { a, b }) = (out.last_mut(), seg)
+                && !legacy
                 && *e_prev == src.entity.0
                 && (*b0 - *a).length() < 1e-12
                 && (*b0 - *a0).normalize_or_zero().perp_dot((*b - *a).normalize_or_zero()).abs() < 1e-9
@@ -1427,6 +1430,7 @@ pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region
         }
         // (The loop may start inside that line.)
         if out.len() > 2
+            && !legacy
             && let (Some((P::Line { a: la, b: lb }, le)), Some((P::Line { a: fa, b: fb }, fe))) = (out.last(), out.first())
             && le == fe
             && (*lb - *fa).length() < 1e-12
