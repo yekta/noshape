@@ -321,8 +321,9 @@ fn everyday(seed: u64) -> Case {
         // three more; batch 8 on, seed 461, three more; batch 10 on, seed
         // 541, three more; batch 12 on, seed 621, three more; batch 13 on,
         // seed 661, three more; batch 14 on, seed 701, three more; batch 15
-        // on, seed 741, three more; batch 16 on, seed 781, three more.)
-        match r.below(if seed >= 781 { 32 } else if seed >= 741 { 29 } else if seed >= 701 { 26 } else if seed >= 661 { 23 } else if seed >= 621 { 20 } else if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
+        // on, seed 741, three more; batch 16 on, seed 781, three more; batch
+        // 17 on, seed 821, three more.)
+        match r.below(if seed >= 821 { 35 } else if seed >= 781 { 32 } else if seed >= 741 { 29 } else if seed >= 701 { 26 } else if seed >= 661 { 23 } else if seed >= 621 { 20 } else if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
             // Corner rectangle (live's tool constraints), width and height.
             0 => {
                 let (w, h) = (r.range(15.0, 50.0), r.range(10.0, 35.0));
@@ -973,6 +974,75 @@ fn everyday(seed: u64) -> Case {
                 let fr = f(&mut r);
                 c.radius(&circle, rad * fr, true);
             }
+            // L-bracket with a hole in its foot: six H / V lines, four lengths,
+            // the hole's diameter and its centre's distances to the foot's end
+            // and to the bottom.
+            32 => {
+                let (w, h, t1, t2) = (r.range(30.0, 50.0), r.range(20.0, 40.0), r.range(8.0, 12.0), r.range(4.0, 10.0));
+                let p = [o, o + v(w, 0.0), o + v(w, t1), o + v(t2, t1), o + v(t2, h), o + v(0.0, h)];
+                let l: Vec<String> = (0..6).map(|i| c.line(p[i], p[(i + 1) % 6])).collect();
+                for i in 0..6 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 6]));
+                    c.hv(i % 2 == 0, &l[i]);
+                }
+                let (dx, rad) = ((w - t2) / 2.0, t1 * 0.25);
+                let hole = c.circle(o + v(w - dx, t1 / 2.0), rad);
+                let fs: Vec<f64> = (0..6).map(|_| f(&mut r)).collect();
+                c.length(&l[0], w * fs[0]);
+                c.length(&l[5], h * fs[1]);
+                c.length(&l[1], t1 * fs[2]);
+                c.length(&l[4], (h - t1) * fs[3]);
+                c.radius(&hole, rad * fs[4], true);
+                c.distance(&format!("{hole}.center"), &l[1], dx * fs[5]);
+                c.distance(&format!("{hole}.center"), &l[0], t1 / 2.0);
+            }
+            // Rectangle with all four corners chamfered alike: H / V sides,
+            // the chamfers Equal, the first at 45° to the bottom, the others
+            // Parallel or Perpendicular to it; the bottom's and the left
+            // side's lengths and a chamfer's.
+            33 => {
+                let (w, h, ch) = (r.range(25.0, 50.0), r.range(18.0, 35.0), r.range(2.0, 5.0));
+                let p = [o + v(ch, 0.0), o + v(w - ch, 0.0), o + v(w, ch), o + v(w, h - ch), o + v(w - ch, h), o + v(ch, h), o + v(0.0, h - ch), o + v(0.0, ch)];
+                let l: Vec<String> = (0..8).map(|i| c.line(p[i], p[(i + 1) % 8])).collect();
+                for i in 0..8 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 8]));
+                }
+                c.hv(true, &l[0]);
+                c.hv(false, &l[2]);
+                c.hv(true, &l[4]);
+                c.hv(false, &l[6]);
+                c.angle(&l[0], &l[1], 45.0);
+                c.pair("PERPENDICULAR", &l[1], &l[3]);
+                c.pair("PARALLEL", &l[1], &l[5]);
+                c.pair("PERPENDICULAR", &l[1], &l[7]);
+                for k in [3, 5, 7] {
+                    c.pair("EQUAL", &l[1], &l[k]);
+                }
+                let (fw, fh, fc) = (f(&mut r), f(&mut r), f(&mut r));
+                c.length(&l[0], (w - 2.0 * ch) * fw);
+                c.length(&l[6], (h - 2.0 * ch) * fh);
+                c.length(&l[1], ch * std::f64::consts::SQRT_2 * fc);
+            }
+            // V with a circle in it: two lines from one point, the first
+            // Horizontal, the angle between them, both lengths, a circle
+            // Tangent to both and its radius.
+            34 => {
+                let (l1, l2, th, rad) = (r.range(30.0, 50.0), r.range(30.0, 50.0), r.range(40.0, 80.0), r.range(3.0, 7.0));
+                let dir = DVec2::from_angle(th.to_radians());
+                let a = c.line(o, o + v(l1, 0.0));
+                let b = c.line(o, o + dir * l2);
+                c.coincident(&format!("{a}.start"), &format!("{b}.start"));
+                c.hv(true, &a);
+                let half = (th / 2.0).to_radians();
+                let circle = c.circle(o + DVec2::from_angle(half) * (rad / half.sin()), rad);
+                c.pair("TANGENT", &a, &circle);
+                c.pair("TANGENT", &b, &circle);
+                let fs: Vec<f64> = (0..4).map(|_| f(&mut r)).collect();
+                c.angle(&a, &b, (th * fs[0]).clamp(30.0, 100.0));
+                c.length(&a, l1 * fs[1]);
+                c.length(&b, l2 * fs[2]);
+                c.radius(&circle, rad * fs[3], false);
+            }
             // D shape: a Horizontal chord and an arc over it, the chord's
             // length and the arc's radius.
             _ => {
@@ -1284,7 +1354,7 @@ fn write_batch() {
 }
 
 /// The batches: (number, first seed, rich).
-const BATCHES: [(usize, u64, bool); 16] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true), (12, 621, true), (13, 661, true), (14, 701, true), (15, 741, true), (16, 781, true)];
+const BATCHES: [(usize, u64, bool); 17] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true), (12, 621, true), (13, 661, true), (14, 701, true), (15, 741, true), (16, 781, true), (17, 821, true)];
 
 /// Batch 8's s464 / s475 stay as live answered: a component the pass can't
 /// close (a hexagon) takes the least change on its own, the rounded
