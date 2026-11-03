@@ -622,10 +622,28 @@ impl Sketch {
             let mut v: Vec<EntityId> = self.entity(*e).map(|x| x.point_refs().into_iter().collect()).unwrap_or_default();
             v.push(*e);
             v
-        }).any(|p| self.coincident_with(p).iter().any(|q| match (self.point(p), self.point(*q)) {
+        }).any(|p| self.coincident_class(p).iter().any(|q| match (self.point(p), self.point(*q)) {
             (Some(a), Some(b)) => (a - b).length() > 1e-9,
             _ => false,
         }))
+    }
+
+    /// The points `p` coincides with, through chains of Coincidents (the
+    /// solver merges them all: live fuzz s485, a diagonal's end on the top
+    /// line's start on the moved side's end).
+    fn coincident_class(&self, p: EntityId) -> Vec<EntityId> {
+        let mut out = vec![p];
+        let mut i = 0;
+        while i < out.len() {
+            for q in self.coincident_with(out[i]) {
+                if !out.contains(&q) {
+                    out.push(q);
+                }
+            }
+            i += 1;
+        }
+        out.remove(0);
+        out
     }
 
     /// How far a placed unit's shared point is from `u`'s (the move

@@ -913,7 +913,11 @@ fn check_batch(n: usize, first: u64, rich: bool) {
 fn differences(case: &Value, live: &Value) -> Vec<String> {
     let mut out = Vec::new();
     let ours = &case["ours"];
-    let close = |a: &Value, b: &Value| (a[0].as_f64().unwrap() - b[0].as_f64().unwrap()).hypot(a[1].as_f64().unwrap() - b[1].as_f64().unwrap()) < 1e-3;
+    // (A point ours doesn't name differs.)
+    let close = |a: &Value, b: &Value| {
+        let c = |v: &Value, k: usize| v[k].as_f64().unwrap_or(f64::NAN);
+        (c(a, 0) - c(b, 0)).hypot(c(a, 1) - c(b, 1)) < 1e-3
+    };
     if let Some(pts) = live["points"].as_object() {
         for (n, p) in pts {
             if !close(&ours["points"][n], p) {

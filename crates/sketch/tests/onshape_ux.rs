@@ -718,3 +718,43 @@ fn a_quad_side_equal_to_a_triangle_side_follows_its_corner_whole() {
         assert!((*p - *q).length() < 2e-3, "ours {got:?} live {live:?}");
     }
 }
+
+#[test]
+fn a_rectangle_with_a_circle_on_its_diagonal_grows_up_from_its_bottom() {
+    // Live fuzz s485: a rectangle (H / V sides, width and height
+    // dimensioned), a construction diagonal and a circle at its midpoint.
+    // The height 20.266 -> 20.444: the bottom stays, the top goes up by the
+    // whole change and the circle by half (the diagonal's end reads moved
+    // through the top's corner; it isn't kept as it was).
+    let mut sk = Sketch::new();
+    let (x0, x1, y0, y1) = (-2.5976, 28.005, 5.8271, 26.0934);
+    let c = [v(x0, y0), v(x1, y0), v(x1, y1), v(x0, y1)];
+    let l: Vec<EntityId> = (0..4).map(|i| sk.add_line(c[i], c[(i + 1) % 4])).collect();
+    let ends = |sk: &Sketch, i: EntityId| sk.endpoints(i).unwrap();
+    for i in 0..4 {
+        let (e, s) = (ends(&sk, l[i]).1, ends(&sk, l[(i + 1) % 4]).0);
+        sk.add_constraint(ConstraintKind::Coincident { a: e, b: s }).unwrap();
+        let kind = if i % 2 == 0 { ConstraintKind::Horizontal { a: l[i], b: None } } else { ConstraintKind::Vertical { a: l[i], b: None } };
+        sk.add_constraint(kind).unwrap();
+    }
+    let diagonal = sk.add_line(c[0], c[2]);
+    sk.entity_mut(diagonal).unwrap().construction = true;
+    let (ds, de) = ends(&sk, diagonal);
+    sk.add_constraint(ConstraintKind::Coincident { a: ds, b: ends(&sk, l[0]).0 }).unwrap();
+    sk.add_constraint(ConstraintKind::Coincident { a: de, b: ends(&sk, l[2]).0 }).unwrap();
+    let circle = sk.add_circle((c[0] + c[2]) * 0.5, 4.9698);
+    let centre = match sk.entity(circle).unwrap().geometry {
+        Geometry::Circle { center, .. } => center,
+        _ => unreachable!(),
+    };
+    sk.add_constraint(ConstraintKind::Midpoint { point: centre, curve: diagonal }).unwrap();
+    sk.add_constraint(ConstraintKind::Length { curve: l[0], value: 30.602602 }).unwrap();
+    sk.add_constraint(ConstraintKind::Length { curve: l[1], value: 20.443754 }).unwrap();
+    sk.add_constraint(ConstraintKind::Diameter { curve: circle, value: 9.300012 }).unwrap();
+    assert!(sk.solve_with(&SolveOptions { constructive: true, ..Default::default() }).is_solved());
+    let got = [ends(&sk, l[0]).0, ends(&sk, l[1]).1, centre].map(|p| sk.point(p).unwrap());
+    let live = [v(-2.597643, 5.827106), v(28.004959, 26.27086), v(12.703658, 16.048983)];
+    for (p, q) in got.iter().zip(&live) {
+        assert!((*p - *q).length() < 2e-3, "ours {got:?} live {live:?}");
+    }
+}
