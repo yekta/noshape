@@ -1128,3 +1128,19 @@ fn chamfered_groove_edges_stay_whole() {
     let split: Vec<_> = at.iter().filter(|(k, d)| degree[*k] == 2 && d.len() == 2 && d[0].cross(d[1]).length() < 1e-9).map(|(k, _)| *k).collect();
     assert!(split.is_empty(), "{split:?}");
 }
+
+/// FILLET-BLEND-SPLIT (dx's FeatureScript corpus, cf-planetary-gears): a tooth's two root edges (dedendum cylinder ×
+/// extruded involute, 5.08 mm long) filleted R0.85: one face each as live (OCCT's walk at its default tolerances
+/// restarted 0.5 mm in, two faces each).
+#[test]
+fn a_tooth_root_fillet_is_one_face() {
+    setup();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/blend");
+    let s = read_brep(&dir.join("planetary-tooth-roots.brep")).unwrap();
+    let all = s.edges();
+    let es = vec![all[1].clone(), all[7].clone()];
+    let out = fillet_checked(&s, &es, &[0.000_850_543_903_162_302_9; 2]).unwrap().shape;
+    assert!(out.is_valid());
+    assert_eq!(out.faces().len(), s.faces().len() + 2);
+    assert!((vol_mm3(&out) - 82.94049).abs() < 1e-4, "{}", vol_mm3(&out));
+}
