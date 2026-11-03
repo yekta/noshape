@@ -320,8 +320,9 @@ fn everyday(seed: u64) -> Case {
         // (Batch 6 on, seed 381: three more kinds; batch 7 on, seed 421,
         // three more; batch 8 on, seed 461, three more; batch 10 on, seed
         // 541, three more; batch 12 on, seed 621, three more; batch 13 on,
-        // seed 661, three more; batch 14 on, seed 701, three more.)
-        match r.below(if seed >= 701 { 26 } else if seed >= 661 { 23 } else if seed >= 621 { 20 } else if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
+        // seed 661, three more; batch 14 on, seed 701, three more; batch 15
+        // on, seed 741, three more.)
+        match r.below(if seed >= 741 { 29 } else if seed >= 701 { 26 } else if seed >= 661 { 23 } else if seed >= 621 { 20 } else if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
             // Corner rectangle (live's tool constraints), width and height.
             0 => {
                 let (w, h) = (r.range(15.0, 50.0), r.range(10.0, 35.0));
@@ -840,6 +841,67 @@ fn everyday(seed: u64) -> Case {
                 c.distance(&format!("{hole}.center"), &l3, dx);
                 c.distance(&format!("{hole}.center"), &l1, dy);
             }
+            // Rectangle with both top corners rounded: H / V sides, two
+            // Equal arcs Tangent to their sides; width, height and a radius.
+            26 => {
+                let (w, h, rad) = (r.range(25.0, 50.0), r.range(18.0, 35.0), r.range(3.0, 7.0));
+                let l1 = c.line(o, o + v(w, 0.0));
+                let l2 = c.line(o + v(w, 0.0), o + v(w, h - rad));
+                let a3 = c.arc(o + v(w - rad, h - rad), rad, 0.0, FRAC_PI_2);
+                let l4 = c.line(o + v(w - rad, h), o + v(rad, h));
+                let a5 = c.arc(o + v(rad, h - rad), rad, FRAC_PI_2, PI);
+                let l6 = c.line(o + v(0.0, h - rad), o);
+                c.coincident(&format!("{l1}.end"), &format!("{l2}.start"));
+                c.coincident(&format!("{l2}.end"), &format!("{a3}.start"));
+                c.coincident(&format!("{a3}.end"), &format!("{l4}.start"));
+                c.coincident(&format!("{l4}.end"), &format!("{a5}.start"));
+                c.coincident(&format!("{a5}.end"), &format!("{l6}.start"));
+                c.coincident(&format!("{l6}.end"), &format!("{l1}.start"));
+                for (a, b) in [(&l2, &a3), (&a3, &l4), (&l4, &a5), (&a5, &l6)] {
+                    c.pair("TANGENT", a, b);
+                }
+                c.pair("EQUAL", &a3, &a5);
+                for (l, hz) in [(&l1, true), (&l2, false), (&l4, true), (&l6, false)] {
+                    c.hv(hz, l);
+                }
+                let fs: Vec<f64> = (0..3).map(|_| f(&mut r)).collect();
+                c.length(&l1, w * fs[0]);
+                c.length(&l6, h * fs[1] - (rad * fs[2]).min(h * fs[1] * 0.4));
+                c.radius(&a3, (rad * fs[2]).min(h * fs[1] * 0.4), false);
+            }
+            // C channel: eight H / V lines; the outer width and height, the
+            // web's and the flanges' thickness (the flanges' inner sides
+            // Equal).
+            27 => {
+                let (w, h, tw, tf) = (r.range(20.0, 35.0), r.range(30.0, 50.0), r.range(3.0, 7.0), r.range(3.0, 7.0));
+                let p = [o, o + v(w, 0.0), o + v(w, tf), o + v(tw, tf), o + v(tw, h - tf), o + v(w, h - tf), o + v(w, h), o + v(0.0, h)];
+                let l: Vec<String> = (0..8).map(|i| c.line(p[i], p[(i + 1) % 8])).collect();
+                for i in 0..8 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 8]));
+                    c.hv(i % 2 == 0, &l[i]);
+                }
+                c.pair("EQUAL", &l[1], &l[5]);
+                let fs: Vec<f64> = (0..4).map(|_| f(&mut r)).collect();
+                c.length(&l[0], w * fs[0]);
+                c.length(&l[7], h * fs[1]);
+                c.length(&l[1], (tf * fs[2]).min(h * fs[1] * 0.3));
+                c.distance(&format!("{}.start", l[3]), &l[7], (tw * fs[3]).min(w * fs[0] * 0.6));
+            }
+            // Equilateral triangle: three Equal sides, the base Horizontal;
+            // the base's length.
+            28 => {
+                let a = r.range(20.0, 40.0);
+                let p = [o, o + v(a, 0.0), o + v(a / 2.0, a * 3f64.sqrt() / 2.0)];
+                let l: Vec<String> = (0..3).map(|i| c.line(p[i], p[(i + 1) % 3])).collect();
+                for i in 0..3 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 3]));
+                }
+                c.hv(true, &l[0]);
+                c.pair("EQUAL", &l[0], &l[1]);
+                c.pair("EQUAL", &l[1], &l[2]);
+                let fa = f(&mut r);
+                c.length(&l[0], a * fa);
+            }
             // D shape: a Horizontal chord and an arc over it, the chord's
             // length and the arc's radius.
             _ => {
@@ -1151,7 +1213,7 @@ fn write_batch() {
 }
 
 /// The batches: (number, first seed, rich).
-const BATCHES: [(usize, u64, bool); 14] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true), (12, 621, true), (13, 661, true), (14, 701, true)];
+const BATCHES: [(usize, u64, bool); 15] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true), (12, 621, true), (13, 661, true), (14, 701, true), (15, 741, true)];
 
 /// Batch 8's s464 / s475 stay as live answered: a component the pass can't
 /// close (a hexagon) takes the least change on its own, the rounded
