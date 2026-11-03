@@ -1439,7 +1439,9 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   no change and doesn't start the line; the second then starts one (left pending at (0,20)). Through the UI tests'
   clicks (helper or window events) the same steps on Top make the line, so it's the tool state the rectangle leaves
   (its value boxes?) eating the next tool's first click on the real input path. Yours (sketch tools).
-- 11-03 22:05 (psui): sketch-fillet-corner, re-recorded with live's hover wait, differs at step 8: Sketch fillet (Shift+F) on,
+- (skasm 22:20: fixed: the clicked corner stays selected while its fillet previews, cleared on confirm; T1
+  sketch_mode fillet_vertex_then_own_radius.) 11-03 22:05 (psui): sketch-fillet-corner, re-recorded with live's
+  hover wait, differs at step 8: Sketch fillet (Shift+F) on,
   a click on the rectangle's corner [30, 20] selects the corner point in live (selection 1 SKETCH_ENTITY, no fillet
   yet), ours selects nothing (no fillet either). The earlier recording matched ours. Yours.
 - (skasm 22:03: asked live for the badge's place there, REQUESTS; ours: each line's row 20.5 px below its

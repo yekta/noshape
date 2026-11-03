@@ -2013,6 +2013,11 @@ impl SketchEditor {
             Ok(res) => {
                 self.pending_corner = Some((preview, res));
                 self.pending_corner_pid = target.1.is_none().then_some(target.0);
+                // Live (ui-parity sketch-fillet-corner): the clicked corner
+                // stays selected until the fillet is confirmed.
+                if target.1.is_none() {
+                    self.selection = vec![target.0];
+                }
                 self.message = Some("Adjust the preview, then press Enter to confirm".into());
                 EditOutcome::redraw()
             }
@@ -2048,7 +2053,9 @@ impl SketchEditor {
     pub fn commit_corner(&mut self, data: &mut SketchData) -> EditOutcome {
         // Enter on a red preview does nothing (live).
         let Some((preview, result)) = self.pending_corner.take() else { return EditOutcome::none() };
-        self.pending_corner_pid = None;
+        if let Some(pid) = self.pending_corner_pid.take() {
+            self.selection.retain(|e| *e != pid);
+        }
         *data = preview;
         self.finish_create(data, &result.created);
         if self.tool == Tool::Chamfer {
@@ -8088,7 +8095,9 @@ mod tests {
         let r = d.sketch.corner_rectangle(v(0.0, 0.0), v(0.04, 0.02));
         let (p0, p1) = (d.sketch.point(r.points[0]).unwrap(), d.sketch.point(r.points[1]).unwrap());
         click(&mut ed, &mut d, p0);
+        assert_eq!(ed.selection, vec![r.points[0]], "the corner stays selected until confirmed (live ui-parity sketch-fillet-corner)");
         assert!(ed.commit_corner(&mut d).changed);
+        assert!(ed.selection.is_empty(), "confirming clears it");
         assert!(ed.dim_edit.is_some(), "radius box after the first fillet");
         ed.dim_edit = None;
         click(&mut ed, &mut d, p1);
