@@ -337,6 +337,41 @@ fn slider_respects_limits() {
     assert!((o.z - 0.025).abs() < 1e-3, "inside range: {o:?}");
 }
 
+/// A drag step one solve lands takes that solve (a Slider's block pulled
+/// along its axis); one the mates hold off its pointer reports it and takes
+/// the substeps from the drag's start (`Prepared::solve_drag`).
+#[test]
+fn a_drag_step_lands_in_one_solve_when_it_can() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let m = mate(10, MateType::Slider, conn(1, face_with(&r, "CapEnd"), Inference::Centroid), conn(2, face_with(&r, "CapStart"), Inference::Centroid));
+    let asm = Assembly {
+        instances: vec![
+            part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
+            part_instance(2, "Block <2>", f.studios[0], body, DVec3::new(0.0, 0.0, 0.02), false),
+        ],
+        mates: vec![m],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let start: std::collections::HashMap<_, _> = res.solved.placements.iter().cloned().collect();
+    let (local, from) = (DVec3::new(0.02, 0.01, 0.0), DVec3::new(0.02, 0.01, 0.02));
+    let drag = |to: DVec3| SolveOptions { drags: vec![(InstanceId(2), local, to)], start: Some(start.clone()), skip_dof: true, ..Default::default() };
+    // Along the axis, 10 mm (four substeps' worth): one solve lands it.
+    let (s, landed) = res.prepared.solve_drag(&drag(DVec3::new(0.02, 0.01, 0.03)), &[from], true);
+    assert!(landed);
+    assert!((DVec3::from(s.placement(InstanceId(2)).unwrap().translation).z - 0.03).abs() < 1e-6);
+    // Sideways: the Slider holds it off the pointer.
+    let (s, landed) = res.prepared.solve_drag(&drag(DVec3::new(0.03, 0.01, 0.03)), &[from], true);
+    assert!(!landed);
+    let o = DVec3::from(s.placement(InstanceId(2)).unwrap().translation);
+    assert!(o.x.abs() < 1e-6 && o.y.abs() < 1e-6, "slides along Z only: {o:?}");
+    // The next step skips the single solve, with the same result.
+    let (t, _) = res.prepared.solve_drag(&drag(DVec3::new(0.03, 0.01, 0.03)), &[from], false);
+    assert!((DVec3::from(t.placement(InstanceId(2)).unwrap().translation) - o).length() < 1e-9);
+}
+
 #[test]
 fn interference_bom_and_explode() {
     let f = doc_with(vec![block_studio()]);
