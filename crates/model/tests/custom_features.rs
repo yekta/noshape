@@ -2081,7 +2081,7 @@ export const noOpCut = defineFeature(function(context is Context, id is Id, defi
 
 /// The B94.6 knurl on the 50 × 50 cylinder (as `knurl_feature_b94_on_a_cylinder`): `kind`, CP12, outer face, groove
 /// depth 100 %, the tooth and helix angles given: the regeneration, its seconds.
-fn knurl_b94(kind: &str, tooth_deg: f64, helix_deg: f64) -> (RegenResult, f64) {
+fn knurl_b94(kind: &str, tooth_deg: f64, helix_deg: f64, size: Option<(f64, f64)>, pitch: &str) -> (RegenResult, f64) {
     const CYLINDER: &str = r#"
 annotation { "Feature Type Name" : "Test cylinder" }
 export const testCylinder = defineFeature(function(context is Context, id is Id, definition is map)
@@ -2090,13 +2090,10 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
         fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 50) * millimeter, "radius" : 25 * millimeter });
     });
 "#;
-    // (KNURL_SIZE=<diameter mm>,<height mm>: another cylinder than live's Ø50 × 50; KNURL_PITCH=CP16 etc.)
-    let cylinder = match std::env::var("KNURL_SIZE") {
-        Ok(v) => {
-            let x: Vec<f64> = v.split(',').map(|a| a.trim().parse().unwrap()).collect();
-            CYLINDER.replace("vector(0, 0, 50)", &format!("vector(0, 0, {})", x[1])).replace("\"radius\" : 25 *", &format!("\"radius\" : {} *", x[0] / 2.0))
-        }
-        Err(_) => CYLINDER.to_string(),
+    // (`size`: (diameter, height) in mm, another cylinder than live's Ø50 × 50.)
+    let cylinder = match size {
+        Some((d, h)) => CYLINDER.replace("vector(0, 0, 50)", &format!("vector(0, 0, {h})")).replace("\"radius\" : 25 *", &format!("\"radius\" : {} *", d / 2.0)),
+        None => CYLINDER.to_string(),
     };
     let src = format!("{}\n{cylinder}", include_str!("fs/knurl_b94.fs"));
     let fx = Fixture::new(&src);
@@ -2116,7 +2113,7 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
     f.params.set("knurlType", ParamValue::Enum(kind.into()));
     f.params.set("knurlFace", ParamValue::Enum("OUTER".into()));
     f.params.set("pitchType", ParamValue::Enum("CIRCULAR".into()));
-    f.params.set("circularPitch", ParamValue::Enum(std::env::var("KNURL_PITCH").unwrap_or_else(|_| "CP12".into())));
+    f.params.set("circularPitch", ParamValue::Enum(pitch.into()));
     f.params.set("toothAngle", expr(&format!("{tooth_deg} deg")));
     f.params.set("toothHelixAngle", expr(&format!("{helix_deg} deg")));
     f.params.set("grooveDepthPercent", expr("100"));
@@ -2160,9 +2157,15 @@ fn knurl_feature_b94_tooth_and_helix_angles() {
         }
         Err(_) => [45.0, 15.0, 30.0, 60.0, 80.0].iter().flat_map(|&t| [45.0, 15.0, 30.0].map(|h| (t, h))).collect(),
     };
+    // (KNURL_SIZE=<diameter mm>,<height mm>: another cylinder; KNURL_PITCH=CP16 etc.)
+    let size = std::env::var("KNURL_SIZE").ok().map(|v| {
+        let x: Vec<f64> = v.split(',').map(|a| a.trim().parse().unwrap()).collect();
+        (x[0], x[1])
+    });
+    let pitch = std::env::var("KNURL_PITCH").unwrap_or_else(|_| "CP12".into());
     let mut bad = Vec::new();
     for (tooth, helix) in pairs {
-        let (r, took) = knurl_b94("DIAMOND", tooth, helix);
+        let (r, took) = knurl_b94("DIAMOND", tooth, helix, size, &pitch);
         let errors: Vec<String> = r.display.features.iter().filter(|s| s.status == FeatureStatus::Error).map(|s| s.message.clone().unwrap_or_default()).collect();
         let b = r.context.bodies.first();
         let (v, faces, valid) = b.map_or((0.0, 0, false), |b| (b.shape.volume().unwrap_or(0.0) * 1e9, b.shape.count(noshape_kernel::ShapeType::Face), b.shape.is_valid()));
@@ -2181,6 +2184,22 @@ fn knurl_feature_b94_tooth_and_helix_angles() {
         }
     }
     assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
+/// The B94.6 Diamond knurl at 30 TPI on a Ø10 × 71 rod, tooth 80°, helix 30° (OCCT runs out of memory on it): a ray
+/// from a 0.2 mm triangle of the rod at the knurl's end crosses a groove's flank at the corner of a cell of its patch,
+/// 0.0019 rad from the flank's end, where Newton's steps from the cell's middle find nothing (the triangle read as
+/// inside the groove: "a non-manifold result"). Ours until live's values come (REQUESTS 11-03 17:20).
+#[test]
+#[ignore = "T2: a 74-groove knurl, about a minute"]
+fn knurl_b94_at_30_tpi_on_a_10_mm_rod() {
+    let (r, _) = knurl_b94("DIAMOND", 80.0, 30.0, Some((10.0, 71.0)), "CP30");
+    assert_ok(&r);
+    assert_eq!(r.context.bodies.len(), 1);
+    let s = &r.context.bodies[0].shape;
+    let v = s.volume().unwrap() * 1e9;
+    assert!(s.is_valid() && (v - 5167.836).abs() <= 1e-6 * 5167.836, "valid {}, {v} mm³", s.is_valid());
+    assert_eq!(s.count(noshape_kernel::ShapeType::Face), 17947);
 }
 
 /// The Feature Studio knurl "Printable ANSI/ASME B94.6 knurling" (the lead's

@@ -5,7 +5,8 @@
 //! the history, time, the path that ran). The hash is of the inputs, op and
 //! options, so a corpus recorded over many runs keeps one case per distinct
 //! call. The replay test (`tests/bool_replay.rs`) runs the cases again and
-//! compares.
+//! compares. BREP text rounds to 15 digits; `NOSHAPE_RECORD_EXACT=1` also
+//! writes `<hash>.bin` (binary, the inputs exactly), which [`load`] prefers.
 
 use crate::{BooleanOp, BooleanOptions, Glue, OpResult, Shape, ShapeType};
 use std::hash::{Hash, Hasher};
@@ -153,12 +154,25 @@ fn case_of(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &BooleanOpti
     Some((format!("{:016x}", h.finish()), bytes))
 }
 
+/// The inputs exactly (NOSHAPE_RECORD_EXACT), beside the text.
+fn write_exact(dir: &Path, name: &str, objects: &[Shape], tools: &[Shape]) {
+    if std::env::var_os("NOSHAPE_RECORD_EXACT").is_none() {
+        return;
+    }
+    let inputs = Shape::compound(&[Shape::compound(objects), Shape::compound(tools)]);
+    if let Ok(bytes) = inputs.to_bin_bytes(false) {
+        let _ = std::fs::create_dir_all(dir);
+        let _ = std::fs::write(dir.join(format!("{name}.bin")), bytes);
+    }
+}
+
 /// Records one call (when it isn't in the corpus yet): `run` performs it.
 pub fn record(dir: &Path, op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &BooleanOptions, run: impl FnOnce() -> crate::Result<OpResult>) -> crate::Result<OpResult> {
     let Some((name, bytes)) = case_of(op, objects, tools, opts) else { return run() };
     if dir.join(format!("{name}.txt")).exists() {
         return run();
     }
+    write_exact(dir, &name, objects, tools);
     let t = std::time::Instant::now();
     let r = run();
     let ms = t.elapsed().as_secs_f64() * 1e3;
@@ -213,6 +227,7 @@ pub struct Call<'a> {
 pub fn record_result(dir: &Path, call: &Call, res: &OpResult, ms: f64, path: &str) {
     let Some((name, bytes)) = case_of(call.op, call.objects, call.tools, call.opts) else { return };
     if !dir.join(format!("{name}.txt")).exists() {
+        write_exact(dir, &name, call.objects, call.tools);
         write_case(dir, &name, &bytes, call, res, ms, path);
     }
 }
@@ -293,8 +308,10 @@ pub fn load(dir: &Path, name: &str) -> Option<Case> {
         _ => Glue::Off,
     };
     let opts = BooleanOptions { fuzzy: num("fuzzy")?, glue, unify: flag("unify"), parallel: flag("parallel"), obb: flag("obb") };
-    let bytes = std::fs::read(dir.join(format!("{name}.brep"))).ok()?;
-    let inputs = Shape::from_brep_bytes(&bytes).ok()?;
+    let inputs = match std::fs::read(dir.join(format!("{name}.bin"))) {
+        Ok(bin) => Shape::from_bin_bytes(&bin).ok()?,
+        Err(_) => Shape::from_brep_bytes(&std::fs::read(dir.join(format!("{name}.brep"))).ok()?).ok()?,
+    };
     let parts = inputs.children();
     let [objects, tools] = parts.as_slice() else { return None };
     let summary = Summary {

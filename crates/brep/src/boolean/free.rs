@@ -240,21 +240,27 @@ pub(super) fn ray_hits(ns: &FreeSurface, patches: &Patches, uv: [f64; 4], p: DVe
         }
         // (The middle's steps gone off the face (a long helical flank's eighth, the crossing at its corner): again
         // from the middle of each cell of its grid the ray passes ahead, seen along the ray (the cell's box grown by a
-        // tenth of its size), the steps kept near the patch.)
+        // tenth of its size), the steps kept near the patch; a cell whose middle finds nothing, the ray within its
+        // corners' box, again from the corner nearest the ray (a crossing in a flank's cell's corner, at the knurl's
+        // end).)
         let (ax, bx) = r.any_orthonormal_pair();
-        let mut seen = [DVec3::ZERO; 25];
-        for (x, &q) in seen.iter_mut().zip(&pa.pts) {
-            *x = DVec3::new((q - p).dot(ax), (q - p).dot(bx), (q - p).dot(r));
-        }
+        let seen = |q: DVec3| DVec3::new((q - p).dot(ax), (q - p).dot(bx), (q - p).dot(r));
         for k in 0..16 {
             let (i, j) = (k % 4, k / 4);
-            let c = [seen[j * 5 + i], seen[j * 5 + i + 1], seen[j * 5 + i + 5], seen[j * 5 + i + 6]];
+            let c = [pa.pts[j * 5 + i], pa.pts[j * 5 + i + 1], pa.pts[j * 5 + i + 5], pa.pts[j * 5 + i + 6]].map(seen);
             let (lo, hi) = c.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(lo, hi), &x| (lo.min(x), hi.max(x)));
             let grow = 0.1 * (hi - lo).max_element();
             if lo.x - grow > 0.0 || lo.y - grow > 0.0 || hi.x + grow < 0.0 || hi.y + grow < 0.0 || hi.z + grow < 0.0 {
                 continue;
             }
-            if let Some(h) = newton(at((i as f64 + 0.5) / 4.0, (j as f64 + 0.5) / 4.0), true) {
+            let (f0, g0) = (i as f64 / 4.0, j as f64 / 4.0);
+            let mut h = newton(at(f0 + 0.125, g0 + 0.125), true);
+            let through = lo.x <= 0.0 && lo.y <= 0.0 && hi.x >= 0.0 && hi.y >= 0.0 && hi.z >= 0.0;
+            if h.is_none() && through {
+                let (n, _) = c.iter().enumerate().map(|(n, x)| (n, x.truncate().length())).fold((0, f64::INFINITY), |a, b| if b.1 < a.1 { b } else { a });
+                h = newton(at(f0 + 0.25 * (n % 2) as f64, g0 + 0.25 * (n / 2) as f64), true);
+            }
+            if let Some(h) = h {
                 add(h);
                 if inside(h.0) {
                     break;

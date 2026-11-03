@@ -2948,11 +2948,16 @@ impl Ctx<'_> {
 
     /// Where 3D point `p` (not on any of solid `s`'s faces) is against solid `s`, by a ray's crossings.
     fn ray_state(&self, p: DVec3, s: usize) -> R<State> {
-        const DIRS: [DVec3; 4] = [
+        // (Then the other way (a point 3 um below a knurl's end, every ray up passing a groove's corner there).)
+        const DIRS: [DVec3; 8] = [
             DVec3::new(0.5773502691896258, 0.5773502691896258, 0.5773502691896258),
             DVec3::new(0.2672612419124244, 0.5345224838248488, 0.8017837257372732),
             DVec3::new(-0.8017837257372732, 0.2672612419124244, 0.5345224838248488),
             DVec3::new(0.5345224838248488, -0.8017837257372732, 0.2672612419124244),
+            DVec3::new(-0.5773502691896258, -0.5773502691896258, -0.5773502691896258),
+            DVec3::new(-0.2672612419124244, -0.5345224838248488, -0.8017837257372732),
+            DVec3::new(0.8017837257372732, -0.2672612419124244, -0.5345224838248488),
+            DVec3::new(-0.5345224838248488, 0.8017837257372732, -0.2672612419124244),
         ];
         let tol = self.tol;
         let sol = &self.solids[s];
@@ -4858,7 +4863,8 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     })?;
     let mut all_states: Vec<R<Vec<(usize, State)>>> = first.into_iter().zip(rest).map(|(a, b)| a.or(b).expect("a piece's states")).collect();
     // (A thin piece whose point lies on another solid's face (a sharp knurl tooth's sub-micrometre sliver beside the
-    // cylinder): as its neighbour across a section with that solid's face, in and out the other way.)
+    // cylinder): as its neighbour across a section with that solid's face, in and out the other way; not across
+    // another's (the sliver's end at another groove's flank: its neighbour there inside the cylinder).)
     for pi in 0..pieces.len() {
         if !matches!(&all_states[pi], Err(Decline(w)) if *w == "a piece's point on another solid's face") {
             continue;
@@ -4869,7 +4875,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             let lo = section_faces.partition_point(|x| x.0 < s);
             for &(_, g) in section_faces[lo..].iter().take_while(|x| x.0 == s) {
                 let t = cx.faces[g].solid;
-                if g == f || t == cx.faces[f].solid {
+                if g == f || t == cx.faces[f].solid || free::surface_distance(&cx.faces[g], pieces[pi].inside) > GREY * tol {
                     continue;
                 }
                 for &pn in &face_pieces[f] {

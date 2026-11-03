@@ -119,6 +119,50 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
   custom_features::knurl_feature_b94_tooth_and_helix_angles, KNURL_SIZE / KNURL_PITCH / KNURL_ANGLES).
 - Squash only with `git reset --soft $(git merge-base HEAD origin/main)` after a fresh fetch; check `git show --stat`.
 
+## CP30 knurls OCCT can't do (11-03 19:20 UTC): landed d55587a0, then three more steps (bool-c)
+- d55587a0 (the two families below) landed 16:20; its sweep (ray.tsv vs foot.tsv): 313 -> 329 of 345, none lost.
+- Corpus replays weren't exact: kernel::bool_corpus writes BRepTools text (15 digits), so a replay saw inputs a
+  rounding off; on a knurl that flips results (Ø10 x 71 CP30 80/30: the replay took it, the model declined it). Now
+  NOSHAPE_RECORD_EXACT=1 also writes `<hash>.bin` (BinTools), which bool_corpus::load prefers: replays match the model
+  (Ø100 x 25 CP30 45/30 recorded so, vibe4 bool-corpora/k100-25x: "a non-manifold result" either way). Record a
+  declined case: `NOSHAPE_BOOL_FALLBACK=0 NOSHAPE_RECORD_FAILED=1 NOSHAPE_RECORD_EXACT=1 NOSHAPE_RECORD_BOOLEANS=<dir>
+  KNURL_SIZE=.. KNURL_PITCH=.. KNURL_ANGLES=..` on the model test custom_features::knurl_feature_b94_tooth_and_helix_
+  angles. bool-a's debug: NOSHAPE_X_RAY=x,y,z;.. (rays from that point: hits, BRUTE (Newton from 4200 starts on each
+  free-form face)), NOSHAPE_X_TURN=x,y,z (a piece's state turned from the first period), NOSHAPE_X_SOLID=a,b (a
+  solid's faces and edges), NOSHAPE_X_ALLP=x0,x1,y0,y1,z0,z1 (pieces with their point in the box), NOSHAPE_X_LSEG=
+  arg,index,box (a face's 2D curves there), NOSHAPE_X_IV=a,b / NOSHAPE_X_IVF=arg,index,x,y,z (a section's intervals),
+  NOSHAPE_X_DIR (two curves leaving a point one way), NOSHAPE_X_NOSYM; NOCLEAN / UNCLEAR / TOUCH2 / PNEAR prints under
+  NOSHAPE_X_NM.
+- OCCT runs out of its 16 GB on every remaining CP30 case (Ø10 x 71 80/30 223 s then fails; Ø100 x 25, Ø63 x 33):
+  the user gets an error there today, so each one taken is pure gain; live asked for their values (REQUESTS.md
+  17:20).
+- Landing 11-03 20:11 (corpora unchanged 0 differ, Shell's recordings the same, v4tests, qa's matrices; knurl sweep
+  corner.tsv against ray.tsv 330 -> 333 of 346, none lost; Ø63 x 100 CP30 45/30 moved from "no clean ray" to taken
+  on vibe4, 309589.989 mm³, 160526 faces, 268 s, 10.3 GB peak for the test process (killed on vibe5 beside three
+  other sweep cases; OCCT fails there at its 16 GB budget). Request (lead / core): noshape's Boolean has no memory
+  budget of its own, so a bigger knurl could take the machine's memory rather than fail as OCCT's does.): (1) free::ray_hits: a cell whose middle finds nothing, the ray within its corners' box,
+  again from its corner nearest the ray (Ø10 x 71 CP30 80/30: a ray from a 0.2 mm triangle at the knurl's end crosses
+  a groove's flank 0.0019 rad from its end at a cell's corner; taken, 5167.836 mm³, 17947 faces, 47 s; T2
+  custom_features::knurl_b94_at_30_tpi_on_a_10_mm_rod). Quarters (three levels) took it too but cost +2.3 % on
+  corpus5's < 50-face cases (vibe3 abrun); the corner 0 %. (2) a sliver whose point is on another solid's face takes
+  its neighbour's states across a section with that face only, not with another tool's (Ø100 x 25 CP30: tool 186's
+  0.4 um strips beside the cylinder took a neighbour inside the cylinder across a 1 um section with another groove:
+  170 -> 34 open edges); (3) rays the other way (-r) after the four (Ø63 x 33 CP30: a point 3 um below the end, every
+  ray up passing a groove's corner there: "no clean ray" gone).
+- Left: CP30 knurls at Ø63 / Ø100 (45/30) have features at the tolerance: every tool's corner edge 0.749 um outside
+  the cylinder, the flank's section 0.81-0.83 um from it, OCCT's section curves accurate to 0.2-1.4 um, the
+  Boolean's tolerance 1-2e-7. Each fix so far shows the next sub-micron conflict; WIP branches, not landed:
+  - bool-seam (bool-b): at the seam (mirrored grooves cross exactly at angle 180) the cylinder's section with flank
+    96:0 below the seam (accuracy 1.44 um, 1.32 um from the corner edge) was dropped by intervals_on as along the
+    boundary, so the cylinder lacked it (a tooth top joined to a groove's floor). Kept when that edge is off the other
+    face; a face vertex in the accuracy band taken only when on the other face; arrange orders curves leaving a point
+    one way by their middles. Ø63 x 33 then stops at a 0.56 um piece of a tool's cap edge lying on the cylinder's top
+    circle without splitting it (face 0:0 at the circle's crossing with tool 351's cap edge, 1.1 um outside).
+  - bool-touch (bool-b): Ø100 x 33 CP30 45/30 "a section touching a face's boundary": sections 0.825 um from the
+    corner edge against a band of 0.828 um. No decline where the face's nearest edge is off the other face by more
+    than both tolerances. Then "a piece's point near its face's boundary": mirrored tools' end caps on the end plane
+    overlap in slivers 2 tolerances wide (point 2.059e-7 from the boundary, tolerance 2.07e-7).
+
 ## Two more knurl families: a section OCCT misses beside its own, a ray Newton loses (11-03 16:30 UTC)
 - Ø25 x 71 CP12 45/30 (k25-71-12, 148 open edges): two mirrored grooves' flanks meet in a 32 um curve at the
   cylinder's end (from the bottom edges' crossing to the ridges') that OCCT's section misses beside the long one it
