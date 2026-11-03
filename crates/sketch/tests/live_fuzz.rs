@@ -978,6 +978,11 @@ fn a_rounded_corners_new_radius_shortens_the_side_placed_before_it() {
     let ours = batch(1, 547, true);
     let d = differences(&ours["cases"][0], &live["cases"]["s547"]);
     assert!(d.is_empty(), "s547: {}", d.join("; "));
+    // s556: height and width change: the bottom-left corner stays, the new
+    // height goes up from the bottom before the right side is carried out.
+    let ours = batch(1, 556, true);
+    let d = differences(&ours["cases"][0], &live["cases"]["s556"]);
+    assert!(d.is_empty(), "s556: {}", d.join("; "));
 }
 
 /// Batch 10's s555 stays as live answered: an isosceles triangle's leg

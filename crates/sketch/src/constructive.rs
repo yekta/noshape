@@ -405,6 +405,11 @@ impl Sketch {
                 // to its Equal before the side Equal to the triangle).
                 let touching: Vec<EntityId> = tied.iter().copied().filter(|u| cons.iter().any(|(c, us)| us.contains(u) && self.connective(*c) && us.iter().any(|x| placed.contains(x)))).collect();
                 let tied = if !touching.is_empty() && touching.len() < tied.len() { touching } else { tied };
+                // One whose own size changes before one only carried (live
+                // fuzz s556: a rounded-corner rectangle's new height goes up
+                // from the bottom before the right side is carried out).
+                let resizing: Vec<EntityId> = tied.iter().copied().filter(|u| cons.iter().any(|(c, us)| us.as_slice() == [*u] && !holds[c] && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Length { .. } | ConstraintKind::Radius { .. } | ConstraintKind::Diameter { .. })))).collect();
+                let tied = if !resizing.is_empty() && resizing.len() < tied.len() { resizing } else { tied };
                 // One that can be placed keeping its whole shape goes first
                 // (fuzz s336: an L-bracket's riser shifts whole before the
                 // inner side, which then shortens).
@@ -476,7 +481,8 @@ impl Sketch {
             // slides them before it's moved whole (live fuzz s547: a new
             // radius keeps both straight sides).
             let hv = |x: EntityId| self.kind(x) == Some(EntityKind::Line) && cons.iter().any(|(c, us)| us.as_slice() == [x] && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Horizontal { b: None, .. } | ConstraintKind::Vertical { b: None, .. })));
-            let corner = round && held.len() == 2 && held.iter().all(|x| hv(*x));
+            let lines_beside: BTreeSet<EntityId> = cons.iter().filter(|(c, us)| us.contains(&u) && self.connective(*c)).flat_map(|(_, us)| us.iter().copied()).filter(|x| *x != u).collect();
+            let corner = round && lines_beside.len() == 2 && lines_beside.iter().all(|x| hv(*x));
             let ladder: &[(u8, u8)] = if corner {
                 &[(1, 3), (3, 1), (0, 3), (1, 2), (1, 1), (1, 0), (2, 1), (2, 0), (0, 2), (0, 1), (0, 0)]
             } else if end_carried && resized {
@@ -585,6 +591,10 @@ impl Sketch {
                 }
                 if slide {
                     for &(n, far) in far_ends.iter().flatten() {
+                        // (A far end joined to placed geometry is where that is.)
+                        if let Some(q) = self.coincident_class(far).into_iter().find(|q| unit_of.get(q).is_some_and(|x| placed.contains(x))).and_then(|q| self.point(q)) {
+                            let _ = sub.set_point(far, q);
+                        }
                         if sub.add_constraint(ConstraintKind::Fix { entity: far }).is_err() || !orig.hold_direction(&mut sub, n) {
                             continue 'attempts;
                         }
