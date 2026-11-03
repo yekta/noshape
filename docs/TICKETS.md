@@ -1544,6 +1544,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 03:28: new scenarios through the driver (green e89c78de): sketch tools inside the toolbar's dropdowns aren't found
   by name (`{"tool": "3 point arc"}`, "Slot", "Inscribed polygon", "Spline", the sketch "Mirror"), nor the Extrude
   direction arrow (`{"button": "Opposite direction"}`); everything else in batches 6–8 (70 scenarios) runs.
+  qa 07:27: in a sketch, `{"empty": true}` leaves a selected line selected (scenario sketch-line-selected-enter-escape,
+  green dcb0ea5d: the last state still 1 SKETCH_ENTITY), while by hand a click on empty space or on the plane's area clears
+  it (live does too): the driver's empty point seems to land on the line or the sketch. The new sketch state (tool,
+  entities, constraints, dimensions) works: Enter keeps the Dimension tool, Enter / Esc never leave the sketch = live.
 - [ ] P1 DIALOG-SWITCH-DISCARDS-NEW (psui) double-clicking another feature while a **new** feature's dialog is open throws
   the new feature away in ours; live keeps it: a box (Sketch 1, Extrude 1), Search tools › Variable, Name
   wall_thickness, Value 2 + Enter (the first Enter applies: the row "#wall_thickness = 2 mm" is in the list, the dialog
