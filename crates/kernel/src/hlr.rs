@@ -259,14 +259,30 @@ pub(crate) fn drop_covered_hidden(edges: Vec<ProjectedEdge>, tol: f64) -> Vec<Pr
 /// (within `tol`) into polylines; collapse collinear interior points.
 pub(crate) fn merge_fragments(edges: Vec<ProjectedEdge>, tol: f64) -> Vec<ProjectedEdge> {
     use std::collections::HashMap;
-    type Key = (Visibility, EdgeClass, Option<u32>);
+    // A silhouette has no source edge: its fragments join only along one
+    // curve (one face's outline), not across faces (live 1857: a knob's
+    // fillet, side and fillet are two ARCs and a LINE).
+    type Key = (Visibility, EdgeClass, Option<u32>, usize);
+    let mut curves: Vec<Curve2> = Vec::new();
     let mut groups: Vec<(Key, Vec<Vec<DVec2>>)> = Vec::new();
     let mut index: HashMap<Key, usize> = HashMap::new();
     for e in edges {
         if e.polyline.len() < 2 {
             continue;
         }
-        let k = (e.visibility, e.class, e.source_edge);
+        let along = if e.class == EdgeClass::Outline && e.source_edge.is_none() {
+            let c = Curve2::of(&e.polyline, tol);
+            match curves.iter().position(|o| o.same(&c, tol)) {
+                Some(i) => i + 1,
+                None => {
+                    curves.push(c);
+                    curves.len()
+                }
+            }
+        } else {
+            0
+        };
+        let k = (e.visibility, e.class, e.source_edge, along);
         let gi = *index.entry(k).or_insert_with(|| {
             groups.push((k, Vec::new()));
             groups.len() - 1
@@ -274,7 +290,7 @@ pub(crate) fn merge_fragments(edges: Vec<ProjectedEdge>, tol: f64) -> Vec<Projec
         groups[gi].1.push(e.polyline);
     }
     let mut out = Vec::new();
-    for ((visibility, class, source_edge), polys) in groups {
+    for ((visibility, class, source_edge, _), polys) in groups {
         let cell = tol.max(1e-15) * 4.0;
         let q = |p: DVec2| ((p.x / cell).round() as i64, (p.y / cell).round() as i64);
         // End point hash: (poly, is_end).
@@ -353,6 +369,46 @@ pub(crate) fn merge_fragments(edges: Vec<ProjectedEdge>, tol: f64) -> Vec<Projec
     out
 }
 
+/// The curve a projected fragment lies on, to tell which fragments continue
+/// each other: a line (unit direction up to sign, offset), a circle (centre,
+/// radius), or another curve (never the same as another fragment's).
+#[derive(Clone, Copy, Debug)]
+enum Curve2 {
+    Line(DVec2, f64),
+    Circle(DVec2, f64),
+    Other,
+}
+
+impl Curve2 {
+    fn of(pts: &[DVec2], tol: f64) -> Curve2 {
+        let (a, b) = (pts[0], pts[pts.len() - 1]);
+        let far = pts.iter().copied().max_by(|p, q| ((*p - a).length() + (*p - b).length()).total_cmp(&((*q - a).length() + (*q - b).length()))).unwrap_or(a);
+        let d = if a.distance(b) > tol { (b - a).normalize() } else { (far - a).normalize_or_zero() };
+        if d != DVec2::ZERO && pts.iter().all(|p| cross2(d, *p - a).abs() <= tol) {
+            let d = if d.x < 0.0 || (d.x == 0.0 && d.y < 0.0) { -d } else { d };
+            return Curve2::Line(d, cross2(d, a));
+        }
+        let m = pts[pts.len() / 2];
+        let (p, q) = if a.distance(b) > tol { (m, b) } else { (pts[pts.len() / 3], pts[2 * pts.len() / 3]) };
+        let det = 2.0 * cross2(p - a, q - a);
+        if det.abs() < 1e-300 {
+            return Curve2::Other;
+        }
+        let (u, v) = (p - a, q - a);
+        let c = a + DVec2::new(v.y * u.length_squared() - u.y * v.length_squared(), u.x * v.length_squared() - v.x * u.length_squared()) / det;
+        let r = c.distance(a);
+        if pts.iter().all(|p| (p.distance(c) - r).abs() <= tol.max(r * 1e-6)) { Curve2::Circle(c, r) } else { Curve2::Other }
+    }
+
+    fn same(&self, o: &Curve2, tol: f64) -> bool {
+        match (self, o) {
+            (Curve2::Line(d, k), Curve2::Line(e, l)) => d.distance(*e) <= 1e-9 && (k - l).abs() <= tol,
+            (Curve2::Circle(c, r), Curve2::Circle(e, s)) => c.distance(*e) <= tol.max(r * 1e-6) && (r - s).abs() <= tol.max(r * 1e-6),
+            _ => false,
+        }
+    }
+}
+
 /// Drop duplicate points and interior points on straight runs.
 fn simplify_collinear(pts: Vec<DVec2>, tol: f64) -> Vec<DVec2> {
     let mut out: Vec<DVec2> = Vec::with_capacity(pts.len());
@@ -396,6 +452,21 @@ mod tests {
         assert_eq!(m.len(), 2);
         let long = m.iter().find(|x| x.polyline.len() == 2 && (x.polyline[0].x - x.polyline[1].x).abs() > 2.5).unwrap();
         assert!((long.polyline[0].x - long.polyline[1].x).abs() - 3.0 < 1e-12);
+    }
+
+    /// Silhouettes (no source edge) join along one curve only: a fillet's
+    /// arc, the side's line and the next arc stay three (live 1857); two
+    /// pieces of one line or one circle join.
+    #[test]
+    fn silhouettes_join_along_one_curve() {
+        let outline = |pts: Vec<[f64; 2]>| ProjectedEdge { visibility: Visibility::Visible, class: EdgeClass::Outline, polyline: pts.iter().map(|p| DVec2::new(p[0], p[1])).collect(), source_edge: None };
+        let arc = |c: [f64; 2], r: f64, a0: f64, a1: f64| (0..=16).map(|i| a0 + (a1 - a0) * i as f64 / 16.0).map(|t| [c[0] + r * t.cos(), c[1] + r * t.sin()]).collect::<Vec<_>>();
+        let h = std::f64::consts::FRAC_PI_2;
+        // Top arc (centre (5, 10)) into the side x = 0, 0..10, into the bottom arc (centre (5, 0)).
+        let e = vec![outline(arc([5.0, 10.0], 5.0, h, 2.0 * h)), outline(vec![[0.0, 10.0], [0.0, 0.0]]), outline(arc([5.0, 0.0], 5.0, 2.0 * h, 3.0 * h))];
+        assert_eq!(merge_fragments(e, 1e-9).len(), 3);
+        let e = vec![outline(vec![[0.0, 0.0], [0.0, 4.0]]), outline(vec![[0.0, 4.0], [0.0, 10.0]]), outline(arc([0.0, 0.0], 3.0, 0.0, 1.0)), outline(arc([0.0, 0.0], 3.0, 1.0, 2.0))];
+        assert_eq!(merge_fragments(e, 1e-9).len(), 2);
     }
 
     #[test]
