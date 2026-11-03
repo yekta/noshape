@@ -1811,7 +1811,7 @@ fn default_plane(q: &str) -> Option<&'static str> {
 }
 
 /// One part's measures, SI (m, m², m³), from live.jsonl or ours.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct PartState {
     pub name: String,
     pub body_type: String,
@@ -1826,11 +1826,32 @@ pub struct PartState {
     pub centroid: Option<[f64; 3]>,
     /// Live's centroid band ([min, max] per axis), when given.
     pub centroid_band: Option<[[f64; 3]; 2]>,
+    /// Faces and edges by geometry (plane, cylinder…; line, circle…; the
+    /// rest "other"), when known (live: its bodydetails).
+    pub face_types: Option<std::collections::BTreeMap<String, usize>>,
+    pub edge_types: Option<std::collections::BTreeMap<String, usize>>,
+}
+
+/// A face's or edge's geometry as the parity suite counts it (Onshape's
+/// type names or ours): plane, cylinder, cone, sphere, torus; line, circle,
+/// ellipse; else other.
+fn geometry_kind(t: &str) -> String {
+    let t = t.to_lowercase();
+    if ["plane", "cylinder", "cone", "sphere", "torus", "line", "circle", "ellipse"].contains(&t.as_str()) { t } else { "other".into() }
 }
 
 /// Live's parts of one live.jsonl line.
 pub fn live_parts(line: &Value) -> Vec<PartState> {
     let band = |v: &Value| v.as_array().and_then(|a| Some([a.first()?.as_f64()?, a.get(1)?.as_f64()?]));
+    // Its bodydetails body (by part id): faces and edges by geometry.
+    let types = |p: &Value, list: &str, field: &str| {
+        let body = line["bodies"].as_array()?.iter().find(|b| b["id"] == p["partId"])?;
+        let mut m = std::collections::BTreeMap::new();
+        for x in body[list].as_array()? {
+            *m.entry(geometry_kind(x[field]["type"].as_str().unwrap_or(""))).or_default() += 1;
+        }
+        Some(m)
+    };
     line["parts"]
         .as_array()
         .into_iter()
@@ -1848,6 +1869,8 @@ pub fn live_parts(line: &Value) -> Vec<PartState> {
             bbox: f3(&p["bbox"]["min"]).zip(f3(&p["bbox"]["max"])).map(|(a, b)| [a, b]),
             centroid: f3(&p["centroid"]),
             centroid_band: p["centroid_band"].as_array().and_then(|b| Some([f3(b.first()?)?, f3(b.get(1)?)?])),
+            face_types: types(p, "faces", "surface"),
+            edge_types: types(p, "edges", "curve"),
         })
         .collect()
 }
@@ -1855,6 +1878,17 @@ pub fn live_parts(line: &Value) -> Vec<PartState> {
 /// Our parts now, SI.
 pub fn our_parts(t: &mut Translator) -> Result<Vec<PartState>, String> {
     let r = t.call("query_parts", json!({}))?;
+    // Faces and edges by geometry, per part.
+    let mut types = |list: &str, field: &str| -> HashMap<String, std::collections::BTreeMap<String, usize>> {
+        let mut out: HashMap<String, std::collections::BTreeMap<String, usize>> = HashMap::new();
+        if let Ok(e) = t.call("query_entities", json!({ "kind": list, "limit": 100000 })) {
+            for x in e[list].as_array().into_iter().flatten() {
+                *out.entry(x["part"].as_str().unwrap_or("").to_string()).or_default().entry(geometry_kind(x[field].as_str().unwrap_or(""))).or_default() += 1;
+            }
+        }
+        out
+    };
+    let (faces, edges) = (types("faces", "surface"), types("edges", "curve"));
     let k = per_unit(&r["units"]);
     let at = |v: &Value| f3(v).map(|p| p.map(|c| c * k));
     Ok(r["parts"]
@@ -1880,6 +1914,8 @@ pub fn our_parts(t: &mut Translator) -> Result<Vec<PartState>, String> {
             bbox: at(&p["bounding_box"]["min"]).zip(at(&p["bounding_box"]["max"])).map(|(a, b)| [a, b]),
             centroid: at(&p["centroid"]),
             centroid_band: None,
+            face_types: p["id"].as_str().map(|id| faces.get(id).cloned().unwrap_or_default()),
+            edge_types: p["id"].as_str().map(|id| edges.get(id).cloned().unwrap_or_default()),
         })
         .collect())
 }
@@ -1908,6 +1944,19 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
         }
         if (o.faces, o.edges, o.vertices) != (l.faces, l.edges, l.vertices) {
             out.push(format!("{who}: {}/{}/{} faces/edges/vertices, live {}/{}/{}", o.faces, o.edges, o.vertices, l.faces, l.edges, l.vertices));
+        } else {
+            // The same counts: the same kinds of faces and edges.
+            let show = |m: &std::collections::BTreeMap<String, usize>| m.iter().map(|(k, n)| format!("{n} {k}")).collect::<Vec<_>>().join(", ");
+            if let (Some(a), Some(b)) = (&o.face_types, &l.face_types)
+                && a != b
+            {
+                out.push(format!("{who}: faces {}, live {}", show(a), show(b)));
+            }
+            if let (Some(a), Some(b)) = (&o.edge_types, &l.edge_types)
+                && a != b
+            {
+                out.push(format!("{who}: edges {}, live {}", show(a), show(b)));
+            }
         }
         // Only what live gives is compared.
         let within = |ours: Option<f64>, live: f64, band: Option<[f64; 2]>| {

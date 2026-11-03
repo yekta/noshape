@@ -425,7 +425,7 @@ fn an_inch_documents_bare_numbers_are_inches() {
 #[test]
 fn differences_use_lives_bands() {
     use noshape_ops::parity::PartState;
-    let part = |volume: f64, faces: u64| PartState { name: "Part 1".into(), body_type: "solid".into(), faces, edges: 12, vertices: 8, volume: Some(volume), area: None, volume_band: None, area_band: None, bbox: None, centroid: Some([0.01, 0.0, 0.0]), centroid_band: None };
+    let part = |volume: f64, faces: u64| PartState { name: "Part 1".into(), body_type: "solid".into(), faces, edges: 12, vertices: 8, volume: Some(volume), area: None, volume_band: None, area_band: None, bbox: None, centroid: Some([0.01, 0.0, 0.0]), ..Default::default() };
     let mut live = part(1.0e-6, 6);
     live.volume_band = Some([0.999e-6, 1.001e-6]);
     live.centroid = Some([0.0100005, 0.0, 0.0]);
@@ -433,7 +433,13 @@ fn differences_use_lives_bands() {
     assert!(differences(&[live.clone()], &[part(1.0005e-6, 6)]).is_empty(), "inside live's bands");
     let d = differences(&[live.clone()], &[part(1.002e-6, 7)]);
     assert!(d.iter().any(|x| x.contains("7/12/8 faces/edges/vertices, live 6/12/8")) && d.iter().any(|x| x.contains("volume")), "{d:?}");
-    assert_eq!(differences(&[live], &[]), ["0 parts, live 1"]);
+    assert_eq!(differences(&[live.clone()], &[]), ["0 parts, live 1"]);
+    // The same counts but other geometry: a fillet face live makes a cylinder.
+    let kinds = |pairs: &[(&str, usize)]| Some(pairs.iter().map(|(k, n)| (k.to_string(), *n)).collect());
+    let (mut a, mut b) = (live.clone(), part(1.0e-6, 6));
+    a.face_types = kinds(&[("plane", 5), ("cylinder", 1)]);
+    b.face_types = kinds(&[("plane", 5), ("other", 1)]);
+    assert_eq!(differences(&[a], &[b]), ["\"Part 1\": faces 1 other, 5 plane, live 1 cylinder, 5 plane"]);
 }
 
 /// Variables from a Variable Studio (live's `variables` with a studio
