@@ -54,6 +54,13 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         if ours != live_status {
             diff.push(format!("status {ours}, live {live_status}"));
         }
+        // Onshape's words: live's row tooltip ("Fillet 1 did not regenerate
+        // properly: …") holds our message.
+        if let Some(m) = line["message"].as_str().filter(|m| !m.is_empty())
+            && !step.message.as_deref().is_some_and(|ours| !ours.is_empty() && m.contains(ours))
+        {
+            diff.push(format!("message {:?}, live {m:?}", step.message.as_deref().unwrap_or("")));
+        }
         match our_parts(&mut t) {
             Ok(parts) => diff.extend(differences(&live_parts(line), &parts)),
             Err(e) => diff.push(format!("parts: {e}")),

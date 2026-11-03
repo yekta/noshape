@@ -35,8 +35,9 @@ pub struct Step {
     pub feature_type: String,
     /// Our feature id, when one was made.
     pub ours: Option<String>,
-    /// Our regeneration status of it ("Ok", "Error", …).
+    /// Our regeneration status of it ("Ok", "Error", …) and its message.
     pub status: Option<String>,
+    pub message: Option<String>,
     /// Things not translated, each with its reason.
     pub problems: Vec<String>,
 }
@@ -169,7 +170,7 @@ impl<'a> Translator<'a> {
         let mut step = Step { index: k, name: f["name"].as_str().unwrap_or("").to_string(), feature_type: f["featureType"].as_str().unwrap_or("").to_string(), ..Default::default() };
         let made = if f["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketch")) { self.sketch(k, &f, &mut step.problems) } else { self.feature(k, &f, &mut step.problems) };
         match made {
-            Ok((id, status)) => {
+            Ok((id, status, message)) => {
                 if let Some(oid) = f["featureId"].as_str() {
                     self.feature_ids.insert(oid.to_string(), id.clone());
                 }
@@ -180,6 +181,7 @@ impl<'a> Translator<'a> {
                 }
                 step.ours = Some(id);
                 step.status = Some(status);
+                step.message = message;
             }
             Err(e) => step.problems.insert(0, format!("not built: {e}")),
         }
@@ -187,7 +189,7 @@ impl<'a> Translator<'a> {
     }
 
     /// A non-sketch feature through feature_add, its parameters by name.
-    fn feature(&mut self, k: usize, f: &Value, problems: &mut Vec<String>) -> Result<(String, String), String> {
+    fn feature(&mut self, k: usize, f: &Value, problems: &mut Vec<String>) -> Result<(String, String, Option<String>), String> {
         let ty = f["featureType"].as_str().ok_or("no featureType")?;
         let schema = self.call("feature_schema", json!({ "type": ty, "all": true })).map_err(|e| format!("feature type `{ty}` is not in noshape ({e})"))?;
         let known: Vec<String> = schema["params"]["properties"].as_object().map(|m| m.keys().cloned().collect()).unwrap_or_default();
@@ -254,7 +256,8 @@ impl<'a> Translator<'a> {
                 }
             }
         };
-        Ok((r["feature"].as_str().unwrap_or("").to_string(), r["feature_status"]["status"].as_str().unwrap_or("").to_string()))
+        let st = &r["feature_status"];
+        Ok((r["feature"].as_str().unwrap_or("").to_string(), st["status"].as_str().unwrap_or("").to_string(), st["message"].as_str().map(str::to_string)))
     }
 
     /// One Onshape parameter as feature_add takes it (`None`: nothing to set).
@@ -697,7 +700,7 @@ impl<'a> Translator<'a> {
 
     /// A sketch: its plane, its curves at Onshape's solved positions (our
     /// inference adds the coincidences), then its dimensions.
-    fn sketch(&mut self, k: usize, f: &Value, problems: &mut Vec<String>) -> Result<(String, String), String> {
+    fn sketch(&mut self, k: usize, f: &Value, problems: &mut Vec<String>) -> Result<(String, String, Option<String>), String> {
         let oid = f["featureId"].as_str().unwrap_or("").to_string();
         let plane_q = f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "sketchPlane").ok_or("no sketchPlane")?;
         let plane = self.param(k, plane_q)?.and_then(|v| v.as_array().and_then(|a| a.first()).cloned()).ok_or("no sketch plane")?;
@@ -813,8 +816,8 @@ impl<'a> Translator<'a> {
         }
         self.dimensions(&oid, &id, f, problems);
         let st = self.call("feature_list", json!({}))?;
-        let status = st["features"].as_array().into_iter().flatten().find(|x| x["id"] == id).and_then(|x| x["status"].as_str()).unwrap_or("Ok").to_string();
-        Ok((id, status))
+        let row = st["features"].as_array().into_iter().flatten().find(|x| x["id"] == id).cloned().unwrap_or_default();
+        Ok((id, row["status"].as_str().unwrap_or("Ok").to_string(), row["message"].as_str().map(str::to_string)))
     }
 
     /// The sketch's dimensions with Onshape's expressions (so variables and
