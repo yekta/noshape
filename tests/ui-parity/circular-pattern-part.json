@@ -1,0 +1,63 @@
+{
+ "name": "circular-pattern-part",
+ "about": "Circular pattern of Part 1 about the front bottom edge, 4 instances, ✓",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Circular pattern"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Axis of pattern"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Instance count"
+   }
+  },
+  {
+   "do": "type",
+   "text": "4"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

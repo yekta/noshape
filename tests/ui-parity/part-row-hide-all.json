@@ -1,0 +1,15 @@
+{
+ "name": "part-row-hide-all",
+ "about": "right-click the Parts header: its menu",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Parts (1)"
+   }
+  }
+ ]
+}

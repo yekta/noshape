@@ -1,0 +1,19 @@
+{
+ "name": "face-dblclick",
+ "about": "double-click the top face: what it selects / opens",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  }
+ ]
+}

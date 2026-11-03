@@ -1,0 +1,67 @@
+{
+ "name": "draft-on-side-face",
+ "about": "Draft tool: neutral plane the bottom face, the front face to draft, 5 deg, ✓",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Draft"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Faces to draft"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     0,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Draft angle"
+   }
+  },
+  {
+   "do": "type",
+   "text": "5"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

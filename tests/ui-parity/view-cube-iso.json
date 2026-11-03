@@ -1,0 +1,21 @@
+{
+ "name": "view-cube-iso",
+ "about": "click the view cube's Isometric, after a Top view",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "view_cube": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_cube": "Isometric"
+   }
+  }
+ ]
+}

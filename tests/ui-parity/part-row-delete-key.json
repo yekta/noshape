@@ -1,0 +1,23 @@
+{
+ "name": "part-row-delete-key",
+ "about": "click Part 1 in the parts list, Delete: a Delete part feature (or nothing?)",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Delete"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

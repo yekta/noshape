@@ -1,0 +1,56 @@
+{
+ "name": "mirror-feature-type",
+ "about": "Mirror tool, Feature mirror: pick Extrude 1 in the list, the Right plane, ✓",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mirror"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Part mirror",
+    "pick": "Feature mirror"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Mirror plane"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Right"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

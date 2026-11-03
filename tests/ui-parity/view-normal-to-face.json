@@ -1,0 +1,23 @@
+{
+ "name": "view-normal-to-face",
+ "about": "click the top face, n: the view turns normal to it",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "n"
+  }
+ ]
+}

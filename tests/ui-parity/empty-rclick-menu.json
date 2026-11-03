@@ -1,0 +1,15 @@
+{
+ "name": "empty-rclick-menu",
+ "about": "right-click empty graphics: the background menu",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "empty": true
+   }
+  }
+ ]
+}

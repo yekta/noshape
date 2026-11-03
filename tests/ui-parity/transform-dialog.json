@@ -1,0 +1,15 @@
+{
+ "name": "transform-dialog",
+ "about": "Transform tool: its fields and type list",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Transform"
+   }
+  }
+ ]
+}

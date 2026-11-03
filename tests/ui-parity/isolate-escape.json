@@ -1,0 +1,23 @@
+{
+ "name": "isolate-escape",
+ "about": "Shift+I on Part 1, then Escape: back to normal",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+i"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

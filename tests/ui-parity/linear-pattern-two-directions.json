@@ -1,0 +1,27 @@
+{
+ "name": "linear-pattern-two-directions",
+ "about": "Linear pattern of Part 1, Second direction ticked: its fields",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Linear pattern"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Second direction"
+   }
+  }
+ ]
+}

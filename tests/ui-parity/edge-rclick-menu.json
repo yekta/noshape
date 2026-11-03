@@ -1,0 +1,19 @@
+{
+ "name": "edge-rclick-menu",
+ "about": "right-click the front top edge: the edge context menu",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "edge": [
+     20,
+     0,
+     10
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "name": "face-rclick-menu",
+ "about": "right-click the top face: the face context menu",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  }
+ ]
+}
