@@ -834,8 +834,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 1. Audit done ("Move annotation" = part_annotation move, landed). Covered elsewhere:
    Move configuration input (config_reorder_inputs), Hide all instances (assembly_set_state on every instance), Save
    custom color (any colour is settable), Update material library (material_library_update, this landing).
-2. API: benchmarks done for Variable Studio, in-context, sheet metal (/root/dx-scratch/bench/*.py); next: drive a model
-   through the MCP server with a real client; render_image of the window camera (image size).
+2. API: benchmarks done for Variable Studio, in-context, sheet metal (/root/dx-scratch/bench/*.py); a real MCP
+   session (11-03 05:25, /root/dx-scratch/mcp/client.py over `noshape mcp` stdio, green 19f17a18): initialize,
+   tools/list (46 tools, 33 KB), document → sketch → extrude → query → ops_call export STEP, errors with
+   did-you-mean: 10 calls in 0.5 s, all as documented. Next: render_image of the window camera (image size).
 3. Drawings (P2): PDF Selectable text landed 10-27 (embedded TrueType subsets, CID fonts with ToUnicode; same
    placement as the outlines); open: compare its file size / font object layout with a live Selectable export; ui2's
    Tables-end and thread tiles checked vs live 10-27 (match); flat pattern Counterbore / Countersink / Form styles.
