@@ -357,6 +357,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   its other half across a 6 mm groove; Onshape's query keeps both halves): live 22/60/40 faces/edges/vertices, one
   fillet face per corner spanning z −10…10 (64.89 / 73.15 mm²); ours 34/88/56. Volume equal (26334.64 mm³), area
   9352.88 mm² vs live 9351.62.
+  core 11-03 09:00 (looked, not fixed): ours is 8 fillet cylinders (31.54 / 34.43 mm², one per 7 mm piece) and 8
+  sliver planes (0.002 / 0.02 mm²) where they end on the groove's floor and ceiling (z ±3); live's 4 faces are one
+  cylinder per corner over both pieces (a face in two pieces, which OCCT doesn't make), and each is ~0.4 mm longer
+  than our two together (64.89 vs 2 × 31.54 = 63.08). Next: why ours stops short of the groove planes (the
+  slivers), then whether the two pieces can be one face.
 - [x] verified 0531f66e (qa 11-03 06:50: the 44 ticket documents = green bad1de8e again, statuses and volumes, but cli-shell-hang-pre's Shell 5, which builds as intended (175027.258 / 72); qa-scratch/cli/tixvol-g0531f66e.out) 08632c09 (core 11-03 04:40: OCCT's blend in metres is kept whenever it is valid, as before eca0da09, and its new tolerances are set to what they need only where its corners are where they should be (within 1e-5 of the part's size; elsewhere as OCCT left them): a blend at the working scale had other faces and moved later features' references (cli-fillet2-segv's Sketch 3 lost its plane), and tighter edges at off corners changed later operations (the askew head bolt's 16th face); bop-pairs-cli-segv-152 and cli-fillet2-segv regenerate as on bad1de8e (87828.610 / 43411.104 mm³), shell-hang's Shell 5 still builds; the blend corpus is as recorded before 11-03) P1 BLEND-TOL-REGEN-CHANGES (core; **new on main since v0.4.22, from eca0da09** "OCCT's blends in metres give what they
   make the tolerances it needs") saved documents regenerate differently, and features that built before now fail: the 44
   ticket documents (qa-scratch/cli/tixvol-gbad1.out vs tixvol-ge89c78de.out, bin = green bad1de8e vs e89c78de; **the
