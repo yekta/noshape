@@ -1592,7 +1592,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   focused with "2 mm" all selected** (std's INITIAL_FOCUS_ON_EDIT on the value); ours: **Name focused**, "wall_thickness"
   selected (qa-scratch/tickets/fl/vd-b2.png, top left; window focused). Same run = live: a click on the selected Extrude 1
   row deselects it, Space clears the selection. Scenario ui-parity/variable-edit-focus. (qa 2026-11-03, build e18f898a)
-- [ ] P3 FEATURE-ROW-ENTER-EDITS (psui; **unconfirmed**, qa 11-03 00:50: live's keys under CDP may not reach the feature list (its ArrowUp didn't move the bar either), so live's "nothing" needs a real-keyboard check: REQUESTS qa 11-03) Enter on a selected feature row opens its dialog in ours: click the Extrude 1 row,
+- [x] verified aeef5eab (qa 11-03 08:14: psui's dbd2f298 per live 1839 / 1844: Enter on a selected row opens nothing, ↑ / ↓ after a row click don't move the bar; scenarios feature-row-enter / -arrow-up-moves-bar through the driver) P3 FEATURE-ROW-ENTER-EDITS (psui; **unconfirmed**, qa 11-03 00:50: live's keys under CDP may not reach the feature list (its ArrowUp didn't move the bar either), so live's "nothing" needs a real-keyboard check: REQUESTS qa 11-03) Enter on a selected feature row opens its dialog in ours: click the Extrude 1 row,
   Enter; live (11-02, qa's tab, livek/t-b1.mjs): **nothing opens** (no dialog; double-click or Edit… opens it); ours:
   the Extrude 1 dialog opens (qa-scratch/tickets/fl/ubf-esc-enter.png, right). The rest of that run = live: in an
   edited dialog with "20" typed in Depth, the 1st Escape reverts the field and keeps the dialog, the 2nd cancels it;
