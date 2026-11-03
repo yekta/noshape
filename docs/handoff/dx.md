@@ -83,6 +83,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   to run: …" (ours errors where live's built; the first difference then reads "(custom feature failed to run)").
   T1 custom_feature_failures_are_reported_apart. Host / std differences → core tickets. Score now **7/11,
   58/78** (bracket03 matches since core's FILLET-SPLIT-EDGE-FACES fix); SCORE.md row updated.
+- 11-03 11:20 FeatureScript corpus arriving (32 cf-* documents, studios/ only so far): T2 `parity_feature_studios`
+  compiles each document's studios in a new document at their pins (13/34 compile, per-document lines, the commonest
+  errors). The translator now makes every studio tab first and points imports of the document's other studios
+  (`"<eid>"` or `"<did>/<vid>/<eid>"`) at our tabs; featurestudio_get / _edit notices resolve imports of other tabs
+  (custom::compile_in_document; e2e feature_studio_custom_feature). Left: 18 imports of elements live hasn't fetched
+  (REQUESTS 11:20), FS-OLD-STD-COMPAT (core: three old-pin studios), FS-EDITOR-IMPORT-NOTICES (psui).
 - 11-03 10:20 live 1857 (drawings of pipeflange-steven and knob-tim, DXF / PDF in live/samples/dx-drawing-corpus/):
   ours made through the agent API from the rebuilt documents, counted per DXF layer (/root/dx-scratch/dxfcount.py).
   Fixed: suggested views' scale from the parts' exact boxes (the fast box of a reopened pipeflange was 66 mm for 50,
