@@ -16,6 +16,18 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-03 05:45.**
+- Landed: P0 CRASH-2045 (3fcc69d8: OCCT's ChFi3d failing with TopoDS_UnCompatibleShapes changed its input in place,
+  freeing topology of the cached body; fillet / variable fillet / chamfer now blend a BRepBuilderAPI_Copy, same
+  sub-shape order so histories keep their indices; a copy per attempt was dropped: composed histories mark untouched
+  faces Modified). The flaky custom_features::fs_errors_match_onshape (with it): FeatureScript's operator / export
+  registries were keyed by module path only, and std 1576 / 1963 modules share our paths, so the last std compiled
+  won for everyone; now per std version (ours if loaded). P1 BLEND-TOL-REGEN-CHANGES (08632c09).
+- Spur Gear 40 teeth (lead via skasm): sketch causes, noted on skasm's SKETCH-SPLINE-CENTRIPETAL; with live's root
+  fillet forced and centripetal knots ours is 4045.57 vs live 4045.89. Mine: FILLET-PRISMATIC-CYLINDER (P2).
+- Live REST works for /featurescript in "live 1812 drawing scale" (3f6b38c141ccc704e8a77fb3 / w 0b5612375b88271eb96f6ef0;
+  /root/core-scratch/live/spur-r.js, `KS=… node kern/nrun.mjs` from /root/live-pw).
+
 **State 11-03 03:35.**
 - Landed since 03:05: public custom features (1a506c3d), the drafted R1-under-R2 corner (285ae4f4: corner_of's spine
   starts where a slanted Rc axis meets it, live 1831's 2.989487 mm² exactly) with the concave pocket as T1 (live 1826).

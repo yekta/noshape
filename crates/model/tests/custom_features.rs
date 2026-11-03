@@ -2655,6 +2655,11 @@ fn public_spur_gear_as_live() {
     let mut doc = Document::new();
     // Its icon and image elements as file tabs, the imports pointed at them (as the document translator does).
     let mut src = src;
+    // (SPUR_RADIUS=<mm>: live's root fillet instead of the sketch's, to tell the sketch from the features.)
+    let forced = std::env::var("SPUR_RADIUS").ok();
+    if let Some(r) = &forced {
+        src = src.replace("        opFillet(context, id + \"fillet\", {\n                    \"entities\" : filletEdges,", &format!("        rootFilletRadius = {r} * millimeter;\n        opFillet(context, id + \"fillet\", {{\n                    \"entities\" : filletEdges,"));
+    }
     if std::env::var_os("SPUR_PRINT").is_some() {
         src = src.replace("        opFillet(context, id + \"fillet\", {\n                    \"entities\" : filletEdges,", "        println(\"root fillet radius \" ~ toString(rootFilletRadius) ~ \" edges \" ~ size(evaluateQuery(context, filletEdges)));\n        opFillet(context, id + \"fillet\", {\n                    \"entities\" : filletEdges,");
     }
@@ -2669,8 +2674,8 @@ fn public_spur_gear_as_live() {
     }
     let units = UnitPrefs::default();
     let opts = RegenOptions { custom_features: Some(scripts.clone()), ..Default::default() };
-    // (live: defaults 2418.047787 mm³ [2416.588367, 2419.507207], 152 faces; changed 4045.886707 [4029.017193,
-    // 4062.756220], 203 faces)
+    // (live: defaults 2418.047787 mm³ [2416.588367, 2419.507207], 152 faces, root fillets r 0.378848 mm; changed
+    // 4045.886707 [4029.017193, 4062.756220], 203 faces, root fillets r 0.166393 mm)
     let cases: [LiveCase; 2] = [
         ("defaults", &[], [2416.588367, 2419.507207], 152),
         ("changed", &[("numTeeth", expr("40")), ("module", expr("2 mm")), ("gearDepth", expr("10 mm")), ("centerHole", ParamValue::Bool(true)), ("centerHoleDia", expr("8 mm"))], [4029.017193, 4062.756220], 203),
@@ -2700,7 +2705,7 @@ fn public_spur_gear_as_live() {
         for o in custom::run::outputs().values() {
             print!("{}", o.output);
         }
-        assert!(v >= band[0] && v <= band[1] && n == faces, "{what}: {v} mm3, {n} faces");
+        assert!(forced.is_some() || (v >= band[0] && v <= band[1] && n == faces), "{what}: {v} mm3, {n} faces");
     }
 }
 

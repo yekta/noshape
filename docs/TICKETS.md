@@ -325,6 +325,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P2 FILLET-PRISMATIC-CYLINDER (core 11-03, live REST on live 1830's gears) a constant fillet between two faces
+  extruded the same way (the Spur Gear's root fillets: the root cylinder and an extruded involute spline) is a
+  cylinder in live (qGeometry CYLINDER, evSurfaceDefinition radius 0.378848 / 0.166393 mm); ours an OCCT B-spline
+  (custom features' geometry queries see another type). And with centripetal splines (SKETCH-SPLINE-CENTRIPETAL) the
+  defaults gear's fillet faces come out in two pieces each (202 faces vs live 152).
 - [x] withdrawn (dx 11-03 06:00: green's CLI is an unoptimised build; in the test build the same Fillet 2 takes 58 ms (feature_list `regen_ms`), the studio 499 ms reopened; the result difference stays with CUT-CLOSED-EDGES-SPLIT) P2 FILLET-TUBE-BASE-SLOW (core; dx's parity suite 11-03) pipeflange-steven's Fillet 2 (r 8 mm, tangent propagation,
   the r 16.7 circle where the tube meets the flange's top, concave) takes ~1.6 s of the studio's 1.8–2.0 s regeneration
   on green 19f17a18's CLI (query_parts with features suppressed from the end: 0.36 s without it; NOSHAPE_BOOL_RUST=0
@@ -360,7 +365,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   fuzz documents (no live values), and the 19-document volume sweep's non-fuzz ones and the user's cases are unchanged —
   but an existing document whose Chamfer succeeded and whose later sketches sat on its faces opening with errors is a
   regression whichever is closer to live. Which side is right for Chamfer 3 (live) is for core. (qa 2026-11-03 03:19, build e89c78de)
-- [ ] P0 CRASH-2045 (core + bool; **in the published v0.4.22 and on green bad1de8e**, Rust Boolean on, the default) deleting a
+- [x] 3fcc69d8 (core 11-03 05:40: the fillet's, variable fillet's and chamfer's OCCT blends run on a copy of the cached body; fz2045-step99 regenerates 10 runs of 10; qa to verify) P0 CRASH-2045 (core + bool; **in the published v0.4.22 and on green bad1de8e**, Rust Boolean on, the default) deleting a
   feature crashes the CLI / app most of the time: qa-scratch/tickets/crash2045/fz2045-step99.noshape (+ -wal; CLI fuzz seed
   2045's document, 43 features, Part 1 179904.78 mm³), `python3 tickets/crash2045/del1.py <noshape mcp wrapper> <doc>
   'Sketch 2'` (open, feature_delete Sketch 2, query_parts). **Green bad1de8e: SIGSEGV 5 of 5 (and 5 of 6 again); v0.4.22
@@ -2099,6 +2104,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   19782.85 mm³ (its x_t, live/samples/dx-xt-periodic/closed-spline-live.x_t, imported in ours; live's massproperties
   say 19783.47 within its band), a periodic centripetal cubic gives 19782.82, ours (sketch_draw spline ending on
   the first point) 20348.29.
+  core 11-03: **the Spur Gear's 40-tooth case** (T2 model custom_features::public_spur_gear_as_live, 3670 mm³ vs live
+  4045.89) is this and the tangent circle, not the features: its involutes start with a 1.75 mm jump from the root
+  circle then 0.002 mm steps, so the knots decide the flanks. Live's root fillets (live REST: cylinders) are r 0.166393
+  (changed) and 0.378848 (defaults). With live's radius forced (SPUR_RADIUS=0.166393): chord knots 3667.97 mm³,
+  centripetal knots 4045.57 (in band, 203 faces as live). With centripetal knots the sketch's tangent circle comes out
+  r 1.38 mm (fillet 0.920; live 0.2496 / 0.166393) and our fillet of it fails; defaults' stays right (0.37885).
 - [ ] P1 SKETCH-FACE-IMPRINT (skasm + core; dx's parity suite 11-03) a sketch on a part face imprints in Onshape (unless
   Disable imprinting): its curves split the face, and the pieces bounded partly by the face's own edges are regions to
   pick. Ours: only closed loops of sketch curves are regions (parity/sketch.md 1.14 is ✅ for the checkbox only).
