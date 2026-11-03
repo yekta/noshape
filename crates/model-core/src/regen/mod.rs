@@ -271,6 +271,8 @@ pub struct Regenerator {
     meshes: HashMap<u64, (u64, bool, Arc<MeshBuffers>)>,
     /// Shapes of the cached meshes and when they were last shown ([`display::build`]).
     mesh_owners: HashMap<u64, (u64, noshape_kernel::Shape)>,
+    /// Each sketch's display, kept while its result is the same ([`display::build`]).
+    sketch_displays: display::SketchDisplays,
     contexts: ContextCache,
     /// Features evaluated so far (not taken from the cache).
     evaluations: u64,
@@ -643,7 +645,7 @@ impl Regenerator {
         if display::perf_enabled() {
             log::info!(target: "perf", "regen: {} features evaluated, {cached} cached, {:.0} ms (preview meshes {})", evaluated.len(), t0.elapsed().as_secs_f64() * 1e3, opts.preview_meshes);
         }
-        let (mut display, needs_refine) = display::build(&ctx, studio, opts, &mut self.meshes, &mut self.mesh_owners, run);
+        let (mut display, needs_refine) = display::build(&ctx, studio, opts, &mut self.meshes, &mut self.mesh_owners, &mut self.sketch_displays, run);
         if aborted() {
             return cancelled();
         }
