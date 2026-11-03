@@ -1497,3 +1497,27 @@ fn dumped_sweep_shell_probe() {
         println!("  shell {:.0} ms {:?}", t0.elapsed().as_secs_f64() * 1e3, s.map(|s| vol(&s.shape) * 1e9).map_err(|e| e.to_string()));
     }
 }
+
+/// PARITY-SPEED (cf-hose-routing): a Ø6 tube swept along a smooth spline, shelled 1 mm in without its end caps: the
+/// smooth walls' path (OCCT's offset spent 30 s and failed, live 0.1 s): the wall 5/9 of the tube, its inner faces
+/// B-splines.
+#[test]
+fn a_tube_shells_by_its_smooth_offset() {
+    set_working_scale(1000.0).unwrap();
+    let mm = |x: f64, y: f64, z: f64| DVec3::new(x, y, z) * 1e-3;
+    let path = make_wire(&[make_interpolated_spline(&[mm(0.0, 0.0, 0.0), mm(40.0, 10.0, 5.0), mm(80.0, -10.0, 20.0), mm(120.0, 0.0, 0.0)], &[], false).unwrap()]).unwrap();
+    let e = &path.edges()[0];
+    let i = e.edge_info().unwrap();
+    let start = e.point_at(i.first_param).unwrap();
+    let dir = e.tangent_at(i.first_param).unwrap().normalize();
+    let profile = make_face_from_wire(&make_wire(&[make_circle(start, dir, 0.003).unwrap()]).unwrap(), true).unwrap();
+    let tube = sweep(&profile, &path, &SweepOptions { solid: true, mode: SweepMode::Discrete, ..Default::default() }).unwrap().shape;
+    let caps: Vec<Shape> = tube.faces().into_iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Plane(_)))).collect();
+    assert_eq!(caps.len(), 2);
+    let r = shell_solid(&tube, &caps, 0.001, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+    assert_eq!(last_shell_path(), "smooth");
+    assert!(r.is_valid());
+    assert_eq!(r.faces().len(), 2 * (tube.faces().len() - 2) + 2);
+    let want = vol(&tube) * 5.0 / 9.0;
+    assert!((vol(&r) - want).abs() < 1e-5 * want, "{} mm3, want {}", vol(&r) * 1e9, want * 1e9);
+}

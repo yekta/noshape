@@ -39,6 +39,7 @@
 #include <BRepAlgoAPI_Splitter.hxx>
 
 #include <BRepAdaptor_Curve.hxx>
+#include <BRepAdaptor_Curve2d.hxx>
 #include <IntCurvesFace_ShapeIntersector.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <BRepAdaptor_Surface.hxx>
@@ -62,6 +63,9 @@
 #include <BRepGProp.hxx>
 #include <BRepLProp_SLProps.hxx>
 #include <BRepLib.hxx>
+#include <BRepOffset_MakeSimpleOffset.hxx>
+#include <BRepTools_Modifier.hxx>
+#include <ShapeCustom_ConvertToBSpline.hxx>
 #include <BRepOffsetAPI_MakeThickSolid.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRepOffset_MakeOffset.hxx>
@@ -2682,6 +2686,220 @@ bool by_planes(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
 
 // ------------------------------------------------------------------ quadrics
 
+// Path 3 (PARITY-SPEED, cf-hose-routing): inward walls of solids whose kept faces all meet tangentially, at least one
+// of them free-form, the removed faces planar (a swept hose, its end caps removed: OCCT's offset spent its 30 s
+// budget intersecting the pipes' offsets; live 0.1 s). OCCT's simple offset of the kept faces (each face's offset
+// surface, no intersections), closed by a rim on each removed face's plane.
+bool by_smooth(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double t, double sign, Built& out)
+{
+  const bool dbg = std::getenv("NOSHAPE_SHELL_DEBUG") != nullptr;
+  auto       no  = [&](const char* why) {
+    if (dbg)
+      std::fprintf(stderr, "smooth: %s\n", why);
+    return false;
+  };
+  if (sign > 0 || removed.empty())
+    return no("outward, or nothing removed");
+  TopoDS_Shape so, old_shell;
+  int          nso = 0, nsh = 0;
+  for (TopExp_Explorer x(solid, TopAbs_SOLID); x.More(); x.Next(), ++nso)
+    so = x.Current();
+  if (nso != 1)
+    return no("not one solid");
+  for (TopExp_Explorer x(so, TopAbs_SHELL); x.More(); x.Next(), ++nsh)
+    old_shell = x.Current();
+  if (nsh != 1)
+    return no("not one shell");
+  ShapeIMap rm;
+  for (const TopoDS_Shape& f : removed)
+  {
+    if (BRepAdaptor_Surface(TopoDS::Face(f)).GetType() != GeomAbs_Plane)
+      return no("a removed face is not planar");
+    rm.Add(f);
+  }
+  bool freeform = false;
+  for (TopExp_Explorer x(so, TopAbs_FACE); x.More(); x.Next())
+  {
+    if (rm.Contains(x.Current()))
+      continue;
+    const TopoDS_Face&  f = TopoDS::Face(x.Current());
+    BRepAdaptor_Surface s(f);
+    const GeomAbs_SurfaceType k = s.GetType();
+    freeform |= k == GeomAbs_BSplineSurface || k == GeomAbs_BezierSurface || k == GeomAbs_OffsetSurface || k == GeomAbs_OtherSurface;
+    // The offset stays clear of the face's centres of curvature.
+    for (int i = 1; i < 8; ++i)
+      for (int j = 1; j < 8; ++j)
+      {
+        const double u = s.FirstUParameter() + (s.LastUParameter() - s.FirstUParameter()) * i / 8;
+        const double v = s.FirstVParameter() + (s.LastVParameter() - s.FirstVParameter()) * j / 8;
+        BRepLProp_SLProps pr(s, u, v, 2, 1e-9);
+        if (pr.IsCurvatureDefined() && std::max(std::abs(pr.MinCurvature()), std::abs(pr.MaxCurvature())) * t > 0.9)
+          return no("a face curves tighter than the wall");
+      }
+  }
+  if (!freeform)
+    return no("no free-form face");
+  // The outward normal of f at the edge e's parameter w (its curve on f: the surface may run on past the face and
+  // fold back), stepped into the face where it is undefined (a sweep's end, its v derivative nought there).
+  auto normal = [](const TopoDS_Edge& e, const TopoDS_Face& f, double w, gp_Dir& n) {
+    const gp_Pnt2d      uv = BRepAdaptor_Curve2d(e, f).Value(w);
+    BRepAdaptor_Surface s(f);
+    const double        uc = 0.5 * (s.FirstUParameter() + s.LastUParameter()), vc = 0.5 * (s.FirstVParameter() + s.LastVParameter());
+    for (double step : {0.0, 1e-6, 1e-4})
+    {
+      BRepLProp_SLProps lp(s, uv.X() + (uc - uv.X()) * step, uv.Y() + (vc - uv.Y()) * step, 1, 1e-9);
+      if (lp.IsNormalDefined())
+      {
+        n = f.Orientation() == TopAbs_REVERSED ? lp.Normal().Reversed() : lp.Normal();
+        return true;
+      }
+    }
+    return false;
+  };
+  ShapeAncMap ef;
+  TopExp::MapShapesAndUniqueAncestors(so, TopAbs_EDGE, TopAbs_FACE, ef);
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const ShapeList& fl = ef(i);
+    if (fl.Extent() != 2)
+      continue;
+    const bool r1 = rm.Contains(fl.First()), r2 = rm.Contains(fl.Last());
+    if (r1 && r2)
+      return no("two removed faces meet");
+    if (r1 || r2)
+      continue;
+    const TopoDS_Edge& e = TopoDS::Edge(ef.FindKey(i));
+    double             w0, w1;
+    BRep_Tool::Range(e, w0, w1);
+    for (int k = 0; k <= 4; ++k)
+    {
+      gp_Dir n1, n2;
+      if (!normal(e, TopoDS::Face(fl.First()), w0 + (w1 - w0) * k / 4, n1) || !normal(e, TopoDS::Face(fl.Last()), w0 + (w1 - w0) * k / 4, n2))
+        return no("no normal at a kept edge");
+      // (Tangent to within what opens a gap under OCCT's confusion across the wall: a sweep's joints, 4e-5 rad.)
+      if (n1.Angle(n2) * t > Precision::Confusion() || n1.Angle(n2) > 1e-3)
+        return no("kept faces meet at an angle");
+    }
+  }
+  BRep_Builder bld;
+  TopoDS_Shell open;
+  bld.MakeShell(open);
+  for (TopoDS_Iterator it(old_shell, false); it.More(); it.Next())
+    if (!rm.Contains(it.Value()))
+      bld.Add(open, it.Value());
+  // How many kept faces the offset moved in (against their outward normal) and out.
+  auto inward = [&](BRepOffset_MakeSimpleOffset& m, int& in, int& out_) {
+    in = out_ = 0;
+    for (TopoDS_Iterator it(open, false); it.More(); it.Next())
+    {
+      const TopoDS_Face& f   = TopoDS::Face(it.Value());
+      const TopoDS_Shape img = m.Generated(f.Oriented(TopAbs_FORWARD));
+      if (img.IsNull() || img.ShapeType() != TopAbs_FACE)
+        continue;
+      BRepAdaptor_Surface s(f), o(TopoDS::Face(img));
+      const double u = 0.5 * (s.FirstUParameter() + s.LastUParameter()), v = 0.5 * (s.FirstVParameter() + s.LastVParameter());
+      BRepLProp_SLProps lp(s, u, v, 1, 1e-9);
+      if (!lp.IsNormalDefined())
+        continue;
+      // (Outward in the solid: the face's orientation in its shell, then the shell's in the solid.)
+      const bool   flip = (f.Orientation() == TopAbs_REVERSED) != (old_shell.Orientation() == TopAbs_REVERSED);
+      const gp_Dir n    = flip ? lp.Normal().Reversed() : lp.Normal();
+      (gp_Vec(s.Value(u, v), o.Value(u, v)).Dot(gp_Vec(n)) < 0 ? in : out_) += 1;
+    }
+  };
+  // (The simple offset follows the faces' orientations in the open shell, not the shell's in the solid.)
+  BRepOffset_MakeSimpleOffset mk(open, (old_shell.Orientation() == TopAbs_REVERSED ? -sign : sign) * t);
+  mk.Perform();
+  if (mk.GetError() != BRepOffsetSimple_OK)
+    return no("the simple offset failed");
+  int n_in = 0, n_out = 0;
+  inward(mk, n_in, n_out);
+  if (n_in == 0 || n_out > 0)
+    return no("the offset is not inward");
+  // The offsets as B-splines (an offset surface took BRepMesh 20-30 s a hose, and its boxes seconds).
+  occ::handle<ShapeCustom_ConvertToBSpline> conv = new ShapeCustom_ConvertToBSpline();
+  conv->SetExtrusionMode(false);
+  conv->SetRevolutionMode(false);
+  conv->SetOffsetMode(true);
+  conv->SetPlaneMode(false);
+  BRepTools_Modifier md(mk.GetResultShape(), conv);
+  if (!md.IsDone())
+    return no("the offsets' conversion failed");
+  // x's image as x.Oriented(o) would be (a converted face whose surface runs the other way comes back reversed).
+  auto image = [&](const TopoDS_Shape& x, TopAbs_Orientation o) {
+    const TopoDS_Shape g = mk.Generated(x.Oriented(TopAbs_FORWARD));
+    if (g.IsNull())
+      return g;
+    const TopoDS_Shape m = md.ModifiedShape(g);
+    return m.IsNull() ? m : m.Oriented(m.Orientation() == g.Orientation() ? o : TopAbs::Reverse(o));
+  };
+  Bnd_Box bb;
+  BRepBndLib::Add(so, bb, false);
+  const double size = std::sqrt(bb.SquareExtent());
+  SourceMap    sources;
+  HHist        h = new BRepTools_History();
+  TopoDS_Shell shell;
+  bld.MakeShell(shell);
+  for (TopoDS_Iterator it(old_shell, false); it.More(); it.Next())
+  {
+    const TopoDS_Face& f  = TopoDS::Face(it.Value());
+    const TopoDS_Face  ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
+    if (!rm.Contains(f))
+    {
+      const TopoDS_Shape img = image(ff, TopAbs::Reverse(f.Orientation()));
+      if (img.IsNull() || img.ShapeType() != TopAbs_FACE)
+        return no("a face has no offset");
+      bld.Add(shell, f);
+      const TopoDS_Face inner = TopoDS::Face(img);
+      bld.Add(shell, inner);
+      sources.Bind(inner, Source{f, (uint8_t)REL_GENERATED});
+      continue;
+    }
+    // Each wire's rim: the wire and its offset (the other way round), on the removed face's plane.
+    const gp_Pln    pl = BRepAdaptor_Surface(ff).Plane();
+    TopLoc_Location loc;
+    const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(ff, loc);
+    for (TopoDS_Iterator w(ff, false); w.More(); w.Next())
+    {
+      TopoDS_Wire ow;
+      bld.MakeWire(ow);
+      for (TopoDS_Iterator e(w.Value(), false); e.More(); e.Next())
+      {
+        const TopoDS_Shape img = image(e.Value(), e.Value().Orientation());
+        if (img.IsNull() || img.ShapeType() != TopAbs_EDGE)
+          return no("a removed face's edge has no offset");
+        BRepAdaptor_Curve c(TopoDS::Edge(img));
+        for (int k = 0; k <= 4; ++k)
+          if (pl.Distance(c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * k / 4)) > 1e-9 * size + BRep_Tool::Tolerance(TopoDS::Edge(img)))
+            return no("an offset edge leaves the removed face's plane");
+        bld.Add(ow, img);
+      }
+      ow.Closed(true);
+      TopoDS_Face rim;
+      bld.MakeFace(rim, surf, loc, BRep_Tool::Tolerance(ff));
+      bld.Add(rim, w.Value());
+      bld.Add(rim, ow.Oriented(TopAbs::Reverse(w.Value().Orientation())));
+      const TopoDS_Face r = TopoDS::Face(rim.Oriented(f.Orientation()));
+      bld.Add(shell, r);
+      h->AddModified(f, r);
+    }
+  }
+  shell.Closed(true);
+  TopoDS_Solid wall;
+  bld.MakeSolid(wall);
+  bld.Add(wall, shell.Oriented(old_shell.Orientation()));
+  if (!BRepCheck_Analyzer(wall).IsValid())
+    return no("the wall is invalid");
+  const double vw = volume_of(wall), vs = volume_of(so);
+  if (dbg)
+    std::fprintf(stderr, "smooth: wall volume %.17g solid %.17g\n", vw, vs);
+  if (!(vw > 0) || !(vw <= vs * (1 + 1e-9)))
+    return no("the wall's volume is off");
+  out.result  = wall;
+  out.history = shell_history(solid, wall, {h}, {}, sources, removed);
+  return true;
+}
+
 // Path 2b (SHELL-SLOW step 2, core 11-01): by_planes for solids of planes, cylinders and cones (the removed faces
 // planes). Each kept face's offset is its own kind (a cylinder's radius, a cone's reference radius moved by t); each
 // vertex's offset where its faces' offsets meet (Newton; two tangent faces: along their offset tangent line; a seam's
@@ -4971,6 +5189,7 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
   };
   const bool done = (method == 0 && removed.empty() && !outward && timed("inversion", [&] { return by_inversion(solid.shape, thickness, b); })) ||
                     (method == 0 && timed("regions", [&] { return by_regions(solid.shape, removed, thickness, sign, b); })) ||
+                    (method == 0 && !std::getenv("NOSHAPE_SHELL_NO_SMOOTH") && timed("smooth", [&] { return by_smooth(solid.shape, removed, thickness, sign, b); })) ||
                     (method == 0 && sharp_freeform && !std::getenv("NOSHAPE_SHELL_NO_QUADRICS") && timed("quadrics", [&] { return by_quadrics(solid.shape, removed, thickness, sign, b); })) ||
                     ((method == 0 || method == 1) && (offset_ok || method == 1) && timed("offset", [&] { return by_offset(solid.shape, removed, thickness, sign, b); })) ||
                     ((method == 0 || method == 3) && !std::getenv("NOSHAPE_SHELL_NO_PLANES") && timed("planes", [&] {

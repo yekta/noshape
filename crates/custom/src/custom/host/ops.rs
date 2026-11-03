@@ -812,9 +812,38 @@ fn path_wire(ev: &EvalCtx, refs: &[Reference]) -> FResult<Shape> {
 /// Sweep with the minimal-twist frame; paths where OCCT's corrected Frenet
 /// frame fails (helices) are retried with the Frenet frame, which is the
 /// minimal-twist frame of a helix, then the discrete one.
+/// Whether `profile` is circles about one end of `path`, square to it there (a hose's): its sweep's shape doesn't
+/// depend on the frame, only how the frame turns the surfaces' parameters.
+fn round_about_path(profile: &Shape, path: &Shape) -> bool {
+    let tol = path.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0) * 1e-9;
+    let mut circle: Option<(DVec3, DVec3)> = None;
+    for e in profile.edges() {
+        let Ok(k::Curve::Circle { center, axis, .. }) = e.edge_curve() else { return false };
+        match circle {
+            None => circle = Some((center, axis)),
+            Some((c, a)) if (c - center).length() > tol || a.cross(axis).length() > 1e-9 => return false,
+            _ => {}
+        }
+    }
+    let Some((c, a)) = circle else { return false };
+    path.edges().iter().any(|e| {
+        let Ok(i) = e.edge_info() else { return false };
+        [i.first_param, i.last_param].into_iter().any(|t| {
+            e.point_at(t).is_ok_and(|p| (p - c).length() <= tol) && e.tangent_at(t).is_ok_and(|d| d.normalize_or_zero().cross(a).length() < 1e-9)
+        })
+    })
+}
+
 fn sweep_any_frame(profile: &Shape, path: &Shape, opts: &k::SweepOptions) -> k::Result<k::OpResult> {
     let mut last = None;
-    for mode in [k::SweepMode::CorrectedFrenet, k::SweepMode::Frenet, k::SweepMode::Discrete] {
+    // A round profile by the discrete frame first: the corrected Frenet frame turns back and forth along a hose's
+    // straight pieces (cf-hose-routing: 2 mm³ off the exact tube, its seam 0.25 mm off its plane).
+    let modes = if round_about_path(profile, path) {
+        [k::SweepMode::Discrete, k::SweepMode::CorrectedFrenet, k::SweepMode::Frenet]
+    } else {
+        [k::SweepMode::CorrectedFrenet, k::SweepMode::Frenet, k::SweepMode::Discrete]
+    };
+    for mode in modes {
         match k::sweep(profile, path, &k::SweepOptions { mode, ..opts.clone() }) {
             Ok(r) if r.shape.is_valid() => return Ok(r),
             Ok(r) => last = Some(Ok(r)),
