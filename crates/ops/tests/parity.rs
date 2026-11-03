@@ -81,7 +81,9 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         let mut diff = Vec::new();
         let live_status = line["status"].as_str().unwrap_or("OK").to_uppercase();
         let ours = step.status.clone().unwrap_or_else(|| "not built".into()).to_uppercase();
-        if ours != live_status {
+        // A status live's fetch didn't name (cf-planetary-gears: "474"): not compared.
+        let known = ["OK", "INFO", "WARNING", "ERROR"].contains(&live_status.as_str());
+        if known && ours != live_status {
             let why = step.message.as_deref().map(|m| format!(" ({m})")).unwrap_or_default();
             diff.push(format!("status {ours}{why}, live {live_status}"));
         }
