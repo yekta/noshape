@@ -1376,7 +1376,23 @@ impl<'a> Translator<'a> {
         let (op, revolve) = strings.iter().find_map(|s| s.strip_suffix(".opExtrude").map(|o| (o.to_string(), false)).or_else(|| s.strip_suffix(".opRevolve").map(|o| (o.to_string(), true))))?;
         let sk = strings.iter().find_map(|s| s.strip_suffix(".wireOp"))?.to_string();
         let curves: Vec<Vec<[f64; 2]>> = strings.iter().filter_map(|e| self.curves.get(&(sk.clone(), e.clone())).cloned()).collect();
-        Some(if revolve { self.revolve_entity(name, &op, &sk, &curves) } else { self.extrude_entity(name, is_start, &op, &sk, &curves) })
+        // Which of the curves' crossings an edge swept from one is (ORDER).
+        fn order(p: &Packed) -> Option<usize> {
+            match p {
+                Packed::Map(m) if m.iter().any(|(k, v)| matches!((k, v), (Packed::Str(k), Packed::Str(v)) if k == "disambiguationType" && v == "ORDER")) => {
+                    m.iter().find_map(|(k, v)| match (k, v) {
+                        (Packed::Str(k), Packed::Num(n)) if k == "order" => Some(*n as usize),
+                        _ => None,
+                    })
+                }
+                Packed::Map(m) => m.iter().find_map(|(_, v)| order(v)),
+                Packed::Array(a) => a.iter().find_map(order),
+                Packed::Tagged(_, v) => order(v),
+                _ => None,
+            }
+        }
+        let crossing = order(&Packed::Map(m.clone()));
+        Some(if revolve { self.revolve_entity(name, &op, &sk, &curves) } else { self.extrude_entity(name, is_start, crossing, &op, &sk, &curves) })
     }
 
     /// The written-out form (`makeQuery(id + "F….opExtrude", "CAP_FACE",
@@ -1404,7 +1420,7 @@ impl<'a> Translator<'a> {
         }
         let sk = sk?;
         let is_start = text.contains("\"isStart\":true");
-        Some(if revolve { self.revolve_entity(name, op, &sk, &curves) } else { self.extrude_entity(name, is_start, op, &sk, &curves) })
+        Some(if revolve { self.revolve_entity(name, op, &sk, &curves) } else { self.extrude_entity(name, is_start, None, op, &sk, &curves) })
     }
 
     /// The edge between faces `a` and `b`; else (a cut split one of them,
@@ -1470,7 +1486,7 @@ impl<'a> Translator<'a> {
         r[kind][0]["id"].as_str().map(str::to_string).ok_or_else(|| format!("{name} of {op}: no entity of ours near {:?} mm", mm(at)))
     }
 
-    fn extrude_entity(&mut self, name: &str, is_start: bool, op: &str, sk: &str, curves: &[Vec<[f64; 2]>]) -> Result<String, String> {
+    fn extrude_entity(&mut self, name: &str, is_start: bool, crossing: Option<usize>, op: &str, sk: &str, curves: &[Vec<[f64; 2]>]) -> Result<String, String> {
         let ours = self.feature_ids.get(op).cloned().ok_or_else(|| format!("{name}: extrude {op} was not built"))?;
         let our_sketch = self.feature_ids.get(sk).cloned().ok_or_else(|| format!("{name}: sketch {sk} was not built"))?;
         if curves.is_empty() {
@@ -1499,10 +1515,12 @@ impl<'a> Translator<'a> {
         // A line is its two ends; arcs and splines are finely sampled.
         let mid = |c: &Vec<[f64; 2]>| if c.len() == 2 { [(c[0][0] + c[1][0]) / 2.0, (c[0][1] + c[1][1]) / 2.0] } else { c[c.len() / 2] };
         let (kind, key, at) = match name {
-            // The edge swept from the vertex the two curves share.
+            // The edge swept from the vertex the two curves share, else from
+            // the `crossing`th point where they cross (an imprinted vertex).
             "SWEPT_EDGE" => {
                 let shared = curves.first().and_then(|a| curves.get(1).and_then(|b| [a[0], a[a.len() - 1]].into_iter().find(|p| [b[0], b[b.len() - 1]].iter().any(|q| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-9))));
-                ("edges", "midpoint", world(shared.ok_or("SWEPT_EDGE: its curves share no vertex")?))
+                let crossed = || curves.first().zip(curves.get(1)).and_then(|(a, b)| crossings(a, b).get(crossing.unwrap_or(0)).copied());
+                ("edges", "midpoint", world(shared.or_else(crossed).ok_or("SWEPT_EDGE: its curves share no vertex")?))
             }
             "SWEPT_FACE" => ("faces", "centroid", world(mid(&curves[0]))),
             "CAP_EDGE" => ("edges", "midpoint", world(mid(&curves[0]))),
@@ -2257,6 +2275,30 @@ fn imprint_query_words(text: &str) -> (Option<String>, Vec<String>) {
         words.extend(["operationId".to_string(), op.to_string(), "sketchEntityId".to_string(), e.to_string()]);
     }
     (Some(sk.to_string()), words)
+}
+
+/// Where polylines `a` and `b` cross, in order along `a`.
+fn crossings(a: &[[f64; 2]], b: &[[f64; 2]]) -> Vec<[f64; 2]> {
+    let mut out: Vec<(f64, [f64; 2])> = Vec::new();
+    for (i, p) in a.windows(2).enumerate() {
+        for q in b.windows(2) {
+            let (d, e) = ([p[1][0] - p[0][0], p[1][1] - p[0][1]], [q[1][0] - q[0][0], q[1][1] - q[0][1]]);
+            let den = d[0] * e[1] - d[1] * e[0];
+            if den.abs() < 1e-30 {
+                continue;
+            }
+            let w = [q[0][0] - p[0][0], q[0][1] - p[0][1]];
+            let (t, u) = ((w[0] * e[1] - w[1] * e[0]) / den, (w[0] * d[1] - w[1] * d[0]) / den);
+            if (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u) {
+                let at = [p[0][0] + t * d[0], p[0][1] + t * d[1]];
+                if out.iter().all(|(_, o)| (o[0] - at[0]).hypot(o[1] - at[1]) > 1e-9) {
+                    out.push((i as f64 + t, at));
+                }
+            }
+        }
+    }
+    out.sort_by(|x, y| x.0.total_cmp(&y.0));
+    out.into_iter().map(|(_, p)| p).collect()
 }
 
 /// How far (m) any sketch point moved between two `sketch_get` replies.
@@ -3098,4 +3140,24 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         }
     }
     res
+}
+
+#[cfg(test)]
+mod tests {
+    /// Two circles cross twice; the crossings come in order along the
+    /// first (stef-radijator's SWEPT_EDGE ORDER 0 / 1 of a ring and a
+    /// patterned hole on it).
+    #[test]
+    fn crossings_in_order_along_the_first_curve() {
+        let circle = |c: [f64; 2], r: f64| (0..=64).map(|i| {
+            let a = i as f64 / 64.0 * std::f64::consts::TAU;
+            [c[0] + r * a.cos(), c[1] + r * a.sin()]
+        }).collect::<Vec<_>>();
+        let ring = circle([0.0, 0.0], 0.0225);
+        let hole = circle([0.0, -0.0225], 0.0025);
+        let x = super::crossings(&ring, &hole);
+        assert_eq!(x.len(), 2, "{x:?}");
+        // Counter-clockwise from +X: the crossing at x < 0 comes first.
+        assert!(x[0][0] < 0.0 && x[1][0] > 0.0 && x.iter().all(|p| (p[0].hypot(p[1]) - 0.0225).abs() < 1e-4), "{x:?}");
+    }
 }
