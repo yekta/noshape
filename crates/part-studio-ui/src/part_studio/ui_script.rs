@@ -55,7 +55,9 @@ impl PartStudioView {
         let in_sketch = self.sketch.as_ref().map(|ed| {
             let f = ed.feature;
             let picks = if ed.tool == crate::sketch_mode::Tool::Dimension { ed.tool_picks() } else { Vec::new() };
-            ed.selection.iter().chain(&picks).map(|e| Reference::SketchEntity { sketch: f, entity: e.0 }).chain(ed.selected_regions.iter().map(|k| Reference::SketchRegion { sketch: f, key: k.clone() })).chain(ed.model_selection.iter().cloned()).collect::<Vec<_>>()
+            // A linked plane, edge or vertex picked into the sketch reads as itself (live: PLANE Right).
+            let linked = self.sketch_data(cx).map(|d| d.external_refs).unwrap_or_default();
+            ed.selection.iter().chain(&picks).map(|e| linked.get(&e.0).cloned().unwrap_or(Reference::SketchEntity { sketch: f, entity: e.0 })).chain(ed.selected_regions.iter().map(|k| Reference::SketchRegion { sketch: f, key: k.clone() })).chain(ed.model_selection.iter().cloned()).collect::<Vec<_>>()
         });
         let picked = in_sketch.or_else(|| dialog.map(|d| d.active_refs()));
         let items: Vec<Value> = picked

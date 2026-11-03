@@ -769,11 +769,14 @@ impl PartStudioView {
                 // Dimensions and constraints to planes, model edges / vertices and
                 // other sketches: a linked external reference entity stands in.
                 let tool_now = self.sketch.as_ref().map(|s| s.tool);
-                // Live (ui-parity sketch-circle-dimension): with a pick held, a click over a plane's area places
-                // the dimension.
-                let placing = tool_now == Some(Tool::Dimension) && self.sketch.as_ref().is_some_and(|s| !s.tool_picks().is_empty());
+                // Live (ui-parity sketch-circle-dimension): with a circle picked, a click over a plane places
+                // its dimension; with a line or point picked another plane is picked (sketch-fully-defined: a
+                // line, then the Right plane: a distance to it), never the sketch's own.
+                let picks = self.sketch.as_ref().filter(|_| tool_now == Some(Tool::Dimension)).map(|s| s.tool_picks()).unwrap_or_default();
+                let round_pick = self.sketch_data(cx).is_some_and(|d| picks.iter().any(|e| matches!(d.sketch.kind(*e), Some(noshape_sketch::EntityKind::Circle | noshape_sketch::EntityKind::Arc))));
                 let plane_area = |r: &Reference| matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. });
-                let hovered = match (hovered, self.hover.clone().filter(|r| !(placing && plane_area(r))), tool_now) {
+                let skip_plane = |r: &Reference| !picks.is_empty() && plane_area(r) && (round_pick || self.is_own_sketch_plane(r, cx));
+                let hovered = match (hovered, self.hover.clone().filter(|r| !skip_plane(r)), tool_now) {
                     (None, Some(r), Some(t @ (Tool::Dimension | Tool::Constraint(_) | Tool::Mirror)))
                         if matches!(r, Reference::Edge(_) | Reference::Vertex(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::Face(_))
                             || matches!(&r, Reference::SketchEntity { sketch, .. } if Some(*sketch) != self.sketch.as_ref().map(|s| s.feature)) =>

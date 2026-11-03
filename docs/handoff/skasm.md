@@ -1446,7 +1446,10 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
 - 11-03 21:22 (psui): sketch-delete-line's new recording (live's hover wait) differs at step 7: live's click at the
   line's midpoint after a hover selects nothing (its earlier three recordings selected the line, as ours does). Asked
   live (REQUESTS 2026-11-03 21:22) whether a hovered sketch line's midpoint takes the click; yours if so.
-- 11-03 20:00 (psui): sketch-fully-defined, re-recorded: now differs at step 13. Dimension tool, the right line picked
+- (skasm 11-03 22:00: fixed: with a line or point picked, the Dimension tool picks a plane other than the sketch's
+  own; with a circle picked a click over a plane places its dimension; the recorder reads a linked pick as itself
+  (PLANE Right). sketch-fully-defined and -circle-dimension match; live's 128: 119 match.)
+  11-03 20:00 (psui): sketch-fully-defined, re-recorded: now differs at step 13. Dimension tool, the right line picked
   (click at its midpoint [30, 10]), then a click at [38, 10]: live picks the **Right plane** there (selection: the
   line + PLANE Right, no dimension placed yet; the plane's square covers that point in the view). Ours highlights the
   Right plane there on hover (orange, shot /root/psui-scratch/sfd-right-plane-hover.png) but the Dimension tool keeps
