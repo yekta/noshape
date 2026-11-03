@@ -1586,7 +1586,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   edited dialog with "20" typed in Depth, the 1st Escape reverts the field and keeps the dialog, the 2nd cancels it;
   Backspace on a row deletes it, Ctrl+Z restores; Rename opens with the whole name selected. Scenario
   ui-parity/feature-row-enter (qa 2026-11-02, build 6b4704f2)
-- [x] verified 24d2ebc7 (qa 11-03 04:33: in sketch both off, after a line Undo on, after Ctrl+Z Undo off / Redo on, after Ctrl+Y Undo on, after ✕ both off = live; tickets/fl/g24-sk-undo.png) acc3bc43 (skasm: the history now starts when the sketch editor opens; UI test picking_the_sketch_plane_is_not_an_undo_step) reopened (qa 11-03 03:21, green e89c78de, window focused, the box start: half right — after a line Undo on / Redo off, after Ctrl+Z Redo on, after Ctrl+Y Redo off, after ✕ both off = live; but **on entering the sketch Undo is enabled** (live: disabled) and **after Ctrl+Z of the only line Undo stays enabled** (live: disabled); qa-scratch/tickets/fl/e89-sk-undo.png: in sketch / line / Ctrl+Z / Ctrl+Y / ✕) 1fede97d P2 SKETCH-UNDO-REDO-STATE (psui / skasm) in a sketch the toolbar Undo and Redo are always enabled: a Part Studio
+- [x] (skasm 11-03 07:45, live 1853: picking the plane after Sketch **is** an undo step, Undo on, Ctrl+Z un-picks
+  it; a plane selected before Sketch isn't; qa's check was the latter. Ours now: the history no longer restarts with
+  the editor, Undo past the pick leaves the editor for the plane-less dialog; UI tests
+  picking_the_sketch_plane_is_an_undo_step, a_preselected_sketch_plane_is_not_an_undo_step) verified 24d2ebc7 (qa 11-03 04:33: in sketch both off, after a line Undo on, after Ctrl+Z Undo off / Redo on, after Ctrl+Y Undo on, after ✕ both off = live; tickets/fl/g24-sk-undo.png) acc3bc43 (skasm: the history now starts when the sketch editor opens; UI test picking_the_sketch_plane_is_not_an_undo_step) reopened (qa 11-03 03:21, green e89c78de, window focused, the box start: half right — after a line Undo on / Redo off, after Ctrl+Z Redo on, after Ctrl+Y Redo off, after ✕ both off = live; but **on entering the sketch Undo is enabled** (live: disabled) and **after Ctrl+Z of the only line Undo stays enabled** (live: disabled); qa-scratch/tickets/fl/e89-sk-undo.png: in sketch / line / Ctrl+Z / Ctrl+Y / ✕) 1fede97d P2 SKETCH-UNDO-REDO-STATE (psui / skasm) in a sketch the toolbar Undo and Redo are always enabled: a Part Studio
   with nothing to undo, Sketch › Top, draw one line (l, two clicks, Esc), Ctrl+Z, Ctrl+Y, then the sketch's ✕. Live (11-02,
   qa's tab, qa-scratch/livek/t-skundo.mjs; `[command-id=UNDO_A_CHANGE / REDO_A_CHANGE]`): entering the sketch **both
   disabled**; after the line Undo enabled / Redo disabled; after Ctrl+Z Undo disabled / Redo enabled; after Ctrl+Y
@@ -2136,7 +2139,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
-- [ ] P2 SKETCH-SPLINE-CENTRIPETAL (skasm; dx 11-03 from live 1836 and skasm's own fuzz 1777) Onshape's fit splines use
+- [x] skasm 11-03 07:40: fit splines are cubics with their knots at the centripetal parameters (live 1777: s202's
+  0.3425 / 0.6367 exact), natural ends without handles (the Spur Gear's root fillet r 0.378848 mm = live's; averaged
+  knots gave 0.37885), and a spline through a closed polygon (one point first and last) is periodic (the closed
+  5-point spline's profile 1978.285 mm² = live's 19782.85 mm³ / 10 mm; ours was 20348.29 mm³); its seam solved in O(n),
+  its gradient folded onto the points. T1 sketch tools::fit_splines_are_centripetal_and_closed_ones_periodic,
+  equations closed_fit_spline_gradients_match_finite_differences; fuzz k-sum unchanged (1141.67 mm). **For core:**
+  the Spur Gear's defaults are now 2418.05 mm³ (in band) but **202 faces** (live 152): each root fillet comes out as
+  two BSpline faces (0.295 + 2.621 mm², before one of 3.124); the sketch's tooth outline is 4 curves as before, so
+  it's OCCT's fillet splitting along the new flank. Open: the 40-tooth case's tangent circle is r 0.88 mm (live
+  0.2496), so its volume is still out of band. P2 SKETCH-SPLINE-CENTRIPETAL (skasm; dx 11-03 from live 1836 and skasm's own fuzz 1777) Onshape's fit splines use
   centripetal knots (cumulative √chord, std fitSpline.fs "the server uses centripetal knots"; 1777: all 11 open
   splines match to 4 decimals), ours chord length (nurbs.rs `chord_params`), so every spline through the same points
   has another shape; and a spline closed on its first point is periodic in Onshape (1836: one closed BCURVE ring

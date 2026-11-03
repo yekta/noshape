@@ -144,10 +144,10 @@ impl PartStudioView {
         // The Sketch dialog before its plane is picked: no sketch model yet.
         let Some(ed) = self.sketch.as_ref() else { return json!({ "tool": null }) };
         let sk = &data.sketch;
-        // The first active toolbar button (live): the tool, else Construction while it is on.
+        // The first active toolbar button (live): the tool, else Construction while it shows active.
         let tool = (ed.tool != crate::sketch_mode::Tool::Select)
             .then(|| crate::ui::onshape_title(ed.tool.label()).split(" (").next().unwrap_or_default().to_string())
-            .or_else(|| ed.construction.then(|| "Construction".to_string()));
+            .or_else(|| ed.construction_shown(sk).then(|| "Construction".to_string()));
         let owned: std::collections::HashSet<_> = sk.entities().filter(|e| e.kind() != EntityKind::Point).flat_map(|e| e.point_refs()).collect();
         let mut entities: Vec<String> = sk
             .entities()

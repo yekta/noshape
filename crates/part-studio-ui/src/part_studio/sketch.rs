@@ -264,16 +264,24 @@ impl PartStudioView {
 
     /// Create/update/drop the sketch editor to match the edit session.
     pub(super) fn sync_sketch_editor(&mut self, cx: &mut Context<Self>) {
-        let Some(id) = self.editing_sketch_id(cx) else {
-            if let Some(ed) = self.sketch.take() {
-                self.sketch_fillet_radius = Some(ed.fillet_radius);
-                self.opts.editing_sketch = None;
-                self.viewport.update(cx, |vp, _| vp.tool_captures_left = false);
+        let drop_editor = |this: &mut Self, cx: &mut Context<Self>| {
+            if let Some(ed) = this.sketch.take() {
+                this.sketch_fillet_radius = Some(ed.fillet_radius);
+                this.opts.editing_sketch = None;
+                this.viewport.update(cx, |vp, _| vp.tool_captures_left = false);
             }
+        };
+        let Some(id) = self.editing_sketch_id(cx) else {
+            drop_editor(self, cx);
             return;
         };
         BIND_ENTRY_KEYS.call_once(|| cx.bind_keys(entry_key_bindings()));
         let plane = self.edit.as_ref().and_then(|e| e.dialog.read(cx).feature.params.query("sketchPlane").first().cloned());
+        // Undo past the plane's pick un-picks it (live 1853): the plane-less dialog again.
+        if plane.is_none() {
+            drop_editor(self, cx);
+            return;
+        }
         let frame = self.display.sketches.iter().find(|s| s.feature == id).map(|s| s.frame).or(match plane {
             Some(Reference::Plane(DatumPlane::Top)) => Some(PlaneFrame::TOP),
             Some(Reference::Plane(DatumPlane::Front)) => Some(PlaneFrame::FRONT),
@@ -295,12 +303,6 @@ impl PartStudioView {
                     self.sketch_fillet_radius = Some(ed.fillet_radius);
                 }
                 self.sketch = Some(SketchEditor::new(id, frame));
-                // The sketch's history starts here: picking its plane isn't
-                // a step (live: Undo off on entering the sketch, and off
-                // again once its only line is undone).
-                if let Some(e) = &mut self.edit {
-                    e.history = super::DraftHistory::new(&e.dialog.read(cx).feature);
-                }
                 let length = self.doc.read(cx).session.doc.settings.units.length;
                 let pending = self.sketch_pending_options.take();
                 if let Some(ed) = &mut self.sketch {
@@ -3981,12 +3983,12 @@ impl PartStudioView {
         // dialog opens, all of it (Search tools too) at 25 % until the sketch
         // plane is picked.
         let disabled = self.sketch.is_none();
-        let (active, construction, selection) = match &self.sketch {
-            Some(ed) => (ed.tool, ed.construction, ed.selection.clone()),
-            None => (Tool::Select, false, Vec::new()),
-        };
         // Constraint buttons not applicable to the selection are disabled.
         let data = self.sketch_data(cx);
+        let (active, construction, selection) = match &self.sketch {
+            Some(ed) => (ed.tool, data.as_ref().is_some_and(|d| ed.construction_shown(&d.sketch)), ed.selection.clone()),
+            None => (Tool::Select, false, Vec::new()),
+        };
         // Onshape's sketch toolbar has the feature toolbar's metrics (§3.10).
         let tool_btn = |tool: Tool, cx: &mut Context<Self>| {
             crate::ui::with_tool_tooltip(

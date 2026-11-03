@@ -200,11 +200,11 @@ fn sketch_undo_and_redo_follow_its_history(cx: &mut TestAppContext) {
     assert_eq!(state(cx), (true, false));
 }
 
-/// SKETCH-UNDO-REDO-STATE reopened (qa 11-03): a sketch started with no
-/// plane, Top then picked: Undo still off (picking the plane isn't a step),
-/// and off again after the only line is undone.
+/// Live 1853: a sketch started with no plane, Top then picked: picking the
+/// plane is an undo step (Undo on), and Undo past the line un-picks it (the
+/// plane field empty again, out of the sketch editor).
 #[gpui::test]
-fn picking_the_sketch_plane_is_not_an_undo_step(cx: &mut TestAppContext) {
+fn picking_the_sketch_plane_is_an_undo_step(cx: &mut TestAppContext) {
     let (window, view) = part_studio(cx, "sk-undo-plane");
     cx.update_window(window, |_, w, cx| {
         view.update(cx, |v, cx| {
@@ -215,23 +215,38 @@ fn picking_the_sketch_plane_is_not_an_undo_step(cx: &mut TestAppContext) {
     .unwrap();
     cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
     draw(cx, window);
+    let state = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).draft_history_state());
+    assert_eq!(state(cx), (false, false));
     cx.update_window(window, |_, _, cx| {
         let dialog = view.read(cx).edit.as_ref().unwrap().dialog.clone();
         dialog.update(cx, |d, cx| d.add_pick(Reference::Plane(DatumPlane::Top), cx));
     })
     .unwrap();
     wait_until(cx, window, |cx| view.read(cx).sketch.is_some());
-    let state = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).draft_history_state());
-    assert_eq!(state(cx), (false, false));
+    assert_eq!(state(cx), (true, false));
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
     draw(cx, window);
     click(cx, window, &view, (500., 400.));
     click(cx, window, &view, (640., 360.));
     keys(cx, window, &["escape"]);
     assert_eq!(state(cx), (true, false));
-    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.draft_undo(false, w, cx))).unwrap();
-    draw(cx, window);
+    let undo = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.draft_undo(false, w, cx))).unwrap();
+        draw(cx, window);
+    };
+    undo(cx);
+    assert_eq!(state(cx), (true, true));
+    undo(cx);
     assert_eq!(state(cx), (false, true));
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_none());
+    assert!(cx.update(|cx| view.read(cx).sketch.is_none()), "the plane is un-picked");
+}
+
+/// Live 1853 (c): a plane selected before Sketch isn't an undo step.
+#[gpui::test]
+fn a_preselected_sketch_plane_is_not_an_undo_step(cx: &mut TestAppContext) {
+    let (_window, view) = sketch_with(cx, "sk-undo-presel", Tool::Line);
+    assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (false, false));
 }
 
 /// The Origin's hidden stand-in (made when a line's first click snaps to the

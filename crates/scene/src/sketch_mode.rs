@@ -1290,6 +1290,16 @@ impl SketchEditor {
 
     /// Cancel the in-progress operation (Esc). Returns true if something was cancelled.
     pub fn cancel(&mut self) -> bool {
+        let tool = self.tool;
+        let out = self.cancel_step();
+        // Live 1853 addendum: Escape out of a tool ends construction mode.
+        if tool != Tool::Select && self.tool == Tool::Select {
+            self.construction = false;
+        }
+        out
+    }
+
+    fn cancel_step(&mut self) -> bool {
         self.value_box_next = None;
         if let Some(d) = self.dim_edit.take() {
             // Onshape resets the selection when the Dimension tool commits a
@@ -4578,14 +4588,28 @@ impl SketchEditor {
             self.construction = !self.construction;
             return false;
         }
+        let mut now = None;
         for id in &self.selection {
             if is_point(&data.sketch, *id) {
                 continue;
             }
             let cur = data.sketch.entity(*id).is_some_and(|e| e.construction);
             let _ = data.sketch.set_construction(*id, !cur);
+            now = Some(now.unwrap_or(true) && !cur);
+        }
+        // Live 1853 addendum: the next curve drawn is construction after
+        // `q` turned a selection into construction.
+        if let Some(c) = now {
+            self.construction = c;
         }
         true
+    }
+
+    /// The Construction button's state (live 1853 addendum): construction
+    /// mode, or a selection of construction curves only.
+    pub fn construction_shown(&self, sk: &Sketch) -> bool {
+        let curves: Vec<EntityId> = self.selection.iter().copied().filter(|id| !is_point(sk, *id)).collect();
+        self.construction || (!curves.is_empty() && curves.iter().all(|id| sk.entity(*id).is_some_and(|e| e.construction)))
     }
 
     /// Apply a constraint tool to the current selection if it fits; else
@@ -8570,6 +8594,32 @@ mod tests {
         let c = d.sketch.curve(l).unwrap();
         assert!((c.length() - 0.03).abs() < 1e-9);
         assert!(c.end_point().x < c.start_point().x, "negative length flips the line");
+    }
+
+    /// Live 1853 addendum: `q` with nothing selected turns construction on,
+    /// Escape out of the Line tool turns it off; `q` on a selected line makes
+    /// it construction and the next line too; the Construction button shows
+    /// a selection of construction curves.
+    #[test]
+    fn construction_mode_as_live() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        ed.toggle_construction(&mut d);
+        assert!(ed.construction_shown(&d.sketch));
+        ed.set_tool(Tool::Line);
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        click(&mut ed, &mut d, v(0.02, 0.0));
+        assert!(d.sketch.entities().any(|e| e.kind() == EntityKind::Line && e.construction));
+        while ed.tool != Tool::Select {
+            ed.cancel();
+        }
+        assert!(!ed.construction_shown(&d.sketch), "Escape out of Line ends it");
+        let l = d.sketch.add_line(v(0.0, 0.01), v(0.02, 0.01));
+        ed.selection = vec![l];
+        assert!(!ed.construction_shown(&d.sketch));
+        assert!(ed.toggle_construction(&mut d));
+        assert!(d.sketch.entity(l).unwrap().construction && ed.construction && ed.construction_shown(&d.sketch));
+        ed.construction = false;
+        assert!(ed.construction_shown(&d.sketch), "a construction line selected alone");
     }
 
     /// Live (ui-parity sketch-dimension-edit): the placement click lands on
