@@ -94,6 +94,16 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
   kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
+- 11-03 21:29 (d) walk of my area on green eed2bdc85 (start window, a configured Part Studio, Variable Studio add row,
+  drawing with suggested views, Export PDF, Import STEP into a document, Derived): all as live. One fix from it:
+  template title block lines ran 0.003 in past their ends in DXF / PDF (my 11-01 square caps for the screen); now
+  the screen alone caps them (`square_caps`) and the outline is live's lines (left, top in three, the left column's
+  bottom): knob-tim's 43 TITLE_BLOCK LINEs = live's. DXF ellipses: same arcs as live's, live only encodes them with
+  an OCS extrusion (no change). Live answers: 1927 asm-flip studios → parity_assemblies 3/3, 5/5 mates; with it
+  AGENT-FLIP-PRIMARY-INVERTED closed: assembly_mate / assembly_list / configurations' `flip_primary` = live's
+  primaryAxisAlignment (true = flipped). 1926 prize-wheel-tim: Hole as live, its last difference core's
+  CUT-CLOSED-EDGES-SPLIT (seam vertex kept by an Add). Run 45: 26/55, 303/480. Waiting on live: 1917 (PDF text
+  offset), sketch wire bodies / in-feature mate connectors (after 04:10 11-04); on core: the tickets above.
 - 11-03 21:03 lead's order (20:10: (a) NOSHAPE_CONFIG_DIR, (b) import ✗ rows, (c) drawings vs live, (d) walk):
   (a) landed 1281b9d9 (crates/ops/tests/config_dir.rs: a constructor before main). Live answers taken first: sketch
   text size (1922; cf-fix-pcb's Extrude 5 volume as live), Suggested views placement and scale (1898; 4 of 4 drawings'
