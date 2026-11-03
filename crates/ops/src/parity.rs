@@ -1303,9 +1303,35 @@ impl<'a> Translator<'a> {
     /// Extrude through the same sketch geometry. Used when live's geometry
     /// for the id is missing.
     fn extrude_name_from_query(&mut self, text: &str) -> Option<Result<String, String>> {
-        use noshape_model::custom::host::packed::{Packed, unpack};
         let packed = text.split("qCompressed(1.0,\"").nth(1)?.split('"').next()?;
-        let tree = unpack(packed).ok()?;
+        let tree = noshape_model::custom::host::packed::unpack(packed).ok()?;
+        self.extrude_name_from_tree(&tree)
+    }
+
+    fn extrude_name_from_tree(&mut self, tree: &noshape_model::custom::host::packed::Packed) -> Option<Result<String, String>> {
+        use noshape_model::custom::host::packed::Packed;
+        // An edge a Boolean made where two named faces meet (`INTERSECT`
+        // of their names, exercise-evana's Fillet 1): their common edge.
+        let top = match tree {
+            Packed::Tagged(_, t) => t.as_ref(),
+            t => t,
+        };
+        if let Packed::Map(tm) = top {
+            let get = |key: &str| tm.iter().find(|(k, _)| matches!(k, Packed::Str(k) if k == key)).map(|(_, v)| v);
+            if matches!(get("queryType"), Some(Packed::Str(t)) if t == "INTERSECT")
+                && let Some(Packed::Array(sides)) = get("derivedFrom")
+                && sides.len() == 2
+            {
+                let mut faces = Vec::new();
+                for side in sides {
+                    match self.extrude_name_from_tree(side)? {
+                        Ok(f) => faces.push(f),
+                        Err(e) => return Some(Err(format!("INTERSECT: {e}"))),
+                    }
+                }
+                return Some(self.common_edge(&faces[0], &faces[1]));
+            }
+        }
         fn find<'p>(p: &'p Packed, names: &[&str]) -> Option<&'p Vec<(Packed, Packed)>> {
             match p {
                 Packed::Map(m) if m.iter().any(|(k, v)| matches!(k, Packed::Str(k) if k == "queryType") && matches!(v, Packed::Str(v) if names.contains(&v.as_str()))) => Some(m),
@@ -1318,7 +1344,7 @@ impl<'a> Translator<'a> {
         let names = ["CAP_FACE", "SWEPT_FACE", "CAP_EDGE", "SWEPT_EDGE", "SWEPT_BODY"];
         // Nested in another operation's name: only a Boolean keeps the entity
         // itself (a pattern's or mirror's COPY is another entity).
-        if let Packed::Tagged(_, top) = &tree
+        if let Packed::Tagged(_, top) = tree
             && let Packed::Map(tm) = top.as_ref()
             && !tm.iter().any(|(k, v)| matches!(k, Packed::Str(k) if k == "queryType") && matches!(v, Packed::Str(v) if names.contains(&v.as_str())))
         {
@@ -1330,7 +1356,7 @@ impl<'a> Translator<'a> {
                 return None;
             }
         }
-        let m = find(&tree, &names)?;
+        let m = find(tree, &names)?;
         let get = |key: &str| m.iter().find(|(k, _)| matches!(k, Packed::Str(k) if k == key)).map(|(_, v)| v);
         let Some(Packed::Str(name)) = get("queryType") else { return None };
         let is_start = matches!(get("isStart"), Some(Packed::Bool(true)));
@@ -1348,6 +1374,36 @@ impl<'a> Translator<'a> {
         let sk = strings.iter().find_map(|s| s.strip_suffix(".wireOp"))?.to_string();
         let curves: Vec<Vec<[f64; 2]>> = strings.iter().filter_map(|e| self.curves.get(&(sk.clone(), e.clone())).cloned()).collect();
         Some(if revolve { self.revolve_entity(name, &op, &sk, &curves) } else { self.extrude_entity(name, is_start, &op, &sk, &curves) })
+    }
+
+    /// The edge between faces `a` and `b`; else (a cut split one of them,
+    /// the name picked the other piece) an edge of one whose other face lies
+    /// in the other's plane.
+    fn common_edge(&mut self, a: &str, b: &str) -> Result<String, String> {
+        let r = self.call("query_entities", json!({ "kind": "edges", "of": [a, b], "limit": 1 }))?;
+        if let Some(e) = r["edges"][0]["id"].as_str() {
+            return Ok(e.to_string());
+        }
+        let all = self.call("query_entities", json!({ "kind": "faces", "limit": 100000 }))?;
+        let face = |id: &str| all["faces"].as_array().into_iter().flatten().find(|f| f["id"] == id).cloned().unwrap_or(Value::Null);
+        let tol = 1e-6 / per_unit(&all["units"]);
+        let on = |f: &Value, g: &Value| -> bool {
+            let (Some(n), Some(m), Some(p), Some(q)) = (f3(&f["normal"]), f3(&g["normal"]), f3(&f["centroid"]), f3(&g["centroid"])) else { return false };
+            let along: f64 = (0..3).map(|i| (p[i] - q[i]) * m[i]).sum();
+            (0..3).all(|i| (n[i] - m[i]).abs() < 1e-9) && along.abs() < tol
+        };
+        for (x, y) in [(a, b), (b, a)] {
+            let target = face(x);
+            let edges = self.call("query_entities", json!({ "kind": "edges", "of": [y] }))?;
+            for e in edges["edges"].as_array().into_iter().flatten() {
+                let Some(id) = e["id"].as_str() else { continue };
+                let sides = self.call("query_entities", json!({ "kind": "faces", "of": [id] }))?;
+                if sides["faces"].as_array().into_iter().flatten().any(|f| f["id"] != y && on(f, &target)) {
+                    return Ok(id.to_string());
+                }
+            }
+        }
+        Err("INTERSECT: its two faces have no common edge of ours".into())
     }
 
     /// A Revolve's face or edge by Onshape's name: the face swept by a

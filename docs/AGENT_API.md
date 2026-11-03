@@ -5735,7 +5735,7 @@ Examples:
 
 Faces, edges or vertices with stable ids and their geometry, to select for features.
 
-Lists the faces / edges / vertices of the parts (or of `part`) with an id to pass to selection parameters, the feature that made them, and geometry: faces: surface type, area, centroid, normal (planar), axis and radius (cylinders, cones...); edges: curve type, length, endpoints, midpoint, center/radius (circles); vertices: position. Filters narrow the list: `surface`/`curve` type, `normal` (planar faces whose outward normal is within 1° of it), `direction` (line edges along it, either way, or circles around it), `created_by` (feature id or name), `near` (closest first: by the distance to the entity, then to its centroid; max `limit`). `at` picks several entities in one call: for each point, the closest entity that passes the filters (in the points' order). With `context: true`, the shown Assembly context's geometry instead (Modeling in context: assembly_edit_in_context); `part` is then an instance name.
+Lists the faces / edges / vertices of the parts (or of `part`) with an id to pass to selection parameters, the feature that made them, and geometry: faces: surface type, area, centroid, normal (planar), axis and radius (cylinders, cones...); edges: curve type, length, endpoints, midpoint, center/radius (circles); vertices: position. Filters narrow the list: `surface`/`curve` type, `normal` (planar faces whose outward normal is within 1° of it), `direction` (line edges along it, either way, or circles around it), `created_by` (feature id or name), `of` (next to every one of these entities: `{"kind": "edges", "of": ["face:…"]}` is a face's edges, two faces give their common edge), `near` (closest first: by the distance to the entity, then to its centroid; max `limit`). `at` picks several entities in one call: for each point, the closest entity that passes the filters (in the points' order). With `context: true`, the shown Assembly context's geometry instead (Modeling in context: assembly_edit_in_context); `part` is then an instance name.
 
 Examples:
 
@@ -5758,6 +5758,7 @@ Examples:
 | `normal` | array of number |  | Faces: outward normal direction, e.g. [0,0,1] for faces facing +Z. |
 | `created_by` | string |  | Only entities made by this feature (id or name). |
 | `direction` | array of number |  | Edges: lines parallel to this direction (either way) or circles whose axis it is, within 1°; e.g. [0,0,1] for vertical edges. |
+| `of` | array of string |  | Only those next to every one of these faces / edges / vertices (ids): a face's edges, vertices or neighbouring faces, an edge's two faces or its vertices, a vertex's edges or faces; two faces: their common edges. |
 | `near` | array of number or string |  | Sort by distance from this point (workspace units). |
 | `at` | array of array of number or string |  | Points (workspace units): the closest entity to each, in order (replaces `near` / `limit`). |
 | `limit` | integer |  | At most this many results (default 200). |

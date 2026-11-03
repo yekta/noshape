@@ -29,7 +29,7 @@ pub fn ops() -> Vec<Op> {
             group: "query",
             verb: "entities",
             summary: "Faces, edges or vertices with stable ids and their geometry, to select for features",
-            description: "Lists the faces / edges / vertices of the parts (or of `part`) with an id to pass to selection parameters, the feature that made them, and geometry: faces: surface type, area, centroid, normal (planar), axis and radius (cylinders, cones...); edges: curve type, length, endpoints, midpoint, center/radius (circles); vertices: position. Filters narrow the list: `surface`/`curve` type, `normal` (planar faces whose outward normal is within 1° of it), `direction` (line edges along it, either way, or circles around it), `created_by` (feature id or name), `near` (closest first: by the distance to the entity, then to its centroid; max `limit`). `at` picks several entities in one call: for each point, the closest entity that passes the filters (in the points' order). With `context: true`, the shown Assembly context's geometry instead (Modeling in context: assembly_edit_in_context); `part` is then an instance name.",
+            description: "Lists the faces / edges / vertices of the parts (or of `part`) with an id to pass to selection parameters, the feature that made them, and geometry: faces: surface type, area, centroid, normal (planar), axis and radius (cylinders, cones...); edges: curve type, length, endpoints, midpoint, center/radius (circles); vertices: position. Filters narrow the list: `surface`/`curve` type, `normal` (planar faces whose outward normal is within 1° of it), `direction` (line edges along it, either way, or circles around it), `created_by` (feature id or name), `of` (next to every one of these entities: `{\"kind\": \"edges\", \"of\": [\"face:…\"]}` is a face's edges, two faces give their common edge), `near` (closest first: by the distance to the entity, then to its centroid; max `limit`). `at` picks several entities in one call: for each point, the closest entity that passes the filters (in the points' order). With `context: true`, the shown Assembly context's geometry instead (Modeling in context: assembly_edit_in_context); `part` is then an instance name.",
             fields: vec![
                 doc_field(),
                 tab_field(),
@@ -40,6 +40,7 @@ pub fn ops() -> Vec<Op> {
                 opt("normal", json!({ "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }), "Faces: outward normal direction, e.g. [0,0,1] for faces facing +Z."),
                 opt("created_by", s(), "Only entities made by this feature (id or name)."),
                 opt("direction", json!({ "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }), "Edges: lines parallel to this direction (either way) or circles whose axis it is, within 1°; e.g. [0,0,1] for vertical edges."),
+                opt("of", strings(), "Only those next to every one of these faces / edges / vertices (ids): a face's edges, vertices or neighbouring faces, an edge's two faces or its vertices, a vertex's edges or faces; two faces: their common edges."),
                 opt("near", json!({ "type": "array", "items": { "type": ["number", "string"] }, "minItems": 3, "maxItems": 3 }), "Sort by distance from this point (workspace units)."),
                 opt("at", json!({ "type": "array", "items": { "type": "array", "items": { "type": ["number", "string"] }, "minItems": 3, "maxItems": 3 }, "minItems": 1 }), "Points (workspace units): the closest entity to each, in order (replaces `near` / `limit`)."),
                 opt("limit", json!({ "type": "integer", "minimum": 1 }), "At most this many results (default 200)."),
@@ -380,17 +381,42 @@ pub(crate) fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         ),
         None => None,
     };
+    let of: Vec<Reference> = match a.opt_array("of")? {
+        Some(ids) => ids
+            .iter()
+            .enumerate()
+            .map(|(i, x)| match x.as_str().and_then(refs::parse_str) {
+                Some(r @ (Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_))) => Ok(r),
+                _ => Err(OpError::param(&format!("of[{i}]"), "a face, edge or vertex id (query_entities)")),
+            })
+            .collect::<Result<_, _>>()?,
+        None => Vec::new(),
+    };
     let surface = a.opt_str("surface")?;
     let curve = a.opt_str("curve")?;
     let limit = a.opt_u64("limit")?.unwrap_or(200) as usize;
     // (distance from `near`, the entity's point, its JSON, its shape for `at`)
     let mut out: Vec<Found> = Vec::new();
     let shape_of = |b: &Body, t: ShapeType, i: usize| if at.is_some() || near.is_some() { b.shape.sub_shape(t, i).ok() } else { None };
+    let target = match kind {
+        "faces" => ShapeType::Face,
+        "edges" => ShapeType::Edge,
+        _ => ShapeType::Vertex,
+    };
+    let mut of_found = false;
     for b in bodies {
+        let next = if of.is_empty() {
+            None
+        } else {
+            let Some(set) = next_to(b, &of, target).map_err(|e| OpError::new("kernel", e.to_string()))? else { continue };
+            of_found = true;
+            Some(set)
+        };
+        let keep = |i: usize| next.as_ref().is_none_or(|n| n.contains(&i));
         match kind {
             "faces" => {
                 for i in 0..b.faces.len() {
-                    if created_by.is_some_and(|f| b.faces[i].creator() != Some(f)) {
+                    if created_by.is_some_and(|f| b.faces[i].creator() != Some(f)) || !keep(i) {
                         continue;
                     }
                     let Some((v, c, sk, n)) = face_json(b, i, k, &names) else { continue };
@@ -409,7 +435,7 @@ pub(crate) fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 // Onshape's edges only (no seams or degenerated edges).
                 let shown = b.shape.shown_topology().unwrap_or_default();
                 for i in 0..b.edges.len() {
-                    if !shown.edges.get(i).copied().unwrap_or(true) {
+                    if !shown.edges.get(i).copied().unwrap_or(true) || !keep(i) {
                         continue;
                     }
                     if created_by.is_some_and(|f| b.edges[i].creator() != Some(f) && !edge_touches(&b.edges[i], f)) {
@@ -433,7 +459,7 @@ pub(crate) fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 // Onshape's vertices only (none at seam ends or on full circles).
                 let shown = b.shape.shown_topology().unwrap_or_default();
                 for i in 0..b.vertices.len() {
-                    if !shown.vertices.get(i).copied().unwrap_or(true) {
+                    if !shown.vertices.get(i).copied().unwrap_or(true) || !keep(i) {
                         continue;
                     }
                     let Ok(vx) = b.shape.sub_shape(ShapeType::Vertex, i) else { continue };
@@ -444,6 +470,9 @@ pub(crate) fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
             _ => return Err(OpError::param("kind", "faces, edges or vertices")),
         }
+    }
+    if !of.is_empty() && !of_found {
+        return Err(OpError::param("of", "no part has all of these entities (ids from query_entities)"));
     }
     if let Some(points) = at {
         // The entity closest to each point; between entities it touches
@@ -477,6 +506,51 @@ pub(crate) fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let total = out.len();
     let list: Vec<Value> = out.into_iter().take(limit).map(|(_, _, v, _)| v).collect();
     Ok(json!({ "units": units_json(&units), "count": total, kind: list }).into())
+}
+
+/// The faces / edges / vertices (`target`) of `b` next to every one of
+/// `of`; `None` when `b` hasn't them all.
+fn next_to(b: &Body, of: &[Reference], target: ShapeType) -> Result<Option<std::collections::HashSet<usize>>, noshape_kernel::KernelError> {
+    let (edge_faces, vertex_faces, vertex_edges) = (b.shape.edge_faces()?, b.shape.vertex_faces()?, b.shape.vertex_edges()?);
+    let has = |list: &[u32], i: usize| list.iter().any(|&x| x as usize == i);
+    let mut all: Option<std::collections::HashSet<usize>> = None;
+    for r in of {
+        let (own, kind) = match r {
+            Reference::Face(n) => (b.find_faces(n), ShapeType::Face),
+            Reference::Edge(n) => (b.find_edges(n), ShapeType::Edge),
+            Reference::Vertex(n) => (b.find_vertices(n), ShapeType::Vertex),
+            _ => return Ok(None),
+        };
+        if own.is_empty() {
+            return Ok(None);
+        }
+        // Each of `own`'s neighbours of the target kind.
+        let mut set = std::collections::HashSet::new();
+        for &o in &own {
+            let near: Vec<usize> = match (kind, target) {
+                (ShapeType::Face, ShapeType::Edge) => (0..edge_faces.len()).filter(|&e| has(&edge_faces[e], o)).collect(),
+                (ShapeType::Face, ShapeType::Vertex) => (0..vertex_faces.len()).filter(|&v| has(&vertex_faces[v], o)).collect(),
+                (ShapeType::Face, _) => b.shape.adjacent_faces(o)?.into_iter().filter(|&f| f != o).collect(),
+                (ShapeType::Edge, ShapeType::Face) => edge_faces.get(o).map(|f| f.iter().map(|&x| x as usize).collect()).unwrap_or_default(),
+                (ShapeType::Edge, ShapeType::Vertex) => (0..vertex_edges.len()).filter(|&v| has(&vertex_edges[v], o)).collect(),
+                // Edges sharing a vertex with it.
+                (ShapeType::Edge, _) => vertex_edges.iter().filter(|es| has(es, o)).flat_map(|es| es.iter().map(|&x| x as usize)).filter(|&e| e != o).collect(),
+                (ShapeType::Vertex, ShapeType::Face) => vertex_faces.get(o).map(|f| f.iter().map(|&x| x as usize).collect()).unwrap_or_default(),
+                (ShapeType::Vertex, ShapeType::Edge) => vertex_edges.get(o).map(|e| e.iter().map(|&x| x as usize).collect()).unwrap_or_default(),
+                // The other ends of its edges.
+                _ => {
+                    let ve = &vertex_edges;
+                    ve.get(o).into_iter().flatten().flat_map(|&e| (0..ve.len()).filter(move |&v| v != o && has(&ve[v], e as usize))).collect()
+                }
+            };
+            set.extend(near);
+        }
+        all = Some(match all {
+            None => set,
+            Some(prev) => prev.intersection(&set).copied().collect(),
+        });
+    }
+    Ok(all)
 }
 
 /// A listed entity: (distance from `near`, its point, its JSON, its shape).

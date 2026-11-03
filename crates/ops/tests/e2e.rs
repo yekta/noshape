@@ -674,6 +674,38 @@ fn block_with_hole(ctx: &mut Ctx, file: &str) {
     assert_eq!(ex["feature_status"]["status"], "Ok", "{ex}");
 }
 
+/// query_entities `of`: what lies next to given entities (a face's edges,
+/// two faces' common edge, an edge's faces, a corner's edges).
+#[test]
+fn entities_next_to_others() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "next-to");
+    let face = |ctx: &mut Ctx, n: [i32; 3]| call(ctx, "query_entities", json!({ "kind": "faces", "normal": n }))["faces"][0]["id"].as_str().unwrap().to_string();
+    let (top, side) = (face(&mut ctx, [0, 0, 1]), face(&mut ctx, [1, 0, 0]));
+    let of = |ctx: &mut Ctx, kind: &str, ids: &[&str]| call(ctx, "query_entities", json!({ "kind": kind, "of": ids }))[kind].as_array().unwrap().clone();
+    // The top: four sides and the hole's circle; its neighbours: the four sides and the bore.
+    let edges = of(&mut ctx, "edges", &[&top]);
+    assert_eq!(edges.len(), 5, "{edges:?}");
+    assert!(edges.iter().all(|e| (num(&e["midpoint"][2]) - 20.0).abs() < 1e-9));
+    assert_eq!(of(&mut ctx, "faces", &[&top]).len(), 5);
+    // Top and +X side: their one common edge, at x 40, z 20, whose faces are those two.
+    let common = of(&mut ctx, "edges", &[&top, &side]);
+    assert_eq!(common.len(), 1, "{common:?}");
+    assert!((num(&common[0]["midpoint"][0]) - 40.0).abs() < 1e-9 && (num(&common[0]["midpoint"][2]) - 20.0).abs() < 1e-9);
+    let edge = common[0]["id"].as_str().unwrap().to_string();
+    let mut faces: Vec<String> = of(&mut ctx, "faces", &[&edge]).iter().map(|f| f["id"].as_str().unwrap().to_string()).collect();
+    faces.sort();
+    let mut want = vec![top.clone(), side.clone()];
+    want.sort();
+    assert_eq!(faces, want);
+    // A corner: three edges, three faces; the common edge's two ends.
+    let corner = call(&mut ctx, "query_entities", json!({ "kind": "vertices", "at": [[40, 20, 20]] }))["vertices"][0]["id"].as_str().unwrap().to_string();
+    assert_eq!((of(&mut ctx, "edges", &[&corner]).len(), of(&mut ctx, "faces", &[&corner]).len()), (3, 3));
+    assert_eq!(of(&mut ctx, "vertices", &[&edge]).len(), 2);
+    let e = try_call(&mut ctx, "query_entities", json!({ "kind": "edges", "of": ["Part 1"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("of[0]"), "{e:?}");
+}
+
 /// Parameters the dialog hides with the given values are ignored, as in the
 /// dialog, and the reply says so (qa AGENT-HIDDEN-PARAMS-SILENT: an offset
 /// given with a Blind end was dropped without a word).

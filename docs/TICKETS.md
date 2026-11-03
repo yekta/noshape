@@ -3126,3 +3126,22 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   region (and so the extruded part) looks like it takes the two lines as one edge. Asked live to confirm the edge
   cases in a scratch sketch (REQUESTS 11-03 13:30). Models in /root/parity/models (NOSHAPE_PARITY_ONLY=<name>);
   rebuilt documents in /root/dx-scratch/pmdocs/ex/. (dx 2026-11-03)
+  The same with regions: motor-mount-jack's Extrude 2 (Remove, qSketchRegion(…, true)) cuts both halves of an
+  ellipse (major 22.5 mm) that a line along its major axis splits; live's hole wall is one face (the tube after it:
+  6/8/0), ours two (7/12/4: the wall split at the line's ends). So: two regions extruded together are one, and a
+  curve their union leaves split only where nothing else bounds it is one edge again.
+- [ ] P1 EXTRUDE-SURFACE-CURVES (core; dx's parity suite 11-03, cf-curve-pattern-normal) a surface Extrude of sketch
+  curves (bodyType SURFACE, `surfaceEntities`) builds only lines, arcs and circles (extrude.rs `curve_to_segment`;
+  a spline, ellipse or conic is skipped, and with nothing else selected it fails "Select sketch curves to extrude.")
+  and only Blind along the normal: `surface()` reads `depth` alone, so Up to (face, part, vertex, next), Symmetric,
+  Second end position, draft and the offset are ignored. Live: cf-curve-pattern-normal's Extrude 2 extrudes Sketch
+  2's fit spline (its wire edges, construction filtered) Up to body into a surface; ours errs, so its later Curve
+  Pattern Normal has nothing to follow. Model /root/parity/models/cf-curve-pattern-normal
+  (NOSHAPE_PARITY_ONLY=cf-curve-pattern-normal). (dx 2026-11-03)
+- [ ] P2 FILLET-OVERFLOW-BULGE (core; dx's parity suite 11-03, knob-jason) knob-jason's Fillet 1 (two edges JPC / JUK
+  with tangent propagation, r 2.5 mm, "Allow edge overflow" on) has live's faces / edges / vertices (45/92/48) but
+  live's part then reaches past the block it rounds: box x ±30.1455, z −10.1568 mm where the block ends at ±30 / −10
+  (Fillet 2 later trims it back to ±29.99), volume 26981.111 mm³; ours stays inside the block, 26977.368 mm³ (−3.7,
+  outside live's band ±2). The overflow face live makes where the rolling ball runs off an edge bulges out; ours
+  doesn't. Model /root/parity/models/knob-jason (NOSHAPE_PARITY_ONLY=knob-jason); rebuilt document
+  /root/dx-scratch/tickets/knob-jason.noshape. (dx 2026-11-03)
