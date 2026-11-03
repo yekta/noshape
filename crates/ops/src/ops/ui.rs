@@ -25,7 +25,7 @@ pub fn ops() -> Vec<Op> {
             group: "ui",
             verb: "state",
             summary: "The document window's state: the tab shown, panels, the version viewed, compare and repair",
-            description: "What the window shows besides the model: the tab shown (`active_tab`), the version viewed (`viewing`, null: the workspace), the Tab manager (open, search), the drawings whose Sheets panel is open, compare mode (base and target) and the Repair panel. Set by the window tools (tab_activate, tab_manager, history_view, history_compare, history_repair_view, drawing_sheets_panel…); with the app open (live mode) they change its window too, and the tab shown, the 3D tabs' cameras and the Part Studios' selections are the window's own (where the user orbited, what they picked).",
+            description: "What the window shows besides the model: the tab shown (`active_tab`), the version viewed (`viewing`, null: the workspace), the Tab manager (open, search), the drawings whose Sheets panel is open, compare mode (base and target) and the Repair panel. Set by the window tools (tab_activate, tab_manager, history_view, history_compare, history_repair_view, drawing_sheets_panel…); with the app open (live mode) they change its window too, and the tab shown, the 3D tabs' cameras and the Part Studios' selections are the window's own (where the user orbited, what they picked), and `window` is what the active Part Studio shows: the focused field, the open dialog with each field's text and state, an open list or menu, the selection, the feature list and the message bar (tests/ui-parity/README.md's state).",
             fields: vec![doc_field()],
             mutates: false,
             destructive: false,
@@ -207,6 +207,8 @@ fn state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         "selection": w.selection.iter().filter(|(_, s)| !s.is_empty()).map(|(t, s)| json!({ "tab": tab_json(od, *t), "selected": s })).collect::<Vec<_>>(),
         "lists": w.lists.iter().map(|(t, l)| json!({ "tab": tab_json(od, *t), "filter": l.filter, "folders_open": l.folders_open.iter().map(|(k, v)| (k.to_string(), json!(v))).collect::<serde_json::Map<_, _>>(), "expanded": l.expanded, "expanded_mates": l.expanded_mates })).collect::<Vec<_>>(),
         "drawing_zoom": w.sheets.iter().map(|(t, sv)| json!({ "tab": tab_json(od, *t), "zoom": sv.zoom, "center": sv.center, "viewport": sv.size })).collect::<Vec<_>>(),
+        // Live mode: what the user's Part Studio shows (its open dialog and fields, lists, feature list).
+        "window": w.ui,
     })
     .into())
 }

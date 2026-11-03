@@ -97,10 +97,13 @@ fn window_snapshot_is_what_the_window_tools_see() {
     let mut snap = noshape_ops::window::WindowSnapshot { active_tab: Some(id), ..Default::default() };
     snap.cameras.insert(id, (noshape_render::Camera::default(), glam::DVec2::new(800.0, 500.0)));
     snap.selection.insert(id, vec![face.clone()]);
+    snap.ui = Some(json!({ "dialog": { "title": "Extrude 1" } }));
     ctx.doc(None).unwrap().window.sync(snap);
     let st = call(&mut ctx, "ui_state", json!({}));
     assert_eq!(st["selection"][0]["selected"], json!([face]), "{st}");
     assert_eq!(st["cameras"].as_array().map(|c| c.len()), Some(1), "{st}");
+    // The Part Studio's on-screen state as the window gave it.
+    assert_eq!(st["window"]["dialog"]["title"], "Extrude 1", "{st}");
 }
 
 #[test]

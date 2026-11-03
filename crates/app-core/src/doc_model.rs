@@ -46,8 +46,9 @@ pub struct DocModel {
     pub window_snapshot: Option<WindowSnapshotFn>,
 }
 
-/// What the window shows, read on demand (see [`DocModel::window_snapshot`]).
-pub type WindowSnapshotFn = Box<dyn Fn(&App) -> noshape_ops::window::WindowSnapshot>;
+/// What the window shows, read on demand outside the document's update (see
+/// [`DocModel::window_snapshot`]).
+pub type WindowSnapshotFn = std::rc::Rc<dyn Fn(&mut App) -> noshape_ops::window::WindowSnapshot>;
 
 #[derive(Clone, Copy)]
 struct ClientStep {

@@ -161,10 +161,29 @@ impl Workspace {
         if crate::ui_script::enabled() {
             crate::ui_script::start(window, cx);
         }
-        // Live mode: agents' calls see this window's tab, cameras and selection.
+        // Live mode: agents' calls see this window's tab, cameras, selection
+        // and, in a Part Studio, its dialog, lists and feature list.
         let me = cx.entity().downgrade();
-        this.doc.update(cx, |dm, _| dm.window_snapshot = Some(Box::new(move |cx: &App| me.upgrade().map(|w| w.read(cx).window_snapshot(cx)).unwrap_or_default())));
+        let handle = window.window_handle();
+        this.doc.update(cx, |dm, _| {
+            dm.window_snapshot = Some(std::rc::Rc::new(move |cx: &mut App| {
+                let Some(ws) = me.upgrade() else { return Default::default() };
+                let mut s = ws.read(cx).window_snapshot(cx);
+                s.ui = handle.update(cx, |_, window, cx| ws.read(cx).active_ui_state(window, cx)).ok().flatten();
+                s
+            }))
+        });
         this
+    }
+
+    /// The active Part Studio's on-screen state as the interaction suite
+    /// records it (tests/ui-parity/README.md): focus, dialog, open list,
+    /// selection, feature list, message bar.
+    fn active_ui_state(&self, window: &Window, cx: &App) -> Option<serde_json::Value> {
+        match self.views.get(&self.active?)? {
+            TabView::PartStudio(v) => Some(v.read(cx).ui_state(window, cx)),
+            _ => None,
+        }
     }
 
     /// What this window shows, for live-mode calls (`DocModel::window_snapshot`).

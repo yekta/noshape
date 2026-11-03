@@ -36,7 +36,11 @@ pub fn serve(doc: &Entity<DocModel>, cx: &mut App) {
         let mut ctx: Option<Ctx> = None;
         while let Ok(req) = rx.recv().await {
             let (tool, args) = (req.tool.clone(), req.args.clone());
-            match weak.update(cx, |dm, cx| run(&mut ctx, &path, dm, &tool, &args, cx)) {
+            // What the window shows now (the user may have orbited, picked or
+            // opened a dialog), read before the document is borrowed.
+            let provider = weak.read_with(cx, |dm, _| dm.window_snapshot.clone()).ok().flatten();
+            let snapshot = provider.map(|f| cx.update(|cx| f(cx)));
+            match weak.update(cx, |dm, cx| run(&mut ctx, &path, dm, &tool, &args, snapshot, cx)) {
                 Ok(r) => req.answer(r),
                 Err(_) => {
                     req.answer(Err(OpError::new("live", "the app closed the document")));
@@ -60,7 +64,7 @@ fn context(path: &Path) -> Result<Ctx, OpError> {
     Ok(ctx)
 }
 
-fn run(ctx: &mut Option<Ctx>, path: &Path, dm: &mut DocModel, tool: &str, args: &Value, cx: &mut Context<DocModel>) -> Result<OpOutput, OpError> {
+fn run(ctx: &mut Option<Ctx>, path: &Path, dm: &mut DocModel, tool: &str, args: &Value, snapshot: Option<noshape_ops::window::WindowSnapshot>, cx: &mut Context<DocModel>) -> Result<OpOutput, OpError> {
     // The document is already open here.
     let (tool, args) = match tool {
         "document_open" => ("document_info", json!({})),
@@ -76,8 +80,7 @@ fn run(ctx: &mut Option<Ctx>, path: &Path, dm: &mut DocModel, tool: &str, args: 
     // before any other edit.
     dm.flush_pending(cx);
     let od = ctx.get_mut(path).expect("adopted");
-    // What the window shows now (the user may have orbited or picked).
-    if let Some(snapshot) = dm.window_snapshot.as_ref().map(|f| f(cx)) {
+    if let Some(snapshot) = snapshot {
         od.window.sync(snapshot);
     }
     std::mem::swap(&mut od.session, &mut dm.session);

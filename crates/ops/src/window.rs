@@ -242,6 +242,8 @@ pub struct WindowState {
     pub selection: BTreeMap<TabId, Vec<String>>,
     /// Each tab's list state (ui_list).
     pub lists: BTreeMap<TabId, ListState>,
+    /// Live mode: the active Part Studio's on-screen state (WindowSnapshot::ui).
+    pub ui: Option<serde_json::Value>,
 }
 
 /// What the open window shows (live mode): read before each call, so the
@@ -253,6 +255,9 @@ pub struct WindowSnapshot {
     pub cameras: BTreeMap<TabId, (Camera, DVec2)>,
     /// Drawings' zoom.
     pub sheets: BTreeMap<TabId, SheetView>,
+    /// The active Part Studio's on-screen state (the interaction suite's
+    /// recorded state: focus, dialog, open list, selection, feature list).
+    pub ui: Option<serde_json::Value>,
     /// Selections: a Part Studio's entity ids, an Assembly's `inst:` ids, a
     /// drawing's `view:` / `annotation:` / `table:` / `break:` / `sketch:` /
     /// `hatch:` / `image:` ids.
@@ -274,6 +279,7 @@ impl WindowState {
         }
         self.sheets.extend(s.sheets);
         self.selection.extend(s.selection);
+        self.ui = s.ui;
     }
 
     /// What `r` does to the window.
