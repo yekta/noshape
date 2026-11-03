@@ -26,8 +26,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CAUSES = {}
 KEYS = ["focus", "dialog", "list", "selection", "features", "parts", "message", "tooltip"]
-# Added later (README "undo", "sketch"): compared once live's recording has them.
-LATER_KEYS = ["undo", "sketch"]
+# Added later (README "undo", "sketch", "assembly"): compared once live's recording has them.
+LATER_KEYS = ["undo", "sketch", "assembly"]
 
 
 def run_one(app, scenario, out, display, timeout):
@@ -166,6 +166,21 @@ def drawn_sizes(a, b):
                 y["value"] = x["value"]
 
 
+def placed_alike(a, b):
+    """An instance's transform after a drag comes from where the pointer landed: within 0.5 mm and 0.002 (rotation
+    entries) ours reads as live's (README "Comparison")."""
+    ia = ((a or {}).get("assembly") or {}).get("instances")
+    ib = ((b or {}).get("assembly") or {}).get("instances")
+    if not (isinstance(ia, list) and isinstance(ib, list)):
+        return
+    for x, y in zip(ia, ib):
+        ta, tb = x.get("transform"), y.get("transform")
+        if isinstance(ta, list) and isinstance(tb, list) and len(ta) == len(tb) == 16:
+            tol = [0.5 if k in (3, 7, 11) else 0.002 for k in range(16)]
+            if all(isinstance(u, (int, float)) and isinstance(w, (int, float)) and abs(u - w) <= t for u, w, t in zip(ta, tb, tol)):
+                y["transform"] = ta
+
+
 def compare(live, ours):
     """(matched steps, total steps, first difference or None)."""
     pairs = [("start", live.get("start"), ours.get("start"))]
@@ -180,6 +195,7 @@ def compare(live, ours):
         a = {k: (a or {}).get(k) for k in keys}
         b = json.loads(json.dumps({k: (b or {}).get(k) for k in keys}))
         drawn_sizes(a, b)
+        placed_alike(a, b)
         d = first_difference(a, b)
         if d is None:
             matched += 1
