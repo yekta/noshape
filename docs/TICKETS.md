@@ -343,7 +343,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   its curves and points (shared corners): a rectangle 1 / 4 / 4. Std filters by qBodyType(…, WIRE) where it matters
   (Fill, Boundary, Rib); custom features counting a sketch's edges or vertices, and a Hole on qCreatedBy(sketch,
   VERTEX) (live fails it when the face's corners are imprinted), differ. Host: query.rs Ent::SketchBody's expansion,
-  evaluate.rs for the new edges and vertices.
+  evaluate.rs for the new edges and vertices. core 11-03 09:20, plan (not started: a refactor of the host's sketch
+  model, after the P0s): Ent::SketchWire(s, curve) and SketchPointBody(s, point) bodies, SketchVertex carrying its
+  curve (a corner is two vertices), Ent::SketchSheet(s) owning the regions with SketchSheetEdge / SketchSheetVertex
+  from the regions' merged boundaries (rings without vertices); then every place that takes Ent::SketchBody as a
+  body (opDeleteBodies, transforms, patterns, Booleans, qEverything) handles the new bodies.
 - [x] (core 11-03 07:45: a blend's new B-spline faces that are planes, cylinders, cones, spheres or tori within 1e-5 of the part are rebuilt on that surface, kept when the solid stays valid and its volume the same (features.cpp analytic_blend_faces; ≤ 0.1 ms a blend on live-30-features): the Spur Gear's root fillets are cylinders as live (defaults 100 / changed 121 cylinders, no B-splines; T1 kernel_robustness::a_fillet_between_extruded_faces_is_a_cylinder); the blend corpus as recorded) P2 FILLET-PRISMATIC-CYLINDER (core 11-03, live REST on live 1830's gears) a constant fillet between two faces
   extruded the same way (the Spur Gear's root fillets: the root cylinder and an extruded involute spline) is a
   cylinder in live (qGeometry CYLINDER, evSurfaceDefinition radius 0.378848 / 0.166393 mm); ours an OCCT B-spline
