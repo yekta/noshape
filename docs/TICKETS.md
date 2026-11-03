@@ -325,6 +325,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P2 CUT-CLOSED-EDGES-SPLIT (core / bool; dx's parity suite 11-03) closed edges a cut makes come out in pieces
+  with extra vertices: bushing2-0-joshua Extrude 2 (circle r5 at the origin on Top, Remove Through all, into a tube
+  r37.5 / r25 × 25 mm symmetric on Front): live 5/6/0 faces/edges/vertices (each loop of the hole one closed edge),
+  ours 5/10/6 (the loops on both cylinders in 2–3 B-spline pieces, e.g. 7.86 + 7.86 mm); clamp-abhil Hole 2: the
+  hole's circle on the 0.9 mm plate's top is two arcs (7.07 + 2.36 mm), live one circle (live 10/22/12, ours
+  10/23/14); pipeflange-steven Extrude 3 likewise (live 24/44/16, ours 24/46/20). Volumes and areas equal. Models in
+  /root/parity/models (`parity_models`, NOSHAPE_PARITY_ONLY=<name>).
+- [ ] P2 FILLET-SPLIT-EDGE-FACES (core; dx's parity suite 11-03) a Fillet of edges a groove cut in two makes one face
+  per piece and more: bracket03-mattie Fillet 1 (r 3 mm, tangent propagation, four 7 mm corner edges, each beside
+  its other half across a 6 mm groove; Onshape's query keeps both halves): live 22/60/40 faces/edges/vertices, one
+  fillet face per corner spanning z −10…10 (64.89 / 73.15 mm²); ours 34/88/56. Volume equal (26334.64 mm³), area
+  9352.88 mm² vs live 9351.62.
 - [x] (core 11-03 04:40: OCCT's blend in metres is kept whenever it is valid, as before eca0da09, and its new tolerances are set to what they need only where its corners are where they should be (within 1e-5 of the part's size; elsewhere as OCCT left them): a blend at the working scale had other faces and moved later features' references (cli-fillet2-segv's Sketch 3 lost its plane), and tighter edges at off corners changed later operations (the askew head bolt's 16th face); bop-pairs-cli-segv-152 and cli-fillet2-segv regenerate as on bad1de8e (87828.610 / 43411.104 mm³), shell-hang's Shell 5 still builds; the blend corpus is as recorded before 11-03) P1 BLEND-TOL-REGEN-CHANGES (core; **new on main since v0.4.22, from eca0da09** "OCCT's blends in metres give what they
   make the tolerances it needs") saved documents regenerate differently, and features that built before now fail: the 44
   ticket documents (qa-scratch/cli/tixvol-gbad1.out vs tixvol-ge89c78de.out, bin = green bad1de8e vs e89c78de; **the
@@ -1437,6 +1449,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P2 IN-FEATURE-MATE-CONNECTOR (psui + core; dx's parity suite 11-03) Onshape's fields that take mate connectors
+  (Hole's "Sketch points to place holes", …) can make a mate connector inside the feature: features.json stores it in
+  the feature's `subFeatures` (a mateConnector, here "On entity", origin Extrude 3's cap face / edge centre) and the
+  field names it by qCreatedBy(subFeature, BODY, MATE_CONNECTOR) (clamp-abhil Holes 2 and 3). Ours has no mate
+  connector inside a feature (the parity translator builds them as Mate connector features before the Hole). Check
+  live's dialog for the icon and its panel before building it.
 - [x] verified db0aedd0 (qa 11-03 03:35: its scenario matches live's recording step for step, psui's driver on green db0aedd0) P3 EYE-CLICK-SELECTS-ROW (psui) clicking a feature row's eye (show / hide) also selects the row in ours: scenario
   feature-row-hide-sketch-eye (the box, click Sketch 1's eye): live's recording (/root/parity/ui/live) selection count 0,
   Sketch 1 shown, not selected; ours (green 2723f7fb, qa-scratch/uip-ours) selection 1 (FEATURE Sketch 1), the row selected.
@@ -2039,6 +2057,21 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
+- [ ] P1 SKETCH-FACE-IMPRINT (skasm + core; dx's parity suite 11-03) a sketch on a part face imprints in Onshape (unless
+  Disable imprinting): its curves split the face, and the pieces bounded partly by the face's own edges are regions to
+  pick. Ours: only closed loops of sketch curves are regions (parity/sketch.md 1.14 is ✅ for the checkbox only).
+  Live: clamp-hms "rectangle hump" (circles r31 / r18 and a line across them, on the top face of "extrude main
+  rectangle"): Extrude 2 picks 5 regions, some bounded by a circle and the face's edges (Onshape's region queries
+  name the cap edges they INTERSECT); after it live has 10/24/16 faces/edges/vertices, 145345.65 mm³.
+  untitled-document-chris Sketch 2 (one 15 mm line across a face): Extrude 2 Remove picks the face piece on one side
+  of it. Ours: no such region, "Select face or sketch region to extrude.". Models in /root/parity/models (run
+  `parity_models` with NOSHAPE_PARITY_ONLY=clamp-hms, docs/PARITY-SUITES.md).
+- [ ] P2 EXTRUDE-OVERLAP-LINES-FACES (skasm + core; dx's parity suite 11-03) sketch lines lying over a profile's edge
+  split its side face: bracket120-datenkrake Extrude 1 (an L profile whose bottom edge at y = 0 is overlapped by
+  short lines and a small rectangle's edge): live 10/24/16 faces/edges/vertices, ours 14/36/24, the bottom side in
+  5 faces. Repro without live: rectangle (0,0)–(100,50) on Top plus a line (40,0)–(60,0), Extrude the region 10 mm →
+  ours 8/18/12 (a box should be 6/12/8); sketch_get's region boundary lists the rectangle's 4 lines only, the split
+  comes from the overlapping line's end points.
 - [x] P2 SNAP-INSERT-FACE (skasm 11-01, assembly.md I14; also v0.4.16, not new; **click fixed 11-01**: the press in snap mode placed nothing (tool events, no Click) and started snap mode's own drag; now it places with the Fastened mate, as live 1704. **Left:** live snaps a hovered face to its centroid connector (ours: the nearest inference point, e.g. an edge midpoint), and live's result is 180° about X with the explicit bottom-circle connector's Z out of the pin (−Z), ours 180° about Y: compare the circle-edge connector frame with live's evMateConnector (origin (70,10,0), Z (0,0,−1), X (1,0,0))). Found: the Part Studio Mate connector feature's CENTER on a circular edge (refgeom.rs `edge_csys`) takes the circle's own axis and x direction: ours Z (0,0,+1), X (−1,0,0) on the pin's bottom (also v0.4.16); live Z out along the planar face's normal, X (1,0,0). The assembly's implicit connectors already use the face normal (eval.rs `unaligned`, live R1). **Fixed 11-01** with live 1708's rule (Z out through the bounded planar face, X the sketch x; T features_b::mate_connectors_on_circular_edges_face_out_of_the_material). **Done 11-01:** the snap insert and its Fastened mate keep the frames coincident (flip_primary true), as live 1704: the pin at T (−50, 20, 10), 180° about X, its connector on the face centroid (20, 10, 10) — GUI ui/i14o.noshape Snap mode on, Insert › a pin with an
   explicit mate connector on its bottom circle, hover the block's plain top face: the pin is placed with its connector on
   the face's connector, Z aligned, so it hangs inside the opaque block (only its bottom face shows, amber); a click

@@ -73,6 +73,28 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   unpacker change; parity_models prints a "SCORE.md row: | … |" line to paste. drawing.md TB25 verified by tests;
   Insert view shows "Show annotations from model" only for a part (live captures; request withdrawn). Assembly
   layout proposed to live (REQUESTS 11-03 02:15), to build the assembly translator once confirmed.
+- 11-03 05:40 LIVE'S CORPUS: /root/parity/models (live's fetch; 18 documents, 11 with live.jsonl, the others
+  INCOMPLETE (REST 429 at 04:23) or SKIPPED, not scored): **4/11 documents match to the end, 51/78 features**
+  (flange-josh, flange-walter, knob-tim, mounting-plate-giana). First score row for qa (SCORE.md):
+  `| 2026-11-03 | 22966caa | 4/11 | 51/78 | – | 2× SKETCH-FACE-IMPRINT (clamp-hms, untitled-document-chris);
+  2× CUT-CLOSED-EDGES-SPLIT (bushing2, clamp-abhil; pipeflange too); 1× EXTRUDE-OVERLAP-LINES-FACES (bracket120);
+  1× FILLET-SPLIT-EDGE-FACES (bracket03) |` (tickets filed 11-03 in skasm / core / psui sections, with
+  IN-FEATURE-MATE-CONNECTOR). Every remaining first difference is one of those tickets.
+  Translator fixes on the way (all landed): Onshape's constraints no longer move a sketch (arc ends mapped by
+  position: ours runs counter-clockwise; a centre-point rectangle's MIDPOINT takes the point last; an angle's
+  quadrant and a circle distance's side as Onshape solved them; an arc whose end parameter wraps); a sketch whose
+  constraints still move it is undone to the edit before them and the first mover is named; filterInnerLoops drops
+  regions inside another's holes; in-feature mate connectors (subFeatures) built before their feature; pre-V2
+  Holes and old SYMMETRIC Extrudes read; a swept edge a cut split resolves to every piece; driven dimensions stay
+  driven. Agent API: sketch_dimension's `label` picks an angle's quadrant. Core's hole.rs: no "Parameters have
+  been overridden" for a pre-V2 Hole (std checks the table only if isV2).
+  Still the translator's (no ticket): dimensions / constraints to external (model) geometry are left to the solved
+  geometry; PROJECTED / OFFSET / CIRCULAR_PATTERN sketch constraints have no counterpart; the in-feature mate
+  connector's "On entity" CAP_EDGE origin isn't found (clamp-abhil Holes 2 / 3 placed from live's bodies instead).
+  Next: rerun when live refetches the 429'd documents (/root/parity/models/*/INCOMPLETE.txt); to run: rsync
+  /root/parity/models/ to vibe5:agents/dx/live-models/, then `tools/tiers/rb.sh env
+  NOSHAPE_PARITY_MODELS=/home/ngyekta/agents/dx/live-models cargo test -q -p noshape-ops --test all
+  parity::parity_models -- --ignored --nocapture`; our documents stay in vibe5:~/tmp/noshape-parity-<pid>/.
 - 11-03 04:30 FIRST REAL RUN (REST open 04:13): /root/parity/models-dx (dx mbd 1721, live hole row, live pattern
   holes; fetched by pm-rollbacks.js + pm-features.sh): 2/3 documents match to the end, 20/21 features. Fixed on the
   way: missing parameters take the feature's defaults (REST-made features store few; a missing defaultScope is Merge
