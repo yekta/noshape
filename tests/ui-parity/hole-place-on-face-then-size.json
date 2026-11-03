@@ -28,7 +28,7 @@
   {
    "do": "click",
    "on": {
-    "field": "Hole diameter"
+    "field": "Diameter"
    }
   },
   {

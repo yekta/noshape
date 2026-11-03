@@ -8,7 +8,8 @@
   {
    "do": "click",
    "on": {
-    "tool": "Circular pattern"
+    "tool": "Linear pattern",
+    "menu": "Circular pattern"
    }
   },
   {

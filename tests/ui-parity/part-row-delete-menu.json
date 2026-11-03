@@ -14,7 +14,7 @@
   {
    "do": "click",
    "on": {
-    "menu": "Delete"
+    "menu": "Delete…"
    }
   },
   {

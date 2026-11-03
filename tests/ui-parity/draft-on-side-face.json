@@ -24,7 +24,7 @@
   {
    "do": "click",
    "on": {
-    "field": "Faces to draft"
+    "field": "Entities to draft"
    }
   },
   {
