@@ -14,7 +14,10 @@ travel; −y 17.57°, front view 9.13°. 13:30: rule found and queued (1ff7b433)
 whose sphere passes through the grabbed point's screen place at half its depth (R² = p0² + (d/2)²), the pointer on
 its rim beyond reach (`Prepared::ball_drag`, only a part whose sole mate is a Ball to fixed geometry); all six within
 0.15° (the rest is live's pixel rounding). Drag probes T2 7/14. Still off: d1 / d5 (Revolute, 1.2°), d4 / d7 (C
-through a chain), d8: maybe the same arcball restricted to the free axis; try it on d1 next. Older state follows.
+through a chain), d8. 16:59: these are live's pointer landing, not a rule: each grab point is 5 mm from its
+axis, so 0.1 mm (under live's 0.17 mm/px) turns the part 1.15° (d5's pure +x drag, 0° by any rule, turned −1.15° in
+live; d4's +x drag −2.11°); d8 (40 mm lever) is 0.12° off; live's middle link stays in d4 / d7 as ours. Assembly
+drag probes done. Older state follows.
 
 ## 2026-11-03 04:20 UTC
 Since 01:30, landed: assembly drag from the drag's start (`drag_substeps`), s548 slide, batch 9 / 10 / probes 13 / asm
