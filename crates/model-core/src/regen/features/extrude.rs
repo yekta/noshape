@@ -279,8 +279,10 @@ fn extrude_profile(ev: &EvalCtx, p: &Profile, dir: DVec3) -> FResult<NamedShape>
             return Ok(named(one_side(&profile, dir, end, draft)?));
         }
         let bound2 = ev.enum_("secondDirectionBound").to_string();
-        let sign = if ev.bool("secondDirectionOppositeDirection") { -1.0 } else { 1.0 };
-        let d2 = dir * sign;
+        // std: the second side runs away from the first only when its flip
+        // differs from the first's (both flips are against the normal).
+        let away = ev.bool("secondDirectionOppositeDirection") != ev.bool("oppositeDirection");
+        let d2 = if away { -dir } else { dir };
         let end2 = end_for(ev, &bound2, "secondDirectionDepth", "secondDirectionBoundEntityFace", "secondDirectionBoundEntityBody", "secondDirectionBoundEntityVertex", "hasSecondDirectionOffset", "secondDirectionOffsetDistance", "secondDirectionOffsetOppositeDirection", d2)?;
         // std: the second side has only its own draft (unticked: away from
         // the profile plane, like the first).

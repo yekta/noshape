@@ -684,6 +684,32 @@ fn extrude_second_direction_up_to_next() {
     assert!(near(nb.shape.volume().unwrap(), 1e-4 * 0.025, 1e-6), "{}", nb.shape.volume().unwrap());
 }
 
+/// std extrude: both flips are against the sketch normal, so a flipped
+/// first direction with a flipped second one extrudes the slab between the
+/// two depths on one side (live: cf-sheet-metal-model-plus Extrude 1).
+#[test]
+fn extrude_second_direction_flip_is_against_the_normal() {
+    let mut t = T::new();
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), rect(0.005, 0.005, 0.015, 0.015));
+    let r = t.regions(s)[0].clone();
+    let x = t.extrude(r, "50 mm", "NEW");
+    t.set(x, "oppositeDirection", b(true));
+    t.set(x, "hasSecondDirection", b(true));
+    t.set(x, "secondDirectionDepth", e("25 mm"));
+    t.set(x, "secondDirectionOppositeDirection", b(true));
+    let z = |t: &mut T| {
+        let res = t.ok();
+        let nb = res.context.bodies.iter().find(|b| b.id.feature == x).unwrap();
+        let bb = nb.shape.bounding_box(true).unwrap();
+        (bb.min.z, bb.max.z, nb.shape.volume().unwrap())
+    };
+    let (lo, hi, v) = z(&mut t);
+    assert!((lo + 0.05).abs() < 1e-7 && (hi + 0.025).abs() < 1e-7 && near(v, 1e-4 * 0.025, 1e-6), "{lo} {hi} {v}");
+    t.set(x, "secondDirectionOppositeDirection", b(false));
+    let (lo, hi, v) = z(&mut t);
+    assert!((lo + 0.05).abs() < 1e-7 && (hi - 0.025).abs() < 1e-7 && near(v, 1e-4 * 0.075, 1e-6), "{lo} {hi} {v}");
+}
+
 #[test]
 fn revolve_up_to_vertex_face_and_next() {
     let quarter = 0.25 * PI * (0.02f64.powi(2) - 0.01f64.powi(2)) * 0.01;

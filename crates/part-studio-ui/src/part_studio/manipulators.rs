@@ -381,8 +381,8 @@ impl PartStudioView {
         if !p.bool("hasSecondDirection") || p.bool("symmetric") {
             return None;
         }
-        // regen extrude: the second side runs along the first's direction, reversed by its own flip.
-        let dir = if p.bool("secondDirectionOppositeDirection") { -first.dir } else { first.dir };
+        // regen extrude: the second side runs away from the first when the two flips differ.
+        let dir = if p.bool("secondDirectionOppositeDirection") != p.bool("oppositeDirection") { -first.dir } else { first.dir };
         // Other end types: std's SECONDARY flip arrow at the profile.
         if !p.is("secondDirectionBound", "BLIND") {
             return Some(Arrow { base: first.base, dir, length: 0.0, param: "", flip: Some("secondDirectionOppositeDirection"), secondary: true });
