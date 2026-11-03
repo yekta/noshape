@@ -1,6 +1,6 @@
 {
  "scenario": "sketch-line-from-midpoint",
- "recorded": "2026-11-03T08:30:43.899Z",
+ "recorded": "2026-11-03T21:59:55.252Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "5e87c8710da754a8b2872cd1",
+  "element": "bf2e69cac2d1cf522dab2e5d",
   "start": "empty",
   "startElement": "16c3ef729d456774c1da81b8"
  },
@@ -139,7 +139,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 47898
+   "t": 36462
   },
   {
    "step": 2,
@@ -152,7 +152,7 @@
    "ok": true,
    "at": [
     1083,
-    617
+    568
    ],
    "state": {
     "focus": {
@@ -245,7 +245,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 57692
+   "t": 43631
   },
   {
    "step": 3,
@@ -345,7 +345,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 60848
+   "t": 46184
   },
   {
    "step": 4,
@@ -359,9 +359,12 @@
     }
    },
    "ok": true,
+   "hover": [
+    "IB"
+   ],
    "at": [
     1082,
-    562
+    519
    ],
    "state": {
     "focus": {
@@ -453,7 +456,7 @@
      "dimensions": []
     }
    },
-   "t": 70905
+   "t": 52123
   },
   {
    "step": 5,
@@ -467,9 +470,10 @@
     }
    },
    "ok": true,
+   "hover": [],
    "at": [
-    1251,
-    567
+    1236,
+    524
    ],
    "state": {
     "focus": {
@@ -576,7 +580,7 @@
      "dimensions": []
     }
    },
-   "t": 78141
+   "t": 59545
   },
   {
    "step": 6,
@@ -690,7 +694,7 @@
      "dimensions": []
     }
    },
-   "t": 80324
+   "t": 62849
   },
   {
    "step": 7,
@@ -804,7 +808,7 @@
      "dimensions": []
     }
    },
-   "t": 82416
+   "t": 64651
   },
   {
    "step": 8,
@@ -818,9 +822,12 @@
     }
    },
    "ok": true,
+   "hover": [
+    "JFF"
+   ],
    "at": [
-    1185,
-    549
+    1176,
+    506
    ],
    "state": {
     "focus": {
@@ -927,7 +934,7 @@
      "dimensions": []
     }
    },
-   "t": 91347
+   "t": 71241
   },
   {
    "step": 9,
@@ -941,9 +948,12 @@
     }
    },
    "ok": true,
+   "hover": [
+    "JFF"
+   ],
    "at": [
-    1214,
-    524
+    1202,
+    484
    ],
    "state": {
     "focus": {
@@ -1053,7 +1063,7 @@
      "dimensions": []
     }
    },
-   "t": 98472
+   "t": 76284
   },
   {
    "step": 10,
@@ -1170,7 +1180,7 @@
      "dimensions": []
     }
    },
-   "t": 100199
+   "t": 79507
   }
  ]
 }

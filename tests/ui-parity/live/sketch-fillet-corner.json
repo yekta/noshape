@@ -1,6 +1,6 @@
 {
  "scenario": "sketch-fillet-corner",
- "recorded": "2026-11-03T16:28:46.533Z",
+ "recorded": "2026-11-03T21:44:45.566Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "435cb0410616c40741715f25",
+  "element": "8148228bcde237408b7d1d97",
   "start": "empty",
   "startElement": "16c3ef729d456774c1da81b8"
  },
@@ -139,7 +139,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 270757
+   "t": 72234
   },
   {
    "step": 2,
@@ -245,7 +245,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 324053
+   "t": 84692
   },
   {
    "step": 3,
@@ -345,7 +345,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 331645
+   "t": 88012
   },
   {
    "step": 4,
@@ -359,6 +359,9 @@
     }
    },
    "ok": true,
+   "hover": [
+    "IB"
+   ],
    "at": [
     1082,
     519
@@ -453,7 +456,7 @@
      "dimensions": []
     }
    },
-   "t": 375256
+   "t": 96090
   },
   {
    "step": 5,
@@ -467,6 +470,7 @@
     }
    },
    "ok": true,
+   "hover": [],
    "at": [
     1206,
     515
@@ -576,7 +580,7 @@
      "dimensions": []
     }
    },
-   "t": 407812
+   "t": 109910
   },
   {
    "step": 6,
@@ -690,7 +694,7 @@
      "dimensions": []
     }
    },
-   "t": 412261
+   "t": 113287
   },
   {
    "step": 7,
@@ -804,7 +808,7 @@
      "dimensions": []
     }
    },
-   "t": 417018
+   "t": 115495
   },
   {
    "step": 8,
@@ -818,6 +822,9 @@
     }
    },
    "ok": true,
+   "hover": [
+    "JFM"
+   ],
    "at": [
     1206,
     515
@@ -880,8 +887,14 @@
     ],
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": null,
+       "id": "JFM"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -890,9 +903,9 @@
        "state": "ok",
        "selected": true,
        "editing": true,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": "edited selected"
+       "cls": "related-highlight edited selected"
       }
      ],
      "rollbackAfter": "Sketch 1"
@@ -927,7 +940,7 @@
      "dimensions": []
     }
    },
-   "t": 457112
+   "t": 125421
   }
  ]
 }

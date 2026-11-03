@@ -1,6 +1,6 @@
 {
  "scenario": "sketch-line-shift-no-inference",
- "recorded": "2026-11-03T08:33:58.973Z",
+ "recorded": "2026-11-03T22:03:33.663Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "2914e52811742be095ea83be",
+  "element": "8ef20610259f1e6f944be4af",
   "start": "empty",
   "startElement": "16c3ef729d456774c1da81b8"
  },
@@ -139,7 +139,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 49574
+   "t": 38469
   },
   {
    "step": 2,
@@ -152,7 +152,7 @@
    "ok": true,
    "at": [
     1083,
-    617
+    568
    ],
    "state": {
     "focus": {
@@ -245,7 +245,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 61612
+   "t": 53857
   },
   {
    "step": 3,
@@ -345,7 +345,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 65297
+   "t": 57961
   },
   {
    "step": 4,
@@ -359,9 +359,10 @@
     }
    },
    "ok": true,
+   "hover": [],
    "at": [
-    1125,
-    564
+    1121,
+    520
    ],
    "state": {
     "focus": {
@@ -453,7 +454,7 @@
      "dimensions": []
     }
    },
-   "t": 71499
+   "t": 69134
   },
   {
    "step": 5,
@@ -468,9 +469,10 @@
     "mods": "shift"
    },
    "ok": true,
+   "hover": [],
    "at": [
-    1223,
-    591
+    1210,
+    545
    ],
    "state": {
     "focus": {
@@ -564,7 +566,7 @@
      "dimensions": []
     }
    },
-   "t": 81068
+   "t": 83074
   },
   {
    "step": 6,
@@ -665,7 +667,7 @@
      "dimensions": []
     }
    },
-   "t": 82867
+   "t": 86464
   }
  ]
 }
