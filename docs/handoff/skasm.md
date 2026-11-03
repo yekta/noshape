@@ -26,7 +26,10 @@ tangent: corner kept, as ours); w1's answer = the circle's centre kept, then eve
 the translation unexplained. w6 is our harness's: Onshape's ANGLE has clockwise / aligned / flipped and live honours
 `clockwise: false` (CCW from the first line), so a V drawn the other way round flips; real documents store the drawn
 sense. Trapezoids: y2-y4 (48/20, 40/22, 48/22) keep the top's right corner like s829, y1 (40/20 but 24 high) and the
-40/20/20 ones its left: no rule found yet. s784's T keeps its undimensioned side alone too (z1-z3): the rectangle
+40/20/20 ones its left: no rule found yet. 21:01: tabulated all 13 answered trapezoids:
+x1 (48.74/21.73→19.70, h 24.18) keeps the right corner, y4 (48/22→20, h 24) the left: near-identical shapes, and no
+ratio (top/base, h/base, leg slope or length) separates the groups: live's choice there reads as its solver's
+numerics, not a rule: s829 closed as not matchable; s784's T likewise (its controlled probes follow ours). s784's T keeps its undimensioned side alone too (z1-z3): the rectangle
 isn't the cause; its flange thickness changes too (u4 did too and kept the dimensioned side): its proportions again.
 s830 (20:4x): the rounded-corner rectangle's top (l10) is placed before its right side (tie broken by x: the
 top's anchor is further left) at its old length (shape 2), so the right side can't reach the arc and the component
