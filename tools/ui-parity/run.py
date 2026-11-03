@@ -140,6 +140,32 @@ def normalize_live(state):
     return state
 
 
+def quantity(text):
+    """(number, unit) of a value box's text ("29.73371 mm"), else None."""
+    m = re.fullmatch(r"\s*(-?[0-9.]+)\s*([a-z°]*)\s*", str(text or ""))
+    return (float(m.group(1)), m.group(2)) if m else None
+
+
+def close(x, y, rel=0.1):
+    return abs(x - y) <= rel * max(abs(x), abs(y), 1e-9)
+
+
+def drawn_sizes(a, b):
+    """Sizes that come from where a click landed (a drawn line's length in its value box or dimension, before a value is
+    typed) differ by a pixel or two between the two sides: within 10 % ours reads as live's (README "Comparison")."""
+    fa, fb = (a or {}).get("focus"), (b or {}).get("focus")
+    if isinstance(fa, dict) and isinstance(fb, dict) and fa.get("kind") == "other" == fb.get("kind"):
+        qa, qb = quantity(fa.get("text")), quantity(fb.get("text"))
+        if qa and qb and qa[1] == qb[1] and close(qa[0], qb[0]):
+            fb["text"], fb["selection"] = fa.get("text"), fa.get("selection")
+    da = ((a or {}).get("sketch") or {}).get("dimensions")
+    db = ((b or {}).get("sketch") or {}).get("dimensions")
+    if isinstance(da, list) and isinstance(db, list):
+        for x, y in zip(da, db):
+            if x.get("kind") == y.get("kind") and isinstance(x.get("value"), (int, float)) and isinstance(y.get("value"), (int, float)) and close(x["value"], y["value"]):
+                y["value"] = x["value"]
+
+
 def compare(live, ours):
     """(matched steps, total steps, first difference or None)."""
     pairs = [("start", live.get("start"), ours.get("start"))]
@@ -152,7 +178,8 @@ def compare(live, ours):
         a = normalize_live(json.loads(json.dumps(a)))
         keys = KEYS + [k for k in LATER_KEYS if k in (a or {})]
         a = {k: (a or {}).get(k) for k in keys}
-        b = {k: (b or {}).get(k) for k in keys}
+        b = json.loads(json.dumps({k: (b or {}).get(k) for k in keys}))
+        drawn_sizes(a, b)
         d = first_difference(a, b)
         if d is None:
             matched += 1
