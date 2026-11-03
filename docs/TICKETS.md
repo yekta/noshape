@@ -1448,8 +1448,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   mend them and the unify then loses 40 mm³. Each slab's own common: the offset slab's and the extrusion slab's come back
   empty (their faces lie on the part's). The other routes: quadrics stops at "a free-form face's offset folds" (the
   B-spline ramp curls at its two side edges, radius 0.085 mm within 0.25 mm of them, an edge the side planes' offsets
-  trim away anyway) and, past that, at a vertex of four faces; OCCT's offset gives an empty inner solid. Next: the
-  common without the coincident free-form faces (slabs wholly inside the part need none), or quadrics past those two.
+  trim away anyway) and, past that, at a vertex of four faces; OCCT's offset gives an empty inner solid. Slabs wholly
+  inside the part need no common, but the offset slab isn't (a vertex 10 µm+ outside) and its own common is the empty
+  one. Next: the offset slab built so its common works (or none needed), or quadrics past the curl and 4-face vertices.
 - [ ] P0 REGEN-SPEED (core 10-29 03:05: met in release on perf.yml run 40796942944 (main 34cbea98): live-30-features full regen 35 / 41 / 53 ms (macOS / Linux / Windows; budget 80, live 171), its Extrude 1 edit commit 34 / 38 / 60 ms (budget 200), big-plate regen 159 / 230 / 306 ms (live 617); qa, please re-measure the GUI commit on a release build, the 301–785 ms were a dev build at load ~30. Was 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left

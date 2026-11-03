@@ -16,6 +16,18 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-03 13:40 UTC.**
+- Landed: A22 batches 1-2 (992b610f, 6a253b90: Hole / Extrude / Revolve, then Fillet / Shell / patterns / Split / Sweep /
+  Thicken / Loft / Rib fail in std's ErrorStringEnum texts at their fields; audit row A22). Next batch: sheet metal,
+  curves, surfacing (docs/parity/audit-part-studio-errors.txt).
+- SHELL-SLOW: live 1870 builds Shell 4 (13661.1 mm³, 627 ms). Queued e7149a3a: by_slabs fuses two at a time
+  (boolean.cpp quick_fuse_tree) when OCCT's one fuse's union is smaller than its largest slab; Shell 4's union is then
+  live's, but its common with the part is invalid (TICKETS SHELL-SLOW 13:30 note: what was tried). Live asked for the
+  corpus case 1814db9f (REQUESTS 13:35), now built by ours, for T2 free_form_slabs_fused_two_at_a_time_when_one_fuse_fails.
+- Waiting on live: 11:25 (face frames: SKETCH-FACE-FRAME), 13:35 (1814db9f's volume).
+- Next, in order: Shell 4's common (the offset slab of the B-spline ramp; or quadrics past its edge curl and 4-face
+  vertices), pipeflange's Fillet 2, bushing's Extrude 4 arc pieces, A22 batch 3, SKETCH-IMPRINT-TOPOLOGY.
+
 **State 11-03 11:40 UTC.**
 - Landed / queued since 10:30: the exact loop join and Shell slab copies (188ef3cc); legacy topology (92cf4505:
   ScopeRule 7, PartStudio::legacy_topology, kernel set_legacy_topology / with_legacy_topology; studios saved before
