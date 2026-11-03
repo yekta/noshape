@@ -338,7 +338,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   ours 5/10/6 (the loops on both cylinders in 2–3 B-spline pieces, e.g. 7.86 + 7.86 mm); clamp-abhil Hole 2: the
   hole's circle on the 0.9 mm plate's top is two arcs (7.07 + 2.36 mm), live one circle (live 10/22/12, ours
   10/23/14); pipeflange-steven Extrude 3 likewise (live 24/44/16, ours 24/46/20). Volumes and areas equal. Models in
-  /root/parity/models (`parity_models`, NOSHAPE_PARITY_ONLY=<name>).
+  /root/parity/models (`parity_models`, NOSHAPE_PARITY_ONLY=<name>). The same with NOSHAPE_BOOL_RUST=0 (OCCT's cut).
+  What it changes beyond counts (dx 11-03): a click picks one piece where live picks the loop; a Fillet (r 1,
+  tangent propagation on) of one piece still rounds the whole loop (−8.5 mm³) but as 3 faces (5 → 8 faces), live 1.
 - [ ] P2 FILLET-SPLIT-EDGE-FACES (core; dx's parity suite 11-03) a Fillet of edges a groove cut in two makes one face
   per piece and more: bracket03-mattie Fillet 1 (r 3 mm, tangent propagation, four 7 mm corner edges, each beside
   its other half across a 6 mm groove; Onshape's query keeps both halves): live 22/60/40 faces/edges/vertices, one

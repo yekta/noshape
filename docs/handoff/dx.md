@@ -73,6 +73,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   unpacker change; parity_models prints a "SCORE.md row: | … |" line to paste. drawing.md TB25 verified by tests;
   Insert view shows "Show annotations from model" only for a part (live captures; request withdrawn). Assembly
   layout proposed to live (REQUESTS 11-03 02:15), to build the assembly translator once confirmed.
+- 11-03 06:20: live mode checked on green 19f17a18: the app open on a document, `noshape mcp` calls on the same
+  path (document_open, sketch, extrude) show in the window at once (3–13 ms per edit), Ctrl+Z in the window undoes
+  the extrude and the CLI then lists only Sketch 1. Live requests filed: 1844+ IN-FEATURE-MATE-CONNECTOR UI, one
+  small assembly for the assembly translator (live's corpus, agreed layout of 1842).
 - 11-03 06:00: translator: constraints / dimensions to model geometry now reference our entity (as Use; a circle
   distance to model geometry takes the side that keeps the sketch still), sketch wire-edge queries (Sheet metal
   model's sketchCurves), Variable lookup tables, older ellipses; tests/parity-models/index.json lists live's 11
