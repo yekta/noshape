@@ -6,7 +6,7 @@ causes of difference, each with its ticket.
 
 | date | green | models | features | scenarios | biggest causes (tickets) |
 |---|---|---|---|---|---|
-| 2026-11-03 | 79ebadef (dx 14:58) | 18/50 | 232/398 (custom 4/49) | – | 9× live's UI fetch without face / edge / sketch geometry or with lagging lines (asked, 1892 / 13:20 updates; refetching); 4× SKETCH-COLLINEAR-EDGES-MERGE (core); 4× custom studios not compiling or at another version (FS-OLD-STD-COMPAT, unfetched imports and versions); 4× fillets (FILLET-PROPAGATION-VOLUME, FILLET-OVERLAP-FAIL, FILLET-KNOB-JASON-VOLUME, FILLET-MEETING-FILLETS-ONE-FACE); 2× SKETCH-FACE-FRAME; also CUT-CLOSED-EDGES-SPLIT, MIRROR-FEATURE-UP-TO, EXTRUDE-SURFACE-CURVES, FILLET-BLEND-SPLIT. Speed: 10 of 41 slower than live (PARITY-SPEED: cf-hose-routing ×236, knob-jason ×29, cf-planetary-gears ×23). Assemblies 8/8, mates 11/11 |
+| 2026-11-03 | 922a4868 + dx translator (dx 16:55) | 24/53 | 285/461 (custom 6/83) | – | 6× custom studios not compiling (3 import studios live can't fetch: 403, REQUESTS 1885; FS-OLD-STD-COMPAT); 5× fillets (FILLET-PROPAGATION-VOLUME, FILLET-OVERLAP-FAIL, FILLET-KNOB-JASON-VOLUME, FILLET-MEETING-FILLETS-ONE-FACE, FILLET-BLEND-SPLIT); 3× custom features failing to run (core); 2× live's UI fetch without geometry / in-feature mate connector queries (asked, 1892 / 13:20); 1× EXTRUDE-SURFACE-CURVES, MIRROR-FEATURE-UP-TO. Speed: 9 of 44 slower than live (PARITY-SPEED: cf-hose-routing ×211, knob-jason ×29, cf-planetary-gears ×22). |
 
 qa 11-03 05:55: the scenario column counts the scenarios with a live recording at compare time (112 of 162 runs; live was
 re-recording); the evening run replaces today's numbers. Scenario differences are psui's (its runner reports its own
