@@ -94,6 +94,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
   kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
+- 11-03 17:33 drawings: the ANSI / ISO title block as live's templates (dom/tpl-geometry, samples/tpl-*.dxf and
+  .pdf): every text on live's MTEXT anchor (Anchor::TopCenter added), the grid on live's lines (round inches of
+  ANSI A's 6.075 × 1.5 in / ISO A3's 8.5 × 2 in block; REV. column was 3 mm off), projection symbol and surface
+  finish mark scaled with the block (ANSI B+ were too small), ANSI mm without the inch tolerances, an unset
+  revision's "-" hidden in PDF / images (live's PDF; DXF keeps it). Check scripts: /root/dx-scratch/tb/{cmp.py
+  (DXF MTEXT vs live), lines.py (TITLE_BLOCK lines), pdfcmp.sh (PDF word boxes)}. Left: DXF-only MTEXT details
+  (live: one MTEXT per block with ^J, the cell's width, empty MTEXTs for empty cells; ours one per line, width 10);
+  live's PDF draws text ~1.5 pt left of its DXF anchors (asked, REQUESTS 17:33).
 - 11-03 16:55 translator (runs 35–36, live's 16:04–16:29 refetches synced): a region placed by a part's box takes
   the closest within 0.1 % of the box (the UI fetch's boxes come from the tessellation: a gear's falls 0.02 mm short
   of its tips). cf-syncro-rotator 3/3, cf-transform-pattern 12/21, cf-wiring 2/2. Score **24/53, 285/461 (custom
