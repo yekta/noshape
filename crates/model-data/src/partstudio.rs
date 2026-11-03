@@ -448,6 +448,12 @@ impl PartStudio {
         self.rollback.unwrap_or(self.features.len()).min(self.features.len())
     }
 
+    /// The sketch right above a rollback bar moved up from the end (live draws it even when hidden).
+    pub fn rolled_to_sketch(&self) -> Option<FeatureId> {
+        let r = self.rollback.filter(|r| *r > 0 && *r < self.features.len())?;
+        self.features.get(r - 1).filter(|f| f.type_id == "sketch").map(|f| f.id)
+    }
+
     /// Default name for a new feature of `ty`: "Extrude 1", "Extrude 2"...
     /// (in the UI language, [`crate::default_names`]).
     pub fn next_name(&self, ty: &FeatureType) -> String {

@@ -513,10 +513,11 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
     }
 
     let t_sk = std::time::Instant::now();
+    let rolled_to = studio.rolled_to_sketch().filter(|_| opts.upto.is_none());
     for s in &ctx.sketches {
         let mut sd = sketch_display(s, opts.editing_sketch == Some(s.feature));
         let owner = ctx.sketch_copies.iter().find(|(_, c)| *c == s.feature).map_or(s.feature, |(p, _)| *p);
-        sd.hidden = studio.feature(owner).is_some_and(|f| f.hidden) || ctx.hidden_sketches.contains(&s.feature);
+        sd.hidden = studio.feature(owner).is_some_and(|f| f.hidden && rolled_to != Some(owner)) || ctx.hidden_sketches.contains(&s.feature);
         sd.color = studio.appearances.iter().rev().find(|a| a.target == crate::partstudio::AppearanceTarget::Feature(s.feature)).map(|a| a.color);
         d.sketches.push(sd);
     }

@@ -183,6 +183,22 @@ impl FeatureDialog {
                     let missing = refs.iter().any(|r| (self.missing)(r)) || (!refs.is_empty() && self.field_error(s.id).is_some());
                     fields.push(json!({ "label": label, "kind": "query", "items": items, "active": self.active_query.as_deref() == Some(s.id), "state": if missing { "error" } else { "ok" } }));
                 }
+                // An array: live reads its box's text (its label, its entries and an item array's add button).
+                ParamKind::Array { item, item_label } => {
+                    let specs = item_slice(item);
+                    let q = specs.iter().find(|p| matches!(p.kind, ParamKind::Query { .. }));
+                    let mut text = vec![crate::i18n::spec(s.label).to_string()];
+                    for (k, it) in values.array(s.id).iter().enumerate() {
+                        text.push(match s.item_template {
+                            Some(t) => self.item_label(t, it, specs, s.id, k),
+                            None => q.and_then(|q| it.query(q.id).first()).map(|r| (self.labeler)(r)).unwrap_or_default(),
+                        });
+                    }
+                    if !(s.hints.has(Hints::DRIVEN_QUERY) || s.hints.has(Hints::ALLOW_ARRAY_FOCUS)) {
+                        text.push(format!("Add {item_label}"));
+                    }
+                    fields.push(json!({ "label": label, "kind": "other", "text": text.join(" "), "state": "ok" }));
+                }
                 _ => {}
             }
         }

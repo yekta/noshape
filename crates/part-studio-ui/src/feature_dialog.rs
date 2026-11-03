@@ -250,6 +250,9 @@ pub struct FeatureDialog {
     /// The field Enter just applied: the input's change event for the last typed key can arrive after the commit
     /// rewrote the text ("15" → "15 mm") and must not open a list for it.
     just_applied: Option<String>,
+    /// The last press in the dialog came while a field held typed text not yet applied: a click on ✓ then only
+    /// applies it (live ui-parity extrude-ok-button: the dialog stays open, a second ✓ closes it).
+    press_applies_typed: bool,
     /// Open "Create variable" popup.
     create_var: Option<CreateVar>,
     /// A field outside the dialog that opened the Create variable popup (the
@@ -403,6 +406,7 @@ impl FeatureDialog {
             whole_sketches: Default::default(),
             completion: None,
             just_applied: None,
+            press_applies_typed: false,
             focus_dialog_pending: false,
             keyboard_left: false,
             create_var: None,
@@ -1414,6 +1418,19 @@ impl FeatureDialog {
         state.update(cx, |s, cx| s.select_all(window, cx));
         cx.notify();
         true
+    }
+
+    /// Applies the focused field's typed text and takes the keyboard from it (live: a click on ✓ then).
+    fn apply_typed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let focused = self.inputs.iter().find(|(_, st)| st.read(cx).focus_handle(cx).is_focused(window)).map(|(p, st)| (p.clone(), st.clone()));
+        if let Some((path, st)) = focused {
+            self.commit_number(&path, &st, window, cx);
+            self.flush_typed(cx);
+        }
+        window.focus(&self.focus, cx);
+        // Live: no control has the keyboard afterwards (ui-parity extrude-ok-button).
+        self.keyboard_left = true;
+        cx.notify();
     }
 
     /// The field's value after Enter inserted an autofill entry: committed
@@ -3832,7 +3849,13 @@ impl Render for FeatureDialog {
             .id("feature-dialog")
             // Clicks on the dialog never reach the graphics area beneath.
             .occlude()
-            .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, _, _| this.keyboard_left = false))
+            .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                this.keyboard_left = false;
+                this.press_applies_typed = this.inputs.iter().any(|(p, st)| {
+                    let st = st.read(cx);
+                    st.focus_handle(cx).is_focused(window) && this.baselines.get(p).is_some_and(|b| *b != st.value().as_ref())
+                });
+            }))
             .key_context("FeatureDialog")
             .track_focus(&self.focus)
             // Onshape feature dialog frame (§3.9): 220 px, white at 95%, no
@@ -3939,6 +3962,7 @@ impl Render for FeatureDialog {
                     // Live (psb 10-21 g): a dialog in configure mode has only ✕.
                     .when(!self.configure_mode, |d| d.child(
                         Button::new("dlg-ok")
+                            .debug_selector(|| "dialog-ok".into())
                             // Live: the ✓ / ✕ are not Tab stops.
                             .tab_stop(false)
                             .custom(
@@ -3964,8 +3988,10 @@ impl Render for FeatureDialog {
                             // any dialog (no title either).
                             // Onshape: the ✓ is disabled while the feature errors
                             // (Enter still commits it).
-                            .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
-                                if !blocked {
+                            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                if std::mem::take(&mut this.press_applies_typed) {
+                                    this.apply_typed(window, cx);
+                                } else if !blocked {
                                     cx.emit(DialogEvent::Accept { repeat: false })
                                 }
                             })),

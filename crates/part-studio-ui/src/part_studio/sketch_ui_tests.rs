@@ -574,6 +574,92 @@ fn enter_applies_then_the_next_enter_accepts(cx: &mut TestAppContext) {
     assert!(cx.update(|cx| view.read(cx).edit.is_none()), "the second Enter accepts");
 }
 
+/// Live (ui-parity extrude-ok-button, behaviours request 1849): a click on ✓ while Depth holds typed text only
+/// applies it ("20 mm"); the dialog stays and the next ✓ accepts.
+#[gpui::test]
+fn a_check_click_with_typed_text_only_applies_it(cx: &mut TestAppContext) {
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "ok-applies", Some(block));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let id = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Extrude 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Extrude dialog").dialog.clone());
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("depth", w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["2", "0"]);
+    let ok = |cx: &mut TestAppContext| {
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        let b = vcx.debug_bounds("dialog-ok").expect("the ✓");
+        vcx.simulate_click(b.center(), Modifiers::default());
+        draw(cx, window);
+    };
+    ok(cx);
+    assert!(cx.update(|cx| view.read(cx).edit.is_some()), "the dialog stays");
+    assert_eq!(dialog.update(cx, |d, cx| d.field_text("depth", cx)).as_deref(), Some("20 mm"));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    ok(cx);
+    assert!(cx.update(|cx| view.read(cx).edit.is_none()), "the second ✓ accepts");
+}
+
+/// Live (ui-parity extrude-remove-tab): Extrude opened on a part's face takes Add by itself, and that isn't an undo
+/// step (Undo off); a change after it is, and undoing it keeps Add.
+#[gpui::test]
+fn what_the_dialog_fills_in_on_opening_is_no_undo_step(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "open-no-undo");
+    view.update(cx, |v, _| v.selection = vec![top.clone()]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Extrude dialog").dialog.clone());
+    let op = |cx: &mut TestAppContext| cx.update(|cx| dialog.read(cx).feature.params.enum_("operationType").to_string());
+    wait_until(cx, window, |cx| dialog.read(cx).feature.params.enum_("operationType") == "ADD" && !view.read(cx).ui_busy());
+    assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (false, false), "nothing to undo on opening");
+    cx.update(|cx| dialog.update(cx, |d, cx| d.set_value("symmetric", noshape_model::ParamValue::Bool(true), cx)));
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (true, false), "a change is a step");
+    keys(cx, window, &["ctrl-z"]);
+    assert_eq!(op(cx), "ADD", "undo goes back to the opened dialog");
+    assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (false, true));
+}
+
+/// Live (behaviours request 1839): Enter on a selected feature row opens nothing, and ↑ after the row click doesn't
+/// move the rollback bar; once the bar is clicked ↑ steps it.
+#[gpui::test]
+fn row_keys_leave_the_feature_and_the_bar(cx: &mut TestAppContext) {
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "row-keys", Some(block));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let id = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Extrude 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.click_feature(id, false, cx);
+        w.focus(&v.ui.list_focus, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    keys(cx, window, &["enter", "up"]);
+    let rollback = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).unwrap().rollback);
+    assert!(cx.update(|cx| view.read(cx).edit.is_none()), "no dialog");
+    assert_eq!(rollback(cx), None, "the bar stays at the end");
+    // A click on the bar (its on_click).
+    view.update(cx, |v, _| v.ui.rollback_keyboard = Some(v.selected_features.clone()));
+    keys(cx, window, &["up"]);
+    assert_eq!(rollback(cx), Some(1), "above Extrude 1");
+    // The sketch the bar now sits under shows, though it is hidden (live: behaviours request 1844).
+    let sketch = cx.update(|cx| view.read(cx).studio(cx).unwrap().features[0].clone());
+    assert!(sketch.hidden, "the extruded sketch starts hidden");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.sketches.iter().any(|s| s.feature == sketch.id));
+    assert!(cx.update(|cx| view.read(cx).display.sketches.iter().all(|s| !s.hidden)), "drawn");
+    let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+    assert_eq!(state["features"]["rows"][0]["hidden"], false, "{}", state["features"]);
+}
+
 /// Live (ui-parity extrude-depth-variable-escape, 11-03): Esc with the autofill list open closes the list only;
 /// `#wall` and the focus stay in Depth (ours reverted the field and left it).
 #[gpui::test]

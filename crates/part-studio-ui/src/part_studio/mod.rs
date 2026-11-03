@@ -230,18 +230,24 @@ pub struct DraftHistory {
     last: Feature,
     /// A viewport gesture is in progress: its steps become one undo entry.
     dragging: bool,
+    /// The next change is editing logic following the last step (live: part of it, not a step of its own).
+    absorb: bool,
 }
 
 impl DraftHistory {
     const LIMIT: usize = 200;
 
     pub fn new(f: &Feature) -> Self {
-        Self { undo: Vec::new(), redo: Vec::new(), last: f.clone(), dragging: false }
+        Self { undo: Vec::new(), redo: Vec::new(), last: f.clone(), dragging: false, absorb: false }
     }
 
     /// Record `current` if it differs from the last checkpoint.
     pub fn checkpoint(&mut self, current: &Feature) -> bool {
         if *current == self.last {
+            return false;
+        }
+        if std::mem::take(&mut self.absorb) {
+            self.last = current.clone();
             return false;
         }
         // A sketch's hidden stand-ins (the Origin's point, made when a first
@@ -2245,8 +2251,9 @@ impl PartStudioView {
         }
         let sub = cx.subscribe_in(&dialog, window, |this: &mut Self, _, ev: &DialogEvent, window, cx| match ev {
             DialogEvent::Changed => {
-                this.draft_checkpoint(cx);
+                // What the editing logic changes at once belongs to the same step.
                 this.auto_operation(cx);
+                this.draft_checkpoint(cx);
                 this.schedule_regen(window, cx);
                 this.refresh_scene(false, cx);
             }
@@ -2353,6 +2360,10 @@ impl PartStudioView {
         }
         self.named_views = None;
         self.auto_operation(cx);
+        // The defaults the editing logic fills in on opening aren't a step (live: Undo off).
+        if let Some(e) = &mut self.edit {
+            e.history = DraftHistory::new(&e.dialog.read(cx).feature);
+        }
         self.schedule_regen(window, cx);
         self.schedule_preview_before(window, cx);
         cx.notify();
@@ -4611,6 +4622,12 @@ impl PartStudioView {
 
     /// The open feature dialog can't regenerate (live: its row turns red and
     /// the Features header shows the error icon until it can).
+    /// Feature `id` is the sketch right above a rollback bar the user moved up: live shows it, hidden or not
+    /// (behaviours request 1844; `regen::display` draws it).
+    fn rolled_to(&self, id: FeatureId, cx: &App) -> bool {
+        self.edit.is_none() && self.studio(cx).and_then(|s| s.rolled_to_sketch()) == Some(id)
+    }
+
     /// The existing feature being edited uses feature `id` (its sketch, a plane): rolled back to before it, the
     /// model doesn't consume such a hidden sketch and live shows it (ui-parity extrude-surface-tab); a new
     /// feature's picks leave it hidden (extrude-new-sketch-row-selected).
@@ -4675,8 +4692,8 @@ impl PartStudioView {
 
     fn render_rollback_bar(&self, index: usize, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        // Light blue once ↑/↓ (or a click) gave it the keyboard, until the
-        // selection changes; selecting a row alone leaves it gray (live 31, 32).
+        // Light blue once a click gave it the keyboard, until the selection
+        // changes; selecting a row leaves it gray (live 31, 32).
         let focused = self.ui.list_focus.is_focused(window) && self.ui.rollback_keyboard.as_ref() == Some(&self.selected_features);
         div()
             .id(SharedString::from(format!("rollback-{index}")))
@@ -4732,7 +4749,7 @@ impl PartStudioView {
         let color = if rolled_back {
             pal.text_rolled_back
         // Live (ui-parity 11-03): while a feature is edited, the hidden sketch its active field picked reads black.
-        } else if suppressed || (f.hidden && !failing && !(editing || self.edit_uses(f.id, cx))) {
+        } else if suppressed || (f.hidden && !failing && !(editing || self.edit_uses(f.id, cx) || self.rolled_to(f.id, cx))) {
             pal.text_faint
         } else {
             // Live L27: a warning's row is red like an error's.
@@ -5018,7 +5035,6 @@ impl PartStudioView {
                     return;
                 }
                 this.click_feature(id, ev.modifiers().shift, cx);
-                // Onshape: after clicking a row, ↑/↓ move the rollback bar.
                 window.focus(&this.ui.list_focus, cx);
             }))
             .drag_over::<RollbackDrag>(|s, _, _, _| s.border_t_2().border_color(p().accent))
@@ -6158,10 +6174,8 @@ impl Render for PartStudioView {
                     cx.propagate();
                 } else if this.edit.is_some() {
                     this.accept_edit(false, window, cx);
-                } else if let Some(id) = this.selected_features.first().copied() {
-                    // Enter on a selected feature opens it for editing.
-                    this.edit_feature(id, window, cx);
                 }
+                // Enter on a selected feature row opens nothing (live 11-03, behaviours request 1839).
             }))
             .on_action(cx.listener(|this, _: &AcceptAndRepeat, window, cx| {
                 if this.edit.is_some() && this.sketch.is_none() {
@@ -6250,15 +6264,20 @@ impl Render for PartStudioView {
             .on_action(cx.listener(|this, a: &RotateRight90, _, cx| this.rotate_by(a, 90.0, 0.0, cx)))
             .on_action(cx.listener(|this, a: &RotateUp90, _, cx| this.rotate_by(a, 0.0, -90.0, cx)))
             .on_action(cx.listener(|this, a: &RotateDown90, _, cx| this.rotate_by(a, 0.0, 90.0, cx)))
+            // ↑ / ↓ step the bar once a click on it gave it the keyboard (live: not after a row click).
             .on_action(cx.listener(|this, _: &RollbackUp, _, cx| {
-                this.ui.rollback_keyboard = Some(this.selected_features.clone());
+                if this.ui.rollback_keyboard.as_ref() != Some(&this.selected_features) {
+                    return;
+                }
                 let r = this.studio(cx).map(|s| s.rollback_index()).unwrap_or(0);
                 if r > 0 {
                     this.set_rollback(Some(r - 1), cx);
                 }
             }))
             .on_action(cx.listener(|this, _: &RollbackDown, _, cx| {
-                this.ui.rollback_keyboard = Some(this.selected_features.clone());
+                if this.ui.rollback_keyboard.as_ref() != Some(&this.selected_features) {
+                    return;
+                }
                 let (r, n) = this.studio(cx).map(|s| (s.rollback_index(), s.features.len())).unwrap_or((0, 0));
                 if r < n {
                     this.set_rollback(if r + 1 >= n { None } else { Some(r + 1) }, cx);

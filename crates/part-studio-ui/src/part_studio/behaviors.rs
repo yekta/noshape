@@ -3741,6 +3741,9 @@ impl PartStudioView {
                     next.set(k, v.clone());
                 }
                 this.ui.std_edit_old = Some(next);
+                if let Some(e) = &mut this.edit {
+                    e.history.absorb = true;
+                }
                 dialog.update(cx, |d, cx| {
                     for (k, v) in changes {
                         d.set_value_logic(&k, v, cx);
