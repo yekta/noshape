@@ -1395,6 +1395,29 @@ fn a_distance_in_a_loop_keeps_the_dimensioned_side() {
     }
 }
 
+/// A trapezoid keeps its shorter side, whichever way its height's Distance
+/// runs, upright or inverted, drawn from either side (live probes 14 q1-q4,
+/// probes 15); a new length of the longer side centres it under the shorter
+/// one (q2, r6, fuzz s753); both sides resizing keep the shorter side's
+/// dimensioned corner (s713). T1.
+#[test]
+fn a_trapezoid_keeps_its_shorter_side() {
+    for (n, list) in [(14, probes14()), (15, probes15())] {
+        let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture(&format!("sketch-probe-{n}.live.json"))).unwrap()).unwrap();
+        let b = probe_batch(list.into_iter().filter(|(name, _)| name.contains("trapezoid")).collect());
+        for case in b["cases"].as_array().unwrap() {
+            let d = differences(case, &live["cases"][case["case"].as_str().unwrap()]);
+            assert!(d.is_empty(), "probes {n} {}: {}", case["case"], d.join("; "));
+        }
+    }
+    for (file, seed) in [("sketch-14.live.json", 713), ("sketch-15.live.json", 753)] {
+        let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture(file)).unwrap()).unwrap();
+        let ours = batch(1, seed, true);
+        let d = differences(&ours["cases"][0], &live["cases"][format!("s{seed}")]);
+        assert!(d.is_empty(), "s{seed}: {}", d.join("; "));
+    }
+}
+
 /// s653 / s725 (batches 12 / 14) stay as live answered: a T's top widens and
 /// its flange thins: the stem stays whole, the Equal overhangs centre the top
 /// on it and the top comes down (the pass couldn't place it; least change
@@ -2586,12 +2609,17 @@ fn probe_matches() {
 }
 
 /// One generated case (FUZZ_SEED=<seed>; 101 on are rich) or probe
-/// (FUZZ_PROBE=t1) solved as live_matches does, its points printed as JSON.
+/// (FUZZ_PROBE=t1, or 14:q2) solved as live_matches does, its points printed as JSON.
 #[test]
 #[ignore = "T2: one live fuzz case"]
 fn one_case() {
     let probe = std::env::var("FUZZ_PROBE").ok();
-    let Some(mut c) = probe.as_ref().and_then(|p| [probes(), probes2(), probes3(), probes4(), probes5(), probes6(), probes10(), probes11(), probes13()].into_iter().flatten().find(|(n, _)| n.split(' ').next() == Some(p.as_str())).map(|(_, c)| c)).or_else(|| {
+    // (FUZZ_PROBE=<set>:<name> where names repeat across sets, e.g. 14:q2.)
+    let sets = || [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15())];
+    let Some(mut c) = probe.as_ref().and_then(|p| {
+        let (set, name) = p.split_once(':').map_or((None, p.as_str()), |(s, n)| (s.parse::<u32>().ok(), n));
+        sets().into_iter().filter(|(k, _)| set.is_none_or(|s| s == *k)).flat_map(|(_, l)| l).find(|(n, _)| n.split(' ').next() == Some(name)).map(|(_, c)| c)
+    }).or_else(|| {
         let seed: u64 = std::env::var("FUZZ_SEED").ok()?.parse().ok()?;
         Some(generate(seed, seed > 100))
     }) else {

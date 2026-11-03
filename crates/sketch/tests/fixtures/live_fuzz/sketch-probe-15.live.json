@@ -1,0 +1,233 @@
+{
+ "note": "Live 2026-11-03 ~17:55 UTC, Part Studio \"skasm probes 15\" (344fa010ba57ff90ed6e33e7) in \"skasm speed\"; each case POSTed as is on Top (POST /features, no UI); points = REST /sketches point entities by their own ids (l1.start \u2026), so no end-swap fix is needed. ours was not read before posting.",
+ "cases": {
+  "r1": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     30.0,
+     0
+    ],
+    "l1.start": [
+     10.0,
+     0
+    ],
+    "l2.end": [
+     40.0,
+     25.0
+    ],
+    "l2.start": [
+     30.0,
+     0
+    ],
+    "l3.end": [
+     0.0,
+     25.0
+    ],
+    "l3.start": [
+     40.0,
+     25.0
+    ],
+    "l4.end": [
+     10.0,
+     0
+    ],
+    "l4.start": [
+     0.0,
+     25.0
+    ]
+   }
+  },
+  "r2": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     30.0,
+     0
+    ],
+    "l1.start": [
+     10.0,
+     0
+    ],
+    "l2.end": [
+     40.0,
+     25.0
+    ],
+    "l2.start": [
+     30.0,
+     0
+    ],
+    "l3.end": [
+     -0.0,
+     25.0
+    ],
+    "l3.start": [
+     40.0,
+     25.0
+    ],
+    "l4.end": [
+     10.0,
+     0
+    ],
+    "l4.start": [
+     -0.0,
+     25.0
+    ]
+   }
+  },
+  "r3": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     36.0,
+     0
+    ],
+    "l1.start": [
+     10.0,
+     0
+    ],
+    "l2.end": [
+     43.0,
+     20.0
+    ],
+    "l2.start": [
+     36.0,
+     0
+    ],
+    "l3.end": [
+     3.0,
+     20.0
+    ],
+    "l3.start": [
+     43.0,
+     20.0
+    ],
+    "l4.end": [
+     10.0,
+     0
+    ],
+    "l4.start": [
+     3.0,
+     20.0
+    ]
+   }
+  },
+  "r4": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     10.0,
+     20.0
+    ],
+    "l1.start": [
+     30.0,
+     20.0
+    ],
+    "l2.end": [
+     0.0,
+     -5.0
+    ],
+    "l2.start": [
+     10.0,
+     20.0
+    ],
+    "l3.end": [
+     40.0,
+     -5.0
+    ],
+    "l3.start": [
+     0.0,
+     -5.0
+    ],
+    "l4.end": [
+     30.0,
+     20.0
+    ],
+    "l4.start": [
+     40.0,
+     -5.0
+    ]
+   }
+  },
+  "r5": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     10.0,
+     20.0
+    ],
+    "l1.start": [
+     30.0,
+     20.0
+    ],
+    "l2.end": [
+     -0.0,
+     -5.0
+    ],
+    "l2.start": [
+     10.0,
+     20.0
+    ],
+    "l3.end": [
+     40.0,
+     -5.0
+    ],
+    "l3.start": [
+     -0.0,
+     -5.0
+    ],
+    "l4.end": [
+     30.0,
+     20.0
+    ],
+    "l4.start": [
+     40.0,
+     -5.0
+    ]
+   }
+  },
+  "r6": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     10.0,
+     20.0
+    ],
+    "l1.start": [
+     30.0,
+     20.0
+    ],
+    "l2.end": [
+     3.0,
+     0
+    ],
+    "l2.start": [
+     10.0,
+     20.0
+    ],
+    "l3.end": [
+     37.0,
+     0
+    ],
+    "l3.start": [
+     3.0,
+     0
+    ],
+    "l4.end": [
+     30.0,
+     20.0
+    ],
+    "l4.start": [
+     37.0,
+     0
+    ]
+   }
+  }
+ }
+}

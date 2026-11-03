@@ -303,6 +303,21 @@ impl Sketch {
         Some(sub)
     }
 
+    /// Two lines a point-to-line Distance spans, one with a new Length: the
+    /// Distance (holding) and the side it keeps ([`Sketch::kept_first_in`]).
+    fn kept_across(&self, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)]) -> Option<(crate::ids::ConstraintId, EntityId)> {
+        let unheld = self.unheld_constraints(1e-9);
+        let resizes = |u: EntityId| cons.iter().any(|(c, us)| us.as_slice() == [u] && unheld.contains(c) && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Length { .. })));
+        cons.iter().find_map(|(c, us)| {
+            let spans = us.len() == 2
+                && !unheld.contains(c)
+                && us.iter().all(|u| self.kind(*u) == Some(EntityKind::Line))
+                && us.iter().any(|u| resizes(*u))
+                && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Distance { a, b, .. }) if self.kind(*a) == Some(EntityKind::Point) && self.kind(*b) == Some(EntityKind::Line));
+            spans.then(|| (*c, self.kept_first_in(us, cons, Some(*c))))
+        })
+    }
+
     /// A component the pass couldn't place: its unchanged units held,
     /// lowest first, each while the rest still solves, then the rest at
     /// least change (live fuzz s653 / s725: a T's wider top and thinner
@@ -316,6 +331,47 @@ impl Sketch {
         let opts = SolveOptions { analyze: false, constructive: false, ..Default::default() };
         let mut held: BTreeSet<EntityId> = BTreeSet::new();
         let mut done = None;
+        // The side a Distance keeps, held first; resized, from its lowest
+        // point (live probes 14 q3: a trapezoid's growing shorter top keeps
+        // its left end), or from the Distance's point when that is its own
+        // and the other side resizes too (fuzz s713: the top grows, the base
+        // shrinks, the top keeps the corner its height is dimensioned from).
+        if let Some((c, k)) = self.kept_across(cons) {
+            let other_resizes = cons.iter().find(|(x, _)| *x == c).is_some_and(|(_, us)| {
+                us.iter().any(|u| *u != k && cons.iter().any(|(x, xs)| xs.as_slice() == [*u] && unheld.contains(x) && matches!(self.constraint(*x).map(|o| &o.kind), Some(ConstraintKind::Length { .. }))))
+            });
+            let was: Vec<(EntityId, Geometry)> = self.entity(k).map(|e| e.point_refs()).unwrap_or_default().into_iter().filter_map(|p| self.entity(p).map(|x| (p, x.geometry.clone()))).collect();
+            let length = cons.iter().filter(|(x, us)| us.as_slice() == [k] && unheld.contains(x)).find_map(|(x, _)| match self.constraint(*x).map(|o| &o.kind) {
+                Some(ConstraintKind::Length { value, .. }) => Some(*value),
+                _ => None,
+            });
+            if let (Some(len), Some((s0, e0))) = (length, self.endpoints(k)) {
+                let own = |p: EntityId| p == s0 || p == e0 || self.coincident_with(p).iter().any(|q| *q == s0 || *q == e0);
+                let point = match self.constraint(c).map(|o| &o.kind) {
+                    Some(ConstraintKind::Distance { a, .. }) if other_resizes && own(*a) => [s0, e0].into_iter().find(|q| *q == *a || self.coincident_with(*a).contains(q)),
+                    _ => None,
+                }
+                .or_else(|| self.anchor(k));
+                if let (Some(stay), Some(a), Some(b)) = (point, self.point(s0), self.point(e0)) {
+                    let (from, other) = if stay == s0 { (a, e0) } else { (b, s0) };
+                    let dir = if stay == s0 { b - a } else { a - b };
+                    let _ = self.set_point(other, from + dir.normalize_or_zero() * len);
+                }
+            }
+            held.insert(k);
+            match self.sub_sketch(comp, cons, &|_| true, &held).map(|mut sub| (matches!(sub.solve_with(&opts).status, SolveStatus::Solved), sub)) {
+                Some((true, sub)) => done = Some(sub),
+                _ => {
+                    for (p, g) in was {
+                        if let Some(x) = self.entity_mut_silent(p) {
+                            x.geometry = g;
+                        }
+                    }
+                    return false;
+                }
+            }
+        }
+        let base: Vec<EntityId> = base.into_iter().filter(|u| !held.contains(u)).collect();
         for u in base {
             let mut with = held.clone();
             with.insert(u);
@@ -344,6 +400,11 @@ impl Sketch {
     fn place_component(&mut self, comp: &[EntityId], cons: &[(crate::ids::ConstraintId, Vec<EntityId>)], unit_of: &HashMap<EntityId, EntityId>) -> bool {
         if self.scale_for_chord(comp, cons) {
             return true;
+        }
+        // Lines a point-to-line Distance spans, one resizing: the side the
+        // Distance keeps fixes the rest (`hold_the_base`).
+        if self.kept_across(cons).is_some() {
+            return false;
         }
         let mut placed: BTreeSet<EntityId> = BTreeSet::new();
         // Sizes and directions to keep are as the pass found them (a side
@@ -1449,6 +1510,13 @@ impl Sketch {
                 let sized = |u: EntityId| self.constraints().any(|o| o.driving && matches!(o.kind, ConstraintKind::Length { curve, .. } if curve == u));
                 if sized(a) != sized(b) {
                     return if sized(a) { a } else { b };
+                }
+                // Then the shorter line (live probes 15: a trapezoid keeps
+                // its shorter side, upright or inverted, drawn either way
+                // round, whichever way the Distance runs).
+                let (la, lb) = (self.size(a), self.size(b));
+                if self.kind(a) == Some(EntityKind::Line) && self.kind(b) == Some(EntityKind::Line) && (la - lb).abs() > 1e-9 {
+                    return if la < lb { a } else { b };
                 }
                 let owns = |u: EntityId| self.entity(u).is_some_and(|e| e.point_refs().contains(&pa)) || self.coincident_with(pa).iter().any(|q| self.entity(u).is_some_and(|e| e.point_refs().contains(q)));
                 if owns(a) != owns(b) {
