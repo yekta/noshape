@@ -249,6 +249,9 @@ dump, the runner, live's first 20 scenarios run in ours and a first score.
   preselected edge (live's account drops the edge since 04:10), Hole / Revolve remembered values, Shift+P as an undo
   step, a rolled-back variable's " = 0", Fillet moved above its Extrude reading "ok", the second Enter after an
   autofill insertion (new scenario extrude-depth-variable-enter-twice).
+- 11-03 14:00: driver: the empty-graphics target avoids the open dialog, planes and sketch curves (it hit the Sketch
+  dialog); every scenario (274) runs with all steps found; the 76 using `empty` rechecked. Live resumed 13:58; I
+  compare each new recording as it lands (a Monitor running run.py per new file on :102).
 - 11-03 13:05: x40 recordings not yet re-recorded (111 psui scenarios): **100/111**; fixed since: New folder keeps the
   features selected, folder rows read with their count. Left: live-account / start effects (Hole tapped, Revolve Thin,
   edge preselection, "#width = 0", the x40 dialog place) and revolve-dialog-axis (skasm: the Line tool's first click
