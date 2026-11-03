@@ -2929,7 +2929,7 @@ fn feature_mirror_of_a_boss_copies_the_boss() {
     }
     let s = t.add("sketch", &[("sketchPlane", q(top)), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
     let r = t.regen();
-    let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+    let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().filter(|g| !g.imprinted).map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
     let boss = t.add("extrude", &[("entities", q(regions)), ("depth", e("5 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
     let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Right)])), ("offset", e("20 mm"))]);
     let m = t.add("mirror", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(boss)])), ("mirrorPlane", q(vec![Reference::FeaturePlane(pl)]))]);

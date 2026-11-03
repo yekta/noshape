@@ -3,6 +3,7 @@
 use crate::params::ParamValue;
 use crate::regen::context::SketchResult;
 use crate::regen::eval::{EvalCtx, FResult, err};
+use noshape_sketch::regions::Region;
 use noshape_sketch::{ConstraintId, ConstraintKind};
 use noshape_units::Dim;
 use std::collections::BTreeMap;
@@ -218,7 +219,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     }
     // Text glyph outlines follow their (solved) text boxes.
     data.add_text_outlines(&mut sk);
-    let regions = sk.regions();
+    let (regions, imprinted, split) = imprint(ev, &frame, &sk, sk.regions());
     let wires = sk.wires();
     let mut dimension_text = BTreeMap::new();
     for c in sk.constraints() {
@@ -253,8 +254,70 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         .iter()
         .map(|i| crate::regen::context::SketchResultImage { id: i.id, box_points: i.box_points.clone(), data_base64: i.data_base64.clone() })
         .collect();
-    ev.ctx.sketches.push(Arc::new(SketchResult { feature: ev.feature, name, frame, sketch: sk, report, regions, wires, dimension_text, images }));
+    ev.ctx.sketches.push(Arc::new(SketchResult { feature: ev.feature, name, frame, sketch: sk, report, regions, imprinted, split, wires, dimension_text, images }));
     Ok(())
+}
+
+/// Entity ids of the face edges imprinted on a sketch (above any sketch entity's; region keys take one more bit).
+pub const IMPRINT_ENTITY: u32 = 1 << 30;
+
+/// The sketch's regions with its plane's face imprinted, as live unless Disable imprinting: the face's edges split the
+/// sketch's own regions, and the face's pieces outside them are regions too (sketch faces that qSketchRegion leaves
+/// out). The regions, which of them are such pieces, and the sketch's own regions that were split.
+fn imprint(ev: &EvalCtx, frame: &crate::display::PlaneFrame, sk: &noshape_sketch::Sketch, own: Vec<Region>) -> (Vec<Region>, Vec<bool>, Vec<Region>) {
+    use noshape_kernel as k;
+    let plain = |own| (own, Vec::new(), Vec::new());
+    use crate::reference::{Reference, Source};
+    let Some(plane) = ev.query("sketchPlane").first().cloned() else { return plain(own) };
+    if ev.bool("disableImprinting") {
+        return plain(own);
+    }
+    // A part's face, or another sketch's region (live 1747: "Face of Sketch 2").
+    let face = match &plane {
+        Reference::Face(_) => ev.resolve_faces(std::slice::from_ref(&plane)).first().and_then(|&(bi, fi)| ev.face_shape(bi, fi).ok()),
+        Reference::SketchRegion { sketch, key } => ev.resolve_region(*sketch, key).and_then(|(s, r)| crate::regen::eval::region_profile(&s, &r, Source::Index(0)).ok()).map(|p| p.shape),
+        _ => None,
+    };
+    let Some(face) = face else { return plain(own) };
+    let mut extra = Vec::new();
+    for (i, e) in face.edges().iter().enumerate() {
+        let Some(c) = face_edge_curve(e, frame) else { return plain(own) };
+        extra.push((noshape_sketch::EntityId(IMPRINT_ENTITY + i as u32), c));
+    }
+    let size = face.bounding_box(false).map(|b| (b.max - b.min).length()).unwrap_or(1.0);
+    let on_face = |p: glam::DVec2| k::make_vertex(frame.to_world(p)).ok().and_then(|v| k::distance(&face, &v).ok()).is_some_and(|d| d.distance <= 1e-6 * size);
+    let ids: std::collections::HashSet<&noshape_sketch::regions::RegionId> = own.iter().map(|o| &o.id).collect();
+    let boxes: Vec<_> = own.iter().map(|o| o.bbox()).collect();
+    let (mut regions, mut imprinted) = (Vec::new(), Vec::new());
+    for r in sk.regions_with(&extra) {
+        let p = (!ids.contains(&r.id)).then(|| r.interior_point());
+        let inside = p.is_none_or(|p| own.iter().zip(&boxes).any(|(o, b)| b.contains(p) && o.contains(p)));
+        if inside || p.is_some_and(on_face) {
+            regions.push(r);
+            imprinted.push(!inside);
+        }
+    }
+    let kept: std::collections::HashSet<noshape_sketch::regions::RegionId> = regions.iter().map(|r| r.id.clone()).collect();
+    let split = own.into_iter().filter(|o| !kept.contains(&o.id)).collect();
+    // The sketch's own regions first, as without imprinting.
+    let (mut first, mut pieces): (Vec<_>, Vec<_>) = regions.into_iter().zip(imprinted).partition(|(_, p)| !p);
+    first.append(&mut pieces);
+    let (regions, imprinted) = first.into_iter().unzip();
+    (regions, imprinted, split)
+}
+
+/// A planar face's edge in its sketch: lines and arcs as such, other curves as their exact B-spline.
+fn face_edge_curve(edge: &noshape_kernel::Shape, frame: &crate::display::PlaneFrame) -> Option<noshape_sketch::Curve2> {
+    if let Some(c) = project_edge(edge, frame) {
+        return Some(c);
+    }
+    let b = edge.edge_bspline().ok()?;
+    if b.periodic {
+        return None;
+    }
+    let knots = b.knots.iter().zip(&b.mults).flat_map(|(&t, &m)| std::iter::repeat_n(t, m as usize)).collect();
+    let ctrl = b.poles.iter().map(|&p| frame.to_local(p)).collect();
+    Some(noshape_sketch::Curve2::Nurbs(noshape_sketch::Nurbs { degree: b.degree as usize, knots, ctrl, weights: b.weights }))
 }
 
 /// Splits `text` at top-level occurrences of `sep` (outside quotes and parentheses).

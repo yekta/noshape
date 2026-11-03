@@ -611,8 +611,9 @@ struct Arrangement {
 }
 
 impl Arrangement {
-    fn new(sk: &Sketch) -> Arrangement {
-        let curves = sketch_curves(sk);
+    fn new(sk: &Sketch, extra: &[(EntityId, Curve2)]) -> Arrangement {
+        let mut curves = sketch_curves(sk);
+        curves.extend_from_slice(extra);
         // Each curve's box once (a spline's is a tessellation).
         let boxes: Vec<BBox> = curves.iter().map(|(_, c)| c.bbox()).collect();
         let tol = tolerance(&boxes);
@@ -896,7 +897,13 @@ impl Sketch {
     /// All bounded regions formed by non-construction curves (including
     /// areas created by overlapping / intersecting curves), sorted by id.
     pub fn regions(&self) -> Vec<Region> {
-        Arrangement::new(self).regions()
+        Arrangement::new(self, &[]).regions()
+    }
+
+    /// [`Sketch::regions`] with `extra` curves among the sketch's (a face's edges imprinted on a sketch on it); their
+    /// ids must not be the sketch's.
+    pub fn regions_with(&self, extra: &[(EntityId, Curve2)]) -> Vec<Region> {
+        Arrangement::new(self, extra).regions()
     }
 
     /// Connected chains of non-construction curves (split where more than two

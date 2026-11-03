@@ -2119,6 +2119,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   untitled-document-chris Sketch 2 (one 15 mm line across a face): Extrude 2 Remove picks the face piece on one side
   of it. Ours: no such region, "Select face or sketch region to extrude.". Models in /root/parity/models (run
   `parity_models` with NOSHAPE_PARITY_ONLY=clamp-hms, docs/PARITY-SUITES.md).
+  core 11-03 07:50 (queued): **live's rule** (core's REST probe, Part Studio "core imprint probe 1" in "live 1812
+  drawing scale"): the face's edges (outer and holes) split the sketch's own regions, and the face's pieces outside
+  them are sketch faces too (qCreatedBy(sketch, FACE)), but **qSketchRegion is only the pieces inside the sketch's
+  own loops** (a Ø10 circle inside the face: faces 78.54 + 2321.46 mm², qSketchRegion 1; a line across: 1200 + 1200,
+  qSketchRegion 0; a circle over an edge: two halves + the rest). Ours now (sketch.rs `imprint`): the same, also on
+  another sketch's region; Disable imprinting as live; the sketch's own regions listed first; a region picked before
+  imprinting split it still extrudes whole (SketchResult.split); the FS host's qSketchRegion and a whole-sketch pick
+  (feature list, preselection) take only the sketch's own. T1 model sketch_assoc::a_sketch_on_a_face_imprints_the_faces_edges
+  (live's 7 cases). untitled-document-chris now matches live to the end. **Left:** clamp-hms Extrude 2 (dx: the
+  translator can't tell which piece live's TOPOLOGY query names: the face-edge curves it lists are derived from
+  "main rectangle" and don't close a loop for its inside test); qCreatedBy(sketch, EDGE / VERTEX) don't include the
+  imprinted edges and vertices yet; whether sketch mode fills the face's pieces and what a feature-list pick takes
+  (asked: REQUESTS 07:20; ours: not filled, the sketch's own only). Cost: +12 ms for 400 circles on a face.
 - [ ] P2 EXTRUDE-OVERLAP-LINES-FACES (skasm + core; dx's parity suite 11-03) sketch lines lying over a profile's edge
   split its side face: bracket120-datenkrake Extrude 1 (an L profile whose bottom edge at y = 0 is overlapped by
   short lines and a small rectangle's edge): live 10/24/16 faces/edges/vertices, ours 14/36/24, the bottom side in

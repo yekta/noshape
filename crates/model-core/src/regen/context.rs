@@ -238,6 +238,11 @@ pub struct SketchResult {
     pub sketch: noshape_sketch::Sketch,
     pub report: noshape_sketch::SolveReport,
     pub regions: Vec<noshape_sketch::regions::Region>,
+    /// Which `regions` are pieces of the sketch plane's face outside the sketch's own loops (imprinted: sketch faces
+    /// that qSketchRegion leaves out, as live); empty when nothing is imprinted.
+    pub imprinted: Vec<bool>,
+    /// The sketch's own regions the imprinted face edges split: references made before imprinting still resolve.
+    pub split: Vec<noshape_sketch::regions::Region>,
     pub wires: Vec<noshape_sketch::regions::Wire>,
     /// Dimension label texts by constraint id.
     pub dimension_text: BTreeMap<u32, String>,

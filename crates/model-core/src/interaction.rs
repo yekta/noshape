@@ -1375,7 +1375,7 @@ mod tests {
 
     #[test]
     fn sketch_curve_click_picks_the_bounded_region() {
-        let region = |key: Vec<u32>, area: f64| crate::display::SketchRegionDisplay { key, positions: vec![], indices: vec![], area };
+        let region = |key: Vec<u32>, area: f64| crate::display::SketchRegionDisplay { key, positions: vec![], indices: vec![], area, imprinted: false };
         // Rectangle (entities 1-4) with a hole (circle 7): the outer region is
         // bounded by both, the disc by the circle only.
         let regions = vec![region(vec![0, 2, 4, 6, 8, 15], 80.0), region(vec![1, 14], 3.0)];

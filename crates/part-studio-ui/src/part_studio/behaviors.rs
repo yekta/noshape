@@ -1206,7 +1206,7 @@ impl PartStudioView {
         for &id in &self.selected_features {
             if let Some(sk) = self.display.sketches.iter().find(|s| s.feature == id) {
                 if wants(QueryFilter::SKETCH_REGION) && !sk.regions.is_empty() {
-                    out.extend(sk.regions.iter().map(|r| Reference::SketchRegion { sketch: id, key: r.key.clone() }));
+                    out.extend(sk.regions.iter().filter(|r| !r.imprinted).map(|r| Reference::SketchRegion { sketch: id, key: r.key.clone() }));
                 } else if wants(QueryFilter::SKETCH) {
                     out.push(Reference::Sketch(id));
                 } else if wants(QueryFilter::SKETCH_EDGE) {

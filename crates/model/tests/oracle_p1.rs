@@ -46,7 +46,7 @@ impl Studio {
         });
         let r = self.regen();
         let sk = r.display.sketches.iter().find(|s| s.feature == sketch).expect("sketch");
-        let mut regions: Vec<_> = sk.regions.iter().collect();
+        let mut regions: Vec<_> = sk.regions.iter().filter(|g| !g.imprinted).collect();
         regions.sort_by(|a, b| b.area.total_cmp(&a.area));
         regions.into_iter().map(|g| Reference::SketchRegion { sketch, key: g.key.clone() }).collect()
     }

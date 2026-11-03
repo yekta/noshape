@@ -1693,7 +1693,7 @@ impl PartStudioView {
         let refs: Vec<Reference> = if filter.intersects(QueryFilter::FEATURE) {
             vec![Reference::Feature(id)]
         } else if let Some(sk) = sketch.filter(|_| filter.intersects(QueryFilter::SKETCH_REGION)) {
-            sk.regions.iter().map(|r| Reference::SketchRegion { sketch: id, key: r.key.clone() }).collect()
+            sk.regions.iter().filter(|r| !r.imprinted).map(|r| Reference::SketchRegion { sketch: id, key: r.key.clone() }).collect()
         } else if sketch.is_some() && filter.intersects(QueryFilter::SKETCH) {
             vec![Reference::Sketch(id)]
         } else if let Some(sk) = sketch.filter(|_| filter.intersects(QueryFilter::SKETCH_POINT)) {

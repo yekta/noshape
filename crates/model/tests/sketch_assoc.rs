@@ -198,3 +198,95 @@ fn text_style_edit_regenerates_with_a_cached_regenerator() {
     let w2 = width(&r2);
     assert!(w2 > w1 * 1.02, "bold glyphs are wider after regen: {w1} -> {w2}");
 }
+
+/// A sketch on a face imprints the face's edges, as live 11-03 (core's probe in "live 1812 drawing scale", a 60 x 40 x
+/// 10 mm block from (0, 0) on Top, sketches on its top face): the face's pieces are sketch faces, the sketch's own
+/// regions are split by the face's edges, and only those are qSketchRegion's; Disable imprinting leaves the sketch's
+/// own. A region picked before it was split still extrudes whole.
+#[test]
+fn a_sketch_on_a_face_imprints_the_faces_edges() {
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.corner_rectangle(DVec2::ZERO, DVec2::new(0.06, 0.04));
+    let mut sketch = ps.new_feature("sketch", &units).unwrap();
+    sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    sketch.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    let sketch_id = sketch.id;
+    ps.features.push(sketch);
+    let key = regen(&ps, &units).display.sketches[0].regions[0].key.clone();
+    let mut ex = ps.new_feature("extrude", &units).unwrap();
+    ex.params.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: sketch_id, key }]));
+    ex.params.set("depth", ParamValue::Expr(ExprValue::new("10 mm")));
+    ps.features.push(ex);
+    let r = regen(&ps, &units);
+    let top = r.context.bodies[0].faces.iter().find(|n| format!("{n:?}").contains("CapEnd")).expect("top cap face").clone();
+    let mm = |x: f64, y: f64| DVec2::new(x, y) * 1e-3;
+    // (live: sketch faces' areas, mm², and how many are qSketchRegion's)
+    type Case = (&'static str, fn(&mut noshape_sketch::Sketch, &dyn Fn(f64, f64) -> DVec2), bool, &'static [f64], usize);
+    let cases: [Case; 7] = [
+        ("circle inside", |s, mm| { s.add_circle(mm(20.0, 20.0), 0.005); }, false, &[78.5398, 2321.4602], 1),
+        ("line across", |s, mm| { s.add_line(mm(30.0, -10.0), mm(30.0, 50.0)); }, false, &[1200.0, 1200.0], 0),
+        ("line from edge to edge", |s, mm| { s.add_line(mm(30.0, 0.0), mm(30.0, 40.0)); }, false, &[1200.0, 1200.0], 0),
+        ("circle over an edge", |s, mm| { s.add_circle(mm(0.0, 20.0), 0.008); }, false, &[100.531, 100.531, 2299.469], 2),
+        ("line inside", |s, mm| { s.add_line(mm(10.0, 10.0), mm(50.0, 30.0)); }, false, &[2400.0], 0),
+        ("corner cut", |s, mm| { s.add_line(mm(0.0, 30.0), mm(10.0, 40.0)); }, false, &[50.0, 2350.0], 0),
+        ("circle inside, Disable imprinting", |s, mm| { s.add_circle(mm(20.0, 20.0), 0.005); }, true, &[78.5398], 1),
+    ];
+    for (what, draw, disable, areas, regions) in cases {
+        let mut s = noshape_sketch::Sketch::new();
+        draw(&mut s, &mm);
+        let mut f = ps.new_feature("sketch", &units).unwrap();
+        f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Face((*top).clone())]));
+        f.params.set("disableImprinting", ParamValue::Bool(disable));
+        f.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: s, ..Default::default() })));
+        let id = f.id;
+        let mut p = ps.clone();
+        p.features.push(f);
+        let r = regen(&p, &units);
+        let s = r.context.sketches.iter().find(|s| s.feature == id).unwrap();
+        let mut ours: Vec<f64> = s.regions.iter().map(|g| g.area() * 1e6).collect();
+        ours.sort_by(f64::total_cmp);
+        assert_eq!(ours.len(), areas.len(), "{what}: {ours:?}");
+        for (a, b) in ours.iter().zip(areas) {
+            assert!((a - b).abs() < 1e-3, "{what}: {ours:?}, live {areas:?}");
+        }
+        let own = (0..s.regions.len()).filter(|&i| !s.imprinted.get(i).copied().unwrap_or(false)).count();
+        assert_eq!(own, regions, "{what}: qSketchRegion's");
+    }
+    // On another sketch's region (live 1747, "Face of Sketch 1"): its boundary is imprinted the same way.
+    let mut s = noshape_sketch::Sketch::new();
+    s.add_line(mm(30.0, -10.0), mm(30.0, 50.0));
+    let mut f = ps.new_feature("sketch", &units).unwrap();
+    let block_region = match ps.features[1].params.0.get("entities") {
+        Some(ParamValue::Query(q)) => q[0].clone(),
+        _ => unreachable!(),
+    };
+    f.params.set("sketchPlane", ParamValue::Query(vec![block_region]));
+    f.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: s, ..Default::default() })));
+    let id = f.id;
+    let mut p = ps.clone();
+    p.features.push(f);
+    let r = regen(&p, &units);
+    let s = r.context.sketches.iter().find(|s| s.feature == id).unwrap();
+    assert_eq!(s.regions.iter().map(|g| (g.area() * 1e6).round()).collect::<Vec<_>>(), [1200.0, 1200.0], "on a sketch region");
+    // The circle over the edge, its whole region picked before imprinting: 8 mm of it, half of it over the edge.
+    let mut s = noshape_sketch::Sketch::new();
+    let c = s.add_circle(mm(0.0, 20.0), 0.008);
+    let whole = noshape_model::regen::eval::encode_region_key(&s.regions()[0].id);
+    assert!(s.regions()[0].entities() == vec![c]);
+    let mut f = ps.new_feature("sketch", &units).unwrap();
+    f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Face((*top).clone())]));
+    f.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: s, ..Default::default() })));
+    let id = f.id;
+    ps.features.push(f);
+    let mut ex = ps.new_feature("extrude", &units).unwrap();
+    ex.params.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: id, key: whole }]));
+    ex.params.set("operationType", ParamValue::Enum("NEW".into()));
+    ex.params.set("depth", ParamValue::Expr(ExprValue::new("5 mm")));
+    ps.features.push(ex);
+    let r = regen(&ps, &units);
+    let v = r.context.bodies.iter().map(|b| b.shape.volume().unwrap() * 1e9).find(|v| (v - 24000.0).abs() > 1.0).expect("the new part");
+    assert!((v - std::f64::consts::PI * 64.0 * 5.0).abs() < 1e-3, "the whole circle: {v} mm³");
+}
+

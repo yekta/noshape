@@ -780,7 +780,8 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             // pick id), so a sketch with hundreds of regions is one draw call.
             let n: [f32; 3] = sk.frame.normal.as_vec3().into();
             let mut mesh = MeshData::default();
-            for r in &sk.regions {
+            // (While editing, not the face's imprinted pieces: only the sketch's own loops are filled.)
+            for r in sk.regions.iter().filter(|r| !(editing && r.imprinted)) {
                 let id = picks.push(PickTarget { reference: Reference::SketchRegion { sketch: sk.feature, key: r.key.clone() }, kind: PickKind::SketchRegion, anchor: None });
                 let base = mesh.positions.len() as u32;
                 mesh.positions.extend_from_slice(&r.positions);

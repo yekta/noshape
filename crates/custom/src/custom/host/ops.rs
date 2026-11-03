@@ -593,7 +593,7 @@ fn transform_refs(ev: &mut EvalCtx, refs: &[Reference], m: &DMat4) -> FResult<()
                 if let Some(pos) = ev.ctx.sketches.iter().position(|s| s.feature == *f) {
                     let s = &ev.ctx.sketches[pos];
                     let frame = crate::regen::eval::transform_frame(&s.frame, m);
-                    let new = crate::regen::context::SketchResult { frame, ..clone_sketch(s) };
+                    let new = crate::regen::context::SketchResult { frame, ..(**s).clone() };
                     ev.ctx.sketches[pos] = Arc::new(new);
                 }
             }
@@ -613,20 +613,6 @@ fn transform_refs(ev: &mut EvalCtx, refs: &[Reference], m: &DMat4) -> FResult<()
         }
     }
     Ok(())
-}
-
-pub fn clone_sketch(s: &crate::regen::context::SketchResult) -> crate::regen::context::SketchResult {
-    crate::regen::context::SketchResult {
-        feature: s.feature,
-        name: s.name.clone(),
-        frame: s.frame,
-        sketch: s.sketch.clone(),
-        report: s.report.clone(),
-        regions: s.regions.clone(),
-        wires: s.wires.clone(),
-        dimension_text: s.dimension_text.clone(),
-        images: s.images.clone(),
-    }
 }
 
 /// Stable instance number of a pattern instance name.

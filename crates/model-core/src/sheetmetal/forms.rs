@@ -391,7 +391,7 @@ pub fn tool_feature(ev: &mut EvalCtx) -> FResult<()> {
         let (regions, wires) = (sk.regions(), sk.wires());
         let (feature, name) = (ev.feature, ev.name.to_string());
         ev.ctx.sketches.retain(|s| s.feature != feature);
-        ev.ctx.sketches.push(Arc::new(crate::regen::context::SketchResult { feature, name, frame: crate::display::PlaneFrame::TOP, sketch: sk, report, regions, wires, dimension_text: BTreeMap::new(), images: Vec::new() }));
+        ev.ctx.sketches.push(Arc::new(crate::regen::context::SketchResult { feature, name, frame: crate::display::PlaneFrame::TOP, sketch: sk, report, regions, imprinted: Vec::new(), split: Vec::new(), wires, dimension_text: BTreeMap::new(), images: Vec::new() }));
         return Ok(());
     }
     let tools = match form.as_str() {

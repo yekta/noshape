@@ -203,6 +203,9 @@ pub struct SketchRegionDisplay {
     pub positions: Vec<[f32; 3]>,
     pub indices: Vec<u32>,
     pub area: f64,
+    /// A piece of the sketch plane's face outside the sketch's own loops (a sketch face, not one of the sketch's
+    /// regions when the whole sketch is picked).
+    pub imprinted: bool,
 }
 
 /// Coordinate frame of a sketch plane (world space).

@@ -1068,7 +1068,11 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
             let mut out = Vec::new();
             for (s, sk) in q.st.ctx.sketches.iter().enumerate() {
                 if q.created_by(&Ent::SketchBody(s)).is_some_and(|c| has_prefix(&c, &id)) {
-                    for r in &sk.regions {
+                    for (i, r) in sk.regions.iter().enumerate() {
+                        // Not the face's imprinted pieces (sketch faces all the same).
+                        if sk.imprinted.get(i).copied().unwrap_or(false) {
+                            continue;
+                        }
                         // Inner loops: regions inside another region's hole.
                         if filter_inner && sk.regions.iter().any(|o| o.holes.iter().any(|h| same_box(&h.bbox(), &r.outer.bbox()))) {
                             continue;

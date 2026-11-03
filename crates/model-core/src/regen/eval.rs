@@ -276,7 +276,7 @@ pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(Fe
         match r {
             Reference::SketchRegion { sketch, key } => ctx
                 .sketch(*sketch)
-                .is_some_and(|s| decode_region_key(key).is_some_and(|id| noshape_sketch::regions::find_region_in(&s.regions, &id).is_some())),
+                .is_some_and(|s| decode_region_key(key).is_some_and(|id| s.split.iter().any(|r| r.id == id) || noshape_sketch::regions::find_region_in(&s.regions, &id).is_some())),
             // A part that doesn't exist at this point of the list (live "(7) Dragging feature rows": a feature
             // moved above the one that made its part fails on its own empty selection, "1 missing selection").
             // Only this studio's own parts: a derived feature lists another studio's.
@@ -746,7 +746,11 @@ impl<'a> EvalCtx<'a> {
         let id = decode_region_key(key)?;
         // The sketch's own regions: rebuilding them per reference made an
         // extrude of 400 circles take minutes.
-        let r = noshape_sketch::regions::find_region_in(&s.regions, &id)?;
+        // A region the imprinted face edges split, picked before imprinting: as it was.
+        let r = match s.split.iter().find(|r| r.id == id) {
+            Some(r) if !s.regions.iter().any(|x| x.id == id) => r.clone(),
+            _ => noshape_sketch::regions::find_region_in(&s.regions, &id)?,
+        };
         Some((s, r))
     }
 

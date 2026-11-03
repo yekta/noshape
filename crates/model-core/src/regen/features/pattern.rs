@@ -1411,17 +1411,7 @@ fn referenced_sketches(p: &crate::params::ParamValues, out: &mut BTreeSet<Featur
 
 /// Sketch moved by an instance transform (frame mapped; 2D data unchanged).
 fn transformed_sketch(s: &SketchResult, m: &DMat4) -> SketchResult {
-    SketchResult {
-        feature: s.feature,
-        name: s.name.clone(),
-        frame: transform_frame(&s.frame, m),
-        sketch: s.sketch.clone(),
-        report: s.report.clone(),
-        regions: s.regions.clone(),
-        wires: s.wires.clone(),
-        dimension_text: s.dimension_text.clone(),
-        images: s.images.clone(),
-    }
+    SketchResult { frame: transform_frame(&s.frame, m), ..s.clone() }
 }
 
 /// Re-run the selected features for every instance (see the module docs).

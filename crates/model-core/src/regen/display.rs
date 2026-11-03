@@ -619,7 +619,7 @@ pub fn sketch_display(s: &super::context::SketchResult, editing: bool) -> Sketch
         }
     }
     let mut regions = Vec::new();
-    for r in &s.regions {
+    for (i, r) in s.regions.iter().enumerate() {
         let outer = r.outer.tessellate(tol);
         let mut flat: Vec<f64> = Vec::new();
         let mut holes_idx = Vec::new();
@@ -641,6 +641,7 @@ pub fn sketch_display(s: &super::context::SketchResult, editing: bool) -> Sketch
             positions: all2.iter().map(|p| f3(frame.to_world(*p) + frame.normal * 1e-6)).collect(),
             indices: tris.into_iter().map(|i| i as u32).collect(),
             area: r.area(),
+            imprinted: s.imprinted.get(i).copied().unwrap_or(false),
         });
     }
     let dof = s.report.dof.unwrap_or(0);

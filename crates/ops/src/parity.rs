@@ -685,7 +685,8 @@ impl<'a> Translator<'a> {
         if let Some((sk, rest)) = text.split("qSketchRegion(id + \"").nth(1).and_then(|r| r.split_once('"')) {
             let ours = self.feature_ids.get(sk).cloned().ok_or_else(|| format!("sketch {sk} was not built"))?;
             let g = self.call("sketch_get", json!({ "sketch": ours }))?;
-            let regions: Vec<&Value> = g["regions"].as_array().into_iter().flatten().collect();
+            // (Not the face's imprinted pieces: sketch faces, not regions.)
+            let regions: Vec<&Value> = g["regions"].as_array().into_iter().flatten().filter(|r| r["imprinted"] != true).collect();
             let curves = |r: &Value| -> Vec<String> { r["boundary"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(str::to_string)).collect() };
             let outer_only = rest.trim_start_matches([',', ' ']).starts_with("true");
             let inner = |r: &Value| {
@@ -711,7 +712,7 @@ impl<'a> Translator<'a> {
             return Ok(None);
         }
         let Some(sk) = strings.iter().find_map(|s| s.strip_suffix(".wireOp")).map(str::to_string) else { return Ok(None) };
-        let segments: Vec<[f64; 2]> = strings.iter().filter_map(|e| self.curves.get(&(sk.clone(), e.clone()))).flat_map(|poly| poly.windows(2).flat_map(|w| [w[0], w[1]])).collect();
+        let mut segments: Vec<[f64; 2]> = strings.iter().filter_map(|e| self.curves.get(&(sk.clone(), e.clone()))).flat_map(|poly| poly.windows(2).flat_map(|w| [w[0], w[1]])).collect();
         if segments.is_empty() {
             return Err(format!("region of sketch {sk}: its curves were not translated"));
         }
@@ -720,6 +721,23 @@ impl<'a> Translator<'a> {
         let (o, x, y) = (f3(&g["frame"]["origin"]), f3(&g["frame"]["x"]), f3(&g["frame"]["y"]));
         let (Some(o), Some(x), Some(y)) = (o, x, y) else { return Err("sketch frame".into()) };
         let frame = self.frames.get(&sk).copied();
+        // A piece of the face the sketch is on is named by the face's edges too: other sketches' curves they came from
+        // ("<sketch>.wireOp" … sketchEntityId), into this sketch's plane.
+        if let Some([fo, fx, fy]) = frame {
+            let mut of: Option<&str> = None;
+            for w in strings.windows(2) {
+                if let Some(other) = w[1].strip_suffix(".wireOp").filter(|_| w[0] == "operationId") {
+                    of = Some(other);
+                }
+                let (Some(other), true) = (of.filter(|o| *o != sk), w[0] == "sketchEntityId") else { continue };
+                let (Some(poly), Some([go, gx, gy])) = (self.curves.get(&(other.to_string(), w[1].clone())), self.frames.get(other)) else { continue };
+                let to_here = |p: &[f64; 2]| {
+                    let world: Vec<f64> = (0..3).map(|i| go[i] + p[0] * gx[i] + p[1] * gy[i] - fo[i]).collect();
+                    [(0..3).map(|i| world[i] * fx[i]).sum::<f64>(), (0..3).map(|i| world[i] * fy[i]).sum::<f64>()]
+                };
+                segments.extend(poly.windows(2).flat_map(|p| [to_here(&p[0]), to_here(&p[1])]));
+            }
+        }
         // Onshape names the region by enough of its boundary curves to tell
         // it apart (TOPOLOGY): ours whose boundary has them all.
         let named: Vec<String> = strings.iter().filter_map(|e| self.sketch_entities.get(&(sk.clone(), e.clone())).cloned()).collect();

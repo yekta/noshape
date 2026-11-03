@@ -502,7 +502,8 @@ pub(super) fn sketch_state(od: &mut OpenDoc, tab: TabId, id: FeatureId, before: 
         v["regions"] = json!(sr
             .regions
             .iter()
-            .map(|g| {
+            .enumerate()
+            .map(|(i, g)| {
                 let key = noshape_model::regen::eval::encode_region_key(&g.id);
                 let area = disp.and_then(|d| d.regions.iter().find(|x| x.key == key)).map(|x| x.area * k * k);
                 let mut rv = json!({ "id": refs::to_id(&Reference::SketchRegion { sketch: id, key: key.clone() }) });
@@ -518,6 +519,9 @@ pub(super) fn sketch_state(od: &mut OpenDoc, tab: TabId, id: FeatureId, before: 
                 boundary.dedup();
                 rv["boundary"] = json!(boundary);
                 rv["holes"] = json!(g.holes.len());
+                if sr.imprinted.get(i).copied().unwrap_or(false) {
+                    rv["imprinted"] = json!(true);
+                }
                 rv
             })
             .collect::<Vec<_>>());
