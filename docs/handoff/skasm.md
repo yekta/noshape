@@ -1352,6 +1352,9 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   click on a line only selects it (selection 1, still one line) and Enter then makes the slot (step 9: 2 arcs, 3
   lines, same as ours); ours makes the slot on the click itself (scene sketch_mode.rs `Tool::Slot` → `make_slots`).
   psui's readout and driver are right there (ours reads 0 because nothing is selected after our click).
+- sketch-extend-to-line step 12, same family: live's Extend click leaves the extended line selected (selection 1, the
+  sketch row related), ours nothing. Also yours. At 13:10 these and the three PERPENDICULAR inferences (your behaviours
+  "skasm (2026-11-03, P1 sketch inference)") are the only differences left in live's 56 new recordings (51/56).
 - PERPENDICULAR where ours infers VERTICAL: sketch-line-from-midpoint, -trim-drag, -undo-trim;
 - a value box after typing over a just-drawn shape: sketch-circle-value-box, -line-value-box, -rectangle-value-boxes
   (live focus "other" with the typed text, ours none);

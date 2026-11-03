@@ -249,6 +249,8 @@ dump, the runner, live's first 20 scenarios run in ours and a first score.
   preselected edge (live's account drops the edge since 04:10), Hole / Revolve remembered values, Shift+P as an undo
   step, a rolled-back variable's " = 0", Fillet moved above its Extrude reading "ok", the second Enter after an
   autofill insertion (new scenario extrude-depth-variable-enter-twice).
+- 11-03 13:10: **51/56** on live's new batch (421/436 states); the 5 left are skasm's sketch tools (skasm.md). Since
+  12:20: feature rows copy / paste nothing (live, my probe), Shift+P hides as an undo step (live 1863).
 - 11-03 12:20: live's new batch (56 recorded, paused 11:59 for request 1870): 35/53 at 11:40; since then the
   autofill rules are live's (an Enter that completes the text only inserts it, the next applies, the next accepts;
   an Enter that changes nothing applies; invalid values are no undo step): all 10 autofill / number-field scenarios
