@@ -1026,13 +1026,17 @@ impl<'a> Translator<'a> {
                 let parts = self.call("query_parts", json!({}))?;
                 let k = per_unit(&parts["units"]);
                 let at = |v: &Value, i: usize| v.as_array().and_then(|a| a.get(i)).and_then(Value::as_f64).map_or(f64::NAN, |c| c * k);
+                // The part whose box holds live's point, else the nearest box
+                // (an earlier difference changed the part; that shows already).
+                let off = |b: &Value| (0..3).map(|i| (at(&b["bounding_box"]["min"], i) - p[i]).max(p[i] - at(&b["bounding_box"]["max"], i)).max(0.0).powi(2)).sum::<f64>().sqrt();
                 parts["parts"]
                     .as_array()
                     .into_iter()
                     .flatten()
-                    .find(|b| (0..3).all(|i| at(&b["bounding_box"]["min"], i) - 1e-6 <= p[i] && p[i] <= at(&b["bounding_box"]["max"], i) + 1e-6))
+                    .filter(|b| !off(b).is_nan())
+                    .min_by(|a, b| off(a).total_cmp(&off(b)))
                     .and_then(|b| b["id"].as_str().map(str::to_string))
-                    .ok_or_else(|| format!("{id}: no part of ours around {:?} mm", p.map(|c| c * 1e3)))
+                    .ok_or_else(|| format!("{id}: no part of ours"))
             }
             "SKETCH_REGION" => self.region_at(p, r.measure),
             other => Err(format!("{id}: reference kind {other} not mapped")),
