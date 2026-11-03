@@ -3049,3 +3049,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   id>", …)`) shows "Imported element … not found" though its Part Studios regenerate with it; live's editor
   resolves imports. The agent API now compiles with the document's tabs (custom::compile_in_document(doc, tab,
   source), dx 11-03); the editor's background compile needs the document's studios passed in. (dx 2026-11-03)
+- [ ] P2 MIRROR-FEATURE-UP-TO (core; dx's parity suite 11-03, clamp-hms) a Mirror of features (patternType FEATURE,
+  Reapply features off) of Extrude 4 (Add, Blind, from a sketch on Plane 1, an offset of Front) and Extrude 5 (Add,
+  Up to surface = Plane 2, another offset of Front) across Front → ours ERROR "Could not create all instances as
+  entered. Try selecting "Reapply features" option." (25/63/40, 117778.8 mm³); live OK, 32/78/48, 123792.2 mm³ (the
+  instances made, Extrude 5's copy up to the same Plane 2 as live does it). Model: /root/parity/models/clamp-hms
+  (`parity_models`, NOSHAPE_PARITY_ONLY=clamp-hms; features 9–12). (dx 2026-11-03)
