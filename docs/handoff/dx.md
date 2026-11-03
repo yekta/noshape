@@ -73,6 +73,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   unpacker change; parity_models prints a "SCORE.md row: | … |" line to paste. drawing.md TB25 verified by tests;
   Insert view shows "Show annotations from model" only for a part (live captures; request withdrawn). Assembly
   layout proposed to live (REQUESTS 11-03 02:15), to build the assembly translator once confirmed.
+- 11-03 08:10 SCORE NOW **6/11 documents, 56/78 features** (was 4/11, 51/78 at 05:05): bracket120, knob-tim and
+  untitled-document-chris match to the end too (translator: live's sketch frames are `transformMatrix` in its fetch;
+  a region named by the sketch's own curves is the whole region the face's edges split; a curve several regions
+  share is decided by its shape's other sides; imprinted face pieces each picked once; cap circles by radius; core
+  fixed SKETCH-FACE-IMPRINT and EXTRUDE-OVERLAP-LINES-FACES). Every remaining first difference is a core ticket:
+  CUT-CLOSED-EDGES-SPLIT (bushing2, clamp-abhil, pipeflange), FILLET-SPLIT-EDGE-FACES (bracket03),
+  EXTRUDE-UP-TO-FACE-BEYOND (clamp-hms; live request filed). The 7 unscored documents translate except faces named
+  through later operations (they resolve by live's geometry once refetched) and bracket00's sheet metal.
 - 11-03 06:55: Parasolid export: whole circles / ellipses are ring edges without a vertex (Parasolid's and Onshape's
   own encoding; a cylinder 3 / 2 / 0 in the file, read back the same; kernel export T1 + T2 parasolid tests pass).
   Live request filed (dx-xt-ring samples: the old file with vertices, the new one, a cross-hole tube) to confirm
