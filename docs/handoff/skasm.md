@@ -10,8 +10,11 @@ Waiting on live: **batch 13** (s661–s700: copy the .live.json into crates/sket
 live_fuzz::live_matches; 369 of 430 match now, list in /root/skasm-scratch/fz/new6.txt) and the P2 ball drags (09:40).
 Open fuzz: s653 (see 11:05). Ball drags answered (live 1870, fuzz/skasm-asm-drag-4.live.jsonl): top-view drags toward
 +x / +y all end at the same 6.38° tilt (corner z 14.97, its plan direction pointing at the pointer) for 5 to 40 mm of
-travel; −y 17.57°, front view 9.13°. Not nearest-to-ray nor grab-depth; no rule yet (P2; next: a T2 reader comparing
-ours, then probes at other start poses). Older state follows.
+travel; −y 17.57°, front view 9.13°. 13:30: rule found and queued (1ff7b433): an arcball about the ball's centre
+whose sphere passes through the grabbed point's screen place at half its depth (R² = p0² + (d/2)²), the pointer on
+its rim beyond reach (`Prepared::ball_drag`, only a part whose sole mate is a Ball to fixed geometry); all six within
+0.15° (the rest is live's pixel rounding). Drag probes T2 7/14. Still off: d1 / d5 (Revolute, 1.2°), d4 / d7 (C
+through a chain), d8: maybe the same arcball restricted to the free axis; try it on d1 next. Older state follows.
 
 ## 2026-11-03 04:20 UTC
 Since 01:30, landed: assembly drag from the drag's start (`drag_substeps`), s548 slide, batch 9 / 10 / probes 13 / asm
