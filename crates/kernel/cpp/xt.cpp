@@ -1411,8 +1411,30 @@ struct BodyWriter
     const int nv = vertices.Extent();
     vertex_idx.resize(nv);
     vertex_tol.assign(nv, 0.0);
+    // Ring edges (a whole circle or ellipse) have no vertex, as Parasolid
+    // writes them (live: a cylinder's caps are 2 edges and 0 vertices): their
+    // vertex is left out when no other edge or apex uses it.
+    std::vector<bool> ring(nv, true);
+    for (auto& [fi, v] : apexes)
+      ring[vertices.FindIndex(v) - 1] = false;
+    for (int i = 0; i < ne; ++i)
+    {
+      const TopoDS_Edge& e  = TopoDS::Edge(edges(i + 1));
+      const TopoDS_Vertex a = TopExp::FirstVertex(e), b = TopExp::LastVertex(e);
+      double                  f, l;
+      occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l);
+      while (auto t = occ::down_cast<Geom_TrimmedCurve>(c))
+        c = t->BasisCurve();
+      const bool whole = a.IsSame(b) && edge_tol[i] == 0 && edge_fit[i].IsNull() && (!occ::down_cast<Geom_Circle>(c).IsNull() || !occ::down_cast<Geom_Ellipse>(c).IsNull())
+                         && std::abs(l - f - 2 * M_PI) < 1e-9;
+      if (!whole)
+      {
+        ring[vertices.FindIndex(a) - 1] = false;
+        ring[vertices.FindIndex(b) - 1] = false;
+      }
+    }
     for (int i = 0; i < nv; ++i)
-      vertex_idx[i] = w.alloc();
+      vertex_idx[i] = ring[i] ? 0 : w.alloc();
     for (auto& [fi, v] : apexes)
     {
       XFin x;
@@ -1484,8 +1506,10 @@ struct BodyWriter
       }
       const TopoDS_Edge& e  = TopoDS::Edge(edges(x.edge));
       const int          vi = vertices.FindIndex(x.positive ? TopExp::LastVertex(e) : TopExp::FirstVertex(e)) - 1;
-      x.next_at_vx          = vertex_fin[vi];
-      vertex_fin[vi]        = x.index;
+      if (!vertex_idx[vi])
+        continue;
+      x.next_at_vx   = vertex_fin[vi];
+      vertex_fin[vi] = x.index;
     }
 
     // Surfaces and face senses.
@@ -1646,14 +1670,19 @@ struct BodyWriter
       Node&       n  = add(16, edge_idx[i]);
       n.fields       = {fd(w.next_id++), fp(0), edge_tol[i] > 0 ? ff(edge_tol[i]) : ff_null(), fp(a.positive ? a.index : b.index), fp(i ? edge_idx[i - 1] : 0), fp(i + 1 < ne ? edge_idx[i + 1] : 0), fp(edge_curve[i]), fp(0), fp(0), fp(body)};
     }
+    std::vector<int> kept; // the vertices written (not rings')
     for (int i = 0; i < nv; ++i)
+      if (vertex_idx[i])
+        kept.push_back(i);
+    for (size_t k = 0; k < kept.size(); ++k)
     {
+      const int i  = kept[k];
       const int pt = w.alloc();
       Node&     p  = add(29, pt);
       p.fields     = {fd(w.next_id++), fp(0), fp(vertex_idx[i]), fp(0), fp(0), fv(vertex_pnt(i).XYZ())};
       chain_point.push_back(pt);
       Node& n  = add(18, vertex_idx[i]);
-      n.fields = {fd(w.next_id++), fp(0), fp(vertex_fin[i]), fp(i ? vertex_idx[i - 1] : 0), fp(i + 1 < nv ? vertex_idx[i + 1] : 0), fp(pt), vertex_tol[i] > 0 ? ff(vertex_tol[i]) : ff_null(), fp(body)};
+      n.fields = {fd(w.next_id++), fp(0), fp(vertex_fin[i]), fp(k ? vertex_idx[kept[k - 1]] : 0), fp(k + 1 < kept.size() ? vertex_idx[kept[k + 1]] : 0), fp(pt), vertex_tol[i] > 0 ? ff(vertex_tol[i]) : ff_null(), fp(body)};
     }
     // Boundary geometry chains (next, previous: fields 3 and 4).
     auto chain = [&](const std::vector<int>& v) {
@@ -1671,7 +1700,7 @@ struct BodyWriter
         first_solid_shell = si.back;
     Node& n  = add(12, body);
     n.fields = {fd(w.next_id - 1), fp(0), fp(0), fp(0), fp(0), fp(0), fp(0), ff(1000), ff(1e-8), fp(0), fp(0), fp(0), fu(1), fp(0), fu(solid_body ? 1 : 3), fu(1),
-                fp(first_solid_shell), fp(bs), fp(bc), fp(bp), fp(infinite), fp(ne ? edge_idx[0] : 0), fp(nv ? vertex_idx[0] : 0)};
+                fp(first_solid_shell), fp(bs), fp(bc), fp(bp), fp(infinite), fp(ne ? edge_idx[0] : 0), fp(kept.empty() ? 0 : vertex_idx[kept[0]])};
   }
 };
 
