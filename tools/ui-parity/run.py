@@ -26,6 +26,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CAUSES = {}
 KEYS = ["focus", "dialog", "list", "selection", "features", "parts", "message", "tooltip"]
+# Added later (README "undo", "sketch"): compared once live's recording has them.
+LATER_KEYS = ["undo", "sketch"]
 
 
 def run_one(app, scenario, out, display, timeout):
@@ -140,8 +142,9 @@ def compare(live, ours):
     matched, first = 0, None
     for name, a, b in pairs:
         a = normalize_live(json.loads(json.dumps(a)))
-        a = {k: (a or {}).get(k) for k in KEYS}
-        b = {k: (b or {}).get(k) for k in KEYS}
+        keys = KEYS + [k for k in LATER_KEYS if k in (a or {})]
+        a = {k: (a or {}).get(k) for k in keys}
+        b = {k: (b or {}).get(k) for k in keys}
         d = first_difference(a, b)
         if d is None:
             matched += 1

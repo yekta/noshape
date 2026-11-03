@@ -112,6 +112,26 @@ Every key always present (`null` / `[]` when there is nothing). Texts exactly as
 - `features.rows`: below "Default geometry" (origin and planes left out), as shown; `rollbackAfter`: the row the bar
   sits under.
 
+Two keys added 11-03 (skasm, for the sketch scenarios; the runner compares each once a live recording has it):
+```json
+ "undo":   { "undo": true, "redo": false },
+ "sketch": { "tool": "Line",
+             "entities": ["construction line", "line", "line", "point"],
+             "constraints": ["COINCIDENT", "COINCIDENT", "HORIZONTAL"],
+             "dimensions": [{"kind": "LINEAR", "value": 30}, {"kind": "DIAMETER", "value": 12}] }
+```
+- `undo`: whether the toolbar's Undo and Redo are enabled (live: `[command-id=UNDO_A_CHANGE / REDO_A_CHANGE]` not
+  disabled); in a sketch or dialog, its own history's.
+- `sketch`: `null` unless a sketch is being edited. `tool`: the active sketch tool's tooltip name without its shortcut
+  (`"Line"`, `"Corner rectangle"`, `"Dimension"`, `"Trim"`), `null` when none (select). `entities`: one entry per
+  sketch entity as the sketch lists them (curve end and centre points aren't entities; a lone point is `"point"`):
+  `line`, `circle`, `arc`, `ellipse`, `elliptical arc`, `spline`, `conic`, `point`, prefixed `construction ` when it
+  is, sorted. `constraints`: one per relation, Onshape's type names (`COINCIDENT`, `HORIZONTAL`, `VERTICAL`,
+  `PARALLEL`, `PERPENDICULAR`, `TANGENT`, `EQUAL`, `CONCENTRIC`, `MIDPOINT`, `SYMMETRIC` (REST `MIRROR`), `FIX`,
+  `NORMAL`, `PIERCE`, …), sorted. `dimensions`: the driving ones as `{kind, value}`: `LINEAR` (a length or any
+  distance, mm), `RADIUS` / `DIAMETER` (mm), `ANGLE` (degrees), values rounded to 6 decimals, sorted by kind then
+  value.
+
 ## noshape side
 
 `NOSHAPE_UI_SCRIPT=<scenario.json> NOSHAPE_UI_STATE_OUT=<recording.json> noshape` (crates/app/src/ui_script.rs;

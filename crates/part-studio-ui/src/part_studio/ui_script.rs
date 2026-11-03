@@ -105,7 +105,76 @@ impl PartStudioView {
             "parts": parts,
             "message": message,
             "tooltip": null,
+            "undo": self.ui_undo_state(cx),
+            "sketch": self.ui_sketch_state(cx),
         })
+    }
+
+    /// `undo`: whether the toolbar's Undo and Redo do something (in a sketch
+    /// or dialog, its own history).
+    fn ui_undo_state(&self, cx: &App) -> Value {
+        let (undo, redo) = if self.edit.is_some() {
+            self.draft_history_state()
+        } else {
+            let d = self.doc.read(cx);
+            (d.can_undo(), d.can_redo())
+        };
+        json!({ "undo": undo, "redo": redo })
+    }
+
+    /// `sketch`: the open sketch's tool and content as Onshape's sketch
+    /// lists them (null outside a sketch).
+    fn ui_sketch_state(&self, cx: &App) -> Value {
+        use noshape_sketch::{ConstraintKind as K, EntityKind};
+        let (Some(ed), Some(data)) = (self.sketch.as_ref(), self.sketch_data(cx)) else { return Value::Null };
+        let sk = &data.sketch;
+        let tool = (ed.tool != crate::sketch_mode::Tool::Select).then(|| ed.tool.label().split(" (").next().unwrap_or_default().to_string());
+        let owned: std::collections::HashSet<_> = sk.entities().filter(|e| e.kind() != EntityKind::Point).flat_map(|e| e.point_refs()).collect();
+        let mut entities: Vec<String> = sk
+            .entities()
+            .filter(|e| !e.external && !e.reference_only && !(e.kind() == EntityKind::Point && owned.contains(&e.id)))
+            .map(|e| {
+                let kind = match e.kind() {
+                    EntityKind::Line => "line",
+                    EntityKind::Circle => "circle",
+                    EntityKind::Arc => "arc",
+                    EntityKind::Ellipse => "ellipse",
+                    EntityKind::EllipticalArc => "elliptical arc",
+                    EntityKind::BSpline | EntityKind::FitSpline => "spline",
+                    EntityKind::Conic => "conic",
+                    EntityKind::Point => "point",
+                };
+                if e.construction { format!("construction {kind}") } else { kind.to_string() }
+            })
+            .collect();
+        entities.sort();
+        // A point the tools share between curves is a Coincident in live.
+        let mut users: std::collections::HashMap<_, usize> = std::collections::HashMap::new();
+        for e in sk.entities().filter(|e| e.kind() != EntityKind::Point && !e.external) {
+            let mut pts = e.point_refs().to_vec();
+            pts.sort();
+            pts.dedup();
+            for p in pts {
+                *users.entry(p).or_default() += 1;
+            }
+        }
+        let mut constraints: Vec<String> = users.values().filter(|n| **n > 1).flat_map(|n| std::iter::repeat_n("COINCIDENT".to_string(), n - 1)).collect();
+        let mut dimensions: Vec<(String, f64)> = Vec::new();
+        for c in sk.constraints().filter(|c| c.driving) {
+            let mm = |v: f64| (v * 1e3 * 1e6).round() / 1e6;
+            match &c.kind {
+                K::Length { value, .. } | K::Distance { value, .. } | K::HorizontalDistance { value, .. } | K::VerticalDistance { value, .. } => dimensions.push(("LINEAR".into(), mm(*value))),
+                K::Radius { value, .. } => dimensions.push(("RADIUS".into(), mm(*value))),
+                K::Diameter { value, .. } => dimensions.push(("DIAMETER".into(), mm(*value))),
+                K::Angle { value, .. } | K::ArcAngle { value, .. } => dimensions.push(("ANGLE".into(), (value.to_degrees() * 1e6).round() / 1e6)),
+                k if k.is_dimension() => dimensions.push((k.name().to_uppercase().replace(' ', "_"), c.kind.value().unwrap_or(0.0))),
+                k => constraints.push(k.name().to_uppercase().replace(' ', "_")),
+            }
+        }
+        constraints.sort();
+        dimensions.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
+        let dimensions: Vec<Value> = dimensions.into_iter().map(|(kind, value)| json!({ "kind": kind, "value": value })).collect();
+        json!({ "tool": tool, "entities": entities, "constraints": constraints, "dimensions": dimensions })
     }
 
     /// A selected entity's kind and owner as the parity state names them (an inferred point: its entity's).

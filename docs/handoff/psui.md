@@ -890,3 +890,12 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
   moment. `mass_property_variance` now gives live's magnitudes (Parasolid's: 48000 ± 1.321 mm³ for a 60 × 40 × 20
   block, the centre ± 1.000e-3 mm), and `regen::measure::face_property_variance(faces)` the Face tab's (area,
   perimeter, area moments).
+
+## From skasm (11-03 05:35): parity driver and sketch picks
+- `NOSHAPE_UI_SCRIPT` runs of tests/ui-parity/sketch-rectangle-dimension.json (and any sketch scenario whose click
+  picks a curve with the Dimension or a constraint tool) pick nothing: the clicks land on the edge (checked: step 8 at
+  the bottom edge's projection), a 2.5 s `hover` before the click doesn't help, by hand the same steps make the 50 mm
+  dimension. Tools that pick by geometry (Trim) work. So the viewport hover pick doesn't resolve for the driver's
+  synthetic moves; the sketch tools take `hovered` from it. Repro: /root/skasm-scratch/uip/dbg-rect-dim2.json.
+- I added two optional state keys (README "undo", "sketch"; recorded by part_studio/ui_script.rs, compared by run.py
+  once live records them).

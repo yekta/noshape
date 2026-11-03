@@ -383,7 +383,7 @@ impl PartStudioView {
         });
     }
 
-    fn sketch_data(&self, cx: &App) -> Option<SketchData> {
+    pub(super) fn sketch_data(&self, cx: &App) -> Option<SketchData> {
         self.edit.as_ref().and_then(|e| e.dialog.read(cx).sketch_data().cloned())
     }
 
