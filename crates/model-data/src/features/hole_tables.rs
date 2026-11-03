@@ -414,6 +414,18 @@ pub fn table_level_name(table: &str, path: &[String]) -> Option<&'static str> {
     level_info(table, path).map(|l| l.name)
 }
 
+/// Key of the level following `path` in Onshape's lookup path map
+/// (`"holeType"`, `"size"`, …).
+pub fn table_level_key(table: &str, path: &[String]) -> Option<String> {
+    if let Some(l) = dynamic_level(table, path) {
+        return Some(l.key.clone());
+    }
+    match walk(table, path)? {
+        (Entry::Level(l), _) => Some(l.key.clone()),
+        _ => None,
+    }
+}
+
 /// Default option of the level following `path`.
 pub fn table_level_default(table: &str, path: &[String]) -> Option<String> {
     level_info(table, path).map(|l| l.default)

@@ -274,6 +274,26 @@ impl<'a> Translator<'a> {
                 let default = values.iter().find(|v| v["enumValue"] == want).or_else(|| values.first()).ok_or("configured parameter without values")?;
                 return self.param(k, &default["value"]);
             }
+            // A standard's lookup path, by level name: ours in level order.
+            "BTMParameterLookupTablePath" => {
+                let table = match p["parameterId"].as_str().unwrap_or("") {
+                    "isoHoleTableEx" => "hole.isoEx",
+                    "isoHoleTable" => "hole.iso",
+                    "ansiHoleTableEx" => "hole.ansiEx",
+                    "ansiHoleTable" => "hole.ansi",
+                    other => return Err(format!("lookup table {other} not translated")),
+                };
+                let by_level = p["value"].as_object().ok_or("lookup path without a value")?;
+                let mut path: Vec<String> = Vec::new();
+                while let Some(level) = noshape_model::features::hole_tables::table_level_key(table, &path) {
+                    let Some(v) = by_level.get(&level).and_then(Value::as_str) else { break };
+                    path.push(v.to_string());
+                }
+                if path.len() < by_level.len() {
+                    return Err(format!("lookup path {} only partly in noshape's {table} ({})", Value::Object(by_level.clone()), path.join(" › ")));
+                }
+                Some(json!(path))
+            }
             "BTMParameterFeatureList" => {
                 let ids: Vec<String> = p["featureIds"].as_array().into_iter().flatten().filter_map(Value::as_str).map(|id| self.feature_ids.get(id).map(|o| format!("feature:{o}")).ok_or_else(|| format!("feature {id} was not built"))).collect::<Result<_, _>>()?;
                 Some(json!(ids))
@@ -326,6 +346,38 @@ impl<'a> Translator<'a> {
             if !parts.is_empty() {
                 return Ok(parts);
             }
+        }
+        // qCreatedBy(makeId("Top"), EntityType.FACE): a default plane; of a
+        // Plane feature: its plane.
+        if let Some(fid) = text.split("qCreatedBy(makeId(\"").nth(1).and_then(|r| r.split('"').next())
+            && text.contains("EntityType.FACE")
+        {
+            if let Some(p) = default_plane(&format!("{fid}.planeOp")) {
+                return Ok(vec![p.to_string()]);
+            }
+            if let Some(ours) = self.feature_ids.get(fid) {
+                return Ok(vec![format!("fplane:{ours}")]);
+            }
+        }
+        // qContainsPoint(…EntityType.EDGE / FACE / VERTEX…, vector(x, y, z) * unit).
+        if let Some(rest) = text.split("qContainsPoint(").nth(1)
+            && let Some(v) = rest.split("vector(").nth(1)
+        {
+            let (nums, unit) = v.split_once(')').unwrap_or((v, ""));
+            let c: Vec<f64> = nums.split(',').filter_map(|x| x.trim().parse().ok()).collect();
+            let scale = if unit.contains("millimeter") { 1e-3 } else if unit.contains("inch") { 0.0254 } else if unit.contains("centimeter") { 1e-2 } else { 1.0 };
+            let kind = ["EDGE", "FACE", "VERTEX"].into_iter().find(|k| rest.contains(&format!("EntityType.{k}"))).unwrap_or("EDGE");
+            if c.len() == 3 {
+                let r = LiveRef { kind: kind.into(), point: Some([c[0] * scale, c[1] * scale, c[2] * scale]), ..Default::default() };
+                let key = (k, format!("point:{text}"));
+                self.refs.insert(key.clone(), r);
+                return self.by_geometry(k, &key.1).map(|e| vec![e]);
+            }
+        }
+        // qAllModifiableSolidBodies(): every part.
+        if text.contains("qAllModifiableSolidBodies()") && !text.contains("qOwnedByBody") {
+            let parts = self.call("query_parts", json!({}))?;
+            return Ok(parts["parts"].as_array().into_iter().flatten().filter_map(|p| p["id"].as_str().map(str::to_string)).collect());
         }
         // qCreatedBy(makeId("F…"), EntityType.VERTEX): a sketch's points.
         if let Some(sk) = text.split("qCreatedBy(makeId(\"").nth(1).and_then(|r| r.split('"').next())
