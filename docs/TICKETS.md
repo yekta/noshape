@@ -403,6 +403,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (eval.rs unify_merged; it kept only face merges). bushing2-0-joshua's Extrude 2 5/6/0 as live, clamp-abhil's Hole 2
   10/22/12 as live (T1 kernel core::a_hole_across_a_tubes_seam_leaves_whole_loops). Left: bushing's Extrude 4
   (18/42/26, live 18/40/24) and pipeflange-steven's Extrude 3 (24/46/20, live 24/44/16), other shapes of the same.
+  dx 11-03 17:15: one more, motor-mount-jack's Extrude 2 (a slot of two ellipses and lines, Remove Blind 25 mm, into
+  the tube r14.35 / r12.1 × 114 mm of Extrude 1): ours 7/12/4, live 6/8/0 (its first difference, run 37).
   core 11-03 09:45: pipeflange-steven's Extrude 3 as live too (24/44/16): a loop's pieces are joined wherever OCCT's
   seam split them (a vertex at u = 0 of a periodic face, no seam there now), also when an earlier unify moved the
   seam; the pieces' curves concatenated exactly (3D and on both faces, one parameter: boolean.cpp concat_shifted), so
