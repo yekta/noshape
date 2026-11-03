@@ -888,11 +888,13 @@ fn asm_drag_probes_match_live() {
             let origin = built.clone();
             let at_start = parts.ev.evaluate(&parts.doc, &origin, &SolveOptions::default(), None);
             let start: std::collections::HashMap<_, _> = at_start.solved.placements.iter().cloned().collect();
+            let mut landed = true;
             for k in 1..=25 {
                 let to = from + step * (k as f64 / 25.0);
                 built = origin.clone();
                 let opts = SolveOptions { drags: vec![(inst, local, to)], drag_view: Some(view_dir), start: Some(start.clone()), skip_dof: true, ..Default::default() };
-                let solved = at_start.prepared.solve_drag(&opts, &[from]);
+                let (solved, l) = at_start.prepared.solve_drag(&opts, &[from], landed);
+                landed = l;
                 for (id, p) in &solved.placements {
                     if let Some(i) = built.instances.iter_mut().find(|i| i.id == *id) {
                         i.placement = *p;

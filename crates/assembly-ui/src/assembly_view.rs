@@ -194,6 +194,8 @@ struct DragState {
     /// instances solves each step from there (live asm drag probes 3: the
     /// end pose depends only on where the drag ends).
     origin: HashMap<InstanceId, Placement>,
+    /// The last step landed the dragged points (`Prepared::solve_drag`).
+    landed: bool,
 }
 
 /// Snap mode drag: a connector of one instance dragged onto another's.
@@ -2574,6 +2576,7 @@ impl AssemblyView {
                         nested: None,
                         solved: None,
                         origin: self.result.solved.placements.iter().cloned().collect(),
+                        landed: true,
                     });
                     return;
                 }
@@ -2638,6 +2641,7 @@ impl AssemblyView {
                     nested,
                     solved: None,
                     origin: self.result.solved.placements.iter().cloned().collect(),
+                    landed: true,
                 });
             }
             ViewportEvent::ToolDrag { position, .. } => {
@@ -2955,6 +2959,7 @@ impl AssemblyView {
             nested: None,
             solved: None,
             origin: self.result.solved.placements.iter().cloned().collect(),
+            landed: true,
         });
     }
 
@@ -3139,20 +3144,22 @@ impl AssemblyView {
         // `NOSHAPE_PERF`: a.drag_solve (background solve), a.drag_apply (UI
         // thread: apply + scene rebuild), a.drag_step (target to applied).
         let asked = std::time::Instant::now();
+        let try_one = d.landed;
         cx.spawn(async move |this, cx| {
-            let solved = cx
+            let (solved, landed) = cx
                 .background_spawn(async move {
                     let t = std::time::Instant::now();
-                    let mut s = if from.is_empty() { prepared.solve(&opts) } else { prepared.solve_drag(&opts, &from) };
+                    let (mut s, landed) = if from.is_empty() { (prepared.solve(&opts), true) } else { prepared.solve_drag(&opts, &from, try_one) };
                     noshape_render::perf::record("a.drag_solve", t.elapsed());
                     s.dof = dof;
                     s.instance_dof = instance_dof;
-                    s
+                    (s, landed)
                 })
                 .await;
             let _ = this.update(cx, |this: &mut Self, cx| {
                 let Some(d) = &mut this.drag else { return };
                 d.busy = false;
+                d.landed = landed;
                 let again = d.pending.is_some();
                 let t = std::time::Instant::now();
                 this.apply_solved(solved, cx);

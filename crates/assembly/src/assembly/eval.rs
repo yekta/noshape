@@ -524,12 +524,18 @@ impl Prepared {
     /// within the pointer's landing in 4).
     /// A move one solve lands (every dragged point on its target, or its
     /// pointer ray) takes that solve alone: a translation needs no substeps.
-    pub fn solve_drag(&self, opts: &SolveOptions, from: &[DVec3]) -> Solved {
+    /// `try_one`: the last step landed, so try one solve first (a drag the
+    /// mates hold off its pointer goes straight to the substeps). Returns
+    /// whether this step landed.
+    pub fn solve_drag(&self, opts: &SolveOptions, from: &[DVec3], try_one: bool) -> (Solved, bool) {
         let moved = from.iter().zip(&opts.drags).map(|(p0, (_, _, t))| (*t - *p0).length()).fold(0.0, f64::max);
         let n = ((moved / 0.002).ceil() as usize).clamp(1, 4);
-        let one = self.solve(opts);
-        if n == 1 || self.drags_land(&one, opts) {
-            return one;
+        if try_one || n == 1 {
+            let one = self.solve(opts);
+            let landed = self.drags_land(&one, opts);
+            if landed || n == 1 {
+                return (one, landed);
+            }
         }
         let mut o = opts.clone();
         let mut s = None;
@@ -544,7 +550,9 @@ impl Prepared {
             }
             s = Some(self.solve(&o));
         }
-        s.expect("at least one substep")
+        let s = s.expect("at least one substep");
+        let landed = self.drags_land(&s, opts);
+        (s, landed)
     }
 
     /// Every dragged point of `opts` within 1 µm of its target (of its

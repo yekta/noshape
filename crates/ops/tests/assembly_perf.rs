@@ -154,11 +154,12 @@ pub(crate) fn drag(ctx: &mut Ctx, path: &str, inst: InstanceId, dir: DVec3, step
     let grab = DVec3::from(p0.translation) + local;
     // As the app: each step from the drag's start, in substeps.
     let origin: HashMap<InstanceId, Placement> = res.solved.placements.iter().cloned().collect();
-    let (mut solves, mut frames) = (Vec::new(), Vec::new());
+    let (mut solves, mut frames, mut landed) = (Vec::new(), Vec::new(), true);
     for i in 1..=steps {
         let target = grab + dir * 1e-3 * i as f64;
         let t = Instant::now();
-        let s = res.prepared.solve_drag(&SolveOptions { drags: vec![(inst, local, target)], start: Some(origin.clone()), skip_dof: true, ..Default::default() }, &[grab]);
+        let (s, l) = res.prepared.solve_drag(&SolveOptions { drags: vec![(inst, local, target)], start: Some(origin.clone()), skip_dof: true, ..Default::default() }, &[grab], landed);
+        landed = l;
         solves.push(t.elapsed());
         // The app's drag step (assembly_view move_scene): the scene's
         // instances follow, no rebuild.
