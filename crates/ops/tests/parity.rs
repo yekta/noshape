@@ -232,3 +232,22 @@ fn an_ellipse_is_rebuilt() {
     let r = run_model("ellipse", &features, &live, "");
     assert_eq!((r.matching, r.compared), (1, 1), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
+
+/// The fillet's edge placed from the bodydetails live's line after the
+/// extrude carries (no refs.jsonl line for it): of the four vertical edges,
+/// the one at (60, 40).
+#[test]
+fn an_edge_is_placed_from_live_bodydetails() {
+    let (features, mut live, refs) = block_model();
+    let refs: String = refs.lines().filter(|l| !l.contains("JHt")).collect::<Vec<_>>().join("\n");
+    let v = |x: f64, y: f64, z: f64| json!({ "x": x, "y": y, "z": z });
+    let edge = |id: &str, x: f64, y: f64| json!({ "id": id, "curve": { "type": "LINE" }, "geometry": { "midPoint": v(x, y, 0.01), "length": 0.02 } });
+    live[1]["bodies"] = json!([{ "id": "JHD", "type": "SOLID", "faces": [], "vertices": [], "edges": [edge("JHB", 0.0, 0.0), edge("JHN", 0.06, 0.0), edge("JHt", 0.06, 0.04), edge("JHp", 0.0, 0.04)] }]);
+    for l in &mut live {
+        for p in l["parts"].as_array_mut().into_iter().flatten() {
+            p.as_object_mut().unwrap().remove("area");
+        }
+    }
+    let r = run_model("block-bodies", &features, &live, &refs);
+    assert_eq!((r.matching, r.compared), (3, 3), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}

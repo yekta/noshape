@@ -23,6 +23,8 @@ pub struct LiveRef {
     pub normal: Option<[f64; 3]>,
     pub direction: Option<[f64; 3]>,
     pub measure: Option<f64>,
+    /// Surface or curve type in our query_entities words ("plane", "line"…).
+    pub geometry: Option<String>,
 }
 
 /// What became of one Onshape feature.
@@ -77,7 +79,7 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
     for line in text.lines().filter(|l| !l.trim().is_empty()) {
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
         let (Some(k), Some(id)) = (v["index"].as_u64(), v["id"].as_str()) else { continue };
-        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64() };
+        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64(), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())) };
         out.insert((k as usize, id.to_string()), r);
     }
     out
@@ -394,19 +396,8 @@ impl<'a> Translator<'a> {
                 let axis = (0..3).max_by(|a, b| n[*a].abs().total_cmp(&n[*b].abs())).unwrap_or(2);
                 Ok(["plane:right", "plane:front", "plane:top"][axis].to_string())
             }
-            "FACE" | "PLANE" => {
-                let mut a = json!({ "kind": "faces", "at": [mm(p)] });
-                if let Some(n) = r.normal {
-                    a["normal"] = json!(n);
-                }
-                if let Some(f) = pick(&self.call("query_entities", a.clone())?, "faces") {
-                    return Ok(f);
-                }
-                // The normal's sense isn't always certain: the nearest face.
-                a.as_object_mut().map(|m| m.remove("normal"));
-                pick(&self.call("query_entities", a)?, "faces").ok_or_else(|| format!("{id}: no face of ours at {:?} mm", mm(p)))
-            }
-            "EDGE" => pick(&self.call("query_entities", json!({ "kind": "edges", "at": [mm(p)] }))?, "edges").ok_or_else(|| format!("{id}: no edge of ours at {:?} mm", mm(p))),
+            "FACE" | "PLANE" => self.nearest("faces", &r).ok_or_else(|| format!("{id}: no face of ours at {:?} mm", mm(p))),
+            "EDGE" => self.nearest("edges", &r).ok_or_else(|| format!("{id}: no edge of ours at {:?} mm", mm(p))),
             "VERTEX" => pick(&self.call("query_entities", json!({ "kind": "vertices", "at": [mm(p)] }))?, "vertices").ok_or_else(|| format!("{id}: no vertex of ours at {:?} mm", mm(p))),
             "BODY" => {
                 let parts = self.call("query_parts", json!({}))?;
@@ -423,6 +414,29 @@ impl<'a> Translator<'a> {
             "SKETCH_REGION" => self.region_at(p, r.measure),
             other => Err(format!("{id}: reference kind {other} not mapped")),
         }
+    }
+
+    /// Our face or edge for live's: of its type, nearest live's point, the
+    /// first whose area / length is live's (a face's point is its box
+    /// centre, which may lie in a hole or on an axis), else the nearest.
+    fn nearest(&mut self, kind: &str, r: &LiveRef) -> Option<String> {
+        let p = r.point?;
+        let mut a = json!({ "kind": kind, "near": mm(p), "limit": 8 });
+        if let Some(t) = &r.geometry {
+            a[if kind == "faces" { "surface" } else { "curve" }] = json!(t);
+        }
+        if let Some(n) = r.normal {
+            a["normal"] = json!(n);
+        }
+        let mut found = self.call("query_entities", a.clone()).ok()?[kind].as_array().cloned().unwrap_or_default();
+        if found.is_empty() && r.normal.is_some() {
+            // The normal's sense isn't always certain.
+            a.as_object_mut().map(|m| m.remove("normal"));
+            found = self.call("query_entities", a).ok()?[kind].as_array().cloned().unwrap_or_default();
+        }
+        let (key, scale) = if kind == "faces" { ("area", 1e6) } else { ("length", 1e3) };
+        let same = |e: &&Value| r.measure.zip(e[key].as_f64()).is_some_and(|(m, ours)| (ours / scale - m).abs() <= 1e-5 * m.abs() + 1e-12);
+        found.iter().find(same).or(found.first()).and_then(|e| e["id"].as_str()).map(str::to_string)
     }
 
     /// The sketch region of ours with live's area (when given) nearest
@@ -706,6 +720,12 @@ fn sampled(e: &Value) -> Option<Vec<[f64; 2]>> {
     }
 }
 
+/// Onshape's surface / curve type names in query_entities' words.
+fn our_type(t: Option<&str>) -> Option<String> {
+    let t = t?.to_lowercase();
+    ["plane", "cylinder", "cone", "sphere", "torus", "line", "circle", "ellipse"].contains(&t.as_str()).then_some(t)
+}
+
 /// Live's referenced geometry from the raw `bodydetails` bodies a
 /// live.jsonl line carries (`bodies`): line k describes the state feature
 /// k + 1 references. Faces get a point on their surface near their box
@@ -728,7 +748,7 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
                 }
                 let c = [(mn[0] + mx[0]) / 2.0, (mn[1] + mx[1]) / 2.0, (mn[2] + mx[2]) / 2.0];
                 let s = &f["surface"];
-                let mut r = LiveRef { kind: "FACE".into(), point: Some(c), measure: f["area"].as_f64(), ..Default::default() };
+                let mut r = LiveRef { kind: "FACE".into(), point: Some(c), measure: f["area"].as_f64(), geometry: our_type(s["type"].as_str()), ..Default::default() };
                 if s["type"] == "PLANE"
                     && let (Some(o), Some(n)) = (v3(&s["origin"]), v3(&s["normal"]))
                 {
@@ -743,7 +763,7 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
             }
             for e in b["edges"].as_array().into_iter().flatten() {
                 if let (Some(id), Some(p)) = (e["id"].as_str(), v3(&e["geometry"]["midPoint"])) {
-                    out.insert((at, id.to_string()), LiveRef { kind: "EDGE".into(), point: Some(p), measure: e["geometry"]["length"].as_f64(), ..Default::default() });
+                    out.insert((at, id.to_string()), LiveRef { kind: "EDGE".into(), point: Some(p), measure: e["geometry"]["length"].as_f64(), geometry: our_type(e["curve"]["type"].as_str()), ..Default::default() });
                 }
             }
             for v in b["vertices"].as_array().into_iter().flatten() {
