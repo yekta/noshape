@@ -1707,8 +1707,10 @@ impl SketchEditor {
         }
         self.cursor = Some(p);
         // A dimension being placed takes the press (live: ui-parity
-        // sketch-dimension-edit, its value over the line's Horizontal glyph).
-        if self.tool == Tool::Dimension && !self.picks.is_empty() {
+        // sketch-dimension-edit, its value over the line's Horizontal glyph),
+        // and so does a drawing tool (live ui-parity revolve-dialog-axis: a
+        // Line started over a rectangle's glyph draws).
+        if (self.tool == Tool::Dimension && !self.picks.is_empty()) || self.tool.draws() {
             self.pressed_label = None;
             self.pressed_glyph = None;
         }
@@ -8690,6 +8692,23 @@ mod tests {
         assert!(d.sketch.entity(l).unwrap().construction && ed.construction && ed.construction_shown(&d.sketch));
         ed.construction = false;
         assert!(ed.construction_shown(&d.sketch), "a construction line selected alone");
+    }
+
+    /// Live (ui-parity revolve-dialog-axis): a Line clicked over a rectangle's
+    /// constraint glyph draws; the glyph doesn't take the press.
+    #[test]
+    fn a_line_started_over_a_glyph_draws() {
+        let (mut ed, mut d) = editor(Tool::CornerRect);
+        click(&mut ed, &mut d, v(0.010, 0.0));
+        click(&mut ed, &mut d, v(0.020, 0.020));
+        let glyph = d.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Horizontal { .. })).map(|c| (c.id, c.kind.entities()[0])).expect("a Horizontal");
+        ed.set_tool(Tool::Line);
+        for p in [v(0.0, 0.0), v(0.0, 0.020)] {
+            ed.pressed_glyph = Some((glyph.0, glyph.1, false));
+            click(&mut ed, &mut d, p);
+        }
+        ed.cancel();
+        assert_eq!(count(&d, EntityKind::Line), 5, "the rectangle and the new line");
     }
 
     /// Live (ui-parity sketch-dimension-edit): the placement click lands on

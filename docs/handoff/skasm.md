@@ -1425,7 +1425,9 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   click on a line only selects it (selection 1, still one line) and Enter then makes the slot (step 9: 2 arcs, 3
   lines, same as ours); ours makes the slot on the click itself (scene sketch_mode.rs `Tool::Slot` → `make_slots`).
   psui's readout and driver are right there (ours reads 0 because nothing is selected after our click).
-- revolve-dialog-axis (x40 recording; Front plane, `g` rectangle (10,0)-(20,20), then `l`, clicks (0,0) and (0,20)):
+- (skasm 11-03 21:28: fixed: the clicks landed on the rectangle's constraint glyphs, whose press the editor took
+  whatever the tool; a drawing tool now draws over a glyph. T1 sketch_mode a_line_started_over_a_glyph_draws.)
+  revolve-dialog-axis (x40 recording; Front plane, `g` rectangle (10,0)-(20,20), then `l`, clicks (0,0) and (0,20)):
   live makes the line (5 entities), ours none. psui instrumented the app on the driver's run: both clicks reach the
   Line tool (ToolDown → `tool_down` with the right sketch points, (0.0029, 0) and (0, 0.0199)) but the first returns
   no change and doesn't start the line; the second then starts one (left pending at (0,20)). Through the UI tests'
