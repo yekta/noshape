@@ -94,6 +94,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
   kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
+- 11-03 16:10 Parasolid import: a ring face with holes (cf-wiring's fan hub, 7 blade roots) gets its seam on a
+  straight (u, v) path between the rings that misses every root (xt_read.cpp place_ring_vertices: the rings' circle
+  edges restarted there; seam_ring keeps the holes): Part 2 reads 40 / 88 / 56 as live (was 90 / 58). T2 kernel
+  export::a_hub_seam_cuts_no_blade_root (corpus file, NOSHAPE_PARITY_MODELS). Import matrix: 145/146 unchanged; the
+  one "change" (dx-nist-assembly.x_t) was the matrix querying the .step's tab of the same name. Hence: a tab name two
+  tabs share is now an error giving both ids (ops find_tab; e2e a_shared_tab_name_asks_for_the_id), never silently
+  the first tab.
 - 11-03 14:55 after run 29: Hole tip faces (HOLE_FACE "tip"), sketch text (BTMSketchTextEntity → sketch_text at
   live's baseline start / ascent / font, turned along its baseline), studio blobs (studios/<eid>.blob → file tabs, no
   placeholder), a vertex by id that is a sketch point; FeatureScript: only a newer std import is refused (a studio of a

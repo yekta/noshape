@@ -335,8 +335,16 @@ pub fn find_tab(doc: &Document, key: &str) -> Result<TabId, OpError> {
     if let Some(t) = doc.tabs.iter().find(|t| t.id.to_string() == k) {
         return Ok(t.id);
     }
-    if let Some(t) = doc.tabs.iter().find(|t| t.name == k).or_else(|| doc.tabs.iter().find(|t| t.name.eq_ignore_ascii_case(k))) {
+    let mut named: Vec<&noshape_model::document::Tab> = doc.tabs.iter().filter(|t| t.name == k).collect();
+    if named.is_empty() {
+        named = doc.tabs.iter().filter(|t| t.name.eq_ignore_ascii_case(k)).collect();
+    }
+    if let [t] = named[..] {
         return Ok(t.id);
+    }
+    if !named.is_empty() {
+        let ids: Vec<String> = named.iter().map(|t| format!("{} ({})", t.id, t.content.kind_name())).collect();
+        return Err(OpError::invalid(format!("{} tabs are named `{key}`; give one by id: {}", named.len(), ids.join(", "))).with_param("tab"));
     }
     let names: Vec<String> = doc.ordered_tabs().iter().map(|t| format!("{} ({})", t.name, t.content.kind_name())).collect();
     Err(OpError::not_found(format!("no tab `{key}`; tabs: {}", names.join(", "))).with_param("tab"))

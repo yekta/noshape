@@ -340,6 +340,24 @@ fn assembly_with_mates() {
     assert_eq!(r["name"], "Pin guide", "a custom name stays: {r}");
 }
 
+/// Two tabs of one name (two imports of one file): the name is an error that
+/// gives both ids, never silently the first tab; each id works.
+#[test]
+fn a_shared_tab_name_asks_for_the_id() {
+    let path = scratch("shared-tab-name.noshape");
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let a = call(&mut ctx, "tab_create", json!({ "kind": "partstudio", "name": "Bracket" }))["tab"]["id"].as_str().unwrap().to_string();
+    let b = call(&mut ctx, "tab_create", json!({ "kind": "partstudio", "name": "Bracket" }))["tab"]["id"].as_str().unwrap().to_string();
+    let e = try_call(&mut ctx, "query_parts", json!({ "tab": "Bracket" })).unwrap_err().to_json();
+    let msg = e["message"].as_str().unwrap();
+    assert_eq!(e["param"], "tab", "{e}");
+    assert!(msg.contains("2 tabs are named `Bracket`") && msg.contains(&a) && msg.contains(&b), "{msg}");
+    for id in [&a, &b] {
+        call(&mut ctx, "query_parts", json!({ "tab": id }));
+    }
+}
+
 /// A configured block: a List input sets the extrude depth, a Checkbox
 /// suppresses the hole, a configuration Variable drives the width.
 #[test]
