@@ -94,6 +94,16 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
   kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
+- 11-03 16:45 translator (runs 32–34): regions named by id that make one part (a board split by a line) are the
+  regions inside the part's box that fill it; an id-only region query whose sketch has more regions than ids is
+  placed by the bodies, not given every region; a sketch's unique vertices are its curves' ends (construction too)
+  and points, one per position (Point pattern's locations); a vertex live gives no geometry for is placed where a
+  sketch made its point coincident with it (Point pattern's reference); in a sketch's live.jsonl line only the
+  sketch's own bodies are regions (the parts' faces stayed faces: fixes 15:31's clamp-hms / cf-hose-routing
+  regression). cf-point-pattern 7/7 (custom 1/1). Score **22/50, 258/398 (custom 5/49)** (run 31: 18/50, 232/398).
+  T1 parity::regions_by_id_that_make_one_part, a_sketch_line_keeps_the_parts_faces. Blocked on live: cf-fix-pcb
+  (ids-only bodies), cf-belt / clamp-hms holes (in-feature mate connector queries). Live refetched cf-wiring 16:23:
+  sync /root/parity/models to vibe5 before a run (pm-daily.sh does).
 - 11-03 16:10 Parasolid import: a ring face with holes (cf-wiring's fan hub, 7 blade roots) gets its seam on a
   straight (u, v) path between the rings that misses every root (xt_read.cpp place_ring_vertices: the rings' circle
   edges restarted there; seam_ring keeps the holes): Part 2 reads 40 / 88 / 56 as live (was 90 / 58). T2 kernel

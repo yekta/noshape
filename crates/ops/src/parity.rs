@@ -817,13 +817,15 @@ impl<'a> Translator<'a> {
         self.regions_of_new_bodies(k, &ours, &g, ids)
     }
 
-    /// Fewer regions named than the sketch has: the ones whose outer box is
-    /// the box of a part feature `k` made (live's line after it), seen along
-    /// the sketch's normal (an extruded part's footprint).
+    /// Fewer regions named than the sketch has: the ones a part feature `k`
+    /// made (live's line after it) covers, seen along the sketch's normal (an
+    /// extruded part's footprint): the region with the part's box, else the
+    /// regions inside that box which together fill it (a board split by a
+    /// line).
     fn regions_of_new_bodies(&mut self, k: usize, _sketch: &str, g: &Value, ids: usize) -> Option<Vec<String>> {
         let before: std::collections::HashSet<&String> = self.refs.keys().filter(|(j, _)| *j == k).map(|(_, id)| id).collect();
         let new: Vec<[[f64; 3]; 2]> = self.refs.iter().filter(|((j, id), r)| *j == k + 1 && r.kind == "BODY" && !before.contains(id)).filter_map(|(_, r)| r.bbox).collect();
-        if new.len() != ids {
+        if new.is_empty() || new.len() > ids {
             return None;
         }
         let unit = per_unit(&g["units"]);
@@ -832,23 +834,32 @@ impl<'a> Translator<'a> {
             let d = [p[0] - o[0], p[1] - o[1], p[2] - o[2]];
             [d[0] * x[0] + d[1] * x[1] + d[2] * x[2], d[0] * y[0] + d[1] * y[1] + d[2] * y[2]]
         };
-        let regions: Vec<&Value> = g["regions"].as_array()?.iter().filter(|r| r["imprinted"] != true).collect();
+        let bounds = |r: &Value| -> Option<Box2> {
+            let v = |a: &Value, i: usize| a[i].as_f64().map(|c| c * unit);
+            let (lo, hi) = (&r["bounds"]["min"], &r["bounds"]["max"]);
+            Some(([v(lo, 0)?, v(lo, 1)?], [v(hi, 0)?, v(hi, 1)?]))
+        };
+        let regions: Vec<(&str, Box2)> = g["regions"].as_array()?.iter().filter(|r| r["imprinted"] != true).filter_map(|r| Some((r["id"].as_str()?, bounds(r)?))).collect();
+        let same = |a: f64, b: f64| (a - b).abs() < 1e-6;
         let mut out = Vec::new();
         for [lo, hi] in new {
             // The box's corners in the sketch plane.
             let corners: Vec<[f64; 2]> = (0..8).map(|i| to2([if i & 1 == 0 { lo[0] } else { hi[0] }, if i & 2 == 0 { lo[1] } else { hi[1] }, if i & 4 == 0 { lo[2] } else { hi[2] }])).collect();
             let (min, max) = corners.iter().fold(([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]), |(a, b), p| ([a[0].min(p[0]), a[1].min(p[1])], [b[0].max(p[0]), b[1].max(p[1])]));
-            let fits = |r: &&&Value| {
-                let (rmin, rmax) = (&r["bounds"]["min"], &r["bounds"]["max"]);
-                let v = |a: &Value, i: usize| a[i].as_f64().map_or(f64::NAN, |c| c * unit);
-                (0..2).all(|i| (v(rmin, i) - min[i]).abs() < 1e-6 && (v(rmax, i) - max[i]).abs() < 1e-6)
-            };
-            let found: Vec<&&Value> = regions.iter().filter(fits).collect();
             // The one with that box (a hole's disc inside the same circle has a smaller one).
-            let [one] = found.as_slice() else { return None };
-            out.push(one["id"].as_str()?.to_string());
+            let exact: Vec<&str> = regions.iter().filter(|(_, (rl, rh))| (0..2).all(|i| same(rl[i], min[i]) && same(rh[i], max[i]))).map(|(id, _)| *id).collect();
+            if let [one] = exact.as_slice() {
+                out.push(one.to_string());
+                continue;
+            }
+            let inside: Vec<&(&str, Box2)> = regions.iter().filter(|(_, (rl, rh))| (0..2).all(|i| rl[i] > min[i] - 1e-6 && rh[i] < max[i] + 1e-6)).collect();
+            let union = inside.iter().fold(([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]), |(a, b), (_, (rl, rh))| ([a[0].min(rl[0]), a[1].min(rl[1])], [b[0].max(rh[0]), b[1].max(rh[1])]));
+            if inside.len() < 2 || !(0..2).all(|i| same(union.0[i], min[i]) && same(union.1[i], max[i])) {
+                return None;
+            }
+            out.extend(inside.iter().map(|(id, _)| id.to_string()));
         }
-        Some(out)
+        (out.len() == ids).then_some(out)
     }
 
     /// A revolve's axis named by id alone: the last sketch's one
@@ -995,12 +1006,30 @@ impl<'a> Translator<'a> {
         {
             return Ok(vec![format!("mc:{ours}.0")]);
         }
-        // A sketch's vertices (Point pattern's locations): its points.
+        // A sketch's vertices (Point pattern's locations): its curves' ends
+        // (construction ones too) and its points, one per position.
         if q["btType"].as_str().is_some_and(|t| t.starts_with("BTMIndividualSketchUniqueVerticesQuery"))
             && let Some(ours) = q["featureId"].as_str().and_then(|f| self.feature_ids.get(f)).cloned()
         {
             let g = self.call("sketch_get", json!({ "sketch": ours }))?;
-            return Ok(g["entities"].as_array().into_iter().flatten().filter(|e| e["type"] == "point" && e["construction"] != true).filter_map(|e| e["id"].as_str().map(str::to_string)).collect());
+            let entities: Vec<&Value> = g["entities"].as_array().into_iter().flatten().collect();
+            let ends: Vec<&str> = entities.iter().flat_map(|e| [&e["start_point"], &e["end_point"]]).filter_map(Value::as_str).collect();
+            let centres: Vec<&str> = entities.iter().filter_map(|e| e["center_point"].as_str()).collect();
+            let mut seen: Vec<[f64; 2]> = Vec::new();
+            let mut out = Vec::new();
+            for e in entities.iter().filter(|e| e["type"] == "point") {
+                let Some(id) = e["id"].as_str() else { continue };
+                let end = ends.contains(&id);
+                if !end && (centres.contains(&id) || e["construction"] == true) {
+                    continue;
+                }
+                let Some(at) = e["at"][0].as_f64().zip(e["at"][1].as_f64()).map(|(u, v)| [u, v]) else { continue };
+                if !seen.iter().any(|p| (p[0] - at[0]).hypot(p[1] - at[1]) < 1e-9) {
+                    seen.push(at);
+                    out.push(id.to_string());
+                }
+            }
+            return Ok(out);
         }
         let ids: Vec<String> = q["deterministicIds"].as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect();
         let text = q["queryString"].as_str().unwrap_or("");
@@ -1010,9 +1039,11 @@ impl<'a> Translator<'a> {
         // A sketch region query without its text (live's UI fetch): the
         // regions of its sketch, as Onshape writes it.
         let written;
+        let mut named = None;
         let text = match (text.is_empty(), q["btType"].as_str().is_some_and(|t| t.starts_with("BTMIndividualSketchRegionQuery")), q["featureId"].as_str()) {
             (true, true, Some(sk)) => {
                 written = format!("query = qSketchRegion(id + \"{sk}\", {});", q["filterInnerLoops"] == true);
+                named = (!ids.is_empty()).then_some(ids.len());
                 written.as_str()
             }
             _ => text,
@@ -1200,7 +1231,13 @@ impl<'a> Translator<'a> {
                     o["id"] != r["id"] && !mine.is_empty() && mine.iter().all(|c| holes.contains(c))
                 })
             };
-            return Ok(regions.iter().filter(|r| !outer_only || !inner(r)).filter_map(|r| r["id"].as_str().map(str::to_string)).collect());
+            let found: Vec<String> = regions.iter().filter(|r| !outer_only || !inner(r)).filter_map(|r| r["id"].as_str().map(str::to_string)).collect();
+            // Some of the sketch's regions named by id (one id each): which
+            // is left to the bodies they made.
+            if let Some(n) = named.filter(|n| *n != found.len()) {
+                return Err(format!("query not mapped (no live geometry for {n} of the sketch's {} regions)", found.len()));
+            }
+            return Ok(found);
         }
         Err(format!("query not mapped (no live geometry for {}): {}", if ids.is_empty() { "it".to_string() } else { ids.join(", ") }, text.chars().take(80).collect::<String>()))
     }
@@ -2144,6 +2181,9 @@ impl<'a> Translator<'a> {
                 }
             }
             if external {
+                if ty == "COINCIDENT" {
+                    self.pin_external_vertex(k, oid, c);
+                }
                 *missed.entry(format!("{ty} to external geometry")).or_default() += 1;
                 continue;
             }
@@ -2180,6 +2220,34 @@ impl<'a> Translator<'a> {
             Ok(ids) if ids.len() == 1 => ids.into_iter().next(),
             _ => None,
         }
+    }
+
+    /// A vertex live gives no geometry for (a sketch's point in ids-only
+    /// lines), placed where sketch `oid` makes one of its points coincident
+    /// with it (live's solve), for later queries naming it.
+    fn pin_external_vertex(&mut self, k: usize, oid: &str, c: &Value) {
+        let params = c["parameters"].as_array().into_iter().flatten();
+        let mut local = None;
+        let mut id = None;
+        for p in params {
+            let n = p["parameterId"].as_str().unwrap_or("");
+            if n.starts_with("local") {
+                local = p["value"].as_str().filter(|v| !v.is_empty());
+            } else if n.starts_with("external")
+                && let [q] = p["queries"].as_array().map(Vec::as_slice).unwrap_or_default()
+                && let Some([one]) = q["deterministicIds"].as_array().map(Vec::as_slice)
+            {
+                id = one.as_str();
+            }
+        }
+        let (Some(local), Some(id)) = (local, id) else { return };
+        if self.refs.keys().any(|(_, i)| i == id) {
+            return;
+        }
+        let Some(&[o, x, y]) = self.frames.get(oid) else { return };
+        let Some([u, v]) = self.solved.get(&(oid.to_string(), local.to_string())).and_then(|g| Some([g["point"][0].as_f64()?, g["point"][1].as_f64()?])) else { return };
+        let at = [0, 1, 2].map(|i| o[i] + u * x[i] + v * y[i]);
+        self.refs.insert((k, id.to_string()), LiveRef { kind: "VERTEX".into(), point: Some(at), ..Default::default() });
     }
 
     /// Where an angle dimension's label goes (ours, metres) so it measures
@@ -2640,10 +2708,16 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
     // A type as `{ "type": … }` or the string alone.
     let kind = |v: &Value| v["type"].as_str().or(v.as_str()).map(str::to_string);
     let mut out = HashMap::new();
+    let body_ids = |l: &Value| -> Vec<String> { l["bodies"].as_array().into_iter().flatten().filter_map(|b| b["id"].as_str().map(str::to_string)).collect() };
+    let held: HashMap<u64, Vec<String>> = lines.iter().filter_map(|l| Some((l["index"].as_u64()?, body_ids(l)))).collect();
     for line in lines {
         let (Some(k), Some(bodies)) = (line["index"].as_u64(), line["bodies"].as_array()) else { continue };
         let at = k as usize + 1;
+        let before = k.checked_sub(1).and_then(|j| held.get(&j));
         for b in bodies {
+            // A sketch's line: the bodies it made are its own (not the parts
+            // before it), their faces its regions.
+            let sketch_body = line["type"] == "newSketch" && b["type"] != "SOLID" && b["id"].as_str().is_none_or(|id| before.is_none_or(|ids| !ids.iter().any(|x| x == id)));
             let mut lo = [f64::INFINITY; 3];
             let mut hi = [f64::NEG_INFINITY; 3];
             for f in b["faces"].as_array().into_iter().flatten() {
@@ -2655,8 +2729,7 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
                 let c = [(mn[0] + mx[0]) / 2.0, (mn[1] + mx[1]) / 2.0, (mn[2] + mx[2]) / 2.0];
                 let s = &f["surface"];
                 let surface = kind(s);
-                // A sketch's line: its faces are its regions.
-                let kind = if line["type"] == "newSketch" { "SKETCH_REGION" } else { "FACE" };
+                let kind = if sketch_body { "SKETCH_REGION" } else { "FACE" };
                 let mut r = LiveRef { kind: kind.into(), point: Some(c), measure: f["area"].as_f64(), geometry: our_type(surface.as_deref()), ..Default::default() };
                 // The compact fetch: origin and the outward normal beside the type.
                 if surface.as_deref() == Some("PLANE")
@@ -2703,6 +2776,9 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
     }
     out
 }
+
+/// A box in a sketch plane: (min, max).
+type Box2 = ([f64; 2], [f64; 2]);
 
 /// Onshape's own bookkeeping, not dialog parameters: the FeatureScript
 /// version a feature was made with, the Fillet dialog's "defaults changed"

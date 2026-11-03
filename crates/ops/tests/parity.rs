@@ -1173,6 +1173,37 @@ fn a_written_out_region_query() {
     assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// Two regions named by id alone that make one part (a board a line splits
+/// in two; cf-point-pattern): the regions inside the part's box that fill
+/// it, not the third rectangle beside it.
+#[test]
+fn regions_by_id_that_make_one_part() {
+    let rect = |n: &str, x0: f64, x1: f64| [segment(&format!("{n}.b"), (x0, 0.0), (x1, 0.0)), segment(&format!("{n}.r"), (x1, 0.0), (x1, 0.01)), segment(&format!("{n}.t"), (x1, 0.01), (x0, 0.01)), segment(&format!("{n}.l"), (x0, 0.01), (x0, 0.0))];
+    let split = segment("split", (0.02, 0.0), (0.02, 0.01));
+    let entities: Vec<Value> = rect("a", 0.0, 0.04).into_iter().chain([split]).chain(rect("b", 0.05, 0.06)).collect();
+    let region = json!({ "btType": "BTMIndividualSketchRegionQuery-140", "deterministicIds": ["JR1", "JR2"], "featureId": "FS1", "filterInnerLoops": true, "queryString": "" });
+    let (features, mut live) = one_extrude("FS1", json!(entities), region, json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 6, "edges": 12, "vertices": 8, "volume": 0.04 * 0.01 * 0.01 }));
+    live[1]["bodies"] = json!([{ "id": "JHD", "type": "SOLID", "faces": [{ "id": "JHG", "box": { "min": [0.0, 0.0, 0.0], "max": [0.04, 0.01, 0.01] } }] }]);
+    let r = run_model("regions-one-part", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
+/// In a sketch's line in live.jsonl the parts before it are still faces
+/// (an extrude up to one of them: clamp-hms, cf-hose-routing); only the
+/// sketch's own body's faces are its regions.
+#[test]
+fn a_sketch_line_keeps_the_parts_faces() {
+    let face = |id: &str| json!({ "id": id, "area": 0.0002, "box": { "min": [0.0, 0.0, 0.0], "max": [0.02, 0.01, 0.0] } });
+    let part = json!({ "id": "JHD", "type": "SOLID", "faces": [face("JHO")] });
+    let lines = [
+        json!({ "index": 0, "type": "extrude", "bodies": [part.clone()] }),
+        json!({ "index": 1, "type": "newSketch", "bodies": [part, { "id": "JS", "type": "SHEET", "faces": [face("JR1")] }] }),
+    ];
+    let refs = refs_from_bodies(&lines);
+    assert_eq!(refs[&(2, "JHO".to_string())].kind, "FACE");
+    assert_eq!(refs[&(2, "JR1".to_string())].kind, "SKETCH_REGION");
+}
+
 /// A region named by id alone, placed from the sketch's line in live.jsonl
 /// (its region faces: area and box): of two rectangles, the one named
 /// (cf-sheet-metal-model-plus's Extrude 2).
