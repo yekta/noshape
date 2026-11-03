@@ -237,12 +237,17 @@ dump, the runner, live's first 20 scenarios run in ours and a first score.
   focus, folder rows (the list's own walk, `list_items`), rollbackAfter "Default geometry"; targets: view cube cells,
   the parts list eye. Next differences: a select's or checkbox's focus readout, the empty field of a new Extrude
   (ours "error"), focus after Esc, hidden sketch rows while rolled back / editing a sketch.
-- 11-03 09:40: **130/184** (822/933 states) on live's latest batch. Landed / queued since 07:50: live 1839 / 1844 / 1849
-  (row Enter opens nothing, ↑ / ↓ only after a click on the bar, the rolled-to hidden sketch shows, ✓ with
-  typed text only applies it, a dialog's opening defaults are no step; skasm did 1853's sketch Undo); another tool or a double-click on another row keeps the open feature (live); typed text
-  (a Variable's name) shows in title and row once committed; Alt+C's tool search as focus `search-tools`. Open with
-  live (REQUESTS 11-03 09:00): fillet-* recordings open with an empty edge field since the neutral pass; live's
-  feature dialog sits over the feature list (x 40, a remembered drag?), so row double-clicks there hit the dialog.
+- 11-03 08:25 (UTC): **130/184** (822/933 states) on live's x-40 batch (/root/parity/ui/live-x40: recorded with live's
+  dialog dragged over the feature list; live is re-recording all into /root/parity/ui/live with the default place,
+  behaviours "ui-parity (2026-11-03, P1 request 1850)"). Since then, landed / queued: live 1839 / 1844 / 1849 (row
+  Enter opens nothing, ↑ / ↓ only after a click on the bar, the rolled-to hidden sketch shows, ✓ or Shift+Enter with
+  typed text only applies it, a dialog's opening defaults are no step; skasm did 1853's sketch Undo); another tool or
+  a double-click on another row keeps the open feature; typed text (a Variable's name) shows in title and row once
+  committed; an edited Variable opens in Value; Shift+I / T with no part do nothing; state for the tool search,
+  Isolate, Section view, shortcut sheet, Named views, appearance and filter; the driver opens toolbar dropdowns and
+  types shift+symbol as X11 does. Left with live (REQUESTS 11-03 08:20 and 1850): fillet-* / chamfer-* after a
+  preselected edge (live's account drops the edge since 04:10), Hole / Revolve remembered values, Shift+P as an undo
+  step, a rolled-back variable's " = 0".
 - 11-03 07:50: **74/107** (live re-records and drops scenarios as its runner changes; run after every batch). Fixed
   since 05:00 (all landed): the sketch plane bubble stays; cancelling an unchanged existing sketch shows no toast; a
   part row double-click renames only on the name; dialog focus rules (tabs, labelled selects, a new active field takes
