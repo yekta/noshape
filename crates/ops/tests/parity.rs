@@ -1156,6 +1156,18 @@ fn a_written_out_region_query() {
     assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// A sketch region query live's UI fetch gives without its text (only its
+/// btType, featureId and filterInnerLoops) is qSketchRegion of that sketch
+/// (cf-point-pattern's Extrude 1).
+#[test]
+fn a_sketch_region_query_without_its_text() {
+    let entities = json!([segment("b", (0.0, 0.0), (0.04, 0.0)), segment("r", (0.04, 0.0), (0.04, 0.02)), segment("t", (0.04, 0.02), (0.0, 0.02)), segment("l", (0.0, 0.02), (0.0, 0.0))]);
+    let region = json!({ "btType": "BTMIndividualSketchRegionQuery-140", "deterministicIds": ["JGC"], "featureId": "FS1", "filterInnerLoops": true, "queryString": "" });
+    let (features, live) = one_extrude("FS1", entities, region, json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 6, "edges": 12, "vertices": 8, "volume": 0.04 * 0.02 * 0.01 }));
+    let r = run_model("region-no-text", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
 /// A sketch on an Extrude's end cap named in the written-out form
 /// (makeQuery(… ".opExtrude", "CAP_FACE" … "isStart":false); live:
 /// learning-center-devon's Sketch 2) lies on our Extrude's end cap.

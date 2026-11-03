@@ -990,8 +990,25 @@ impl<'a> Translator<'a> {
         {
             return Ok(vec![format!("mc:{ours}.0")]);
         }
+        // A sketch's vertices (Point pattern's locations): its points.
+        if q["btType"].as_str().is_some_and(|t| t.starts_with("BTMIndividualSketchUniqueVerticesQuery"))
+            && let Some(ours) = q["featureId"].as_str().and_then(|f| self.feature_ids.get(f)).cloned()
+        {
+            let g = self.call("sketch_get", json!({ "sketch": ours }))?;
+            return Ok(g["entities"].as_array().into_iter().flatten().filter(|e| e["type"] == "point" && e["construction"] != true).filter_map(|e| e["id"].as_str().map(str::to_string)).collect());
+        }
         let ids: Vec<String> = q["deterministicIds"].as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect();
         let text = q["queryString"].as_str().unwrap_or("");
+        // A sketch region query without its text (live's UI fetch): the
+        // regions of its sketch, as Onshape writes it.
+        let written;
+        let text = match (text.is_empty(), q["btType"].as_str().is_some_and(|t| t.starts_with("BTMIndividualSketchRegionQuery")), q["featureId"].as_str()) {
+            (true, true, Some(sk)) => {
+                written = format!("query = qSketchRegion(id + \"{sk}\", {});", q["filterInnerLoops"] == true);
+                written.as_str()
+            }
+            _ => text,
+        };
         // Not placed just before feature k (live's line after a sketch has no
         // bodies): where an earlier line has them all (an id names one entity).
         let k = if !ids.is_empty() && !ids.iter().all(|id| self.refs.contains_key(&(k, id.clone()))) {
