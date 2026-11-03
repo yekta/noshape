@@ -16,6 +16,18 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-03 11:40 UTC.**
+- Landed / queued since 10:30: the exact loop join and Shell slab copies (188ef3cc); legacy topology (92cf4505:
+  ScopeRule 7, PartStudio::legacy_topology, kernel set_legacy_topology / with_legacy_topology; studios saved before
+  11-03's clean-ups regenerate without them; qa's MIRROR-PIECE-ORDER-CHANGE was 2027df5d's line join); FILLET-31S-FAIL
+  fails in 3 s (01040244, kernel ScopedDeadline: a tighter deadline for one step); EXTRUDE-SLIT-REGION (dc70faed);
+  queued f4059499: EXTRUDE-UP-TO-FACE-BEYOND (planar Up to face ends on its plane), imprint and overlap lines under
+  legacy_topology, the setting carried into rayon work. Parity 4/7 documents, 52/57 features.
+- Any new topology change that alters saved documents goes under legacy_topology (or a ScopeRule 8 with its own flag).
+- Waiting on live: REQUESTS 09:10 (Shell 4 on the exact body), 11:25 (face frames: SKETCH-FACE-FRAME). Still open:
+  Shell 4 fail-fast (no time limit or decline reason separates it from shells that build), clamp-hms Mirror 1 (TICKETS),
+  knob-jason's Fillet 2 building (live geometry pending, dx), SKETCH-IMPRINT-TOPOLOGY (host sketch bodies, P2, after P0s).
+
 **State 11-03 10:30 UTC.**
 - Landed since 06:45: FULL-ROUND-CORNER-SPHERES (a77b78ff, merge_corner_spheres), FILLET-SPLIT-EDGE-FACES (f7221608,
   fillet_as_cut spans), bracket03's Chamfer 1 (2027df5d, join_split_lines), CUT-CLOSED-EDGES-SPLIT's tube case
