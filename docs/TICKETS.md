@@ -3255,6 +3255,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   15..35 × 10..20 mm, live 35..60 × -10..5)". Looks like the picked features (or their instances) are taken in the
   order of their ids rather than as listed. Model /root/parity/models/cf-parameter-pattern;
   `NOSHAPE_PARITY_ONLY=cf-parameter-pattern` `parity::parity_models` a few times.
+  qa 19:58 (green e9422c1c): **deterministic per document, and it is the id order**: a saved translation
+  gives the same result on every reopen (6 / 6). /root/qa-scratch/tickets/fs-flist/bad-id-order.noshape (picked
+  Sketch 1 F766c0fb2a606, Extrude 1 F715748dc0c0b: the Extrude's id sorts first) → 3 parts, Part 2 1088.2214, the
+  pattern's notice `@featureListFunction: EXTRUDE_FAILED` (patternUtils.fs 293 applyPattern); good-id-order.noshape
+  (Sketch 1 F36340493b76e, Extrude 1 F584b01ddf68e: listed order = id order) → live's 4 parts, Part 2 2250. So the
+  picked features re-run in id order, the Extrude before its sketch is solved again for the instance; std runs them
+  in the order of the FeatureList (the feature list's order).
 - [ ] P1 PARITY-SPEED (core; dx's parity suite 11-03 run 31, the runner's new "speed:" line) 10 of the 41 corpus
   documents with live's times regenerate slower than live (ours: the reopened document's regeneration on vibe5;
   live: the sum of its features' regeneration times, live.jsonl's last line). Worst: **cf-hose-routing 116 s vs live
