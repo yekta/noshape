@@ -818,21 +818,22 @@ impl<'a> Translator<'a> {
     }
 
     /// Fewer regions named than the sketch has: the ones a part feature `k`
-    /// made (live's line after it) covers, seen along the sketch's normal (an
+    /// made (live's line after it; or the faces it added to a part) covers, seen along the sketch's normal (an
     /// extruded part's footprint): the region with the part's box, else the
     /// regions inside that box which together fill it (a board split by a
     /// line).
     fn regions_of_new_bodies(&mut self, k: usize, _sketch: &str, g: &Value, ids: usize) -> Option<Vec<String>> {
         let before: std::collections::HashSet<&String> = self.refs.keys().filter(|(j, _)| *j == k).map(|(_, id)| id).collect();
-        let new: Vec<[[f64; 3]; 2]> = self.refs.iter().filter(|((j, id), r)| *j == k + 1 && r.kind == "BODY" && !before.contains(id)).filter_map(|(_, r)| r.bbox).collect();
-        if new.is_empty() || new.len() > ids {
-            return None;
-        }
+        let made = |kind: &str| -> Vec<[[f64; 3]; 2]> { self.refs.iter().filter(|((j, id), r)| *j == k + 1 && r.kind == kind && !before.contains(id)).filter_map(|(_, r)| r.bbox).collect() };
+        let (new, faces) = (made("BODY"), made("FACE"));
         let unit = per_unit(&g["units"]);
         let (o, x, y) = (f3(&g["frame"]["origin"])?.map(|c| c * unit), f3(&g["frame"]["x"])?, f3(&g["frame"]["y"])?);
-        let to2 = |p: [f64; 3]| {
-            let d = [p[0] - o[0], p[1] - o[1], p[2] - o[2]];
-            [d[0] * x[0] + d[1] * x[1] + d[2] * x[2], d[0] * y[0] + d[1] * y[1] + d[2] * y[2]]
+        let n = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+        let dot = |a: [f64; 3], b: [f64; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        let corners = |[lo, hi]: [[f64; 3]; 2]| (0..8).map(move |i| [if i & 1 == 0 { lo[0] } else { hi[0] }, if i & 2 == 0 { lo[1] } else { hi[1] }, if i & 4 == 0 { lo[2] } else { hi[2] }]);
+        // A box seen along the sketch's normal, in the sketch plane.
+        let footprint = |b: [[f64; 3]; 2]| -> Box2 {
+            corners(b).map(|p| [dot([p[0] - o[0], p[1] - o[1], p[2] - o[2]], x), dot([p[0] - o[0], p[1] - o[1], p[2] - o[2]], y)]).fold(([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]), |(a, b), p| ([a[0].min(p[0]), a[1].min(p[1])], [b[0].max(p[0]), b[1].max(p[1])]))
         };
         let bounds = |r: &Value| -> Option<Box2> {
             let v = |a: &Value, i: usize| a[i].as_f64().map(|c| c * unit);
@@ -840,23 +841,46 @@ impl<'a> Translator<'a> {
             Some(([v(lo, 0)?, v(lo, 1)?], [v(hi, 0)?, v(hi, 1)?]))
         };
         let regions: Vec<(&str, Box2)> = g["regions"].as_array()?.iter().filter(|r| r["imprinted"] != true).filter_map(|r| Some((r["id"].as_str()?, bounds(r)?))).collect();
+        // Live's box may come from the tessellation (the UI fetch): a gear's
+        // is short of its tips.
+        let tol = |(min, max): Box2| 1e-6_f64.max(1e-3 * (max[0] - min[0]).hypot(max[1] - min[1]));
+        let off = |(min, max): Box2, (rl, rh): &Box2| (0..2).map(|i| (rl[i] - min[i]).abs().max((rh[i] - max[i]).abs())).fold(0.0, f64::max);
+        // The region with that box (a hole's disc inside the same circle has a smaller one).
+        let closest = |f: Box2| regions.iter().filter(|(_, b)| off(f, b) < tol(f)).min_by(|a, b| off(f, &a.1).total_cmp(&off(f, &b.1))).map(|(id, _)| id.to_string());
+        // One region added to a part (no new body): the cap it made, a new
+        // face flat along the sketch's normal.
+        if new.is_empty() && ids == 1 {
+            let flat = |b: &[[f64; 3]; 2]| {
+                let along: Vec<f64> = corners(*b).map(|p| dot(p, n)).collect();
+                along.iter().cloned().fold(f64::NEG_INFINITY, f64::max) - along.iter().cloned().fold(f64::INFINITY, f64::min) < 1e-7
+            };
+            let caps: Vec<Box2> = faces.iter().filter(|b| flat(b)).map(|b| footprint(*b)).collect();
+            // Else the one region holding the cap (clipped where it merged
+            // into the part).
+            let holding = |f: &Box2| -> Option<String> {
+                let t = tol(*f);
+                match regions.iter().filter(|(_, (rl, rh))| (0..2).all(|i| rl[i] < f.0[i] + t && rh[i] > f.1[i] - t)).collect::<Vec<_>>().as_slice() {
+                    [(id, _)] => Some(id.to_string()),
+                    _ => None,
+                }
+            };
+            return caps.iter().find_map(|f| closest(*f)).or_else(|| caps.iter().find_map(holding)).map(|id| vec![id]);
+        }
+        if new.is_empty() || new.len() > ids {
+            return None;
+        }
         let mut out = Vec::new();
-        for [lo, hi] in new {
-            // The box's corners in the sketch plane.
-            let corners: Vec<[f64; 2]> = (0..8).map(|i| to2([if i & 1 == 0 { lo[0] } else { hi[0] }, if i & 2 == 0 { lo[1] } else { hi[1] }, if i & 4 == 0 { lo[2] } else { hi[2] }])).collect();
-            let (min, max) = corners.iter().fold(([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]), |(a, b), p| ([a[0].min(p[0]), a[1].min(p[1])], [b[0].max(p[0]), b[1].max(p[1])]));
-            // Live's box may come from the tessellation (the UI fetch): a
-            // gear's is short of its tips.
-            let tol = 1e-6_f64.max(1e-3 * (max[0] - min[0]).hypot(max[1] - min[1]));
-            let off = |(rl, rh): &Box2| (0..2).map(|i| (rl[i] - min[i]).abs().max((rh[i] - max[i]).abs())).fold(0.0, f64::max);
-            // The one with that box (a hole's disc inside the same circle has a smaller one).
-            if let Some((id, _)) = regions.iter().filter(|(_, b)| off(b) < tol).min_by(|a, b| off(&a.1).total_cmp(&off(&b.1))) {
-                out.push(id.to_string());
+        for b in new {
+            let f = footprint(b);
+            if let Some(id) = closest(f) {
+                out.push(id);
                 continue;
             }
-            let inside: Vec<&(&str, Box2)> = regions.iter().filter(|(_, (rl, rh))| (0..2).all(|i| rl[i] > min[i] - tol && rh[i] < max[i] + tol)).collect();
+            // Regions inside the box that together fill it (a board a line splits).
+            let t = tol(f);
+            let inside: Vec<&(&str, Box2)> = regions.iter().filter(|(_, (rl, rh))| (0..2).all(|i| rl[i] > f.0[i] - t && rh[i] < f.1[i] + t)).collect();
             let union = inside.iter().fold(([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]), |(a, b), (_, (rl, rh))| ([a[0].min(rl[0]), a[1].min(rl[1])], [b[0].max(rh[0]), b[1].max(rh[1])]));
-            if inside.len() < 2 || off(&union) >= tol {
+            if inside.len() < 2 || off(f, &union) >= t {
                 return None;
             }
             out.extend(inside.iter().map(|(id, _)| id.to_string()));
@@ -2732,7 +2756,7 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
                 let s = &f["surface"];
                 let surface = kind(s);
                 let kind = if sketch_body { "SKETCH_REGION" } else { "FACE" };
-                let mut r = LiveRef { kind: kind.into(), point: Some(c), measure: f["area"].as_f64(), geometry: our_type(surface.as_deref()), ..Default::default() };
+                let mut r = LiveRef { kind: kind.into(), point: Some(c), measure: f["area"].as_f64(), geometry: our_type(surface.as_deref()), bbox: Some([mn, mx]), ..Default::default() };
                 // The compact fetch: origin and the outward normal beside the type.
                 if surface.as_deref() == Some("PLANE")
                     && s.is_string()

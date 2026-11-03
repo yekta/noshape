@@ -1188,6 +1188,43 @@ fn regions_by_id_that_make_one_part() {
     assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// A region named by id alone added to a part (no new body): placed by the
+/// cap it made, a new face flat along the sketch's normal
+/// (cf-sheet-metal-model-plus's Extrude 2).
+#[test]
+fn a_region_by_id_added_to_a_part() {
+    let rect = |n: &str, x0: f64, x1: f64| [segment(&format!("{n}.b"), (x0, 0.0), (x1, 0.0)), segment(&format!("{n}.r"), (x1, 0.0), (x1, 0.01)), segment(&format!("{n}.t"), (x1, 0.01), (x0, 0.01)), segment(&format!("{n}.l"), (x0, 0.01), (x0, 0.0))];
+    let sketch = |id: &str, name: &str, entities: Vec<Value>| json!({ "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": id, "name": name,
+        "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+        "entities": entities, "constraints": [] });
+    let extrude = |id: &str, name: &str, region: &str, op: &str, depth: &str| json!({ "btType": "BTMFeature-134", "featureType": "extrude", "featureId": id, "name": name, "parameters": [
+        { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+        { "btType": "BTMParameterEnum-145", "parameterId": "operationType", "value": op },
+        { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": [region], "queryString": "" }] },
+        { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+        { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": depth }] });
+    let features = json!({ "features": [
+        sketch("FS1", "Sketch 1", rect("a", 0.0, 0.04).to_vec()),
+        extrude("FE1", "Extrude 1", "JR1", "NEW", "10 mm"),
+        sketch("FS2", "Sketch 2", rect("b", 0.04, 0.05).into_iter().chain(rect("c", 0.06, 0.07)).collect()),
+        extrude("FE2", "Extrude 2", "JR2", "ADD", "20 mm"),
+    ] });
+    let face = |id: &str, lo: [f64; 3], hi: [f64; 3]| json!({ "id": id, "box": { "min": lo, "max": hi } });
+    let block = vec![face("JF1", [0.0, 0.0, 0.0], [0.04, 0.01, 0.0]), face("JF2", [0.0, 0.0, 0.01], [0.04, 0.01, 0.01])];
+    let grown: Vec<Value> = block.iter().cloned().chain([face("JF3", [0.04, 0.0, 0.02], [0.05, 0.01, 0.02]), face("JF4", [0.05, 0.0, 0.0], [0.05, 0.01, 0.02])]).collect();
+    // The block, then an L-shaped prism.
+    let part = |(v, f, e, n): (f64, u32, u32, u32)| json!([{ "name": "Part 1", "bodyType": "SOLID", "faces": f, "edges": e, "vertices": n, "volume": v }]);
+    let (one, two) = ((0.04 * 0.01 * 0.01, 6, 12, 8), (0.04 * 0.01 * 0.01 + 0.01 * 0.01 * 0.02, 8, 18, 12));
+    let live = vec![
+        json!({ "index": 0, "status": "OK", "parts": [] }),
+        json!({ "index": 1, "status": "OK", "parts": part(one), "bodies": [{ "id": "JHD", "type": "SOLID", "faces": block.clone() }] }),
+        json!({ "index": 2, "status": "OK", "type": "newSketch", "parts": part(one), "bodies": [{ "id": "JHD", "type": "SOLID", "faces": block }] }),
+        json!({ "index": 3, "status": "OK", "parts": part(two), "bodies": [{ "id": "JHD", "type": "SOLID", "faces": grown }] }),
+    ];
+    let r = run_model("region-added", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (4, 4), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
 /// In a sketch's line in live.jsonl the parts before it are still faces
 /// (an extrude up to one of them: clamp-hms, cf-hose-routing); only the
 /// sketch's own body's faces are its regions.
