@@ -210,6 +210,10 @@ std::shared_ptr<const UnifyScope> rust_unify_scope(const OcShape& target);
 // NOSHAPE_RECORD_BOOLEANS. False when OCCT's fails.
 bool quick_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, bool parallel, TopoDS_Shape& out,
                    occ::handle<BRepTools_History>& hist);
+// The union of `all`, two at a time in a balanced tree of OCCT fuses at the working scale, and its history from
+// `all`. False when one fails.
+bool quick_fuse_tree(const std::vector<TopoDS_Shape>& all, bool parallel, TopoDS_Shape& out,
+                     occ::handle<BRepTools_History>& hist);
 
 class HistoryBuilder
 {

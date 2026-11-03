@@ -405,6 +405,8 @@ bool by_offset(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
   // (catches self-intersecting offsets that BRepCheck accepts).
   const double vo = volume_of(outer), vi = volume_of(inner), vr = volume_of(r);
   lap("volumes");
+  if (std::getenv("NOSHAPE_SHELL_DEBUG"))
+    std::fprintf(stderr, "offset: outer %.9g inner %.9g result %.9g mm3\n", vo * 1e9, vi * 1e9, vr * 1e9);
   if (!(vi > 0 && vr > 0 && vi < vo && std::abs(vo - vi - vr) <= 1e-6 * vo))
     return no("volumes don't add up");
   // The part's own faces that stay (inward: the outside, outward: the
@@ -3170,7 +3172,11 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           if (!lp.IsNormalDefined())
             return no("a free-form face's normal undefined");
           if (lp.IsCurvatureDefined() && std::max(std::abs(lp.MaxCurvature()), std::abs(lp.MinCurvature())) * thickness > 0.9)
+          {
+            if (dbg)
+              std::fprintf(stderr, "quadrics: fold at (%d, %d): k %g %g /mm, d %g mm, reversed %d\n", a, b, lp.MaxCurvature() / 1e3, lp.MinCurvature() / 1e3, d * 1e3, (int)(f.Orientation() == TopAbs_REVERSED));
             return no("a free-form face's offset folds");
+          }
         }
       q.d   = d;
       q.off = new Geom_OffsetSurface(q.base, d);
@@ -4559,6 +4565,25 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     HHist        fu_hist;
     if (!quick_boolean(0, first, rest, bop_parallel(), fu_out, fu_hist))
       return false;
+    // A union smaller than its largest slab or larger than them all: OCCT's one fuse of free-form slabs gone wrong
+    // (bop-pairs-gpf-5267's Shell 4: 0.13 of 13663 mm³); two at a time instead (live's 13663).
+    double vmax = 0, vsum = 0;
+    std::vector<TopoDS_Shape> all;
+    for (ShapeList::Iterator it(tools); it.More(); it.Next())
+    {
+      const double v = volume_of(it.Value());
+      vmax = std::max(vmax, v);
+      vsum += v;
+      all.push_back(it.Value());
+    }
+    const double vu = volume_of(fu_out);
+    if (!(vu >= vmax * (1 - 1e-6) && vu <= vsum * (1 + 1e-6)))
+    {
+      if (dbg)
+        std::fprintf(stderr, "slabs: union %.6g outside [%.6g, %.6g], two at a time\n", vu, vmax, vsum);
+      if (!quick_fuse_tree(all, bop_parallel(), fu_out, fu_hist))
+        return false;
+    }
     union_ = fu_out;
     hu = fu_hist;
   }
@@ -4611,6 +4636,8 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
     hb = cu_hist;
   }
   lap("common");
+  if (dbg)
+    std::fprintf(stderr, "slabs: common volume %.6g valid %d\n", volume_of(r), (int)valid_solid(r));
   // Merge the faces split up by the slab construction.
   ShapeUpgrade_UnifySameDomain usd(r, true, true, false);
   usd.SetLinearTolerance(1e-7);

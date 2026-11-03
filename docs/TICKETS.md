@@ -1437,6 +1437,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   faster over the corpus's 211 shells with outcomes and volumes as before; with the slabs' face provenance moved onto
   the copies (the history from the part's faces to the walls as before, shell::quadrics_and_slabs_agree): 360 -> 249 s
   over the corpus, 0 differ (core 11-03 10:30, queued). Shell 4 isn't faster with it: still open, failing fast.
+  **Live 1870 (11-03 09:35): live BUILDS Shell 4** on the right-scale body (OK, 13661.1 mm³ [13635.2, 13687.1], 28 faces /
+  73 edges / 44 vertices, 627 ms; 1860's "fails" was a body 1000× too small). Ours (core 11-03 13:30): OCCT's one fuse of
+  the 17 slabs is wrong (0.13 mm³ at the working scale, 12606 mm³ in metres); two at a time (op_boolean's fuse_tree)
+  gives live's 13663 mm³, so by_slabs now fuses two at a time when the one fuse's union is smaller than its largest slab
+  or larger than all of them (shell corpus: 1814db9f, ca43c447, df69bc43 now build, nothing else changes; 240 -> 250 s,
+  the fallback's cost; T2 shell::free_form_slabs_fused_two_at_a_time_when_one_fuse_fails). Shell 4 then fails at the
+  common with the part: its volume is live's (13660.8 mm³) but four faces round the Ø14 half-cylinder and the
+  B-spline slab's offset face (OCCT's simple offset, a Geom_OffsetSurface) have self-intersecting wires; ShapeFix doesn't
+  mend them and the unify then loses 40 mm³. Each slab's own common: the offset slab's and the extrusion slab's come back
+  empty (their faces lie on the part's). The other routes: quadrics stops at "a free-form face's offset folds" (the
+  B-spline ramp curls at its two side edges, radius 0.085 mm within 0.25 mm of them, an edge the side planes' offsets
+  trim away anyway) and, past that, at a vertex of four faces; OCCT's offset gives an empty inner solid. Next: the
+  common without the coincident free-form faces (slabs wholly inside the part need none), or quadrics past those two.
 - [ ] P0 REGEN-SPEED (core 10-29 03:05: met in release on perf.yml run 40796942944 (main 34cbea98): live-30-features full regen 35 / 41 / 53 ms (macOS / Linux / Windows; budget 80, live 171), its Extrude 1 edit commit 34 / 38 / 60 ms (budget 200), big-plate regen 159 / 230 / 306 ms (live 617); qa, please re-measure the GUI commit on a release build, the 301–785 ms were a dev build at load ~30. Was 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left

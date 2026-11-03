@@ -3931,6 +3931,33 @@ bool fuse_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Shape>& t, 
 
 } // namespace
 
+bool quick_fuse_tree(const std::vector<TopoDS_Shape>& all, bool parallel, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist)
+{
+  std::vector<TopoDS_Shape>     in = all;
+  std::unique_ptr<ScaledInputs> sc;
+  if (working_scale() != 1.0 && std::getenv("NOSHAPE_BOOL_NO_SCALE") == nullptr)
+  {
+    sc = std::make_unique<ScaledInputs>(working_scale());
+    for (TopoDS_Shape& x : in)
+      x = sc->scale(x);
+  }
+  BoolOpts opts{};
+  opts.parallel = parallel;
+  {
+    const KernelTimer timer("boolean.quick_tree");
+    if (!fuse_tree(in, opts, out, hist))
+      return false;
+  }
+  if (sc)
+  {
+    out                                  = sc->unscale(out, hist);
+    occ::handle<BRepTools_History> whole = sc->hist;
+    whole->Merge(hist);
+    hist = whole;
+  }
+  return true;
+}
+
 // Planes between groups of boxes for slab-wise work: along the axis where
 // the boxes leave the most gaps, about `per_slab` boxes a slab (at most 32
 // slabs), halfway across the gaps nearest to equal counts. False when the
