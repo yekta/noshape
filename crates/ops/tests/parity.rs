@@ -1008,6 +1008,26 @@ fn a_region_bounded_by_exactly_the_named_curves() {
     assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// The written-out form of a region query (makeQuery(… "IMPRINT",
+/// EntityType.FACE …) naming a rectangle by its bottom side; live:
+/// learning-center-devon's Extrude 1).
+#[test]
+fn a_written_out_region_query() {
+    let sketch = "FdHX57YE0MI7PDU_0";
+    let side = |s: &str| format!("2i9coyYI-wWEe-o83F-jBj8-nmqTMMu2mK71.{s}");
+    let entities = json!([
+        segment(&side("bottom"), (0.0, 0.0), (0.04, 0.0)),
+        segment(&side("right"), (0.04, 0.0), (0.04, 0.02)),
+        segment(&side("top"), (0.04, 0.02), (0.0, 0.02)),
+        segment(&side("left"), (0.0, 0.02), (0.0, 0.0)),
+    ]);
+    let text = format!("query=makeQuery(id+\"{sketch}.imprint\",\"IMPRINT\",EntityType.FACE,{{\"disambiguationData\":[topologyDisambiguation([[makeQuery(id+\"{sketch}.imprint\",\"IMPRINT\",EntityType.EDGE,{{\"derivedFrom\":sketchEntityQuery(id+\"{sketch}.wireOp\",EntityType.EDGE,\"{}\")}}),-1.0]])]}});", side("bottom"));
+    let region = json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JGC"], "queryString": text });
+    let (features, live) = one_extrude(sketch, entities, region, json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 6, "edges": 12, "vertices": 8, "volume": 0.04 * 0.02 * 0.01 }));
+    let r = run_model("written-out", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
 /// qSketchRegion(…, true) leaves out every region inside another's hole,
 /// rings nested in a bore too (live: bearing-block-takumi).
 #[test]

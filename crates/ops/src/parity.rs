@@ -1118,18 +1118,23 @@ impl<'a> Translator<'a> {
     /// TOPOLOGY is the sketch entities bounding it): our region whose
     /// interior point lies inside those curves. `None`: not a region query.
     fn region_from_query(&mut self, text: &str) -> Result<Option<String>, String> {
-        let Some(packed) = text.split("qCompressed(1.0,\"").nth(1).and_then(|r| r.split('"').next()) else { return Ok(None) };
-        let Ok(tree) = noshape_model::custom::host::packed::unpack(packed) else { return Ok(None) };
-        let mut strings = Vec::new();
-        packed_strings(&tree, &mut strings);
+        let (sk, strings) = match text.split("qCompressed(1.0,\"").nth(1).and_then(|r| r.split('"').next()) {
+            Some(packed) => {
+                let Ok(tree) = noshape_model::custom::host::packed::unpack(packed) else { return Ok(None) };
+                let mut strings = Vec::new();
+                packed_strings(&tree, &mut strings);
+                // The sketch whose imprint the face is (the query's own
+                // operation), else the first sketch named.
+                let sk = root_operation(&tree).and_then(|o| o.strip_suffix(".imprint").map(str::to_string)).or_else(|| strings.iter().find_map(|s| s.strip_suffix(".wireOp")).map(str::to_string));
+                (sk, strings)
+            }
+            None => imprint_query_words(text),
+        };
         // A face the sketch imprints, told by the curves around it (a face
         // swept from sketch curves names them too, without the imprint).
         if !["SKETCH_ENTITY", "FACE", "TOPOLOGY", "IMPRINT"].iter().all(|w| strings.iter().any(|s| s == w)) {
             return Ok(None);
         }
-        // The sketch whose imprint the face is (the query's own operation),
-        // else the first sketch named.
-        let sk = root_operation(&tree).and_then(|o| o.strip_suffix(".imprint").map(str::to_string)).or_else(|| strings.iter().find_map(|s| s.strip_suffix(".wireOp")).map(str::to_string));
         let Some(sk) = sk else { return Ok(None) };
         let mut segments: Vec<[f64; 2]> = strings.iter().filter_map(|e| self.curves.get(&(sk.clone(), e.clone()))).flat_map(|poly| poly.windows(2).flat_map(|w| [w[0], w[1]])).collect();
         let ours = self.feature_ids.get(&sk).cloned().ok_or_else(|| format!("sketch {sk} was not built"))?;
@@ -2140,6 +2145,26 @@ impl SketchMap {
         let p: [f64; 3] = std::array::from_fn(|i| fo[i] + u * fx[i] + w * fy[i] - o[i]);
         [(0..3).map(|i| p[i] * x[i]).sum(), (0..3).map(|i| p[i] * y[i]).sum()]
     }
+}
+
+/// The written-out form of a sketch region query (`makeQuery(id +
+/// "<sketch>.imprint", "IMPRINT", EntityType.FACE, { "disambiguationData" :
+/// [topologyDisambiguation([[makeQuery(… "derivedFrom" :
+/// sketchEntityQuery(id + "<sketch>.wireOp", EntityType.EDGE, "<entity>")
+/// …`; learning-center-devon) as the words its packed form gives: its sketch
+/// and the curves it names.
+fn imprint_query_words(text: &str) -> (Option<String>, Vec<String>) {
+    let Some(sk) = text.split("makeQuery(id+\"").nth(1).and_then(|r| r.split('"').next()).and_then(|o| o.strip_suffix(".imprint")) else { return (None, Vec::new()) };
+    if !text.contains("\"IMPRINT\",EntityType.FACE") || !text.contains("topologyDisambiguation") {
+        return (None, Vec::new());
+    }
+    let mut words: Vec<String> = ["SKETCH_ENTITY", "FACE", "TOPOLOGY", "IMPRINT"].map(String::from).to_vec();
+    for entity in text.split("sketchEntityQuery(").skip(1) {
+        let mut quoted = entity.split('"').skip(1).step_by(2);
+        let (Some(op), Some(e)) = (quoted.next(), quoted.next()) else { continue };
+        words.extend(["operationId".to_string(), op.to_string(), "sketchEntityId".to_string(), e.to_string()]);
+    }
+    (Some(sk.to_string()), words)
 }
 
 /// How far (m) any sketch point moved between two `sketch_get` replies.
