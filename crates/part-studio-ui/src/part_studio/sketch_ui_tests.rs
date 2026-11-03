@@ -482,8 +482,9 @@ fn the_parity_state_reads_dialog_list_and_features(cx: &mut TestAppContext) {
     let depth = state["dialog"]["fields"].as_array().unwrap().iter().find(|f| f["label"] == "Depth").expect("Depth listed").clone();
     assert_eq!((depth["kind"].as_str(), depth["text"].as_str(), depth["focused"].as_bool()), (Some("number"), Some("#wa"), Some(true)));
     let rows: Vec<&str> = state["features"]["rows"].as_array().unwrap().iter().map(|r| r["name"].as_str().unwrap()).collect();
-    assert_eq!(rows, ["#wall_thickness = 4 mm"]);
-    assert_eq!(state["features"]["rollbackAfter"], "#wall_thickness = 4 mm");
+    // The new Extrude's row while its dialog is open, above the bar (live).
+    assert_eq!(rows, ["#wall_thickness = 4 mm", "Extrude 1"]);
+    assert_eq!(state["features"]["rollbackAfter"], "Extrude 1");
 }
 
 /// Live (ui-parity extrude-enter-commits): `20` Enter applies "20 mm" and keeps the dialog; the next Enter accepts it.

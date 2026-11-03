@@ -241,6 +241,11 @@ pub struct FeatureDialog {
     pub whole_sketches: std::collections::HashSet<FeatureId>,
     /// Open `#` variable autofill list of a numeric field.
     completion: Option<crate::var_complete::VarCompletion>,
+    /// The dialog takes the keyboard at its next render (see `set_value`).
+    focus_dialog_pending: bool,
+    /// The last press was in the graphics area, not in the dialog (live: the page has the keyboard then, the
+    /// selection field stays active; `ui_focus`).
+    pub graphics_pressed: bool,
     /// The field Enter just applied: the input's change event for the last typed key can arrive after the commit
     /// rewrote the text ("15" → "15 mm") and must not open a list for it.
     just_applied: Option<String>,
@@ -397,6 +402,8 @@ impl FeatureDialog {
             whole_sketches: Default::default(),
             completion: None,
             just_applied: None,
+            focus_dialog_pending: false,
+            graphics_pressed: false,
             create_var: None,
             external_field: None,
             extra: None,
@@ -526,8 +533,12 @@ impl FeatureDialog {
         // click or a ticked box too (LOFT-PROFILES-PINK: ✓ stayed pale).
         self.dirty = true;
         let shown = self.visible_selection_fields();
+        let active = self.active_query.clone();
         self.set_value_auto(path, v, cx);
         self.focus_new_empty_field(&shown);
+        // A selection field the edit brought up and activated takes the keyboard from the checkbox or tab clicked
+        // (live ui-parity shell-hollow-toggle: Hollow ticked, "Parts to hollow" has the focus).
+        self.focus_dialog_pending |= self.active_query != active && self.active_query.as_ref().is_some_and(|q| !shown.contains(&q.as_str()));
     }
 
     /// The selection fields (and selection-driven arrays) shown now, in
@@ -3735,6 +3746,9 @@ fn item_slice(item: &Arc<Vec<ParamSpec>>) -> &'static [ParamSpec] {
 
 impl Render for FeatureDialog {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if std::mem::take(&mut self.focus_dialog_pending) {
+            window.focus(&self.focus, cx);
+        }
         let pal = p();
         let help_focus = self.tab_stop("help", cx);
         let params: &'static [ParamSpec] = self.ty.params.as_slice();
@@ -3805,6 +3819,7 @@ impl Render for FeatureDialog {
             .id("feature-dialog")
             // Clicks on the dialog never reach the graphics area beneath.
             .occlude()
+            .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, _, _| this.graphics_pressed = false))
             .key_context("FeatureDialog")
             .track_focus(&self.focus)
             // Onshape feature dialog frame (§3.9): 220 px, white at 95%, no

@@ -1523,6 +1523,9 @@ impl PartStudioView {
         if matches!(ev, ViewportEvent::ToolDown { .. }) {
             self.draft_checkpoint(cx);
         }
+        if press && let Some(e) = &self.edit {
+            e.dialog.update(cx, |d, _| d.graphics_pressed = true);
+        }
         if let (ViewportEvent::ToolDown { .. } | ViewportEvent::ToolDrag { .. }, Some(e)) = (ev, &mut self.edit) {
             e.history.dragging = true;
         }
@@ -3091,13 +3094,14 @@ impl PartStudioView {
     /// index they show (editing rolls the model to just after the edited feature).
     fn list_items(&self, studio: &noshape_model::partstudio::PartStudio, cx: &App) -> (Vec<ListItem>, usize) {
         let n_features = studio.features.len();
-        let rollback = studio.rollback_index();
+        // The bar stays where it is while a feature is edited (live ui-parity feature-row-dblclick-sketch).
+        let bar_at = studio.rollback_index();
         // Editing a feature rolls the model to just after it: the rows
         // below show rolled back (Onshape), unless "Final" is on.
         let rollback = match &self.edit {
             // (Paused regeneration: the list stays as it is, live 10-27.)
-            Some(e) if !e.is_new && !e.dialog.read(cx).show_final && self.ui.regen_paused.is_none() => rollback.min(e.index + 1),
-            _ => rollback,
+            Some(e) if !e.is_new && !e.dialog.read(cx).show_final && self.ui.regen_paused.is_none() => bar_at.min(e.index + 1),
+            _ => bar_at,
         };
         let filtered = self.filtered(cx);
         let editing_id = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
@@ -3123,14 +3127,14 @@ impl PartStudioView {
         let mut in_hidden_run = false;
         // The bar at a folder's top (its Roll to here): drawn under the
         // folder's row when that folder opens at the rollback feature.
-        let mut bar_in_folder = self.ui.rollback_folder_top.filter(|&(_, at)| at == rollback && filtered.is_none()).map(|(fid, _)| fid);
+        let mut bar_in_folder = self.ui.rollback_folder_top.filter(|&(_, at)| at == bar_at && filtered.is_none()).map(|(fid, _)| fid);
         for (i, f) in studio.features.iter().enumerate() {
             if editing_new_at == Some(i) {
                 items.push(ListItem::Placeholder);
             }
             // Not at the folder's first row, or under a closed folder: the bar
             // stays where it was.
-            if i == rollback
+            if i == bar_at
                 && bar_in_folder.is_some_and(|fid| {
                     let chain = studio.folder_chain(f.folder);
                     !chain.contains(&fid) || open_folder.contains(&fid) || chain.iter().take_while(|c| **c != fid).chain(std::iter::once(&fid)).any(|c| studio.folder(*c).is_none_or(|fd| self.folder_collapsed(fd)))
@@ -3138,7 +3142,7 @@ impl PartStudioView {
             {
                 bar_in_folder = None;
             }
-            if i == rollback && bar_in_folder.is_none() {
+            if i == bar_at && bar_in_folder.is_none() {
                 in_hidden_run = false;
                 // Between two children of an open folder the bar is one of its rows,
                 // indented like them (live ROLLBACK-BAR-IN-FOLDER: x 64–235).
@@ -3165,7 +3169,7 @@ impl PartStudioView {
                     if prompt_folder == Some(fd.id) {
                         items.push(ListItem::Prompt);
                     }
-                    if i == rollback && bar_in_folder == Some(fd.id) {
+                    if i == bar_at && bar_in_folder == Some(fd.id) {
                         items.push(ListItem::Rollback(i, FOLDER_INDENT * (depth + 1) as f32));
                         bar_in_folder = None;
                     }
@@ -3199,7 +3203,7 @@ impl PartStudioView {
         if editing_new_at.is_some_and(|i| i >= n_features) {
             items.push(ListItem::Placeholder);
         }
-        if rollback >= n_features {
+        if bar_at >= n_features {
             items.push(ListItem::Rollback(n_features, 0.));
         }
         if prompt_anchor == Some(None) {
@@ -4562,6 +4566,20 @@ impl PartStudioView {
 
     /// The open feature dialog can't regenerate (live: its row turns red and
     /// the Features header shows the error icon until it can).
+    /// The feature being edited uses feature `id` (its sketch, a plane): live shows such a hidden sketch while the
+    /// dialog is open (ui-parity extrude-surface-tab, feature-row-dblclick-sketch).
+    fn edit_uses(&self, id: FeatureId, cx: &App) -> bool {
+        let Some(e) = &self.edit else { return false };
+        fn uses(values: &noshape_model::params::ParamValues, id: FeatureId) -> bool {
+            values.0.values().any(|v| match v {
+                ParamValue::Query(q) => q.iter().any(|r| r.depends_on() == Some(id)),
+                ParamValue::Array(items) => items.iter().any(|it| uses(it, id)),
+                _ => false,
+            })
+        }
+        uses(&e.dialog.read(cx).feature.params, id)
+    }
+
     fn edit_invalid(&self, cx: &App) -> bool {
         self.edit.as_ref().is_some_and(|e| {
             let d = e.dialog.read(cx);
@@ -4569,11 +4587,9 @@ impl PartStudioView {
         })
     }
 
-    fn render_editing_placeholder(&self, slot: (usize, f32), cx: &App) -> AnyElement {
-        let pal = p();
-        // Live: a new Hole's row reads "Ø 6.35 mm ↧ 12 mm" while it is drawn.
-        let name = self
-            .edit
+    /// The new feature's row name while its dialog is open (live: a new Hole's row reads "Ø 6.35 mm ↧ 12 mm").
+    fn placeholder_name(&self, cx: &App) -> String {
+        self.edit
             .as_ref()
             .map(|e| {
                 let f = e.dialog.read(cx).row_feature();
@@ -4583,7 +4599,12 @@ impl PartStudioView {
                     computed.iter().find(|(c, _)| c == k).map(|(_, v)| v.clone()).or_else(|| crate::feature_dialog::shown_length(&f, k, &units, &self.display.variables))
                 })
             })
-            .unwrap_or_default();
+            .unwrap_or_default()
+    }
+
+    fn render_editing_placeholder(&self, slot: (usize, f32), cx: &App) -> AnyElement {
+        let pal = p();
+        let name = self.placeholder_name(cx);
         let icon = self.edit.as_ref().map(|e| feature_icon(&e.dialog.read(cx).feature.type_id)).unwrap_or_else(|| icon_path("part"));
         // Hovered, its error as a feature row's (live: a new feature failing in its dialog, the custom knurl):
         // "<name> did not regenerate properly: <message>", else its name.
@@ -4665,7 +4686,7 @@ impl PartStudioView {
         let color = if rolled_back {
             pal.text_rolled_back
         // Live (ui-parity 11-03): while a feature is edited, the hidden sketch its active field picked reads black.
-        } else if suppressed || (f.hidden && !failing && !(related && self.edit.is_some())) {
+        } else if suppressed || (f.hidden && !failing && !(editing || self.edit_uses(f.id, cx))) {
             pal.text_faint
         } else {
             // Live L27: a warning's row is red like an error's.

@@ -32,8 +32,9 @@ impl FeatureDialog {
         if let Some(c) = &self.create_var {
             return Self::create_var_inputs(c).into_iter().find(|(_, st, _)| st.read(cx).focus_handle(cx).is_focused(window)).map(|(l, st, _)| field_focus(l, st.read(cx)));
         }
-        // A select's closed field (live: its hidden input, no label), a selection field, a checkbox or a button.
-        if self.selects.values().any(|s| s.read(cx).has_focus(window)) {
+        // A select's closed field or its open list (live: its hidden input, no label), a selection field, a checkbox
+        // or a button.
+        if self.selects.values().any(|s| s.read(cx).has_focus(window) || s.read(cx).is_open()) {
             return Some(json!({ "kind": "field", "label": null, "text": "", "selection": [0, 0], "all": false }));
         }
         if let Some((key, _)) = self.tab_stops.iter().find(|(_, h)| h.is_focused(window)) {
@@ -44,7 +45,11 @@ impl FeatureDialog {
             return Some(json!({ "kind": "field", "label": label, "text": null, "selection": null, "all": false }));
         }
         let Some(path) = self.inputs.keys().find(|p| self.input_of(p, window, cx).is_some_and(|i| i.0)) else {
-            // No control has the keyboard: the active selection field has the focus (live).
+            // Only the dialog has the keyboard: its active selection field has the focus (live); after Esc left a
+            // field, nothing has (live ui-parity extrude-escape-cancels).
+            if !self.focus.is_focused(window) || self.graphics_pressed {
+                return None;
+            }
             let q = self.active_query.as_deref()?;
             let label = self.spec_for_path(q).map(|s| crate::i18n::spec(s.label)).unwrap_or_else(|| q.to_string());
             return Some(json!({ "kind": "field", "label": label, "text": null, "selection": null, "all": false }));
@@ -97,8 +102,12 @@ impl FeatureDialog {
         let mut tabs = Vec::new();
         let mut fields = Vec::new();
         let values = &self.feature.params;
+        let mut prev: Option<&ParamSpec> = None;
         for s in self.ty.params.iter().filter(|s| s.is_visible(values)) {
-            let label = crate::i18n::spec(s.label);
+            // A value drawn beside the row before it (Draft's angle) shows no label of its own.
+            let companion = prev.is_some_and(|p| p.hints.has(Hints::FIRST_IN_ROW) && p.hints.has(Hints::DISPLAY_SHORT)) && s.hints.has(Hints::DISPLAY_SHORT);
+            prev = Some(s);
+            let label = if companion { Value::Null } else { json!(crate::i18n::spec(s.label)) };
             match &s.kind {
                 ParamKind::Enum { options, .. } if s.hints.has(Hints::HORIZONTAL_ENUM) => {
                     let cur = values.enum_(s.id);
@@ -140,7 +149,8 @@ impl FeatureDialog {
                 ParamKind::Query { .. } => {
                     let refs = values.query(s.id).to_vec();
                     let items: Vec<String> = self.query_rows(s, &refs).into_iter().map(|r| r.0).collect();
-                    let missing = refs.iter().any(|r| (self.missing)(r)) || self.field_error(s.id).is_some();
+                    // Missing picks are red; an empty field the feature's error blames isn't (live: a new Extrude's).
+                    let missing = refs.iter().any(|r| (self.missing)(r)) || (!refs.is_empty() && self.field_error(s.id).is_some());
                     fields.push(json!({ "label": label, "kind": "query", "items": items, "active": self.active_query.as_deref() == Some(s.id), "state": if missing { "error" } else { "ok" } }));
                 }
                 _ => {}

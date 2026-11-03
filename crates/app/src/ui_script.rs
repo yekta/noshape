@@ -158,8 +158,9 @@ fn locate(t: &Value, studio: &Studio, cx: &App) -> Result<Point<Pixels>, String>
     ps.read(cx).ui_target_point(t, cx)
 }
 
+/// Presses at `at`, where the pointer already is (a pointer that doesn't move sends no second move: a repeated
+/// one would snap an edge's midpoint).
 fn mouse(window: &mut Window, cx: &mut App, at: Point<Pixels>, button: MouseButton, modifiers: Modifiers, clicks: usize) {
-    window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: at, pressed_button: None, modifiers }), cx);
     for n in 1..=clicks {
         window.dispatch_event(PlatformInput::MouseDown(MouseDownEvent { button, position: at, modifiers, click_count: n, first_mouse: false }), cx);
         window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { button, position: at, modifiers, click_count: n }), cx);
@@ -265,7 +266,10 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                                 let row = json!({ "list_row": pick });
                                 match cx.update(|_, cx| locate(&row, &ps, cx)).unwrap_or_else(|e| Err(e.to_string())) {
                                     Ok(at) => {
-                                        let _ = cx.update(|window, cx| mouse(window, cx, at, MouseButton::Left, Modifiers::default(), 1));
+                                        let _ = cx.update(|window, cx| {
+                                            window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }), cx);
+                                            mouse(window, cx, at, MouseButton::Left, Modifiers::default(), 1)
+                                        });
                                         Ok(())
                                     }
                                     Err(e) => Err(e),

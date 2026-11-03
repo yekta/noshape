@@ -231,7 +231,7 @@ dump, the runner, live's first 20 scenarios run in ours and a first score.
   function rows ("max("). The 4 left are live-runner artifacts (keys after a row click don't reach Onshape's list under
   CDP; sketch dialog kind) — REQUESTS 11-03 02:00. Runner normalizes cloud-only menu rows (Add comment) and -1
   highlights.
-- 11-03 03:20: **37/49 scenarios, 205/224 states** (live re-records as its runner improves). Fixed as live: right-click
+- 11-03 04:40: **47/72 scenarios, 270/337 states** (03:20: 37/49) (live re-records as its runner improves). Fixed as live: right-click
   on a row outside the selection opens the menu for the selection and that row; a hidden sketch with other features
   has no Hide other / all sketches; the sketch row menu has Paste into sketch; state: rename / folder name inputs as
   focus, folder rows (the list's own walk, `list_items`), rollbackAfter "Default geometry"; targets: view cube cells,

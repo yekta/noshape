@@ -42,21 +42,7 @@ impl PartStudioView {
             .unwrap_or(&self.selection)
             .iter()
             .map(|r| {
-                let body = |r: &Reference| self.body_of(r).and_then(|b| self.display.body(&b)).map(|b| b.name.clone()).unwrap_or_default();
-                let (kind, owner) = match r {
-                    Reference::Face(_) => ("FACE", body(r)),
-                    Reference::Edge(_) => ("EDGE", body(r)),
-                    Reference::Vertex(_) => ("VERTEX", body(r)),
-                    Reference::Body(_) => ("BODY", body(r)),
-                    Reference::Plane(p) => ("PLANE", format!("{p:?}")),
-                    Reference::Origin => ("VERTEX", "Origin".to_string()),
-                    Reference::SketchEntity { sketch, .. } => ("SKETCH_ENTITY", feature_name(*sketch)),
-                    Reference::SketchRegion { sketch, .. } => ("FACE", feature_name(*sketch)),
-                    Reference::Sketch(f) | Reference::Feature(f) => ("FEATURE", feature_name(*f)),
-                    Reference::FeaturePlane(f) | Reference::ConstructionPlane { feature: f, .. } => ("PLANE", feature_name(*f)),
-                    Reference::MateConnector { feature, .. } => ("MATE_CONNECTOR", feature_name(*feature)),
-                    _ => ("OTHER", String::new()),
-                };
+                let (kind, owner) = self.selection_kind_owner(r, cx);
                 json!({ "kind": kind, "owner": owner })
             })
             .chain(self.selected_features.iter().filter(|f| picked.is_none() && !self.selection.contains(&Reference::Feature(**f))).map(|f| json!({ "kind": "FEATURE", "owner": feature_name(*f) })))
@@ -90,7 +76,12 @@ impl PartStudioView {
                                     _ => "ok",
                                 }
                             };
-                            rows.push(json!({ "name": self.shown_feature_name(f, cx), "state": state, "selected": self.selected_features.contains(&f.id) || editing == Some(f.id), "editing": editing == Some(f.id), "related": related.contains(&f.id), "hidden": f.hidden && !(editing.is_some() && related.contains(&f.id)) }));
+                            rows.push(json!({ "name": self.shown_feature_name(f, cx), "state": state, "selected": self.selected_features.contains(&f.id) || editing == Some(f.id), "editing": editing == Some(f.id), "related": related.contains(&f.id), "hidden": f.hidden && !(editing == Some(f.id) || self.edit_uses(f.id, cx)) }));
+                        }
+                        // A new feature's row while its dialog is open (red while it fails, as drawn).
+                        super::ListItem::Placeholder => {
+                            let state = if self.edit_invalid(cx) { "error" } else { "ok" };
+                            rows.push(json!({ "name": self.placeholder_name(cx), "state": state, "selected": true, "editing": true, "related": false, "hidden": false }));
                         }
                         // A new folder's row is related-highlighted until the next click (live ui 10-25 b (1)).
                         super::ListItem::Folder(_, fd) => rows.push(json!({ "name": fd.name, "state": "ok", "selected": self.ui.selected_folder == Some(fd.id), "editing": false, "related": self.ui.fresh_folder == Some(fd.id), "hidden": false })),
@@ -115,6 +106,27 @@ impl PartStudioView {
             "message": message,
             "tooltip": null,
         })
+    }
+
+    /// A selected entity's kind and owner as the parity state names them (an inferred point: its entity's).
+    fn selection_kind_owner(&self, r: &Reference, cx: &App) -> (&'static str, String) {
+        let feature_name = |id: FeatureId| self.studio(cx).and_then(|s| s.feature(id).map(|f| f.name.clone())).unwrap_or_default();
+        let body = |r: &Reference| self.body_of(r).and_then(|b| self.display.body(&b)).map(|b| b.name.clone()).unwrap_or_default();
+        match r {
+            Reference::Face(_) => ("FACE", body(r)),
+            Reference::Edge(_) => ("EDGE", body(r)),
+            Reference::Vertex(_) => ("VERTEX", body(r)),
+            Reference::Body(_) => ("BODY", body(r)),
+            Reference::Plane(p) => ("PLANE", format!("{p:?}")),
+            Reference::Origin => ("VERTEX", "Origin".to_string()),
+            Reference::SketchEntity { sketch, .. } => ("SKETCH_ENTITY", feature_name(*sketch)),
+            Reference::SketchRegion { sketch, .. } => ("FACE", feature_name(*sketch)),
+            Reference::Sketch(f) | Reference::Feature(f) => ("FEATURE", feature_name(*f)),
+            Reference::FeaturePlane(f) | Reference::ConstructionPlane { feature: f, .. } => ("PLANE", feature_name(*f)),
+            Reference::MateConnector { feature, .. } => ("MATE_CONNECTOR", feature_name(*feature)),
+            Reference::Implicit { on, .. } => self.selection_kind_owner(on, cx),
+            Reference::QueryVariable(_) => ("OTHER", String::new()),
+        }
     }
 
     /// The focused rename or folder name input, if any.

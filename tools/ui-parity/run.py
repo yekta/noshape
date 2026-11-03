@@ -109,6 +109,10 @@ CLOUD_ONLY = {"Add comment"}
 
 def normalize_live(state):
     """Live's state in the agreed form: cloud-only menu rows dropped, no highlighted row as null (live: -1)."""
+    # A focused checkbox: the DOM gives its value "on" and no selection; it has no text.
+    focus = (state or {}).get("focus")
+    if isinstance(focus, dict) and focus.get("text") == "on" and focus.get("selection") == [None, None]:
+        focus["text"], focus["selection"] = None, None
     lst = (state or {}).get("list")
     if isinstance(lst, dict):
         rows = lst.get("rows") or []
