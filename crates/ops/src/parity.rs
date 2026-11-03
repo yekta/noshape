@@ -316,6 +316,21 @@ impl<'a> Translator<'a> {
         registry::run(self.ctx, op, &args).map(|o| o.value).map_err(|e| e.to_json().to_string())
     }
 
+    /// Places an instance of the assembly tab `assembly` where live has its occurrence:
+    /// `transform` row-major 4×4, metres (the assembly definition's
+    /// `occurrences[].transform`).
+    pub fn place(&mut self, assembly: &str, instance: &str, transform: &[f64]) -> Result<(), String> {
+        let [m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, ..] = transform else { return Err(format!("transform of {instance}: 16 numbers")) };
+        let rot = glam::DMat3::from_cols(glam::DVec3::new(*m0, *m4, *m8), glam::DVec3::new(*m1, *m5, *m9), glam::DVec3::new(*m2, *m6, *m10));
+        let (axis, angle) = glam::DQuat::from_mat3(&rot).to_axis_angle();
+        let mut args = json!({ "tab": assembly, "instance": instance, "translation": mm([*m3, *m7, *m11]) });
+        if angle.abs() > 1e-12 {
+            args["axis"] = json!([axis.x, axis.y, axis.z]);
+            args["angle"] = json!(format!("{} rad", angle));
+        }
+        self.call("assembly_transform", args).map(|_| ())
+    }
+
     /// Rebuilds feature `k` (after features 0 … k−1).
     pub fn step(&mut self, k: usize) -> Step {
         let f = self.features[k].clone();

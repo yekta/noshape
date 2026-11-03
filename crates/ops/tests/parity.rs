@@ -629,10 +629,19 @@ fn a_second_part_studio_goes_into_its_own_tab() {
             assert!(s.ours.is_some(), "{}: {:?}", s.name, s.problems);
         }
     }
-    let run = |ctx: &mut Ctx, tab: &str| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name("query_parts").unwrap(), &json!({ "tab": tab })).unwrap().value;
+    let run = |ctx: &mut Ctx, tool: &str, args: Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap().value;
     for tab in ["Part Studio 1", "Bracket"] {
-        let p = run(&mut ctx, tab);
+        let p = run(&mut ctx, "query_parts", json!({ "tab": tab }));
         assert_eq!(p["parts"].as_array().map(Vec::len), Some(1), "{tab}: {p}");
         assert_eq!((p["parts"][0]["faces"].as_u64(), p["parts"][0]["edges"].as_u64()), (Some(8), Some(17)), "{tab}: {p}");
     }
+    // An instance of it placed by live's occurrence transform (row-major,
+    // metres): turned 90° about Z, moved to (100, 20, 0) mm.
+    run(&mut ctx, "assembly_insert", json!({ "source": "Bracket" }));
+    let mut t = Translator::open_in(&mut ctx, "Unused", &json!({ "features": [] }), Default::default()).unwrap();
+    t.place("Assembly 1", "Bracket <1>", &[0.0, -1.0, 0.0, 0.1, 1.0, 0.0, 0.0, 0.02, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]).unwrap();
+    let list = t.call("assembly_list", json!({ "tab": "Assembly 1" })).unwrap();
+    let i = &list["instances"][0];
+    let near = |v: &Value, want: &[f64]| want.iter().enumerate().all(|(k, w)| (v[k].as_f64().unwrap() - w).abs() < 1e-6);
+    assert!(near(&i["translation"], &[100.0, 20.0, 0.0]) && near(&i["rotation"], &[0.0, 0.0, std::f64::consts::FRAC_1_SQRT_2, std::f64::consts::FRAC_1_SQRT_2]), "{i}");
 }
