@@ -3941,6 +3941,9 @@ impl PartStudioView {
         let r_hover = r.clone();
         let view = cx.entity();
         let part_name = b.name.clone();
+        // The name's painted bounds: a double-click renames only on its text.
+        let name_at: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+        let (name_at2, name_text) = (name_at.clone(), b.name.clone());
         let several_parts = self.display.bodies.len() > 1;
         // Live 1714: a composite part's, a surface's or a curve's row has no
         // Copy <name> and no Hide other / all parts; a curve's no Export….
@@ -3995,6 +3998,11 @@ impl PartStudioView {
                 // a composite adds "(open|closed) (N parts)".
                 None => div()
                     .id(SharedString::from(format!("part-name-{}", b.id)))
+                    .relative()
+                    .child({
+                        let at = name_at.clone();
+                        canvas(move |bounds, _, _| at.set(bounds), |_, _, _, _| {}).absolute().inset_0()
+                    })
                     // With the properties shown the name is as wide as its text and the pills follow it (live
                     // "psui (2026-10-28, P1) part-studio 7.7").
                     .when(!show_props, |d| d.flex_1())
@@ -4044,9 +4052,12 @@ impl PartStudioView {
                     this.refresh_scene(false, cx);
                 }
             }))
-            // Live: double-clicking the name renames the part.
+            // Live: double-clicking the name renames the part; beside it the second click is a click (it
+            // deselects: ui-parity parts-row-dblclick).
             .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
-                if ev.click_count() >= 2 {
+                let b = name_at2.get();
+                let on_name = f32::from(ev.position().x - b.origin.x) <= crate::ui::text_width(window, &name_text, crate::ui::ROW_TEXT) + 2.0;
+                if ev.click_count() >= 2 && on_name {
                     this.start_part_rename(id1.clone(), window, cx);
                 } else if ev.modifiers().shift && this.edit.is_none() && this.ui.part_anchor.is_some() {
                     this.select_part_range(&id1, cx);

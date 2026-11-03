@@ -539,7 +539,11 @@ impl FeatureDialog {
         self.focus_new_empty_field(&shown);
         // A selection field the edit brought up and activated takes the keyboard from the checkbox or tab clicked
         // (live ui-parity shell-hollow-toggle: Hollow ticked, "Parts to hollow" has the focus).
-        self.focus_dialog_pending |= self.active_query != active && self.active_query.as_ref().is_some_and(|q| !shown.contains(&q.as_str()));
+        if self.active_query != active && self.active_query.as_ref().is_some_and(|q| !shown.contains(&q.as_str())) {
+            self.focus_dialog_pending = true;
+            // (A tab that brings the field up doesn't leave the keyboard outside: live extrude-surface-tab.)
+            self.keyboard_left = false;
+        }
     }
 
     /// The selection fields (and selection-driven arrays) shown now, in
