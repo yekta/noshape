@@ -2133,7 +2133,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   "main rectangle" and don't close a loop for its inside test); qCreatedBy(sketch, EDGE / VERTEX) don't include the
   imprinted edges and vertices yet; whether sketch mode fills the face's pieces and what a feature-list pick takes
   (asked: REQUESTS 07:20; ours: not filled, the sketch's own only). Cost: +12 ms for 400 circles on a face.
-- [ ] P2 EXTRUDE-OVERLAP-LINES-FACES (skasm + core; dx's parity suite 11-03) sketch lines lying over a profile's edge
+- [x] (core 11-03 08:10: one line's pieces in a region's boundary are one profile edge, as one circle's arcs were: the box is 6/12/8 (T1 kernel_robustness::a_line_over_a_profiles_side_leaves_it_one_face) and bracket120's Extrude 1 matches live; its Extrude 2 (Add of two regions) then differs: 10003.57 mm³ vs live 7948.5, the regions picked, for dx) P2 EXTRUDE-OVERLAP-LINES-FACES (skasm + core; dx's parity suite 11-03) sketch lines lying over a profile's edge
   split its side face: bracket120-datenkrake Extrude 1 (an L profile whose bottom edge at y = 0 is overlapped by
   short lines and a small rectangle's edge): live 10/24/16 faces/edges/vertices, ours 14/36/24, the bottom side in
   5 faces. Repro without live: rectangle (0,0)–(100,50) on Top plus a line (40,0)–(60,0), Extrude the region 10 mm →

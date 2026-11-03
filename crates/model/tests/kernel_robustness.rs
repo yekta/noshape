@@ -2892,6 +2892,25 @@ fn opposite_extrudes_of_one_circle_make_one_cylinder_face() {
     assert!((volume(&r) - 2261.946711).abs() < 1e-5, "{}", volume(&r));
 }
 
+/// EXTRUDE-OVERLAP-LINES-FACES (dx's parity suite, bracket120-datenkrake, live 10/24/16 faces/edges/vertices): a
+/// line lying over a rectangle's side splits it in the sketch, but the extruded side is one face (a box: 6/12/8).
+#[test]
+fn a_line_over_a_profiles_side_leaves_it_one_face() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.corner_rectangle(DVec2::ZERO, DVec2::new(0.1, 0.05));
+    sk.add_line(DVec2::new(0.04, 0.0), DVec2::new(0.06, 0.0));
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let r = t.regen();
+    let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+    assert_eq!(regions.len(), 1);
+    let x = t.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+    let r = t.ok(x);
+    let b = &r.context.bodies[0].shape;
+    use noshape_kernel::ShapeType::{Edge, Face, Vertex};
+    assert_eq!((b.count(Face), b.count(Edge), b.count(Vertex)), (6, 12, 8));
+}
+
 /// qa TOUCH-PATTERN-ADD (live request 1594): a cylinder r10 at (5, −5) × 5
 /// mm, Part linear pattern along Right, 20 mm, 2 instances, Add: the copy only
 /// touches the part along a line. Live: Info "Boolean resulted in no

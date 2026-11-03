@@ -1413,7 +1413,30 @@ pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region
                 *e0 = *s0 + sweep_prev + seg_sweep;
                 continue;
             }
+            // Likewise one line's pieces (split where other curves lie over it or end on it): one edge, so one side
+            // face (live: bracket120's bottom face).
+            if let (Some((P::Line { a: a0, b: b0 }, e_prev)), P::Line { a, b }) = (out.last_mut(), seg)
+                && *e_prev == src.entity.0
+                && (*b0 - *a).length() < 1e-12
+                && (*b0 - *a0).normalize_or_zero().perp_dot((*b - *a).normalize_or_zero()).abs() < 1e-9
+            {
+                *b0 = *b;
+                continue;
+            }
             out.push((seg.clone(), src.entity.0));
+        }
+        // (The loop may start inside that line.)
+        if out.len() > 2
+            && let (Some((P::Line { a: la, b: lb }, le)), Some((P::Line { a: fa, b: fb }, fe))) = (out.last(), out.first())
+            && le == fe
+            && (*lb - *fa).length() < 1e-12
+            && (*lb - *la).normalize_or_zero().perp_dot((*fb - *fa).normalize_or_zero()).abs() < 1e-9
+        {
+            let a = *la;
+            out.pop();
+            if let Some((P::Line { a: fa, .. }, _)) = out.first_mut() {
+                *fa = a;
+            }
         }
         // A loop made only of one entity's arcs may also wrap around at the start.
         if out.len() == 2
