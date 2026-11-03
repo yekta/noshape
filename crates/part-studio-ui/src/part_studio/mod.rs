@@ -912,7 +912,7 @@ impl PartStudioView {
             let faulty = self.display.feature_state(id).map(|s| s.faulty.clone()).unwrap_or_default();
             // Live (sketch/00-sketch-dialog-empty.png): a sketch without a
             // plane asks for one in a blue bubble over the graphics.
-            const NO_PLANE: &str = "Select a sketch plane";
+            const NO_PLANE: &str = NO_SKETCH_PLANE_BUBBLE;
             let no_plane = e.dialog.read(cx).feature.type_id == "sketch" && st.as_ref().is_some_and(|(k, m)| *k == FeatureStatus::Error && m == noshape_model::regen::features::sketch::NO_SKETCH_PLANE);
             // Live (qa5 BOOL1): a feature's info ("Boolean resulted in no
             // geometry change…") is a blue bubble at the top centre of the
@@ -5376,9 +5376,11 @@ impl PartStudioView {
         if let Some((st, msg)) = self.message.clone().filter(|(_, m)| self.edit.is_some() || m != behaviors::NO_INTERSECTION) {
             // Info messages close by themselves after 5 s however they were
             // set (live: message bubbles auto-dismiss after 5000 ms; qa5 C5 /
-            // SM10); errors and warnings stay until closed.
+            // SM10); errors and warnings stay until closed, and so does the
+            // Sketch dialog's "Select a sketch plane" until a plane is picked
+            // (live ui-parity sketch-*: still there steps later).
             let key = (st, msg.clone());
-            if st == FeatureStatus::Info && self.ui.message_timed.as_ref() != Some(&key) {
+            if st == FeatureStatus::Info && msg != NO_SKETCH_PLANE_BUBBLE && self.ui.message_timed.as_ref() != Some(&key) {
                 self.ui.message_timed = Some(key.clone());
                 cx.spawn(async move |this, cx| {
                     cx.background_executor().timer(Duration::from_secs(5)).await;
@@ -5471,6 +5473,9 @@ impl PartStudioView {
         div().absolute().top(px(14.)).right(px(15.)).child(cube).into_any_element()
     }
 }
+
+/// The Sketch dialog's bubble while it has no plane (live sketch/00-sketch-dialog-empty.png).
+const NO_SKETCH_PLANE_BUBBLE: &str = "Select a sketch plane";
 
 /// The separator between the feature and parts lists being dragged.
 #[derive(Clone)]

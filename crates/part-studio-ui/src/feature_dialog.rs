@@ -243,8 +243,9 @@ pub struct FeatureDialog {
     completion: Option<crate::var_complete::VarCompletion>,
     /// The dialog takes the keyboard at its next render (see `set_value`).
     focus_dialog_pending: bool,
-    /// The last press was in the graphics area, not in the dialog (live: the page has the keyboard then, the
-    /// selection field stays active; `ui_focus`).
+    /// The keyboard left the dialog: a press in the graphics area, or Esc out of a field (live: the page has the
+    /// keyboard then, the selection field stays active; `ui_focus`). A press in the dialog or a field's focus
+    /// brings it back.
     pub graphics_pressed: bool,
     /// The field Enter just applied: the input's change event for the last typed key can arrive after the commit
     /// rewrote the text ("15" → "15 mm") and must not open a list for it.
@@ -1371,7 +1372,10 @@ impl FeatureDialog {
             // Onshape keeps the selection field active while a number field
             // has keyboard focus ("two fields are active"), so picks still
             // go to it.
-            InputEvent::Focus => cx.notify(),
+            InputEvent::Focus => {
+                this.graphics_pressed = false;
+                cx.notify()
+            }
             InputEvent::Blur => {
                 this.completion = None;
                 // The Create variable popup taking the keyboard from this field commits nothing: live keeps the
@@ -3592,6 +3596,7 @@ impl FeatureDialog {
                 return;
             }
             cx.stop_propagation();
+            this.graphics_pressed = true;
             let base = st_esc.read(cx).value().to_string();
             this.on_text_changed(&p_esc, base, cx);
             cx.notify();

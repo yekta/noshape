@@ -111,7 +111,11 @@ impl PartStudioView {
     /// A selected entity's kind and owner as the parity state names them (an inferred point: its entity's).
     fn selection_kind_owner(&self, r: &Reference, cx: &App) -> (&'static str, String) {
         let feature_name = |id: FeatureId| self.studio(cx).and_then(|s| s.feature(id).map(|f| f.name.clone())).unwrap_or_default();
-        let body = |r: &Reference| self.body_of(r).and_then(|b| self.display.body(&b)).map(|b| b.name.clone()).unwrap_or_default();
+        // The preview may have consumed the entity: then the model before the edited feature has it.
+        let body = |r: &Reference| {
+            let before = self.ui.preview_before.as_deref();
+            std::iter::once(&*self.display).chain(before).find_map(|d| noshape_ops::studio::body_of(d, r).and_then(|b| d.body(&b)).map(|b| b.name.clone())).unwrap_or_default()
+        };
         match r {
             Reference::Face(_) => ("FACE", body(r)),
             Reference::Edge(_) => ("EDGE", body(r)),

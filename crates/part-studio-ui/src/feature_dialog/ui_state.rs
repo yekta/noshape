@@ -37,7 +37,8 @@ impl FeatureDialog {
         if self.selects.values().any(|s| s.read(cx).has_focus(window) || s.read(cx).is_open()) {
             return Some(json!({ "kind": "field", "label": null, "text": "", "selection": [0, 0], "all": false }));
         }
-        if let Some((key, _)) = self.tab_stops.iter().find(|(_, h)| h.is_focused(window)) {
+        // (The Sketch dialog's plane field holds a Tab stop but live never shows it focused.)
+        if let Some((key, _)) = self.tab_stops.iter().find(|(k, h)| h.is_focused(window) && !(self.feature.type_id == "sketch" && k.starts_with("q:"))) {
             let label = match key.split_once(':') {
                 Some(("q" | "cb", path)) => self.spec_for_path(path).map(|s| crate::i18n::spec(s.label)),
                 _ => None,
@@ -45,9 +46,10 @@ impl FeatureDialog {
             return Some(json!({ "kind": "field", "label": label, "text": null, "selection": null, "all": false }));
         }
         let Some(path) = self.inputs.keys().find(|p| self.input_of(p, window, cx).is_some_and(|i| i.0)) else {
-            // Only the dialog has the keyboard: its active selection field has the focus (live); after Esc left a
-            // field, nothing has (live ui-parity extrude-escape-cancels).
-            if !self.focus.is_focused(window) || self.graphics_pressed {
+            // No control has the keyboard: the active selection field has the focus (live), unless the keyboard
+            // left the dialog (a press in the graphics, Esc out of a field: live ui-parity extrude-escape-cancels).
+            // The Sketch dialog doesn't take the focus at all (live: its plane field isn't focused).
+            if self.graphics_pressed || self.feature.type_id == "sketch" {
                 return None;
             }
             let q = self.active_query.as_deref()?;
@@ -70,6 +72,32 @@ impl FeatureDialog {
         } else {
             vec![("Name", &c.name, false), ("Value", &c.value, true), ("Description", &c.description, false)]
         }
+    }
+
+    /// The top-level parameters the dialog draws, in order: visible ones outside folded groups (as
+    /// `render_params`: a group holds the parameters its header hides when off).
+    fn shown_params(&self) -> Vec<&'static ParamSpec> {
+        let values = &self.feature.params;
+        let mut groups: Vec<(&'static str, bool)> = Vec::new();
+        let mut out = Vec::new();
+        for s in self.ty.params.iter().filter(|s| s.is_visible(values)) {
+            let depends_on = |header: &str| {
+                let mut off = values.clone();
+                off.set(header, ParamValue::Bool(false));
+                !s.is_visible(&off)
+            };
+            while groups.last().is_some_and(|g| !depends_on(g.0)) {
+                groups.pop();
+            }
+            if groups.iter().any(|g| !g.1) {
+                continue;
+            }
+            if s.hints.has(Hints::GROUP_HEADER) {
+                groups.push((s.id, values.bool(s.id) && !self.collapsed_groups.contains(s.id)));
+            }
+            out.push(s);
+        }
+        out
     }
 
     /// `state.dialog` while the Create variable popup is open (live: it stands for the dialog).
@@ -103,7 +131,7 @@ impl FeatureDialog {
         let mut fields = Vec::new();
         let values = &self.feature.params;
         let mut prev: Option<&ParamSpec> = None;
-        for s in self.ty.params.iter().filter(|s| s.is_visible(values)) {
+        for s in self.shown_params() {
             // A value drawn beside the row before it (Draft's angle) shows no label of its own.
             let companion = prev.is_some_and(|p| p.hints.has(Hints::FIRST_IN_ROW) && p.hints.has(Hints::DISPLAY_SHORT)) && s.hints.has(Hints::DISPLAY_SHORT);
             prev = Some(s);

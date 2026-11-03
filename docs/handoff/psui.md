@@ -237,6 +237,11 @@ dump, the runner, live's first 20 scenarios run in ours and a first score.
   focus, folder rows (the list's own walk, `list_items`), rollbackAfter "Default geometry"; targets: view cube cells,
   the parts list eye. Next differences: a select's or checkbox's focus readout, the empty field of a new Extrude
   (ours "error"), focus after Esc, hidden sketch rows while rolled back / editing a sketch.
+- 11-03 05:00: 57/101 before the Sketch-dialog focus and "Select a sketch plane" fixes (rerun pending). Landed
+  48ed5ca2: overlapping datum planes pick the nearest (planes write a far-scaled depth in the pick pass). Open with
+  live (REQUESTS 11-03 03:50): neutral starts (account's remembered Fillet radius 3 mm), select list kind / disabled
+  state, mod+click, consumed sketch shown after Roll to here (user-hidden case), selection after New folder; the
+  4 key-delivery artifacts (arrow-up, Enter, copy/paste, mod-click) are live-runner issues.
 - Open: whole-sketch picks (Onshape's sketch-row pick persists as "Faces of Sketch 1" and follows new regions; ours
   stores the regions): model gap, see Requests to the lead. Targets not resolvable yet: a chip's ×, a row's eye, view
   cube faces, tools only in a toolbar dropdown, "Section view" (not a toolbar tool in ours).

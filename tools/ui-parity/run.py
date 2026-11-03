@@ -66,7 +66,7 @@ def first_difference(a, b, path=""):
         for k in a:
             if k not in b:
                 continue
-            if path == ".selection" and k == "items" and not all("owner" in i for i in (a[k] or [])):
+            if path == ".selection" and k == "items" and not all("owner" in i and i.get("kind") for i in (a[k] or [])):
                 continue
             # A flip button has no label of its own (live records its icon's name).
             if k == "label" and a.get("kind") == "toggle":
@@ -91,7 +91,7 @@ def all_differences(a, b, path=""):
     if isinstance(a, dict) and isinstance(b, dict):
         out = []
         for k in a:
-            if k not in b or (path == ".selection" and k == "items" and not all("owner" in i for i in (a[k] or []))):
+            if k not in b or (path == ".selection" and k == "items" and not all("owner" in i and i.get("kind") for i in (a[k] or []))):
                 continue
             if k == "label" and a.get("kind") == "toggle":
                 continue
@@ -116,6 +116,10 @@ def normalize_live(state):
     # The bubble's close button is part of live's text ("Select a sketch plane × Close").
     if isinstance((state or {}).get("message"), str):
         state["message"] = state["message"].removesuffix("× Close").strip()
+    # A flip button's state is its icon in live's DOM ("…-opposite": not flipped); its "checked" isn't kept.
+    for f in ((state or {}).get("dialog") or {}).get("fields") or []:
+        if f.get("kind") == "toggle" and str(f.get("label", "")).startswith("icon:"):
+            f["checked"] = not str(f["label"]).endswith("-opposite")
     lst = (state or {}).get("list")
     if isinstance(lst, dict):
         rows = lst.get("rows") or []
