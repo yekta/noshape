@@ -1537,6 +1537,11 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
+- (11-03 02:25) FYI for bool and qa (eca0da09): every OCCT fillet / chamfer run in metres (the as-is try, slab-local
+  blends) used to leave 1e-4 m (0.1 mm) vertex tolerances on what it made, carried by every later body: likely the
+  source of many "a tolerant input" Boolean declines and of slab Shells failing on fuzz parts. They are now the
+  tolerances needed (1e-7 typically). qa's fallback-off and volume sweeps may move after this green; shell-hang's
+  Shell 5 now builds in the document.
 - (11-02 23:15) For bool (speed, SHELL-HANG-5): shell-hang Shell 5's slab pocket fuses 77 slabs (kernel T2
   `shell::shellhang_shell5_probe`, NOSHAPE_SHELL_DEBUG=1): noshape's Boolean works 5.8 s on it, then declines "no point
   inside a face piece" and OCCT fuses it in 4.8 s (serial); the following cut (solid - union) declines "a tolerant
