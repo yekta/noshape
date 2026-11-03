@@ -627,6 +627,16 @@ impl PartStudioView {
     pub fn schedule_regen(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let caller = std::panic::Location::caller();
         self.perf_script_note("regen scheduled");
+        // A new feature's preview waits for std's editing logic's first run (std_edit_logic runs it then).
+        if self.edit.is_some()
+            && let Some(held) = &mut self.ui.std_logic_first
+        {
+            // Pending all the same (the working overlay on a slow model; an earlier run's late result isn't shown).
+            *held = true;
+            self.regen_seq += 1;
+            self.begin_pending(self.regen_seq, window, cx);
+            return;
+        }
         // Paused regeneration (Onshape): edits wait until "Regenerate".
         if self.ui.regen_paused.is_some() && !std::mem::take(&mut self.ui.force_regen) {
             // Nothing starts: an "Opening…" waiting for this run goes. The
@@ -2259,7 +2269,7 @@ impl PartStudioView {
                     e.history.absorb = true;
                 }
                 // What the editing logic changes at once belongs to the same step.
-                this.auto_operation(cx);
+                this.auto_operation(window, cx);
                 this.draft_checkpoint(cx);
                 this.schedule_regen(window, cx);
                 this.refresh_scene(false, cx);
@@ -2358,6 +2368,7 @@ impl PartStudioView {
         // A new feature's first change runs std's editing logic with an
         // empty old definition; an edited one starts from its values.
         self.ui.std_edit_old = (!is_new).then(|| dialog.read(cx).feature.params.clone());
+        self.ui.std_logic_first = (is_new && noshape_model::custom::std_feature::has_editing_logic(&dialog.read(cx).feature.type_id)).then_some(false);
         self.edit = Some(EditSession { dialog, index, is_new, _sub: sub, history });
         // Live ("Panels vs feature dialogs"): opening a feature dialog closes
         // the tool panels (Mass and section properties, Named views) for good;
@@ -2366,7 +2377,7 @@ impl PartStudioView {
             self.set_show_mass(false, cx);
         }
         self.named_views = None;
-        self.auto_operation(cx);
+        self.auto_operation(window, cx);
         // The defaults the editing logic fills in on opening aren't a step (live: Undo off).
         if let Some(e) = &mut self.edit {
             e.history = DraftHistory::new(&e.dialog.read(cx).feature);

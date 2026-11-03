@@ -2009,3 +2009,26 @@ fn an_edge_midpoint_lights_up_its_feature(cx: &mut TestAppContext) {
     view.update(cx, |v, _| v.selection = vec![Reference::Implicit { on: Box::new(edge), inference: noshape_model::reference::Inference::Midpoint }]);
     assert!(cx.update(|cx| view.read(cx).related_features(cx).contains(&maker)));
 }
+
+/// A new Extrude on a part's face previews as Add from the first preview: it waits for std's editing logic (which
+/// turns New into Add) instead of showing the New result, a separate part, until then (ui-parity extrude-remove-tab).
+#[gpui::test]
+fn a_new_extrude_on_a_face_never_previews_as_new(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "no-new-flash");
+    view.update(cx, |v, _| v.selection = vec![top.clone()]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Extrude dialog").dialog.clone());
+    let mut most = 0;
+    let t = std::time::Instant::now();
+    while t.elapsed() < std::time::Duration::from_secs(30) {
+        most = most.max(cx.update(|cx| view.read(cx).display.bodies.len()));
+        if cx.update(|cx| dialog.read(cx).feature.params.enum_("operationType") == "ADD" && !view.read(cx).ui_busy()) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        cx.executor().advance_clock(std::time::Duration::from_millis(20));
+        draw(cx, window);
+    }
+    assert_eq!(cx.update(|cx| (dialog.read(cx).feature.params.enum_("operationType").to_string(), view.read(cx).display.bodies.len())), ("ADD".to_string(), 1));
+    assert_eq!(most, 1, "no New preview with a second part on the way");
+}

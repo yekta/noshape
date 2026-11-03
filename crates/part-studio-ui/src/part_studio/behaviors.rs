@@ -383,6 +383,9 @@ pub struct UiState {
     /// std's editing logic running off the UI thread (std Extrude runs a
     /// whole trial extrude for its boolean heuristics).
     pub std_edit_task: Option<Task<()>>,
+    /// A new feature's preview waits for std's editing logic to run once (a new Extrude on a part's face opens as
+    /// New and turns Add: its New preview showed a separate part for most of a second). `Some(true)`: one was held.
+    pub std_logic_first: Option<bool>,
     /// A FeatureScript manipulator being dragged (its index in the feature
     /// state's `manipulators`, where it is now: drawn there until the
     /// preview catches up), and the run of its change function.
@@ -689,6 +692,7 @@ impl UiState {
             decal_sized: None,
             std_edit_old: None,
             std_edit_task: None,
+            std_logic_first: None,
             std_manip_live: None,
             std_manip_task: None,
             preview_task: None,
@@ -2217,7 +2221,7 @@ impl PartStudioView {
                 if let Some(dialog) = this.edit.as_ref().map(|e| e.dialog.clone())
                     && noshape_model::custom::std_feature::has_editing_logic(&dialog.read(cx).feature.type_id)
                 {
-                    this.std_edit_logic(&dialog, cx);
+                    this.std_edit_logic(&dialog, window, cx);
                 }
                 // Chips of parts the feature consumes get their names now.
                 if let Some(dialog) = this.edit.as_ref().map(|e| e.dialog.clone()) {
@@ -3666,7 +3670,7 @@ impl PartStudioView {
     /// becomes Add when the profile sits on a part (with that part as the
     /// merge scope), and choosing Remove/Intersect points the feature into
     /// the part. Fields the user set are left alone.
-    pub(super) fn auto_operation(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn auto_operation(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(e) = &self.edit else { return };
         // Live L49/L50: a tapped hole's Depth, Tapped depth and Tap
         // clearance stay linked, new or edited (std's holeEditLogic does it
@@ -3698,7 +3702,7 @@ impl PartStudioView {
         let ty = e.dialog.read(cx).feature.type_id.clone();
         if noshape_model::custom::std_feature::has_editing_logic(&ty) {
             let dialog = e.dialog.clone();
-            self.std_edit_logic(&dialog, cx);
+            self.std_edit_logic(&dialog, window, cx);
             return;
         }
         if !e.is_new {
@@ -3734,7 +3738,7 @@ impl PartStudioView {
     /// It runs in the background; a result for values the user has changed
     /// since is dropped (the run for the new values follows). Without the
     /// model before the feature yet, it runs once that arrives.
-    pub(super) fn std_edit_logic(&mut self, dialog: &Entity<crate::feature_dialog::FeatureDialog>, cx: &mut Context<Self>) {
+    pub(super) fn std_edit_logic(&mut self, dialog: &Entity<crate::feature_dialog::FeatureDialog>, window: &mut Window, cx: &mut Context<Self>) {
         let Some(ctx) = self.ui.before_context.clone() else { return };
         let (ty, id, name, params, user_set) = {
             let d = dialog.read(cx);
@@ -3744,23 +3748,30 @@ impl PartStudioView {
         let clicked = dialog.update(cx, |d, _| d.clicked_button.take()).unwrap_or_default();
         let old = self.ui.std_edit_old.replace(params.clone()).unwrap_or_default();
         if old == params && clicked.is_empty() {
+            if self.ui.std_logic_first.take() == Some(true) {
+                self.schedule_regen(window, cx);
+            }
             return;
         }
         let creating = self.edit.as_ref().is_some_and(|e| e.is_new);
         let units = self.doc.read(cx).session.doc.settings.units;
         let dialog = dialog.clone();
         let sent = params.clone();
-        self.ui.std_edit_task = Some(cx.spawn(async move |this, cx| {
+        self.ui.std_edit_task = Some(cx.spawn_in(window, async move |this, cx| {
             let changed = cx.background_spawn(async move { noshape_model::custom::std_feature::editing_logic_in_clicked((*ctx).clone(), &ty, id, &name, &units, &old, &sent, &user_set, creating, &clicked) }).await;
-            let _ = this.update(cx, |this: &mut Self, cx| {
+            let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 // Done (a newer run would have dropped this one): the studio is idle again ([`Self::ui_busy`]).
                 this.ui.std_edit_task = None;
-                let Some(changed) = changed else { return };
-                if dialog.read(cx).feature.params != params {
-                    return;
-                }
-                let changes: Vec<(String, ParamValue)> = changed.0.into_iter().filter(|(k, v)| params.get(k) != Some(v)).collect();
+                // The first run is in: a held preview runs now unless the changes below schedule their own.
+                let held = this.ui.std_logic_first.take() == Some(true);
+                let changes: Vec<(String, ParamValue)> = match changed {
+                    Some(changed) if dialog.read(cx).feature.params == params => changed.0.into_iter().filter(|(k, v)| params.get(k) != Some(v)).collect(),
+                    _ => Vec::new(),
+                };
                 if changes.is_empty() {
+                    if held {
+                        this.schedule_regen(window, cx);
+                    }
                     return;
                 }
                 let mut next = params;
