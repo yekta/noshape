@@ -1704,6 +1704,7 @@ impl<'a> Translator<'a> {
                 }
             }
         }
+        self.unsnap(&oid, &id, map);
         // Constraints and dimensions keep the geometry where Onshape solved
         // it; any that move it (a solve that differs) are taken back.
         let before = self.call("sketch_get", json!({ "sketch": id }))?;
@@ -1730,6 +1731,50 @@ impl<'a> Translator<'a> {
         let st = self.call("feature_list", json!({}))?;
         let row = st["features"].as_array().into_iter().flatten().find(|x| x["id"] == id).cloned().unwrap_or_default();
         Ok((id, row["status"].as_str().unwrap_or("Ok").to_string(), row["message"].as_str().map(str::to_string)))
+    }
+
+    /// Our line tool's Horizontal / Vertical inference snaps a line live
+    /// solved a hair off the axis (exercise-anthony's patterned hexagon,
+    /// 0.03°): those constraints go and the line's ends back to live's solve.
+    fn unsnap(&mut self, oid: &str, id: &str, map: SketchMap) {
+        let Ok(g) = self.call("sketch_get", json!({ "sketch": id })) else { return };
+        let k = per_unit(&g["units"]);
+        let live_of: HashMap<&str, &str> = self.sketch_entities.iter().filter(|((o, _), _)| o == oid).map(|((_, e), c)| (c.as_str(), e.as_str())).collect();
+        let p2 = |v: &Value| Some([v[0].as_f64()?, v[1].as_f64()?]);
+        let mut snapped = Vec::new();
+        let mut moves = Vec::new();
+        for c in g["constraints"].as_array().into_iter().flatten() {
+            let axis = match c["type"].as_str() {
+                Some("Horizontal") => 1,
+                Some("Vertical") => 0,
+                _ => continue,
+            };
+            let Some([line]) = c["entities"].as_array().map(Vec::as_slice) else { continue };
+            let Some(eid) = line.as_str().and_then(|l| live_of.get(l)) else { continue };
+            let Some(solve) = self.solved.get(&(oid.to_string(), eid.to_string())).filter(|s| s["entityType"] == "lineSegment") else { continue };
+            let (Some(a), Some(b)) = (p2(&solve["startPoint"]), p2(&solve["endPoint"])) else { continue };
+            let (a, b) = (map.local(a), map.local(b));
+            if (b[axis] - a[axis]).abs() <= 1e-9 {
+                continue;
+            }
+            snapped.push(c["id"].clone());
+            for (end, at) in [("start", a), ("end", b)] {
+                if let Some(pid) = self.sketch_entities.get(&(oid.to_string(), format!("{eid}.{end}"))) {
+                    moves.push((pid.clone(), at));
+                }
+            }
+        }
+        if snapped.is_empty() || self.call("sketch_delete", json!({ "sketch": id, "constraints": snapped })).is_err() {
+            return;
+        }
+        let Ok(g) = self.call("sketch_get", json!({ "sketch": id })) else { return };
+        for (pid, at) in moves {
+            let Some(now) = g["entities"].as_array().into_iter().flatten().find(|e| e["id"] == pid.as_str()).and_then(|e| p2(&e["at"])) else { continue };
+            let d = [at[0] / k - now[0], at[1] / k - now[1]];
+            if d[0].hypot(d[1]) * k > 1e-12 {
+                let _ = self.call("sketch_transform", json!({ "sketch": id, "entities": [pid], "translate": d }));
+            }
+        }
     }
 
     /// The sketch's geometric constraints as ours (the geometry already

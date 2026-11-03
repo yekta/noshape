@@ -1005,6 +1005,23 @@ fn filter_inner_loops_leaves_out_what_a_hole_holds() {
 
 /// A sketch whose frame isn't live's is a difference (here live's Top sketch
 /// turned 90°: x along +Y), and none where it is.
+/// A line live solved a hair off horizontal (a patterned hexagon's edge in
+/// exercise-anthony) stays where live has it: our line tool's inferred
+/// Horizontal is dropped, so the triangle's volume is live's.
+#[test]
+fn a_line_just_off_horizontal_is_not_snapped() {
+    let (a, b, c) = ((0.0, 0.0), (0.02, 0.00001), (0.01, 0.015));
+    let lines = json!([segment("l1", a, b), segment("l2", b, c), segment("l3", c, a)]);
+    let area = 0.5 * ((b.0 - a.0) * (c.1 - a.1) - (b.1 - a.1) * (c.0 - a.0));
+    let region = json!({ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": "FS1", "queryString": "query = qSketchRegion(id + \"FS1\", false);" });
+    let (mut features, live) = one_extrude("FS1", lines, region, json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 5, "edges": 9, "vertices": 6, "volume": area * 0.01 }));
+    let solve = |id: &str, p: (f64, f64), q: (f64, f64)| json!({ "id": id, "entityType": "lineSegment", "startPoint": [p.0, p.1], "endPoint": [q.0, q.1] });
+    features["sketches"] = json!({ "sketches": [{ "featureId": "FS1", "transformMatrix": [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+        "geomEntities": [solve("l1", a, b), solve("l2", b, c), solve("l3", c, a)] }] });
+    let r = run_model("off-horizontal", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
 #[test]
 fn a_sketch_frame_unlike_lives_is_a_difference() {
     let (mut features, mut live) = one_extrude("FS1", json!([circle("c", 0.01, (0.0, 0.0))]), json!({ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": "FS1", "queryString": "query = qSketchRegion(id + \"FS1\", false);" }), json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 3, "edges": 2, "vertices": 0, "volume": std::f64::consts::PI * 1e-6 }));
