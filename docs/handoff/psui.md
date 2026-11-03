@@ -530,9 +530,9 @@ N12. (11-01) Part Studio audit (user 11-01): docs/parity/audit-part-studio.md. D
      model's flip) and RUST-EXTRUDE-SCOPE-SLOW's psui part (dialog FS functions under the kernel cancel flag after
      15 s: repro 418 s -> 33 s). Note: a CLI binary older than scope rule 5 makes legacy (native) sheet metal studios;
      rebuild the CLI (`rb.sh --get noshape-cli cargo build -p noshape-cli`) before making test docs.
-     Open in this line: custom (Feature Studio) features' editing logic is parsed (CustomFeatureDef::editing_logic) but
-     never run in dialogs, nor their manipulator change functions (P2); M5 partial fillet points; Helix flip; points
-     manipulators.
+     Open in this line: M5 partial fillet points; Helix flip; points manipulators. (Custom features' editing logic and
+     manipulator change functions do run now: std_feature::editing_logic_in_clicked / manipulator_change_in take a
+     Feature Studio's definition first.)
 
 N11. (11-01 04:54) Drawing sheets taken from dx (user 11-01): docs/parity/workflow-drawing.md and
      workflow-drawing-sheet-metal.md. dx keeps drawing.md and the import sheets; notes to dx in docs/handoff/dx.md

@@ -135,8 +135,9 @@ Two keys added 11-03 (skasm, for the sketch scenarios; the runner compares each 
 ## Comparison
 
 `tools/ui-parity/run.py` compares the keys both sides record. A size that comes from where a click landed (a drawn
-line's or circle's length in the sketch value box, or its dimension before a value is typed) is equal when within 10 %:
-each side's pointer is at whole pixels, so the same `sketch_point` steps draw lengths a pixel or two apart (a 10 mm circle 9.53 mm in live).
+line's or circle's length in the sketch value box, or its dimension before a value is typed) is equal when within
+10 %: each side's pointer is at whole pixels, so the same `sketch_point` steps draw lengths a pixel or two apart (a
+10 mm circle is 9.53 mm in live).
 
 ## noshape side
 
