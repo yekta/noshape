@@ -13,6 +13,7 @@ noshape-units.workspace = true
 noshape-sketch.workspace = true
 noshape-kernel.workspace = true
 noshape-model.workspace = true
+noshape-featurescript.workspace = true
 noshape-store.workspace = true
 noshape-render.workspace = true
 noshape-scene.workspace = true

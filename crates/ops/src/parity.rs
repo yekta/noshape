@@ -41,6 +41,8 @@ pub struct Step {
     pub message: Option<String>,
     /// Things not translated, each with its reason.
     pub problems: Vec<String>,
+    /// A custom feature (Onshape's `namespace` names its Feature Studio).
+    pub custom: bool,
 }
 
 pub struct Translator<'a> {
@@ -82,6 +84,11 @@ pub struct Translator<'a> {
     studios: HashMap<String, String>,
     /// What isn't translated of the document itself (configuration inputs…).
     pub notes: Vec<String>,
+    /// Custom features' failures, apart from geometry: a Feature Studio
+    /// that doesn't compile ("<studio>: failed to compile: …").
+    pub custom_failures: Vec<String>,
+    /// Each Feature Studio's pinned std and the one our host serves for it.
+    pub std_pins: Vec<(String, u32, u32)>,
 }
 
 fn f3(v: &Value) -> Option<[f64; 3]> {
@@ -214,7 +221,7 @@ impl<'a> Translator<'a> {
             .flatten()
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), std_pins: Vec::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -233,6 +240,17 @@ impl<'a> Translator<'a> {
         };
         if let Err(e) = self.call("featurestudio_edit", json!({ "tab": tab, "source": source })).and_then(|_| self.call("featurestudio_commit", json!({ "tab": tab }))) {
             self.notes.push(format!("Feature Studio {name}: {e}"));
+        }
+        // Its pinned std (`FeatureScript N;`), loaded as our host serves it.
+        if let Some(pin) = source.split("FeatureScript").nth(1).and_then(|r| r.trim_start().split(';').next()).and_then(|v| v.trim().parse::<u32>().ok()) {
+            self.std_pins.push((name.to_string(), pin, noshape_featurescript::std_version_for(pin)));
+        }
+        // What the editor's notices call errors: it doesn't compile.
+        if let Ok(g) = self.call("featurestudio_get", json!({ "tab": tab })) {
+            let errors: Vec<String> = g["notices"].as_array().into_iter().flatten().filter(|n| n["severity"] == "error").map(|n| format!("{} (line {})", n["message"].as_str().unwrap_or("?"), n["line"])).collect();
+            if !errors.is_empty() {
+                self.custom_failures.push(format!("{name}: failed to compile: {}", errors.iter().take(3).cloned().collect::<Vec<_>>().join("; ")));
+            }
         }
         self.studios.insert(element.to_string(), tab);
     }
@@ -335,6 +353,7 @@ impl<'a> Translator<'a> {
     pub fn step(&mut self, k: usize) -> Step {
         let f = self.features[k].clone();
         let mut step = Step { index: k, name: f["name"].as_str().unwrap_or("").to_string(), feature_type: f["featureType"].as_str().unwrap_or("").to_string(), ..Default::default() };
+        step.custom = f["namespace"].as_str().is_some_and(|n| !n.is_empty());
         // Mate connectors made inside the feature's dialog (its sub-features):
         // ours has none in a feature, so each is a Mate connector before it.
         for sub in f["subFeatures"].as_array().into_iter().flatten().filter(|s| s["featureType"] == "mateConnector") {

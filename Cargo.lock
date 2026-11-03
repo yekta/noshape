@@ -4941,6 +4941,7 @@ dependencies = [
  "jpeg-encoder",
  "log",
  "miniz_oxide 0.8.9",
+ "noshape-featurescript",
  "noshape-kernel",
  "noshape-model",
  "noshape-render",

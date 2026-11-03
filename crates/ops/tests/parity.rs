@@ -13,6 +13,7 @@ fn scratch(name: &str) -> PathBuf {
 }
 
 /// One document's result: features matching live, and the first that doesn't.
+#[derive(Debug)]
 struct ModelResult {
     name: String,
     features: usize,
@@ -29,13 +30,20 @@ struct ModelResult {
     list_ms: f64,
     /// Our slowest features in it (name, ms).
     slowest: Vec<(String, f64)>,
+    /// Custom features compared and matching, and their failures to
+    /// compile / run (apart from geometry differences).
+    custom_compared: usize,
+    custom_matching: usize,
+    custom: Vec<String>,
+    /// Feature Studios whose pinned std ours serves at another version.
+    std_pins: Vec<String>,
 }
 
 /// Rebuilds `features` and compares with `live` (live.jsonl lines) after each feature.
 fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelResult {
     let mut ctx = Ctx::new();
     let path = scratch(&format!("{name}.noshape"));
-    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, untranslated: Vec::new(), regen_ms: None, open_ms: 0.0, list_ms: 0.0, slowest: Vec::new() };
+    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, untranslated: Vec::new(), regen_ms: None, open_ms: 0.0, list_ms: 0.0, slowest: Vec::new(), custom_compared: 0, custom_matching: 0, custom: Vec::new(), std_pins: Vec::new() };
     // refs.jsonl wins over the geometry read from live's bodydetails.
     let mut all = refs_from_bodies(live);
     all.extend(parse_refs(refs));
@@ -48,14 +56,21 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
     };
     res.features = t.len();
     res.untranslated.extend(t.notes.iter().map(|n| format!("document: {n}")));
+    res.custom.extend(t.custom_failures.iter().cloned());
+    res.std_pins.extend(t.std_pins.iter().filter(|(_, pin, served)| pin != served).map(|(n, pin, served)| format!("{n} pins std {pin}, served {served}")));
     for k in 0..t.len() {
         let step = t.step(k);
         for p in &step.problems {
             res.untranslated.push(format!("{} ({}): {p}", step.name, step.feature_type));
         }
         // Not compared where live has no line (a dump of the end state only).
+        // A custom feature that wasn't made: its Feature Studio didn't load or define it.
+        if step.custom && step.ours.is_none() {
+            res.custom.push(format!("{}: failed to compile / load: {}", step.name, step.problems.first().map(String::as_str).unwrap_or("not built")));
+        }
         let Some(line) = live.iter().find(|l| l["index"].as_u64() == Some(k as u64)) else { continue };
         res.compared += 1;
+        res.custom_compared += usize::from(step.custom);
         let mut diff = Vec::new();
         let live_status = line["status"].as_str().unwrap_or("OK").to_uppercase();
         let ours = step.status.clone().unwrap_or_else(|| "not built".into()).to_uppercase();
@@ -74,10 +89,18 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
             Ok(parts) => diff.extend(differences(&live_parts(line), &parts)),
             Err(e) => diff.push(format!("parts: {e}")),
         }
+        // A custom feature that errors where live's doesn't failed to run
+        // (the FeatureScript host or std), apart from geometry.
+        let failed_run = step.custom && step.ours.is_some() && ours == "ERROR" && live_status != "ERROR";
+        if failed_run {
+            res.custom.push(format!("{}: failed to run: {}", step.name, step.message.as_deref().unwrap_or("no message")));
+        }
         if diff.is_empty() {
             res.matching += 1;
+            res.custom_matching += usize::from(step.custom);
         } else if res.first.is_none() {
-            res.first = Some(format!("feature {k} \"{}\" ({}): {}", step.name, step.feature_type, diff.join("; ")));
+            let kind = if failed_run { "custom feature failed to run" } else if step.custom && step.ours.is_none() { "custom feature failed to compile / load" } else { step.feature_type.as_str() };
+            res.first = Some(format!("feature {k} \"{}\" ({kind}): {}", step.name, diff.join("; ")));
         }
     }
     drop(t);
@@ -102,7 +125,25 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
 }
 
 fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
-    let features: Value = serde_json::from_str(&std::fs::read_to_string(dir.join("features.json")).ok()?).ok()?;
+    let mut features: Value = serde_json::from_str(&std::fs::read_to_string(dir.join("features.json")).ok()?).ok()?;
+    // The document's own Feature Studios: studios/<elementId>.fs (its source,
+    // the std it pins in its header) and optional <elementId>.json ({ "name", … }),
+    // with features.json's `featureStudios`.
+    if let Ok(entries) = std::fs::read_dir(dir.join("studios")) {
+        for e in entries.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "fs")) {
+            let (Some(id), Ok(source)) = (e.file_stem().map(|s| s.to_string_lossy().to_string()), std::fs::read_to_string(&e)) else { continue };
+            let meta: Value = std::fs::read_to_string(e.with_extension("json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or(Value::Null);
+            let mut studio = if meta.is_object() { meta } else { json!({}) };
+            studio["source"] = json!(source);
+            if studio["name"].is_null() {
+                studio["name"] = json!(id);
+            }
+            if !features["featureStudios"].is_object() {
+                features["featureStudios"] = json!({});
+            }
+            features["featureStudios"][id.as_str()] = studio;
+        }
+    }
     let live = std::fs::read_to_string(dir.join("live.jsonl")).unwrap_or_default().lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).filter(|l| l.get("index").is_some()).collect();
     let refs = std::fs::read_to_string(dir.join("refs.jsonl")).unwrap_or_default();
     Some((features, live, refs))
@@ -160,6 +201,15 @@ fn parity_models() {
         };
         let speed = if r.slowest.is_empty() { speed } else { format!("{speed} (slowest: {})", r.slowest.iter().map(|(n, ms)| format!("{n} {ms:.0} ms")).collect::<Vec<_>>().join(", ")) };
         println!("{}: {}/{} features match ({} of {} compared){}{speed}", r.name, r.matching, r.compared, r.compared, r.features, r.first.as_ref().map(|f| format!("; first difference: {f}")).unwrap_or_else(|| "; matches to the end".into()));
+        if r.custom_compared > 0 || !r.custom.is_empty() {
+            println!("  custom features: {}/{} match", r.custom_matching, r.custom_compared);
+        }
+        for c in &r.custom {
+            println!("  custom feature {c}");
+        }
+        for p in &r.std_pins {
+            println!("  std: {p}");
+        }
         for u in &r.untranslated {
             println!("  untranslated: {u}");
         }
@@ -167,7 +217,9 @@ fn parity_models() {
     }
     let docs = results.iter().filter(|r| r.first.is_none() && r.compared > 0).count();
     let (matching, total) = results.iter().fold((0, 0), |(m, t), r| (m + r.matching, t + r.compared));
-    println!("parity_models score: {docs}/{} documents match to the end, {matching}/{total} features match", results.len());
+    let (custom_matching, custom_total) = results.iter().fold((0, 0), |(m, t), r| (m + r.custom_matching, t + r.custom_compared));
+    let custom_failed = results.iter().filter(|r| !r.custom.is_empty()).count();
+    println!("parity_models score: {docs}/{} documents match to the end, {matching}/{total} features match; custom features {custom_matching}/{custom_total}, {custom_failed} documents with custom features failing to compile / run", results.len());
     // The causes: first differences by feature type and what differed.
     let mut causes: std::collections::BTreeMap<String, usize> = Default::default();
     for f in results.iter().filter_map(|r| r.first.as_deref()) {
@@ -196,8 +248,8 @@ fn parity_models() {
     for (c, n) in causes.iter().take(5) {
         println!("  cause: {n} × {c}");
     }
-    println!("{}", score_row(docs, results.len(), matching, total, &causes));
-    let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "compared": r.compared, "matching": r.matching, "regen_ms": r.regen_ms.map(|(o, l)| json!({ "ours": o, "live": l })), "slowest": r.slowest, "first_difference": r.first, "untranslated": r.untranslated })).collect();
+    println!("{}", score_row(docs, results.len(), matching, total, (custom_matching, custom_total), &causes));
+    let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "compared": r.compared, "matching": r.matching, "regen_ms": r.regen_ms.map(|(o, l)| json!({ "ours": o, "live": l })), "slowest": r.slowest, "first_difference": r.first, "custom_features": { "compared": r.custom_compared, "matching": r.custom_matching, "failures": r.custom, "std": r.std_pins }, "untranslated": r.untranslated })).collect();
     let _ = std::fs::write(root.with_file_name("report.json"), serde_json::to_string_pretty(&json!({ "documents_matching": docs, "documents": results.len(), "features_matching": matching, "features": total, "causes": causes.iter().map(|(c, n)| json!({ "cause": c, "documents": n })).collect::<Vec<_>>(), "models": report })).unwrap());
     if std::env::var_os("NOSHAPE_PARITY_INDEX").is_some() {
         let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/parity-models/index.json");
@@ -209,7 +261,7 @@ fn parity_models() {
 /// (NOSHAPE_PARITY_BUILD, else this checkout's commit), models and features
 /// matched, the scenarios column left to psui's runner, the five biggest
 /// causes (qa adds their tickets).
-fn score_row(docs: usize, total_docs: usize, matching: usize, features: usize, causes: &[(String, usize)]) -> String {
+fn score_row(docs: usize, total_docs: usize, matching: usize, features: usize, (custom_matching, custom_total): (usize, usize), causes: &[(String, usize)]) -> String {
     let days = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() / 86_400).unwrap_or(0) as i64;
     // Civil date from days since 1970-01-01 (H. Hinnant's algorithm).
     let z = days + 719_468;
@@ -226,7 +278,9 @@ fn score_row(docs: usize, total_docs: usize, matching: usize, features: usize, c
         out.status.success().then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
     });
     let top: Vec<String> = causes.iter().take(5).map(|(c, n)| format!("{n}× {c}")).collect();
-    format!("SCORE.md row: | {year}-{month:02}-{day:02} | {} | {docs}/{total_docs} | {matching}/{features} | – | {} |", build.unwrap_or_else(|| "?".into()), if top.is_empty() { "–".into() } else { top.join("; ") })
+    // Custom features (FeatureScript) counted on their own, in the features column.
+    let custom = if custom_total > 0 { format!(" (custom {custom_matching}/{custom_total})") } else { String::new() };
+    format!("SCORE.md row: | {year}-{month:02}-{day:02} | {} | {docs}/{total_docs} | {matching}/{features}{custom} | – | {} |", build.unwrap_or_else(|| "?".into()), if top.is_empty() { "–".into() } else { top.join("; ") })
 }
 
 /// A small Part Studio as Onshape's REST gives it: a 60 × 40 rectangle with
@@ -491,6 +545,44 @@ export const cube = defineFeature(function(context is Context, id is Id, definit
     let live = vec![json!({ "index": 0, "status": "OK", "parts": [{ "faces": 6, "edges": 12, "vertices": 8, "volume": 1e-6 }] })];
     let r = run_model("custom-cube", &features, &live, "");
     assert_eq!((r.matching, r.compared), (1, 1), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+    assert_eq!((r.custom_matching, r.custom_compared, r.custom.len()), (1, 1, 0), "{:?}", r.custom);
+}
+
+/// Custom features are counted apart, and their failures reported apart
+/// from geometry: a Feature Studio that doesn't compile, a feature that
+/// throws where live's built; a studio pinned to std 1963 is served at 1963.
+/// The studios come from the document's studios/ directory too.
+#[test]
+fn custom_feature_failures_are_reported_apart() {
+    let ok = r#"FeatureScript 1963;
+import(path : "onshape/std/geometry.fs", version : "1963.0");
+
+annotation { "Feature Type Name" : "Thrower" }
+export const thrower = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        throw regenError("Nope");
+    });
+"#;
+    let broken = "FeatureScript 3095;\nimport(path : \"onshape/std/common.fs\", version : \"3095.0\");\nexport const = ;\n";
+    let dir = scratch("custom-studios");
+    std::fs::create_dir_all(dir.join("studios")).unwrap();
+    std::fs::write(dir.join("studios/0aaa.fs"), ok).unwrap();
+    std::fs::write(dir.join("studios/0aaa.json"), r#"{ "name": "Throwers" }"#).unwrap();
+    std::fs::write(dir.join("studios/0bbb.fs"), broken).unwrap();
+    let features = json!({ "features": [
+        { "btType": "BTMFeature-134", "featureType": "thrower", "namespace": "e0aaa::m1", "featureId": "FT", "name": "Thrower 1", "parameters": [] },
+        { "btType": "BTMFeature-134", "featureType": "gone", "namespace": "e0bbb::m1", "featureId": "FG", "name": "Gone 1", "parameters": [] }
+    ] });
+    std::fs::write(dir.join("features.json"), features.to_string()).unwrap();
+    let (features, _, refs) = read_model(&dir).unwrap();
+    let live = vec![json!({ "index": 0, "status": "OK", "parts": [] }), json!({ "index": 1, "status": "OK", "parts": [] })];
+    let r = run_model("custom-failures", &features, &live, &refs);
+    assert_eq!(r.custom_compared, 2, "{r:?}");
+    assert!(r.custom.iter().any(|c| c.starts_with("0bbb: failed to compile")), "{:?}", r.custom);
+    assert!(r.custom.iter().any(|c| c.starts_with("Thrower 1: failed to run")), "{:?}", r.custom);
+    assert!(r.first.as_deref().is_some_and(|f| f.contains("(custom feature failed to run)")), "{:?}", r.first);
+    assert!(r.std_pins.is_empty(), "1963 is served as pinned: {:?}", r.std_pins);
 }
 
 /// `NOSHAPE_PACKED_DIR=<dir>`: every packed query (`qCompressed(1.0, "…", id)`)
