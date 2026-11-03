@@ -94,6 +94,25 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
   kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
+- 11-03 14:25 corpus to 50 documents (runs 25–29, /root/dx-scratch/pm-run*.log): SCORE_LINE.
+  Fixed in core's area where the fix was one line, with T1 tests: Extrude's second direction flip is against the
+  sketch normal (std: away only when the two flips differ; cf-sheet-metal-model-plus), FeatureScript modules
+  imported twice in one compile are one module (diamond export imports; cornerOvercut). Agent API: query_entities
+  `of` (faces / edges / vertices next to given ones; e2e entities_next_to_others). Translator / runner: an INTERSECT
+  edge is its two faces' common edge (exercise-evana, knob-kraut), a region bounded by exactly the named curves
+  (chords), written-out makeQuery region / cap queries (learning-center-devon), SWEPT_EDGE from where two curves
+  cross (ORDER), a part by id is the one with live's box (pattern copies; exercise-jan), Import features import
+  live's imports/<id> file (cf-wiring), a mate connector created-by query before ids (prize-wheel-tim), lines our
+  tool snapped H/V un-snapped (exercise-anthony), parts paired by box not corner sums, a [0, 0, 0] centroid and the
+  UI fetch's loose client box not compared, a custom feature with unplaced inputs is "translation incomplete".
+  Assemblies: every instance held fixed while placed at live's transform, mate states read once freed, any move on
+  freeing reported; live's asm-hinge-live matches: **8/8 assemblies, 11/11 mates**.
+  Tickets filed: SKETCH-COLLINEAR-EDGES-MERGE (P1, core; live confirmed in 1904; 4 documents), EXTRUDE-SURFACE-CURVES
+  (P1, core), FILLET-BLEND-SPLIT, FILLET-KNOB-JASON-VOLUME, SKETCH-FACE-FRAME examples (core has live's rule, 1897).
+  Asked live: tessellation-derived face boxes / edge midpoints for the UI fetch (1892 update; knob-kraut and
+  prize-wheel-tim already refetched so), lagging lines in 4 documents (13:20). Left: prize-wheel-tim's Sketch 3 is on
+  the Hole's "tip" face (HOLE_FACE, not mapped yet); cf-wiring's Part 2 reads 2 edges / 2 vertices more than live
+  from the x_t (fan blades; needs live's edge list); stef-radijator's Fillet 1 one face more (all 37 edges mapped).
 - 11-03 12:43 more corpus: FeatureScript host / std gaps found with featurestudio_monitor on the rebuilt documents
   (FS-OLD-STD-COMPAT: std 392's checkInput; FS-ANYTHING-PARAM; FS-WAVE-SPRING: an inside-out loft + thicken, 157 s;
   FILLET-PROPAGATION-VOLUME); core told in core.md. Translator: id-only regions picked by the boxes of the parts

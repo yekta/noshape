@@ -1058,6 +1058,9 @@ impl<'a> Translator<'a> {
         if let Some(r) = self.extrude_name_from_query(text) {
             return r.map(|e| vec![e]);
         }
+        if let Some(r) = self.hole_face_from_query(text) {
+            return r.map(|e| vec![e]);
+        }
         // sketchEntityQuery(id+"F….wireOp", EntityType.EDGE, "<entity>").
         if let Some(rest) = text.split("sketchEntityQuery(id+\"").nth(1)
             && let Some((sk, after)) = rest.split_once(".wireOp\"")
@@ -1431,6 +1434,31 @@ impl<'a> Translator<'a> {
         }
         let crossing = order(&Packed::Map(m.clone()));
         Some(if revolve { self.revolve_entity(name, &op, &sk, &curves) } else { self.extrude_entity(name, is_start, crossing, &op, &sk, &curves) })
+    }
+
+    /// A Hole's face by Onshape's name (`HOLE_FACE` of `….opHole`): its
+    /// `tip`, the face of ours the Hole made farthest down its bore.
+    fn hole_face_from_query(&mut self, text: &str) -> Option<Result<String, String>> {
+        let strings = packed_strings_of(text);
+        if !strings.iter().any(|s| s == "HOLE_FACE") {
+            return None;
+        }
+        let op = strings.iter().find(|s| s.ends_with(".opHole")).and_then(|s| s.split(".op").next())?;
+        let name = strings.iter().position(|s| s == "faceName").and_then(|i| strings.get(i + 1))?.clone();
+        let Some(ours) = self.feature_ids.get(op).cloned() else { return Some(Err(format!("HOLE_FACE: hole {op} was not built"))) };
+        if name != "tip" {
+            return Some(Err(format!("HOLE_FACE {name} not translated")));
+        }
+        let faces = match self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 200 })) {
+            Ok(f) => f["faces"].as_array().cloned().unwrap_or_default(),
+            Err(e) => return Some(Err(e)),
+        };
+        // The bore: the narrowest cylinder; the tip: the other face farthest along its axis.
+        let bore = faces.iter().filter(|f| f["surface"] == "cylinder").min_by(|a, b| a["radius"].as_f64().unwrap_or(f64::MAX).total_cmp(&b["radius"].as_f64().unwrap_or(f64::MAX)))?;
+        let (c, d) = (f3(&bore["centroid"])?, f3(&bore["axis"]["direction"])?);
+        let along = |f: &Value| f3(&f["centroid"]).map_or(0.0, |p| (0..3).map(|i| (p[i] - c[i]) * d[i]).sum::<f64>().abs());
+        let tip = faces.iter().filter(|f| f["surface"] != "cylinder").max_by(|a, b| along(a).total_cmp(&along(b)))?;
+        tip["id"].as_str().map(|id| Ok(id.to_string()))
     }
 
     /// The written-out form (`makeQuery(id + "F….opExtrude", "CAP_FACE",
