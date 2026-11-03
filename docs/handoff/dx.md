@@ -40,6 +40,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   burn the account's REST quota: live is fetching the corpus. When GET /features reopens (~04:45 UTC): fetch
   "dx mbd 1721" (noshape mm test, e 2c69867e1296f9a369ea1c36) and a few P1 studios of that document ("live hole
   row", "live pattern holes", "live mirror half hole A") into /root/parity/models-dx/ and run parity_models on them.
+- 11-03 00:25: without live's geometry the translator now reads Onshape's own names too: Extrude CAP_FACE /
+  SWEPT_FACE / CAP_EDGE / SWEPT_EDGE / SWEPT_BODY (from the sketch curves, against our extrude's result), Revolve
+  SWEPT_FACE / SWEPT_EDGE / SWEPT_BODY, sketchEntityQuery, qCreatedBy(…, BODY / FACE), qContainsPoint(…, vector),
+  qAllModifiableSolidBodies; Hole standards (lookup path by level key: model-data `table_level_key`), thread classes;
+  an older Hole's V2 / pre-V2 duplicates skipped, tolerance fields counted. Live's fs-pack-src and ui-1025c dumps
+  translate whole except custom features and 4 Hole parameters (locationSignatures, holeDepthMultiple: not in std
+  1963; check live's current std before a ticket). Live's README (/root/parity/models/README.md) has no raw `bodies`
+  per line: asked again (REQUESTS 11-03 00:20); the names above cover Extrude / Revolve references without it.
 - Tried on 6 older feature dumps (/root/dx-scratch/pm/models, on vibe5 ~/agents/dx/pm-models): next in the translator:
   configuration inputs and variables (`#HeadHeight`), Onshape-internal parameters (asVersion, defaultsChanged),
   revolveType, constraints on external references (`externalSecond`), splines / ellipses, BTMParameterLookupTablePath
