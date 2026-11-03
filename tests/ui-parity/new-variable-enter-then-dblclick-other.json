@@ -1,0 +1,52 @@
+{
+ "name": "new-variable-enter-then-dblclick-other",
+ "about": "Variable tool, name v1, Value 2 + Enter (applied, dialog open), then double-click Extrude 1: live keeps \"#v1 = 2 mm\" in the list",
+ "area": "psui",
+ "source": "qa live check 11-03",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Variable"
+   }
+  },
+  {
+   "do": "type",
+   "text": "v1"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Value"
+   }
+  },
+  {
+   "do": "type",
+   "text": "2"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ],
+ "ticket": "DIALOG-SWITCH-DISCARDS-NEW"
+}

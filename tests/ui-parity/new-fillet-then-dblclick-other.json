@@ -1,0 +1,42 @@
+{
+ "name": "new-fillet-then-dblclick-other",
+ "about": "click the front top edge, Shift+F (a new Fillet previewing), then double-click Sketch 1: is the Fillet kept or dropped?",
+ "area": "psui",
+ "source": "qa 11-03 (probe)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+f"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ],
+ "ticket": "DIALOG-SWITCH-DISCARDS-NEW"
+}

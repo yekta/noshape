@@ -1,0 +1,48 @@
+{
+ "name": "edit-then-dblclick-other",
+ "about": "edit Extrude 1, Depth 20 + Enter (applied), then double-click Sketch 1: is the 20 kept?",
+ "area": "psui",
+ "source": "qa 11-03 (probe)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "type",
+   "text": "20"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ],
+ "ticket": "DIALOG-SWITCH-DISCARDS-NEW"
+}
