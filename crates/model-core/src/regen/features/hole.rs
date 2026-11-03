@@ -729,8 +729,10 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     // Counterbore / countersink values don't count. Also for holes whose
     // values were never synced from the table (live's REST-built H1–H5 show
     // it: HOLE-SIZE-NO-DIAMETER (2)).
+    // Not for a Hole before V2 (std hole.fs: `if (definition.isV2)`).
     let synced = ev.params.bool(ht::TABLE_SYNCED_PARAM);
-    if !ev.params.lookup(ht::hole_table_param(ev.params).0).is_empty() {
+    let v2 = !matches!(ev.params.0.get("isV2"), Some(crate::params::ParamValue::Bool(false)));
+    if v2 && !ev.params.lookup(ht::hole_table_param(ev.params).0).is_empty() {
         let (pid, table) = ht::hole_table_param(ev.params);
         if let Some(spec) = ht::table_values(table, &ht::complete_path(table, ev.params.lookup(pid))) {
             // Unsynced, only the values that were set count (the others take the table's, `hole_dims`).

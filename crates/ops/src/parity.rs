@@ -345,11 +345,40 @@ impl<'a> Translator<'a> {
         let mut unknown = Vec::new();
         let given: Vec<&str> = f["parameters"].as_array().into_iter().flatten().filter_map(|p| p["parameterId"].as_str()).collect();
         let mut tolerances = 0;
+        // A Hole before V2: its standard is today's table for its units and
+        // style (std hole.fs picks it so).
+        let legacy_table = (ty == "hole" && !given.contains(&"isV2")).then(|| {
+            let value = |id: &str| f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == id).and_then(|p| p["value"].as_str());
+            match (value("unitsSystem") == Some("INCH"), value("style").is_none_or(|s| s == "SIMPLE")) {
+                (true, true) => "ansiHoleTableEx",
+                (true, false) => "ansiHoleTable",
+                (false, true) => "isoHoleTableEx",
+                (false, false) => "isoHoleTable",
+            }
+        });
         for p in f["parameters"].as_array().into_iter().flatten() {
             let Some(id) = p["parameterId"].as_str() else { continue };
             if INTERNAL.contains(&id) {
                 continue;
             }
+            // Its "Custom" standard (std's tappedOrClearanceHoleTable): no
+            // table, whatever its units.
+            if legacy_table.is_some() && id == "standardTappedOrClearance" && p["value"]["standard"] == "Custom" {
+                for table in ["ansiHoleTableEx", "ansiHoleTable", "isoHoleTableEx", "isoHoleTable"] {
+                    params.insert(table.into(), json!([]));
+                }
+                continue;
+            }
+            let renamed;
+            let (p, id) = match legacy_table {
+                Some(table) if id == "standardTappedOrClearance" && !given.contains(&table) => {
+                    let mut q = p.clone();
+                    q["parameterId"] = json!(table);
+                    renamed = q;
+                    (&renamed, table)
+                }
+                _ => (p, id),
+            };
             // A legacy parameter beside its newer version (Hole `style` /
             // `styleV2`): the newer one counts.
             if ty == "hole" && (given.contains(&format!("{id}V2").as_str()) || given.contains(&format!("{id}V3").as_str())) {
@@ -502,7 +531,13 @@ impl<'a> Translator<'a> {
         let ids: Vec<String> = q["deterministicIds"].as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect();
         let text = q["queryString"].as_str().unwrap_or("");
         if !ids.is_empty() && ids.iter().all(|id| self.refs.contains_key(&(k, id.clone()))) {
-            return ids.iter().map(|id| self.by_geometry(k, id)).collect();
+            let found: Vec<String> = ids.iter().map(|id| self.by_geometry(k, id)).collect::<Result<_, _>>()?;
+            // A swept edge a Boolean split: Onshape's query keeps every piece.
+            let strings = packed_strings_of(text);
+            if strings.iter().any(|s| s == "SPLIT") && strings.iter().any(|s| s == "SWEPT_EDGE") {
+                return Ok(self.with_collinear_pieces(found));
+            }
+            return Ok(found);
         }
         if let Some(p) = default_plane(text) {
             return Ok(vec![p.to_string()]);
@@ -1304,6 +1339,29 @@ impl<'a> Translator<'a> {
         [("center", centres), ("minimum", centres - radii), ("maximum", centres + radii)].into_iter().min_by(|x, y| (x.1 - want).abs().total_cmp(&(y.1 - want).abs())).map(|m| m.0)
     }
 
+    /// `edges` and the line edges on the same lines (the pieces a cut
+    /// split them into).
+    fn with_collinear_pieces(&mut self, edges: Vec<String>) -> Vec<String> {
+        let Ok(all) = self.call("query_entities", json!({ "kind": "edges", "curve": "line", "limit": 100000 })) else { return edges };
+        let all: Vec<&Value> = all["edges"].as_array().into_iter().flatten().collect();
+        let v = |e: &Value, k: &str| -> Option<[f64; 3]> { Some([e[k][0].as_f64()?, e[k][1].as_f64()?, e[k][2].as_f64()?]) };
+        let mut out = edges.clone();
+        for id in &edges {
+            let Some(line) = all.iter().find(|e| e["id"] == id.as_str()) else { continue };
+            let (Some(p), Some(d)) = (v(line, "start"), v(line, "direction")) else { continue };
+            for e in &all {
+                let (Some(q), Some(f), Some(eid)) = (v(e, "start"), v(e, "direction"), e["id"].as_str()) else { continue };
+                let cross = |a: [f64; 3], b: [f64; 3]| [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+                let norm = |a: [f64; 3]| a.iter().map(|c| c * c).sum::<f64>().sqrt();
+                let off = cross([q[0] - p[0], q[1] - p[1], q[2] - p[2]], d);
+                if norm(cross(d, f)) < 1e-9 && norm(off) < 1e-6 && !out.iter().any(|o| o == eid) {
+                    out.push(eid.to_string());
+                }
+            }
+        }
+        out
+    }
+
     /// Notes the first constraint or dimension that moved the sketch.
     fn check_moved(&mut self, id: &str, what: impl FnOnce() -> String) {
         if self.first_move.is_some() {
@@ -1581,7 +1639,8 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
 const INTERNAL: [&str; 3] = ["asVersion", "defaultsChanged", "computeTransformsWithoutBuiltin"];
 
 /// Older features' parameters as today's std (and ours) has them, as
-/// Onshape upgrades them: Revolve's `revolveType`, a Variable's `value`.
+/// Onshape upgrades them: Revolve's `revolveType`, Extrude's `SYMMETRIC`
+/// end, a pre-V2 Hole's, a Variable's `value`.
 fn upgrade(ty: &str, params: &mut Map<String, Value>, unknown: &mut Vec<String>) {
     let mut done = |id: &str, params: &mut Map<String, Value>| {
         unknown.retain(|u| u != id);
@@ -1598,6 +1657,13 @@ fn upgrade(ty: &str, params: &mut Map<String, Value>, unknown: &mut Vec<String>)
                 }
             }
         }
+        // Older Extrudes: Symmetric was an end type.
+        "extrude" => {
+            if params.get("endBound").is_some_and(|b| b == "SYMMETRIC") {
+                params.insert("endBound".into(), json!("BLIND"));
+                params.insert("symmetric".into(), json!(true));
+            }
+        }
         // Holes before V2 (2019): unsuffixed names, the start as a flag.
         "hole" => {
             for (old, new) in [("endStyle", "endStyleV2"), ("holeDiameter", "holeDiameterV3"), ("cBoreDiameter", "cBoreDiameterV3"), ("cBoreDepth", "cBoreDepthV3"), ("cSinkDiameter", "cSinkDiameterV3"), ("cSinkAngle", "cSinkAngleV3"), ("tapDrillDiameter", "tapDrillDiameterV3"), ("holeDepth", "holeDepthV3"), ("tappedDepth", "tappedDepthV3")] {
@@ -1612,9 +1678,10 @@ fn upgrade(ty: &str, params: &mut Map<String, Value>, unknown: &mut Vec<String>)
             {
                 params.insert("styleV2".into(), v);
             }
-            // Its standard tables only filled the sizes it stores too.
-            done("standardTappedOrClearance", params);
             done("standardBlindInLast", params);
+            if !params.contains_key("isV2") {
+                params.insert("isV2".into(), json!(false));
+            }
             if let Some(v) = done("startFromSketch", params) {
                 params.insert("startStyle".into(), json!(if v == true { "SKETCH" } else { "PART" }));
             }
