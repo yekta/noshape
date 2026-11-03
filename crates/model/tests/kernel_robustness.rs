@@ -2976,6 +2976,21 @@ fn a_region_slit_by_a_line_extrudes() {
     assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), 4);
 }
 
+/// EXTRUDE-UP-TO-FACE-BEYOND (dx; live ends on the face's surface): a Ø10 circle at (50, 0) on Top, beside a 20 × 20
+/// × 10 block, extruded New up to the block's top face: a Ø10 × 10 cylinder.
+#[test]
+fn up_to_a_face_past_its_edges_ends_on_its_plane() {
+    let mut t = T::new();
+    t.block(20.0, 20.0, 10.0);
+    let top = t.faces_where(|c| c.z > 9.999);
+    let (_, disc) = t.sketch(&[], &[((50.0, 0.0), 5.0)]);
+    let x = t.add("extrude", &[("entities", q(disc)), ("endBound", en("UP_TO_SURFACE")), ("endBoundEntityFace", q(top)), ("operationType", en("NEW"))]);
+    let r = t.ok(x);
+    assert_eq!(r.context.bodies.len(), 2);
+    let v = r.context.bodies[1].shape.volume().unwrap() * 1e9;
+    assert!((v - std::f64::consts::PI * 25.0 * 10.0).abs() < 1e-6, "{v}");
+}
+
 /// EXTRUDE-OVERLAP-LINES-FACES (dx's parity suite, bracket120-datenkrake, live 10/24/16 faces/edges/vertices): a
 /// line lying over a rectangle's side splits it in the sketch, but the extruded side is one face (a box: 6/12/8).
 #[test]

@@ -125,7 +125,16 @@ fn end_for(ev: &EvalCtx, bound: &str, depth_id: &str, face_id: &'static str, bod
             let target = match r {
                 Reference::Face(_) => {
                     let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(r)).first().ok_or_else(|| crate::regen::eval::FeatureError::new("Up to face no longer exists"))?;
-                    ev.face_shape(bi, fi)?
+                    let face = ev.face_shape(bi, fi)?;
+                    // A planar face: its plane (live ends a profile reaching past the face's edges on its surface:
+                    // dx's EXTRUDE-UP-TO-FACE-BEYOND).
+                    match face.face_plane()? {
+                        Some(pl) => {
+                            let ext = ev.model_extent() * 4.0;
+                            k::make_plane_face(&pl, -ext, ext, -ext, ext)?
+                        }
+                        None => face,
+                    }
                 }
                 _ => {
                     let f = ev.resolve_plane(r).ok_or_else(|| crate::regen::eval::FeatureError::new("Select a face or plane"))?;

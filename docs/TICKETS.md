@@ -335,7 +335,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   parts summing 236.44 mm³ instead of 308.36 (qa-scratch/cli/tixvol-ge77387ec.out). A fuzz document, no live value;
   the point is that an existing document changes its result after an update. The pieces' names / order after a Boolean
   should not depend on a later topology clean-up. (qa 2026-11-03 10:02, build e77387ec)
-- [ ] P2 EXTRUDE-UP-TO-FACE-BEYOND (core; dx's parity suite 11-03) Extrude Up to face fails when the profile lies
+- [x] (core 11-03 12:00: Up to face on a planar face ends on its plane (extrude.rs end_for; curved faces as before): the Ø10 beside the block a Ø10 × 10 cylinder; clamp-hms 3 -> 12 of 15 features as live, its Mirror 1 next; T1 kernel_robustness::up_to_a_face_past_its_edges_ends_on_its_plane) P2 EXTRUDE-UP-TO-FACE-BEYOND (core; dx's parity suite 11-03) Extrude Up to face fails when the profile lies
   beyond the face's edges: ours "Failed to extrude selections, check input."; live ends it on the face's surface.
   Repro: a 20 × 20 block (Top, 10 mm); on Top a Ø10 circle at (50, 0); Extrude it, New, Up to face = the block's top
   face → ours Error (expected a Ø10 × 10 cylinder at (50, 0)). Live: clamp-hms Extrude 2 (the "rectangle hump"
