@@ -1,0 +1,27 @@
+{
+ "name": "tool-search-escape",
+ "about": "alt+c, type ext, Escape: the search closes",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "key",
+   "key": "alt+c"
+  },
+  {
+   "do": "type",
+   "text": "ext"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

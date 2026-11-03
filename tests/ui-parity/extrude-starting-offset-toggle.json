@@ -1,0 +1,21 @@
+{
+ "name": "extrude-starting-offset-toggle",
+ "about": "edit Extrude 1, tick Starting offset: its type and distance appear",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Starting offset"
+   }
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "name": "hole-counterbore-tab",
+ "about": "Hole tool, the Counterbore tab: its fields",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Counterbore"
+   }
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+{
+ "name": "tool-search-enter",
+ "about": "alt+c, type shell, Enter: the Shell dialog opens",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "key",
+   "key": "alt+c"
+  },
+  {
+   "do": "type",
+   "text": "shell"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

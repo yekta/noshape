@@ -1,0 +1,19 @@
+{
+ "name": "fillet-full-round-tab",
+ "about": "Shift+F, the Full round tab: its fields",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "key",
+   "key": "shift+f"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Full round"
+   }
+  }
+ ]
+}

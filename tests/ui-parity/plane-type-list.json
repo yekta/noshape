@@ -1,0 +1,21 @@
+{
+ "name": "plane-type-list",
+ "about": "Plane tool: open its type dropdown (Offset): its rows",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Plane"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Offset"
+   }
+  }
+ ]
+}

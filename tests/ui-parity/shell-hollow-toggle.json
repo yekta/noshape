@@ -1,0 +1,21 @@
+{
+ "name": "shell-hollow-toggle",
+ "about": "Shell tool, tick Hollow: the face field goes",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Shell"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Hollow"
+   }
+  }
+ ]
+}

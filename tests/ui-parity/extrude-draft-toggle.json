@@ -1,0 +1,21 @@
+{
+ "name": "extrude-draft-toggle",
+ "about": "edit Extrude 1, tick Draft: the draft angle field and its flip appear",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Draft"
+   }
+  }
+ ]
+}

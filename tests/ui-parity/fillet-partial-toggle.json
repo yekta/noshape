@@ -1,0 +1,29 @@
+{
+ "name": "fillet-partial-toggle",
+ "about": "Fillet on the front top edge, tick Partial fillet: its fields",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+f"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Partial fillet"
+   }
+  }
+ ]
+}

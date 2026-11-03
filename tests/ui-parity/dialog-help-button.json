@@ -1,0 +1,21 @@
+{
+ "name": "dialog-help-button",
+ "about": "edit Extrude 1, click the dialog's ?",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "?"
+   }
+  }
+ ]
+}

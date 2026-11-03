@@ -1,0 +1,21 @@
+{
+ "name": "extrude-thin-tab",
+ "about": "edit Extrude 1, the Thin tab: its fields",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Thin"
+   }
+  }
+ ]
+}

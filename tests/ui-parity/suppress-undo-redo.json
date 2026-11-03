@@ -1,0 +1,41 @@
+{
+ "name": "suppress-undo-redo",
+ "about": "right-click Extrude 1 › Suppress, mod+z, mod+y",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Suppress"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "mod+y"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

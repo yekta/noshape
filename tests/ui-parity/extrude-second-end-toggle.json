@@ -1,0 +1,21 @@
+{
+ "name": "extrude-second-end-toggle",
+ "about": "edit Extrude 1, tick Second end position: the second end type and depth appear",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Second end position"
+   }
+  }
+ ]
+}

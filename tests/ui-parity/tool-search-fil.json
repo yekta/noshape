@@ -1,0 +1,23 @@
+{
+ "name": "tool-search-fil",
+ "about": "alt+c, type fil: the matching tools listed",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "key",
+   "key": "alt+c"
+  },
+  {
+   "do": "type",
+   "text": "fil"
+  }
+ ]
+}

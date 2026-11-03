@@ -1,0 +1,21 @@
+{
+ "name": "boolean-tabs",
+ "about": "Boolean tool: the Union / Subtract / Intersect tabs, click Subtract: its fields",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Boolean"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Subtract"
+   }
+  }
+ ]
+}

@@ -1,0 +1,15 @@
+{
+ "name": "parts-row-dblclick",
+ "about": "double-click Part 1 in the parts list",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "part": "Part 1"
+   }
+  }
+ ]
+}

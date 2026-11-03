@@ -1,0 +1,21 @@
+{
+ "name": "linear-pattern-type-list",
+ "about": "Linear pattern tool: open its type dropdown (Part pattern / Feature pattern / Face pattern)",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Linear pattern"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Part pattern"
+   }
+  }
+ ]
+}

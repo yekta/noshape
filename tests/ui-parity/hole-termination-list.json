@@ -1,0 +1,21 @@
+{
+ "name": "hole-termination-list",
+ "about": "Hole tool, open Termination (Blind): its rows",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Blind"
+   }
+  }
+ ]
+}

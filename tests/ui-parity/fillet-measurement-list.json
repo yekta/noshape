@@ -1,0 +1,19 @@
+{
+ "name": "fillet-measurement-list",
+ "about": "Shift+F, open the Measurement dropdown (Radius): its rows",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "key",
+   "key": "shift+f"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Radius"
+   }
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "name": "extrude-surface-tab",
+ "about": "edit Extrude 1, the Surface tab: its fields",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Surface"
+   }
+  }
+ ]
+}

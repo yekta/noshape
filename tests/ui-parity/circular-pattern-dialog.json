@@ -1,0 +1,15 @@
+{
+ "name": "circular-pattern-dialog",
+ "about": "Circular pattern tool: its fields",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Circular pattern"
+   }
+  }
+ ]
+}

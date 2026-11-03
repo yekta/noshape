@@ -1,0 +1,21 @@
+{
+ "name": "chamfer-type-list",
+ "about": "Chamfer tool, open its chamfer type dropdown: its rows",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Chamfer"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Equal distance"
+   }
+  }
+ ]
+}

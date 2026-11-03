@@ -1,0 +1,21 @@
+{
+ "name": "parts-row-edit-appearance",
+ "about": "right-click Part 1 › Edit appearance…: the appearance editor",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit appearance…"
+   }
+  }
+ ]
+}

@@ -1,0 +1,15 @@
+{
+ "name": "parts-row-click",
+ "about": "click Part 1 in the parts list: selection is the body",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  }
+ ]
+}

@@ -1,0 +1,23 @@
+{
+ "name": "parts-row-hide-show-eye",
+ "about": "click Part 1's eye twice",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "eye",
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "eye",
+    "part": "Part 1"
+   }
+  }
+ ]
+}

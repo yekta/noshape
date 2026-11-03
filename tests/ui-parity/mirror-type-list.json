@@ -1,0 +1,21 @@
+{
+ "name": "mirror-type-list",
+ "about": "Mirror tool: open its type dropdown",
+ "area": "psui",
+ "source": "everyday",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mirror"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Part mirror"
+   }
+  }
+ ]
+}
