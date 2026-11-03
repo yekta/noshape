@@ -1396,3 +1396,29 @@ fn slab_fuse_probe() {
         }
     }
 }
+
+/// A dumped shell's input (NOSHAPE_DUMP_OPS's `shell-<n>.brep`, NOSHAPE_SHELL_CASE = its path without `.brep`; the face
+/// index and thickness from its `.txt`) shelled and timed, written as STEP (`<case>.step`, mm) with the removed face
+/// described, for rebuilding it in live.
+#[test]
+#[ignore = "T2 probe: NOSHAPE_SHELL_CASE"]
+fn dumped_shell_probe() {
+    let Ok(case) = std::env::var("NOSHAPE_SHELL_CASE") else { return };
+    let s = read_brep(std::path::Path::new(&format!("{case}.brep"))).unwrap();
+    let txt = std::fs::read_to_string(format!("{case}.txt")).unwrap();
+    let faces: Vec<usize> = txt.lines().filter_map(|l| l.strip_prefix("face ")).map(|v| v.parse().unwrap()).collect();
+    let t: f64 = txt.split("thickness ").nth(1).and_then(|r| r.split(' ').next()).unwrap().parse().unwrap();
+    let all = s.faces();
+    println!("input: {:.6} mm3, {} faces, valid {}; thickness {} mm", vol(&s) * 1e9, all.len(), s.is_valid(), t * 1e3);
+    for &i in &faces {
+        let f = &all[i];
+        let c = f.centroid().unwrap();
+        println!("removed face {i}: {:?}, area {:.4} mm2, centroid ({:.4}, {:.4}, {:.4}) mm, normal {:.4?}", format!("{:?}", f.face_surface().ok()).chars().take(30).collect::<String>(), f.area().unwrap() * 1e6, c.x * 1e3, c.y * 1e3, c.z * 1e3, f.normal_at_point(c).ok());
+    }
+    write_step_shapes(std::path::Path::new(&format!("{case}.step")), std::slice::from_ref(&s), LengthUnit::Millimeter).unwrap();
+    set_working_scale(1000.0).unwrap();
+    let removed: Vec<Shape> = faces.iter().map(|&i| all[i].clone()).collect();
+    let t0 = std::time::Instant::now();
+    let r = shell_solid(&s, &removed, t, ShellSide::Inside, ShellMethod::Auto);
+    println!("shell: {:.0} ms, {:?}", t0.elapsed().as_secs_f64() * 1e3, r.map(|r| (vol(&r.shape) * 1e9, r.shape.faces().len())).map_err(|e| e.to_string()));
+}
