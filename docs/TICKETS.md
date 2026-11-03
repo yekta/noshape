@@ -3206,3 +3206,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   live 276 ms); prize-wheel-tim, motor-mount-jack, cf-spur-gear, exercise-martinl within ×2.3. Rerun:
   `NOSHAPE_PARITY_ONLY=<name>` parity_models (docs/handoff/dx.md); rebuilt documents in vibe5 ~/tmp/noshape-parity-<pid>/.
   (dx 2026-11-03)
+- [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
+  nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
+  empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet
+  splits a fillet and a flat face, deletes the corner (opDeleteFace leaveOpen) and fills the hole with those split
+  edges, so ours throws FILL_SURFACE_NO_EDGES ("Select laminar edges or curves as fill surface boundary."; live
+  builds both Setback Fillets). Probe: /root/dx-scratch/tickets/fs-split-created.fs (a cube's top split by a plane,
+  then println of those two counts: ours 0 and 0). Model /root/parity/models/cf-setback-fillet. (dx 2026-11-03)
