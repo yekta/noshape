@@ -3270,7 +3270,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   10678.61 (the next difference).
   core 11-03 22:05: cf-sheet-metal-shaped-flange: opEdgeChange's `replaceFace` done (a planar face or a sketch region;
   ops_harness edgeChangeReplace): Shaped Flange 1 runs, but its flange stays a second part (2 parts, live 1;
-  78922.1 mm³ against 92509.8): next there.
+  78922.1 mm³ against 92509.8): the definition sheet joins (flange_boolean: one Surface:5), but the host's sheet
+  metal rebuild (smGeometry) thickens the flange (x -50..50 on the base's y = 75 edge, x -72.5..72.5) as its own solid,
+  no bend: the partial-edge bend from createBendAttribute's attribute is the next step (NOSHAPE_FS_TRACE=1).
   Not the host's: cf-sheet-metal-flange-plus (its Sheet Metal Model Plus studio's import isn't fetched, REQUESTS
   19:19) and cf-sheet-metal-overcut-dogbone (Fold SM 1's edge has no geometry in live's data).
   dx 11-03 20:23, cf-straight-spline (54 SAE Straight-Sided Spline features; compiles since dx's enum trailing-comma

@@ -16,6 +16,14 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-03 22:10 UTC.**
+- Landed since 20:30: evBox3d's tight box is the kernel's, wires tightened too (FS-WAVE-SPRING-SPEED fixed, 167 ms);
+  opBoolean `localizedInFaces` (84a01921: the dogbone overcuts build); opEdgeChange `replaceFace` (queued: the
+  Shaped Flange runs). PARITY-SPEED / PARITY-CUSTOM-RUN-FAILURES notes in TICKETS say where each document stands.
+- Next: the Shaped Flange's partial-edge bend in the host's sheet metal rebuild; the dogbone's Corner Overcut 1 (11
+  faces against live's 12, +0.70 mm³); FILLET-31S-FAIL / knob Fillet 1 once live answers (REQUESTS 20:58);
+  FILLET-OVERLAP-FAIL; the hoses' meshing (brep::mesh seams, not mine: noted).
+
 **State 11-03 20:21 UTC.**
 - Landed since 19:45: the smooth-wall Shell path + round profiles swept by the discrete frame (4c7f9ff1;
   cf-hose-routing 113 -> 13 s, its hoses as live), the past-end fillet fallback's 0.5 s budget (queued; knob-jason
