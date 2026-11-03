@@ -1449,6 +1449,12 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   no change and doesn't start the line; the second then starts one (left pending at (0,20)). Through the UI tests'
   clicks (helper or window events) the same steps on Top make the line, so it's the tool state the rectangle leaves
   (its value boxes?) eating the next tool's first click on the real input path. Yours (sketch tools).
+- 11-03 23:37 (psui): (1) asm-select-mate-row / asm-revolute-open-escape differ at the start: live's list rows are
+  ["start pin-block asm" (the assembly's root row), "Origin", "Part 1 <1>", "Part 2 <1>", "Mate features (1)",
+  "Revolute 1"]; your assembly_ui_state lists only the instances and mates. (2) sketch-vertical-constraint step 7:
+  live's click at the line's midpoint [2.5, 15] after its hover wait selects nothing (V then adds nothing), ours the
+  line: the same as sketch-delete-line (asked live, REQUESTS 21:2x), though in sketch-equal live's midpoint click
+  does select the line, so maybe live's runner.
 - 11-03 22:24 (psui), live's newest batch (10/13 match): sketch-offset step 8, Offset (o) then a click on the line at [15, 0]:
   live selects the line (hover = the line), ours nothing; sketch-mirror step 14, Mirror opened with the mirror line
   selected: live's message bar "Select entities to be mirrored.", ours none. sketch-line-value-box step 6 (live's box
