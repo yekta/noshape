@@ -1914,10 +1914,14 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 let (ux, uy) = (pl.dir_to_sheet([1.0, 0.0]), pl.dir_to_sheet([0.0, 1.0]));
                 let in_band = |p: [f64; 2]| pl.breaks().iter().any(|b| p[b.axis as usize] > b.a && p[b.axis as usize] < b.b);
                 let mark = g.mark();
-                // Concentric circles share one mark, sized to the largest
-                // (live 1857: knob-tim's four circles, one mark).
+                // One mark per hole or boss axis seen end-on, sized to its
+                // largest cylinder, hidden ones too (live 1857: pipeflange's
+                // bolt holes to their r 4 counterbore, its radial hole in the
+                // Right view; knob-tim's four circles one mark); and per
+                // other full circle.
                 let mut circles: Vec<([f64; 2], f64)> = Vec::new();
-                for (c, r, _) in geo.full_circles().into_iter().filter(|_| v.show_centerlines) {
+                let full = geo.full_circles().into_iter().map(|(c, r, _)| (c, r));
+                for (c, r) in geo.ends.iter().copied().chain(full).filter(|_| v.show_centerlines) {
                     match circles.iter_mut().find(|(o, _)| centermark_key(*o) == centermark_key(c)) {
                         Some(k) => k.1 = k.1.max(r),
                         None => circles.push((c, r)),
@@ -1936,6 +1940,12 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     const HIDDEN: f64 = 0.045 * 25.4;
                     let (c, r) = (pl.to_sheet(c), pl.len_to_sheet(r));
                     let (a, gap) = (vt.centermark_mark_size + HIDDEN, vt.centermark_gap_size + HIDDEN);
+                    // At the default sizes a small circle's mark shrinks to
+                    // leave the cross and gap 0.7 r (live 1857: r 2 mm, cross
+                    // ±0.028 in, gap 0.027; set sizes stay, live asb 10-22 b).
+                    let auto = vt.centermark_mark_size == 0.0 && vt.centermark_gap_size == 0.0;
+                    let k = if auto { (0.7 * r / (a + gap)).min(1.0) } else { 1.0 };
+                    let (a, gap) = (a * k, gap * k);
                     let at = |u: [f64; 2], t: f64| [c[0] + u[0] * t, c[1] + u[1] * t];
                     // Turned with Align centermark.
                     let turn = v.centermark_angles.iter().find(|(k, _)| *k == key).map(|(_, a)| *a).unwrap_or(0.0);

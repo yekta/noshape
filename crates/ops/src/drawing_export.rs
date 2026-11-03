@@ -195,8 +195,11 @@ pub fn export_files(drawing: &Drawing, sheets: &[usize], s: &ExportSettings, sou
     let mut drawing = drawing.clone();
     // Help H:drawing_properties_-_annotations: "all exported drawings
     // will, by default, no longer contain Drawing and Sheet Property
-    // placeholders (----)".
-    drawing.props.hide_placeholder = true;
+    // placeholders (----)": the PDF and images; live's DXF keeps them as
+    // MTEXT (1857: TITLE, DWG NO., APPROVED "----").
+    if !matches!(f, DrawingFormat::Dxf | DrawingFormat::Dwg | DrawingFormat::Dwt) {
+        drawing.props.hide_placeholder = true;
+    }
     if s.hide_inspection {
         drawing.props.hide_inspection = true;
     }

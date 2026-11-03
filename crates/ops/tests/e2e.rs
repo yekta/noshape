@@ -1235,7 +1235,10 @@ fn drawing_views_and_dimensions() {
     let dxf = scratch("drawing.dxf");
     call(&mut ctx, "drawing_export", json!({ "drawing": tab, "format": "DXF", "file": dxf.to_str().unwrap() }));
     // Release 14 (live's default) is written in the drawing's code page, not UTF-8.
-    assert!(std::fs::read(&dxf).unwrap().windows(8).any(|w| w == b"ENTITIES"));
+    let bytes = std::fs::read(&dxf).unwrap();
+    assert!(bytes.windows(8).any(|w| w == b"ENTITIES"));
+    // Unset properties keep their "----" in a DXF (live 1857), not in a PDF.
+    assert!(bytes.windows(4).any(|w| w == b"----"), "no placeholder in the DXF");
 }
 
 #[test]
@@ -5915,6 +5918,38 @@ fn mistyped_names_get_the_options_and_a_suggestion() {
     assert!(e.message.starts_with("`cirle` is not a drawing tool (did you mean `circle`?); tools: line,"), "{}", e.message);
     let e = try_call(&mut ctx, "export_parts", json!({ "format": "STP", "file": scratch("typo.stp").to_str().unwrap() })).unwrap_err();
     assert!(e.message.starts_with("`STP` is not one of: PARASOLID, ACIS, STEP,") && e.message.ends_with("(did you mean `STEP`?)"), "{}", e.message);
+}
+
+/// A hole seen end-on gets a centermark though its edges aren't circles (a
+/// radial hole through a round boss, its edges saddle curves; live 1857:
+/// pipeflange-steven's Right view): the boss's mark in the Top view and the
+/// hole's in the Front view, six lines each.
+#[test]
+fn a_radial_hole_gets_its_centermark() {
+    let mut ctx = Ctx::new();
+    let sketch = new_sketch(&mut ctx, "radial-hole.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "tool": "circle", "points": [[0, 0], [20, 0]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sketch }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "40 mm" } }));
+    let hole = call(&mut ctx, "sketch_create", json!({ "plane": "plane:front" }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": hole, "tool": "circle", "points": [[0, 20, 0], [0, 20, 3]] }));
+    let disc = call(&mut ctx, "sketch_get", json!({ "sketch": hole }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [disc], "operationType": "REMOVE", "endBound": "THROUGH_ALL", "symmetric": true } }));
+    let d = call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "suggested_views": true }));
+    let dxf = scratch("radial-hole.dxf");
+    call(&mut ctx, "drawing_export", json!({ "drawing": d["drawing"], "format": "DXF", "file": dxf.to_str().unwrap() }));
+    let text = String::from_utf8_lossy(&std::fs::read(&dxf).unwrap()).to_string();
+    // (code, value) pairs: LINE entities on CENTERMARKS.
+    let lines: Vec<&str> = text.lines().map(str::trim).collect();
+    let (mut kind, mut marks) = ("", 0);
+    for p in lines.chunks(2).filter(|p| p.len() == 2) {
+        match p[0] {
+            "0" => kind = p[1],
+            "8" if kind == "LINE" && p[1] == "CENTERMARKS" => marks += 1,
+            _ => {}
+        }
+    }
+    assert_eq!(marks, 12, "two marks of six lines");
 }
 
 /// Suggested views of a 50 mm part reopened from its file are 1:1 on ANSI A

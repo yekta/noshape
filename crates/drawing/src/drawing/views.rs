@@ -1280,6 +1280,9 @@ pub struct ViewGeometry {
     /// Axes of cylindrical faces seen from the side (for automatic
     /// centerlines), as projected segments.
     pub axes: Vec<[[f64; 2]; 2]>,
+    /// Cylinders seen end-on (for automatic centermarks): each axis's
+    /// projected point and the largest radius on it, hidden faces too.
+    pub ends: Vec<([f64; 2], f64)>,
     pub min: [f64; 2],
     pub max: [f64; 2],
     /// Exact HLR (false = fast polygonal preview).
@@ -2389,6 +2392,7 @@ fn apply_crop(g: &mut ViewGeometry, crop: &Crop) {
     };
     g.snaps.retain(|s| inside(s.p));
     g.sketch_points.retain(|p| inside(*p));
+    g.ends.retain(|e| inside(e.0));
     // Section boundaries stay whole; hatch lines are cropped at build time.
     let axes = std::mem::take(&mut g.axes);
     for a in axes {
@@ -2555,6 +2559,42 @@ fn cylinder_axes(shapes: &[Shape], frame: &ViewFrame) -> Vec<[[f64; 2]; 2]> {
         .collect()
 }
 
+/// Cylindrical and conical faces whose axis is the view direction, grouped
+/// by axis: the axis's projected point and the largest radius (a cone's
+/// widest edge: a countersink), where the group's faces go at least half
+/// way round (holes and bosses, not corner rounds).
+fn cylinder_ends(shapes: &[Shape], frame: &ViewFrame) -> Vec<([f64; 2], f64)> {
+    // (projected axis point, largest radius, angular intervals)
+    type Group = ([f64; 2], f64, Vec<(f64, f64)>);
+    let mut groups: Vec<Group> = Vec::new();
+    for shape in shapes {
+        for f in shape.faces() {
+            let (origin, axis, radius) = match f.face_surface() {
+                Ok(Surface::Cylinder { origin, axis, radius, .. }) => (origin, axis.normalize(), radius),
+                Ok(Surface::Cone { origin, axis, .. }) => {
+                    let a = axis.normalize();
+                    let widest = f.edges().iter().flat_map(|e| sample_edge(e, 8)).map(|p| ((p - origin) - a * (p - origin).dot(a)).length()).fold(0.0, f64::max);
+                    (origin, a, widest)
+                }
+                _ => continue,
+            };
+            if axis.dot(frame.dir).abs() < 1.0 - 1e-9 || radius <= 0.0 {
+                continue;
+            }
+            let Ok(uv) = f.uv_bounds() else { continue };
+            let c = frame.project(origin);
+            match groups.iter_mut().find(|g| (g.0[0] - c[0]).hypot(g.0[1] - c[1]) < 1e-9) {
+                Some(g) => {
+                    g.1 = g.1.max(radius);
+                    g.2.push((uv[0].min(uv[1]), uv[0].max(uv[1])));
+                }
+                None => groups.push((c, radius, vec![(uv[0].min(uv[1]), uv[0].max(uv[1]))])),
+            }
+        }
+    }
+    groups.into_iter().filter(|g| angular_coverage(&g.2) >= std::f64::consts::PI - 1e-6).map(|g| (g.0, g.1)).collect()
+}
+
 /// Total angle covered by a set of angular intervals (radians, union,
 /// modulo a full turn). Pieces of one face split along the axis share their
 /// interval and count once.
@@ -2678,6 +2718,7 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
         .collect();
     g.snaps.extend(centers);
     g.axes = cylinder_axes(&shapes, frame);
+    g.ends = cylinder_ends(&shapes, frame);
     g
 }
 
@@ -3293,6 +3334,7 @@ fn detail_geometry(id: ViewId, parent: &ViewGeometry, center: [f64; 2], radius: 
     };
     g.snaps = parent.snaps.iter().filter(|s| inside(s.p)).cloned().collect();
     g.sketch_points = parent.sketch_points.iter().copied().filter(|p| inside(*p)).collect();
+    g.ends = parent.ends.iter().copied().filter(|e| inside(e.0)).collect();
     // Section boundaries stay whole (closed loops) so hatching works; the
     // hatch lines are clipped to the detail circle when the sheet is built.
     g.section_segments = parent.section_segments.clone();
