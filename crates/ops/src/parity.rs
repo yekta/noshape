@@ -392,7 +392,8 @@ impl<'a> Translator<'a> {
             if !known.iter().any(|n| n == id) && ty == "hole" {
                 // A Hole saved by an older std keeps its earlier parameters
                 // beside the V3 ones; tolerances don't change the geometry.
-                if ["Tolerance", "Precision", "holeClass", "toleranceMatching"].iter().any(|w| id.contains(w)) {
+                // (`locationSignatures`: the dialog's editing logic; `holeDepthMultiple`: a tolerance's label.)
+                if ["Tolerance", "Precision", "holeClass", "toleranceMatching", "locationSignatures", "holeDepthMultiple"].iter().any(|w| id.contains(w)) {
                     tolerances += 1;
                     continue;
                 }
