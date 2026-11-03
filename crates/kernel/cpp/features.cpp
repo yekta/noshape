@@ -1057,6 +1057,19 @@ OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const Swe
         fail_invalid("the sweep path must lie on the faces to lock");
     }
   }
+  if (std::getenv("NOSHAPE_DUMP_OPS") != nullptr)
+  {
+    // The profiles, then the path, in one compound.
+    TopoDS_Compound c;
+    BRep_Builder    cb;
+    cb.MakeCompound(c);
+    for (const auto& pr : profiles.items)
+      cb.Add(c, pr);
+    cb.Add(c, sw);
+    std::ostringstream p;
+    p << "sweep mode " << mode << " profiles " << profiles.items.size();
+    dump_op("sweep", c, {}, p.str());
+  }
   BRepOffsetAPI_MakePipeShell mk(sw);
   {
     // OCCT's defaults (1e-4 absolute) are tuned for millimetre parts: in metres

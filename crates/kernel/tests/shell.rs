@@ -1463,3 +1463,37 @@ fn dumped_shell_probe() {
     let r = shell_solid(&s, &removed, t, ShellSide::Inside, ShellMethod::Auto);
     println!("shell: {:.0} ms, {:?}", t0.elapsed().as_secs_f64() * 1e3, r.map(|r| (vol(&r.shape) * 1e9, r.shape.faces().len())).map_err(|e| e.to_string()));
 }
+
+/// A dumped sweep (NOSHAPE_DUMP_OPS's `sweep-<n>.brep`: the profile, then the path; NOSHAPE_SWEEP_CASE = its path
+/// without `.brep`): its path, then each frame mode's sweep, its faces and a 1 mm inward shell without its caps
+/// (NOSHAPE_SHELL_DEBUG shows the path the shell takes).
+#[test]
+#[ignore = "T2 probe: NOSHAPE_SWEEP_CASE"]
+fn dumped_sweep_shell_probe() {
+    let Ok(case) = std::env::var("NOSHAPE_SWEEP_CASE") else { return };
+    let c = read_brep(std::path::Path::new(&format!("{case}.brep"))).unwrap();
+    let parts = c.children();
+    let (profile, path) = (parts[0].clone(), parts[parts.len() - 1].clone());
+    for e in path.edges() {
+        let i = e.edge_info().unwrap();
+        println!("path {} {:.4?} -> {:.4?} len {:.4}", format!("{:?}", i.curve).chars().take(12).collect::<String>(), i.start * 1e3, i.end * 1e3, i.length * 1e3);
+        for f in [0.0, 0.001, 0.01, 0.99, 0.999, 1.0] {
+            let t = i.first_param + (i.last_param - i.first_param) * f;
+            println!("    at {f}: {:.6?} tangent {:.6?}", e.point_at(t).unwrap() * 1e3, e.tangent_at(t).unwrap().normalize());
+        }
+    }
+    set_working_scale(1000.0).unwrap();
+    for mode in [SweepMode::CorrectedFrenet, SweepMode::Frenet, SweepMode::Discrete] {
+        let t0 = std::time::Instant::now();
+        let Ok(r) = sweep(&profile, &path, &SweepOptions { solid: true, mode, ..Default::default() }) else {
+            println!("{mode:?}: failed");
+            continue;
+        };
+        let ms = t0.elapsed().as_secs_f64() * 1e3;
+        let caps: Vec<Shape> = r.shape.faces().into_iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Plane(_)))).collect();
+        println!("{mode:?}: {ms:.0} ms, {} faces, valid {}, {:.6} mm3, {} caps", r.shape.faces().len(), r.shape.is_valid(), vol(&r.shape) * 1e9, caps.len());
+        let t0 = std::time::Instant::now();
+        let s = shell_solid(&r.shape, &caps, 0.001, ShellSide::Inside, ShellMethod::Auto);
+        println!("  shell {:.0} ms {:?}", t0.elapsed().as_secs_f64() * 1e3, s.map(|s| vol(&s.shape) * 1e9).map_err(|e| e.to_string()));
+    }
+}

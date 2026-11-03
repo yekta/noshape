@@ -98,6 +98,10 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
         step(context, id, "curves", function(sub) {
             opFitSpline(context, sub + "sp", { "points" : [vector(0, 0, 0) * mm, vector(10, 5, 0) * mm, vector(20, 0, 0) * mm] });
             check("opFitSpline", size(evaluateQuery(context, qCreatedBy(sub + "sp", EntityType.EDGE))) == 1, "");
+            // Derivatives are by the spline's parameter on [0, 1]: this cubic Hermite peaks at y = 25 mm (100 t (1 - t)).
+            opFitSpline(context, sub + "hd", { "points" : [vector(0, 0, 0) * mm, vector(100, 0, 0) * mm], "startDerivative" : vector(0, 100, 0) * mm, "endDerivative" : vector(0, -100, 0) * mm });
+            const hb = evBox3d(context, { "topology" : qCreatedBy(sub + "hd", EntityType.EDGE), "tight" : true });
+            check("opFitSpline derivatives", abs(hb.maxCorner[1] - 25 * mm) < 1e-6 * mm, hb);
             opHelix(context, sub + "hx", { "axisStart" : vector(0, 0, 0) * mm, "direction" : vector(0, 0, 1), "startPoint" : vector(5, 0, 0) * mm, "interval" : [0, 2], "clockwise" : false, "helicalPitch" : 2 * mm, "spiralPitch" : 0 * mm });
             check("opHelix", size(evaluateQuery(context, qCreatedBy(sub + "hx", EntityType.EDGE))) >= 1, "");
             opPolyline(context, sub + "pl", { "points" : [vector(0, 0, 0) * mm, vector(5, 0, 0) * mm, vector(5, 5, 0) * mm] });

@@ -915,8 +915,13 @@ fn op_fit_spline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (cx, id, def) = args(i, &a)?;
     let pts: Vec<DVec3> = def.get("points").as_array().map(|v| v.iter().filter_map(vec3_of).collect()).unwrap_or_default();
     let mut tangents = Vec::new();
-    if let (Some(s), Some(e)) = (vec3_of(def.get("startDerivative")), vec3_of(def.get("endDerivative"))) {
-        tangents = vec![s, e];
+    // Onshape's derivatives are with respect to the spline's parameter on [0, 1] (geomOperations.fs:
+    // arcLengthParameterization false); OCCT's interpolation runs over the chord length.
+    let chord: f64 = pts.windows(2).map(|w| (w[1] - w[0]).length()).sum();
+    if let (Some(s), Some(e)) = (vec3_of(def.get("startDerivative")), vec3_of(def.get("endDerivative")))
+        && chord > 0.0
+    {
+        tangents = vec![s / chord, e / chord];
     }
     run_op(i, &cx, &id, "SKETCH_SPLINE_FAILED", |ev| {
         if pts.len() < 2 {
