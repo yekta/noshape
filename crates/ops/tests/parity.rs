@@ -99,9 +99,12 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
             Ok(parts) => diff.extend(differences(&live_parts(line), &parts)),
             Err(e) => diff.push(format!("parts: {e}")),
         }
-        // A custom feature that errors where live's doesn't failed to run
-        // (the FeatureScript host or std), apart from geometry.
-        let failed_run = step.custom && step.ours.is_some() && ours == "ERROR" && live_status != "ERROR";
+        // An input we couldn't place (live's geometry missing or a query
+        // form not translated): the difference may be ours, not the model's.
+        let unmapped = step.problems.iter().any(|p| p.contains("query not mapped") || p.contains("no entity of ours") || p.contains("was not built") || p.contains("not built:"));
+        // A custom feature that errors where live's doesn't, given all its
+        // inputs, failed to run (the FeatureScript host or std), apart from geometry.
+        let failed_run = step.custom && step.ours.is_some() && ours == "ERROR" && live_status != "ERROR" && !unmapped;
         if failed_run {
             res.custom.push(format!("{}: failed to run: {}", step.name, step.message.as_deref().unwrap_or("no message")));
         }
@@ -109,9 +112,6 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
             res.matching += 1;
             res.custom_matching += usize::from(step.custom);
         } else if res.first.is_none() {
-            // An input we couldn't place (live's geometry missing or a query
-            // form not translated): the difference may be ours, not the model's.
-            let unmapped = step.problems.iter().any(|p| p.contains("query not mapped") || p.contains("no entity of ours") || p.contains("was not built") || p.contains("not built:"));
             let kind = if failed_run {
                 "custom feature failed to run"
             } else if step.custom && step.ours.is_none() {
@@ -646,7 +646,11 @@ import(path : "onshape/std/geometry.fs", version : "1963.0");
 
 annotation { "Feature Type Name" : "Thrower" }
 export const thrower = defineFeature(function(context is Context, id is Id, definition is map)
-    precondition {}
+    precondition
+    {
+        annotation { "Name" : "Edge" }
+        definition.edge is Query;
+    }
     {
         throw regenError("Nope");
     });
@@ -659,13 +663,18 @@ export const thrower = defineFeature(function(context is Context, id is Id, defi
     std::fs::write(dir.join("studios/0bbb.fs"), broken).unwrap();
     let features = json!({ "features": [
         { "btType": "BTMFeature-134", "featureType": "thrower", "namespace": "e0aaa::m1", "featureId": "FT", "name": "Thrower 1", "parameters": [] },
-        { "btType": "BTMFeature-134", "featureType": "gone", "namespace": "e0bbb::m1", "featureId": "FG", "name": "Gone 1", "parameters": [] }
+        { "btType": "BTMFeature-134", "featureType": "gone", "namespace": "e0bbb::m1", "featureId": "FG", "name": "Gone 1", "parameters": [] },
+        { "btType": "BTMFeature-134", "featureType": "thrower", "namespace": "e0aaa::m1", "featureId": "FT2", "name": "Thrower 2", "parameters": [
+            { "btType": "BTMParameterQueryList-148", "parameterId": "edge", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JXX"], "queryString": "" }] }
+        ] }
     ] });
     std::fs::write(dir.join("features.json"), features.to_string()).unwrap();
     let (features, _, refs) = read_model(&dir).unwrap();
-    let live = vec![json!({ "index": 0, "status": "OK", "parts": [] }), json!({ "index": 1, "status": "OK", "parts": [] })];
+    let live = vec![json!({ "index": 0, "status": "OK", "parts": [] }), json!({ "index": 1, "status": "OK", "parts": [] }), json!({ "index": 2, "status": "OK", "parts": [] })];
     let r = run_model("custom-failures", &features, &live, &refs);
-    assert_eq!(r.custom_compared, 2, "{r:?}");
+    assert_eq!(r.custom_compared, 3, "{r:?}");
+    // Its edge not placed: the translation's failure, not the host's.
+    assert!(!r.custom.iter().any(|c| c.starts_with("Thrower 2")), "{:?}", r.custom);
     assert!(r.custom.iter().any(|c| c.starts_with("0bbb: failed to compile")), "{:?}", r.custom);
     assert!(r.custom.iter().any(|c| c.starts_with("Thrower 1: failed to run")), "{:?}", r.custom);
     assert!(r.first.as_deref().is_some_and(|f| f.contains("(custom feature failed to run)")), "{:?}", r.first);

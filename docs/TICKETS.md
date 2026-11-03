@@ -3041,7 +3041,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   circle centres in martinl's Sketch 2 moves them 15 mm), the sketch's view orientation. Live's frames across the
   corpus (86 sketches): cap faces x = the sketch's x (+X on ±Z faces); extruded side faces y = +Z, x = y × normal
   (normal −X: x (0, −1, 0); +X: (0, 1, 0); +Y: (−1, 0, 0); −Y: (1, 0, 0); a 98° face: (−0.139, −0.99, 0)); a sheet
-  metal flange tilted 30° (bracket00-ira Sketch 2): y along the bend (0, 1, 0), x up the slope (0.866, 0, 0.5).
+  metal flange tilted 30° (bracket00-ira Sketch 2): y along the bend (0, 1, 0), x up the slope (0.866, 0, 0.5). Also
+  cf-hose-routing Sketch 2 on the −X side face of Extrude 1 (x −115): ours x (0, 0, −1), live (0, −1, 0).
   Ours takes OCCT's plane x (eval.rs raw_plane, Reference::Face). parity_models now counts a sketch frame that isn't
   live's as a difference. /root/dx-scratch/frames.py lists them (CLI against the rebuilt documents). (dx 2026-11-03)
 - [ ] P3 SKETCH-REDUNDANT-SOLVES (skasm; dx's parity suite, models-dx live-hole-row, live 1862) a sketch whose
@@ -3108,3 +3109,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   +916.533 mm³, box ±12.5 mm, OK); and it is slow: 16.6 s when the feature is added, **157 s** to regenerate the
   reopened document (parity_models' timing). Rebuilt document: /root/dx-scratch/pmdocs/cf/cf-wave-spring.noshape;
   model /root/parity/models/cf-wave-spring (NOSHAPE_PARITY_ONLY=cf-wave-spring). (dx 2026-11-03)
+- [ ] P2 FILLET-BLEND-SPLIT (core / kernel; dx's FeatureScript corpus 11-03, cf-planetary-gears) a fillet of a
+  straight edge between a cylinder and an extruded fit spline comes out as two faces stacked along the edge where
+  live's is one: the Planetary Gears feature's root fillets (its gear studio's `opFillet` of each tooth gap's two
+  vertical edges, dedendum cylinder × involute) are B-spline faces of 0.668 + 5.913 mm² split at 1/10 of the 5.08 mm
+  depth, so the sun gear has 147 faces (live 111) and the planet 99 (live 75), 2 extra per tooth; volumes and areas
+  agree with live's to 1e-5, the ring gear (no fillets) matches. Likely OCCT's blend approximation in several
+  patches. Rebuilt document: /root/dx-scratch/pmdocs/cf/cf-planetary-gears.noshape; model
+  /root/parity/models/cf-planetary-gears (NOSHAPE_PARITY_ONLY=cf-planetary-gears). (dx 2026-11-03)
