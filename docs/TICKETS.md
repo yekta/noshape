@@ -3147,10 +3147,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   2's fit spline (its wire edges, construction filtered) Up to body into a surface; ours errs, so its later Curve
   Pattern Normal has nothing to follow. Model /root/parity/models/cf-curve-pattern-normal
   (NOSHAPE_PARITY_ONLY=cf-curve-pattern-normal). (dx 2026-11-03)
-- [ ] P2 FILLET-OVERFLOW-BULGE (core; dx's parity suite 11-03, knob-jason) knob-jason's Fillet 1 (two edges JPC / JUK
-  with tangent propagation, r 2.5 mm, "Allow edge overflow" on) has live's faces / edges / vertices (45/92/48) but
-  live's part then reaches past the block it rounds: box x ±30.1455, z −10.1568 mm where the block ends at ±30 / −10
-  (Fillet 2 later trims it back to ±29.99), volume 26981.111 mm³; ours stays inside the block, 26977.368 mm³ (−3.7,
-  outside live's band ±2). The overflow face live makes where the rolling ball runs off an edge bulges out; ours
-  doesn't. Model /root/parity/models/knob-jason (NOSHAPE_PARITY_ONLY=knob-jason); rebuilt document
+- [ ] P2 FILLET-KNOB-JASON-VOLUME (core; dx's parity suite 11-03, knob-jason) knob-jason's Fillet 1 (two edges JPC /
+  JUK with tangent propagation, r 2.5 mm, "Allow edge overflow" on) has live's faces / edges / vertices (45/92/48)
+  but 26977.368 mm³ where live's is 26981.111 (−3.7, outside live's band ±2) and area 7628.295 mm², live 7629.006.
+  (Live's box there, ±30.1455 mm past the ±30 block, is the UI fetch's loose client bounds round fillet surfaces,
+  not geometry.) Model /root/parity/models/knob-jason (NOSHAPE_PARITY_ONLY=knob-jason); rebuilt document
   /root/dx-scratch/tickets/knob-jason.noshape. (dx 2026-11-03)

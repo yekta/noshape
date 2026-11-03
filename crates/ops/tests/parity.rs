@@ -596,6 +596,13 @@ fn differences_use_lives_bands() {
     let at = |x: f64, y: f64, volume: f64| PartState { bbox: Some([[x, y, 0.0], [x + 0.01, y + 0.01, 0.05]]), ..part(volume, 6) };
     let live = [at(0.0253, -0.0213, 1.0e-6), at(-0.0213, 0.0253, 1.0e-6)];
     assert!(differences(&live, &[at(-0.0213, 0.0253, 1.0e-6), at(0.0253, -0.0213, 1.0e-6 + 1e-17)]).is_empty());
+    // The UI fetch's box is the client's bounds, loose round a fillet
+    // (knob-kraut's ±15 mm knob read −15.4005 / +15.3382): ours inside is no difference.
+    let round = |lo: f64, hi: f64| PartState { bbox: Some([[lo, lo, 0.0], [hi, hi, 0.1]]), ..part(1.0e-6, 6) };
+    let loose = PartState { bbox_outer: true, ..round(-0.0154005, 0.0153382) };
+    assert!(differences(std::slice::from_ref(&loose), &[round(-0.015, 0.015)]).is_empty());
+    assert!(differences(&[loose], &[round(-0.016, 0.015)]).iter().any(|d| d.contains("box")));
+    assert!(differences(&[round(-0.0154005, 0.0153382)], &[round(-0.015, 0.015)]).iter().any(|d| d.contains("box")));
 }
 
 /// Variables from a Variable Studio (live's `variables` with a studio

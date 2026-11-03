@@ -2525,6 +2525,9 @@ pub struct PartState {
     pub volume_band: Option<[f64; 2]>,
     pub area_band: Option<[f64; 2]>,
     pub bbox: Option<[[f64; 3]; 2]>,
+    /// Live's box is the web client's body bounds (its UI fetch), loose
+    /// around fillets' surfaces: ours only has to lie inside it.
+    pub bbox_outer: bool,
     pub centroid: Option<[f64; 3]>,
     /// Live's centroid band ([min, max] per axis), when given.
     pub centroid_band: Option<[[f64; 3]; 2]>,
@@ -2607,6 +2610,8 @@ pub fn live_parts(line: &Value) -> Vec<PartState> {
             volume_band: band(&p["volume_band"]),
             area_band: band(&p["area_band"]),
             bbox: f3(&p["bbox"]["min"]).zip(f3(&p["bbox"]["max"])).map(|(a, b)| [a, b]),
+            // The UI fetch's bodies list their faces by id alone.
+            bbox_outer: line["bodies"].as_array().into_iter().flatten().find(|b| b["id"] == p["partId"]).and_then(|b| b["faces"].as_array()?.first().cloned()).is_some_and(|f| f.as_object().is_some_and(|f| f.len() == 1)),
             // massproperties gives exactly [0, 0, 0] for a part without a
             // material (live README; every part of the UI fetch): not known.
             centroid: f3(&p["centroid"]).filter(|c| *c != [0.0; 3]),
@@ -2654,6 +2659,7 @@ pub fn our_parts(t: &mut Translator) -> Result<Vec<PartState>, String> {
             volume_band: None,
             area_band: None,
             bbox: at(&p["bounding_box"]["min"]).zip(at(&p["bounding_box"]["max"])).map(|(a, b)| [a, b]),
+            bbox_outer: false,
             centroid: at(&p["centroid"]),
             centroid_band: None,
             face_types: p["id"].as_str().map(|id| faces.get(id).cloned().unwrap_or_default()),
@@ -2725,8 +2731,9 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
         {
             out.push(format!("{who}: centroid {:?} mm, live {:?}", a.map(|c| c * 1e3), b.map(|c| c * 1e3)));
         }
+        let off = |a: [[f64; 3]; 2], b: [[f64; 3]; 2], j: usize| if l.bbox_outer { (b[0][j] - a[0][j]).max(a[1][j] - b[1][j]) } else { (a[0][j] - b[0][j]).abs().max((a[1][j] - b[1][j]).abs()) };
         if let (Some(a), Some(b)) = (o.bbox, l.bbox)
-            && (0..2).any(|i| (0..3).any(|j| (a[i][j] - b[i][j]).abs() > 1e-6))
+            && (0..3).any(|j| off(a, b, j) > 1e-6)
         {
             out.push(format!("{who}: box {:?} mm, live {:?}", a.map(|p| p.map(|c| c * 1e3)), b.map(|p| p.map(|c| c * 1e3))));
         }
