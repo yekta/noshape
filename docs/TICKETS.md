@@ -3171,3 +3171,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   revolved groove 6.35 mm high with r 3.175 mm (1/8 in), so the two fillets meet at the groove's middle on one torus;
   live's part is 5 faces / 4 edges, ours 6 / 5 (the volume is live's). Live keeps the round groove as one face.
   Model /root/parity/models/pulley02-maxwell (NOSHAPE_PARITY_ONLY=pulley02-maxwell). (dx 2026-11-03)
+- [ ] P3 XT-SEAM-ACROSS-LOOP (dx; parity suite 11-03, cf-wiring's Import) a Parasolid cylinder face bounded by two
+  rings with other loops on it (a fan hub with 7 blade roots) gets OCCT's seam at the rings' only vertices (angle 0 of
+  their circles), and when a blade root's edges cross that angle ShapeFix splits them there: Part 2 reads 40 / 90 / 58
+  faces / edges / vertices, live 40 / 88 / 56 (two root B-spline edges in two pieces each at x 45, z 30 mm). seam_ring
+  (xt_read.cpp) takes only two-loop faces; it would need the ring edges' vertices put in a gap between the face's
+  other loops and the seam run there. File: /root/parity/models/cf-wiring/imports/6ae9ae35100f83b7021d3619.x_t.
+  (dx 2026-11-03)
