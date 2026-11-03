@@ -129,6 +129,37 @@ fn undoing_three_edits_back_evaluates_nothing() {
     }
 }
 
+/// The same with the dialog's runs between (qa REGEN-SPEED: the third Ctrl+Z still re-evaluated 29 features in the
+/// app): each edit typed in two steps, each step previewed and refined, the original state still a lookup three
+/// undos back.
+#[test]
+fn undoing_three_typed_edits_back_evaluates_nothing() {
+    let units = UnitPrefs::default();
+    let config = ConfigValues::default();
+    let mut ps = PartStudio::new();
+    let plate = sketch_region(&mut ps, &units, rect(0.0, 0.0, 0.04, 0.02));
+    let ex = add(&mut ps, &units, "extrude", &[("entities", q(vec![plate])), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+    let mut regen = Regenerator::new();
+    let mut app = |ps: &PartStudio| {
+        let r = regen.regenerate(ps, &config, &units, &RegenOptions { preview_meshes: true, ..Default::default() });
+        if r.needs_refine { regen.regenerate(ps, &config, &units, &RegenOptions::default()) } else { r }
+    };
+    let mut states = vec![ps.clone()];
+    app(&ps);
+    for typed in [["1 mm", "11 mm", "11.5 mm"], ["9 mm", "9.5 mm", "9.25 mm"], ["1 mm", "13 mm", "13.5 mm"]] {
+        let mut next = states.last().unwrap().clone();
+        for depth in typed {
+            next.features.iter_mut().find(|f| f.id == ex).unwrap().params.set("depth", e(depth));
+            app(&next);
+        }
+        states.push(next);
+    }
+    for k in (0..3).rev() {
+        let r = app(&states[k]);
+        assert!(r.evaluated.is_empty(), "undo to state {k}: {} features evaluated", r.evaluated.len());
+    }
+}
+
 /// Undoing a delete takes the feature and the body's mesh from the cache
 /// (nothing evaluated or meshed); once its upstream changed it is
 /// evaluated again.

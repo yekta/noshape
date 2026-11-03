@@ -255,7 +255,7 @@ const VERSIONS: usize = 3;
 const KEEP_GONE: usize = 8;
 /// Whole results kept: undoing or redoing this many steps back is a lookup (PLAN 2.6: undo / redo ≤ 50 ms; past
 /// [`VERSIONS`] edits of one feature its evaluations are gone).
-const RESULTS: usize = 8;
+const RESULTS: usize = 32;
 /// And while their meshes (each counted once) stay under this many bytes.
 const RESULT_MESH_BYTES: usize = 256 << 20;
 
@@ -663,7 +663,9 @@ impl Regenerator {
         display.variables = ctx.variables.clone();
         display.regen_ms = t0.elapsed().as_secs_f32() * 1000.0;
         let result = RegenResult { display, needs_refine, context: ctx, cancelled: false, evaluated };
-        if let Some(k) = result_key {
+        // (Full results only: a preview can't serve a full run, and the dialog's previews as values are typed would
+        // push out the states undo goes back to.)
+        if let Some(k) = result_key.filter(|_| !result.needs_refine) {
             self.results.retain(|(x, _)| *x != k);
             self.results.insert(0, (k, result.clone()));
             self.results.truncate(RESULTS);
