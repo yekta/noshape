@@ -286,6 +286,21 @@ impl<'a> Translator<'a> {
     pub fn step(&mut self, k: usize) -> Step {
         let f = self.features[k].clone();
         let mut step = Step { index: k, name: f["name"].as_str().unwrap_or("").to_string(), feature_type: f["featureType"].as_str().unwrap_or("").to_string(), ..Default::default() };
+        // Mate connectors made inside the feature's dialog (its sub-features):
+        // ours has none in a feature, so each is a Mate connector before it.
+        for sub in f["subFeatures"].as_array().into_iter().flatten().filter(|s| s["featureType"] == "mateConnector") {
+            let mut problems = Vec::new();
+            match self.feature(k, sub, &mut problems) {
+                Ok((id, _, _)) => {
+                    if let Some(oid) = sub["featureId"].as_str() {
+                        self.feature_ids.insert(oid.to_string(), id);
+                    }
+                    step.problems.push(format!("its in-feature {} built as a feature before it (noshape has none inside a feature)", sub["featureType"].as_str().unwrap_or("?")));
+                }
+                Err(e) => step.problems.push(format!("its in-feature {}: not built: {e}", sub["featureType"].as_str().unwrap_or("?"))),
+            }
+            step.problems.extend(problems.into_iter().map(|p| format!("its in-feature {}: {p}", sub["featureType"].as_str().unwrap_or("?"))));
+        }
         let made = if f["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketch")) { self.sketch(k, &f, &mut step.problems) } else { self.feature(k, &f, &mut step.problems) };
         match made {
             Ok((id, status, message)) => {
@@ -499,6 +514,9 @@ impl<'a> Translator<'a> {
         {
             let ours = self.feature_ids.get(fid).cloned().ok_or_else(|| format!("feature {fid} was not built"))?;
             let kind = q["entityType"].as_str().unwrap_or("BODY");
+            if q["bodyType"] == "MATE_CONNECTOR" {
+                return Ok(vec![format!("mc:{ours}.0")]);
+            }
             if kind == "FACE" && let Ok(g) = self.call("sketch_get", json!({ "sketch": ours })) {
                 return Ok(g["regions"].as_array().into_iter().flatten().filter_map(|r| r["id"].as_str().map(str::to_string)).collect());
             }
@@ -610,7 +628,7 @@ impl<'a> Translator<'a> {
         }
         // qSketchRegion(id + "F…", filterInnerLoops): the sketch's regions;
         // with `true` only those not inside another (a region whose curves
-        // all bound another region is one of its holes' insides).
+        // all bound another region with holes is one of those holes' insides).
         if let Some((sk, rest)) = text.split("qSketchRegion(id + \"").nth(1).and_then(|r| r.split_once('"')) {
             let ours = self.feature_ids.get(sk).cloned().ok_or_else(|| format!("sketch {sk} was not built"))?;
             let g = self.call("sketch_get", json!({ "sketch": ours }))?;
@@ -619,7 +637,7 @@ impl<'a> Translator<'a> {
             let outer_only = rest.trim_start_matches([',', ' ']).starts_with("true");
             let inner = |r: &Value| {
                 let mine = curves(r);
-                regions.iter().any(|o| o["id"] != r["id"] && o["area"].as_f64() > r["area"].as_f64() && { let theirs = curves(o); mine.iter().all(|c| theirs.contains(c)) })
+                regions.iter().any(|o| o["id"] != r["id"] && o["holes"].as_u64().unwrap_or(0) > 0 && { let theirs = curves(o); mine.iter().all(|c| theirs.contains(c)) })
             };
             return Ok(regions.iter().filter(|r| !outer_only || !inner(r)).filter_map(|r| r["id"].as_str().map(str::to_string)).collect());
         }
@@ -995,7 +1013,7 @@ impl<'a> Translator<'a> {
                             let (c, s) = (a.cos(), a.sin());
                             at(cx + r * (c * xd - s * yd), cy + r * (c * yd + s * xd))
                         };
-                        let (t0, t1) = (e["startParam"].as_f64().unwrap_or(0.0), e["endParam"].as_f64().unwrap_or(0.0));
+                        let (t0, t1) = arc_span(e).unwrap_or((0.0, 0.0));
                         Some(json!({ "tool": "three_point_arc", "points": [pt(t0), pt(t1), pt((t0 + t1) / 2.0)], "construction": construction }))
                     }
                 }
@@ -1357,12 +1375,20 @@ impl<'a> Translator<'a> {
             if let Some(v) = value {
                 args["value"] = json!(v);
             }
+            let driven = c["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"] == "driven" && p["value"] == true);
             match self.call("sketch_dimension", args) {
-                Ok(_) => {
+                Ok(r) => {
                     self.sketch_edits += 1;
+                    // Onshape's driven (reference) dimension.
+                    if driven
+                        && let Some(d) = r["dimension"].as_str()
+                        && self.call("sketch_dimension_options", json!({ "sketch": id, "dimension": d, "driving": false })).is_ok()
+                    {
+                        self.sketch_edits += 1;
+                    }
                     self.check_moved(id, || format!("{ty} {kind} {} on {}", c["parameters"].as_array().into_iter().flatten().find_map(|p| p["expression"].as_str()).unwrap_or(""), ["localFirst", "localSecond", "localEntity1", "localEntity2"].iter().filter_map(|n| par0(n)).filter(|v| !v.is_empty()).collect::<Vec<_>>().join(", ")));
                 }
-                Err(e) => problems.push(format!("{ty} dimension: {e}")),
+                Err(e) => problems.push(format!("{ty} dimension on {}: {e}", ["localFirst", "localSecond", "localEntity1", "localEntity2"].iter().filter_map(|n| par0(n)).filter(|v| !v.is_empty()).collect::<Vec<_>>().join(", "))),
             }
         }
     }
@@ -1431,6 +1457,14 @@ fn packed_strings(p: &noshape_model::custom::host::packed::Packed, out: &mut Vec
     }
 }
 
+/// An arc's parameters, the end past the start: Onshape's may wrap (an arc
+/// from π to 0 runs through 3π/2).
+fn arc_span(e: &Value) -> Option<(f64, f64)> {
+    let (a, b) = (e["startParam"].as_f64()?, e["endParam"].as_f64()?);
+    let tau = std::f64::consts::TAU;
+    Some((a, if b < a { b + tau * ((a - b) / tau).ceil() } else { b }))
+}
+
 /// An Onshape sketch curve as a polyline in its sketch plane (metres).
 fn sampled(e: &Value) -> Option<Vec<[f64; 2]>> {
     let g = &e["geometry"];
@@ -1444,10 +1478,7 @@ fn sampled(e: &Value) -> Option<Vec<[f64; 2]>> {
         "BTCurveGeometryCircle" => {
             let (cx, cy, r, xd, yd) = (num("xCenter"), num("yCenter"), num("radius"), num("xDir"), num("yDir"));
             let sense = if g["clockwise"].as_bool() == Some(true) { -1.0 } else { 1.0 };
-            let (t0, t1) = match (e["startParam"].as_f64(), e["endParam"].as_f64()) {
-                (Some(a), Some(b)) => (a, b),
-                _ => (0.0, std::f64::consts::TAU),
-            };
+            let (t0, t1) = arc_span(e).unwrap_or((0.0, std::f64::consts::TAU));
             Some(
                 (0..=64)
                     .map(|i| {
@@ -1461,10 +1492,7 @@ fn sampled(e: &Value) -> Option<Vec<[f64; 2]>> {
         "BTCurveGeometryEllipse" => {
             let (cx, cy, a, b, xd, yd) = (num("xCenter"), num("yCenter"), num("majorRadius"), num("minorRadius"), num("xDir"), num("yDir"));
             let sense = if g["clockwise"].as_bool() == Some(true) { -1.0 } else { 1.0 };
-            let (t0, t1) = match (e["startParam"].as_f64(), e["endParam"].as_f64()) {
-                (Some(x), Some(y)) => (x, y),
-                _ => (0.0, std::f64::consts::TAU),
-            };
+            let (t0, t1) = arc_span(e).unwrap_or((0.0, std::f64::consts::TAU));
             Some(
                 (0..=64)
                     .map(|i| {
@@ -1568,6 +1596,27 @@ fn upgrade(ty: &str, params: &mut Map<String, Value>, unknown: &mut Vec<String>)
                 if t == "TWO_DIRECTIONS" {
                     params.insert("hasStartBound".into(), json!(true));
                 }
+            }
+        }
+        // Holes before V2 (2019): unsuffixed names, the start as a flag.
+        "hole" => {
+            for (old, new) in [("endStyle", "endStyleV2"), ("holeDiameter", "holeDiameterV3"), ("cBoreDiameter", "cBoreDiameterV3"), ("cBoreDepth", "cBoreDepthV3"), ("cSinkDiameter", "cSinkDiameterV3"), ("cSinkAngle", "cSinkAngleV3"), ("tapDrillDiameter", "tapDrillDiameterV3"), ("holeDepth", "holeDepthV3"), ("tappedDepth", "tappedDepthV3")] {
+                if !params.contains_key(new)
+                    && let Some(v) = done(old, params)
+                {
+                    params.insert(new.into(), v);
+                }
+            }
+            if !params.contains_key("styleV2")
+                && let Some(v) = params.get("style").cloned()
+            {
+                params.insert("styleV2".into(), v);
+            }
+            // Its standard tables only filled the sizes it stores too.
+            done("standardTappedOrClearance", params);
+            done("standardBlindInLast", params);
+            if let Some(v) = done("startFromSketch", params) {
+                params.insert("startStyle".into(), json!(if v == true { "SKETCH" } else { "PART" }));
             }
         }
         "assignVariable" => {
