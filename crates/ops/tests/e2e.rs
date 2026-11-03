@@ -56,6 +56,20 @@ fn ellipse_axis_dimension_reads_its_diameter() {
     assert_eq!(values, ["Ø30", "Ø12"], "{st}");
 }
 
+/// A shape whose clicks don't complete it is an error naming the clicks,
+/// also when its one click snapped to the Origin (it drew nothing).
+#[test]
+fn an_incomplete_shape_is_an_error() {
+    let mut ctx = Ctx::new();
+    let path = scratch("incomplete-shape.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+    for at in [[0, 0], [5, 5]] {
+        let e = try_call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "ellipse", "points": [at] })).expect_err("one click");
+        assert!(e.message.contains("didn't complete an ellipse"), "{}", e.to_json());
+    }
+}
+
 /// An angle dimension measures the quadrant its `label` is in, as the
 /// Dimension tool's cursor picks it (the parity translator places Onshape's
 /// 120° this way).

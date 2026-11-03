@@ -664,9 +664,11 @@ fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, poin
         ed.finish_polygon(&mut t.data);
     }
     ed.cancel();
-    let created: Vec<EntityId> = t.data.sketch.entities().map(|e| e.id).filter(|e| !before.contains(e)).collect();
+    // The Origin a click snapped to (an external point) isn't a drawn shape.
+    let created: Vec<EntityId> = t.data.sketch.entities().filter(|e| !before.contains(&e.id) && !e.external).map(|e| e.id).collect();
     if created.is_empty() {
-        let hint = ed.message.clone().unwrap_or_else(|| format!("the clicks didn't complete a {name} (see sketch_draw's tool list for the clicks it takes)"));
+        let article = if name.starts_with(['a', 'e', 'i', 'o', 'u']) { "an" } else { "a" };
+        let hint = ed.message.clone().unwrap_or_else(|| format!("the clicks didn't complete {article} {name} (see sketch_draw's tool list for the clicks it takes)"));
         return Err(OpError::invalid(format!("nothing was drawn: {hint}")).with_param(format!("{p}points")));
     }
     if construction {
