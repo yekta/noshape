@@ -2339,11 +2339,14 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
     ~Reset() { t_free = nullptr; }
   } reset;
   {
-    const KernelTimer timer("boolean.rust.brep");
+    const KernelTimer     timer("boolean.rust.brep");
+    const RustMemoryWatch watch;
     if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), tol, touching_only, r))
     {
-      // (Declined "cancelled": stopped, not handed to OCCT.)
+      // (Declined "cancelled": stopped, not handed to OCCT; so past the memory budget, with OCCT's error.)
       stop();
+      if (RustMemoryWatch::over())
+        fail_op("operation stopped: it needed more than " + std::to_string(RustMemoryWatch::budget_mb()) + " MB of memory");
       return decline(nullptr);
     }
   }

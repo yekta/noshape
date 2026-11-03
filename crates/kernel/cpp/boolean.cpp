@@ -365,11 +365,44 @@ extern "C" void noshape_pool_leave(void* previous)
   delete p;
 }
 
+namespace {
+// Where the process's resident memory stood when this thread's noshape Boolean started (0: none running), and
+// whether it has grown past the budget since.
+thread_local size_t t_rust_rss_start = 0;
+thread_local bool   t_rust_over      = false;
+} // namespace
+
+RustMemoryWatch::RustMemoryWatch() : myPrevious(t_rust_rss_start)
+{
+  t_rust_rss_start = std::max<size_t>(resident_bytes(), 1);
+  t_rust_over      = false;
+}
+
+RustMemoryWatch::~RustMemoryWatch() { t_rust_rss_start = myPrevious; }
+
+bool RustMemoryWatch::over() { return t_rust_over; }
+
+size_t RustMemoryWatch::budget_mb() { return memory_budget() >> 20; }
+
 extern "C" int noshape_should_break()
 {
   Deadline* const d = t_deadline;
   if (cancelled(t_cancel))
     return 1;
+  if (t_rust_rss_start != 0)
+  {
+    // (A process's size is a file read on Linux: every 50 ms.)
+    thread_local double next_rss = 0;
+    const double        now      = steady_seconds();
+    if (!t_rust_over && now >= next_rss)
+    {
+      next_rss         = now + 0.05;
+      const size_t rss = resident_bytes();
+      t_rust_over      = rss > t_rust_rss_start && rss - t_rust_rss_start > memory_budget();
+    }
+    if (t_rust_over)
+      return 1;
+  }
   if (d == nullptr)
     return 0;
   if (d->hit.load(std::memory_order_relaxed))

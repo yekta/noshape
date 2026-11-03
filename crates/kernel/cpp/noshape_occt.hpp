@@ -83,6 +83,21 @@ namespace noshape {
 const std::atomic<bool>* thread_cancel_flag();
 // Throws "cancelled" (fail_op) once the thread's regeneration is cancelled or the memory budget is spent.
 void fail_if_cancelled();
+// While alive, noshape's Boolean on this thread stops (its stop hook) once the process has grown past the memory
+// budget since it started, as OCCT's builds do; `over()` then says so.
+class RustMemoryWatch
+{
+public:
+  RustMemoryWatch();
+  ~RustMemoryWatch();
+  RustMemoryWatch(const RustMemoryWatch&)            = delete;
+  RustMemoryWatch& operator=(const RustMemoryWatch&) = delete;
+  static bool   over();
+  static size_t budget_mb();
+
+private:
+  size_t myPrevious;
+};
 // Budget of a blend (qa FILLET-HANG: OCCT's blend approximation never
 // returned): `f` runs with a CPU-time timer on this thread (Linux) that
 // ticks every 100 ms; once `cpu_seconds` are used or the regeneration is
