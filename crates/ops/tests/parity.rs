@@ -130,9 +130,9 @@ fn parity_models() {
             continue;
         }
         if let Ok(s) = std::fs::read_to_string(dir.join("source.json")).map(|t| serde_json::from_str::<Value>(&t).unwrap_or(Value::Null)) {
-            // Live's source.json: the public original and live's copy of it.
-            let o = &s["original"];
-            index.push(json!({ "name": name, "title": s["title"], "document": o["did"], "workspace": o["wid"], "element": o["eid"], "url": o["url"], "copy": s["copy"]["url"] }));
+            // Live's source.json: live's copy (fetched from) and the public original.
+            let c = &s["copy"];
+            index.push(json!({ "name": name, "document": c["did"], "workspace": c["wid"], "element": c["eid"], "url": c["url"], "title": s["title"], "original": s["original"]["url"] }));
         }
         // Live's fetch skipped or didn't finish it: nothing to compare.
         if !dir.join("live.jsonl").is_file() {
