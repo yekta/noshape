@@ -54,7 +54,8 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         let live_status = line["status"].as_str().unwrap_or("OK").to_uppercase();
         let ours = step.status.clone().unwrap_or_else(|| "not built".into()).to_uppercase();
         if ours != live_status {
-            diff.push(format!("status {ours}, live {live_status}"));
+            let why = step.message.as_deref().map(|m| format!(" ({m})")).unwrap_or_default();
+            diff.push(format!("status {ours}{why}, live {live_status}"));
         }
         // Onshape's words: live's row tooltip ("Fillet 1 did not regenerate
         // properly: …") holds our message.

@@ -1306,7 +1306,7 @@ Examples:
 
 A sketch's entities, constraints, dimensions, solve state and regions.
 
-Entities with ids and geometry (sketch coordinates, workspace units), constraints and dimensions (`dim:…`, value and expression), DOF and status (fully defined, under defined, over defined), regions (`region:…` ids, area, `center` of the outer loop's box, a point `inside` the region) for Extrude / Revolve, and the plane frame.
+Entities with ids and geometry (sketch coordinates, workspace units), constraints and dimensions (`dim:…`, value and expression), DOF and status (fully defined, under defined, over defined), regions (`region:…` ids, area, `center` of the outer loop's box, a point `inside` the region, the `boundary` curves) for Extrude / Revolve, and the plane frame.
 
 Examples:
 

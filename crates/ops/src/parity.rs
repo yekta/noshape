@@ -511,8 +511,18 @@ impl<'a> Translator<'a> {
         let (o, x, y) = (f3(&g["frame"]["origin"]), f3(&g["frame"]["x"]), f3(&g["frame"]["y"]));
         let (Some(o), Some(x), Some(y)) = (o, x, y) else { return Err("sketch frame".into()) };
         let frame = self.frames.get(&sk).copied();
+        // Onshape names the region by enough of its boundary curves to tell
+        // it apart (TOPOLOGY): ours whose boundary has them all.
+        let named: Vec<String> = strings.iter().filter_map(|e| self.sketch_entities.get(&(sk.clone(), e.clone())).cloned()).collect();
+        let all: Vec<Value> = g["regions"].as_array().cloned().unwrap_or_default();
+        let bounded: Vec<Value> = all.iter().filter(|r| !named.is_empty() && named.iter().all(|e| r["boundary"].as_array().is_some_and(|b| b.iter().any(|x| x == e)))).cloned().collect();
+        if let [only] = bounded.as_slice() {
+            return Ok(only["id"].as_str().map(str::to_string));
+        }
+        // Else (several share them, or none known): the one inside those curves.
+        let regions = if bounded.is_empty() { all } else { bounded };
         let mut best: Option<(f64, String)> = None;
-        for r in g["regions"].as_array().into_iter().flatten() {
+        for r in &regions {
             let (u, v) = (r["inside"][0].as_f64().unwrap_or(0.0), r["inside"][1].as_f64().unwrap_or(0.0));
             // Ours (mm, our frame) → Onshape's sketch plane (m).
             let k = per_unit(&g["units"]);
