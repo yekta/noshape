@@ -119,8 +119,20 @@ fn parity_models() {
     let docs = results.iter().filter(|r| r.first.is_none() && r.compared > 0).count();
     let (matching, total) = results.iter().fold((0, 0), |(m, t), r| (m + r.matching, t + r.compared));
     println!("parity_models score: {docs}/{} documents match to the end, {matching}/{total} features match", results.len());
+    // The causes: first differences by feature type and what differed.
+    let mut causes: std::collections::BTreeMap<String, usize> = Default::default();
+    for f in results.iter().filter_map(|r| r.first.as_deref()) {
+        let ty = f.split(" (").nth(1).and_then(|r| r.split(')').next()).unwrap_or("?");
+        let what = f.split("): ").nth(1).map(|d| d.split([';', ',']).next().unwrap_or(d)).map(|d| d.split_whitespace().filter(|w| !w.chars().any(|c| c.is_ascii_digit() || c == '"')).take(3).collect::<Vec<_>>().join(" ")).unwrap_or_default();
+        *causes.entry(format!("{ty}: {what}")).or_default() += 1;
+    }
+    let mut causes: Vec<(String, usize)> = causes.into_iter().collect();
+    causes.sort_by_key(|c| std::cmp::Reverse(c.1));
+    for (c, n) in causes.iter().take(5) {
+        println!("  cause: {n} × {c}");
+    }
     let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "compared": r.compared, "matching": r.matching, "first_difference": r.first, "untranslated": r.untranslated })).collect();
-    let _ = std::fs::write(root.with_file_name("report.json"), serde_json::to_string_pretty(&json!({ "documents_matching": docs, "documents": results.len(), "features_matching": matching, "features": total, "models": report })).unwrap());
+    let _ = std::fs::write(root.with_file_name("report.json"), serde_json::to_string_pretty(&json!({ "documents_matching": docs, "documents": results.len(), "features_matching": matching, "features": total, "causes": causes.iter().map(|(c, n)| json!({ "cause": c, "documents": n })).collect::<Vec<_>>(), "models": report })).unwrap());
     if std::env::var_os("NOSHAPE_PARITY_INDEX").is_some() {
         let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/parity-models/index.json");
         std::fs::write(file, serde_json::to_string_pretty(&index).unwrap() + "\n").unwrap();
