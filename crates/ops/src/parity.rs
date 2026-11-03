@@ -193,10 +193,24 @@ impl<'a> Translator<'a> {
         let known: Vec<String> = schema["params"]["properties"].as_object().map(|m| m.keys().cloned().collect()).unwrap_or_default();
         let mut params = Map::new();
         let mut unknown = Vec::new();
+        let given: Vec<&str> = f["parameters"].as_array().into_iter().flatten().filter_map(|p| p["parameterId"].as_str()).collect();
+        let mut tolerances = 0;
         for p in f["parameters"].as_array().into_iter().flatten() {
             let Some(id) = p["parameterId"].as_str() else { continue };
             if INTERNAL.contains(&id) {
                 continue;
+            }
+            if !known.iter().any(|n| n == id) && ty == "hole" {
+                // A Hole saved by an older std keeps its earlier parameters
+                // beside the V3 ones; tolerances don't change the geometry.
+                if ["Tolerance", "Precision", "holeClass", "toleranceMatching"].iter().any(|w| id.contains(w)) {
+                    tolerances += 1;
+                    continue;
+                }
+                let stem = id.trim_end_matches("V2");
+                if given.contains(&format!("{stem}V3").as_str()) || given.contains(&format!("{stem}V2").as_str()) && known.iter().any(|n| *n == format!("{stem}V2")) {
+                    continue;
+                }
             }
             match self.param(k, p) {
                 Ok(None) => {}
@@ -210,6 +224,9 @@ impl<'a> Translator<'a> {
                 }
                 Err(e) => problems.push(format!("{id}: {e}")),
             }
+        }
+        if tolerances > 0 {
+            problems.push(format!("{tolerances} tolerance / precision fields not translated (no effect on the geometry)"));
         }
         upgrade(ty, &mut params, &mut unknown);
         if !unknown.is_empty() {
@@ -281,7 +298,10 @@ impl<'a> Translator<'a> {
                     "isoHoleTable" => "hole.iso",
                     "ansiHoleTableEx" => "hole.ansiEx",
                     "ansiHoleTable" => "hole.ansi",
-                    other => return Err(format!("lookup table {other} not translated")),
+                    "ansiThreadClass" | "ansiThreadClassV2" => "thread.ansiClass",
+                    "isoThreadClass" | "isoThreadClassV2" => "thread.isoClass",
+                    // A table we don't have: reported with the feature's unknown parameters.
+                    _ => return Ok(Some(p["value"].clone())),
                 };
                 let by_level = p["value"].as_object().ok_or("lookup path without a value")?;
                 let mut path: Vec<String> = Vec::new();
