@@ -1353,6 +1353,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Extrude 1 dialog opens and **the variable is gone, Features (7) → (6)** (tickets/fl/ub-var-switch.png). This may be the
   user's VAR-AUTOCOMPLETE-ENTER path: make #wall_thickness, Enter once, double-click the Extrude to use it → no such
   variable, the list offers only New variable…. Scenario ui-parity/new-variable-then-use-at-once. (qa 2026-11-03, build daaaab03)
+  qa 11-03 01:10: **the same when another toolbar tool is clicked**: psui's driver on green 2723f7fb, scenario
+  boolean-union-two-parts (first version): a new Extrude 2 (New, 5 mm, first Enter applied, dialog open), then the
+  Boolean tool → Part 2 gone, Extrude 2 dropped (qa-scratch/uip-ours/boolean-union-two-parts.json steps 7–8); live kept
+  a new variable (first Enter applied) when the toolbar was clicked next (livek/t-varnew2.mjs). Scenario
+  new-extrude-then-other-tool.
 - [ ] P2 VARIABLE-EDIT-FOCUS (psui) editing a Variable feature focuses Name in ours, Value in live: double-click the
   "#wall_thickness = 2 mm" row; live (11-02, qa's tab, livek/t-b2.mjs): dialog "#wall_thickness = 2 mm", **the Value field
   focused with "2 mm" all selected** (std's INITIAL_FOCUS_ON_EDIT on the value); ours: **Name focused**, "wall_thickness"
