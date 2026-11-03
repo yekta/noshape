@@ -73,6 +73,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   unpacker change; parity_models prints a "SCORE.md row: | … |" line to paste. drawing.md TB25 verified by tests;
   Insert view shows "Show annotations from model" only for a part (live captures; request withdrawn). Assembly
   layout proposed to live (REQUESTS 11-03 02:15), to build the assembly translator once confirmed.
+- 11-03 06:00: translator: constraints / dimensions to model geometry now reference our entity (as Use; a circle
+  distance to model geometry takes the side that keeps the sketch still), sketch wire-edge queries (Sheet metal
+  model's sketchCurves), Variable lookup tables, older ellipses; tests/parity-models/index.json lists live's 11
+  fetched documents. Agent API: feature_list gives each feature's `regen_ms` and the total (Regeneration times
+  panel); parity_models prints each document's slowest features. NOTE: /root/green/noshape is an unoptimised build
+  (Fillet 2 of pipeflange 1.6 s there, 58 ms in the test build): don't time features on it. Tickets filed today:
+  SKETCH-FACE-IMPRINT (P1), EXTRUDE-OVERLAP-LINES-FACES, CUT-CLOSED-EDGES-SPLIT, FILLET-SPLIT-EDGE-FACES,
+  IN-FEATURE-MATE-CONNECTOR (live request filed for its UI), SKETCH-SPLINE-CENTRIPETAL. Import matrix re-run: all
+  144 samples unchanged. MCP stdio session checked.
 - Walk 11-03 05:45 on green 19f17a18 (:105): Variable Studio #wall (autocomplete from the studio, "Insert into all"
   on), Extrude depth #wall, the studio's value 4 → 8 mm updates the part, right-click Depth › Configure ("Extrude 1
   Depth added to Size"), Large = 2*#wall, switching Size to Large: 16 mm. No regressions. Note for walks: the shared
