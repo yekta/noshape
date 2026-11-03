@@ -358,6 +358,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the block's top edge reaches beyond the back face's edges) is OK in live and gives 10/24/16 faces/edges/vertices,
   145345.65 mm³; ours errors on that one piece (the others are inside the block). Live request filed to confirm
   the simple repro.
+- [ ] P2 SM-LOUVER-KERNEL-ABORT (core; found by skasm's T2) the sheet metal form library's **louver** studio no longer
+  builds its tools: two of its features fail with "Geometry operation failed: geometry kernel exception: the kernel
+  crashed (signal 6)" (an OCCT abort), then "Form must be tagged with at least one part to add or remove." Red in the
+  lead's T2 since at least f8e5323e (11-03 00:53): model sheetmetal_std::library_form_tools_as_live (louver: no
+  bodies, live 1975.3626 / 1889.368549 mm³) and library_forms_placed_as_live (its Form 1 then finds no tagged tools).
+  `cargo test -p noshape-model --test all sheetmetal_std::library_form -- --ignored`. (2026-11-03, skasm)
 - [ ] P2 SKETCH-IMPRINT-TOPOLOGY (core 11-03, from SKETCH-FACE-IMPRINT; live REST probes "core imprint probe 1") a
   sketch's bodies in FeatureScript are live's: **each curve is a wire body of its own (its own end vertices), each
   sketch point a point body, and the regions one sheet body** with its own edges and vertices (the face it lies on
