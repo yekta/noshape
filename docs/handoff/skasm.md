@@ -1353,6 +1353,12 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   click on a line only selects it (selection 1, still one line) and Enter then makes the slot (step 9: 2 arcs, 3
   lines, same as ours); ours makes the slot on the click itself (scene sketch_mode.rs `Tool::Slot` → `make_slots`).
   psui's readout and driver are right there (ours reads 0 because nothing is selected after our click).
+- revolve-dialog-axis (x40 recording; Front plane, `g` rectangle (10,0)-(20,20), then `l`, clicks (0,0) and (0,20)):
+  live makes the line (5 entities), ours none. psui instrumented the app on the driver's run: both clicks reach the
+  Line tool (ToolDown → `tool_down` with the right sketch points, (0.0029, 0) and (0, 0.0199)) but the first returns
+  no change and doesn't start the line; the second then starts one (left pending at (0,20)). Through the UI tests'
+  clicks (helper or window events) the same steps on Top make the line, so it's the tool state the rectangle leaves
+  (its value boxes?) eating the next tool's first click on the real input path. Yours (sketch tools).
 - sketch-extend-to-line step 12, same family: live's Extend click leaves the extended line selected (selection 1, the
   sketch row related), ours nothing. Also yours. At 13:10 these and the three PERPENDICULAR inferences (your behaviours
   "skasm (2026-11-03, P1 sketch inference)") are the only differences left in live's 56 new recordings (51/56).
