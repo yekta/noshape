@@ -3349,3 +3349,27 @@ fn incremental_regeneration_reuses_what_an_edit_leaves_alone() {
 fn volume_of(s: &noshape_kernel::Shape) -> f64 {
     noshape_kernel::volume_properties(s).map_or(0.0, |p| p.mass) * 1e9
 }
+
+/// ADD-INSIDE-OUT (dx's parity suite, cf-parameter-pattern): a boss extruded from a sketch on the top face of a drafted
+/// block (either pull direction) adds to it; the block's shell is the solid's reversed one, and the boss built on the
+/// face (fuse_on_face) turned the part inside out (−922.937 mm³, live +922.937).
+#[test]
+fn a_boss_on_a_drafted_blocks_top_adds_to_it() {
+    for pull in [false, true] {
+        let mut t = T::new();
+        let (_, regions) = t.sketch(&[&[(-10.0, -5.0), (10.0, -5.0), (10.0, 5.0), (-10.0, 5.0)]], &[]);
+        let x = t.add("extrude", &[("entities", q(regions)), ("depth", e("5 mm")), ("operationType", en("NEW")), ("hasDraft", ParamValue::Bool(true)), ("draftAngle", e("10 deg")), ("draftPullDirection", ParamValue::Bool(pull))]);
+        let v0 = volume(&t.ok(x));
+        assert!(v0 > 0.0, "{v0}");
+        let top = t.faces_where(|c| c.z > 4.999);
+        let mut sk = noshape_sketch::Sketch::new();
+        sk.add_circle(DVec2::ZERO, 0.002);
+        let s = t.add("sketch", &[("sketchPlane", q(top)), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let r = t.regen();
+        let disc: Vec<Reference> = r.display.sketches.iter().find(|g| g.feature == s).unwrap().regions.iter().filter(|g| !g.imprinted).map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+        assert_eq!(disc.len(), 1);
+        let boss = t.add("extrude", &[("entities", q(disc)), ("depth", e("2 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
+        let v = volume(&t.ok(boss));
+        assert!((v - v0 - std::f64::consts::PI * 8.0).abs() < 1e-6, "pull {pull}: {v} after {v0}");
+    }
+}

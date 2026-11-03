@@ -921,8 +921,7 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
     ns.Closed(shell.Closed());
     TopoDS_Solid so;
     B.MakeSolid(so);
-    B.Add(so, ns.Oriented(shell.Orientation()));
-    so.Orientation(solid.Orientation());
+    B.Add(so, ns); // (the faces as the shell's iterator gives them: already in the solid's orientation)
     r = so;
     for (const TopoDS_Shape& x : gone)
       if (!h->IsRemoved(x))
@@ -4561,8 +4560,7 @@ static bool cut_through_holes(const TopoDS_Shape& target, const std::vector<Topo
   ns.Closed(true);
   TopoDS_Solid so;
   B.MakeSolid(so);
-  B.Add(so, ns.Oriented(shell.Orientation()));
-  so.Orientation(solid.Orientation());
+  B.Add(so, ns); // (the faces as the shell's iterator gives them: already in the solid's orientation)
   if (!closed_and_oriented(so))
     return no(21);
   out  = so;
@@ -4737,8 +4735,7 @@ static bool fuse_on_face(const TopoDS_Shape& target, const OcShape* src, const T
   ns.Closed(true);
   TopoDS_Solid so;
   B.MakeSolid(so);
-  B.Add(so, ns.Oriented(shell.Orientation()));
-  so.Orientation(solid.Orientation());
+  B.Add(so, ns); // (the faces as the shell's iterator gives them: already in the solid's orientation)
   if (!closed_and_oriented(so))
     return no(9);
   HHist h = new BRepTools_History();
@@ -5144,8 +5141,7 @@ static bool local_boolean(const TopoDS_Shape& target, const OcShape* src, const 
   ns.Closed(true);
   TopoDS_Solid so;
   B.MakeSolid(so);
-  B.Add(so, ns.Oriented(shell.Orientation()));
-  so.Orientation(solid.Orientation());
+  B.Add(so, ns); // (the faces as the shell's iterator gives them: already in the solid's orientation)
   if (!closed_and_oriented(so))
     return no(12);
   // As OCCT's own Boolean: no BRepCheck of the result (the 400-fin plate's

@@ -4877,8 +4877,7 @@ static bool fillet_square_corner(const TopoDS_Shape& s, const TopoDS_Edge& e, do
   ns.Closed(true);
   TopoDS_Solid so;
   B.MakeSolid(so);
-  B.Add(so, ns.Oriented(shell.Orientation()));
-  so.Orientation(solid.Orientation());
+  B.Add(so, ns); // (the faces as the shell's iterator gives them: already in the solid's orientation)
   if (!closed_and_oriented(so))
     return no(20);
   HHist h = new BRepTools_History();
