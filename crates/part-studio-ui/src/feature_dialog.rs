@@ -2399,6 +2399,7 @@ impl FeatureDialog {
                 };
                 let el = div()
                     .id(SharedString::from(format!("flip-{fpath}")))
+                    .map(|d| crate::ui_script::mark(d, || format!("button:{}", crate::i18n::spec(f.label))))
                     .w(px(26.))
                     .h(px(26.))
                     .flex()
