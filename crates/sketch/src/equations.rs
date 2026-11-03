@@ -7,7 +7,7 @@ use crate::dual::{Dual, Num, V2};
 use crate::entities::{EntityKind, Geometry};
 use crate::ids::EntityId;
 use crate::linalg::BandLu;
-use crate::nurbs::{fit_params, handle_ends, seam_handles, span_weight, FitSystem, Nurbs};
+use crate::nurbs::{fit_params, handle_ends, span_weight, FitSystem, Nurbs, Seam};
 use crate::sketch::Sketch;
 use smallvec::SmallVec;
 #[cfg(test)]
@@ -477,7 +477,7 @@ impl FitDiff {
         let seam = ends == FitEnds::Periodic;
         let handles = match ends {
             FitEnds::Handles => Some((glam::DVec2::new(x[2 * n], x[2 * n + 1]), glam::DVec2::new(x[2 * n + 2], x[2 * n + 3]))),
-            FitEnds::Periodic => Some(seam_handles(&pts)?),
+            FitEnds::Periodic => Some(Seam::new(&pts)?.handles()),
             FitEnds::Natural => None,
         };
         let (ub, total) = fit_params(&pts);
@@ -592,6 +592,7 @@ impl FitDiff {
                     g[k][j] = (s[k][0] - s[k][1]) / (2.0 * h);
                 }
             }
+
             // ub_k = S_k / W: dub_k = (dS_k - ub_k dW) / W, so weight i's
             // coefficient is (sum of g_k for k > i - sum of g_k ub_k) / W.
             for k in 0..at.len() {
@@ -627,33 +628,20 @@ impl FitDiff {
         out
     }
 
-    /// The seam handles' gradient moved onto the points: dh/dP by central
-    /// differences (O(n) per point, the cyclic solve).
+    /// The seam handles' gradient moved onto the points (the handles are
+    /// the points').
     fn fold_seam(&self, out: &mut [Probe]) {
+        use glam::DVec2;
         let n = self.pts.len();
-        let size: f64 = self.pts.windows(2).map(|w| (w[1] - w[0]).length()).sum();
-        let h = 1e-7 * size.max(1e-12);
-        let mut pts = self.pts.clone();
-        let mut jac = vec![[0.0; 4]; 2 * n];
-        for i in 0..n {
-            for c in 0..2 {
-                let at = pts[i][c];
-                pts[i][c] = at + h;
-                let hi = seam_handles(&pts);
-                pts[i][c] = at - h;
-                let lo = seam_handles(&pts);
-                pts[i][c] = at;
-                if let (Some(a), Some(b)) = (hi, lo) {
-                    let d = [a.0 - b.0, a.1 - b.1];
-                    jac[2 * i + c] = [d[0].x / (2.0 * h), d[0].y / (2.0 * h), d[1].x / (2.0 * h), d[1].y / (2.0 * h)];
-                }
-            }
-        }
+        let Some(seam) = Seam::new(&self.pts) else { return };
         for pr in out.iter_mut() {
             for g in [&mut pr.gx, &mut pr.gy] {
-                let hg = [g[2 * n], g[2 * n + 1], g[2 * n + 2], g[2 * n + 3]];
-                for (j, row) in jac.iter().enumerate() {
-                    g[j] += row.iter().zip(&hg).map(|(a, b)| a * b).sum::<f64>();
+                let (g0, g1) = (DVec2::new(g[2 * n], g[2 * n + 1]), DVec2::new(g[2 * n + 2], g[2 * n + 3]));
+                if let Some(gp) = seam.handles_grad(g0, g1) {
+                    for (i, v) in gp.iter().enumerate() {
+                        g[2 * i] += v.x;
+                        g[2 * i + 1] += v.y;
+                    }
                 }
                 g.truncate(2 * n);
             }

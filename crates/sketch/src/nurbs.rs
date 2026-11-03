@@ -456,7 +456,7 @@ impl Nurbs {
         if n < 3 || (pts[n] - pts[0]).length() > 1e-12 * (1.0 + pts[0].length()) {
             return None;
         }
-        seam_derivative(pts)
+        Seam::new(pts).map(|s| s.d)
     }
 
     /// Handle positions giving the natural end tangents of [`Nurbs::interpolate`].
@@ -608,70 +608,140 @@ pub(crate) fn handle_ends(pts: &[DVec2], h0: DVec2, h1: DVec2) -> (DVec2, DVec2)
     ((h0 - pts[0]) * (3.0 * total / first), (pts[n - 1] - h1) * (3.0 * total / last))
 }
 
-/// The seam derivative of the periodic cubic through `pts` (the last point
-/// standing for the first; each copy's own spans, so a gradient may move
-/// them apart). The cyclic system for the second derivatives M_k (M_n =
-/// M_0) solved in O(n) (Sherman–Morrison).
-pub(crate) fn seam_derivative(pts: &[DVec2]) -> Option<DVec2> {
-    let n = pts.len().checked_sub(1)?;
-    if n < 3 {
-        return None;
-    }
-    let (ub, total) = fit_params(pts);
-    if total <= 1e-300 {
-        return None;
-    }
-    let h: Vec<f64> = (0..n).map(|k| ub[k + 1] - ub[k]).collect();
-    if h.iter().any(|x| *x <= 1e-300) {
-        return None;
-    }
-    let slope = |k: usize| (pts[k + 1] - pts[k]) / h[k];
-    let r: Vec<DVec2> = (0..n).map(|k| (slope(k) - slope((k + n - 1) % n)) * 6.0).collect();
-    // Row k: h[k-1] M[k-1] + 2 (h[k-1] + h[k]) M[k] + h[k] M[k+1]; the
-    // corners are h[n-1].
-    let sub = |k: usize| h[(k + n - 1) % n];
-    let diag = |k: usize| 2.0 * (h[(k + n - 1) % n] + h[k]);
-    let (alpha, beta) = (h[n - 1], h[n - 1]);
-    let gamma = -diag(0);
-    let mut b: Vec<f64> = (0..n).map(diag).collect();
-    b[0] -= gamma;
-    b[n - 1] -= alpha * beta / gamma;
-    let solve = |rhs: &[DVec2]| -> Option<Vec<DVec2>> {
-        let mut c = vec![0.0; n];
-        let mut d = vec![DVec2::ZERO; n];
-        c[0] = h[0] / b[0];
-        d[0] = rhs[0] / b[0];
-        for k in 1..n {
-            let m = b[k] - sub(k) * c[k - 1];
-            if m.abs() <= 1e-300 {
-                return None;
-            }
-            c[k] = if k + 1 < n { h[k] / m } else { 0.0 };
-            d[k] = (rhs[k] - d[k - 1] * sub(k)) / m;
-        }
-        for k in (0..n - 1).rev() {
-            d[k] = d[k] - d[k + 1] * c[k];
-        }
-        Some(d)
-    };
-    let x = solve(&r)?;
-    let mut u = vec![DVec2::ZERO; n];
-    u[0] = DVec2::splat(gamma);
-    u[n - 1] = DVec2::splat(alpha);
-    let z = solve(&u)?;
-    let den = DVec2::ONE + z[0] + z[n - 1] * (beta / gamma);
-    let f = (x[0] + x[n - 1] * (beta / gamma)) / den;
-    let m = |k: usize| x[k] - z[k] * f;
-    Some(slope(0) - (m(0) * 2.0 + m(1 % n)) * (h[0] / 6.0))
+/// The periodic cubic's seam through `pts` (the last point standing for the
+/// first; each copy its own input, so a gradient may move them apart): its
+/// second derivatives M_k (M_n = M_0) from the cyclic system
+/// h[k-1] M[k-1] + 2 (h[k-1] + h[k]) M[k] + h[k] M[k+1] = r[k], solved in
+/// O(n) (Sherman–Morrison), and the seam derivative.
+pub(crate) struct Seam {
+    pts: Vec<DVec2>,
+    w: Vec<f64>,
+    total: f64,
+    h: Vec<f64>,
+    m: Vec<DVec2>,
+    pub(crate) d: DVec2,
 }
 
-/// The handles giving the seam derivative of [`seam_derivative`] at both
-/// ends (the cubic's second and second-last control points).
-pub(crate) fn seam_handles(pts: &[DVec2]) -> Option<(DVec2, DVec2)> {
-    let n = pts.len();
-    let d = seam_derivative(pts)?;
-    let (ub, _) = fit_params(pts);
-    Some((pts[0] + d * (ub[1] / 3.0), pts[n - 1] - d * ((1.0 - ub[n - 2]) / 3.0)))
+impl Seam {
+    pub(crate) fn new(pts: &[DVec2]) -> Option<Seam> {
+        let n = pts.len().checked_sub(1)?;
+        if n < 3 {
+            return None;
+        }
+        let w: Vec<f64> = pts.windows(2).map(|q| span_weight(q[1] - q[0])).collect();
+        let total: f64 = w.iter().sum();
+        if total <= 1e-300 || w.iter().any(|x| *x <= 1e-300 * total) {
+            return None;
+        }
+        let h: Vec<f64> = w.iter().map(|x| x / total).collect();
+        let mut seam = Seam { pts: pts.to_vec(), w, total, h, m: Vec::new(), d: DVec2::ZERO };
+        let r: Vec<DVec2> = (0..n).map(|k| (seam.slope(k) - seam.slope((k + n - 1) % n)) * 6.0).collect();
+        seam.m = seam.solve(&r)?;
+        seam.d = seam.slope(0) - (seam.m[0] * 2.0 + seam.m[1 % n]) * (seam.h[0] / 6.0);
+        Some(seam)
+    }
+
+    fn slope(&self, k: usize) -> DVec2 {
+        (self.pts[k + 1] - self.pts[k]) / self.h[k]
+    }
+
+    /// The cyclic system's solution for `rhs` (it is symmetric: also its
+    /// adjoint).
+    fn solve(&self, rhs: &[DVec2]) -> Option<Vec<DVec2>> {
+        let (h, n) = (&self.h, self.h.len());
+        let sub = |k: usize| h[(k + n - 1) % n];
+        let diag = |k: usize| 2.0 * (h[(k + n - 1) % n] + h[k]);
+        let (alpha, beta) = (h[n - 1], h[n - 1]);
+        let gamma = -diag(0);
+        let mut b: Vec<f64> = (0..n).map(diag).collect();
+        b[0] -= gamma;
+        b[n - 1] -= alpha * beta / gamma;
+        let tri = |rhs: &[DVec2]| -> Option<Vec<DVec2>> {
+            let mut c = vec![0.0; n];
+            let mut d = vec![DVec2::ZERO; n];
+            c[0] = h[0] / b[0];
+            d[0] = rhs[0] / b[0];
+            for k in 1..n {
+                let m = b[k] - sub(k) * c[k - 1];
+                if m.abs() <= 1e-300 {
+                    return None;
+                }
+                c[k] = if k + 1 < n { h[k] / m } else { 0.0 };
+                d[k] = (rhs[k] - d[k - 1] * sub(k)) / m;
+            }
+            for k in (0..n - 1).rev() {
+                d[k] = d[k] - d[k + 1] * c[k];
+            }
+            Some(d)
+        };
+        let x = tri(rhs)?;
+        let mut u = vec![DVec2::ZERO; n];
+        u[0] = DVec2::splat(gamma);
+        u[n - 1] = DVec2::splat(alpha);
+        let z = tri(&u)?;
+        let den = DVec2::ONE + z[0] + z[n - 1] * (beta / gamma);
+        let f = (x[0] + x[n - 1] * (beta / gamma)) / den;
+        Some((0..n).map(|k| x[k] - z[k] * f).collect())
+    }
+
+    /// The handles giving the seam derivative at both ends (the cubic's
+    /// second and second-last control points).
+    pub(crate) fn handles(&self) -> (DVec2, DVec2) {
+        let n = self.h.len();
+        (self.pts[0] + self.d * (self.h[0] / 3.0), self.pts[n] - self.d * (self.h[n - 1] / 3.0))
+    }
+
+    /// A value's gradient with respect to the points, from its gradients
+    /// `g0`, `g1` with respect to the two handles (the system's adjoint: one
+    /// more solve).
+    pub(crate) fn handles_grad(&self, g0: DVec2, g1: DVec2) -> Option<Vec<DVec2>> {
+        let n = self.h.len();
+        let (h, m, d) = (&self.h, &self.m, self.d);
+        let mut gp = vec![DVec2::ZERO; n + 1];
+        let mut gh = vec![0.0; n];
+        let mut gs = vec![DVec2::ZERO; n];
+        let mut gm = vec![DVec2::ZERO; n];
+        // h0 = P0 + d h[0] / 3, h1 = Pn - d h[n-1] / 3.
+        gp[0] += g0;
+        gp[n] += g1;
+        let gd = g0 * (h[0] / 3.0) - g1 * (h[n - 1] / 3.0);
+        gh[0] += g0.dot(d) / 3.0;
+        gh[n - 1] -= g1.dot(d) / 3.0;
+        // d = slope0 - (2 M0 + M1) h[0] / 6.
+        gs[0] += gd;
+        gh[0] -= gd.dot(m[0] * 2.0 + m[1 % n]) / 6.0;
+        gm[0] -= gd * (2.0 * h[0] / 6.0);
+        gm[1 % n] -= gd * (h[0] / 6.0);
+        // M = A⁻¹ r: λ = A⁻ᵀ gm; dr = λ, dA = -λ Mᵀ.
+        let lam = self.solve(&gm)?;
+        for k in 0..n {
+            let (km, kp) = ((k + n - 1) % n, (k + 1) % n);
+            // Row k: h[km] M[km] + 2 (h[km] + h[k]) M[k] + h[k] M[kp].
+            gh[km] -= lam[k].dot(m[km]) + 2.0 * lam[k].dot(m[k]);
+            gh[k] -= lam[k].dot(m[kp]) + 2.0 * lam[k].dot(m[k]);
+            // r[k] = 6 (slope k - slope km).
+            gs[k] += lam[k] * 6.0;
+            gs[km] -= lam[k] * 6.0;
+        }
+        // slope k = (P[k+1] - P[k]) / h[k].
+        for k in 0..n {
+            let q = self.pts[k + 1] - self.pts[k];
+            gp[k + 1] += gs[k] / h[k];
+            gp[k] -= gs[k] / h[k];
+            gh[k] -= gs[k].dot(q) / (h[k] * h[k]);
+        }
+        // h k = w k / W, w k = |P[k+1] - P[k]|^(1/2).
+        let sum: f64 = (0..n).map(|k| gh[k] * self.w[k]).sum::<f64>() / (self.total * self.total);
+        for k in 0..n {
+            let gw = gh[k] / self.total - sum;
+            let q = self.pts[k + 1] - self.pts[k];
+            let l = q.length();
+            let dq = q * (gw * 0.5 / (l * l.sqrt()));
+            gp[k + 1] += dq;
+            gp[k] -= dq;
+        }
+        Some(gp)
+    }
 }
 
 /// A fit span's share of the parameter before normalising: the square root
