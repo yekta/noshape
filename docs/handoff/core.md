@@ -16,6 +16,20 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-03 10:30 UTC.**
+- Landed since 06:45: FULL-ROUND-CORNER-SPHERES (a77b78ff, merge_corner_spheres), FILLET-SPLIT-EDGE-FACES (f7221608,
+  fillet_as_cut spans), bracket03's Chamfer 1 (2027df5d, join_split_lines), CUT-CLOSED-EDGES-SPLIT's tube case
+  (e77387ec, boolean.cpp move_seams_off_holes + model-core unify_merged). Queued: the exact loop join (61d9b701,
+  join_loop_pieces with concat_shifted; pipeflange's Extrude 3), Shell's slabs as copies (SHELL-SLOW: the shell corpus
+  360 -> 249 s, 0 differ).
+- Parity models (vibe5 ~/agents/core-parity-models): 3/7 documents, 42/57 features. Tools: ops T2
+  regen_profile::bodies_after_feature (NOSHAPE_BODY_DOC / _UPTO), kernel T2 core::brep_edges_probe (NOSHAPE_BREP_EDGES,
+  NOSHAPE_BREP_UNIFY), shell::dumped_shell_probe (a case or a directory: the shell corpus on vibe4
+  ~/agents/shellcorpus/cases), blend::dumped_fillet_faces_probe / dumped_chamfer_faces_probe.
+- Next, in order: SHELL-SLOW's Shell 4 failing fast (live fails it in ~1 s; REQUESTS 09:10 for the clean re-check);
+  pipeflange's Fillet 2 (36/81/42, live 36/79/40); seam-split arc pieces counted and picked as one edge (bushing's
+  Extrude 4); SKETCH-IMPRINT-TOPOLOGY (the host's sketch bodies, plan in TICKETS).
+
 **State 11-03 06:45 UTC.**
 - Landed: P1 SKETCH-FACE-IMPRINT (bd7aba69; live's rule from a REST probe, Part Studio "core imprint probe 1" in "live
   1812 drawing scale": the face's edges split the sketch's own regions, the face's other pieces are sketch faces but
