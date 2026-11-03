@@ -3328,6 +3328,8 @@ void merge_full_rounds(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
 // the edges it shares with other faces keep their curves there. Kept when the solid stays valid, its volume the same.
 static void merge_corner_spheres(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
 {
+  if (legacy_topology())
+    return;
   const KernelTimer timer("blend.corner_spheres");
   ShapeAncMap       ef;
   TopExp::MapShapesAndAncestors(r, TopAbs_EDGE, TopAbs_FACE, ef);
@@ -3511,6 +3513,8 @@ static void merge_corner_spheres(const TopoDS_Shape& input, TopoDS_Shape& r, HHi
 // chamfered groove of dx's bracket03-mattie, live 58/136/80 to OCCT's 58/144/88) joined into one edge.
 static void join_split_lines(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
 {
+  if (legacy_topology())
+    return;
   const KernelTimer timer("blend.join_lines");
   ShapeAncMap       ve, ef;
   TopExp::MapShapesAndUniqueAncestors(r, TopAbs_VERTEX, TopAbs_EDGE, ve);
@@ -3661,6 +3665,8 @@ static double tighten_new_tolerances(const TopoDS_Shape& input, const TopoDS_Sha
 // solid stays valid and its volume the same.
 static void analytic_blend_faces(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
 {
+  if (legacy_topology())
+    return;
   const KernelTimer timer("blend.analytic");
   ShapeIMap old;
   TopExp::MapShapes(input, TopAbs_FACE, old);
@@ -4906,7 +4912,7 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     rmax = std::max(rmax, r);
   }
   // Pieces of one line, a gap between them: one fillet over the whole line, as live (OCCT stops each at the gap).
-  if (checked && es.size() > 1)
+  if (checked && es.size() > 1 && !legacy_topology())
   {
     std::optional<std::pair<TopoDS_Shape, HHist>> spans;
     {

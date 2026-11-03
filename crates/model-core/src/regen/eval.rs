@@ -1543,9 +1543,10 @@ pub fn sweep_names(ev: &EvalCtx, profile: &Profile, res: &k::OpResult, start_cap
     ev.name_result(&[&empty], &res.history, &res.shape, &roles, None)
 }
 
-/// Whether a unify merged anything: faces, or edges only (a hole's loop in pieces across a seam made whole).
+/// Whether a unify merged anything: faces, or edges only (a hole's loop in pieces across a seam made whole; not in a
+/// studio saved before that, [`noshape_kernel::legacy_topology`]).
 pub fn unify_merged(before: &Shape, after: &Shape) -> bool {
-    after.count(ShapeType::Face) < before.count(ShapeType::Face) || after.count(ShapeType::Edge) < before.count(ShapeType::Edge)
+    after.count(ShapeType::Face) < before.count(ShapeType::Face) || (!noshape_kernel::legacy_topology() && after.count(ShapeType::Edge) < before.count(ShapeType::Edge))
 }
 
 /// Whether the tools can account for a cut that leaves nothing of `target`

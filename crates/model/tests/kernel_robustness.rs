@@ -2922,6 +2922,40 @@ fn a_fillet_between_extruded_faces_is_a_cylinder() {
     assert!(b.is_valid());
 }
 
+/// CUT-CLOSED-EDGES-SPLIT in a Part Studio (dx's bushing2-0-joshua, live 5/6/0): a tube on Front (r37.5 / r25, 25 mm
+/// symmetric), an r5 hole through its top wall from Top. A studio saved before the 11-03 topology clean-ups
+/// (ScopeRule 6) regenerates as it did, the hole's loops in pieces (qa MIRROR-PIECE-ORDER-CHANGE: later features
+/// must find their parts where they were).
+#[test]
+fn a_hole_through_a_tube_as_live_and_old_studios_as_they_were() {
+    use noshape_model::partstudio::ScopeRule;
+    let mut t = T::new();
+    let mut tube = noshape_sketch::Sketch::new();
+    tube.add_circle(DVec2::ZERO, 0.0375);
+    tube.add_circle(DVec2::ZERO, 0.025);
+    let s1 = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: tube, ..Default::default() })))]);
+    let r = t.regen();
+    let annulus: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s1).unwrap().regions.iter().max_by(|a, b| a.area.total_cmp(&b.area)).map(|g| Reference::SketchRegion { sketch: s1, key: g.key.clone() }).into_iter().collect();
+    t.add("extrude", &[("entities", q(annulus)), ("depth", e("25 mm")), ("symmetric", ParamValue::Bool(true)), ("operationType", en("NEW"))]);
+    let mut hole = noshape_sketch::Sketch::new();
+    hole.add_circle(DVec2::ZERO, 0.005);
+    let s2 = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: hole, ..Default::default() })))]);
+    let r = t.regen();
+    let disc: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s2).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s2, key: g.key.clone() }).collect();
+    let cut = t.add("extrude", &[("entities", q(disc)), ("endBound", en("THROUGH_ALL")), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true))]);
+    let counts = |r: &RegenResult| {
+        let b = &r.context.bodies[0].shape;
+        let shown = b.shown_topology().unwrap();
+        (b.count(noshape_kernel::ShapeType::Face), shown.edges.iter().filter(|x| **x).count(), shown.vertices.iter().filter(|x| **x).count())
+    };
+    assert_eq!(counts(&t.ok(cut)), (5, 6, 0), "a new studio: live's");
+    t.ps.scope_rule = ScopeRule(6);
+    t.ps.upgrade_saved_params();
+    assert!(t.ps.legacy_topology);
+    t.reg = Regenerator::new();
+    assert_eq!(counts(&t.ok(cut)), (5, 10, 6), "a studio saved before: as it was");
+}
+
 /// EXTRUDE-OVERLAP-LINES-FACES (dx's parity suite, bracket120-datenkrake, live 10/24/16 faces/edges/vertices): a
 /// line lying over a rectangle's side splits it in the sketch, but the extruded side is one face (a box: 6/12/8).
 #[test]

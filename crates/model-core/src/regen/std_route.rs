@@ -66,6 +66,22 @@ impl Drop for BlendKernel {
     }
 }
 
+/// The kernel's topology clean-ups off for a studio saved before them ([`crate::partstudio::PartStudio::legacy_topology`])
+/// while it regenerates on this thread; the setting before comes back when dropped.
+pub struct LegacyTopology(bool);
+
+impl LegacyTopology {
+    pub fn set(on: bool) -> Self {
+        Self(noshape_kernel::set_legacy_topology(on))
+    }
+}
+
+impl Drop for LegacyTopology {
+    fn drop(&mut self) {
+        noshape_kernel::set_legacy_topology(self.0);
+    }
+}
+
 thread_local! {
     /// Core features (Extrude, Fillet, ...) run natively; [`set_std_route`]
     /// makes std run them instead, the oracle the native ones are tested

@@ -46,13 +46,14 @@ impl Feature {
 /// Merge scope (live L56); 5, sheet metal runs by std, Onshape's own sheet
 /// metal FeatureScript ([`PartStudio::legacy_sheet_metal`]); 6, fillets and
 /// chamfers by noshape's own blends where they build them exactly
-/// ([`PartStudio::legacy_blends`]); 0, older studios.
+/// ([`PartStudio::legacy_blends`]); 7, the topology clean-ups of 11-03
+/// ([`PartStudio::legacy_topology`]); 0, older studios.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScopeRule(pub u8);
 
 impl Default for ScopeRule {
     fn default() -> Self {
-        ScopeRule(6)
+        ScopeRule(7)
     }
 }
 
@@ -238,6 +239,12 @@ pub struct PartStudio {
     /// split later could take another body id: BLEND-RUST-DEFAULT-REGEN).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub legacy_blends: bool,
+    /// Saved with features before the topology clean-ups of 11-03 (ScopeRule < 7: a blend's analytic faces and
+    /// corner spheres, fillets along split edges, split lines joined, seams moved off holes): it regenerates
+    /// without them, so later features find their parts where they were (a Boolean's pieces come out in another
+    /// order otherwise: qa MIRROR-PIECE-ORDER-CHANGE).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub legacy_topology: bool,
     /// Rollback bar position: number of features evaluated (None = all).
     #[serde(default)]
     pub rollback: Option<usize>,
@@ -439,6 +446,10 @@ impl PartStudio {
         // Blends made by OCCT stay OCCT's (any feature: custom ones may blend too).
         if self.scope_rule.0 < 6 && !self.features.is_empty() {
             self.legacy_blends = true;
+        }
+        // And without the topology clean-ups made since.
+        if self.scope_rule.0 < 7 && !self.features.is_empty() {
+            self.legacy_topology = true;
         }
         self.scope_rule = ScopeRule::default();
     }

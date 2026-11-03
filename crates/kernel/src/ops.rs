@@ -388,6 +388,23 @@ pub fn shell_solid(solid: &Shape, faces: &[Shape], thickness: f64, side: ShellSi
     op(ffi::op_shell_solid(solid.raw(), &l, thickness, side == ShellSide::Outside, m))
 }
 
+thread_local! {
+    static LEGACY_TOPOLOGY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// The topology clean-ups of 11-03 off for this thread (a Part Studio saved before them regenerates as it did: a
+/// later Boolean's pieces come out in its old order, qa MIRROR-PIECE-ORDER-CHANGE): a blend's analytic faces, its
+/// corner spheres, its fillets along split edges, its split lines joined; a unify's seams moved off holes, loops joined.
+/// Returns the thread's setting before.
+pub fn set_legacy_topology(on: bool) -> bool {
+    LEGACY_TOPOLOGY.with(|c| c.replace(on))
+}
+
+/// Whether [`set_legacy_topology`] is on for this thread.
+pub fn legacy_topology() -> bool {
+    LEGACY_TOPOLOGY.with(|c| c.get())
+}
+
 /// Scale applied to lengths around OCCT's blend algorithms (the checked fillet and chamfer),
 /// process-wide. Their approximation tolerances are absolute and tuned for
 /// millimetre-sized parts: the same part modelled in metres fails (a top-loop

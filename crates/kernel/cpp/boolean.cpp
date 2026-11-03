@@ -2809,6 +2809,7 @@ TopoDS_Shape merge_cylinder_patches(const TopoDS_Shape& s, HHist& hist)
 // The unify, looking only in `sc` when given (UnifyScope); `clean` (when
 // given) says whether the result has nothing more to merge.
 TopoDS_Shape unify_faces_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean);
+TopoDS_Shape unify_seams_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean);
 
 // Two B-splines end to end (the second starting where the first ends), exactly: the same degree (raised), the second's
 // knots shifted onto the first's end (no rescaling, unlike OCCT's CompCurve in 2D), joined C0, its weights scaled to
@@ -3098,7 +3099,69 @@ TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist)
   return out;
 }
 
+// `out`'s solids in the order of the input's they came from (by their faces, through `hist`): a unify mustn't reorder
+// a Boolean's pieces, later features name them by place (qa MIRROR-PIECE-ORDER-CHANGE: Mirror 3's five pieces another
+// way round once a unify that merged only edges was kept). `out` when it has fewer than two solids or keeps the order.
+TopoDS_Shape keep_solid_order(const TopoDS_Shape& in, const TopoDS_Shape& out, const HHist& hist)
+{
+  std::vector<TopoDS_Shape> solids;
+  for (TopExp_Explorer x(out, TopAbs_SOLID); x.More(); x.Next())
+    solids.push_back(x.Current());
+  if (solids.size() < 2 || out.ShapeType() != TopAbs_COMPOUND)
+    return out;
+  // Each result face: the first input solid one of its sources is in.
+  NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> rank;
+  int                                                            k = 0;
+  for (TopExp_Explorer x(in, TopAbs_SOLID); x.More(); x.Next(), ++k)
+    for (TopExp_Explorer f(x.Current(), TopAbs_FACE); f.More(); f.Next())
+    {
+      ShapeList imgs;
+      if (!hist.IsNull() && hist->IsRemoved(f.Current()))
+        continue;
+      if (!hist.IsNull())
+        imgs = hist->Modified(f.Current());
+      if (imgs.IsEmpty())
+        imgs.Append(f.Current());
+      for (ShapeList::Iterator it(imgs); it.More(); it.Next())
+        if (!rank.IsBound(it.Value()))
+          rank.Bind(it.Value(), k);
+    }
+  std::vector<std::pair<int, size_t>> order;
+  for (size_t i = 0; i < solids.size(); ++i)
+  {
+    int r = std::numeric_limits<int>::max();
+    for (TopExp_Explorer f(solids[i], TopAbs_FACE); f.More(); f.Next())
+      if (const int* x = rank.Seek(f.Current()))
+        r = std::min(r, *x);
+    order.emplace_back(r, i);
+  }
+  std::stable_sort(order.begin(), order.end());
+  bool same = true;
+  for (size_t i = 0; i < order.size(); ++i)
+    same = same && order[i].second == i;
+  if (same)
+    return out;
+  // (Only the solids' order: anything else in the compound after them.)
+  TopoDS_Compound c;
+  BRep_Builder    B;
+  B.MakeCompound(c);
+  for (const auto& [r, i] : order)
+    B.Add(c, solids[i]);
+  for (TopoDS_Iterator it(out); it.More(); it.Next())
+    if (it.Value().ShapeType() != TopAbs_SOLID && it.Value().ShapeType() != TopAbs_COMPSOLID)
+      B.Add(c, it.Value());
+  return c;
+}
+
 TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean)
+{
+  if (legacy_topology())
+    return unify_faces_in(s0, hist, sc, clean);
+  const TopoDS_Shape r = unify_seams_in(s0, hist, sc, clean);
+  return r.IsSame(s0) ? r : keep_solid_order(s0, r, hist);
+}
+
+TopoDS_Shape unify_seams_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean)
 {
   const TopoDS_Shape s = unify_faces_in(s0, hist, sc, clean);
   if (!TopExp_Explorer(s, TopAbs_SOLID).More())
