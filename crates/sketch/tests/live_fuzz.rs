@@ -1376,6 +1376,25 @@ fn a_u_bend_grows_about_its_arc_and_a_trapezoid_keeps_its_top() {
     }
 }
 
+/// A point-to-line Distance inside one loop keeps the member with a Length of
+/// its own (fuzz s747: a C channel's new web keeps the outer side; probes 14
+/// q5 / q6 either way the Distance runs, q8 a rectangle's height keeps its
+/// dimensioned bottom). T1.
+#[test]
+fn a_distance_in_a_loop_keeps_the_dimensioned_side() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-15.live.json")).unwrap()).unwrap();
+    let ours = batch(1, 747, true);
+    let d = differences(&ours["cases"][0], &live["cases"]["s747"]);
+    assert!(d.is_empty(), "s747: {}", d.join("; "));
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-probe-14.live.json")).unwrap()).unwrap();
+    let b = probe_batch(probes14().into_iter().filter(|(n, _)| ["q5", "q6", "q8"].iter().any(|q| n.starts_with(&format!("{q} ")))).collect());
+    assert_eq!(b["cases"].as_array().unwrap().len(), 3);
+    for case in b["cases"].as_array().unwrap() {
+        let d = differences(case, &live["cases"][case["case"].as_str().unwrap()]);
+        assert!(d.is_empty(), "{}: {}", case["case"], d.join("; "));
+    }
+}
+
 /// s653 / s725 (batches 12 / 14) stay as live answered: a T's top widens and
 /// its flange thins: the stem stays whole, the Equal overhangs centre the top
 /// on it and the top comes down (the pass couldn't place it; least change
@@ -2485,6 +2504,50 @@ fn probes14() -> Vec<(String, Case)> {
     out
 }
 
+/// Probes 15 (probes 14 q2 / q4: a trapezoid keeps its top, whichever way the
+/// height's Distance runs): the upper line, the one drawn later or the
+/// shorter one? Inverted trapezoids (the longer line on top) and ones drawn
+/// top first.
+fn probes15() -> Vec<(String, Case)> {
+    let v = DVec2::new;
+    let mut out = Vec::new();
+    let mut add = |name: &str, f: &dyn Fn(&mut Case)| {
+        let mut c = Case::new();
+        f(&mut c);
+        out.push((name.to_string(), c));
+    };
+    // Lower line `low` long, upper `up` long, 20 high; the loop drawn from the
+    // lower line (or from the upper one, `top_first`); the height a Distance
+    // from the upper line's corner to the lower line (or `reverse`).
+    let trapezoid = |c: &mut Case, low: f64, up: f64, top_first: bool, reverse: bool, new_low: f64, height: f64| {
+        let w = low.max(up);
+        let p = [v((w - low) / 2.0, 0.0), v((w + low) / 2.0, 0.0), v((w + up) / 2.0, 20.0), v((w - up) / 2.0, 20.0)];
+        let order: [usize; 4] = if top_first { [2, 3, 0, 1] } else { [0, 1, 2, 3] };
+        let l: Vec<String> = order.iter().map(|&i| c.line(p[i], p[(i + 1) % 4])).collect();
+        for i in 0..4 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+        }
+        let (lower, right, upper, left) = if top_first { (&l[2], &l[3], &l[0], &l[1]) } else { (&l[0], &l[1], &l[2], &l[3]) };
+        c.hv(true, lower);
+        c.hv(true, upper);
+        c.pair("EQUAL", right, left);
+        c.length(lower, new_low);
+        c.length(upper, up);
+        if reverse {
+            c.distance(&format!("{lower}.start"), upper, height);
+        } else {
+            c.distance(&format!("{upper}.start"), lower, height);
+        }
+    };
+    add("r1 inverted trapezoid (bottom 20, top 40), height (top's corner to the bottom) 20 -> 25", &|c| trapezoid(c, 20.0, 40.0, false, false, 20.0, 25.0));
+    add("r2 inverted trapezoid, height (bottom's corner to the top) 20 -> 25", &|c| trapezoid(c, 20.0, 40.0, false, true, 20.0, 25.0));
+    add("r3 inverted trapezoid, bottom 20 -> 26", &|c| trapezoid(c, 20.0, 40.0, false, false, 26.0, 20.0));
+    add("r4 trapezoid (bottom 40, top 20) drawn top first, height (top's corner to the bottom) 20 -> 25", &|c| trapezoid(c, 40.0, 20.0, true, false, 40.0, 25.0));
+    add("r5 trapezoid drawn top first, height (bottom's corner to the top) 20 -> 25", &|c| trapezoid(c, 40.0, 20.0, true, true, 40.0, 25.0));
+    add("r6 trapezoid drawn top first, bottom 40 -> 34", &|c| trapezoid(c, 40.0, 20.0, true, false, 34.0, 20.0));
+    out
+}
+
 fn probe_batch(list: Vec<(String, Case)>) -> Value {
     let cases: Vec<Value> = list.into_iter().map(|(name, mut c)| {
         let ours = ours(&mut c);
@@ -2499,7 +2562,7 @@ fn probe_batch(list: Vec<(String, Case)>) -> Value {
 #[test]
 #[ignore = "T2: live fuzz least-change probes"]
 fn probe_matches() {
-    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14())] {
+    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15())] {
         let b = probe_batch(list);
         let path = fixture(&format!("sketch-probe-{n}.json"));
         if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == format!("probe-{n}")) {

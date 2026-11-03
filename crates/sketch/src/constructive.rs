@@ -1442,6 +1442,14 @@ impl Sketch {
                 && self.kind(pb) == Some(EntityKind::Line)
                 && self.joined_by_points(a, b, cons)
             {
+                // The member with a Length of its own stays first (live
+                // probes 14 q5 / q6 / q8, fuzz s747: a C channel's new web
+                // keeps the dimensioned outer side, whichever way the
+                // Distance runs; a rectangle's height its dimensioned bottom).
+                let sized = |u: EntityId| self.constraints().any(|o| o.driving && matches!(o.kind, ConstraintKind::Length { curve, .. } if curve == u));
+                if sized(a) != sized(b) {
+                    return if sized(a) { a } else { b };
+                }
                 let owns = |u: EntityId| self.entity(u).is_some_and(|e| e.point_refs().contains(&pa)) || self.coincident_with(pa).iter().any(|q| self.entity(u).is_some_and(|e| e.point_refs().contains(q)));
                 if owns(a) != owns(b) {
                     return if owns(a) { a } else { b };

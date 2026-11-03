@@ -8,9 +8,10 @@ Assembly drag probes: done (the rest is live's pointer landing on 5 mm levers, 1
 on my 16:46 build: 54/61 of live's sketch recordings; the 7 left are live-side (4 runner misses asked in REQUESTS
 17:25: `origin` clicks the feature list's Origin row, a flaky line click, a missed Ø10 circle; extend-to-line's
 re-record asked 16:57), psui's extrude-new-sketch-row-selected (Add preview lists "Part 2"; for psui) and the angle
-box (fixed). **Waiting on live: probes 14** (`skasm-sketch-probe-14.live.json`: copy to
-crates/sketch/tests/fixtures/live_fuzz/sketch-probe-14.live.json, run live_fuzz::probe_matches; it settles s747 /
-s753 / s713: which side a point-to-line Distance in one loop keeps). Then batch 16 (everyday profiles).
+box (fixed). Probes 14 answered (17:53): a point-to-line Distance in one loop keeps the member with its own Length (C channel's
+outer side, rectangle's bottom): s747 / q5 fixed, fuzz 488 of 550, probes 14 6/8. A trapezoid keeps its top (and its
+top-left corner) every way (q2 / q4, s753, s713): upper, drawn later or shorter? **Waiting on live: probes 15**
+(`skasm-sketch-probe-15.live.json`: inverted trapezoids and ones drawn top first), then **batch 16** (sent 17:27).
 
 ## 2026-11-03 12:55 UTC
 Live 1866 answered and done (queued b5a2cf4c): a line square to a woken line whose direction a constraint holds is

@@ -1,0 +1,405 @@
+{
+ "note": "Live 2026-11-03 ~17:55 UTC, Part Studio \"skasm probes 14\" (c56bda410052290c59189c5f) in \"skasm speed\"; each case POSTed as is on Top (POST /features, no UI); points = REST /sketches point entities by their own ids (l1.start \u2026), so no end-swap fix is needed. ours was not read before posting.",
+ "cases": {
+  "q1": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     40.0,
+     -5.0
+    ],
+    "l1.start": [
+     0.0,
+     -5.0
+    ],
+    "l2.end": [
+     30.0,
+     20.0
+    ],
+    "l2.start": [
+     40.0,
+     -5.0
+    ],
+    "l3.end": [
+     10.0,
+     20.0
+    ],
+    "l3.start": [
+     30.0,
+     20.0
+    ],
+    "l4.end": [
+     0.0,
+     -5.0
+    ],
+    "l4.start": [
+     10.0,
+     20.0
+    ]
+   }
+  },
+  "q2": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     37.0,
+     0
+    ],
+    "l1.start": [
+     3.0,
+     0
+    ],
+    "l2.end": [
+     30.0,
+     20.0
+    ],
+    "l2.start": [
+     37.0,
+     0
+    ],
+    "l3.end": [
+     10.0,
+     20.0
+    ],
+    "l3.start": [
+     30.0,
+     20.0
+    ],
+    "l4.end": [
+     3.0,
+     0
+    ],
+    "l4.start": [
+     10.0,
+     20.0
+    ]
+   }
+  },
+  "q3": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     43.0,
+     0
+    ],
+    "l1.start": [
+     3.0,
+     0
+    ],
+    "l2.end": [
+     36.0,
+     20.0
+    ],
+    "l2.start": [
+     43.0,
+     0
+    ],
+    "l3.end": [
+     10.0,
+     20.0
+    ],
+    "l3.start": [
+     36.0,
+     20.0
+    ],
+    "l4.end": [
+     3.0,
+     0
+    ],
+    "l4.start": [
+     10.0,
+     20.0
+    ]
+   }
+  },
+  "q4": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     40.0,
+     -5.0
+    ],
+    "l1.start": [
+     -0.0,
+     -5.0
+    ],
+    "l2.end": [
+     30.0,
+     20.0
+    ],
+    "l2.start": [
+     40.0,
+     -5.0
+    ],
+    "l3.end": [
+     10.0,
+     20.0
+    ],
+    "l3.start": [
+     30.0,
+     20.0
+    ],
+    "l4.end": [
+     -0.0,
+     -5.0
+    ],
+    "l4.start": [
+     10.0,
+     20.0
+    ]
+   }
+  },
+  "q5": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     25.0,
+     0
+    ],
+    "l1.start": [
+     0,
+     0
+    ],
+    "l2.end": [
+     25.0,
+     5.0
+    ],
+    "l2.start": [
+     25.0,
+     0
+    ],
+    "l3.end": [
+     6.0,
+     5.0
+    ],
+    "l3.start": [
+     25.0,
+     5.0
+    ],
+    "l4.end": [
+     6.0,
+     35.0
+    ],
+    "l4.start": [
+     6.0,
+     5.0
+    ],
+    "l5.end": [
+     25.0,
+     35.0
+    ],
+    "l5.start": [
+     6.0,
+     35.0
+    ],
+    "l6.end": [
+     25.0,
+     40.0
+    ],
+    "l6.start": [
+     25.0,
+     35.0
+    ],
+    "l7.end": [
+     0,
+     40.0
+    ],
+    "l7.start": [
+     25.0,
+     40.0
+    ],
+    "l8.end": [
+     0,
+     0
+    ],
+    "l8.start": [
+     0,
+     40.0
+    ]
+   }
+  },
+  "q6": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     25.0,
+     0
+    ],
+    "l1.start": [
+     0,
+     0
+    ],
+    "l2.end": [
+     25.0,
+     5.0
+    ],
+    "l2.start": [
+     25.0,
+     0
+    ],
+    "l3.end": [
+     6.0,
+     5.0
+    ],
+    "l3.start": [
+     25.0,
+     5.0
+    ],
+    "l4.end": [
+     6.0,
+     35.0
+    ],
+    "l4.start": [
+     6.0,
+     5.0
+    ],
+    "l5.end": [
+     25.0,
+     35.0
+    ],
+    "l5.start": [
+     6.0,
+     35.0
+    ],
+    "l6.end": [
+     25.0,
+     40.0
+    ],
+    "l6.start": [
+     25.0,
+     35.0
+    ],
+    "l7.end": [
+     0,
+     40.0
+    ],
+    "l7.start": [
+     25.0,
+     40.0
+    ],
+    "l8.end": [
+     0,
+     0
+    ],
+    "l8.start": [
+     0,
+     40.0
+    ]
+   }
+  },
+  "q7": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     25.0,
+     0
+    ],
+    "l1.start": [
+     0,
+     0
+    ],
+    "l2.end": [
+     25.0,
+     5.0
+    ],
+    "l2.start": [
+     25.0,
+     0
+    ],
+    "l3.end": [
+     4.0,
+     5.0
+    ],
+    "l3.start": [
+     25.0,
+     5.0
+    ],
+    "l4.end": [
+     4.0,
+     43.0
+    ],
+    "l4.start": [
+     4.0,
+     5.0
+    ],
+    "l5.end": [
+     25.0,
+     43.0
+    ],
+    "l5.start": [
+     4.0,
+     43.0
+    ],
+    "l6.end": [
+     25.0,
+     48.0
+    ],
+    "l6.start": [
+     25.0,
+     43.0
+    ],
+    "l7.end": [
+     -0.0,
+     48.0
+    ],
+    "l7.start": [
+     25.0,
+     48.0
+    ],
+    "l8.end": [
+     0,
+     0
+    ],
+    "l8.start": [
+     -0.0,
+     48.0
+    ]
+   }
+  },
+  "q8": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     30.0,
+     0
+    ],
+    "l1.start": [
+     0,
+     0
+    ],
+    "l2.end": [
+     30.0,
+     25.0
+    ],
+    "l2.start": [
+     30.0,
+     0
+    ],
+    "l3.end": [
+     -0.0,
+     25.0
+    ],
+    "l3.start": [
+     30.0,
+     25.0
+    ],
+    "l4.end": [
+     0,
+     0
+    ],
+    "l4.start": [
+     -0.0,
+     25.0
+    ]
+   }
+  }
+ }
+}
