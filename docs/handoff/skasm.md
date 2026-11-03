@@ -32,6 +32,16 @@ answers, fix Undo; when my 19 scenarios are recorded, run them (`run.py --app /r
 --display :103 --live /root/parity/ui/live --out /root/skasm-scratch/uip <names>`, per-step differences:
 /root/skasm-scratch/uipdiff.py /root/skasm-scratch/uip).
 
+07:55: SKETCH-SPLINE-CENTRIPETAL done (landed d3711409 with live 1853's Undo / construction fixes): fit splines are
+cubics with knots at centripetal parameters, natural ends without handles, periodic when the points list ends on
+its own first point (structural: `FitEnds::of`; a Coincident joining an open spline's ends doesn't make it periodic).
+That landing was a speed regression on sk211's closed 94-point spline (now periodic: 36 -> 252 ms, a finite-difference
+seam gradient); fix-forward queued f92189d2: the seam gradient by the cyclic system's adjoint (`nurbs::Seam`, O(n)).
+vibe3 solve_time after the fix vs main 231f04d7: Coincident 28 -> 15 ms, the over-defined Distance 36 -> 63 ms (the
+periodic spline takes 120 LM iterations to its plateau instead of 61; per iteration equal, ~0.35 ms), regions 24 ->
+23 ms. Spur Gear defaults now in band but 202 faces (OCCT fillet splits each root fillet; noted for core in the
+ticket). Parity suite: 22/30 sketch scenarios, 232/247 states (the rest: lengths clicked a pixel apart).
+
 ## State at 01:30 UTC
 Landed overnight (all on main by dabe8513): sketch drag far hold (g6) and levels + farthest point (g4); drag from the
 drag's start (live drag probes 12: the result depends only on where the drag ends) in dragged components of <= 60
