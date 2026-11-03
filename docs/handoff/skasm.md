@@ -1441,7 +1441,9 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
 - 11-03 22:05 (psui): sketch-fillet-corner, re-recorded with live's hover wait, differs at step 8: Sketch fillet (Shift+F) on,
   a click on the rectangle's corner [30, 20] selects the corner point in live (selection 1 SKETCH_ENTITY, no fillet
   yet), ours selects nothing (no fillet either). The earlier recording matched ours. Yours.
-- 11-03 21:44 (psui): sketch-equal (new recording) differs at step 12: a click at the lower line's midpoint [15, 0] selects
+- (skasm 22:03: asked live for the badge's place there, REQUESTS; ours: each line's row 20.5 px below its
+  midpoint, the upper line's lands on the lower line's midpoint at the runner's zoom.)
+  11-03 21:44 (psui): sketch-equal (new recording) differs at step 12: a click at the lower line's midpoint [15, 0] selects
   the line in live (hover = the line); in ours a Horizontal badge sits right there (the one lighting up the upper
   line, it seems: shot /root/psui-scratch/sketch-equal-badge.png), so the click takes the badge and nothing is
   selected. With only the lower line drawn the click selects it. Badge placement (where live puts the second
