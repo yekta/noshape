@@ -1404,6 +1404,25 @@ fn slab_fuse_probe() {
 #[ignore = "T2 probe: NOSHAPE_SHELL_CASE"]
 fn dumped_shell_probe() {
     let Ok(case) = std::env::var("NOSHAPE_SHELL_CASE") else { return };
+    // (A directory: each case in it, its time and result only.)
+    if std::path::Path::new(&case).is_dir() {
+        let mut cases: Vec<String> = std::fs::read_dir(&case).unwrap().filter_map(|e| e.ok()).map(|e| e.path().to_string_lossy().to_string()).filter(|p| p.ends_with(".brep")).map(|p| p.trim_end_matches(".brep").to_string()).collect();
+        cases.sort();
+        set_working_scale(1000.0).unwrap();
+        for c in cases {
+            let Ok(s) = read_brep(std::path::Path::new(&format!("{c}.brep"))) else { continue };
+            let Ok(txt) = std::fs::read_to_string(format!("{c}.txt")) else { continue };
+            let faces: Vec<usize> = txt.lines().filter_map(|l| l.strip_prefix("face ")).filter_map(|v| v.parse().ok()).collect();
+            let Some(t) = txt.split("thickness ").nth(1).and_then(|r| r.split(' ').next()).and_then(|v| v.parse::<f64>().ok()) else { continue };
+            let outward = txt.contains("outward 1");
+            let all = s.faces();
+            let removed: Vec<Shape> = faces.iter().filter_map(|&i| all.get(i).cloned()).collect();
+            let t0 = std::time::Instant::now();
+            let r = shell_solid(&s, &removed, t, if outward { ShellSide::Outside } else { ShellSide::Inside }, ShellMethod::Auto);
+            eprintln!("case {} {:.0} ms {} {:.6}", c.rsplit('/').next().unwrap_or(""), t0.elapsed().as_secs_f64() * 1e3, if r.is_ok() { "ok" } else { "failed" }, r.as_ref().map(|r| vol(&r.shape) * 1e9).unwrap_or(0.0));
+        }
+        return;
+    }
     let s = read_brep(std::path::Path::new(&format!("{case}.brep"))).unwrap();
     let txt = std::fs::read_to_string(format!("{case}.txt")).unwrap();
     let faces: Vec<usize> = txt.lines().filter_map(|l| l.strip_prefix("face ")).map(|v| v.parse().unwrap()).collect();
@@ -1415,7 +1434,7 @@ fn dumped_shell_probe() {
         let c = f.centroid().unwrap();
         println!("removed face {i}: {:?}, area {:.4} mm2, centroid ({:.4}, {:.4}, {:.4}) mm, normal {:.4?}", format!("{:?}", f.face_surface().ok()).chars().take(30).collect::<String>(), f.area().unwrap() * 1e6, c.x * 1e3, c.y * 1e3, c.z * 1e3, f.normal_at_point(c).ok());
     }
-    write_step_shapes(std::path::Path::new(&format!("{case}.step")), std::slice::from_ref(&s), LengthUnit::Millimeter).unwrap();
+    write_step_shapes(std::path::Path::new(&format!("{case}.step")), std::slice::from_ref(&s), LengthUnit::Meter).unwrap();
     set_working_scale(1000.0).unwrap();
     let removed: Vec<Shape> = faces.iter().map(|&i| all[i].clone()).collect();
     let t0 = std::time::Instant::now();

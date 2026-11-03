@@ -388,6 +388,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (eval.rs unify_merged; it kept only face merges). bushing2-0-joshua's Extrude 2 5/6/0 as live, clamp-abhil's Hole 2
   10/22/12 as live (T1 kernel core::a_hole_across_a_tubes_seam_leaves_whole_loops). Left: bushing's Extrude 4
   (18/42/26, live 18/40/24) and pipeflange-steven's Extrude 3 (24/46/20, live 24/44/16), other shapes of the same.
+  Extrude 4's two: its notch leaves the tube's end an arc, and the (moved) seam's vertex splits it (at −z on both
+  walls); no angle is free of the slots and the notch, so OCCT's seam always splits something there. Matching needs
+  the seam-split pieces of one arc counted (shown_topology) and picked as one edge.
 - [x] (core 11-03 09:00: pieces of one straight edge between the same two planes, a gap between them, are filleted as one cut along the whole line (features.cpp fillet_as_cut's spans, before OCCT): live's one face a corner, rounding off the 0.3 mm the groove leaves in the corner; bracket03-mattie's Fillet 1 exactly live's (22/60/40, 9351.620768 mm², 26334.635 mm³); T1 kernel blend::fillet_over_a_groove_is_one_face; the blend corpus as recorded. Its Chamfer 1 then 58/144/88 vs live 58/136/80: a blend's lines split where nothing ends are joined (features.cpp join_split_lines), 58/136/80 as live; bracket03-mattie matches live to the end; T1 kernel blend::chamfered_groove_edges_stay_whole) P2 FILLET-SPLIT-EDGE-FACES (core; dx's parity suite 11-03) a Fillet of edges a groove cut in two makes one face
   per piece and more: bracket03-mattie Fillet 1 (r 3 mm, tangent propagation, four 7 mm corner edges, each beside
   its other half across a 6 mm groove; Onshape's query keeps both halves): live 22/60/40 faces/edges/vertices, one
