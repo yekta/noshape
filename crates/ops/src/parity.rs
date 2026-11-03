@@ -92,6 +92,9 @@ pub struct Translator<'a> {
     /// Queries of a parameter left out while its others translated (the
     /// feature's problems).
     partial: Vec<String>,
+    /// Live's solved sketch geometry (`sketches` geomEntities) by (sketch
+    /// feature id, entity id).
+    solved: HashMap<(String, String), Value>,
     /// Each Feature Studio's pinned std and the one our host serves for it.
     pub std_pins: Vec<(String, u32, u32)>,
 }
@@ -220,7 +223,15 @@ impl<'a> Translator<'a> {
     fn new(ctx: &'a mut Ctx, doc: &Value, refs: HashMap<(usize, String), LiveRef>) -> Result<Self, String> {
         let features = doc["features"].as_array().ok_or("features.json has no `features`")?.clone();
         let mut frames = HashMap::new();
+        let mut solved = HashMap::new();
         for s in doc["sketches"]["sketches"].as_array().into_iter().flatten() {
+            if let Some(id) = s["featureId"].as_str() {
+                for g in s["geomEntities"].as_array().into_iter().flatten() {
+                    if let Some(e) = g["id"].as_str() {
+                        solved.insert((id.to_string(), e.to_string()), g.clone());
+                    }
+                }
+            }
             // `sketchMatrix` (older API versions) or `transformMatrix` (live's fetch).
             let (Some(id), Some(m)) = (s["featureId"].as_str(), s["sketchMatrix"].as_array().or(s["transformMatrix"].as_array())) else { continue };
             let m: Vec<f64> = m.iter().filter_map(Value::as_f64).collect();
@@ -235,7 +246,7 @@ impl<'a> Translator<'a> {
             .flatten()
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), std_pins: Vec::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, std_pins: Vec::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -476,7 +487,10 @@ impl<'a> Translator<'a> {
     fn feature(&mut self, k: usize, f: &Value, problems: &mut Vec<String>) -> Result<(String, String, Option<String>), String> {
         let ty = f["featureType"].as_str().ok_or("no featureType")?;
         // A custom feature: its namespace names the Feature Studio ("e<element id>::m<microversion>").
-        let custom = f["namespace"].as_str().filter(|n| !n.is_empty()).map(|n| match n.strip_prefix('e').and_then(|r| r.split("::").next()).and_then(|e| self.studios.get(e)) {
+        // "e<element>::m<microversion>", or another document's version
+        // "d<document>::v<version>::e<element>::m<microversion>".
+        let element = |n: &str| n.split("::").find_map(|p| p.strip_prefix('e')).map(str::to_string);
+        let custom = f["namespace"].as_str().filter(|n| !n.is_empty()).map(|n| match element(n).and_then(|e| self.studios.get(&e)) {
             // Ours: `custom:<tab id>:<feature name>` (model-data custom::type_id).
             Some(tab) => Ok(format!("custom:{tab}:{ty}")),
             None => Err(format!("custom feature `{ty}` from a Feature Studio not in features.json ({n})")),
@@ -616,6 +630,59 @@ impl<'a> Translator<'a> {
         };
         let st = &r["feature_status"];
         Ok((r["feature"].as_str().unwrap_or("").to_string(), st["status"].as_str().unwrap_or("").to_string(), st["message"].as_str().map(str::to_string)))
+    }
+
+    /// Sketch entity `e` of sketch `oid` moved to live's solved geometry
+    /// (lines, circles, arcs and points; `None`: no solve given or no change).
+    fn solved_entity(&self, oid: &str, e: &Value) -> Option<Value> {
+        let id = e["entityId"].as_str()?;
+        let g = self.solved.get(&(oid.to_string(), id.to_string()))?;
+        let p2 = |v: &Value| Some([v[0].as_f64()?, v[1].as_f64()?]);
+        let mut out = e.clone();
+        let gt = e["geometry"]["btType"].as_str().unwrap_or("");
+        match g["entityType"].as_str()? {
+            "lineSegment" if gt.starts_with("BTCurveGeometryLine") => {
+                let (a, b) = (p2(&g["startPoint"])?, p2(&g["endPoint"])?);
+                let l = (b[0] - a[0]).hypot(b[1] - a[1]);
+                if l < 1e-12 {
+                    return None;
+                }
+                out["geometry"]["pntX"] = json!(a[0]);
+                out["geometry"]["pntY"] = json!(a[1]);
+                out["geometry"]["dirX"] = json!((b[0] - a[0]) / l);
+                out["geometry"]["dirY"] = json!((b[1] - a[1]) / l);
+                out["startParam"] = json!(0.0);
+                out["endParam"] = json!(l);
+            }
+            "circle" | "arc" if gt.starts_with("BTCurveGeometryCircle") => {
+                let c = p2(&g["center"])?;
+                out["geometry"]["xCenter"] = json!(c[0]);
+                out["geometry"]["yCenter"] = json!(c[1]);
+                out["geometry"]["radius"] = g["radius"].clone();
+                // An arc's ends as angles from its xDir, in its sense.
+                if g["entityType"] == "arc" {
+                    let (xd, yd) = (e["geometry"]["xDir"].as_f64().unwrap_or(1.0), e["geometry"]["yDir"].as_f64().unwrap_or(0.0));
+                    let sense = if e["geometry"]["clockwise"].as_bool() == Some(true) { -1.0 } else { 1.0 };
+                    let angle = |p: [f64; 2]| {
+                        let (u, v) = (p[0] - c[0], p[1] - c[1]);
+                        sense * (u * -yd + v * xd).atan2(u * xd + v * yd)
+                    };
+                    let (t0, mut t1) = (angle(p2(&g["startPoint"])?), angle(p2(&g["endPoint"])?));
+                    while t1 <= t0 + 1e-12 {
+                        t1 += std::f64::consts::TAU;
+                    }
+                    out["startParam"] = json!(t0);
+                    out["endParam"] = json!(t1);
+                }
+            }
+            "point" if e["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketchPoint")) => {
+                let p = p2(&g["point"])?;
+                out["x"] = json!(p[0]);
+                out["y"] = json!(p[1]);
+            }
+            _ => return None,
+        }
+        Some(out)
     }
 
     /// Our plane (a default plane, a Plane feature's or a planar face) where
@@ -1408,6 +1475,10 @@ impl<'a> Translator<'a> {
         // run the other way (an arc is counter-clockwise).
         let mut ends: Vec<Option<[[f64; 2]; 2]>> = Vec::new();
         for e in f["entities"].as_array().into_iter().flatten() {
+            // Where live's solve put it (`sketches` geomEntities): stored
+            // geometry can lag its variables (cf-parameter-pattern).
+            let solved = self.solved_entity(&oid, e);
+            let e = solved.as_ref().unwrap_or(e);
             let eid = e["entityId"].as_str().unwrap_or("").to_string();
             let g = &e["geometry"];
             let construction = e["isConstruction"].as_bool() == Some(true);

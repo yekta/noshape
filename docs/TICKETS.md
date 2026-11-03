@@ -3060,3 +3060,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   placed) → ours ERROR "Unfilleted edge overlapped by fillet." (no change: 21/46/24, 3665307.7 mm³); live OK,
   44/99/54, 3569327.9 mm³. Model: /root/parity/models/learning-center-michael (`parity_models`,
   NOSHAPE_PARITY_ONLY=learning-center-michael; feature 5). (dx 2026-11-03)
+- [ ] P1 ADD-INSIDE-OUT (core / bool; dx's parity suite 11-03, cf-parameter-pattern) an Extrude Add of a 2 mm boss
+  on the top face of a drafted block leaves the part inside out: volume −922.937 mm³ (query_parts), the magnitude
+  live's +922.937. The block: Extrude 1, a 20 × 10 mm rectangle on Top, depth 5 mm (#a / 2), draft 10° (#a deg,
+  pull direction flipped); Extrude 2 (Add, Blind 2 mm, scope Part 1) of a sketch region on its top face. Everything
+  downstream (here a parameter pattern) sees a negative solid. Repro: /root/dx-scratch/tickets/negative-volume-add.noshape
+  (features as live's; query_parts after Extrude 2), model /root/parity/models/cf-parameter-pattern. (dx 2026-11-03)
