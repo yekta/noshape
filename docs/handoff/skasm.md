@@ -11,12 +11,25 @@ probes 11. Queued: SKETCH-UNDO-REDO-STATE (P2; sketch toolbar Undo / Redo follow
 vibe3 scene sketch_perf, main 689c6070 -> dabe8513: S300 mixed point drag 7.7 -> 6.0 ms, the rest equal (179-curve
 corner 1.11, drag frame 2.8, drag step 2.04 ms). GUI (my build): bolt-circle drag keeps c3, c4 radial from its start
 whatever the path; sketch Undo / Redo greyed on entering, Undo on after a drag.
-Numbers: drag probes 7 8/8, 9 6/6; edit 6/6; probes 1-6 all; batch 8 40/40; **batch 9 40/40 on its first answer**
+Numbers: drag probes 7 8/8, 9 6/6; edit 6/6; probes 1-6 all; batch 8 40/40; batch 10 36/40; **batch 9 40/40 on its first answer**
 (live 1837, everyday profiles s501–s540 with tonight's rules); batches 1-9 1194 mm (k-sum, all in batches 1-3).
 End-of-day walk (02:20, green 8254441b, has tonight's drag work): sketch on Top (Undo / Redo greyed on entering; N
 then N again flips to Bottom as live), corner rectangle with live's glyphs, corner drag (Undo on after), assembly
 Revolute pin drag only spins it: no regressions (screens /root/skasm-scratch/walk1103/). Sent batch 10 (s541–s580,
 3 new kinds: isosceles triangle, one rounded corner, two-hole flange).
+**Batch 10 answered (live 1841): 36/40 on the first answer.** Next (P1, everyday kinds), in order:
+1. s548 / s556 / s547 (rectangle with one rounded corner; width / height / radius change): live keeps the left, bottom
+   AND top lines' levels (the bottom-left corner), the right side shortens and the arc grows into the corner. Ours
+   places l1, carries l2 up whole (shape 3, its length kept), so the bigger arc can't meet l4's level and l4 fails ->
+   the whole component falls back to least squares (splits the change about the middle). Needs: an H / V line whose
+   own relations hold keeps its level while placing its neighbours (the drag's `still_across` idea in the pass), or
+   l2 placed with the arc (group) before being carried whole.
+2. s555 (isosceles triangle, leg length changed): live keeps the base, the apex goes straight up. Ours: the chamfer
+   slide rung slides both legs' ends (breaking the legs' Equal) -> rejected -> least squares (base -2.7, apex +5.4).
+   Tried: no slide when a neighbour is tied by an Equal + a group attempt holding the lowest unplaced neighbour: the
+   pass then frees the leg first and moves the base (worse, 16 -> 37 mm). Needed: place the leg with its Equal partner
+   as a pair, the base held.
+Flanges (s546 / s550 / s565: the spacing changes, the line's start hole stays) already match.
 Open (P2, need live data, nothing to guess): s6, s102 (probes 10), s218 / s236 / s226 (probes 11: s226's spline
 loop moves rigidly in live; s236's third quad down in live, up in ours; s218's chain turns only through k19), s209 / s11
 (probes 13 sent), s230 (tried keeping the Length side's Equal partner: worse elsewhere), s210 (an Angle with an H line
