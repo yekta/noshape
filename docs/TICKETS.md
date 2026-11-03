@@ -333,6 +333,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   cli/rel2045.out): v0.4.18 died 4 / 4, v0.4.20 1 / 4, v0.4.21 3 / 4, v0.4.22 2 / 4. And the runs that live give three
   different Part 1 volumes for the same delete: 45738.053 (v0.4.20 ×3), 90652.299 (v0.4.22, green), 179904.78 (v0.4.21,
   v0.4.22, green) — nondeterministic regeneration as well as the crash.
+  qa 02:41: **the app dies just opening the document** (no delete): green bad1de8e app on :110,
+  `noshape tickets/crash2045/fz2045-step99.noshape`: SIGSEGV 2 of 4 opens (no message in the log), the other two up
+  and running after 60 s. So it is the regeneration itself; deleting a feature only regenerates again.
 - [ ] P2 CRASH-1837-ONCE (core; seen once) CLI fuzz seed 1837 (`clifuzz_time.py 1837 106`, fallback on, Rust Boolean on) on
   green e18f898a died at **step 98, a delete, "corrupted double-linked list" / "noshape: the kernel aborted; not
   recoverable"** (exit 134, 3.9 s into the step); the stack is in qa-scratch/tickets/crash1837/stderr-g1837.log (frames as
