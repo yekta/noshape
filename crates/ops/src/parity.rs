@@ -827,8 +827,14 @@ impl<'a> Translator<'a> {
         let mut others = 0;
         for c in f["constraints"].as_array().into_iter().flatten() {
             let ty = c["constraintType"].as_str().unwrap_or("");
+            let par0 = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).and_then(|p| p["value"].as_str().map(str::to_string));
             let kind = match ty {
-                "DISTANCE" => "distance",
+                "DISTANCE" => match par0("direction").as_deref() {
+                    Some("HORIZONTAL") => "horizontal_distance",
+                    Some("VERTICAL") => "vertical_distance",
+                    _ => "distance",
+                },
+                "CENTERLINE_DIMENSION" => "centerline",
                 "LENGTH" => "length",
                 "DIAMETER" => "diameter",
                 "RADIUS" => "radius",
@@ -845,7 +851,9 @@ impl<'a> Translator<'a> {
                 if n.starts_with("external") {
                     let Some(ext) = par(n) else { continue };
                     let text: String = ext["queries"].as_array().into_iter().flatten().filter_map(|q| q["queryString"].as_str()).collect();
-                    if text.contains("Origin") || text.contains("originOp") {
+                    // The Origin: its deterministic id is "IB".
+                    let origin_id = ext["queries"].as_array().into_iter().flatten().any(|q| q["deterministicIds"].as_array().is_some_and(|ids| ids.len() == 1 && ids[0] == "IB"));
+                    if origin_id || text.contains("Origin") || text.contains("originOp") {
                         entities.push("origin".to_string());
                     } else {
                         problems.push(format!("{ty} dimension: external reference not translated ({})", text.chars().take(60).collect::<String>()));
