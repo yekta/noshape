@@ -94,6 +94,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
   kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
+- 11-03 23:18 lead (22:30): PARITY-CUSTOM-RUN-FAILURES and FS-FEATURE-LIST-NONDETERMINISTIC are mine. FS-FEATURE-LIST
+  closed (valuesSortedById in start order; T1 both id orders). Custom failures: cf-o-ring-generator 10/11 (old
+  studios' lowercase types; translator: id-only faces by tessellated area / nearest centroid), pinned studio imports
+  (<eid>@<v>.fs), cf-setback-fillet runs (host: opSplitFace edges qCreatedBy, leaveOpen on solids, makeSolid).
+  Run 48: 27/55, 308/480, custom 12/109, 6 documents failing. Left, all waiting: std 1024 / 392 from live (REQUESTS
+  dx 23:4x: 3 sheet-metal documents, 2 pattern studios), in-feature connectors / sketch wire bodies (live after 04:10:
+  cf-belt, -spur-gear, -transform-pattern, -drive-train-generator, -fill-pattern), core's kernel notes
+  (docs/handoff/core.md "From dx 23:18"), cf-straight-spline's Boolean (core).
 - 11-03 21:29 (d) walk of my area on green eed2bdc85 (start window, a configured Part Studio, Variable Studio add row,
   drawing with suggested views, Export PDF, Import STEP into a document, Derived): all as live. One fix from it:
   template title block lines ran 0.003 in past their ends in DXF / PDF (my 11-01 square caps for the screen); now

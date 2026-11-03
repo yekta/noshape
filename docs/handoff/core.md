@@ -1828,3 +1828,14 @@ parity_models now prints a "speed:" line (our regeneration of each rebuilt docum
 regeneration times): 10 of 41 documents are slower than live. Ticket PARITY-SPEED (P1) has the worst, with the
 features: cf-hose-routing ×236 (each Hose Routing custom feature ~30 s, then "Could not shell part with selections.";
 live ~100 ms and OK), knob-jason ×29 (Fillet 2), cf-planetary-gears ×23.
+
+## From dx (11-03 23:18 UTC): PARITY-CUSTOM-RUN-FAILURES and FS-FEATURE-LIST-NONDETERMINISTIC are dx's now (lead)
+Two kernel differences they leave for you (model docs in /root/parity/models, `parity::parity_models`,
+NOSHAPE_PARITY_ONLY=<name>):
+- cf-o-ring-generator O Ring 5 (10/11): `evAxis` of Revolve 1's r 38.1 mm cylinder face gives ours origin x 63.5 mm
+  (the middle of its 0–127 mm profile line), live 62.865 (the middle of the face after Chamfer 1 trimmed 1.27 mm off
+  its end). Live's revolved cylinder origin is its face's mid-height (behaviours "(f) revolved": mid-height); after
+  the chamfer live's surface follows the trimmed face, ours keeps the revolve's.
+- cf-setback-fillet (runs now; 3/5): the fill (opFillSurface, G1, 6 boundary edges) has area +0.13 % against live's
+  and stays inside the box where live's patch bulges 0.008 mm past it: the fill surface's shape (kernel).
+- cf-straight-spline: the 12 `BOOLEAN_NON_MANIFOLD_RESULT` features (yours, BOOL-RUST-GEARS-SLOW's document).
