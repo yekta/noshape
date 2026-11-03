@@ -104,7 +104,7 @@ pub fn ops() -> Vec<Op> {
                 opt("c", connector.clone(), "Width: the second width connector."),
                 opt("d", connector, "Width: the second tab connector (optional)."),
                 opt("name", s(), "Name (default \"Fastened 1\", ...)."),
-                opt("flip_primary", json!({ "type": "boolean" }), "Flip primary axis (default: keep the moving instance's current orientation, like the dialog)."),
+                opt("flip_primary", json!({ "type": "boolean" }), "Flip primary axis: true flips it, as the dialog's button (Onshape's primaryAxisAlignment; default: keep the moving instance's current orientation, like the dialog)."),
                 opt("reorient_secondary", json!({ "type": "integer", "minimum": 0, "maximum": 3 }), "Reorient secondary axis: quarter turns about the primary axis (the dialog's button clicks, 0-3)."),
                 opt("offset", json!({ "type": "object" }), "Offset: {\"x\", \"y\", \"z\": length, \"rotation\": angle} expressions where the mate type allows them."),
                 opt("rotation_axis", json!({ "type": "string", "enum": ["x", "y", "z"], "default": "z" }), "Axis of the rotation offset."),
@@ -314,7 +314,7 @@ fn describe(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
             let st = r.mates.iter().find(|s| s.id == m.id);
             let mut v = json!({ "id": format!("mate:{}", m.id.0), "name": m.name, "type": mate_type_id(m.mate_type), "a": format!("inst:{}", m.a.instance.0), "b": format!("inst:{}", m.b.instance.0), "ok": st.map(|s| s.ok), "message": st.and_then(|s| s.message.clone()), "suppressed": m.suppressed });
             // The dialog's settings (as assembly_mate takes them).
-            v["flip_primary"] = json!(m.flip_primary);
+            v["flip_primary"] = json!(!m.flip_primary);
             if m.reorient_secondary != 0 {
                 v["reorient_secondary"] = json!(m.reorient_secondary);
             }
@@ -804,7 +804,8 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         None => Mate::new(id, name.clone(), mate_type, ca.clone(), cb.clone()),
     };
     m.flip_primary = match (a.get("flip_primary").and_then(Value::as_bool), &old) {
-        (Some(f), _) => f,
+        // (The model's flag is true when the Z axes agree: not flipped.)
+        (Some(f), _) => !f,
         (None, Some(o)) => o.flip_primary,
         (None, None) => sa::default_flip_primary(&before, &ca, &cb, &units).unwrap_or(false),
     };

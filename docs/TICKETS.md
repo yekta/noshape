@@ -391,6 +391,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   18329.66 mm³ (after Extrude 3 already differs by split edges, CUT-CLOSED-EDGES-SPLIT). Our document:
   vibe5:~/tmp/noshape-parity-<pid>/pipeflange-steven.noshape (parity_models, NOSHAPE_PARITY_ONLY=pipeflange-steven).
 - [ ] P2 CUT-CLOSED-EDGES-SPLIT (core / bool; dx's parity suite 11-03) closed edges a cut makes come out in pieces
+  dx 11-03 21:22: an Add does it too: prize-wheel-tim's Extrude 2 (a 2.4 × 6.8 mm centre rectangle unioned across the
+  knob's r 1.88 circle at z 19.8 mm) leaves the circle's seam vertex at (0, 1.88): the top arc is two 1.30 mm arcs,
+  live one 2.60 mm arc (live 20/49/32, ours 20/50/33; its only difference, 7/8 features as live).
   with extra vertices: bushing2-0-joshua Extrude 2 (circle r5 at the origin on Top, Remove Through all, into a tube
   r37.5 / r25 × 25 mm symmetric on Front): live 5/6/0 faces/edges/vertices (each loop of the hole one closed edge),
   ours 5/10/6 (the loops on both cylinders in 2–3 B-spline pieces, e.g. 7.86 + 7.86 mm); clamp-abhil Hole 2: the
@@ -3037,7 +3040,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   sheetmetal/flat.rs FlatForm / FlatMark): each form's direction (up = toward the flat's reference side) and the hole
   heads (centre, Ø, side); then dx draws them with drawing.props.flat_lines.
 - [ ] P3 LOFT-COAXIAL-CIRCLES-SURFACE (core; found by dx through live 1811) a Loft through coaxial circles (r 10 at z 0, r 6 at z 15, r 9 at z 30 mm, Solid, defaults) makes its cap edges B-spline curves in ours (live: CIRCLE edges, so a Parasolid export splits each closed cap edge in two and live reads 4 edges / 4 vertices instead of 2 / 0) and its side face reads as a surface of revolution after our export, a non-rational periodic cubic B-spline (130 × 5 poles) in live: the types differ wherever they show (Measure / query_entities `surface`, exports: our Parasolid writes it as a spun surface, which live reads as REVOLVED). Same volume (5156.745 mm³ both, evVolume HIGH). Live's own loft as Parasolid: live/samples/dx-xt-periodic/loft-circles-live.x_t; behaviours "dx (2026-11-02, P3 follow-up to 1808)". (dx 2026-11-03)
-- [ ] P2 AGENT-FLIP-PRIMARY-INVERTED (dx + skasm; found by dx's assembly parity 11-03) assembly_mate / assembly_list
+- [x] (dx 11-03 21:22: assembly_mate / assembly_list / an assembly configuration's `flip_primary` is the dialog's Flip primary axis and live's primaryAxisAlignment (true = flipped), converted at the ops boundary; the translator passes live's value as is; parity_assemblies 3/3 as live, asm-flip-midaxis default and flipped included) P2 AGENT-FLIP-PRIMARY-INVERTED (dx + skasm; found by dx's assembly parity 11-03) assembly_mate / assembly_list
   `flip_primary` is the solver's internal flag (true = Z axes aligned), the opposite of Onshape's stored
   `primaryAxisAlignment` and of the dialog's Flip primary axis (live: false = Z aligned, true = flipped; behaviours
   "Fastened mate: default primary-axis alignment", skb-primary-axis-a/b/c). An agent copying a live mate's

@@ -100,8 +100,9 @@ fn describe(a: &Assembly) -> Value {
                 .iter()
                 .map(|(k, v)| {
                     let j = match v {
-                        // Unsuppressed is stored; the API says suppressed.
-                        ParamValue::Bool(b) if c.param == param::UNSUPPRESSED => json!(!b),
+                        // Unsuppressed and the Z axes agreeing are stored; the
+                        // API says suppressed and flipped (as the dialogs).
+                        ParamValue::Bool(b) if c.param == param::UNSUPPRESSED || c.param == param::FLIP => json!(!b),
                         ParamValue::Bool(b) => json!(b),
                         ParamValue::Expr(e) => json!(e.text),
                         ParamValue::Text(t) => json!(t),
@@ -338,8 +339,9 @@ pub(super) fn set_value(ctx: &mut Ctx, args: &Args) -> Result<crate::registry::O
     let raw = args.get("value").ok_or_else(|| OpError::param("value", "required"))?;
     let value = if noshape_model::assembly::config::param_is_bool(p) {
         let b = raw.as_bool().ok_or_else(|| OpError::param("value", "true or false"))?;
-        // `suppressed` in the API; the column stores Unsuppressed.
-        ParamValue::Bool(if p == param::UNSUPPRESSED { !b } else { b })
+        // `suppressed` / flipped in the API; the column stores Unsuppressed /
+        // the model's flag.
+        ParamValue::Bool(if p == param::UNSUPPRESSED || p == param::FLIP { !b } else { b })
     } else {
         ParamValue::Expr(ExprValue::new(text(raw, "value")?))
     };

@@ -86,10 +86,11 @@ fn near(a: [f64; 3], b: [f64; 3], tol: f64) -> bool {
 #[test]
 fn axial_mates_default_align_and_flip_turns_over() {
     for kind in ["revolute", "cylindrical", "planar"] {
-        // The CLI's flip_primary is the model's: true = Z axes aligned.
+        // The op's flip_primary is the dialog's Flip primary axis (live's
+        // primaryAxisAlignment): true turns the moving part over.
         let (t, z) = mate(kind, None, Start::Upright);
         assert!(near(t, [0.0, 0.0, -30.0], 1e-2) && near(z, [0.0, 0.0, 1.0], 1e-6), "{kind} default: t {t:?} Z {z:?}");
-        let (t, z) = mate(kind, Some(false), Start::Upright);
+        let (t, z) = mate(kind, Some(true), Start::Upright);
         assert!(near(t, [0.0, 0.0, 50.0], 1e-2) && near(z, [0.0, 0.0, -1.0], 1e-6), "{kind} flipped: t {t:?} Z {z:?}");
     }
     for kind in ["revolute", "fastened"] {
@@ -323,8 +324,8 @@ fn editing_a_mate_between_free_parts_moves_the_pin_back_upright() {
     call(&mut ctx, "assembly_transform", json!({ "instance": "Part 2 <1>", "translation": [-50, 60, 40] }));
     let pin = json!({ "instance": "Part 2 <1>", "entity": entity_at(&mut ctx, "Part 2 <1>", "faces", [150.0, 60.0, 55.0]), "inference": "mid_axis" });
     let plate = json!({ "instance": "Part 1 <1>", "entity": entity_at(&mut ctx, "Part 1 <1>", "faces", [130.0, 20.0, 5.0]), "inference": "mid_axis" });
-    // As live's REST mate (flipPrimary false): the pin turns over onto the plate.
-    let r = call(&mut ctx, "assembly_mate", json!({ "type": "revolute", "a": pin, "b": plate, "flip_primary": false }));
+    // Flipped (the model's Z axes opposed): the pin turns over onto the plate.
+    let r = call(&mut ctx, "assembly_mate", json!({ "type": "revolute", "a": pin, "b": plate, "flip_primary": true }));
     let mate = r["mate"].as_str().unwrap().to_string();
     let pose = |ctx: &mut Ctx, name: &str| -> (Vec<f64>, Vec<f64>) {
         let list = call(ctx, "assembly_list", json!({}));
@@ -340,7 +341,7 @@ fn editing_a_mate_between_free_parts_moves_the_pin_back_upright() {
     // Live's REST mate left it turned about Z × w instead (rz −157.48°, the
     // pose the edit started from there); the same mate holds there too.
     call(&mut ctx, "assembly_transform", json!({ "instance": "Part 2 <1>", "translation": [314.745604269, 96.609801613, 20], "axis": [0.195284380652, -0.980746659782, 0], "angle": "180 deg" }));
-    call(&mut ctx, "assembly_mate", json!({ "mate": mate, "flip_primary": true }));
+    call(&mut ctx, "assembly_mate", json!({ "mate": mate, "flip_primary": false }));
     let (t, q) = pose(&mut ctx, "Part 2 <1>");
     assert_eq!(pose(&mut ctx, "Part 1 <1>"), plate0, "the plate stays");
     assert!(upright(&q) && near([t[0], t[1], t[2]], [-70.0, 20.0, -10.0], 1e-6), "flipped back upright: t {t:?}, q {q:?}");
@@ -355,10 +356,10 @@ fn editing_a_mate_between_free_parts_moves_the_pin_back_upright() {
 /// fixed 40 × 40 × 20 block's Ø10 hole on both cylinders' mid-axis connectors
 /// lands unturned, its centre on the hole's: (−60, 0, −5) mm, live's default
 /// mate and its `primaryAxisAlignment: false` alike, ours by default and with
-/// the op's `flip_primary` true (the model's flag, !primaryAxisAlignment).
+/// the op's `flip_primary` false (as live's field).
 #[test]
 fn a_pin_revoluted_into_a_fixed_block_lands_as_live() {
-    for flip in [None, Some(true)] {
+    for flip in [None, Some(false)] {
         let dir = std::env::temp_dir().join(format!("noshape-flip1907-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("f.noshape");
@@ -383,6 +384,7 @@ fn a_pin_revoluted_into_a_fixed_block_lands_as_live() {
         }
         call(&mut ctx, "assembly_mate", args);
         let list = call(&mut ctx, "assembly_list", json!({}));
+        assert_eq!(list["mates"][0]["flip_primary"], json!(false), "read back as live's primaryAxisAlignment");
         let i = list["instances"].as_array().unwrap().iter().find(|i| i["name"] == "Part 2 <1>").unwrap().clone();
         let f = |k: &str| i[k].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect::<Vec<f64>>();
         let (t, q) = (f("translation"), f("rotation"));

@@ -2356,7 +2356,7 @@ Examples:
 | `c` | object |  | Width: the second width connector. |
 | `d` | object |  | Width: the second tab connector (optional). |
 | `name` | string |  | Name (default "Fastened 1", ...). |
-| `flip_primary` | boolean |  | Flip primary axis (default: keep the moving instance's current orientation, like the dialog). |
+| `flip_primary` | boolean |  | Flip primary axis: true flips it, as the dialog's button (Onshape's primaryAxisAlignment; default: keep the moving instance's current orientation, like the dialog). |
 | `reorient_secondary` | integer |  | Reorient secondary axis: quarter turns about the primary axis (the dialog's button clicks, 0-3). |
 | `offset` | object |  | Offset: {"x", "y", "z": length, "rotation": angle} expressions where the mate type allows them. |
 | `rotation_axis` | one of `x`, `y`, `z` |  | Axis of the rotation offset. |
