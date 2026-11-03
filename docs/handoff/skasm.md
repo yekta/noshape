@@ -1433,6 +1433,11 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   no change and doesn't start the line; the second then starts one (left pending at (0,20)). Through the UI tests'
   clicks (helper or window events) the same steps on Top make the line, so it's the tool state the rectangle leaves
   (its value boxes?) eating the next tool's first click on the real input path. Yours (sketch tools).
+- 11-03 21:44 (psui): sketch-equal (new recording) differs at step 12: a click at the lower line's midpoint [15, 0] selects
+  the line in live (hover = the line); in ours a Horizontal badge sits right there (the one lighting up the upper
+  line, it seems: shot /root/psui-scratch/sketch-equal-badge.png), so the click takes the badge and nothing is
+  selected. With only the lower line drawn the click selects it. Badge placement (where live puts the second
+  line's Horizontal badge): yours.
 - 11-03 21:22 (psui): sketch-delete-line's new recording (live's hover wait) differs at step 7: live's click at the
   line's midpoint after a hover selects nothing (its earlier three recordings selected the line, as ours does). Asked
   live (REQUESTS 2026-11-03 21:22) whether a hovered sketch line's midpoint takes the click; yours if so.
