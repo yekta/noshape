@@ -334,12 +334,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the block's top edge reaches beyond the back face's edges) is OK in live and gives 10/24/16 faces/edges/vertices,
   145345.65 mm³; ours errors on that one piece (the others are inside the block). Live request filed to confirm
   the simple repro.
-- [ ] P2 SKETCH-IMPRINT-TOPOLOGY (core 11-03, from SKETCH-FACE-IMPRINT; live behaviours 1747 / ~24081) a sketch on a
-  face owns the face's imprinted edges and vertices in live: qCreatedBy(sketch, VERTEX) returns the face's corners
-  too (a Hole on qCreatedBy(sketch, VERTEX) fails "Error regenerating." for that), qCreatedBy(sketch, EDGE) the
-  face's edges, split where the sketch's curves cross them (live probe "core imprint probe 1": a Ø10 circle inside
-  a 60 × 40 face: 6 edges, 5 vertices; a line across it: 8 / 8). Ours: the sketch's own only (the FS host's
-  SketchEdge / SketchPoint entities; the imprinted curves aren't kept in SketchResult).
+- [ ] P2 SKETCH-IMPRINT-TOPOLOGY (core 11-03, from SKETCH-FACE-IMPRINT; live REST probes "core imprint probe 1") a
+  sketch's bodies in FeatureScript are live's: **each curve is a wire body of its own (its own end vertices), each
+  sketch point a point body, and the regions one sheet body** with its own edges and vertices (the face it lies on
+  imprinted). qCreatedBy(sketch, BODY / EDGE / VERTEX) on Top: a rectangle 5 / 8 / 12 (wire 4 edges, 8 vertices;
+  sheet 4 / 4); a circle 3 / 2 / 1 (wire ring, sheet ring, the centre a POINT body); a line 1 / 1 / 2. On a 60 × 40
+  face: a Ø10 circle inside 6 edges / 5 vertices, a line across 8 / 8 (the sheet's two pieces). Ours: one sketch body,
+  its curves and points (shared corners): a rectangle 1 / 4 / 4. Std filters by qBodyType(…, WIRE) where it matters
+  (Fill, Boundary, Rib); custom features counting a sketch's edges or vertices, and a Hole on qCreatedBy(sketch,
+  VERTEX) (live fails it when the face's corners are imprinted), differ. Host: query.rs Ent::SketchBody's expansion,
+  evaluate.rs for the new edges and vertices.
 - [x] (core 11-03 07:45: a blend's new B-spline faces that are planes, cylinders, cones, spheres or tori within 1e-5 of the part are rebuilt on that surface, kept when the solid stays valid and its volume the same (features.cpp analytic_blend_faces; ≤ 0.1 ms a blend on live-30-features): the Spur Gear's root fillets are cylinders as live (defaults 100 / changed 121 cylinders, no B-splines; T1 kernel_robustness::a_fillet_between_extruded_faces_is_a_cylinder); the blend corpus as recorded) P2 FILLET-PRISMATIC-CYLINDER (core 11-03, live REST on live 1830's gears) a constant fillet between two faces
   extruded the same way (the Spur Gear's root fillets: the root cylinder and an extruded involute spline) is a
   cylinder in live (qGeometry CYLINDER, evSurfaceDefinition radius 0.378848 / 0.166393 mm); ours an OCCT B-spline
