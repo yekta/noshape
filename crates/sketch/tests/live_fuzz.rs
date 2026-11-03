@@ -2827,6 +2827,106 @@ fn probes17() -> Vec<(String, Case)> {
     out
 }
 
+/// Probes 18 (probes 17's open ones): a V with a circle (w1: what moves its
+/// corner), trapezoids between probes 16's 40/20/20 and s829's proportions,
+/// s784's T with and without its neighbouring rectangle.
+fn probes18() -> Vec<(String, Case)> {
+    let v = DVec2::new;
+    let mut out = Vec::new();
+    let mut add = |name: &str, f: &dyn Fn(&mut Case)| {
+        let mut c = Case::new();
+        f(&mut c);
+        out.push((name.to_string(), c));
+    };
+    // V: a Horizontal leg 50, one at 72° 42; `circle`: 0 none, 1 Tangent to
+    // both, 2 Tangent to the Horizontal leg only (its centre on the bisector);
+    // `reverse`: the angle dimensioned from the slanted leg.
+    let v_shape = |c: &mut Case, deg: f64, circle: u8, reverse: bool| {
+        let (th, r) = (72.0f64, 5.4);
+        let a = c.line(v(0.0, 0.0), v(50.0, 0.0));
+        let b = c.line(v(0.0, 0.0), DVec2::from_angle(th.to_radians()) * 42.0);
+        c.coincident(&format!("{a}.start"), &format!("{b}.start"));
+        c.hv(true, &a);
+        if circle > 0 {
+            let half = (th / 2.0).to_radians();
+            let k = c.circle(DVec2::from_angle(half) * (r / half.sin()), r);
+            c.pair("TANGENT", &a, &k);
+            if circle == 1 {
+                c.pair("TANGENT", &b, &k);
+            }
+            c.radius(&k, r, false);
+        }
+        if reverse {
+            c.angle(&b, &a, deg);
+        } else {
+            c.angle(&a, &b, deg);
+        }
+        c.length(&a, 50.0);
+        c.length(&b, 42.0);
+    };
+    add("w4 V without a circle, angle 72 -> 89 deg", &|c| v_shape(c, 89.0, 0, false));
+    add("w5 V with a circle Tangent to the Horizontal leg only, angle 72 -> 89 deg", &|c| v_shape(c, 89.0, 2, false));
+    add("w6 V with a circle, angle 72 -> 89 deg, dimensioned from the slanted leg", &|c| v_shape(c, 89.0, 1, true));
+    // Trapezoid: base `b`, top `t`, height `h` (drawn from the base's left
+    // end at the origin), the top resized to `t2`; Distance from the top's
+    // right corner to the base.
+    let trapezoid = |c: &mut Case, b: f64, t: f64, h: f64, t2: f64| {
+        let p = [v(0.0, 0.0), v(b, 0.0), v((b + t) / 2.0, h), v((b - t) / 2.0, h)];
+        let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+        for i in 0..4 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+        }
+        c.hv(true, &l[0]);
+        c.hv(true, &l[2]);
+        c.pair("EQUAL", &l[1], &l[3]);
+        c.length(&l[0], b);
+        c.length(&l[2], t2);
+        c.distance(&format!("{}.start", l[2]), &l[0], h);
+    };
+    add("y1 trapezoid 40 / 20, 24 high, top 20 -> 18", &|c| trapezoid(c, 40.0, 20.0, 24.0, 18.0));
+    add("y2 trapezoid 48 / 20, 20 high, top 20 -> 18", &|c| trapezoid(c, 48.0, 20.0, 20.0, 18.0));
+    add("y3 trapezoid 40 / 22, 20 high, top 22 -> 20", &|c| trapezoid(c, 40.0, 22.0, 20.0, 20.0));
+    add("y4 trapezoid 48 / 22, 24 high, top 22 -> 20 (about s829's)", &|c| trapezoid(c, 48.0, 22.0, 24.0, 20.0));
+    // Fuzz s784's T (stem 10.173 -> 11.905 wide, flange 5.379 -> 5.694 thick,
+    // the stem's height on its right side) and its rectangle (width 30.783 ->
+    // 27.951, or unchanged).
+    let t784 = |c: &mut Case| {
+        let p = [v(16.78, -0.81), v(26.95, -0.81), v(26.95, 26.74), v(43.66, 26.74), v(43.66, 32.11), v(0.06, 32.11), v(0.06, 26.74), v(16.78, 26.74)];
+        let l: Vec<String> = (0..8).map(|i| c.line(p[i], p[(i + 1) % 8])).collect();
+        for i in 0..8 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 8]));
+            c.hv(i % 2 == 0, &l[i]);
+        }
+        c.pair("EQUAL", &l[2], &l[6]);
+        c.length(&l[4], 43.598);
+        c.length(&l[3], 5.694);
+        c.length(&l[0], 11.905);
+        c.length(&l[1], 27.549);
+    };
+    let rect784 = |c: &mut Case, w: f64| {
+        let p = [v(70.16, 5.18), v(100.94, 5.18), v(100.94, 29.06), v(70.16, 29.06)];
+        let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+        for i in 0..4 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+        }
+        c.pair("PERPENDICULAR", &l[2], &l[3]);
+        c.pair("PARALLEL", &l[0], &l[2]);
+        c.pair("PARALLEL", &l[3], &l[1]);
+        c.hv(true, &l[2]);
+        c.length(&l[0], w);
+    };
+    add("z1 s784's T and its rectangle (narrowed), as fuzz s784", &|c| {
+        t784(c);
+        rect784(c, 27.951);
+    });
+    add("z2 s784's T alone", &|c| t784(c));
+    add("z3 s784's T and its rectangle unchanged", &|c| {
+        t784(c);
+        rect784(c, 30.78);
+    });
+    out
+}
+
 fn probe_batch(list: Vec<(String, Case)>) -> Value {
     let cases: Vec<Value> = list.into_iter().map(|(name, mut c)| {
         let ours = ours(&mut c);
@@ -2841,7 +2941,7 @@ fn probe_batch(list: Vec<(String, Case)>) -> Value {
 #[test]
 #[ignore = "T2: live fuzz least-change probes"]
 fn probe_matches() {
-    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16()), (17, probes17())] {
+    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16()), (17, probes17()), (18, probes18())] {
         let b = probe_batch(list);
         let path = fixture(&format!("sketch-probe-{n}.json"));
         if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == format!("probe-{n}")) {
@@ -2871,7 +2971,7 @@ fn probe_matches() {
 fn one_case() {
     let probe = std::env::var("FUZZ_PROBE").ok();
     // (FUZZ_PROBE=<set>:<name> where names repeat across sets, e.g. 14:q2.)
-    let sets = || [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16()), (17, probes17())];
+    let sets = || [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16()), (17, probes17()), (18, probes18())];
     let Some(mut c) = probe.as_ref().and_then(|p| {
         let (set, name) = p.split_once(':').map_or((None, p.as_str()), |(s, n)| (s.parse::<u32>().ok(), n));
         sets().into_iter().filter(|(k, _)| set.is_none_or(|s| s == *k)).flat_map(|(_, l)| l).find(|(n, _)| n.split(' ').next() == Some(name)).map(|(_, c)| c)
