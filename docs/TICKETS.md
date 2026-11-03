@@ -3241,6 +3241,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   unit of the 0–1 parameter, exactly the posted startDerivativeX/Y, endDerivativeX/Y) places the spline's end
   handles for them (adds them to a spline drawn without); the curve's ends then have those derivatives (T1
   onshape_ux::a_fit_spline_takes_onshapes_end_derivatives). Left for dx: the sketch_draw field and the translator.
+- [ ] P3 KNOB-TIM-TANGENT-EDGE-BSPLINE (core; dx's drawing comparison 11-03 21:03) knob-tim's suggested-views drawing
+  matches live's DXF (samples/dx-drawing-corpus/knob-tim.dxf, request 1864) entity for entity but one: the isometric
+  view's lower tangent edge, an ELLIPSE in live (centre (7.829, 6.0897) in, major 0.9843), is a 37-point SPLINE plus a
+  0.017 in LINE in ours: that model edge is a B-spline in ours where Parasolid's is a circle. Our DXF writes model
+  B-splines as SPLINE (as live does). Translated model: NOSHAPE_PARITY_SAVE + NOSHAPE_PARITY_ONLY=knob-tim.
 - [ ] P1 PARITY-CUSTOM-RUN-FAILURES (core; dx's parity suite run 42, 11-03 19:33) the corpus's community features
   whose inputs translate whole but fail in our host, with the Monitor's first error (featurestudio_monitor on the
   translated documents: `NOSHAPE_PARITY_SAVE=<dir>` keeps them, NOSHAPE_PARITY_ONLY=<name>; copies of all in

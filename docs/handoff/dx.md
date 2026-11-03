@@ -94,6 +94,17 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
   kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
+- 11-03 21:03 lead's order (20:10: (a) NOSHAPE_CONFIG_DIR, (b) import ✗ rows, (c) drawings vs live, (d) walk):
+  (a) landed 1281b9d9 (crates/ops/tests/config_dir.rs: a constructor before main). Live answers taken first: sketch
+  text size (1922; cf-fix-pcb's Extrude 5 volume as live), Suggested views placement and scale (1898; 4 of 4 drawings'
+  view centres and scales as live), cf-sheet-metal-model-plus configuration (1913; nothing to do), prize-wheel-tim
+  Hole INFO (1891; ours right, live refetch asked), 1907 flip (asked for the Part Studio files). Spline end derivatives
+  (lead 20:35: sketch_draw start_derivative / end_derivative + translator; cf-curve-pattern-normal's handles as live,
+  its surface still core's EXTRUDE-SURFACE-CURVES). FeatureScript enum trailing comma (cf-straight-spline compiles).
+  (b) McMaster helix lengths as live (tolerant edges take the free-form fin's SP-curve), g50 F19 ✅; g50 F8 left
+  (needs the face on an extended surface). (c) knob-tim's drawing = live's DXF but one tangent edge (core,
+  KNOB-TIM-TANGENT-EDGE-BSPLINE); pipeflange-steven waits on its model (CUT-CLOSED-EDGES-SPLIT). Selectable PDF fonts
+  encoded as live's (/ToUnicode /Identity-H, CIDToGIDMap by character, /DW). Next: (d) walk on the newest green.
 - 11-03 19:46 lead's order (19:05: item 2 until nothing on our side is left): run 42 = **26/54, 297/421 (custom 7/55)**.
   Landed: a studio's `defineSheetMetalFeature` features get their fields (custom, e48af5a3; T1
   custom_features::a_sheet_metal_custom_feature_has_its_fields), live's HTML-escaped messages compared unescaped
