@@ -808,6 +808,11 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
 ## Requests to the lead (qa, updated 2026-11-03 01:40)
+- **11-03 07:38:** still no 05:00 release (Release workflow idle since v0.4.22). CRASH-2045 repro binary is
+  **qa-scratch/rel/k/keep/x/y/noshape-0531f66e** (don't delete: later greens' seed-2045 sessions diverge after core's
+  imprint change, so only that binary replays the crash; wrapper tickets/crash2045/wrap-0531f66e.sh). Scenarios: 255 in
+  tests/ui-parity (bin/mkscen.py → bin/uipsync.sh). Loops on green 0531f66e: /tmp/qa-nfloop27.sh (2281–2340),
+  /tmp/qa-gfloop11.sh (2341–2380); v0.4.22 /tmp/qa-cfloop68.sh (2241–2280).
 - **11-03 06:50:** **no release cut yet** (none at 05:00; `gh run list -R yekta/noshape -w Release`); when it comes: the
   artifact checks, `bash /tmp/qa-relsmoke.sh 0.4.23 v0422`, /tmp/qa-relgui423.sh (made), /tmp/qa-mem423.sh (made), the
   updater on :149. Since 04:15: BLEND-TOL-REGEN-CHANGES fixed by core 08632c09, verified on 0531f66e; CRASH-2045: core's
