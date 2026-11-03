@@ -1742,3 +1742,13 @@ Live's community FeatureScript documents (/root/parity/models/cf-*/studios) now 
 an enum's trailing comma, std rollSurface.fs, std 392's 4-argument checkInput), FS-ANYTHING-PARAM (an isAnything
 array item arrives as its expression string). Also ADD-INSIDE-OUT (P1), MIRROR-FEATURE-UP-TO, FILLET-OVERLAP-FAIL,
 FILLET-31S-FAIL from the model suite.
+
+## From dx (11-03 14:42 UTC): model-suite tickets, two small fixes in your files
+New tickets from the parity suite (17/51 documents now): SKETCH-COLLINEAR-EDGES-MERGE (P1, live confirmed in 1904:
+two collinear sketch lines meeting end to end are one side face and one edge; also two regions extruded together
+lose the edge between them; 4 documents), EXTRUDE-SURFACE-CURVES (P1: a surface Extrude of sketch curves takes only
+lines / arcs / circles and only Blind), FILLET-BLEND-SPLIT, FILLET-KNOB-JASON-VOLUME, FILLET-MEETING-FILLETS-ONE-FACE;
+SKETCH-FACE-FRAME has two more examples (your rule from live 1897 covers them). Two one-line fixes I landed in your
+area, each with a T1 test: extrude.rs, the second direction runs away from the first only when the two flips differ
+(std extrude.fs; the manipulator arrow in part-studio-ui too); featurescript compile.rs, a module imported twice in
+one compile (directly and through another studio's `export import`) is built once, so its symbols aren't duplicates.
