@@ -1339,7 +1339,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   focused with "2 mm" all selected** (std's INITIAL_FOCUS_ON_EDIT on the value); ours: **Name focused**, "wall_thickness"
   selected (qa-scratch/tickets/fl/vd-b2.png, top left; window focused). Same run = live: a click on the selected Extrude 1
   row deselects it, Space clears the selection. Scenario ui-parity/variable-edit-focus. (qa 2026-11-03, build e18f898a)
-- [ ] P3 FEATURE-ROW-ENTER-EDITS (psui) Enter on a selected feature row opens its dialog in ours: click the Extrude 1 row,
+- [ ] P3 FEATURE-ROW-ENTER-EDITS (psui; **unconfirmed**, qa 11-03 00:50: live's keys under CDP may not reach the feature list (its ArrowUp didn't move the bar either), so live's "nothing" needs a real-keyboard check: REQUESTS qa 11-03) Enter on a selected feature row opens its dialog in ours: click the Extrude 1 row,
   Enter; live (11-02, qa's tab, livek/t-b1.mjs): **nothing opens** (no dialog; double-click or Edit… opens it); ours:
   the Extrude 1 dialog opens (qa-scratch/tickets/fl/ubf-esc-enter.png, right). The rest of that run = live: in an
   edited dialog with "20" typed in Depth, the 1st Escape reverts the field and keeps the dialog, the 2nd cancels it;
@@ -1352,7 +1352,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   enabled / disabled; after ✕ both disabled and no sketch left. Ours: **both enabled at every step inside the sketch**
   (and Redo with nothing to redo does nothing), both disabled again after ✕ (qa-scratch/tickets/fl/ub-sk-undo.png: open,
   in sketch, line, Ctrl+Z, Ctrl+Y, ✕; focused: ubf-sk-undo.png). Scenario ui-parity/sketch-undo-redo-state. (qa 2026-11-02, build 6b4704f2)
-- [ ] P2 ROLLBACK-BAR-UNDO-STEP (psui) moving the rollback bar is an undo step in ours, not in live: a 40 x 30 x 10 box
+- [x] not a bug, withdrawn by qa (11-03 00:50: live's ArrowUp under CDP never moved the bar, so "Undo stays disabled" proved nothing; dragging the bar with the mouse in live (livek/t-rb3.mjs) rolls Extrude 1 back, enables Undo, and Ctrl+Z puts the bar back at the end with Redo enabled = ours) P2 ROLLBACK-BAR-UNDO-STEP (psui) moving the rollback bar is an undo step in ours, not in live: a 40 x 30 x 10 box
   (Sketch 1, Extrude 1; nothing undoable after open), click the Extrude 1 row, ArrowUp (bar above Extrude 1), ArrowDown;
   live (11-02, qa's tab, "qa parity vars", toolbar `[command-id=UNDO_A_CHANGE]`): **Undo stays disabled** through both
   moves; ours: **Undo enabled after the first move**, and Ctrl+Z moves the bar back up (re-checked with the window focused: tickets/fl/ubf-undo-bar.png; first run ub-undo-bar.png:
