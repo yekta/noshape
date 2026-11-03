@@ -2686,6 +2686,109 @@ fn probes16() -> Vec<(String, Case)> {
     out
 }
 
+/// Probes 17 (batch 17's misses): a T's stem width (s838 / s841 / s857 keep
+/// the stem's dimensioned side, s784 the other), an L-bracket's rounded inner
+/// corner (s835), a V with a circle in it (s845), s829's own trapezoid.
+fn probes17() -> Vec<(String, Case)> {
+    use std::f64::consts::PI;
+    let v = DVec2::new;
+    let mut out = Vec::new();
+    let mut add = |name: &str, f: &dyn Fn(&mut Case)| {
+        let mut c = Case::new();
+        f(&mut c);
+        out.push((name.to_string(), c));
+    };
+    // T: flange 40 x 6 on a stem 10 wide, 20 high (as the fuzz kind).
+    let t_profile = |c: &mut Case, sw: f64, t: f64, sh: f64, left_height: bool| {
+        let (w0, t0, sw0, sh0) = (40.0, 6.0, 10.0, 20.0);
+        let x0 = (w0 - sw0) / 2.0;
+        let p = [v(x0, 0.0), v(x0 + sw0, 0.0), v(x0 + sw0, sh0), v(w0, sh0), v(w0, sh0 + t0), v(0.0, sh0 + t0), v(0.0, sh0), v(x0, sh0)];
+        let l: Vec<String> = (0..8).map(|i| c.line(p[i], p[(i + 1) % 8])).collect();
+        for i in 0..8 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 8]));
+            c.hv(i % 2 == 0, &l[i]);
+        }
+        c.pair("EQUAL", &l[2], &l[6]);
+        c.length(&l[4], w0);
+        c.length(&l[3], t);
+        c.length(&l[0], sw);
+        c.length(if left_height { &l[7] } else { &l[1] }, sh);
+    };
+    add("u1 T, stem 10 -> 12 wide, its height dimensioned on the right", &|c| t_profile(c, 12.0, 6.0, 20.0, false));
+    add("u2 T, stem 10 -> 8 wide, height on the right", &|c| t_profile(c, 8.0, 6.0, 20.0, false));
+    add("u3 T, stem 10 -> 12 wide, height on the left", &|c| t_profile(c, 12.0, 6.0, 20.0, true));
+    add("u4 T, stem 10 -> 12 wide and flange 6 -> 7 thick, height on the right", &|c| t_profile(c, 12.0, 7.0, 20.0, false));
+    add("u5 T, stem 10 -> 12 wide and 20 -> 24 high (on the right)", &|c| t_profile(c, 12.0, 6.0, 24.0, false));
+    // L-bracket 40 x 34, foot 6.7 thick, upright 6.4 thick, its inner corner rounded R4.
+    let rounded_l = |c: &mut Case, r_new: f64, t1_new: f64| {
+        let (w, h, t1, t2, r) = (40.0, 34.0, 6.7, 6.4, 4.0);
+        let l1 = c.line(v(0.0, 0.0), v(w, 0.0));
+        let l2 = c.line(v(w, 0.0), v(w, t1));
+        let l3 = c.line(v(w, t1), v(t2 + r, t1));
+        let a4 = c.arc(v(t2 + r, t1 + r), r, PI, 1.5 * PI);
+        let l5 = c.line(v(t2, t1 + r), v(t2, h));
+        let l6 = c.line(v(t2, h), v(0.0, h));
+        let l7 = c.line(v(0.0, h), v(0.0, 0.0));
+        for (a, b) in [(&l1, &l2), (&l2, &l3), (&l5, &l6), (&l6, &l7), (&l7, &l1)] {
+            c.coincident(&format!("{a}.end"), &format!("{b}.start"));
+        }
+        c.coincident(&format!("{l3}.end"), &format!("{a4}.end"));
+        c.coincident(&format!("{a4}.start"), &format!("{l5}.start"));
+        c.pair("TANGENT", &l3, &a4);
+        c.pair("TANGENT", &a4, &l5);
+        for (x, hz) in [(&l1, true), (&l2, false), (&l3, true), (&l5, false), (&l6, true), (&l7, false)] {
+            c.hv(hz, x);
+        }
+        c.length(&l1, w);
+        c.length(&l7, h);
+        c.length(&l2, t1_new);
+        c.length(&l6, t2);
+        c.radius(&a4, r_new, false);
+    };
+    add("v1 L-bracket with a rounded inner corner, R4 -> R5", &|c| rounded_l(c, 5.0, 6.7));
+    add("v2 L-bracket with a rounded inner corner, foot 6.7 -> 6.25 thick", &|c| rounded_l(c, 4.0, 6.25));
+    add("v3 L-bracket with a rounded inner corner, R4 -> R4.2 and foot 6.7 -> 6.25", &|c| rounded_l(c, 4.2, 6.25));
+    // V: a Horizontal leg 50 and one at 72° 42, a circle R5.4 Tangent to both.
+    let v_circle = |c: &mut Case, deg: f64, rad: f64, l2: f64| {
+        let (th, r) = (72.0f64, 5.4);
+        let a = c.line(v(0.0, 0.0), v(50.0, 0.0));
+        let b = c.line(v(0.0, 0.0), DVec2::from_angle(th.to_radians()) * 42.0);
+        c.coincident(&format!("{a}.start"), &format!("{b}.start"));
+        c.hv(true, &a);
+        let half = (th / 2.0).to_radians();
+        let circle = c.circle(DVec2::from_angle(half) * (r / half.sin()), r);
+        c.pair("TANGENT", &a, &circle);
+        c.pair("TANGENT", &b, &circle);
+        c.angle(&a, &b, deg);
+        c.length(&a, 50.0);
+        c.length(&b, l2);
+        c.radius(&circle, rad, false);
+    };
+    add("w1 V with a circle, angle 72 -> 89 deg", &|c| v_circle(c, 89.0, 5.4, 42.0));
+    add("w2 V with a circle, R5.4 -> R7", &|c| v_circle(c, 72.0, 7.0, 42.0));
+    add("w3 V with a circle, the slanted leg 42 -> 48", &|c| v_circle(c, 72.0, 5.4, 48.0));
+    // Fuzz s829's trapezoid (drawn top 21.731, dimensioned 19.698), as drawn,
+    // moved, halved, and with half the change.
+    let s829 = |c: &mut Case, at: DVec2, k: f64, top: f64| {
+        let p = [v(-0.6, -9.42), v(48.14, -9.42), v(34.63, 14.76), v(12.9, 14.76)].map(|q| at + q * k);
+        let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+        for i in 0..4 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+        }
+        c.hv(true, &l[0]);
+        c.hv(true, &l[2]);
+        c.pair("EQUAL", &l[1], &l[3]);
+        c.length(&l[0], 48.74 * k);
+        c.length(&l[2], top * k);
+        c.distance(&format!("{}.start", l[2]), &l[0], 24.18 * k);
+    };
+    add("x1 s829's trapezoid as drawn, top 21.73 -> 19.70", &|c| s829(c, v(0.0, 0.0), 1.0, 19.7));
+    add("x2 the same moved by (20, 20)", &|c| s829(c, v(20.0, 20.0), 1.0, 19.7));
+    add("x3 the same at half size", &|c| s829(c, v(0.0, 0.0), 0.5, 19.7));
+    add("x4 s829's trapezoid, top 21.73 -> 20.71 (half the change)", &|c| s829(c, v(0.0, 0.0), 1.0, 20.715));
+    out
+}
+
 fn probe_batch(list: Vec<(String, Case)>) -> Value {
     let cases: Vec<Value> = list.into_iter().map(|(name, mut c)| {
         let ours = ours(&mut c);
@@ -2700,7 +2803,7 @@ fn probe_batch(list: Vec<(String, Case)>) -> Value {
 #[test]
 #[ignore = "T2: live fuzz least-change probes"]
 fn probe_matches() {
-    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16())] {
+    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16()), (17, probes17())] {
         let b = probe_batch(list);
         let path = fixture(&format!("sketch-probe-{n}.json"));
         if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == format!("probe-{n}")) {
@@ -2730,7 +2833,7 @@ fn probe_matches() {
 fn one_case() {
     let probe = std::env::var("FUZZ_PROBE").ok();
     // (FUZZ_PROBE=<set>:<name> where names repeat across sets, e.g. 14:q2.)
-    let sets = || [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16())];
+    let sets = || [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16()), (17, probes17())];
     let Some(mut c) = probe.as_ref().and_then(|p| {
         let (set, name) = p.split_once(':').map_or((None, p.as_str()), |(s, n)| (s.parse::<u32>().ok(), n));
         sets().into_iter().filter(|(k, _)| set.is_none_or(|s| s == *k)).flat_map(|(_, l)| l).find(|(n, _)| n.split(' ').next() == Some(name)).map(|(_, c)| c)
