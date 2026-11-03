@@ -16,6 +16,17 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-03 08:45.**
+- Landed: P1 SKETCH-FACE-IMPRINT (bd7aba69; live's rule from a REST probe, Part Studio "core imprint probe 1" in "live
+  1812 drawing scale": the face's edges split the sketch's own regions, the face's other pieces are sketch faces but
+  not qSketchRegion's; sketch.rs `imprint`, SketchResult.imprinted / .split; untitled-document-chris matches live).
+  Queued: EXTRUDE-OVERLAP-LINES-FACES (one line's pieces one profile edge; bracket120's Extrude 1 as live).
+- Parity models on vibe5: ~/agents/core-parity-models (6 copied from /root/parity/models);
+  `NOSHAPE_PARITY_MODELS=$HOME/agents/core-parity-models cargo test -p noshape-ops --test all parity_models -- --ignored --nocapture`.
+- Left for others: clamp-hms Extrude 2 and bracket120 Extrude 2 (dx, the translator's region choice);
+  CUT-CLOSED-EDGES-SPLIT (bool; the loops' vertices are the seams', an edge join does nothing). Asked live: REQUESTS
+  07:20 (sketch mode fill of imprinted pieces, a feature-list pick of a sketch on a face).
+
 **State 11-03 05:45.**
 - Landed: P0 CRASH-2045 (3fcc69d8: OCCT's ChFi3d failing with TopoDS_UnCompatibleShapes changed its input in place,
   freeing topology of the cached body; fillet / variable fillet / chamfer now blend a BRepBuilderAPI_Copy, same
