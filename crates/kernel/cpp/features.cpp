@@ -3334,9 +3334,18 @@ static void set_tolerance(const TopoDS_Shape& x, double t)
 // OCCT's blend in metres leaves its approximation tolerance (1e-4: 0.1 mm) on the edges, vertices and faces it makes;
 // they get what they need instead (shell-hang: Chamfer 4's 0.1 mm vertices made every later Shell's slab fuse come
 // out broken). Returns the largest tolerance a new vertex needs (its distance to the curves ending at it, on the
-// edges and on the faces). The input's own sub-shapes, shared with it, never change; a vertex of theirs that would
-// need more: infinity, and the result as it was.
-static double tighten_new_tolerances(const TopoDS_Shape& input, const TopoDS_Shape& r)
+// edges and on the faces). The input's own sub-shapes, shared with it, never change. Where a new vertex needs more than
+// `limit` (OCCT's corners really that far off: tighter edges there change later operations, qa's askew head bolt) or a
+// vertex of the input's would: the result as it was, and infinity.
+// 1e-5 of a part's size: how far a blend's corner may be from where it should be for its tolerances to be tightened.
+static double accurate(const TopoDS_Shape& part)
+{
+  Bnd_Box box;
+  BRepBndLib::Add(part, box);
+  return box.IsVoid() ? 0 : 1e-5 * std::sqrt(box.SquareExtent());
+}
+
+static double tighten_new_tolerances(const TopoDS_Shape& input, const TopoDS_Shape& r, double limit)
 {
   ShapeIMap old;
   for (TopAbs_ShapeEnum k : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
@@ -3415,7 +3424,7 @@ static double tighten_new_tolerances(const TopoDS_Shape& input, const TopoDS_Sha
     set_tolerance(v, need);
     worst = std::max(worst, need);
   }
-  if (!past_old && valid_changed(input, r))
+  if (!past_old && worst <= limit && valid_changed(input, r))
     return worst;
   for (const auto& [x, t] : was)
     set_tolerance(x, t);
@@ -3450,7 +3459,7 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
     {
       const KernelTimer timer("blend.finish");
       merge_full_rounds(input, r, h);
-      tighten_new_tolerances(input, r);
+      tighten_new_tolerances(input, r, accurate(input));
       return as_is.finish(r, h);
     }
   }
@@ -4542,7 +4551,7 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     HHist        h;
     if (blend_in_slabs(s.shape, es, 2 * rmax, blend, out, h))
     {
-      tighten_new_tolerances(s.shape, out);
+      tighten_new_tolerances(s.shape, out, accurate(s.shape));
       return make_result({s.shape}, out, h.get());
     }
   }
@@ -4566,7 +4575,7 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
       fail_op("fillet failed: unfilleted edge overlapped by fillet");
     if (!past)
       throw;
-    tighten_new_tolerances(s.shape, past->first);
+    tighten_new_tolerances(s.shape, past->first, accurate(s.shape));
     return make_result({s.shape}, past->first, past->second.get());
   }
 }
@@ -5196,7 +5205,7 @@ static OpOut op_chamfer_unbudgeted(const OcShape& s, const OcShapeList& edges, c
   if (checked && mode == 0)
     if (auto corner = chamfer_into_fillet_corners(s.shape, es, d1))
     {
-      tighten_new_tolerances(s.shape, corner->first);
+      tighten_new_tolerances(s.shape, corner->first, accurate(s.shape));
       return make_result({s.shape}, corner->first, corner->second.get());
     }
   if (checked)
@@ -5231,7 +5240,7 @@ static OpOut op_chamfer_unbudgeted(const OcShape& s, const OcShapeList& edges, c
     HHist        h;
     if (blend_in_slabs(s.shape, es, 2 * size, blend, out, h))
     {
-      tighten_new_tolerances(s.shape, out);
+      tighten_new_tolerances(s.shape, out, accurate(s.shape));
       return make_result({s.shape}, out, h.get());
     }
   }

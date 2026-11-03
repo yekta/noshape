@@ -1558,6 +1558,9 @@ What it found on pattern_second's fin under the 400-fin plate (release, load 20â
   a second ray when a hit is within ~1e-3 of the face's size from its boundary would make it safe.
 
 ## Requests to the lead
+- (11-03 04:15) Release: eca0da09 (in greens since 02:22) made some saved documents regenerate differently (qa P1
+  BLEND-TOL-REGEN-CHANGES); the fix is queued now (OCCT's metre blends kept as before, only their tolerances
+  tightened). If the 05:00 cut can't take a green with it, cut before eca0da09.
 - (11-03 02:25) FYI for bool and qa (eca0da09): every OCCT fillet / chamfer run in metres (the as-is try, slab-local
   blends) used to leave 1e-4 m (0.1 mm) vertex tolerances on what it made, carried by every later body: likely the
   source of many "a tolerant input" Boolean declines and of slab Shells failing on fuzz parts. They are now the
