@@ -605,3 +605,34 @@ fn an_old_symmetric_extrude_is_read() {
     let r = run_model("old-symmetric", &features, &live, &refs);
     assert_eq!((r.matching, r.features), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
+
+/// An assembly's sources: a second Part Studio translated into a new tab of
+/// the same document (`open_in`); each tab has its own part, the first is
+/// untouched.
+#[test]
+fn a_second_part_studio_goes_into_its_own_tab() {
+    let (features, live, refs) = block_model();
+    let mut all = refs_from_bodies(&live);
+    all.extend(parse_refs(&refs));
+    let mut ctx = Ctx::new();
+    let path = scratch("two-studios.noshape");
+    {
+        let mut t = Translator::open(&mut ctx, &path, &features, all.clone()).unwrap();
+        for k in 0..t.len() {
+            assert!(t.step(k).ours.is_some());
+        }
+    }
+    {
+        let mut t = Translator::open_in(&mut ctx, "Bracket", &features, all).unwrap();
+        for k in 0..t.len() {
+            let s = t.step(k);
+            assert!(s.ours.is_some(), "{}: {:?}", s.name, s.problems);
+        }
+    }
+    let run = |ctx: &mut Ctx, tab: &str| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name("query_parts").unwrap(), &json!({ "tab": tab })).unwrap().value;
+    for tab in ["Part Studio 1", "Bracket"] {
+        let p = run(&mut ctx, tab);
+        assert_eq!(p["parts"].as_array().map(Vec::len), Some(1), "{tab}: {p}");
+        assert_eq!((p["parts"][0]["faces"].as_u64(), p["parts"][0]["edges"].as_u64()), (Some(8), Some(17)), "{tab}: {p}");
+    }
+}

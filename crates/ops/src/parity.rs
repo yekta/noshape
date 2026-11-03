@@ -74,6 +74,9 @@ pub struct Translator<'a> {
     ellipses: HashMap<(String, String), [f64; 6]>,
     /// Face pieces one selection list already took (each is picked once).
     picked: std::collections::HashSet<String>,
+    /// The Part Studio tab translated into (`open_in`); calls that take a
+    /// `tab` get it.
+    tab: Option<String>,
     first_move: Option<String>,
     /// Onshape Feature Studio element id → our Feature Studio tab id.
     studios: HashMap<String, String>,
@@ -150,6 +153,50 @@ impl<'a> Translator<'a> {
     /// A new document at `path` for the Part Studio `doc` (features.json),
     /// with live's reference geometry `refs`.
     pub fn open(ctx: &'a mut Ctx, path: &Path, doc: &Value, refs: HashMap<(usize, String), LiveRef>) -> Result<Self, String> {
+        let _ = std::fs::remove_file(path);
+        let mut t = Self::new(ctx, doc, refs)?;
+        t.call("document_create", json!({ "path": path.to_str().ok_or("path")? }))?;
+        // Bare numbers in Onshape's expressions are in the document's units.
+        let (length, angle) = doc_units(&doc["units"]);
+        if length.is_some() || angle.is_some() {
+            let mut a = json!({});
+            if let Some(l) = length {
+                a["length_unit"] = json!(l);
+            }
+            if let Some(g) = angle {
+                a["angle_unit"] = json!(g);
+            }
+            t.call("document_set_units", a)?;
+        }
+        t.studio_setup(doc);
+        Ok(t)
+    }
+
+    /// Another Part Studio of the document open in `ctx` (an assembly's
+    /// sources): a new tab `name` the features go into (the document's units
+    /// are the first studio's).
+    pub fn open_in(ctx: &'a mut Ctx, name: &str, doc: &Value, refs: HashMap<(usize, String), LiveRef>) -> Result<Self, String> {
+        let mut t = Self::new(ctx, doc, refs)?;
+        let made = t.call("tab_create", json!({ "kind": "Part Studio", "name": name }))?;
+        t.tab = Some(made["tab"]["id"].as_str().ok_or("tab_create gave no tab id")?.to_string());
+        t.studio_setup(doc);
+        Ok(t)
+    }
+
+    /// Configuration inputs, Variable Studios and Feature Studios of `doc`.
+    fn studio_setup(&mut self, doc: &Value) {
+        for c in doc["configuration"]["configurationParameters"].as_array().into_iter().flatten() {
+            self.config_input(c);
+        }
+        for table in doc["variables"].as_array().into_iter().flatten().filter(|v| v["variableStudioReference"].is_object()) {
+            self.variable_studio(table);
+        }
+        for (element, studio) in doc["featureStudios"].as_object().into_iter().flatten() {
+            self.feature_studio(element, studio);
+        }
+    }
+
+    fn new(ctx: &'a mut Ctx, doc: &Value, refs: HashMap<(usize, String), LiveRef>) -> Result<Self, String> {
         let features = doc["features"].as_array().ok_or("features.json has no `features`")?.clone();
         let mut frames = HashMap::new();
         for s in doc["sketches"]["sketches"].as_array().into_iter().flatten() {
@@ -167,31 +214,7 @@ impl<'a> Translator<'a> {
             .flatten()
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
-        let _ = std::fs::remove_file(path);
-        let mut t = Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), first_move: None, studios: HashMap::new(), notes: Vec::new() };
-        t.call("document_create", json!({ "path": path.to_str().ok_or("path")? }))?;
-        // Bare numbers in Onshape's expressions are in the document's units.
-        let (length, angle) = doc_units(&doc["units"]);
-        if length.is_some() || angle.is_some() {
-            let mut a = json!({});
-            if let Some(l) = length {
-                a["length_unit"] = json!(l);
-            }
-            if let Some(g) = angle {
-                a["angle_unit"] = json!(g);
-            }
-            t.call("document_set_units", a)?;
-        }
-        for c in doc["configuration"]["configurationParameters"].as_array().into_iter().flatten() {
-            t.config_input(c);
-        }
-        for table in doc["variables"].as_array().into_iter().flatten().filter(|v| v["variableStudioReference"].is_object()) {
-            t.variable_studio(table);
-        }
-        for (element, studio) in doc["featureStudios"].as_object().into_iter().flatten() {
-            t.feature_studio(element, studio);
-        }
-        Ok(t)
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -282,8 +305,14 @@ impl<'a> Translator<'a> {
         self.features.is_empty()
     }
 
-    pub fn call(&mut self, tool: &str, args: Value) -> Result<Value, String> {
+    pub fn call(&mut self, tool: &str, mut args: Value) -> Result<Value, String> {
         let op = registry::by_tool_name(tool).ok_or_else(|| format!("no tool {tool}"))?;
+        if let (Some(tab), Some(a)) = (&self.tab, args.as_object_mut())
+            && op.fields.iter().any(|f| f.name == "tab")
+            && !a.contains_key("tab")
+        {
+            a.insert("tab".into(), json!(tab));
+        }
         registry::run(self.ctx, op, &args).map(|o| o.value).map_err(|e| e.to_json().to_string())
     }
 
