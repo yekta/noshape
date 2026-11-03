@@ -249,6 +249,9 @@ dump, the runner, live's first 20 scenarios run in ours and a first score.
   preselected edge (live's account drops the edge since 04:10), Hole / Revolve remembered values, Shift+P as an undo
   step, a rolled-back variable's " = 0", Fillet moved above its Extrude reading "ok", the second Enter after an
   autofill insertion (new scenario extrude-depth-variable-enter-twice).
+- 2026-11-03 19:01: parity suites check (lead): live's recordings (128) are now in tests/ui-parity/live and the model index lists
+  all 58 documents (both had stayed off main: live's commits sat on an unpushed local branch). Copy new recordings
+  from /root/parity/ui/live into tests/ui-parity/live when comparing them.
 - 11-03 17:30: **114/128 scenarios, 887/932 states** on live's batch (/root/parity/ui/live). Left: 7 fillet-* (live's
   account drops the preselected edge, REQUESTS 1850 / 15:05), 7 sketch (skasm.md), extrude-end-type-up-to-face (live's
   start read before its list drew). Fixed since 15:10: the driver's idle check waits for an open dialog's model before
