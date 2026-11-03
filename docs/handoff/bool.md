@@ -96,13 +96,45 @@ Repro: ~/agents/fuzz/dump3005/shell-10 / -11 (NOSHAPE_DUMP_OPS dumps; core_scrat
   it 0.14 mm from its end (both vertices of 0.1 mm tolerance, apart by less than the sum, not merged as one): two
   collinear pieces from one vertex. (c) a5f1e564: collinear overlapping segments after projection. OCCT's PaveFiller
   sources aren't on this machine (only the installed OCCT in /root/occt).
-- Next, in order: (1) land bool-c once its sweep (vibe5 uvper2.tsv) is >= 258; (2) b7eb72a8 (held projection);
-  (3) the two-edges kinds above; (4) speed: intervals_on's numeric_intersections (each boundary curve's samples once per face), free-form rays (fewer Newton starts per patch), C2::param_of, BRepCheck on built faces only;
-  (5) the 30 TPI knurl's tolerance (see the regression section below). Tools: bin/why4.sh (single cases on vibe4),
-  bin/syncdbg.sh [worktree] (bool-a = that worktree + env-gated debug prints from bin/dbgpatch.py: NOSHAPE_X_NM,
-  _ALLP, _PAIR, _SEGS, _TWIN (segments between one pair of vertices), _NOPC (a piece without its curve on a
-  free-form face), _DELV (the deleted-vertex rule), _PROJ (a failed projection), _TINY (a tiny arc)).
+- Next, in order: (1) check the three knurls that timed out on vibe5 (fin2) by hand on vibe4; (2) the knurls' remaining "a non-manifold result" (32 of 346): a section running
+  within its 5 um tolerance beside another argument's edge on the cylinder (Ø25 x 10 CP30 45/30, recorded
+  vibe4 ~/agents/bool-corpora/k25-10-30: the flank's section with the cylinder 2.5 um from the groove's ridge edge,
+  a sliver piece between; OCCT makes them one common block); (3) b7eb72a8 (held projection); (4) the two-edges kinds
+  above; (5) speed: free-form rays (fewer Newton starts per patch), C2::param_of, OCCT's section tolerance check.
+  Tools: bin/why4.sh (single cases on vibe4), bin/syncdbg.sh [worktree] (bool-a = that worktree + env-gated debug
+  prints from bin/dbgpatch.py: NOSHAPE_X_NM, _ALLP, _PAIR, _SEGS, _TWIN (segments between one pair of vertices),
+  _NOPC (a piece without its curve on a free-form face), _DELV (the deleted-vertex rule), _PROJ (a failed
+  projection), _TINY (a tiny arc), _NEARSEG (segments near a non-manifold one), _SHORT (pieces under 1e-7),
+  _LOST (a face lost), _NOENDS (a section without ends), _CYLNC); knurl recordings: vibe4 ~/agents/bool-corpora/k*
+  (record one with NOSHAPE_RECORD_BOOLEANS=<dir> and NOSHAPE_BOOL_RUST=0 on the model test
+  custom_features::knurl_feature_b94_tooth_and_helix_angles, KNURL_SIZE / KNURL_PITCH / KNURL_ANGLES).
 - Squash only with `git reset --soft $(git merge-base HEAD origin/main)` after a fresh fetch; check `git show --stat`.
+
+## Wrong knurl results on main fixed; split points nearer than the tolerance one vertex (11-03 07:30 UTC)
+- Found: since 86596b72 the knurl sweep's Ø25 x 25 CP20 45/45 was TAKEN WRONG on main: 11811.805 mm³, invalid,
+  where OCCT gives 11878.823 (valid); Ø25 x 24 CP12 45/30 invalid (OCCT's volume). Both have over 2000 faces,
+  where the build skips BRepCheck (a full check costs the diamond knurl 8.8 -> 12.2 s on vibe3: too much). The
+  sweep counts takes only: check its "valid false" rows too (kcmp.py doesn't).
+- Ø25 x 25 (recorded, T2 a_25_by_25_knurl): build() makes a section piece a few tolerances long whose ends'
+  parameters came out the wrong way straight between its vertices (a Geom_Line, range 0..length), but
+  ellipse_pcurve then put the section's own curves on the faces on it, by the section's parameters: the curves on
+  the cylinder pieces were elsewhere (open wires, negative areas; GProp's volume from them 0.6 % off). Now such an
+  edge (EllEdge::straight) gets its curves on the faces by projection. Equivalent to OCCT (2.9e-9 relative).
+- Ø25 x 24 (recorded, T2 a_25_by_24_knurl): two split points of a section a micrometre apart across it, both within
+  its 5 um reach, joined by an 11 nm piece of it: a wire crossing itself. Now split_reach makes consecutive split
+  points nearer along the curve than the tolerance one vertex (regroup, again with them merged; OCCT's pave).
+  Equivalent to OCCT. The same takes the Ø10 x 10 CP12 knurl (T1 a_ten_millimetre_knurl: valid, OCCT's groove by
+  groove volume) and the seam grooves (T1 grooves_crossing_at_the_seam, valid as OCCT's) again: both were T1s
+  asserting declines.
+- Guards (cheap): in results past 2000 faces each made cylinder / cone face's wires must close on its surface
+  ("a face's curves don't close"); in the core a piece whose curve's ends are far nearer each other than its
+  vertices declines ("a piece shorter than its vertices' distance").
+- Knurl sweep (fin2): 302 -> 307 of 346, no "valid false" row left (Ø25 x 25 at OCCT's 11878.823); three cases that
+  took 600-900 s timed out on loaded vibe5 (Ø100 x 50 CP30 45/30, Ø63 x 50 CP30 45/45, Ø100 x 71 CP30 80/30), one
+  that timed out was taken. Corpora and Shell's recordings decline as before (reasons move: more "a point near two
+  vertices" from the regroup rounds), 0 differ; qa's checks identical.
+- Debug: /root/bool-scratch/negarea-check.diff on the debug copy (NOSHAPE_X_NEGAREA: made faces of negative area
+  with their edges' origins, ranges and curves on the face; NOSHAPE_X_CHECK: BRepCheck's failing sub-shapes).
 
 ## The curvature allowance at a vertex capped (11-03 03:50 UTC)
 - arrange.rs merges the directions of curves leaving a vertex that are within 1e-9 + 1 um x their curvatures

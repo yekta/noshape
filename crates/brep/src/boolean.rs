@@ -2868,6 +2868,18 @@ impl Ctx<'_> {
             }
         }
         on.sort_by(|x, y| x.0.total_cmp(&y.0));
+        // (Two split points nearer along it than the tolerance, different vertices (each within the section's
+        // reach, a micrometre apart across it: a knurl section's 11 nm piece between them): one vertex, as OCCT's
+        // pave; again with the two merged.)
+        if on.len() > 1 {
+            let len = *len.get_or_init(|| self.seg_length(s));
+            for w in on.windows(2) {
+                if w[0].1 != w[1].1 && (w[1].0 - w[0].0) * len <= tol {
+                    let (p, q) = (self.p(w[0].1), self.p(w[1].1));
+                    self.pool.regroup.lock().expect("a group").push(bounding_sphere(&[(p, self.pool.t[w[0].1 as usize]), (q, self.pool.t[w[1].1 as usize])]));
+                }
+            }
+        }
         let mut chain = vec![s.v[0]];
         chain.extend(on.into_iter().map(|x| x.1));
         chain.push(s.v[1]);
@@ -4444,6 +4456,14 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     section_faces.sort_unstable();
     section_faces.dedup();
     crate::check_cancel()?;
+    // (A piece whose curve runs far shorter than its vertices are apart (a section's 11 nm between two of its split
+    // points a micrometre apart across it): the faces' wires would cross themselves there.)
+    for se in &sedges {
+        let d = (cx.p(se.seg.v[1]) - cx.p(se.seg.v[0])).length();
+        if se.seg.v[0] != se.seg.v[1] && d > 4.0 * tol && (cx.seg_at(&se.seg, 1.0) - cx.seg_at(&se.seg, 0.0)).length() < 0.5 * d {
+            return Err(Decline("a piece shorter than its vertices' distance"));
+        }
+    }
     // Pieces of faces.
     let mut pieces: Vec<Piece> = Vec::new();
     let mut face_pieces: Vec<Vec<usize>> = vec![Vec::new(); cx.faces.len()];

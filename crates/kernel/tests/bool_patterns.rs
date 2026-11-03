@@ -419,6 +419,41 @@ fn as_recorded(name: &str) {
     assert_eq!(counts(&r.shape), [c.summary.faces, c.summary.edges, c.summary.vertices]);
 }
 
+/// noshape's Boolean alone on a recorded knurl: valid, OCCT's counts, its volume within `rel` (OCCT's sections are
+/// approximations).
+fn knurl_as_recorded(name: &str, rel: f64) {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, name).expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let v = r.shape.volume().unwrap();
+    assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= rel * c.summary.volume, "valid {}, volume {v} against OCCT's {}", r.shape.is_valid(), c.summary.volume);
+    let counts = |s: &k::Shape| [k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+    assert_eq!(counts(&r.shape), [c.summary.faces, c.summary.edges, c.summary.vertices]);
+}
+
+/// The Ø25 × 24 CP12 45° / 30° knurl (recorded, 74 grooves): two split points of a section a micrometre apart across
+/// it, both within its reach, are one vertex (an 11 nm piece of it joined them: a wire crossing itself, an invalid
+/// result past the 2000 faces the build checks).
+#[test]
+#[ignore = "T2: a 74-groove knurl, its 2592 faces checked"]
+fn a_25_by_24_knurl() {
+    knurl_as_recorded("3c8b721535de27b6", 1e-8);
+}
+
+/// The Ø25 × 25 CP20 45° / 45° knurl (recorded, 124 grooves): section pieces made straight between their vertices
+/// get their curves on the faces by projection (the section's curves, by its own parameters, were put on the line's:
+/// cylinder pieces open on the cylinder, the result invalid and 0.6 % of its volume off).
+#[test]
+#[ignore = "T2: a 124-groove knurl, its 12464 faces checked"]
+fn a_25_by_25_knurl() {
+    knurl_as_recorded("ae71f76b6e894374", 1e-8);
+}
+
 /// A common keeping a piece of an argument's half circle from its start (recorded): the piece's range from the
 /// edge's own start (its angle a rounding below it went a turn on: "an edge outside its face's range").
 #[test]
@@ -434,19 +469,8 @@ fn halves_of_a_closed_edge_on_a_torus() {
     as_recorded("9f434299c9a0048f");
 }
 
-/// noshape's Boolean alone on a recorded case (recorded with it on: its summary is ours then), its result valid and
-/// against OCCT's on the same inputs now: the same counts, its volume within `rel`.
-fn declines_as(name: &str, reason: &str) {
-    let _ = k::set_working_scale(1000.0);
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
-    let c = k::bool_corpus::load(&dir, name).expect("the recorded case");
-    k::set_rust_boolean_only(true);
-    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
-    let why = k::last_rust_decline();
-    k::set_rust_boolean_only(false);
-    assert!(r.is_err() && why == reason, "taken, or declined otherwise: {why}");
-}
-
+/// noshape's Boolean alone on a recorded case, its result valid and against OCCT's on the same inputs now: the same
+/// counts, its volume within `rel`.
 fn valid_as_occt(name: &str, rel: f64) {
     let _ = k::set_working_scale(1000.0);
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
@@ -556,12 +580,11 @@ fn an_arc_tangent_to_an_edge_at_a_vertex() {
 }
 
 /// Two knurl grooves crossing at the cylinder's seam 0.8 mm above its end (recorded: the Ø25 × 24 knurl at 45° /
-/// 30°, its tools 13 and 50): sections crossing within their tolerance of a section's end. Taken while such a
-/// crossing was the end (11-02 05:10); that rule, with a crossing given its section's tolerance, cost the knurl sweep
-/// 37 cases (Ø63 and Ø100 at 20 and 30 TPI non-manifold), so this one declines to OCCT ("an invalid result").
+/// 30°, its tools 13 and 50): sections crossing within their tolerance of a section's end, the crossings a
+/// micrometre apart one vertex ("an invalid result" before).
 #[test]
-fn grooves_crossing_at_the_seam_declines() {
-    declines_as("13187a9d1dd709bc", "an invalid result");
+fn grooves_crossing_at_the_seam() {
+    valid_as_occt("13187a9d1dd709bc", 1e-9);
 }
 
 /// A Shell common whose part has a face of nominal tolerance 1e-5 (its real one 1e-7) and many vertices and edges of
@@ -910,10 +933,21 @@ fn ellipse_edges_after_a_cones_apex() {
     valid_as_occt("b200c5bfa89fcb3d", 1e-9);
 }
 
-/// A Ø10 × 10 diamond knurl, 12 TPI 45° / 45° (recorded; 30 grooves; OCCT's one cut of them is invalid, 1.16e-6 m³
-/// against 6.77883e-7 groove by groove). Taken while a crossing on a section had the section's 5 um tolerance (11-02
-/// 14:46); that cost the knurl sweep 37 cases, so this one declines again ("an invalid result").
+/// A Ø10 × 10 diamond knurl, 12 TPI 45° / 45° (recorded; 30 grooves): split points of a curve nearer along it than
+/// the tolerance are one vertex, as OCCT's pave (two crossings a micrometre apart across a section joined by an 11 nm
+/// piece of it: "an invalid result"). Valid, and the volume of OCCT's cut groove by groove (6.77883e-7 m³; its one
+/// cut of all of them is invalid, 1.16e-6).
 #[test]
-fn a_ten_millimetre_knurl_declines() {
-    declines_as("5099e897b3caf1fa", "an invalid result");
+fn a_ten_millimetre_knurl() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "5099e897b3caf1fa").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert!(r.shape.is_valid());
+    let v = r.shape.volume().unwrap();
+    assert!((v - 6.77883072e-7).abs() <= 1e-5 * 6.77883072e-7, "volume {v}");
 }

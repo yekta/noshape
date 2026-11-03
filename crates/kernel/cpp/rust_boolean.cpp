@@ -14,6 +14,7 @@
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <BRepTools_WireExplorer.hxx>
 #include <BRepLib.hxx>
 #include <BRepBndLib.hxx>
 #include <ShapeAnalysis_Surface.hxx>
@@ -720,6 +721,8 @@ struct EllEdge
   double                    t0 = 0, t1 = 0, tol = 0;
   // OCCT's ellipse round the other way (its axis against ours): the edge runs from its end to its start.
   bool reversed = false;
+  // Made straight between its vertices instead (a few tolerances long): its curves on the faces projected.
+  bool straight = false;
 };
 
 // OCCT's sections of pairs of the arguments' faces (arg, face, arg, face; the earlier argument's first).
@@ -1070,6 +1073,13 @@ const char* piece_pcurve(const BrepResult& r, const std::vector<const OcShape*>&
 const char* ellipse_pcurve(const EllEdge& x, const TopoDS_Face& src, const TopoDS_Edge& e, const occ::handle<Geom_Surface>& s,
                            const TopLoc_Location& loc, BRep_Builder& bb)
 {
+  // (Made straight: the section's curves on the faces go by its parameters, not the line's.)
+  if (x.straight)
+  {
+    BOPTools_AlgoTools2D::BuildPCurveForEdgeOnFace(e, TopoDS::Face(src.Oriented(TopAbs_FORWARD)));
+    double a = 0, z = 0;
+    return BRep_Tool::CurveOnSurface(e, s, loc, a, z).IsNull() ? "a short section's curve on a face" : nullptr;
+  }
   for (int j = 0; j < 2; ++j)
     if (!x.curve.IsNull() && x.face[j].IsSame(src))
     {
@@ -1329,10 +1339,11 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     // 0.3 um piece by three faces' vertices): straight between its vertices, as the Boolean put it in the faces.)
     if (!(t0 < t1) && p0.Distance(p1) > 1e-12 && p0.Distance(p1) <= 100 * tol)
     {
-      c   = new Geom_Line(p0, gp_Dir(gp_Vec(p0, p1)));
-      loc = TopLoc_Location();
-      t0  = 0;
-      t1  = p0.Distance(p1);
+      c                = new Geom_Line(p0, gp_Dir(gp_Vec(p0, p1)));
+      loc              = TopLoc_Location();
+      t0               = 0;
+      t1               = p0.Distance(p1);
+      ells[i].straight = true;
     }
     if (!(t0 < t1))
       return "an edge against its curve";
@@ -2345,6 +2356,51 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   // them: fuzz seed 1144's mirror fuse and Shell common).
   if (r.face_origin.size() / 3 <= 2000 && !BRepCheck_Analyzer(out).IsValid())
     return decline("an invalid result");
+  // (Past that: each made face on a cylinder or cone its wires closed on its surface (a curve's piece on the wrong
+  // part of its curve on the face left a Ø25 x 25 knurl's cylinder pieces open there: an invalid result, 0.6 % of
+  // its volume off).)
+  if (r.face_origin.size() / 3 > 2000)
+    for (size_t i = 0; i < t_built.f.size(); ++i)
+    {
+      if (r.face_origin[3 * i] == 0)
+        continue;
+      const TopoDS_Face&               f = TopoDS::Face(t_built.f[i]);
+      TopLoc_Location                  loc;
+      const occ::handle<Geom_Surface>& sf = BRep_Tool::Surface(f, loc);
+      const occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(sf);
+      const occ::handle<Geom_ConicalSurface>     cn = occ::down_cast<Geom_ConicalSurface>(sf);
+      if (cs.IsNull() && cn.IsNull())
+        continue;
+      // (Angles to lengths at its largest radius.)
+      double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+      BRepTools::UVBounds(f, u0, u1, v0, v1);
+      const auto   cone_r = [&](double v) { return std::abs(cn->RefRadius() + v * std::sin(cn->SemiAngle())); };
+      const double radius = !cs.IsNull() ? cs->Radius() : std::max(cone_r(v0), cone_r(v1));
+      for (TopExp_Explorer wx(f, TopAbs_WIRE); wx.More(); wx.Next())
+      {
+        gp_Pnt2d first, last;
+        bool     started = false;
+        for (BRepTools_WireExplorer we(TopoDS::Wire(wx.Current()), f); we.More(); we.Next())
+        {
+          const TopoDS_Edge& e = we.Current();
+          double a = 0, z = 0;
+          const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, f, a, z);
+          if (pc.IsNull())
+            return decline("an edge without its curve on a curved face");
+          const bool     fwd = e.Orientation() != TopAbs_REVERSED;
+          const gp_Pnt2d p0 = pc->Value(fwd ? a : z), p1 = pc->Value(fwd ? z : a);
+          const double   reach = 10 * (BRep_Tool::Tolerance(e) + tol);
+          if (started && (std::abs(p0.X() - last.X()) * radius > reach || std::abs(p0.Y() - last.Y()) > reach))
+            return decline("a face's curves don't close");
+          if (!started)
+            first = p0;
+          started = true;
+          last    = p1;
+        }
+        if (started && (std::abs(first.X() - last.X()) * radius > 10 * tol + 1e-6 || std::abs(first.Y() - last.Y()) > 10 * tol + 1e-6))
+          return decline("a face's curves don't close");
+      }
+    }
   // (A result with free-form faces isn't kept as a body: the next Boolean converts it, curves on faces and all;
   // nor one with ellipses, hyperbolas or parabolas: converted, they are OCCT's curves, frame and parameters.)
   for (size_t i = 0; i < r.body.surfaces.size(); i += 12)
