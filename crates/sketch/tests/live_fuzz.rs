@@ -2653,6 +2653,39 @@ fn probes15() -> Vec<(String, Case)> {
     out
 }
 
+/// Probes 16 (probes 14 q3 kept a trapezoid's top-left end as its top grew,
+/// fuzz s829 / s713 the top's dimensioned right corner): at the origin or
+/// away from it, the top growing or shrinking.
+fn probes16() -> Vec<(String, Case)> {
+    let v = DVec2::new;
+    let mut out = Vec::new();
+    let mut add = |name: &str, f: &dyn Fn(&mut Case)| {
+        let mut c = Case::new();
+        f(&mut c);
+        out.push((name.to_string(), c));
+    };
+    // Base 40, top 20, 20 high, drawn from the base's left end at `o`; the
+    // height a Distance from the top's start (right corner) to the base.
+    let trapezoid = |c: &mut Case, o: DVec2, top: f64| {
+        let p = [o, o + v(40.0, 0.0), o + v(30.0, 20.0), o + v(10.0, 20.0)];
+        let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+        for i in 0..4 {
+            c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+        }
+        c.hv(true, &l[0]);
+        c.hv(true, &l[2]);
+        c.pair("EQUAL", &l[1], &l[3]);
+        c.length(&l[0], 40.0);
+        c.length(&l[2], top);
+        c.distance(&format!("{}.start", l[2]), &l[0], 20.0);
+    };
+    add("t1 trapezoid at the origin, top 20 -> 26 (as probes 14 q3)", &|c| trapezoid(c, v(0.0, 0.0), 26.0));
+    add("t2 trapezoid at (13.7, 6.2), top 20 -> 26", &|c| trapezoid(c, v(13.7, 6.2), 26.0));
+    add("t3 trapezoid at the origin, top 20 -> 16", &|c| trapezoid(c, v(0.0, 0.0), 16.0));
+    add("t4 trapezoid at (13.7, 6.2), top 20 -> 16", &|c| trapezoid(c, v(13.7, 6.2), 16.0));
+    out
+}
+
 fn probe_batch(list: Vec<(String, Case)>) -> Value {
     let cases: Vec<Value> = list.into_iter().map(|(name, mut c)| {
         let ours = ours(&mut c);
@@ -2667,7 +2700,7 @@ fn probe_batch(list: Vec<(String, Case)>) -> Value {
 #[test]
 #[ignore = "T2: live fuzz least-change probes"]
 fn probe_matches() {
-    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15())] {
+    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16())] {
         let b = probe_batch(list);
         let path = fixture(&format!("sketch-probe-{n}.json"));
         if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == format!("probe-{n}")) {
@@ -2697,7 +2730,7 @@ fn probe_matches() {
 fn one_case() {
     let probe = std::env::var("FUZZ_PROBE").ok();
     // (FUZZ_PROBE=<set>:<name> where names repeat across sets, e.g. 14:q2.)
-    let sets = || [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15())];
+    let sets = || [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16())];
     let Some(mut c) = probe.as_ref().and_then(|p| {
         let (set, name) = p.split_once(':').map_or((None, p.as_str()), |(s, n)| (s.parse::<u32>().ok(), n));
         sets().into_iter().filter(|(k, _)| set.is_none_or(|s| s == *k)).flat_map(|(_, l)| l).find(|(n, _)| n.split(' ').next() == Some(name)).map(|(_, c)| c)
