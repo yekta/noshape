@@ -4459,6 +4459,8 @@ bool by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remove
           return false;
       }
       lap("pocket fuse");
+      if (dbg)
+        std::fprintf(stderr, "slabs: pocket union %.6g, %d solids, valid %d\n", volume_of(u), solid_count(u), (int)BRepCheck_Analyzer(u).IsValid());
       ShapeList a1, a2;
       a1.Append(solid);
       a2.Append(u);

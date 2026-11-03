@@ -106,6 +106,27 @@ pub fn record(dir: &Path, blend: Blend, checked: bool, shape: &Shape, edges: &[S
     r
 }
 
+/// A case's summary written again from a run of it now (where the kernel's blends change on purpose).
+pub fn rerecord(dir: &Path, case: &Case) -> crate::Result<()> {
+    let t = std::time::Instant::now();
+    let res = run(case)?;
+    let ms = t.elapsed().as_secs_f64() * 1e3;
+    let s = Summary::of(&res);
+    let text = format!(
+        "{}edges {}\nshape_faces {}\nvalid {}\nvolume {:.17e}\nfaces {}\nedges_out {}\nvertices {}\nhistory {:016x}\nms {ms:.3}\n",
+        describe(&case.blend, case.checked).replace(&format!("scale {:e}\n", crate::working_scale()), &format!("scale {:e}\n", case.scale)),
+        case.edges.len(),
+        case.shape.count(ShapeType::Face),
+        s.valid as u8,
+        s.volume,
+        s.faces,
+        s.edges,
+        s.vertices,
+        s.history,
+    );
+    std::fs::write(dir.join(format!("{}.txt", case.name)), text).map_err(|e| crate::KernelError::InvalidInput(e.to_string()))
+}
+
 /// The cases of a corpus directory, by name.
 pub fn cases(dir: &Path) -> Vec<String> {
     let mut v: Vec<String> = std::fs::read_dir(dir).map(|r| r.filter_map(|e| e.ok()).filter_map(|e| e.file_name().to_str()?.strip_suffix(".txt").map(str::to_string)).collect()).unwrap_or_default();

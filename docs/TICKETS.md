@@ -328,6 +328,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   211). Left: live bounds the pocket's front strip by the opening's own plane up to the ceiling (one 380.97 mm² face,
   z 15 -> 17), ours by the slabs' ends (small faces); the time: 12-18 s on vibe4, of it the 77-slab fuse ~11 s
   (noshape's Boolean 5.8 s before declining "no point inside a face piece", then OCCT's serial 4.8 s; asked bool).
+  11-03 02:10: **in the document Shell 5 failed** (after 31 s; the probes used a STEP copy of its input, whose import
+  had reset the tolerances): Chamfer 4, OCCT's chamfer run in metres, left its approximation tolerance (1e-4 m) on the
+  vertices it made, every later body carried them, and the 77 slabs' fuse came out broken (negative volume, 19
+  solids). OCCT's blends in metres now give their new vertices / edges / faces the tolerances they need (blended at
+  the working scale where a corner is really off): the document's Shell 5 builds, 175027.258 mm³, 72 faces, as the
+  probe. T1 kernel blend::a_chamfer_in_metres_keeps_tight_vertices; T2 shell::shellhang_shell5_doc_probe (the
+  document's own input).
 - [x] verified bc7d7e9f (qa 11-02 23:20, qa-scratch/bin/fillg1.py, live 1805's FI2 on the green as CLI: Fill 1 Warning "Could not meet tangency constraints at highlighted points." as live, Part 1 11712 mm³ = live; the sheet 4302.286 mm² (live 4327.564, −0.6 %), z 20…42.615 (live 20…42.969: live's dome peaks 6.5 mm off centre at 42.964, its centre 42.615 = our symmetric peak)) (core 11-02 19:40, our own four-sided G1 Coons fill; three-edge fills still take OCCT's flat ConstrainedFilling) P2 FILL-G1-DOME (core 11-02, live 1739 FI2): a Fill G1 to a shelled box's outer side faces builds in live with the
   warning "Could not meet tangency constraints at highlighted points." (a dome to z 42.97, 4327.5641 mm²: the corners
   can't be tangent to two perpendicular walls); ours fails ("Cannot create fill surface…"): OCCT's plate throws for

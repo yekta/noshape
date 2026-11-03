@@ -754,3 +754,41 @@ fn result_key_cost_probe() {
     }
     let _ = std::fs::remove_dir_all(&tmp);
 }
+
+/// Which feature of a document first leaves a body with a vertex tolerance at or over NOSHAPE_TOL_OVER (default 1e-5
+/// m): each feature's run (rollback after it), the largest vertex tolerance of its bodies (their B-rep text).
+/// `NOSHAPE_TOL_DOC=<file>`.
+#[test]
+#[ignore = "T2 tool: NOSHAPE_TOL_DOC"]
+fn tolerance_by_feature() {
+    let Ok(path) = std::env::var("NOSHAPE_TOL_DOC") else { return };
+    let over: f64 = std::env::var("NOSHAPE_TOL_OVER").ok().and_then(|v| v.parse().ok()).unwrap_or(1e-5);
+    let copy = std::env::temp_dir().join(format!("noshape-tol-{}.noshape", std::process::id()));
+    std::fs::copy(&path, &copy).unwrap();
+    let s = noshape_ops::session::Session::open(&copy).unwrap();
+    let units = s.doc.settings.units;
+    let mut reg = Regenerator::new();
+    for tab in &s.doc.tabs {
+        let TabContent::PartStudio(ps) = &tab.content else { continue };
+        for k in 0..ps.features.len() {
+            let r = reg.regenerate(ps, &ConfigValues::default(), &units, &RegenOptions { upto: Some(k + 1), ..Default::default() });
+            let mut worst = (0.0f64, String::new());
+            for b in &r.context.bodies {
+                let Ok(bytes) = b.shape.to_brep_bytes() else { continue };
+                let text = String::from_utf8_lossy(&bytes);
+                let mut lines = text.lines();
+                while let Some(l) = lines.next() {
+                    if l.trim() == "Ve"
+                        && let Some(t) = lines.next().and_then(|t| t.split_whitespace().next()).and_then(|t| t.parse::<f64>().ok())
+                        && t > worst.0
+                    {
+                        worst = (t, b.id.to_string());
+                    }
+                }
+            }
+            let st = &r.display.features[k];
+            println!("{} {} ({:?}): largest vertex tolerance {:.3e} ({}){}", k + 1, ps.features[k].name, st.status, worst.0, worst.1, if worst.0 >= over { "  <-- over" } else { "" });
+        }
+    }
+    let _ = std::fs::remove_file(&copy);
+}

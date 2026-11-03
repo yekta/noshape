@@ -16,6 +16,30 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-03 02:15.**
+- Landed: the whole-result cache (1e5ae181). Landing: OCCT's blends in metres (scaled_blend's as-is try, slab-local
+  blends, the fallbacks) leave ChFi3d's 1e-4 m on what they make: `tighten_new_tolerances` sets new vertices / edges /
+  faces to what they need (BRep_Builder's updates only raise: set on the TShapes) and sends the as-is try to the
+  working scale where a new vertex needs over 1e-5 of the part's size. shell-hang's Shell 5 builds in the document
+  now (it failed after 31 s: Chamfer 4's 0.1 mm vertices broke the slab fuse). Blend corpus: 8 of 310 cases changed
+  (OCCT's metre corners were really off: the R6 overflow's pinched edges gone, the 2 / 4 mixed corners 8542.44 ->
+  8546.24 mm³ toward live's 8548.56); re-recorded on vibe4 / vibe3 / here (blend_replay::blend_corpus_rerecord;
+  vibe4 ~/agents/blend-corpus.pre-1103 the old one). Tools: ops regen_profile::tolerance_by_feature (which feature
+  leaves big tolerances), NOSHAPE_DUMP_OPS now dumps chamfers, kernel blend::dumped_chamfer_tolerance_probe.
+- Next: perf.sh bench_profdocs again (Shell 5's time in the document); qa's fuzz documents' Shells may change (for the
+  better: inputs with tight tolerances).
+
+**State 11-03 00:45.**
+- Landed: BLEND-DRAFT-CORNER-FACES (801e98e9, d7d1a411: convex and concave), probes (713e3fdb). Queued: the
+  whole-result cache (regen/mod.rs `results`, RESULTS 8 under 256 MB of meshes): undo / redo past the per-feature
+  cache's 3 versions is a lookup (REGEN-SPEED's third Ctrl+Z, PLAN 2.6 50 ms).
+- perf.sh bench_profdocs (vibe3, 3388ad39): every profile document under 2.5 s but shell-hang, whose Shell 5 takes
+  30.3 s in release (live 0.3 s; the 30 s budget): the 77-slab pocket fuse (bool asked, Requests). Next: whether it
+  fails on the budget there.
+- Live asked (REQUESTS 00:05-00:22): the concave drafted corner, the loft's section parameters (vase 43 mm³: live's
+  knots 0 / .253171 / .500891 / .755237 / 1, no chord-length variant fits), public custom features' sources
+  (/root/parity/featurescript), the drafted R1-under-R2 corner.
+
 **State 11-02 23:58.**
 - Landed since 22:35: Loft connections (6a3297ac), Offset curve with targets (47c75914) and Offset, extend and split
   (73396503: the extended offset imprinted on the face's body, live 1813's 212.5 + 787.5 mm²), psui's

@@ -924,3 +924,54 @@ fn drafted_small_corner_rounds_under_the_top_loop_probe() {
         }
     }
 }
+
+/// The largest vertex tolerance of a shape (its B-rep text).
+fn max_vertex_tolerance(s: &Shape) -> f64 {
+    let bytes = s.to_brep_bytes().unwrap();
+    let text = String::from_utf8_lossy(&bytes);
+    let mut lines = text.lines();
+    let mut worst = 0.0f64;
+    while let Some(l) = lines.next() {
+        if l.trim() == "Ve"
+            && let Some(t) = lines.next().and_then(|t| t.split_whitespace().next()).and_then(|t| t.parse::<f64>().ok())
+        {
+            worst = worst.max(t);
+        }
+    }
+    worst
+}
+
+/// A dumped chamfer (NOSHAPE_DUMP_OPS: CHAMFER_CASE=<dir>/chamfer-<n>, 0-based sub-shape indices) again: the largest
+/// vertex tolerance before and after.
+#[test]
+#[ignore = "T2 tool: CHAMFER_CASE"]
+fn dumped_chamfer_tolerance_probe() {
+    let Some(case) = std::env::var_os("CHAMFER_CASE") else { return };
+    let case = std::path::PathBuf::from(case);
+    let s = read_brep(&case.with_extension("brep")).unwrap();
+    let spec = std::fs::read_to_string(case.with_extension("txt")).unwrap();
+    let (edges, faces) = (s.edges(), s.faces());
+    let es: Vec<Shape> = spec.lines().filter_map(|l| l.strip_prefix("edge ")).filter_map(|n| n.trim().parse::<usize>().ok()).map(|n| edges[n].clone()).collect();
+    let fs: Vec<Shape> = spec.lines().filter_map(|l| l.strip_prefix("face ")).filter_map(|n| n.trim().parse::<usize>().ok()).map(|n| faces[n].clone()).collect();
+    let head: Vec<&str> = spec.lines().find(|l| l.starts_with("chamfer ")).unwrap().split_whitespace().collect();
+    let (mode, d1, d2): (u8, f64, f64) = (head[4].parse().unwrap(), head[6].parse().unwrap(), head[8].parse().unwrap());
+    let sp = match mode { 0 => ChamferSpec::Equal(d1), 1 => ChamferSpec::TwoDistances(d1, d2), _ => ChamferSpec::DistanceAngle(d1, d2) };
+    println!("input: {} edges chamfered, mode {mode}, largest vertex tolerance {:.3e}", es.len(), max_vertex_tolerance(&s));
+    let r = chamfer_checked(&s, &es, sp, &fs).unwrap();
+    println!("result: largest vertex tolerance {:.3e}, valid {}, blend decline {:?}; the input's after it {:.3e}", max_vertex_tolerance(&r.shape), r.shape.is_valid(), last_blend_decline(), max_vertex_tolerance(&s));
+}
+
+/// shell-hang's Chamfer 4 (8 mm on two edges; its input as the document has it, metres): OCCT's chamfer in metres
+/// left its approximation tolerance, 0.1 mm, on the vertices it made, and every later Shell's slab fuse of that part
+/// came out broken (Shell 5 failed after 31 s; live builds it). Its corners are exact: the vertices get 1e-7.
+#[test]
+fn a_chamfer_in_metres_keeps_tight_vertices() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_brep(&dir.join("shellhang-chamfer4-input.brep")).unwrap();
+    let edges = s.edges();
+    let before = vol_mm3(&s);
+    let r = chamfer_checked(&s, &[edges[1].clone(), edges[2].clone()], ChamferSpec::Equal(0.008), &[]).unwrap().shape;
+    assert!(r.is_valid());
+    assert!(max_vertex_tolerance(&r) < 1e-6, "{:e}", max_vertex_tolerance(&r));
+    assert!(vol_mm3(&r) < before);
+}

@@ -33,10 +33,12 @@
 #include <BRepFeat_MakeLinearForm.hxx>
 #include <BRepFilletAPI_MakeChamfer.hxx>
 #include <BRepFilletAPI_MakeFillet.hxx>
+#include <algorithm>
 #include <limits>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <BRepLib.hxx>
+#include <ShapeAnalysis_Edge.hxx>
 #include <TopAbs.hxx>
 #include <BRepLib_FindSurface.hxx>
 #include <BRepOffsetAPI_DraftAngle.hxx>
@@ -81,6 +83,9 @@
 #include <BRepTools_ReShape.hxx>
 #include <BRepTools_WireExplorer.hxx>
 #include <BRep_Builder.hxx>
+#include <BRep_TFace.hxx>
+#include <BRep_TEdge.hxx>
+#include <BRep_TVertex.hxx>
 #include <BRep_Tool.hxx>
 #include <Bnd_Box.hxx>
 #include <Geom_Plane.hxx>
@@ -3315,6 +3320,109 @@ void merge_full_rounds(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
   h = compose(input, h, step);
 }
 
+// OCCT's blend in metres leaves its approximation tolerance (1e-4: 0.1 mm) on the edges, vertices and faces it makes;
+// they get what they need instead (shell-hang: Chamfer 4's 0.1 mm vertices made every later Shell's slab fuse come
+// out broken). Returns the largest tolerance a new vertex needs (its distance to the curves ending at it, on the
+// edges and on the faces): where OCCT's corners really are that far off, the caller blends at the working scale. The
+// input's own sub-shapes, shared with it, never change; a vertex of theirs that would need more: infinity, and the
+// result as it was.
+// A sub-shape's tolerance set (BRep_Builder's updates only raise it).
+static void set_tolerance(const TopoDS_Shape& x, double t)
+{
+  if (x.ShapeType() == TopAbs_VERTEX)
+    occ::down_cast<BRep_TVertex>(x.TShape())->Tolerance(t);
+  else if (x.ShapeType() == TopAbs_EDGE)
+    occ::down_cast<BRep_TEdge>(x.TShape())->Tolerance(t);
+  else if (x.ShapeType() == TopAbs_FACE)
+    occ::down_cast<BRep_TFace>(x.TShape())->Tolerance(t);
+}
+
+static double tighten_new_tolerances(const TopoDS_Shape& input, const TopoDS_Shape& r)
+{
+  ShapeIMap old;
+  for (TopAbs_ShapeEnum k : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+    TopExp::MapShapes(input, k, old);
+  std::vector<std::pair<TopoDS_Shape, double>> was;
+  auto keep = [&](const TopoDS_Shape& x, double t) { was.emplace_back(x, t); };
+  ShapeAnalysis_Edge sae;
+  for (TopExp_Explorer x(r, TopAbs_FACE); x.More(); x.Next())
+    if (!old.Contains(x.Current()) && std::none_of(was.begin(), was.end(), [&](const auto& w) { return w.first.IsSame(x.Current()); }))
+    {
+      keep(x.Current(), BRep_Tool::Tolerance(TopoDS::Face(x.Current())));
+      set_tolerance(x.Current(), Precision::Confusion());
+    }
+  ShapeIMap edges;
+  TopExp::MapShapes(r, TopAbs_EDGE, edges);
+  for (int i = 1; i <= edges.Extent(); ++i)
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(edges(i));
+    if (old.Contains(e))
+      continue;
+    keep(e, BRep_Tool::Tolerance(e));
+    double dev = 0;
+    if (!BRep_Tool::Degenerated(e))
+      sae.CheckSameParameter(e, dev);
+    set_tolerance(e, std::max(dev, Precision::Confusion()));
+  }
+  // Each vertex at a new edge: its distance to that edge's ends (3D curve and pcurves), the edge's tolerance.
+  ShapeAncMap vef, eff;
+  TopExp::MapShapesAndUniqueAncestors(r, TopAbs_VERTEX, TopAbs_EDGE, vef);
+  TopExp::MapShapesAndUniqueAncestors(r, TopAbs_EDGE, TopAbs_FACE, eff);
+  double worst = 0;
+  bool   past_old = false;
+  for (int i = 1; i <= vef.Extent(); ++i)
+  {
+    const TopoDS_Vertex& v = TopoDS::Vertex(vef.FindKey(i));
+    const gp_Pnt         p = BRep_Tool::Pnt(v);
+    double               need = Precision::Confusion();
+    bool                 touched = !old.Contains(v);
+    for (ShapeList::Iterator it(vef(i)); it.More(); it.Next())
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(it.Value());
+      if (old.Contains(e))
+      {
+        need = std::max(need, BRep_Tool::Tolerance(e));
+        continue;
+      }
+      touched = true;
+      need    = std::max(need, BRep_Tool::Tolerance(e));
+      if (BRep_Tool::Degenerated(e))
+        continue;
+      const double t = BRep_Tool::Parameter(v, e);
+      double       f, l;
+      if (const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l); !c.IsNull())
+        need = std::max(need, c->Value(t).Distance(p));
+      if (const int k = eff.FindIndex(e); k > 0)
+        for (ShapeList::Iterator ft(eff(k)); ft.More(); ft.Next())
+        {
+          const TopoDS_Face&               face = TopoDS::Face(ft.Value());
+          const occ::handle<Geom2d_Curve>  pc   = BRep_Tool::CurveOnSurface(e, face, f, l);
+          const occ::handle<Geom_Surface>  surf = BRep_Tool::Surface(face);
+          if (!pc.IsNull() && !surf.IsNull())
+          {
+            const gp_Pnt2d uv = pc->Value(BRep_Tool::Parameter(v, e, face));
+            need              = std::max(need, surf->Value(uv.X(), uv.Y()).Distance(p));
+          }
+        }
+    }
+    if (!touched)
+      continue;
+    if (old.Contains(v))
+    {
+      past_old = past_old || need > BRep_Tool::Tolerance(v) * (1 + 1e-9);
+      continue;
+    }
+    keep(v, BRep_Tool::Tolerance(v));
+    set_tolerance(v, need);
+    worst = std::max(worst, need);
+  }
+  if (!past_old && valid_changed(input, r))
+    return worst;
+  for (const auto& [x, t] : was)
+    set_tolerance(x, t);
+  return std::numeric_limits<double>::infinity();
+}
+
 OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const char* what,
                    const MakeBuild& make)
 {
@@ -3337,11 +3445,15 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
       const KernelTimer timer("blend.as_is_check");
       valid = ok && valid_changed(input, r);
     }
+    // Kept where OCCT's corners are within 1e-5 of the part's size of where they should be.
     if (valid)
     {
       const KernelTimer timer("blend.finish");
       merge_full_rounds(input, r, h);
-      return as_is.finish(r, h);
+      Bnd_Box box;
+      BRepBndLib::Add(input, box);
+      if (tighten_new_tolerances(input, r) <= 1e-5 * std::sqrt(box.SquareExtent()))
+        return as_is.finish(r, h);
     }
   }
   const KernelTimer timer("blend.scaled");
@@ -4431,7 +4543,10 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     TopoDS_Shape out;
     HHist        h;
     if (blend_in_slabs(s.shape, es, 2 * rmax, blend, out, h))
+    {
+      tighten_new_tolerances(s.shape, out);
       return make_result({s.shape}, out, h.get());
+    }
   }
   try
   {
@@ -4453,6 +4568,7 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
       fail_op("fillet failed: unfilleted edge overlapped by fillet");
     if (!past)
       throw;
+    tighten_new_tolerances(s.shape, past->first);
     return make_result({s.shape}, past->first, past->second.get());
   }
 }
@@ -4997,6 +5113,15 @@ static OpOut op_chamfer_unbudgeted(const OcShape& s, const OcShapeList& edges, c
                  uint8_t mode, double d1, double d2, bool checked)
 {
   require_non_null(s.shape, "shape");
+  if (std::getenv("NOSHAPE_DUMP_OPS"))
+  {
+    std::ostringstream p;
+    p.precision(17);
+    p << "chamfer checked " << checked << " mode " << (int)mode << " d1 " << d1 << " d2 " << d2;
+    std::vector<TopoDS_Shape> subs = edges.items;
+    subs.insert(subs.end(), faces.items.begin(), faces.items.end());
+    dump_op("chamfer", s.shape, subs, p.str());
+  }
   if (edges.items.empty())
     fail_invalid("chamfer needs at least one edge");
   if (!(d1 > 1e-9))
@@ -5072,7 +5197,10 @@ static OpOut op_chamfer_unbudgeted(const OcShape& s, const OcShapeList& edges, c
   // patch (OCCT's retries "succeed" there with a different solid).
   if (checked && mode == 0)
     if (auto corner = chamfer_into_fillet_corners(s.shape, es, d1))
+    {
+      tighten_new_tolerances(s.shape, corner->first);
       return make_result({s.shape}, corner->first, corner->second.get());
+    }
   if (checked)
   {
     const SlabBlend blend = [&](const TopoDS_Shape& slab, const std::vector<int>& idx,
@@ -5104,7 +5232,10 @@ static OpOut op_chamfer_unbudgeted(const OcShape& s, const OcShapeList& edges, c
     TopoDS_Shape out;
     HHist        h;
     if (blend_in_slabs(s.shape, es, 2 * size, blend, out, h))
+    {
+      tighten_new_tolerances(s.shape, out);
       return make_result({s.shape}, out, h.get());
+    }
   }
   try
   {

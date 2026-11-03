@@ -322,3 +322,17 @@ fn blend_corpus_pinched_corners() {
     }
     println!("{found} cases with pinched corners");
 }
+
+/// The named cases' summaries written again from today's kernel (NOSHAPE_BLEND_RERECORD=<name>,<name>…): where a
+/// change of the blends is meant (11-03: OCCT's blend in metres kept only where its corners are where they should be).
+#[test]
+#[ignore = "T2 tool: NOSHAPE_BLEND_RERECORD"]
+fn blend_corpus_rerecord() {
+    let Ok(names) = std::env::var("NOSHAPE_BLEND_RERECORD") else { return };
+    let dir = std::env::var("NOSHAPE_BLEND_CORPUS").unwrap_or_else(|_| "/root/core-scratch/blend-corpus".into());
+    for name in names.split(',') {
+        let case = blend_corpus::load(Path::new(&dir), name).expect("case");
+        blend_corpus::rerecord(Path::new(&dir), &case).expect("rerecorded");
+        println!("{name} rerecorded");
+    }
+}

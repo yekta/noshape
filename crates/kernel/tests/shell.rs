@@ -1262,3 +1262,87 @@ fn smooth_vase_loft_knots_probe() {
         }
     }
 }
+
+/// shell-hang's Shell 5 on its input as the document has it (NOSHAPE_DUMP_OPS: metres, faces 1 and 25 removed, 3 mm
+/// in; tests/data/shell/shellhang-shell5-doc-input.brep). The STEP copy (shellhang_shell5_probe) builds; this one
+/// failed after 31 s in the document (perf.sh bench_profdocs 11-03).
+#[test]
+#[ignore = "T2: probe"]
+fn shellhang_shell5_doc_probe() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_brep(&dir.join("shellhang-shell5-doc-input.brep")).unwrap();
+    let faces = s.faces();
+    let rm = vec![faces[1].clone(), faces[25].clone()];
+    let live = read_parasolid(&dir.join("shellhang-shell5-live.x_t"), LengthUnit::Meter).unwrap();
+    println!("input {:.6} mm3, {} faces; live {:.4} mm3", vol(&s) * 1e9, faces.len(), vol(&live) * 1e9);
+    for f in &rm {
+        println!("removed: centre {:?} mm, area {:.6} mm2", f.centroid().unwrap() * 1e3, f.area().unwrap() * 1e6);
+    }
+    let t0 = std::time::Instant::now();
+    match shell_solid(&s, &rm, 0.003, ShellSide::Inside, ShellMethod::Auto) {
+        Ok(r) => println!("ours {:.4} mm3, {} faces, valid {}, {:.0} ms via {}", vol(&r.shape) * 1e9, r.shape.count(ShapeType::Face), r.shape.is_valid(), t0.elapsed().as_secs_f64() * 1e3, last_shell_path()),
+        Err(e) => println!("ours: {e} ({:.0} ms)", t0.elapsed().as_secs_f64() * 1e3),
+    }
+    // The same input in millimetres (the STEP copy's scale).
+    let mm = s.transformed(&Transform::Scale { center: DVec3::ZERO, factor: 1000.0 }).unwrap();
+    let faces = mm.faces();
+    let t0 = std::time::Instant::now();
+    match shell_solid(&mm, &[faces[1].clone(), faces[25].clone()], 3.0, ShellSide::Inside, ShellMethod::Auto) {
+        Ok(r) => println!("in mm: {:.4} mm3, {} faces, valid {}, {:.0} ms via {}", vol(&r.shape), r.shape.count(ShapeType::Face), r.shape.is_valid(), t0.elapsed().as_secs_f64() * 1e3, last_shell_path()),
+        Err(e) => println!("in mm: {e} ({:.0} ms)", t0.elapsed().as_secs_f64() * 1e3),
+    }
+}
+
+/// shell-hang Shell 5's slabs (NOSHAPE_SHELL_DUMP_TOOLS=<dir> on shellhang_shell5_doc_probe; SHELL5_TOOLS=<dir> here):
+/// fused, then halves fused, down to the smallest set whose fuse comes out broken (a volume under the largest
+/// slab's, or not positive).
+#[test]
+#[ignore = "T2: probe"]
+fn shellhang_shell5_slab_bisect_probe() {
+    let Some(dir) = std::env::var_os("SHELL5_TOOLS") else { return };
+    let mut tools: Vec<(usize, Shape)> = (0..128).filter_map(|k| read_brep(&std::path::Path::new(&dir).join(format!("tool{k}.brep"))).ok().map(|s| (k, s))).collect();
+    println!("{} slabs", tools.len());
+    let broken = |set: &[(usize, Shape)]| -> bool {
+        let shapes: Vec<Shape> = set.iter().map(|(_, s)| s.clone()).collect();
+        let biggest = shapes.iter().map(vol).fold(0.0, f64::max);
+        match fuse_all(&shapes, &BooleanOptions::default()) {
+            Ok(r) => { let v = vol(&r.shape); v.is_nan() || v <= 0.0 || v < biggest * (1.0 - 1e-9) }
+            Err(_) => true,
+        }
+    };
+    println!("all: broken {}", broken(&tools));
+    // Drop slabs one half at a time while the rest stays broken.
+    let mut step = tools.len() / 2;
+    while step >= 1 {
+        let mut i = 0;
+        while i < tools.len() {
+            let mut rest = tools.clone();
+            rest.drain(i..(i + step).min(rest.len()));
+            if rest.len() >= 2 && broken(&rest) {
+                tools = rest;
+            } else {
+                i += step;
+            }
+        }
+        step /= 2;
+    }
+    println!("smallest broken set: {:?}", tools.iter().map(|(k, _)| *k).collect::<Vec<_>>());
+    for (k, s) in &tools {
+        let b = s.bounding_box(true).unwrap();
+        println!("  tool{k}: {:.9e} m3, {} faces, box {:?} .. {:?}", vol(s), s.count(ShapeType::Face), b.min, b.max);
+    }
+}
+
+/// The 18 slabs whose fuse breaks (shellhang_shell5_slab_bisect_probe): the union's solids and volumes, exact and fuzzy.
+#[test]
+#[ignore = "T2: probe"]
+fn shellhang_shell5_broken_fuse_probe() {
+    let Some(dir) = std::env::var_os("SHELL5_TOOLS") else { return };
+    let set = [0, 1, 4, 5, 6, 7, 16, 17, 18, 19, 24, 25, 26, 27, 44, 45, 46, 47];
+    let tools: Vec<Shape> = set.iter().map(|k| read_brep(&std::path::Path::new(&dir).join(format!("tool{k}.brep"))).unwrap()).collect();
+    for fuzzy in [0.0, 1e-7, 1e-6, 1e-5, 1e-4] {
+        let r = fuse_all(&tools, &BooleanOptions { fuzzy, ..Default::default() }).unwrap();
+        let vols: Vec<String> = r.shape.solids().iter().map(|s| format!("{:.4}", vol(s))).collect();
+        println!("fuzzy {fuzzy:e}: {:.4} mm3, {} solids {:?}, {} shells, valid {}", vol(&r.shape), r.shape.count(ShapeType::Solid), vols, r.shape.count(ShapeType::Shell), r.shape.is_valid());
+    }
+}
