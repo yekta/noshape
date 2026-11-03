@@ -585,3 +585,23 @@ fn onshapes_constraints_dont_move_the_sketch() {
     let half = g["regions"].as_array().unwrap().iter().find(|r| (r["area"].as_f64().unwrap() - 0.5 * pi * 25.0).abs() < 1e-3).unwrap_or_else(|| panic!("{}", g["regions"]));
     assert!(half["center"][1].as_f64().unwrap() < 0.0, "{half}");
 }
+
+/// An Extrude saved before Symmetric was a checkbox (endBound SYMMETRIC):
+/// the block 20 mm deep about the sketch plane.
+#[test]
+fn an_old_symmetric_extrude_is_read() {
+    let (mut features, mut live, refs) = block_model();
+    features["features"].as_array_mut().unwrap().truncate(2);
+    for p in features["features"][1]["parameters"].as_array_mut().unwrap() {
+        if p["parameterId"] == "endBound" {
+            p["value"] = json!("SYMMETRIC");
+        }
+    }
+    live.truncate(2);
+    for p in live[1]["parts"].as_array_mut().unwrap() {
+        p.as_object_mut().unwrap().remove("area");
+        p["bbox"] = json!({ "min": [0.0, 0.0, -0.01], "max": [0.06, 0.04, 0.01] });
+    }
+    let r = run_model("old-symmetric", &features, &live, &refs);
+    assert_eq!((r.matching, r.features), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
