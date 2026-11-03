@@ -21,7 +21,10 @@ pins that corner first in `hold_the_base`; the overhangs must point away from th
 too): s838 / s841 / s857 fixed, s784 (a T beside a rectangle) keeps the other side and now fails; batches 1-17 565
 of 630, probes 17 8/15. v3 / s835 fixed too (a resized line one line away from a resized corner arc goes first on a rank tie): 566 of 630,
 probes 17 9/15. Left from probes 17: w1 / w2 (V with a circle: angle, radius), x1-x4 (s829's trapezoid keeps its right corner at any place or
-size; the 40/20/20 ones keep the left). Batch 17's other misses, as first noted (tried and reverted at 20:00):
+size; the 40/20/20 ones keep the left). s830 (20:4x): the rounded-corner rectangle's top (l10) is placed before its right side (tie broken by x: the
+top's anchor is further left) at its old length (shape 2), so the right side can't reach the arc and the component
+falls back, where the right side (steady, lowest) is held: live keeps the lower-left corner, the top grows to the arc.
+Pinning the lowest point in the fallback broke 13 (20:0x, reverted). Batch 17's other misses, as first noted (tried and reverted at 20:00):
 - s838 / s841 (T, the stem's bottom resized): live keeps the stem's side whose height is dimensioned and the flange
   recentres; but s784 (a T too) keeps the other side. Holding dimensioned units first in `hold_the_base` fixed s838 /
   s857, broke s784 and s841 (564 vs 563): reverted. Keeping a resized line's end at a dimensioned neighbour broke 120.
@@ -1341,9 +1344,11 @@ Assembly perf (10-27, dev build, `cargo test -p noshape-ops --test all assembly_
 ## Requests to the lead
 - (11-03 17:34) Sketch drag step's regeneration (core's regen path): median 1.42 ms (10-30: ~0.94) and one 4 ms step
   (always step 61 of `sketch_perf::speed_target`, 219 entities); still inside the 8 ms target, but growing.
-- (11-03 17:34) Assembly interaction scenarios: the suite has none (256 psui, 25 skasm sketch); it needs psui's driver
-  on assembly tabs (ui_state / targets in assembly-ui) and live's runner on an Assembly. I can write the scenarios and
-  the assembly-ui side once that's decided.
+- (11-03 17:34, 20:41) Assembly interaction scenarios: the suite has none (all 282 start in a Part Studio). Proposed
+  format sent to live (REQUESTS 20:41: a start's "assembly" with instances and mates, targets instance / mate / face
+  on an instance, one more state key "assembly"). Building ours: ops::ui_parity::build_start's "assembly" (mine);
+  AssemblyView's ui_state and targets (mine, assembly-ui). Needed from psui: the app driver (crates/app/src/
+  ui_script.rs, typed to PartStudioView) dispatching to an AssemblyView when the start opens on one.
 - (11-03 12:55, for psui) the ui-parity driver now moves the pointer to each click / drag start in three moves from where it was, and drags in fifteen, as live's runner does (it decides which sketch lines get woken). No other suite result changed in my sketch runs; please rerun yours.
 
 - (11-03 12:10) I stopped a ui-parity run by pattern and it also killed **psui's** suite run (/root/psui-scratch/uip-new56.log stops at sketch-circle-value-box, 12:10:44). Sorry: please tell psui to rerun it. I now kill only the PIDs I start.

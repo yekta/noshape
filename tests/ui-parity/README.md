@@ -42,6 +42,11 @@ A name from `starts.json`: a units setting and a feature list in FeatureScript t
 parameter ids; sketches as shapes with corner / centre points in mm on a named plane), so live builds it over REST
 and noshape through crates/ops. `"empty"` is a new Part Studio in mm.
 
+An assembly start (proposed by skasm 11-03, not yet recorded by live) adds, after the features, `"assembly":
+{"instances": [{"part": "Part 1", "fixed": true}, {"part": "Part 2", "at": [60, 0, 0]}], "mates": [{"type":
+"Revolute", "name": "Revolute 1", "a": {"instance": "Part 2 <1>", "face": [65, 0, 15], "inference": "mid_axis"},
+"b": {…}}]}` (positions in the document's unit, a face by a point on it); ours builds it (ops `ui_parity::build_start`).
+
 ### steps
 - `{"do": "click" | "dblclick" | "rclick" | "hover", "on": TARGET}`; `hover` waits `ms` (default 1500); a click may
   carry `"mods": "shift" | "mod" | "alt"`, held during the click.

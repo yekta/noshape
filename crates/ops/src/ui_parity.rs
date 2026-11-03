@@ -88,6 +88,43 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
             call(ctx, "feature_rename", json!({ "feature": made, "name": name })).map_err(what)?;
         }
     }
+    if let Some(asm) = start.get("assembly") {
+        build_assembly(ctx, asm)?;
+    }
+    Ok(())
+}
+
+/// A start's `assembly` (after the Part Studio's features): its instances
+/// (`part`, optional `fixed` and `at` [x, y, z] in the document's unit) and
+/// its mates (`type`, `name`, sides `a` / `b` as an instance, a point on the
+/// face, and an inference).
+fn build_assembly(ctx: &mut Ctx, asm: &Value) -> Result<(), String> {
+    for (k, i) in asm["instances"].as_array().into_iter().flatten().enumerate() {
+        let what = |e: String| format!("assembly instance {k}: {e}");
+        let part = i["part"].as_str().ok_or_else(|| what("no part".into()))?;
+        let made = call(ctx, "assembly_insert", json!({ "source": i["studio"].as_str().unwrap_or("Part Studio 1"), "part": part })).map_err(what)?;
+        let name = made["instances"].get(0).and_then(|x| x["name"].as_str()).or_else(|| made["name"].as_str()).map(str::to_string).ok_or_else(|| what(format!("no instance in {made}")))?;
+        if let Some(at) = i.get("at") {
+            call(ctx, "assembly_transform", json!({ "instance": name, "translation": at })).map_err(what)?;
+        }
+        if i["fixed"].as_bool() == Some(true) {
+            call(ctx, "assembly_set_state", json!({ "instances": [name], "fixed": true })).map_err(what)?;
+        }
+    }
+    for (k, m) in asm["mates"].as_array().into_iter().flatten().enumerate() {
+        let what = |e: String| format!("assembly mate {k}: {e}");
+        let side = |ctx: &mut Ctx, s: &Value| -> Result<Value, String> {
+            let instance = s["instance"].as_str().ok_or("a side without an instance")?;
+            let faces = call(ctx, "assembly_entities", json!({ "instance": instance, "kind": "faces", "at": [s["face"].clone()] }))?;
+            let id = faces["faces"].get(0).and_then(|f| f["id"].as_str()).ok_or_else(|| format!("no face of {instance} at {}", s["face"]))?;
+            Ok(json!({ "instance": instance, "entity": id, "inference": s["inference"].as_str().unwrap_or("center") }))
+        };
+        let mut args = json!({ "type": m["type"].as_str().unwrap_or("fastened").to_lowercase(), "a": side(ctx, &m["a"]).map_err(what)?, "b": side(ctx, &m["b"]).map_err(what)? });
+        if let Some(n) = m["name"].as_str() {
+            args["name"] = json!(n);
+        }
+        call(ctx, "assembly_mate", args).map_err(what)?;
+    }
     Ok(())
 }
 
@@ -114,6 +151,31 @@ mod tests {
         let names: Vec<&str> = rows.iter().map(|r| r.0.as_str()).collect();
         assert_eq!(names, ["Variable 1", "Sketch 1", "Fillet 1", "Extrude 1"], "{rows:?}");
         assert!(rows.iter().filter(|r| r.0 != "Fillet 1").all(|r| r.1 == "Ok"), "{rows:?}");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// A start with an assembly (live 1907's pin in a block): the block fixed,
+    /// the pin Revolute'd into its hole on mid-axis connectors.
+    #[test]
+    fn an_assembly_start_builds() {
+        let start = json!({ "units": "mm", "features": [
+            { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[-20, -20], [20, 20]] }, { "circle": [[0, 0], [5, 0]] }] },
+            { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 1"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW" } },
+            { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "circle": [[60, 0], [65, 0]] }] },
+            { "type": "extrude", "name": "Extrude 2", "params": { "entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "30 mm", "operationType": "NEW" } }
+        ], "assembly": {
+            "instances": [{ "part": "Part 1", "fixed": true }, { "part": "Part 2" }],
+            "mates": [{ "type": "Revolute", "name": "Revolute 1", "a": { "instance": "Part 2 <1>", "face": [65, 0, 15], "inference": "mid_axis" }, "b": { "instance": "Part 1 <1>", "face": [5, 0, 10], "inference": "mid_axis" } }]
+        } });
+        let dir = std::env::temp_dir().join(format!("noshape-uip-asm-{}", std::process::id()));
+        let path = dir.join("pin.noshape");
+        let mut ctx = Ctx::new();
+        build_start(&mut ctx, &path, &start).unwrap();
+        let list = call(&mut ctx, "assembly_list", json!({})).unwrap();
+        let pin = list["instances"].as_array().unwrap().iter().find(|i| i["name"] == "Part 2 <1>").unwrap().clone();
+        let t: Vec<f64> = pin["translation"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+        assert!((t[0] + 60.0).abs() < 1e-6 && t[1].abs() < 1e-6 && (t[2] + 5.0).abs() < 1e-6, "{pin}");
+        assert_eq!(list["mates"][0]["name"], "Revolute 1", "{list}");
         let _ = std::fs::remove_dir_all(dir);
     }
 }
