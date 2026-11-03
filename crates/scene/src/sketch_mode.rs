@@ -1065,7 +1065,7 @@ pub fn dimension_edit_text(data: &SketchData, cid: ConstraintId, units: &UnitPre
     // ("35.5376823 deg"), zeros trimmed.
     let length_decimals = (8.0 + units.length.meters().log10() + 1e-9).floor().max(0.0) as u8;
     let precision = if dim == Dim::ANGLE { units.angle_precision.max(7) } else { units.length_precision.max(length_decimals) };
-    Some(noshape_units::format_quantity_with(Quantity::new(value, dim), units, precision))
+    Some(noshape_units::format_quantity_with(Quantity::new(value, dim), units, precision).replace('°', " deg"))
 }
 
 /// Glyph icon for a geometric constraint (None for dimensions).
@@ -7751,6 +7751,22 @@ mod tests {
         for (p, q) in results[0].iter().zip(&live) {
             assert!((*p * 1e3 - *q).length() < 1e-3, "ours {:?} live {live:?}", results[0]);
         }
+    }
+
+    /// Live ui-parity sketch-angular-dimension: a new angle's value box reads
+    /// "31.686223 deg" (7 decimals, zeros trimmed, " deg"; its label "°").
+    #[test]
+    fn an_angle_value_box_reads_deg() {
+        let (mut ed, mut data) = editor(Tool::Select);
+        let a = data.sketch.add_line(v(0.0, 0.0), v(0.03, 0.0));
+        let b = data.sketch.add_line(v(0.0, 0.0), v(0.025, 0.015));
+        let value = 31.686223f64.to_radians();
+        let cid = data.sketch.add_constraint(ConstraintKind::Angle { a, b, value }).unwrap();
+        let units = UnitPrefs::default();
+        let text = dimension_edit_text(&data, cid, &units).unwrap();
+        assert_eq!(text, "31.686223 deg");
+        ed.apply_dimension(&mut data, cid, &text, &units, &noshape_units::EmptyScope).unwrap();
+        assert!((data.sketch.constraint(cid).unwrap().kind.value().unwrap() - value).abs() < 1e-9);
     }
 
     #[test]
