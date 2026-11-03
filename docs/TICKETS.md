@@ -1388,7 +1388,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   edited dialog with "20" typed in Depth, the 1st Escape reverts the field and keeps the dialog, the 2nd cancels it;
   Backspace on a row deletes it, Ctrl+Z restores; Rename opens with the whole name selected. Scenario
   ui-parity/feature-row-enter (qa 2026-11-02, build 6b4704f2)
-- [ ] P2 SKETCH-UNDO-REDO-STATE (psui / skasm) in a sketch the toolbar Undo and Redo are always enabled: a Part Studio
+- [x] 1fede97d P2 SKETCH-UNDO-REDO-STATE (psui / skasm) in a sketch the toolbar Undo and Redo are always enabled: a Part Studio
   with nothing to undo, Sketch › Top, draw one line (l, two clicks, Esc), Ctrl+Z, Ctrl+Y, then the sketch's ✕. Live (11-02,
   qa's tab, qa-scratch/livek/t-skundo.mjs; `[command-id=UNDO_A_CHANGE / REDO_A_CHANGE]`): entering the sketch **both
   disabled**; after the line Undo enabled / Redo disabled; after Ctrl+Z Undo disabled / Redo enabled; after Ctrl+Y
