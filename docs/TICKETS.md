@@ -404,6 +404,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the working scale where a corner is really off): the document's Shell 5 builds, 175027.258 mm³, 72 faces, as the
   probe. T1 kernel blend::a_chamfer_in_metres_keeps_tight_vertices; T2 shell::shellhang_shell5_doc_probe (the
   document's own input).
+  11-03 03:30, corpus 32fd against live's body (1819's .x_t; T2 shell::corpus_32fd_against_live_probe, the
+  cuts of the near-coincident bodies also give whole-body noise pieces): ours keeps a 3.46 mm³ sliver at y 1.586..2
+  behind the removed bottom (live cuts the 45° face's whole wall overhang, 1.414 mm past the shared edge, not one wall
+  thickness), and cuts 2.09 mm³ of the fin's end-cap wall below z 0 that live keeps (our clip box extends past the
+  removed face's bottom edge because the shared edge ends there; live only past edges the two faces share). A strip
+  as wide as the wall's overhang fits the 45° face but would cut that end cap too (3.5° to the removed plane): no one
+  rule found yet.
 - [x] verified bc7d7e9f (qa 11-02 23:20, qa-scratch/bin/fillg1.py, live 1805's FI2 on the green as CLI: Fill 1 Warning "Could not meet tangency constraints at highlighted points." as live, Part 1 11712 mm³ = live; the sheet 4302.286 mm² (live 4327.564, −0.6 %), z 20…42.615 (live 20…42.969: live's dome peaks 6.5 mm off centre at 42.964, its centre 42.615 = our symmetric peak)) (core 11-02 19:40, our own four-sided G1 Coons fill; three-edge fills still take OCCT's flat ConstrainedFilling) P2 FILL-G1-DOME (core 11-02, live 1739 FI2): a Fill G1 to a shelled box's outer side faces builds in live with the
   warning "Could not meet tangency constraints at highlighted points." (a dome to z 42.97, 4327.5641 mm²: the corners
   can't be tangent to two perpendicular walls); ours fails ("Cannot create fill surface…"): OCCT's plate throws for

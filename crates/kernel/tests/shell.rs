@@ -1346,3 +1346,24 @@ fn shellhang_shell5_broken_fuse_probe() {
         println!("fuzzy {fuzzy:e}: {:.4} mm3, {} solids {:?}, {} shells, valid {}", vol(&r.shape), r.shape.count(ShapeType::Solid), vols, r.shape.count(ShapeType::Shell), r.shape.is_valid());
     }
 }
+
+/// Fuzz corpus case 32fd (live 1816 / 1819: 1 mm inward, two faces removed; live 6572.907658 mm³, 25 faces): ours
+/// against live's body (corpus-32fd-live.x_t), the pieces where they differ.
+#[test]
+#[ignore = "T2: probe"]
+fn corpus_32fd_against_live_probe() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell");
+    let s = read_brep(&dir.join("corpus-32fd-input.brep")).unwrap();
+    let live = read_parasolid(&dir.join("corpus-32fd-live.x_t"), LengthUnit::Meter).unwrap();
+    let faces = s.faces();
+    let rm: Vec<Shape> = faces.iter().filter(|f| (f.area().unwrap() * 1e6 - 815.670158).abs() < 1e-3 || (f.area().unwrap() * 1e6 - 2149.248454).abs() < 1e-3).cloned().collect();
+    assert_eq!(rm.len(), 2);
+    let r = shell_solid(&s, &rm, 0.001, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+    println!("ours {:.6} mm3 {} faces, live {:.6} mm3 {} faces", vol(&r) * 1e9, r.count(ShapeType::Face), vol(&live) * 1e9, live.count(ShapeType::Face));
+    for (what, d) in [("ours - live", cut(&r, &live).unwrap().shape), ("live - ours", cut(&live, &r).unwrap().shape)] {
+        for p in d.solids() {
+            let b = p.bounding_box(true).unwrap();
+            println!("{what}: {:.6} mm3 in {:.4?} .. {:.4?}", vol(&p) * 1e9, b.min * 1e3, b.max * 1e3);
+        }
+    }
+}
