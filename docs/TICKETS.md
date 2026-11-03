@@ -3106,13 +3106,21 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   pull direction flipped); Extrude 2 (Add, Blind 2 mm, scope Part 1) of a sketch region on its top face. Everything
   downstream (here a parameter pattern) sees a negative solid. Repro: /root/dx-scratch/tickets/negative-volume-add.noshape
   (features as live's; query_parts after Extrude 2), model /root/parity/models/cf-parameter-pattern. (dx 2026-11-03)
-- [ ] P2 FS-ANYTHING-PARAM (core / custom; dx's FeatureScript corpus 11-03, cf-parameter-pattern) an `isAnything`
+- [x] (core 11-03 14:55: an isAnything value that isn't the host's own fs: form is evaluated as an expression with the studio's variables, an array literal element by element (custom run.rs expression_value); text that doesn't evaluate stays a string. T1 model custom_features::an_anything_parameter_written_as_an_array_is_one. cf-parameter-pattern then stops at FS-FEATURE-LIST-RERUN) P2 FS-ANYTHING-PARAM (core / custom; dx's FeatureScript corpus 11-03, cf-parameter-pattern) an `isAnything`
   parameter in an array item (Parameter pattern's `varArray[i].valueArray`, live's expression "[15,20,25]") reaches
   the feature as the string "[15,20,25]", not the array: `size(definition.varArray[0].valueArray)` → "Call
   size(string) does not match size(array) or (map)" (line 25), "Error regenerating."; live builds the pattern.
   Agent API side: feature_get shows `"valueArray": "[15,20,25]"` (the expression), as the dialog would keep it; the
   host should evaluate it. Rebuilt document: /root/dx-scratch/pmdocs/cf/cf-parameter-pattern.noshape
   (featurestudio_monitor). (dx 2026-11-03)
+- [ ] P2 FS-FEATURE-LIST-RERUN (core / custom; dx's FeatureScript corpus, cf-parameter-pattern, from FS-ANYTHING-PARAM)
+  a FeatureList parameter's feature functions can't be called: the community Parameter pattern hands
+  `definition.features` to std's applyPattern as its instanceFunction, which re-runs the picked features once per
+  instance with the variables set for it; ours fails "A picked feature cannot be re-run" (host status.rs
+  feature_list_function is a stub), "Could not pattern selected features.". Needs a FeatureList function that
+  re-evaluates the picked native (and custom) features in the FS context under the instance's id and variables, as
+  Feature pattern's Reapply does natively. Rebuilt document: /root/dx-scratch/pmdocs/cf/cf-parameter-pattern.noshape.
+  (core 11-03)
 - [ ] P2 FILLET-PROPAGATION-VOLUME (core; dx's parity suite 11-03, pipeflange-steven) Fillet 2 (r 8 mm, one edge,
   tangent propagation, circular) after a Fillet 1 and a cut: ours 36/81/42 faces/edges/vertices, 18314.952 mm³;
   live 36/79/40, 18329.663 mm³ (Δ 14.7 mm³, so not only split edges, see CUT-CLOSED-EDGES-SPLIT). Live's new faces:
