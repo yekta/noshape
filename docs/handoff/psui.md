@@ -865,7 +865,7 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
-- 11-03 18:40 (psui): P2 IN-FEATURE-MATE-CONNECTOR needs core first. Live answered (behaviours "IN-FEATURE-MATE-
+- 11-03 18:31 (psui): P2 IN-FEATURE-MATE-CONNECTOR needs core first. Live answered (behaviours "IN-FEATURE-MATE-
   CONNECTOR", request 1851): Hole's mate connector side button on, a face click makes a connector that lives inside
   the Hole (features.json `subFeatures`), chip "Mate connector", nothing in the feature or parts lists. Proposed model
   shape for core: `Feature.sub_features: Vec<Feature>` (serde default, skipped when empty), each a mateConnector
