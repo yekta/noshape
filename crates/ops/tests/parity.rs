@@ -887,7 +887,13 @@ fn parity_assemblies() {
         for e in std::fs::read_dir(dir.join("studios")).into_iter().flatten().filter_map(|e| e.ok()) {
             let file = e.file_name().to_string_lossy().to_string();
             let Some(element) = file.strip_suffix(".json").filter(|s| !s.ends_with(".parts")) else { continue };
-            let (Some(features), Some(parts)) = (read(&e.path()), read(&dir.join("studios").join(format!("{element}.parts.json")))) else { continue };
+            // Its parts: <element>.parts.json, else the last state of live's
+            // <element>.live.jsonl (live's layout, 1842).
+            let last_state = || {
+                let lines = std::fs::read_to_string(dir.join("studios").join(format!("{element}.live.jsonl"))).ok()?;
+                lines.lines().rev().filter_map(|l| serde_json::from_str::<Value>(l).ok()).find(|l| l.get("index").is_some()).map(|l| l["parts"].clone())
+            };
+            let (Some(features), Some(parts)) = (read(&e.path()), read(&dir.join("studios").join(format!("{element}.parts.json"))).or_else(last_state)) else { continue };
             studios.push((element.to_string(), features, parts));
         }
         studios.sort_by(|a, b| a.0.cmp(&b.0));
@@ -948,12 +954,12 @@ fn an_assembly_is_rebuilt_as_lives() {
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly.noshape"), &asm, &[("E1".into(), studio, parts)]);
     assert!(r.untranslated.is_empty() && r.differences.is_empty(), "{r:?}");
     assert_eq!((r.occurrences_matching, r.occurrences, r.mates_matching, r.mates), (2, 2, 1, 1));
-    // A place the Revolute doesn't allow: ours solves back onto the mate.
+    // A place the Revolute doesn't allow: freed there, ours solves it back
+    // onto the mate, 10 mm.
     let mut off = asm.clone();
     off["rootAssembly"]["occurrences"][1]["transform"][11] = json!(0.03);
     let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-assembly-off.noshape"), &off, &[("E1".into(), off_studio, off_parts)]);
-    assert_eq!(r.occurrences_matching, 1, "{r:?}");
-    assert!(r.differences.iter().any(|d| d.starts_with("Part 1 <2>")), "{r:?}");
+    assert!(r.differences.iter().any(|d| d.starts_with("Part 1 <2>: freed at live's place, our mates move it 10.000000 mm")), "{r:?}");
 }
 
 /// A sketch on Top of `entities` (Onshape JSON) and one Extrude of `region`

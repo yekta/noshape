@@ -3090,12 +3090,14 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             continue;
         };
         let mut args = json!({ "tab": "Assembly 1", "type": ty, "a": a, "b": b, "name": name });
-        // As stored: the flip, the secondary axis's quarter turns, the offset.
-        // (Ours true = Z axes aligned: live's primaryAxisAlignment false.)
-        if let Some(flip) = par("primaryAxisAlignment").and_then(|p| p["value"].as_bool()) {
-            args["flip_primary"] = json!(!flip);
-        }
-        if let Some(turns) = par("secondaryAxisAlignment").and_then(|p| p["value"].as_str()).and_then(|v| ["PLUS_X", "PLUS_Y", "MINUS_X", "MINUS_Y"].iter().position(|x| *x == v)) {
+        // As stored: the flip, the secondary axis's quarter turns, the offset;
+        // a parameter left out (live's UI fetch) has its default, false and
+        // PLUS_X, not the dialog's choice. (Ours true = Z axes aligned: live's
+        // primaryAxisAlignment false.)
+        let flip = par("primaryAxisAlignment").and_then(|p| p["value"].as_bool()).unwrap_or(false);
+        args["flip_primary"] = json!(!flip);
+        let turns = par("secondaryAxisAlignment").and_then(|p| p["value"].as_str()).map_or(Some(0), |v| ["PLUS_X", "PLUS_Y", "MINUS_X", "MINUS_Y"].iter().position(|x| *x == v));
+        if let Some(turns) = turns {
             args["reorient_secondary"] = json!(turns);
         }
         if par("mateOffsetEnabled").is_some_and(|p| p["value"] == true) {
@@ -3121,6 +3123,14 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     }
     // Adding a mate snaps its connectors into line as the dialog does; live's
     // places are after any drag since: moved there again, the mates solving.
+    // All held fixed while placed (a free one dragged pulls its mated
+    // neighbours and stops short), compared there, then freed as live has them.
+    let held: Vec<String> = occurrences.iter().filter(|o| o["fixed"] != true).filter_map(|o| o["path"].as_array().and_then(|p| p.last()).and_then(Value::as_str).and_then(|id| ours.get(id)).cloned()).collect();
+    if !held.is_empty()
+        && let Err(e) = placer.call("assembly_set_state", json!({ "tab": "Assembly 1", "instances": held, "fixed": true }))
+    {
+        res.differences.push(format!("holding the instances: {e}"));
+    }
     for o in occurrences.iter().filter(|o| o["fixed"] != true) {
         let Some(name) = o["path"].as_array().and_then(|p| p.last()).and_then(Value::as_str).and_then(|id| ours.get(id)) else { continue };
         if let Some(m) = o["transform"].as_array().map(|a| a.iter().filter_map(Value::as_f64).collect::<Vec<_>>())
@@ -3157,16 +3167,31 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             res.differences.push(format!("{name}{}: at {:?} mm, rotation {oq:?}; live {:?} mm, {q:?} (off {:.6} mm / {:.2e})", if i["fixed"] == true { " (fixed)" } else { "" }, ot.iter().map(|c| c * 1e3).collect::<Vec<_>>(), t.map(|c| c * 1e3), dt * 1e3, dq));
         }
     }
+    // Freed: live's places satisfy its mates, so ours shouldn't move them.
+    let after = if held.is_empty() { Ok(list.clone()) } else { placer.call("assembly_set_state", json!({ "tab": "Assembly 1", "instances": held, "fixed": false })).and_then(|_| placer.call("assembly_list", json!({ "tab": "Assembly 1" }))) };
+    let Ok(after) = after else {
+        res.differences.push("freeing the placed instances failed".into());
+        return res;
+    };
     let states = &asm["features"]["featureStates"];
     for (id, name) in &mate_names {
         res.mates += 1;
         let live_ok = states[id.as_str()]["featureStatus"].as_str().unwrap_or("OK") == "OK";
-        let Some(m) = list["mates"].as_array().into_iter().flatten().find(|m| m["name"] == name.as_str()) else { continue };
+        let Some(m) = after["mates"].as_array().into_iter().flatten().find(|m| m["name"] == name.as_str()) else { continue };
         let ok = m["ok"] == true;
         if ok == live_ok {
             res.mates_matching += 1;
         } else {
             res.differences.push(format!("{name}: {}, live {}", if ok { "OK".to_string() } else { format!("error ({})", m["message"].as_str().unwrap_or("")) }, states[id.as_str()]["featureStatus"].as_str().unwrap_or("?")));
+        }
+    }
+    let at = |l: &Value, name: &str| l["instances"].as_array().into_iter().flatten().find(|i| i["name"] == name).map(|i| (0..3).map(|j| i["translation"][j].as_f64().unwrap_or(f64::NAN) * k).collect::<Vec<_>>());
+    for name in &held {
+        if let (Some(a), Some(b)) = (at(&list, name), at(&after, name)) {
+            let moved = (0..3).map(|j| (a[j] - b[j]).abs()).fold(0.0, f64::max);
+            if moved > 1e-6 {
+                res.differences.push(format!("{name}: freed at live's place, our mates move it {:.6} mm", moved * 1e3));
+            }
         }
     }
     res
