@@ -1305,6 +1305,20 @@ fn a_u_bend_grows_about_its_arc_and_a_trapezoid_keeps_its_top() {
     }
 }
 
+/// Batch 15's s754 / s769 stay as live answered: a rectangle's two rounded
+/// top corners (Equal arcs) grow: the bottom and the top keep their levels,
+/// the sides shorten and the top shrinks from both ends (the top's far end
+/// was held at the other arc's old radius and the loop fell back). T1.
+#[test]
+fn both_rounded_top_corners_grow_into_the_rectangle() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-15.live.json")).unwrap()).unwrap();
+    for seed in [754, 769] {
+        let ours = batch(1, seed, true);
+        let d = differences(&ours["cases"][0], &live["cases"][format!("s{seed}")]);
+        assert!(d.is_empty(), "s{seed}: {}", d.join("; "));
+    }
+}
+
 /// Batch 10's s555 stays as live answered: an isosceles triangle's leg
 /// length changed: the base stays, the apex goes straight up (the leg and
 /// its Equal partner placed together, the base held; 16 mm off before). T1.

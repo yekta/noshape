@@ -568,6 +568,9 @@ impl Sketch {
                 }
             }).collect();
             let mut slid: Vec<EntityId> = Vec::new();
+            // Slid on a rail (their far end on a resizing partner): moved,
+            // not placed: the partner places them.
+            let mut rails: Vec<EntityId> = Vec::new();
             // (4: an Equal partner joined to u comes along, the other
             // neighbours held: live fuzz s555, an isosceles triangle's new leg
             // length keeps the base, the apex goes straight up.)
@@ -655,13 +658,33 @@ impl Sketch {
                 if pair {
                     light.extend(partners.iter().copied());
                 }
+                let mut railed = Vec::new();
                 if slide {
                     for &(n, far) in far_ends.iter().flatten() {
                         // (A far end joined to placed geometry is where that is.)
                         if let Some(q) = self.coincident_class(far).into_iter().find(|q| unit_of.get(q).is_some_and(|x| placed.contains(x))).and_then(|q| self.point(q)) {
                             let _ = sub.set_point(far, q);
                         }
-                        if sub.add_constraint(ConstraintKind::Fix { entity: far }).is_err() || !orig.hold_direction(&mut sub, n) {
+                        // A far end on an unplaced Equal partner of u, which
+                        // resizes too, keeps only its level: it slides along a
+                        // fixed line (live fuzz s769: a rectangle's two rounded
+                        // top corners grow, the top shrinks from both ends).
+                        let partner_end = self.coincident_class(far).into_iter().any(|q| {
+                            unit_of.get(&q).is_some_and(|x| *x != u && !placed.contains(x) && cons.iter().any(|(c, us)| us.len() == 2 && us.contains(x) && us.contains(&u) && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Equal { .. }))))
+                        });
+                        if partner_end {
+                            railed.push(n);
+                        }
+                        let held_far = match (partner_end, sub.curve(n), sub.point(far)) {
+                            (true, Some(crate::geom::Curve2::Line { a, b }), Some(q)) => {
+                                let d = (b - a).normalize_or_zero();
+                                let rail = sub.add_line(q - d, q + d);
+                                let _ = sub.set_construction(rail, true);
+                                sub.add_constraint(ConstraintKind::Fix { entity: rail }).is_ok() && sub.add_constraint(ConstraintKind::Coincident { a: far, b: rail }).is_ok()
+                            }
+                            _ => sub.add_constraint(ConstraintKind::Fix { entity: far }).is_ok(),
+                        };
+                        if !held_far || !orig.hold_direction(&mut sub, n) {
                             continue 'attempts;
                         }
                         light.push(n);
@@ -682,6 +705,7 @@ impl Sketch {
                     done = Some(sub);
                     if slide {
                         slid = sliding.clone();
+                        rails = railed;
                     }
                     if pair {
                         slid = partners.clone();
@@ -759,7 +783,9 @@ impl Sketch {
                         mine.geometry = x;
                     }
                 }
-                placed.insert(g);
+                if !rails.contains(&g) {
+                    placed.insert(g);
+                }
             }
             self.shift_loops_for_distances(cons, &placed);
             let unheld = self.unheld_constraints(1e-9);
