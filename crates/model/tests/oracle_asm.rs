@@ -882,21 +882,20 @@ fn asm_drag_probes_match_live() {
                 DVec3::from(p.translation) + q * local
             };
             let from = place(&built);
-            // As the app drags (`Prepared::solve_drag`): each step from
-            // the drag's start, in one substep per 2 mm, at most 4 (live asm
-            // drag probes 3: the end pose depends only on where it ends).
+            // As the app drags (`Prepared::solve_drag`): each step from the
+            // drag's start (live asm drag probes 3: the end pose depends
+            // only on where it ends).
             let origin = built.clone();
+            let at_start = parts.ev.evaluate(&parts.doc, &origin, &SolveOptions::default(), None);
+            let start: std::collections::HashMap<_, _> = at_start.solved.placements.iter().cloned().collect();
             for k in 1..=25 {
                 let to = from + step * (k as f64 / 25.0);
                 built = origin.clone();
-                let n = (((to - from).length() / 0.002).ceil() as usize).clamp(1, 4);
-                for j in 1..=n {
-                    let opts = SolveOptions { drags: vec![(inst, local, from + (to - from) * (j as f64 / n as f64))], drag_view: Some(view_dir), ..Default::default() };
-                    let res = parts.ev.evaluate(&parts.doc, &built, &opts, None);
-                    for (id, p) in &res.solved.placements {
-                        if let Some(i) = built.instances.iter_mut().find(|i| i.id == *id) {
-                            i.placement = *p;
-                        }
+                let opts = SolveOptions { drags: vec![(inst, local, to)], drag_view: Some(view_dir), start: Some(start.clone()), skip_dof: true, ..Default::default() };
+                let solved = at_start.prepared.solve_drag(&opts, &[from]);
+                for (id, p) in &solved.placements {
+                    if let Some(i) = built.instances.iter_mut().find(|i| i.id == *id) {
+                        i.placement = *p;
                     }
                 }
             }

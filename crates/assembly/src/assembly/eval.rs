@@ -522,9 +522,15 @@ impl Prepared {
     /// then) to its target in substeps: one per 2 mm, at most 4 (one solve
     /// doesn't reach a large turn: live asm drag probe d1 12° off in one,
     /// within the pointer's landing in 4).
+    /// A move one solve lands (every dragged point on its target, or its
+    /// pointer ray) takes that solve alone: a translation needs no substeps.
     pub fn solve_drag(&self, opts: &SolveOptions, from: &[DVec3]) -> Solved {
         let moved = from.iter().zip(&opts.drags).map(|(p0, (_, _, t))| (*t - *p0).length()).fold(0.0, f64::max);
         let n = ((moved / 0.002).ceil() as usize).clamp(1, 4);
+        let one = self.solve(opts);
+        if n == 1 || self.drags_land(&one, opts) {
+            return one;
+        }
         let mut o = opts.clone();
         let mut s = None;
         for j in 1..=n {
@@ -539,6 +545,20 @@ impl Prepared {
             s = Some(self.solve(&o));
         }
         s.expect("at least one substep")
+    }
+
+    /// Every dragged point of `opts` within 1 µm of its target (of its
+    /// pointer ray with `drag_view`) in `solved`.
+    fn drags_land(&self, solved: &Solved, opts: &SolveOptions) -> bool {
+        opts.drags.iter().all(|(id, local, target)| {
+            let Some((_, p)) = solved.placements.iter().find(|(i, _)| i == id) else { return false };
+            let off = placement_to_frame(p).transform_point(*local) - *target;
+            let off = match opts.drag_view.map(|v| v.normalize_or_zero()) {
+                Some(v) if v != DVec3::ZERO => off - v * off.dot(v),
+                _ => off,
+            };
+            off.length() < 1e-6
+        })
     }
 
     /// Solve from the stored (or `opts.start`) placements.
