@@ -1529,6 +1529,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P3 NEW-DIALOG-UNDO-STEP (psui) opening a new feature's dialog enables Undo in ours: with the box's top face selected,
+  Shift+E. Live's recordings (extrude-remove-tab, boolean-union-two-parts, new-extrude-then-other-tool; /root/parity/ui/live):
+  the Extrude 2 dialog opens with Undo **off**; it turns on at the first change in the dialog (the Remove tab). Ours (green
+  7d35f2cb, qa-scratch/uip-score3/): Undo on as soon as the dialog opens. (qa 2026-11-03 08:04, build 7d35f2cb)
 - [ ] P2 IN-FEATURE-MATE-CONNECTOR (psui + core; dx's parity suite 11-03) Onshape's fields that take mate connectors
   (Hole's "Sketch points to place holes", …) can make a mate connector inside the feature: features.json stores it in
   the feature's `subFeatures` (a mateConnector, here "On entity", origin Extrude 3's cap face / edge centre) and the
