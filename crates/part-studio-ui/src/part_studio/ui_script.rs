@@ -406,7 +406,9 @@ impl PartStudioView {
 impl PartStudioView {
     /// A regeneration is under way (the driver waits for it after each step).
     pub fn ui_busy(&self) -> bool {
-        self.pending.is_some() || self.context.is_none()
+        // An open dialog's model before the feature and std's editing logic on it (a new Extrude opens as New and
+        // turns Add once that ran) count too.
+        self.pending.is_some() || self.context.is_none() || self.ui.preview_task.is_some() || self.ui.std_edit_task.is_some()
     }
 
     /// Redraw the studio and its dialog, so every named control records where it is now.

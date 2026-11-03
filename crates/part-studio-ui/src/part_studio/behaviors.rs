@@ -2210,6 +2210,7 @@ impl PartStudioView {
                 .await;
             let (display, context) = display;
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
+                this.ui.preview_task = None;
                 this.ui.before_context = Some(context);
                 this.ui.preview_before = Some(Arc::new(display));
                 // Changes made before the model was ready get std's editing logic now.
@@ -3751,8 +3752,10 @@ impl PartStudioView {
         let sent = params.clone();
         self.ui.std_edit_task = Some(cx.spawn(async move |this, cx| {
             let changed = cx.background_spawn(async move { noshape_model::custom::std_feature::editing_logic_in_clicked((*ctx).clone(), &ty, id, &name, &units, &old, &sent, &user_set, creating, &clicked) }).await;
-            let Some(changed) = changed else { return };
             let _ = this.update(cx, |this: &mut Self, cx| {
+                // Done (a newer run would have dropped this one): the studio is idle again ([`Self::ui_busy`]).
+                this.ui.std_edit_task = None;
+                let Some(changed) = changed else { return };
                 if dialog.read(cx).feature.params != params {
                     return;
                 }
