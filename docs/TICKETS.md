@@ -880,6 +880,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [x] verified ccb54580 (qa 11-02 20:13: its first seed replayed to its step with NOSHAPE_BOOL_FALLBACK=0 on green ccb54580 — the same op, no decline with this reason; bin/nfrecheck.py) P2 BOOL-DECLINE "a plane at an angle to a cone" (bool): 5 calls in 2 seeds; first fuzz seed 1201 step 93 (draft). (qa 2026-11-02 00:25, build 45424566)
 - [ ] P2 BOOL-DECLINE "a new edge on a free-form face" (bool): 5 calls in 1 seeds; first fuzz seed 1208 step 89 (mirror). (qa 2026-11-02 00:25, build 45424566)
 - [ ] P2 BOOL-DECLINE "a point near two vertices" (bool): 4 calls in 3 seeds; first fuzz seed 1196 step 11 (shell). (qa 2026-11-02 00:25, build 45424566)
+- [ ] P2 BOOL-DECLINE "a section along a cylinder's seam" (bool): 2 calls in 1 seeds; first fuzz seed 2101 step 42 (delete). (qa 2026-11-03 04:27, build bad1de8e)
 - [ ] P2 BOOL-DECLINE "cones meeting at an apex" (bool): 2 calls in 1 seeds; first fuzz seed 1846 step 23 (shell). (qa 2026-11-03 01:55, build 107649d9)
 - [ ] P2 BOOL-DECLINE "a hyperbola unlike OCCT's sections" (bool; the new plane-steeper-than-the-rulings cut, 01836a3f / 657c9d2a): 1 call in 1 seeds; first fuzz seed 1860 step 7 (mirror). (qa 2026-11-03 01:55, build 107649d9)
 - [ ] P2 BOOL-DECLINE "a plane through a cone's apex" (bool): 4 calls in 1 seeds; first fuzz seed 1203 step 95 (draft). (qa 2026-11-02 00:25, build 45424566)
