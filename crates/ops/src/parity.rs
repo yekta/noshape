@@ -1269,6 +1269,8 @@ pub struct PartState {
     pub area_band: Option<[f64; 2]>,
     pub bbox: Option<[[f64; 3]; 2]>,
     pub centroid: Option<[f64; 3]>,
+    /// Live's centroid band ([min, max] per axis), when given.
+    pub centroid_band: Option<[[f64; 3]; 2]>,
 }
 
 /// Live's parts of one live.jsonl line.
@@ -1290,6 +1292,7 @@ pub fn live_parts(line: &Value) -> Vec<PartState> {
             area_band: band(&p["area_band"]),
             bbox: f3(&p["bbox"]["min"]).zip(f3(&p["bbox"]["max"])).map(|(a, b)| [a, b]),
             centroid: f3(&p["centroid"]),
+            centroid_band: p["centroid_band"].as_array().and_then(|b| Some([f3(b.first()?)?, f3(b.get(1)?)?])),
         })
         .collect()
 }
@@ -1321,6 +1324,7 @@ pub fn our_parts(t: &mut Translator) -> Result<Vec<PartState>, String> {
             area_band: None,
             bbox: at(&p["bounding_box"]["min"]).zip(at(&p["bounding_box"]["max"])).map(|(a, b)| [a, b]),
             centroid: at(&p["centroid"]),
+            centroid_band: None,
         })
         .collect())
 }
@@ -1367,7 +1371,7 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
             out.push(format!("{who}: area {:.6} mm², live {:.6}", o.area.unwrap_or(f64::NAN) * 1e6, a * 1e6));
         }
         if let (Some(a), Some(b)) = (o.centroid, l.centroid)
-            && (0..3).any(|j| (a[j] - b[j]).abs() > 1e-6)
+            && (0..3).any(|j| (a[j] - b[j]).abs() > 1e-6 && !l.centroid_band.is_some_and(|[lo, hi]| a[j] >= lo[j] - 1e-9 && a[j] <= hi[j] + 1e-9))
         {
             out.push(format!("{who}: centroid {:?} mm, live {:?}", a.map(|c| c * 1e3), b.map(|c| c * 1e3)));
         }

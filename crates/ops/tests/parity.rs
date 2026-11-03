@@ -346,3 +346,19 @@ fn an_inch_documents_bare_numbers_are_inches() {
     let r = run_model("block-inch", &features, &live, &refs);
     assert_eq!((r.matching, r.compared), (3, 3), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
+
+/// The comparison: counts exact; volume, area and centroid within live's
+/// band (REST's low-accuracy values) or 1e-6; anything else is named.
+#[test]
+fn differences_use_lives_bands() {
+    use noshape_ops::parity::PartState;
+    let part = |volume: f64, faces: u64| PartState { name: "Part 1".into(), body_type: "solid".into(), faces, edges: 12, vertices: 8, volume: Some(volume), area: None, volume_band: None, area_band: None, bbox: None, centroid: Some([0.01, 0.0, 0.0]), centroid_band: None };
+    let mut live = part(1.0e-6, 6);
+    live.volume_band = Some([0.999e-6, 1.001e-6]);
+    live.centroid = Some([0.0100005, 0.0, 0.0]);
+    live.centroid_band = Some([[0.0099, -1e-4, -1e-4], [0.0101, 1e-4, 1e-4]]);
+    assert!(differences(&[live.clone()], &[part(1.0005e-6, 6)]).is_empty(), "inside live's bands");
+    let d = differences(&[live.clone()], &[part(1.002e-6, 7)]);
+    assert!(d.iter().any(|x| x.contains("7/12/8 faces/edges/vertices, live 6/12/8")) && d.iter().any(|x| x.contains("volume")), "{d:?}");
+    assert_eq!(differences(&[live], &[]), ["0 parts, live 1"]);
+}
