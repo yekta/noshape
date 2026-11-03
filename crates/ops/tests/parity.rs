@@ -219,7 +219,8 @@ fn translates_a_sketch_extrude_and_fillet() {
     let r = run_model("block", &features, &live, &refs);
     assert_eq!((r.matching, r.features), (3, 3), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
     // What isn't translated is said, per feature.
-    assert!(r.untranslated.iter().any(|u| u.contains("geometric constraints left to inference")), "{:?}", r.untranslated);
+    // The COINCIDENT without entities is counted, not dropped.
+    assert!(r.untranslated.iter().any(|u| u.contains("constraints left to the solved geometry: 1 COINCIDENT rejected")), "{:?}", r.untranslated);
 }
 
 /// Without live's geometry a query is reported, not guessed.

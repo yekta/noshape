@@ -883,17 +883,87 @@ impl<'a> Translator<'a> {
                 }
             }
         }
+        self.constraints(&oid, &id, f, problems);
         self.dimensions(&oid, &id, f, problems);
         let st = self.call("feature_list", json!({}))?;
         let row = st["features"].as_array().into_iter().flatten().find(|x| x["id"] == id).cloned().unwrap_or_default();
         Ok((id, row["status"].as_str().unwrap_or("Ok").to_string(), row["message"].as_str().map(str::to_string)))
     }
 
+    /// The sketch's geometric constraints as ours (the geometry already
+    /// satisfies them: they keep it so when variables or configurations
+    /// change a dimension). Coincidences our inference merged into one point
+    /// are skipped; the rest that fail or have no counterpart are counted.
+    fn constraints(&mut self, oid: &str, id: &str, f: &Value, problems: &mut Vec<String>) {
+        let mut missed: std::collections::BTreeMap<String, usize> = Default::default();
+        for c in f["constraints"].as_array().into_iter().flatten() {
+            let ty = c["constraintType"].as_str().unwrap_or("");
+            let ours = match ty {
+                "COINCIDENT" => "coincident",
+                "CONCENTRIC" => "concentric",
+                "PARALLEL" => "parallel",
+                "TANGENT" => "tangent",
+                "HORIZONTAL" => "horizontal",
+                "VERTICAL" => "vertical",
+                "MIDPOINT" => "midpoint",
+                "PERPENDICULAR" => "perpendicular",
+                "EQUAL" => "equal",
+                "SYMMETRIC" | "MIRROR" => "symmetric",
+                "FIX" => "fix",
+                "NORMAL" => "normal",
+                "CURVATURE" => "curvature",
+                // Dimensions: `dimensions`.
+                "DISTANCE" | "LENGTH" | "DIAMETER" | "RADIUS" | "ANGLE" | "CENTERLINE_DIMENSION" => continue,
+                _ => {
+                    *missed.entry(format!("{ty} (no counterpart)")).or_default() += 1;
+                    continue;
+                }
+            };
+            let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).and_then(|p| p["value"].as_str().map(str::to_string)).filter(|v| !v.is_empty());
+            // Ours takes the mirror line last, a midpoint's point first.
+            let order: &[&str] = match ours {
+                "symmetric" => &["localFirst", "localSecond", "localMirror"],
+                "midpoint" => &["localMidpoint", "localFirst", "localEntity1", "localSecond", "localEntity2"],
+                _ => &["localFirst", "localSecond"],
+            };
+            let mut entities: Vec<String> = Vec::new();
+            let mut external = false;
+            for n in order {
+                if let Some(v) = par(n) {
+                    match self.sketch_entities.get(&(oid.to_string(), v)) {
+                        Some(e) => entities.push(e.clone()),
+                        None => external = true,
+                    }
+                }
+            }
+            for p in c["parameters"].as_array().into_iter().flatten().filter(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("external"))) {
+                // The Origin (deterministic id IB) is ours too.
+                let origin = p["queries"].as_array().into_iter().flatten().any(|q| q["deterministicIds"].as_array().is_some_and(|ids| ids.len() == 1 && ids[0] == "IB"));
+                if origin {
+                    entities.push("origin".into());
+                } else {
+                    external = true;
+                }
+            }
+            if external {
+                *missed.entry(format!("{ty} to external geometry")).or_default() += 1;
+                continue;
+            }
+            if ours == "coincident" && entities.len() == 2 && entities[0] == entities[1] {
+                continue;
+            }
+            if entities.is_empty() || self.call("sketch_constrain", json!({ "sketch": id, "constraint": ours, "entities": entities })).is_err() {
+                *missed.entry(format!("{ty} rejected")).or_default() += 1;
+            }
+        }
+        if !missed.is_empty() {
+            problems.push(format!("constraints left to the solved geometry: {}", missed.iter().map(|(k, n)| format!("{n} {k}")).collect::<Vec<_>>().join(", ")));
+        }
+    }
+
     /// The sketch's dimensions with Onshape's expressions (so variables and
-    /// configurations drive them); other constraints are left to our
-    /// inference at the solved positions and counted.
+    /// configurations drive them).
     fn dimensions(&mut self, oid: &str, id: &str, f: &Value, problems: &mut Vec<String>) {
-        let mut others = 0;
         for c in f["constraints"].as_array().into_iter().flatten() {
             let ty = c["constraintType"].as_str().unwrap_or("");
             let par0 = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).and_then(|p| p["value"].as_str().map(str::to_string));
@@ -908,10 +978,7 @@ impl<'a> Translator<'a> {
                 "DIAMETER" => "diameter",
                 "RADIUS" => "radius",
                 "ANGLE" => "angle",
-                _ => {
-                    others += 1;
-                    continue;
-                }
+                _ => continue,
             };
             let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).cloned();
             let value = ["length", "angle"].iter().find_map(|n| par(n)).and_then(|p| p["expression"].as_str().map(str::to_string));
@@ -946,9 +1013,6 @@ impl<'a> Translator<'a> {
             if let Err(e) = self.call("sketch_dimension", args) {
                 problems.push(format!("{ty} dimension: {e}"));
             }
-        }
-        if others > 0 {
-            problems.push(format!("{others} geometric constraints left to inference (geometry at Onshape's solved positions)"));
         }
     }
 }
