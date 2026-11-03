@@ -16,7 +16,12 @@ point, or from the Distance's corner when the other side resizes too: s713). Pro
 (s713, s753 fixed). FUZZ_PROBE takes `14:q2` (names repeat across sets). Batch 16 answered (19:42): 39/40 first, 40/40 now (s811: a construction line with a new Length is placed first, then arcs centred on its ends); batches 1-16 530 of 590. Batch 17 answered (19:54): 33/40 first; batches 1-17 563 of 630. Probes 16 answered (20:01): 4/4 match ours (a trapezoid's resized shorter top keeps its left end, at the origin or
 away, growing or shrinking), so s829 (same constraints, same order, symmetric legs; keeps the right corner) differs
 by its proportions or place only: next probe = s829's own coordinates, then shifted / scaled / its top's change
-halved. Batch 17's other misses, each needing its own probes next (tried and reverted at 20:00):
+halved. Probes 17 answered (20:1x, 20:19 fixed u1-u5): a T's resized stem keeps the side whose height is dimensioned (`stem_anchor`
+pins that corner first in `hold_the_base`; the overhangs must point away from the stem, else a flange's top matches
+too): s838 / s841 / s857 fixed, s784 (a T beside a rectangle) keeps the other side and now fails; batches 1-17 565
+of 630, probes 17 8/15. Left from probes 17: v3 (rounded L, radius and foot both: live resizes the foot first, then the
+fillet), w1 / w2 (V with a circle: angle, radius), x1-x4 (s829's trapezoid keeps its right corner at any place or
+size; the 40/20/20 ones keep the left). Batch 17's other misses, as first noted (tried and reverted at 20:00):
 - s838 / s841 (T, the stem's bottom resized): live keeps the stem's side whose height is dimensioned and the flange
   recentres; but s784 (a T too) keeps the other side. Holding dimensioned units first in `hold_the_base` fixed s838 /
   s857, broke s784 and s841 (564 vs 563): reverted. Keeping a resized line's end at a dimensioned neighbour broke 120.

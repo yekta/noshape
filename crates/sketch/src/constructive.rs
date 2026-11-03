@@ -371,6 +371,19 @@ impl Sketch {
                 }
             }
         }
+        // A T's resized stem: its corner at the side whose height is
+        // dimensioned stays first (live probes 17 u1-u5).
+        if held.is_empty() {
+            let unit_of: HashMap<EntityId, EntityId> = comp.iter().flat_map(|u| self.entity(*u).map(|e| e.point_refs()).unwrap_or_default().into_iter().map(move |p| (p, *u))).collect();
+            let holds: HashMap<crate::ids::ConstraintId, bool> = cons.iter().map(|(c, _)| (*c, !unheld.contains(c))).collect();
+            if let Some(p) = comp.iter().find_map(|u| self.stem_anchor(*u, cons, &unit_of, &holds))
+                && let Some(mut sub) = self.sub_sketch(comp, cons, &|_| true, &BTreeSet::from([p]))
+                && matches!(sub.solve_with(&opts).status, SolveStatus::Solved)
+            {
+                held.insert(p);
+                done = Some(sub);
+            }
+        }
         let base: Vec<EntityId> = base.into_iter().filter(|u| !held.contains(u)).collect();
         for u in base {
             let mut with = held.clone();
@@ -1578,6 +1591,42 @@ impl Sketch {
             tied.extend(k.entities().into_iter().filter(|x| own.contains(x)));
         }
         tied.len()
+    }
+
+    /// A T's stem bottom with a new Length (its sides lead on to Equal
+    /// overhangs): it keeps the end at the side whose height is dimensioned
+    /// (live probes 17 u1-u5, fuzz s838 / s841 / s857); None otherwise.
+    fn stem_anchor(&self, u: EntityId, cons: &[(crate::ids::ConstraintId, Vec<EntityId>)], unit_of: &HashMap<EntityId, EntityId>, holds: &HashMap<crate::ids::ConstraintId, bool>) -> Option<EntityId> {
+        let length_of = |x: EntityId| cons.iter().find(|(c, us)| us.as_slice() == [x] && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Length { .. }))).map(|(c, _)| *c);
+        if self.kind(u) != Some(EntityKind::Line) || length_of(u).is_none_or(|c| holds[&c]) {
+            return None;
+        }
+        let (s0, e0) = self.endpoints(u)?;
+        let next = |p: EntityId, not: EntityId| -> Option<(EntityId, EntityId)> {
+            let n = self.coincident_class(p).into_iter().find_map(|q| unit_of.get(&q).copied().filter(|x| *x != not && self.kind(*x) == Some(EntityKind::Line)))?;
+            let (a, b) = self.endpoints(n)?;
+            let far = if self.coincident_class(p).contains(&a) || a == p { b } else { a };
+            Some((n, far))
+        };
+        let (ns, fs) = next(s0, u)?;
+        let (ne, fe) = next(e0, u)?;
+        let (os, os_far) = next(fs, ns)?;
+        let (oe, oe_far) = next(fe, ne)?;
+        let equal = cons.iter().any(|(c, us)| us.len() == 2 && us.contains(&os) && us.contains(&oe) && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Equal { .. })));
+        // The overhangs point away from the stem (a flange's top has them
+        // pointing back under it).
+        let (a, b) = (self.point(s0)?, self.point(e0)?);
+        let (mid, dir) = ((a + b) / 2.0, (b - a).normalize_or_zero());
+        let along = |p: EntityId| self.point(p).map(|q| (q - mid).dot(dir).abs());
+        let outward = |joint: EntityId, tip: EntityId| along(tip).zip(along(joint)).is_some_and(|(t, j)| t > j + 1e-9);
+        if !equal || !outward(fs, os_far) || !outward(fe, oe_far) {
+            return None;
+        }
+        match (length_of(ns).is_some(), length_of(ne).is_some()) {
+            (true, false) => Some(s0),
+            (false, true) => Some(e0),
+            _ => None,
+        }
     }
 
     /// A unit's point kept when it alone takes a change: its lowest point

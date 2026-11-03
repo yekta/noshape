@@ -1477,6 +1477,26 @@ fn a_lever_hangs_on_its_centre_line() {
     assert!(d.is_empty(), "s811: {}", d.join("; "));
 }
 
+/// A T's resized stem keeps its side whose height is dimensioned and the
+/// flange recentres (live probes 17 u1-u5; fuzz s838 / s841 / s857). (Fuzz
+/// s784, a T beside a rectangle, keeps the other side: not followed.) T1.
+#[test]
+fn a_t_stem_keeps_its_dimensioned_side() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-probe-17.live.json")).unwrap()).unwrap();
+    let b = probe_batch(probes17().into_iter().filter(|(n, _)| n.starts_with('u')).collect());
+    assert_eq!(b["cases"].as_array().unwrap().len(), 5);
+    for case in b["cases"].as_array().unwrap() {
+        let d = differences(case, &live["cases"][case["case"].as_str().unwrap()]);
+        assert!(d.is_empty(), "{}: {}", case["case"], d.join("; "));
+    }
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-17.live.json")).unwrap()).unwrap();
+    for seed in [838, 841, 857] {
+        let ours = batch(1, seed, true);
+        let d = differences(&ours["cases"][0], &live["cases"][format!("s{seed}")]);
+        assert!(d.is_empty(), "s{seed}: {}", d.join("; "));
+    }
+}
+
 /// A trapezoid keeps its shorter side, whichever way its height's Distance
 /// runs, upright or inverted, drawn from either side (live probes 14 q1-q4,
 /// probes 15); a new length of the longer side centres it under the shorter
