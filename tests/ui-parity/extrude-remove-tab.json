@@ -42,6 +42,14 @@
   {
    "do": "wait",
    "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
   }
  ]
 }

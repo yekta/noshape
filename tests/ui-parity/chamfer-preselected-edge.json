@@ -18,8 +18,7 @@
   {
    "do": "click",
    "on": {
-    "tool": "Fillet",
-    "menu": "Chamfer"
+    "tool": "Chamfer"
    }
   }
  ]

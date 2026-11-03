@@ -18,8 +18,7 @@
   {
    "do": "click",
    "on": {
-    "tool": "Fillet",
-    "menu": "Chamfer"
+    "tool": "Chamfer"
    }
   },
   {
@@ -48,6 +47,14 @@
   {
    "do": "type",
    "text": "2"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
   },
   {
    "do": "key",

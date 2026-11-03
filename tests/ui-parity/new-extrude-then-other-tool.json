@@ -1,0 +1,58 @@
+{
+ "name": "new-extrude-then-other-tool",
+ "about": "a new Extrude 2 (New, 5 mm, first Enter applies, dialog open), then click the Boolean tool: is Extrude 2 kept (Part 2) or dropped?",
+ "area": "psui",
+ "source": "qa 11-03 (ours drops it)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+e"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "New"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "type",
+   "text": "5"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Boolean"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ],
+ "ticket": "DIALOG-SWITCH-DISCARDS-NEW"
+}
