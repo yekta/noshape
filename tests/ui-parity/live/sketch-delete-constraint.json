@@ -1,6 +1,6 @@
 {
  "scenario": "sketch-delete-constraint",
- "recorded": "2026-11-03T15:35:11.030Z",
+ "recorded": "2026-11-03T21:04:16.682Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "66b90049c014380b8a8194e9",
+  "element": "20f3f4c58e2005a1e4d14df6",
   "start": "empty",
   "startElement": "16c3ef729d456774c1da81b8"
  },
@@ -139,7 +139,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 80215
+   "t": 37296
   },
   {
    "step": 2,
@@ -152,7 +152,7 @@
    "ok": true,
    "at": [
     1083,
-    667
+    568
    ],
    "state": {
     "focus": {
@@ -245,7 +245,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 107195
+   "t": 43757
   },
   {
    "step": 3,
@@ -345,7 +345,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 113298
+   "t": 46669
   },
   {
    "step": 4,
@@ -359,6 +359,9 @@
     }
    },
    "ok": true,
+   "hover": [
+    "IB"
+   ],
    "at": [
     1082,
     519
@@ -453,7 +456,7 @@
      "dimensions": []
     }
    },
-   "t": 119935
+   "t": 52556
   },
   {
    "step": 5,
@@ -467,6 +470,7 @@
     }
    },
    "ok": true,
+   "hover": [],
    "at": [
     1180,
     537
@@ -565,7 +569,7 @@
      "dimensions": []
     }
    },
-   "t": 125514
+   "t": 59793
   },
   {
    "step": 6,
@@ -668,7 +672,7 @@
      "dimensions": []
     }
    },
-   "t": 127339
+   "t": 61587
   },
   {
    "step": 7,
@@ -682,6 +686,9 @@
     }
    },
    "ok": true,
+   "hover": [
+    "JFB"
+   ],
    "at": [
     1131,
     528
@@ -786,7 +793,7 @@
      "dimensions": []
     }
    },
-   "t": 130750
+   "t": 65715
   },
   {
    "step": 8,
@@ -890,7 +897,7 @@
      "dimensions": []
     }
    },
-   "t": 140499
+   "t": 68292
   },
   {
    "step": 9,
@@ -994,7 +1001,7 @@
      "dimensions": []
     }
    },
-   "t": 142336
+   "t": 70039
   }
  ]
 }

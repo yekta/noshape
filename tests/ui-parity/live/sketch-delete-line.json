@@ -1,6 +1,6 @@
 {
  "scenario": "sketch-delete-line",
- "recorded": "2026-11-03T15:37:24.563Z",
+ "recorded": "2026-11-03T21:08:53.405Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "07799d4105bceb3f44410a74",
+  "element": "eda38996f7e09b8a2c266c50",
   "start": "empty",
   "startElement": "16c3ef729d456774c1da81b8"
  },
@@ -139,7 +139,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 49468
+   "t": 41709
   },
   {
    "step": 2,
@@ -152,7 +152,7 @@
    "ok": true,
    "at": [
     1083,
-    568
+    667
    ],
    "state": {
     "focus": {
@@ -245,7 +245,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 54925
+   "t": 49311
   },
   {
    "step": 3,
@@ -345,7 +345,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 57911
+   "t": 52520
   },
   {
    "step": 4,
@@ -359,6 +359,9 @@
     }
    },
    "ok": true,
+   "hover": [
+    "IB"
+   ],
    "at": [
     1082,
     519
@@ -453,7 +456,7 @@
      "dimensions": []
     }
    },
-   "t": 71230
+   "t": 58474
   },
   {
    "step": 5,
@@ -467,6 +470,7 @@
     }
    },
    "ok": true,
+   "hover": [],
    "at": [
     1172,
     545
@@ -566,7 +570,7 @@
      "dimensions": []
     }
    },
-   "t": 78139
+   "t": 67055
   },
   {
    "step": 6,
@@ -670,7 +674,7 @@
      "dimensions": []
     }
    },
-   "t": 80262
+   "t": 69243
   },
   {
    "step": 7,
@@ -684,6 +688,9 @@
     }
    },
    "ok": true,
+   "hover": [
+    "JFB"
+   ],
    "at": [
     1127,
     532
@@ -746,14 +753,8 @@
     ],
     "list": null,
     "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "SKETCH_ENTITY",
-       "owner": null,
-       "id": "JFB"
-      }
-     ]
+     "count": 0,
+     "items": []
     },
     "features": {
      "rows": [
@@ -762,9 +763,9 @@
        "state": "ok",
        "selected": true,
        "editing": true,
-       "related": true,
+       "related": false,
        "hidden": false,
-       "cls": "related-highlight edited selected"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Sketch 1"
@@ -789,7 +790,7 @@
      "dimensions": []
     }
    },
-   "t": 88142
+   "t": 73419
   },
   {
    "step": 8,
@@ -883,12 +884,17 @@
     "tooltip": null,
     "sketch": {
      "tool": null,
-     "entities": [],
-     "constraints": [],
+     "entities": [
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
      "dimensions": []
     }
    },
-   "t": 91263
+   "t": 75262
   }
  ]
 }

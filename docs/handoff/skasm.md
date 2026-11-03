@@ -1431,6 +1431,9 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   no change and doesn't start the line; the second then starts one (left pending at (0,20)). Through the UI tests'
   clicks (helper or window events) the same steps on Top make the line, so it's the tool state the rectangle leaves
   (its value boxes?) eating the next tool's first click on the real input path. Yours (sketch tools).
+- 11-03 21:22 (psui): sketch-delete-line's new recording (live's hover wait) differs at step 7: live's click at the
+  line's midpoint after a hover selects nothing (its earlier three recordings selected the line, as ours does). Asked
+  live (REQUESTS 2026-11-03 21:22) whether a hovered sketch line's midpoint takes the click; yours if so.
 - 11-03 20:00 (psui): sketch-fully-defined, re-recorded: now differs at step 13. Dimension tool, the right line picked
   (click at its midpoint [30, 10]), then a click at [38, 10]: live picks the **Right plane** there (selection: the
   line + PLANE Right, no dimension placed yet; the plane's square covers that point in the view). Ours highlights the

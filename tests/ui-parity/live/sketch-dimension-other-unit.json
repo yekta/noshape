@@ -1,6 +1,6 @@
 {
  "scenario": "sketch-dimension-other-unit",
- "recorded": "2026-11-03T15:53:34.552Z",
+ "recorded": "2026-11-03T21:19:13.513Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "0fed553fd9891538ffc807a8",
+  "element": "84469a57b984720879ecbff6",
   "start": "empty",
   "startElement": "16c3ef729d456774c1da81b8"
  },
@@ -139,7 +139,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 58132
+   "t": 67718
   },
   {
    "step": 2,
@@ -152,7 +152,7 @@
    "ok": true,
    "at": [
     1083,
-    667
+    568
    ],
    "state": {
     "focus": {
@@ -245,7 +245,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 69514
+   "t": 75205
   },
   {
    "step": 3,
@@ -345,7 +345,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 73854
+   "t": 79708
   },
   {
    "step": 4,
@@ -359,6 +359,9 @@
     }
    },
    "ok": true,
+   "hover": [
+    "IB"
+   ],
    "at": [
     1082,
     519
@@ -453,7 +456,7 @@
      "dimensions": []
     }
    },
-   "t": 102306
+   "t": 90178
   },
   {
    "step": 5,
@@ -467,6 +470,7 @@
     }
    },
    "ok": true,
+   "hover": [],
    "at": [
     1157,
     540
@@ -566,7 +570,7 @@
      "dimensions": []
     }
    },
-   "t": 110787
+   "t": 100122
   },
   {
    "step": 6,
@@ -670,7 +674,7 @@
      "dimensions": []
     }
    },
-   "t": 113401
+   "t": 102583
   },
   {
    "step": 7,
@@ -774,7 +778,7 @@
      "dimensions": []
     }
    },
-   "t": 118727
+   "t": 104677
   },
   {
    "step": 8,
@@ -788,6 +792,9 @@
     }
    },
    "ok": true,
+   "hover": [
+    "JFB"
+   ],
    "at": [
     1118,
     529
@@ -893,7 +900,7 @@
      "dimensions": []
     }
    },
-   "t": 123026
+   "t": 120089
   },
   {
    "step": 9,
@@ -907,6 +914,7 @@
     }
    },
    "ok": true,
+   "hover": [],
    "at": [
     1104,
     541
@@ -1019,7 +1027,7 @@
      ]
     }
    },
-   "t": 129512
+   "t": 132999
   },
   {
    "step": 10,
@@ -1147,7 +1155,7 @@
      ]
     }
    },
-   "t": 132065
+   "t": 135851
   },
   {
    "step": 11,
@@ -1257,7 +1265,7 @@
      ]
     }
    },
-   "t": 136935
+   "t": 141219
   }
  ]
 }

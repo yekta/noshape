@@ -1,6 +1,6 @@
 {
  "scenario": "sketch-dimension-escape",
- "recorded": "2026-11-03T15:48:47.941Z",
+ "recorded": "2026-11-03T21:15:51.919Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "dce3db6d13c17c0b44347130",
+  "element": "d3ef7658f9f8265943a582d7",
   "start": "empty",
   "startElement": "16c3ef729d456774c1da81b8"
  },
@@ -139,7 +139,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 76725
+   "t": 34859
   },
   {
    "step": 2,
@@ -245,7 +245,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 87484
+   "t": 39846
   },
   {
    "step": 3,
@@ -345,7 +345,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 100263
+   "t": 42065
   },
   {
    "step": 4,
@@ -359,6 +359,9 @@
     }
    },
    "ok": true,
+   "hover": [
+    "IB"
+   ],
    "at": [
     1082,
     519
@@ -453,7 +456,7 @@
      "dimensions": []
     }
    },
-   "t": 114109
+   "t": 47127
   },
   {
    "step": 5,
@@ -467,6 +470,7 @@
     }
    },
    "ok": true,
+   "hover": [],
    "at": [
     1173,
     545
@@ -566,7 +570,7 @@
      "dimensions": []
     }
    },
-   "t": 129892
+   "t": 54544
   },
   {
    "step": 6,
@@ -670,7 +674,7 @@
      "dimensions": []
     }
    },
-   "t": 132913
+   "t": 56815
   },
   {
    "step": 7,
@@ -774,7 +778,7 @@
      "dimensions": []
     }
    },
-   "t": 134802
+   "t": 59397
   },
   {
    "step": 8,
@@ -788,6 +792,9 @@
     }
    },
    "ok": true,
+   "hover": [
+    "JFB"
+   ],
    "at": [
     1127,
     532
@@ -893,7 +900,7 @@
      "dimensions": []
     }
    },
-   "t": 138973
+   "t": 64740
   },
   {
    "step": 9,
@@ -907,6 +914,7 @@
     }
    },
    "ok": true,
+   "hover": [],
    "at": [
     1113,
     544
@@ -1019,7 +1027,7 @@
      ]
     }
    },
-   "t": 145121
+   "t": 73091
   },
   {
    "step": 10,
@@ -1129,7 +1137,7 @@
      ]
     }
    },
-   "t": 147061
+   "t": 74897
   }
  ]
 }
