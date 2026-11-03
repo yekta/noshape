@@ -3030,6 +3030,63 @@ fn probes18() -> Vec<(String, Case)> {
     out
 }
 
+/// Probes 19 (fuzz s830 / s893: a rounded-corner rectangle, wider and taller,
+/// keeps its lower-left corner in live; ours places the top before the right
+/// side and falls back): width, height and both, with one rounded corner and
+/// with both top corners rounded.
+fn probes19() -> Vec<(String, Case)> {
+    use std::f64::consts::FRAC_PI_2;
+    let v = DVec2::new;
+    let mut out = Vec::new();
+    let mut add = |name: &str, f: &dyn Fn(&mut Case)| {
+        let mut c = Case::new();
+        f(&mut c);
+        out.push((name.to_string(), c));
+    };
+    // 34 x 24, R3.5 at the top right (and top left with `both`), as the fuzz
+    // kinds; the bottom's and the left side's lengths and the radius.
+    let rounded = |c: &mut Case, w2: f64, h2: f64, both: bool| {
+        let (w, h, r) = (34.0, 24.0, 3.5);
+        let l1 = c.line(v(0.0, 0.0), v(w, 0.0));
+        let l2 = c.line(v(w, 0.0), v(w, h - r));
+        let a3 = c.arc(v(w - r, h - r), r, 0.0, FRAC_PI_2);
+        let top_end = if both { v(r, h) } else { v(0.0, h) };
+        let l4 = c.line(v(w - r, h), top_end);
+        let a5 = both.then(|| c.arc(v(r, h - r), r, FRAC_PI_2, 2.0 * FRAC_PI_2));
+        let l6 = c.line(if both { v(0.0, h - r) } else { v(0.0, h) }, v(0.0, 0.0));
+        c.coincident(&format!("{l1}.end"), &format!("{l2}.start"));
+        c.coincident(&format!("{l2}.end"), &format!("{a3}.start"));
+        c.coincident(&format!("{a3}.end"), &format!("{l4}.start"));
+        match &a5 {
+            Some(a5) => {
+                c.coincident(&format!("{l4}.end"), &format!("{a5}.start"));
+                c.coincident(&format!("{a5}.end"), &format!("{l6}.start"));
+                c.pair("TANGENT", &l4, a5);
+                c.pair("TANGENT", a5, &l6);
+                c.pair("EQUAL", &a3, a5);
+            }
+            None => c.coincident(&format!("{l4}.end"), &format!("{l6}.start")),
+        }
+        c.coincident(&format!("{l6}.end"), &format!("{l1}.start"));
+        c.pair("TANGENT", &l2, &a3);
+        c.pair("TANGENT", &a3, &l4);
+        c.hv(true, &l1);
+        c.hv(false, &l2);
+        c.hv(true, &l4);
+        c.hv(false, &l6);
+        c.length(&l1, w2);
+        c.length(&l6, if both { h2 - r } else { h2 });
+        c.radius(&a3, r, false);
+    };
+    add("rr1 one rounded corner, 34 -> 40 wide", &|c| rounded(c, 40.0, 24.0, false));
+    add("rr2 one rounded corner, 24 -> 30 high", &|c| rounded(c, 34.0, 30.0, false));
+    add("rr3 one rounded corner, 34 -> 40 wide and 24 -> 30 high (as s830)", &|c| rounded(c, 40.0, 30.0, false));
+    add("rr4 both top corners rounded, 34 -> 40 wide", &|c| rounded(c, 40.0, 24.0, true));
+    add("rr5 both top corners rounded, 24 -> 30 high", &|c| rounded(c, 34.0, 30.0, true));
+    add("rr6 both top corners rounded, 34 -> 40 wide and 24 -> 30 high (as s893)", &|c| rounded(c, 40.0, 30.0, true));
+    out
+}
+
 fn probe_batch(list: Vec<(String, Case)>) -> Value {
     let cases: Vec<Value> = list.into_iter().map(|(name, mut c)| {
         let ours = ours(&mut c);
@@ -3044,7 +3101,7 @@ fn probe_batch(list: Vec<(String, Case)>) -> Value {
 #[test]
 #[ignore = "T2: live fuzz least-change probes"]
 fn probe_matches() {
-    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16()), (17, probes17()), (18, probes18())] {
+    for (n, list) in [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16()), (17, probes17()), (18, probes18()), (19, probes19())] {
         let b = probe_batch(list);
         let path = fixture(&format!("sketch-probe-{n}.json"));
         if std::env::var("LIVE_FUZZ_WRITE").is_ok_and(|v| v == format!("probe-{n}")) {
@@ -3074,7 +3131,7 @@ fn probe_matches() {
 fn one_case() {
     let probe = std::env::var("FUZZ_PROBE").ok();
     // (FUZZ_PROBE=<set>:<name> where names repeat across sets, e.g. 14:q2.)
-    let sets = || [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16()), (17, probes17()), (18, probes18())];
+    let sets = || [(1, probes()), (2, probes2()), (3, probes3()), (4, probes4()), (5, probes5()), (6, probes6()), (10, probes10()), (11, probes11()), (13, probes13()), (14, probes14()), (15, probes15()), (16, probes16()), (17, probes17()), (18, probes18()), (19, probes19())];
     let Some(mut c) = probe.as_ref().and_then(|p| {
         let (set, name) = p.split_once(':').map_or((None, p.as_str()), |(s, n)| (s.parse::<u32>().ok(), n));
         sets().into_iter().filter(|(k, _)| set.is_none_or(|s| s == *k)).flat_map(|(_, l)| l).find(|(n, _)| n.split(' ').next() == Some(name)).map(|(_, c)| c)
