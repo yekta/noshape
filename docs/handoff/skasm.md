@@ -1,24 +1,19 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
-## Resume here (2026-11-02 23:30 UTC)
-State: two sketch drag commits on agent/skasm (f25655fc g6 far hold, e71728e2 g4 levels), landing after vibe3's
-bench numbers (g6 alone: 1549-curve drag 12.0–12.2 ms avg, limit 12.3). Branch `skasm-drag-across` is superseded by
-e71728e2 (the level rule only where no dimension holds and the dragged component has ≤ 60 curves; delete the branch).
-Sketch drags now (crates/sketch/src/drag_hold.rs): the dimension hold first (`drag_weights`, as before); when it
-can't reach the pointer, `keep_far` holds geometry ≥ 2 relations from the dragged one (Equal doesn't count as a
-link), its nearest ring giving way one curve at a time (latest first), what it released placed last by least change
-(`place_released`); with nothing dimensioned, `drag_levels` keeps H / V lines away from the dragged geometry level.
-Both only in dragged components of ≤ 60 curves (`DragGraph`, cached per revision). Probes 7 8/8, probes 9 4/6 over
-25 steps (g4 0.002 mm in x; g6's c4 0.11 mm: path dependence, exact in one step: asked live, REQUESTS "drag probes
-12"), live fuzz 169/230.
-23:50: GUI check (my build, a bolt circle made by the CLI, /root/skasm-scratch/g6ui/): dragging a hole keeps the next
-hole exactly while the drag stays reachable (centre within 14 mm of both); past that (≥ 28 mm from the held hole) the
-next ring gives way too, as the rule says. Seen there: the viewport repeats pointer moves (4 of 21 drag steps solved
-twice): a repeated position is no longer solved again, sketch (bb93e015, scene test) and assembly (92045a14).
-Assembly drag probe d6 (Ball, ours 12°, live 6.2°) looks like live solving only ~3 of its 25 events (each step's
-target on the pointer's ray at the point's depth converges to ours); asked live for slow drags of g6 and d6
-(REQUESTS "drag probes 12", → asm-drag-3.live.jsonl / sketch-probe-12.live.json). Sent probes 13 (leave-one-out of
-s209 / s11). T2 oracle_asm asm_spec_probes_match_live reads probes 1786 / 1798 / 4 from their input (12/14).
+## Resume here (2026-11-03 01:00 UTC)
+Landed today so far: g6 far hold + g4 levels (ef2406bc, b06df28d), asm probe reader (107649d9), repeated pointer
+positions not re-solved (sketch + assembly), probes 13 sent (01ce95d2 batch). Unlanded on agent/skasm, waiting for
+vibe3's scene drag numbers before landing (perf.sh sketch_perf at d4eef634 vs main in /root/skasm-scratch/wt-main,
+logs perf3.log / perf-main.log): d725b402 s11 rules, e8789c42 **drag from the drag's start** (live drag probes 12:
+the result depends only on where the drag ends; the editor keeps `drag_origin`, each step solves from it, from the
+last step only when that fails; `Sketch::begin_drag`), d4eef634 fixtures (batch 8 + probes 11 answers), 8171d22d
+transitive aliasing (s485 / s496), f8327a03 chamfer slide (s465), 1d58a872 per-component fallback (s464 / s475).
+Numbers now: drag probes 7 8/8, 9 6/6; edit probes 6/6; probes 1–6 all; batch 8 40/40 on positions; batches 1–8 sum
+1194 mm (was 1325 with batch 8 at the start of the night; batches 1–7 1209 → 1194). Live's single-jump rule (a drag
+with one move after the threshold moves nothing; probes 12 g6b / g6d / g6e) is NOT done: our agent API's drag op
+would then do nothing for a one-point path; decide with an extra step in the op (P3).
+If the scene drag got slower with drag-from-start (main baseline vs d4eef634), keep the from-start only for small
+components or cache the origin's positions instead of cloning (Sketch::drag clones `start` already).
 Lead's list (20:15), in order:
 1. Done: dx's X1 (B), other documents' assemblies (27549ea9; note to dx in docs/handoff/dx.md "From skasm (11-02)").
    If dx asks for more (configurations of another document's assembly aren't offered), that comes first.
