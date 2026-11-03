@@ -3962,7 +3962,7 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_past_end_faces(const TopoDS
 // between two planes, each end closed by a plane square to the edge, no two
 // edges sharing a vertex. Null when it doesn't apply.
 std::optional<std::pair<TopoDS_Shape, HHist>> fillet_as_cut(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es,
-                                                            const std::vector<double>& rs)
+                                                            const std::vector<double>& rs, bool pieces_only)
 {
   ShapeAncMap e2f, v2f;
   TopExp::MapShapesAndAncestors(input, TopAbs_EDGE, TopAbs_FACE, e2f);
@@ -3980,21 +3980,27 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_as_cut(const TopoDS_Shape& 
     n = gp_Vec(d);
     return true;
   };
-  ShapeIMap                 used;
-  ShapeList                 tools;
-  // Per edge: the ball's axis (a point and the edge's direction) and radius.
-  std::vector<std::pair<gp_Ax1, double>> balls;
+  // Each edge: its ends (as face 1 runs it), the two faces' normals, the radius.
+  struct Piece
+  {
+    TopoDS_Vertex va, vb;
+    gp_Pnt        a, b;
+    gp_Vec        n1, n2;
+    double        r;
+  };
+  ShapeIMap          used;
+  std::vector<Piece> ps;
   for (size_t i = 0; i < es.size(); ++i)
   {
     const TopoDS_Edge& E = es[i];
-    const double       r = rs.size() == 1 ? rs[0] : rs[i];
-    BRepAdaptor_Curve  c(E);
-    const ShapeList*   fl = e2f.Seek(E);
+    Piece              p;
+    p.r = rs.size() == 1 ? rs[0] : rs[i];
+    BRepAdaptor_Curve c(E);
+    const ShapeList*  fl = e2f.Seek(E);
     if (c.GetType() != GeomAbs_Line || fl == nullptr || fl->Extent() != 2)
       return std::nullopt;
     const TopoDS_Face f1 = TopoDS::Face(fl->First()), f2 = TopoDS::Face(fl->Last());
-    gp_Vec            n1, n2;
-    if (f1.IsSame(f2) || !outward(f1, n1) || !outward(f2, n2))
+    if (f1.IsSame(f2) || !outward(f1, p.n1) || !outward(f2, p.n2))
       return std::nullopt;
     // Convex: (n1 x n2) . t > 0, t the edge's direction as face 1 runs it.
     TopoDS_Edge in1;
@@ -4003,20 +4009,58 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_as_cut(const TopoDS_Shape& 
         in1 = TopoDS::Edge(x.Current());
     if (in1.IsNull())
       return std::nullopt;
-    TopoDS_Vertex va, vb;
-    TopExp::Vertices(in1, va, vb, true);
-    if (va.IsNull() || vb.IsNull() || va.IsSame(vb) || used.Contains(va) || used.Contains(vb))
+    TopExp::Vertices(in1, p.va, p.vb, true);
+    if (p.va.IsNull() || p.vb.IsNull() || p.va.IsSame(p.vb) || used.Contains(p.va) || used.Contains(p.vb))
       return std::nullopt;
-    used.Add(va);
-    used.Add(vb);
-    const gp_Pnt a = BRep_Tool::Pnt(va), b = BRep_Tool::Pnt(vb);
+    used.Add(p.va);
+    used.Add(p.vb);
+    p.a = BRep_Tool::Pnt(p.va);
+    p.b = BRep_Tool::Pnt(p.vb);
+    const gp_Vec t(p.a, p.b);
+    if (t.Magnitude() < Precision::Confusion() || p.n1.Crossed(p.n2).Dot(t) <= 1e-9 * t.Magnitude())
+      return std::nullopt;
+    ps.push_back(p);
+  }
+  // Pieces of one line between the same two planes (a groove cut across the edge: live's fillet runs on through the
+  // gap, one face over both, rounding off what material the gap leaves in the corner; dx's bracket03-mattie) are one
+  // span, from the first piece's start to the last's end.
+  std::vector<std::vector<size_t>> spans;
+  std::vector<bool>                grouped(ps.size(), false);
+  for (size_t i = 0; i < ps.size(); ++i)
+  {
+    if (grouped[i])
+      continue;
+    std::vector<size_t> g{i};
+    grouped[i]      = true;
+    const gp_Lin l(ps[i].a, gp_Dir(gp_Vec(ps[i].a, ps[i].b)));
+    const double tol = 1e-9 * (1 + ps[i].a.Distance(ps[i].b));
+    for (size_t j = i + 1; j < ps.size(); ++j)
+      if (!grouped[j] && std::abs(ps[j].r - ps[i].r) <= 1e-9 * ps[i].r && l.Distance(ps[j].a) <= tol && l.Distance(ps[j].b) <= tol && gp_Vec(ps[j].a, ps[j].b).Dot(l.Direction()) > 0 &&
+          ps[j].n1.IsEqual(ps[i].n1, 1e-9, 1e-9) && ps[j].n2.IsEqual(ps[i].n2, 1e-9, 1e-9))
+      {
+        g.push_back(j);
+        grouped[j] = true;
+      }
+    const gp_Dir d = l.Direction();
+    std::sort(g.begin(), g.end(), [&](size_t x, size_t y) { return gp_Vec(ps[i].a, ps[x].a).Dot(d) < gp_Vec(ps[i].a, ps[y].a).Dot(d); });
+    spans.push_back(g);
+  }
+  if (pieces_only && std::none_of(spans.begin(), spans.end(), [](const std::vector<size_t>& g) { return g.size() > 1; }))
+    return std::nullopt;
+  ShapeList                              tools;
+  std::vector<std::pair<gp_Ax1, double>> balls;
+  for (const std::vector<size_t>& g : spans)
+  {
+    const Piece& first = ps[g.front()];
+    const Piece& last  = ps[g.back()];
+    const gp_Pnt a = first.a, b = last.b;
     const gp_Vec t(a, b);
     const double L = t.Magnitude();
-    if (L < Precision::Confusion() || n1.Crossed(n2).Dot(t) <= 1e-9 * L)
-      return std::nullopt;
     const gp_Vec u = t / L;
-    // Each end: three faces, the third a plane square to the edge.
-    for (const TopoDS_Vertex& v : {va, vb})
+    const gp_Vec n1 = first.n1, n2 = first.n2;
+    const double r  = first.r;
+    // Each end of the span: three faces, the third a plane square to the edge.
+    for (const TopoDS_Vertex& v : {first.va, last.vb})
     {
       const ShapeList* at = v2f.Seek(v);
       ShapeIMap        faces;
@@ -4028,8 +4072,10 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_as_cut(const TopoDS_Shape& 
       bool capped = false;
       for (int k = 1; k <= 3; ++k)
       {
-        gp_Vec n;
-        capped = capped || (!faces(k).IsSame(f1) && !faces(k).IsSame(f2) && outward(TopoDS::Face(faces(k)), n) && std::abs(std::abs(n.Dot(u)) - 1) < 1e-9);
+        gp_Vec     n;
+        const bool own = faces(k).IsSame(e2f.Seek(es[g.front()])->First()) || faces(k).IsSame(e2f.Seek(es[g.front()])->Last()) ||
+                         faces(k).IsSame(e2f.Seek(es[g.back()])->First()) || faces(k).IsSame(e2f.Seek(es[g.back()])->Last());
+        capped = capped || (!own && outward(TopoDS::Face(faces(k)), n) && std::abs(std::abs(n.Dot(u)) - 1) < 1e-9);
       }
       if (!capped)
         return std::nullopt;
@@ -4058,7 +4104,7 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_as_cut(const TopoDS_Shape& 
   if (!cut.IsDone() || cut.HasErrors() || !valid_shape(cut.Shape()))
     return std::nullopt;
   HHist h = history_of({input}, cut);
-  // The faces the cut made: from the ball they belong to, generated by its edge.
+  // The faces the cut made: from the ball they belong to, generated by its edges.
   ShapeIMap old;
   for (TopExp_Explorer f(input, TopAbs_FACE); f.More(); f.Next())
   {
@@ -4075,9 +4121,10 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_as_cut(const TopoDS_Shape& 
     BRepAdaptor_Surface a(TopoDS::Face(f.Current()), false);
     if (a.GetType() != GeomAbs_Cylinder)
       continue;
-    for (size_t i = 0; i < balls.size(); ++i)
-      if (std::abs(a.Cylinder().Radius() - balls[i].second) < 1e-9 * balls[i].second && gp_Lin(balls[i].first).Distance(a.Cylinder().Location()) < 1e-9 * balls[i].second)
-        h->AddGenerated(es[i], f.Current());
+    for (size_t k = 0; k < balls.size(); ++k)
+      if (std::abs(a.Cylinder().Radius() - balls[k].second) < 1e-9 * balls[k].second && gp_Lin(balls[k].first).Distance(a.Cylinder().Location()) < 1e-9 * balls[k].second)
+        for (size_t i : spans[k])
+          h->AddGenerated(es[i], f.Current());
   }
   return std::make_pair(cut.Shape(), h);
 }
@@ -4819,6 +4866,17 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     rs.push_back(r);
     rmax = std::max(rmax, r);
   }
+  // Pieces of one line, a gap between them: one fillet over the whole line, as live (OCCT stops each at the gap).
+  if (checked && es.size() > 1)
+  {
+    std::optional<std::pair<TopoDS_Shape, HHist>> spans;
+    {
+      const KernelTimer timer("blend.spans");
+      spans = fillet_as_cut(s.shape, es, rs, true);
+    }
+    if (spans)
+      return make_result({s.shape}, spans->first, spans->second.get());
+  }
   // One square corner edge: built directly.
   if (checked && es.size() == 1)
   {
@@ -4891,7 +4949,7 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     if (!past)
       past = fillet_past_end_faces(in, es, rs);
     if (!past)
-      past = fillet_as_cut(in, es, rs);
+      past = fillet_as_cut(in, es, rs, false);
     if (!past && fillet_overflows(in, es, rs))
       fail_op("fillet failed: unfilleted edge overlapped by fillet");
     if (!past)

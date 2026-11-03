@@ -1018,3 +1018,53 @@ fn full_round_corners_are_one_sphere_each() {
     let v = vol_mm3(&r);
     assert!((10450.111593..=10451.067592).contains(&v), "{v}");
 }
+
+/// A dumped fillet (NOSHAPE_DUMP_OPS's `fillet-<n>`; NOSHAPE_FILLET_FACES_CASE = its path without `.brep`): its
+/// edges, then the result's faces (type, area, centroid) and each small face's edges.
+#[test]
+#[ignore = "T2 probe: NOSHAPE_FILLET_FACES_CASE"]
+fn dumped_fillet_faces_probe() {
+    let Ok(case) = std::env::var("NOSHAPE_FILLET_FACES_CASE") else { return };
+    setup();
+    let s = read_brep(std::path::Path::new(&format!("{case}.brep"))).unwrap();
+    let txt = std::fs::read_to_string(format!("{case}.txt")).unwrap();
+    let idx: Vec<usize> = txt.lines().filter_map(|l| l.strip_prefix("edge ")).map(|v| v.parse().unwrap()).collect();
+    let r: f64 = txt.split("radii ").nth(1).and_then(|r| r.split_whitespace().next()).unwrap().parse().unwrap();
+    let all = s.edges();
+    let es: Vec<Shape> = idx.iter().map(|&i| all[i].clone()).collect();
+    for e in &es {
+        let x = e.edge_info().unwrap();
+        println!("edge {:.4?} -> {:.4?}", x.start / MM, x.end / MM);
+    }
+    let out = fillet_checked(&s, &es, &vec![r; es.len()]).unwrap().shape;
+    println!("faces {}, volume {:.6}, area {:.6}", out.faces().len(), vol_mm3(&out), out.area().unwrap() / (MM * MM));
+    for (i, f) in out.faces().iter().enumerate() {
+        let c = f.centroid().unwrap() / MM;
+        let a = f.area().unwrap() / (MM * MM);
+        println!("F{i} {} area {a:.4} at ({:.3}, {:.3}, {:.3})", format!("{:?}", f.face_surface().ok()).chars().take(14).collect::<String>(), c.x, c.y, c.z);
+        if a < 1.0 || format!("{:?}", f.face_surface().ok()).contains("Cylinder") {
+            for e in f.edges() {
+                let x = e.edge_info().unwrap();
+                println!("    edge {} {:.4?} -> {:.4?} len {:.4}", format!("{:?}", x.curve).chars().take(8).collect::<String>(), x.start / MM, x.end / MM, x.length / MM);
+            }
+        }
+    }
+}
+
+/// FILLET-SPLIT-EDGE-FACES (dx's bracket03-mattie, live: one face a corner): a block's corner edge cut in two by a
+/// groove 2.5 mm deep, both pieces R3: one cylinder over the whole edge, rounding off the 0.5 mm of material the
+/// groove leaves in the corner (its strip: arc asin(1/6) × 3 mm, 6 mm long).
+#[test]
+fn fillet_over_a_groove_is_one_face() {
+    setup();
+    let block = bx([0.0; 3], [40.0, 20.0, 20.0]);
+    let groove = bx([37.5, -1.0, 7.0], [41.0, 21.0, 13.0]);
+    let b = cut(&block, &groove).unwrap().shape;
+    let pieces = edges_where(&b, |i| (i.start.x - 40.0 * MM).abs() < 1e-9 && i.start.y.abs() < 1e-9 && (i.end.x - 40.0 * MM).abs() < 1e-9 && i.end.y.abs() < 1e-9);
+    assert_eq!(pieces.len(), 2);
+    let r = fillet_checked(&b, &pieces, &[3.0 * MM]).unwrap().shape;
+    assert!(r.is_valid());
+    let cyl: Vec<f64> = r.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { .. }))).map(|f| f.area().unwrap() / (MM * MM)).collect();
+    let want = 2.0 * 3.0 * std::f64::consts::FRAC_PI_2 * 7.0 + 3.0 * (1.0f64 / 6.0).asin() * 6.0;
+    assert!(cyl.len() == 1 && (cyl[0] - want).abs() < 1e-4, "{cyl:?}, want {want}");
+}
