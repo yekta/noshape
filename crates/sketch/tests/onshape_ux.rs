@@ -758,3 +758,33 @@ fn a_rectangle_with_a_circle_on_its_diagonal_grows_up_from_its_bottom() {
         assert!((*p - *q).length() < 2e-3, "ours {got:?} live {live:?}");
     }
 }
+
+#[test]
+fn a_longer_chamfer_slides_its_ends_along_the_sides() {
+    // Live fuzz s465: a rectangle with a 45° chamfer at its bottom-right
+    // corner, the chamfer's length 6.757 -> 7.51: only the chamfer's ends
+    // move, along the bottom and the right side; the outer box stays.
+    let mut sk = Sketch::new();
+    let (x0, x1, y0, y1) = (9.484914772801268, 39.92615074312081, -8.092778338134226, 14.262781702091216);
+    let c = [v(x0, y0), v(35.14840455662541, y0), v(x1, -3.315032151638828), v(x1, y1), v(x0, y1)];
+    let l: Vec<EntityId> = (0..5).map(|i| sk.add_line(c[i], c[(i + 1) % 5])).collect();
+    let ends = |sk: &Sketch, i: EntityId| sk.endpoints(i).unwrap();
+    for i in 0..5 {
+        let (e, s) = (ends(&sk, l[i]).1, ends(&sk, l[(i + 1) % 5]).0);
+        sk.add_constraint(ConstraintKind::Coincident { a: e, b: s }).unwrap();
+    }
+    sk.add_constraint(ConstraintKind::Horizontal { a: l[0], b: None }).unwrap();
+    sk.add_constraint(ConstraintKind::Vertical { a: l[2], b: None }).unwrap();
+    sk.add_constraint(ConstraintKind::Horizontal { a: l[3], b: None }).unwrap();
+    sk.add_constraint(ConstraintKind::Vertical { a: l[4], b: None }).unwrap();
+    sk.add_constraint(ConstraintKind::Angle { a: l[0], b: l[1], value: std::f64::consts::FRAC_PI_4 }).unwrap();
+    sk.add_constraint(ConstraintKind::Length { curve: l[4], value: y1 - y0 }).unwrap();
+    sk.add_constraint(ConstraintKind::Length { curve: l[3], value: x1 - x0 }).unwrap();
+    sk.add_constraint(ConstraintKind::Length { curve: l[1], value: 7.509996366076509 }).unwrap();
+    assert!(sk.solve_with(&SolveOptions { constructive: true, ..Default::default() }).is_solved());
+    let got = [ends(&sk, l[0]).0, ends(&sk, l[0]).1, ends(&sk, l[1]).1, ends(&sk, l[2]).1].map(|p| sk.point(p).unwrap());
+    let live = [v(9.484915, -8.092778), v(34.615782, -8.092778), v(39.926151, -2.782409), v(39.926151, 14.262782)];
+    for (p, q) in got.iter().zip(&live) {
+        assert!((*p - *q).length() < 2e-3, "ours {got:?} live {live:?}");
+    }
+}

@@ -456,7 +456,9 @@ impl Sketch {
             let chained = self.chained_size(u, cons);
             let round = matches!(self.kind(u), Some(EntityKind::Arc | EntityKind::Circle));
             let lower_held = if round { self.lower_shared(u, &held) } else { None };
-            // (neighbours held: 0 none, 1 all, 2 the lower one; shape)
+            // (neighbours held: 0 none, 1 all, 2 the lower one, 3 lines
+            // sliding: each keeps its far end and direction, the end it
+            // shares with u slides along it; shape)
             // A line carried at its end that its Equal chain resizes keeps
             // its direction, its free start taking the change (live fuzz
             // s11: the quad's side follows its moved corner whole and grows
@@ -467,11 +469,33 @@ impl Sketch {
             } else if lower_held.is_some() {
                 &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (2, 1), (2, 0), (0, 2), (0, 1), (0, 0)]
             } else {
-                &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (0, 2), (0, 1), (0, 0)]
+                &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (0, 2), (0, 1), (3, 1), (0, 0)]
             };
+            // Each held neighbour line's end away from u (none: no slide).
+            let far_ends: Option<Vec<(EntityId, EntityId)>> = held.iter().map(|n| {
+                let (s0, e0) = self.endpoints(*n).filter(|_| self.kind(*n) == Some(EntityKind::Line))?;
+                let mine = self.entity(u).map(|e| e.point_refs()).unwrap_or_default();
+                let near = |p: EntityId| mine.contains(&p) || self.coincident_class(p).iter().any(|q| mine.contains(q));
+                match (near(s0), near(e0)) {
+                    (true, false) => Some((*n, e0)),
+                    (false, true) => Some((*n, s0)),
+                    _ => None,
+                }
+            }).collect();
+            let mut slid: Vec<EntityId> = Vec::new();
+            // Only a change of its own size slides (live fuzz s465: a 45°
+            // chamfer's new length; s466 / s489: a parallelogram side with
+            // a new angle turns about its start instead).
+            let size_dim = |c: crate::ids::ConstraintId| matches!(self.constraint(c).map(|k| &k.kind), Some(ConstraintKind::Length { .. }));
+            let unheld_mine: Vec<&(crate::ids::ConstraintId, Vec<EntityId>)> = cons.iter().filter(|(c, us)| us.contains(&u) && !holds[c]).collect();
+            let own_size_only = !unheld_mine.is_empty() && unheld_mine.iter().all(|(c, us)| us.as_slice() == [u] && size_dim(*c));
             // (A Concentric's kept circle doesn't hold the other: it comes.)
             'attempts: for &(hold, shape) in ladder.iter().filter(|(h, _)| concentric_first.is_none() || *h == 0) {
                 let hold_neighbours = hold == 1;
+                let slide = hold == 3;
+                if slide && (held.is_empty() || far_ends.is_none() || !own_size_only) {
+                    continue;
+                }
                 let mut fixed = placed.clone();
                 if hold_neighbours {
                     fixed.extend(held.iter().copied());
@@ -481,6 +505,9 @@ impl Sketch {
                 }
                 let mut with = fixed.clone();
                 with.insert(u);
+                if slide {
+                    with.extend(held.iter().copied());
+                }
                 let keep = |c: crate::ids::ConstraintId, us: &[EntityId]| us.contains(&u) && us.iter().all(|x| with.contains(x)) && (us.iter().all(|x| *x == u || placed.contains(x)) || self.connective(c));
                 let Some(mut sub) = self.sub_sketch_by(cons, &keep, &fixed) else { return false };
                 if shape == 3 && end_carried {
@@ -510,7 +537,16 @@ impl Sketch {
                     }
                 }
                 let still = if hold == 2 { lower_held.map(|(_, q)| q) } else { anchor };
-                let opts = SolveOptions { light: vec![u], still: still.into_iter().collect(), analyze: false, constructive: false, ..Default::default() };
+                let mut light = vec![u];
+                if slide {
+                    for &(n, far) in far_ends.iter().flatten() {
+                        if sub.add_constraint(ConstraintKind::Fix { entity: far }).is_err() || !orig.hold_direction(&mut sub, n) {
+                            continue 'attempts;
+                        }
+                        light.push(n);
+                    }
+                }
+                let opts = SolveOptions { light, still: still.into_iter().collect(), analyze: false, constructive: false, ..Default::default() };
                 let st = sub.solve_with(&opts).status;
                 // With its neighbours let go: only when each of them can
                 // follow, stretching along itself or carried by a neighbour
@@ -523,13 +559,16 @@ impl Sketch {
                 }
                 if matches!(st, SolveStatus::Solved) {
                     done = Some(sub);
+                    if slide {
+                        slid = held.iter().copied().collect();
+                    }
                     break 'attempts;
                 }
             }
             // A loop one unit can't close: u with its unplaced neighbours
             // (placed geometry still fixed), then with its placed ones too;
             // the change is shared within the group.
-            let mut group = vec![u];
+            let mut group: Vec<EntityId> = std::iter::once(u).chain(slid).collect();
             if done.is_none() {
                 let pin = self.lowest_point(cons.iter().filter(|(c, us)| us.contains(&u) && !holds[c]).filter_map(|(c, _)| self.constraint(*c)).flat_map(|c| c.kind.entities()));
                 // An unplaced Equal partner stays out: it comes later, its
