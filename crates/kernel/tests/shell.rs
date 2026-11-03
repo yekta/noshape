@@ -1380,7 +1380,7 @@ fn slab_fuse_probe() {
         let kinds: Vec<String> = t.faces().iter().map(|f| format!("{:?}", f.face_surface().ok()).chars().take(8).collect()).collect();
         println!("tool {k}: {:.6} mm3, {} faces {:?}", vol(t) * 1e9, t.faces().len(), kinds);
     }
-    set_working_scale(1000.0);
+    set_working_scale(1000.0).unwrap();
     let opts = BooleanOptions::default();
     let t = std::time::Instant::now();
     let all = fuse_all(&tools, &opts);
