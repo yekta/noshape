@@ -174,6 +174,8 @@ pub struct UiState {
     /// The hovered edge whose midpoint marker shows: its midpoint can
     /// become the hover target ([`PartStudioView::update_hover`]).
     pub midpoint_armed: Option<Reference>,
+    /// Where the pointer was when that edge was armed: the midpoint snaps only once it moved from there.
+    pub midpoint_armed_at: Option<DVec2>,
     pub select_other: Option<SelectOther>,
     /// S shortcut toolbar position (viewport-local).
     pub mini_toolbar: Option<DVec2>,
@@ -581,6 +583,7 @@ impl UiState {
             alt_held: false,
             hover_pick: None,
             midpoint_armed: None,
+            midpoint_armed_at: None,
             select_other: None,
             mini_toolbar: None,
             camera_menu: None,
@@ -3177,20 +3180,29 @@ impl PartStudioView {
         let raw_edge = self.ui.hover_pick.as_ref().filter(|t| matches!(t.kind, PickKind::Edge | PickKind::SketchCurve)).map(|t| t.reference.clone());
         let points_ok = self.sketch.is_none() && self.active_field_filter(cx).is_none_or(field_takes_points);
         // Out of the graphics nothing snaps (HOVER-VERTEX-STAYS: the pointer's
-        // last place inside kept an armed edge's midpoint lit after it left).
+        // last place inside kept an armed edge's midpoint lit after it left);
+        // nor before the pointer moved from where it armed the edge: arriving
+        // and staying on the midpoint keeps the edge (another hover update
+        // with the pointer still made it the midpoint: a click then picked
+        // the midpoint, which Fillet doesn't take; ui-parity fillet-*).
         let in_window = points_ok
             && self.viewport.read(cx).pointer_inside()
             && match (&self.ui.midpoint_armed, self.ui.pointer) {
                 (Some(e), Some(p)) => self.edge_midpoint(e).and_then(|m| self.viewport.read(cx).project(m)).is_some_and(|s| in_midpoint_window(s, p)),
                 _ => false,
             };
-        let (snap, armed) = midpoint_hover_step(self.ui.midpoint_armed.is_some(), points_ok && raw_edge.is_some(), in_window);
+        let moved = self.ui.pointer != self.ui.midpoint_armed_at;
+        let (snap, armed) = midpoint_hover_step(self.ui.midpoint_armed.is_some(), points_ok && raw_edge.is_some(), in_window, moved);
         let target = match self.ui.midpoint_armed.clone().filter(|_| snap) {
             Some(e) => Some(Reference::Implicit { on: Box::new(e), inference: noshape_model::reference::Inference::Midpoint }),
             None => raw,
         };
         if !snap {
-            self.ui.midpoint_armed = if armed { raw_edge } else { None };
+            let next = if armed { raw_edge } else { None };
+            if next != self.ui.midpoint_armed {
+                self.ui.midpoint_armed_at = self.ui.pointer;
+            }
+            self.ui.midpoint_armed = next;
         }
         let changed = target != self.hover;
         self.hover = target;
@@ -4105,9 +4117,9 @@ pub(super) fn in_midpoint_window(mid: DVec2, pointer: DVec2) -> bool {
 /// One hover update near an edge midpoint: (the midpoint is the target,
 /// an edge stays armed). `armed`: an edge's midpoint marker already shows;
 /// `on_edge`: the pick under the pointer is an edge; `in_window`: the
-/// pointer is in the armed midpoint's window.
-pub(super) fn midpoint_hover_step(armed: bool, on_edge: bool, in_window: bool) -> (bool, bool) {
-    let snap = armed && in_window;
+/// pointer is in the armed midpoint's window; `moved`: it moved since the edge was armed.
+pub(super) fn midpoint_hover_step(armed: bool, on_edge: bool, in_window: bool, moved: bool) -> (bool, bool) {
+    let snap = armed && in_window && moved;
     (snap, snap || on_edge)
 }
 
@@ -4138,15 +4150,17 @@ mod midpoint_target_tests {
     #[test]
     fn hovering_near_an_edge_midpoint_targets_the_midpoint() {
         // Arriving straight on the midpoint: the edge (its marker appears).
-        assert_eq!(midpoint_hover_step(false, true, false), (false, true));
-        // Then within the window: the midpoint.
-        assert_eq!(midpoint_hover_step(true, true, true), (true, true));
+        assert_eq!(midpoint_hover_step(false, true, false, true), (false, true));
+        // Staying there (another hover update, the pointer still): still the edge (ui-parity fillet-*).
+        assert_eq!(midpoint_hover_step(true, true, true, false), (false, true));
+        // Then moved within the window: the midpoint.
+        assert_eq!(midpoint_hover_step(true, true, true, true), (true, true));
         // Over the adjacent face, still in the window: the midpoint.
-        assert_eq!(midpoint_hover_step(true, false, true), (true, true));
+        assert_eq!(midpoint_hover_step(true, false, true, true), (true, true));
         // Along the edge, out of the window: the edge, still armed.
-        assert_eq!(midpoint_hover_step(true, true, false), (false, true));
+        assert_eq!(midpoint_hover_step(true, true, false, true), (false, true));
         // Over a face out of the window: the face, disarmed.
-        assert_eq!(midpoint_hover_step(true, false, false), (false, false));
+        assert_eq!(midpoint_hover_step(true, false, false, true), (false, false));
     }
 }
 
