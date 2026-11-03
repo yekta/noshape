@@ -1447,6 +1447,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   button), though by hand the focus does move (3 Tabs reach Depth as live): the focus record follows the active query, not
   the keyboard focus. Live's runner caveat (qa's own CDP runs): key presses after a row click may not reach live's feature
   list, so live's feature-row-arrow-up-moves-bar / feature-row-enter recordings may show no reaction for that reason.
+  qa 03:28: new scenarios through the driver (green e89c78de): sketch tools inside the toolbar's dropdowns aren't found
+  by name (`{"tool": "3 point arc"}`, "Slot", "Inscribed polygon", "Spline", the sketch "Mirror"), nor the Extrude
+  direction arrow (`{"button": "Opposite direction"}`); everything else in batches 6–8 (70 scenarios) runs.
 - [ ] P1 DIALOG-SWITCH-DISCARDS-NEW (psui) double-clicking another feature while a **new** feature's dialog is open throws
   the new feature away in ours; live keeps it: a box (Sketch 1, Extrude 1), Search tools › Variable, Name
   wall_thickness, Value 2 + Enter (the first Enter applies: the row "#wall_thickness = 2 mm" is in the list, the dialog
