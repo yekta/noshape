@@ -21,13 +21,15 @@ struct ModelResult {
     matching: usize,
     first: Option<String>,
     untranslated: Vec<String>,
+    /// Full regeneration: ours (reopened) and live's, ms.
+    regen_ms: Option<(f64, Option<f64>)>,
 }
 
 /// Rebuilds `features` and compares with `live` (live.jsonl lines) after each feature.
 fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelResult {
     let mut ctx = Ctx::new();
     let path = scratch(&format!("{name}.noshape"));
-    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, untranslated: Vec::new() };
+    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, untranslated: Vec::new(), regen_ms: None };
     // refs.jsonl wins over the geometry read from live's bodydetails.
     let mut all = refs_from_bodies(live);
     all.extend(parse_refs(refs));
@@ -71,6 +73,15 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
             res.first = Some(format!("feature {k} \"{}\" ({}): {}", step.name, step.feature_type, diff.join("; ")));
         }
     }
+    drop(t);
+    // Our full regeneration: the document reopened, its parts queried.
+    let mut fresh = Ctx::new();
+    let t0 = std::time::Instant::now();
+    let reopened = noshape_ops::registry::by_tool_name("document_open").map(|op| noshape_ops::registry::run(&mut fresh, op, &json!({ "path": path.to_str().unwrap() })).is_ok()).unwrap_or(false)
+        && noshape_ops::registry::by_tool_name("query_parts").map(|op| noshape_ops::registry::run(&mut fresh, op, &json!({})).is_ok()).unwrap_or(false);
+    if reopened {
+        res.regen_ms = Some((t0.elapsed().as_secs_f64() * 1000.0, live.iter().find_map(|l| l["full_regen_ms"].as_f64())));
+    }
     res
 }
 
@@ -110,7 +121,12 @@ fn parity_models() {
             continue;
         };
         let r = run_model(&name, &features, &live, &refs);
-        println!("{}: {}/{} features match ({} of {} compared){}", r.name, r.matching, r.compared, r.compared, r.features, r.first.as_ref().map(|f| format!("; first difference: {f}")).unwrap_or_else(|| "; matches to the end".into()));
+        let speed = match r.regen_ms {
+            Some((ours, Some(l))) => format!("; reopened and regenerated in {ours:.0} ms (live full regeneration {l:.0} ms)"),
+            Some((ours, None)) => format!("; reopened and regenerated in {ours:.0} ms"),
+            None => String::new(),
+        };
+        println!("{}: {}/{} features match ({} of {} compared){}{speed}", r.name, r.matching, r.compared, r.compared, r.features, r.first.as_ref().map(|f| format!("; first difference: {f}")).unwrap_or_else(|| "; matches to the end".into()));
         for u in &r.untranslated {
             println!("  untranslated: {u}");
         }
@@ -131,7 +147,7 @@ fn parity_models() {
     for (c, n) in causes.iter().take(5) {
         println!("  cause: {n} × {c}");
     }
-    let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "compared": r.compared, "matching": r.matching, "first_difference": r.first, "untranslated": r.untranslated })).collect();
+    let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "compared": r.compared, "matching": r.matching, "regen_ms": r.regen_ms.map(|(o, l)| json!({ "ours": o, "live": l })), "first_difference": r.first, "untranslated": r.untranslated })).collect();
     let _ = std::fs::write(root.with_file_name("report.json"), serde_json::to_string_pretty(&json!({ "documents_matching": docs, "documents": results.len(), "features_matching": matching, "features": total, "causes": causes.iter().map(|(c, n)| json!({ "cause": c, "documents": n })).collect::<Vec<_>>(), "models": report })).unwrap());
     if std::env::var_os("NOSHAPE_PARITY_INDEX").is_some() {
         let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/parity-models/index.json");
