@@ -129,6 +129,8 @@ pub struct CtxState {
     /// Feature status per id (`@functionReportFeatureStatus`).
     pub status: HashMap<FsId, Value>,
     started: Vec<Started>,
+    /// Every id `startFeature` started, in that order (`valuesSortedById`).
+    pub start_order: Vec<FsId>,
     /// FeatureScript-only variables (values that are not quantities).
     pub variables: BTreeMap<String, Value>,
     pub attributes: Vec<(Reference, Value)>,
@@ -242,6 +244,7 @@ impl FsContext {
                 next_seq: 1,
                 status: HashMap::new(),
                 started: Vec::new(),
+                start_order: Vec::new(),
                 variables: BTreeMap::new(),
                 attributes,
                 debug_entities: Vec::new(),

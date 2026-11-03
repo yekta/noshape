@@ -3249,7 +3249,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   view's lower tangent edge, an ELLIPSE in live (centre (7.829, 6.0897) in, major 0.9843), is a 37-point SPLINE plus a
   0.017 in LINE in ours: that model edge is a B-spline in ours where Parasolid's is a circle. Our DXF writes model
   B-splines as SPLINE (as live does). Translated model: NOSHAPE_PARITY_SAVE + NOSHAPE_PARITY_ONLY=knob-tim.
-- [ ] P1 PARITY-CUSTOM-RUN-FAILURES (core; dx's parity suite run 42, 11-03 19:33) the corpus's community features
+- [ ] P1 PARITY-CUSTOM-RUN-FAILURES (dx, from core 11-03 22:30; dx's parity suite run 42, 11-03 19:33) the corpus's community features
   whose inputs translate whole but fail in our host, with the Monitor's first error (featurestudio_monitor on the
   translated documents: `NOSHAPE_PARITY_SAVE=<dir>` keeps them, NOSHAPE_PARITY_ONLY=<name>; copies of all in
   /root/dx-scratch/pmsave/<name>.noshape), each with live building it:
@@ -3279,7 +3279,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   fix): 12 fail `@opBoolean: BOOLEAN_NON_MANIFOLD_RESULT`, then `Type error: value BOOLEAN_NON_MANIFOLD_RESULT cannot be
   enum ErrorStringEnum` (error.fs 149, processError: the host's code isn't one of the served std's); the first one is
   31/78/49 faces / edges / vertices, live 31/77/48; and the document regenerates in 59 s, live 7.8 s (PARITY-SPEED).
-- [ ] P1 FS-FEATURE-LIST-NONDETERMINISTIC (core; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
+- [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our
   random feature ids) gave 9/9 once and twice "3 parts, live 4; Part 2 volume 1088.22 mm³, live 2250 (box

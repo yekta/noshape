@@ -3082,9 +3082,17 @@ export const sumCube = defineFeature(function(context is Context, id is Id, defi
 
 /// FS-FEATURE-LIST-RERUN (dx's FeatureScript corpus, cf-parameter-pattern): a FeatureList parameter's functions re-run
 /// the picked features under std applyPattern, with the variables set at the time and each instance's transform;
-/// the picked sketch is solved again for each instance.
+/// the picked sketch is solved again for each instance. FS-FEATURE-LIST-NONDETERMINISTIC: in the feature list's order
+/// (std valuesSortedById), whichever way the features' ids sort.
 #[test]
 fn feature_list_functions_rerun_the_picked_features() {
+    // (Sketch id, Extrude id): in order, then the Extrude's sorting first.
+    for (sketch_id, extrude_id) in [(0x1000_0000_0001u64, 0x2000_0000_0001u64), (0x2000_0000_0002, 0x1000_0000_0002)] {
+        rerun_the_picked_features(sketch_id, extrude_id);
+    }
+}
+
+fn rerun_the_picked_features(sketch_id: u64, extrude_id: u64) {
     let src = studio(
         r#"
 annotation { "Feature Type Name" : "Depth pattern" }
@@ -3111,18 +3119,26 @@ export const depthPattern = defineFeature(function(context is Context, id is Id,
     v.params.set("variableType", ParamValue::Enum("LENGTH".into()));
     v.params.set("lengthValue", expr("10 mm"));
     ps.features.push(v);
+    // The sketch's width is #w (so a re-run Extrude needs its sketch solved again first).
     let mut sk = noshape_sketch::Sketch::new();
-    sk.corner_rectangle(glam::DVec2::ZERO, glam::DVec2::new(0.01, 0.01));
+    let rect = sk.corner_rectangle(glam::DVec2::ZERO, glam::DVec2::new(0.01, 0.01));
+    sk.add_constraint(noshape_sketch::ConstraintKind::Fix { entity: rect.points[0] }).unwrap();
+    let width = sk.add_constraint(noshape_sketch::ConstraintKind::Length { curve: rect.curves[0], value: 0.01 }).unwrap();
+    sk.add_constraint(noshape_sketch::ConstraintKind::Length { curve: rect.curves[3], value: 0.01 }).unwrap();
+    let mut data = noshape_model::sketch_feature::SketchData { sketch: sk, ..Default::default() };
+    data.dimension_exprs.insert(width.0, ExprValue::new("#w"));
     let mut s = ps.new_feature("sketch", &fx.units).unwrap();
+    s.id = noshape_model::reference::FeatureId(sketch_id);
     s.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(noshape_model::reference::DatumPlane::Top)]));
-    s.params.set("sketch", ParamValue::Sketch(Box::new(noshape_model::sketch_feature::SketchData { sketch: sk, ..Default::default() })));
+    s.params.set("sketch", ParamValue::Sketch(Box::new(data)));
     let sid = s.id;
     ps.features.push(s);
     let r = fx.regen(&mut Regenerator::new(), &ps);
     let region: Vec<Reference> = r.display.sketches.iter().find(|g| g.feature == sid).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: sid, key: g.key.clone() }).collect();
     let mut x = ps.new_feature("extrude", &fx.units).unwrap();
+    x.id = noshape_model::reference::FeatureId(extrude_id);
     x.params.set("entities", ParamValue::Query(region));
-    x.params.set("depth", expr("#w"));
+    x.params.set("depth", expr("10 mm"));
     let xid = x.id;
     ps.features.push(x);
     let mut f = ps.new_feature(&fx.ty("depthPattern"), &fx.units).unwrap();
@@ -3132,7 +3148,7 @@ export const depthPattern = defineFeature(function(context is Context, id is Id,
     assert_ok(&r);
     let mut parts: Vec<(f64, f64)> = r.context.bodies.iter().map(|b| (b.shape.bounding_box(false).unwrap().min.x * 1e3, b.shape.volume().unwrap() * 1e9)).collect();
     parts.sort_by(|a, b| a.0.total_cmp(&b.0));
-    assert_eq!(parts.len(), 3, "{parts:?}");
+    assert_eq!(parts.len(), 3, "ids {sketch_id:x} / {extrude_id:x}: {parts:?}");
     for ((x, v), (x0, v0)) in parts.iter().zip([(0.0, 1000.0), (30.0, 1500.0), (60.0, 2000.0)]) {
         assert!((x - x0).abs() < 1e-3 && (v - v0).abs() < 1e-6, "{parts:?}");
     }

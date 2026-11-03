@@ -61,10 +61,26 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("lastModifyingOperationId", last_modifying_operation_id),
 ];
 
-/// Values of an id -> value map in feature order (ids sort like features).
+/// Values of an id -> value map in the order their features started (std): picked Part Studio features (a
+/// FeatureList's keys) in the feature list's order, then subfeatures in the order `startFeature` saw them; other keys
+/// after, as the map has them.
 fn values_sorted_by_id(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
     let m = noshape_featurescript::natives::map_arg(i, &a, 1)?;
-    Ok(Value::array(m.values().cloned().collect()))
+    let st = cx.state.lock();
+    let rank = |k: &Value| -> usize {
+        let id: Option<super::FsId> = k.as_array().and_then(|x| x.iter().map(|s| s.as_str()).collect());
+        let Some(id) = id else { return usize::MAX };
+        let feature = match id.as_slice() {
+            [f] => f.strip_prefix('F').and_then(|h| u64::from_str_radix(h, 16).ok()).and_then(|n| st.feature_defs.iter().position(|d| d.id.0 == n)),
+            _ => None,
+        };
+        feature.or_else(|| st.start_order.iter().position(|s| *s == id).map(|p| st.feature_defs.len() + p)).unwrap_or(usize::MAX)
+    };
+    let mut entries: Vec<(usize, Value)> = m.iter().map(|(k, v)| (rank(k), v.clone())).collect();
+    drop(st);
+    entries.sort_by_key(|e| e.0);
+    Ok(Value::array(entries.into_iter().map(|e| e.1).collect()))
 }
 
 /// A FeatureList parameter value: picked feature Id -> feature function (run in `cx`, when given).
@@ -243,6 +259,9 @@ fn start_feature(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let id = id_arg(i, &a, 1)?;
     let mut st = cx.state.lock();
     let snapshot = st.ctx.clone();
+    if !st.start_order.contains(&id) {
+        st.start_order.push(id.clone());
+    }
     st.started.push(super::Started { id, snapshot });
     Ok(Value::map(Map::new()))
 }
