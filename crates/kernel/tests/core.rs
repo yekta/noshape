@@ -601,7 +601,10 @@ fn a_hole_across_a_tubes_seam_leaves_whole_loops() {
 fn brep_edges_probe() {
     let Ok(path) = std::env::var("NOSHAPE_BREP_EDGES") else { return };
     let mm = 1e-3;
-    let r = read_brep(std::path::Path::new(&path)).unwrap();
+    let mut r = read_brep(std::path::Path::new(&path)).unwrap();
+    if std::env::var_os("NOSHAPE_BREP_UNIFY").is_some() {
+        r = unify_same_domain_whole(&r).unwrap().shape;
+    }
     let shown = r.shown_topology().unwrap();
     println!("{} / {} / {}", r.faces().len(), shown.edges.iter().filter(|e| **e).count(), shown.vertices.iter().filter(|v| **v).count());
     for (i, f) in r.faces().iter().enumerate() {

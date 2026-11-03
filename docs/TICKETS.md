@@ -388,6 +388,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (eval.rs unify_merged; it kept only face merges). bushing2-0-joshua's Extrude 2 5/6/0 as live, clamp-abhil's Hole 2
   10/22/12 as live (T1 kernel core::a_hole_across_a_tubes_seam_leaves_whole_loops). Left: bushing's Extrude 4
   (18/42/26, live 18/40/24) and pipeflange-steven's Extrude 3 (24/46/20, live 24/44/16), other shapes of the same.
+  core 11-03 09:45: pipeflange-steven's Extrude 3 as live too (24/44/16): a loop's pieces are joined wherever OCCT's
+  seam split them (a vertex at u = 0 of a periodic face, no seam there now), also when an earlier unify moved the
+  seam; the pieces' curves concatenated exactly (3D and on both faces, one parameter: boolean.cpp concat_shifted), so
+  volumes stay OCCT's to the bit (bool_patterns' exact cases unchanged); a linear pre-check keeps it ~1 ms over the
+  perf documents. Parity 42/57 features. Left: bushing's Extrude 4, pipeflange's Fillet 2 (36/81/42, live 36/79/40).
   Extrude 4's two: its notch leaves the tube's end an arc, and the (moved) seam's vertex splits it (at −z on both
   walls); no angle is free of the slots and the notch, so OCCT's seam always splits something there. Matching needs
   the seam-split pieces of one arc counted (shown_topology) and picked as one edge.

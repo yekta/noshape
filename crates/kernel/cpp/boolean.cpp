@@ -38,6 +38,10 @@
 #include <Message_ProgressScope.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <Geom2d_BSplineCurve.hxx>
+#include <Geom2d_TrimmedCurve.hxx>
+#include <Geom2dConvert.hxx>
+#include <GeomConvert.hxx>
 #include <BRepBuilderAPI_GTransform.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
@@ -2806,44 +2810,292 @@ TopoDS_Shape merge_cylinder_patches(const TopoDS_Shape& s, HHist& hist)
 // given) says whether the result has nothing more to merge.
 TopoDS_Shape unify_faces_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean);
 
-// A loop's pieces left meeting at vertices of just two curved edges between the same two faces (once a seam moved off
-// them): joined, B-splines concatenated. `s` when there are none or the result isn't valid with the same volume.
+// Two B-splines end to end (the second starting where the first ends), exactly: the same degree (raised), the second's
+// knots shifted onto the first's end (no rescaling, unlike OCCT's CompCurve in 2D), joined C0, its weights scaled to
+// meet. For 3D (Geom) and 2D (Geom2d) curves alike, so curves of one edge keep one parameter.
+template <class Curve, class Pnt, class Arr>
+occ::handle<Curve> concat_shifted(const occ::handle<Curve>& a0, const occ::handle<Curve>& b0)
+{
+  occ::handle<Curve> a = occ::down_cast<Curve>(a0->Copy()), b = occ::down_cast<Curve>(b0->Copy());
+  const int          d = std::max(a->Degree(), b->Degree());
+  a->IncreaseDegree(d);
+  b->IncreaseDegree(d);
+  const double shift = a->LastParameter() - b->FirstParameter();
+  const int    na = a->NbPoles(), nb = b->NbPoles();
+  const int    ka = a->NbKnots(), kb = b->NbKnots();
+  const bool   rational = a->IsRational() || b->IsRational();
+  const double ratio = a->Weight(na) / b->Weight(1);
+  Arr                         poles(1, na + nb - 1);
+  NCollection_Array1<double>  weights(1, na + nb - 1);
+  for (int i = 1; i <= na; ++i)
+  {
+    poles(i)   = a->Pole(i);
+    weights(i) = a->Weight(i);
+  }
+  for (int i = 2; i <= nb; ++i)
+  {
+    poles(na + i - 1)   = b->Pole(i);
+    weights(na + i - 1) = ratio * b->Weight(i);
+  }
+  NCollection_Array1<double> knots(1, ka + kb - 1);
+  NCollection_Array1<int>    mults(1, ka + kb - 1);
+  for (int i = 1; i <= ka; ++i)
+  {
+    knots(i) = a->Knot(i);
+    mults(i) = a->Multiplicity(i);
+  }
+  mults(ka) = d;
+  for (int i = 2; i <= kb; ++i)
+  {
+    knots(ka + i - 1) = b->Knot(i) + shift;
+    mults(ka + i - 1) = b->Multiplicity(i);
+  }
+  return rational ? new Curve(poles, weights, knots, mults, d) : new Curve(poles, knots, mults, d);
+}
+
+// A loop's pieces left meeting at vertices of just two curved edges between the same two faces (where a seam crossed
+// it): one edge, the pieces' curves (3D and on both faces) concatenated exactly, their parameters kept. `s` when
+// there are none or the result isn't valid.
+// Whether some u-periodic face has a curved edge ending at u = 0 of its surface where the face has no seam: the only
+// place join_loop_pieces joins. Linear, no maps (most bodies have none: a hole's circle ends on its seam).
+bool loop_joint_candidates(const TopoDS_Shape& s)
+{
+  for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More(); fx.Next())
+  {
+    const TopoDS_Face&              f = TopoDS::Face(fx.Current());
+    const occ::handle<Geom_Surface> g = BRep_Tool::Surface(f);
+    if (g.IsNull() || !g->IsUPeriodic())
+      continue;
+    ShapeIMap seam_v;
+    for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+      if (BRep_Tool::IsClosed(TopoDS::Edge(x.Current()), f))
+        for (TopExp_Explorer v(x.Current(), TopAbs_VERTEX); v.More(); v.Next())
+          seam_v.Add(v.Current());
+    for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+      if (BRep_Tool::Degenerated(e) || BRep_Tool::IsClosed(e, f))
+        continue;
+      TopoDS_Vertex v0, v1;
+      TopExp::Vertices(e, v0, v1);
+      if (v0.IsNull() || v0.IsSame(v1) || BRepAdaptor_Curve(e).GetType() == GeomAbs_Line)
+        continue;
+      for (const TopoDS_Vertex& v : {v0, v1})
+        if (!seam_v.Contains(v) && std::abs(std::remainder(BRep_Tool::Parameters(v, f).X(), g->UPeriod())) < 1e-7)
+          return true;
+    }
+  }
+  return false;
+}
+
 TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist)
 {
-  ShapeAncMap ve, ef;
+  {
+    const KernelTimer timer("unify.loop_check");
+    if (!loop_joint_candidates(s))
+      return s;
+  }
+  const KernelTimer timer("unify.loop_pieces");
+  ShapeAncMap       ve, ef;
   unique_ancestors(s, TopAbs_VERTEX, TopAbs_EDGE, ve);
-  unique_ancestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
-  bool any = false;
-  for (int i = 1; i <= ve.Extent() && !any; ++i)
+  // The joints: two curved edges, neither a seam, on the same two faces.
+  std::vector<int> joints;
+  bool             mapped = false;
+  for (int i = 1; i <= ve.Extent(); ++i)
   {
     const ShapeList& es = ve(i);
     if (es.Extent() != 2)
       continue;
     const TopoDS_Edge a = TopoDS::Edge(es.First()), b = TopoDS::Edge(es.Last());
-    if (BRep_Tool::Degenerated(a) || BRep_Tool::Degenerated(b) || BRepAdaptor_Curve(a).GetType() == GeomAbs_Line || BRepAdaptor_Curve(b).GetType() == GeomAbs_Line)
+    if (a.IsSame(b) || BRep_Tool::Degenerated(a) || BRep_Tool::Degenerated(b) || BRepAdaptor_Curve(a).GetType() == GeomAbs_Line || BRepAdaptor_Curve(b).GetType() == GeomAbs_Line)
       continue;
+    if (!mapped)
+    {
+      unique_ancestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+      mapped = true;
+    }
     const ShapeList *fa = ef.Seek(a), *fb = ef.Seek(b);
-    any = fa != nullptr && fb != nullptr && fa->Extent() == 2 && fb->Extent() == 2 &&
-          ((fa->First().IsSame(fb->First()) && fa->Last().IsSame(fb->Last())) || (fa->First().IsSame(fb->Last()) && fa->Last().IsSame(fb->First())));
+    if (fa == nullptr || fb == nullptr || fa->Extent() != 2 || fb->Extent() != 2 || fa->First().IsSame(fa->Last()))
+      continue;
+    if (!((fa->First().IsSame(fb->First()) && fa->Last().IsSame(fb->Last())) || (fa->First().IsSame(fb->Last()) && fa->Last().IsSame(fb->First()))))
+      continue;
+    if (BRep_Tool::IsClosed(a, TopoDS::Face(fa->First())) || BRep_Tool::IsClosed(a, TopoDS::Face(fa->Last())) || BRep_Tool::IsClosed(b, TopoDS::Face(fa->First())) || BRep_Tool::IsClosed(b, TopoDS::Face(fa->Last())))
+      continue;
+    // Only where a seam split the loop: at u = 0 (a whole period) of a periodic face's surface, OCCT's seams' place.
+    bool at_seam = false;
+    for (const TopoDS_Shape& fx : {fa->First(), fa->Last()})
+    {
+      const TopoDS_Face&              f = TopoDS::Face(fx);
+      const occ::handle<Geom_Surface> g = BRep_Tool::Surface(f);
+      if (g.IsNull() || !g->IsUPeriodic())
+        continue;
+      const gp_Pnt2d uv = BRep_Tool::Parameters(TopoDS::Vertex(ve.FindKey(i)), f);
+      at_seam = at_seam || std::abs(std::remainder(uv.X(), g->UPeriod())) < 1e-7;
+    }
+    if (at_seam)
+      joints.push_back(i);
   }
-  if (!any)
+  if (joints.empty())
     return s;
-  const KernelTimer            timer("unify.loop_pieces");
-  BRepBuilderAPI_Copy          cp(s, true, false);
-  ShapeUpgrade_UnifySameDomain u(cp.Shape(), true, false, true);
-  u.Build();
-  if (u.Shape().IsSame(cp.Shape()) || !BRepCheck_Analyzer(u.Shape()).IsValid())
+  ShapeIMap joint_v;
+  for (int i : joints)
+    joint_v.Add(ve.FindKey(i));
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape();
+  BRep_Builder                   B;
+  ShapeIMap                      used;
+  std::vector<std::pair<std::vector<TopoDS_Edge>, TopoDS_Edge>> made;
+  for (int i : joints)
+  {
+    const TopoDS_Vertex j = TopoDS::Vertex(ve.FindKey(i));
+    if (used.Contains(ve(i).First()))
+      continue;
+    // Back from j to the chain's start (a vertex that isn't a joint, or j again: a closed chain).
+    TopoDS_Vertex start = j;
+    TopoDS_Edge   prev  = TopoDS::Edge(ve(i).First());
+    for (int guard = 0; guard < 1000; ++guard)
+    {
+      TopoDS_Vertex v0, v1;
+      TopExp::Vertices(prev, v0, v1);
+      const TopoDS_Vertex other = v0.IsSame(start) ? v1 : v0;
+      if (!joint_v.Contains(other) || other.IsSame(j))
+      {
+        start = joint_v.Contains(other) ? j : other;
+        break;
+      }
+      const ShapeList& es = ve.FindFromKey(other);
+      prev  = TopoDS::Edge(es.First().IsSame(prev) ? es.Last() : es.First());
+      start = other;
+    }
+    // Forward from start.
+    std::vector<TopoDS_Edge> chain;
+    TopoDS_Vertex            at = start;
+    TopoDS_Edge              last;
+    for (int guard = 0; guard < 1000; ++guard)
+    {
+      const ShapeList* es = ve.Seek(at);
+      if (es == nullptr)
+        break;
+      TopoDS_Edge next;
+      for (ShapeList::Iterator it(*es); it.More() && next.IsNull(); it.Next())
+        if (!used.Contains(it.Value()) && (joint_v.Contains(at) || chain.empty()) && !it.Value().IsSame(last))
+        {
+          const ShapeList* fl = ef.Seek(it.Value());
+          const ShapeList* f0 = chain.empty() ? fl : ef.Seek(chain.front());
+          if (fl != nullptr && f0 != nullptr && fl->Extent() == 2 && (fl->First().IsSame(f0->First()) || fl->First().IsSame(f0->Last())) && (fl->Last().IsSame(f0->First()) || fl->Last().IsSame(f0->Last())))
+            next = TopoDS::Edge(it.Value());
+        }
+      if (next.IsNull())
+        break;
+      used.Add(next);
+      TopoDS_Edge e = TopoDS::Edge(next.Oriented(TopAbs_FORWARD));
+      if (!TopExp::FirstVertex(e).IsSame(at))
+        e.Reverse();
+      chain.push_back(e);
+      last = next;
+      at   = TopExp::LastVertex(e, true);
+      if (at.IsSame(start) || !joint_v.Contains(at))
+        break;
+    }
+    if (chain.size() < 2)
+      continue;
+    const TopoDS_Face F[2] = {TopoDS::Face(ef.FindFromKey(chain[0]).First()), TopoDS::Face(ef.FindFromKey(chain[0]).Last())};
+    occ::handle<Geom_BSplineCurve>   c3;
+    occ::handle<Geom2d_BSplineCurve> c2[2];
+    double                                                 tol = 0;
+    bool                                                   ok  = true;
+    for (const TopoDS_Edge& e : chain)
+    {
+      tol = std::max(tol, BRep_Tool::Tolerance(e));
+      const bool                    rev = e.Orientation() == TopAbs_REVERSED;
+      const TopoDS_Edge             ef_ = TopoDS::Edge(e.Oriented(TopAbs_FORWARD));
+      double                        a = 0, b = 0;
+      TopLoc_Location               el;
+      const occ::handle<Geom_Curve> c = BRep_Tool::Curve(ef_, el, a, b);
+      if (c.IsNull())
+      {
+        ok = false;
+        break;
+      }
+      occ::handle<Geom_BSplineCurve> bs = GeomConvert::CurveToBSplineCurve(new Geom_TrimmedCurve(occ::down_cast<Geom_Curve>(c->Transformed(el.Transformation())), a, b));
+      if (rev)
+        bs->Reverse();
+      // Each piece's curve on the faces with the same parameter (its 3D one's), a whole number of periods on.
+      occ::handle<Geom2d_BSplineCurve> b2[2];
+      for (int k = 0; k < 2 && ok; ++k)
+      {
+        double                          f2, l2;
+        const occ::handle<Geom2d_Curve> p = BRep_Tool::CurveOnSurface(ef_, F[k], f2, l2);
+        if (p.IsNull() || std::abs(f2 - a) > 1e-9 || std::abs(l2 - b) > 1e-9)
+        {
+          ok = false;
+          break;
+        }
+        b2[k] = Geom2dConvert::CurveToBSplineCurve(new Geom2d_TrimmedCurve(p, f2, l2));
+        if (rev)
+          b2[k]->Reverse();
+        if (!c2[k].IsNull())
+        {
+          const occ::handle<Geom_Surface> g  = BRep_Tool::Surface(F[k]);
+          const gp_Pnt2d                  e0 = c2[k]->EndPoint(), s0 = b2[k]->StartPoint();
+          const double pu = g->IsUPeriodic() ? g->UPeriod() : 0, pv = g->IsVPeriodic() ? g->VPeriod() : 0;
+          const double ku = pu > 0 ? std::round((e0.X() - s0.X()) / pu) : 0, kv = pv > 0 ? std::round((e0.Y() - s0.Y()) / pv) : 0;
+          if (ku != 0 || kv != 0)
+            b2[k]->Translate(gp_Vec2d(ku * pu, kv * pv));
+          if (b2[k]->StartPoint().Distance(e0) > 1e-7)
+            ok = false;
+        }
+      }
+      if (!ok)
+        break;
+      if (!c3.IsNull() && bs->StartPoint().Distance(c3->EndPoint()) > tol + Precision::Confusion())
+      {
+        ok = false;
+        break;
+      }
+      c3 = c3.IsNull() ? bs : concat_shifted<Geom_BSplineCurve, gp_Pnt, NCollection_Array1<gp_Pnt>>(c3, bs);
+      for (int k = 0; k < 2; ++k)
+        c2[k] = c2[k].IsNull() ? b2[k] : concat_shifted<Geom2d_BSplineCurve, gp_Pnt2d, NCollection_Array1<gp_Pnt2d>>(c2[k], b2[k]);
+      if (!ok)
+        break;
+    }
+    if (!ok)
+      continue;
+    const occ::handle<Geom_BSplineCurve> curve = c3;
+    TopoDS_Edge                          E;
+    B.MakeEdge(E, curve, tol);
+    const TopoDS_Vertex vs = TopExp::FirstVertex(chain.front(), true), vl = TopExp::LastVertex(chain.back(), true);
+    B.Add(E, vs.Oriented(TopAbs_FORWARD));
+    B.Add(E, vl.Oriented(TopAbs_REVERSED));
+    B.Range(E, curve->FirstParameter(), curve->LastParameter());
+    for (int k = 0; k < 2; ++k)
+    {
+      B.UpdateEdge(E, c2[k], F[k], tol);
+      B.Range(E, F[k], curve->FirstParameter(), curve->LastParameter());
+    }
+    if (!ok)
+      continue;
+    B.SameRange(E, true);
+    B.SameParameter(E, true);
+    rs->Replace(chain.front().Oriented(TopAbs_FORWARD), chain.front().Orientation() == TopAbs_REVERSED ? TopoDS::Edge(E.Reversed()) : E);
+    for (size_t k = 1; k < chain.size(); ++k)
+      rs->Remove(chain[k].Oriented(TopAbs_FORWARD));
+    made.emplace_back(chain, E);
+  }
+  if (made.empty())
     return s;
-  GProp_GProps g0, g1;
-  BRepGProp::VolumeProperties(s, g0);
-  BRepGProp::VolumeProperties(u.Shape(), g1);
-  if (std::abs(g1.Mass() - g0.Mass()) > 1e-5 * std::abs(g0.Mass()))
+  const TopoDS_Shape out = rs->Apply(s);
+  if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
     return s;
   if (hist.IsNull())
     hist = new BRepTools_History();
-  hist->Merge(new BRepTools_History(to_list(std::vector<TopoDS_Shape>{s}), cp));
-  hist->Merge(u.History());
-  return u.Shape();
+  HHist h = rs->History();
+  if (h.IsNull())
+    h = new BRepTools_History();
+  for (const auto& [chain, E] : made)
+    for (size_t k = 1; k < chain.size(); ++k)
+      h->AddModified(chain[k].Oriented(TopAbs_FORWARD), E);
+  hist->Merge(h);
+  return out;
 }
 
 TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean)
@@ -2856,11 +3108,11 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
     const KernelTimer timer("unify.seams");
     moved = move_seams_off_holes(s, hist);
   }
-  if (moved.IsSame(s))
-    return s;
-  if (clean != nullptr)
+  // (Also where an earlier unify moved the seam: the pieces a later cut left.)
+  const TopoDS_Shape joined = join_loop_pieces(moved, hist);
+  if (clean != nullptr && !joined.IsSame(s))
     *clean = false;
-  return join_loop_pieces(moved, hist);
+  return joined;
 }
 
 TopoDS_Shape unify_faces_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean)
