@@ -1850,7 +1850,7 @@ impl SketchEditor {
                 }
             }
             Tool::Slot => {
-                let ids: Vec<EntityId> = if self.selection.is_empty() { hovered.into_iter().collect() } else { std::mem::take(&mut self.selection) };
+                let ids: Vec<EntityId> = if self.selection.is_empty() || self.slot_pending() { hovered.into_iter().collect() } else { std::mem::take(&mut self.selection) };
                 self.make_slots(data, &ids)
             }
             Tool::Offset => {
@@ -2393,6 +2393,9 @@ impl SketchEditor {
         let out = self.make_slots_in(&mut preview, &curves);
         if let Some(created) = out {
             self.pending_slot = Some((preview, created));
+            // Live (ui-parity sketch-slot-on-line): the picked curves stay
+            // selected until the slot commits.
+            self.selection = curves;
         }
         if committed { EditOutcome::changed() } else { EditOutcome::redraw() }
     }
@@ -2414,6 +2417,7 @@ impl SketchEditor {
     /// Commit the slot preview into the sketch.
     pub fn commit_slot(&mut self, data: &mut SketchData) -> EditOutcome {
         let Some((preview, created)) = self.pending_slot.take() else { return EditOutcome::none() };
+        self.selection.clear();
         *data = preview;
         self.finish_create(data, &created);
         EditOutcome::changed()
@@ -7283,8 +7287,10 @@ mod tests {
         assert!((w - ed.slot_width).abs() < 1e-12 && at.x > 0.04, "{at} {w}");
         assert_eq!(count(&d, EntityKind::Arc), 0, "nothing committed yet");
         assert!(ed.dim_edit.is_none(), "no value box for a slot");
+        assert_eq!(ed.selection, vec![line], "the picked line stays selected meanwhile (live sketch-slot-on-line)");
         click(&mut ed, &mut d, v(0.03, 0.04));
         assert!(!ed.slot_pending());
+        assert!(ed.selection.is_empty(), "committing clears it");
         assert_eq!(count(&d, EntityKind::Arc), 2, "the empty-space click committed it");
         assert!(!d.sketch.entity(line).unwrap().construction, "centerline stays solid");
         assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Diameter { .. })), "Ø width dimension");
