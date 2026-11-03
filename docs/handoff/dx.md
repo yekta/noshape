@@ -73,6 +73,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   unpacker change; parity_models prints a "SCORE.md row: | … |" line to paste. drawing.md TB25 verified by tests;
   Insert view shows "Show annotations from model" only for a part (live captures; request withdrawn). Assembly
   layout proposed to live (REQUESTS 11-03 02:15), to build the assembly translator once confirmed.
+- 11-03 09:10 STL units (lead's question): live reads a unitless STL in the **document's length unit** (import dialog
+  Units defaults to it: Millimeter in a mm document, Inch in an inch one; behaviours G35 / G35b); ours does the same.
+  Our export_parts' STL default is Meter / Binary (as live's REST translation, "Units = meters"), so a mm part
+  exported with defaults and re-imported with defaults is 1000× small. Live's dialog is sticky; its first-export
+  default is asked (request filed 09:10). CUT-CLOSED-EDGES-SPLIT is bool's now (lead 09:05).
 - 11-03 08:30 (lead: PARITY-IMPRINT-REGION-QUERY first, then the corpus's untranslated reasons): the region query
   was already fixed (07:55, ticked); untranslated reasons tallied over all 18 documents: merge scopes named by a
   live point outside our changed part (clamp-hms ×5) now take the nearest part; in-feature mate connectors' imprint
@@ -87,7 +92,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   a region named by the sketch's own curves is the whole region the face's edges split; a curve several regions
   share is decided by its shape's other sides; imprinted face pieces each picked once; cap circles by radius; core
   fixed SKETCH-FACE-IMPRINT and EXTRUDE-OVERLAP-LINES-FACES). Every remaining first difference is a core ticket:
-  CUT-CLOSED-EDGES-SPLIT (bushing2, clamp-abhil, pipeflange), FILLET-SPLIT-EDGE-FACES (bracket03),
+  CUT-CLOSED-EDGES-SPLIT (bool now, handed over by core: bushing2, clamp-abhil, pipeflange), FILLET-SPLIT-EDGE-FACES (bracket03),
   EXTRUDE-UP-TO-FACE-BEYOND (clamp-hms; live request filed). The 7 unscored documents translate except faces named
   through later operations (they resolve by live's geometry once refetched) and bracket00's sheet metal.
 - 11-03 06:55: Parasolid export: whole circles / ellipses are ring edges without a vertex (Parasolid's and Onshape's
