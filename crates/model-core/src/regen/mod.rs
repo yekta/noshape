@@ -253,6 +253,11 @@ pub(super) const KEEP_RUNS: u64 = 16;
 /// feature (and everything after it) as it was.
 const VERSIONS: usize = 3;
 const KEEP_GONE: usize = 8;
+/// Whole results kept: undoing or redoing this many steps back is a lookup (PLAN 2.6: undo / redo ≤ 50 ms; past
+/// [`VERSIONS`] edits of one feature its evaluations are gone).
+const RESULTS: usize = 8;
+/// And while their meshes (each counted once) stay under this many bytes.
+const RESULT_MESH_BYTES: usize = 256 << 20;
 
 /// Parsed Assembly context snapshots: (id, revision) -> bodies and their display.
 type ContextCache = HashMap<(u32, u32), (Vec<Arc<context::Body>>, Vec<crate::display::BodyDisplay>)>;
@@ -269,6 +274,33 @@ pub struct Regenerator {
     contexts: ContextCache,
     /// Features evaluated so far (not taken from the cache).
     evaluations: u64,
+    /// The last runs' results by [`result_key`], newest first.
+    results: Vec<(u64, RegenResult)>,
+}
+
+/// Everything a run's result depends on (the studio, its settings and the options; preview meshes aside: a full
+/// result serves a preview); none for studios with Assembly contexts (their snapshots are too big to hash each run).
+fn result_key(studio: &PartStudio, config: &ConfigValues, units: &UnitPrefs, opts: &RegenOptions, effective: &[eval::EffectiveFeature]) -> Option<u64> {
+    if !studio.contexts.is_empty() {
+        return None;
+    }
+    let settings = (config, units, opts.upto, opts.editing_sketch, opts.relative_deflection.to_bits(), opts.angular_deflection.to_bits(), display::angle_display_mesh());
+    let mut key = hash_bytes(hash_bytes(1, &serde_json::to_vec(studio).ok()?), &serde_json::to_vec(&settings).ok()?);
+    for (name, v) in &opts.document_variables {
+        key = hash_bytes(hash_bytes(key, name.as_bytes()), &v.value.to_le_bytes());
+    }
+    for f in effective {
+        if crate::features::importing::is_derived(&f.type_id)
+            && let Some(p) = &opts.derived
+        {
+            key = hash_bytes(key, &p.version(f.params.text("partStudio")).to_le_bytes());
+        }
+        if let Some((tab, _)) = crate::custom::parse_type_id(&f.type_id) {
+            let v = opts.custom_features.clone().unwrap_or_else(custom_features::fallback_provider).version(tab);
+            key = hash_bytes(key, &v.to_le_bytes());
+        }
+    }
+    Some(key)
 }
 
 /// NOSHAPE_KERNEL_PROFILE: the kernel's profile is printed for each feature.
@@ -341,6 +373,17 @@ impl Regenerator {
             .collect();
         let aborted = || opts.cancel.as_ref().is_some_and(RegenCancel::aborted);
         let cancelled = || RegenResult { cancelled: true, ..Default::default() };
+        let result_key = result_key(studio, config, units, opts, &effective);
+        if let Some(k) = result_key
+            && let Some(i) = self.results.iter().position(|(x, r)| *x == k && (opts.preview_meshes || !r.needs_refine))
+        {
+            let entry = self.results.remove(i);
+            let mut r = entry.1.clone();
+            self.results.insert(0, entry);
+            r.evaluated = Vec::new();
+            r.display.regen_ms = t0.elapsed().as_secs_f32() * 1000.0;
+            return r;
+        }
         for (i, f) in studio.features.iter().enumerate() {
             if aborted() {
                 return cancelled();
@@ -616,7 +659,29 @@ impl Regenerator {
         display.features = states;
         display.variables = ctx.variables.clone();
         display.regen_ms = t0.elapsed().as_secs_f32() * 1000.0;
-        RegenResult { display, needs_refine, context: ctx, cancelled: false, evaluated }
+        let result = RegenResult { display, needs_refine, context: ctx, cancelled: false, evaluated };
+        if let Some(k) = result_key {
+            self.results.retain(|(x, _)| *x != k);
+            self.results.insert(0, (k, result.clone()));
+            self.results.truncate(RESULTS);
+            let mut seen = std::collections::HashSet::new();
+            let mut bytes = 0;
+            let keep = self
+                .results
+                .iter()
+                .position(|(_, r)| {
+                    for b in &r.display.bodies {
+                        if seen.insert(Arc::as_ptr(&b.mesh)) {
+                            let m = &b.mesh;
+                            bytes += 12 * (m.positions.len() + m.normals.len() + m.vertices.len() + m.mesh_lines.len() + m.edges.iter().map(Vec::len).sum::<usize>()) + 4 * m.indices.len();
+                        }
+                    }
+                    bytes > RESULT_MESH_BYTES
+                })
+                .map_or(self.results.len(), |i| i.max(1));
+            self.results.truncate(keep);
+        }
+        result
     }
 }
 

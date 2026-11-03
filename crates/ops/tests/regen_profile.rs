@@ -721,3 +721,36 @@ fn edit_latency(check: bool) {
     }
     let _ = std::fs::remove_dir_all(&tmp);
 }
+
+/// The whole-result cache's key costs a serialization of the studio a run: its time on the perf documents, and a
+/// repeated run's (a cache hit) against the first.
+#[test]
+#[ignore = "T2 probe"]
+fn result_key_cost_probe() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf");
+    let tmp = std::env::temp_dir().join(format!("noshape-keycost-{}", std::process::id()));
+    std::fs::create_dir_all(&tmp).unwrap();
+    for name in ["live-30-features", "big-plate", "fins-400", "knurl-d25x25-45-45", "parts-1000"] {
+        let copy = tmp.join(format!("{name}.noshape"));
+        std::fs::copy(dir.join(format!("{name}.noshape")), &copy).unwrap();
+        let s = noshape_ops::session::Session::open(&copy).unwrap();
+        let units = s.doc.settings.units;
+        for tab in &s.doc.tabs {
+            let TabContent::PartStudio(ps) = &tab.content else { continue };
+            let t = Instant::now();
+            let mut bytes = 0;
+            for _ in 0..10 {
+                bytes = serde_json::to_vec(ps).unwrap().len();
+            }
+            let ser = t.elapsed().as_secs_f64() * 1e3 / 10.0;
+            let mut reg = Regenerator::new();
+            let t = Instant::now();
+            reg.regenerate(ps, &ConfigValues::default(), &units, &RegenOptions::default());
+            let first = t.elapsed().as_secs_f64() * 1e3;
+            let t = Instant::now();
+            let again = reg.regenerate(ps, &ConfigValues::default(), &units, &RegenOptions::default());
+            println!("{name}: {} features, studio {} kB serialized in {ser:.2} ms; first run {first:.0} ms, again {:.2} ms ({} evaluated)", ps.features.len(), bytes / 1024, t.elapsed().as_secs_f64() * 1e3, again.evaluated.len());
+        }
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+}

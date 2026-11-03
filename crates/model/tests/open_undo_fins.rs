@@ -95,6 +95,40 @@ fn change(regen: &mut Regenerator, ps: &PartStudio, what: &str) -> f64 {
     preview + refine
 }
 
+/// Undo past the per-feature cache's depth (qa REGEN-SPEED: the third Ctrl+Z after three edits re-evaluated every
+/// feature, PLAN 2.6's budget 50 ms): each of the last runs' results comes back whole, nothing evaluated, its meshes
+/// the same; a full result serves the app's preview pass.
+#[test]
+fn undoing_three_edits_back_evaluates_nothing() {
+    let units = UnitPrefs::default();
+    let config = ConfigValues::default();
+    let mut ps = PartStudio::new();
+    let plate = sketch_region(&mut ps, &units, rect(0.0, 0.0, 0.04, 0.02));
+    let ex = add(&mut ps, &units, "extrude", &[("entities", q(vec![plate])), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+    let boss = sketch_region(&mut ps, &units, rect(0.01, 0.005, 0.02, 0.015));
+    add(&mut ps, &units, "extrude", &[("entities", q(vec![boss])), ("depth", e("5 mm")), ("operationType", en("ADD")), ("defaultScope", b(true)), ("startOffset", b(true)), ("startOffsetBound", en("BLIND")), ("startOffsetDistance", e("10 mm"))]);
+    let mut regen = Regenerator::new();
+    // The app's passes: preview meshes, then refined.
+    let mut app = |ps: &PartStudio| {
+        let r = regen.regenerate(ps, &config, &units, &RegenOptions { preview_meshes: true, ..Default::default() });
+        if r.needs_refine { regen.regenerate(ps, &config, &units, &RegenOptions::default()) } else { r }
+    };
+    let mut states = vec![ps.clone()];
+    let mut shown = vec![app(&ps)];
+    for depth in ["11 mm", "9 mm", "13 mm"] {
+        let mut next = states.last().unwrap().clone();
+        next.features.iter_mut().find(|f| f.id == ex).unwrap().params.set("depth", e(depth));
+        shown.push(app(&next));
+        states.push(next);
+    }
+    for k in (0..3).rev() {
+        let r = app(&states[k]);
+        assert!(r.evaluated.is_empty(), "undo to state {k}: {} features evaluated", r.evaluated.len());
+        assert!(std::sync::Arc::ptr_eq(&r.display.bodies[0].mesh, &shown[k].display.bodies[0].mesh), "undo to state {k}: its mesh");
+        assert!(!r.needs_refine);
+    }
+}
+
 /// Undoing a delete takes the feature and the body's mesh from the cache
 /// (nothing evaluated or meshed); once its upstream changed it is
 /// evaluated again.
@@ -139,7 +173,9 @@ fn undoing_an_edit_reuses_the_previous_evaluation() {
     let mut edited = ps.clone();
     let plate = edited.features.iter().position(|f| f.type_id == "extrude").unwrap();
     edited.features[plate].params.set("depth", e("12 mm"));
-    assert_eq!(result(&edited).evaluated.len(), edited.features.len() - plate, "the edit regenerates everything after it");
+    // (Incremental regeneration reuses those that read nothing it changed.)
+    let ran = result(&edited).evaluated;
+    assert!(ran.contains(&edited.features[plate].id) && ran.len() <= edited.features.len() - plate, "the edit regenerates from it: {ran:?}");
     let undone = result(&ps);
     assert!(undone.evaluated.is_empty(), "undo: {:?} evaluated", undone.evaluated);
     assert!(std::sync::Arc::ptr_eq(&undone.display.bodies[0].mesh, &first.display.bodies[0].mesh), "undo: the body's mesh comes from the cache");
