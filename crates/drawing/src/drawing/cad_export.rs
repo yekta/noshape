@@ -720,6 +720,9 @@ impl Sheet<'_> {
             common.linetype = name.to_string();
             common.linetype_scale = scale;
             common.line_weight = LineWeight::Value((width * 100.0).round() as i16);
+        } else if self.g.cad_line_layer(li) == CadLayer::Centermarks {
+            // Live 1857: a mark's extended lines CENTER, its cross continuous.
+            common.linetype = if l.style == super::sheet::LineStyle::Centerline { "CENTER" } else { "Continuous" }.to_string();
         }
         put(doc, e, owner).map(|_| ())
     }
@@ -1554,7 +1557,8 @@ mod tests {
 
     /// A model edge that is no line, circle, arc or ellipse is a cubic SPLINE
     /// on its layer, ending on the edge's ends (live 1857: pipeflange-steven's
-    /// VISIBLE and TANGENT_LINES); a detail border stays a POLYLINE.
+    /// VISIBLE and TANGENT_LINES); a detail border stays a POLYLINE; a
+    /// centermark's lines carry their linetypes.
     #[test]
     fn free_form_model_edges_are_splines() {
         let mut g = SheetGeometry::new(279.4, 215.9);
@@ -1565,6 +1569,10 @@ mod tests {
         let m = g.mark();
         g.lines.push(crate::drawing::sheet::Polyline2 { points: wave.iter().map(|p| [p[0], p[1] + 50.0]).collect(), style: LineStyle::Thin, closed: false, pick: 0 });
         g.cad_since(m, CadLayer::DetailViewBorder);
+        let m = g.mark();
+        g.line([100.0, 50.0], [102.0, 50.0], LineStyle::Thin);
+        g.line([103.0, 50.0], [120.0, 50.0], LineStyle::Centerline);
+        g.cad_since(m, CadLayer::Centermarks);
         let doc = acadrust::DxfReader::from_reader(std::io::Cursor::new(to_dxf_version(&g, 4, DxfVersion::AC1014).unwrap())).unwrap().read().unwrap();
         let spline = doc.entities().find_map(|e| match e {
             EntityType::Spline(s) if s.common.layer == "VISIBLE" => Some(s.clone()),
@@ -1574,6 +1582,13 @@ mod tests {
         let ends = [spline.control_points[0], spline.control_points[40]];
         assert!((ends[0].x - 20.0).abs() < 1e-9 && (ends[1].x - 60.0).abs() < 1e-9 && (ends[1].y - wave[40][1]).abs() < 1e-9, "{ends:?}");
         assert!(doc.entities().any(|e| matches!(e, EntityType::Polyline2D(p) if p.common.layer == "DETAIL_VIEW_BORDER")));
+        // A centermark's cross continuous, its extended line CENTER (live 1857).
+        let mut types: Vec<String> = doc.entities().filter_map(|e| match e {
+            EntityType::Line(l) if l.common.layer == "CENTERMARKS" => Some(l.common.linetype.to_uppercase()),
+            _ => None,
+        }).collect();
+        types.sort();
+        assert_eq!(types, ["CENTER", "CONTINUOUS"]);
     }
 
     /// Live drw2-k-dxf2018: a table is an ACAD_TABLE over a *T block (an

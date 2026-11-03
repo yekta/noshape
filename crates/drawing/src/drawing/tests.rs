@@ -3748,6 +3748,25 @@ fn auto_centermarks_follow_mark_gap_and_extended_lines() {
     assert!(lines.iter().all(|l| l.0 == LineStyle::Thin));
 }
 
+/// Live 1857 (knob-tim): concentric circles share one centermark, its
+/// lines out to the largest (the demo's hole and its fillet edge).
+#[test]
+fn concentric_circles_share_one_centermark() {
+    use super::sheet::LineStyle;
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let top = ViewId(2);
+    drawing.sheets[0].view_mut(top).unwrap().show_centerlines = true;
+    let b = render_sheet(&drawing, 0, &sources, &ViewCache::new(), false).unwrap();
+    let marks: Vec<u32> = b.picks.iter().enumerate().filter(|(_, p)| matches!(p, PickTarget::AutoCentermark { view, .. } if *view == top)).map(|(i, _)| i as u32).collect();
+    assert!(!marks.is_empty());
+    for pick in marks {
+        let lines: Vec<_> = b.geometry.lines.iter().filter(|l| l.pick == pick).collect();
+        assert_eq!(lines.len(), 6, "one cross and four extended lines per centre: {lines:?}");
+        assert_eq!(lines.iter().filter(|l| l.style == LineStyle::Centerline).count(), 4);
+    }
+}
+
 /// Live drw2-en-ansi-a / drw2-k-dxf2018: the full text style table (36
 /// with Standard, Noto Sans in the ACAD xdata, the fixed-height styles at
 /// the text height) and one style per kind of text: title block values in

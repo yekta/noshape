@@ -1905,7 +1905,16 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 let (ux, uy) = (pl.dir_to_sheet([1.0, 0.0]), pl.dir_to_sheet([0.0, 1.0]));
                 let in_band = |p: [f64; 2]| pl.breaks().iter().any(|b| p[b.axis as usize] > b.a && p[b.axis as usize] < b.b);
                 let mark = g.mark();
+                // Concentric circles share one mark, sized to the largest
+                // (live 1857: knob-tim's four circles, one mark).
+                let mut circles: Vec<([f64; 2], f64)> = Vec::new();
                 for (c, r, _) in geo.full_circles().into_iter().filter(|_| v.show_centerlines) {
+                    match circles.iter_mut().find(|(o, _)| centermark_key(*o) == centermark_key(c)) {
+                        Some(k) => k.1 = k.1.max(r),
+                        None => circles.push((c, r)),
+                    }
+                }
+                for (c, r) in circles {
                     // Deleted one by one (select + Delete).
                     let key = centermark_key(c);
                     if in_band(c) || v.deleted_centermarks.contains(&key) {
