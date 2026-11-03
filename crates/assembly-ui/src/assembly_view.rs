@@ -190,6 +190,18 @@ struct DragState {
     /// The target (and `value`) the last solve was started for: a repeated
     /// pointer position isn't solved again.
     solved: Option<(DVec3, f64)>,
+    /// Every instance's placement when the drag started: a drag of
+    /// instances solves each step from there (live asm drag probes 3: the
+    /// end pose depends only on where the drag ends).
+    origin: HashMap<InstanceId, Placement>,
+}
+
+/// Substeps a drag step takes from the drag's start to its target: one per
+/// 2 mm the grabbed point moves, at most 4 (one solve doesn't reach a large
+/// turn: live asm drag probe d1 12° off in one, within the pointer's
+/// landing in 4).
+fn drag_substeps(moved: f64) -> usize {
+    ((moved / 0.002).ceil() as usize).clamp(1, 4)
 }
 
 /// Snap mode drag: a connector of one instance dragged onto another's.
@@ -2569,6 +2581,7 @@ impl AssemblyView {
                         explode: self.explode_edit,
                         nested: None,
                         solved: None,
+                        origin: self.result.solved.placements.iter().cloned().collect(),
                     });
                     return;
                 }
@@ -2632,6 +2645,7 @@ impl AssemblyView {
                     explode: false,
                     nested,
                     solved: None,
+                    origin: self.result.solved.placements.iter().cloned().collect(),
                 });
             }
             ViewportEvent::ToolDrag { position, .. } => {
@@ -2948,6 +2962,7 @@ impl AssemblyView {
             explode: false,
             nested: None,
             solved: None,
+            origin: self.result.solved.placements.iter().cloned().collect(),
         });
     }
 
@@ -3115,14 +3130,16 @@ impl AssemblyView {
             // its offset to the grab point.
             None if !d.start.is_empty() => {
                 let drags = d.ids.iter().filter_map(|id| d.start.get(id).map(|p| (*id, placement_to_frame(p).inverse().transform_point(d.grab0), target))).collect();
-                SolveOptions { drags, drag_view: Some(d.plane_normal), start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() }
+                SolveOptions { drags, drag_view: Some(d.plane_normal), start: Some(d.origin.clone()), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() }
             }
             // (The pointer's ray, along the view: live asm drag probes.)
             _ => match d.nested {
                 Some(c) => SolveOptions { nested_drags: vec![((d.top, c), d.local, target)], drag_view: Some(d.plane_normal), start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },
-                None => SolveOptions { drags: vec![(d.top, d.local, target)], drag_view: Some(d.plane_normal), start: Some(start), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },
+                None => SolveOptions { drags: vec![(d.top, d.local, target)], drag_view: Some(d.plane_normal), start: Some(d.origin.clone()), nested_start: Some(self.result.solved.nested.clone()), ..Default::default() },
             },
         };
+        // From the drag's start: each grabbed point there, then substeps.
+        let from: Vec<DVec3> = opts.drags.iter().map(|(id, local, _)| d.origin.get(id).map_or(*local, |p| placement_to_frame(p).transform_point(*local))).collect();
         // The instance list keeps its DOF glyphs while dragging; the drag's
         // "Move" edit re-evaluates them.
         opts.skip_dof = true;
@@ -3134,7 +3151,24 @@ impl AssemblyView {
             let solved = cx
                 .background_spawn(async move {
                     let t = std::time::Instant::now();
-                    let mut s = prepared.solve(&opts);
+                    let mut s = if from.is_empty() {
+                        prepared.solve(&opts)
+                    } else {
+                        let n = drag_substeps(from.iter().zip(&opts.drags).map(|(p0, (_, _, t))| (*t - *p0).length()).fold(0.0, f64::max));
+                        let mut o = opts.clone();
+                        let mut s: Option<noshape_model::assembly::eval::Solved> = None;
+                        for j in 1..=n {
+                            let f = j as f64 / n as f64;
+                            for ((_, _, t), (p0, (_, _, t1))) in o.drags.iter_mut().zip(from.iter().zip(&opts.drags)) {
+                                *t = *p0 + (*t1 - *p0) * f;
+                            }
+                            if let Some(prev) = &s {
+                                o.start = Some(prev.placements.iter().cloned().collect());
+                            }
+                            s = Some(prepared.solve(&o));
+                        }
+                        s.expect("at least one substep")
+                    };
                     noshape_render::perf::record("a.drag_solve", t.elapsed());
                     s.dof = dof;
                     s.instance_dof = instance_dof;
