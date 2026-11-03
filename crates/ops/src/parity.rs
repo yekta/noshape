@@ -555,6 +555,20 @@ impl<'a> Translator<'a> {
             if kind == "FACE" && let Ok(g) = self.call("sketch_get", json!({ "sketch": ours })) {
                 return Ok(g["regions"].as_array().into_iter().flatten().filter_map(|r| r["id"].as_str().map(str::to_string)).collect());
             }
+            // A sketch's wire edges: its curves (without construction ones
+            // when filtered).
+            if kind == "EDGE"
+                && let Ok(g) = self.call("sketch_get", json!({ "sketch": ours }))
+            {
+                let no_construction = q["filterConstruction"] == true;
+                return Ok(g["entities"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter(|e| e["type"] != "point" && !(no_construction && e["construction"] == true))
+                    .filter_map(|e| e["id"].as_str().map(str::to_string))
+                    .collect());
+            }
             let (list, field) = match kind {
                 "EDGE" => ("edges", "id"),
                 "VERTEX" => ("vertices", "id"),
@@ -1377,6 +1391,7 @@ impl<'a> Translator<'a> {
     /// The sketch's dimensions with Onshape's expressions (so variables and
     /// configurations drive them).
     fn dimensions(&mut self, oid: &str, id: &str, f: &Value, problems: &mut Vec<String>) {
+        let mut external: std::collections::BTreeMap<String, usize> = Default::default();
         for c in f["constraints"].as_array().into_iter().flatten() {
             let ty = c["constraintType"].as_str().unwrap_or("");
             let par0 = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).and_then(|p| p["value"].as_str().map(str::to_string));
@@ -1396,6 +1411,7 @@ impl<'a> Translator<'a> {
             let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).cloned();
             let value = ["length", "angle"].iter().find_map(|n| par(n)).and_then(|p| p["expression"].as_str().map(str::to_string));
             let mut entities = Vec::new();
+            let mut missing = false;
             for n in ["localFirst", "externalFirst", "localSecond", "externalSecond", "localEntity1", "localEntity2"] {
                 if n.starts_with("external") {
                     let Some(ext) = par(n) else { continue };
@@ -1405,7 +1421,7 @@ impl<'a> Translator<'a> {
                     if origin_id || text.contains("Origin") || text.contains("originOp") {
                         entities.push("origin".to_string());
                     } else {
-                        problems.push(format!("{ty} dimension: external reference not translated ({})", text.chars().take(60).collect::<String>()));
+                        missing = true;
                     }
                     continue;
                 }
@@ -1415,6 +1431,11 @@ impl<'a> Translator<'a> {
                         None => problems.push(format!("{ty} dimension: sketch entity {v} not translated")),
                     }
                 }
+            }
+            // To model geometry: left to the solved geometry, as constraints are.
+            if missing {
+                *external.entry(ty.to_string()).or_default() += 1;
+                continue;
             }
             if entities.is_empty() {
                 continue;
@@ -1448,6 +1469,9 @@ impl<'a> Translator<'a> {
                 }
                 Err(e) => problems.push(format!("{ty} dimension on {}: {e}", ["localFirst", "localSecond", "localEntity1", "localEntity2"].iter().filter_map(|n| par0(n)).filter(|v| !v.is_empty()).collect::<Vec<_>>().join(", "))),
             }
+        }
+        if !external.is_empty() {
+            problems.push(format!("dimensions left to the solved geometry: {}", external.iter().map(|(k, n)| format!("{n} {k} to external geometry")).collect::<Vec<_>>().join(", ")));
         }
     }
 }
