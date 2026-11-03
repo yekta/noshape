@@ -21,7 +21,14 @@ pins that corner first in `hold_the_base`; the overhangs must point away from th
 too): s838 / s841 / s857 fixed, s784 (a T beside a rectangle) keeps the other side and now fails; batches 1-17 565
 of 630, probes 17 8/15. v3 / s835 fixed too (a resized line one line away from a resized corner arc goes first on a rank tie): 566 of 630,
 probes 17 9/15. Left from probes 17: w1 / w2 (V with a circle: angle, radius), x1-x4 (s829's trapezoid keeps its right corner at any place or
-size; the 40/20/20 ones keep the left). s830 (20:4x): the rounded-corner rectangle's top (l10) is placed before its right side (tie broken by x: the
+size; the 40/20/20 ones keep the left). Probes 18 answered (20:46): V: the corner moves only with the circle tangent to both legs (w4 no circle, w5 one
+tangent: corner kept, as ours); w1's answer = the circle's centre kept, then everything translated (−1.905, 1.94) mm:
+the translation unexplained. w6 is our harness's: Onshape's ANGLE has clockwise / aligned / flipped and live honours
+`clockwise: false` (CCW from the first line), so a V drawn the other way round flips; real documents store the drawn
+sense. Trapezoids: y2-y4 (48/20, 40/22, 48/22) keep the top's right corner like s829, y1 (40/20 but 24 high) and the
+40/20/20 ones its left: no rule found yet. s784's T keeps its undimensioned side alone too (z1-z3): the rectangle
+isn't the cause; its flange thickness changes too (u4 did too and kept the dimensioned side): its proportions again.
+s830 (20:4x): the rounded-corner rectangle's top (l10) is placed before its right side (tie broken by x: the
 top's anchor is further left) at its old length (shape 2), so the right side can't reach the arc and the component
 falls back, where the right side (steady, lowest) is held: live keeps the lower-left corner, the top grows to the arc.
 Pinning the lowest point in the fallback broke 13 (20:0x, reverted). Batch 17's other misses, as first noted (tried and reverted at 20:00):

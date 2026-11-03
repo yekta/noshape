@@ -1,0 +1,505 @@
+{
+ "note": "Live 2026-11-03 ~20:41 UTC, Part Studio \"skasm probes 18\" (ea80ccc99befce2c68780a1b) in \"skasm speed\"; each case POSTed as is on Top (POST /features, no UI); points = REST /sketches point entities by their own ids (l1.start \u2026), so no end-swap fix is needed. ours was not read before posting.",
+ "cases": {
+  "w4": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     50.0,
+     0
+    ],
+    "l1.start": [
+     0,
+     0
+    ],
+    "l2.end": [
+     0.733001,
+     41.993603
+    ],
+    "l2.start": [
+     0,
+     0
+    ]
+   }
+  },
+  "w5": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "c3.center": [
+     7.432462,
+     5.4
+    ],
+    "l1.end": [
+     50.0,
+     0
+    ],
+    "l1.start": [
+     0,
+     0
+    ],
+    "l2.end": [
+     0.733001,
+     41.993603
+    ],
+    "l2.start": [
+     0,
+     0
+    ]
+   }
+  },
+  "w6": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "c3.center": [
+     -5.269463,
+     -7.525573
+    ],
+    "l1.end": [
+     50.225617,
+     -12.925573
+    ],
+    "l1.start": [
+     0.225617,
+     -12.925573
+    ],
+    "l2.end": [
+     0.958618,
+     -54.919177
+    ],
+    "l2.start": [
+     0.225617,
+     -12.925573
+    ]
+   }
+  },
+  "y1": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     41.0,
+     0
+    ],
+    "l1.start": [
+     1.0,
+     0
+    ],
+    "l2.end": [
+     30.0,
+     24.0
+    ],
+    "l2.start": [
+     41.0,
+     0
+    ],
+    "l3.end": [
+     12.0,
+     24.0
+    ],
+    "l3.start": [
+     30.0,
+     24.0
+    ],
+    "l4.end": [
+     1.0,
+     0
+    ],
+    "l4.start": [
+     12.0,
+     24.0
+    ]
+   }
+  },
+  "y2": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     47.0,
+     0
+    ],
+    "l1.start": [
+     -1.0,
+     0
+    ],
+    "l2.end": [
+     32.0,
+     20.0
+    ],
+    "l2.start": [
+     47.0,
+     0
+    ],
+    "l3.end": [
+     14.0,
+     20.0
+    ],
+    "l3.start": [
+     32.0,
+     20.0
+    ],
+    "l4.end": [
+     -1.0,
+     0
+    ],
+    "l4.start": [
+     14.0,
+     20.0
+    ]
+   }
+  },
+  "y3": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     39.0,
+     0
+    ],
+    "l1.start": [
+     -1.0,
+     0
+    ],
+    "l2.end": [
+     29.0,
+     20.0
+    ],
+    "l2.start": [
+     39.0,
+     0
+    ],
+    "l3.end": [
+     9.0,
+     20.0
+    ],
+    "l3.start": [
+     29.0,
+     20.0
+    ],
+    "l4.end": [
+     -1.0,
+     0
+    ],
+    "l4.start": [
+     9.0,
+     20.0
+    ]
+   }
+  },
+  "y4": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     47.0,
+     0
+    ],
+    "l1.start": [
+     -1.0,
+     0
+    ],
+    "l2.end": [
+     33.0,
+     24.0
+    ],
+    "l2.start": [
+     47.0,
+     0
+    ],
+    "l3.end": [
+     13.0,
+     24.0
+    ],
+    "l3.start": [
+     33.0,
+     24.0
+    ],
+    "l4.end": [
+     -1.0,
+     0
+    ],
+    "l4.start": [
+     13.0,
+     24.0
+    ]
+   }
+  },
+  "z1": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     28.685,
+     -0.81
+    ],
+    "l1.start": [
+     16.78,
+     -0.81
+    ],
+    "l10.end": [
+     98.111,
+     29.06
+    ],
+    "l10.start": [
+     98.111,
+     5.18
+    ],
+    "l11.end": [
+     70.16,
+     29.06
+    ],
+    "l11.start": [
+     98.111,
+     29.06
+    ],
+    "l12.end": [
+     70.16,
+     5.18
+    ],
+    "l12.start": [
+     70.16,
+     29.06
+    ],
+    "l2.end": [
+     28.685,
+     26.739
+    ],
+    "l2.start": [
+     28.685,
+     -0.81
+    ],
+    "l3.end": [
+     44.5315,
+     26.739
+    ],
+    "l3.start": [
+     28.685,
+     26.739
+    ],
+    "l4.end": [
+     44.5315,
+     32.433
+    ],
+    "l4.start": [
+     44.5315,
+     26.739
+    ],
+    "l5.end": [
+     0.9335,
+     32.433
+    ],
+    "l5.start": [
+     44.5315,
+     32.433
+    ],
+    "l6.end": [
+     0.9335,
+     26.74
+    ],
+    "l6.start": [
+     0.9335,
+     32.433
+    ],
+    "l7.end": [
+     16.78,
+     26.74
+    ],
+    "l7.start": [
+     0.9335,
+     26.74
+    ],
+    "l8.end": [
+     16.78,
+     -0.81
+    ],
+    "l8.start": [
+     16.78,
+     26.74
+    ],
+    "l9.end": [
+     98.111,
+     5.18
+    ],
+    "l9.start": [
+     70.16,
+     5.18
+    ]
+   }
+  },
+  "z2": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     28.685,
+     -0.81
+    ],
+    "l1.start": [
+     16.78,
+     -0.81
+    ],
+    "l2.end": [
+     28.685,
+     26.739
+    ],
+    "l2.start": [
+     28.685,
+     -0.81
+    ],
+    "l3.end": [
+     44.5315,
+     26.739
+    ],
+    "l3.start": [
+     28.685,
+     26.739
+    ],
+    "l4.end": [
+     44.5315,
+     32.433
+    ],
+    "l4.start": [
+     44.5315,
+     26.739
+    ],
+    "l5.end": [
+     0.9335,
+     32.433
+    ],
+    "l5.start": [
+     44.5315,
+     32.433
+    ],
+    "l6.end": [
+     0.9335,
+     26.74
+    ],
+    "l6.start": [
+     0.9335,
+     32.433
+    ],
+    "l7.end": [
+     16.78,
+     26.74
+    ],
+    "l7.start": [
+     0.9335,
+     26.74
+    ],
+    "l8.end": [
+     16.78,
+     -0.81
+    ],
+    "l8.start": [
+     16.78,
+     26.74
+    ]
+   }
+  },
+  "z3": {
+   "feature": "OK",
+   "message": "(REST status; row tooltip not read, as probes 10 / 13)",
+   "points": {
+    "l1.end": [
+     28.685,
+     -0.81
+    ],
+    "l1.start": [
+     16.78,
+     -0.81
+    ],
+    "l10.end": [
+     100.94,
+     29.06
+    ],
+    "l10.start": [
+     100.94,
+     5.18
+    ],
+    "l11.end": [
+     70.16,
+     29.06
+    ],
+    "l11.start": [
+     100.94,
+     29.06
+    ],
+    "l12.end": [
+     70.16,
+     5.18
+    ],
+    "l12.start": [
+     70.16,
+     29.06
+    ],
+    "l2.end": [
+     28.685,
+     26.739
+    ],
+    "l2.start": [
+     28.685,
+     -0.81
+    ],
+    "l3.end": [
+     44.5315,
+     26.739
+    ],
+    "l3.start": [
+     28.685,
+     26.739
+    ],
+    "l4.end": [
+     44.5315,
+     32.433
+    ],
+    "l4.start": [
+     44.5315,
+     26.739
+    ],
+    "l5.end": [
+     0.9335,
+     32.433
+    ],
+    "l5.start": [
+     44.5315,
+     32.433
+    ],
+    "l6.end": [
+     0.9335,
+     26.74
+    ],
+    "l6.start": [
+     0.9335,
+     32.433
+    ],
+    "l7.end": [
+     16.78,
+     26.74
+    ],
+    "l7.start": [
+     0.9335,
+     26.74
+    ],
+    "l8.end": [
+     16.78,
+     -0.81
+    ],
+    "l8.start": [
+     16.78,
+     26.74
+    ],
+    "l9.end": [
+     100.94,
+     5.18
+    ],
+    "l9.start": [
+     70.16,
+     5.18
+    ]
+   }
+  }
+ }
+}
