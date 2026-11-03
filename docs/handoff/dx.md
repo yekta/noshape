@@ -73,6 +73,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   unpacker change; parity_models prints a "SCORE.md row: | … |" line to paste. drawing.md TB25 verified by tests;
   Insert view shows "Show annotations from model" only for a part (live captures; request withdrawn). Assembly
   layout proposed to live (REQUESTS 11-03 02:15), to build the assembly translator once confirmed.
+- Walk 11-03 05:45 on green 19f17a18 (:105): Variable Studio #wall (autocomplete from the studio, "Insert into all"
+  on), Extrude depth #wall, the studio's value 4 → 8 mm updates the part, right-click Depth › Configure ("Extrude 1
+  Depth added to Size"), Large = 2*#wall, switching Size to Large: 16 mm. No regressions. Note for walks: the shared
+  ~/.config/noshape/left_panel_width.txt holds 1240 (someone's drag at 01:36), so the feature panel fills the window;
+  run the app with XDG_CONFIG_HOME=/root/dx-scratch/xdg (own preferences) instead of resetting the shared file.
 - 11-03 05:40 LIVE'S CORPUS: /root/parity/models (live's fetch; 18 documents, 11 with live.jsonl, the others
   INCOMPLETE (REST 429 at 04:23) or SKIPPED, not scored): **4/11 documents match to the end, 51/78 features**
   (flange-josh, flange-walter, knob-tim, mounting-plate-giana). First score row for qa (SCORE.md):
