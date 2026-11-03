@@ -16,6 +16,14 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-03 20:21 UTC.**
+- Landed since 19:45: the smooth-wall Shell path + round profiles swept by the discrete frame (4c7f9ff1;
+  cf-hose-routing 113 -> 13 s, its hoses as live), the past-end fillet fallback's 0.5 s budget (queued; knob-jason
+  3.9 -> 1.1 s), BOOL-RUST-GEARS-SLOW filed for bool (planetary gears 12.8 s vs 1.35 s without the Rust Boolean).
+- PARITY-SPEED state per document in its TICKETS notes. Next: FILLET-31S-FAIL (knob-jason Fillet 2: a 5 mm face's
+  two edges at R2.5, a full round; vibe5 ~/core-knob/fillet-2.brep / .txt), knob-jason Fillet 1's -3.7 mm³,
+  FS-WAVE-SPRING-SPEED, FILLET-OVERLAP-FAIL.
+
 **State 11-03 19:30 UTC.**
 - Landed / queued since 16:20: MIRROR-FEATURE-UP-TO (a19a1254: touching features' faces patterned as one tool),
   opFitSpline derivatives by [0, 1] (queued; PARITY-SPEED's cf-hose-routing). FILLET-OVERLAP-FAIL analysed (TICKETS:

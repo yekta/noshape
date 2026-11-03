@@ -3301,6 +3301,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   our cubic Hermite). Left: the 0.9 s a hose (live ~0.1 s), the spline shape, and the 13 s: the display mesh,
   BRepMesh 1.3-4.3 s on each 12-face hose (degree 6 x 9-11 B-spline pipes at the 144-a-circle angle; noshape's own
   mesher declines them, "B-spline face declined: a seam", NOSHAPE_MESH_DEBUG): a seam in brep::mesh would take them.
+  core 11-03 20:21: cf-planetary-gears: the Rust Boolean, 10x (BOOL-RUST-GEARS-SLOW, bool). knob-jason 3.9 -> 1.1 s (the
+  past-end fallback's 0.5 s budget; Fillet 2 still fails: FILLET-31S-FAIL). cf-fix-pcb: one OCCT Boolean tree 3.4 s
+  (bool) and 8364 face areas 2 s (NOSHAPE_KERNEL_PROFILE). stef-radijator-nlukic: three 90 ms bounding boxes, its
+  Fillet 1 200 ms. knob-jason's Fillet 1 volume (-3.7 mm³, its first difference): live's per-face areas in live.jsonl
+  are tessellated (an untouched cylinder 621.78 against the exact 622.04), so they can't place it.
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet
