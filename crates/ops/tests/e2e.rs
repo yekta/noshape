@@ -931,7 +931,7 @@ fn update_workspace_moves_references_to_newer_versions() {
     let mut ctx = Ctx::new();
     let lib = scratch("update-ws-lib.noshape");
     call(&mut ctx, "document_create", json!({ "path": lib.to_str().unwrap() }));
-    call(&mut ctx, "tab_create", json!({ "kind": "variablestudio", "name": "Sizes" }));
+    call(&mut ctx, "tab_create", json!({ "kind": "variable_studio", "name": "Sizes" }));
     call(&mut ctx, "variable_create", json!({ "tab": "Sizes", "name": "w", "value": "10 mm" }));
     call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
     let user = scratch("update-ws-user.noshape");
