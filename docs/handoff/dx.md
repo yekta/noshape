@@ -805,7 +805,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   `NOSHAPE_RB_LOCAL=1 tools/tiers/rb.sh cargo test -q -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`
   (NOSHAPE_PARITY_MODELS to point elsewhere, NOSHAPE_PARITY_ONLY=<name> for one). It prints per document the first
   differing feature, what wasn't translated, our vs live's regeneration time, the score line and the five biggest
-  causes; report.json lands next to the models directory.
+  causes; report.json lands next to the models directory. Its last line, "SCORE.md row: | date | build | models |
+  features | – | causes |", pastes into docs/parity/SCORE.md as is (set NOSHAPE_PARITY_BUILD=$(cat /root/green/SHA)
+  when measuring a green; else the checkout's commit; the scenarios column is psui's).
 - (10-29 16:40) DRAWING-SHIFT-SLASH: done 10-30 as decided (the sheet is app-core's; psui told in their handoff).
 - **land.sh and the 3964a7cf revert (10-29 06:44)**: land.sh did not miss it. The change touched model-data, so its
   crate list (reverse dependencies) included noshape-ops, and vibe3 ran noshape-ops' full tests (e2e included) green. All

@@ -140,7 +140,23 @@ fn parity_models() {
     let mut causes: std::collections::BTreeMap<String, usize> = Default::default();
     for f in results.iter().filter_map(|r| r.first.as_deref()) {
         let ty = f.split(" (").nth(1).and_then(|r| r.split(')').next()).unwrap_or("?");
-        let what = f.split("): ").nth(1).map(|d| d.split([';', ',']).next().unwrap_or(d)).map(|d| d.split_whitespace().filter(|w| !w.chars().any(|c| c.is_ascii_digit() || c == '"')).take(3).collect::<Vec<_>>().join(" ")).unwrap_or_default();
+        // Its first difference without part names, numbers as #, live's side dropped.
+        let first = f.split_once("): ").map(|(_, d)| d).unwrap_or("").split("; ").next().unwrap_or("");
+        let first = first.split(", live").next().unwrap_or(first);
+        let first = match first.split_once("\": ") {
+            Some((_, rest)) if first.starts_with('"') => rest,
+            _ => first,
+        };
+        let mut what = String::new();
+        for c in first.chars() {
+            if c.is_ascii_digit() {
+                if !what.ends_with('#') {
+                    what.push('#');
+                }
+            } else if !(c == '.' && what.ends_with('#')) {
+                what.push(c);
+            }
+        }
         *causes.entry(format!("{ty}: {what}")).or_default() += 1;
     }
     let mut causes: Vec<(String, usize)> = causes.into_iter().collect();
@@ -148,12 +164,37 @@ fn parity_models() {
     for (c, n) in causes.iter().take(5) {
         println!("  cause: {n} × {c}");
     }
+    println!("{}", score_row(docs, results.len(), matching, total, &causes));
     let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "compared": r.compared, "matching": r.matching, "regen_ms": r.regen_ms.map(|(o, l)| json!({ "ours": o, "live": l })), "first_difference": r.first, "untranslated": r.untranslated })).collect();
     let _ = std::fs::write(root.with_file_name("report.json"), serde_json::to_string_pretty(&json!({ "documents_matching": docs, "documents": results.len(), "features_matching": matching, "features": total, "causes": causes.iter().map(|(c, n)| json!({ "cause": c, "documents": n })).collect::<Vec<_>>(), "models": report })).unwrap());
     if std::env::var_os("NOSHAPE_PARITY_INDEX").is_some() {
         let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/parity-models/index.json");
         std::fs::write(file, serde_json::to_string_pretty(&index).unwrap() + "\n").unwrap();
     }
+}
+
+/// One docs/parity/SCORE.md row, to paste as is: UTC date, the build
+/// (NOSHAPE_PARITY_BUILD, else this checkout's commit), models and features
+/// matched, the scenarios column left to psui's runner, the five biggest
+/// causes (qa adds their tickets).
+fn score_row(docs: usize, total_docs: usize, matching: usize, features: usize, causes: &[(String, usize)]) -> String {
+    let days = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() / 86_400).unwrap_or(0) as i64;
+    // Civil date from days since 1970-01-01 (H. Hinnant's algorithm).
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    let build = std::env::var("NOSHAPE_PARITY_BUILD").ok().or_else(|| {
+        let out = std::process::Command::new("git").args(["rev-parse", "--short=8", "HEAD"]).current_dir(env!("CARGO_MANIFEST_DIR")).output().ok()?;
+        out.status.success().then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
+    });
+    let top: Vec<String> = causes.iter().take(5).map(|(c, n)| format!("{n}× {c}")).collect();
+    format!("SCORE.md row: | {year}-{month:02}-{day:02} | {} | {docs}/{total_docs} | {matching}/{features} | – | {} |", build.unwrap_or_else(|| "?".into()), if top.is_empty() { "–".into() } else { top.join("; ") })
 }
 
 /// A small Part Studio as Onshape's REST gives it: a 60 × 40 rectangle with
