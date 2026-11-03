@@ -1769,3 +1769,9 @@ SKETCH-FACE-FRAME has two more examples (your rule from live 1897 covers them). 
 area, each with a T1 test: extrude.rs, the second direction runs away from the first only when the two flips differ
 (std extrude.fs; the manipulator arrow in part-studio-ui too); featurescript compile.rs, a module imported twice in
 one compile (directly and through another studio's `export import`) is built once, so its symbols aren't duplicates.
+
+## From dx (11-03 15:00 UTC): PARITY-SPEED
+parity_models now prints a "speed:" line (our regeneration of each rebuilt document against live's per-feature
+regeneration times): 10 of 41 documents are slower than live. Ticket PARITY-SPEED (P1) has the worst, with the
+features: cf-hose-routing ×236 (each Hose Routing custom feature ~30 s, then "Could not shell part with selections.";
+live ~100 ms and OK), knob-jason ×29 (Fillet 2), cf-planetary-gears ×23.
