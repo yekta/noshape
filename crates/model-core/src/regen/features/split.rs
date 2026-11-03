@@ -37,7 +37,7 @@ fn resolve_tool(ev: &EvalCtx, r: &Reference, trimmed: bool) -> FResult<Tool> {
         Reference::Body(id) => {
             let b = ev.ctx.body(id).ok_or_else(|| fe("The split tool no longer exists"))?;
             if b.kind != BodyKind::Surface {
-                return err("Split with a surface, face, plane or mate connector");
+                return err("Incorrect input for tool type.");
             }
             let faces = rebrand(ev, b.faces.clone());
             let plane = if b.shape.count(ShapeType::Face) == 1 && !trimmed { b.shape.faces()[0].face_plane()? } else { None };
@@ -135,7 +135,7 @@ fn project_onto(curve: &Shape, face: &Shape, dir: Option<DVec3>) -> FResult<Vec<
             return Ok(moved.edges());
         }
     }
-    let proj = k::project_curves(curve, face, dir).map_err(kerr("Projecting the split curves failed"))?;
+    let proj = k::project_curves(curve, face, dir).map_err(kerr("Tool entity cannot split the selected part/face."))?;
     Ok(proj.edges())
 }
 
@@ -171,7 +171,7 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
         }
         let Some(ti) = index_of_body(ev, id) else { continue };
         let target = ev.ctx.bodies[ti].clone();
-        let res = k::split(std::slice::from_ref(&target.shape), std::slice::from_ref(&tool.shape), &k::BooleanOptions::default()).map_err(kerr("Split failed"))?;
+        let res = k::split(std::slice::from_ref(&target.shape), std::slice::from_ref(&tool.shape), &k::BooleanOptions::default()).map_err(kerr("Tool entity cannot split the selected part/face."))?;
         let face_names = if target.kind == BodyKind::Wire { Vec::new() } else { ev.name_result(&[&target.shape_names(), &tool.names], &res.history, &res.shape, &BTreeMap::new(), None) };
         let mut pieces: Vec<(f64, DVec3, NamedShape)> = pieces_of(&res.shape, &face_names, target.kind, ev.feature)
             .into_iter()
@@ -295,7 +295,7 @@ fn split_faces(ev: &mut EvalCtx) -> FResult<()> {
         if imprint.is_empty() {
             continue;
         }
-        let res = k::imprint(&body.shape, &imprint).map_err(kerr("Split failed"))?;
+        let res = k::imprint(&body.shape, &imprint).map_err(kerr("Tool entity cannot split the selected part/face."))?;
         let res_solid = if body.kind == BodyKind::Solid { res.shape.solids().into_iter().next().unwrap_or(res.shape.clone()) } else { res.shape.clone() };
         if res_solid.count(ShapeType::Face) <= body.shape.count(ShapeType::Face) {
             continue;

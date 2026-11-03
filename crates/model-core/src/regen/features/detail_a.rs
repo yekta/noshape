@@ -691,12 +691,12 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
 pub fn modify_fillet(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("faces");
     if refs.is_empty() {
-        return err("Select fillet faces to modify");
+        return crate::regen::eval::err_at(&["faces"], "Select fillet faces to modify.");
     }
     let change = ev.is("modifyFilletType", "CHANGE_RADIUS");
     let radius = if change { ev.length("radius")? } else { 0.0 };
     if change && radius <= 0.0 {
-        return err("Fillet radius must be positive");
+        return crate::regen::eval::err_at(&["radius"], "Error regenerating: a parameter is out of range.");
     }
     let groups = by_body(ev.resolve_faces(refs));
     if groups.is_empty() {
@@ -763,7 +763,7 @@ pub fn modify_fillet(ev: &mut EvalCtx) -> FResult<()> {
         }
         let healed = crate::regen::eval::names_for(&res.shape, face_names);
         let shapes: Vec<Shape> = edges.iter().filter_map(|e| res.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
-        let res2 = k::fillet(&res.shape, &shapes, radius).map_err(kerr("Fillet failed (radius may be too large)"))?;
+        let res2 = k::fillet(&res.shape, &shapes, radius).map_err(kerr("Failed to fillet selections."))?;
         let mut names2 = ev.name_result(&[&healed], &res2.history, &res2.shape, &BTreeMap::new(), Some(&blend_role));
         // Blend(edge) -> original fillet face name.
         let map: BTreeMap<Name, Name> = keep_name.into_iter().filter_map(|(ei, old)| healed.edges.get(ei).map(|en| (Arc::new(TopoName::face(ev.feature, Role::Blend(en.clone()))), old))).collect();

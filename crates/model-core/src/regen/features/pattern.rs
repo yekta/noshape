@@ -212,7 +212,7 @@ fn sample_edge(e: &Shape) -> FResult<Vec<DVec3>> {
 fn chain_path(edges: &[SourcedEdge]) -> FResult<Path> {
     let mut rest: Vec<Vec<DVec3>> = edges.iter().map(|e| sample_edge(&e.shape)).collect::<FResult<_>>()?;
     if rest.is_empty() {
-        return err("Select a path");
+        return err("Select a path to pattern along.");
     }
     let mut chain = rest.remove(0);
     let tol = 1e-6;
@@ -547,7 +547,7 @@ fn copy_bodies(ev: &EvalCtx, bodies: &[usize], instances: &[Instance]) -> FResul
         }
         for (bj, &bi) in bodies.iter().enumerate() {
             let b = &ev.ctx.bodies[bi];
-            let res = k::transform(&b.shape, &inst.t, false).map_err(kerr("Pattern failed"))?;
+            let res = k::transform(&b.shape, &inst.t, false).map_err(kerr("Failed to create pattern, check input."))?;
             let names = copy_names(ev, &b.faces, &res, inst.code);
             out.push((ii, bj, b.kind, NamedShape::new(res.shape, names)));
         }
@@ -621,11 +621,11 @@ fn faces_tool(ev: &EvalCtx, body: &Body, faces: &[usize]) -> FResult<FaceTool> {
     }
     let mut inputs = face_shapes.clone();
     inputs.extend(caps.iter().cloned());
-    let sewn = k::sew(&inputs, 1e-6, true).map_err(kerr("These faces can't be patterned (they don't bound a closed volume)"))?;
+    let sewn = k::sew(&inputs, 1e-6, true).map_err(kerr("Failed to create pattern, check input."))?;
     // Separate closed pieces (a Hole at several points) make one tool.
     let solid = match sewn.shape.count(ShapeType::Solid) {
-        0 => return err("These faces can't be patterned (they don't bound a closed volume)"),
-        1 => sewn.shape.solids().into_iter().next().ok_or_else(|| fe("These faces can't be patterned (they don't bound a closed volume)"))?,
+        0 => return err("Failed to create pattern, check input."),
+        1 => sewn.shape.solids().into_iter().next().ok_or_else(|| fe("Failed to create pattern, check input."))?,
         _ => Shape::compound(&sewn.shape.solids()),
     };
     // Names: selected faces keep their names, caps are new.
@@ -687,7 +687,7 @@ fn pattern_faces(ev: &mut EvalCtx, body_id: &BodyId, faces: &[usize], instances:
             return err("Cancelled");
         }
         // Moved, not copied (see copy_bodies).
-        let res = k::transform(&tool.shape, &inst.t, false).map_err(kerr("Pattern failed"))?;
+        let res = k::transform(&tool.shape, &inst.t, false).map_err(kerr("Failed to create pattern, check input."))?;
         let names = copy_names(ev, &tool.names, &res, inst.code);
         tools.push(NamedShape::new(res.shape, names));
     }
@@ -1422,7 +1422,7 @@ fn reapply_features(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance
     let me = ev.features.iter().position(|f| f.id == ev.feature);
     let mut seeds: Vec<&EffectiveFeature> = Vec::new();
     for f in feats {
-        let Some(i) = ev.features.iter().position(|x| x.id == *f) else { return err("A selected feature no longer exists") };
+        let Some(i) = ev.features.iter().position(|x| x.id == *f) else { return err_at(&["instanceFunction"], "Select features to pattern.") };
         if me.is_some_and(|m| i >= m) {
             return err("Only features before the pattern can be patterned");
         }
@@ -1752,13 +1752,13 @@ fn transform_of(ev: &EvalCtx) -> FResult<Option<k::Transform>> {
             if ev.bool("uniform") {
                 let s = ev.real("scale")?;
                 if s <= 0.0 {
-                    return err("Scale must be positive");
+                    return err_at(&["scale"], "Error regenerating: a parameter is out of range.");
                 }
                 k::Transform::Scale { center, factor: s }
             } else {
                 let f = DVec3::new(ev.real("scaleX")?, ev.real("scaleY")?, ev.real("scaleZ")?);
                 if f.min_element() <= 0.0 {
-                    return err("Scale factors must be positive");
+                    return err_at(&["scaleX", "scaleY", "scaleZ"], "Error regenerating: a parameter is out of range.");
                 }
                 let frame = conn.as_ref().map(mc_frame).unwrap_or_else(|| DMat4::from_translation(center));
                 k::Transform::Matrix(frame * DMat4::from_scale(f) * frame.inverse())
@@ -1804,7 +1804,7 @@ pub fn transform(ev: &mut EvalCtx) -> FResult<()> {
     for bi in bodies {
         let b = ev.ctx.bodies[bi].clone();
         // Moved, not copied: the body keeps its geometry at a new location.
-        let res = k::transform(&b.shape, &t, false).map_err(kerr("Transform failed"))?;
+        let res = k::transform(&b.shape, &t, false).map_err(kerr("Could not transform part."))?;
         let mut faces: Vec<Option<Name>> = vec![None; res.shape.count(ShapeType::Face)];
         for r in &res.history.records {
             if r.arg == 0 && r.input_kind == ShapeType::Face && r.output_kind == ShapeType::Face
@@ -1831,7 +1831,7 @@ pub fn transform(ev: &mut EvalCtx) -> FResult<()> {
 pub fn copy_part(ev: &mut EvalCtx) -> FResult<()> {
     let bodies = ev.resolve_bodies(ev.query("entities"));
     if bodies.is_empty() {
-        return err("Select parts to copy");
+        return err_at(&["entities"], "Select parts to pattern.");
     }
     let inst = [Instance { code: 1, t: k::Transform::Translate(DVec3::ZERO) }];
     for (_, bj, kind, ns) in copy_bodies(ev, &bodies, &inst)? {

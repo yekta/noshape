@@ -285,7 +285,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         ev.length("nonCircularRadius")?
     };
     if radius <= 0.0 {
-        return err("Fillet radius must be positive");
+        return crate::regen::eval::err_at(&[if width { "width" } else if circular { "radius" } else { "nonCircularRadius" }], "Error regenerating: a parameter is out of range.");
     }
     if ev.bool("isVariable") && !width {
         return variable_fillet(ev, radius);
@@ -303,7 +303,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
                     "ENTITY" => {
                         let r = ev.query(ent).first().ok_or_else(|| crate::regen::eval::FeatureError::new("Select an entity for the partial fillet end type."))?;
                         let p = ev.resolve_vertex_point(r).or_else(|| ev.resolve_faces(std::slice::from_ref(r)).first().and_then(|&(b, f)| ev.ctx.bodies[b].shape.sub_shape(ShapeType::Face, f).ok()?.centroid().ok()));
-                        Bound::Point(p.ok_or_else(|| crate::regen::eval::FeatureError::new("The bounding entity no longer exists"))?)
+                        Bound::Point(p.ok_or_else(|| crate::regen::eval::FeatureError::new("Select an entity for the partial fillet end type."))?)
                     }
                     _ => Bound::Fraction(ev.real(frac)?),
                 })
@@ -685,7 +685,7 @@ fn distance_one_faces(ev: &EvalCtx, body: &crate::regen::context::Body, edges: &
 pub fn shell(ev: &mut EvalCtx) -> FResult<()> {
     let t = ev.length("thickness")?;
     if t <= 0.0 {
-        return err("Shell thickness must be positive");
+        return crate::regen::eval::err_at(&["thickness"], "Error regenerating: a parameter is out of range.");
     }
     let side = if ev.bool("oppositeDirection") { k::ShellSide::Outside } else { k::ShellSide::Inside };
     let mut groups: BTreeMap<usize, Vec<usize>> = BTreeMap::new();

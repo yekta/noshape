@@ -320,7 +320,7 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
     let along = |f: &crate::display::PlaneFrame, m: DVec3| path_end_near(&path, m).map_or(f.normal, |(_, t)| t);
     let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::Along(&along), false).map_err(|_| fe(thin_fail))? } else { ev.profiles(refs)? };
     if profiles.is_empty() {
-        return err("No valid profiles to sweep");
+        return crate::regen::eval::err_at(&[if thin { "wallShape" } else { "profiles" }], "Select faces or sketch regions to sweep.");
     }
     // sweep.fs thinSweep: Onshape sweeps the wall as a sheet, thickens it
     // (normal to the sheet) and trims the ends to the cap planes. Swept
@@ -931,7 +931,7 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         };
         let th = k::thicken(&res.shape, t1, t2).map_err(|_| fe("Failed to thicken lofted body, check thickness."))?;
         if th.shape.count(ShapeType::Solid) == 0 {
-            return err("Thin loft did not produce a solid");
+            return err("Could not create loft with given information. Check profile order, guide/profile intersections or end conditions.");
         }
         let names = thicken_names(ev, &inp, &th.shape, t1.max(t2));
         let tools = vec![NamedShape::new(th.shape, names)];
@@ -1086,9 +1086,9 @@ pub fn thicken(ev: &mut EvalCtx) -> FResult<()> {
     let mut tools: Vec<NamedShape> = Vec::new();
     let mut grouped: BTreeMap<usize, usize> = BTreeMap::new();
     for inp in &inputs {
-        let res = k::thicken(&inp.shape, t1, t2).map_err(kerr("Thicken failed"))?;
+        let res = k::thicken(&inp.shape, t1, t2).map_err(kerr("Failed to thicken all selections."))?;
         if res.shape.count(ShapeType::Solid) == 0 {
-            return err("Thicken did not produce a solid");
+            return err("Failed to thicken all selections.");
         }
         let shape = res.shape;
         let names = thicken_names(ev, inp, &shape, t1.max(t2));
@@ -1304,7 +1304,7 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
     let draft = if ev.bool("hasDraft") { Some((ev.angle("draftAngle")?, ev.bool("draftOpposite"))) } else { None };
     let t = ev.length("thickness")?;
     if t <= 0.0 {
-        return err("Rib thickness must be positive");
+        return crate::regen::eval::err_at(&["thickness"], "Error regenerating: a parameter is out of range.");
     }
     let frame = refs
         .iter()
@@ -1316,7 +1316,7 @@ pub fn rib(ev: &mut EvalCtx) -> FResult<()> {
     let edges = resolve_curves(ev, refs)?;
     let wires = wires_from(&edges)?;
     if wires.is_empty() {
-        return err("The rib profiles no longer exist");
+        return crate::regen::eval::err_at(&["profiles"], "Select sketch profiles to create the ribs.");
     }
     let normal = ev.is("ribExtrusionDirection", "NORMAL_TO_SKETCH_PLANE");
     // Parallel to the sketch plane: a closed profile fails first with
@@ -1581,7 +1581,7 @@ fn rib_normal(base: &Shape, wire: &Shape, dir: DVec3, t: f64, draft: Option<(f64
 pub fn cube(ev: &mut EvalCtx) -> FResult<()> {
     let s = ev.length("sideLength")?;
     if s <= 0.0 {
-        return err("Side length must be positive");
+        return crate::regen::eval::err_at(&["sideLength"], "Error regenerating: a parameter is out of range.");
     }
     let shape = k::make_box(&k::Plane::xy(), s, s, s)?;
     let names = name_new(ev, &shape);
@@ -1591,7 +1591,7 @@ pub fn cube(ev: &mut EvalCtx) -> FResult<()> {
 pub fn sphere(ev: &mut EvalCtx) -> FResult<()> {
     let r = ev.length("radius")?;
     if r <= 0.0 {
-        return err("Radius must be positive");
+        return crate::regen::eval::err_at(&["radius"], "Error regenerating: a parameter is out of range.");
     }
     let c = match ev.query("center").first() {
         Some(q) => ev.resolve_vertex_point(q).ok_or_else(|| fe("The sphere center no longer exists"))?,
