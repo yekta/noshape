@@ -1022,7 +1022,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
    views), 1835 (explode lines). Translator gaps known: HOLE_FACE other than "tip", constraints to external geometry,
    PROJECTED / OFFSET / CIRCULAR_PATTERN constraints, spline end derivatives (after SKETCH-SPLINE-CENTRIPETAL).
 1. Import numbers: the remaining ✗ rows of docs/parity/workflow-import-matrix.md (g50 F8 / F19, McMaster helix; kern).
-2. API: render_image of the window camera (image size).
+2. (done 11-03 15:10: render_image `view: "window"` takes the graphics area's size.)
 3. Drawings (P2): selectable PDF compared with live's (dx-pdf-selectable.pdf): one embedded NotoSans CID TrueType
    subset "AAAAAA+NotoSans", Identity-H, as live (ours adds a ToUnicode CMap stream where live names Identity-H).
    Next: hidden-line views of the corpus parts against live's (request 11-03 07:20: live's DXF / PDF of
