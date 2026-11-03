@@ -561,6 +561,16 @@ fn an_inch_documents_bare_numbers_are_inches() {
     assert_eq!((r.matching, r.compared), (3, 3), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// massproperties' [0, 0, 0] centroid of a part without a material isn't
+/// live's centroid, even when the part's box is about the origin
+/// (exercise-chino's Extrude 1, fetched through live's UI).
+#[test]
+fn a_zero_centroid_is_unknown() {
+    let line = |c: [f64; 3]| json!({ "index": 0, "parts": [{ "name": "Part 1", "faces": 12, "centroid": c, "bbox": { "min": [-0.01775, -0.00575, -0.00555], "max": [0.01775, 0.00575, 0.00555] } }] });
+    assert_eq!(live_parts(&line([0.0; 3]))[0].centroid, None);
+    assert_eq!(live_parts(&line([0.0027, 0.0, 0.002]))[0].centroid, Some([0.0027, 0.0, 0.002]));
+}
+
 /// The comparison: counts exact; volume, area and centroid within live's
 /// band (REST's low-accuracy values) or 1e-6; anything else is named.
 #[test]

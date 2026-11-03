@@ -2472,12 +2472,9 @@ pub fn live_parts(line: &Value) -> Vec<PartState> {
             volume_band: band(&p["volume_band"]),
             area_band: band(&p["area_band"]),
             bbox: f3(&p["bbox"]["min"]).zip(f3(&p["bbox"]["max"])).map(|(a, b)| [a, b]),
-            // massproperties gives [0, 0, 0] for a part without a material
-            // (live README): not known unless the part's box is about the origin.
-            centroid: f3(&p["centroid"]).filter(|c| {
-                let box_centre = f3(&p["bbox"]["min"]).zip(f3(&p["bbox"]["max"])).map(|(a, b)| [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0, (a[2] + b[2]) / 2.0]);
-                *c != [0.0; 3] || box_centre.is_none_or(|m| m.iter().all(|x| x.abs() < 1e-6))
-            }),
+            // massproperties gives exactly [0, 0, 0] for a part without a
+            // material (live README; every part of the UI fetch): not known.
+            centroid: f3(&p["centroid"]).filter(|c| *c != [0.0; 3]),
             centroid_band: p["centroid_band"].as_array().and_then(|b| Some([f3(b.first()?)?, f3(b.get(1)?)?])),
             face_types: types(p, "faces", "surface"),
             edge_types: types(p, "edges", "curve"),
