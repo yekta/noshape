@@ -94,6 +94,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
   kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
+- 11-03 18:45 lead's order (18:00): (1) title block DXF text as live's (one MTEXT per block, ^J, cell width and
+  height, empty " " cells, Fields style; all 22 of live's template DXFs match MTEXT for MTEXT: /root/dx-scratch/tb/
+  allmt.sh) — landed b8bdf7be; the JIS templates, ISO_A4_Portrait, ISO / JIS decimal comma, no ANSI E — landed
+  1d12be01. (2) translator gaps, largest first: polygon regions (pattern-copy sides, construction circle out),
+  regions cross-checked by the new parts' boxes (clamp-guillem 6 → 23/25); three dead-studio documents unscored
+  (tests/parity-models/unscored.json, SCORE.md note). Not ours / waiting: cf-spur-gear and cf-transform-pattern's
+  mate connectors name vertices by bare ids ("IF", "JIU") with no geometry in live's lines (not guessed);
+  cf-parameter-pattern is flaky in the host (FS-FEATURE-LIST-NONDETERMINISTIC filed for core). Next: (3) the PDF
+  text offset when live answers REQUESTS 17:33; more gaps from run 40's list.
 - 11-03 17:33 drawings: the ANSI / ISO title block as live's templates (dom/tpl-geometry, samples/tpl-*.dxf and
   .pdf): every text on live's MTEXT anchor (Anchor::TopCenter added), the grid on live's lines (round inches of
   ANSI A's 6.075 × 1.5 in / ISO A3's 8.5 × 2 in block; REV. column was 3 mm off), projection symbol and surface

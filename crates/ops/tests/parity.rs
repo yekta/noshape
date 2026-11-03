@@ -274,6 +274,8 @@ fn parity_models() {
     dirs.sort();
     let mut results = Vec::new();
     let mut index = Vec::new();
+    // Documents left out of the score, with why (tests/parity-models/unscored.json).
+    let unscored: Vec<Value> = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/parity-models/unscored.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
     for dir in dirs {
         let name = dir.file_name().unwrap().to_string_lossy().to_string();
         if only.as_ref().is_some_and(|o| *o != name) {
@@ -283,6 +285,10 @@ fn parity_models() {
             // Live's source.json: live's copy (fetched from) and the public original.
             let c = &s["copy"];
             index.push(json!({ "name": name, "document": c["did"], "workspace": c["wid"], "element": c["eid"], "url": c["url"], "title": s["title"], "original": s["original"]["url"] }));
+        }
+        if let Some(u) = unscored.iter().find(|u| u["name"] == name.as_str()) {
+            println!("{name}: not scored ({})", u["reason"].as_str().unwrap_or(""));
+            continue;
         }
         // Live's fetch skipped or didn't finish it: nothing to compare.
         if !dir.join("live.jsonl").is_file() {
@@ -1130,6 +1136,60 @@ fn a_region_named_with_the_lines_touching_it() {
     let ring = std::f64::consts::PI * (0.0175 * 0.0175 - 0.01 * 0.01) * 0.01;
     let (features, live) = one_extrude(sketch, entities, region, json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 4, "edges": 4, "vertices": 0, "volume": ring }));
     let r = run_model("touching-lines", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
+/// A polygon (Onshape's: a construction circle, a `.seed` side and its
+/// `.pattern.0.i.0` copies) named by five of its sides, inside a rectangle
+/// whose region has those sides too: the hexagon, its sixth side its own
+/// and its circle not a boundary (live: clamp-guillem's Extrusión 3, its
+/// packed query).
+#[test]
+fn a_polygon_region_named_by_some_sides() {
+    let sketch = "FBJ3ApNA1lPHSK2_2";
+    let packed = "&34e$eJytkk1vozAQhv+M9wiKIYRwNGAS2vARG6nNCTnYSr1tgBinu9lfX0Oy3a162D1UlizbM+8zHr3zLfTA9izUJfModACXAzvu5eHMtOzamGmGYOZ8jlSXXtAlqIqy2BSrnTmKVkstxYAWyIlmhrYHXCj5KniiuuP0wq5Jl1EcMoDfL3QOcLzCRvIkB92pyw0fEYyqtMhNoOuFmiqnPHRAyhGkENoLkIR3LupzBF/KNb13aueHVKLoaQBOY1cTiAN6j6toXeO8SqsdFWB4Frp5un4g5bSx5+DZfUCM/xKR78NBCE48siA+WZIgakwxi9s+kMdeyVaThvogzUqS5lUMr+2S+bS/i8ieNIQTQS3o2r4NzbIgAz3TWqh2Bv/KhI5JhS6B3n+gLBiMoBvO+RrM/Gsw3r8wCzIbx4kY71xQkHSV5mhTx7jEeYzzaGdc65Q8yJa9DAh+rDu5YCy3BEhmZbylw/5xcye2p9ca3n7UgND9vtzB6pE8HP3fUuOVHKhmSid/KAFIsqapTjJb58FBNrKGXY9/anXmwthrRg+V9TiTn1uKLWNe5JuZTVCEP8beAHJP+kk=";
+    let h = 0.004 * 0.75f64.sqrt();
+    let corners = [(0.0095, 0.008 + h), (0.0055, 0.008 + h), (0.0035, 0.008), (0.0055, 0.008 - h), (0.0095, 0.008 - h), (0.0115, 0.008)];
+    let mut circle = circle("k3WAadzeC771.cCircle", h, (0.0075, 0.008));
+    circle["isConstruction"] = json!(true);
+    let mut entities = vec![circle];
+    for i in 0..6 {
+        let id = if i == 0 { "k3WAadzeC771.seed".to_string() } else { format!("k3WAadzeC771.pattern.0.{i}.0") };
+        entities.push(segment(&id, corners[i], corners[(i + 1) % 6]));
+    }
+    let rect = |n: &str, x0: f64, y0: f64, x1: f64, y1: f64| [segment(&format!("{n}.b"), (x0, y0), (x1, y0)), segment(&format!("{n}.r"), (x1, y0), (x1, y1)), segment(&format!("{n}.t"), (x1, y1), (x0, y1)), segment(&format!("{n}.l"), (x0, y1), (x0, y0))];
+    entities.extend(rect("outer", -0.01, -0.01, 0.03, 0.03));
+    let region = json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JNO"], "queryString": format!("query=qCompressed(1.0,\"{packed}\",id);") });
+    let area = 1.5 * 3f64.sqrt() * 0.004 * 0.004;
+    let (features, live) = one_extrude(sketch, json!(entities), region, json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 8, "edges": 18, "vertices": 12, "volume": area * 0.01 }));
+    let r = run_model("polygon-sides", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
+/// A band around a rectangle (an offset U closed by a line), named by the
+/// rectangle's sides too: the curves leave both regions open, the box of
+/// the part it made tells the band (live: clamp-guillem's Extrusión 5, its
+/// packed query; 61 × 43 mm, the rectangle 55 × 40).
+#[test]
+fn a_region_told_by_the_part_it_made() {
+    let sketch = "FhVqhD0CLcpmSXX_2";
+    let packed = "&384$eJyNUl13mjAY/jPvLuWYIKCXCNFyVsW9ic7upgdJWtIVQYxb/feLuFl7Vrrd5CR53ucr8GnswZeDao4zjxMKUu+zcqMfD5nR1TbOTBaSGf0bEcda8SGIdJHeptM7u1Vbo41W+9APadS3ahuQqtE/lJw0VdneZOeh44k8zoBdDnwALJ4ySyn03lTN8bd8hCwUSTq3QFWrpnVO5JhCIkPCCXF8mBSrXRH3o9u8Lvl6fU9/6kalNR/B7tSqFZLAPzMR3dyzuUjEHVew/65MXpwDJJLnjgvrb2lSiMN0unsemqpGD30McIijKLdePekEoMu60VuDOQ8gmS0wmYu4R851cdCuFxZuMEeJiveI6wzgWT2YK5BQixIXifcfbA8a/Vi8Q4//5Z07BJ4q92UVfb15UH5GuyP43SIwmz8tm3wZ+kuywP7ph0CCFN2Q/vEP3Q/y+7CpjKlKJEOkdigKuA8rhoKtr7LYL2bfkyFnkUCiLsq0U1nadv1WEenouhXNbKsPq55YHUWQBkjyTtnXXEhJ15R617xtPoBJGLG32C9XiAik";
+    let mm = |x: f64| x / 1000.0;
+    let entities = json!([
+        segment("XZOIhTuGGql8.bottom", (0.0, 0.0), (mm(-55.0), 0.0)),
+        segment("XZOIhTuGGql8.top", (0.0, mm(40.0)), (mm(-55.0), mm(40.0))),
+        segment("XZOIhTuGGql8.left", (0.0, 0.0), (0.0, mm(40.0))),
+        segment("XZOIhTuGGql8.right", (mm(-55.0), 0.0), (mm(-55.0), mm(40.0))),
+        segment("jo3xVCWHfe6a.0", (mm(3.0), 0.0), (mm(3.0), mm(43.0))),
+        segment("jo3xVCWHfe6a.1", (mm(3.0), mm(43.0)), (mm(-58.0), mm(43.0))),
+        segment("jo3xVCWHfe6a.2", (mm(-58.0), 0.0), (mm(-58.0), mm(43.0))),
+        segment("MNjUrcUA6U1P", (mm(3.0), 0.0), (mm(-58.0), 0.0)),
+    ]);
+    let region = json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JVG"], "queryString": format!("query=qCompressed(1.0,\"{packed}\",id);") });
+    let band = (61.0 * 43.0 - 55.0 * 40.0) * 1e-6 * 0.01;
+    let (features, mut live) = one_extrude(sketch, entities, region, json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 10, "edges": 24, "vertices": 16, "volume": band }));
+    live[1]["bodies"] = json!([{ "id": "JHD", "type": "SOLID", "faces": [{ "id": "JHG", "box": { "min": [mm(-58.0), 0.0, 0.0], "max": [mm(3.0), mm(43.0), 0.01] } }] }]);
+    let r = run_model("band-by-box", &features, &live, "");
     assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 

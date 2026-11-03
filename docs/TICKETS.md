@@ -3216,6 +3216,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (xt_read.cpp) takes only two-loop faces; it would need the ring edges' vertices put in a gap between the face's
   other loops and the seam run there. File: /root/parity/models/cf-wiring/imports/6ae9ae35100f83b7021d3619.x_t.
   (dx 2026-11-03)
+- [ ] P1 FS-FEATURE-LIST-NONDETERMINISTIC (core; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
+  pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
+  from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our
+  random feature ids) gave 9/9 once and twice "3 parts, live 4; Part 2 volume 1088.22 mm³, live 2250 (box
+  15..35 × 10..20 mm, live 35..60 × -10..5)". Looks like the picked features (or their instances) are taken in the
+  order of their ids rather than as listed. Model /root/parity/models/cf-parameter-pattern;
+  `NOSHAPE_PARITY_ONLY=cf-parameter-pattern` `parity::parity_models` a few times.
 - [ ] P1 PARITY-SPEED (core; dx's parity suite 11-03 run 31, the runner's new "speed:" line) 10 of the 41 corpus
   documents with live's times regenerate slower than live (ours: the reopened document's regeneration on vibe5;
   live: the sum of its features' regeneration times, live.jsonl's last line). Worst: **cf-hose-routing 116 s vs live

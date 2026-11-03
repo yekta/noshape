@@ -66,6 +66,8 @@ pub struct Translator<'a> {
     /// Onshape sketch curves by (sketch feature id, entity id), sampled as
     /// sketch-plane segments (metres), for picking regions.
     curves: HashMap<(String, String), Vec<[f64; 2]>>,
+    /// Construction curves among them.
+    construction: std::collections::HashSet<(String, String)>,
     /// Configuration inputs' default options (`configuration` of features.json).
     config_defaults: HashMap<String, String>,
     /// Edits the current sketch's constraints and dimensions made (to undo).
@@ -260,7 +262,7 @@ impl<'a> Translator<'a> {
             .flatten()
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, placeholder: None, std_pins: Vec::new(), foreign })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, placeholder: None, std_pins: Vec::new(), foreign })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -709,6 +711,11 @@ impl<'a> Translator<'a> {
         }
         // A parameter we reject: reported, and the feature added without it.
         let r = loop {
+            // NOSHAPE_PARITY_TRACE=1: each feature as sent (to tell our
+            // translation's changes from the evaluation's).
+            if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+                eprintln!("TRACE feature_add {args}");
+            }
             match self.call("feature_add", args.clone()) {
                 Ok(r) => break r,
                 Err(e) => {
@@ -814,7 +821,7 @@ impl<'a> Translator<'a> {
         if regions.len() == ids {
             return Some(regions);
         }
-        self.regions_of_new_bodies(k, &ours, &g, ids)
+        self.regions_of_new_bodies(k, &ours, &g, ids, true)
     }
 
     /// Fewer regions named than the sketch has: the ones a part feature `k`
@@ -822,9 +829,15 @@ impl<'a> Translator<'a> {
     /// extruded part's footprint): the region with the part's box, else the
     /// regions inside that box which together fill it (a board split by a
     /// line).
-    fn regions_of_new_bodies(&mut self, k: usize, _sketch: &str, g: &Value, ids: usize) -> Option<Vec<String>> {
+    /// (`caps`: also by the cap a region added to a part made.)
+    fn regions_of_new_bodies(&mut self, k: usize, _sketch: &str, g: &Value, ids: usize, caps: bool) -> Option<Vec<String>> {
         let before: std::collections::HashSet<&String> = self.refs.keys().filter(|(j, _)| *j == k).map(|(_, id)| id).collect();
-        let made = |kind: &str| -> Vec<[[f64; 3]; 2]> { self.refs.iter().filter(|((j, id), r)| *j == k + 1 && r.kind == kind && !before.contains(id)).filter_map(|(_, r)| r.bbox).collect() };
+        // (By id: the same order every run.)
+        let made = |kind: &str| -> Vec<[[f64; 3]; 2]> {
+            let mut m: Vec<(&String, [[f64; 3]; 2])> = self.refs.iter().filter(|((j, id), r)| *j == k + 1 && r.kind == kind && !before.contains(id)).filter_map(|((_, id), r)| Some((id, r.bbox?))).collect();
+            m.sort_by(|a, b| a.0.cmp(b.0));
+            m.into_iter().map(|(_, b)| b).collect()
+        };
         let (new, faces) = (made("BODY"), made("FACE"));
         let unit = per_unit(&g["units"]);
         let (o, x, y) = (f3(&g["frame"]["origin"])?.map(|c| c * unit), f3(&g["frame"]["x"])?, f3(&g["frame"]["y"])?);
@@ -849,7 +862,7 @@ impl<'a> Translator<'a> {
         let closest = |f: Box2| regions.iter().filter(|(_, b)| off(f, b) < tol(f)).min_by(|a, b| off(f, &a.1).total_cmp(&off(f, &b.1))).map(|(id, _)| id.to_string());
         // One region added to a part (no new body): the cap it made, a new
         // face flat along the sketch's normal.
-        if new.is_empty() && ids == 1 {
+        if new.is_empty() && ids == 1 && caps {
             let flat = |b: &[[f64; 3]; 2]| {
                 let along: Vec<f64> = corners(*b).map(|p| dot(p, n)).collect();
                 along.iter().cloned().fold(f64::NEG_INFINITY, f64::max) - along.iter().cloned().fold(f64::INFINITY, f64::min) < 1e-7
@@ -886,6 +899,24 @@ impl<'a> Translator<'a> {
             out.extend(inside.iter().map(|(id, _)| id.to_string()));
         }
         (out.len() == ids).then_some(out)
+    }
+
+    /// The regions of one sketch that the parts feature `k` made cover (by
+    /// their boxes), when they are other regions than `ids`.
+    fn regions_by_bodies(&mut self, k: usize, ids: &[String]) -> Option<Vec<String>> {
+        let sketch = ids.first()?.strip_prefix("region:")?.split(':').next()?.to_string();
+        if ids.iter().any(|i| i.strip_prefix("region:").and_then(|r| r.split(':').next()) != Some(sketch.as_str())) {
+            return None;
+        }
+        let g = self.call("sketch_get", json!({ "sketch": sketch })).ok()?;
+        let found = self.regions_of_new_bodies(k, &sketch, &g, ids.len(), false)?;
+        // The same regions, though the face's edges split them (keys from 2^30).
+        let own = |id: &String| -> String {
+            let Some((head, keys)) = id.rsplit_once(':') else { return id.clone() };
+            format!("{head}:{}", keys.split(',').filter(|k| k.parse::<u64>().is_ok_and(|v| v < 1 << 30)).collect::<Vec<_>>().join(","))
+        };
+        let set = |v: &[String]| v.iter().map(own).collect::<std::collections::BTreeSet<_>>();
+        (set(&found) != set(ids)).then_some(found)
     }
 
     /// A revolve's axis named by id alone: the last sketch's one
@@ -943,7 +974,19 @@ impl<'a> Translator<'a> {
                         }),
                     }
                 }
-                let Some(first) = missed.first().cloned() else { return Ok((!ids.is_empty()).then(|| json!(ids))) };
+                let regions_param = ["entities", "surfaceEntities", "regions", "faceToAdd"].contains(&p["parameterId"].as_str().unwrap_or(""));
+                let Some(first) = missed.first().cloned() else {
+                    // Regions by their curves, checked against the parts the
+                    // feature made (live's line after it): its boxes win when
+                    // they tell other regions (clamp-guillem's band around a
+                    // rectangle names the rectangle's sides too).
+                    if regions_param
+                        && let Some(better) = self.regions_by_bodies(k, &ids)
+                    {
+                        return Ok(Some(json!(better)));
+                    }
+                    return Ok((!ids.is_empty()).then(|| json!(ids)));
+                };
                 // Regions named by id alone (older documents' queries carry no
                 // text, and live's bodies have no sketch regions): as many as
                 // the last sketch has, they are its regions.
@@ -1400,9 +1443,15 @@ impl<'a> Translator<'a> {
         // rectangle's `.left` side alone is on both its inside and the region
         // beside it; live: bracket120's Extrude 2 takes the rectangle).
         if bounded.len() > 1 {
-            let shapes: std::collections::BTreeSet<&str> = strings.iter().filter(|e| self.curves.contains_key(&(sk.clone(), (*e).clone()))).filter_map(|e| e.rsplit_once('.').map(|(p, _)| p)).collect();
-            // Each side not named yet, once.
-            let siblings = self.curves.iter().filter(|((s, id), _)| *s == sk && !strings.contains(id) && id.rsplit_once('.').is_some_and(|(p, _)| shapes.contains(p)));
+            // (A shape's curves share the id before the first dot: a
+            // rectangle's `.left`, a polygon's `.seed` and `.pattern.0.1.0`
+            // sides; clamp-guillem's hexagons.)
+            let shape = |e: &str| e.split_once('.').map(|(p, _)| p.to_string());
+            let shapes: std::collections::BTreeSet<String> = strings.iter().filter(|e| self.curves.contains_key(&(sk.clone(), (*e).clone()))).filter_map(|e| shape(e)).collect();
+            // Each side not named yet, once; not its construction curves (a
+            // polygon's circle).
+            let construction = |id: &String| self.construction.contains(&(sk.clone(), id.clone()));
+            let siblings = self.curves.iter().filter(|((s, id), _)| *s == sk && !strings.contains(id) && !construction(id) && shape(id).is_some_and(|p| shapes.contains(&p)));
             segments.extend(siblings.flat_map(|(_, poly)| poly.windows(2).flat_map(|w| [w[0], w[1]])));
         }
         // Else (several share them, or none known): the one inside those curves.
@@ -1905,6 +1954,9 @@ impl<'a> Translator<'a> {
             let eid = e["entityId"].as_str().unwrap_or("").to_string();
             let g = &e["geometry"];
             let construction = e["isConstruction"].as_bool() == Some(true);
+            if construction {
+                self.construction.insert((oid.clone(), eid.clone()));
+            }
             let gt = g["btType"].as_str().unwrap_or("");
             let num = |k: &str| g[k].as_f64().unwrap_or(0.0);
             // Text: placed after the curves (sketch_text).

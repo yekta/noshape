@@ -6,7 +6,12 @@ causes of difference, each with its ticket.
 
 | date | green | models | features | scenarios | biggest causes (tickets) |
 |---|---|---|---|---|---|
-| 2026-11-03 | a45c1cc4 (dx daily run 17:40) | 26/57 | 288/466 (custom 7/86) | – | 6× custom studios not compiling (3 import studios live can't fetch: 403, REQUESTS 1885; FS-OLD-STD-COMPAT); 5× fillets (FILLET-PROPAGATION-VOLUME, FILLET-OVERLAP-FAIL, FILLET-KNOB-JASON-VOLUME, FILLET-MEETING-FILLETS-ONE-FACE, FILLET-BLEND-SPLIT); 3× custom features failing to run (core); 2× live's UI fetch without geometry / in-feature mate connector queries (asked, 1892 / 13:20); 1× EXTRUDE-SURFACE-CURVES, MIRROR-FEATURE-UP-TO. Speed: 16 of 44 slower than live (PARITY-SPEED: cf-hose-routing ×230, cf-planetary-gears ×30, knob-jason ×29; vibe5 loaded during the run). |
+| 2026-11-03 | dx translator 18:45 (run 40; 3 dead-studio documents unscored) | 25/54 | 296/421 (custom 6/55) | – | 6× custom studios not compiling (3 import studios live can't fetch: 403, REQUESTS 1885; FS-OLD-STD-COMPAT); 5× fillets (FILLET-PROPAGATION-VOLUME, FILLET-OVERLAP-FAIL, FILLET-KNOB-JASON-VOLUME, FILLET-MEETING-FILLETS-ONE-FACE, FILLET-BLEND-SPLIT); 3× custom features failing to run (core); 2× live's UI fetch without geometry / in-feature mate connector queries (asked, 1892 / 13:20); 1× EXTRUDE-SURFACE-CURVES, MIRROR-FEATURE-UP-TO. Speed: 16 of 44 slower than live (PARITY-SPEED: cf-hose-routing ×230, cf-planetary-gears ×30, knob-jason ×29; vibe5 loaded during the run). cf-parameter-pattern flips between 9/9 and 8/9 run to run (FS-FEATURE-LIST-NONDETERMINISTIC, core); clamp-guillem 6 → 23 of 25. |
+
+dx 11-03 18:15: three documents are left out of the model score (tests/parity-models/unscored.json, printed as "not
+scored" by `parity_models`): cf-ansi-washers, cf-socket-head-cap-screw-creator and cf-thread-creator. Their Feature
+Studios import studios of documents that are no longer public (live gets 403 fetching them, REQUESTS 1885), so their
+custom features can't be built in noshape or anywhere else; they measure nothing about us.
 
 qa 11-03 05:55: the scenario column counts the scenarios with a live recording at compare time (112 of 162 runs; live was
 re-recording); the evening run replaces today's numbers. Scenario differences are psui's (its runner reports its own
