@@ -1,5 +1,6 @@
 [
   { "name": "cf-ansi-washers", "reason": "its Feature Studios import studios of documents that are no longer public (live: 403 on d9e449…/e97335… and cc3882…/d9904…, REQUESTS 1885): its custom features can't be built anywhere" },
   { "name": "cf-socket-head-cap-screw-creator", "reason": "its Feature Studio imports a studio of a document that is no longer public (live: 403 on a46a97…/2a3d2f…, REQUESTS 1885): its custom features can't be built anywhere" },
-  { "name": "cf-thread-creator", "reason": "its Feature Studio imports a studio of a document that is no longer public (live: 403 on e57f82…/eba680…, REQUESTS 1885): its custom feature can't be built anywhere" }
+  { "name": "cf-thread-creator", "reason": "its Feature Studio imports a studio of a document that is no longer public (live: 403 on e57f82…/eba680…, REQUESTS 1885): its custom feature can't be built anywhere" },
+  { "name": "cf-curve-pattern-normal", "reason": "its Surface Tangent Plane studio imports debug.fs and planes.fs from d9e449…/e97335…, the document that is no longer public (live: 403, REQUESTS 1885; makeTangentPlaneOnFace and the other plane functions it calls are only there): its custom features can't be built anywhere" }
 ]

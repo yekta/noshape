@@ -208,9 +208,10 @@ pub struct CtxState {
     pub split_tools: Vec<(DVec3, DVec3, Vec<DVec3>)>,
     /// The face pieces each `opSplitFace` left (their snapshot points; `qSplitBy` faces).
     pub split_face_pieces: HashMap<FsId, Vec<DVec3>>,
-    /// The bodies each `opSplitFace` cut and the midpoints of the edges it made there, in order: those edges are
-    /// `qCreatedBy` it, whatever later operations rename them (an `opDeleteFace` leaving them open).
-    pub split_face_edges: Vec<(FsId, Vec<BodyId>, Vec<DVec3>)>,
+    /// The bodies each `opSplitFace` / `opSplitPart` cut, the midpoints of the edges it made there and its
+    /// operation number, in order: those edges are `qCreatedBy` it, whatever later operations rename them (an
+    /// `opDeleteFace` leaving them open), also on a body touched since (a split sheet's piece got a new id).
+    pub split_face_edges: Vec<(FsId, Vec<BodyId>, Vec<DVec3>, u32)>,
     /// The same for the vertices an operation made where its new edges end (a localized opBoolean: the corner
     /// overcut's corner breaks go on `qCreatedBy(<its Boolean>, VERTEX)`), by their points.
     pub made_vertices: Vec<(FsId, Vec<BodyId>, Vec<DVec3>)>,

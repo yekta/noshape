@@ -781,12 +781,13 @@ impl<'a> QueryCx<'a> {
     fn split_face_edge_op(&self, e: &Ent) -> Option<FsId> {
         let Ent::Edge(b, _) = e else { return None };
         let body = &self.st.ctx.bodies[*b].id;
-        let mut splits = self.st.split_face_edges.iter().rev().filter(|(_, owners, _)| owners.contains(body)).peekable();
+        let touched = self.st.touched.get(body).copied();
+        let mut splits = self.st.split_face_edges.iter().rev().filter(|(_, owners, _, seq)| owners.contains(body) || touched.is_some_and(|t| t >= *seq)).peekable();
         splits.peek()?;
         let s = self.shape(e)?;
         let info = s.edge_info().ok()?;
         let m = s.point_at((info.first_param + info.last_param) * 0.5).ok()?;
-        splits.find(|(_, _, mids)| mids.iter().any(|p| p.distance(m) < 1e-7)).map(|(id, _, _)| id.clone())
+        splits.find(|(_, _, mids, _)| mids.iter().any(|p| p.distance(m) < 1e-7)).map(|(id, ..)| id.clone())
     }
 
     /// Start/end cap role of a face created by an extrude-like operation.
@@ -1574,6 +1575,17 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
             // the untouched copy lies on them too.
             let last: Vec<Arc<str>> = query.get("lastOperationId").as_array().map(|a| a.iter().filter_map(|c| c.as_str()).collect()).unwrap_or_default();
             let since = q.st.ops.values().find(|o| !last.is_empty() && o.id == last).map_or(0, |o| o.seq + 1);
+            // A tracked body split since: its pieces too (std sheet metal's Fold tracks its definition sheet through
+            // the split that makes the fold's two sides).
+            let bodies: Vec<&BodyId> = out.iter().filter_map(|e| if let Ent::Body(b) = e { Some(&q.st.ctx.bodies[*b].id) } else { None }).collect();
+            let mut pieces = Vec::new();
+            for (op, (all, _)) in &q.st.splits {
+                let after = q.st.ops.values().find(|o| &o.id == op).is_none_or(|o| o.seq >= since);
+                if after && all.iter().any(|b| bodies.contains(&b)) {
+                    pieces.extend(all.iter().filter_map(|b| q.st.ctx.bodies.iter().position(|x| &x.id == b)).map(Ent::Body));
+                }
+            }
+            out.extend(pieces);
             out.retain(|e| match q.owner(e) {
                 Some(Ent::Body(b)) => q.st.touched.get(&q.st.ctx.bodies[b].id).is_some_and(|s| *s > since),
                 _ => true,

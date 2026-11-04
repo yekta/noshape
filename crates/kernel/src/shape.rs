@@ -331,6 +331,12 @@ impl Shape {
     }
 
     /// Build a compound containing `shapes`.
+    /// A shell of these faces as they are (shared edges stay shared; nothing is sewn).
+    pub fn shell(faces: &[Shape]) -> Result<Shape> {
+        let l = vec_to_list(faces);
+        Shape::from_res(ffi::make_shell(&l))
+    }
+
     pub fn compound(shapes: &[Shape]) -> Shape {
         let l = vec_to_list(shapes);
         Shape::from_res(ffi::make_compound(&l)).unwrap_or_else(|_| Shape::null())

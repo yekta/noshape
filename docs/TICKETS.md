@@ -55,7 +55,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   by std (regen::std_route, bridging curve) reaches it: the user sees that feature fail. Owner dx unless noted.
   - [ ] P1 FS-NATIVE-OPDERIP @opDerip: std's sheetMetalBend, sheetMetalJog and sheetMetalTab (run by std here) call it
     through sheetMetalDeripCall (also moveFace and SMFlatOp in std).
-  - [x] (dx 11-04 17:05: Trim curve's evaluator for the documented fields; sheet metal Loft's `trimToPoints` with
+  - [x] (dx 11-04 16:59: Trim curve's evaluator for the documented fields; sheet metal Loft's `trimToPoints` with
     `helpPointPosition` splits the wire at those points and keeps the piece by the help point (core's curves.rs
     `trim_wire_at`, split out of trim_curve). T1 ops_harness moveCurveBoundary.)
     P1 FS-NATIVE-OPMOVECURVEBOUNDARY @opMoveCurveBoundary: std's sheetMetalLoft (run by std here); also std's
@@ -3781,6 +3781,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   copying the body per instance (1,736 copies); T1 ops_harness patternSolidFaces. The translator breaks ties between
   equally good faces by the part live's is on (both parts have that hole); T1 parity::a_face_two_parts_have_is_the_
   one_on_lives_part. Run 65: 34/56, 358/482, custom 28/111.
+  dx 11-04 17:29: cf-curve-pattern-normal is unscored (tests/parity-models/unscored.json): its Surface Tangent Plane
+  studio imports debug.fs and planes.fs from d9e449…/e97335…, cf-ansi-washers' no-longer-public document (403,
+  REQUESTS 1885), and calls makeTangentPlaneOnFace and the other plane functions only those have. Overcut's Fold SM 1
+  (std 1188): opSplitPart now leaves a split sheet as a sheet per piece (Onshape's split surfaces), its cut's edges
+  qCreatedBy the split, and a tracked body follows into the pieces split from it (T1 ops_harness splitSheet); the
+  fold now gets past the split, then the edge it rotates about isn't found on the moving piece (its edge is
+  credited to the split on the fixed piece only: the moving piece's body id, last touched before the split, isn't
+  among the split's owners when it's queried); left there, next for dx. Run 72: 37/55, 366/471 (custom 38/109).
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our

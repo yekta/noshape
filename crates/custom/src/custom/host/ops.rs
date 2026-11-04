@@ -580,7 +580,8 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (bodies, mids, points) = made;
     if !mids.is_empty() || !points.is_empty() {
         let mut st = cx.state.lock();
-        st.split_face_edges.push((id.clone(), bodies.clone(), mids));
+        let seq = bodies.iter().filter_map(|b| st.touched.get(b).copied()).max().unwrap_or(u32::MAX);
+        st.split_face_edges.push((id.clone(), bodies.clone(), mids, seq));
         st.made_vertices.push((id.clone(), bodies, points));
     }
     if let Some((targets, tools)) = before {
@@ -1268,7 +1269,7 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         Some("KEEP_BACK") => Some(false),
         _ => None,
     };
-    let (split_targets, plane) = run_op(i, &cx, &id, "SPLIT_FAILED", |ev| {
+    let (split_targets, plane, mids) = run_op(i, &cx, &id, "SPLIT_FAILED", |ev| {
         // Onshape's opSplitPart texts (std splitpart.fs leaves them to it).
         if ev.resolve_bodies(&targets).is_empty() {
             return Err(super::code_error_faulty("SPLIT_SELECT_TARGETS", &["targets"]));
@@ -1292,9 +1293,29 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
         let target_ids: Vec<BodyId> = ev.resolve_bodies(&targets).into_iter().map(|b| ev.ctx.bodies[b].id.clone()).collect();
         let mut changed = false;
+        // The edges the split made (midpoints on none of the target's old ones): qCreatedBy(id, EDGE).
+        let mut mids = Vec::new();
         for bi in ev.resolve_bodies(&targets).into_iter().rev() {
             let body = ev.ctx.bodies[bi].clone();
             let mut res = k::split(std::slice::from_ref(&body.shape), &tools, &Default::default())?;
+            let old_edges = Shape::compound(&body.shape.edges());
+            let made: Vec<bool> = res
+                .shape
+                .edges()
+                .iter()
+                .map(|edge| {
+                    let Some(m) = edge.edge_info().ok().and_then(|info| edge.point_at((info.first_param + info.last_param) * 0.5).ok()) else { return false };
+                    let new = k::make_vertex(m).and_then(|v| k::distance(&v, &old_edges)).is_ok_and(|d| d.distance > 1e-7);
+                    if new {
+                        mids.push(m);
+                    }
+                    new
+                })
+                .collect();
+            // A sheet comes apart where it was split: a body per piece (Onshape's split surfaces).
+            if body.kind != BodyKind::Solid && made.contains(&true) {
+                res.shape = sheet_pieces(&res.shape, &made)?;
+            }
             let solids = res.shape.solids();
             changed |= solids.len() > 1 || body.kind != BodyKind::Solid;
             if let (Some(front), Some((o, n)), true) = (keep_side, plane, solids.len() > 1) {
@@ -1314,7 +1335,7 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let ids: Vec<BodyId> = tool_bodies.iter().filter_map(|b| ev.ctx.bodies.get(*b).map(|x| x.id.clone())).collect();
             ev.ctx.bodies.retain(|b| !ids.contains(&b.id));
         }
-        Ok((target_ids, plane))
+        Ok((target_ids, plane, mids))
     })?;
     // Split pieces are "created by" the split and by the original's creator
     // (std query.fs, qCreatedBy).
@@ -1323,9 +1344,53 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     for piece in &pieces {
         st.record_merge(piece, &split_targets, &id);
     }
-    let all = split_targets.iter().chain(&pieces).cloned().collect();
+    let all: Vec<BodyId> = split_targets.iter().chain(&pieces).cloned().collect();
+    if !mids.is_empty() {
+        // The bodies the new edges are on now (the pieces' ids are settled only after the operation).
+        let on_edges: Vec<BodyId> = st
+            .ctx
+            .bodies
+            .iter()
+            .filter(|b| {
+                b.shape.edges().iter().any(|e| {
+                    e.edge_info().ok().and_then(|i| e.point_at((i.first_param + i.last_param) * 0.5).ok()).is_some_and(|m| mids.iter().any(|p| p.distance(m) < 1e-7))
+                })
+            })
+            .map(|b| b.id.clone())
+            .collect();
+        let seq = on_edges.iter().filter_map(|b| st.touched.get(b).copied()).max().unwrap_or(u32::MAX);
+        st.split_face_edges.push((id.clone(), on_edges, mids, seq));
+    }
     st.splits.insert(id.clone(), (all, plane));
     Ok(Value::Undefined)
+}
+
+/// A sheet's faces as shells of the faces joined by edges not `cut` (by edge index): one per piece.
+fn sheet_pieces(sheet: &Shape, cut: &[bool]) -> FResult<Shape> {
+    let faces = sheet.faces();
+    let mut group: Vec<usize> = (0..faces.len()).collect();
+    fn root(g: &mut [usize], mut i: usize) -> usize {
+        while g[i] != i {
+            g[i] = g[g[i]];
+            i = g[i];
+        }
+        i
+    }
+    for (e, fs) in sheet.edge_faces()?.iter().enumerate() {
+        if cut.get(e).copied().unwrap_or(false) {
+            continue;
+        }
+        for w in fs.windows(2) {
+            let (a, b) = (root(&mut group, w[0] as usize), root(&mut group, w[1] as usize));
+            group[a] = b;
+        }
+    }
+    let mut pieces: BTreeMap<usize, Vec<Shape>> = BTreeMap::new();
+    for (i, f) in faces.into_iter().enumerate() {
+        pieces.entry(root(&mut group, i)).or_default().push(f);
+    }
+    let shells = pieces.into_values().map(|fs| Shape::shell(&fs)).collect::<Result<Vec<_>, _>>()?;
+    Ok(Shape::compound(&shells))
 }
 
 fn op_draft(i: &mut Interp, a: Vec<Value>) -> R<Value> {
@@ -1715,7 +1780,8 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     st.split_tools.extend(tools);
     st.split_face_pieces.insert(id.clone(), pieces);
     if !mids.is_empty() {
-        st.split_face_edges.push((id.clone(), owners.clone(), mids));
+        let seq = owners.iter().filter_map(|b| st.touched.get(b).copied()).max().unwrap_or(u32::MAX);
+        st.split_face_edges.push((id.clone(), owners.clone(), mids, seq));
     }
     drop(st);
     Ok(Value::map_from([("splittingEdges", super::query::transient_queries(&cx, &new_edges))]))

@@ -259,6 +259,18 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const extended = evLength(context, { "entities" : qOwnedByBody(qCreatedBy(sub + "b", EntityType.BODY), EntityType.EDGE) });
             check("opMoveCurveBoundary extend", abs(extended - 110 * mm) < 1e-6 * mm, extended);
         });
+        step(context, id, "splitSheet", function(sub) {
+            // A sheet split by a plane comes apart into two sheets, each with the cut's edge, qCreatedBy the split
+            // (a sheet metal Fold splits its definition sheet so).
+            fCuboid(context, sub + "b", { "corner1" : vector(0, 0, 2200) * mm, "corner2" : vector(20, 10, 2205) * mm });
+            opExtractSurface(context, sub + "s", { "faces" : qContainsPoint(qCreatedBy(sub + "b", EntityType.FACE), vector(10, 5, 2205) * mm) });
+            const sheet = qCreatedBy(sub + "s", EntityType.BODY);
+            opPlane(context, sub + "pl", { "plane" : plane(vector(8, 0, 2200) * mm, vector(1, 0, 0)) });
+            opSplitPart(context, sub + "split", { "targets" : sheet, "tool" : qCreatedBy(sub + "pl", EntityType.FACE), "keepTools" : true });
+            const sheets = size(evaluateQuery(context, qBodyType(qOwnerBody(qCreatedBy(sub + "split", EntityType.EDGE)), BodyType.SHEET)));
+            const cut = size(evaluateQuery(context, qCreatedBy(sub + "split", EntityType.EDGE)));
+            check("opSplitPart of a sheet", sheets == 2 && cut == 2, [sheets, cut]);
+        });
         step(context, id, "patternSolidFaces", function(sub) {
             // A solid's hole face patterned (std's FACE pattern, a Fill pattern of holes): the holes repeated in that
             // part, no copies of it.

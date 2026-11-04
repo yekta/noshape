@@ -48,6 +48,7 @@ extern "C" char etext;
 #include <BRepTools_WireExplorer.hxx>
 #include <TopoDS.hxx>
 #include <BRep_Builder.hxx>
+#include <TopoDS_Shell.hxx>
 #include <ShapeFix_Shape.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS_Compound.hxx>
@@ -964,6 +965,21 @@ std::unique_ptr<OcShapeList> children(const OcShape& s)
 }
 
 std::unique_ptr<OcShape> make_compound(const OcShapeList& l) { return wrap(compound_of(l.items)); }
+
+// A shell of these faces as they are (shared edges stay shared; nothing sewn).
+std::unique_ptr<OcShape> make_shell(const OcShapeList& l)
+{
+  BRep_Builder b;
+  TopoDS_Shell sh;
+  b.MakeShell(sh);
+  for (const TopoDS_Shape& f : l.items)
+  {
+    if (f.ShapeType() != TopAbs_FACE)
+      fail_invalid("a shell takes faces");
+    b.Add(sh, f);
+  }
+  return wrap(sh);
+}
 
 std::unique_ptr<OcShapeList> list_new() { return std::make_unique<OcShapeList>(); }
 void list_push(OcShapeList& l, const OcShape& s)

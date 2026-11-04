@@ -476,6 +476,7 @@ pub(crate) mod ffi {
         fn shown_topology(s: &OcShape) -> Result<Vec<u8>>;
         fn children(s: &OcShape) -> Result<UniquePtr<OcShapeList>>;
         fn make_compound(l: &OcShapeList) -> Result<UniquePtr<OcShape>>;
+        fn make_shell(l: &OcShapeList) -> Result<UniquePtr<OcShape>>;
         fn list_new() -> Result<UniquePtr<OcShapeList>>;
         fn list_push(l: Pin<&mut OcShapeList>, s: &OcShape) -> Result<()>;
         fn list_len(l: &OcShapeList) -> Result<usize>;

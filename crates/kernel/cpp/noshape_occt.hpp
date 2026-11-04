@@ -729,6 +729,7 @@ rust::Vec<uint32_t>          adjacent_faces(const OcShape& s, uint32_t face_inde
 rust::Vec<uint8_t>           shown_topology(const OcShape& s);
 std::unique_ptr<OcShapeList> children(const OcShape& s);
 std::unique_ptr<OcShape>     make_compound(const OcShapeList& l);
+std::unique_ptr<OcShape>     make_shell(const OcShapeList& l);
 std::unique_ptr<OcShapeList> list_new();
 void                         list_push(OcShapeList& l, const OcShape& s);
 size_t                       list_len(const OcShapeList& l);
