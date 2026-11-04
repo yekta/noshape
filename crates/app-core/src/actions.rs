@@ -203,6 +203,8 @@ pub fn default_key_bindings() -> Vec<KeyBinding> {
         // Not from the Feature Studio's code editor, where Ctrl+Space is the editor's own (FS-EDITOR-COMPLETE).
         KeyBinding::new("ctrl-space", SwitchRecentTab, Some(RECENT_TAB_CONTEXT)),
         KeyBinding::new("[", MeasureTool, doc),
+        // Control+M on every OS, macOS too (not Cmd+M): a Mac browser minimises the window on Cmd+M before
+        // Onshape sees it, so Onshape on a Mac only ever gets Control+M (lead 11-04).
         KeyBinding::new("ctrl-m", MateConnectorTool, doc_mod),
         KeyBinding::new("k", ToggleMateConnectors, doc),
         KeyBinding::new("a", FlipPrimaryAxis, dlg),
