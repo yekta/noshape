@@ -868,6 +868,13 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- 11-04 02:59: **edge midpoint rule under review (lead 03:00)**. Ours (92095b8d): a pointer resting 250 ms on an edge's
+  midpoint snaps to the midpoint point (behaviors.rs MIDPOINT_DWELL, schedule_midpoint_dwell; the point's menu; POINT
+  of EDGE in the state). Every Part Studio recording agrees (select-edge-then-chamfer-tool 00:56 POINT; edge-rclick-menu
+  without Fillet…; fillet-* fields empty), but skasm's sketch version was reverted at 03:00 (live's 02:24–02:40
+  re-recordings select the line at its midpoint) and 1954 came from the runner, so I asked live for a by-hand retry
+  (REQUESTS 11-04 02:59). If by hand the click takes the edge: drop the dwell (ready = moved only, as d89c51a1 had) and the point
+  menu stays only for a moved pointer. The 15 edge scenarios now click a quarter of the edge either way.
 - 11-04 01:07: **187/221 scenarios, 1433/1532 states**. Since 23:00 (all landed): the graphics context menu in the state
   (app-core os_menu::menu_state); a pick that fills a field and moves on gives the next field the keyboard; which
   control keeps the keyboard when an edit brings up a field (tab: the field; checkbox: only if the old active field
