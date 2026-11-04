@@ -48,8 +48,9 @@ passed but clicks no GUI — qa still can't check it (workflow requested). Memor
 **/tmp was pruned (files older than ~22 h) at some point on 11-04**: qa's smoke / volume / status scripts and the halfmir2
 documents were gone. Rebuilt in qa-scratch/bin (qa-vols.py, qa-fstat.py, qa-tixvol.sh, qa-fget.py, qa-presmoke.sh,
 qa-relsmoke.sh, qa-cliwrap-mem.sh; /tmp links), halfmir2 docs in qa-scratch/docs/hm2-{a,b,c}.noshape (bin/mirsetgui.sh updated).
-**Lost and not yet rebuilt: SM-CLOSED-BUTT's /tmp/qa-smbutt2.py and RUST-MIRROR-NEGATIVE's /tmp/qa-mir972.py** (not in this
-smoke). GUI rows with the new halfmir2 docs: all pixel-identical to v0.4.25 (cli/relgui-v0426b.out).
+SM-CLOSED-BUTT's and RUST-MIRROR-NEGATIVE's checks rebuilt as bin/qa-smbutt.py and bin/qa-mir972.py (Top plane), back in
+qa-presmoke.sh; on v0.4.25 and v0.4.26 they give the old values exactly (8535.161626 / 8601.815265 / 8601.815679, 23 faces;
+341072.9043 / 86): both hold on v0.4.26. GUI rows with the new halfmir2 docs: all pixel-identical to v0.4.25 (cli/relgui-v0426b.out).
 
 **v0.4.25 (published 05:49, cut d9fb8f44 = 38d75390 + bump, contains greens through ad60edf9; Release run 41775622951)
 smoked 05:51–06:11: good, no new blocker.** Artifacts: the published Linux tarball, CLI tarball and .deb are
