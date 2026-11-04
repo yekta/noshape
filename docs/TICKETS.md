@@ -71,8 +71,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     edge: the host's sheet metal rebuild makes them from the flat's bend lines (old ones dropped on the next
     rebuild), and @evSheetMetalBendUp answers the flat bend line's up; T1 custom_features::bend_centerline_wires_as_live
     (live's own probe: x 100.063053, y 0 → 60, z 0, up true). Left: a flipped flange's joint edge has no
-    association here, so its wire has none (T2 bend_centerline_wire_of_a_flange_down_as_live;
-    SM-FLIPPED-JOINT-ASSOCIATION).) P1 FS-NATIVE-EVSHEETMETALBENDUP (dx 11-04 17:32: unreachable here yet: pcbEnd asks
+    association here, so its wire has none: fixed, SM-FLIPPED-JOINT-ASSOCIATION; T1
+    bend_centerline_wire_of_a_flange_down_as_live).) P1 FS-NATIVE-EVSHEETMETALBENDUP (dx 11-04 17:32: unreachable here yet: pcbEnd asks
     it of the bend centerline wire bodies associated with the definition's bends, which our sheet metal doesn't make,
     and calls it in `try silent` (a failure reads as "down")) @evSheetMetalBendUp: std's pcbEnd (run by std here).
   - [x] (dx 11-04 16:17: the second fundamental form's derivative along a tangent, from the kernel's second
@@ -113,7 +113,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   a_tab_into_a_ripped_corner_fills_it_from_its_flange (NOSHAPE_FS_TRACE=1: the Tab's group subtract / transform /
   copyTool / boolean all run "ok").
 
-- [ ] P1 SM-FLIPPED-JOINT-ASSOCIATION (dx; 11-04 19:28) a 100 × 60 plate (thicken 2 mm, radius 3 mm) with a Flange
+- [x] (dx 11-04 19:50: opEdgeChange puts the attributes of the edges it moves back on them where they went, as
+  Parasolid keeps them; the T2 is T1 now) P1 SM-FLIPPED-JOINT-ASSOCIATION (dx; 11-04 19:28) a 100 × 60 plate (thicken 2 mm, radius 3 mm) with a Flange
   flipped down on its x = 100 edge: the definition's joint edge (x = 102, z = 2) carries no sheet metal association
   attribute here (the unflipped flange's, at x = 100, keeps the plate edge's), so std's getSMAssociationAttributes
   finds nothing on it: the part's bend edges and the bend centerline wire get no association, and live's probe

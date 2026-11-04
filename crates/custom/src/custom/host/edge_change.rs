@@ -49,6 +49,17 @@ fn op_edge_change(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         };
         options.push((edges, length_of(o.get("offset")).unwrap_or(0.0), replace));
     }
+    // The attributes on the edges it moves (Parasolid's stay on a moved edge; the operation's attribute remap, by
+    // where they were, would drop them).
+    let kept: Vec<(Value, crate::reference::Reference, super::query::Snapshot)> = {
+        let st = cx.state.lock();
+        options
+            .iter()
+            .flat_map(|(edges, _, _)| edges.iter())
+            .filter_map(|r| st.attr_snapshots.get(r).map(|(_, snap)| (r, snap.clone())))
+            .flat_map(|(r, snap)| st.attributes_of(r).into_iter().map(move |v| (v.clone(), r.clone(), snap.clone())).collect::<Vec<_>>())
+            .collect()
+    };
     let moves = run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
         let mut moves: Vec<(Vec<DVec3>, Vec<DVec3>)> = Vec::new();
         let mut by_body: BTreeMap<usize, BTreeMap<usize, Move>> = BTreeMap::new();
@@ -92,7 +103,20 @@ fn op_edge_change(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
         Ok(moves)
     })?;
-    cx.state.lock().edge_moves.extend(moves);
+    let mut st = cx.state.lock();
+    st.edge_moves.extend(moves);
+    // Each dropped attribute back on the edge where its edge went.
+    let back: Vec<(crate::reference::Reference, Value)> = {
+        let q = super::query::QueryCx::new(&st);
+        kept.into_iter()
+            .filter(|(v, r, _)| !st.attributes_of(r).contains(&v))
+            .filter_map(|(v, _, snap)| q.tracked(&snap, false).first().map(|e| (q.to_ref(e), v)))
+            .filter(|(r, v)| !st.attributes_of(r).contains(&v))
+            .collect()
+    };
+    for (r, v) in back {
+        st.push_attribute(r, v);
+    }
     Ok(Value::Undefined)
 }
 

@@ -637,7 +637,7 @@ impl<'a> QueryCx<'a> {
     /// its old points (renamed or merged), or on the old edge between its
     /// ends (split pieces). With `to_sheets`, a solid's entity may also
     /// become a sheet's (extracted surfaces).
-    fn tracked(&self, snap: &Snapshot, to_sheets: bool) -> Vec<Ent> {
+    pub(super) fn tracked(&self, snap: &Snapshot, to_sheets: bool) -> Vec<Ent> {
         const TOL: f64 = 1e-7;
         // An edge opEdgeChange moved is looked for where it went too (and on through later moves).
         let mut wheres: Vec<Vec<DVec3>> = vec![snap.points.clone()];

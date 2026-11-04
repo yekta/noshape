@@ -3528,7 +3528,6 @@ fn bend_centerline_wires_as_live() {
 
 /// The same with the Flange flipped down: live's wire answers up false.
 #[test]
-#[ignore = "T2: fails until SM-FLIPPED-JOINT-ASSOCIATION (the flipped flange's joint edge has no association)"]
 fn bend_centerline_wire_of_a_flange_down_as_live() {
     bend_centerline_case(true, "false");
 }
