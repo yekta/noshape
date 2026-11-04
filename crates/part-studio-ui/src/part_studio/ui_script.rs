@@ -424,7 +424,7 @@ impl PartStudioView {
     pub fn ui_busy(&self) -> bool {
         // An open dialog's model before the feature and std's editing logic on it (a new Extrude opens as New and
         // turns Add once that ran) count too.
-        self.pending.is_some() || self.context.is_none() || self.ui.preview_task.is_some() || self.ui.std_edit_task.is_some() || self.ui.material_notice_pending
+        self.pending.is_some() || self.context.is_none() || self.ui.preview_task.is_some() || self.ui.scene_task.is_some() || self.ui.std_edit_task.is_some() || self.ui.material_notice_pending
     }
 
     /// The hover under a resting pointer isn't settled yet: a hover query in flight, or an edge's midpoint dwell

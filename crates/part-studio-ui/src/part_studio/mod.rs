@@ -338,7 +338,13 @@ pub struct PartStudioView {
     /// While a feature dialog previews: the model before the feature, the
     /// preview blend's base (`preview_mix_base`).
     built_base: Option<BuiltScene>,
-    cache: GpuCache,
+    /// The scene builder's GPU caches: also used by background builds (`apply_display_async`).
+    cache: Arc<parking_lot::Mutex<GpuCache>>,
+    /// Bumped by every applied display: a background scene build for an older one is dropped.
+    display_seq: u64,
+    /// Bumped by every scene build started: a background build's scene only lands if none started since (its
+    /// display's other steps still run).
+    scene_gen: u64,
     pub selection: Vec<Reference>,
     hover: Option<Reference>,
     opts: SceneOptions,
@@ -503,7 +509,9 @@ impl PartStudioView {
             display: Arc::new(StudioDisplay::defaults()),
             built: None,
             built_base: None,
-            cache: GpuCache::default(),
+            cache: Default::default(),
+            display_seq: 0,
+            scene_gen: 0,
             selection: Vec::new(),
             hover: None,
             opts: SceneOptions { show_planes: true, show_sketches: true, show_origin: true, ..Default::default() },
@@ -748,7 +756,12 @@ impl PartStudioView {
                     let made = head.then(|| (studio.clone(), shown_vars.clone(), display.clone()));
                     crate::start_thumbnail::regen_done(&path, this.tab, made, cx);
                 }
-                this.apply_display(display, window, cx);
+                // A dialog's preview: its scene is built off the UI thread.
+                if this.edit.is_some() {
+                    this.apply_display_async(display, window, cx);
+                } else {
+                    this.apply_display(display, window, cx);
+                }
                 this.note_done(done_studio, upto, done_config, full.clone());
                 this.perf_script_note("display applied");
                 if !refine {
@@ -780,7 +793,11 @@ impl PartStudioView {
                     scene_builder::log_regen_perf("refine", &fine.display, &studio);
                     let display = Arc::new(fine.display);
                     crate::start_thumbnail::regen_done(&path, this.tab, head.then(|| (studio.clone(), shown_vars, display.clone())), cx);
-                    this.apply_display(display, window, cx);
+                    if this.edit.is_some() {
+                        this.apply_display_async(display, window, cx);
+                    } else {
+                        this.apply_display(display, window, cx);
+                    }
                     this.note_done(studio, upto, config, full);
                     this.perf_script_step(cx);
                 });
@@ -894,6 +911,36 @@ impl PartStudioView {
 
     fn apply_display(&mut self, display: Arc<StudioDisplay>, window: &mut Window, cx: &mut Context<Self>) {
         let _t = noshape_render::perf::scope("ps.apply_display");
+        let (geometry_changed, job) = self.apply_display_begin(display, window, cx);
+        let scene = job.build(&self.cache, self.gpu.uploader());
+        self.apply_display_end(geometry_changed, Some(scene), cx);
+    }
+
+    /// [`Self::apply_display`] with the scene built on a background thread (a dialog's preview and close: ~30 ms each
+    /// on a big studio): the rest follows when it lands, unless a newer display was applied meanwhile.
+    fn apply_display_async(&mut self, display: Arc<StudioDisplay>, window: &mut Window, cx: &mut Context<Self>) {
+        let _t = noshape_render::perf::scope("ps.apply_display");
+        let (geometry_changed, job) = self.apply_display_begin(display, window, cx);
+        let (seq, generation) = (self.display_seq, self.scene_gen);
+        let (cache, up) = (self.cache.clone(), self.gpu.uploader().clone());
+        let build = cx.background_spawn(async move { job.build(&cache, &up) });
+        self.ui.scene_task = Some(cx.spawn_in(window, async move |this, cx| {
+            let scene = build.await;
+            let _ = this.update(cx, |this: &mut Self, cx| {
+                this.ui.scene_task = None;
+                if this.display_seq != seq {
+                    return;
+                }
+                this.apply_display_end(geometry_changed, (this.scene_gen == generation).then_some(scene), cx);
+            });
+        }));
+    }
+
+    /// What [`Self::apply_display`] does before building the scene; returns whether the geometry changed and the
+    /// build to run.
+    fn apply_display_begin(&mut self, display: Arc<StudioDisplay>, window: &mut Window, cx: &mut Context<Self>) -> (bool, SceneJob) {
+        self.display_seq += 1;
+        self.scene_gen += 1;
         let geometry_changed = !Arc::ptr_eq(&self.display, &display);
         // A shown center of mass follows its part (gone with it).
         if geometry_changed && let Some((b, _)) = self.ui.com.take() {
@@ -928,10 +975,18 @@ impl PartStudioView {
         self.ui.transform_ghost = self.transform_ghost(cx);
         let shown = self.display_for_scene();
         let opts = self.scene_options(cx);
-        let built = scene_builder::build(&shown, &opts, &mut self.cache, self.gpu.uploader());
-        let prio = built.picks.priority_fn();
-        self.built = Some(built);
-        self.build_preview_base(&opts, cx);
+        let base = self.preview_base_job(&opts, cx);
+        (geometry_changed, SceneJob { shown, opts, base })
+    }
+
+    /// What [`Self::apply_display`] does once the scene is built (`None`: a newer build replaced it meanwhile).
+    fn apply_display_end(&mut self, geometry_changed: bool, scene: Option<(BuiltScene, Option<BuiltScene>)>, cx: &mut Context<Self>) {
+        let _t = noshape_render::perf::scope("ps.apply_display_end");
+        if let Some((built, base)) = scene {
+            self.built = Some(built);
+            self.built_base = base;
+        }
+        let prio = self.built.as_ref().map(|b| b.picks.priority_fn());
         self.ui.pick_filter = None;
         // Thickness analysis follows every edit.
         if geometry_changed && self.ui.thickness.as_ref().is_some_and(|t| !t.parts.is_empty()) {
@@ -949,7 +1004,9 @@ impl PartStudioView {
             noshape_model::interaction::entities_along_ray(&disp, o, d, 0.0, &|_| false, 1).first().map(|h| o + d.normalize() * h.depth)
         });
         self.viewport.update(cx, |vp, _| {
-            vp.pick_priority = prio;
+            if let Some(prio) = prio {
+                vp.pick_priority = prio;
+            }
             vp.orbit_pivot_fn = Some(pivot);
         });
         // The notices panel lists the open dialog's feature too (a new one isn't in the document yet).
@@ -1086,13 +1143,11 @@ impl PartStudioView {
         self.ui.preview_tool_adds && !self.tool_missed() && !self.ui.preview_tool.as_ref().is_some_and(|(_, fid)| self.display.features.iter().any(|f| f.id == *fid && f.status == noshape_model::display::FeatureStatus::Error))
     }
 
-    /// Build [`Self::built_base`] with the view options of the scene.
-    fn build_preview_base(&mut self, opts: &SceneOptions, cx: &App) {
-        let base = self.preview_mix_base(cx);
-        self.built_base = base.map(|d| {
-            let o = SceneOptions { show_planes: false, show_sketches: false, show_origin: false, body_layer: noshape_render::scene::compare::BASE, preview_bodies: Vec::new(), display_only: Vec::new(), ..opts.clone() };
-            scene_builder::build(&d, &o, &mut self.cache, self.gpu.uploader())
-        });
+    /// What [`Self::built_base`] is built from, with the view options of the scene.
+    fn preview_base_job(&self, opts: &SceneOptions, cx: &App) -> Option<(Arc<StudioDisplay>, SceneOptions)> {
+        let base = self.preview_mix_base(cx)?;
+        let o = SceneOptions { show_planes: false, show_sketches: false, show_origin: false, body_layer: noshape_render::scene::compare::BASE, preview_bodies: Vec::new(), display_only: Vec::new(), ..opts.clone() };
+        Some((base, o))
     }
 
     /// Rebuild the scene for changed view options (same display).
@@ -1104,8 +1159,11 @@ impl PartStudioView {
         self.ui.transform_ghost = self.transform_ghost(cx);
         let shown = self.display_for_scene();
         let opts = self.scene_options(cx);
-        self.built = Some(scene_builder::build(&shown, &opts, &mut self.cache, self.gpu.uploader()));
-        self.build_preview_base(&opts, cx);
+        let base = self.preview_base_job(&opts, cx);
+        self.scene_gen += 1;
+        let (built, base) = SceneJob { shown, opts, base }.build(&self.cache, self.gpu.uploader());
+        self.built = Some(built);
+        self.built_base = base;
         self.refresh_scene(true, cx);
         cx.notify();
     }
@@ -2545,7 +2603,8 @@ impl PartStudioView {
         self.pending = None;
         self.pending_timer = None;
         self.context = b.context;
-        self.apply_display(b.display, window, cx);
+        // Closing a dialog: the committed model's scene is built off the UI thread.
+        self.apply_display_async(b.display, window, cx);
         if !current.is_some_and(|(studio, upto, config)| upto == b.upto && config == b.config && studio == *b.studio) {
             self.schedule_regen(window, cx);
         }
@@ -5732,6 +5791,22 @@ impl PartStudioView {
         // options live in its dropdown menu (§3.7).
         let cube = self.render_view_cube(cx);
         div().absolute().top(px(14.)).right(px(15.)).child(cube).into_any_element()
+    }
+}
+
+/// A scene build for [`PartStudioView::apply_display`]: the shown model and, while a dialog previews, the blend's base.
+struct SceneJob {
+    shown: Arc<StudioDisplay>,
+    opts: SceneOptions,
+    base: Option<(Arc<StudioDisplay>, SceneOptions)>,
+}
+
+impl SceneJob {
+    fn build(self, cache: &parking_lot::Mutex<GpuCache>, up: &noshape_render::renderer::Uploader) -> (BuiltScene, Option<BuiltScene>) {
+        let mut cache = cache.lock();
+        let built = scene_builder::build(&self.shown, &self.opts, &mut cache, up);
+        let base = self.base.map(|(d, o)| scene_builder::build(&d, &o, &mut cache, up));
+        (built, base)
     }
 }
 

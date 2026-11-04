@@ -411,6 +411,8 @@ pub struct UiState {
     /// (onDecalFeatureChange sizes the decal when they first are).
     pub decal_sized: Option<(noshape_model::reference::FeatureId, String)>,
     pub preview_task: Option<Task<()>>,
+    /// A scene being built off the UI thread (`apply_display_async`).
+    pub scene_task: Option<Task<()>>,
     /// Add / Remove / Intersect previews (live part-studio/234-237): the tool
     /// body (the feature regenerated as New) and the task computing it.
     pub preview_tool: Option<(Arc<StudioDisplay>, noshape_model::FeatureId)>,
@@ -721,6 +723,7 @@ impl UiState {
             std_manip_live: None,
             std_manip_task: None,
             preview_task: None,
+            scene_task: None,
             preview_tool: None,
             preview_tool_adds: false,
             preview_tone: false,
@@ -2307,7 +2310,7 @@ impl PartStudioView {
                     dialog.update(cx, |d, cx| d.set_labeler(labeler, cx));
                 }
                 let d = this.display.clone();
-                this.apply_display(d, window, cx);
+                this.apply_display_async(d, window, cx);
             });
         }));
     }

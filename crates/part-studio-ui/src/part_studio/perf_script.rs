@@ -51,11 +51,12 @@ pub(super) fn from_env() -> Option<Script> {
 const FRAME_STAGES: [&str; 3] = ["gpui.request_layout", "gpui.prepaint", "gpui.paint"];
 /// Their UI-thread CPU time (app-core gpu.rs `draw_stat`).
 const FRAME_STAGES_CPU: [&str; 3] = ["gpui.request_layout_cpu", "gpui.prepaint_cpu", "gpui.paint_cpu"];
-/// Where a ui-latency sample's time goes (wall ms, summed over the action and its frame): the regenerated model's
-/// scene, the Part Studio's and the dialog's renders, each slice's, then GPUI's phases.
+/// Where a ui-latency sample's time goes (wall ms, summed over the action and its frame): applying the regenerated
+/// model (on the UI thread: its start and, once the scene is built, its end) and the scene build (a background
+/// thread for a dialog's preview), the Part Studio's and the dialog's renders, each slice's, then GPUI's phases.
 /// A ui-latency sample: (the action, waiting, the frame, the action's CPU, the frame's CPU), and [`PARTS`].
 type Sample = ([f32; 5], [f32; PARTS.len()]);
-const PARTS: [&str; 14] = ["ps.apply_display", "s.build", "ps.render", "fd.render", "ps.slice_toolbar", "ps.slice_underlay", "ps.slice_overlay", "ps.slice_features", "ps.slice_parts", "ps.row_feature", "ps.row_part", "gpui.request_layout", "gpui.prepaint", "gpui.paint"];
+const PARTS: [&str; 15] = ["ps.apply_display", "ps.apply_display_end", "s.build", "ps.render", "fd.render", "ps.slice_toolbar", "ps.slice_underlay", "ps.slice_overlay", "ps.slice_features", "ps.slice_parts", "ps.row_feature", "ps.row_part", "gpui.request_layout", "gpui.prepaint", "gpui.paint"];
 
 impl PartStudioView {
     /// A stage of the step in progress (the regeneration scheduled, its result in, its display applied), logged

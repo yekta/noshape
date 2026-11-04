@@ -2524,3 +2524,27 @@ fn cached_views_survive_a_reused_parent_and_a_focus_change(cx: &mut TestAppConte
     assert_eq!((count("list") - list0, count("row") - row0), (1, 0), "a focus change elsewhere redraws no cached view");
     assert_eq!(row_at(cx), Some(first));
 }
+
+/// A dialog's preview builds its scene off the UI thread (`apply_display_async`): it lands once built, and never
+/// over a display applied after it.
+#[gpui::test]
+fn a_background_scene_build_never_lands_over_a_newer_display(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "scene-async");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let full = cx.update(|cx| view.read(cx).display.clone());
+    let empty = std::sync::Arc::new(noshape_model::display::StudioDisplay::defaults());
+    let top_picks = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).built.as_ref().map_or(0, |b| b.picks.ids_for(&top).len()));
+    assert_eq!(top_picks(cx), 1);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.apply_display_async(empty.clone(), w, cx);
+            v.apply_display(full.clone(), w, cx);
+        })
+    })
+    .unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert_eq!(top_picks(cx), 1, "the older build was dropped");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.apply_display_async(empty.clone(), w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert_eq!(top_picks(cx), 0, "a build alone lands");
+}
