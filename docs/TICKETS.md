@@ -3444,7 +3444,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   edges, so ours throws FILL_SURFACE_NO_EDGES ("Select laminar edges or curves as fill surface boundary."; live
   builds both Setback Fillets). Probe: /root/dx-scratch/tickets/fs-split-created.fs (a cube's top split by a plane,
   then println of those two counts: ours 0 and 0). Model /root/parity/models/cf-setback-fillet. (dx 2026-11-03)
-- [ ] P2 FS-POCKET-HOLES (core / bool; dx's FeatureScript corpus 11-03, cf-pocket-holes) the public Pocket Holes
+- [x] P2 FS-POCKET-HOLES (core / bool; dx's FeatureScript corpus 11-03, cf-pocket-holes) the public Pocket Holes
   feature on a 22 in board edge (its edge maps exactly: midpoint and 558.8 mm as live's) makes four angled pocket holes
   (two sketched circles each, extruded and subtracted, tilted 15°): live's part is 22 / 28 / 8 faces / edges /
   vertices, 1074808.897 mm³; ours 22 / 36 / 20, 1076257.520 mm³, so ours removes 5289 mm³ where live removes 6737
@@ -3452,3 +3452,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   rotationAround / coordSystem / toWorld agree with Onshape's (probe /root/dx-scratch/fs/rot.fs). Rebuilt document:
   /root/dx-scratch/tickets/cf-pocket-holes.noshape (featurestudio_monitor; the studio can be edited there to print
   its locations and depths). Model /root/parity/models/cf-pocket-holes. (dx 2026-11-03)
+  Fixed (core 11-04): an inch was 0.0254 m in our expressions and FeatureScript's `2.54 * centimeter`
+  (0.025400000000000002) in std, so the board extruded `(3/4)*inch` measured one ulp under the script's
+  `3/4 * inch` and took the 5/8 in table (holes 1.6 mm off-centre, shallower). Our unit factors are std's now (live's
+  1 in sketch circle has radius 0.025400000000000002); cf-pocket-holes matches to the end.

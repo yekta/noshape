@@ -590,3 +590,14 @@ fn live_rounding_and_the_new_functions() {
 fn ev_err_any(s: &str) -> bool {
     evaluate(s, &scope()).is_err()
 }
+
+/// Lengths typed in inches are FeatureScript's to the last digit (std `inch = 2.54 * centimeter`): Pocket Holes compares
+/// a board extruded `(3/4)*inch` with its constant `3/4 * inch` and takes the 3/4 in holes only when they're equal.
+#[test]
+fn inch_lengths_are_featurescripts() {
+    let fs_inch = 2.54 * 0.01;
+    assert_eq!(ev("(3/4)*inch").value, 3.0 / 4.0 * fs_inch);
+    assert_eq!(ev("0.75 in").value, 0.75 * fs_inch);
+    assert_eq!(ev("1 in").value, 0.025_400_000_000_000_002);
+    assert_eq!(ev("2 ft").value, 2.0 * (12.0 * fs_inch));
+}

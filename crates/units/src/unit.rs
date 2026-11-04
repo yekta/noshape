@@ -30,16 +30,18 @@ impl LengthUnit {
         LengthUnit::Yard,
     ];
 
-    /// Size of one unit in meters.
+    /// Size of one unit in meters: std's constants to the last digit (`inch = 2.54 * centimeter`, one ulp above
+    /// 0.0254; live's 1 in sketch circle has radius 0.025400000000000002), so a feature comparing a length typed in
+    /// inches with a FeatureScript constant (cf-pocket-holes: `>= 3/4 * inch`) sees what live sees.
     pub const fn meters(self) -> f64 {
         match self {
             LengthUnit::Micrometer => 1e-6,
             LengthUnit::Millimeter => 1e-3,
             LengthUnit::Centimeter => 1e-2,
             LengthUnit::Meter => 1.0,
-            LengthUnit::Inch => 0.0254,
-            LengthUnit::Foot => 0.3048,
-            LengthUnit::Yard => 0.9144,
+            LengthUnit::Inch => 2.54 * 1e-2,
+            LengthUnit::Foot => 12.0 * (2.54 * 1e-2),
+            LengthUnit::Yard => 3.0 * (12.0 * (2.54 * 1e-2)),
         }
     }
 
@@ -402,7 +404,8 @@ mod tests {
 
     #[test]
     fn factors() {
-        assert_eq!(LengthUnit::Inch.meters(), 0.0254);
+        assert_eq!(LengthUnit::Inch.meters(), 0.025_400_000_000_000_002);
+        assert_eq!(LengthUnit::Yard.meters(), 0.914_400_000_000_000_1);
         assert!((AngleUnit::Degree.radians() * 180.0 - std::f64::consts::PI).abs() < 1e-15);
         let p = UnitPrefs::default();
         assert!((p.si_factor(Dim::AREA) - 1e-6).abs() < 1e-20);
