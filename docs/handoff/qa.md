@@ -41,7 +41,10 @@ byte-identical to the run's, SHA256SUMS OK. **Updater with `noshape mcp` running
 lead's fix):** fetched 23:18:05 (~4 min after publish), staged; Restart → the app 0.4.29 (new pid), g34 reopened — the update
 works with the mcp copy open; the mcp copy (pid 363405) kept running on the old binary (/proc/…/exe "(deleted)"): its client
 stays on 0.4.28 until it reconnects; no update-helper.log (old helper). Once the lead's helper ships: on the update after it,
-check the mcp copy is closed and the log names it, on Linux too (same-app rule). Smoke / tixvol of v0.4.29 running on vibe3.
+check the mcp copy is closed and the log names it, on Linux too (same-app rule). **Done 23:31: good, no blocker** — CLI smoke on
+vibe3 (round trip, volume sweep = v0.4.28, all fixed tickets, the user's cases incl. the Gyro matrices: only the picked body
+changes), the 44 ticket documents = 6c3decf4, GUI rows pixel-identical to v0.4.28 (vibe3 :63), title bar on the Linux release
+app all five menus open (tickets/titlebar-menus-linux-v0429.png).
 
 **11-04 23:05: new release check (lead: the user's Windows update bug).** Update from the previous release with a
 `noshape mcp` running from the install folder must end on the new version, the log saying what the helper closed. Windows:
