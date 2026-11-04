@@ -39,6 +39,33 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   plane values (~2.5 s), the face's display mesh (5 s); core: Replace face on the 512 × 512 side runs > 10 min in
   OCCT's point projection onto the B-spline (Extrema_GenExtPS::BuildGrid per point; core.md).
 
+- Natives std calls that the FeatureScript host lacks (lead 11-04 13:08, after DISPLACEMENT-MAP; dx 11-04 14:53:
+  native_args.rs MISSING and MISSING_OLDER; callers traced through std 3095). P1 where a standard feature noshape runs
+  by std (regen::std_route, bridging curve) reaches it: the user sees that feature fail. Owner dx unless noted.
+  - [ ] P1 FS-NATIVE-OPDERIP @opDerip: std's sheetMetalBend, sheetMetalJog and sheetMetalTab (run by std here) call it
+    through sheetMetalDeripCall (also moveFace and SMFlatOp in std).
+  - [ ] P1 FS-NATIVE-OPMOVECURVEBOUNDARY @opMoveCurveBoundary: std's sheetMetalLoft (run by std here); also std's
+    trimCurve and offsetCurveOnFace (ours run natively).
+  - [ ] P1 FS-NATIVE-EVSHEETMETALBENDUP @evSheetMetalBendUp: std's pcbEnd (run by std here).
+  - [ ] P1 FS-NATIVE-EVFACECURVATUREDERIVATIVES @evFaceCurvatureDerivatives: std's bridgingCurve (Bridging curve always
+    runs by std when the host is loaded) through evFaceCurvatureDerivative.
+  - [ ] P1 FS-NATIVE-OPSMFLATOPERATION @opSMFlatOperation: std's SMFlatOp (sketching on a sheet metal flat; noshape
+    has no such feature yet), its only caller.
+  - [ ] P2 FS-NATIVE-OPIMPORTFOREIGN @opImportForeign: std's importForeign (ours runs natively): custom features only.
+  - [ ] P2 FS-NATIVE-OPOFFSETCURVEONFACE @opOffsetCurveOnFace: std's offsetCurveOnFace (ours natively): custom
+    features only.
+  - [ ] P2 FS-NATIVE-EVAPPROXIMATEBSPLINESURFACE @evApproximateBSplineSurface: no std feature; custom features only.
+  - [ ] P2 FS-NATIVE-EVFAULTS @evFaults: no std feature (Check tools); custom features only.
+  - [ ] P2 FS-NATIVE-EVMAXTOLERANCE @evMaxTolerance: no std feature; custom features only.
+  - [ ] P2 FS-NATIVE-EVTOLERANCES @evTolerances: no std feature; custom features only.
+  - [ ] P2 FS-NATIVE-GETHOLEATTRIBUTES @getHoleAttributes: std's holeTable.fs (getHoleAttribute; hole tables), no
+    std feature; custom features and tables only.
+  - [ ] P2 FS-NATIVE-OPBOOLEANEDPATTERN @opBooleanedPattern: no std feature; custom features only.
+  - [ ] P2 FS-NATIVE-OPSPLITBYSELFSHADOW @opSplitBySelfShadow: no std feature; custom features only.
+  - [ ] P2 FS-NATIVE-OLD-STD only older pinned std releases call these (their own sheet metal): @startSheetMetalFeature,
+    @endSheetMetalFeature, @opBendAtEdgeInternal, @opFlattenInternal, @opFoldInternal, @opPrepareForBendingInternal,
+    @opRoll, @evEdgeCurvature: a studio pinned to such a release that calls them fails (FS-OLD-STD-COMPAT).
+
 ## From the user, 2026-11-02 (v0.4.19, macOS)
 - [x] (psui 11-03 00:10, fixed by "psui: VAR-AUTOCOMPLETE-ENTER …": (1) an open feature dialog kept the variables of
   the regeneration before it opened, so a dialog opened before the one defining `#wall_thickness` finished listed only
