@@ -36,6 +36,13 @@ Restart → `noshape --version` 0.4.23 and g34 reopened (qa-scratch/upd423-0c.pn
 VAR-AUTOCOMPLETE-ENTER's psui fixes, CRASH-2045's saved-document fix; not in it: the later sketch undo, feature-row,
 variable-focus fixes (after bdbba238). Release fuzz on v0.4.23 running (/tmp/qa-cfloop69.sh, seeds 2481–2540).
 
+**11-04 02:17:** new **P0 CRASH-3151** (core): fuzz seed 3151's saved document aborts the CLI / app on open
+(OCCT fillet → TopOpeBRepBuild, heap corrupt) in v0.4.24 and main, not v0.4.23 (its features fail before) — list it in
+the 04:30 list as open, in v0.4.24 already. Repro tickets/crash3151/open.py. The watch's fuzz baselines now persist
+(/tmp/qa-watch-n0, -m0; after reviewing new summary lines run /tmp/qa-watch-ack.sh) — restarts used to hide a death.
+REGEN-SPEED's third undo verified cached on dc680be5 (/tmp/qa-undo3.sh; app with NOSHAPE_CONFIG_DIR=qa-scratch/cfg-u3,
+since the shared config's left_panel_width.txt is 1240). Greens 2136ac52 / 0e9162ad / 685a79ce: no change in the sweeps.
+
 **11-04 00:04: night state.** Greens since 21:20 checked (dx's cf corpus 12 documents, volume sweep = v0.4.23, the 44
 ticket documents): d70c9eb2 (kernel tight box), 84a01921 (bool point-in-face speed, opBoolean localizedInFaces), bfc130c8
 (fillet groups rounded alone), 2b5807f7 (tori / spheres one surface) — no change. Interaction suite **124/136** on 9cb98b67
