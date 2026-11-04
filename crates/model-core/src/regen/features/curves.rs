@@ -762,26 +762,34 @@ pub fn trim_curve(ev: &mut EvalCtx) -> FResult<()> {
         if tools.is_empty() {
             return crate::regen::eval::err_at(&["trimTo"], "Select a boundary to trim to.");
         }
-        let res = k::split(std::slice::from_ref(&shape), &tools, &k::BooleanOptions::default())?;
-        let pieces = chain_split_pieces(&res.shape, &tools)?;
-        if pieces.len() < 2 {
-            return err("Curve does not intersect boundary.");
-        }
-        let anchor = match help {
-            Some(h) => h,
-            None => order_chain(&shape.edges(), 1e-6).and_then(|c| chain_end(&c, false)).map(|x| x.0)?,
-        };
-        let keep_idx = pieces
-            .iter()
-            .enumerate()
-            .map(|(i, p)| (i, k::distance(p, &k::make_vertex(anchor).unwrap_or_default()).map(|d| d.distance).unwrap_or(f64::INFINITY)))
-            .min_by(|a, b| a.1.total_cmp(&b.1))
-            .map(|x| x.0)
-            .unwrap_or(0);
-        let kept: Vec<Shape> = if flip { pieces.iter().enumerate().filter(|(i, _)| *i != keep_idx).map(|(_, p)| p.clone()).collect() } else { vec![pieces[keep_idx].clone()] };
-        let shape = if kept.len() == 1 { kept[0].clone() } else { Shape::compound(&kept) };
-        replace_wire_body(ev, bi, shape);
+        trim_wire_at(ev, bi, &tools, help, flip)?;
     }
+    Ok(())
+}
+
+/// Wire body `bi` split by `tools` (shapes it meets), the piece nearest `help` kept (with `flip`, the others; without
+/// a help point, the piece at the chain's start). Trim curve's trim and std's opMoveCurveBoundary to points.
+pub fn trim_wire_at(ev: &mut EvalCtx, bi: usize, tools: &[Shape], help: Option<DVec3>, flip: bool) -> FResult<()> {
+    let shape = ev.ctx.bodies[bi].shape.clone();
+    let res = k::split(std::slice::from_ref(&shape), tools, &k::BooleanOptions::default())?;
+    let pieces = chain_split_pieces(&res.shape, tools)?;
+    if pieces.len() < 2 {
+        return err("Curve does not intersect boundary.");
+    }
+    let anchor = match help {
+        Some(h) => h,
+        None => order_chain(&shape.edges(), 1e-6).and_then(|c| chain_end(&c, false)).map(|x| x.0)?,
+    };
+    let keep_idx = pieces
+        .iter()
+        .enumerate()
+        .map(|(i, p)| (i, k::distance(p, &k::make_vertex(anchor).unwrap_or_default()).map(|d| d.distance).unwrap_or(f64::INFINITY)))
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .map(|x| x.0)
+        .unwrap_or(0);
+    let kept: Vec<Shape> = if flip { pieces.iter().enumerate().filter(|(i, _)| *i != keep_idx).map(|(_, p)| p.clone()).collect() } else { vec![pieces[keep_idx].clone()] };
+    let shape = if kept.len() == 1 { kept[0].clone() } else { Shape::compound(&kept) };
+    replace_wire_body(ev, bi, shape);
     Ok(())
 }
 

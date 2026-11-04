@@ -244,6 +244,21 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const want = 0.020 * sin(45 * degree) / (0.005 * (0.020 + 0.005 * cos(45 * degree)) ^ 2) * meter ^ -2;
             check("evFaceCurvatureDerivative on a torus", abs(kd - want) < 1e-3 * want, [kd, want]);
         });
+        step(context, id, "moveCurveBoundary", function(sub) {
+            // std sheet metal Loft trims a wire at points, the piece by a help point kept; Trim curve's own fields
+            // (here an extension by 10 mm) as the feature.
+            const z = 2100;
+            opFitSpline(context, sub + "a", { "points" : [vector(0, 0, z) * mm, vector(50, 0, z) * mm, vector(100, 0, z) * mm] });
+            opMoveCurveBoundary(context, sub + "trim", { "wires" : qCreatedBy(sub + "a", EntityType.BODY), "moveBoundaryType" : MoveCurveBoundaryType.TRIM,
+                        "trimToPoints" : [vector(30, 0, z) * mm, vector(70, 0, z) * mm], "helpPointPosition" : vector(50, 0, z) * mm });
+            const trimmed = evLength(context, { "entities" : qOwnedByBody(qCreatedBy(sub + "a", EntityType.BODY), EntityType.EDGE) });
+            check("opMoveCurveBoundary to points", abs(trimmed - 40 * mm) < 1e-6 * mm, trimmed);
+            opFitSpline(context, sub + "b", { "points" : [vector(0, 10, z) * mm, vector(100, 10, z) * mm] });
+            opMoveCurveBoundary(context, sub + "ext", { "wires" : qCreatedBy(sub + "b", EntityType.BODY), "moveBoundaryType" : MoveCurveBoundaryType.EXTEND,
+                        "endCondition" : CurveExtensionEndCondition.BLIND, "extensionDistance" : 10 * mm, "extensionShape" : CurveExtensionShape.TANGENT });
+            const extended = evLength(context, { "entities" : qOwnedByBody(qCreatedBy(sub + "b", EntityType.BODY), EntityType.EDGE) });
+            check("opMoveCurveBoundary extend", abs(extended - 110 * mm) < 1e-6 * mm, extended);
+        });
         step(context, id, "patternSolidFaces", function(sub) {
             // A solid's hole face patterned (std's FACE pattern, a Fill pattern of holes): the holes repeated in that
             // part, no copies of it.

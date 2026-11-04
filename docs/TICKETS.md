@@ -55,7 +55,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   by std (regen::std_route, bridging curve) reaches it: the user sees that feature fail. Owner dx unless noted.
   - [ ] P1 FS-NATIVE-OPDERIP @opDerip: std's sheetMetalBend, sheetMetalJog and sheetMetalTab (run by std here) call it
     through sheetMetalDeripCall (also moveFace and SMFlatOp in std).
-  - [ ] P1 FS-NATIVE-OPMOVECURVEBOUNDARY @opMoveCurveBoundary: std's sheetMetalLoft (run by std here); also std's
+  - [x] (dx 11-04 17:05: Trim curve's evaluator for the documented fields; sheet metal Loft's `trimToPoints` with
+    `helpPointPosition` splits the wire at those points and keeps the piece by the help point (core's curves.rs
+    `trim_wire_at`, split out of trim_curve). T1 ops_harness moveCurveBoundary.)
+    P1 FS-NATIVE-OPMOVECURVEBOUNDARY @opMoveCurveBoundary: std's sheetMetalLoft (run by std here); also std's
     trimCurve and offsetCurveOnFace (ours run natively).
   - [ ] P1 FS-NATIVE-EVSHEETMETALBENDUP @evSheetMetalBendUp: std's pcbEnd (run by std here).
   - [x] (dx 11-04 16:17: the second fundamental form's derivative along a tangent, from the kernel's second

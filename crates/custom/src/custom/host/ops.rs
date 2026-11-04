@@ -49,6 +49,7 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("opOffsetFace", op_offset_face),
     ("opCreateBSplineCurve", op_create_bspline_curve),
     ("opCreateBSplineSurface", op_create_bspline_surface),
+    ("opMoveCurveBoundary", op_move_curve_boundary),
     ("opExtractSurface", op_extract_surface),
     ("opCreateOutline", op_create_outline),
     ("opSplitFace", op_split_face),
@@ -1501,6 +1502,41 @@ fn op_create_bspline_surface(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let names = crate::regen::features::bshared::new_face_names(ev, &shape);
         ev.apply_operation(vec![NamedShape::new(shape, names)], "NEW", None, kind)
     })?;
+    Ok(Value::Undefined)
+}
+
+/// opMoveCurveBoundary: Trim curve's evaluator (trim to entities, extend by a distance or up to an entity), and std
+/// sheet metal Loft's trim of a wire at points (`trimToPoints`; the piece by `helpPointPosition` kept).
+fn op_move_curve_boundary(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let (cx, id, def) = args(i, &a)?;
+    let wires = evaluate_refs(i, &cx, def.get("wires"))?;
+    let flip = def_bool(&def, "flipHeuristics", false);
+    let points: Vec<DVec3> = def.get("trimToPoints").as_array().map(|a| a.iter().filter_map(vec3_of).collect()).unwrap_or_default();
+    if !points.is_empty() {
+        let help = vec3_of(def.get("helpPointPosition"));
+        run_op(i, &cx, &id, "MOVE_CURVE_BOUNDARY_TRIM_NO_INTERSECTION", |ev| {
+            for bi in ev.resolve_bodies(&wires) {
+                let shape = ev.ctx.bodies[bi].shape.clone();
+                let tools = points.iter().map(|p| Ok(k::make_vertex(k::distance(&shape, &k::make_vertex(*p)?)?.point_a)?)).collect::<FResult<Vec<_>>>()?;
+                crate::regen::features::curves::trim_wire_at(ev, bi, &tools, help, flip)?;
+            }
+            Ok(())
+        })?;
+        return Ok(Value::Undefined);
+    }
+    let mut p = ParamValues::default();
+    p.set("wires", ParamValue::Query(wires));
+    p.set("moveBoundaryType", ParamValue::Enum(def_enum(&def, "moveBoundaryType").map_or("TRIM".into(), |e| e.to_string())));
+    p.set("endCondition", ParamValue::Enum(def_enum(&def, "endCondition").map_or("BLIND".into(), |e| e.to_string())));
+    p.set("extensionShape", ParamValue::Enum(def_enum(&def, "extensionShape").map_or("CURVATURE".into(), |e| e.to_string())));
+    p.set("extensionDistance", length_param(def_length_opt(&def, "extensionDistance").unwrap_or(0.0)));
+    for key in ["trimTo", "extendTo", "helpPoint"] {
+        let q = def.get(key);
+        let refs = if q.is_undefined() { Vec::new() } else { evaluate_refs(i, &cx, q)? };
+        p.set(key, ParamValue::Query(refs));
+    }
+    p.set("flipHeuristics", ParamValue::Bool(flip));
+    run_op_with(i, &cx, &id, "MOVE_CURVE_BOUNDARY_FAILED", &p, crate::regen::features::curves::trim_curve)?;
     Ok(Value::Undefined)
 }
 
