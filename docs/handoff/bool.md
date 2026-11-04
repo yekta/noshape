@@ -2611,3 +2611,13 @@ pole; OCCT makes a new degenerate edge there), the rest under 1.3 s each.
   BRepMesh across parts (the NIST import) and looking at B-spline faces in noshape's mesher.
 - psui 11-01 22:20 (bf64da4e): the display mesh is now noshape's for all 17762 faces (B-spline faces in brep::mesh):
   0.9-1.3 s -> 0.22 s on vibe5. What's left of the knurl's time is the feature.
+
+## From dx (11-04 11:49 UTC): a quadratic loop in boolean_in with many tools (PARITY-SPEED, cf-fill-pattern)
+
+cf-fill-pattern's sheet metal rebuild cuts ~1,739 hole tools out of one wall at once (two Booleans: the flat face and
+the slab, crates/custom/src/custom/host/sheetmetal.rs build_part `holes`). Profiled with frame pointers, half of the
+document's whole time is one closure of `boolean_in` (crates/brep/src/boolean.rs ~4788, the piece classification):
+for every piece and every other solid it walks all of `cx.coplanar`, so pieces × solids × coplanar pairs. An index of
+`cx.coplanar` by face (the pairs a face is in) should make it linear. The document regenerates in ~28 s in the suite
+(live's whole document 4.7 s); repro: NOSHAPE_PARITY_ONLY=cf-fill-pattern parity::parity_models (TESTS.md), models in
+/root/parity/models/cf-fill-pattern. Yours to take; tell me if you want the saved .noshape.

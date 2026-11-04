@@ -3754,7 +3754,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   34.7 -> 17.2 s (same box, back to back); the instance loop 4.4 -> 0.15 s, std's attribute loop ~7 -> under 2 s.
   **For bool:** the sheet metal rebuild's two Booleans cutting a wall's ~1,739 holes at once take ~4.9 s
   (crates/custom/src/custom/host/sheetmetal.rs build_part, `holes`: OCCT Cut of the flat face and of the slab by
-  all the hole tools); live's whole document is 4.7 s.
+  all the hole tools); live's whole document is 4.7 s. dx 11:49: the time is in noshape's own Boolean: boolean_in's piece
+  classification walks every coplanar pair for every piece and solid (crates/brep/src/boolean.rs ~4788), half of the
+  document's time; handoff/bool.md "From dx (11-04 11:49)".
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet
