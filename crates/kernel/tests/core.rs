@@ -605,6 +605,10 @@ fn brep_edges_probe() {
     if std::env::var_os("NOSHAPE_BREP_UNIFY").is_some() {
         r = unify_same_domain_whole(&r).unwrap().shape;
     }
+    // (NOSHAPE_BREP_JOIN: as a blend's result is: seams moved off loops, loop pieces joined.)
+    if std::env::var_os("NOSHAPE_BREP_JOIN").is_some() {
+        r = noshape_kernel::join_edges(&r).unwrap().shape;
+    }
     let shown = r.shown_topology().unwrap();
     println!("{} / {} / {}", r.faces().len(), shown.edges.iter().filter(|e| **e).count(), shown.vertices.iter().filter(|v| **v).count());
     for (i, f) in r.faces().iter().enumerate() {

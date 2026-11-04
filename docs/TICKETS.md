@@ -3447,6 +3447,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   top face in two arcs each, split at (±18, −22, 0) where the cone's seam ends (kernel core::brep_edges_probe now lists
   such joints). They join once the cone's seam runs to a vertex the rim already has (boolean.cpp seam_to_vertex is
   for cylinders only). The volume (18314.95 vs 18329.66) is OCCT's blend there, a separate difference.
+  core 11-04 14:00: tried (patch /root/core-scratch/cone-seam2.patch, not landed): seam_to_vertex for cones, run after
+  blends too (the fillet's merged-blends path skipped the joins). The rebuilt cone face is valid with its area, but
+  the part isn't: the countersink's bottom circle is the hole cylinder's top, whose own seam ends at that circle's
+  vertex, so the two seams must move together (to one angle) for the rim to join.
 - [x] (core 11-03 15:05: OCCT patch 0020 (29d17a5a, lib synced) and the volume integral's u-isoline skip (acfb0433): the Wave Spring builds as live, 916.595 mm³ / 4402.375 mm² (live 916.533 / 4402.296, in its bands), its feature in 5.8 s instead of 16.6 (157 s reopened); T1 kernel surfacing::a_long_wavy_strip_thickens_along_it; the rest of the time is FS-WAVE-SPRING-SPEED) P1 FS-WAVE-SPRING (core; dx's FeatureScript corpus 11-03, cf-wave-spring) the community Wave Spring (FeatureScript
   336: two opFitSpline of 600 points each, opLoft between them into a wavy strip, opThicken 0.5 mm; Ø25 / Ø20,
   height 25 mm, 10 turns, 5 waves) builds an inside-out solid in ours: volume −555.401 mm³, box ±19 mm (live
