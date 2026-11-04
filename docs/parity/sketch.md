@@ -13,56 +13,56 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 1.1 | Sketch button / Shift+S opens the Sketch dialog prompting "Select a sketch plane" | B§1.1, i18n | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 1.2 | A preselected plane or planar face fills the Sketch plane field | B§1.1 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 1.3 | Context menu on a plane/face: **New sketch** | H:sketch_basics, LE | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 1.1 | Sketch button / Shift+S opens the Sketch dialog prompting "Select a sketch plane" | B§1.1, i18n | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.120–124 (dialog, "Sketch plane" field active) and l.22542 ("Select a sketch plane" toast), skasm 11-04 |
+| 1.2 | A preselected plane or planar face fills the Sketch plane field | B§1.1 | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.120 (select the plane, then Sketch), skasm 11-04 |
+| 1.3 | Context menu on a plane/face: **New sketch** | H:sketch_basics, LE | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.272 (face menu: New sketch…), skasm 11-04 |
 | 1.4 | Double-click a sketch in the Feature list (or Edit) re-opens it | B§1.1 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 1.5 | View is **not** reoriented on entry by default; `n` views normal to the sketch plane, `n` again flips | View__orient_normal_to_sketch_on_edit, B§1.4 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 1.5 | View is **not** reoriented on entry by default; `n` views normal to the sketch plane, `n` again flips | View__orient_normal_to_sketch_on_edit, B§1.4 | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.119, 122–123 (the view does not rotate; N views normal), skasm 11-04 |
 | 1.6 | "Orient normal to sketch on edit" option in the camera menu | View__orient_normal_to_sketch_on_edit | ✅ (Part Studio camera menu; the sketch view orients on entry) | 0.4.10+ / 2d9a275c 10-27 |
 | 1.7 | A new sketch starts with no tool active once the plane is picked; a click in empty space does nothing; the view doesn't rotate | Live sketch/00, 01, 44, 500–503 (confirmed by live capture) | ✅ (checked in the app 10-24: Top picked from the list, no tool active, empty click does nothing, view stays) | 0.4.10+ / 2d9a275c 10-27 |
 | 1.7a | The sketch frame (Onshape `SketchPlaneDisplay.updateBounds`): placed once when first drawn, centred on the plane entity's bounds centre (the ray through the graphics centre if off screen), 0.7 × the graphics height tall (`VIEWPORT_HEIGHT_TO_PLANE_HEIGHT_RATIO`) × 1.77777 wide; fixed in the plane afterwards (zoom / geometry don't change it; a new plane re-places it); `#90cef1` 1 px; name 20 px (`PLANE_TEXT_HEIGHT_PX`) in the plane 5 px inside the top-left corner, shrunk to fit | Bundle webgl `oM`, live sketch/500–503 (2.02 × 1.14 plane at the default zoom) | ✅ (app 10-24: frame corners at (388,557) (727,265) (1776,567) (1437,860) vs live (388,557) (728,263) (1776,567) (1435,861)) | 8627322e 10-28 (Sketch 2 on Front, view normal: frame x 366–1479, y 209.5–835.5 = 1113 × 626 px, ratio 1.778, ≈ 0.7 × the 892 px graphics height; note: the 1 px line reads (172,218,245), lighter than #90cef1, antialiased off the pixel grid) |
 | 1.8 | ✓ / Enter accepts the sketch; "Finish sketch" button | H:sketch_basics, B§1.5 | ✅ | 0.4.10+ / 965d3f56 10-27 (✓ accepts; Enter with no tool keeps the sketch open = live behaviours 214 / 4824) |
-| 1.9 | ✗ cancels the whole sketch session; a Restore link undoes the cancel | H:sketch_basics | ✅ (✕ shows "Sketch N has been canceled. **Restore** ×" (GUI :103 m3-toast.png); Restore reopens the draft with its geometry (m3-restored.png); × dismisses) | 0.4.10+ / 2d9a275c 10-27 |
-| 1.10 | Esc cancels the active tool / chain, never the sketch | H:sketch_tools ("The Escape key exits a tool selection") | ✅ (also when the focus is in the Sketch dialog) | 0.4.10+ / 2d9a275c 10-27 |
+| 1.9 | ✗ cancels the whole sketch session; a Restore link undoes the cancel | H:sketch_basics | ✅ (✕ shows "Sketch N has been canceled. **Restore** ×" (GUI :103 m3-toast.png); Restore reopens the draft with its geometry (m3-restored.png); × dismisses) | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.128 ("Sketch 2 has been canceled. Restore"), skasm 11-04 |
+| 1.10 | Esc cancels the active tool / chain, never the sketch | H:sketch_tools ("The Escape key exits a tool selection") | ✅ (also when the focus is in the Sketch dialog) | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.148 (one Esc ends the chain and the tool), l.189 (Esc keeps the selection), skasm 11-04 |
 | 1.11 | Extrude (Shift+E) / Revolve (Shift+W) from the sketch toolbar accept the sketch and preselect all regions | H:sketch_tools | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 1.12 | Ctrl+Z / Ctrl+Y inside the sketch step through sketch edits | LE, B§8.2 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 1.13 | Sketch dialog options are remembered between sessions (except Show expressions) | H:sketch_basics | ✅ (Show constraints remembered; Show expressions resets) | 0.4.10+ / 2d9a275c 10-27 |
-| 1.14 | Disable imprinting checkbox when sketching on a part face | H:sketch_basics | ✅ (feature param) | 0.4.10+ / 203c4d6f 10-27 |
+| 1.13 | Sketch dialog options are remembered between sessions (except Show expressions) | H:sketch_basics | ✅ (Show constraints remembered; Show expressions resets) | 0.4.10+ / 2d9a275c 10-27; = live: live 1940 (an unsaved setting gets the template: Show constraints off, Show errors on), skasm 11-04 |
+| 1.14 | Disable imprinting checkbox when sketching on a part face | H:sketch_basics | ✅ (feature param) | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.124 (the dialog's checkboxes), skasm 11-04 |
 | 1.15 | Feature list shows a blue indicator on a sketch that is not fully defined | PartStudio__features_and_parts_lists, LE | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 1.16 | Shift+H hides / shows all sketches | H:sketch_basics | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 1.17 | Shift+P hides construction geometry | B§1.7 | ✅ (Part Studio: hides planes and sketches construction) | 0.4.10+ / 203c4d6f 10-27 |
+| 1.16 | Shift+H hides / shows all sketches | H:sketch_basics | ✅ | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.1198 (Shift+H hides / shows sketches), skasm 11-04 |
+| 1.17 | Shift+P hides construction geometry | B§1.7 | ✅ (Part Studio: hides planes and sketches construction) | 0.4.10+ / 203c4d6f 10-27; = live: behaviours "psui (2026-11-03, P2 request 1863)" (Shift+P hides origin, planes and sketches, an undo step each press), skasm 11-04 |
 
 ## 2. Toolbar
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 2.1 | Sketch toolbar replaces the feature toolbar while a sketch is open | H:sketch_tools | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 2.1 | Sketch toolbar replaces the feature toolbar while a sketch is open | H:sketch_tools | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.125 (the Sketch toolbar replaces the Part Studio's), skasm 11-04 |
 | 2.2 | Order: Undo, Redo, Extrude, Revolve, Line▾, Rectangle▾, Circle▾, Arc▾, Polygon▾, Spline▾, Point, Text, Use▾, Construction, Fillet▾, Trim▾, Offset▾, Mirror, Pattern▾, Dimension, 14 constraints | LE (docs toolbar images) | ✅ (groups and dropdown contents match live dom/toolbar-sketch.txt + dropdowns-sketch.json, incl. the Insert DXF or DWG ▾ / Insert image group after Linear pattern) | 0.4.10+ / 203c4d6f 10-27 |
-| 2.3 | Groups: Line/Midpoint line; Corner/Center point/Aligned rectangle; Center point/3 point circle/Ellipse; 3 point/Tangent/Center point/Elliptical arc/Conic; Inscribed/Circumscribed polygon; Spline/Bezier/Spline control point; Use/Intersection; Fillet/Chamfer; Trim/Extend/Split; Offset/Slot; Linear/Circular pattern/Transform | LE | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 2.4 | A group button shows the last tool used from that group | H:sketch_tools | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 2.5 | The active tool's button is highlighted | UI | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 2.3 | Groups: Line/Midpoint line; Corner/Center point/Aligned rectangle; Center point/3 point circle/Ellipse; 3 point/Tangent/Center point/Elliptical arc/Conic; Inscribed/Circumscribed polygon; Spline/Bezier/Spline control point; Use/Intersection; Fillet/Chamfer; Trim/Extend/Split; Offset/Slot; Linear/Circular pattern/Transform | LE | ✅ | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.106 (the sketch toolbar's groups) and dom/toolbar-sketch.txt, skasm 11-04 |
+| 2.4 | A group button shows the last tool used from that group | H:sketch_tools | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.176 (dropdown memory), skasm 11-04 |
+| 2.5 | The active tool's button is highlighted | UI | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.125 (active tool #eaeaea + inset shadow), skasm 11-04 |
 | 2.6 | Tools stay active until Esc or another tool is chosen | H:sketch_tools | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 2.7 | Pressing a tool's shortcut (or button) again exits it | B§2.1 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
+| 2.7 | Pressing a tool's shortcut (or button) again exits it | B§2.1 | ✅ | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.202 (a tool's shortcut while active turns it off), skasm 11-04 |
 | 2.8 | Constraint buttons not applicable to the current selection are disabled | B§3.1 | ✅ (T:sm) | 8cd3c4da 10-28 (GUI 1600 px: collapsed list at full strength with a line selected = live request 1549: live never dims constraints, and collapses this group below 1650 px too) |
-| 2.9 | Tooltips name the tool and its shortcut | UI | ✅ | 0.4.10+ / 203c4d6f 10-27 |
+| 2.9 | Tooltips name the tool and its shortcut | UI | ✅ | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.98 (tooltips "Name (shortcut)"), skasm 11-04 |
 | 2.10 | Search tools (Alt+C) finds sketch tools | H:sketch_tools | ✅ (sketch tools listed first in a sketch) | 0.4.10+ / 2d9a275c 10-27 |
-| 2.11 | S opens the sketch shortcut toolbar at the cursor | H:sketch_basics | ✅ (sketch tools in the S toolbar) | 0.4.10+ / 2d9a275c 10-27 |
+| 2.11 | S opens the sketch shortcut toolbar at the cursor | H:sketch_basics | ✅ (sketch tools in the S toolbar) | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.198 (S: the shortcut toolbar at the cursor), skasm 11-04 |
 
 ## 3. Keyboard shortcuts (sketch scope)
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 3.1 | l Line, g Corner rectangle, r Center point rectangle, c Center point circle, a 3 point arc, Shift+S Point | B§8.1 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 3.2 | q Construction, Shift+F Fillet, m Trim, x Extend, o Offset, u Use, d Dimension | B§8.1 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 3.3 | i Coincident, Shift+O Concentric, b Parallel, t Tangent, h Horizontal, v Vertical, Shift+L Perpendicular, e Equal, Shift+M Midpoint, Shift+K Normal, Shift+G Pierce, Shift+Q Symmetric, Shift+J Fix, Shift+U Curvature | B§8.1 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 3.4 | Shift+A switches Line ↔ Tangent arc while chaining (keeps the chain) | H:line | ✅ | 0.4.10+ / 203c4d6f 10-27 |
+| 3.1 | l Line, g Corner rectangle, r Center point rectangle, c Center point circle, a 3 point arc, Shift+S Point | B§8.1 | ✅ | 0.4.10+ / 203c4d6f 10-27; = live: dom/skasm-prefs-shortcuts-keyboard.txt (behaviours l.29052), skasm 11-04 |
+| 3.2 | q Construction, Shift+F Fillet, m Trim, x Extend, o Offset, u Use, d Dimension | B§8.1 | ✅ | 0.4.10+ / 203c4d6f 10-27; = live: dom/skasm-prefs-shortcuts-keyboard.txt (behaviours l.29052), skasm 11-04 |
+| 3.3 | i Coincident, Shift+O Concentric, b Parallel, t Tangent, h Horizontal, v Vertical, Shift+L Perpendicular, e Equal, Shift+M Midpoint, Shift+K Normal, Shift+G Pierce, Shift+Q Symmetric, Shift+J Fix, Shift+U Curvature | B§8.1 | ✅ | 0.4.10+ / 203c4d6f 10-27; = live: dom/skasm-prefs-shortcuts-keyboard.txt (behaviours l.29052), skasm 11-04 |
+| 3.4 | Shift+A switches Line ↔ Tangent arc while chaining (keeps the chain) | H:line | ✅ | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.204 (Shift+A switches the chain to Tangent arc), skasm 11-04 |
 | 3.5 | Shift (hold) suppresses inferences while drawing / dragging | H:automatic_inferencing | ✅ | 0.4.10+ / dd1b5037 10-27 (Line: Shift drops the horizontal inference) |
 | 3.6 | Shift (hold) shows all constraint glyphs while moving | H:working_with_constraints | ✅ | 0.4.10+ / dd1b5037 10-27 (Show constraints off: Shift shows the glyphs) |
 | 3.7 | Alt (hold) while drawing a rectangle makes a square | H:corner_rectangle | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 3.8 | Alt+←/→ switches between on-the-fly dimension boxes | H:sketch_basics | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 3.9 | Delete / Backspace deletes selected entities, constraints and dimensions | H:dimension, H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 3.10 | Space clears the sketch selection | B§8.2 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 3.11 | Ctrl+C / Ctrl+V copy / paste sketch entities | H:sketch_basics | ✅ (T:ux) | 0.4.10+ / 203c4d6f 10-27 |
+| 3.11 | Ctrl+C / Ctrl+V copy / paste sketch entities | H:sketch_basics | ✅ (T:ux) | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.191 (Copy sketch entities in the entity menu), skasm 11-04 |
 | 3.12 | `#` typed without `=` in a sketch value box is the view shortcut; `=#var` enters a variable | H:sketch_basics | ✅ | 0.4.10+ / 41f60e47 10-28 |
 | 3.13 | Shortcuts are user-customizable | B§2.1 | ✅ (Shift+/ › Customize keyboard shortcuts opens the Preferences window scrolled to Keyboard shortcuts, like live's /user/settings?focusView=customize-keyboard-shortcuts tab (shortcuts/30–47): tabs, Edit / Reset per row, legend, Reset all, Shortcut toolbars; GUI :103 k1–k2) | 78958d0f 10-28 (Preferences › Keyboard shortcuts › Sketch: Bezier (Unassigned) › pencil → "Edit shortcut: Bezier", j captured, ✓ → chip "j" with the customized border; in a sketch j starts Bezier ("Click to add control points; double-click to end"); note the Preferences page is its own window) |
 
@@ -70,57 +70,57 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 4.1 | Line: click-click-click chains connected segments | H:line | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 4.1 | Line: click-click-click chains connected segments | H:line | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.148 (Line chains), skasm 11-04 |
 | 4.2 | Line: press-drag-release makes a single segment | H:line | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 4.3 | Line: clicking an existing point closes / ends the chain | B§2.4.1 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 4.3 | Line: clicking an existing point closes / ends the chain | B§2.4.1 | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.148 (closing on the start point ends the chain, the tool stays), skasm 11-04 |
 | 4.4 | Line: moving back onto the chain end switches to a tangent arc; after the arc the tool reverts to Line | H:line | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.5 | Midpoint line: click the midpoint, then an end; midpoint constraint | H:midpoint_line | ✅ (live spec 10-27: a normal point at the midpoint, the line from the clicked end; skasm 10-27) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.6 | Corner rectangle: click corner, click diagonal corner, or drag | H:corner_rectangle | ✅ (live spec 10-27: Horizontal on the edge at the 2nd click's y, Perpendicular with the edge at the 1st click's x, 2 Parallel; sketch test `corner_rectangle_constraints_follow_the_click_order`) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.7 | Center point rectangle: click center, click corner, or drag; a construction point at the center, Midpoint of both diagonals (live spec 10-27: no diagonal lines, the Help's "construction diagonal" isn't stored) | H:center_point_rectangle, live spec-tools | ✅ (skasm 10-27: `MidpointOf` point-to-point midpoints; scene test `center_rectangle_and_three_point_circle_as_live`) | 0.4.10+ / 2d9a275c 10-27 |
-| 4.8 | Aligned rectangle: two clicks for the first side, third click for the width | H:aligned_rectangle | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
-| 4.9 | Center point circle: click center, click rim, or drag | H:center_point_circle | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 4.8 | Aligned rectangle: two clicks for the first side, third click for the width | H:aligned_rectangle | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.151 (Aligned rectangle: click, click, click), skasm 11-04 |
+| 4.9 | Center point circle: click center, click rim, or drag | H:center_point_circle | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.152 (centre, rim; Ø while dragging), skasm 11-04 |
 | 4.10 | 3 point circle: three clicks, or drag 1→2 then click 3; a construction point Coincident with the circle at each click (live spec 10-27) | H:3_point_circle | ✅ (T:sm; points skasm 10-27) | 0.4.10+ / 2d9a275c 10-27 |
-| 4.11 | 3 point arc: start, end, then the bulge point; drag start→end then click | H:3_point_arc | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 4.11 | 3 point arc: start, end, then the bulge point; drag start→end then click | H:3_point_arc | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.155 (3 point arc: start, end, bend), skasm 11-04 |
 | 4.12 | 3 point arc: snaps to an exact semicircle when the center reaches the chord | H:3_point_arc | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 4.13 | Tangent arc tool: start at a curve end, click the end; tangent constraint | H:arc_tangent | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
-| 4.14 | Center point arc: center, start (radius), end; the sweep follows the cursor's direction | H:center_point_arc | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.13 | Tangent arc tool: start at a curve end, click the end; tangent constraint | H:arc_tangent | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.156 (Tangent arc from a line end), skasm 11-04 |
+| 4.14 | Center point arc: center, start (radius), end; the sweep follows the cursor's direction | H:center_point_arc | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.157 (Center point arc), skasm 11-04 |
 | 4.15 | Ellipse: center, primary axis, secondary radius; a horizontal / vertical major-axis click makes it Horizontal / Vertical (live spec 10-27 "majorAxisSnap0") | H:ellipse | ✅ (T:sm; snap skasm 10-27) | 0.4.10+ / 2d9a275c 10-27 |
-| 4.16 | Elliptical arc: center, primary axis, secondary radius + start, end on the construction ellipse | H:elliptical_arc | ✅ (T:sm) | 0.4.10+ / 965d3f56 10-27 (centre, axis, 3rd click = minor radius + start, end) |
+| 4.16 | Elliptical arc: center, primary axis, secondary radius + start, end on the construction ellipse | H:elliptical_arc | ✅ (T:sm) | 0.4.10+ / 965d3f56 10-27 (centre, axis, 3rd click = minor radius + start, end); = live: behaviours l.158, l.199 (elliptical arc: 4 clicks), skasm 11-04 |
 | 4.17 | Elliptical arc start/end snap to the axis / quadrant points | H:elliptical_arc | ✅ (axis / quadrant snaps on the construction ellipse) | 0.4.10+ / 2d9a275c 10-27 |
-| 4.18 | Conic: start, end, control point; rho value | H:conic | ✅ (T:ux, T:sm; GUI :103 rho field auto-focus and 0.7 Enter verified; /tmp/skb/2026-10-18/conic-rho*.png) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.18 | Conic: start, end, control point; rho value | H:conic | ✅ (T:ux, T:sm; GUI :103 rho field auto-focus and 0.7 Enter verified; /tmp/skb/2026-10-18/conic-rho*.png) | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.159 (Conic: Rho box straight away, default 0.5), skasm 11-04 |
 | 4.19 | Inscribed / circumscribed polygon: center, circumference; construction circle. Inscribed: the 2nd click is an edge's middle (circle tangent to the edges); circumscribed: a vertex (circle through the vertices) | H:inscribed_polygon; live skasm 10-26 (behaviours "skasm sketch polygons") | ✅ (geometry and constraints as live 10-26 (seed + circular pattern; inscribed Midpoint + Tangent, circumscribed Coincident on the circle; no Ø dimension), test `polygon_second_click_is_an_edge_middle_inscribed_and_a_vertex_circumscribed`; GUI :103 10-27) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.20 | Polygon: type the side count before the circumference click (3–50) | H:inscribed_polygon | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 4.21 | Polygon: after the circumference click the pointer's distance from the centre sets the side count (+1 per 10 px beyond the click, −1 per 10 px in, min 3); Enter or any click commits (no new polygon at the click); Esc discards | Live skasm 10-27 (behaviours "skasm (2026-10-27) sketch polygon side count") | ✅ (T:sm `polygon_sides_typed_and_midpoint_line`, `polygon_spinner_and_next_center_commit_the_previous_polygon`) | 0.4.10+ / 2d9a275c 10-27 |
-| 4.22 | Spline: click points, double-click to end | H:spline | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.22 | Spline: click points, double-click to end | H:spline | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.162 (Spline: double-click the last point), skasm 11-04 |
 | 4.23 | Spline: closes when the last point lands on the first | H:spline | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.24 | Spline: context menu **Confirm spline** finishes one point behind | H:spline | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.25 | Spline tangent handles (white points) to drag | H:spline | ✅ (T:ux; GUI :103 open spline shows white tangent handles; handles are not deletable) | 0.4.10+ / 2d9a275c 10-27 |
-| 4.26 | Bezier: click control points, double-click to end; control polygon shown | H:bezier | ✅ (control polygon shown while drawing and when selected) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.26 | Bezier: click control points, double-click to end; control polygon shown | H:bezier | ✅ (control polygon shown while drawing and when selected) | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.163 (Bezier: control polygon, Deg label), skasm 11-04 |
 | 4.27 | Bezier: context menu **Escape bezier** removes the curve in progress | H:bezier | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
 | 4.28 | Bezier degree label (double-click to edit, max 15) | H:bezier | ✅ (T:ux; GUI :103 double-click opens degree input; 4→6 succeeds, 16 rejected; bezier-degree-six-verified.png) | 0.4.10+ / 965d3f56 10-27 (double-click Deg 3 → 6; curve kept) |
 | 4.29 | Spline control point: click a spline / bezier control polygon to add a point | H:spline_control_point | ✅ (T:ux) | 8627322e 10-28 (GUI: 4-point Bezier "Deg 3"; Spline control point (hint "Click a spline or bezier control polygon to add a control point"), hover near it shows the dashed polygon, click its first segment → "Deg 4", 3 interior points) |
-| 4.30 | Point: click to place | H:point | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 4.31 | Text: drag a box, lower-left corner and height set the first line; horizontal constraint on the bottom edge | H:text | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 4.32 | Text: font, bold, italic, flip; edit later; drag by its box | H:text | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 4.30 | Point: click to place | H:point | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.165 (each click drops a hollow point), skasm 11-04 |
+| 4.31 | Text: drag a box, lower-left corner and height set the first line; horizontal constraint on the bottom edge | H:text | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.167 (Text: two corners, then the Text dialog), skasm 11-04 |
+| 4.32 | Text: font, bold, italic, flip; edit later; drag by its box | H:text | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.167 (font, B, I, flips), skasm 11-04 |
 | 4.33 | Text: Convert to expression | H:text | ✅ (GUI :103 Convert to expression evaluates `"A" ~ (2 + 3)` to A5; text-expression.png) | skasm 11-01 GUI :103: Text tool, edit box › Convert to expression, `"A" ~ (2 + 3)` ✓ → the sketch shows "A5" (ui/tx10c.png) |
-| 4.34 | Slot: select centerline curves (before or after the tool); one shared width dimension | H:slot | ✅ (T:ux) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.34 | Slot: select centerline curves (before or after the tool); one shared width dimension | H:slot | ✅ (T:ux) | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.164, l.213 (Slot wraps a picked curve; commits on the next click), skasm 11-04 |
 | 4.35 | Slot: a connected chain gives one slot following the chain | H:slot | ✅ (T:ux; GUI :103 selected L-shaped line chain makes one continuous slot with shared width input; chained-slot.png) | 0.4.10+ / 965d3f56 10-27 (L chain selected → one slot) |
-| 4.36 | Construction toggle: q with a selection toggles it, without one draws construction geometry | H:construction | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 4.37 | Construction lines are dashed (dash-dot) in the status color | B§5.2 | ✅ (dashed, status colors) | 0.4.10+ / 2d9a275c 10-27 |
+| 4.36 | Construction toggle: q with a selection toggles it, without one draws construction geometry | H:construction | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.168 (Q toggles construction), skasm 11-04 |
+| 4.37 | Construction lines are dashed (dash-dot) in the status color | B§5.2 | ✅ (dashed, status colors) | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.168 (dash-dot in the same blue), skasm 11-04 |
 | 4.38 | Insert image / Insert DXF or DWG | H:insert_image, H:insert_dwg_or_dxf | ✅ (DXF ASCII + binary and DWG R13–2018 through cadkit (crates/sketch/src/cad.rs, dwg.rs): block references expanded (placement, scale, rotation, arrays, nesting), mirrored/tilted planes and non-uniform block scales mapped exactly; T:ux dwg.rs fixtures R2000–R2018 + cad.rs tests; GUI :103 m4-dwg.png "Inserted 7 entities from fixture.dwg" incl. the BLOCK1 line. Images: 3D textured quads in any orientation, depth tested, exact colors, visible outside sketch mode (m2-placed / m2-iso / m2-accepted-c.png)) | ff379982 10-28 (DXF half: panel Units From file ▾, Use file origin position, Choose a DXF or DWG file…; inserts 83 entities; Insert image not run) |
-| 4.39 | Preview geometry while placing is drawn in the sketch preview color | B§2.3 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
+| 4.39 | Preview geometry while placing is drawn in the sketch preview color | B§2.3 | ✅ | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.137 (rubber band #449ccd), skasm 11-04 |
 
 ## 5. On-the-fly dimensions
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 5.1 | Right after creation a box shows the suggested value (line length, circle diameter, arc radius) | H:sketch_basics, H:line | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 5.2 | Typing a value or expression and Enter adds a driving dimension | H:line | ✅ (OTF-FIRST-KEY fixed 0537ac91) | 0.4.10+ / 6cbb24e0 10-27 |
+| 5.1 | Right after creation a box shows the suggested value (line length, circle diameter, arc radius) | H:sketch_basics, H:line | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours "skasm (2026-11-04 00:00, P2) sketch-line-value-box" (1952: the box is the committed line's), skasm 11-04 |
+| 5.2 | Typing a value or expression and Enter adds a driving dimension | H:line | ✅ (OTF-FIRST-KEY fixed 0537ac91) | 0.4.10+ / 6cbb24e0 10-27; = live: 1952 (typing then Enter dimensions the line) and ui-parity sketch-line-value-box, skasm 11-04 |
 | 5.3 | Continuing to sketch leaves the geometry undimensioned (box disappears) | H:sketch_basics | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 5.4 | Rectangles: length box, Enter, width box, Enter | H:corner_rectangle | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 5.4 | Rectangles: length box, Enter, width box, Enter | H:corner_rectangle | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: ui-parity sketch-rectangle-value-boxes (live recording), skasm 11-04 |
 | 5.5 | Ellipse / elliptical arc: primary then secondary diameter | H:ellipse | ✅ (T:sm) | 0.4.10+ / 965d3f56 10-27 (readout Ø primary, then Ø secondary) |
 | 5.6 | Polygon: no value box and no Ø dimension (live spec 10-26 "Sketch polygon commits": seed + circular pattern, no DIAMETER; the Help's "diameter of the construction circle" is only the readout) | H:inscribed_polygon | ✅ (scene test `polygon_sides_typed_and_midpoint_line`: no box) | 0.4.10+ / 2d9a275c 10-27 |
-| 5.7 | Fillet: radius box right after the first fillet | H:sketch_fillet | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 5.7 | Fillet: radius box right after the first fillet | H:sketch_fillet | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.169 (Enter commits and opens the radius box), skasm 11-04 |
 | 5.8 | `=#var` uses a variable; expressions with units and functions | H:sketch_basics | ✅ | 0.4.10+ / 41f60e47 10-28 |
 | 5.9 | Esc closes the box without dimensioning | — | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 5.10 | Chained lines: the chain continues from the dimensioned end | H:line | ✅ | 0.4.10+ / 2d9a275c 10-27 |
@@ -129,18 +129,18 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 6.1 | Snap to existing points creates a coincident (shared point) | B§6 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 6.2 | Snap to the sketch origin; coincident to the origin | H:automatic_inferencing | ✅ (T:inf) | 0.4.10+ / 2d9a275c 10-27 |
+| 6.1 | Snap to existing points creates a coincident (shared point) | B§6 | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.142 (coincident-snap target), skasm 11-04 |
+| 6.2 | Snap to the sketch origin; coincident to the origin | H:automatic_inferencing | ✅ (T:inf) | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.6972 (a corner rectangle snaps to the origin), skasm 11-04 |
 | 6.3 | Horizontal / vertical alignment with the origin and other points: dotted guide, constraint on click | H:automatic_inferencing | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 6.4 | Midpoint snap on lines and arcs creates a midpoint constraint | B§6 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 6.5 | Center snap on circles / arcs; quadrant snap | B§6 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 6.6 | Point on curve snap creates a coincident | B§6 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 6.7 | New line horizontal / vertical inference | B§6 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 6.7 | New line horizontal / vertical inference | B§6 | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.148 (H / V inference glyphs by the cursor), skasm 11-04 |
 | 6.8 | Parallel / perpendicular to the previous segment | B§6 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 6.9 | Wake-up: lines the cursor passed over give parallel / perpendicular inferences | H:automatic_inferencing | ✅ (T:inf) | ea572159 10-28 (GUI: hover a free line, start a new line elsewhere, move along its direction → Parallel glyph, the woken line lit orange) |
 | 6.10 | Tangent inference from an arc / spline end | B§6 | ✅ (SKETCH-START-INFERENCE fixed) (T:inf) | 78958d0f 10-28 (GUI: 3 point arc, Line started on its end and moved along the tangent → the arc lights as the inference, a Tangent glyph is stored; qa-scratch/tickets/sketch-arc-tangent-7895.png; first verified f8014efa) |
-| 6.11 | Inference glyph next to the cursor | H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 6.12 | Inference line yellow dashed (`INFERENCE_SNAP_LINE_COLOR`) | B§6 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 6.11 | Inference glyph next to the cursor | H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.148 (inference glyphs ~15 px below-right of the cursor), skasm 11-04 |
+| 6.12 | Inference line yellow dashed (`INFERENCE_SNAP_LINE_COLOR`) | B§6 | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.136 (inference dashes #449ccd / #e2bc2c), skasm 11-04 |
 | 6.13 | Shift suppresses inferences | H:automatic_inferencing | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 6.14 | Snap to model vertices and edges when sketching on a face; vertices stay linked | H:sketch_basics | ✅ (GUI :103 m10.png: sketch on a part face, the line start snaps to the model vertex with a coincident inference and stays linked (fixed point)) | 0.4.10+ / 965d3f56 10-27 (sketch on wf-block's top face: line from the top face's corner vertex, start black + use glyph) |
 | 6.15 | Woken entity / parallel partner highlighted orange, new line drawn dotted when parallel | H:automatic_inferencing | ✅ | 0.4.10+ / 2d9a275c 10-27 |
@@ -150,21 +150,21 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 7.1 | d / button activates; stays active for the next dimension | H:dimension | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 7.1 | d / button activates; stays active for the next dimension | H:dimension | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: ui-parity sketch-dim-enter-keeps-tool (live recording), skasm 11-04 |
 | 7.2 | Picked entities highlight; the dimension previews at the cursor before placing | H:dimension | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 7.3 | The placement click places the dimension and opens its value box | H:dimension | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 7.3 | The placement click places the dimension and opens its value box | H:dimension | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.179 (the placing click opens the value box), skasm 11-04 |
 | 7.4 | Single line: length; slanted line dragged up/down or left/right: horizontal / vertical | H:dimension | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 7.5 | Two points: aligned when dragged at an angle, horizontal / vertical when dragged straight | H:dimension | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 7.6 | Two parallel lines: distance (implies parallel) | H:dimension | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 7.7 | Two lines at an angle: angle; the quadrant follows the cursor | H:dimension | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
-| 7.8 | Circle: diameter; arc: radius | H:dimension | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 7.8 | Circle: diameter; arc: radius | H:dimension | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.180 (circle Ø with a leader), skasm 11-04 |
 | 7.9 | Arc length: both end points then the arc | H:dimension | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 7.10 | Point / line / circle to a construction line, cursor across it: centerline dimension (twice the distance) | H:dimension | ✅ (T:sm, T:ux) | 8cd3c4da 10-28 (GUI: point + construction line, d: 27.977 on the point's side, Ø55.955 with the cursor across the line) |
 | 7.11 | Ellipse: major / minor diameter | B§4.2 | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 7.12 | Dimension to the sketch origin | H:dimension | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 7.13 | Dimension to planes / model edges | H:dimension | ✅ (planes as trace lines, model edges / vertices as linked reference geometry) | 0.4.10+ / 965d3f56 10-27 (point to model edge 24.797 → 20) |
 | 7.14 | Over-defining dimensions are made driven: plain grey value ("Ø10", no parentheses) and the value box still opens, no toast | H:dimension; live "qa4 round 5 s5 driven dims" (1) | ✅ (test `driven_labels_and_offset_side_as_live`; GUI :103 skasm 10-26: second Ø on a dimensioned circle opens the box, grey plain "Ø10" after Esc) | 0.4.10+ / 203c4d6f 10-27 (duplicate Ø → driven grey plain; h + v + aligned length all stay driving: asked live 18:26) |
-| 7.15 | Driven ↔ driving from the context menu ("Change to driving/driven dimension") | H:dimension | ✅ | 0.4.10+ / 203c4d6f 10-27 |
+| 7.15 | Driven ↔ driving from the context menu ("Change to driving/driven dimension") | H:dimension | ✅ | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.192 (Change to driven dimension in a dimension's menu), skasm 11-04 |
 | 7.16 | Double-click a dimension to edit its value | H:dimension | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 7.16a | Esc on an untouched value box (new or reopened) closes it at once (a new dimension keeps its measured value); a changed box reverts on the first Esc, closes on the second; a bare expression is stored with the document unit ("2*5" → "(2*5) mm") | live qa4 round 5 v3 s5 (DIM-ESC-UNTOUCHED, DIM-EXPR-UNIT) | ✅ (app; `quantity_text::simple` no longer reads "*5" as a unit; tests `dimension_expression_keeps_the_unit`, `expressions_get_the_unit_around_them`) | 0.4.10+ / 2d9a275c 10-27 |
 | 7.17 | Editing moves both dimensioned sides by half (except radius / diameter) | H:dimension | ✅ (T:ux) | 0.4.10+ / 965d3f56 10-27 (free line 16.85 → 30 horizontal: both ends moved, centre kept) |
@@ -181,7 +181,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 8.1 | Select-first: constraint applies immediately to the selection | H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 8.1 | Select-first: constraint applies immediately to the selection | H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.185 (select, then the shortcut), skasm 11-04 |
 | 8.2 | Multi-selection: Parallel / Equal / Coincident / Tangent chain all entities, Horizontal / Vertical / Fix apply to each | H:parallel, H:equal, H:horizontal | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 8.3 | Tool-first: each pair picked is constrained; tool stays on until clicked again or another tool | H:coincident | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 8.4 | Coincident: point-point, point-curve, collinear lines, same circle | H:coincident | ✅ | 0.4.10+ / 965d3f56 10-27 (two line ends + i: both move halfway, coincident glyph) |
@@ -196,8 +196,8 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 8.9 | Symmetric: axis line first, then two entities | H:symmetric | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 8.10 | Curvature: spline/conic + adjacent curve | H:curvature | ✅ | ff379982 10-28 (spline started on a line's end; select spline + line, shift+u → Curvature glyphs on both, the joint re-solves; conic case not run) |
 | 8.11 | Constraints to planes / model edges | H:working_with_constraints | ✅ (SKETCH-MODEL-EDGE-SELECT residual verified 10-29 night, 10 / 10 fast move-and-clicks) (same reference mechanism as dimensions) | 70eb094c 10-28 (GUI: line + model edge click keeps the line selected 40/40; the edge is taken 7/10 with a 0.15 s rest, 9/10 with 0.4 s) |
-| 8.12 | Glyphs show for the hovered entity (show after hover, hide after 750 ms); all with Show constraints | H:working_with_constraints, B§3.5 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 8.13 | Hover a glyph highlights its entities (yellow); click selects it; Delete removes it | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27 |
+| 8.12 | Glyphs show for the hovered entity (show after hover, hide after 750 ms); all with Show constraints | H:working_with_constraints, B§3.5 | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: live 1938 / 1940 (hovered entity's glyphs, ~40 px above), skasm 11-04 |
+| 8.13 | Hover a glyph highlights its entities (yellow); click selects it; Delete removes it | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.144 (hover a glyph: yellow, its entities highlighted), skasm 11-04 |
 | 8.14 | Drag glyphs to move them | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 8.15 | Conflicting constraints: white glyph on red | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 8.16 | External (Use) constraints have a blue glyph background | H:working_with_constraints | ✅ (GUI :103 Equal to projected model circle gives blue glyph backgrounds; external-equal.png) | 0.4.10+ / 965d3f56 10-27 (Use glyphs on #def1fb) |
@@ -208,15 +208,15 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 9.1 | Click selects; clicking more adds; clicking a selected entity deselects | Onshape | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 9.1 | Click selects; clicking more adds; clicking a selected entity deselects | Onshape | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.263 (clicks add, no modifier), skasm 11-04 |
 | 9.1a | A click on a line's midpoint selects the line, after a still rest too (live's nine re-recordings 11-04 02:24-02:40; 1937 / 1954 and two recordings saw nothing selected, asked of live) | live ui-parity re-recordings, behaviours 1937 / 1954 | 🔧 | ours selects the line; sketch-delete-line / -vertical-constraint (live: nothing) differ | skasm 11-04 |
 | 9.2 | Box select left→right: window (entirely inside) | B§5.4 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 9.3 | Box select right→left: crossing (anything the box touches) | B§5.4 | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
-| 9.4 | Hover highlights orange, selection amber, related entities yellow | H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 9.4 | Hover highlights orange, selection amber, related entities yellow | H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.137–139 (colours), skasm 11-04 |
 | 9.5 | Not fully constrained points win over fully constrained ones under the cursor | H:sketch_tools | ✅ (T:ux; fresh GUI :103 free point overlapping fixed origin drags away while origin stays fixed; current-point-priority.png) | 4c97692e 10-28 (GUI: Point with Shift held on the origin (no snap), then a drag from that spot moves the free point (−48, +64 px); the origin stays) |
-| 9.6 | Clicking a closed region selects it | B§1.6 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 9.7 | Select other (`) | B§5.4 | ✅ (GUI :103 backtick opens candidate popup; select-other-focus.png) | 0.4.10+ / 203c4d6f 10-27 |
-| 9.8 | Click in empty space clears the selection | Onshape | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 9.6 | Clicking a closed region selects it | B§1.6 | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.143 (clicking inside a closed region selects it), skasm 11-04 |
+| 9.7 | Select other (`) | B§5.4 | ✅ (GUI :103 backtick opens candidate popup; select-other-focus.png) | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.208 (Select other dialog), skasm 11-04 |
+| 9.8 | Click in empty space clears the selection | Onshape | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.189 (clicking empty space clears the selection), skasm 11-04 |
 
 ## 10. Dragging and solving
 
@@ -227,36 +227,36 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 10.3 | Dropping a point on another point merges them; on a curve makes it coincident | B§7.1 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 10.4 | Dropping a point on the origin constrains it to the origin | B§7.1 | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 10.5 | Shift while dragging suppresses the snap | B§7.1 | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
-| 10.6 | Colors: blue under-defined, black fully defined, red over-defined, per entity | Home__colors | ✅ (theme palette: #0000d0 / black / #cd0000) | 0.4.10+ / 2d9a275c 10-27 |
+| 10.6 | Colors: blue under-defined, black fully defined, red over-defined, per entity | Home__colors | ✅ (theme palette: #0000d0 / black / #cd0000) | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.133–135 (#0000d0 under defined, near-black defined), skasm 11-04 |
 | 10.7 | Text boxes drag as a whole | H:text | ✅ | 8cd3c4da 10-28 (GUI: text 'AB' dragged by its glyphs: box, corners and text move together) |
 
 ## 11. Edit tools
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 11.1 | Fillet: click a vertex, radius box; later vertices make equal fillets | H:sketch_fillet | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 11.1 | Fillet: click a vertex, radius box; later vertices make equal fillets | H:sketch_fillet | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.169 (hover a corner, click, R box on Enter), skasm 11-04 |
 | 11.2 | Fillet: click two curves | H:sketch_fillet | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 11.3 | Fillet keeps a virtual sharp with the coincident constraints | H:sketch_fillet | ✅ | 0.4.10+ / da18f886 10-28 (fixed L outline, Shift+F R30: the corner keeps its virtual sharp point; tickets/fillet-typed-smaller-da18.png) |
 | 11.4 | Fillet drag manipulator; too-large preview in red | H:sketch_fillet | ✅ (SKETCH-FILLET-STUCK-RADIUS fixed) (T:sm; red preview, radius manipulator) | d2357ee5 10-28 (qa 06:44: a too-large sticky radius previews red with the hollow arrow and no value box, Enter does nothing, dragging the arrow in turns it blue and Enter commits; an over-drag release toasts "The current fillet radius produces invalid geometry.") |
-| 11.5 | Chamfer: vertex or two lines, two distance dimensions (45° default) | H:sketch_chamfer | ✅ (T:ux) | 0.4.10+ / 203c4d6f 10-27 |
-| 11.6 | Trim: click removes up to the nearest intersections, whole curve when unbounded | H:trim | ✅ | 0.4.10+ / 2d9a275c 10-27 |
-| 11.7 | Trim: drag across curves trims everything crossed | H:trim | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
+| 11.5 | Chamfer: vertex or two lines, two distance dimensions (45° default) | H:sketch_chamfer | ✅ (T:ux) | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.170 (chamfer: same flow, two distances), skasm 11-04 |
+| 11.6 | Trim: click removes up to the nearest intersections, whole curve when unbounded | H:trim | ✅ | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.171 (Trim: a click removes back to the intersections), skasm 11-04 |
+| 11.7 | Trim: drag across curves trims everything crossed | H:trim | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.171 (Trim: drag across), skasm 11-04 |
 | 11.8 | Trim: click a standalone point deletes it | H:trim | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 11.9 | Extend: click a line or arc to extend to the next boundary | H:extend | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 11.10 | Extend: "Unable to extend the selected geometry." | i18n | ✅ (GUI :103 extending an unbounded circle reports exact message; extend-error.png; T:sm added) | 0.4.10+ / 203c4d6f 10-27 |
 | 11.11 | Split: click a curve where to split | H:sketch_split | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 11.12 | Offset: select curves / chain, distance and direction, Enter; then click more curves. Live "psb (10-24 j)": the copies get their own points joined by Coincidents, sharp outer corners, own centres; one OFFSET per further pair (all on the first picked pair) and one DISTANCE on that pair (a lone curve: one OFFSET), no Parallel / Concentric; free ends unconstrained; editing the distance moves every copy; a new offset starts away from the region (a circle outward), the flip isn't remembered | H:offset; live psb (10-24 j), qa4 round 5 s1 follow-up | ✅ (GUI :103 skasm 10-26: one edge offsets away from the region with the arrow, Enter creates it and opens the "5 mm" box with ± ✓ ✕; `Sketch::offset_tool`, `ConstraintKind::OffsetCurve`; tests `offset_tool_makes_live_constraints_on_a_chain`, `offset_tool_on_the_closed_loop_and_a_circle`) | 0.4.10+ / 2d9a275c 10-27 |
+| 11.12 | Offset: select curves / chain, distance and direction, Enter; then click more curves. Live "psb (10-24 j)": the copies get their own points joined by Coincidents, sharp outer corners, own centres; one OFFSET per further pair (all on the first picked pair) and one DISTANCE on that pair (a lone curve: one OFFSET), no Parallel / Concentric; free ends unconstrained; editing the distance moves every copy; a new offset starts away from the region (a circle outward), the flip isn't remembered | H:offset; live psb (10-24 j), qa4 round 5 s1 follow-up | ✅ (GUI :103 skasm 10-26: one edge offsets away from the region with the arrow, Enter creates it and opens the "5 mm" box with ± ✓ ✕; `Sketch::offset_tool`, `ConstraintKind::OffsetCurve`; tests `offset_tool_makes_live_constraints_on_a_chain`, `offset_tool_on_the_closed_loop_and_a_circle`) | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.172 and "qa4 round 5 s1 offset", skasm 11-04 |
 | 11.12a | Offset takes one chain: a curve not connected to the pending one is only selected (again: deselected) with "Can only offset a single chain at once."; the preview stays | live qa4 round 5 s1 follow-up (5) (OFF-TOAST) | ✅ (test `offset_takes_one_chain`) | f8014efa 10-28 (GUI: O, line 1 previews, line 2 → orange + "Can only offset a single chain at once.", preview stays; 2nd click deselects; toast lifetime → TOAST-AUTOHIDE) |
 | 11.12b | Offset: the picked curves stay selected (orange) while the preview shows; a click on empty space drops the preview and makes nothing; no prompt at the bottom | ui-parity sketch-offset (live 11-03 22:10), behaviours sketch/122 | ✅ (T:sm offset_preview_arrow_and_repeat) | skasm 11-04: ui-parity sketch-offset matches (11 states) |
-| 11.13 | Mirror with preselection: click the mirror line, resolves at once and the tool ends | H:sketch_mirror | ✅ (T:sm) | 0.4.10+ / 965d3f56 10-27 (ellipse + mirror line preselected: resolves at once) |
-| 11.14 | Mirror tool-first: "Select a mirror line.", then "Select entities to be mirrored.", Esc exits | H:sketch_mirror, i18n | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
+| 11.13 | Mirror with preselection: click the mirror line, resolves at once and the tool ends | H:sketch_mirror | ✅ (T:sm) | 0.4.10+ / 965d3f56 10-27 (ellipse + mirror line preselected: resolves at once); = live: behaviours l.173 and ui-parity sketch-mirror, skasm 11-04 |
+| 11.14 | Mirror tool-first: "Select a mirror line.", then "Select entities to be mirrored.", Esc exits | H:sketch_mirror, i18n | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.173 and ui-parity sketch-mirror, skasm 11-04 |
 | 11.14a | Mirror with one line preselected: it is the mirror line, "Select entities to be mirrored." | ui-parity sketch-mirror (live) | ✅ (T:sm mirror_takes_a_lone_preselected_line_as_its_line) | skasm 11-04: ui-parity sketch-mirror matches (15 states) |
-| 11.15 | Linear / circular pattern with on-canvas manipulators (count, spacing, direction, angle, center) | H:sketch_linear_pattern | ✅ (T:sm; click in space / Enter accept, Esc cancel; linear instances linked to the seed) | 0.4.10+ / 965d3f56 10-27 (3x / 1x manipulators, count label edit, Enter accepts) |
+| 11.15 | Linear / circular pattern with on-canvas manipulators (count, spacing, direction, angle, center) | H:sketch_linear_pattern | ✅ (T:sm; click in space / Enter accept, Esc cancel; linear instances linked to the seed) | 0.4.10+ / 965d3f56 10-27 (3x / 1x manipulators, count label edit, Enter accepts); = live: behaviours l.174 (pattern previews with manipulators), skasm 11-04 |
 | 11.16 | Pattern preview limited to 10 instances | H:sketch_linear_pattern | ✅ | 0.4.10+ / 965d3f56 10-27 (count 15: preview 10) |
 | 11.17 | Edit pattern from the pattern glyph | H:sketch_linear_pattern | ✅ (T:sm; linear and circular instances are linked to the seed, see 14.1) | 0.4.10+ / 965d3f56 10-27 (right-click glyph › Edit pattern; count 15 → 3) |
-| 11.18 | Transform: triad manipulator (move, rotate, scale, free-drag center), Enter commits, Esc cancels | H:sketch_transform | ✅ (click in space / Enter commit, Esc cancel) | 0.4.10+ / 965d3f56 10-27 (paste shows the triad: ring, scale arrow, move square; Enter commits, Esc leaves) |
+| 11.18 | Transform: triad manipulator (move, rotate, scale, free-drag center), Enter commits, Esc cancels | H:sketch_transform | ✅ (click in space / Enter commit, Esc cancel) | 0.4.10+ / 965d3f56 10-27 (paste shows the triad: ring, scale arrow, move square; Enter commits, Esc leaves); = live: behaviours l.174 (Transform: a 2D triad), skasm 11-04 |
 | 11.19 | Use: click model edges / faces / other sketches to project; linked to the source | H:use | ✅ (planar curves project exactly; non-planar edges project to a fitted spline like Onshape; other sketches; linked); a used circle / arc has a construction centre point, its line ends are not (live "skb (10-25) sketch Use on a face sketch", 4b5ac4fe) | 0.4.10+ / 965d3f56 10-27 (U, block edge → black line + use glyphs) |
-| 11.20 | Use: hover preview of the projection | H:use | ✅ (GUI :103 m8.png: hovering the cylinder top edge highlights it and previews the projected circle on the sketch plane; click creates it) | 0.4.10+ / 965d3f56 10-27 (hover preview orange) |
+| 11.20 | Use: hover preview of the projection | H:use | ✅ (GUI :103 m8.png: hovering the cylinder top edge highlights it and previews the projected circle on the sketch plane; click creates it) | 0.4.10+ / 965d3f56 10-27 (hover preview orange); = live: behaviours l.207 (Use: hover pre-highlights the edge), skasm 11-04 |
 | 11.21 | Use silhouette edges | H:use | ✅ (cylinders, cones, spheres, tori; verified on the demo plate) | 0.4.10+ / dd1b5037 10-27 (Front sketch, U on the pin's cylinder face: two silhouette lines + end edges) |
 | 11.22 | Intersection: face crossing the sketch plane | H:intersection | ✅ | 8cd3c4da 10-28 (GUI: sketch on Front through a centred block, Intersection › top face → a black fixed line x −20…20 at z 10) |
 | 11.23 | Text cannot be patterned / mirrored in a sketch | H:text | ✅ | 0.4.10+ / 203c4d6f 10-27 |
@@ -266,12 +266,12 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
 | 12.1 | Sketch entities: Delete sketch entity / Delete N sketch entities | i18n, B§9 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
-| 12.2 | Construction, Transform sketch entities, Copy sketch entities | B§9 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
+| 12.2 | Construction, Transform sketch entities, Copy sketch entities | B§9 | ✅ | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.191 (Copy / Transform sketch entities), skasm 11-04 |
 | 12.3 | Paste sketch entities (clipboard holds sketch entities) | B§9 | ✅ | 0.4.10+ / 965d3f56 10-27 (Ctrl+C / Ctrl+V of a line lands centred on the pointer) |
-| 12.4 | View normal to sketch plane; Exit tool; Clear selection | B§9 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
+| 12.4 | View normal to sketch plane; Exit tool; Clear selection | B§9 | ✅ | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.193 (View normal to sketch plane), skasm 11-04 |
 | 12.5 | Use (model edge under the cursor) | B§9 | ✅ (GUI :103 right-click unused model edge offers Use; model-context-use.png) | 0.4.10+ / 965d3f56 10-27 (right-click an unused model edge: Use) |
 | 12.6 | Spline in progress: Confirm spline; Bezier: Escape bezier | H:spline, H:bezier | ✅ (T:sm) | 0.4.10+ / 2d9a275c 10-27 |
-| 12.7 | Dimension: Change to driving / driven dimension, Delete | H:dimension | ✅ | 0.4.10+ / 203c4d6f 10-27 |
+| 12.7 | Dimension: Change to driving / driven dimension, Delete | H:dimension | ✅ | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.192 (Change to driven dimension), skasm 11-04 |
 | 12.8 | Constraint glyph: Delete | H:working_with_constraints | ✅ | 0.4.10+ / 203c4d6f 10-27 |
 | 12.9 | Add comment, Configure dimension | H:dimension | ✅ Configure dimension. Add comment belongs to Onshape comments, a cloud-only feature excluded by TEAM-RULES | skasm 11-01 GUI :103: with a list input Size, a dimension's menu starts Configure dimension, Change to driven dimension (= live; was second, "Configure dimension with Size"), toast "Sketch 1 length added to Size"; without an input no Configure item, = live (cd4c / cd5s.png) |
 
@@ -279,7 +279,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
-| 13.1 | Tool prompts at the bottom of the view ("Select a mirror line.", …) | i18n | ✅ | 0.4.10+ / 203c4d6f 10-27 |
+| 13.1 | Tool prompts at the bottom of the view ("Select a mirror line.", …) | i18n | ✅ | 0.4.10+ / 203c4d6f 10-27; = live: ui-parity sketch-mirror ("Select entities to be mirrored." as live), skasm 11-04 |
 | 13.2 | "Cannot fillet selected point." | i18n | ✅ (FILLET-POINT-MSG, qa verified dd1b5037) | 0.4.10+ / 203c4d6f 10-27 |
 | 13.3 | "The maximum bezier degree (15) has been reached." | i18n | ✅ (GUI :103 entering degree 16 reports exact message; bezier-max-degree-error.png; T:sm creation limit also added) | 0.4.10+ / 965d3f56 10-27 (degree 16 → exact message) |
 | 13.4 | Conflicting constraints reported as a sketch warning | B§7.2 | ✅ | 0.4.10+ / 203c4d6f 10-27 |
@@ -291,13 +291,13 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 14.1 | Circular pattern instances follow seed edits and a shared draggable center | H:sketch_circular_pattern | ✅ (T:ux: seed drag, center drag, circle/ellipse dimension edits, deletion cleanup; GUI recheck pending) | 8cd3c4da 10-28 (GUI: circle › Circular pattern ('3x' on canvas) › Enter; dragging the seed's rim grows all three instances together, '=' glyphs) |
 | 14.2 | Bezier creation rejects a seventeenth control point with the degree-15 message and still allows completion | H:bezier, i18n | ✅ (T:sm `bezier_creation_stops_at_degree_fifteen_and_can_still_finish`; live: 14 points → Deg 13, no message) | 8627322e 10-28 (GUI: Bezier, 17 clicks → the 17th not taken, status "The maximum bezier degree (15) has been reached."; Enter completes it, label "Deg 15", 16 control points) |
 | 14.3 | Holding/releasing Shift updates inference at a stationary cursor; Shift before release suppresses a pending drag snap | H:automatic_inferencing | ✅ (T:sm; GUI :103 m12.png: Shift down at a stationary cursor drops the horizontal inference, release restores it) | f8014efa 10-28 (GUI: line rubber band at a horizontal inference, Shift down at a stationary cursor drops it, release restores) |
-| 14.4 | Reopening an ellipse dimension shows its diameter; reopening conic rho stays unitless; accepting unchanged preserves geometry | H:dimension, H:conic | ✅ (T:sm `reopening_ellipse_and_rho_dimensions_preserves_the_displayed_value`, now also with a stored diameter expression) | f8014efa / 8627322e 10-28 (ellipse: 40 → Ø40, reopen shows "40 mm", the diameter; conic: reopening Rho shows "0.5" unitless) |
+| 14.4 | Reopening an ellipse dimension shows its diameter; reopening conic rho stays unitless; accepting unchanged preserves geometry | H:dimension, H:conic | ✅ (T:sm `reopening_ellipse_and_rho_dimensions_preserves_the_displayed_value`, now also with a stored diameter expression) | f8014efa / 8627322e 10-28 (ellipse: 40 → Ø40, reopen shows "40 mm", the diameter; conic: reopening Rho shows "0.5" unitless); a regression check of ours (no live behaviour to compare), skasm 11-04 |
 | 14.5 | One Esc ends a Line chain and exits Line; double-click ends the chain while keeping Line active | Live sketch/56–57, behaviours.md | ✅ (T:sm `line_clicks_chain_and_one_esc_exits_the_tool`; GUI :103) | 0.4.10+ / 203c4d6f 10-27 |
 | 14.6 | Sketch context menu offers Confirm Sketch N, accepting the sketch | Live behaviours.md §Leaving a sketch | ✅ (GUI :103 k1-menu.png, k2-menu-line.png) | 0.4.10+ / 203c4d6f 10-27 |
 | 14.7 | Conic creation retains a default driving Rho dimension when its initial value box is dismissed; typing updates the same dimension | Live sketch/84–86 | ✅ (GUI :103 k6-conic-c.png: rho box opens with 0.5 selected; Esc keeps a driving `Rho 0.5`) | 8627322e 10-28 (GUI: Conic 3 clicks → rho box "0.5" selected; Esc → driving "Rho 0.5" kept; reopen, 0.7 → the same dim reads Rho 0.7, curve sharper) |
-| 14.8 | Insert image/DXF fallback file chooser actually loads the selected file | GUI :103 | ✅ (GUI :103 current-image-loaded/current-image-inserted and current-dxf-inserted: image rectangle renders; fixture DXF inserts line + circle) | ff379982 10-28 (NOSHAPE_NO_NATIVE_DIALOGS: Insert DXF or DWG › Choose a DXF or DWG file… → in-app "Insert DXF or DWG" path box; samples/asb-cm-1-default.dxf + Open → "Inserted 83 entities from asb-cm-1-default.dxf", all selected) |
+| 14.8 | Insert image/DXF fallback file chooser actually loads the selected file | GUI :103 | ✅ (GUI :103 current-image-loaded/current-image-inserted and current-dxf-inserted: image rectangle renders; fixture DXF inserts line + circle) | ff379982 10-28 (NOSHAPE_NO_NATIVE_DIALOGS: Insert DXF or DWG › Choose a DXF or DWG file… → in-app "Insert DXF or DWG" path box; samples/asb-cm-1-default.dxf + Open → "Inserted 83 entities from asb-cm-1-default.dxf", all selected); a regression check of ours (no live behaviour to compare), skasm 11-04 |
 | 14.9 | Esc with a sketch context menu open: with a tool active the 1st Esc exits the tool (the menu stays), the 2nd closes the menu; with no tool, one Esc closes it | behaviours ~197 (live sketch/405–408) | ✅ (OsMenu::on_first_escape; skasm 10-28: the earlier "without canceling the tool" text came from our own GUI, not live) | ea572159 10-28 |
-| 14.10 | Fast trim drags crossing the viewport do not skip curves between mouse events | H:trim | ✅ (T:sm; GUI :103 m11.png: one fast two-event drag trims all three crossed lines) | 8cd3c4da 10-28 (GUI: M, one drag of 3 mouse events across three free lines 50 px apart → all three trimmed) |
+| 14.10 | Fast trim drags crossing the viewport do not skip curves between mouse events | H:trim | ✅ (T:sm; GUI :103 m11.png: one fast two-event drag trims all three crossed lines) | 8cd3c4da 10-28 (GUI: M, one drag of 3 mouse events across three free lines 50 px apart → all three trimmed); a regression check of ours (no live behaviour to compare), skasm 11-04 |
 | 14.11 | Esc preserves the sketch selection; Space or an empty-space click clears it | Live sketch/31,36 | ✅ (GUI :103 k1-esc.png: line stays selected after Esc) | 0.4.10+ / 965d3f56 10-27 (Esc keeps a selected line, Space clears) |
 | 14.12 | S toolbar has the live ten-tool order, includes Spline, and pressing S again repositions it at the cursor | Live sketch/38–39 | ✅ (GUI :103 current-s-toolbar-focused/current-s-repositioned: ten tools, 2×5, second S moves it) | 0.4.10+ / 203c4d6f 10-27 |
 | 14.13 | Sketch context menu offers Select other, Zoom to fit, Zoom to selection, with Confirm sketch first | Live sketch/31,37 | ✅ (GUI :103 k2-menu-line.png) | 0.4.10+ / 203c4d6f 10-27 |
@@ -323,7 +323,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 14.33 | Circular pattern / Transform still use the floating options panel (live: on-canvas only) | Live sketch/138–139 | ✅ (circular: `3x` label + open-pattern angle value, GUI :103 k5-open-c/k5-90-c.png; transform: triad on the selection, rotation/scale fields appear once dragged, GUI k5-xf-c/k5-rot-c.png; T:sm `transform_triad_follows_the_selection_until_its_center_is_dragged`; no options panels remain for patterns/transform) | 4c97692e / 8627322e 10-28 (circular pattern on a circle: dotted path + "3x" on canvas, no panel; Transform on a line: rotate ring + arrows triad on the selection, no panel) |
 | 14.34 | Right-click on a model edge in a sketch: Confirm \| Use \| Hide Part, Curve/surface analysis…, Isolate…, Make transparent… \| Clear selection, Select ▸, Select other… \| zoom/view items incl. Align view with vertical axis | Live sketch/204 | ✅ (Add comment is cloud-only, left out) | b184b401 10-28 (GUI: live-30 copy, Sketch 2 on the plate top, right-click the straight front edge → Confirm Sketch 2 | Use | Hide Part 1, Curve/surface analysis…, Isolate…, Make transparent… | Clear selection, Select ▸, Select other… | Zoom to fit, Zoom to selection, View normal to sketch plane, Align view with vertical axis; a circular rim leaves out the last item; qa-scratch/tickets/sketch-model-edge-menu-b184.png) |
 | 14.35 | Bottom-right one-line readout of the sketch selection: Length / Diameter / Radius / Point X Y Z / Distance / Parallel dist / Angle (deg); nothing for mixed selections | Live behaviours.md §Drawing tools (status bar), sketch/108, 136, 139 | ✅ (T:sm; GUI :103 m5-readout-c.png "Diameter: 50.8 mm") | 0.4.10+ / 203c4d6f 10-27 |
-| 14.36 | Typed expressions on ellipse axis (diameter) dimensions are kept and regenerate correctly | H:dimension | ✅ (T:sm + model test `ellipse_diameter_expressions_regenerate_as_radii` pass) | f8014efa 10-28 (GUI, qa-scratch/ellg.noshape: ellipse axis dim "2 * 15 mm" shows "2 * 15 mm = Ø30", semi-major 15; reopen box "2 * 15 mm") |
+| 14.36 | Typed expressions on ellipse axis (diameter) dimensions are kept and regenerate correctly | H:dimension | ✅ (T:sm + model test `ellipse_diameter_expressions_regenerate_as_radii` pass) | f8014efa 10-28 (GUI, qa-scratch/ellg.noshape: ellipse axis dim "2 * 15 mm" shows "2 * 15 mm = Ø30", semi-major 15; reopen box "2 * 15 mm"); a regression check of ours (no live behaviour to compare), skasm 11-04 |
 | 14.37 | Used (projected) geometry carries the "use" glyph at its middle and both ends; hovering it highlights the entity; selecting it + Delete unlinks the geometry (stays as free sketch geometry) | Live sketch/202 | ✅ (T:sm; GUI :103 m9-hover-c.png: cube use glyph on hover; select + Delete → m9-unlinked-c.png, the circle becomes free blue geometry) | 0.4.10+ / 203c4d6f 10-27 |
 | 14.38 | Used geometry is drawn black (fixed) like live, not purple | Live sketch/202 | ✅ (ui2: `sketch_color` draws external geometry in the constrained color; `SKETCH_EXTERNAL` removed) | 0.4.10+ / 965d3f56 10-27 (Use: black line) |
 | 14.39 | Live values next to the rubber band while drawing (line length, rectangle width/height, circle / polygon Ø halfway to the cursor when it fits, else outside (across the centre for a horizontal cursor, below the shape otherwise; live skasm 10-27, T:sm `circle_and_polygon_readout_sits_halfway_or_outside_as_live`), arc R, ellipse axes, polygon Ø) in `#449ccd` 13 px, no box | Live sketch/05, 09, 51, 76–80 | ✅ (QA3; `preview_values`, T:sm `rubber_band_shows_live_values`; GUI :103 q1.png / q3-c.png) | 0.4.10+ / 203c4d6f 10-27 |
