@@ -3983,7 +3983,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   T1 case with a second bend of the other hand. dx 23:44: the T1 cases (both hands, a
   spline rolled wall) build exactly with the exact cylinders, so they're in (T1 a_bend_beside_a_spline_rolled_wall_
   is_a_cylinder). Up to Part: 54/124/72 against 50/112/76, live's volume, area 8,812.57 against 8,792.51 (+0.23 %);
-  the rest is elsewhere in the part (4 faces, 12 edges).
+  the rest is elsewhere in the part (4 faces, 12 edges). dx 23:49: the rest is the rolled wall's second
+  bend (y ≈ 57, z ≈ 31): its definition-edge fillet (definition radius 1) is a 21.47 mm² cylinder (≈82°) where
+  live's inner face is 19.205 mm² (73.36°, as the first bend's, which is exact now), and its thickening collapses
+  into sliver end faces (0.716, 0.143 mm²). Next: the definition faces' angle at that edge against live's attribute.
   dx 11-04 21:39: cf-sheet-metal-shaped-flange's Shaped Flange 1 (flange a separate part, 78,922 vs 92,510 mm³):
   the definition sheet joins (the flange shares its partial edge with the base), but `addEdge` (its transient
   query ∪ startTracking) resolves to two edges after flangeEdgeChange + flange_boolean: the moved joint edge (z 2.5,
