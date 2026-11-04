@@ -1749,14 +1749,13 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
     TopExp::MapShapes(e, TopAbs_VERTEX, seam_v);
   for (const TopoDS_Edge& e : rest)
     TopExp::MapShapes(e, TopAbs_VERTEX, chain_v);
-  // Only where the seam splits the chain: its vertex there joins two chain edges going on smoothly (not a corner, as
-  // where this put it).
-  for (int i = 1; i <= seam_v.Extent(); ++i)
-  {
-    if (!chain_v.Contains(seam_v(i)))
-      continue;
-    const TopoDS_Vertex&   x = TopoDS::Vertex(seam_v(i));
-    std::vector<gp_Vec>    ds;
+  // A joint of the chain: two chain edges on the same other face going on smoothly, pieces of one curve (where OCCT's
+  // seam split it; not a corner, nor where a line runs on tangent from an ellipse).
+  ShapeAncMap ef;
+  TopExp::MapShapesAndUniqueAncestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+  auto joint = [&](const TopoDS_Vertex& x) {
+    std::vector<gp_Vec>       ds;
+    std::vector<TopoDS_Shape> others;
     for (const TopoDS_Edge& e : rest)
       for (TopExp_Explorer w(e, TopAbs_VERTEX); w.More(); w.Next())
         if (w.Current().IsSame(x))
@@ -1766,19 +1765,25 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
           gp_Vec            d;
           c.D1(BRep_Tool::Parameter(TopoDS::Vertex(w.Current()), e), p, d);
           ds.push_back(d);
+          if (const ShapeList* fs = ef.Seek(e))
+            for (ShapeList::Iterator it(*fs); it.More(); it.Next())
+              if (!it.Value().IsSame(a))
+                others.push_back(it.Value());
           break;
         }
-    if (ds.size() != 2 || ds[0].Magnitude() < 1e-12 || ds[1].Magnitude() < 1e-12
-        || ds[0].Crossed(ds[1]).Magnitude() > 1e-6 * ds[0].Magnitude() * ds[1].Magnitude())
+    return ds.size() == 2 && others.size() == 2 && others[0].IsSame(others[1]) && ds[0].Magnitude() > 1e-12 && ds[1].Magnitude() > 1e-12
+           && ds[0].Crossed(ds[1]).Magnitude() <= 1e-6 * ds[0].Magnitude() * ds[1].Magnitude();
+  };
+  for (int i = 1; i <= seam_v.Extent(); ++i)
+    if (chain_v.Contains(seam_v(i)) && !joint(TopoDS::Vertex(seam_v(i))))
       return {};
-  }
   TopoDS_Vertex V;
   double        best = std::numeric_limits<double>::infinity();
   for (int i = 1; i <= chain_v.Extent(); ++i)
   {
     const TopoDS_Vertex& x = TopoDS::Vertex(chain_v(i));
     const double         d = std::abs(uv(BRep_Tool::Pnt(x)).Y() - v_ring);
-    if (!seam_v.Contains(x) && d < best - 1e-12)
+    if (!seam_v.Contains(x) && d < best - 1e-12 && !joint(x))
     {
       best = d;
       V    = x;
