@@ -3492,7 +3492,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (edgeChangeHoles, patternSheetHoles, collisionWires, qContainsPoint), featurescript tests::arithmetic_and_strings.
   Its first Fill pattern still takes ~34 s (live's whole document 4.7 s): PARITY-SPEED. The two FeatureScript 392
   pattern studios now translate whole and fail on checkInput (FS-OLD-STD-COMPAT), as counted.
-  dx 11-04 08:44: cf-transform-pattern 14 -> 20/21 (custom 4/5): a mate connector on a sketch region (core's
+  dx 11-04 08:38: cf-transform-pattern 14 -> 20/21 (custom 4/5): a mate connector on a sketch region (core's
   refgeom.rs, T1 features_b::mate_connector_on_a_sketch_region), the translator's written CAP_VERTEX (T1
   parity::a_written_out_cap_vertex_query), opPattern of a sketch region copies its sketch, no part, as live (T1
   ops_harness patternSketchRegion). Left: Transform pattern 7's in-feature mate connector (translation).
