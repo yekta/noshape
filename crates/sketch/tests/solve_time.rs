@@ -45,3 +45,55 @@ fn fuzz_sketch_regions_quickly() {
     assert_eq!(regions.len(), 1385);
     assert!(took < Duration::from_secs(1), "{took:?}");
 }
+
+/// Timings of the two broken spline sketches (PLAN 2.7, T2): a re-solve, one with the DOF analysis, regions, a
+/// dimension change, and a 30-step point drag of qa's fuzz sketch; the sk211 constraints above.
+/// `tools/tiers/perf.sh -p noshape-sketch --test all -- solve_time::broken_spline_sketch_timings --ignored --nocapture`
+#[test]
+#[ignore = "T2: timings"]
+fn broken_spline_sketch_timings() {
+    use noshape_sketch::SolveOptions;
+    let path = format!("{}/tests/fixtures/solve/fz211-final.json", env!("CARGO_MANIFEST_DIR"));
+    let sk: Sketch = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let med = |mut v: Vec<Duration>| {
+        v.sort();
+        (v[v.len() / 2].as_secs_f64() * 1e3, v[v.len() - 1].as_secs_f64() * 1e3)
+    };
+    let (mut plain, mut analyze, mut dim) = (Vec::new(), Vec::new(), Vec::new());
+    let d = sk.constraints().find(|c| c.driving && c.kind.is_dimension() && c.kind.value().is_some_and(|v| v.abs() > 1e-9)).map(|c| (c.id, c.kind.value().unwrap()));
+    for _ in 0..5 {
+        let mut s = sk.clone();
+        let t = Instant::now();
+        s.solve_with(&SolveOptions { analyze: false, ..Default::default() });
+        plain.push(t.elapsed());
+        let mut s = sk.clone();
+        let t = Instant::now();
+        s.solve_with(&SolveOptions { analyze: true, ..Default::default() });
+        analyze.push(t.elapsed());
+        let mut s = sk.clone();
+        let t = Instant::now();
+        if let Some((id, v)) = d {
+            let _ = s.set_dimension_value(id, v * 1.002);
+        }
+        s.solve();
+        dim.push(t.elapsed());
+    }
+    let mut s = sk.clone();
+    let p = s.entities().filter(|e| e.kind() == EntityKind::Line && !e.external).flat_map(|e| e.point_refs()).find(|p| s.point(*p).is_some()).unwrap();
+    let from = s.point(p).unwrap();
+    let t = Instant::now();
+    let each = s.begin_drag(&[(DragHandle::Point(p), from)]);
+    let begin = t.elapsed().as_secs_f64() * 1e3;
+    let start = s.clone();
+    let mut steps = Vec::new();
+    for k in 1..=30 {
+        if each {
+            s = start.clone();
+        }
+        let t = Instant::now();
+        s.drag(&[(DragHandle::Point(p), from + glam::DVec2::new(0.0002 * k as f64, 0.0001 * k as f64))]);
+        steps.push(t.elapsed());
+    }
+    let f = |(m, w): (f64, f64)| format!("median {m:.2} ms, worst {w:.2} ms");
+    println!("fz211: re-solve {}; with the DOF analysis {}; a dimension change {}; drag: begin {begin:.2} ms, a step {}", f(med(plain)), f(med(analyze)), f(med(dim)), f(med(steps)));
+}
