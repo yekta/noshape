@@ -1548,3 +1548,20 @@ fn dumped_body_faces_probe() {
         }
     }
 }
+
+/// SHELL-SLOW's Shell 4 (qa's 5267: a block with a B-spline ramp round a Ø12 hole, the ramp's foot on a 0.1 mm skirt),
+/// 1 mm in without its sloped face: live builds it, 13661.1 mm³ [13635.2, 13687.1], in 627 ms. Ours by quadrics: a
+/// corner of four faces split in two (the ramp tangent to a fillet tangent to the top, ending on the hole), the skirt
+/// gone inside (the rounds' offsets meet the floor's), the ramp's edge round the hole marched. It failed after 10.8 s.
+#[test]
+fn shell4_ramp_round_a_hole_on_a_skirt_shells_as_live() {
+    set_working_scale(1000.0).unwrap();
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell/shell4-input.brep");
+    let body = read_brep(&path).unwrap();
+    let faces = body.faces();
+    let r = shell_solid(&body, &[faces[1].clone()], 0.001, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+    assert_eq!(last_shell_path(), "quadrics");
+    assert!(r.is_valid());
+    let v = vol(&r) * 1e9;
+    assert!((13635.2..=13687.1).contains(&v), "{v} mm3");
+}

@@ -116,6 +116,10 @@
 #include <Geom_SphericalSurface.hxx>
 #include <functional>
 #include <GeomProjLib.hxx>
+#include <Geom2d_BSplineCurve.hxx>
+#include <Geom2dAPI_Interpolate.hxx>
+#include <TColgp_HArray1OfPnt2d.hxx>
+#include <TColStd_HArray1OfReal.hxx>
 #include <Geom_Plane.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <BOPAlgo_ArgumentAnalyzer.hxx>
@@ -3547,6 +3551,124 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     across[(size_t)c] = {a, b};
     group[(size_t)tan[0]] = group[(size_t)tan[1]] = c;
   }
+  // Strips lower than the wall: a planar face square to a planar neighbour b across one sharp base edge, every point
+  // of it nearer b than t, its edges across from the base tangent to their faces and its two other edges short ends
+  // (Shell 4's 0.1 mm skirt under its front rounds). In the wall's inside it vanishes: the rounds' offsets meet b's,
+  // its top edges are edges between them and b, its base and ends go, each end's two corners one.
+  std::vector<char>                     strip(nf + 1);
+  std::vector<std::vector<TopoDS_Edge>> base_by(ne + 1); // a strip's base edge: its top edges, in order
+  std::vector<std::vector<int>>         v_faces(nv + 1), v_edges(nv + 1);
+  for (int c = 1; c <= nf; ++c)
+  {
+    if (!kept[(size_t)c] || collapse[(size_t)c] || sf[(size_t)c].kind != GeomAbs_Plane)
+      continue;
+    const TopoDS_Face fc = TopoDS::Face(faces(c));
+    int               nw = 0;
+    for (TopExp_Explorer x(fc, TopAbs_WIRE); x.More(); x.Next())
+      ++nw;
+    if (nw != 1)
+      continue;
+    std::vector<TopoDS_Edge> uses;
+    for (BRepTools_WireExplorer x(BRepTools::OuterWire(fc), fc); x.More(); x.Next())
+      uses.push_back(x.Current());
+    // The base: a sharp edge to a kept plane square to c, every vertex of c within t of that plane.
+    int base = -1, b = -1;
+    for (size_t p = 0; p < uses.size() && base < 0; ++p)
+    {
+      const int e = edges.FindIndex(uses[p]), o = efi[(size_t)e][0] == c ? efi[(size_t)e][1] : efi[(size_t)e][0];
+      if (tangent[(size_t)e] || seam[(size_t)e] || !kept[(size_t)o] || collapse[(size_t)o] || sf[(size_t)o].kind != GeomAbs_Plane
+          || std::abs(sf[(size_t)o].n.Dot(sf[(size_t)c].n)) > 1e-9 * sf[(size_t)o].n.Modulus() * sf[(size_t)c].n.Modulus())
+        continue;
+      const gp_Pln pb = BRepAdaptor_Surface(TopoDS::Face(faces(o))).Plane();
+      bool         low = true;
+      for (TopExp_Explorer x(fc, TopAbs_VERTEX); x.More() && low; x.Next())
+        low = pb.Distance(BRep_Tool::Pnt(TopoDS::Vertex(x.Current()))) < 0.9 * t;
+      if (low)
+      {
+        base = (int)p;
+        b    = o;
+      }
+    }
+    if (base < 0)
+      continue;
+    // From the base round: an end, the top edges (tangent), the other end.
+    const size_t n = uses.size();
+    if (n < 4)
+      continue;
+    const int e_end1 = edges.FindIndex(uses[(base + 1) % n]), e_end2 = edges.FindIndex(uses[(base + n - 1) % n]);
+    std::vector<TopoDS_Edge> top;
+    bool                     ok = true;
+    for (size_t p = 2; p + 1 < n && ok; ++p)
+    {
+      const int e = edges.FindIndex(uses[(base + p) % n]), o = efi[(size_t)e][0] == c ? efi[(size_t)e][1] : efi[(size_t)e][0];
+      ok = tangent[(size_t)e] && !seam[(size_t)e] && kept[(size_t)o] && !collapse[(size_t)o] && o != b;
+      top.push_back(uses[(base + p) % n]);
+    }
+    for (const int e : {e_end1, e_end2})
+    {
+      const int o = efi[(size_t)e][0] == c ? efi[(size_t)e][1] : efi[(size_t)e][0];
+      ok        = ok && !tangent[(size_t)e] && !seam[(size_t)e] && kept[(size_t)o] && BRepAdaptor_Curve(TopoDS::Edge(edges(e))).GetType() == GeomAbs_Line;
+    }
+    if (!ok || top.empty() || e_end1 == e_end2)
+      continue;
+    strip[(size_t)c]                                      = 1;
+    const int eb                                          = edges.FindIndex(uses[base]);
+    gone[(size_t)eb] = gone[(size_t)e_end1] = gone[(size_t)e_end2] = 1;
+    // (Its top edges in order; b's wire takes them from the base's start, either way round: below.)
+    base_by[(size_t)eb] = top;
+    for (const TopoDS_Edge& e : top)
+    {
+      const int k = edges.FindIndex(e);
+      (efi[(size_t)k][0] == c ? efi[(size_t)k][0] : efi[(size_t)k][1]) = b;
+      tangent[(size_t)k] = 0;
+    }
+    for (const int e : {e_end1, e_end2})
+    {
+      TopoDS_Vertex v0, v1;
+      TopExp::Vertices(TopoDS::Edge(edges(e)), v0, v1);
+      const int r0 = find(verts.FindIndex(v0)), r1 = find(verts.FindIndex(v1));
+      if (r0 != r1)
+        vrep[(size_t)r1] = r0;
+    }
+  }
+  // The faces and edges at each of the strips' vertices: b for the strip, and both corners' where they're one.
+  if (std::any_of(strip.begin(), strip.end(), [](char x) { return x != 0; }))
+    for (int i = 1; i <= nv; ++i)
+    {
+      const int r = find(i);
+      for (int j = 1; j <= nv; ++j)
+      {
+        if (find(j) != r)
+          continue;
+        const TopoDS_Vertex& vj = TopoDS::Vertex(verts(j));
+        for (ShapeList::Iterator it(vf.FindFromKey(vj)); it.More(); it.Next())
+          v_faces[(size_t)i].push_back(faces.FindIndex(it.Value()));
+        for (ShapeList::Iterator it(ve.FindFromKey(vj)); it.More(); it.Next())
+          if (!gone[(size_t)edges.FindIndex(it.Value())])
+            v_edges[(size_t)i].push_back(edges.FindIndex(it.Value()));
+      }
+      bool on_strip = false;
+      for (int f : v_faces[(size_t)i])
+        on_strip = on_strip || strip[(size_t)f];
+      if (!on_strip)
+      {
+        v_faces[(size_t)i].clear();
+        v_edges[(size_t)i].clear();
+        continue;
+      }
+      // The strip's faces out, the base's in (where the strip was).
+      std::vector<int> fs2;
+      for (int f : v_faces[(size_t)i])
+        if (!strip[(size_t)f] && std::find(fs2.begin(), fs2.end(), f) == fs2.end())
+          fs2.push_back(f);
+      for (int e : v_edges[(size_t)i])
+        for (int f : efi[(size_t)e])
+          if (std::find(fs2.begin(), fs2.end(), f) == fs2.end())
+            fs2.push_back(f);
+      v_faces[(size_t)i] = fs2;
+      std::sort(v_edges[(size_t)i].begin(), v_edges[(size_t)i].end());
+      v_edges[(size_t)i].erase(std::unique(v_edges[(size_t)i].begin(), v_edges[(size_t)i].end()), v_edges[(size_t)i].end());
+    }
   // Vertices: three faces (two tangent: along their offset tangent line), or a closed face's seam and one face.
   std::vector<gp_XYZ> pts(nv + 1);
   // Vertices whose offsets are two corners and an edge between them (four faces, two tangent edges on one): the
@@ -3565,12 +3687,14 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     const TopoDS_Vertex& v  = TopoDS::Vertex(verts(i));
     const gp_Pnt         V  = BRep_Tool::Pnt(v);
     const ShapeList&     fl = vf.FindFromKey(v);
-    std::vector<int>     fs;
-    for (ShapeList::Iterator it(fl); it.More(); it.Next())
-      fs.push_back(faces.FindIndex(it.Value()));
-    std::vector<int> es;
-    for (ShapeList::Iterator it(ve.FindFromKey(v)); it.More(); it.Next())
-      es.push_back(edges.FindIndex(it.Value()));
+    std::vector<int>     fs = v_faces[(size_t)i];
+    if (fs.empty())
+      for (ShapeList::Iterator it(fl); it.More(); it.Next())
+        fs.push_back(faces.FindIndex(it.Value()));
+    std::vector<int> es = v_edges[(size_t)i];
+    if (es.empty())
+      for (ShapeList::Iterator it(ve.FindFromKey(v)); it.More(); it.Next())
+        es.push_back(edges.FindIndex(it.Value()));
     auto n_at = [&](int f) { return gp_Vec(normal_at(TopoDS::Face(faces(f)), V)).XYZ(); };
     // The corner on tangent edge `tp` (between `a` and another face) where its offset meets face `third`'s; the reason
     // where it isn't found.
@@ -3871,6 +3995,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   std::vector<TopoDS_Edge> ex(ne + 1);
   std::vector<char>        flip(ne + 1);
   std::vector<int>         group_edge(nf + 1, 0); // a collapsing face's edge (the first of its tangent edges)
+  std::map<int, std::pair<std::vector<double>, std::vector<gp_Pnt>>> marched_at; // a marched edge's points by parameter
   for (int i = 1; i <= ne; ++i)
   {
     // (A removed face's seam has no offset: its rim bands get their own, below.)
@@ -4073,14 +4198,16 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
             m1 = pb.LowerDistanceParameter();
           }
         }
-        const int                  n = 32;
+        // (64 steps: 32 left the curves on a free-form offset 30 µm apart between the points.)
+        const int                  n = 64;
         NCollection_Array1<gp_Pnt> q(1, n + 1);
         bool                       marched = true;
         for (int k = 1; k < n && marched; ++k)
         {
           gp_Pnt p;
           gp_Vec d;
-          oc.D1(m0 + (m1 - m0) * k / n, p, d);
+          // (Closer at the ends: a corner can sit by a curl, where a free-form offset's parameters run fast.)
+          oc.D1(m0 + (m1 - m0) * 0.5 * (1 - std::cos(M_PI * k / n)), p, d);
           if (d.Magnitude() < 1e-12)
           {
             marched = false;
@@ -4099,12 +4226,18 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         q(n + 1) = B;
         if (marched)
         {
-          GeomAPI_PointsToBSpline fit(q, 3, 8, GeomAbs_C2, 1e-7 * size);
+          // By chord length; its curves on the faces fitted through the same points at the same parameters (below).
+          NCollection_Array1<double> pr(1, n + 1);
+          pr(1) = 0;
+          for (int k = 2; k <= n + 1; ++k)
+            pr(k) = pr(k - 1) + q(k).Distance(q(k - 1));
+          GeomAPI_PointsToBSpline fit(q, pr, 3, 8, GeomAbs_C2, 1e-7 * size);
           if (fit.IsDone())
           {
             c  = fit.Curve();
             p0 = c->FirstParameter();
             p1 = c->LastParameter();
+            marched_at[i] = {std::vector<double>(pr.begin(), pr.end()), std::vector<gp_Pnt>(q.begin(), q.end())};
           }
         }
       }
@@ -4175,6 +4308,29 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     for (TopoDS_Iterator it(w, false); it.More(); it.Next())
     {
       const int k = edges.FindIndex(it.Value());
+      if (gone[(size_t)k] && !base_by[(size_t)k].empty())
+      {
+        // A strip's base: the strip's top edges' offsets, from where the base starts (its corner and the top's one).
+        std::vector<TopoDS_Edge> chain = base_by[(size_t)k];
+        const int start = find(verts.FindIndex(TopExp::FirstVertex(TopoDS::Edge(it.Value()), true)));
+        if (find(verts.FindIndex(TopExp::FirstVertex(chain.front(), true))) != start)
+        {
+          std::reverse(chain.begin(), chain.end());
+          for (TopoDS_Edge& te : chain)
+            te.Reverse();
+        }
+        for (const TopoDS_Edge& te : chain)
+        {
+          const int j = edges.FindIndex(te);
+          if (ex[(size_t)j].IsNull())
+          {
+            ok_wires = false;
+            continue;
+          }
+          bld.Add(ow, ex[(size_t)j].Oriented(flip[(size_t)j] ? TopAbs::Reverse(te.Orientation()) : te.Orientation()));
+        }
+        continue;
+      }
       if (gone[(size_t)k])
         continue;
       if (ex[(size_t)k].IsNull())
@@ -4222,7 +4378,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     const TopoDS_Face& f  = TopoDS::Face(it.Value());
     const int          i  = faces.FindIndex(f);
     const TopoDS_Face  ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
-    if (collapse[(size_t)i])
+    if (collapse[(size_t)i] || strip[(size_t)i])
       bld.Add(shell, outward ? TopoDS_Shape(f.Reversed()) : TopoDS_Shape(f)); // (no offset: the neighbours' offsets meet where it was)
     else if (kept[(size_t)i])
     {
@@ -4249,6 +4405,72 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
               return no("a pole without its curve");
             bld.UpdateEdge(ex[(size_t)k], occ::down_cast<Geom2d_Curve>(pc->Copy()), of, 1e3 * tol);
             bld.Range(ex[(size_t)k], of, c0, c1);
+            continue;
+          }
+          if (const auto mp = marched_at.find(k); mp != marched_at.end())
+          {
+            // A marched edge: its points' places on the offset, at the 3D curve's parameters, fitted (continuous in a
+            // periodic u, then a whole number of turns to the original's start).
+            const occ::handle<Geom_Surface>& g = sf[(size_t)i].off;
+            const auto& [pr, pts3]             = mp->second;
+            NCollection_Array1<gp_Pnt2d> uv(1, (int)pts3.size());
+            NCollection_Array1<double>   pp(1, (int)pr.size());
+            bool                         on = true;
+            // (Each from the last one's place: a free-form offset can fold near a curl, its two sheets through one
+            // point.)
+            const occ::handle<ShapeAnalysis_Surface> sas = new ShapeAnalysis_Surface(g);
+            for (size_t p = 0; p < pts3.size() && on; ++p)
+            {
+              gp_Pnt2d w2 = p == 0 ? sas->ValueOfUV(pts3[p], 1e3 * tol) : sas->NextValueOfUV(uv((int)p), pts3[p], 1e3 * tol);
+              if (p > 0 && g->Value(w2.X(), w2.Y()).Distance(pts3[p]) >= 1e3 * tol)
+                w2 = sas->ValueOfUV(pts3[p], 1e3 * tol);
+              // (A free-form offset's points are marched to its projection's precision, a few µm.)
+              on = g->Value(w2.X(), w2.Y()).Distance(pts3[p]) < std::max(1e3 * tol, 1e-4 * size);
+              if (!on)
+                break;
+              double u = w2.X(), v = w2.Y();
+              if (p > 0 && g->IsUPeriodic())
+                u += std::round((uv((int)p).X() - u) / g->UPeriod()) * g->UPeriod();
+              uv((int)p + 1) = gp_Pnt2d(u, v);
+              pp((int)p + 1) = pr[p];
+            }
+            if (!on)
+              return no("a marched edge's curve on its face failed");
+            // (Interpolated: PointsToBSpline's 2D fit at given parameters ran 2 radians off its own points.)
+            occ::handle<TColgp_HArray1OfPnt2d> huv = new TColgp_HArray1OfPnt2d(uv);
+            occ::handle<TColStd_HArray1OfReal> hpp = new TColStd_HArray1OfReal(pp);
+            Geom2dAPI_Interpolate              fit2(huv, hpp, false, 1e-12);
+            fit2.Perform();
+            if (!fit2.IsDone())
+              return no("a marched edge's curve on its face failed");
+            occ::handle<Geom2d_Curve> c2(fit2.Curve());
+            double                    o0, o1;
+            if (const occ::handle<Geom2d_Curve> co = BRep_Tool::CurveOnSurface(TopoDS::Edge(edges(k).Oriented(TopAbs_FORWARD)), ff, o0, o1); !co.IsNull() && g->IsUPeriodic())
+            {
+              const double du = std::round((co->Value(o0).X() - c2->Value(c2->FirstParameter()).X()) / g->UPeriod()) * g->UPeriod();
+              if (du != 0)
+                c2->Translate(gp_Vec2d(du, 0));
+            }
+            bld.UpdateEdge(ex[(size_t)k], c2, of, 1e3 * tol);
+            bld.Range(ex[(size_t)k], of, pr.front(), pr.back());
+            // Its tolerance what the curves are apart between the points (an intersection's approximation).
+            {
+              double                        a0, a1, w = 0;
+              const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(ex[(size_t)k], a0, a1);
+              const int ns = 4 * (int)pr.size();
+              for (int p = 0; p <= ns; ++p)
+              {
+                const double   sp = pr.front() + (pr.back() - pr.front()) * p / ns;
+                const gp_Pnt2d u2 = c2->Value(sp);
+                w                 = std::max(w, g->Value(u2.X(), u2.Y()).Distance(c3->Value(sp)));
+              }
+              if (1.5 * w > BRep_Tool::Tolerance(ex[(size_t)k]))
+              {
+                bld.UpdateEdge(ex[(size_t)k], 1.5 * w);
+                for (TopExp_Explorer vx2(ex[(size_t)k], TopAbs_VERTEX); vx2.More(); vx2.Next())
+                  bld.UpdateVertex(TopoDS::Vertex(vx2.Current()), std::max(BRep_Tool::Tolerance(TopoDS::Vertex(vx2.Current())), 1.5 * w));
+              }
+            }
             continue;
           }
           if (!quad::add_pcurve(ex[(size_t)k], of, TopoDS::Edge(edges(k).Oriented(TopAbs_FORWARD)), ff, seam[(size_t)k] != 0, 1e3 * tol))
@@ -4433,8 +4655,34 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     an.ContinuityMode()     = false;
     an.CurveOnSurfaceMode() = false;
     an.Perform();
+    // (Only where an offset takes part: the part's own shapes can touch within their tolerances, Shell 4's two
+    // vertices 0.1 mm apart, one 0.1 mm loose.)
+    bool crossing = false;
     if (an.HasFaulty())
+    {
+      ShapeIMap in;
+      TopExp::MapShapes(so, in);
+      for (const BOPAlgo_CheckResult& cr : an.GetCheckResult())
+        for (const TopoDS_Shape& x : cr.GetFaultyShapes1())
+          crossing = crossing || !in.Contains(x);
+    }
+    if (crossing)
+    {
+      if (dbg)
+        for (const BOPAlgo_CheckResult& cr : an.GetCheckResult())
+        {
+          std::fprintf(stderr, "quadrics: interference %d:", (int)cr.GetCheckStatus());
+          for (const TopoDS_Shape& x : cr.GetFaultyShapes1())
+          {
+            Bnd_Box bb;
+            BRepBndLib::Add(x, bb);
+            const gp_Pnt c = bb.IsVoid() ? gp_Pnt() : gp_Pnt((bb.CornerMin().XYZ() + bb.CornerMax().XYZ()) / 2);
+            std::fprintf(stderr, " [type %d at %.3f %.3f %.3f]", (int)x.ShapeType(), c.X() * 1e3, c.Y() * 1e3, c.Z() * 1e3);
+          }
+          std::fprintf(stderr, "\n");
+        }
       return no("the offsets cross each other or the part");
+    }
   }
   lap("self-interference");
   const double vw = volume_of(wall), vs = volume_of(so);

@@ -1554,6 +1554,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   edge whose offsets' intersection comes in pieces is marched. Shell corpus (211): no outcome or volume changes. Shell 4
   now stops at a 0.1 mm step (edge 25, planes at z 0..0.1 mm by the ramp's foot) whose offset vanishes at 1 mm: the
   cavity loses that face (Parasolid's 28 / 73 / 44): next.
+  core 11-04 04:30: **Shell 4 builds** by quadrics, 13659.035 mm³ (live 13661.1 [13635.2, 13687.1]), 2.4 s (failed
+  after 10.8 s; live 627 ms): the skirt is a strip lower than the wall (a plane square to its base's plane, its top
+  edges tangent): inside, the rounds' offsets meet the floor's, its base and ends go; an edge whose offsets'
+  intersection comes in pieces is marched (cosine-spaced, its curves on the faces through the same points at the
+  same parameters, its tolerance what they're apart); the self-interference check ignores the part's own shapes
+  (two of its vertices 0.1 mm apart, one 0.1 mm loose). Shell corpus unchanged (211). T1 kernel shell::
+  shell4_ramp_round_a_hole_on_a_skirt_shells_as_live. Left: 24 faces against live's 28; 2.4 s against 0.63 (the
+  self-interference check 1.7 s of it).
 - [ ] P0 REGEN-SPEED (core 10-29 03:05: met in release on perf.yml run 40796942944 (main 34cbea98): live-30-features full regen 35 / 41 / 53 ms (macOS / Linux / Windows; budget 80, live 171), its Extrude 1 edit commit 34 / 38 / 60 ms (budget 200), big-plate regen 159 / 230 / 306 ms (live 617); qa, please re-measure the GUI commit on a release build, the 301–785 ms were a dev build at load ~30. Was 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left
