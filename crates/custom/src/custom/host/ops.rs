@@ -2017,11 +2017,13 @@ fn op_extend_sheet_body(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 fn op_fill_surface(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (cx, id, def) = args(i, &a)?;
     let mut items = Vec::new();
+    let mut boundary = Vec::new();
     for (key, continuity) in [("edgesG0", "G0"), ("edgesG1", "G1"), ("edgesG2", "G2")] {
         let edges = evaluate_refs(i, &cx, def.get(key))?;
         if edges.is_empty() {
             continue;
         }
+        boundary.extend(edges.iter().cloned());
         let mut item = ParamValues::default();
         item.set("entities", ParamValue::Query(edges));
         item.set("continuity", ParamValue::Enum(continuity.into()));
@@ -2041,6 +2043,8 @@ fn op_fill_surface(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     if let Some(n) = def.get("sampleSize").as_number() {
         p.set("sampleSize", ParamValue::Expr(noshape_units::ExprValue::new(n.to_string())));
     }
+    // Its edges depend on the boundary they were built along (qDependency: std joins the patch to the sheet there).
+    cx.state.lock().dependencies.insert(id.clone(), boundary);
     run_op_with(i, &cx, &id, "REGEN_ERROR", &p, crate::regen::features::surfaces::fill)?;
     Ok(Value::Undefined)
 }

@@ -668,5 +668,22 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             check("opFillet createDetachedSurface", size(evaluateQuery(context, qOwnedByBody(qCreatedBy(sub + "c", EntityType.BODY), EntityType.FACE))) == 6 &&
                     size(evaluateQuery(context, qBodyType(qCreatedBy(sub + "f", EntityType.BODY), BodyType.SHEET))) == 1 && abs(fa - PI * mm * 10 * mm) < 1e-6 * mm ^ 2, fa);
         });
+        step(context, id, "fillAfterSplit", function(sub) {
+            // The public Setback Fillet: a face split, half of it deleted open, the hole filled; the fill's edges are
+            // its own (one lies where the split's edge does) and depend on the boundary, so std's join finds them.
+            const z = 4500;
+            fCuboid(context, sub + "b", { "corner1" : vector(0, 0, z) * mm, "corner2" : vector(10, 10, z + 10) * mm });
+            const body = qCreatedBy(sub + "b", EntityType.BODY);
+            opPlane(context, sub + "pl", { "plane" : plane(vector(5, 0, z) * mm, vector(1, 0, 0)) });
+            opSplitFace(context, sub + "split", { "faceTargets" : qContainsPoint(qCreatedBy(sub + "b", EntityType.FACE), vector(5, 5, z + 10) * mm), "planeTools" : qCreatedBy(sub + "pl", EntityType.FACE) });
+            opDeleteBodies(context, sub + "delpl", { "entities" : qCreatedBy(sub + "pl", EntityType.BODY) });
+            opDeleteFace(context, sub + "del", { "deleteFaces" : qContainsPoint(qOwnedByBody(body, EntityType.FACE), vector(2.5, 5, z + 10) * mm), "includeFillet" : false, "capVoid" : false, "leaveOpen" : true });
+            const hole = qEdgeTopologyFilter(qOwnedByBody(body, EntityType.EDGE), EdgeTopology.LAMINAR);
+            opFillSurface(context, sub + "fill", { "edgesG0" : hole, "edgesG1" : qNothing(), "edgesG2" : qNothing(), "guideVertices" : qNothing() });
+            const made = qEdgeTopologyFilter(qCreatedBy(sub + "fill", EntityType.EDGE), EdgeTopology.LAMINAR);
+            const atSplit = qContainsPoint(made, vector(5, 5, z + 10) * mm);
+            const fromSplit = size(evaluateQuery(context, qIntersection([qDependency(atSplit), qCreatedBy(sub + "split", EntityType.EDGE)])));
+            check("opFillSurface makes its edges, on its boundary", size(evaluateQuery(context, hole)) == 4 && size(evaluateQuery(context, made)) == 4 && fromSplit == 1, [size(evaluateQuery(context, made)), fromSplit]);
+        });
         println("done");
     });

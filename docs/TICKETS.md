@@ -4089,7 +4089,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   bool 11-04 18:29: that subtraction (20 tooth gaps from the blank) is noshape's Boolean now: 0.25 s, OCCT's 2.0 s
   (it declined "coincident pieces differ": the blank's cylinder split at its seam under a gap's B-spline face). All 14
   of the document's Booleans are taken, 2-8x OCCT's speed.
-- [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
+- [x] (dx 11-04 21:45: both Setback Fillets run again, one solid with live's counts: a body another operation made
+  after a split (the fill's patch) keeps its own edges where the split's lie, and opFillSurface's edges depend on its
+  boundary, so std 782's join finds its matches; T1 ops_harness fillAfterSplit. Left: +0.12 % area, the fill's
+  shape, core's fill surface.) P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet
   splits a fillet and a flat face, deletes the corner (opDeleteFace leaveOpen) and fills the hole with those split

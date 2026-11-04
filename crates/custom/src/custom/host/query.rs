@@ -795,7 +795,11 @@ impl<'a> QueryCx<'a> {
         let Ent::Edge(b, _) = e else { return None };
         let body = &self.st.ctx.bodies[*b].id;
         let touched = self.st.touched.get(body).copied();
-        let mut splits = self.st.split_face_edges.iter().rev().filter(|(_, owners, _, seq)| owners.contains(body) || touched.is_some_and(|t| t >= *seq)).peekable();
+        // A body another operation made after the split has its own edges, even where the split's lie (a fill
+        // patching the hole its edges bound).
+        let made = self.st.body_ops.get(body).and_then(|op| self.st.ops.values().find(|o| &o.id == op).map(|o| (op, o.seq)));
+        let later = |id: &FsId, seq: u32| made.is_some_and(|(op, s)| op != id && s > seq);
+        let mut splits = self.st.split_face_edges.iter().rev().filter(|(id, owners, _, seq)| owners.contains(body) || (touched.is_some_and(|t| t >= *seq) && !later(id, *seq))).peekable();
         splits.peek()?;
         let s = self.shape(e)?;
         let info = s.edge_info().ok()?;
