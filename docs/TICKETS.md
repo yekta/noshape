@@ -3477,6 +3477,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the arc (the dumped fillet, kernel T2 blend::dumped_fillet_faces_probe) the result is live's: 81 faces, 11179.174277
   mm³, 5211.1405 mm². (Still OCCT's, ~170 ms against live's 31: noshape's blend wants a planar face along each
   edge, and these run between two cylinders; BLEND-RUST.)
+  core 11-04 05:47: noshape's blend takes those now (blend/prism.rs: a straight edge between two faces ruled along it,
+  ending on caps square to it, rounded as the section's fillet swept between the caps): live's 81 faces, 11179.174220
+  mm³, 5211.140462 mm², 2.3 ms against OCCT's 170 (T1 kernel blend::fin_end_rounds_between_two_cylinders_are_lives).
+  The document needs this ticket's query too.
 
 - [ ] P1 PARITY-SPEED (core; dx's parity suite 11-03 run 31, the runner's new "speed:" line) 10 of the 41 corpus
   documents with live's times regenerate slower than live (ours: the reopened document's regeneration on vibe5;

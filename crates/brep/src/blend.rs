@@ -15,6 +15,7 @@ use crate::nurbs::NurbsCurve;
 use crate::{Body, Curve, Decline, Edge, Face, Kind, Origin, Output, Record, Relation, Solid, Surface, Use};
 
 mod corner;
+mod prism;
 use glam::DVec3;
 
 /// A blend of one edge.
@@ -403,7 +404,11 @@ pub fn blend(body: &Body, edges: &[BlendEdge], tol: f64) -> Result<Output, Decli
     let ve = vertex_edges(body);
     let order: Vec<u32> = edges.iter().map(|e| e.edge).collect();
     let corners = vertex_corners(body, &uses, &ve, &spec_of, &order);
-    let chains = chains(body, &uses, &ve, &spec_of, &corners, margin)?;
+    let chains = match chains(body, &uses, &ve, &spec_of, &corners, margin) {
+        Ok(c) => c,
+        // (Straight edges between faces ruled along them, ending on caps square to them: each its own round.)
+        Err(why) => return prism::blend(body, edges, &uses, &ve, margin).map_err(|_| why),
+    };
     let boxes: Vec<(DVec3, DVec3)> = body.edges.iter().map(|e| edge_box(body, e)).collect();
     for c in &chains {
         check_clearance(body, &ve, &boxes, c, &chains, &corners, margin)?;

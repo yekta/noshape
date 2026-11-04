@@ -1216,3 +1216,39 @@ fn rounds_of_arcs_meeting_at_corners_are_lives() {
         assert!((a - 47.162566997).abs() < 1e-5 || (a - 78.315557040).abs() < 1e-5, "{a}");
     }
 }
+
+/// stef-radijator's Fillet 1 (live "core (2026-11-04 00:09)" (b): 81 faces, cylinders and planes only, 11179.174219
+/// mm³, 5211.140462 mm²): R1 on the 36 fin ends' vertical edges, each between the outer cylinder and a gap's,
+/// ending on the top and the hub's face. noshape's blend takes it (each round the section's fillet swept between
+/// the caps), live's to the last digits; OCCT's took 170 ms (live 31).
+#[test]
+fn fin_end_rounds_between_two_cylinders_are_lives() {
+    setup();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/blend");
+    let s = read_brep(&dir.join("radiator-fins.brep")).unwrap();
+    let es: Vec<Shape> = s
+        .edges()
+        .into_iter()
+        .filter(|e| {
+            e.edge_info().is_ok_and(|i| {
+                let on_rim = |p: glam::DVec3| ((p.x * p.x + p.y * p.y).sqrt() / MM - 22.5).abs() < 1e-3;
+                matches!(i.curve, Curve::Line { .. }) && ((i.end - i.start).z.abs() / MM - 5.0).abs() < 1e-6 && on_rim(i.start) && on_rim(i.end)
+            })
+        })
+        .collect();
+    assert_eq!(es.len(), 36);
+    set_rust_blend(Some(true));
+    let t = std::time::Instant::now();
+    let r = fillet_checked(&s, &es, &[MM; 36]);
+    let ms = t.elapsed().as_secs_f64() * 1e3;
+    set_rust_blend(None);
+    let r = r.unwrap().shape;
+    assert_eq!(last_blend_decline(), "");
+    assert!(r.is_valid());
+    let u = unify_same_domain(&r).unwrap().shape;
+    assert_eq!(u.faces().len(), 81);
+    assert!(u.faces().iter().all(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { .. } | Surface::Plane(_)))));
+    assert!((vol_mm3(&u) - 11179.174219).abs() < 1e-4, "{}", vol_mm3(&u));
+    assert!((u.area().unwrap() / (MM * MM) - 5211.140462).abs() < 1e-4);
+    eprintln!("fin end rounds: {ms:.1} ms");
+}

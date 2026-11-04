@@ -797,14 +797,32 @@ bool rust_blend(const OcShape& s, const std::vector<TopoDS_Edge>& es, const std:
       occ::handle<Geom_Curve> basis = c;
       while (const occ::handle<Geom_TrimmedCurve> tc = occ::down_cast<Geom_TrimmedCurve>(basis))
         basis = tc->BasisCurve();
-      const occ::handle<Geom_Line> ln = occ::down_cast<Geom_Line>(basis);
-      if (ln.IsNull())
+      const occ::handle<Geom_Line>   ln = occ::down_cast<Geom_Line>(basis);
+      const occ::handle<Geom_Circle> ci = occ::down_cast<Geom_Circle>(basis);
+      if (ln.IsNull() && ci.IsNull())
       {
-        brep_decline("a piece of an edge not a line");
+        brep_decline("a piece of an edge not a line or an arc");
         return false;
       }
-      const gp_Lin g  = ln->Lin().Transformed(loc.Transformation());
-      const double t0 = ElCLib::Parameter(g, p0), t1 = ElCLib::Parameter(g, p1);
+      double t0, t1;
+      if (!ln.IsNull())
+      {
+        const gp_Lin g = ln->Lin().Transformed(loc.Transformation());
+        t0             = ElCLib::Parameter(g, p0);
+        t1             = ElCLib::Parameter(g, p1);
+      }
+      else
+      {
+        // (A piece of an arc: its ends within the source's range, the source's way.)
+        const gp_Circ g = ci->Circ().Transformed(loc.Transformation());
+        t0              = ElCLib::InPeriod(ElCLib::Parameter(g, p0), f - 1e-9, f - 1e-9 + 2 * M_PI);
+        t1              = ElCLib::InPeriod(ElCLib::Parameter(g, p1), f - 1e-9, f - 1e-9 + 2 * M_PI);
+        if (t0 > l + 1e-9 || t1 > l + 1e-9 || !(t1 > t0))
+        {
+          brep_decline("a piece of an arc off its edge");
+          return false;
+        }
+      }
       bb.MakeEdge(e, c, loc, BRep_Tool::Tolerance(src));
       // (Its curves on the faces it bounds: theirs, set as those faces are made below.)
       bb.Add(e, vs[v0].Oriented(TopAbs_FORWARD));
