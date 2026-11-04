@@ -671,7 +671,7 @@ impl<'a> QueryCx<'a> {
             }
             Some(vec![Arc::from(f.to_string())])
         };
-        let face_id = |n: &TopoName| -> Option<(u32, FsId)> {
+        let uncached = |n: &TopoName| -> Option<(u32, FsId)> {
             let own = match self.st.op_of_face(n) {
                 Some(op) => Some((op.seq, op.id.clone())),
                 None => n.creator().and_then(|f| feature_id(f).map(|i| (0, i))),
@@ -683,7 +683,16 @@ impl<'a> QueryCx<'a> {
                 (o, None) => o,
             }
         };
-        let newest = |faces: &[Arc<TopoName>]| faces.iter().filter_map(|f| face_id(f)).max_by_key(|x| x.0).map(|x| x.1);
+        let face_id = |n: &Arc<TopoName>| -> Option<(u32, FsId)> {
+            let key = Arc::as_ptr(n) as usize;
+            if let Some((_, found)) = self.st.face_creators.lock().get(&key) {
+                return found.clone();
+            }
+            let found = uncached(n);
+            self.st.face_creators.lock().insert(key, (n.clone(), found.clone()));
+            found
+        };
+        let newest = |faces: &[Arc<TopoName>]| faces.iter().filter_map(face_id).max_by_key(|x| x.0).map(|x| x.1);
         match e {
             Ent::Datum(DatumPlane::Top) => Some(vec!["Top".into()]),
             Ent::Datum(DatumPlane::Front) => Some(vec!["Front".into()]),
@@ -700,12 +709,12 @@ impl<'a> QueryCx<'a> {
                 TopoName::Edge { faces, .. } => newest(faces),
                 TopoName::Boundary { face, .. } => face_id(face).map(|x| x.1),
                 TopoName::Vertex { faces, .. } => newest(faces),
-                other => face_id(other).map(|x| x.1),
+                other => uncached(other).map(|x| x.1),
             }
             .or_else(|| self.created_by(&Ent::Body(*b))),
             Ent::Vertex(b, i) => match &*ctx.bodies[*b].vertices[*i] {
                 TopoName::Vertex { faces, .. } => newest(faces),
-                other => face_id(other).map(|x| x.1),
+                other => uncached(other).map(|x| x.1),
             }
             .or_else(|| self.created_by(&Ent::Body(*b))),
             Ent::SketchBody(s) | Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) => feature_id(ctx.sketches[*s].feature),
@@ -1413,7 +1422,7 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
             // The entities with a matching attribute, once (thousands of entities and attributes after a pattern).
             let having: std::collections::HashSet<&Reference> = q
                 .st
-                .attributes
+                .attributes()
                 .iter()
                 .filter(|(_, v)| (name.is_undefined() || *v.get("name") == name) && (exact.is_undefined() || *v.get("attribute") == exact) && attr_matches(v.get("attribute"), &pattern))
                 .map(|(x, _)| x)

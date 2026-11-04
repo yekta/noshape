@@ -570,7 +570,7 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         if let Some(op) = st.ops.values().find(|o| o.id == id).cloned() {
             let new: Vec<TopoName> = st.ctx.bodies.iter().filter(|b| targets.contains(&b.id)).flat_map(|b| b.faces.iter()).filter(|n| tools.contains(&**n) || tools.contains(n.root())).map(|n| (**n).clone()).collect();
             for n in new {
-                st.adopted.insert(n, op.clone());
+                st.adopt(n, op.clone());
             }
         }
     }
@@ -738,7 +738,7 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (marker, feature) = (super::marker_of(&id), st.feature);
     own_sketches(&mut st, marker, &sketches);
     for (source, copy) in &sketches {
-        let copied: Vec<Value> = st.attributes.iter().filter(|(r, _)| *r == Reference::Sketch(*source)).map(|(_, v)| v.clone()).collect();
+        let copied: Vec<Value> = st.attributes_of(&Reference::Sketch(*source)).into_iter().cloned().collect();
         for v in copied {
             st.push_attribute(Reference::Sketch(*copy), v);
         }
@@ -746,7 +746,7 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     for (name, source, b) in made {
         let inst = super::wrap_body_id(&b, marker, st.op_bits(marker), feature);
         // A copy keeps its body's attributes (std Form's tool instances keep the Tag's form attributes).
-        let copied: Vec<Value> = st.attributes.iter().filter(|(r, _)| *r == Reference::Body(source.clone())).map(|(_, v)| v.clone()).collect();
+        let copied: Vec<Value> = st.attributes_of(&Reference::Body(source.clone())).into_iter().cloned().collect();
         for v in copied {
             st.push_attribute(Reference::Body(inst.clone()), v);
         }
@@ -1861,7 +1861,7 @@ fn op_merge_contexts(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     }
     let (source, source_attributes) = {
         let o = other.state.lock();
-        (o.ctx.clone(), o.attributes.clone())
+        (o.ctx.clone(), o.attributes().to_vec())
     };
     let (marker, moved, sketches) = run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
         let mut moved: Vec<(BodyId, u32)> = Vec::new();
@@ -1932,7 +1932,7 @@ fn copy_sketches(ev: &mut EvalCtx, id: &[Arc<str>], sketches: impl Iterator<Item
 fn own_sketches(st: &mut super::CtxState, marker: crate::reference::FeatureId, copies: &[(crate::reference::FeatureId, crate::reference::FeatureId)]) {
     if let Some(op) = st.ops.get(&marker).cloned() {
         for (_, new) in copies {
-            st.ops.insert(*new, op.clone());
+            st.alias_op(*new, op.clone());
         }
     }
 }

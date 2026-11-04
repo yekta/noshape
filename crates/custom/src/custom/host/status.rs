@@ -191,7 +191,7 @@ fn set_property(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             continue;
         }
         let key = Value::map_from([("property", Value::str(kind.clone())), ("custom", def.get("customPropertyId").clone())]);
-        st.attributes.retain(|(e, v)| !(*e == r && *v.get("name") == key));
+        st.attributes_mut().retain(|(e, v)| !(*e == r && *v.get("name") == key));
         st.push_attribute(r, Value::map_from([("name", key), ("attribute", value.clone())]));
     }
     Ok(Value::Undefined)
@@ -211,7 +211,7 @@ fn get_property(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         return Ok(Value::str(b.name.clone()));
     }
     let key = Value::map_from([("property", Value::str(kind)), ("custom", def.get("customPropertyId").clone())]);
-    Ok(st.attributes.iter().find(|(e, v)| e == r && *v.get("name") == key).map(|(_, v)| v.get("attribute").clone()).unwrap_or_default())
+    Ok(st.attributes_of(r).into_iter().find(|v| *v.get("name") == key).map(|v| v.get("attribute").clone()).unwrap_or_default())
 }
 
 fn last_modifying_operation_id(i: &mut Interp, a: Vec<Value>) -> R<Value> {
@@ -655,7 +655,7 @@ fn set_attribute(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let mut st = cx.state.lock();
     for r in refs {
         if !name.is_undefined() {
-            st.attributes.retain(|(e, v)| !(*e == r && *v.get("name") == name));
+            st.attributes_mut().retain(|(e, v)| !(*e == r && *v.get("name") == name));
         }
         st.push_attribute(r, Value::map_from([("name", name.clone()), ("attribute", attribute.clone())]));
     }
@@ -686,13 +686,9 @@ fn get_attributes(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let st = cx.state.lock();
     // In the entities' order (Onshape: a Flange's walls are numbered in the
     // order its edges were picked, which Butt joint - Direction 1 follows).
-    let mut by_entity: std::collections::HashMap<&Reference, Vec<&Value>> = std::collections::HashMap::new();
-    for (e, v) in &st.attributes {
-        by_entity.entry(e).or_default().push(v);
-    }
     let mut out: Vec<Value> = Vec::new();
     for e in &refs {
-        for v in by_entity.get(e).into_iter().flatten() {
+        for v in st.attributes_of(e) {
             if !name.is_undefined() && *v.get("name") != name {
                 continue;
             }
@@ -712,7 +708,7 @@ fn get_attribute(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let name = def.get("name").clone();
     let st = cx.state.lock();
     let Some(first) = refs.first() else { return Ok(Value::Undefined) };
-    Ok(st.attributes.iter().find(|(e, v)| e == first && *v.get("name") == name).map(|(_, v)| v.get("attribute").clone()).unwrap_or_default())
+    Ok(st.attributes_of(first).into_iter().find(|v| *v.get("name") == name).map(|v| v.get("attribute").clone()).unwrap_or_default())
 }
 
 fn get_all_attributes(i: &mut Interp, a: Vec<Value>) -> R<Value> {
@@ -722,10 +718,8 @@ fn get_all_attributes(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let st = cx.state.lock();
     let mut m = Map::new();
     if let Some(first) = refs.first() {
-        for (e, v) in &st.attributes {
-            if e == first
-                && let Some(n) = v.get("name").as_str()
-            {
+        for v in st.attributes_of(first) {
+            if let Some(n) = v.get("name").as_str() {
                 m.insert(Value::str(n), v.get("attribute").clone());
             }
         }
@@ -743,7 +737,7 @@ fn remove_attributes(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let pattern = def.get("attributePattern").clone();
     let name = def.get("name").clone();
     let mut st = cx.state.lock();
-    st.attributes.retain(|(e, v)| {
+    st.attributes_mut().retain(|(e, v)| {
         let hit = refs.as_ref().is_none_or(|r| r.contains(e)) && (name.is_undefined() || *v.get("name") == name) && matches_pattern(v.get("attribute"), &pattern);
         !hit
     });

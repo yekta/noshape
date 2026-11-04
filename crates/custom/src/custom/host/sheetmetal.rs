@@ -45,32 +45,7 @@ fn fe(m: impl Into<String>) -> FeatureError {
 
 /// The SM attribute (`SMAttribute`) of an entity with the given object type.
 pub(super) fn sm_attribute(st: &CtxState, r: &Reference, object_type: &str) -> Option<Value> {
-    st.attributes.iter().find(|(x, v)| x == r && v.get("attribute").get("objectType").as_str().is_some_and(|t| &*t == object_type)).map(|(_, v)| v.get("attribute").clone())
-}
-
-/// Each entity's attributes, in order, for loops over many entities (a scan of them all per entity is quadratic:
-/// a Fill pattern leaves a thousand holes, each edge with its attributes).
-pub(super) struct AttrIndex<'a>(HashMap<&'a Reference, Vec<&'a Value>>);
-
-impl<'a> AttrIndex<'a> {
-    pub(super) fn of(st: &'a CtxState) -> Self {
-        let mut m: HashMap<&Reference, Vec<&Value>> = HashMap::new();
-        for (r, v) in &st.attributes {
-            m.entry(r).or_default().push(v);
-        }
-        AttrIndex(m)
-    }
-
-    /// [`sm_attribute`].
-    pub(super) fn sm(&self, r: &Reference, object_type: &str) -> Option<Value> {
-        self.0.get(r)?.iter().find(|v| v.get("attribute").get("objectType").as_str().is_some_and(|t| &*t == object_type)).map(|v| v.get("attribute").clone())
-    }
-
-    /// [`associations`].
-    pub(super) fn associations(&self, r: &Reference) -> Vec<Value> {
-        let tag = std_tag("sheetMetalAttribute.fs", "SMAssociationAttribute");
-        self.0.get(r).map(|vs| vs.iter().filter(|v| v.get("attribute").tag() == tag).map(|v| v.get("attribute").clone()).collect()).unwrap_or_default()
-    }
+    st.attributes_of(r).into_iter().find(|v| v.get("attribute").get("objectType").as_str().is_some_and(|t| &*t == object_type)).map(|v| v.get("attribute").clone())
 }
 
 /// `{ value : <length> }` fields of SM attributes, in meters.
@@ -81,7 +56,7 @@ fn length_field(attr: &Value, key: &str) -> f64 {
 /// The association attributes of an entity (copied to the part entities).
 pub(super) fn associations(st: &CtxState, r: &Reference) -> Vec<Value> {
     let tag = std_tag("sheetMetalAttribute.fs", "SMAssociationAttribute");
-    st.attributes.iter().filter(|(x, v)| x == r && v.get("attribute").tag() == tag).map(|(_, v)| v.get("attribute").clone()).collect()
+    st.attributes_of(r).into_iter().filter(|v| v.get("attribute").tag() == tag).map(|v| v.get("attribute").clone()).collect()
 }
 
 /// A definition sheet to build: its entities and what std attached to them.
@@ -138,9 +113,8 @@ fn joints(st: &CtxState, q: &QueryCx, b: usize) -> Joints {
     let mut rolled = BTreeMap::new();
     let mut ids: JointIds = (BTreeMap::new(), BTreeMap::new());
     let id_of = |j: &Value| j.get("attributeId").as_str().map(|s| Arc::<str>::from(&*s));
-    let attrs = AttrIndex::of(st);
     for f in 0..st.ctx.bodies[b].faces.len() {
-        if let Some(j) = attrs.sm(&q.to_ref(&Ent::Face(b, f)), "JOINT")
+        if let Some(j) = sm_attribute(st, &q.to_ref(&Ent::Face(b, f)), "JOINT")
             && j.get("jointType").get("value").as_str().as_deref() == Some("BEND")
         {
             rolled.insert(f, length_field(&j, "radius"));
@@ -150,7 +124,7 @@ fn joints(st: &CtxState, q: &QueryCx, b: usize) -> Joints {
         }
     }
     for e in 0..st.ctx.bodies[b].edges.len() {
-        let Some(j) = attrs.sm(&q.to_ref(&Ent::Edge(b, e)), "JOINT") else { continue };
+        let Some(j) = sm_attribute(st, &q.to_ref(&Ent::Edge(b, e)), "JOINT") else { continue };
         if let Some(id) = id_of(&j) {
             ids.0.insert(e, id);
         }
@@ -268,13 +242,11 @@ impl BendRelief {
 
 /// Corner features' settings on a definition body's vertices.
 fn relief_overrides(st: &CtxState, q: &QueryCx, b: usize, model: &BendRelief) -> BTreeMap<usize, BendRelief> {
-    let attrs = AttrIndex::of(st);
-    (0..st.ctx.bodies[b].vertices.len()).filter_map(|v| BendRelief::of_vertex(&attrs.sm(&q.to_ref(&Ent::Vertex(b, v)), "CORNER")?, model).map(|r| (v, r))).collect()
+    (0..st.ctx.bodies[b].vertices.len()).filter_map(|v| BendRelief::of_vertex(&sm_attribute(st, &q.to_ref(&Ent::Vertex(b, v)), "CORNER")?, model).map(|r| (v, r))).collect()
 }
 
 fn corner_overrides(st: &CtxState, q: &QueryCx, b: usize, model: &CornerRelief) -> BTreeMap<usize, CornerRelief> {
-    let attrs = AttrIndex::of(st);
-    (0..st.ctx.bodies[b].vertices.len()).filter_map(|v| attrs.sm(&q.to_ref(&Ent::Vertex(b, v)), "CORNER").map(|a| (v, CornerRelief::of_corner(&a, model)))).collect()
+    (0..st.ctx.bodies[b].vertices.len()).filter_map(|v| sm_attribute(st, &q.to_ref(&Ent::Vertex(b, v)), "CORNER").map(|a| (v, CornerRelief::of_corner(&a, model)))).collect()
 }
 
 /// What one part entity comes from: a definition face, edge or vertex.
@@ -1804,9 +1776,8 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let previous: Vec<BodyId> = st.ctx.bodies.iter().enumerate().filter(|(pb, p)| p.kind == BodyKind::Solid && !own.is_empty() && associations(&st, &q.to_ref(&Ent::Body(*pb))).iter().any(|x| own.contains(x))).map(|(_, p)| p.id.clone()).collect();
             let mut forms = Vec::new();
             let mut wall_ids = BTreeMap::new();
-            let attrs = AttrIndex::of(&st);
             for f in 0..body.faces.len() {
-                if let Some(wall) = attrs.sm(&q.to_ref(&Ent::Face(b, f)), "WALL") {
+                if let Some(wall) = sm_attribute(&st, &q.to_ref(&Ent::Face(b, f)), "WALL") {
                     forms.extend(form_tools(&st, &wall, f, &mut tool_ids));
                     if let Some(id) = wall.get("attributeId").as_str() {
                         wall_ids.insert(f, id.to_string());
@@ -1944,7 +1915,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
     }
     if !renamed.is_empty() {
-        for (_, v) in st.attributes.iter_mut() {
+        for (_, v) in st.attributes_mut().iter_mut() {
             if v.get("attribute").get("formedToolBodyIds").as_array().is_some() || v.get("attribute").get("cuttingToolBodyIds").as_array().is_some() {
                 *v = rename_strings(v, &renamed);
             }
@@ -1992,10 +1963,8 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         links.extend(faces.iter().enumerate().filter_map(|(f, d)| Some((Reference::Face((*part.faces[f]).clone()), def_ref(d)?))));
         links.extend(edges.iter().enumerate().filter_map(|(e, d)| Some((Reference::Edge((*part.edges.get(e)?.clone()).clone()), def_ref(d)?))));
         links.extend(vertices.iter().enumerate().filter_map(|(v, d)| Some((Reference::Vertex((*part.vertices.get(v)?.clone()).clone()), def_ref(d)?))));
-        let assoc: Vec<Vec<Value>> = {
-            let attrs = AttrIndex::of(&st);
-            links.iter().map(|(_, from)| attrs.associations(from)).collect()
-        };
+        // All read before any is added (each addition drops the attributes' index).
+        let assoc: Vec<Vec<Value>> = links.iter().map(|(_, from)| associations(&st, from)).collect();
         for ((to, _), attrs) in links.into_iter().zip(assoc) {
             for attr in attrs {
                 st.push_attribute(to.clone(), Value::map_from([("attribute", attr)]));
@@ -2594,7 +2563,7 @@ fn ev_sheet_metal_form_tool_bodies(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let arg = def_arg(i, &a, 1)?;
     let faces = evaluate_refs(i, &cx, arg.get("sheetMetalFormFaces"))?;
-    let formed = cx.state.lock().attributes.iter().any(|(_, v)| v.get("attribute").get("formedToolBodyIds").as_array().is_some_and(|f| !f.is_empty()));
+    let formed = cx.state.lock().attributes().iter().any(|(_, v)| v.get("attribute").get("formedToolBodyIds").as_array().is_some_and(|f| !f.is_empty()));
     if !faces.is_empty() && formed {
         return Err(i.error("@evSheetMetalFormToolBodies: the tools of sheet metal forms are not supported yet"));
     }
@@ -2611,7 +2580,7 @@ fn ev_sheet_metal_flat_transformation(i: &mut Interp, a: Vec<Value>) -> R<Value>
         // The definition entity the part face comes from (shared association).
         let def_entity = faces.first().and_then(|r| {
             associations(&st, r).into_iter().find_map(|assoc| {
-                st.attributes.iter().filter(|(x, v)| x != r && *v.get("attribute") == assoc).find_map(|(x, _)| {
+                st.attributes().iter().filter(|(x, v)| x != r && *v.get("attribute") == assoc).find_map(|(x, _)| {
                     let e = q.from_ref(x).into_iter().next()?;
                     let Some(Ent::Body(b)) = q.owner(&e) else { return None };
                     sm_attribute(&st, &q.to_ref(&Ent::Body(b)), "MODEL").map(|model| (e, b, model))

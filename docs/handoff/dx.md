@@ -21,7 +21,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   `pattern_sheet_holes` in opPattern, evCollision of wire bodies, `planar_face_contains` for qContainsPoint,
   `AttrIndex` in the sheet metal rebuild. Its first Fill pattern still takes ~34 s (live 4.7 s): next for
   PARITY-SPEED: the rebuild (12 s), std's separateEntitiesForFacePattern (7.8 s), qCreatedBy in the instance loop
-  (9.8 s; a cache by op sequence would do).
+  (9.8 s; now 4.4 s: `CtxState::face_creators`, cleared by begin_op / adopt / alias_op; attributes only through
+  `attributes()` / `attributes_mut()` / `attributes_of()`, the last from an index the mutator drops).
 - core: SKETCH-PLANE-FRAME (handoff/core.md 11-04 06:35).
 
 ## 11-02 23:35 UTC: model parity suite (lead 11-02 23:35, top item; docs/PARITY-SUITES.md §1)

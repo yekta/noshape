@@ -90,6 +90,9 @@ struct Started {
 pub type SplitRecord = (Vec<BodyId>, Option<(DVec3, DVec3)>);
 
 /// Mutable modeling state of one feature evaluation.
+/// [`CtxState::face_creators`]: by a face name's address, the name and its creator (operation number, id).
+pub type FaceCreators = HashMap<usize, (Arc<TopoName>, Option<(u32, FsId)>)>;
+
 pub struct CtxState {
     pub ctx: Context,
     /// The Part Studio feature being evaluated.
@@ -117,6 +120,10 @@ pub struct CtxState {
     /// Faces a Boolean brought into its targets (its tools' faces): created by the Boolean, as their edges with them
     /// (std rib.fs, boolean.fs: qCreatedBy(<the Boolean>, FACE / EDGE); the public Laser Joint's overcuts).
     pub adopted: HashMap<TopoName, OpInfo>,
+    /// Each face name's creator (operation number, id) as `ops` and `adopted` give it, by the name's Arc (held, so
+    /// its address isn't reused): qCreatedBy asks it of every face, thousands of times in a Fill pattern's loop.
+    /// Cleared when `ops` or `adopted` change ([`Self::begin_op`], [`Self::adopt`], [`Self::alias_op`]).
+    pub face_creators: Mutex<FaceCreators>,
     /// The operation that made each construction plane (`ConstructionPlane` references; qCreatedBy).
     pub plane_ops: HashMap<Reference, FsId>,
     /// Each operation's bits of its bodies' ids (unique in this feature).
@@ -133,7 +140,9 @@ pub struct CtxState {
     pub start_order: Vec<FsId>,
     /// FeatureScript-only variables (values that are not quantities).
     pub variables: BTreeMap<String, Value>,
-    pub attributes: Vec<(Reference, Value)>,
+    attrs: Vec<(Reference, Value)>,
+    /// `attrs`' positions by entity, built when first asked after a change ([`Self::attributes_of`]).
+    attr_index: Mutex<Option<HashMap<Reference, Vec<usize>>>>,
     /// `debug()` entities as they were when debugged (std debugs points,
     /// lines and arrows of sub-features it then aborts) and their colours
     /// (sRGB), shown while the feature is edited.
@@ -240,6 +249,7 @@ impl FsContext {
                 merged_creators: HashMap::new(),
                 body_ops: HashMap::new(),
                 adopted: HashMap::new(),
+                face_creators: Mutex::new(HashMap::new()),
                 plane_ops: HashMap::new(),
                 body_bits: BodyBits::default(),
                 touched: HashMap::new(),
@@ -249,7 +259,8 @@ impl FsContext {
                 started: Vec::new(),
                 start_order: Vec::new(),
                 variables: BTreeMap::new(),
-                attributes,
+                attrs: attributes,
+                attr_index: Mutex::new(None),
                 debug_entities: Vec::new(),
                 computed: Vec::new(),
                 manipulators: Vec::new(),
@@ -279,7 +290,7 @@ impl FsContext {
             let snaps: HashMap<Reference, (BodyId, query::Snapshot)> = {
                 let q = query::QueryCx::new(&st);
                 let mut out = HashMap::new();
-                for (r, _) in &st.attributes {
+                for (r, _) in st.attributes() {
                     if !out.contains_key(r)
                         && let Some(s) = q.attribute_snapshot(r)
                     {
@@ -301,7 +312,7 @@ impl FsContext {
         let (hidden, shown): (Vec<_>, Vec<_>) = std::mem::take(&mut ctx.bodies).into_iter().partition(|b| st.hidden.contains(&b.id));
         ctx.bodies = (shown).into();
         ctx.fs_hidden_bodies = hidden;
-        ctx.fs_attributes = st.attributes.clone();
+        ctx.fs_attributes = st.attributes().to_vec();
         ctx.fs_transients = st.persistent.clone();
         ctx
     }
@@ -314,6 +325,31 @@ impl FsContext {
 
 impl CtxState {
     /// Transient id string of an entity (stable within this evaluation).
+    /// Every attribute: (entity, `{ name, attribute }`), in the order they were set.
+    pub fn attributes(&self) -> &[(Reference, Value)] {
+        &self.attrs
+    }
+
+    /// The attributes to change (their index is rebuilt when next asked).
+    pub fn attributes_mut(&mut self) -> &mut Vec<(Reference, Value)> {
+        *self.attr_index.get_mut() = None;
+        &mut self.attrs
+    }
+
+    /// The attributes of entity `r` (`{ name, attribute }`), in order: from an index of them all (std asks this of
+    /// each of thousands of entities after a pattern).
+    pub fn attributes_of(&self, r: &Reference) -> Vec<&Value> {
+        let mut index = self.attr_index.lock();
+        let index = index.get_or_insert_with(|| {
+            let mut m: HashMap<Reference, Vec<usize>> = HashMap::new();
+            for (k, (e, _)) in self.attrs.iter().enumerate() {
+                m.entry(e.clone()).or_default().push(k);
+            }
+            m
+        });
+        index.get(r).map(|ks| ks.iter().map(|k| &self.attrs[*k].1).collect()).unwrap_or_default()
+    }
+
     /// Attach an attribute to `r`.
     pub fn push_attribute(&mut self, r: Reference, v: Value) {
         if !self.attr_snapshots.contains_key(&r)
@@ -321,7 +357,7 @@ impl CtxState {
         {
             self.attr_snapshots.insert(r.clone(), s);
         }
-        self.attributes.push((r, v));
+        self.attributes_mut().push((r, v));
     }
 
     /// Attributes whose entity an operation renamed follow it (a sheet
@@ -352,13 +388,13 @@ impl CtxState {
         // All at once: one entity's new name may be another's old one.
         let map: HashMap<Reference, Vec<Reference>> = moves.iter().map(|(o, to)| (o.clone(), to.iter().map(|(n, _)| n.clone()).collect())).collect();
         let mut copies = Vec::new();
-        for (r, v) in self.attributes.iter_mut() {
+        for (r, v) in self.attributes_mut().iter_mut() {
             if let Some(to) = map.get(r) {
                 copies.extend(to[1..].iter().map(|n| (n.clone(), v.clone())));
                 *r = to[0].clone();
             }
         }
-        self.attributes.extend(copies);
+        self.attributes_mut().extend(copies);
         for (old, _) in &moves {
             self.attr_snapshots.remove(old);
         }
@@ -464,8 +500,21 @@ impl CtxState {
         let seq = self.next_seq;
         self.next_seq += 1;
         self.ops.insert(marker, OpInfo { id: id.to_vec(), seq });
+        self.face_creators.get_mut().clear();
         self.body_bits.assign(marker);
         Some(marker)
+    }
+
+    /// Face `n` brought into its target by Boolean `op` (created by it from now on).
+    pub fn adopt(&mut self, n: TopoName, op: OpInfo) {
+        self.adopted.insert(n, op);
+        self.face_creators.get_mut().clear();
+    }
+
+    /// Marker `marker` names operation `op` too (copies an operation made under other ids).
+    pub fn alias_op(&mut self, marker: FeatureId, op: OpInfo) {
+        self.ops.insert(marker, op);
+        self.face_creators.get_mut().clear();
     }
 
     /// The bits of the ids of the bodies operation `marker` creates.
