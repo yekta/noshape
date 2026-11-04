@@ -1731,11 +1731,21 @@ TopoDS_Shape merge_cylinder_bands(const TopoDS_Shape& s, HHist& hist)
   return s;
 }
 
+// A face bounded otherwise (its seam moved) covers what it did: only the integration's noise (a hole the wrong way
+// round would add its area). One face's area, not the solid's volume twice (motor-mount-jack's pattern: 41 ms).
+static bool same_area(const TopoDS_Face& a, const TopoDS_Face& f)
+{
+  GProp_GProps g0, g1;
+  BRepGProp::SurfaceProperties(a, g0);
+  BRepGProp::SurfaceProperties(f, g1);
+  return std::abs(g1.Mass() - g0.Mass()) <= 1e-5 * std::abs(g0.Mass());
+}
+
 // A cylinder face between one end circle and a chain of other edges round the axis whose seam splits the chain (a
 // shaft's band below spline slots, a run-out crossing the seam, cf-straight-spline; live's faces have no seams, its
 // run-out is one edge): the seam moved to run from the circle to the chain's vertex nearest it, the circle's vertex
 // with it; join_loop_pieces then joins what the old seam split. Null where it doesn't apply or doesn't come out valid
-// with the same volume.
+// with the same area.
 TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const gp_Cylinder& ca, const std::vector<TopoDS_Edge>& seams,
                             const TopoDS_Edge& end, const std::vector<TopoDS_Edge>& rest, HHist& hist)
 {
@@ -1930,12 +1940,7 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
   const bool same = BRepAdaptor_Curve(end).Circle().Axis().Direction().Dot(gp_Vec(n)) > 0;
   rs->Replace(end.Oriented(TopAbs_FORWARD), same ? ring : TopoDS::Edge(ring.Reversed()));
   const TopoDS_Shape out = rs->Apply(s);
-  if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
-    return {};
-  GProp_GProps g0, g1;
-  BRepGProp::VolumeProperties(s, g0);
-  BRepGProp::VolumeProperties(out, g1);
-  if (std::abs(g1.Mass() - g0.Mass()) > 1e-5 * std::abs(g0.Mass()))
+  if (out.IsNull() || !same_area(a, F) || !BRepCheck_Analyzer(out).IsValid())
     return {};
   if (hist.IsNull())
     hist = new BRepTools_History();
@@ -1954,7 +1959,7 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
 // tube's seam: the hole's loops split where the seam meets them, dx's CUT-CLOSED-EDGES-SPLIT; Parasolid's faces have no
 // seams, live's loops are whole): the seam moved to the widest angle no other edge reaches, the end circles' vertices
 // with it, the other edges the face's inner wires. One face at a time; the shape unchanged where nothing applies or
-// the result isn't valid with the same volume.
+// the result isn't valid with the same area.
 TopoDS_Shape move_seams_off_holes(const TopoDS_Shape& s, HHist& hist)
 {
   for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More(); fx.Next())
@@ -2146,14 +2151,7 @@ TopoDS_Shape move_seams_off_holes(const TopoDS_Shape& s, HHist& hist)
       rs->Replace(old.Oriented(TopAbs_FORWARD), same ? made : TopoDS::Edge(made.Reversed()));
     }
     const TopoDS_Shape out = rs->Apply(s);
-    if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
-      continue;
-    GProp_GProps g0, g1;
-    BRepGProp::VolumeProperties(s, g0);
-    BRepGProp::VolumeProperties(out, g1);
-    // (The same faces bounded otherwise: only the integration's noise, up to 2e-5 of the volume with the loops'
-    // B-splines (motor-mount-jack's slots); a hole flipped would be thousands of times that.)
-    if (std::abs(g1.Mass() - g0.Mass()) > 1e-4 * std::abs(g0.Mass()))
+    if (out.IsNull() || !same_area(a, F) || !BRepCheck_Analyzer(out).IsValid())
       continue;
     if (hist.IsNull())
       hist = new BRepTools_History();

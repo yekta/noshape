@@ -360,6 +360,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 PARITY-SPEED-MOTOR-MOUNT (core 11-04 09:05) motor-mount-jack matches live to the end now but regenerates in
   ~440 ms against live's 53: Circular pattern 1 (a face pattern of two elliptic slot walls through the tube, ×4) 244 ms
   (live 5), Extrude 3 86 ms (live 6), Fillet 2 (the bore's full round) 71 ms (live 3). Next for core.
+  core 11-04 09:55: the seam movers check the rebuilt face's area, not the solid's volume twice (unify.seams 41 -> 17
+  ms; parity unchanged). The pattern's 176 ms are OCCT's Boolean (face-face intersections of the B-spline rims);
+  Extrude 3's 80 ms and Fillet 2's 39 ms are the Rust Boolean's `boolean.rust.brep` step on the part with those rims
+  (**bool**: the conversion of a part with B-spline edges, NOSHAPE_KERNEL_PROFILE on motor-mount-jack).
 - [ ] P2 FULL-ROUND-BOSS-TWO-FACES (core 11-04 09:05) a full round of a boss's whole cylinder (a Ø16 × 3 mm puck's rim)
   has the right volume, but its half torus is two faces: OCCT's torus has its v seam on the outer equator, which the
   outer half crosses (the bore's inner half is one face, as live's). Live: one face (not checked live; Parasolid's
