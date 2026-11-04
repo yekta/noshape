@@ -7,6 +7,12 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 right (7607.301), mirror set and cli-fillet-segv right; published 08:43:30 (all three bundles); the release tarball is byte-identical to the smoked artifact.
 Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfmir2 B P0.
 
+**11-04 09:03:** green 5363e4d8 (OCCT patch 0021 synced): **CRASH-3151, CRASH-3388, CRASH-2045 verified** 10 / 10 each
+(open / delete repro and the fuzz session; cli/vc-5363e4d8.txt, /tmp/qa-verify-crash.sh <sha>); BLEND-RUST-STRAIGHT-WRONG
+verified (slow1151 = a6ff8389 feature by feature); volume sweep, the 44 ticket documents and dx's cf corpus unchanged. Fuzz since
+the 05:00 list: v0.4.24 180 seeds (one death: seed 3388 = CRASH-3388), 56a0f49b 100 seeds 0. Loops now: 5363e4d8
+/tmp/qa-nfloop35.sh (3401–3460), /tmp/qa-gfloop18.sh (3461–3500); v0.4.25 /tmp/qa-cfloop74.sh (3501–3560).
+
 **11-04 08:12:** no green since 4570b4e5 (06:09): core's OCCT patch 0021 (CRASH-3151, likely CRASH-2045 too) needs a
 lib sync before main can go green. When a green has it: re-run tickets/crash3151/open.py (and crash3388/open.py, crash2045's
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
