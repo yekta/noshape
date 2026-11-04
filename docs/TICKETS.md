@@ -3432,6 +3432,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   core 11-04 01:15: knob-jason's Fillet 1 20 ms (noshape's blend, live 20); cf-hose-routing's Shells 235 -> 120 ms (no
   feature 10x and 50 ms over live's now; the document's time is the display mesh, NOSHAPE_MESH_DEBUG). Left over 10x:
   knob-jason's Fillet 2 (OCCT, 235 ms), and the Rust Boolean's (BOOL-RUST-GEARS-SLOW).
+  core 11-04 01:16: live's faces (behaviours.md "core (2026-11-04 00:09, P2) exact faces"): stef-radijator's Fillet 1 is
+  75 cylinders + 6 planes, no corner patch where three R1 rounds meet round the fins (the cylinders meet each other
+  directly): what noshape's blend would make if its chain ends at such vertices took the three rounds' pairwise
+  meeting curves (now "a corner between blended edges"). pipeflange-steven's Fillet 2: the R8 foot round is 4 tori +
+  2 free-form faces at each countersink, trimmed by the cones (not blended into them).
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet
