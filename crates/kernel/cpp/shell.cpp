@@ -2890,10 +2890,16 @@ bool by_smooth(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
   bld.Add(wall, shell.Oriented(old_shell.Orientation()));
   if (!BRepCheck_Analyzer(wall).IsValid())
     return no("the wall is invalid");
-  const double vw = volume_of(wall), vs = volume_of(so);
+  // (A sanity check, so OCCT's plain integral: the exact ones were 180 of a hose's 235 ms.)
+  auto rough = [](const TopoDS_Shape& x) {
+    GProp_GProps g;
+    BRepGProp::VolumeProperties(x, g);
+    return g.Mass();
+  };
+  const double vw = rough(wall), vs = rough(so);
   if (dbg)
     std::fprintf(stderr, "smooth: wall volume %.17g solid %.17g\n", vw, vs);
-  if (!(vw > 0) || !(vw <= vs * (1 + 1e-9)))
+  if (!(vw > 0) || !(vw <= vs * (1 + 1e-3)))
     return no("the wall's volume is off");
   out.result  = wall;
   out.history = shell_history(solid, wall, {h}, {}, sources, removed);
