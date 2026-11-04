@@ -16,6 +16,22 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-04 12:55 UTC.**
+- Landed since 10:55: HOLE-RIM-PIECES (OCCT's intersection pieces of the same two faces meeting smoothly are joined
+  exactly; the seam movers measure areas adaptively: parity 330 -> 333 on yesterday's models), CANCEL-LATENCY (a
+  thread's last noshape Boolean's shapes freed on a thread of their own: late cancels 19-182 -> 18-133 ms).
+- Queued: PARITY-SPEED (lead's cf-fill-pattern item): face projections on elementary surfaces take the surface's
+  foot when the classifier says inside, and off a face of many edges the nearest edge by the edges' boxes (the Fill
+  pattern 42.9 -> 25.0 s). **For dx** (ticket PARITY-SPEED 11-04 note): the ~195,000 props_surface calls are the
+  parity translator's (ops parity.rs query_with: a centroid and an area per face per query on fresh Shapes), not
+  the regeneration; and the Fill pattern's 1,737 parts (live 2) make the runner's end measures.
+- My parity models on vibe5 (~/core-parity-all) were a day old: resynced from /root/parity/models at 12:20; the
+  330/333 numbers above are on the old copy.
+- Perf: today's commits don't move the CI benches (big plate 1.65 s; vibe3 A/B at 39d1156cb: the fin edit 138-141 ms
+  and fins x1000 1.81-1.84 s before them, the same after; the drift from the 06:11 baseline's 120 ms is older).
+- Next: the cone seam (pipeflange's split countersink rims), Shell 4's self-interference check, the O-ring evAxis
+  once live answers (REQUESTS 10:55).
+
 **State 11-04 10:56 UTC.**
 - Landed / queued since 09:58: the face pattern's cut glued and checked (Glue::InsideChecked, motor-mount's pattern
   Boolean 176 -> 118 ms); SKETCH-PLANE-FRAME (sketches on construction planes in std newSketch's frame, ScopeRule 9);
