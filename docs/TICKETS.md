@@ -112,7 +112,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     @evEdgeCurvature: a studio pinned to such a release that calls them fails (FS-OLD-STD-COMPAT). (dx 11-04 20:50:
     @opRoll done: opWrap serves it, RollSurface's fields being WrapSurface's.)
 
-- [ ] P1 TAB-RIPPED-CORNER (core; dx 11-04 18:31, live request 2005 T2) a 100 × 60 plate (thicken 2 mm, radius 2 mm)
+- [ ] P1 TAB-RIPPED-CORNER (skasm, from core (lead 11-04 21:45); dx 11-04 18:31, live request 2005 T2) a 100 × 60 plate (thicken 2 mm, radius 2 mm)
   with 30 mm flanges on its x = 100 and y = 60 edges (a corner rip), and a Tab sketched on the x-flange's outer face
   (y 50 → 62, z 10 → 20) merged into that flange: live regenerates OK and fills the corner box from that flange,
   21196.5854 mm³ (+40.4), 28 faces / 62 edges / 36 vertices; ours regenerates OK but changes nothing (21156.1854 mm³,
