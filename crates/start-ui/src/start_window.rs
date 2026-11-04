@@ -3614,8 +3614,8 @@ pub fn help_menu(cx: &App) -> AnyElement {
         .h(px(30.))
         .px(px(4.))
         .rounded(px(3.))
-        .child(h_flex().gap(px(5.)).child(crate::assets::icon("help", 20., cx)).child(os::glyph(os::GLYPH_CARET, 8., pal.text)))
-        .os_dropdown_menu(HELP_MENU, false, |m, _, _| crate::start_hooks::help_items(m))
+        .child(h_flex().gap(px(6.)).child(crate::assets::icon("help", 20., cx)).child(os::glyph(os::GLYPH_CARET, 8., pal.text)))
+        .os_dropdown_menu(HELP_MENU, false, |m, _, _| crate::start_hooks::help_items(m).separator().item(OsMenuItem::new("About noshape").disabled(true)))
         .debug_selector(|| HELP_MENU.into())
         .into_any_element()
 }
