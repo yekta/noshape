@@ -11,6 +11,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-04 16:48 UTC: daily parity run (PARITY-MODELS-DAILY-RUN)
+- /root/dx-scratch/pm-daily.sh on main b3acf8a5 with live's corpus resynced: 37/56, 371/482, custom 38/111, every
+  document as runs 70 / 71; 7 of 41 documents slower than live (9 in run 70), the worst motor-mount-jack ×5.7 and
+  cf-spur-gear ×2.5. Report /root/parity/report.json, log /root/dx-scratch/pm-daily.log; SCORE.md row added.
+- Open from main since ~14:53 (core.md): pulley02-maxwell Fillet 1 (7 -> 2/7), clamp-hms Extrude 5 (14 -> 11/15).
+- DISPLACEMENT-MAP since 15:02: compared with live (Replace off faster than live: side 7.4 s vs 11.14 s, top 7.3 s vs
+  11.17 s; Replace on waits on core's projection); evFaceCurvatureDerivatives and the `is` / `as` precedence landed
+  (76055ba0; live asked for the exact level, REQUESTS 16:17); std loading never panics (b3acf8a5).
+
 ## 11-04 15:02 UTC: DISPLACEMENT-MAP (P1 from the user; TICKETS "From the user, 2026-11-04")
 - Landed: `x = append(x, v)` in place (interp.rs `assign_grown`; 58b8577c); evFaceTangentPlanes in one kernel call
   (kernel `face_frames_at_uvs`), @opCreateBSplineSurface (ops.rs), brep::mesh takes B-spline faces closed round u and
