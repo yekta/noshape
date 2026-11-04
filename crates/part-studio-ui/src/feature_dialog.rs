@@ -3802,7 +3802,7 @@ impl FeatureDialog {
                 // Ctrl+↑ / ↓ (no input binding): ×0.1.
                 .capture_key_down(cx.listener(move |this, e: &KeyDownEvent, window, cx| {
                     let k = &e.keystroke;
-                    if (k.key == "up" || k.key == "down") && k.modifiers.control && !k.modifiers.alt {
+                    if (k.key == "up" || k.key == "down") && crate::quantity_field::step_ctrl(&k.modifiers) && !k.modifiers.alt {
                         let mods = crate::quantity_field::StepMods { shift: k.modifiers.shift, ctrl: true };
                         if this.step_number(&p_k, &st_k, k.key == "up", mods, window, cx) {
                             cx.stop_propagation();
@@ -3906,7 +3906,7 @@ impl FeatureDialog {
                             return;
                         }
                         cx.stop_propagation();
-                        let mods = crate::quantity_field::StepMods { shift: e.modifiers.shift, ctrl: e.modifiers.control || e.modifiers.platform };
+                        let mods = crate::quantity_field::StepMods { shift: e.modifiers.shift, ctrl: crate::quantity_field::step_ctrl(&e.modifiers) };
                         this.step_number(&p_wheel, &st2, dy > 0., mods, window, cx);
                     }))
                 })
