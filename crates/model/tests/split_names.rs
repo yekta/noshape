@@ -267,3 +267,99 @@ fn other_features_take_one_split_piece_s_face() {
     let bb = new.shape.bounding_box(true).unwrap();
     assert!((bb.max.z - 0.012).abs() < 1e-7, "{bb:?}");
 }
+
+/// SPLIT-FACE-SAME-ID (the user's Gyro, lead P0 11-04): three concentric rings (one Revolve of three rectangles) split
+/// by one plane: each ring's cut face is its own, so a Chamfer of the inner ring's chamfers that ring only (it loses
+/// π d² (r1 + r2), its two rims' triangles revolved) and the other two keep their volumes; also with both sides
+/// kept (six parts).
+#[test]
+fn one_split_through_several_bodies_names_each_cut_face_apart() {
+    use std::f64::consts::PI;
+    for both in [false, true] {
+        let mut t = T::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        for (a, b) in [(3.0, 5.0), (7.0, 9.0), (11.0, 13.0)] {
+            let p: Vec<_> = [(a, -5.0), (b, -5.0), (b, 5.0), (a, 5.0)].iter().map(|&(x, y)| sk.add_point(DVec2::new(x * 1e-3, y * 1e-3))).collect();
+            for i in 0..4 {
+                sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
+            }
+        }
+        let (a0, a1) = (sk.add_point(DVec2::new(0.0, -0.006)), sk.add_point(DVec2::new(0.0, 0.006)));
+        let axis = sk.add_line_between(a0, a1).unwrap();
+        sk.set_construction(axis, true).unwrap();
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let r = t.regen();
+        let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+        assert_eq!(regions.len(), 3);
+        t.add("revolve", &[("entities", q(regions)), ("axis", q(vec![Reference::SketchEntity { sketch: s, entity: axis.0 }])), ("revolveType", en("FULL"))]);
+        let r = t.ok();
+        assert_eq!(r.context.bodies.len(), 3);
+        let bodies = r.context.bodies.iter().map(|b| Reference::Body(b.id.clone())).collect();
+        t.add("splitPart", &[("targets", q(bodies)), ("tool", q(vec![Reference::Plane(DatumPlane::Top)])), ("keepBothSides", ParamValue::Bool(both))]);
+        let r = t.ok();
+        assert_eq!(r.context.bodies.len(), if both { 6 } else { 3 });
+        let volumes = |r: &RegenResult| r.context.bodies.iter().map(|b| (b.id.clone(), b.shape.volume().unwrap() * 1e9)).collect::<BTreeMap<_, _>>();
+        let before = volumes(&r);
+        // The cut faces (z = 0): each part's own name; the inner ring's is the smallest.
+        let mut cut: Vec<(f64, noshape_model::reference::BodyId, Reference)> = Vec::new();
+        for b in r.context.bodies.iter() {
+            for (i, n) in b.faces.iter().enumerate() {
+                let f = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap();
+                if f.is_planar() && f.centroid().unwrap().z.abs() < 1e-9 {
+                    cut.push((f.area().unwrap() * 1e6, b.id.clone(), Reference::Face((**n).clone())));
+                }
+            }
+        }
+        assert_eq!(cut.len(), if both { 6 } else { 3 });
+        let names: std::collections::HashSet<String> = cut.iter().map(|c| format!("{:?}", c.2)).collect();
+        assert_eq!(names.len(), cut.len(), "every part's cut face named apart");
+        cut.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let (_, inner, face) = cut[0].clone();
+        t.add("chamfer", &[("entities", q(vec![face])), ("width", e("0.5 mm")), ("tangentPropagation", ParamValue::Bool(true))]);
+        let r = t.ok();
+        let after = volumes(&r);
+        let lost = PI * 0.25 * (3.0 + 5.0);
+        for (id, v) in &after {
+            let want = if *id == inner { before[id] - lost } else { before[id] };
+            assert!((v - want).abs() < 1e-6 * want, "both sides {both}: {id:?} {v} mm³, want {want} (the chamfered one {inner:?})");
+        }
+    }
+}
+
+/// The same with one Remove extrude through three separate blocks: each block's hole wall is its own face.
+#[test]
+fn one_remove_through_several_bodies_names_each_wall_apart() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    for x0 in [0.0, 0.03, 0.06] {
+        let p: Vec<_> = [(x0, 0.0), (x0 + 0.02, 0.0), (x0 + 0.02, 0.02), (x0, 0.02)].iter().map(|&(x, y)| sk.add_point(DVec2::new(x, y))).collect();
+        for i in 0..4 {
+            sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
+        }
+    }
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let r = t.regen();
+    let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+    t.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm"))]);
+    // A slot across all three, cut through.
+    let mut sk = noshape_sketch::Sketch::new();
+    let p: Vec<_> = [(-0.005, 0.008), (0.085, 0.008), (0.085, 0.012), (-0.005, 0.012)].iter().map(|&(x, y)| sk.add_point(DVec2::new(x, y))).collect();
+    for i in 0..4 {
+        sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
+    }
+    let s2 = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let r = t.ok();
+    assert_eq!(r.context.bodies.len(), 3);
+    let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s2).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s2, key: g.key.clone() }).collect();
+    let bodies = r.context.bodies.iter().map(|b| Reference::Body(b.id.clone())).collect();
+    t.add("extrude", &[("entities", q(regions)), ("endBound", en("THROUGH_ALL")), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(false)), ("booleanScope", q(bodies))]);
+    let r = t.ok();
+    let mut names = std::collections::HashMap::<String, usize>::new();
+    for b in r.context.bodies.iter() {
+        for n in b.faces.iter() {
+            *names.entry(format!("{n:?}")).or_default() += 1;
+        }
+    }
+    let shared: Vec<_> = names.iter().filter(|(_, c)| **c > 1).collect();
+    assert!(shared.is_empty(), "{} parts, names on several: {shared:?}", r.context.bodies.len());
+}

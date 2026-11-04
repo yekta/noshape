@@ -165,6 +165,8 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
     let both = ev.bool("keepBothSides");
     let front = ev.bool("keepFront");
     let mut changed = false;
+    // Every target's kept pieces, named apart across the targets before they become parts (below).
+    let mut kept: Vec<(BodyId, BodyKind, usize, NamedShape)> = Vec::new();
     for (tord, id) in target_ids.iter().enumerate() {
         if tool.body.as_ref() == Some(id) {
             continue;
@@ -194,10 +196,22 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
         // source's colour, at the end of the parts list.
         ev.ctx.bodies.remove(ti);
         for (j, (_, _, p)) in pieces.into_iter().enumerate() {
-            let bid = BodyId { feature: ev.feature, index: (tord * 64 + j) as u32 };
-            let name = ev.ctx.alloc_part_name(target.kind);
-            ev.ctx.bodies.push(Arc::new(Body::new(bid, name, target.kind, p.shape, p.names.faces, target.color, ev.feature)));
+            kept.push((BodyId { feature: ev.feature, index: (tord * 64 + j) as u32 }, target.kind, target.color, p));
         }
+    }
+    // One tool through several bodies names each body's cut face alike (it comes from the tool): apart per part, as
+    // Parasolid's, so a face picked on one ring is that ring's only (user P0 11-04, the Gyro: a Chamfer of one ring's
+    // cut face chamfered all three). A reference made before still finds every one (`descends_from`), as it did.
+    if kept.len() > 1 {
+        let mut named: Vec<NamedShape> = kept.iter().map(|k| k.3.clone()).collect();
+        crate::regen::eval::name_pieces_apart(&mut named, ev.feature);
+        for (k, n) in kept.iter_mut().zip(named) {
+            k.3 = n;
+        }
+    }
+    for (bid, kind, color, p) in kept {
+        let name = ev.ctx.alloc_part_name(kind);
+        ev.ctx.bodies.push(Arc::new(Body::new(bid, name, kind, p.shape, p.names.faces, color, ev.feature)));
     }
     if !changed {
         // Live "fs (10-25 06:15)": an info (the feature's only one), the

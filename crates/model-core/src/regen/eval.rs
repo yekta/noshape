@@ -1208,6 +1208,26 @@ impl<'a> EvalCtx<'a> {
             }
             new_bodies.push((ti, bodies));
         }
+        // One tool through several targets names each one's new faces alike (they come from the tool): apart per
+        // part, as Parasolid's (the SPLIT-FACE-SAME-ID family: a slot through three blocks, a chamfer of one block's
+        // wall chamfered all three). A reference made before still finds every one (`descends_from`), as it did.
+        if new_bodies.len() > 1 {
+            let mut seen: std::collections::HashSet<&Name> = std::collections::HashSet::new();
+            let shared = new_bodies.iter().flat_map(|(_, bs)| bs.iter().flat_map(|b| b.faces.iter().collect::<std::collections::HashSet<_>>())).any(|n| !seen.insert(n));
+            if shared {
+                let mut all: Vec<NamedShape> = new_bodies.iter().flat_map(|(_, bs)| bs.iter().map(|b| NamedShape::new(b.shape.clone(), b.faces.clone()))).collect();
+                name_pieces_apart(&mut all, self.feature);
+                let mut it = all.into_iter();
+                for (_, bs) in new_bodies.iter_mut() {
+                    for b in bs.iter_mut() {
+                        let Some(n) = it.next() else { break };
+                        if n.names.faces != b.faces {
+                            *b = Arc::new(Body::named(b.id.clone(), b.name.clone(), b.kind, n.shape, n.names, b.color, self.feature));
+                        }
+                    }
+                }
+            }
+        }
         // Replace targets (descending index order keeps indices valid).
         new_bodies.sort_by_key(|b| std::cmp::Reverse(b.0));
         for (ti, bodies) in new_bodies {
