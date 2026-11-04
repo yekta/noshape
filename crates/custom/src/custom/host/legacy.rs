@@ -9,10 +9,10 @@ use noshape_featurescript::interp::{Interp, NativeFn, R};
 use noshape_featurescript::value::{Map, Tag, Value, enum_name, tag_name};
 use std::sync::Arc;
 
-/// The first library release whose evaluation builtins return std's types: 2241's evaluate.fs still converts
-/// (`lineFromBuiltin(@evAxis(…))`), 2506's doesn't; the releases between aren't shipped yet, and a pin there gets
-/// 2241 (the test `releases_up_to_typed_since_convert_raw_results` checks every shipped release against this).
-pub const TYPED_SINCE: u32 = 2506;
+/// The first library release whose evaluation builtins return std's types: 2455's evaluate.fs still converts
+/// (`lineFromBuiltin(@evAxis(…))`), 2473's doesn't (the test `releases_up_to_typed_since_convert_raw_results` checks
+/// every shipped release against this).
+pub const TYPED_SINCE: u32 = 2473;
 
 /// The current native `name`, its result in the raw form.
 fn raw_call(name: &str, i: &mut Interp, a: Vec<Value>) -> R<Value> {

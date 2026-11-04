@@ -8,7 +8,7 @@ use crate::value::{Map, Tag, UNIT_KEY, VALUE_KEY, Value};
 use std::sync::{Arc, OnceLock};
 
 /// The first shipped std whose operators read as these (units.fs from 1024, vector.fs from 2506).
-const SINCE: u32 = 2506;
+pub const SINCE: u32 = 2506;
 
 #[cfg(test)]
 thread_local! {
