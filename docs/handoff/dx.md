@@ -37,8 +37,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   planar up-to faces as planes), abortFeature frees ids: Sheet Metal Up to Part runs; its sheet is live's, the part
   64/146/84 vs 50/112/76 (rolled walls in our rebuild: next). Parity run 87: 368/471, custom 40/109, 1 document
   failing to run (cf-fix-pcb, after core's Extrude 5).
-- Next: cf-sheet-metal-model-plus's rolled walls in the rebuild; FS-QUERY-EDGE-ORDER (cross-feature creation order);
-  04:00 daily walk on the newest green.
+- 23:34 (0640127b): sheet metal bends beside a rolled wall from the definition edge's fillet (curved wall trimmed
+  by it, the flat wall's setback where it meets it); T1 a_bend_beside_a_rolled_wall and bends_of_both_hands_… (exact
+  volumes). Up to Part's part now has live's volume; left 55 vs 50 faces: the kernel's fillet against a B-spline wall
+  is a B-spline (live: exact cylinders) and thickens into slivers on one bend (TICKETS 23:33).
+- Parity run 88 (my tree over main of ~23:20): 38/55, 376/471, custom 40/109, 1 document failing to run.
+- Next: exact cylinders for those fillets (a T1 with a spline rolled wall first); FS-QUERY-EDGE-ORDER
+  (cross-feature creation order); 04:00 daily walk on the newest green.
 - 21:29: DISPLACEMENT-MAP end to end with core's Replace face (297f49cdd): /root/dx-scratch/disp/e2e/run.py.
 - Next: FS-QUERY-EDGE-ORDER (creation-order key, ticket 20:14), the other failing custom features (cf-setback-
   fillet fill surface, Sheet Metal Up to Part, Fix PCB), DISPLACEMENT-MAP end to end when core's Replace face on
