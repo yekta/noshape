@@ -259,6 +259,11 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
 /// Entity ids of the face edges imprinted on a sketch (above any sketch entity's; region keys take one more bit).
 pub const IMPRINT_ENTITY: u32 = 1 << 30;
 
+/// Whether a sketch entity id is an imprinted face edge's (text boxes' glyph outlines lie above them).
+pub fn is_imprint_entity(id: u32) -> bool {
+    (IMPRINT_ENTITY..noshape_sketch::text::glyph_id_base(1)).contains(&id)
+}
+
 /// The sketch's regions with its plane's face imprinted, as live unless Disable imprinting: the face's edges split the
 /// sketch's own regions, and the face's pieces outside them are regions too (sketch faces that qSketchRegion leaves
 /// out). The regions, which of them are such pieces, and the sketch's own regions that were split.

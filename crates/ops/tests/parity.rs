@@ -1532,6 +1532,29 @@ fn filter_inner_loops_leaves_out_what_a_hole_holds() {
     assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// qSketchRegion(…, true) leaves out a letter's counter as any region in a hole: a text "o" extrudes as a ring,
+/// with `false` as a disc (live: cf-fix-pcb's "Embossed Letters", 17 of the sketch's 23 regions).
+#[test]
+fn filter_inner_loops_leaves_out_a_letters_counter() {
+    let text = json!({ "btType": "BTMSketchTextEntity-1761", "entityId": "t", "isConstruction": false, "baselineStartX": 0.0, "baselineStartY": 0.0,
+        "baselineDirectionX": 0.01, "baselineDirectionY": 0.0, "ascent": 0.01, "parameters": [
+            { "btType": "BTMParameterString-149", "parameterId": "fontName", "value": "OpenSans-Regular.ttf" },
+            { "btType": "BTMParameterString-149", "parameterId": "text", "value": "o" },
+            { "btType": "BTMParameterBoolean-144", "parameterId": "mirrorHorizontal", "value": false },
+            { "btType": "BTMParameterBoolean-144", "parameterId": "mirrorVertical", "value": false }] });
+    // Ours as the first difference against a part no extrude makes: (faces, volume).
+    let ours = |filter: bool| {
+        let region = json!({ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": "FS1", "filterInnerLoops": filter, "queryString": format!("query = qSketchRegion(id + \"FS1\", {filter});") });
+        let (features, live) = one_extrude("FS1", json!([text.clone()]), region, json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 1, "edges": 1, "vertices": 1, "volume": 1.0 }));
+        let first = run_model(&format!("letter-counter-{filter}"), &features, &live, "").first.unwrap_or_default();
+        let faces = first.split("\"Part 1\": ").nth(1).and_then(|r| r.split('/').next()).and_then(|n| n.parse::<u32>().ok());
+        let volume = first.split("volume ").nth(1).and_then(|r| r.split(' ').next()).and_then(|v| v.parse::<f64>().ok());
+        (faces.unwrap_or_else(|| panic!("{first}")), volume.unwrap_or_else(|| panic!("{first}")))
+    };
+    let ((ring_faces, ring), (disc_faces, disc)) = (ours(true), ours(false));
+    assert!(ring_faces > disc_faces && ring < 0.9 * disc, "ring {ring_faces} faces {ring} mm³, disc {disc_faces} faces {disc} mm³");
+}
+
 /// A line live solved a hair off horizontal (a patterned hexagon's edge in
 /// exercise-anthony) stays where live has it: our line tool's inferred
 /// Horizontal is dropped, so the triangle's volume is live's.

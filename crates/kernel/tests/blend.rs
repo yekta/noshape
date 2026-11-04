@@ -1055,12 +1055,67 @@ fn dumped_fillet_faces_probe() {
         let c = f.centroid().unwrap() / MM;
         let a = f.area().unwrap() / (MM * MM);
         println!("F{i} {} area {a:.4} at ({:.3}, {:.3}, {:.3})", format!("{:?}", f.face_surface().ok()).chars().take(14).collect::<String>(), c.x, c.y, c.z);
-        if a < 1.0 || format!("{:?}", f.face_surface().ok()).contains("Cylinder") {
+        if a < 1.0 || format!("{:?}", f.face_surface().ok()).contains("Cylinder") || (std::env::var("NOSHAPE_FILLET_FACES_BSPLINE").is_ok() && matches!(f.face_surface(), Ok(Surface::BSpline { .. }))) {
             for e in f.edges() {
                 let x = e.edge_info().unwrap();
                 println!("    edge {} {:.4?} -> {:.4?} len {:.4}", format!("{:?}", x.curve).chars().take(8).collect::<String>(), x.start / MM, x.end / MM, x.length / MM);
             }
         }
+    }
+}
+
+/// pipeflange's Fillet 2 (NOSHAPE_FILLET_FACES_CASE = its dump): each B-spline corner face's distance from the exact
+/// envelope of the R8 ball rolling round the R16.7 tube on the plate, or on a countersink's R4 rim at (±18, ±18).
+#[test]
+#[ignore = "T2 probe: NOSHAPE_FILLET_FACES_CASE"]
+fn countersink_corner_envelope_probe() {
+    let Ok(case) = std::env::var("NOSHAPE_FILLET_FACES_CASE") else { return };
+    setup();
+    let s = read_brep(std::path::Path::new(&format!("{case}.brep"))).unwrap();
+    let txt = std::fs::read_to_string(format!("{case}.txt")).unwrap();
+    let idx: Vec<usize> = txt.lines().filter_map(|l| l.strip_prefix("edge ")).map(|v| v.parse().unwrap()).collect();
+    let all = s.edges();
+    let es: Vec<Shape> = idx.iter().map(|&i| all[i].clone()).collect();
+    let out = fillet_checked(&s, &es, &vec![8.0 * MM; es.len()]).unwrap().shape;
+    let centre = |phi: f64| {
+        let p = DVec3::new(24.7 * phi.cos(), 24.7 * phi.sin(), 8.0);
+        let h = DVec3::new(18.0 * p.x.signum(), 18.0 * p.y.signum(), 0.0);
+        let c = (p - h).truncate().length();
+        if c < 4.0 { DVec3::new(p.x, p.y, (64.0 - (4.0 - c) * (4.0 - c)).sqrt()) } else { p }
+    };
+    let dist = |x: DVec3| {
+        let mut best = (f64::MAX, 0.0);
+        for k in 0..20000 {
+            let phi = std::f64::consts::TAU * k as f64 / 20000.0;
+            let d = (x - centre(phi)).length();
+            if d < best.0 {
+                best = (d, phi);
+            }
+        }
+        let (mut lo, mut hi) = (best.1 - 4e-4, best.1 + 4e-4);
+        for _ in 0..80 {
+            let (a, b) = (lo + (hi - lo) / 3.0, hi - (hi - lo) / 3.0);
+            if (x - centre(a)).length() < (x - centre(b)).length() { hi = b } else { lo = a }
+        }
+        (x - centre(0.5 * (lo + hi))).length() - 8.0
+    };
+    for f in out.faces() {
+        if !matches!(f.face_surface(), Ok(Surface::BSpline { .. })) {
+            continue;
+        }
+        let [u0, u1, v0, v1] = f.uv_bounds().unwrap();
+        let (mut worst, mut at) = (0.0f64, DVec3::ZERO);
+        for i in 0..=24 {
+            for j in 0..=24 {
+                let x = f.point_at_uv(u0 + (u1 - u0) * i as f64 / 24.0, v0 + (v1 - v0) * j as f64 / 24.0).unwrap() / MM;
+                let d = dist(x);
+                if d.abs() > worst.abs() {
+                    (worst, at) = (d, x);
+                }
+            }
+        }
+        let c = f.centroid().unwrap() / MM;
+        println!("face at ({:.3}, {:.3}, {:.3}) area {:.4}: off the envelope by up to {worst:+.4} mm at {at:.3?}", c.x, c.y, c.z, f.area().unwrap() / (MM * MM));
     }
 }
 

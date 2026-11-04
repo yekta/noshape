@@ -865,8 +865,10 @@ fn dump_document() {
             println!("  parts after {name}: {:?}", parts(&r));
             for b in r.context.bodies.iter() {
                 for (i, n) in b.faces.iter().enumerate() {
-                    let c = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok().and_then(|f| f.centroid().ok()).unwrap_or_default() * 1e3;
-                    println!("    {} face {i} at ({:.2}, {:.2}, {:.2}): {n:?}", b.name, c.x, c.y, c.z);
+                    let face = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok();
+                    let c = face.as_ref().and_then(|f| f.centroid().ok()).unwrap_or_default() * 1e3;
+                    let a = face.as_ref().and_then(|f| f.area().ok()).unwrap_or_default() * 1e6;
+                    println!("    {} face {i} at ({:.2}, {:.2}, {:.2}) area {a:.6}: {n:?}", b.name, c.x, c.y, c.z);
                 }
             }
         }

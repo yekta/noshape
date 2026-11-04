@@ -3995,6 +3995,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that check and stops at "Cannot add joint joining selected entities." (next).
   dx 11-04 22:39: that is core's opExtendSheetBody (Move boundary: single planar face, Blind only); Make joint needs
   EXTEND_TO_SURFACE of edges on a many-face sheet (core.md 22:39).
+  core 11-04 23:48: cf-fix-pcb's Extrude 5 as live (328/903/594, live's volume): the translator's qSketchRegion(…,
+  true) took a text box's glyph curves for imprinted face edges (both ids from 1 << 30), so the letters' counters
+  stayed in (23 regions, live 17) and were filled; now only the imprint block below the first text box's glyphs
+  (model-core sketch::is_imprint_entity; T1 ops parity::filter_inner_loops_leaves_out_a_letters_counter). Left: its
+  area +1.58 mm² (live's band ±0.44), the letters' side walls (1.2 mm of outline over 15 glyphs); Fix PCB 2 runs next.
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our
