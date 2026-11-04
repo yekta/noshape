@@ -1791,7 +1791,7 @@ static bool same_area(const TopoDS_Face& a, const TopoDS_Face& f)
 
 // Whether the faces of `out` that use any of `edges` are valid (a face and edges replaced in a valid solid: the other
 // faces are as they were; the whole solid's check was 5 ms a move on motor-mount-jack's tube).
-static bool valid_around(const TopoDS_Shape& out, std::initializer_list<TopoDS_Shape> edges)
+static bool valid_around(const TopoDS_Shape& out, const std::vector<TopoDS_Shape>& edges)
 {
   for (TopExp_Explorer fx(out, TopAbs_FACE); fx.More(); fx.Next())
   {
@@ -3579,7 +3579,11 @@ TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist)
   if (made.empty())
     return s;
   const TopoDS_Shape out = rs->Apply(s);
-  if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+  std::vector<TopoDS_Shape> joined;
+  for (const auto& m : made)
+    joined.push_back(m.second);
+  // (A joint's vertex is the two pieces' alone: only the faces along the joined edges change.)
+  if (out.IsNull() || !valid_around(out, joined))
     return s;
   if (hist.IsNull())
     hist = new BRepTools_History();
