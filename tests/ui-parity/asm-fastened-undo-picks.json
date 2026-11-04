@@ -1,6 +1,6 @@
 {
  "name": "asm-fastened-undo-picks",
- "about": "Undo in an open Fastened dialog takes the newest connector pick back out (live 1962): pick, Ctrl+Z, two picks, Ctrl+Z twice.",
+ "about": "Undo in an open Fastened dialog takes the newest connector pick back out (live 1962): pick, Ctrl+Z, two picks, Ctrl+Z twice. The second pick of Part 2 is 5 mm off the first (a pointer that doesn't move gets no new hover).",
  "area": "skasm",
  "source": "live 1962",
  "start": "two-blocks",
@@ -30,8 +30,8 @@
    "do": "click",
    "on": {
     "face": [
-     70,
-     10,
+     74,
+     14,
      10
     ],
     "instance": "Part 2 <1>"
