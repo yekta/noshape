@@ -304,6 +304,9 @@ fn abort_feature(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let s = st.started.remove(k);
         st.started.truncate(k);
         st.ctx = s.snapshot;
+        // Its operations are gone, their ids free again (std measures each bend's angle on a temporary fillet under
+        // one id, aborted every time).
+        st.used_ids.retain(|u| !u.starts_with(&id));
     }
     Ok(Value::Undefined)
 }

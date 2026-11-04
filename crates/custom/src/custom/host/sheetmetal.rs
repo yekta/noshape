@@ -1692,7 +1692,7 @@ fn rolled_bend(topo: &Topo, fi: usize, front: f64, back: f64, solids: &mut Vec<S
 }
 
 /// A point inside a face.
-fn inner_point(f: &Shape) -> Option<DVec3> {
+pub(super) fn inner_point(f: &Shape) -> Option<DVec3> {
     let [u0, u1, v0, v1] = f.uv_bounds().ok()?;
     for (a, b) in [(0.5, 0.5), (0.3, 0.3), (0.7, 0.7), (0.3, 0.7), (0.7, 0.3), (0.5, 0.2), (0.2, 0.5), (0.5, 0.8), (0.8, 0.5)] {
         let p = f.point_at_uv(u0 + (u1 - u0) * a, v0 + (v1 - v0) * b).ok()?;

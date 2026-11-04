@@ -154,7 +154,9 @@ fn op_extrude(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 return crate::regen::features::extrude::next_parts(ev);
             }
             let faces = ev.resolve_faces(refs);
-            let bodies = ev.resolve_bodies(refs);
+            // Bodies picked as bodies (a face's owner is not the bound: std's UP_TO_SURFACE start face).
+            let body_refs: Vec<Reference> = refs.iter().filter(|r| matches!(r, Reference::Body(_))).cloned().collect();
+            let bodies = ev.resolve_bodies(&body_refs);
             let mut shapes: Vec<Shape> = faces.iter().filter_map(|(b, f)| ev.face_shape(*b, *f).ok()).chain(bodies.iter().map(|b| ev.ctx.bodies[*b].shape.clone())).collect();
             if shapes.is_empty()
                 && let Some(f) = refs.first().and_then(|r| ev.resolve_plane(r))
@@ -195,17 +197,26 @@ fn op_extrude(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let mut sheets = Vec::new();
         // An up-to end: the sheet runs far that way, then is cut back at the end surface (a hem between its two
         // bounding planes, std's sheet metal Hem).
+        // Live 2026: startDepth / endDepth do nothing then; the translational offsets move the ends (the start back
+        // toward the profile, the end on along the direction).
         let far = ev.model_extent() * 4.0 + 1.0;
-        let bounds: Vec<Shape> = [(start.is_none(), &start_entity, start_bound.as_deref().unwrap_or_default()), (end.is_none(), &end_entity, &*end_bound)]
-            .into_iter()
-            .filter(|(up_to, ..)| *up_to)
-            .map(|(_, refs, bound)| target(refs, bound))
-            .collect::<FResult<_>>()?;
+        let start_offset = length_of(def.get("startTranslationalOffset")).unwrap_or(0.0);
+        let bounds = Bounds {
+            d,
+            start: match start {
+                None => Some(target(&start_entity, start_bound.as_deref().unwrap_or_default())?.translated(-d * start_offset)?),
+                Some(_) => None,
+            },
+            end: match end {
+                None => Some(end_target(&end_entity)?),
+                Some(_) => None,
+            },
+        };
         for (n, edge) in edge_shapes(ev, &refs)?.into_iter().enumerate() {
             let (s, e) = (start.unwrap_or(far), end.unwrap_or(far));
             let mut res = k::extrude_between(&edge, -d * s, d * e, 0.0).map_err(|e| fe(format!("Extrude failed: {e}")))?;
-            if !bounds.is_empty() {
-                res = trim_to_bounds(&res, &bounds, &edge, start.map(|s| -d * s).or(end.map(|e| d * e)))?;
+            if bounds.start.is_some() || bounds.end.is_some() {
+                res = bounds.trim(&res, &edge.translated(-d * s)?)?;
             }
             // Onshape's sheet faces the side `tangent × direction` (live sm3:
             // (0,0)→(30,0) extruded +z faces −y).
@@ -236,25 +247,82 @@ fn op_extrude(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     Ok(Value::Undefined)
 }
 
-/// An edge's sheet run far toward its up-to ends, cut back at the end surfaces `bounds`: the piece touching every
-/// bound (and, with one blind end, the edge moved to that end by `blind`) that holds the edge, else the only such
-/// piece. No history: these sheets are named by their roles alone.
-fn trim_to_bounds(res: &k::OpResult, bounds: &[Shape], edge: &Shape, blind: Option<DVec3>) -> FResult<k::OpResult> {
-    let split = k::split(std::slice::from_ref(&res.shape), bounds, &k::BooleanOptions::default())?;
-    let touches = |a: &Shape, b: &Shape| k::distance(a, b).is_ok_and(|x| x.distance < 1e-7);
-    let blind_edge = match blind {
-        Some(v) => Some(edge.translated(v)?),
-        None => None,
-    };
-    let reach: Vec<Shape> = split.shape.faces().into_iter().filter(|f| bounds.iter().all(|b| touches(f, b)) && blind_edge.as_ref().is_none_or(|e| touches(f, e))).collect();
-    // The piece the edge lies in, else the only one between the ends (a part crossed several times: not yet).
-    let with_edge: Vec<Shape> = reach.iter().filter(|f| touches(f, edge)).cloned().collect();
-    let kept = if with_edge.is_empty() { reach } else { with_edge };
-    if kept.len() != 1 {
-        return err("The extrude does not reach its end surface");
+/// An edge's up-to ends (live 2026): a surface, offset already, or a part, where each point of the sheet stops at the
+/// first face it meets (one edge's sheet ends at two depths where the part steps); a start already on the part's
+/// face runs through to its far side.
+struct Bounds {
+    d: DVec3,
+    start: Option<Shape>,
+    end: Option<Shape>,
+}
+
+impl Bounds {
+    /// The edge's sheet `res`, run far toward its up-to ends, cut back to them; `start_line`: where it starts (the
+    /// edge at its blind start, or far back).
+    fn trim(&self, res: &k::OpResult, start_line: &Shape) -> FResult<k::OpResult> {
+        // A planar face bounds as its whole plane (Onshape extends an up-to surface).
+        let size = res.shape.bounding_box(false).map(|b| b.diagonal() * 2.0).unwrap_or(1.0);
+        let extended = |b: &Shape| -> Shape {
+            let faces = b.faces();
+            match faces.first().and_then(|f| f.face_plane().ok().flatten()) {
+                Some(pl) if faces.len() == 1 && b.solids().is_empty() => {
+                    let c = res.shape.bounding_box(false).map(|x| x.center()).unwrap_or(pl.origin);
+                    let o = c - pl.normal * (c - pl.origin).dot(pl.normal);
+                    k::make_plane_face(&k::Plane::new(o, pl.normal, pl.x_dir), -size, size, -size, size).unwrap_or_else(|_| b.clone())
+                }
+                _ => b.clone(),
+            }
+        };
+        let start = self.start.as_ref().map(extended);
+        let end = self.end.as_ref().map(extended);
+        let tools: Vec<Shape> = start.iter().chain(end.iter()).cloned().collect();
+        let split = k::split(std::slice::from_ref(&res.shape), &tools, &k::BooleanOptions::default())?;
+        let touches = |a: &Shape, b: &Shape| k::distance(a, b).is_ok_and(|x| x.distance < 1e-7);
+        // A planar bound: which side of it a point is, along the direction (+: further on).
+        let side = |bound: &Shape, p: DVec3| -> Option<f64> {
+            let pl = bound.faces().into_iter().next()?.face_plane().ok().flatten()?;
+            let n = if pl.normal.dot(self.d) < 0.0 { -pl.normal } else { pl.normal };
+            Some((p - pl.origin).dot(n))
+        };
+        let solid_end = end.as_ref().filter(|e| !e.solids().is_empty());
+        let mut pieces: Vec<(Shape, DVec3)> = split.shape.faces().into_iter().filter_map(|f| Some((f.clone(), super::sheetmetal::inner_point(&f)?))).collect();
+        if let Some(st) = &start {
+            pieces.retain(|(_, c)| side(st, *c).is_none_or(|x| x > 0.0));
+        }
+        if let Some(end) = end.as_ref().filter(|_| solid_end.is_none()) {
+            pieces.retain(|(_, c)| side(end, *c).is_none_or(|x| x < 0.0));
+        }
+        let begin = start.as_ref().unwrap_or(start_line);
+        let kept: Vec<Shape> = match solid_end {
+            // From the start, through pieces on the start's side of the part's boundary, up to where it is crossed.
+            Some(part) => {
+                let inside = |c: DVec3| part.classify_point(c, 1e-7).is_ok_and(|k| k == k::PointClass::Inside);
+                let first: Vec<usize> = (0..pieces.len()).filter(|&i| touches(&pieces[i].0, begin)).collect();
+                let Some(&f0) = first.first() else { return err("The extrude does not reach its end surface") };
+                let mode = inside(pieces[f0].1);
+                let mut keep = vec![false; pieces.len()];
+                let mut todo: Vec<usize> = first.into_iter().filter(|&i| inside(pieces[i].1) == mode).collect();
+                while let Some(i) = todo.pop() {
+                    if std::mem::replace(&mut keep[i], true) {
+                        continue;
+                    }
+                    for j in 0..pieces.len() {
+                        if !keep[j] && inside(pieces[j].1) == mode && touches(&pieces[i].0, &pieces[j].0) {
+                            todo.push(j);
+                        }
+                    }
+                }
+                pieces.into_iter().zip(keep).filter(|(_, k)| *k).map(|(p, _)| p.0).collect()
+            }
+            None => pieces.into_iter().map(|p| p.0).filter(|f| touches(f, begin)).collect(),
+        };
+        if kept.is_empty() {
+            return err("The extrude does not reach its end surface");
+        }
+        let shape = if kept.len() == 1 { kept[0].clone() } else { k::sew(&kept, 1e-7, false).map(|r| r.shape).unwrap_or_else(|_| Shape::compound(&kept)) };
+        // No history: these sheets are named by their roles alone.
+        Ok(k::OpResult { shape, history: k::History::default() })
     }
-    let shape = if kept.len() == 1 { kept[0].clone() } else { Shape::compound(&kept) };
-    Ok(k::OpResult { shape, history: k::History::default() })
 }
 
 /// Shell `p` with its faces agreeing, facing the way of the first of `sides` (a point and normal) that lies on it.

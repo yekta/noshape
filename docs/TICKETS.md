@@ -3935,6 +3935,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   surface"); the face profiles' path has it (prism until). Also done for it: opFillet createDetachedSurface (std's
   bendAngle measures a temporary detached fillet; ours filleted the sheet itself and failed), sheets extruded from a
   chain of curves sewn one way round.
+  dx 11-04 22:57: Sheet Metal Up to Part runs (live 2026's semantics): an edge's sheet up to a part stops point by
+  point at the first face it meets (a start on the part's face: through to its far side), startDepth / endDepth do
+  nothing with up-to ends, the translational offsets move them, a planar up-to face counts as its whole plane and
+  a face's owner is not the bound; abortFeature frees its operations' ids (std's temporary bend fillets reuse one).
+  Its sheet is live's (5 faces, x −25…−10); the part 64/146/84, 7,727.9 mm³ against live's 50/112/76, 7,600.0
+  (next: the rolled walls' rebuild). T1 ops_harness upToPart. Parity run 87: 1 document left failing to run
+  (cf-fix-pcb, after core's Extrude 5).
   dx 11-04 21:39: cf-sheet-metal-shaped-flange's Shaped Flange 1 (flange a separate part, 78,922 vs 92,510 mm³):
   the definition sheet joins (the flange shares its partial edge with the base), but `addEdge` (its transient
   query ∪ startTracking) resolves to two edges after flangeEdgeChange + flange_boolean: the moved joint edge (z 2.5,

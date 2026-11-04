@@ -707,5 +707,35 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const d = evDistance(context, { "side0" : qCreatedBy(sub + "s", EntityType.EDGE), "side1" : vector(50, 25, z) * mm }).distance;
             check("opFitSpline with derivatives", d < 1e-6 * mm, d);
         });
+        step(context, id, "upToPart", function(sub) {
+            // Live 2026: an edge's sheet up to a part stops, point by point, at the first face it meets (a stepped
+            // part: two depths); a start up to a surface, offset back toward the profile, starts there.
+            const z = 4900;
+            fCuboid(context, sub + "a", { "corner1" : vector(-50, 0, z) * mm, "corner2" : vector(-20, 10, z + 10) * mm });
+            fCuboid(context, sub + "b", { "corner1" : vector(-50, 10, z) * mm, "corner2" : vector(-25, 20, z + 10) * mm });
+            opBoolean(context, sub + "u", { "tools" : qUnion([qCreatedBy(sub + "a", EntityType.BODY), qCreatedBy(sub + "b", EntityType.BODY)]), "operationType" : BooleanOperationType.UNION });
+            const part = qCreatedBy(sub + "a", EntityType.BODY);
+            const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, z + 5) * mm, vector(0, 0, 1), vector(1, 0, 0)) });
+            skLineSegment(sk, "l", { "start" : vector(0, 0) * mm, "end" : vector(0, 20) * mm });
+            skSolve(sk);
+            const line = qCreatedBy(sub + "sk", EntityType.EDGE);
+            opExtrude(context, sub + "x", { "entities" : line, "direction" : vector(-1, 0, 0), "startBound" : BoundingType.BLIND, "startDepth" : 0 * mm,
+                        "endBound" : BoundingType.UP_TO_BODY, "endBoundEntity" : part });
+            const a1 = evArea(context, { "entities" : qCreatedBy(sub + "x", EntityType.FACE) });
+            check("opExtrude of an edge up to a stepped part", abs(a1 - 450 * mm ^ 2) < 1e-6 * mm ^ 2, a1);
+            opExtrude(context, sub + "y", { "entities" : line, "direction" : vector(-1, 0, 0), "isStartBoundOpposite" : false,
+                        "startBound" : BoundingType.UP_TO_SURFACE, "startBoundEntity" : qContainsPoint(qOwnedByBody(part, EntityType.FACE), vector(-20, 5, z + 5) * mm),
+                        "startTranslationalOffset" : 10 * mm, "endBound" : BoundingType.UP_TO_BODY, "endBoundEntity" : part });
+            const a2 = evArea(context, { "entities" : qCreatedBy(sub + "y", EntityType.FACE) });
+            check("opExtrude of an edge from a surface's offset up to a part", abs(a2 - 250 * mm ^ 2) < 1e-6 * mm ^ 2, a2);
+            // An aborted subfeature's operations free their ids (std measures each bend on a temporary fillet so).
+            for (var k = 0; k < 2; k += 1)
+            {
+                startFeature(context, sub + "tmp");
+                fCuboid(context, sub + "tmp" + "c", { "corner1" : vector(0, 30, z) * mm, "corner2" : vector(1, 31, z + 1) * mm });
+                abortFeature(context, sub + "tmp");
+            }
+            check("abortFeature frees its ids", isQueryEmpty(context, qCreatedBy(sub + "tmp", EntityType.BODY)), "");
+        });
         println("done");
     });
