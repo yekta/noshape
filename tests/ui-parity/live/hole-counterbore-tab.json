@@ -1,6 +1,6 @@
 {
  "scenario": "hole-counterbore-tab",
- "recorded": "2026-11-04T00:07:04.264Z",
+ "recorded": "2026-11-04T11:00:47.448Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "8fe053afa7f1b4f804b1a6fc",
+  "element": "aecfc1c79535e3125aace66c",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -78,20 +78,20 @@
      "kind": "field",
      "tag": "div",
      "label": "Sketch points to place holes",
-     "dialog": "M6x1.00 ↧ 15 mm"
+     "dialog": "Ø 6.35 mm ↧ 12 mm"
     },
     "dialog": {
-     "title": "M6x1.00 ↧ 15 mm",
+     "title": "Ø 6.35 mm ↧ 12 mm",
      "titleState": "error",
      "kind": "feature",
      "tabs": [
       {
        "label": "Inch",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Metric",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Simple",
@@ -124,19 +124,13 @@
       {
        "label": null,
        "kind": "enum",
-       "text": "Tapped",
-       "state": "ok"
-      },
-      {
-       "label": "Thread class",
-       "kind": "boolean",
-       "checked": false,
+       "text": "Drilled",
        "state": "ok"
       },
       {
        "label": "",
        "kind": "number",
-       "text": "5 mm",
+       "text": "6.35 mm",
        "focused": false,
        "state": "ok"
       },
@@ -161,7 +155,7 @@
       {
        "label": "",
        "kind": "number",
-       "text": "15 mm",
+       "text": "12 mm",
        "focused": false,
        "state": "ok"
       },
@@ -170,20 +164,6 @@
        "kind": "enum",
        "text": "118 deg",
        "state": "ok"
-      },
-      {
-       "label": "",
-       "kind": "number",
-       "text": "10 mm",
-       "focused": false,
-       "state": "ok"
-      },
-      {
-       "label": "",
-       "kind": "number",
-       "text": "5",
-       "focused": false,
-       "state": "ok"
       }
      ],
      "error": null,
@@ -191,17 +171,17 @@
     },
     "dialogs": [
      {
-      "title": "M6x1.00 ↧ 15 mm",
+      "title": "Ø 6.35 mm ↧ 12 mm",
       "titleState": "error",
       "kind": "feature",
       "tabs": [
        {
         "label": "Inch",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Metric",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Simple",
@@ -234,19 +214,13 @@
        {
         "label": null,
         "kind": "enum",
-        "text": "Tapped",
-        "state": "ok"
-       },
-       {
-        "label": "Thread class",
-        "kind": "boolean",
-        "checked": false,
+        "text": "Drilled",
         "state": "ok"
        },
        {
         "label": "",
         "kind": "number",
-        "text": "5 mm",
+        "text": "6.35 mm",
         "focused": false,
         "state": "ok"
        },
@@ -271,7 +245,7 @@
        {
         "label": "",
         "kind": "number",
-        "text": "15 mm",
+        "text": "12 mm",
         "focused": false,
         "state": "ok"
        },
@@ -279,20 +253,6 @@
         "label": "",
         "kind": "enum",
         "text": "118 deg",
-        "state": "ok"
-       },
-       {
-        "label": "",
-        "kind": "number",
-        "text": "10 mm",
-        "focused": false,
-        "state": "ok"
-       },
-       {
-        "label": "",
-        "kind": "number",
-        "text": "5",
-        "focused": false,
         "state": "ok"
        }
       ],
@@ -326,7 +286,7 @@
        "cls": ""
       },
       {
-       "name": "M6x1.00 ↧ 15 mm",
+       "name": "Ø 6.35 mm ↧ 12 mm",
        "state": "error",
        "selected": true,
        "editing": true,
@@ -335,7 +295,7 @@
        "cls": "edited selected ns-list-item-error"
       }
      ],
-     "rollbackAfter": "M6x1.00 ↧ 15 mm"
+     "rollbackAfter": "Ø 6.35 mm ↧ 12 mm"
     },
     "parts": [
      "Part 1"
@@ -349,7 +309,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 49871
+   "t": 43727
   },
   {
    "step": 2,
@@ -369,17 +329,17 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "Ø 5 mm ↧ 15 mm | ⌴Ø 11.25 mm ↧ 6 mm",
+     "title": "Ø 6.35 mm ↧ 12 mm | ⌴Ø 11.25 mm ↧ 6 mm",
      "titleState": "error",
      "kind": "feature",
      "tabs": [
       {
        "label": "Inch",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Metric",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Simple",
@@ -418,7 +378,7 @@
       {
        "label": "",
        "kind": "number",
-       "text": "5 mm",
+       "text": "6.35 mm",
        "focused": false,
        "state": "ok"
       },
@@ -457,7 +417,7 @@
       {
        "label": "",
        "kind": "number",
-       "text": "15 mm",
+       "text": "12 mm",
        "focused": false,
        "state": "ok"
       },
@@ -473,17 +433,17 @@
     },
     "dialogs": [
      {
-      "title": "Ø 5 mm ↧ 15 mm | ⌴Ø 11.25 mm ↧ 6 mm",
+      "title": "Ø 6.35 mm ↧ 12 mm | ⌴Ø 11.25 mm ↧ 6 mm",
       "titleState": "error",
       "kind": "feature",
       "tabs": [
        {
         "label": "Inch",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Metric",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Simple",
@@ -522,7 +482,7 @@
        {
         "label": "",
         "kind": "number",
-        "text": "5 mm",
+        "text": "6.35 mm",
         "focused": false,
         "state": "ok"
        },
@@ -561,7 +521,7 @@
        {
         "label": "",
         "kind": "number",
-        "text": "15 mm",
+        "text": "12 mm",
         "focused": false,
         "state": "ok"
        },
@@ -602,7 +562,7 @@
        "cls": ""
       },
       {
-       "name": "Ø 5 mm ↧ 15 mm | ⌴Ø 11.25 mm ↧ 6 mm",
+       "name": "Ø 6.35 mm ↧ 12 mm | ⌴Ø 11.25 mm ↧ 6 mm",
        "state": "error",
        "selected": true,
        "editing": true,
@@ -611,7 +571,7 @@
        "cls": "edited selected ns-list-item-error"
       }
      ],
-     "rollbackAfter": "Ø 5 mm ↧ 15 mm | ⌴Ø 11.25 mm ↧ 6 mm"
+     "rollbackAfter": "Ø 6.35 mm ↧ 12 mm | ⌴Ø 11.25 mm ↧ 6 mm"
     },
     "parts": [
      "Part 1"
@@ -625,7 +585,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 57122
+   "t": 50309
   }
  ]
 }

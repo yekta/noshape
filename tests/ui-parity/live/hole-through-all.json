@@ -1,6 +1,6 @@
 {
  "scenario": "hole-through-all",
- "recorded": "2026-11-04T00:12:10.993Z",
+ "recorded": "2026-11-04T11:05:18.423Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "d248e44fd1831f3398ce71e0",
+  "element": "9b3873a11dd706abd1db644d",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -78,20 +78,20 @@
      "kind": "field",
      "tag": "div",
      "label": "Sketch points to place holes",
-     "dialog": "M6x1.00 ↧ 15 mm"
+     "dialog": "Ø 6.35 mm ↧ 12 mm"
     },
     "dialog": {
-     "title": "M6x1.00 ↧ 15 mm",
+     "title": "Ø 6.35 mm ↧ 12 mm",
      "titleState": "error",
      "kind": "feature",
      "tabs": [
       {
        "label": "Inch",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Metric",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Simple",
@@ -124,19 +124,13 @@
       {
        "label": null,
        "kind": "enum",
-       "text": "Tapped",
-       "state": "ok"
-      },
-      {
-       "label": "Thread class",
-       "kind": "boolean",
-       "checked": false,
+       "text": "Drilled",
        "state": "ok"
       },
       {
        "label": "",
        "kind": "number",
-       "text": "5 mm",
+       "text": "6.35 mm",
        "focused": false,
        "state": "ok"
       },
@@ -161,7 +155,7 @@
       {
        "label": "",
        "kind": "number",
-       "text": "15 mm",
+       "text": "12 mm",
        "focused": false,
        "state": "ok"
       },
@@ -170,20 +164,6 @@
        "kind": "enum",
        "text": "118 deg",
        "state": "ok"
-      },
-      {
-       "label": "",
-       "kind": "number",
-       "text": "10 mm",
-       "focused": false,
-       "state": "ok"
-      },
-      {
-       "label": "",
-       "kind": "number",
-       "text": "5",
-       "focused": false,
-       "state": "ok"
       }
      ],
      "error": null,
@@ -191,17 +171,17 @@
     },
     "dialogs": [
      {
-      "title": "M6x1.00 ↧ 15 mm",
+      "title": "Ø 6.35 mm ↧ 12 mm",
       "titleState": "error",
       "kind": "feature",
       "tabs": [
        {
         "label": "Inch",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Metric",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Simple",
@@ -234,19 +214,13 @@
        {
         "label": null,
         "kind": "enum",
-        "text": "Tapped",
-        "state": "ok"
-       },
-       {
-        "label": "Thread class",
-        "kind": "boolean",
-        "checked": false,
+        "text": "Drilled",
         "state": "ok"
        },
        {
         "label": "",
         "kind": "number",
-        "text": "5 mm",
+        "text": "6.35 mm",
         "focused": false,
         "state": "ok"
        },
@@ -271,7 +245,7 @@
        {
         "label": "",
         "kind": "number",
-        "text": "15 mm",
+        "text": "12 mm",
         "focused": false,
         "state": "ok"
        },
@@ -279,20 +253,6 @@
         "label": "",
         "kind": "enum",
         "text": "118 deg",
-        "state": "ok"
-       },
-       {
-        "label": "",
-        "kind": "number",
-        "text": "10 mm",
-        "focused": false,
-        "state": "ok"
-       },
-       {
-        "label": "",
-        "kind": "number",
-        "text": "5",
-        "focused": false,
         "state": "ok"
        }
       ],
@@ -326,7 +286,7 @@
        "cls": ""
       },
       {
-       "name": "M6x1.00 ↧ 15 mm",
+       "name": "Ø 6.35 mm ↧ 12 mm",
        "state": "error",
        "selected": true,
        "editing": true,
@@ -335,7 +295,7 @@
        "cls": "edited selected ns-list-item-error"
       }
      ],
-     "rollbackAfter": "M6x1.00 ↧ 15 mm"
+     "rollbackAfter": "Ø 6.35 mm ↧ 12 mm"
     },
     "parts": [
      "Part 1"
@@ -349,7 +309,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 30439
+   "t": 38819
   },
   {
    "step": 2,
@@ -374,17 +334,17 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "M6x1.00 ↧ 15 mm",
+     "title": "Ø 6.35 mm ↧ 12 mm",
      "titleState": "error",
      "kind": "feature",
      "tabs": [
       {
        "label": "Inch",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Metric",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Simple",
@@ -417,19 +377,13 @@
       {
        "label": null,
        "kind": "enum",
-       "text": "Tapped",
-       "state": "ok"
-      },
-      {
-       "label": "Thread class",
-       "kind": "boolean",
-       "checked": false,
+       "text": "Drilled",
        "state": "ok"
       },
       {
        "label": "",
        "kind": "number",
-       "text": "5 mm",
+       "text": "6.35 mm",
        "focused": false,
        "state": "ok"
       },
@@ -454,7 +408,7 @@
       {
        "label": "",
        "kind": "number",
-       "text": "15 mm",
+       "text": "12 mm",
        "focused": false,
        "state": "ok"
       },
@@ -463,20 +417,6 @@
        "kind": "enum",
        "text": "118 deg",
        "state": "ok"
-      },
-      {
-       "label": "",
-       "kind": "number",
-       "text": "10 mm",
-       "focused": false,
-       "state": "ok"
-      },
-      {
-       "label": "",
-       "kind": "number",
-       "text": "5",
-       "focused": false,
-       "state": "ok"
       }
      ],
      "error": null,
@@ -484,17 +424,17 @@
     },
     "dialogs": [
      {
-      "title": "M6x1.00 ↧ 15 mm",
+      "title": "Ø 6.35 mm ↧ 12 mm",
       "titleState": "error",
       "kind": "feature",
       "tabs": [
        {
         "label": "Inch",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Metric",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Simple",
@@ -527,19 +467,13 @@
        {
         "label": null,
         "kind": "enum",
-        "text": "Tapped",
-        "state": "ok"
-       },
-       {
-        "label": "Thread class",
-        "kind": "boolean",
-        "checked": false,
+        "text": "Drilled",
         "state": "ok"
        },
        {
         "label": "",
         "kind": "number",
-        "text": "5 mm",
+        "text": "6.35 mm",
         "focused": false,
         "state": "ok"
        },
@@ -564,7 +498,7 @@
        {
         "label": "",
         "kind": "number",
-        "text": "15 mm",
+        "text": "12 mm",
         "focused": false,
         "state": "ok"
        },
@@ -572,20 +506,6 @@
         "label": "",
         "kind": "enum",
         "text": "118 deg",
-        "state": "ok"
-       },
-       {
-        "label": "",
-        "kind": "number",
-        "text": "10 mm",
-        "focused": false,
-        "state": "ok"
-       },
-       {
-        "label": "",
-        "kind": "number",
-        "text": "5",
-        "focused": false,
         "state": "ok"
        }
       ],
@@ -619,7 +539,7 @@
        "cls": ""
       },
       {
-       "name": "M6x1.00 ↧ 15 mm",
+       "name": "Ø 6.35 mm ↧ 12 mm",
        "state": "error",
        "selected": true,
        "editing": true,
@@ -628,7 +548,7 @@
        "cls": "edited selected ns-list-item-error"
       }
      ],
-     "rollbackAfter": "M6x1.00 ↧ 15 mm"
+     "rollbackAfter": "Ø 6.35 mm ↧ 12 mm"
     },
     "parts": [
      "Part 1"
@@ -642,7 +562,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 48028
+   "t": 54477
   },
   {
    "step": 3,
@@ -656,17 +576,17 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "M6x1.00 ↧ 15 mm",
+     "title": "Ø 6.35 mm ↧ 12 mm",
      "titleState": "error",
      "kind": "feature",
      "tabs": [
       {
        "label": "Inch",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Metric",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Simple",
@@ -699,19 +619,13 @@
       {
        "label": null,
        "kind": "enum",
-       "text": "Tapped",
-       "state": "ok"
-      },
-      {
-       "label": "Thread class",
-       "kind": "boolean",
-       "checked": false,
+       "text": "Drilled",
        "state": "ok"
       },
       {
        "label": "",
        "kind": "number",
-       "text": "5 mm",
+       "text": "6.35 mm",
        "focused": false,
        "state": "ok"
       },
@@ -736,7 +650,7 @@
       {
        "label": "",
        "kind": "number",
-       "text": "15 mm",
+       "text": "12 mm",
        "focused": false,
        "state": "ok"
       },
@@ -745,20 +659,6 @@
        "kind": "enum",
        "text": "118 deg",
        "state": "ok"
-      },
-      {
-       "label": "",
-       "kind": "number",
-       "text": "10 mm",
-       "focused": false,
-       "state": "ok"
-      },
-      {
-       "label": "",
-       "kind": "number",
-       "text": "5",
-       "focused": false,
-       "state": "ok"
       }
      ],
      "error": null,
@@ -766,17 +666,17 @@
     },
     "dialogs": [
      {
-      "title": "M6x1.00 ↧ 15 mm",
+      "title": "Ø 6.35 mm ↧ 12 mm",
       "titleState": "error",
       "kind": "feature",
       "tabs": [
        {
         "label": "Inch",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Metric",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Simple",
@@ -809,19 +709,13 @@
        {
         "label": null,
         "kind": "enum",
-        "text": "Tapped",
-        "state": "ok"
-       },
-       {
-        "label": "Thread class",
-        "kind": "boolean",
-        "checked": false,
+        "text": "Drilled",
         "state": "ok"
        },
        {
         "label": "",
         "kind": "number",
-        "text": "5 mm",
+        "text": "6.35 mm",
         "focused": false,
         "state": "ok"
        },
@@ -846,7 +740,7 @@
        {
         "label": "",
         "kind": "number",
-        "text": "15 mm",
+        "text": "12 mm",
         "focused": false,
         "state": "ok"
        },
@@ -854,20 +748,6 @@
         "label": "",
         "kind": "enum",
         "text": "118 deg",
-        "state": "ok"
-       },
-       {
-        "label": "",
-        "kind": "number",
-        "text": "10 mm",
-        "focused": false,
-        "state": "ok"
-       },
-       {
-        "label": "",
-        "kind": "number",
-        "text": "5",
-        "focused": false,
         "state": "ok"
        }
       ],
@@ -901,7 +781,7 @@
        "cls": ""
       },
       {
-       "name": "M6x1.00 ↧ 15 mm",
+       "name": "Ø 6.35 mm ↧ 12 mm",
        "state": "error",
        "selected": true,
        "editing": true,
@@ -910,7 +790,7 @@
        "cls": "edited selected ns-list-item-error"
       }
      ],
-     "rollbackAfter": "M6x1.00 ↧ 15 mm"
+     "rollbackAfter": "Ø 6.35 mm ↧ 12 mm"
     },
     "parts": [
      "Part 1"
@@ -924,7 +804,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 52585
+   "t": 58819
   },
   {
    "step": 4,
@@ -938,7 +818,7 @@
    "ok": true,
    "at": [
     380,
-    445
+    348
    ],
    "state": {
     "focus": {
@@ -951,20 +831,20 @@
       0
      ],
      "all": false,
-     "dialog": "M6x1.00 THRU"
+     "dialog": "Ø 6.35 mm THRU"
     },
     "dialog": {
-     "title": "M6x1.00 THRU",
+     "title": "Ø 6.35 mm THRU",
      "titleState": "error",
      "kind": "feature",
      "tabs": [
       {
        "label": "Inch",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Metric",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Simple",
@@ -997,19 +877,13 @@
       {
        "label": null,
        "kind": "enum",
-       "text": "Tapped",
-       "state": "ok"
-      },
-      {
-       "label": "Thread class",
-       "kind": "boolean",
-       "checked": false,
+       "text": "Drilled",
        "state": "ok"
       },
       {
        "label": "",
        "kind": "number",
-       "text": "5 mm",
+       "text": "6.35 mm",
        "focused": false,
        "state": "ok"
       },
@@ -1030,12 +904,6 @@
        "kind": "toggle",
        "checked": false,
        "state": "ok"
-      },
-      {
-       "label": "Tap through all",
-       "kind": "boolean",
-       "checked": true,
-       "state": "ok"
       }
      ],
      "error": null,
@@ -1043,17 +911,17 @@
     },
     "dialogs": [
      {
-      "title": "M6x1.00 THRU",
+      "title": "Ø 6.35 mm THRU",
       "titleState": "error",
       "kind": "feature",
       "tabs": [
        {
         "label": "Inch",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Metric",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Simple",
@@ -1086,19 +954,13 @@
        {
         "label": null,
         "kind": "enum",
-        "text": "Tapped",
-        "state": "ok"
-       },
-       {
-        "label": "Thread class",
-        "kind": "boolean",
-        "checked": false,
+        "text": "Drilled",
         "state": "ok"
        },
        {
         "label": "",
         "kind": "number",
-        "text": "5 mm",
+        "text": "6.35 mm",
         "focused": false,
         "state": "ok"
        },
@@ -1118,12 +980,6 @@
         "label": "icon:svg-icon-flip-direction-opposite",
         "kind": "toggle",
         "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Tap through all",
-        "kind": "boolean",
-        "checked": true,
         "state": "ok"
        }
       ],
@@ -1157,7 +1013,7 @@
        "cls": ""
       },
       {
-       "name": "M6x1.00 THRU",
+       "name": "Ø 6.35 mm THRU",
        "state": "error",
        "selected": true,
        "editing": true,
@@ -1166,7 +1022,7 @@
        "cls": "edited selected ns-list-item-error"
       }
      ],
-     "rollbackAfter": "M6x1.00 THRU"
+     "rollbackAfter": "Ø 6.35 mm THRU"
     },
     "parts": [
      "Part 1"
@@ -1180,7 +1036,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 64135
+   "t": 67350
   },
   {
    "step": 5,
@@ -1200,20 +1056,20 @@
       0
      ],
      "all": false,
-     "dialog": "M6x1.00 THRU"
+     "dialog": "Ø 6.35 mm THRU"
     },
     "dialog": {
-     "title": "M6x1.00 THRU",
+     "title": "Ø 6.35 mm THRU",
      "titleState": "error",
      "kind": "feature",
      "tabs": [
       {
        "label": "Inch",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Metric",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Simple",
@@ -1246,19 +1102,13 @@
       {
        "label": null,
        "kind": "enum",
-       "text": "Tapped",
-       "state": "ok"
-      },
-      {
-       "label": "Thread class",
-       "kind": "boolean",
-       "checked": false,
+       "text": "Drilled",
        "state": "ok"
       },
       {
        "label": "",
        "kind": "number",
-       "text": "5 mm",
+       "text": "6.35 mm",
        "focused": false,
        "state": "ok"
       },
@@ -1279,12 +1129,6 @@
        "kind": "toggle",
        "checked": false,
        "state": "ok"
-      },
-      {
-       "label": "Tap through all",
-       "kind": "boolean",
-       "checked": true,
-       "state": "ok"
       }
      ],
      "error": null,
@@ -1292,17 +1136,17 @@
     },
     "dialogs": [
      {
-      "title": "M6x1.00 THRU",
+      "title": "Ø 6.35 mm THRU",
       "titleState": "error",
       "kind": "feature",
       "tabs": [
        {
         "label": "Inch",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Metric",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Simple",
@@ -1335,19 +1179,13 @@
        {
         "label": null,
         "kind": "enum",
-        "text": "Tapped",
-        "state": "ok"
-       },
-       {
-        "label": "Thread class",
-        "kind": "boolean",
-        "checked": false,
+        "text": "Drilled",
         "state": "ok"
        },
        {
         "label": "",
         "kind": "number",
-        "text": "5 mm",
+        "text": "6.35 mm",
         "focused": false,
         "state": "ok"
        },
@@ -1367,12 +1205,6 @@
         "label": "icon:svg-icon-flip-direction-opposite",
         "kind": "toggle",
         "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Tap through all",
-        "kind": "boolean",
-        "checked": true,
         "state": "ok"
        }
       ],
@@ -1406,7 +1238,7 @@
        "cls": ""
       },
       {
-       "name": "M6x1.00 THRU",
+       "name": "Ø 6.35 mm THRU",
        "state": "error",
        "selected": true,
        "editing": true,
@@ -1415,7 +1247,7 @@
        "cls": "edited selected ns-list-item-error"
       }
      ],
-     "rollbackAfter": "M6x1.00 THRU"
+     "rollbackAfter": "Ø 6.35 mm THRU"
     },
     "parts": [
      "Part 1"
@@ -1429,7 +1261,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 68544
+   "t": 71738
   },
   {
    "step": 6,
@@ -1476,7 +1308,7 @@
        "cls": ""
       },
       {
-       "name": "M6x1.00 THRU",
+       "name": "Ø 6.35 mm THRU",
        "state": "error",
        "selected": false,
        "editing": false,
@@ -1485,7 +1317,7 @@
        "cls": "ns-list-item-error"
       }
      ],
-     "rollbackAfter": "M6x1.00 THRU"
+     "rollbackAfter": "Ø 6.35 mm THRU"
     },
     "parts": [
      "Part 1"
@@ -1499,7 +1331,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 74976
+   "t": 77263
   },
   {
    "step": 7,
@@ -1540,7 +1372,7 @@
        "cls": ""
       },
       {
-       "name": "M6x1.00 THRU",
+       "name": "Ø 6.35 mm THRU",
        "state": "error",
        "selected": false,
        "editing": false,
@@ -1549,7 +1381,7 @@
        "cls": "ns-list-item-error"
       }
      ],
-     "rollbackAfter": "M6x1.00 THRU"
+     "rollbackAfter": "Ø 6.35 mm THRU"
     },
     "parts": [
      "Part 1"
@@ -1563,7 +1395,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 79179
+   "t": 81621
   }
  ]
 }

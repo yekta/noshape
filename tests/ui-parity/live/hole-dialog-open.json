@@ -1,6 +1,6 @@
 {
  "scenario": "hole-dialog-open",
- "recorded": "2026-11-04T00:07:58.027Z",
+ "recorded": "2026-11-04T11:01:40.421Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "4339c3cf6deb52357623000f",
+  "element": "6474f572f0a793cfaae1e157",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -78,20 +78,20 @@
      "kind": "field",
      "tag": "div",
      "label": "Sketch points to place holes",
-     "dialog": "M6x1.00 ↧ 15 mm"
+     "dialog": "Ø 6.35 mm ↧ 12 mm"
     },
     "dialog": {
-     "title": "M6x1.00 ↧ 15 mm",
+     "title": "Ø 6.35 mm ↧ 12 mm",
      "titleState": "error",
      "kind": "feature",
      "tabs": [
       {
        "label": "Inch",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Metric",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Simple",
@@ -124,19 +124,13 @@
       {
        "label": null,
        "kind": "enum",
-       "text": "Tapped",
-       "state": "ok"
-      },
-      {
-       "label": "Thread class",
-       "kind": "boolean",
-       "checked": false,
+       "text": "Drilled",
        "state": "ok"
       },
       {
        "label": "",
        "kind": "number",
-       "text": "5 mm",
+       "text": "6.35 mm",
        "focused": false,
        "state": "ok"
       },
@@ -161,7 +155,7 @@
       {
        "label": "",
        "kind": "number",
-       "text": "15 mm",
+       "text": "12 mm",
        "focused": false,
        "state": "ok"
       },
@@ -170,20 +164,6 @@
        "kind": "enum",
        "text": "118 deg",
        "state": "ok"
-      },
-      {
-       "label": "",
-       "kind": "number",
-       "text": "10 mm",
-       "focused": false,
-       "state": "ok"
-      },
-      {
-       "label": "",
-       "kind": "number",
-       "text": "5",
-       "focused": false,
-       "state": "ok"
       }
      ],
      "error": null,
@@ -191,17 +171,17 @@
     },
     "dialogs": [
      {
-      "title": "M6x1.00 ↧ 15 mm",
+      "title": "Ø 6.35 mm ↧ 12 mm",
       "titleState": "error",
       "kind": "feature",
       "tabs": [
        {
         "label": "Inch",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Metric",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Simple",
@@ -234,19 +214,13 @@
        {
         "label": null,
         "kind": "enum",
-        "text": "Tapped",
-        "state": "ok"
-       },
-       {
-        "label": "Thread class",
-        "kind": "boolean",
-        "checked": false,
+        "text": "Drilled",
         "state": "ok"
        },
        {
         "label": "",
         "kind": "number",
-        "text": "5 mm",
+        "text": "6.35 mm",
         "focused": false,
         "state": "ok"
        },
@@ -271,7 +245,7 @@
        {
         "label": "",
         "kind": "number",
-        "text": "15 mm",
+        "text": "12 mm",
         "focused": false,
         "state": "ok"
        },
@@ -279,20 +253,6 @@
         "label": "",
         "kind": "enum",
         "text": "118 deg",
-        "state": "ok"
-       },
-       {
-        "label": "",
-        "kind": "number",
-        "text": "10 mm",
-        "focused": false,
-        "state": "ok"
-       },
-       {
-        "label": "",
-        "kind": "number",
-        "text": "5",
-        "focused": false,
         "state": "ok"
        }
       ],
@@ -326,7 +286,7 @@
        "cls": ""
       },
       {
-       "name": "M6x1.00 ↧ 15 mm",
+       "name": "Ø 6.35 mm ↧ 12 mm",
        "state": "error",
        "selected": true,
        "editing": true,
@@ -335,7 +295,7 @@
        "cls": "edited selected ns-list-item-error"
       }
      ],
-     "rollbackAfter": "M6x1.00 ↧ 15 mm"
+     "rollbackAfter": "Ø 6.35 mm ↧ 12 mm"
     },
     "parts": [
      "Part 1"
@@ -349,7 +309,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 32822
+   "t": 33275
   }
  ]
 }
