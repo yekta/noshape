@@ -16,6 +16,17 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-04 09:51 UTC.**
+- Landed: motor-mount-jack as live to the end (915bffd1 with its fix-forward 480bdf02: a face pattern's cap on a curved
+  face only where the faces leave one face all round, the gusset mirror as before; the seam movers check the rebuilt
+  face's area before the solid's volume); SHELL-SLOW Shell 4 1.36 -> 1.06 s (3fe8cd25: the marched edges' normals
+  warm-started, Newton with the offsets' own gradients; left: OCCT's self-interference check 0.57 s, volumes 0.12 s).
+- prize-wheel-tim's Extrude 2 changed geometry with dx's 75b1e14a9 (import mapping; bisected, ticket
+  PRIZE-WHEEL-IMPORT-REGRESSION for dx). cf-sheet-metal-overcut-dogbone's Corner Overcut 1: the FS host's edge order
+  (FS-QUERY-EDGE-ORDER, dx). cf-straight-spline Feature 5: Parasolid's 0.0106 mm corner edges
+  (STRAIGHT-SPLINE-CORNER-EDGES).
+- Next: learning-center-michael's Fillet 2 (overflowing rounds), pipeflange's Fillet 2, the motor-mount speed.
+
 **State 11-04 09:11 UTC.**
 - Queued 2c24ee7b: **motor-mount-jack matches live to the end (10/10, was 3/10)**: touching sketch regions picked
   together are united (a shared line or a whole shared loop; sketch regions::union_touching), a face pattern's caps lie
