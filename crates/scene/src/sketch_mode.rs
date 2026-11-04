@@ -498,6 +498,11 @@ pub struct SketchEditor {
     pub selected_constraints: Vec<ConstraintId>,
     /// Hovered sketch entity (from the viewport pick).
     pub hover: Option<EntityId>,
+    /// Where the pointer last moved to, and when (a still rest by a line's
+    /// midpoint targets the midpoint: live 1937 / 1954).
+    pub pointer_still: (DVec2, std::time::Instant),
+    /// The press came after such a rest.
+    press_rested: bool,
     /// Use tool: projection preview of the hovered model edges.
     pub use_preview: Vec<Vec<DVec2>>,
     /// Hovered sketch region (key) when no entity is under the cursor.
@@ -760,6 +765,11 @@ const INFERENCE_COLOR: [u8; 4] = [0xff, 0xc2, 0x0e, 255];
 const PREVIEW_COLOR: [u8; 4] = [0x44, 0x9c, 0xcd, 255];
 /// The dash along a rubber band whose direction is inferred (live sketch/51).
 const INFERRED_DASH_COLOR: [u8; 4] = [0xe2, 0xbc, 0x2c, 255];
+/// A still rest this long by a line's midpoint targets the midpoint (as the
+/// Part Studio's edges, part-studio-ui behaviors MIDPOINT_DWELL).
+const MIDPOINT_DWELL: std::time::Duration = std::time::Duration::from_millis(250);
+/// The midpoint's window: within this many px of it, along each axis.
+const MIDPOINT_WINDOW_PX: f64 = 9.0;
 
 /// The inference sets the direction of the line being drawn (not a point to
 /// snap to): shown on the rubber band as its dash (live sketch/51–53).
@@ -1125,6 +1135,8 @@ impl SketchEditor {
             selection: Vec::new(),
             selected_constraints: Vec::new(),
             hover: None,
+            pointer_still: (DVec2::splat(f64::NAN), std::time::Instant::now()),
+            press_rested: false,
             use_preview: Vec::new(),
             hover_region: None,
             selected_regions: Vec::new(),
@@ -1434,6 +1446,9 @@ impl SketchEditor {
     }
 
     pub fn pointer_move(&mut self, data: &mut SketchData, p: DVec2, shift: bool, alt: bool) -> EditOutcome {
+        if p != self.pointer_still.0 {
+            self.pointer_still = (p, std::time::Instant::now());
+        }
         // Polygon side count from the pointer's distance to the centre (live,
         // behaviours "skasm (2026-10-27) sketch polygon side count"): one
         // side more per 10 px beyond the 2nd click, one less per 10 px in.
@@ -1764,6 +1779,7 @@ impl SketchEditor {
                         self.drag = Some(DragState::Text { entity: e, start: p, points, moved: false });
                     }
                     Some(e) => {
+                        self.press_rested = self.pointer_still.1.elapsed() >= MIDPOINT_DWELL;
                         self.drag = Some(DragState::Pending { entity: e, start: p });
                     }
                     None => {
@@ -3680,7 +3696,16 @@ impl SketchEditor {
         self.press = None;
         self.drag_origin = None;
         let out = match self.drag.take() {
-            Some(DragState::Pending { entity, .. }) => {
+            Some(DragState::Pending { entity, start }) => {
+                // Live (1937 / 1954): after a still rest within 9 px of a
+                // line's midpoint the click takes the implicit midpoint and
+                // selects nothing; a quick click selects the line.
+                if self.press_rested
+                    && let Some(Curve2::Line { a, b }) = data.sketch.curve(entity)
+                    && ((start - (a + b) * 0.5) / self.world_per_px).abs().max_element() <= MIDPOINT_WINDOW_PX
+                {
+                    return EditOutcome::none();
+                }
                 if let Some(pos) = self.selection.iter().position(|e| *e == entity) {
                     self.selection.remove(pos);
                 } else {
@@ -7103,6 +7128,13 @@ mod tests {
         assert_eq!(ed.enter_target(), EnterTarget::Nothing, "Dimension tool active, nothing pending");
         assert!(ed.cancel(), "Esc ends the Dimension tool");
         assert_eq!(ed.tool, Tool::Select);
+        // A still rest on its midpoint, then a click: nothing (live 1937 / 1954).
+        ed.pointer_move(&mut d, v(0.02, 0.01), false, false);
+        ed.pointer_still.1 -= std::time::Duration::from_millis(300);
+        click(&mut ed, &mut d, v(0.02, 0.01));
+        assert!(ed.selection.is_empty(), "a rested midpoint click selects nothing");
+        // A quick click there takes the line.
+        ed.pointer_move(&mut d, v(0.0201, 0.01), false, false);
         click(&mut ed, &mut d, v(0.02, 0.01));
         assert!(!ed.selection.is_empty(), "the line is selected");
         assert_eq!(ed.enter_target(), EnterTarget::Nothing, "a selection");

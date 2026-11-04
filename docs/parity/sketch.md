@@ -209,6 +209,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | # | Behaviour | Source | Status | Verified |
 |---|---|---|---|---|
 | 9.1 | Click selects; clicking more adds; clicking a selected entity deselects | Onshape | ✅ | 0.4.10+ / 2d9a275c 10-27 |
+| 9.1a | A still rest (250 ms) within 9 px of a line's midpoint, then a click: the implicit midpoint, nothing selected; a quick click selects the line | behaviours "psui / skasm (2026-11-03 21:22, P3)" (1937), psui 1954 | ✅ (T:sm enter_never_accepts_the_sketch_and_esc_keeps_the_selection) | skasm 11-04: ui-parity sketch-delete-line / -vertical-constraint match; nine older recordings that select the line there asked of live for a re-record |
 | 9.2 | Box select left→right: window (entirely inside) | B§5.4 | ✅ | 0.4.10+ / 2d9a275c 10-27 |
 | 9.3 | Box select right→left: crossing (anything the box touches) | B§5.4 | ✅ (T:sm) | 0.4.10+ / 203c4d6f 10-27 |
 | 9.4 | Hover highlights orange, selection amber, related entities yellow | H:working_with_constraints | ✅ | 0.4.10+ / 2d9a275c 10-27 |
