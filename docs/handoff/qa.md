@@ -950,6 +950,9 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
 ## Requests to the lead (qa, updated 2026-11-04 14:02)
+- **(11-04 14:21) 4c9c1741 (Windows title bar clicks) is not on main**: it is only on origin/queue/lead-docs-4c9c1741 (13:29),
+  a docs-queue branch, though it changes vendor/gpui-pre/src/window.rs; main (6bfc1a6f) and green 33c385a5 lack it, so the
+  17:00 cut would ship the dead Windows title bar again unless it lands first.
 - **(11-04 14:02) A Windows / macOS title-bar check qa can run on a release** (the new same-on-every-platform rule, the lead's
   17:00 ask): qa can't run the Windows app here, and no workflow clicks the GUI except nav.yml's view navigation. Please
   add a workflow_dispatch job (nav.yml's pattern: the release asset on windows-latest and macos-15, a driver like
