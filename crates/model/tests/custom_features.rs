@@ -477,6 +477,130 @@ fn new_feature_studio_template_compiles() {
     assert!(c.features.is_empty());
 }
 
+/// The public Displacement map feature (tests/fs/displacement_map.fs, FeatureScript 3044) on a Ø50 × 50 mm cylinder's
+/// `face` ("side" or "top") with the pixel values `csv`: degree 5, black 0 mm, white 1 mm. The regeneration, its
+/// seconds.
+fn displacement_map(csv: &str, face: &str, replace: bool) -> (RegenResult, f64) {
+    let cylinder = studio(
+        r#"
+annotation { "Feature Type Name" : "Test cylinder" }
+export const testCylinder = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * meter, "topCenter" : vector(0, 0, 50) * millimeter, "radius" : 25 * millimeter });
+    });
+"#,
+    );
+    let mut doc = Document::new();
+    let disp = doc.add_tab("Displacement map", TabContent::FeatureStudio(FeatureStudio::new(include_str!("fs/displacement_map.fs"))));
+    let cyl = doc.add_tab("Cylinder", TabContent::FeatureStudio(FeatureStudio::new(&cylinder)));
+    let table = doc.add_tab("leather.csv", TabContent::File(noshape_model::file_tab::FileTab::new("leather.csv", csv.as_bytes(), 0)));
+    let scripts = DocumentScripts::from_document(&doc);
+    for (_, name, c) in scripts.studios() {
+        assert!(!c.has_errors(), "{name}: {:?}", c.diagnostics);
+    }
+    let units = UnitPrefs::default();
+    let opts = RegenOptions { custom_features: Some(scripts.clone()), ..Default::default() };
+    let mut ps = PartStudio::new();
+    ps.features.push(ps.new_feature(&custom::type_id(cyl, "testCylinder"), &units).unwrap());
+    let mut reg = Regenerator::new();
+    let r = reg.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+    assert_ok(&r);
+    let b = &r.context.bodies[0];
+    let pick = (0..b.faces.len())
+        .find(|&i| {
+            let s = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().face_surface().unwrap();
+            match face {
+                "side" => matches!(s, noshape_kernel::Surface::Cylinder { .. }),
+                _ => matches!(s, noshape_kernel::Surface::Plane(_)) && b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().centroid().unwrap().z > 0.025,
+            }
+        })
+        .expect("the face");
+    let mut f = ps.new_feature(&custom::type_id(disp, "displacementMap"), &units).unwrap();
+    f.params.set("imageTable", ParamValue::Text(table.to_string()));
+    f.params.set("face", ParamValue::Query(vec![Reference::Face((*b.faces[pick]).clone())]));
+    f.params.set("degree", expr("5"));
+    f.params.set("blackValue", expr("0 mm"));
+    f.params.set("whiteValue", expr("1 mm"));
+    f.params.set("replaceFace", ParamValue::Bool(replace));
+    ps.features.push(f);
+    let t = std::time::Instant::now();
+    let r = reg.regenerate(&ps, &ConfigValues::default(), &units, &opts);
+    (r, t.elapsed().as_secs_f64())
+}
+
+/// Pixel values 0-255 of a `n` × `n` image: a diagonal wave.
+fn wave_csv(n: usize) -> String {
+    (0..n).map(|i| (0..n).map(|j| format!("{}", ((((i + 2 * j) as f64) * 0.7).sin() * 127.5 + 127.5).round() as i32)).collect::<Vec<_>>().join(",") + "\n").collect()
+}
+
+/// The Displacement map (the last feature) regenerated with its info "<n> samples", as live.
+fn assert_samples(r: &RegenResult, info: &str) {
+    let last = r.display.features.last().expect("the feature");
+    if last.status != FeatureStatus::Info || last.message.as_deref() != Some(info) {
+        assert_ok(r);
+    }
+}
+
+/// The user's Displacement map (DISPLACEMENT-MAP): on the cylinder's periodic side face and on its flat top, a sheet of
+/// the displaced points beside the part (Replace face off), or the face replaced by it.
+#[test]
+fn displacement_map_on_a_cylinder() {
+    let csv = wave_csv(24);
+    let plain = PI * 0.025f64.powi(2) * 0.05;
+    let solid_volume = |r: &RegenResult| r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| b.shape.volume().unwrap().abs()).sum::<f64>();
+    for face in ["side", "top"] {
+        let (r, _) = displacement_map(&csv, face, false);
+        assert_samples(&r, "576 samples");
+        assert_eq!(r.context.bodies.iter().map(|b| b.kind).collect::<Vec<_>>(), [noshape_model::display::BodyKind::Solid, noshape_model::display::BodyKind::Surface], "{face}: the part and the displaced sheet");
+        assert!((solid_volume(&r) - plain).abs() < 1e-12, "{face}: the part as it was");
+        let (r, _) = displacement_map(&csv, face, true);
+        assert_samples(&r, "576 samples");
+        assert_eq!(r.context.bodies.len(), 1, "{face}: the face replaced");
+        let v = solid_volume(&r);
+        let grown = match face {
+            "side" => PI * 0.026f64.powi(2) * 0.05,
+            _ => PI * 0.025f64.powi(2) * 0.051,
+        };
+        assert!(v > plain && v < grown, "{face}: volume {v} between {plain} and {grown}");
+    }
+}
+
+/// The user's case: the 512 × 512 leather image (NOSHAPE_DISP_CSV=<file>) on the side and the top, Replace face off and
+/// on, timed.
+#[test]
+#[ignore = "T2: probe; needs the user's CSV (NOSHAPE_DISP_CSV)"]
+fn displacement_map_probe() {
+    let Ok(path) = std::env::var("NOSHAPE_DISP_CSV") else { return };
+    let csv = std::fs::read_to_string(path).expect("the CSV");
+    // NOSHAPE_DISP_ONLY=side:false: one case, its FeatureScript lines profiled.
+    let only = std::env::var("NOSHAPE_DISP_ONLY").ok();
+    custom::run::set_profiling(only.is_some());
+    for face in ["side", "top"] {
+        for replace in [false, true] {
+            if only.as_ref().is_some_and(|o| *o != format!("{face}:{replace}")) {
+                continue;
+            }
+            let (r, secs) = displacement_map(&csv, face, replace);
+            let feature = r.display.features.last().expect("the feature");
+            println!("DISP feature {:.2} s", feature.time_ms / 1000.0);
+            if only.is_some() {
+                let mut lines: Vec<_> = custom::run::outputs().values().flat_map(|o| o.line_times.clone()).collect();
+                lines.sort_by_key(|l| std::cmp::Reverse(l.2));
+                for (m, l, t) in lines.iter().take(40) {
+                    println!("DISP line {t:>10.2?} {m}:{l}");
+                }
+            }
+            let status: Vec<String> = r.display.features.iter().map(|s| format!("{:?} {:?}", s.status, s.message)).collect();
+            let notices: Vec<String> = custom::run::outputs().values().flat_map(|o| o.notices.iter().map(|n| format!("{} {}: {}", n.module, n.pos, n.message))).collect();
+            let kinds: Vec<_> = r.context.bodies.iter().map(|b| (b.kind, b.shape.volume().unwrap_or(0.0).abs())).collect();
+            println!("DISP {face} replace={replace}: {secs:.2} s, bodies {kinds:?}, {status:?} {notices:?}");
+        }
+    }
+}
+
 /// The user's own Onshape feature (Y Threads) on a Ø10 x 20 mm cylinder.
 #[test]
 fn real_onshape_feature_y_threads() {

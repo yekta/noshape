@@ -663,25 +663,39 @@ impl NurbsSurface {
     /// The parameters of the point of it nearest `p` (from a grid of samples, 8 a span each way, or near
     /// `seed`; then Newton's method on the distance's gradient), and the distance.
     pub fn param_of(&self, p: DVec3, seed: Option<DVec2>) -> (DVec2, f64) {
+        if let Some(s) = seed {
+            return self.refine(p, s);
+        }
+        // The nearest of a grid of samples, refined: at most 64 a side first (a 512 × 512 pole surface had 16 M), all
+        // 8 a span when that lands off the surface.
+        let full = (8 * (self.nu - self.udegree).max(1), 8 * (self.nv - self.vdegree).max(1));
+        let coarse = (full.0.min(64), full.1.min(64));
+        let r = self.refine(p, self.nearest_sample(p, coarse));
+        if r.1 <= 1e-9 * (1.0 + p.abs().max_element()) || coarse == full {
+            return r;
+        }
+        self.refine(p, self.nearest_sample(p, full))
+    }
+
+    fn nearest_sample(&self, p: DVec3, (mu, mv): (usize, usize)) -> DVec2 {
         let ((u0, u1), (v0, v1)) = self.range();
         let mut best = (DVec2::new(u0, v0), f64::INFINITY);
-        if let Some(s) = seed {
-            best = (s, (self.at(s.x, s.y) - p).length_squared());
-        } else {
-            let mu = 8 * (self.nu - self.udegree).max(1);
-            let mv = 8 * (self.nv - self.vdegree).max(1);
-            for i in 0..=mu {
-                let u = u0 + (u1 - u0) * i as f64 / mu as f64;
-                for j in 0..=mv {
-                    let v = v0 + (v1 - v0) * j as f64 / mv as f64;
-                    let d = (self.at(u, v) - p).length_squared();
-                    if d < best.1 {
-                        best = (DVec2::new(u, v), d);
-                    }
+        for i in 0..=mu {
+            let u = u0 + (u1 - u0) * i as f64 / mu as f64;
+            for j in 0..=mv {
+                let v = v0 + (v1 - v0) * j as f64 / mv as f64;
+                let d = (self.at(u, v) - p).length_squared();
+                if d < best.1 {
+                    best = (DVec2::new(u, v), d);
                 }
             }
         }
-        let mut uv = best.0;
+        best.0
+    }
+
+    /// Newton's iteration from `uv` towards the surface point nearest `p`, kept in the parameter box.
+    fn refine(&self, p: DVec3, mut uv: DVec2) -> (DVec2, f64) {
+        let ((u0, u1), (v0, v1)) = self.range();
         for _ in 0..50 {
             let [s, su, sv, suu, suv, svv] = self.derivs(uv.x, uv.y);
             let r = s - p;
@@ -700,6 +714,16 @@ impl NurbsSurface {
             }
         }
         (uv, (self.at(uv.x, uv.y) - p).length())
+    }
+
+    /// Whether its u = u0 and u = u1 edges are the same curve (a periodic surface made non-periodic).
+    pub fn closed_in_u(&self) -> bool {
+        let ((u0, u1), (v0, v1)) = self.range();
+        (0..=8).all(|j| {
+            let v = v0 + (v1 - v0) * j as f64 / 8.0;
+            let (a, b) = (self.at(u0, v), self.at(u1, v));
+            (a - b).length() <= 1e-9 * (1.0 + a.abs().max_element())
+        })
     }
 }
 

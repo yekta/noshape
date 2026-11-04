@@ -19,6 +19,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   array in place (mapArray and filter build with the last); `@resize` no longer copies an array it owns. 262,144
   appends of vectors, a mapArray and a filter of them: under 0.5 s (was a time-out). T1 featurescript tests::building_large_arrays_is_linear,
   growing_an_array_in_place_answers_as_the_call.
+  dx 11-04 14:18: (2) evFaceTangentPlanes asks the kernel once for all its parameters (kernel face_frames_at_uvs);
+  (3) @opCreateBSplineSurface (periodic u / v, rational, boundary curves, makeSolid; kernel make_bspline_surface);
+  noshape's display mesher takes a B-spline face closed round u (a seam), and a grid past 400,000 nodes is thinned to
+  it (was BRepMesh: 30+ min on the 512 × 512 tube). With core's Replace face (074e9c95f) the script runs on the
+  cylinder's side and top, Replace face off and on: T1 model custom_features::displacement_map_on_a_cylinder (24 × 24),
+  kernel rust_mesh::a_bspline_tube_with_a_seam_meshes_here_within_brepmeshs_area. The user's 512 × 512 (T2
+  custom_features::displacement_map_probe, NOSHAPE_DISP_CSV, NOSHAPE_DISP_ONLY=side:false profiles it): side, Replace
+  off, 29 s: ~24 s is our FeatureScript interpreter (units / vector operators run as std FeatureScript, ~5 µs a
+  call: the points loop 22 s profiled, std's typechecks of 262,144 parameters and control points ~9 s), the face's
+  mesh 5 s. Next (dx): the interpreter's calls and std's units / vector operators; then the times against live's.
 
 ## From the user, 2026-11-02 (v0.4.19, macOS)
 - [x] (psui 11-03 00:10, fixed by "psui: VAR-AUTOCOMPLETE-ENTER …": (1) an open feature dialog kept the variables of

@@ -219,21 +219,21 @@ fn face_on_left(face: &k::Shape, info: &k::EdgeInfo, p: DVec3, n: DVec3, d: DVec
     face.project_point(left).is_ok_and(|pr| pr.point.distance(left) < eps * 1e-3)
 }
 
-fn face_tangent_plane(s: &k::Shape, uv: DVec2) -> Option<crate::display::PlaneFrame> {
+/// The tangent planes at parameters in [0, 1]² of the face's uv bounds: x along u, one kernel call for all.
+fn face_tangent_planes(s: &k::Shape, uvs: &[DVec2]) -> Option<Vec<crate::display::PlaneFrame>> {
     let b = s.uv_bounds().ok()?;
-    let u = b[0] + (b[1] - b[0]) * uv.x;
-    let v = b[2] + (b[3] - b[2]) * uv.y;
-    let p = s.point_at_uv(u, v).ok()?;
-    let n = s.normal_at_uv(u, v).ok()?.normalize_or_zero();
-    // x along the u direction.
-    let du = (b[1] - b[0]) * 1e-6;
-    let p2 = s.point_at_uv(u + du, v).ok().unwrap_or(p);
-    let mut x = (p2 - p) - n * (p2 - p).dot(n);
-    if x.length_squared() < 1e-30 {
-        x = any_perpendicular(n);
-    }
-    let x = x.normalize_or_zero();
-    Some(crate::display::PlaneFrame { origin: p, x, y: n.cross(x), normal: n })
+    let at: Vec<DVec2> = uvs.iter().map(|uv| DVec2::new(b[0] + (b[1] - b[0]) * uv.x, b[2] + (b[3] - b[2]) * uv.y)).collect();
+    let frames = s.frames_at_uvs(&at).ok()?;
+    Some(
+        frames
+            .into_iter()
+            .map(|[p, du, n]| {
+                let n = n.normalize_or_zero();
+                let x = (du - n * du.dot(n)).try_normalize().unwrap_or_else(|| any_perpendicular(n));
+                crate::display::PlaneFrame { origin: p, x, y: n.cross(x), normal: n }
+            })
+            .collect(),
+    )
 }
 
 fn ev_face_tangent_planes(i: &mut Interp, a: Vec<Value>) -> R<Value> {
@@ -244,7 +244,7 @@ fn ev_face_tangent_planes(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             return Some(params.iter().map(|_| plane_value(&p)).collect::<Vec<_>>());
         }
         let s = q.shape(e)?;
-        params.iter().map(|uv| face_tangent_plane(&s, *uv).map(|p| plane_value(&p))).collect()
+        Some(face_tangent_planes(&s, &params)?.iter().map(plane_value).collect())
     })?;
     Ok(Value::array(planes))
 }
@@ -814,8 +814,7 @@ fn ev_face_curvatures(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         let s = q.shape(e)?;
         let surf = s.face_surface().ok()?;
         let mut out = Vec::new();
-        for uv in &params {
-            let pl = face_tangent_plane(&s, *uv)?;
+        for pl in face_tangent_planes(&s, &params)? {
             let (k1, k2) = match &surf {
                 k::Surface::Plane(_) => (0.0, 0.0),
                 k::Surface::Cylinder { radius, .. } => (1.0 / radius, 0.0),

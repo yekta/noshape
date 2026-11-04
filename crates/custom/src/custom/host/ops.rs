@@ -48,6 +48,7 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("opSphere", op_sphere),
     ("opOffsetFace", op_offset_face),
     ("opCreateBSplineCurve", op_create_bspline_curve),
+    ("opCreateBSplineSurface", op_create_bspline_surface),
     ("opExtractSurface", op_extract_surface),
     ("opCreateOutline", op_create_outline),
     ("opSplitFace", op_split_face),
@@ -1440,6 +1441,65 @@ fn op_create_bspline_curve(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             return err("Invalid B-spline curve");
         }
         add_wire(ev, k::make_bspline(&poles, weights.as_deref(), &knots, &mults, degree, periodic)?)
+    })?;
+    Ok(Value::Undefined)
+}
+
+fn knot_values(v: &Value) -> Vec<f64> {
+    let num = |v: &Value| v.as_number().or_else(|| v.get("value").as_number());
+    v.as_array().map(|a| a.iter().filter_map(num).collect()).unwrap_or_default()
+}
+
+/// A rational spline's weights: a surface's matrix row by row, a curve's array.
+fn weight_values(c: &Value) -> Option<Vec<f64>> {
+    c.get("isRational").as_bool().unwrap_or(false).then(|| c.get("weights").as_array().map(|rows| rows.iter().flat_map(|r| knot_values(r).into_iter().chain(r.as_number())).collect()).unwrap_or_default())
+}
+
+/// opCreateBSplineSurface: a sheet (or with `makeSolid` a solid, when it encloses a region) of a std `BSplineSurface`,
+/// whole or inside `boundaryBSplineCurves` (2D curves in its (u, v) space). std's bSplineSurface has written out the
+/// knots and the periodic overlap.
+fn op_create_bspline_surface(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let (cx, id, def) = args(i, &a)?;
+    let c = def.get("bSplineSurface");
+    let rows: Vec<Vec<DVec3>> = c.get("controlPoints").as_array().map(|rows| rows.iter().map(|r| r.as_array().map(|r| r.iter().filter_map(vec3_of).collect()).unwrap_or_default()).collect()).unwrap_or_default();
+    let (nu, nv) = (rows.len(), rows.first().map_or(0, Vec::len));
+    let degree = |k: &str| c.get(k).as_number().unwrap_or(0.0) as u32;
+    let surface = k::BSplineSurfaceData {
+        poles: rows.iter().flatten().copied().collect(),
+        nu,
+        nv,
+        weights: weight_values(c),
+        u_knots: knot_values(c.get("uKnots")),
+        v_knots: knot_values(c.get("vKnots")),
+        u_degree: degree("uDegree"),
+        v_degree: degree("vDegree"),
+        u_periodic: c.get("isUPeriodic").as_bool().unwrap_or(false),
+        v_periodic: c.get("isVPeriodic").as_bool().unwrap_or(false),
+    };
+    let boundary: Vec<k::BSplineCurve2dData> = def
+        .get("boundaryBSplineCurves")
+        .as_array()
+        .map(|cs| {
+            cs.iter()
+                .map(|b| k::BSplineCurve2dData {
+                    poles: b.get("controlPoints").as_array().map(|a| a.iter().filter_map(vec2_of).collect()).unwrap_or_default(),
+                    weights: weight_values(b),
+                    knots: knot_values(b.get("knots")),
+                    degree: b.get("degree").as_number().unwrap_or(0.0) as u32,
+                    periodic: b.get("isPeriodic").as_bool().unwrap_or(false),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let make_solid = def_bool(&def, "makeSolid", false);
+    run_op(i, &cx, &id, "CANNOT_MAKE_BSPLINESURFACE", |ev| {
+        if rows.iter().any(|r| r.len() != nv) || nu * nv == 0 {
+            return err("Invalid B-spline surface");
+        }
+        let shape = k::make_bspline_surface(&surface, &boundary, make_solid)?;
+        let kind = if shape.solids().is_empty() { BodyKind::Surface } else { BodyKind::Solid };
+        let names = crate::regen::features::bshared::new_face_names(ev, &shape);
+        ev.apply_operation(vec![NamedShape::new(shape, names)], "NEW", None, kind)
     })?;
     Ok(Value::Undefined)
 }

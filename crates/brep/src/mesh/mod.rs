@@ -831,7 +831,7 @@ impl GridSurface for NurbsSurface {
         "B-spline"
     }
     fn closed(&self) -> bool {
-        false
+        self.closed_in_u()
     }
     fn range(&self) -> ((f64, f64), (f64, f64)) {
         NurbsSurface::range(self)
@@ -845,8 +845,29 @@ impl GridSurface for NurbsSurface {
     fn at(&self, u: f64, v: f64) -> DVec3 {
         NurbsSurface::at(self, u, v)
     }
+    /// Closed round u: a node the iteration from `seed` can't reach across the seam is found afresh, and one on the
+    /// seam is at u0 or u1, the one nearer `seed`.
     fn param_of(&self, p: DVec3, seed: Option<DVec2>) -> (DVec2, f64) {
-        NurbsSurface::param_of(self, p, seed)
+        let mut r = NurbsSurface::param_of(self, p, seed);
+        let Some(s) = seed else { return r };
+        if !self.closed_in_u() {
+            return r;
+        }
+        if r.1 > 1e-9 * (1.0 + p.abs().max_element()) {
+            let fresh = NurbsSurface::param_of(self, p, None);
+            if fresh.1 < r.1 {
+                r = fresh;
+            }
+        }
+        let ((u0, u1), _) = NurbsSurface::range(self);
+        let eps = 1e-9 * (u1 - u0);
+        let nearer_u1 = (s.x - u1).abs() < (s.x - u0).abs();
+        if (r.0.x - u0).abs() <= eps && nearer_u1 {
+            r.0.x = u1;
+        } else if (r.0.x - u1).abs() <= eps && !nearer_u1 {
+            r.0.x = u0;
+        }
+        r
     }
 }
 
@@ -1030,8 +1051,18 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
     let (mu, mv) = (smallest(&us, su), smallest(&vs, sv));
     refine(&mut us, su, 10.0 * mv);
     refine(&mut vs, sv, 10.0 * mu);
-    if us.len() * vs.len() > 400_000 {
-        return Err("too many grid nodes");
+    // Past the limit, thinned evenly both ways to it: a display mesh coarser than the deflections ask rather than
+    // BRepMesh's (half an hour on a 512 × 512 pole displacement map).
+    const MAX_NODES: usize = 400_000;
+    if us.len() * vs.len() > MAX_NODES {
+        let f = ((us.len() * vs.len()) as f64 / MAX_NODES as f64).sqrt();
+        let thin = |t: &mut Vec<f64>| {
+            let last = t.len() - 1;
+            let n = ((last as f64 / f).floor() as usize).max(1);
+            *t = (0..=n).map(|k| t[k * last / n]).collect();
+        };
+        thin(&mut us);
+        thin(&mut vs);
     }
     let scaled = |q: DVec2| DVec2::new(q.x * su, q.y * sv);
     // Interior grid nodes: inside the boundary (even-odd), at least a third of the local step from it. Each

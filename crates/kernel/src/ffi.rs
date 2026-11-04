@@ -494,6 +494,7 @@ pub(crate) mod ffi {
         fn face_point_at_uv(face: &OcShape, u: f64, v: f64) -> Result<P3>;
         fn face_project_point(face: &OcShape, p: P3) -> Result<ProjPoint>;
         fn face_uv_bounds(face: &OcShape) -> Result<Vec<f64>>;
+        fn face_frames_at_uvs(face: &OcShape, uvs: &[f64]) -> Result<Vec<f64>>;
         fn edge_point_at(edge: &OcShape, t: f64) -> Result<P3>;
         fn edge_tangent_at(edge: &OcShape, t: f64) -> Result<P3>;
         fn edge_derivatives_at(edge: &OcShape, t: f64) -> Result<Vec<f64>>;

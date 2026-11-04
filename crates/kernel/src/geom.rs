@@ -301,6 +301,14 @@ impl Shape {
         Ok(FaceProjection { point: v3(r.point), u: r.u, v: r.v, distance: r.distance })
     }
 
+    /// Point, first u derivative and outward normal (the face's orientation) at each surface parameter (u, v), in one
+    /// call.
+    pub fn frames_at_uvs(&self, uvs: &[DVec2]) -> Result<Vec<[DVec3; 3]>> {
+        let flat: Vec<f64> = uvs.iter().flat_map(|p| [p.x, p.y]).collect();
+        let r = ck(ffi::face_frames_at_uvs(self.raw(), &flat))?;
+        Ok(r.as_chunks::<9>().0.iter().map(|c| [DVec3::new(c[0], c[1], c[2]), DVec3::new(c[3], c[4], c[5]), DVec3::new(c[6], c[7], c[8])]).collect())
+    }
+
     /// Parameter bounds of a face: `[umin, umax, vmin, vmax]`.
     pub fn uv_bounds(&self) -> Result<[f64; 4]> {
         let v = ck(ffi::face_uv_bounds(self.raw()))?;

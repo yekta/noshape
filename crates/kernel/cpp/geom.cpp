@@ -682,6 +682,39 @@ ProjPoint face_project_point(const OcShape& fs, P3 p)
   return r;
 }
 
+// Point, first u derivative and outward normal (face orientation) at each (u, v) of `uvs`: 9 values a parameter, one
+// adaptor for all (a Displacement map asks 262,144 tangent planes of one face).
+rust::Vec<double> face_frames_at_uvs(const OcShape& fs, rust::Slice<const double> uvs)
+{
+  const TopoDS_Face&  f = as_face(fs.shape, "shape");
+  BRepAdaptor_Surface s(f);
+  const bool          reversed = f.Orientation() == TopAbs_REVERSED;
+  rust::Vec<double>   r;
+  r.reserve(uvs.size() / 2 * 9);
+  for (size_t k = 0; k + 1 < uvs.size(); k += 2)
+  {
+    const double u = uvs[k], v = uvs[k + 1];
+    gp_Pnt       p;
+    gp_Vec       du, dv;
+    s.D1(u, v, p, du, dv);
+    gp_Vec n = du.Crossed(dv);
+    if (n.Magnitude() < 1e-15)
+    {
+      BRepLProp_SLProps props(s, u, v, 1, 1e-9);
+      if (!props.IsNormalDefined())
+        fail_op("normal is undefined at this point");
+      n = gp_Vec(props.Normal());
+    }
+    else
+      n.Normalize();
+    if (reversed)
+      n.Reverse();
+    for (double x : {p.X(), p.Y(), p.Z(), du.X(), du.Y(), du.Z(), n.X(), n.Y(), n.Z()})
+      r.push_back(x);
+  }
+  return r;
+}
+
 rust::Vec<double> face_uv_bounds(const OcShape& fs)
 {
   const TopoDS_Face& f = as_face(fs.shape, "shape");

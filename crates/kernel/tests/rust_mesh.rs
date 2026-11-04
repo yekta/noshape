@@ -372,3 +372,39 @@ fn a_lofts_bspline_sides_mesh_here_within_brepmeshs_area() {
     assert_watertight(&rust);
     assert_normals(&s, &rust, &occt);
 }
+
+#[test]
+fn a_bspline_tube_with_a_seam_meshes_here_within_brepmeshs_area() {
+    // A wavy tube, periodic round u (a Displacement map wrapped round a cylinder): one face with a seam, its two
+    // uses at the u range's ends.
+    let (n, rows) = (12, 6);
+    let mut poles = Vec::new();
+    for i in 0..n + 3 {
+        for j in 0..rows {
+            let a = TAU * (i % n) as f64 / n as f64;
+            let r = (10.0 + if (i % n + j) % 2 == 0 { 0.6 } else { 0.0 }) * MM;
+            poles.push(DVec3::new(r * a.cos(), r * a.sin(), 6.0 * j as f64 * MM));
+        }
+    }
+    let tube = BSplineSurfaceData {
+        poles,
+        nu: n + 3,
+        nv: rows,
+        weights: None,
+        u_knots: (0..n + 3 + 4).map(|k| (k as f64 - 3.0) / n as f64).collect(),
+        v_knots: [0.0; 4].into_iter().chain([1.0 / 3.0, 2.0 / 3.0]).chain([1.0; 4]).collect(),
+        u_degree: 3,
+        v_degree: 3,
+        u_periodic: true,
+        v_periodic: false,
+    };
+    let s = make_bspline_surface(&tube, &[], false).unwrap();
+    assert_eq!((s.count(ShapeType::Face), s.count(ShapeType::Edge)), (1, 3), "one face with a seam");
+    let rust = mesh(&s, true);
+    let copy = transform(&s, &Transform::Translate(DVec3::ZERO), true).unwrap().shape;
+    let occt = mesh(&copy, false);
+    assert_eq!(rust.rust_faces, 1, "meshed here");
+    let (a, b) = (faces(&rust)[0].0, faces(&occt)[0].0);
+    assert!((a - b).abs() <= 2e-3 * b, "area {a} against BRepMesh's {b}");
+    assert_normals(&s, &rust, &occt);
+}
