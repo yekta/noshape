@@ -3547,6 +3547,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   14.5 s of CPU, ~6 s wall, our mesher declines their seams): it now compares the Regeneration times panel's total
   (run 52): cf-hose-routing 7.6 s -> 1.77 s against live's 0.49 s (×15.6 -> ×3.6), cf-o-ring-generator 311 -> 86 ms
   (no longer slower; live 65 ms); the wall time stays in each document's line.
+  On core 05:26's reading: the two props_volume calls a Hose Routing are shell_part's (their backtraces run through
+  run_op › op_shell, not the runner's measures), and the "~5 s of the 6.9" is the display mesh after the features
+  (mesh.brepmesh in the profile's closing block), not the FeatureScript host.
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet
