@@ -102,6 +102,18 @@ fn ev_axis(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             Some((sk.frame.to_world(sk.sketch.point(noshape_sketch::EntityId(*id))?), sk.frame.normal))
         }
         Ent::Datum(_) | Ent::Plane(_) => q.plane(e).map(|p| (p.origin, p.normal)),
+        // A cylinder face's: through the middle of the face's extent along its axis, as it is now (live 1992: a
+        // chamfer, fillet or split moves it; the surface's frame stays).
+        Ent::Face(..) => {
+            let (o, d) = entity_axis(q, e)?;
+            let s = q.shape(e)?;
+            if !matches!(s.face_surface().ok()?, k::Surface::Cylinder { .. }) {
+                return Some((o, d));
+            }
+            let ts: Vec<f64> = s.edges().iter().filter_map(|x| x.edge_info().ok().map(|i| (x.clone(), i))).flat_map(|(x, i)| (0..=16).filter_map(move |k| x.point_at(i.first_param + (i.last_param - i.first_param) * k as f64 / 16.0).ok())).map(|p| (p - o).dot(d)).collect();
+            let (lo, hi) = ts.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), &t| (a.min(t), b.max(t)));
+            Some(if lo.is_finite() { (o + d * (0.5 * (lo + hi)), d) } else { (o, d) })
+        }
         _ => entity_axis(q, e),
     })?;
     Ok(line_value(o, d))

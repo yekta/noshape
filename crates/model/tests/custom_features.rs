@@ -3292,3 +3292,32 @@ export const tiltedBlock = defineFeature(function(context is Context, id is Id, 
         assert!(v > lo && v < hi, "{name}: {v} mm³, not in {lo}..{hi}");
     }
 }
+
+/// evAxis of a cylinder face (live 1992): along its axis through the middle of the face's extent as it is now, not
+/// its surface's frame origin: the Ø20 × 20 mm cylinder's side 10 mm up, 9 after a 2 mm chamfer on its top edge
+/// (cf-o-ring-generator's O Ring 5 reads it after Chamfer 1).
+#[test]
+fn ev_axis_of_a_cylinder_face_is_through_its_middle() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Axis probe" }
+export const axisProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 20) * millimeter, "radius" : 10 * millimeter });
+        const side = qCreatedBy(id + "c", EntityType.FACE)->qGeometry(GeometryType.CYLINDER);
+        println(roundToPrecision(evAxis(context, { "axis" : side }).origin[2] / millimeter, 6));
+        opChamfer(context, id + "ch", { "entities" : qCreatedBy(id + "c", EntityType.EDGE)->qNthElement(0)->qUnion(qCreatedBy(id + "c", EntityType.EDGE))->qWithinRadius(vector(0, 0, 20) * millimeter, 11 * millimeter), "chamferType" : ChamferType.EQUAL_OFFSETS, "width" : 2 * millimeter });
+        println(roundToPrecision(evAxis(context, { "axis" : qCreatedBy(id + "c", EntityType.FACE)->qGeometry(GeometryType.CYLINDER) }).origin[2] / millimeter, 6));
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("axisProbe"), &fx.units).unwrap();
+    let fid = f.id;
+    ps.features.push(f);
+    assert_ok(&fx.regen(&mut Regenerator::new(), &ps));
+    let out = custom::run::output_of(fid).unwrap().output;
+    assert_eq!(out, "10\n9\n", "{out}");
+}

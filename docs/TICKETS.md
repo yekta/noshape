@@ -371,6 +371,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 PARITY-SPEED-MOTOR-MOUNT (core 11-04 09:05) motor-mount-jack matches live to the end now but regenerates in
   ~440 ms against live's 53: Circular pattern 1 (a face pattern of two elliptic slot walls through the tube, ×4) 244 ms
   (live 5), Extrude 3 86 ms (live 6), Fillet 2 (the bore's full round) 71 ms (live 3). Next for core.
+  core 11-04 14:04: cf-o-ring-generator's O Ring 5: live 1992: evAxis of a cylinder face runs through the middle of
+  the face's current extent along its axis (a chamfer, fillet or split moves it; evSurfaceDefinition's frame stays).
+  The host's evAxis does that for cylinder faces; the document matches live to the end (11/11). T1 model
+  custom_features::ev_axis_of_a_cylinder_face_is_through_its_middle.
   core 11-04 09:21: the seam movers check the rebuilt face's area, not the solid's volume twice (unify.seams 41 -> 17
   ms; parity unchanged). The pattern's 176 ms are OCCT's Boolean (face-face intersections of the B-spline rims);
   Extrude 3's 80 ms and Fillet 2's 39 ms are the Rust Boolean's `boolean.rust.brep` step on the part with those rims
