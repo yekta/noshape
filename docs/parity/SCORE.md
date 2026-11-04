@@ -34,3 +34,9 @@ matches now (→ 117/128); sketch-fully-defined now differs only at step 13 (foc
 qa 11-03 23:02: on green 9cb98b67 against live's 136 recordings in tests/ui-parity/live: **124/136 scenarios, 967/997 states**.
 Left: 7 fillet-* and extrude-end-type-up-to-face (live's recordings, as before), sketch-extend-to-line (stale, re-record asked),
 sketch-fillet-corner (fixed by skasm 2e0485c2, after this green), sketch-delete-line, sketch-equal (psui's notes to skasm).
+qa 11-04 04:14: on green ad60edf9 against live's 286 recordings: **259/286 scenarios, 1734/1818 states** (undo-rename
+counted after a re-run: the first run's app couldn't connect to the X display at start, a harness hiccup; it matches, 6/6). Left:
+fillet / chamfer "error" titles (10, incl. new-fillet-then-dblclick-other, undo-new-fillet: live's preselected edge, REQUESTS
+1850), hole-* (6: live's account remembers M6x1.00 ↧ 15 mm, behaviours 1849 item 1, a neutral start pending), measure-fillet-face
+(POINT vs EDGE), sketch-delete-line / -vertical-constraint / -extend-to-line (selection), revolve-dialog-axis, face-rclick-menu,
+mass-properties-part (Mass override enabled), section-view-front (focus), extrude-end-type-up-to-face (live's start).
