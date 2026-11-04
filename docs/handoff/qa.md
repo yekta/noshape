@@ -49,7 +49,7 @@ passed but clicks no GUI — qa still can't check it (workflow requested). Memor
 documents were gone. Rebuilt in qa-scratch/bin (qa-vols.py, qa-fstat.py, qa-tixvol.sh, qa-fget.py, qa-presmoke.sh,
 qa-relsmoke.sh, qa-cliwrap-mem.sh; /tmp links), halfmir2 docs in qa-scratch/docs/hm2-{a,b,c}.noshape (bin/mirsetgui.sh updated).
 **Lost and not yet rebuilt: SM-CLOSED-BUTT's /tmp/qa-smbutt2.py and RUST-MIRROR-NEGATIVE's /tmp/qa-mir972.py** (not in this
-smoke). GUI rows re-running with the new halfmir2 docs.
+smoke). GUI rows with the new halfmir2 docs: all pixel-identical to v0.4.25 (cli/relgui-v0426b.out).
 
 **v0.4.25 (published 05:49, cut d9fb8f44 = 38d75390 + bump, contains greens through ad60edf9; Release run 41775622951)
 smoked 05:51–06:11: good, no new blocker.** Artifacts: the published Linux tarball, CLI tarball and .deb are
