@@ -465,6 +465,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   ms; parity unchanged). The pattern's 176 ms are OCCT's Boolean (face-face intersections of the B-spline rims);
   Extrude 3's 80 ms and Fillet 2's 39 ms are the Rust Boolean's `boolean.rust.brep` step on the part with those rims
   (**bool**: the conversion of a part with B-spline edges, NOSHAPE_KERNEL_PROFILE on motor-mount-jack).
+  core 11-04 15:32: Circular pattern 1 136 -> 111 ms: the seam movers' checks (unify.seams 29 -> 6 ms) compare a cylinder
+  face's area as r times its domain's (∮ u dv over the edges' curves, a fixed Gauss rule: the faces share those
+  curves up to whole turns) instead of two adaptive surface integrals (8 ms a face here), and check only the faces
+  using the replaced edges, not the whole solid. The rest of the feature is the Boolean (79 ms, bool).
 - [ ] P2 FULL-ROUND-BOSS-TWO-FACES (core 11-04 09:05) a full round of a boss's whole cylinder (a Ø16 × 3 mm puck's rim)
   has the right volume, but its half torus is two faces: OCCT's torus has its v seam on the outer equator, which the
   outer half crosses (the bore's inner half is one face, as live's). Live: one face (not checked live; Parasolid's

@@ -96,6 +96,9 @@
 #include <BRepTools_ReShape.hxx>
 #include <Geom_Circle.hxx>
 #include <Geom2d_Line.hxx>
+#include <Geom2dAdaptor_Curve.hxx>
+#include <math.hxx>
+#include <math_Vector.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRep_Builder.hxx>
 #include <TColStd_PackedMapOfInteger.hxx>
@@ -1733,13 +1736,73 @@ TopoDS_Shape merge_cylinder_bands(const TopoDS_Shape& s, HHist& hist)
 
 // A face bounded otherwise (its seam moved) covers what it did: only the integration's noise (a hole the wrong way
 // round would add its area). One face's area, not the solid's volume twice (motor-mount-jack's pattern: 41 ms).
+// A face's parameter-domain area, ∮ u dv over its edges' curves on it (Green), each edge by a 16-point Gauss rule per
+// smooth span: on faces whose edges' curves are the same up to whole turns, equal to rounding however coarse the rule.
+static double uv_area(const TopoDS_Face& f)
+{
+  math_Vector gp(1, 16), gw(1, 16);
+  math::GaussPoints(16, gp);
+  math::GaussWeights(16, gw);
+  double sum = 0;
+  for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+  {
+    const TopoDS_Edge&              e = TopoDS::Edge(x.Current());
+    double                          a, b;
+    const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, f, a, b);
+    if (pc.IsNull())
+      return std::numeric_limits<double>::quiet_NaN();
+    Geom2dAdaptor_Curve ac(pc, a, b);
+    const int           n = ac.NbIntervals(GeomAbs_C2);
+    NCollection_Array1<double> cuts(1, n + 1);
+    ac.Intervals(cuts, GeomAbs_C2);
+    double edge = 0;
+    for (int i = 1; i <= n; ++i)
+    {
+      const double t0 = cuts(i), t1 = cuts(i + 1), h = 0.5 * (t1 - t0);
+      for (int k = 1; k <= 16; ++k)
+      {
+        gp_Pnt2d p;
+        gp_Vec2d d;
+        pc->D1(t0 + h * (gp(k) + 1), p, d);
+        edge += gw(k) * h * p.X() * d.Y();
+      }
+    }
+    sum += e.Orientation() == TopAbs_REVERSED ? -edge : edge;
+  }
+  return sum;
+}
+
 static bool same_area(const TopoDS_Face& a, const TopoDS_Face& f)
 {
+  // Cylinders: r times the domain's area (a tube's face with holes bounded by B-spline rims: 8 ms a face adaptively).
+  TopLoc_Location l0, l1;
+  if (!occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(a, l0)).IsNull() && !occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(f, l1)).IsNull())
+  {
+    const double d0 = std::abs(uv_area(a)), d1 = std::abs(uv_area(f));
+    if (std::isfinite(d0) && std::isfinite(d1))
+      return std::abs(d1 - d0) <= 1e-9 * d0;
+  }
   // (Adaptively, to 1e-7: the fixed rule was 1e-3 off on a tube's face with holes bounded by joined B-spline rims.)
   GProp_GProps g0, g1;
   BRepGProp::SurfaceProperties(a, g0, 1e-7);
   BRepGProp::SurfaceProperties(f, g1, 1e-7);
   return std::abs(g1.Mass() - g0.Mass()) <= 1e-5 * std::abs(g0.Mass());
+}
+
+// Whether the faces of `out` that use any of `edges` are valid (a face and edges replaced in a valid solid: the other
+// faces are as they were; the whole solid's check was 5 ms a move on motor-mount-jack's tube).
+static bool valid_around(const TopoDS_Shape& out, std::initializer_list<TopoDS_Shape> edges)
+{
+  for (TopExp_Explorer fx(out, TopAbs_FACE); fx.More(); fx.Next())
+  {
+    bool uses = false;
+    for (TopExp_Explorer ex(fx.Current(), TopAbs_EDGE); ex.More() && !uses; ex.Next())
+      for (const TopoDS_Shape& e : edges)
+        uses = uses || ex.Current().IsSame(e);
+    if (uses && !BRepCheck_Analyzer(fx.Current()).IsValid())
+      return false;
+  }
+  return true;
 }
 
 // A cylinder face between one end circle and a chain of other edges round the axis whose seam splits the chain (a
@@ -1941,7 +2004,7 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
   const bool same = BRepAdaptor_Curve(end).Circle().Axis().Direction().Dot(gp_Vec(n)) > 0;
   rs->Replace(end.Oriented(TopAbs_FORWARD), same ? ring : TopoDS::Edge(ring.Reversed()));
   const TopoDS_Shape out = rs->Apply(s);
-  if (out.IsNull() || !same_area(a, F) || !BRepCheck_Analyzer(out).IsValid())
+  if (out.IsNull() || !same_area(a, F) || !valid_around(out, {ring}))
     return {};
   if (hist.IsNull())
     hist = new BRepTools_History();
@@ -2152,7 +2215,7 @@ TopoDS_Shape move_seams_off_holes(const TopoDS_Shape& s, HHist& hist)
       rs->Replace(old.Oriented(TopAbs_FORWARD), same ? made : TopoDS::Edge(made.Reversed()));
     }
     const TopoDS_Shape out = rs->Apply(s);
-    if (out.IsNull() || !same_area(a, F) || !BRepCheck_Analyzer(out).IsValid())
+    if (out.IsNull() || !same_area(a, F) || !valid_around(out, {low, top}))
       continue;
     if (hist.IsNull())
       hist = new BRepTools_History();
