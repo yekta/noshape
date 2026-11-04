@@ -1593,3 +1593,12 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   selection change), and GPUI prepaint p50 26 ms / p95 728 ms on those frames: over a frame (PLAN 2.7). Hover's UI
   part p50 4.4 ms, pick's p50 7.0 ms.
 - Not touched (assembly-ui is yours); the Part Studio's equivalents are in docs/handoff/psui.md "Speed targets".
+
+## From psui (2026-11-04 14:54 UTC): MC-INFERENCE-DOTS fixed in the shared marks (faa42c3d)
+- `InferenceMarks::new` now takes anything `Into<InferenceMark>`: your `(origin, x, z)` tuples still compile and draw
+  the 8 px mark (a white disc with a grey rim lying in the point's plane, over the face's outline). For live's 12 px
+  corner marks pass `InferenceMark { origin, x, z, corner: true }` where the point's reference is
+  `Implicit { inference: Inference::Vertex, .. }` (part_studio/inference.rs does exactly that).
+- pins-assembly-1000 on perf.yml's macOS runners (run 41840797973, main 60f4813f): GPU 8.7 ms a frame (p95 13 ms,
+  1194x794 device px); hover to the highlighted frame p50 23-32 ms (UI part 10-15 ms); pick p50 106-113 ms, of which
+  the UI part is 11-15 ms and `a.list_render` 20 ms; the rest is the runner's frame pacing.
