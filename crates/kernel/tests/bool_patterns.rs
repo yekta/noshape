@@ -1073,3 +1073,18 @@ fn a_spline_shafts_run_outs_tangent_to_its_slots_cut_manifold() {
     let v = s.volume().unwrap() * 1e9;
     assert!((v / 52687.29 - 1.0).abs() < 1e-6, "{v}");
 }
+
+/// motor-mount-jack's Extrude 3 cut (recorded before its unify): a tube with a slot of two ellipses and lines. The
+/// seam move took the ellipses' tangent lines for a seam's split and hopped from vertex to vertex: 3.4 s (17 ms
+/// before). Nothing to move: quick, and the shape as it was.
+#[test]
+fn a_slot_of_ellipses_and_tangent_lines_keeps_its_seam_quickly() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/unify/motor-mount-slots.brep");
+    let s = k::read_brep(&path).expect("the cut");
+    let t = Instant::now();
+    let u = k::unify_same_domain(&s).expect("unified").shape;
+    let ms = t.elapsed().as_secs_f64() * 1e3;
+    assert!(u.is_valid());
+    assert!(ms < 1000.0, "{ms:.0} ms");
+    assert_eq!((u.count(k::ShapeType::Face), u.count(k::ShapeType::Edge)), (s.count(k::ShapeType::Face), s.count(k::ShapeType::Edge)));
+}
