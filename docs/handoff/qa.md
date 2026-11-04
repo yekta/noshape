@@ -36,6 +36,13 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**v0.4.27 (published 18:26, cut 7f0a43a2 = v0.4.26 + lead da79fadca: .gitattributes keeps std sources LF on a Windows
+checkout — a Windows-only patch, not on main) smoked 18:27–18:42: good, = v0.4.26.** Artifacts byte-identical to the Release run's
+(41876313694, all checks green), SHA256SUMS OK, 11 assets; CLI / app "0.4.27"; round trip, volume sweep, fixed tickets (incl.
+the rebuilt SM-CLOSED-BUTT and RUST-MIRROR-NEGATIVE), the user's cases and the 44 ticket documents all = v0.4.26. **Updater
+v0.4.26 → v0.4.27 works** (fetched 18:30:33, ~4 min after publish; Restart → 0.4.27, g34 reopened; upd427-0/-1.png). GUI rows
+not rerun (no code change on Linux).
+
 **11-04 17:59: fuzz and sweeps moved to vibe3 (lead: this machine at load 19–24; keep local runs to quick checks).**
 vibe3 (8 cores, user ngyekta, ~/qa = a copy of qa-scratch's bin / tickets / docs / smdocs / cf / fz documents with paths
 rewritten; binaries in ~/qa/rel; wrappers ~/qa/bin/w-<sha>.sh with `ulimit -v`, no systemd-run there). Running: CLI loops
