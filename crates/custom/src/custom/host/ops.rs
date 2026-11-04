@@ -738,10 +738,16 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
     }
     let only_edges = !refs.is_empty() && refs.iter().all(|r| matches!(r, Reference::Edge(_)));
+    let only_faces = !refs.is_empty() && refs.iter().all(|r| matches!(r, Reference::Face(_)));
     let (made, sketches) = run_op(i, &cx, &id, "PATTERN_BODY_FAILED", |ev| {
         // A sheet's hole loops (std sheet metal's edge pattern: a Fill pattern of holes): the holes cut again
         // where each instance puts them, in the sheet itself.
         if only_edges && let Some(done) = pattern_sheet_holes(ev, &refs, &transforms)? {
+            return Ok(done);
+        }
+        // A solid's faces (std's FACE pattern: a Fill pattern of holes in a part): repeated in their own body, as
+        // Parasolid's face pattern (not copies of the body).
+        if only_faces && let Some(done) = pattern_solid_faces(ev, &refs, &transforms, &names)? {
             return Ok(done);
         }
         let bodies = ev.resolve_bodies(&refs);
@@ -847,6 +853,25 @@ fn pattern_sheet_holes(ev: &mut EvalCtx, refs: &[Reference], transforms: &[DMat4
     }).collect();
     ev.replace_body(b, cut, names);
     super::edge_change::keep_edge_names(ev, b, &body.edges, &edge_from);
+    Ok(Some((Vec::new(), Vec::new())))
+}
+
+/// The instances of solids' faces (`refs`), each set repeated in its own body by Face pattern's evaluator. `None`:
+/// not all faces of solids.
+fn pattern_solid_faces(ev: &mut EvalCtx, refs: &[Reference], transforms: &[DMat4], names: &[String]) -> FResult<Option<PatternMade>> {
+    let mut by_body: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for (b, f) in ev.resolve_faces(refs) {
+        by_body.entry(b).or_default().push(f);
+    }
+    if by_body.is_empty() || by_body.keys().any(|&b| ev.ctx.bodies[b].kind != BodyKind::Solid) {
+        return Ok(None);
+    }
+    use crate::regen::features::pattern::{Instance, pattern_faces};
+    let instances: Vec<Instance> = transforms.iter().enumerate().map(|(k_, m)| Instance { code: instance_number(names.get(k_).map(|s| s.as_str()).unwrap_or(""), k_), t: k::Transform::Matrix(*m) }).collect();
+    let bodies: Vec<(BodyId, Vec<usize>)> = by_body.into_iter().map(|(b, fs)| (ev.ctx.bodies[b].id.clone(), fs)).collect();
+    for (id, faces) in bodies {
+        pattern_faces(ev, &id, &faces, &instances, true)?;
+    }
     Ok(Some((Vec::new(), Vec::new())))
 }
 

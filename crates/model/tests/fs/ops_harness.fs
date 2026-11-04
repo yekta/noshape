@@ -225,6 +225,18 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
                     holders = append(holders, evVertexPoint(context, { "vertex" : v }));
             check("an attribute goes with its vertex", holders == [], holders);
         });
+        step(context, id, "patternSolidFaces", function(sub) {
+            // A solid's hole face patterned (std's FACE pattern, a Fill pattern of holes): the holes repeated in that
+            // part, no copies of it.
+            fCuboid(context, sub + "b", { "corner1" : vector(0, 0, 1400) * mm, "corner2" : vector(40, 20, 1410) * mm });
+            fCylinder(context, sub + "c", { "bottomCenter" : vector(5, 10, 1395) * mm, "topCenter" : vector(5, 10, 1415) * mm, "radius" : 2 * mm });
+            opBoolean(context, sub + "cut", { "tools" : qCreatedBy(sub + "c", EntityType.BODY), "targets" : qCreatedBy(sub + "b", EntityType.BODY), "operationType" : BooleanOperationType.SUBTRACTION });
+            const hole = qGeometry(qOwnedByBody(qCreatedBy(sub + "b", EntityType.BODY), EntityType.FACE), GeometryType.CYLINDER);
+            opPattern(context, sub + "p", { "entities" : hole, "transforms" : [transform(vector(10, 0, 0) * mm), transform(vector(20, 0, 0) * mm)], "instanceNames" : ["1", "2"] });
+            const bodies = size(evaluateQuery(context, qOwnerBody(qCreatedBy(sub + "b", EntityType.FACE))));
+            const v = evVolume(context, { "entities" : qCreatedBy(sub + "b", EntityType.BODY) });
+            check("opPattern of a solid's faces", bodies == 1 && abs(v - (8000 - 3 * PI * 4 * 10) * mm ^ 3) < 1e-6 * (8000 * mm ^ 3), [bodies, v]);
+        });
         step(context, id, "collisionWires", function(sub) {
             // Wire bodies collide where their edges meet (std Fill pattern's border check).
             fCuboid(context, sub + "a", { "corner1" : vector(0, 0, 950) * mm, "corner2" : vector(10, 10, 960) * mm });

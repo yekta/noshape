@@ -686,8 +686,9 @@ fn faces_tool(ev: &EvalCtx, body: &Body, faces: &[usize]) -> FResult<FaceTool> {
 }
 
 /// `strict` (Face pattern / mirror): an instance off the part fails (live
-/// L42/L43); a Feature pattern leaves such instances out.
-fn pattern_faces(ev: &mut EvalCtx, body_id: &BodyId, faces: &[usize], instances: &[Instance], strict: bool) -> FResult<()> {
+/// L42/L43); a Feature pattern leaves such instances out. (FeatureScript's
+/// opPattern of a solid's faces too.)
+pub fn pattern_faces(ev: &mut EvalCtx, body_id: &BodyId, faces: &[usize], instances: &[Instance], strict: bool) -> FResult<()> {
     let Some(bi) = index_of_body(ev, body_id) else { return Ok(()) };
     let body = ev.ctx.bodies[bi].clone();
     let t0 = std::time::Instant::now();

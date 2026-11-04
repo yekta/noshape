@@ -3624,6 +3624,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   names something else now, with nothing that can carry it where it was, is gone, its attributes with it
   (Parasolid's); T1 ops_harness attributeGoesWithItsVertex. Left: Fold SM 1 (its studio pins 1188: waits for
   FS-OLD-STD-COMPAT). Run 63: 33/56, 355/482, custom 26/111 (cf-fill-pattern 8/11).
+  dx 11-04 12:19: cf-fill-pattern 8 -> 11/11 (matches live to the end): its Fill pattern face-patterns the holes of a
+  plain solid (Extrude 1's part, which the user named "Sheet metal"), and the host's opPattern of a solid's faces now
+  repeats them in that body through Face pattern's evaluator (core's pattern.rs pattern_faces, made pub) instead of
+  copying the body per instance (1,736 copies); T1 ops_harness patternSolidFaces. The translator breaks ties between
+  equally good faces by the part live's is on (both parts have that hole); T1 parity::a_face_two_parts_have_is_the_
+  one_on_lives_part. Run 65: 34/56, 358/482, custom 28/111.
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our

@@ -1637,3 +1637,56 @@ fn a_written_out_cap_vertex_query() {
     let corner = t.call("query_entities", json!({ "kind": "vertices", "near": [20.0, 10.0, 10.0], "limit": 1 })).unwrap();
     assert_eq!(corner["vertices"][0]["id"].as_str(), Some(picked.as_str()), "{corner}");
 }
+
+/// Two parts with a face in one place (each the same rectangle extruded, 10 and 20 mm: their bottoms): a reference
+/// to live's face on the 20 mm part takes ours on our 20 mm part (cf-fill-pattern's hole is in its sheet metal
+/// part and its solid; the pattern goes on the one live's is on).
+#[test]
+fn a_face_two_parts_have_is_the_one_on_lives_part() {
+    let line = |id: &str, a: [f64; 2], b: [f64; 2]| {
+        let l = ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2)).sqrt();
+        json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "startParam": 0.0, "endParam": l,
+            "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": a[0], "pntY": a[1], "dirX": (b[0] - a[0]) / l, "dirY": (b[1] - a[1]) / l } })
+    };
+    let top = json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }]);
+    let extrude = |fid: &str, depth: &str| json!({ "btType": "BTMFeature-134", "featureType": "extrude", "featureId": fid, "name": fid, "parameters": [
+        { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+        { "btType": "BTMParameterEnum-145", "parameterId": "operationType", "value": "NEW" },
+        { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": "FS1", "queryString": "" }] },
+        { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+        { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": depth }] });
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1", "parameters": top, "constraints": [],
+          "entities": [line("b", [0.0, 0.0], [0.02, 0.0]), line("r", [0.02, 0.0], [0.02, 0.01]), line("t", [0.02, 0.01], [0.0, 0.01]), line("l", [0.0, 0.01], [0.0, 0.0])] },
+        extrude("FE1", "10 mm"),
+        extrude("FE2", "20 mm"),
+        { "btType": "BTMFeature-134", "featureType": "mateConnector", "featureId": "FM1", "name": "Mate connector 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "originType", "value": "ON_ENTITY" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "originQuery", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JBOT"], "queryString": "" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "entityInferenceType", "value": "CENTROID" }] }
+    ] });
+    // Live after Extrude 2: both parts, the bottom face JBOT on the 20 mm one (JB2).
+    let face = |id: &str| json!({ "id": id, "area": 0.0002, "box": { "min": [0.0, 0.0, 0.0], "max": [0.02, 0.01, 0.0] } });
+    let side = json!({ "id": "JS", "area": 0.0002, "box": { "min": [0.0, 0.0, 0.0], "max": [0.02, 0.0, 0.01] } });
+    let live = vec![
+        json!({ "index": 0, "status": "OK", "parts": [] }),
+        json!({ "index": 1, "status": "OK", "parts": [] }),
+        json!({ "index": 2, "status": "OK", "parts": [], "bodies": [
+            { "id": "JB1", "type": "SOLID", "faces": [face("JOTHER"), side, { "id": "JTOP1", "area": 0.0002, "box": { "min": [0.0, 0.0, 0.01], "max": [0.02, 0.01, 0.01] } }] },
+            { "id": "JB2", "type": "SOLID", "faces": [face("JBOT"), { "id": "JTOP2", "area": 0.0002, "box": { "min": [0.0, 0.0, 0.02], "max": [0.02, 0.01, 0.02] } }] }] }),
+        json!({ "index": 3, "status": "OK", "parts": [] }),
+    ];
+    let mut ctx = Ctx::new();
+    let path = scratch("face-on-lives-part.noshape");
+    let mut t = Translator::open(&mut ctx, &path, &features, refs_from_bodies(&live)).unwrap();
+    for k in 0..3 {
+        assert!(t.step(k).ours.is_some());
+    }
+    let s = t.step(3);
+    let f = t.call("feature_get", json!({ "feature": s.ours.unwrap() })).unwrap();
+    let picked = f["params"]["originQuery"][0].as_str().unwrap_or_else(|| panic!("{f}")).to_string();
+    let parts = t.call("query_parts", json!({})).unwrap();
+    let tall = parts["parts"].as_array().unwrap().iter().find(|p| p["bounding_box"]["max"][2].as_f64().is_some_and(|z| z > 15.0)).expect("the 20 mm part")["id"].as_str().unwrap().to_string();
+    let on_tall = t.call("query_entities", json!({ "kind": "faces", "part": tall, "limit": 20 })).unwrap();
+    assert!(on_tall["faces"].as_array().unwrap().iter().any(|x| x["id"] == picked.as_str()), "{picked} not on {tall}: {on_tall}");
+}

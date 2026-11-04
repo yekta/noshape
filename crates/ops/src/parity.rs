@@ -34,6 +34,9 @@ pub struct LiveRef {
     /// Of a sketch's wire body or regions (live's `"type": "SKETCH"` bodies): a query's text, when there, places it
     /// better (the sketch entity it names), so it goes first.
     pub sketch: bool,
+    /// The live part a face, edge or vertex is on (two parts can have one there: cf-fill-pattern's sheet metal
+    /// part and the solid both have the hole its Fill pattern patterns).
+    pub body: Option<String>,
 }
 
 /// What became of one Onshape feature.
@@ -175,7 +178,7 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
     for line in text.lines().filter(|l| !l.trim().is_empty()) {
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
         let (Some(k), Some(id)) = (v["index"].as_u64(), v["id"].as_str()) else { continue };
-        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64(), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox: None, sketch: false };
+        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64(), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox: None, sketch: false, body: None };
         out.insert((k as usize, id.to_string()), r);
     }
     out
@@ -1928,10 +1931,16 @@ impl<'a> Translator<'a> {
                 let axis = (0..3).max_by(|a, b| n[*a].abs().total_cmp(&n[*b].abs())).unwrap_or(2);
                 Ok(["plane:right", "plane:front", "plane:top"][axis].to_string())
             }
-            "FACE" | "PLANE" => self.nearest("faces", &r).ok_or_else(|| format!("{id}: no face of ours at {:?} mm", mm(p))),
+            "FACE" | "PLANE" => {
+                let part = self.part_of(k, &r);
+                self.nearest("faces", &r, part.as_deref()).ok_or_else(|| format!("{id}: no face of ours at {:?} mm", mm(p)))
+            }
             // A sketch's line: that line of ours (a part's edge of its length may lie beside it).
             "EDGE" if r.sketch && let Some(line) = self.sketch_line_at(p, r.measure) => Ok(line),
-            "EDGE" => self.nearest("edges", &r).ok_or_else(|| format!("{id}: no edge of ours at {:?} mm", mm(p))),
+            "EDGE" => {
+                let part = self.part_of(k, &r);
+                self.nearest("edges", &r, part.as_deref()).ok_or_else(|| format!("{id}: no edge of ours at {:?} mm", mm(p)))
+            }
             "VERTEX" => {
                 // A part's vertex there, else a sketch's point (a sketch's
                 // wire body in live's line).
@@ -2018,7 +2027,18 @@ impl<'a> Translator<'a> {
     /// centre, which may lie in a hole or on an axis), then the first within
     /// 0.2 % of it (live's compact fetch sums tessellation facets: a cylinder's
     /// area 0.04 % low), else the nearest.
-    fn nearest(&mut self, kind: &str, r: &LiveRef) -> Option<String> {
+    /// Our part for the live part `r` is on, when live's line says (by its box, as a BODY reference).
+    fn part_of(&mut self, k: usize, r: &LiveRef) -> Option<String> {
+        let body = r.body.clone()?;
+        if !self.refs.contains_key(&(k, body.clone())) {
+            return None;
+        }
+        self.by_geometry(k, &body).ok()
+    }
+
+    /// `part`: the part of ours live's is on, which decides between equally good ones (two parts with a hole in
+    /// one place: cf-fill-pattern's sheet metal part and its solid).
+    fn nearest(&mut self, kind: &str, r: &LiveRef, part: Option<&str>) -> Option<String> {
         let p = r.point?;
         let mut a = json!({ "kind": kind, "near": mm(p), "limit": 8 });
         if let Some(t) = &r.geometry {
@@ -2038,7 +2058,8 @@ impl<'a> Translator<'a> {
         let (key, scale) = if kind == "faces" { ("area", k * k) } else { ("length", k) };
         let within = |tol: f64| move |e: &&Value| r.measure.zip(e[key].as_f64()).is_some_and(|(m, ours)| (ours * scale - m).abs() <= tol * m.abs() + 1e-12);
         let id = |e: &Value| e["id"].as_str().map(str::to_string);
-        if let Some(e) = found.iter().find(within(1e-5)) {
+        let exact: Vec<&Value> = found.iter().filter(within(1e-5)).collect();
+        if let Some(e) = exact.iter().find(|e| part.is_some_and(|p| e["part"] == p)).or(exact.first()) {
             return id(e);
         }
         // Within the tolerance, the one whose centroid is nearest live's point
@@ -3003,6 +3024,7 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
         let at = k as usize + 1;
         let before = k.checked_sub(1).and_then(|j| held.get(&j));
         for b in bodies {
+            let part_id = b["id"].as_str().filter(|_| b["type"] != "SKETCH").map(str::to_string);
             // A sketch's line: the bodies it made are its own (not the parts
             // before it), their faces its regions.
             let sketch_body = line["type"] == "newSketch" && b["type"] != "SOLID" && b["id"].as_str().is_none_or(|id| before.is_none_or(|ids| !ids.iter().any(|x| x == id)));
@@ -3018,7 +3040,7 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
                 let s = &f["surface"];
                 let surface = kind(s);
                 let kind = if sketch_body { "SKETCH_REGION" } else { "FACE" };
-                let mut r = LiveRef { kind: kind.into(), point: Some(c), measure: f["area"].as_f64(), geometry: our_type(surface.as_deref()), bbox: Some([mn, mx]), ..Default::default() };
+                let mut r = LiveRef { kind: kind.into(), point: Some(c), measure: f["area"].as_f64(), geometry: our_type(surface.as_deref()), bbox: Some([mn, mx]), body: part_id.clone().filter(|_| !sketch_body), ..Default::default() };
                 // The compact fetch: origin and the outward normal beside the type.
                 if surface.as_deref() == Some("PLANE")
                     && s.is_string()
@@ -3042,12 +3064,12 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
             for e in b["edges"].as_array().into_iter().flatten() {
                 if let (Some(id), Some(p)) = (e["id"].as_str(), v3(&e["geometry"]["midPoint"]).or_else(|| v3(&e["midPoint"]))) {
                     let length = e["geometry"]["length"].as_f64().or(e["length"].as_f64());
-                    out.insert((at, id.to_string()), LiveRef { kind: "EDGE".into(), point: Some(p), measure: length, geometry: our_type(kind(&e["curve"]).as_deref()), ..Default::default() });
+                    out.insert((at, id.to_string()), LiveRef { kind: "EDGE".into(), point: Some(p), measure: length, geometry: our_type(kind(&e["curve"]).as_deref()), body: part_id.clone().filter(|_| !sketch_body), ..Default::default() });
                 }
             }
             for v in b["vertices"].as_array().into_iter().flatten() {
                 if let (Some(id), Some(p)) = (v["id"].as_str(), v3(&v["point"])) {
-                    out.insert((at, id.to_string()), LiveRef { kind: "VERTEX".into(), point: Some(p), ..Default::default() });
+                    out.insert((at, id.to_string()), LiveRef { kind: "VERTEX".into(), point: Some(p), body: part_id.clone().filter(|_| !sketch_body), ..Default::default() });
                 }
             }
             // Its box from its faces', else (bodies listed by id alone) the
