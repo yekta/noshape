@@ -2970,6 +2970,76 @@ double eval(const Surf& s, const gp_XYZ& x)
   return (rho - (s.r + h * std::tan(s.ang))) * std::cos(s.ang);
 }
 
+// eval's value and its gradient (the offset's normal there, away from it on the positive side).
+double eval_grad(const Surf& s, const gp_XYZ& x, gp_XYZ& g)
+{
+  if (s.kind == GeomAbs_Plane)
+  {
+    g = s.n;
+    return s.n.Dot(x) - s.c;
+  }
+  if (s.general)
+  {
+    const gp_Pnt   P(x);
+    const gp_Pnt2d uv = s.has_hint ? s.sas->NextValueOfUV(s.hint, P, 1e-12, 1e-9) : s.sas->ValueOfUV(P, 1e-12);
+    s.hint            = uv;
+    s.has_hint        = true;
+    gp_Pnt S;
+    gp_Vec Du, Dv;
+    s.base->D1(uv.X(), uv.Y(), S, Du, Dv);
+    const gp_Vec N = Du.Crossed(Dv);
+    const double m = N.Magnitude();
+    if (m < 1e-300)
+      return 1e300;
+    g = N.XYZ() / m;
+    return gp_Vec(S, P).Dot(N) / m - s.d;
+  }
+  const gp_XYZ dir = s.ax.Direction().XYZ();
+  const gp_XYZ w   = x - s.ax.Location().XYZ();
+  const double h   = w.Dot(dir);
+  const gp_XYZ rw  = w - dir * h;
+  const double rho = rw.Modulus();
+  const gp_XYZ e   = rho > 1e-300 ? rw / rho : gp_XYZ(0, 0, 0);
+  if (s.kind == GeomAbs_Cylinder)
+  {
+    g = e;
+    return rho - s.r;
+  }
+  if (s.kind == GeomAbs_Sphere)
+  {
+    const double m = w.Modulus();
+    g              = m > 1e-300 ? w / m : gp_XYZ(0, 0, 0);
+    return m - s.r;
+  }
+  if (s.kind == GeomAbs_Torus)
+  {
+    const double m = std::sqrt((rho - s.ang) * (rho - s.ang) + h * h);
+    g              = m > 1e-300 ? (e * (rho - s.ang) + dir * h) / m : gp_XYZ(0, 0, 0);
+    return m - s.r;
+  }
+  g = (e - dir * std::tan(s.ang)) * std::cos(s.ang);
+  return (rho - (s.r + h * std::tan(s.ang))) * std::cos(s.ang);
+}
+
+// solve3 with the surfaces' own gradients: one evaluation of each a step (a march's many points on free-form faces).
+bool solve3_grad(const Surf* s[3], gp_XYZ& x, double scale)
+{
+  for (int it = 0; it < 60; ++it)
+  {
+    gp_XYZ       g[3];
+    const gp_XYZ F(eval_grad(*s[0], x, g[0]), eval_grad(*s[1], x, g[1]), eval_grad(*s[2], x, g[2]));
+    if (std::max({std::abs(F.X()), std::abs(F.Y()), std::abs(F.Z())}) < 1e-13 * scale)
+      return true;
+    gp_Mat J;
+    for (int r = 1; r <= 3; ++r)
+      J.SetRow(r, g[r - 1]);
+    if (std::abs(J.Determinant()) < 1e-12)
+      return false;
+    x -= J.Inverted() * F;
+  }
+  return false;
+}
+
 // Newton on `fs` (as many unknowns as functions: 3 for a point, 1 along a line).
 bool solve3(const Surf* s[3], gp_XYZ& x, double scale)
 {
@@ -4202,6 +4272,31 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         const int                  n = 64;
         NCollection_Array1<gp_Pnt> q(1, n + 1);
         bool                       marched = true;
+        // The faces' normals by the foot of each step's point, found from the last step's (a projection from scratch
+        // each time was 3 ms a step on Shell 4's ramp).
+        struct Foot
+        {
+          TopoDS_Face                        f;
+          occ::handle<ShapeAnalysis_Surface> sas;
+          BRepAdaptor_Surface                s;
+          gp_Pnt2d                           uv;
+          bool                               has = false;
+          gp_XYZ normal(const gp_Pnt& p, double tol)
+          {
+            uv  = has ? sas->NextValueOfUV(uv, p, 1e-12, tol) : sas->ValueOfUV(p, 1e-12);
+            has = true;
+            BRepLProp_SLProps lp(s, uv.X(), uv.Y(), 1, 1e-9);
+            const gp_Dir      d = lp.IsNormalDefined() ? lp.Normal() : gp_Dir(0, 0, 1);
+            return (f.Orientation() == TopAbs_REVERSED ? d.Reversed() : d).XYZ();
+          }
+        };
+        Foot foot[2];
+        for (int k = 0; k < 2; ++k)
+        {
+          foot[k].f   = TopoDS::Face(faces(k == 0 ? fa : fb));
+          foot[k].sas = new ShapeAnalysis_Surface(BRep_Tool::Surface(foot[k].f));
+          foot[k].s.Initialize(foot[k].f);
+        }
         for (int k = 1; k < n && marched; ++k)
         {
           gp_Pnt p;
@@ -4218,8 +4313,8 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           pl.n                    = d.Normalized().XYZ();
           pl.c                    = pl.n.Dot(p.XYZ());
           const quad::Surf* s3[3] = {&sf[(size_t)fa], &sf[(size_t)fb], &pl};
-          gp_XYZ            y     = p.XYZ() - (gp_Vec(normal_at(TopoDS::Face(faces(fa)), p)).XYZ() + gp_Vec(normal_at(TopoDS::Face(faces(fb)), p)).XYZ()) * t;
-          marched                 = quad::solve3(s3, y, size) && (y - p.XYZ()).Modulus() < 10 * thickness;
+          gp_XYZ            y     = p.XYZ() - (foot[0].normal(p, 1e-6 * size) + foot[1].normal(p, 1e-6 * size)) * t;
+          marched                 = quad::solve3_grad(s3, y, size) && (y - p.XYZ()).Modulus() < 10 * thickness;
           q(k + 1)                = gp_Pnt(y);
         }
         q(1)     = A;
