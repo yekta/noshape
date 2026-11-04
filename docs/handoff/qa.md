@@ -36,6 +36,17 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-04 17:59: fuzz and sweeps moved to vibe3 (lead: this machine at load 19–24; keep local runs to quick checks).**
+vibe3 (8 cores, user ngyekta, ~/qa = a copy of qa-scratch's bin / tickets / docs / smdocs / cf / fz documents with paths
+rewritten; binaries in ~/qa/rel; wrappers ~/qa/bin/w-<sha>.sh with `ulimit -v`, no systemd-run there). Running: CLI loops
+~/qa/bin/v3nf.sh (green f3010615, fallback off, 3981–4040), v3g.sh (4041–4080), v3cf.sh (v0.4.26 release CLI, 4081–4140),
+summaries ~/qa/cli/{nf,cf}loop.summary; GUI fuzz ~/qa/bin/fzloop.sh :61 (its own Xvfb :61, llvmpipe; one display only,
+vibe3 is shared: bool's replays run there too). Per-green sweeps: `bin/v3sweep.sh [sha]` then `bin/v3get.sh <sha>` (results
+copied to qa-scratch/cli). The watch (bin/qa-watch.sh, from bin now) pulls vibe3's summaries every minute into
+cli/v3-{nf,cf}.summary; baselines qa-scratch/watch-{nf,cf}.base, `bin/qa-watch-ack.sh` after reviewing. Local GUI fuzz loops on
+:110 / :131 stopped (they were the load and the Xvfb CPU); the updater app on :149 stays. A new green loop on vibe3: copy the
+green there (v3sweep.sh does), write v3nf/v3g with the new sha and seeds, `touch ~/qa/loop.stop` stops the CLI loops.
+
 **v0.4.26 (published 16:34, cut 5b449900 = 477c41683 + bump; Release run 41852299915, "Check macOS arm64" cancelled at
 16:10 yet published) smoked 16:35–17:00: good, no blocker.** Artifacts: the published Linux tarball, CLI tarball and .deb are
 byte-identical to the run's linux-x86_64 artifact; SHA256SUMS OK; 11 assets. CLI / app as CLI "0.4.26"; round trip 67643.716875
