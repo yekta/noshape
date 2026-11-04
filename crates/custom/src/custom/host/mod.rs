@@ -111,6 +111,9 @@ pub struct CtxState {
     /// sketch with its tools).
     pub loaded: bool,
     transient_ids: HashMap<Arc<str>, Reference>,
+    /// Transient ids earlier features of the regeneration handed out ([`Context::fs_transient_next`]): this one's
+    /// count on from there.
+    transient_base: usize,
     transient_of: HashMap<Reference, Arc<str>>,
     /// Transient ids kept from feature to feature ([`Context::fs_transients`]).
     pub persistent: Vec<(Arc<str>, Reference)>,
@@ -252,6 +255,7 @@ impl FsContext {
         ctx.bodies.extend(hidden_bodies);
         let attributes = std::mem::take(&mut ctx.fs_attributes);
         let persistent = std::mem::take(&mut ctx.fs_transients);
+        let transient_base = ctx.fs_transient_next;
         let cx = Arc::new(FsContext {
             serial: next_serial(),
             state: Mutex::new(CtxState {
@@ -263,6 +267,7 @@ impl FsContext {
                 xform,
                 loaded: false,
                 transient_ids: HashMap::new(),
+                transient_base,
                 transient_of: HashMap::new(),
                 persistent,
                 ops: HashMap::new(),
@@ -339,6 +344,7 @@ impl FsContext {
         ctx.fs_hidden_bodies = hidden;
         ctx.fs_attributes = st.attributes().to_vec();
         ctx.fs_transients = st.persistent.clone();
+        ctx.fs_transient_next = st.transient_base + st.transient_ids.len();
         ctx
     }
 
@@ -474,8 +480,8 @@ impl CtxState {
                 }
             }
         }
-        // Onshape-style three letter ids: JAA, JAB, ...
-        let mut n = self.transient_ids.len();
+        // Onshape-style three letter ids: JAA, JAB, ..., on from the earlier features' (never one twice).
+        let mut n = self.transient_base + self.transient_ids.len();
         let mut s = String::new();
         loop {
             s.insert(0, (b'A' + (n % 26) as u8) as char);

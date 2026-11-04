@@ -3681,3 +3681,36 @@ fn edge_order_at_a_corner_as_live() {
     let at = |p: &str| corner.find(p).unwrap_or_else(|| panic!("{p} in {corner}"));
     assert!(corner.matches('{').count() == 2 && at("N[0,40,0 d 1,0,0 ; 30,40,0") < at("N[30,40,0 d 0,-1,0 ; 30,20,0"), "{region}");
 }
+
+/// Transient ids never repeat across the features of a regeneration (Onshape's are unique in the Part Studio): std
+/// makes attribute ids from them (assignSMAssociationAttributes), so a later feature's new entity reusing an earlier
+/// one's id joined their sheet metal associations (cf-sheet-metal-shaped-flange's Make joint 1).
+#[test]
+fn transient_ids_are_new_in_every_feature() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Id probe" }
+export const idProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCuboid(context, id + "b", { "corner1" : vector(0, 0, 0) * meter, "corner2" : vector(1, 1, 1) * millimeter });
+        println(toString(evaluateQuery(context, qCreatedBy(id + "b", EntityType.BODY))[0]));
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    let ids: Vec<_> = (0..2)
+        .map(|_| {
+            let f = ps.new_feature(&fx.ty("idProbe"), &fx.units).unwrap();
+            let id = f.id;
+            ps.features.push(f);
+            id
+        })
+        .collect();
+    let mut reg = Regenerator::new();
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
+    let out: Vec<String> = ids.iter().map(|f| custom::run::output_of(*f).expect("probe output").output).collect();
+    assert!(out[0].contains("transientId") && out[0] != out[1], "{out:?}");
+}

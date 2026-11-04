@@ -609,6 +609,9 @@ pub struct Context {
     /// Transient ids FeatureScript stored in attributes that must outlive the
     /// feature (std Form's tool bodies, kept in the walls' attributes).
     pub fs_transients: Vec<(Arc<str>, crate::reference::Reference)>,
+    /// How many transient ids FeatureScript has handed out so far in this regeneration: the next feature's go on
+    /// from there, so ids (and std's attribute ids made from them) never repeat across features, as Onshape's.
+    pub fs_transient_next: usize,
     /// Sheet metal definition joints in the order they appeared (the std
     /// rebuild's: an edge by its end points and its faces' boxes, a rolled
     /// face by its box, in 0.1 µm): an entity a later feature changes, or an
@@ -749,6 +752,7 @@ impl Context {
             fs_attributes,
             fs_hidden_bodies,
             fs_transients,
+            fs_transient_next,
             sm_births,
             own_names,
         } = self;
@@ -785,6 +789,7 @@ impl Context {
             && o.fs_attributes.is_empty()
             && same_arcs(fs_hidden_bodies, &o.fs_hidden_bodies)
             && *fs_transients == o.fs_transients
+            && *fs_transient_next == o.fs_transient_next
             && *sm_births == o.sm_births
             && *own_names == o.own_names
     }
