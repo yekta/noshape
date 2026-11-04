@@ -243,6 +243,9 @@ pub struct FeatureDialog {
     completion: Option<crate::var_complete::VarCompletion>,
     /// The dialog takes the keyboard at its next render (see `set_value`).
     focus_dialog_pending: bool,
+    /// A pick filled the active field and moved on: the next field takes the keyboard at the next render (Onshape's
+    /// autoAdvanceToNextControl focuses it; live ui-parity draft-on-side-face).
+    focus_active_pending: bool,
     /// The keyboard left the dialog: a press in the graphics area, or Esc out of a field (live: the page has the
     /// keyboard then, the selection field stays active; `ui_focus`). A press in the dialog or a field's focus
     /// brings it back.
@@ -324,6 +327,15 @@ impl EventEmitter<DialogEvent> for FeatureDialog {}
 impl Focusable for FeatureDialog {
     fn focus_handle(&self, _: &App) -> FocusHandle {
         self.focus.clone()
+    }
+}
+
+/// A dialog field writes a plain angle "3 deg", as a committed one (live ui-parity draft-on-side-face: the default
+/// Draft angle focused reads "3 deg"); expressions stay as written.
+fn dialog_angle_text(text: &str) -> String {
+    match text.trim().strip_suffix('°').map(str::trim) {
+        Some(num) if num.parse::<f64>().is_ok() => format!("{num} deg"),
+        _ => text.to_string(),
     }
 }
 
@@ -417,6 +429,7 @@ impl FeatureDialog {
             quiet_text: None,
             edit_focus: None,
             focus_dialog_pending: false,
+            focus_active_pending: false,
             keyboard_left: false,
             create_var: None,
             external_field: None,
@@ -776,6 +789,7 @@ impl FeatureDialog {
         }
         if added && full && self.advance_disarmed.as_deref() != Some(path.as_str()) {
             self.advance_query_focus(&path);
+            self.focus_active_pending = self.active_query.as_deref().is_some_and(|q| q != path) && self.feature.type_id != "sketch";
         }
         self.changed(cx);
         cx.notify();
@@ -3562,6 +3576,7 @@ impl FeatureDialog {
             return Some(div().w_full().h(px(26.)).flex().items_center().justify_end().pr(px(4.)).border_b_1().border_color(gpui_kit::rgb(0xeeeeee)).text_size(px(13.33)).text_color(pal.text_faint).child(text).into_any_element());
         }
         let text = match (&s.kind, values.get(s.id)) {
+            (ParamKind::Num(n), Some(ParamValue::Expr(e))) if n.kind == noshape_model::params::NumKind::Angle => dialog_angle_text(&e.text),
             (ParamKind::Num(_) | ParamKind::Bool { .. }, Some(ParamValue::Expr(e))) => e.text.clone(),
             (ParamKind::Text { .. }, Some(ParamValue::Text(t))) => t.clone(),
             (ParamKind::Num(_), _) | (ParamKind::Text { .. }, _) => String::new(),
@@ -3827,6 +3842,13 @@ impl Render for FeatureDialog {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if std::mem::take(&mut self.focus_dialog_pending) {
             window.focus(&self.focus, cx);
+        }
+        if std::mem::take(&mut self.focus_active_pending)
+            && let Some(q) = self.active_query.clone()
+        {
+            let h = self.tab_stop(&format!("q:{q}"), cx);
+            window.focus(&h, cx);
+            self.keyboard_left = false;
         }
         let pal = p();
         let help_focus = self.tab_stop("help", cx);
@@ -4351,5 +4373,18 @@ mod vertex_group_tests {
         assert!(groups_vertices(true, 2, 2));
         // One of them removed again: single chips.
         assert!(!groups_vertices(true, 2, 1));
+    }
+}
+
+#[cfg(test)]
+mod angle_text_tests {
+    use super::dialog_angle_text;
+
+    #[::core::prelude::v1::test]
+    fn a_plain_angle_reads_deg_and_expressions_stay() {
+        assert_eq!(dialog_angle_text("3°"), "3 deg");
+        assert_eq!(dialog_angle_text("2.5 °"), "2.5 deg");
+        assert_eq!(dialog_angle_text("5 deg"), "5 deg");
+        assert_eq!(dialog_angle_text("#a + 1°"), "#a + 1°");
     }
 }

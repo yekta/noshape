@@ -2067,3 +2067,22 @@ fn a_fillets_tangent_edge_lights_up_the_fillet(cx: &mut TestAppContext) {
     let related = cx.update(|cx| view.read(cx).related_features(cx));
     assert!(related.contains(&fillet) && !related.contains(&extrude), "{related:?}");
 }
+
+/// Live (ui-parity draft-on-side-face): a face picked in the graphics fills Draft's Neutral plane and the next field,
+/// Entities to draft, becomes active with the keyboard (the press in the graphics had taken it from the dialog).
+#[gpui::test]
+fn a_pick_that_moves_on_gives_the_next_field_the_keyboard(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "pick-advance-focus");
+    view.update(cx, |v, _| v.selection.clear());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("draft", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Draft dialog").dialog.clone());
+    let focus = |cx: &mut TestAppContext| cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)["focus"].clone()).unwrap();
+    assert_eq!(focus(cx)["label"], "Neutral plane");
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.keyboard_left = true;
+        d.add_pick(top, cx);
+    }));
+    draw(cx, window);
+    assert_eq!((focus(cx)["kind"].clone(), focus(cx)["label"].clone()), ("field".into(), "Entities to draft".into()));
+}

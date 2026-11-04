@@ -45,6 +45,7 @@ impl PartStudioView {
             json!({ "kind": "none", "label": null, "text": null, "selection": null, "all": false })
         };
         let list = crate::os_menu::ui_state(cx)
+            .or_else(|| self.context_menu.as_ref().and_then(|(_, m, _)| crate::os_menu::menu_state(m, cx)))
             .or_else(|| dialog.and_then(|d| d.ui_list()))
             .or_else(|| self.dim_completion_state())
             .or_else(|| self.ui.cell_completion.as_ref().map(|c| c.ui_state()))

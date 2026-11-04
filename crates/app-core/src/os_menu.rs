@@ -751,6 +751,11 @@ pub fn open_labels(cx: &App) -> Vec<String> {
 /// its rows (separators left out), the hovered one and the disabled ones.
 pub fn ui_state(cx: &App) -> Option<serde_json::Value> {
     let (_, _, _, menu, _) = cx.try_global::<OsMenuHost>()?.0.as_ref()?;
+    menu_state(menu, cx)
+}
+
+/// [`ui_state`] of a menu held elsewhere (the graphics area's context menu).
+pub fn menu_state(menu: &Entity<OsMenu>, cx: &App) -> Option<serde_json::Value> {
     let m = menu.read(cx);
     let mut rows = Vec::new();
     let (mut highlighted, mut disabled) = (None, Vec::new());
