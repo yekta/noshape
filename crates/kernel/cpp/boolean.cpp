@@ -3718,6 +3718,22 @@ double volume_of(const TopoDS_Shape& x)
 }
 
 // The union's volume is the sum of the inputs': they only touch.
+// The cut of `tools` lying inside `args` and apart: the result's volume is theirs less the tools' (to a thousandth of
+// the smallest tool: the integration's noise with B-spline faces is ~1e-5 of the part).
+bool cut_volumes_add_up(const std::vector<TopoDS_Shape>& args, const std::vector<TopoDS_Shape>& tools, const TopoDS_Shape& result)
+{
+  double va = 0, vt = 0, smallest = std::numeric_limits<double>::infinity();
+  for (const TopoDS_Shape& x : args)
+    va += volume_of(x);
+  for (const TopoDS_Shape& x : tools)
+  {
+    const double v = volume_of(x);
+    vt += v;
+    smallest = std::min(smallest, v);
+  }
+  return !tools.empty() && smallest > 0 && std::abs(volume_of(result) - (va - vt)) <= 1e-3 * smallest;
+}
+
 bool volumes_add_up(const std::vector<TopoDS_Shape>& inputs, const TopoDS_Shape& result)
 {
   double sum = 0;
@@ -6188,6 +6204,8 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   BoolOpts first = opts;
   if (first.glue == 3 && op != 0) // glue is for fusing touching shapes only
     first.glue = 0;
+  if (first.glue == 4) // (a cut by tools inside the part: checked below)
+    first.glue = op == 1 ? 1 : 0;
   // Many tools (a knurl's 148 crossing grooves): OCCT's intersection of the
   // pairs runs in parallel.
   first.parallel = first.parallel || n_tools >= 8;
@@ -6295,6 +6313,20 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
       apply_opts(*b, plain);
       build_cancellable(*b);
     }
+  }
+  // A checked glue cut: kept when the part lost each tool's whole volume (the tools inside it and apart; a glued cut
+  // gone wrong leaves some of a tool), else again without glue. (Tools reaching out of the part fail it: slower, right.)
+  if (!by_tree && opts.glue == 4 && op == 1 && (b->HasErrors() || !b->IsDone() || !cut_volumes_add_up(a, each, b->Shape())))
+  {
+    fail_if_cancelled();
+    BoolOpts plain = opts;
+    plain.glue     = 0;
+    plain.parallel = first.parallel;
+    b              = make();
+    b->SetArguments(to_list(a));
+    b->SetTools(to_list(t));
+    apply_opts(*b, plain);
+    build_cancellable(*b);
   }
   fail_if_cancelled();
   if (!by_tree && (b->HasErrors() || !b->IsDone()))

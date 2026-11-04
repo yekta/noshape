@@ -135,6 +135,7 @@ fn glue_name(g: Glue) -> &'static str {
         Glue::Shift => "shift",
         Glue::Full => "full",
         Glue::ShiftChecked => "shift_checked",
+        Glue::InsideChecked => "inside_checked",
     }
 }
 
@@ -305,6 +306,7 @@ pub fn load(dir: &Path, name: &str) -> Option<Case> {
         "shift" => Glue::Shift,
         "full" => Glue::Full,
         "shift_checked" => Glue::ShiftChecked,
+        "inside_checked" => Glue::InsideChecked,
         _ => Glue::Off,
     };
     let opts = BooleanOptions { fuzzy: num("fuzzy")?, glue, unify: flag("unify"), parallel: flag("parallel"), obb: flag("obb") };

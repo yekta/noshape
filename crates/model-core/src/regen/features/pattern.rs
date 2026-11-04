@@ -756,7 +756,9 @@ fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: boo
     // Onshape's face pattern only changes the body the faces are on: the
     // copies of a hole on Part 1 never cut a part overlapping it (qa4 F12).
     let Some(bi) = index_of_body(ev, seed) else { return Ok(()) };
-    ev.boolean_into_with(&[bi], tools, k::BooleanOp::Cut, &EvalCtx::many_tools_options())
+    // (Its copies' faces lie on the part's own faces: the glued cut, checked.)
+    let opts = k::BooleanOptions { glue: k::Glue::InsideChecked, ..EvalCtx::many_tools_options() };
+    ev.boolean_into_with(&[bi], tools, k::BooleanOp::Cut, &opts)
 }
 
 /// The growth of a face pattern copy `tool` (a boss) whose footprint on the

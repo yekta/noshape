@@ -33,6 +33,10 @@ pub enum Glue {
     /// sum of the inputs' (they merely touch), else the boolean runs again
     /// without glue. For patterns, whose instances usually stand on a face.
     ShiftChecked,
+    /// For a cut by tools lying in the part, their faces on its faces (a face pattern's copies of a hole through a
+    /// tube's wall): GlueShift, kept only when the part loses each tool's whole volume, else the cut runs again
+    /// without glue.
+    InsideChecked,
 }
 
 /// Options for [`boolean`] and [`split`].
@@ -68,6 +72,7 @@ impl BooleanOptions {
                 Glue::Shift => 1,
                 Glue::Full => 2,
                 Glue::ShiftChecked => 3,
+                Glue::InsideChecked => 4,
             },
             unify: self.unify,
             parallel: self.parallel,
