@@ -570,9 +570,19 @@ impl FeatureDialog {
         let active = self.active_query.clone();
         self.set_value_auto(path, v, cx);
         self.focus_new_empty_field(&shown);
-        // A selection field the edit brought up and activated takes the keyboard from the checkbox or tab clicked
-        // (live ui-parity shell-hollow-toggle: Hollow ticked, "Parts to hollow" has the focus).
-        if self.active_query != active && self.active_query.as_ref().is_some_and(|q| !shown.contains(&q.as_str())) {
+        // A selection field the edit brought up and activated takes the keyboard from the control clicked: from a tab
+        // always (live ui-parity edit-feature-remove-tab: Remove, Merge scope focused), from a checkbox when the
+        // field active before went away (shell-hollow-toggle: Hollow ticked, "Parts to hollow" focused; linear-
+        // pattern-two-directions: Second direction ticked, the checkbox keeps it), from a dropdown never
+        // (mirror-feature-type: Feature mirror chosen, the select focused).
+        let kind = self.spec_for_path(path).map(|s| (matches!(s.kind, ParamKind::Enum { .. }), s.hints.has(Hints::HORIZONTAL_ENUM)));
+        let before_gone = active.as_deref().is_none_or(|a| !self.visible_selection_fields().contains(&a));
+        let takes = match kind {
+            Some((true, true)) => true,
+            Some((true, false)) => false,
+            _ => before_gone,
+        };
+        if takes && self.active_query != active && self.active_query.as_ref().is_some_and(|q| !shown.contains(&q.as_str())) {
             self.focus_dialog_pending = true;
             // (A tab that brings the field up doesn't leave the keyboard outside: live extrude-surface-tab.)
             self.keyboard_left = false;
