@@ -2059,10 +2059,19 @@ impl Window {
             Box::new(move || {
                 handle
                     .update(&mut cx, |_, window, _cx| {
-                        for (area, hitbox) in &window.rendered_frame.window_control_hitboxes {
-                            if window.mouse_hit_test.ids.contains(&hitbox.id) {
-                                return Some(*area);
+                        let frame = &window.rendered_frame;
+                        let ids = &window.mouse_hit_test.ids;
+                        // A control over a drag area (a button's pointer, a field's I-beam) takes the click: Windows
+                        // would otherwise move the window and the title bar's buttons never get it.
+                        let control_above = |at: usize| {
+                            ids[..at].iter().any(|id| frame.cursor_styles.iter().any(|c| c.hitbox_id == Some(*id) && c.style != CursorStyle::Arrow))
+                        };
+                        for (area, hitbox) in &frame.window_control_hitboxes {
+                            let Some(at) = ids.iter().position(|id| *id == hitbox.id) else { continue };
+                            if *area == WindowControlArea::Drag && control_above(at) {
+                                continue;
                             }
+                            return Some(*area);
                         }
                         None
                     })
