@@ -198,6 +198,16 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const faces = size(evaluateQuery(context, qCreatedBy(sub + "t", EntityType.FACE)));
             check("opThicken of a sheet's joined faces", size(bodies) == 1 && faces == 8, [size(bodies), faces]);
         });
+        step(context, id, "createdByFollowsChanges", function(sub) {
+            // qCreatedBy asked again after an operation answers for the context as it is now (its answers are kept
+            // while nothing changes).
+            fCuboid(context, sub + "b", { "corner1" : vector(0, 0, 1200) * mm, "corner2" : vector(10, 10, 1210) * mm });
+            const before = size(evaluateQuery(context, qCreatedBy(sub + "b", EntityType.FACE)));
+            const again = size(evaluateQuery(context, qCreatedBy(sub + "b", EntityType.FACE)));
+            opDeleteBodies(context, sub + "d", { "entities" : qCreatedBy(sub + "b", EntityType.BODY) });
+            const after = size(evaluateQuery(context, qCreatedBy(sub + "b", EntityType.FACE)));
+            check("qCreatedBy after a change", before == 6 && again == 6 && after == 0, [before, again, after]);
+        });
         step(context, id, "collisionWires", function(sub) {
             // Wire bodies collide where their edges meet (std Fill pattern's border check).
             fCuboid(context, sub + "a", { "corner1" : vector(0, 0, 950) * mm, "corner2" : vector(10, 10, 960) * mm });

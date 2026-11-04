@@ -54,7 +54,7 @@ pub enum Ent {
     SketchVertex(usize, u32),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum EType {
     Vertex,
     Edge,
@@ -93,7 +93,7 @@ pub fn entity_type_of(e: &Ent) -> EType {
 
 /// Body/sub-shape topology of one body, computed on demand.
 #[derive(Default)]
-struct Topo {
+pub struct Topo {
     edge_faces: Vec<Vec<u32>>,
     vertex_faces: Vec<Vec<u32>>,
     vertex_edges: Vec<Vec<u32>>,
@@ -138,7 +138,14 @@ impl<'a> QueryCx<'a> {
         if let Some(t) = self.topo.borrow().get(&b) {
             return t.clone();
         }
-        let shape = &self.st.ctx.bodies[b].shape;
+        // Kept for the body itself across queries (std's per-entity attribute loops build a QueryCx a call).
+        let body = self.st.ctx.bodies.untracked()[b].clone();
+        let key = Arc::as_ptr(&body) as usize;
+        if let Some((_, t)) = self.st.topo_cache.lock().get(&key) {
+            self.topo.borrow_mut().insert(b, t.clone());
+            return t.clone();
+        }
+        let shape = &body.shape;
         let vertex_edges = shape.vertex_edges().unwrap_or_default();
         let mut edge_vertices = vec![Vec::new(); shape.count(ShapeType::Edge)];
         for (v, es) in vertex_edges.iter().enumerate() {
@@ -158,7 +165,28 @@ impl<'a> QueryCx<'a> {
         let (shown_edges, shown_vertices) = (shown.edges, shown.vertices);
         let t = Arc::new(Topo { edge_faces, vertex_faces, vertex_edges, edge_vertices, shown_edges, shown_vertices });
         self.topo.borrow_mut().insert(b, t.clone());
+        let mut cache = self.st.topo_cache.lock();
+        if cache.len() >= 256 {
+            cache.clear();
+        }
+        cache.insert(key, (body.clone(), t.clone()));
         t
+    }
+
+    /// Body `b`'s [`NameIndex`], kept for the body itself across queries.
+    fn name_index(&self, b: usize) -> Arc<NameIndex> {
+        let body = &self.st.ctx.bodies.untracked()[b];
+        let key = Arc::as_ptr(body) as usize;
+        if let Some((_, ix)) = self.st.name_index.lock().get(&key) {
+            return ix.clone();
+        }
+        let ix = Arc::new(NameIndex::of(body));
+        let mut cache = self.st.name_index.lock();
+        if cache.len() >= 8192 {
+            cache.clear();
+        }
+        cache.insert(key, (body.clone(), ix.clone()));
+        ix
     }
 
     /// Whether an entity exists in Onshape's topology (see [`Topo::shown_edges`]).
@@ -301,9 +329,20 @@ impl<'a> QueryCx<'a> {
         let ctx = &self.st.ctx;
         match r {
             Reference::Body(id) => ctx.bodies.iter().position(|b| &b.id == id).map(Ent::Body).into_iter().collect(),
-            Reference::Face(n) => ctx.bodies.iter().enumerate().flat_map(|(b, body)| body.find_faces(n).into_iter().map(move |f| Ent::Face(b, f))).collect(),
-            Reference::Edge(n) => ctx.bodies.iter().enumerate().flat_map(|(b, body)| body.find_edges(n).into_iter().map(move |f| Ent::Edge(b, f))).collect(),
-            Reference::Vertex(n) => ctx.bodies.iter().enumerate().flat_map(|(b, body)| body.find_vertices(n).into_iter().map(move |f| Ent::Vertex(b, f))).collect(),
+            // Only the bodies that may hold it ([`NameIndex`]): a lookup asks every body otherwise, each without the
+            // name scanning all its entities for split relatives (thousands of bodies after a pattern).
+            Reference::Face(n) => {
+                let want = Wanted::of(n, NameKind::Face);
+                ctx.bodies.iter().enumerate().filter(|(b, _)| self.name_index(*b).may_hold(&want)).flat_map(|(b, body)| body.find_faces(n).into_iter().map(move |f| Ent::Face(b, f))).collect()
+            }
+            Reference::Edge(n) => {
+                let want = Wanted::of(n, NameKind::Edge);
+                ctx.bodies.iter().enumerate().filter(|(b, _)| self.name_index(*b).may_hold(&want)).flat_map(|(b, body)| body.find_edges(n).into_iter().map(move |f| Ent::Edge(b, f))).collect()
+            }
+            Reference::Vertex(n) => {
+                let want = Wanted::of(n, NameKind::Vertex);
+                ctx.bodies.iter().enumerate().filter(|(b, _)| self.name_index(*b).may_hold(&want)).flat_map(|(b, body)| body.find_vertices(n).into_iter().map(move |f| Ent::Vertex(b, f))).collect()
+            }
             Reference::Origin => vec![Ent::Origin],
             Reference::Plane(p) => vec![Ent::Datum(*p)],
             Reference::Sketch(f) => ctx.sketches.iter().position(|s| s.feature == *f).map(Ent::SketchBody).into_iter().collect(),
@@ -992,6 +1031,106 @@ fn creation_order(faces: &[crate::naming::Name]) -> Vec<usize> {
     out
 }
 
+/// Hashes of a body's names, to tell without asking it whether a lookup could find something there: its face, edge
+/// and vertex names (an exact match), and the roots (split wrappers stripped) of its faces' names and of the face
+/// names inside its edge and vertex names (a split relative: `Body::find_*`'s fuzzy matches all share a root).
+pub struct NameIndex {
+    names: std::collections::HashSet<u64>,
+    face_roots: std::collections::HashSet<u64>,
+    edge_roots: std::collections::HashSet<u64>,
+    vertex_roots: std::collections::HashSet<u64>,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum NameKind {
+    Face,
+    Edge,
+    Vertex,
+}
+
+/// A looked-up name's hash and its related roots' hashes.
+struct Wanted {
+    name: u64,
+    kind: NameKind,
+    roots: Vec<u64>,
+}
+
+fn name_hash(n: &TopoName) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    n.hash(&mut h);
+    h.finish()
+}
+
+/// The faces named inside an edge or vertex name.
+fn named_faces(n: &TopoName) -> Vec<&TopoName> {
+    match n {
+        TopoName::Edge { faces, .. } => faces.iter().map(|f| &**f).collect(),
+        TopoName::Boundary { face, .. } => vec![&**face],
+        TopoName::Vertex { faces, .. } => faces.iter().map(|f| &**f).collect(),
+        _ => Vec::new(),
+    }
+}
+
+impl NameIndex {
+    fn of(body: &crate::regen::context::Body) -> NameIndex {
+        let root = |n: &TopoName| name_hash(n.root());
+        let names = body.faces.iter().chain(&body.edges).chain(&body.vertices).map(|n| name_hash(n)).collect();
+        let face_roots = body.faces.iter().map(|n| root(n)).collect();
+        let edge_roots = body.edges.iter().flat_map(|n| named_faces(n).into_iter().map(root)).collect();
+        let vertex_roots = body.vertices.iter().flat_map(|n| named_faces(n).into_iter().map(root)).collect();
+        NameIndex { names, face_roots, edge_roots, vertex_roots }
+    }
+
+    fn may_hold(&self, w: &Wanted) -> bool {
+        if self.names.contains(&w.name) {
+            return true;
+        }
+        let roots = match w.kind {
+            NameKind::Face => &self.face_roots,
+            NameKind::Edge => &self.edge_roots,
+            NameKind::Vertex => &self.vertex_roots,
+        };
+        w.roots.iter().any(|r| roots.contains(r))
+    }
+}
+
+impl Wanted {
+    fn of(n: &TopoName, kind: NameKind) -> Wanted {
+        let roots = match kind {
+            NameKind::Face => vec![name_hash(n.root())],
+            NameKind::Edge | NameKind::Vertex => named_faces(n).into_iter().map(|f| name_hash(f.root())).collect(),
+        };
+        Wanted { name: name_hash(n), kind, roots }
+    }
+}
+
+/// What qCreatedBy's answer depends on, as it was ([`CtxState::created_cache`]): the bodies and sketches themselves
+/// (held, so a new one can't take an old one's address) and the sizes of the records it reads.
+pub struct CreatedSeen {
+    bodies: Vec<Arc<crate::regen::context::Body>>,
+    sketches: Vec<Arc<crate::regen::context::SketchResult>>,
+    counts: [usize; 11],
+}
+
+impl CreatedSeen {
+    fn counts(st: &CtxState) -> [usize; 11] {
+        [st.ops.len(), st.adopted.len(), st.merged_creators.len(), st.body_ops.len(), st.split_face_edges.len(), st.made_vertices.len(), st.plane_ops.len(), st.hidden.len(), st.ctx.planes.len(), st.ctx.connectors.len(), st.ctx.points.len()]
+    }
+
+    fn of(st: &CtxState) -> CreatedSeen {
+        CreatedSeen { bodies: st.ctx.bodies.untracked().to_vec(), sketches: st.ctx.sketches.clone(), counts: Self::counts(st) }
+    }
+
+    fn same(&self, st: &CtxState) -> bool {
+        self.counts == Self::counts(st)
+            && self.bodies.len() == st.ctx.bodies.len()
+            && self.bodies.iter().zip(st.ctx.bodies.untracked()).all(|(a, b)| Arc::ptr_eq(a, b))
+            && self.sketches.len() == st.ctx.sketches.len()
+            && self.sketches.iter().zip(&st.ctx.sketches).all(|(a, b)| Arc::ptr_eq(a, b))
+    }
+}
+
 fn uniq(v: Vec<Ent>) -> Vec<Ent> {
     let mut seen = std::collections::HashSet::new();
     v.into_iter().filter(|e| seen.insert(e.clone())).collect()
@@ -1087,8 +1226,12 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
                 Ent::Body(b) => q.st.merged_creators.get(&q.st.ctx.bodies[*b].id).is_some_and(|cs| cs.iter().any(|c| has_prefix(c, &id))),
                 _ => false,
             };
+            let key = (id.clone(), entity_type);
+            if let Some((_, found)) = q.st.created_cache.lock().get(&key).filter(|(seen, _)| seen.same(q.st)) {
+                return Ok(found.clone());
+            }
             let visible: Vec<Ent> = q.all(entity_type).into_iter().filter(|e| q.created_by(e).is_some_and(|c| has_prefix(&c, &id)) || merged(e)).collect();
-            if !visible.is_empty() {
+            let found: Vec<Ent> = if !visible.is_empty() {
                 visible
             } else {
                 // Nothing visible: the faces / edges it made may now be part of
@@ -1097,7 +1240,13 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
                 // Not the definition body itself (std flange's merge checks that
                 // its boolean created no body).
                 q.all_with(entity_type, true).into_iter().filter(|e| !matches!(e, Ent::Body(_)) && q.created_by(e).is_some_and(|c| has_prefix(&c, &id))).collect()
+            };
+            let mut cache = q.st.created_cache.lock();
+            if cache.len() >= 64 {
+                cache.clear();
             }
+            cache.insert(key, (CreatedSeen::of(q.st), found.clone()));
+            found
         }
         "SKETCH_REGION" => {
             let Some(id) = id_of(query.get("featureId")) else { return Ok(Vec::new()) };

@@ -3729,6 +3729,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   ~2 ms a call). dx's (FeatureScript host); handoff/dx.md 11-04 08:04. dx 08:28: face creators cached by name (cleared
   when operations or adoptions change) and attributes indexed by entity in CtxState: the loop 7.9 -> 4.4 s, the
   document 37 -> 33 s; left: the rebuild 12 s, std's assignSMAttributesToNewOrSplitEntities 7.2 s (its own loops).
+  dx 11-04 11:02 (lead: the attribute loops are the interpreter's, dx's; the Booleans' share is bool's): qCreatedBy's
+  answers kept while the context is the same (bodies and sketches by identity, the records' sizes), each body's
+  topology and name hashes kept by body: a name lookup asks only the bodies that can hold it (exact, or a split
+  relative by root) instead of all ~1,800 test pattern copies, each scanning its entities. The Fill pattern batch
+  34.7 -> 17.2 s (same box, back to back); the instance loop 4.4 -> 0.15 s, std's attribute loop ~7 -> under 2 s.
+  **For bool:** the sheet metal rebuild's two Booleans cutting a wall's ~1,739 holes at once take ~4.9 s
+  (crates/custom/src/custom/host/sheetmetal.rs build_part, `holes`: OCCT Cut of the flat face and of the slab by
+  all the hole tools); live's whole document is 4.7 s.
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet

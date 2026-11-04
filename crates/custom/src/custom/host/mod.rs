@@ -93,6 +93,11 @@ pub type SplitRecord = (Vec<BodyId>, Option<(DVec3, DVec3)>);
 /// [`CtxState::face_creators`]: by a face name's address, the name and its creator (operation number, id).
 pub type FaceCreators = HashMap<usize, (Arc<TopoName>, Option<(u32, FsId)>)>;
 
+/// Something worked out from a body, by the body's address (the body held, so the address stays its own).
+pub type ByBody<T> = Mutex<HashMap<usize, (Arc<crate::regen::context::Body>, Arc<T>)>>;
+/// [`CtxState::created_cache`]: by (feature id, entity type), the answer and what it was worked out from.
+pub type CreatedCache = HashMap<(FsId, Option<query::EType>), (query::CreatedSeen, Vec<query::Ent>)>;
+
 pub struct CtxState {
     pub ctx: Context,
     /// The Part Studio feature being evaluated.
@@ -124,6 +129,14 @@ pub struct CtxState {
     /// its address isn't reused): qCreatedBy asks it of every face, thousands of times in a Fill pattern's loop.
     /// Cleared when `ops` or `adopted` change ([`Self::begin_op`], [`Self::adopt`], [`Self::alias_op`]).
     pub face_creators: Mutex<FaceCreators>,
+    /// qCreatedBy's answers by (feature id, entity type), each kept while the context it was worked out in is the
+    /// same ([`query::CreatedSeen`]): std asks the same one thousands of times in a loop (a Fill pattern's
+    /// instances). Cleared with `face_creators`.
+    /// Each body's topology (QueryCx's), by the body (held, so the address stays its own).
+    /// Each body's name hashes (QueryCx::from_ref's prefilter), by the body (held).
+    pub name_index: ByBody<query::NameIndex>,
+    pub topo_cache: ByBody<query::Topo>,
+    pub created_cache: Mutex<CreatedCache>,
     /// The operation that made each construction plane (`ConstructionPlane` references; qCreatedBy).
     pub plane_ops: HashMap<Reference, FsId>,
     /// Each operation's bits of its bodies' ids (unique in this feature).
@@ -253,6 +266,9 @@ impl FsContext {
                 body_ops: HashMap::new(),
                 adopted: HashMap::new(),
                 face_creators: Mutex::new(HashMap::new()),
+                created_cache: Mutex::new(HashMap::new()),
+                topo_cache: Mutex::new(HashMap::new()),
+                name_index: Mutex::new(HashMap::new()),
                 plane_ops: HashMap::new(),
                 body_bits: BodyBits::default(),
                 touched: HashMap::new(),
@@ -505,6 +521,7 @@ impl CtxState {
         self.next_seq += 1;
         self.ops.insert(marker, OpInfo { id: id.to_vec(), seq });
         self.face_creators.get_mut().clear();
+        self.created_cache.get_mut().clear();
         self.body_bits.assign(marker);
         Some(marker)
     }
@@ -513,12 +530,14 @@ impl CtxState {
     pub fn adopt(&mut self, n: TopoName, op: OpInfo) {
         self.adopted.insert(n, op);
         self.face_creators.get_mut().clear();
+        self.created_cache.get_mut().clear();
     }
 
     /// Marker `marker` names operation `op` too (copies an operation made under other ids).
     pub fn alias_op(&mut self, marker: FeatureId, op: OpInfo) {
         self.ops.insert(marker, op);
         self.face_creators.get_mut().clear();
+        self.created_cache.get_mut().clear();
     }
 
     /// The bits of the ids of the bodies operation `marker` creates.
