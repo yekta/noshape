@@ -3224,11 +3224,13 @@ export const oldPin = defineFeature(function(context is Context, id is Id, defin
     assert_ok(&fx.regen(&mut reg, &ps));
     let out = custom::run::output_of(fid).unwrap().output;
     assert_eq!(out, "V975_BEND_LINE_EXTENTS\ntrue\n", "{out}");
+}
 
 /// DISPLACEMENT-MAP (the user's displacement map, whose template is an opCreateBSplineSurface face as big as the face):
 /// opReplaceFace (a) on a curved face, the Ø20 × 20 mm cylinder's side by a coaxial Ø22 cylinder's (exactly π·121·20)
-/// and by a loft through bumpy closed splines (r 10.5 + 0.4 cos 4a: about π·20·(10.5² + 0.4²/2) = 6,937), and (b) with a template partly below and partly above
-/// the face, the 40 × 20 × 10 mm block's top by a loft between two sloped lines, z = 9 + 0.1 x (exactly 8,800 mm³).
+/// and by a loft through bumpy closed splines (r 10.5 + 0.4 cos 4a: about π·20·(10.5² + 0.4²/2) = 6,937), and (b) with
+/// a template partly below and partly above the face, the 40 × 20 × 10 mm block's top by a loft between two sloped
+/// lines, z = 9 + 0.1 x (exactly 8,800 mm³).
 #[test]
 fn replace_face_on_curved_faces_and_by_crossing_templates() {
     const SRC: &str = r#"
