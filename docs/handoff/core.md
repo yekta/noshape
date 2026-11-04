@@ -16,6 +16,12 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-04 07:49 UTC.**
+- Full parity (this worktree = main bfc79590): 322/480 features, 30/55 documents (03:30: 319 / 29): knob-jason 11/11,
+  stef-radijator 5/6. Slower than live: 8 of 42 (was 11); cf-hose-routing ×2.2 (was ×12.9); the one feature over
+  ×10 is cf-fix-pcb's Fix PCB 2 (OCCT Boolean tree, bool's). The watcher's /tmp/lead/main-status still says green
+  4570b4e5 at 06:09 (not updated since; lead's).
+
 **State 11-04 07:28 UTC.**
 - qa's P0s of the morning, all mine, fixed and landed: BLEND-RUST-STRAIGHT-WRONG (c9c634ae: the straight-edge rounds
   read convexity off an end edge, wrong at a thin rim's reflex corner; now off the face across the edge, tangent points
