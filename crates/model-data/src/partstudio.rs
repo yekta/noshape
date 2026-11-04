@@ -32,9 +32,19 @@ pub struct Feature {
     /// expression (e.g. `#depth < 0.5 in`) is true.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suppression_expr: Option<String>,
+    /// Features made inside this one's dialog (Onshape's `subFeatures`: a mate connector made from a field's "Select
+    /// mate connectors" button): evaluated just before it on its input, read by its queries as
+    /// `Reference::MateConnector { feature: sub.id, .. }`, gone after it (not in the feature or parts lists).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sub_features: Vec<Feature>,
 }
 
 impl Feature {
+    /// Feature `id` is this one or one of its sub-features.
+    pub fn owns(&self, id: FeatureId) -> bool {
+        self.id == id || self.sub_features.iter().any(|s| s.id == id)
+    }
+
     pub fn feature_type(&self) -> Option<&'static FeatureType> {
         features::get(&self.type_id)
     }
@@ -507,6 +517,7 @@ impl PartStudio {
             custom_name: false,
             hidden: false,
             suppression_expr: None,
+            sub_features: Vec::new(),
         })
     }
 

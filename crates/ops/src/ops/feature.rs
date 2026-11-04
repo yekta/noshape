@@ -6,10 +6,10 @@ use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, doc, studio, values};
 use noshape_model::features::{self, Category};
-use noshape_model::params::ParamKind;
+use noshape_model::params::{ParamKind, ParamValue};
 use serde_json::{Value, json};
 
-const PARAMS_DOC: &str = "Parameter values by parameter id (see `feature_schema`): booleans; enum option ids (\"BLIND\"); numbers as expression strings with units (\"25 mm\", \"0.5 in\", \"30 deg\", \"#width / 2\", \"2 * #t + 1 mm\"; a bare number uses the workspace units); selections as arrays of reference ids from the query and sketch tools (\"region:…\", \"face:…\", \"edge:…\", \"plane:top\", \"body:…\"); array parameters as arrays of objects of their item parameters.";
+const PARAMS_DOC: &str = "Parameter values by parameter id (see `feature_schema`): booleans; enum option ids (\"BLIND\"); numbers as expression strings with units (\"25 mm\", \"0.5 in\", \"30 deg\", \"#width / 2\", \"2 * #t + 1 mm\"; a bare number uses the workspace units); selections as arrays of reference ids from the query and sketch tools (\"region:…\", \"face:…\", \"edge:…\", \"plane:top\", \"body:…\"), where a field takes mate connectors an item `{\"mate_connector\": {Mate connector parameters}}` makes one inside the feature (the field's \"Select mate connectors\" button; no Mate connector feature is added); array parameters as arrays of objects of their item parameters.";
 
 pub fn ops() -> Vec<Op> {
     vec![
@@ -302,6 +302,8 @@ fn dialog_logic(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, fe
     // regen_profile::bench_editing_logic).
     if noshape_model::custom::std_feature::has_editing_logic(&feature.type_id) {
         let ctx = od.regenerate_with(tab, None, |o| o.upto = Some(index))?.context;
+        // Its in-feature mate connectors exist for it (a Hole reaches the parts from them).
+        let ctx = noshape_model::regen::with_sub_features(ctx, feature, &units);
         let specified: Vec<String> = given.keys().cloned().collect();
         let ty = feature.feature_type();
         let shown = |k: &str| ty.and_then(|t| t.param(k)).is_some_and(|s| !s.hints.has(noshape_model::params::Hints::ALWAYS_HIDDEN));
@@ -424,6 +426,10 @@ fn feature_json(f: &noshape_model::Feature) -> Value {
     if let Some(specs) = specs {
         v["visible"] = json!(values::visible_ids(specs, &f.params));
     }
+    // Its in-feature mate connectors (named in its selections as `mc:<id>.0`).
+    if !f.sub_features.is_empty() {
+        v["sub_features"] = Value::Array(f.sub_features.iter().map(feature_json).collect());
+    }
     if let Some(e) = &f.suppression_expr {
         v["suppression_expression"] = json!(e);
     }
@@ -536,7 +542,8 @@ fn add(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let units = od.doc().settings.units;
     let ps = doc::studio(od.doc(), tab)?;
     let mut feature = ps.new_feature(ty.id, &units).ok_or_else(|| OpError::param("type", "unknown feature type"))?;
-    let params = derived_source(od.doc(), ty.id, params)?;
+    let mut params = derived_source(od.doc(), ty.id, params)?;
+    in_feature_connectors(&mut feature, &mut params, ps, &units, od.doc())?;
     values::apply(&ty.params, &mut feature.params, &params, &units, od.doc()).map_err(|e| e.under("params"))?;
     // Plane: the type follows the selection when none is given (cPlaneLogic).
     if ty.id == "cPlane" && !params.contains_key("cplaneType") && !feature.params.query("entities").is_empty() {
@@ -583,8 +590,11 @@ fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         if feature.type_id == "sketch" && params.contains_key("sketch") {
             return Err(OpError::param("params.sketch", "edit sketch geometry with the sketch tools"));
         }
-        let params = derived_source(od.doc(), ty.id, params.clone())?;
+        let mut params = derived_source(od.doc(), ty.id, params.clone())?;
+        let ps = doc::studio(od.doc(), tab)?;
+        in_feature_connectors(&mut feature, &mut params, ps, &units, od.doc())?;
         values::apply(&ty.params, &mut feature.params, &params, &units, od.doc()).map_err(|e| e.under("params"))?;
+        drop_unused_sub_features(&mut feature);
         if feature.type_id == "hole" {
             hole_standard(&mut feature, &|k| params.contains_key(k));
         }
@@ -606,6 +616,61 @@ fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         out["ignored"] = json!(ignored);
     }
     Ok(out.into())
+}
+
+/// In-feature mate connectors: a selection item `{"mate_connector": {its parameters}}` makes a mate connector inside
+/// the feature (Onshape's subFeatures, made from a field's "Select mate connectors" button) and the item names it.
+/// It starts as Onshape's: no owner part, Move ticked (live 1851).
+fn in_feature_connectors(feature: &mut noshape_model::partstudio::Feature, params: &mut serde_json::Map<String, Value>, ps: &noshape_model::partstudio::PartStudio, units: &noshape_units::UnitPrefs, doc: &noshape_model::Document) -> Result<(), OpError> {
+    type Make<'a> = dyn FnMut(&serde_json::Map<String, Value>, &str) -> Result<String, OpError> + 'a;
+    fn walk(v: &mut Value, path: &str, make: &mut Make) -> Result<(), OpError> {
+        match v {
+            Value::Object(o) if o.len() == 1 && o.contains_key("mate_connector") => {
+                let p = o["mate_connector"].as_object().ok_or_else(|| OpError::param(path, "`mate_connector`: an object of Mate connector parameters (feature_schema mateConnector)"))?.clone();
+                *v = Value::String(make(&p, path)?);
+            }
+            Value::Array(items) => {
+                for (i, it) in items.iter_mut().enumerate() {
+                    walk(it, &format!("{path}[{i}]"), make)?;
+                }
+            }
+            Value::Object(o) => {
+                for (k, x) in o.iter_mut() {
+                    walk(x, &format!("{path}.{k}"), make)?;
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+    let Some(ty) = noshape_model::features::get("mateConnector") else { return Ok(()) };
+    let mut make = |p: &serde_json::Map<String, Value>, path: &str| -> Result<String, OpError> {
+        let mut sub = ps.new_feature("mateConnector", units).ok_or_else(|| OpError::invalid("mate connectors are not available"))?;
+        sub.name = "Mate connector".into();
+        let start = json!({ "allowOwnerEntity": false, "requireOwnerPart": false, "isForSubFeature": true, "transform": true });
+        values::apply(&ty.params, &mut sub.params, start.as_object().expect("an object"), units, doc).map_err(|e| e.under(path))?;
+        values::apply(&ty.params, &mut sub.params, p, units, doc).map_err(|e| e.under(&format!("{path}.mate_connector")))?;
+        let id = sub.id;
+        feature.sub_features.push(sub);
+        Ok(format!("mc:{id}.0"))
+    };
+    for (k, v) in params.iter_mut() {
+        walk(v, &format!("params.{k}"), &mut make)?;
+    }
+    Ok(())
+}
+
+/// In-feature mate connectors no selection of the feature names any more go with it (a chip removed).
+fn drop_unused_sub_features(feature: &mut noshape_model::partstudio::Feature) {
+    fn named(v: &ParamValue, id: noshape_model::reference::FeatureId) -> bool {
+        match v {
+            ParamValue::Query(q) => q.iter().any(|r| matches!(r, noshape_model::reference::Reference::MateConnector { feature, .. } if *feature == id)),
+            ParamValue::Array(items) => items.iter().any(|it| it.0.values().any(|x| named(x, id))),
+            _ => false,
+        }
+    }
+    let params = feature.params.clone();
+    feature.sub_features.retain(|s| params.0.values().any(|v| named(v, s.id)));
 }
 
 fn get(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

@@ -1351,7 +1351,7 @@ fn a_features_appearance_opens_as_live(cx: &mut TestAppContext) {
             v.doc.update(cx, |doc, cx| {
                 doc.edit_studio(tab, "Add features", cx, |ps| {
                     for (id, ty, name) in [(9001, "sketch", "Sketch 1"), (9002, "extrude", "Extrude 1")] {
-                        ps.features.push(noshape_model::partstudio::Feature { id: FeatureId(id), type_id: ty.into(), name: name.into(), suppressed: false, params: Default::default(), folder: None, custom_name: false, hidden: false, suppression_expr: None });
+                        ps.features.push(noshape_model::partstudio::Feature { id: FeatureId(id), type_id: ty.into(), name: name.into(), suppressed: false, params: Default::default(), folder: None, custom_name: false, hidden: false, suppression_expr: None, sub_features: Vec::new() });
                     }
                 })
             });

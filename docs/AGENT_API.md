@@ -767,7 +767,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `type` | string | required | Feature type id (see `feature_types`). |
-| `params` | object |  | Parameter values by parameter id (see `feature_schema`): booleans; enum option ids ("BLIND"); numbers as expression strings with units ("25 mm", "0.5 in", "30 deg", "#width / 2", "2 * #t + 1 mm"; a bare number uses the workspace units); selections as arrays of reference ids from the query and sketch tools ("region:…", "face:…", "edge:…", "plane:top", "body:…"); array parameters as arrays of objects of their item parameters. |
+| `params` | object |  | Parameter values by parameter id (see `feature_schema`): booleans; enum option ids ("BLIND"); numbers as expression strings with units ("25 mm", "0.5 in", "30 deg", "#width / 2", "2 * #t + 1 mm"; a bare number uses the workspace units); selections as arrays of reference ids from the query and sketch tools ("region:…", "face:…", "edge:…", "plane:top", "body:…"), where a field takes mate connectors an item `{"mate_connector": {Mate connector parameters}}` makes one inside the feature (the field's "Select mate connectors" button; no Mate connector feature is added); array parameters as arrays of objects of their item parameters. |
 | `name` | string |  | Feature name (default: "Extrude 1", ...). |
 | `index` | integer |  | Position in the feature list (default: at the rollback bar). |
 
@@ -789,7 +789,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `feature` | string | required | Feature id or name. |
-| `params` | object |  | Parameter values by parameter id (see `feature_schema`): booleans; enum option ids ("BLIND"); numbers as expression strings with units ("25 mm", "0.5 in", "30 deg", "#width / 2", "2 * #t + 1 mm"; a bare number uses the workspace units); selections as arrays of reference ids from the query and sketch tools ("region:…", "face:…", "edge:…", "plane:top", "body:…"); array parameters as arrays of objects of their item parameters. |
+| `params` | object |  | Parameter values by parameter id (see `feature_schema`): booleans; enum option ids ("BLIND"); numbers as expression strings with units ("25 mm", "0.5 in", "30 deg", "#width / 2", "2 * #t + 1 mm"; a bare number uses the workspace units); selections as arrays of reference ids from the query and sketch tools ("region:…", "face:…", "edge:…", "plane:top", "body:…"), where a field takes mate connectors an item `{"mate_connector": {Mate connector parameters}}` makes one inside the feature (the field's "Select mate connectors" button; no Mate connector feature is added); array parameters as arrays of objects of their item parameters. |
 | `name` | string |  | New name. |
 
 #### feature_get

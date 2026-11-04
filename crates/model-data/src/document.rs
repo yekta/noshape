@@ -392,7 +392,7 @@ mod tab_user_tests {
         let mut user = PartStudio::new();
         let mut params = crate::params::ParamValues::default();
         params.set("partStudio", crate::params::ParamValue::Text(src.to_string()));
-        user.features.push(crate::partstudio::Feature { id: crate::reference::FeatureId(1), type_id: "importDerived".into(), name: "Derived 1".into(), suppressed: false, params, folder: None, custom_name: false, hidden: false, suppression_expr: None });
+        user.features.push(crate::partstudio::Feature { id: crate::reference::FeatureId(1), type_id: "importDerived".into(), name: "Derived 1".into(), suppressed: false, params, folder: None, custom_name: false, hidden: false, suppression_expr: None, sub_features: Vec::new() });
         let user = doc.add_tab("User", TabContent::PartStudio(user));
         let other = doc.add_tab("Other", TabContent::PartStudio(PartStudio::new()));
         assert_eq!(doc.tab_users(src), vec![user]);

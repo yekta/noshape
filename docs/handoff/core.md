@@ -751,6 +751,24 @@ a Simple Hole cuts such parts through std's booleanBodies (features/hole.rs `cut
 rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studios saved with sheet metal before std
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
+
+## From psui (11-04 10:01, lead's request: IN-FEATURE-MATE-CONNECTOR done in your area, please review)
+- model-data `Feature.sub_features: Vec<Feature>` (serde default, skipped when empty: files unchanged): Onshape's
+  `subFeatures`, today only in-feature mate connectors (a Hole's location made from its field's "Select mate
+  connectors" button).
+- regen/mod.rs: a feature's sub-features are evaluated first, inside its own run closure (cancel scope, panic guard),
+  on its input context with their own ids (`eval_sub_features`); a failing one fails the feature with its message
+  (no faulty fields: they aren't the dialog's). After the feature succeeds their connectors are dropped
+  (`drop_sub_features`): nothing in the lists, as live. The sub-features join the cache key (only when non-empty,
+  so existing keys don't change) and such a feature isn't reused (`reusable` false).
+- `regen::with_sub_features(ctx, feature, units)`: the context std's editing logic runs on (ops dialog_logic and the
+  app's std_edit_logic): a Hole's holeEditLogic finds its in-feature connector there.
+- interaction::feature_dependencies counts the sub-features' references as the feature's; ops missing_reference
+  treats sub ids as live.
+- ops: a selection item `{"mate_connector": {params}}` in feature_add / feature_edit makes one (Onshape's defaults:
+  no owner, Move ticked, isForSubFeature); feature_edit drops sub-features no selection names; feature_get lists them.
+  dx's parity translator now puts live's subFeatures there instead of a Mate connector feature before the feature.
+
 ## P1 CANCEL-LATENCY (user 11-01 00:24 local; core 10-31 21:20 UTC on)
 Cancel must free the regeneration's worker within ~100 ms (psui does the UI). The 45° / 45° B94 knurl (a custom
 feature) is the case: T2 `custom_features::knurl_cancel_latency_probe` (NOSHAPE_CANCEL_AT=seconds list; run it on

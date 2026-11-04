@@ -653,7 +653,8 @@ pub fn edge_creator_by(n: &noshape_model::reference::TopoName, order: impl Fn(Fe
 /// (its parts keep their names, qa5 DER4); Assembly context geometry is
 /// never missing (a snapshot).
 pub fn missing_reference(doc: &noshape_model::Document, ps: &PartStudio) -> impl Fn(&Reference) -> bool + Send + Sync + 'static {
-    let mut live: std::collections::HashSet<FeatureId> = ps.features.iter().filter(|f| !f.suppressed).map(|f| f.id).collect();
+    // A feature's in-feature mate connectors live with it.
+    let mut live: std::collections::HashSet<FeatureId> = ps.features.iter().filter(|f| !f.suppressed).flat_map(|f| std::iter::once(f.id).chain(f.sub_features.iter().map(|s| s.id))).collect();
     for f in ps.features.iter().filter(|f| f.type_id == "importDerived" && !f.suppressed) {
         let key = f.params.text("partStudio").trim().to_string();
         if let Some(noshape_model::document::TabContent::PartStudio(src)) = doc.tabs.iter().find(|t| t.id.to_string() == key).map(|t| &t.content) {

@@ -105,7 +105,8 @@ fn defined_variable(f: &Feature) -> Option<&str> {
 pub fn feature_dependencies(features: &[Feature], index: usize) -> Vec<FeatureId> {
     let Some(f) = features.get(index) else { return Vec::new() };
     let mut ints = HashSet::new();
-    f.params.0.values().for_each(|v| param_refs(v, &mut ints));
+    // Its in-feature mate connectors' references are its own.
+    std::iter::once(f).chain(&f.sub_features).flat_map(|g| g.params.0.values()).for_each(|v| param_refs(v, &mut ints));
     let vars = used_variables(f);
     features[..index]
         .iter()
@@ -1050,7 +1051,7 @@ mod tests {
     use noshape_units::{Dim, EmptyScope, UnitPrefs};
 
     fn feat(id: u64, ty: &str, name: &str, params: ParamValues) -> Feature {
-        Feature { id: FeatureId(id), type_id: ty.into(), name: name.into(), suppressed: false, params, folder: None, custom_name: false, hidden: false, suppression_expr: None }
+        Feature { id: FeatureId(id), type_id: ty.into(), name: name.into(), suppressed: false, params, folder: None, custom_name: false, hidden: false, suppression_expr: None, sub_features: Vec::new() }
     }
 
     fn studio() -> PartStudio {

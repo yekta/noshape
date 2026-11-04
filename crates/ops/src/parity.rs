@@ -16,6 +16,9 @@ use serde_json::{Map, Value, json};
 use std::collections::HashMap;
 use std::path::Path;
 
+/// How a translated selection names an in-feature mate connector until its feature is added.
+const SUB_FEATURE: &str = "subfeature:";
+
 /// One referenced entity as live evaluated it (`refs.jsonl`), SI units.
 #[derive(Clone, Debug, Default)]
 pub struct LiveRef {
@@ -58,6 +61,8 @@ pub struct Translator<'a> {
     refs: HashMap<(usize, String), LiveRef>,
     /// Onshape feature id → ours.
     feature_ids: HashMap<String, String>,
+    /// In-feature mate connectors translated (live's sub-feature id → our parameters), placed in their feature.
+    sub_params: HashMap<String, Map<String, Value>>,
     /// (Onshape sketch feature id, sketch entity id) → our entity id
     /// (points as "<id>.start" / ".end" / ".center").
     sketch_entities: HashMap<(String, String), String>,
@@ -265,7 +270,7 @@ impl<'a> Translator<'a> {
             .flatten()
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, placeholder: None, std_pins: Vec::new(), foreign })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, placeholder: None, std_pins: Vec::new(), foreign })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -516,21 +521,17 @@ impl<'a> Translator<'a> {
         let f = self.features[k].clone();
         let mut step = Step { index: k, name: f["name"].as_str().unwrap_or("").to_string(), feature_type: f["featureType"].as_str().unwrap_or("").to_string(), ..Default::default() };
         step.custom = f["namespace"].as_str().is_some_and(|n| !n.is_empty());
-        // Mate connectors made inside the feature's dialog (its sub-features):
-        // ours has none in a feature, so each is a Mate connector before it.
+        // Mate connectors made inside the feature's dialog (its sub-features): translated here, they go into the
+        // feature's selections that name them (`{"mate_connector": …}`, ours in-feature too).
         for sub in f["subFeatures"].as_array().into_iter().flatten().filter(|s| s["featureType"] == "mateConnector") {
             let mut problems = Vec::new();
-            match self.feature(k, sub, &mut problems) {
-                Ok((id, status, message)) => {
+            match self.feature_params(k, sub, &mut problems) {
+                Ok((_, params)) => {
                     if let Some(oid) = sub["featureId"].as_str() {
-                        self.feature_ids.insert(oid.to_string(), id);
+                        self.sub_params.insert(oid.to_string(), params);
                     }
-                    if status == "Error" {
-                        problems.push(format!("ours errs: {}", message.unwrap_or_default()));
-                    }
-                    step.problems.push(format!("its in-feature {} built as a feature before it (noshape has none inside a feature)", sub["featureType"].as_str().unwrap_or("?")));
                 }
-                Err(e) => step.problems.push(format!("its in-feature {}: not built: {e}", sub["featureType"].as_str().unwrap_or("?"))),
+                Err(e) => step.problems.push(format!("its in-feature {}: not translated: {e}", sub["featureType"].as_str().unwrap_or("?"))),
             }
             step.problems.extend(problems.into_iter().map(|p| format!("its in-feature {}: {p}", sub["featureType"].as_str().unwrap_or("?"))));
         }
@@ -599,7 +600,8 @@ impl<'a> Translator<'a> {
     }
 
     /// A non-sketch feature through feature_add, its parameters by name.
-    fn feature(&mut self, k: usize, f: &Value, problems: &mut Vec<String>) -> Result<(String, String, Option<String>), String> {
+    /// Feature `f` (live's JSON) translated: our type and parameters.
+    fn feature_params(&mut self, k: usize, f: &Value, problems: &mut Vec<String>) -> Result<(String, Map<String, Value>), String> {
         let ty = f["featureType"].as_str().ok_or("no featureType")?;
         // A custom feature: its namespace names the Feature Studio ("e<element id>::m<microversion>").
         // "e<element>::m<microversion>", or another document's version
@@ -728,6 +730,31 @@ impl<'a> Translator<'a> {
                 params.insert(id.clone(), d);
             }
         }
+        Ok((ty.to_string(), params))
+    }
+
+    /// Placeholders of in-feature mate connectors in a translated selection, replaced by the connector's parameters.
+    fn place_sub_features(&self, v: &mut Value) {
+        match v {
+            Value::String(id) => {
+                if let Some(params) = id.strip_prefix(SUB_FEATURE).and_then(|oid| self.sub_params.get(oid)) {
+                    *v = json!({ "mate_connector": params });
+                }
+            }
+            Value::Array(items) => items.iter_mut().for_each(|x| self.place_sub_features(x)),
+            Value::Object(o) => o.values_mut().for_each(|x| self.place_sub_features(x)),
+            _ => {}
+        }
+    }
+
+    /// Feature `f` added after features 0 … k−1: its id, status and message.
+    fn feature(&mut self, k: usize, f: &Value, problems: &mut Vec<String>) -> Result<(String, String, Option<String>), String> {
+        let (ty, mut params) = self.feature_params(k, f, problems)?;
+        // Its in-feature mate connectors, by their placeholders in its selections.
+        for v in params.values_mut() {
+            self.place_sub_features(v);
+        }
+        let ty = ty.as_str();
         let mut args = json!({ "type": ty, "params": params });
         // "#featureName": Onshape's placeholder for the default name.
         if let Some(n) = f["name"].as_str().filter(|n| !n.starts_with('#')) {
@@ -1110,9 +1137,14 @@ impl<'a> Translator<'a> {
         // one): its id may name a face too (prize-wheel-tim).
         if q["btType"].as_str().is_some_and(|t| t.starts_with("BTMIndividualCreatedByQuery"))
             && q["bodyType"] == "MATE_CONNECTOR"
-            && let Some(ours) = q["featureId"].as_str().and_then(|f| self.feature_ids.get(f))
+            && let Some(f) = q["featureId"].as_str()
         {
-            return Ok(vec![format!("mc:{ours}.0")]);
+            if self.sub_params.contains_key(f) {
+                return Ok(vec![format!("{SUB_FEATURE}{f}")]);
+            }
+            if let Some(ours) = self.feature_ids.get(f) {
+                return Ok(vec![format!("mc:{ours}.0")]);
+            }
         }
         // A sketch's vertices (Point pattern's locations): its curves' ends
         // (construction ones too) and its points, one per position.

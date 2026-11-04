@@ -864,13 +864,13 @@ mod scope_tests {
     fn var(id: u64, name: &str, suppressed: bool) -> Feature {
         let mut p = ParamValues::default();
         p.set("name", ParamValue::Text(name.into()));
-        Feature { id: FeatureId(id), type_id: "assignVariable".into(), name: format!("Variable {id}"), suppressed, params: p, folder: None, custom_name: false, hidden: false, suppression_expr: None }
+        Feature { id: FeatureId(id), type_id: "assignVariable".into(), name: format!("Variable {id}"), suppressed, params: p, folder: None, custom_name: false, hidden: false, suppression_expr: None, sub_features: Vec::new() }
     }
 
     #[test]
     fn only_variables_defined_before_a_feature_are_in_scope() {
         let mut ps = PartStudio::new();
-        let ext = Feature { id: FeatureId(9), type_id: "extrude".into(), name: "Extrude 1".into(), suppressed: false, params: ParamValues::default(), folder: None, custom_name: false, hidden: false, suppression_expr: None };
+        let ext = Feature { id: FeatureId(9), type_id: "extrude".into(), name: "Extrude 1".into(), suppressed: false, params: ParamValues::default(), folder: None, custom_name: false, hidden: false, suppression_expr: None, sub_features: Vec::new() };
         ps.features = vec![var(1, "a", false), var(2, "b", true), ext, var(3, "width", false), var(4, "a", false), var(5, "b", false)];
         // At the extrude (index 2): `a` exists, `width` and `b` (suppressed before) do not.
         let later = variables_defined_later(&ps, 2);

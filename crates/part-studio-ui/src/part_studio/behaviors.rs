@@ -3786,6 +3786,8 @@ impl PartStudioView {
             let d = dialog.read(cx);
             (d.feature.type_id.clone(), d.feature.id, d.feature.name.clone(), d.feature.params.clone(), d.user_set.iter().cloned().collect::<Vec<String>>())
         };
+        // Its in-feature mate connectors, built for it on the model before it (a Hole reaches the parts from them).
+        let with_subs = { dialog.read(cx).feature.clone() };
         // A std button the user clicked runs the logic with it (clickedButton).
         let clicked = dialog.update(cx, |d, _| d.clicked_button.take()).unwrap_or_default();
         let old = self.ui.std_edit_old.replace(params.clone()).unwrap_or_default();
@@ -3806,7 +3808,12 @@ impl PartStudioView {
         let dialog = dialog.clone();
         let sent = params.clone();
         self.ui.std_edit_task = Some(cx.spawn_in(window, async move |this, cx| {
-            let changed = cx.background_spawn(async move { noshape_model::custom::std_feature::editing_logic_in_clicked((*ctx).clone(), &ty, id, &name, &units, &old, &sent, &user_set, creating, &clicked) }).await;
+            let changed = cx
+                .background_spawn(async move {
+                    let ctx = noshape_model::regen::with_sub_features(ctx, &with_subs, &units);
+                    noshape_model::custom::std_feature::editing_logic_in_clicked((*ctx).clone(), &ty, id, &name, &units, &old, &sent, &user_set, creating, &clicked)
+                })
+                .await;
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 // Done (a newer run would have dropped this one): the studio is idle again ([`Self::ui_busy`]).
                 this.ui.std_edit_task = None;

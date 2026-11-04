@@ -887,6 +887,43 @@ fn version_properties_and_publish() {
     assert_eq!(e.param.as_deref(), Some("version"), "{e:?}");
 }
 
+/// IN-FEATURE-MATE-CONNECTOR (live 1851): a Hole placed on a mate connector made inside it (its "Sketch points to
+/// place holes" field's "Select mate connectors" button, here at the top face's centroid) cuts the hole there and adds
+/// no Mate connector feature; the connector is the Hole's own and goes when the Hole no longer names it.
+#[test]
+fn a_hole_on_an_in_feature_mate_connector() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "hole-in-feature-mc.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[-20, -15], [20, 15]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+    let s2 = call(&mut ctx, "sketch_create", json!({ "plane": { "query": { "kind": "faces", "normal": [0, 0, 1] } } }))["sketch"].as_str().unwrap().to_string();
+    let p = call(&mut ctx, "sketch_draw", json!({ "sketch": s2, "tool": "point", "points": [[5, 0, 10]] }));
+    let pt: Vec<Value> = p["created"].as_array().unwrap().iter().filter(|x| x["type"] == "point").map(|x| x["id"].clone()).collect();
+    let top = call(&mut ctx, "query_entities", json!({ "kind": "faces", "normal": [0, 0, 1], "limit": 1 }))["faces"][0]["id"].as_str().unwrap().to_string();
+    let mc = json!({ "mate_connector": { "originQuery": [top], "entityInferenceType": "CENTROID" } });
+    let h = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": [mc], "isoHoleTableEx": ["Drilled", "5 mm"], "endStyleV2": "THROUGH" } }));
+    assert_eq!(h["feature_status"]["status"], "Ok", "{h}");
+    let names: Vec<String> = call(&mut ctx, "feature_list", json!({}))["features"].as_array().unwrap().iter().map(|f| f["name"].as_str().unwrap().to_string()).collect();
+    assert!(!names.iter().any(|n| n.starts_with("Mate connector")), "{names:?}");
+    assert_eq!(call(&mut ctx, "query_datums", json!({}))["mate_connectors"], json!([]));
+    let g = call(&mut ctx, "feature_get", json!({ "feature": h["feature"] }));
+    let subs = g["sub_features"].as_array().unwrap_or_else(|| panic!("{g}"));
+    assert_eq!((subs.len(), subs[0]["type"].as_str(), subs[0]["params"]["isForSubFeature"].as_bool()), (1, Some("mateConnector"), Some(true)), "{g}");
+    assert_eq!(g["params"]["locations"][0], json!(format!("mc:{}.0", subs[0]["id"].as_str().unwrap())), "{g}");
+    // Through the 10 mm block at its centre: a 5 mm hole.
+    let hole = std::f64::consts::PI * 2.5 * 2.5 * 10.0;
+    let vol = num(&call(&mut ctx, "query_parts", json!({}))["parts"][0]["volume"]);
+    assert!((vol - (12000.0 - hole)).abs() < 0.5, "{vol}");
+    let c = call(&mut ctx, "query_entities", json!({ "kind": "faces", "surface": "cylinder" }));
+    let at = &c["faces"][0]["axis"]["origin"];
+    assert!(at[0].as_f64().is_some_and(|x| x.abs() < 1e-6) && at[1].as_f64().is_some_and(|y| y.abs() < 1e-6), "{c}");
+    // The location moved to a sketch point: the connector goes with it.
+    call(&mut ctx, "feature_edit", json!({ "feature": h["feature"], "params": { "locations": pt } }));
+    let g = call(&mut ctx, "feature_get", json!({ "feature": h["feature"] }));
+    assert!(g.get("sub_features").is_none(), "{g}");
+}
+
 /// A Hole's Standard through the API does what the dialog does: the Units
 /// tab that shows it and the table's sizes in the fields not given.
 #[test]

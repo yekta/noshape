@@ -410,7 +410,11 @@ impl Regenerator {
             }
             let converted = f.feature_type().and_then(|t| resolve_bool_exprs(params, &t.params, &scope, &mut expr_error));
             let params = converted.as_ref().unwrap_or(params);
-            let blob = serde_json::to_vec(&(&f.type_id, &f.name, params, suppressed)).unwrap_or_default();
+            let mut blob = serde_json::to_vec(&(&f.type_id, &f.name, params, suppressed)).unwrap_or_default();
+            // Its in-feature mate connectors are part of it.
+            if !f.sub_features.is_empty() {
+                blob.extend(serde_json::to_vec(&f.sub_features).unwrap_or_default());
+            }
             key = hash_bytes(key, &blob);
             let local = hash_bytes(key0, &blob);
             // Derived features depend on another Part Studio's state.
@@ -427,6 +431,7 @@ impl Regenerator {
             // Reused when its inputs are (not custom, std-run, derived or Assembly-context features: they read more
             // than the context).
             let reusable = reuse
+                && f.sub_features.is_empty()
                 && !crate::custom::is_custom(&f.type_id)
                 && std_route::evaluator(&f.type_id).is_none()
                 && !crate::features::importing::is_derived(&f.type_id)
@@ -525,11 +530,13 @@ impl Regenerator {
                         ev.custom = opts.custom_features.clone();
                         ev.custom_type = crate::custom::is_custom(&f.type_id).then(|| f.type_id.clone());
                         let specs = f.feature_type().map(|t| t.params.as_slice()).unwrap_or(&[]);
+                        let subs = sub_feature_params(f, units);
                         // Every boolean of the feature on this thread stops
                         // when the run is aborted (not only boolean_into's).
                         let cancel = opts.cancel.clone();
                         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                             let mut run = || {
+                                eval_sub_features(&mut ev, &subs, units, &outer_vars)?;
                                 ev.check_bounds(specs)?;
                                 declines.scope(&f.type_id, || eval_fn(&mut ev))
                             };
@@ -577,6 +584,7 @@ impl Regenerator {
                                 if uses_context {
                                     ev.ctx.bodies.retain(|b| !crate::in_context::is_context_feature(b.id.feature));
                                 }
+                                drop_sub_features(&mut ev.ctx, f);
                                 ev.ctx.bodies.track(None);
                                 features::refgeom::refresh_open_composites(&mut ev.ctx);
                                 ev.ctx.renumber_default_names();
@@ -737,4 +745,58 @@ fn apply_configured_names(display: &mut crate::display::StudioDisplay, ps: &Part
             b.color = c;
         }
     }
+}
+
+/// A feature's sub-features (its in-feature mate connectors) with their parameters' defaults filled in.
+fn sub_feature_params(f: &crate::partstudio::Feature, units: &UnitPrefs) -> Vec<(FeatureId, String, String, crate::params::ParamValues)> {
+    f.sub_features
+        .iter()
+        .map(|sub| {
+            let mut params = sub.params.clone();
+            if let Some(t) = sub.feature_type() {
+                crate::params::fill_defaults(&t.params, &mut params, units);
+            }
+            (sub.id, sub.type_id.clone(), sub.name.clone(), params)
+        })
+        .collect()
+}
+
+/// Builds a feature's sub-features on its input, in order, before the feature itself (Onshape evaluates a feature's
+/// `subFeatures` first): a failing one fails the feature with its message.
+fn eval_sub_features(ev: &mut EvalCtx, subs: &[(FeatureId, String, String, crate::params::ParamValues)], units: &UnitPrefs, outer_vars: &BTreeMap<String, Quantity>) -> eval::FResult<()> {
+    for (id, type_id, name, params) in subs {
+        let Some(sub_fn) = features::evaluator(type_id) else {
+            return Err(eval::FeatureError::new(format!("{type_id} is not available in this build yet")));
+        };
+        let mut sub = EvalCtx::new(*id, name, params, units, std::mem::take(&mut ev.ctx), outer_vars);
+        let r = sub_fn(&mut sub);
+        ev.ctx = sub.ctx;
+        // Its fields aren't the feature's: no field of the dialog is named.
+        r.map_err(|e| eval::FeatureError { faulty: Vec::new(), ..e })?;
+    }
+    Ok(())
+}
+
+/// `ctx` (the model before feature `f`) with `f`'s sub-features built on it, as `f` sees it: what std's editing
+/// logic of `f` runs on (a Hole's holeEditLogic reaches the parts from its in-feature mate connectors).
+pub fn with_sub_features(ctx: Arc<Context>, f: &crate::partstudio::Feature, units: &UnitPrefs) -> Arc<Context> {
+    if f.sub_features.is_empty() {
+        return ctx;
+    }
+    let subs = sub_feature_params(f, units);
+    let (empty, params) = (BTreeMap::new(), crate::params::ParamValues::default());
+    let mut ev = EvalCtx::new(f.id, &f.name, &params, units, (*ctx).clone(), &empty);
+    // A sub-feature that fails leaves the rest as they were (the feature itself reports it).
+    let _ = eval_sub_features(&mut ev, &subs, units, &empty);
+    Arc::new(ev.ctx)
+}
+
+/// What a feature's sub-features made goes once the feature is built: nothing in the lists (live 1851).
+fn drop_sub_features(ctx: &mut Context, f: &crate::partstudio::Feature) {
+    if f.sub_features.is_empty() {
+        return;
+    }
+    let made = |r: &crate::reference::Reference| matches!(r, crate::reference::Reference::MateConnector { feature, .. } if f.sub_features.iter().any(|s| s.id == *feature));
+    ctx.connectors.retain(|c| !made(&c.reference));
+    ctx.connector_owners.retain(|(r, _)| !made(r));
 }

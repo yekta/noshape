@@ -31,7 +31,7 @@ fn dialogs_edit_the_active_configuration() {
         configured: vec![],
     };
     let e = |t: &str| ParamValue::Expr(ExprValue::new(t));
-    let mut base = Feature { id: FeatureId(7), type_id: "extrude".into(), name: "Extrude 1".into(), suppressed: false, params: ParamValues::default(), folder: None, custom_name: false, hidden: false, suppression_expr: None };
+    let mut base = Feature { id: FeatureId(7), type_id: "extrude".into(), name: "Extrude 1".into(), suppressed: false, params: ParamValues::default(), folder: None, custom_name: false, hidden: false, suppression_expr: None, sub_features: Vec::new() };
     base.params.set("depth", e("12 mm"));
     cfg.configured.push(ConfiguredParam { input: "s".into(), feature: FeatureId(7), param: "depth".into(), values: [("a".to_string(), e("12 mm")), ("b".to_string(), e("30 mm"))].into_iter().collect() });
     let mut large = cfg.defaults();
@@ -53,7 +53,7 @@ fn a_configured_variable_names_itself_with_the_active_value() {
         inputs: vec![ConfigInput { id: "s".into(), name: "Size".into(), kind: ConfigInputKind::List { options: vec![ListOption { id: "a".into(), name: "S".into() }, ListOption { id: "b".into(), name: "L".into() }], default: "a".into() }, visible_when: None, excluded: false }],
         configured: vec![ConfiguredParam { input: "s".into(), feature: FeatureId(3), param: "lengthValue".into(), values: [("a".to_string(), ParamValue::Expr(ExprValue::new("40 mm"))), ("b".to_string(), ParamValue::Expr(ExprValue::new("80 mm")))].into_iter().collect() }],
     };
-    let mut var = Feature { id: FeatureId(3), type_id: "assignVariable".into(), name: "Variable 1".into(), suppressed: false, params: ParamValues::default(), folder: None, custom_name: false, hidden: false, suppression_expr: None };
+    let mut var = Feature { id: FeatureId(3), type_id: "assignVariable".into(), name: "Variable 1".into(), suppressed: false, params: ParamValues::default(), folder: None, custom_name: false, hidden: false, suppression_expr: None, sub_features: Vec::new() };
     var.params.set("name", ParamValue::Text("w".into()));
     var.params.set("lengthValue", ParamValue::Expr(ExprValue::new("40 mm")));
     let mut large = cfg.defaults();
