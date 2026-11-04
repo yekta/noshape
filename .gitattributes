@@ -3,3 +3,6 @@ docs/handoff/qa5-routing.md merge=union
 patches/occt/*.patch -text
 # Signed fixtures: hashed byte for byte (no CRLF on a Windows checkout).
 crates/update/tests/fixtures/** -text
+# Onshape's std sources: the older releases are zstd packs against these exact bytes (no CRLF on a Windows checkout).
+crates/featurescript/std/** -text
+crates/featurescript/std-versions/** -text
