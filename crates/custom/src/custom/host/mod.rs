@@ -198,6 +198,9 @@ pub struct CtxState {
     /// The bodies each `opSplitFace` cut and the midpoints of the edges it made there, in order: those edges are
     /// `qCreatedBy` it, whatever later operations rename them (an `opDeleteFace` leaving them open).
     pub split_face_edges: Vec<(FsId, Vec<BodyId>, Vec<DVec3>)>,
+    /// The same for the vertices an operation made where its new edges end (a localized opBoolean: the corner
+    /// overcut's corner breaks go on `qCreatedBy(<its Boolean>, VERTEX)`), by their points.
+    pub made_vertices: Vec<(FsId, Vec<BodyId>, Vec<DVec3>)>,
 }
 
 /// The `Context` builtin.
@@ -279,6 +282,7 @@ impl FsContext {
                 split_tools: Vec::new(),
                 split_face_pieces: HashMap::new(),
                 split_face_edges: Vec::new(),
+                made_vertices: Vec::new(),
                 attr_snapshots: HashMap::new(),
                 body_versions: HashMap::new(),
                 transient_versions: HashMap::new(),

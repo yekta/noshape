@@ -712,6 +712,7 @@ impl<'a> QueryCx<'a> {
                 other => uncached(other).map(|x| x.1),
             }
             .or_else(|| self.created_by(&Ent::Body(*b))),
+            Ent::Vertex(..) if let Some(op) = self.made_vertex_op(e) => Some(op),
             Ent::Vertex(b, i) => match &*ctx.bodies[*b].vertices[*i] {
                 TopoName::Vertex { faces, .. } => newest(faces),
                 other => uncached(other).map(|x| x.1),
@@ -728,6 +729,16 @@ impl<'a> QueryCx<'a> {
 
     /// The last `opSplitFace` that made edge `e` (its midpoint on one it made, in a body it cut; not a tool lying
     /// on it).
+    /// The last operation that made vertex `e` where it is ([`CtxState::made_vertices`]), in a body it changed.
+    fn made_vertex_op(&self, e: &Ent) -> Option<FsId> {
+        let Ent::Vertex(b, _) = e else { return None };
+        let body = &self.st.ctx.bodies[*b].id;
+        let mut made = self.st.made_vertices.iter().rev().filter(|(_, owners, _)| owners.contains(body)).peekable();
+        made.peek()?;
+        let p = self.shape(e)?.vertex_point().ok()?;
+        made.find(|(_, _, points)| points.iter().any(|q| q.distance(p) < 1e-7)).map(|(id, _, _)| id.clone())
+    }
+
     fn split_face_edge_op(&self, e: &Ent) -> Option<FsId> {
         let Ent::Edge(b, _) = e else { return None };
         let body = &self.st.ctx.bodies[*b].id;
