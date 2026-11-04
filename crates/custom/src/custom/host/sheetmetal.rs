@@ -513,6 +513,8 @@ struct Bend {
     /// Pull-back of each wall from the edge (definition surface).
     setback: f64,
     axis_point: DVec3,
+    /// Its radius at the definition surface.
+    def_radius: f64,
 }
 
 /// Geometry of the bend at edge `e` between walls `fa` (seen from `a`) and `fb`.
@@ -521,7 +523,10 @@ fn bend_geometry(topo: &Topo, e: usize, fa: usize, fb: usize, radius: f64, front
     let len = s.distance(t);
     let dir = (t - s) / len.max(1e-300);
     let into = |f: usize| -> FResult<(DVec3, DVec3)> {
-        let (p, n) = face_normal(&topo.faces[f])?;
+        let (p, n_mid) = face_normal(&topo.faces[f])?;
+        // A curved (rolled) wall's normal where it meets the bend, not at its middle (live 2031: the angle the
+        // bend attribute holds beside a rolled wall).
+        let n = topo.faces[f].normal_at_point((s + t) * 0.5).map(|n| n.normalize()).unwrap_or(n_mid);
         let mut a = n.cross(dir).normalize();
         if (p - s).dot(a) < 0.0 {
             a = -a;
@@ -537,7 +542,7 @@ fn bend_geometry(topo: &Topo, e: usize, fa: usize, fb: usize, radius: f64, front
     let def_radius = radius + if concave_front { front } else { back };
     let setback = def_radius * (angle * 0.5).tan();
     let axis_point = s + a1 * setback + m1 * def_radius;
-    Ok(Bend { start: s, dir, len, angle, setback, axis_point })
+    Ok(Bend { start: s, dir, len, angle, setback, axis_point, def_radius })
 }
 
 /// A wall with curved sides (a cut's arc across a flange) as its definition
@@ -1217,6 +1222,9 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         setbacks.insert(e, b.setback);
         bends.push((e, fa, fb, b));
     }
+    // Bends beside a curved wall come from the definition edge's fillet; their flat walls stop where it meets them.
+    let (fillet_bends, trimmed_walls, fillet_setbacks) = curved_wall_bends(&topo, &bends);
+    setbacks.extend(fillet_setbacks);
     // Each wall's outline in its definition plane: pulled back from its
     // bends, and from its rips by the minimal clearance (live
     // dom/fs-smprobe3-{4,6}.txt: both walls stop 0.02 mm short of a rip).
@@ -1454,7 +1462,10 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             rolled: None,
             end_cuts,
         });
-        let mut bend = k::revolve(&face, b.axis_point, b.dir * sign, b.angle).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
+        let mut bend = match fillet_bends.get(&e) {
+            Some(f) => k::thicken(f, front, back).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape,
+            None => k::revolve(&face, b.axis_point, b.dir * sign, b.angle).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape,
+        };
         let (v0, v1) = (topo.nearest_vertex(b.start), topo.nearest_vertex(b.start + b.dir * b.len));
         let neutral = def.bends.get(&e).copied().unwrap_or(0.0) + def.k_factor * (front + back);
         let turn = |p: DVec3, ang: f64| {
@@ -1548,7 +1559,8 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
                 wall_flats.push((fi, topo.faces[fi].clone()));
                 continue;
             }
-            rolled_bend(&topo, fi, front, back, &mut solids, &mut pieces)?;
+            let face = trimmed_walls.get(&fi).unwrap_or(&topo.faces[fi]);
+            rolled_bend(&topo, fi, face, front, back, &mut solids, &mut pieces)?;
             if let Some(st) = def.rolled.get(&fi).and_then(|r| rolled_strip(&topo, fi, *r)) {
                 strips.push(st);
             }
@@ -1670,10 +1682,72 @@ fn plain_wall(topo: &Topo, fi: usize, front: f64, back: f64, solids: &mut Vec<Sh
     Ok(())
 }
 
+/// Bends beside a curved (rolled) wall: the definition edge's fillet at the definition radius (both walls are
+/// swept along the bend, so it is a cylinder meeting each tangentially, as live 2031's), the wall trimmed by it.
+/// Each curved wall's bends are filleted together on the wall and its neighbours across them. A wall's planar
+/// neighbours are pulled back by the setback as usual, which is where the fillet leaves them.
+/// Bends' fillet faces by definition edge, curved walls as their fillets left them, flat walls' setbacks by edge.
+type CurvedWallBends = (BTreeMap<usize, Shape>, BTreeMap<usize, Shape>, BTreeMap<usize, f64>);
+
+fn curved_wall_bends(topo: &Topo, bends: &[(usize, usize, usize, Bend)]) -> CurvedWallBends {
+    let (mut by_edge, mut walls, mut setbacks) = (BTreeMap::new(), BTreeMap::new(), BTreeMap::new());
+    let curved = |f: usize| topo.faces[f].face_plane().ok().flatten().is_none();
+    for c in (0..topo.faces.len()).filter(|&f| curved(f)) {
+        let mine: Vec<&(usize, usize, usize, Bend)> = bends.iter().filter(|(_, fa, fb, _)| *fa == c || *fb == c).collect();
+        if mine.is_empty() {
+            continue;
+        }
+        let mut faces = vec![topo.faces[c].clone()];
+        faces.extend(mine.iter().map(|(_, fa, fb, _)| topo.faces[if *fa == c { *fb } else { *fa }].clone()));
+        let Ok(shell) = k::sew(&faces, 1e-7, false) else { continue };
+        let shell = shell.shape;
+        let on = |p: DVec3, x: &Shape| k::make_vertex(p).ok().and_then(|v| k::distance(&v, x).ok()).is_some_and(|d| d.distance < 1e-7);
+        let edges = shell.edges();
+        let picked: Option<Vec<(usize, f64)>> = mine
+            .iter()
+            .map(|(e, _, _, b)| {
+                let (s, t) = topo.edge_ends[*e];
+                edges.iter().position(|x| on((s + t) * 0.5, x)).map(|i| (i, b.def_radius))
+            })
+            .collect();
+        let Some(picked) = picked else { continue };
+        let shapes: Vec<Shape> = picked.iter().map(|(i, _)| edges[*i].clone()).collect();
+        let radii: Vec<f64> = picked.iter().map(|(_, r)| *r).collect();
+        let Ok(res) = k::fillet_radii(&shell, &shapes, &radii) else { continue };
+        let generated = |i: usize| -> Option<Shape> {
+            res.history.generated(0, ShapeType::Edge, i as u32).into_iter().find(|(t, _)| *t == ShapeType::Face).and_then(|(_, f)| res.shape.sub_shape(ShapeType::Face, f as usize).ok())
+        };
+        let fillets: Option<Vec<Shape>> = picked.iter().map(|(i, _)| generated(*i)).collect();
+        let Some(fillets) = fillets else { continue };
+        // The curved wall as the fillets left it: the result's face lying on the wall's middle.
+        let (mid, _) = match face_normal(&topo.faces[c]) {
+            Ok(x) => x,
+            Err(_) => continue,
+        };
+        let Some(wall) = res.shape.faces().into_iter().find(|f| on(mid, f) && !fillets.iter().any(|x| x == f)) else { continue };
+        for ((e, fa, fb, _), f) in mine.iter().zip(fillets) {
+            // The flat wall's setback: from the joint to the fillet's edge on that wall.
+            let flat = if *fa == c { *fb } else { *fa };
+            let (s, t) = topo.edge_ends[*e];
+            let joint = (s + t) * 0.5;
+            if let Ok(Some(pl)) = topo.faces[flat].face_plane() {
+                let on_wall = f.edges().into_iter().filter_map(|x| x.endpoints().ok()).map(|(a, b)| (a + b) * 0.5).find(|m| (*m - pl.origin).dot(pl.normal).abs() < 1e-7 && m.distance(joint) > 1e-9);
+                if let Some(m) = on_wall {
+                    let dir = (t - s).normalize_or_zero();
+                    let d = m - joint;
+                    setbacks.insert(*e, (d - dir * d.dot(dir)).length());
+                }
+            }
+            by_edge.insert(*e, f);
+        }
+        walls.insert(c, wall);
+    }
+    (by_edge, walls, setbacks)
+}
+
 /// A rolled bend: definition face `fi` thickened (`front` along its normal).
 /// Its offsets come from the face; its end caps from the face's edges there.
-fn rolled_bend(topo: &Topo, fi: usize, front: f64, back: f64, solids: &mut Vec<Shape>, pieces: &mut Vec<Piece>) -> FResult<()> {
-    let face = &topo.faces[fi];
+fn rolled_bend(topo: &Topo, fi: usize, face: &Shape, front: f64, back: f64, solids: &mut Vec<Shape>, pieces: &mut Vec<Piece>) -> FResult<()> {
     let res = k::thicken(face, front, back).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
     let own: Vec<usize> = (0..topo.edges.len()).filter(|e| topo.edge_faces[*e].contains(&(fi as u32))).collect();
     for f in res.faces() {
