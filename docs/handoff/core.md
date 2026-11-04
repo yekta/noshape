@@ -16,6 +16,14 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-04 08:17 UTC.**
+- Landed since 07:49: op_join_edges after fillets / chamfers (two arcs of one circle meeting alone joined): stef-
+  radijator 6/6. Full parity on this worktree: **323/480 features, 31/55 documents** (03:30: 319 / 29).
+- Next, by size: pipeflange's Fillet 2 (R8 round trimmed by countersink cones, live 4 tori + 8 OTHER), learning-center-
+  michael's overflowing R14.5 rounds (FILLET-OVERLAP-FAIL), motor-mount-jack's elliptic slot wall in two faces (an
+  extrusion band's merge with a seam), cf-straight-spline Feature 5's bottom circle (live 8 arcs), Shell 4's speed
+  (1.3 s, live 0.63: the self-interference check and the marched edges).
+
 **State 11-04 07:49 UTC.**
 - Full parity (this worktree = main bfc79590): 322/480 features, 30/55 documents (03:30: 319 / 29): knob-jason 11/11,
   stef-radijator 5/6. Slower than live: 8 of 42 (was 11); cf-hose-routing ×2.2 (was ×12.9); the one feature over
