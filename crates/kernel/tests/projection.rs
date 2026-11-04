@@ -99,4 +99,12 @@ fn projection_onto_a_face_with_many_holes() {
     // Past the plate's corner.
     let q = top.project_point(DVec3::new(-0.001, -0.001, 0.002)).unwrap();
     assert!(q.point.distance(DVec3::new(0.0, 0.0, 0.002)) < 1e-9, "{q:?}");
+    // On a hole's rim (a Draft's tangent check projects edge midpoints) and on the plate's edge: the point itself.
+    for p in [c + DVec3::X * 0.001, DVec3::new(0.05, 0.0, 0.002)] {
+        let q = top.project_point(p).unwrap();
+        assert!(q.distance < 1e-9 && q.point.distance(p) < 1e-9, "{p:?}: {q:?}");
+        // And just above it.
+        let q = top.project_point(p + DVec3::Z * h).unwrap();
+        assert!((q.distance - h).abs() < 1e-9 && q.point.distance(p) < 1e-9, "{p:?} + h: {q:?}");
+    }
 }

@@ -528,9 +528,10 @@ static bool face_interior_nearest(const TopoDS_Face& f, const gp_Pnt& p, double&
 ProjPoint face_project_point(const OcShape& fs, P3 p)
 {
   const TopoDS_Face& f = as_face(fs.shape, "shape");
-  // On an elementary surface, the foot on it when it is inside the face: the nearest point there. (BRepExtrema below
-  // also measures the point against every edge and vertex: 0.6 ms a call on a plate's face with a Fill pattern's 1,700
-  // holes. Not on free-form ones: their projection can stop at another extremum, PROJ-RULED.)
+  // On an elementary surface, the foot on it when it is inside the face or on its boundary (an edge's midpoint, as a
+  // Draft's tangent check asks): the nearest point there. (BRepExtrema below also measures the point against every
+  // edge and vertex: 0.6 ms a call on a plate's face with a Fill pattern's 1,700 holes, ~1 ms on cf-circular-pattern's.
+  // Not on free-form ones: their projection can stop at another extremum, PROJ-RULED.)
   const GeomAbs_SurfaceType kind = BRepAdaptor_Surface(f, false).GetType();
   if (kind == GeomAbs_Plane || kind == GeomAbs_Cylinder || kind == GeomAbs_Cone || kind == GeomAbs_Sphere || kind == GeomAbs_Torus)
   {
@@ -543,7 +544,7 @@ ProjPoint face_project_point(const OcShape& fs, P3 p)
         double u, v;
         pr.LowerDistanceParameters(u, v);
         BRepClass_FaceClassifier fc(f, gp_Pnt2d(u, v), BRep_Tool::Tolerance(f));
-        if (fc.State() == TopAbs_IN)
+        if (fc.State() == TopAbs_IN || fc.State() == TopAbs_ON)
         {
           ProjPoint r{};
           r.point    = from_pnt(pr.NearestPoint());

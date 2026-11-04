@@ -3830,6 +3830,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   core 11-03 22:34: stef-radijator-nlukic's Fillet 1 (37 edges, R1) is OCCT's 171 ms (live 31 ms): noshape's blend
   declines "a corner between blended edges" (its vertex blends are only three square straight convex edges with one
   round; these corners aren't): BLEND-RUST's general vertex blends. The dumped-fillet probe now prints the decline.
+  core 11-04 15:16: cf-circular-pattern 1126 -> 177 ms (live 237; matches to the end since PATTERN-EDGE-DIRECTION):
+  Draft's tangent check projects edge midpoints onto their faces, and the projection's surface foot was taken only
+  inside the face, so a point on its boundary went through BRepExtrema (~1 ms a call on the plate's faces; Draft 1
+  76 -> 4.6 ms, Feature Pattern 1060 -> 154 ms). T1 kernel projection::projection_onto_a_face_with_many_holes.
   core 11-04 01:15: knob-jason's Fillet 1 20 ms (noshape's blend, live 20); cf-hose-routing's Shells 235 -> 120 ms (no
   feature 10x and 50 ms over live's now; the document's time is the display mesh, NOSHAPE_MESH_DEBUG). Left over 10x:
   knob-jason's Fillet 2 (OCCT, 235 ms), and the Rust Boolean's (BOOL-RUST-GEARS-SLOW).
