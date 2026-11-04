@@ -1541,4 +1541,10 @@ fn dumped_body_faces_probe() {
         let c = f.centroid().unwrap() * 1e3;
         println!("face {i} {} area {:.4} at ({:.4}, {:.4}, {:.4})", format!("{:?}", f.face_surface().ok()).chars().take(12).collect::<String>(), f.area().unwrap() * 1e6, c.x, c.y, c.z);
     }
+    if std::env::var_os("NOSHAPE_FACES_EDGES").is_some() {
+        for (i, e) in s.edges().iter().enumerate() {
+            let x = e.edge_info().unwrap();
+            println!("edge {i} {} {:.4?} -> {:.4?} len {:.4}", format!("{:?}", x.curve).chars().take(10).collect::<String>(), x.start * 1e3, x.end * 1e3, x.length * 1e3);
+        }
+    }
 }

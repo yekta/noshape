@@ -3265,6 +3265,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   ones (unchanged at 100x: something else there); as a default it breaks blend::a_drafted_blocks_top_loop_over_its_
   corner_rounds_is_lives / ..._pockets_floor_... (their corners rebuilt from OCCT's patches) and two oracle audits;
   the corpus: 2 of 310 change. Not landed.
+  core 11-04 00:30: the top set rounded alone stays short too, the bottom set alone is exact (at 10x): the top and
+  bottom outline arcs are the same circles, traversed the other way, so ChFi3d's corner accuracy depends on the
+  edges' direction. The fix is still exact torus/torus corners of our own.
 - [x] (core 11-03 23:20: OCCT's unify tells two tori are one only by intersecting them (IntPatch, which can't): adjacent faces on equal tori / spheres (frame and radii within confusion) now get one surface first (boolean.cpp share_equal_surfaces, their edges' curves moved over; kept only where the unified result is valid), and the Fillet feature unifies its result where only its blends merge (detail.rs merged_blends). pulley02-maxwell 7/7 to the end; T1 kernel blend::a_grooves_two_rounds_on_one_torus_unify_to_one_face; Boolean corpus as before (the same 4 of 974), blend corpus unchanged) P2 FILLET-MEETING-FILLETS-ONE-FACE (core; dx's parity suite 11-03, pulley02-maxwell) two fillets that meet on
   one surface stay two faces in ours where live's part has one: pulley02's Fillet 1 rounds both bottom corners of a
   revolved groove 6.35 mm high with r 3.175 mm (1/8 in), so the two fillets meet at the groove's middle on one torus;
