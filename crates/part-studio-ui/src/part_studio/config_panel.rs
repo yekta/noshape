@@ -1007,7 +1007,7 @@ impl PartStudioView {
     }
 
     /// Add a configuration input of one of Onshape's kinds (List, Checkbox, Variable).
-    fn add_config_input(&mut self, label: &'static str, cx: &mut Context<Self>) {
+    pub(super) fn add_config_input(&mut self, label: &'static str, cx: &mut Context<Self>) {
         self.edit_config(noshape_ops::config::ADD_INPUT, cx, |ps| {
             noshape_ops::config::add_input(ps, label);
         })
@@ -2408,7 +2408,7 @@ impl PartStudioView {
             .pb(px(18.))
             .border_b_1()
             .border_color(pal.border)
-            .child(h_flex().h(px(30.)).justify_between().child(div().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Configurations")).child(split));
+            .child(h_flex().h(px(30.)).justify_between().child(div().debug_selector(|| "cfgbox-title".into()).text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Configurations")).child(div().debug_selector(|| "cfgbox-split".into()).child(split)));
         // Visibility conditions: hidden inputs and options don't show.
         let (shown, effective) = cfg.visibility(&self.config_values);
         for (input, vis) in cfg.inputs.iter().zip(&shown) {
@@ -2489,6 +2489,7 @@ impl PartStudioView {
         Some(
             div()
                 .id("cfg-box")
+                .debug_selector(|| "cfg-box".into())
                 .relative()
                 .flex_none()
                 .child(col.when_some(height, |c, h| c.h(px(h)).overflow_hidden()))

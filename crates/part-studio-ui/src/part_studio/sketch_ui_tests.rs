@@ -2548,3 +2548,42 @@ fn a_background_scene_build_never_lands_over_a_newer_display(cx: &mut TestAppCon
     wait_until(cx, window, |cx| !view.read(cx).ui_busy());
     assert_eq!(top_picks(cx), 0, "a build alone lands");
 }
+
+/// Opening a select changes nothing outside its list (live: the Configurations box's Size select keeps its field at
+/// [74,112,161,26] and the panel unmoved while open; the field shows the empty search input): the box, its title and
+/// buttons, the field and the feature list keep their bounds.
+#[gpui::test]
+fn opening_the_configuration_select_moves_nothing(cx: &mut TestAppContext) {
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "cfg-select", Some(block));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    view.update(cx, |v, cx| v.add_config_input("List", cx));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let (input, select) = cx.update(|cx| {
+        let v = view.read(cx);
+        let (id, (s, _)) = v.ui.cfg_selects.iter().next().expect("the List input's select");
+        (id.clone(), s.clone())
+    });
+    let names = ["cfg-box", "cfgbox-title", "cfgbox-split", "feature-list"];
+    let field = format!("os-select:cfgsel-{input}");
+    let bounds = |cx: &mut TestAppContext| {
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        let mut all: Vec<(String, Option<Bounds<gpui_kit::Pixels>>)> = names.iter().map(|n| (n.to_string(), vcx.debug_bounds(n))).collect();
+        all.push((field.clone(), vcx.debug_bounds(Box::leak(field.clone().into_boxed_str()))));
+        all
+    };
+    let closed = bounds(cx);
+    assert!(closed.iter().all(|(_, b)| b.is_some()), "{closed:?}");
+    let at = closed.last().unwrap().1.unwrap().center();
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at, Modifiers::default());
+    draw(cx, window);
+    assert!(cx.update(|cx| select.read(cx).is_open()), "the list opened");
+    let open = bounds(cx);
+    for ((name, a), (_, b)) in closed.iter().zip(&open) {
+        assert_eq!(a, b, "{name} moved when the select opened");
+    }
+}
