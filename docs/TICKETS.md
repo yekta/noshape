@@ -3921,6 +3921,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (bendAngle "Expects 2-sided edge"), no bend: our rebuild leaves the flange apart. The flangeEdgeChange's own input
   resolves to a sketch entity plus the edge. Next: a moved edge's transient id resolving to where it went only (as
   the Hem's `hemEdges` does), then the bend.
+  dx 11-04 21:59: found: the stale edge is the profile's sketch line, which our startTracking returned with the
+  edge extracted from it. Tracking never yields a sketch entity now (nothing later is made into one; std writes
+  qUnion([q, startTracking(q)]) for originals): Shaped Flange 1 as live (50/112/64, 92,513 mm³), the document
+  4 -> 5/10; T1 ops_harness trackSketchLine. Next difference: Make joint 1 (std's sheetMetalMakeJoint) "An internal
+  edge cannot be used to create a joint.", live OK.
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our

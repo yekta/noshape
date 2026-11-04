@@ -685,5 +685,19 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const fromSplit = size(evaluateQuery(context, qIntersection([qDependency(atSplit), qCreatedBy(sub + "split", EntityType.EDGE)])));
             check("opFillSurface makes its edges, on its boundary", size(evaluateQuery(context, hole)) == 4 && size(evaluateQuery(context, made)) == 4 && fromSplit == 1, [size(evaluateQuery(context, made)), fromSplit]);
         });
+        step(context, id, "trackSketchLine", function(sub) {
+            // startTracking of a sketch line gives what was made from it, never the line itself (std's Shaped Flange
+            // takes the tracked profile line as the one edge it bends).
+            const z = 4700;
+            const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, z) * mm, vector(0, 0, 1), vector(1, 0, 0)) });
+            skLineSegment(sk, "l", { "start" : vector(0, 0) * mm, "end" : vector(20, 0) * mm });
+            skSolve(sk);
+            const line = qCreatedBy(sub + "sk", EntityType.EDGE);
+            const tracked = startTracking(context, line);
+            const before = size(evaluateQuery(context, tracked));
+            opExtrude(context, sub + "x", { "entities" : line, "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : 10 * mm });
+            const after = evaluateQuery(context, tracked);
+            check("startTracking of a sketch line", before == 0 && size(after) >= 1 && size(evaluateQuery(context, qSketchFilter(qUnion(after), SketchObject.YES))) == 0, [before, size(after)]);
+        });
         println("done");
     });

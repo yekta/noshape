@@ -630,6 +630,10 @@ impl<'a> QueryCx<'a> {
                 out.extend(self.all_with(Some(EType::Edge), true).into_iter().filter(|e| !self.is_sketch(e) && swept(e)));
             }
         }
+        // What the entities became: nothing later makes a sketch entity (the tracked sketch line itself isn't one of
+        // them; std writes qUnion([q, startTracking(q)]) for the originals): a Shaped Flange's tracked profile line
+        // gives the edge extracted from it alone.
+        out.retain(|e| !self.is_sketch(e));
         uniq(out)
     }
 
