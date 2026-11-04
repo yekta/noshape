@@ -3429,6 +3429,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   soon as vertices are to be merged, a seam off a ruling declined at a round's start, sections kept for later
   rounds. Left: the decline costs one round's OCCT sections (as many as OCCT's own then); next a cache of
   IntTools_FaceFace results OCCT's PaveFiller would read (an OCCT patch), or taking these cuts (handoff).
+  bool 11-04 03:47: **cf-straight-spline at OCCT's time**: a part studio's late declines (a seam end off its line,
+  "two edges leave a vertex in one direction", an arc across a seam) are remembered by feature type, op and number of
+  objects; the like go straight to OCCT's (the 54 spline features: one tries noshape's Boolean, 53 don't). vibe3:
+  35.3 / 35.2 s against OCCT's 34.9 / 36.9 s (main 122 s, live 7.8 s); gears 2.3 s. The whole parity suite (60
+  documents): the same features match as main, none slower past 0.5 s. T1 bool_patterns::a_late_decline_sends_the_
+  like_straight_to_occt. Fixing it for good (these cuts taken) stays in the handoff; the OCCT patch not needed for now.
 - [ ] P1 PARITY-SPEED (core; dx's parity suite 11-03 run 31, the runner's new "speed:" line) 10 of the 41 corpus
   documents with live's times regenerate slower than live (ours: the reopened document's regeneration on vibe5;
   live: the sum of its features' regeneration times, live.jsonl's last line). Worst: **cf-hose-routing 116 s vs live
@@ -3470,6 +3476,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   core 11-04 01:15: knob-jason's Fillet 1 20 ms (noshape's blend, live 20); cf-hose-routing's Shells 235 -> 120 ms (no
   feature 10x and 50 ms over live's now; the document's time is the display mesh, NOSHAPE_MESH_DEBUG). Left over 10x:
   knob-jason's Fillet 2 (OCCT, 235 ms), and the Rust Boolean's (BOOL-RUST-GEARS-SLOW).
+  bool 11-04 03:47 (vibe3, 8 cores, idle; the reopened document's regeneration): cf-straight-spline 122 s on main
+  11-03 -> 35 s now, OCCT's Boolean alone 35 s, live 7.8 s: the rest of the gap (27 s) is not the Boolean's choice
+  (OCCT's own cuts take ~0.3 s each of the 54 features; props_surface 86 s summed over threads in a profiled run);
+  cf-planetary-gears 15.1 s -> 2.1 s (OCCT 3.0 s, live 0.54 s). Whole suite on vibe3, main vs bool's: hose-routing
+  20.8 -> 18.3 s, setback-fillet 2.6 -> 1.6 s, sheet-metal-shaped-flange 1.9 -> 1.2 s, spur-gear 8.4 -> 7.4 s,
+  stef-radijator 1.4 -> 0.9 s; the others within 0.5 s.
   core 11-04 01:16: live's faces (behaviours.md "core (2026-11-04 00:09, P2) exact faces"): stef-radijator's Fillet 1 is
   75 cylinders + 6 planes, no corner patch where three R1 rounds meet round the fins (the cylinders meet each other
   directly): what noshape's blend would make if its chain ends at such vertices took the three rounds' pairwise

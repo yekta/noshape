@@ -249,10 +249,11 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
     let counters = noshape_featurescript::value::shown_counters();
     let derived = ev.derived.clone();
     let cancel = ev.cancel.clone();
+    let declines = noshape_kernel::DeclineScope::current();
 
     // Run on a thread with a large stack (FeatureScript recursion), in the regeneration's cancel scope (the kernel's
     // cancel flag is per thread: without it a cancelled custom feature's Booleans ran to their end) and with the
-    // interpreter stopping at it too.
+    // interpreter stopping at it too; its Booleans in the feature's place in the regeneration's declines.
     let run = std::thread::scope(|s| {
         std::thread::Builder::new()
             .stack_size(STACK_SIZE)
@@ -270,6 +271,10 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
                     let r = f.and_then(|f| i.call_value(&f, vec![ctx_value, host::id_value(&feature_id), definition]));
                     let lines = i.profile.take().map(|p| p.times.into_iter().map(|((m, l), t)| (m, l, t)).collect()).unwrap_or_default();
                     (r.map(|_| ()).map_err(|e| e.message()), std::mem::take(&mut i.notices), std::mem::take(&mut i.output), lines)
+                };
+                let go = || match &declines {
+                    Some(d) => d.run(go),
+                    None => go(),
                 };
                 match &cancel {
                     Some(c) => c.scope(go),

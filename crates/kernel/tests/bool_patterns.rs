@@ -454,6 +454,29 @@ fn a_25_by_25_knurl() {
     knurl_as_recorded("ae71f76b6e894374", 1e-8);
 }
 
+/// cf-straight-spline's cuts by a pattern of 8 spline cutters (recorded): noshape's Boolean declines the first late
+/// (a cutter cone's seam end merged off its line, after OCCT's sections), so in its feature type's scope the next
+/// cut goes straight to OCCT's (a "two edges" cut, declined as late outside the scope); OCCT's results both.
+#[test]
+fn a_late_decline_sends_the_like_straight_to_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let (a, b) = (k::bool_corpus::load(&dir, "171341672da7c4f9").expect("a case"), k::bool_corpus::load(&dir, "e424988cc95b8153").expect("a case"));
+    let run = |c: &k::bool_corpus::Case| {
+        let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("the cut");
+        let v = r.shape.volume().unwrap();
+        assert!((v - c.summary.volume).abs() <= 1e-9 * c.summary.volume, "volume {v} against OCCT's {}", c.summary.volume);
+        (k::last_boolean_path(), k::last_rust_decline())
+    };
+    let memo = std::sync::Arc::new(k::DeclineMemo::default());
+    memo.scope("spline", || {
+        assert_eq!(run(&a).1, "a seam off a ruling");
+        assert_eq!(run(&b).1, "not tried (an earlier path took it)");
+    });
+    // (Another feature type, or none: tried.)
+    memo.scope("another", || assert_eq!(run(&b).1, "two edges leave a vertex in one direction"));
+}
+
 /// cf-planetary-gears' cut of a gear's 42 tooth gaps (recorded, one tool of 254 faces): OCCT's result, and no slower
 /// than twice OCCT's time here (the point deep inside the gear's face took 35 distances to each of its 294 curves per
 /// probe curve: 7 s a face, 12.8 s against OCCT's 0.5 s).

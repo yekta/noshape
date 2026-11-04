@@ -76,10 +76,78 @@ impl BooleanOptions {
     }
 }
 
+/// A part studio's late declines of noshape's Boolean, each with its feature's type, op and number of objects: the
+/// like (another feature of that type, its pattern of tools the same or another size) goes straight to OCCT's. Late:
+/// found only after OCCT's sections, which OCCT then makes again (a spline shaft's 8 to 32 cutters, a cutter cone's
+/// seam end merged off its line, a cutter's edge 0.6 um off the shaft: 0.3 s a feature, 54 spline features).
+#[derive(Default)]
+pub struct DeclineMemo(std::sync::Mutex<Vec<(u64, BooleanOp, usize)>>);
+
+const LATE_DECLINES: [&str; 3] = ["a seam off a ruling", "two edges leave a vertex in one direction", "an arc across a cylinder's seam"];
+
+std::thread_local! {
+    static DECLINE_SCOPE: std::cell::RefCell<Option<DeclineScope>> = const { std::cell::RefCell::new(None) };
+}
+
+impl DeclineMemo {
+    /// Runs `f` (a feature's evaluation, `kind` its type) with its Booleans on this thread kept in and read from
+    /// this memo.
+    pub fn scope<R>(self: &std::sync::Arc<Self>, kind: &str, f: impl FnOnce() -> R) -> R {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        kind.hash(&mut h);
+        DeclineScope(self.clone(), h.finish()).run(f)
+    }
+}
+
+/// A feature's place in its regeneration's [`DeclineMemo`], to carry onto another thread (a custom feature's
+/// FeatureScript runs on its own).
+#[derive(Clone)]
+pub struct DeclineScope(std::sync::Arc<DeclineMemo>, u64);
+
+impl DeclineScope {
+    /// This thread's, if any.
+    pub fn current() -> Option<DeclineScope> {
+        DECLINE_SCOPE.with(|d| d.borrow().clone())
+    }
+
+    /// Runs `f` with this thread's Booleans in this scope.
+    pub fn run<R>(&self, f: impl FnOnce() -> R) -> R {
+        struct Restore(Option<DeclineScope>);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                DECLINE_SCOPE.with(|d| *d.borrow_mut() = self.0.take());
+            }
+        }
+        let _restore = Restore(DECLINE_SCOPE.with(|d| d.borrow_mut().replace(self.clone())));
+        f()
+    }
+}
+
 /// Boolean of several objects with several tools
 /// (BRepAlgoAPI_Fuse/Cut/Common with SetArguments/SetTools, non-destructive).
 /// History args: objects in order, then tools.
 pub fn boolean(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &BooleanOptions) -> Result<OpResult> {
+    let Some(DeclineScope(memo, kind)) = DeclineScope::current() else { return boolean_once(op, objects, tools, opts) };
+    let key = (kind, op, objects.len());
+    let skip = memo.0.lock().is_ok_and(|v| v.contains(&key));
+    if !skip {
+        let r = boolean_once(op, objects, tools, opts);
+        if crate::last_boolean_path() != "rust" && LATE_DECLINES.contains(&crate::last_rust_decline().as_str())
+            && let Ok(mut v) = memo.0.lock()
+        {
+            v.push(key);
+        }
+        return r;
+    }
+    let mode = crate::brep_bridge::rust_boolean_mode();
+    crate::set_rust_boolean(Some(false));
+    let r = boolean_once(op, objects, tools, opts);
+    crate::set_rust_boolean(mode);
+    r
+}
+
+fn boolean_once(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &BooleanOptions) -> Result<OpResult> {
     require_nonempty(objects, "boolean objects")?;
     require_nonempty(tools, "boolean tools")?;
     let code = match op {

@@ -42,6 +42,11 @@ pub fn set_rust_boolean(on: Option<bool>) {
     brep_decline("not tried (an earlier path took it)");
 }
 
+/// This thread's setting of [`set_rust_boolean`].
+pub(crate) fn rust_boolean_mode() -> Option<bool> {
+    MODE.with(|m| m.get())
+}
+
 pub(crate) fn brep_enabled() -> bool {
     static ENV: OnceLock<bool> = OnceLock::new();
     MODE.with(|m| m.get()).unwrap_or_else(|| *ENV.get_or_init(|| std::env::var("NOSHAPE_BOOL_RUST").as_deref() != Ok("0")))

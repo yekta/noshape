@@ -43,6 +43,16 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   and copies it to vibe3 ~/bool-obin (models in ~/bool-obin/models); run it with NOSHAPE_PARITY_MODELS and
   NOSHAPE_PARITY_ONLY; sweep.sh now runs 2 cases at a time and refuses to start beside a running sweep (lead 11-03).
 
+- cf-straight-spline at OCCT's time (bool, 11-04 03:47): kernel::DeclineMemo (the Regenerator's, across runs): a
+  late decline ("a seam off a ruling", "two edges leave a vertex in one direction", "an arc across a cylinder's seam")
+  is kept by feature type, op and number of objects; the like go straight to OCCT's (set_rust_boolean(false) for the
+  call). model-core opens the scope around each feature's evaluation (regen/mod.rs), custom's run.rs carries it onto
+  the FeatureScript thread (DeclineScope). Each spline feature makes one Boolean a run (the parity runner regenerates
+  once per feature, so a per-run memo didn't help). vibe3: 35.3 / 35.2 s against OCCT's 34.9 / 36.9 s. Whole parity
+  suite (60 documents, the same main): the same matches, none slower past 0.5 s. Careful comparing builds: build both
+  from one main (a newer main's fixes looked like 2 lost matches here). The decline log in bool-a: NOSHAPE_X_DECL
+  (DECL / TAKE with times, FEATURE names, MEMO keys and skips).
+
 ## From core (11-02 07:20): two Boolean costs found profiling FeatureScript-driven regenerations
 Sampled warm on vibe4 (model tests' `custom_features::fs_warm_profile` / `sheetmetal_std::fs_sheet_metal_profile`,
 NOSHAPE_SAMPLE_OUT; tests/sampler.rs samples every running thread):

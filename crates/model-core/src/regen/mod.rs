@@ -278,6 +278,9 @@ pub struct Regenerator {
     evaluations: u64,
     /// The last runs' results by [`result_key`], newest first.
     results: Vec<(u64, RegenResult)>,
+    /// noshape's Boolean's late declines, by feature type: the like go straight to OCCT's (kept across runs: each
+    /// adds or edits a feature or two).
+    declines: Arc<noshape_kernel::DeclineMemo>,
 }
 
 /// Everything a run's result depends on (the studio, its settings and the options; preview meshes aside: a full
@@ -359,6 +362,7 @@ impl Regenerator {
             });
         }
         let mut ctx: Arc<Context> = Arc::new(Context { legacy_face_frames: studio.legacy_face_frames, ..Default::default() });
+        let declines = self.declines.clone();
         let mut states = Vec::with_capacity(studio.features.len());
         let mut live: Vec<FeatureId> = Vec::new();
         let (mut evaluated, mut cached): (Vec<FeatureId>, usize) = (Vec::new(), 0);
@@ -527,7 +531,7 @@ impl Regenerator {
                         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                             let mut run = || {
                                 ev.check_bounds(specs)?;
-                                eval_fn(&mut ev)
+                                declines.scope(&f.type_id, || eval_fn(&mut ev))
                             };
                             match &cancel {
                                 Some(c) => c.scope(run),
