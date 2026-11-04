@@ -9,6 +9,7 @@ causes of difference, each with its ticket.
 | 2026-11-03 | dx 21:29 (run 45; 3 dead-studio documents unscored; prize-wheel-tim refetched, its Hole as live) | 26/55 | 303/480 (custom 7/109) | – |
 | 2026-11-03 | dx 22:49 (run 47: valuesSortedById in feature order, cf-parameter-pattern 9/9; old studios' lowercase types, id-only faces by tessellated area: cf-o-ring-generator 10/11) | 27/55 | 308/480 (custom 12/109) | – |
 | 2026-11-03 | dx 23:17 (run 48: pinned studio imports, opSplitFace edges / leaveOpen / makeSolid in the host: cf-setback-fillet runs; custom-failing documents 8 → 6) | 27/55 | 308/480 (custom 12/109) | – |
+| 2026-11-04 | dx 05:56 (run 53: a pattern instance id past the pattern's last is its seed (stef-radijator 3 -> 5/6); speed now compares features' times) | 29/55 | 321/480 (custom 17/109) | – |
 
 dx 11-03 18:15: three documents are left out of the model score (tests/parity-models/unscored.json, printed as "not
 scored" by `parity_models`): cf-ansi-washers, cf-socket-head-cap-screw-creator and cf-thread-creator. Their Feature

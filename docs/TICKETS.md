@@ -3468,7 +3468,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   35.3 / 35.2 s against OCCT's 34.9 / 36.9 s (main 122 s, live 7.8 s); gears 2.3 s. The whole parity suite (60
   documents): the same features match as main, none slower past 0.5 s. T1 bool_patterns::a_late_decline_sends_the_
   like_straight_to_occt. Fixing it for good (these cuts taken) stays in the handoff; the OCCT patch not needed for now.
-- [ ] P2 PARITY-STEF-FILLET-QUERY (dx, from core 11-04 05:30; parity suite, stef-radijator-nlukic) Fillet 1's 37 edge
+- [x] (dx 11-04 05:56: the 20th query is a SWEPT_EDGE of Extrude 2 at the crossing of the ring QFFmUTV2brKS and `TNHaprdwY81W.1.18.0`, an instance id Sketch 1's 18-instance circular pattern doesn't list (it has the seed aszIiqlQyJeU and .0.1.0 … .1.17.0); with that curve missing, both "curves" were the ring and the nearest edge was the arc. A missing instance id is now instance i mod n of its pattern (here the seed), parity.rs pattern_alias, T1 parity::tests::a_pattern_instance_past_the_last_is_the_seed: Fillet 1 and Chamfer 1 as live, stef-radijator 3 -> 5/6; Chamfer 2 next, 84/241/160 against live's 84/237/156: the faces as live, 4 edges / vertices more, split edges, CUT-CLOSED-EDGES-SPLIT's family) P2 PARITY-STEF-FILLET-QUERY (dx, from core 11-04 05:30; parity suite, stef-radijator-nlukic) Fillet 1's 37 edge
   queries: 36 have deterministic ids (the 36 vertical R1 edges of the 18 fins), the 20th has none (only its
   qCompressed string), and the translator resolves that one to the 2.85 mm top arc of the outer circle (r 22.5) at
   (22.45, ±1.42, 20). Live doesn't round that arc: its result has no torus (behaviours "core (2026-11-04 00:09)":

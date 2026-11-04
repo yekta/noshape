@@ -1354,7 +1354,7 @@ impl<'a> Translator<'a> {
             return Ok(None);
         }
         let Some(sk) = sk else { return Ok(None) };
-        let mut segments: Vec<[f64; 2]> = strings.iter().filter_map(|e| self.curves.get(&(sk.clone(), e.clone()))).flat_map(|poly| poly.windows(2).flat_map(|w| [w[0], w[1]])).collect();
+        let mut segments: Vec<[f64; 2]> = strings.iter().filter_map(|e| self.curve_of(&sk, e)).flat_map(|poly| poly.windows(2).flat_map(|w| [w[0], w[1]]).collect::<Vec<_>>()).collect();
         let ours = self.feature_ids.get(&sk).cloned().ok_or_else(|| format!("sketch {sk} was not built"))?;
         let g = self.call("sketch_get", json!({ "sketch": ours }))?;
         let (o, x, y) = (f3(&g["frame"]["origin"]), f3(&g["frame"]["x"]), f3(&g["frame"]["y"]));
@@ -1599,7 +1599,13 @@ impl<'a> Translator<'a> {
         }
         let (op, revolve) = strings.iter().find_map(|s| s.strip_suffix(".opExtrude").map(|o| (o.to_string(), false)).or_else(|| s.strip_suffix(".opRevolve").map(|o| (o.to_string(), true))))?;
         let sk = strings.iter().find_map(|s| s.strip_suffix(".wireOp"))?.to_string();
-        let curves: Vec<Vec<[f64; 2]>> = strings.iter().filter_map(|e| self.curves.get(&(sk.clone(), e.clone())).cloned()).collect();
+        let mut curves: Vec<Vec<[f64; 2]>> = Vec::new();
+        for c in strings.iter().filter_map(|e| self.curve_of(&sk, e)) {
+            // (A query names a curve again in its derivedFrom.)
+            if !curves.contains(&c) {
+                curves.push(c);
+            }
+        }
         // Which of the curves' crossings an edge swept from one is (ORDER).
         fn order(p: &Packed) -> Option<usize> {
             match p {
@@ -1665,7 +1671,7 @@ impl<'a> Translator<'a> {
             let (s, after) = q.split_once(".wireOp\"")?;
             let e = after.split('"').nth(1)?;
             sk = Some(s.to_string());
-            curves.extend(self.curves.get(&(s.to_string(), e.to_string())).cloned());
+            curves.extend(self.curve_of(s, e));
         }
         let sk = sk?;
         let is_start = text.contains("\"isStart\":true");
@@ -1733,6 +1739,18 @@ impl<'a> Translator<'a> {
         }
         let r = self.call("query_entities", a)?;
         r[kind][0]["id"].as_str().map(str::to_string).ok_or_else(|| format!("{name} of {op}: no entity of ours near {:?} mm", mm(at)))
+    }
+
+    /// Sketch `sk`'s curve `id` as drawn; a pattern instance id the sketch doesn't have
+    /// (`<seed>.<group>.<i>.<k>`, stef-radijator's `TNHaprdwY81W.1.18.0` of an 18-instance circular pattern, named
+    /// by Fillet 1 though the pattern lists instances 0-17) is instance i mod n of the pattern listing its siblings
+    /// (the seed for i = n), as live resolves it (its Fillet rounds the edge at the seed's crossing).
+    fn curve_of(&self, sk: &str, id: &str) -> Option<Vec<[f64; 2]>> {
+        if let Some(c) = self.curves.get(&(sk.to_string(), id.to_string())) {
+            return Some(c.clone());
+        }
+        let sketch = self.features.iter().find(|f| f["featureId"] == sk)?;
+        self.curves.get(&(sk.to_string(), pattern_alias(sketch, id)?)).cloned()
     }
 
     fn extrude_entity(&mut self, name: &str, is_start: bool, crossing: Option<usize>, op: &str, sk: &str, curves: &[Vec<[f64; 2]>]) -> Result<String, String> {
@@ -3586,8 +3604,52 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     res
 }
 
+/// A sketch pattern instance id the sketch doesn't list (`<seed>.<group>.<i>.<k>`, `.center` for its centre): the
+/// id of instance i mod n of the pattern constraint whose instances share its seed (`sketch`: the sketch feature).
+fn pattern_alias(sketch: &Value, id: &str) -> Option<String> {
+    let (id, center) = match id.strip_suffix(".center") {
+        Some(i) => (i, true),
+        None => (id, false),
+    };
+    let parts: Vec<&str> = id.split('.').collect();
+    let [base @ .., _, i, _] = parts.as_slice() else { return None };
+    let (prefix, i) = (format!("{}.", base.join(".")), i.parse::<usize>().ok()?);
+    for c in sketch["constraints"].as_array().into_iter().flatten() {
+        // Its instances (the curves, not their centres) by index.
+        let mut instances: Vec<(usize, String)> = c["parameters"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|p| Some((p["parameterId"].as_str()?.strip_prefix("localInstance1,")?.parse().ok()?, p["value"].as_str()?.to_string())))
+            .collect();
+        if !instances.iter().any(|(_, v)| v.starts_with(&prefix)) {
+            continue;
+        }
+        instances.sort();
+        let (_, alias) = instances.get(i % instances.len())?;
+        return Some(if center { format!("{alias}.center") } else { alias.clone() });
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
+    /// stef-radijator's Fillet 1 names `TNHaprdwY81W.1.18.0` of an 18-instance circular pattern listing the seed
+    /// `aszIiqlQyJeU` at 0 and `TNHaprdwY81W.0.1.0` … `.1.17.0`: the seed (live rounds the edge at its crossing).
+    #[test]
+    fn a_pattern_instance_past_the_last_is_the_seed() {
+        let mut params = vec![serde_json::json!({ "parameterId": "localInstance1,0", "value": "aszIiqlQyJeU" }), serde_json::json!({ "parameterId": "localInstance0,0", "value": "aszIiqlQyJeU.center" })];
+        for i in 1..18 {
+            let g = if i < 10 { 0 } else { 1 };
+            params.push(serde_json::json!({ "parameterId": format!("localInstance1,{i}"), "value": format!("TNHaprdwY81W.{g}.{i}.0") }));
+        }
+        let sketch = serde_json::json!({ "featureId": "FS", "constraints": [{ "constraintType": "CIRCULAR_PATTERN", "parameters": params }] });
+        assert_eq!(super::pattern_alias(&sketch, "TNHaprdwY81W.1.18.0").as_deref(), Some("aszIiqlQyJeU"));
+        assert_eq!(super::pattern_alias(&sketch, "TNHaprdwY81W.1.18.0.center").as_deref(), Some("aszIiqlQyJeU.center"));
+        assert_eq!(super::pattern_alias(&sketch, "TNHaprdwY81W.1.20.0").as_deref(), Some("TNHaprdwY81W.0.2.0"));
+        assert_eq!(super::pattern_alias(&sketch, "QFFmUTV2brKS"), None);
+    }
+
     /// Two circles cross twice; the crossings come in order along the
     /// first (stef-radijator's SWEPT_EDGE ORDER 0 / 1 of a ring and a
     /// patterned hole on it).
