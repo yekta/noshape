@@ -1492,6 +1492,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   core 11-03 14:45: the two-at-a-time fallback is out again: live fails 1814db9f (one of the three corpus shells it
   made build: "Could not shell part with selections.", 2 ms, REQUESTS 12:40), and it didn't get Shell 4 through;
   T2 shell::a_fuzz_shell_live_refuses_fails.
+  core 11-04 00:27: Shell 4 past the quadric path's fold check: it measured a B-spline's curvature on its extension (the
+  ramp's tangent continuation has another curvature exactly on the bound) and ignored its sign (an offset folds only
+  towards a centre of curvature, d·k ≥ 1); now on the face's own surface, signed (shell corpus unchanged, 211 cases).
+  Next stop there: vertex 3 (14.0, -20.1, 20) where four faces meet, two edges tangent: their offsets don't meet in one
+  point, the cavity needs a new short edge (Parasolid's 28 / 73 / 44): the quadric path making that edge is the next
+  step. Probe: /root/core-scratch/s4/shell4.brep / .txt (face 1, 1 mm) with kernel shell::dumped_shell_probe.
 - [ ] P0 REGEN-SPEED (core 10-29 03:05: met in release on perf.yml run 40796942944 (main 34cbea98): live-30-features full regen 35 / 41 / 53 ms (macOS / Linux / Windows; budget 80, live 171), its Extrude 1 edit commit 34 / 38 / 60 ms (budget 200), big-plate regen 159 / 230 / 306 ms (live 617); qa, please re-measure the GUI commit on a release build, the 301–785 ms were a dev build at load ~30. Was 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left

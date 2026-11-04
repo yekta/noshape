@@ -1529,3 +1529,16 @@ fn a_tube_shells_by_its_smooth_offset() {
     let want = vol(&tube) * 5.0 / 9.0;
     assert!((vol(&r) - want).abs() < 1e-5 * want, "{} mm3, want {}", vol(&r) * 1e9, want * 1e9);
 }
+
+/// A dumped body's faces (NOSHAPE_FACES_CASE = its `.brep`): index, surface, area (mm²), centroid (mm): to write a
+/// probe's `.txt`.
+#[test]
+#[ignore = "T2 probe: NOSHAPE_FACES_CASE"]
+fn dumped_body_faces_probe() {
+    let Ok(case) = std::env::var("NOSHAPE_FACES_CASE") else { return };
+    let s = read_brep(std::path::Path::new(&case)).unwrap();
+    for (i, f) in s.faces().iter().enumerate() {
+        let c = f.centroid().unwrap() * 1e3;
+        println!("face {i} {} area {:.4} at ({:.4}, {:.4}, {:.4})", format!("{:?}", f.face_surface().ok()).chars().take(12).collect::<String>(), f.area().unwrap() * 1e6, c.x, c.y, c.z);
+    }
+}

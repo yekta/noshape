@@ -3347,6 +3347,8 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         return no("a free-form face not smooth");
       double u0, u1, v0, v1;
       BRepTools::UVBounds(f, u0, u1, v0, v1);
+      // (The face's own surface, for the fold check: an extension's curvature on the bounds is the extension's.)
+      const occ::handle<Geom_Surface> own = q.base;
       // A B-spline extended past its bounds (tangentially, its own parameters kept): an outward wall's corner and
       // edges lie past the face where it flares (a vase's foot), the offsets must meet there.
       if (auto bs = occ::down_cast<Geom_BSplineSurface>(q.base); !bs.IsNull() && !bs->IsUPeriodic() && !bs->IsVPeriodic())
@@ -3386,10 +3388,12 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       for (int a = 0; a <= n; ++a)
         for (int b = 0; b <= n; ++b)
         {
-          GeomLProp_SLProps lp(q.base, u0 + (u1 - u0) * a / n, v0 + (v1 - v0) * b / n, 2, 1e-12);
+          GeomLProp_SLProps lp(own, u0 + (u1 - u0) * a / n, v0 + (v1 - v0) * b / n, 2, 1e-12);
           if (!lp.IsNormalDefined())
             return no("a free-form face's normal undefined");
-          if (lp.IsCurvatureDefined() && std::max(std::abs(lp.MaxCurvature()), std::abs(lp.MinCurvature())) * thickness > 0.9)
+          // (It folds only offset towards a centre of curvature, as far as it: d·k ≥ 1 along the surface's normal; a
+          // ramp's edge curling away from the wall stays clear, bop-pairs-gpf-5267's Shell 4.)
+          if (lp.IsCurvatureDefined() && std::max(lp.MaxCurvature() * d, lp.MinCurvature() * d) > 0.9)
           {
             if (dbg)
               std::fprintf(stderr, "quadrics: fold at (%d, %d): k %g %g /mm, d %g mm, reversed %d\n", a, b, lp.MaxCurvature() / 1e3, lp.MinCurvature() / 1e3, d * 1e3, (int)(f.Orientation() == TopAbs_REVERSED));
