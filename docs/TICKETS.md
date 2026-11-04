@@ -400,6 +400,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   hole's circle on the 0.9 mm plate's top is two arcs (7.07 + 2.36 mm), live one circle (live 10/22/12, ours
   10/23/14); pipeflange-steven Extrude 3 likewise (live 24/44/16, ours 24/46/20). Volumes and areas equal. Models in
   /root/parity/models (`parity_models`, NOSHAPE_PARITY_ONLY=<name>). The same with NOSHAPE_BOOL_RUST=0 (OCCT's cut).
+  dx 11-04 00:22, seen in a drawing: pipeflange-steven's suggested views against live's (samples/dx-drawing-corpus):
+  every outline and view position as live's, but in the top view each rib blends tangentially into its bolt boss
+  (the boss outline part thin tangent edge, part missing: four hole bosses drawn over ~210° where live's are whole
+  circles, the rib stopping at them); the model's Fillet 2 / the split edges under it, not the drawing.
   What it changes beyond counts (dx 11-03): a click picks one piece where live picks the loop; a Fillet (r 1,
   tangent propagation on) of one piece still rounds the whole loop (−8.5 mm³) but as 3 faces (5 → 8 faces), live 1.
   core 11-03 06:38 (tried, not kept): UnifySameDomain on edges only with B-splines concatenated, wherever a vertex joins
