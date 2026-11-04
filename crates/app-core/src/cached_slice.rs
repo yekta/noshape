@@ -67,6 +67,12 @@ impl<V: 'static> Slice<V> {
         })
     }
 
+    /// A slice its parent's notifications don't invalidate: its owner replaces it when what it shows changed (a list
+    /// row keyed by its state: a new entity draws afresh in the same frame, the old one's paint is reused otherwise).
+    pub fn unobserved(parent: &Entity<V>, render: impl Fn(&mut V, &mut Window, &mut Context<V>) -> AnyElement + 'static, cx: &mut App) -> Entity<Self> {
+        cx.new(|_| Self { parent: parent.downgrade(), render: Rc::new(render), subs: Vec::new(), followed: None, measure: Rc::default(), key: None })
+    }
+
     /// Also invalidate the slice when `other` notifies (state the slice reads
     /// from another entity, e.g. the viewport's camera).
     pub fn observing<T: 'static>(this: &Entity<Self>, other: &Entity<T>, cx: &mut App) {

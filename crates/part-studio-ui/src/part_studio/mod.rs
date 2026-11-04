@@ -372,6 +372,10 @@ pub struct PartStudioView {
     /// What the feature rows read from the list as a whole, set when the
     /// list renders.
     row_ctx: RowCtx,
+    /// Feature rows drawn as cached views, by their state's key (`feature_row_cached`).
+    row_cache: std::collections::HashMap<FeatureId, (u64, Entity<crate::cached_slice::Slice<PartStudioView>>)>,
+    /// Part rows the same way (`part_row_cached`).
+    part_row_cache: std::collections::HashMap<BodyId, (u64, Entity<crate::cached_slice::Slice<PartStudioView>>)>,
     fitted_once: bool,
     message: Option<(FeatureStatus, String)>,
     /// A sketch cancelled with ✕: its draft, index and whether it was new,
@@ -518,6 +522,8 @@ impl PartStudioView {
             filter_rows: (None, Vec::new()),
             list_cache: Default::default(),
             row_ctx: RowCtx::default(),
+            row_cache: Default::default(),
+            part_row_cache: Default::default(),
             fitted_once: false,
             message: None,
             canceled_edit: None,
@@ -3359,6 +3365,11 @@ impl PartStudioView {
             first_config_input,
             pending: self.pending_regen(cx),
         };
+        // Rows of features no longer in the studio leave the row cache.
+        if let Some(st) = self.studio(cx) {
+            let ids: std::collections::HashSet<FeatureId> = st.features.iter().map(|f| f.id).collect();
+            self.row_cache.retain(|id, _| ids.contains(id));
+        }
         self.filter_rows = self.filter_key(cx);
         let mut rows: Vec<AnyElement> = Vec::new();
         let mut dg_rows: Vec<AnyElement> = Vec::new();
@@ -3638,7 +3649,7 @@ impl PartStudioView {
                 ListItem::Rollback(i, x) => indent(x, last, self.render_rollback_bar(i, window, cx)),
                 ListItem::Ellipsis => ellipsis(),
                 ListItem::Folder(x, fd) => indent(x, last, self.render_folder_row(&fd, slot, cx)),
-                ListItem::Feature(x, id) => indent(x, last, self.render_feature_row_view(id, slot, cx)),
+                ListItem::Feature(x, id) => indent(x, last, self.feature_row_cached(id, slot, cx)),
                 ListItem::DerivedSketch(x, id, k) => indent(x, last, self.render_derived_sketch_row(id, k, cx)),
                 ListItem::ConstructionPlane(x, r) => indent(x, last, self.render_construction_plane_row(r, cx)),
                 ListItem::Prompt => self.render_folder_prompt(cx),
@@ -3683,6 +3694,9 @@ impl PartStudioView {
     /// `PsSlices`).
     fn render_parts_list(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
+        let display = self.display.clone();
+        // Rows of parts no longer shown leave the row cache.
+        self.part_row_cache.retain(|id, _| display.body(id).is_some());
         // Parts list.
         // Parts list sections by body kind (Onshape: Parts, Surfaces, Curves).
         // Composite parts have their own list (Help PartStudio__composite_part:
@@ -3692,7 +3706,7 @@ impl PartStudioView {
             .into_iter()
             .map(|(title, key)| {
                 let of_kind = |b: &noshape_model::display::BodyDisplay| part_section(b) == key;
-                let bodies: Vec<&noshape_model::display::BodyDisplay> = self.display.bodies.iter().filter(|b| of_kind(b)).collect();
+                let bodies: Vec<&noshape_model::display::BodyDisplay> = display.bodies.iter().filter(|b| of_kind(b)).collect();
                 // Filtered (live 10-27): the parts the query drops are one
                 // "…" row per run (live ui-parity feature-filter: U+2026, the
                 // feature list's is three dots); the title keeps counting them all.
@@ -3706,7 +3720,7 @@ impl PartStudioView {
                         continue;
                     }
                     gap = false;
-                    rows.push(crate::ui_script::wrap(self.render_part_row(b, cx), || format!("part:{}", b.name)));
+                    rows.push(crate::ui_script::wrap(self.part_row_cached(b, cx), || format!("part:{}", b.name)));
                 }
                 (title, key, rows, bodies.iter().map(|b| b.id.clone()).collect())
             })
@@ -3976,6 +3990,51 @@ impl PartStudioView {
     /// One feature's row. (Not a cached view of its own: gpui re-renders
     /// every cached view nested in one being re-rendered, here the list's.)
     /// `slot`: its child index in the list and its indent (see `render_feature_row`).
+    /// A feature row as a cached view while its state stays (a row click re-rendered and laid out every row:
+    /// ~18 ms of a frame with the parts list on cf-straight-spline); a row whose look follows something else
+    /// ([`Self::feature_row_key`] `None`) is drawn inline.
+    fn feature_row_cached(&mut self, id: FeatureId, slot: (usize, f32), cx: &mut Context<Self>) -> AnyElement {
+        let Some(key) = self.feature_row_key(id, slot, cx) else {
+            self.row_cache.remove(&id);
+            return self.render_feature_row_view(id, slot, cx);
+        };
+        let row = match self.row_cache.get(&id) {
+            Some((k, e)) if *k == key => e.clone(),
+            _ => {
+                let me = cx.entity();
+                let e = crate::cached_slice::Slice::unobserved(&me, move |this: &mut Self, _, cx| this.render_feature_row_view(id, slot, cx), cx);
+                self.row_cache.insert(id, (key, e.clone()));
+                e
+            }
+        };
+        row.cached(StyleRefinement::default().w_full().h(px(crate::ui::ROW_H))).into_any_element()
+    }
+
+    /// What a feature row shows, as a number; `None` when it follows state outside it (the edited or renamed row,
+    /// an open row menu, a drag, the ui-parity driver's marks).
+    fn feature_row_key(&self, id: FeatureId, slot: (usize, f32), cx: &App) -> Option<u64> {
+        use std::hash::{Hash, Hasher};
+        if crate::ui_script::active() || cx.has_active_drag() || self.ui.feature_drop.get().is_some() || self.ui.list_menu.is_some() || self.row_ctx.editing_id == Some(id) || self.renaming.as_ref().is_some_and(|r| r.0 == id) {
+            return None;
+        }
+        let s = self.studio(cx)?;
+        let i = s.features.iter().position(|f| f.id == id)?;
+        let f = &s.features[i];
+        let mut h = std::hash::DefaultHasher::new();
+        (Arc::as_ptr(&self.display) as usize, i, slot.0, slot.1.to_bits()).hash(&mut h);
+        (f.name.as_str(), f.type_id.as_str(), f.suppressed, f.hidden, f.suppression_expr.is_some(), self.shown_feature_name(f, cx)).hash(&mut h);
+        if s.configuration.configured.iter().any(|c| c.feature == id) {
+            format!("{:?}", self.current_config(s)).hash(&mut h);
+        }
+        // The selection's size only shows on a selected row (its drag pill's "2 items").
+        let selected = self.selected_features.contains(&id);
+        (i >= self.row_ctx.rollback, self.rolled_to(id, cx), selected, selected.then_some(self.selected_features.len())).hash(&mut h);
+        (self.row_ctx.related.contains(&id), self.row_ctx.pending.contains(&id), self.ui.derived_open.contains(&id)).hash(&mut h);
+        // The open dialog shows in a row only through these two (the edited row itself is drawn inline).
+        self.edit_uses(id, cx).hash(&mut h);
+        Some(h.finish())
+    }
+
     fn render_feature_row_view(&mut self, id: FeatureId, slot: (usize, f32), cx: &mut Context<Self>) -> AnyElement {
         let Some((i, f)) = self.studio(cx).and_then(|s| s.features.iter().position(|f| f.id == id).map(|i| (i, s.features[i].clone()))) else {
             return div().into_any_element();
@@ -3993,22 +4052,72 @@ impl PartStudioView {
     /// A row of the parts list: click selects (or feeds a dialog's part
     /// field), hover highlights the part, the eye hides or shows it, and the
     /// context menu has Onshape's part commands.
-    fn render_part_row(&self, b: &noshape_model::display::BodyDisplay, cx: &mut Context<Self>) -> AnyElement {
-        let show_props = self.show_part_props(cx);
-        let pal = p();
+    /// A part row's (selected, related): a part picked in the open dialog's active field is selected in the list too
+    /// (live part-studio/440; not while another field is active, psui/m-03); related (live 10-27
+    /// `related-highlight`) is the part of a selected face, edge or vertex, or one a selected feature made.
+    fn part_row_flags(&self, b: &noshape_model::display::BodyDisplay, cx: &App) -> (bool, bool) {
         let r = Reference::Body(b.id.clone());
-        // A part picked in the open dialog's active field is selected in the
-        // list too (live part-studio/440; not while another field is active,
-        // psui/m-03).
         let selected = match &self.edit {
             Some(e) => e.dialog.read(cx).active_refs().contains(&r),
             None => self.selection.contains(&r),
         };
-        // Live 10-27 (`related-highlight`): the part of a selected face,
-        // edge or vertex, or one a selected feature made.
         let related = !selected
             && self.edit.is_none()
             && (self.selection.iter().any(|s| !matches!(s, Reference::Body(_)) && self.body_of(s).as_ref() == Some(&b.id)) || self.selected_features.contains(&b.id.feature));
+        (selected, related)
+    }
+
+    /// A part row as a cached view while its state stays (as [`Self::feature_row_cached`]).
+    fn part_row_cached(&mut self, b: &noshape_model::display::BodyDisplay, cx: &mut Context<Self>) -> AnyElement {
+        let Some(key) = self.part_row_key(b, cx) else {
+            self.part_row_cache.remove(&b.id);
+            return self.render_part_row(b, cx);
+        };
+        let id = b.id.clone();
+        let row = match self.part_row_cache.get(&id) {
+            Some((k, e)) if *k == key => e.clone(),
+            _ => {
+                let me = cx.entity();
+                let id2 = id.clone();
+                let e = crate::cached_slice::Slice::unobserved(
+                    &me,
+                    move |this: &mut Self, _, cx| {
+                        let d = this.display.clone();
+                        match d.body(&id2) {
+                            Some(b) => this.render_part_row(b, cx),
+                            None => div().into_any_element(),
+                        }
+                    },
+                    cx,
+                );
+                self.part_row_cache.insert(id, (key, e.clone()));
+                e
+            }
+        };
+        row.cached(StyleRefinement::default().w_full().h(px(24.))).into_any_element()
+    }
+
+    /// What a part row shows, as a number; `None` while it is renamed, dragged over or marked for the ui-parity driver.
+    fn part_row_key(&self, b: &noshape_model::display::BodyDisplay, cx: &App) -> Option<u64> {
+        use std::hash::{Hash, Hasher};
+        if crate::ui_script::active() || cx.has_active_drag() || self.ui.part_renaming.as_ref().is_some_and(|(x, ..)| *x == b.id) {
+            return None;
+        }
+        let mut h = std::hash::DefaultHasher::new();
+        (Arc::as_ptr(&self.display) as usize, &b.id, self.part_row_flags(b, cx), self.show_part_props(cx)).hash(&mut h);
+        let props = self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).map(|p| format!("{p:?}"));
+        props.hash(&mut h);
+        if let Some(pn) = self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).and_then(|p| p.part_number.clone()).filter(|p| !p.is_empty()) {
+            crate::part_studio_hooks::release_log(self.doc.read(cx)).revisions(&pn).len().hash(&mut h);
+        }
+        Some(h.finish())
+    }
+
+    fn render_part_row(&self, b: &noshape_model::display::BodyDisplay, cx: &mut Context<Self>) -> AnyElement {
+        let show_props = self.show_part_props(cx);
+        let pal = p();
+        let r = Reference::Body(b.id.clone());
+        let (selected, related) = self.part_row_flags(b, cx);
         let hidden = b.hidden;
         let (id1, id2, id3) = (b.id.clone(), b.id.clone(), b.id.clone());
         let r_hover = r.clone();

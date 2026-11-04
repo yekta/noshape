@@ -676,6 +676,35 @@ fn undo_does_nothing_while_a_dialog_control_has_the_keyboard(cx: &mut TestAppCon
     assert!(!symmetric(cx), "the keyboard elsewhere: the dialog's edit undone");
 }
 
+/// A feature row click redraws only the rows whose state changed (the clicked one): the others, and the parts list's
+/// rows, keep their cached views (speed: the lists' re-render was ~18 ms of a click's frame on a big studio).
+#[gpui::test]
+fn a_row_click_redraws_only_the_rows_that_change(cx: &mut TestAppContext) {
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } },
+        { "type": "cPlane", "name": "Plane 1", "params": { "entities": ["plane:top"], "offset": "5 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "row-cache", Some(block));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let rows = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).row_cache.iter().map(|(id, (_, e))| (*id, e.entity_id())).collect::<std::collections::HashMap<_, _>>());
+    let before = rows(cx);
+    let parts = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).part_row_cache.values().map(|(_, e)| e.entity_id()).collect::<Vec<_>>());
+    let parts_before = parts(cx);
+    assert_eq!(parts_before.len(), 1, "the part's row is cached");
+    let id = |name: &str, cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == name).unwrap().id);
+    let (plane, extrude) = (id("Plane 1", cx), id("Extrude 1", cx));
+    assert!(before.contains_key(&plane) && before.contains_key(&extrude), "rows cached: {before:?}");
+    view.update(cx, |v, cx| v.click_feature(plane, false, cx));
+    draw(cx, window);
+    let after = rows(cx);
+    assert_ne!(after[&plane], before[&plane], "the clicked row is drawn again");
+    assert_eq!(after[&extrude], before[&extrude], "an unchanged row keeps its cached view");
+    assert_eq!(parts(cx), parts_before, "the part (not made by Plane 1) keeps its row");
+    assert!(cx.update(|cx| view.read(cx).selected_features == vec![plane]));
+}
+
 /// Live (behaviours request 1839): Enter on a selected feature row opens nothing, and ↑ after the row click doesn't
 /// move the rollback bar; once the bar is clicked ↑ steps it.
 #[gpui::test]
