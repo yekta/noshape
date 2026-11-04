@@ -1395,6 +1395,18 @@ impl Sketch {
         // convergence. Walk the driving dimensions from their currently
         // measured values to the targets in sub-steps.
         let quick = SolveOptions { analyze: false, ..opts.clone() };
+        // Not when the walk's start doesn't solve either (a sketch broken
+        // whatever the change): every walk would fail its first step.
+        *self = snapshot.clone();
+        for (id, a, _) in &dims {
+            if let Some(c) = self.constraint_mut_silent(*id) {
+                c.kind.set_value(*a);
+            }
+        }
+        if matches!(run_ext(self, &quick, &[], false).status, SolveStatus::Failed { .. }) {
+            *self = snapshot;
+            return run(self, opts, &[]);
+        }
         for steps in [4usize, 16, 64] {
             *self = snapshot.clone();
             let mut ok = true;

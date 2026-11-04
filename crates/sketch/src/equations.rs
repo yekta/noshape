@@ -561,17 +561,23 @@ impl FitDiff {
             let mut g = vec![vec![DVec2::ZERO; n]; at.len()];
             let mut s = vec![[DVec2::ZERO; 2]; at.len()];
             let mut rows: Vec<usize> = Vec::new();
+            // Each probe's span: a knot reaches the basis at u only within
+            // p + 1 spans of it, elsewhere a probe's own term cancels in the
+            // central difference.
+            let spans: Vec<usize> = at.iter().map(|&(u, _)| self.frame.find_span(u)).collect();
             for j in 1..n - 1 {
                 s.iter_mut().for_each(|v| *v = [DVec2::ZERO; 2]);
+                // ub[j] is knot p + j (`FitSystem::set_knots`): it alone moves.
+                let m = p + j;
                 for (si, sign) in [1.0, -1.0].into_iter().enumerate() {
                     ub[j] = self.ub[j] + sign * h;
-                    FitSystem::set_knots(&ub, p, &mut frame.knots);
+                    frame.knots[m] = ub[j];
                     if si == 0 {
-                        let moved = |k: &usize| frame.knots[*k] != self.sys.knots[*k];
-                        let klo = (0..frame.knots.len()).find(moved).unwrap_or(usize::MAX);
-                        let khi = (0..frame.knots.len()).rev().find(moved).unwrap_or(0);
+                        // Rows whose basis spans the moved knot (`first` is sorted).
+                        let lo = self.first.partition_point(|f| f + 2 * p + 2 < m);
+                        let hi = self.first.partition_point(|f| *f <= m + 1);
                         rows.clear();
-                        rows.extend((0..nc).filter(|&r| self.sys.row_param(r) == Some(j) || (self.first[r] <= khi + 1 && self.first[r] + 2 * p + 2 >= klo)));
+                        rows.extend((lo..hi).chain((0..nc).filter(|&r| self.sys.row_param(r) == Some(j) && !(lo..hi).contains(&r))));
                     }
                     for &r in &rows {
                         let (u0, der, _) = self.sys.rows[r];
@@ -583,11 +589,15 @@ impl FitDiff {
                         }
                     }
                     for (k, &(u, der)) in at.iter().enumerate() {
+                        if spans[k] + 1 < j || spans[k] > m + p {
+                            continue;
+                        }
                         let (f, c) = FitSystem::basis_row(&frame, u, der);
                         s[k][si] += self.row_dot(f, &c);
                     }
                 }
                 ub[j] = self.ub[j];
+                frame.knots[m] = self.ub[j];
                 for k in 0..at.len() {
                     g[k][j] = (s[k][0] - s[k][1]) / (2.0 * h);
                 }
