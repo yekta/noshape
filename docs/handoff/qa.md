@@ -7,6 +7,11 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 right (7607.301), mirror set and cli-fillet-segv right; published 08:43:30 (all three bundles); the release tarball is byte-identical to the smoked artifact.
 Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfmir2 B P0.
 
+**11-04 12:00:** greens 915bffd1 (touching regions extrude as one), 8d1106ad (SHELL-SLOW marching), e45c7ee4 (sub-features),
+51826f9e (glued face-pattern cut), b8c31b9e (construction-plane sketch frame), a82d8b82 (HOLE-RIM-PIECES): volume sweep = v0.4.25,
+the 44 ticket documents, dx's cf corpus, the user's cases unchanged. Fuzz 0 deaths: v0.4.25 60, 5363e4d8 100. Loops now: a82d8b82
+/tmp/qa-nfloop36.sh (3561–3620), /tmp/qa-gfloop19.sh (3621–3660); v0.4.25 /tmp/qa-cfloop75.sh (3661–3720). Next: the 16:30 list.
+
 **11-04 09:03:** green 5363e4d8 (OCCT patch 0021 synced): **CRASH-3151, CRASH-3388, CRASH-2045 verified** 10 / 10 each
 (open / delete repro and the fuzz session; cli/vc-5363e4d8.txt, /tmp/qa-verify-crash.sh <sha>); BLEND-RUST-STRAIGHT-WRONG
 verified (slow1151 = a6ff8389 feature by feature); volume sweep, the 44 ticket documents and dx's cf corpus unchanged. Fuzz since
