@@ -3653,6 +3653,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the outline chains (the y = ±75 / ±25 lines, the arc, the prong ends: tangent to Fillet 1's vertical rounds, whose
   edges e42–e47 are ellipses). So OCCT won't make it in any grouping: it needs noshape's blend (BLEND-RUST) for chains of
   lines, arcs and Fillet 1's cylinders with sphere corners, plus the overflowing rims.
+  core 11-04 23:54: the 23 edges (fillet-1 dump): Fillet 1 rounded the prong ends' edges (x = 200 with the top, the
+  bottom and the sides) and left each corner a mitre, two R14.485 cylinders meeting on a 45° ellipse (e42–e47);
+  Fillet 2's tangent chains take those ellipses (and the bottom's x = 185.51 lines, tangent edges between z = 0 and
+  Fillet 1's cylinders) at the same R14.485, where the ball can't roll: its centre is where the cylinders' axes
+  meet, and live's six SPHERE faces (326.019 mm²) are that ball. ChFi3d fails there (a stationary ball), so every
+  grouping fails. Needs, in noshape's blend: an edge between two blends of the fillet's own radius as the ball's
+  sphere, the chains through tangent edges, and the R12.5 rims' tori trimmed by the side rounds (live's 32.1 mm²
+  top-face pieces). Days, not hours.
 - [x] (core 11-03 13:00: the boss went through boolean.cpp fuse_on_face, which rebuilt the shell from its iterator's faces (already in the solid's orientation) and then flipped the new shell once more by the shell's; a drafted extrude's solid holds its shell REVERSED, so the part came out inside out. The same at four other sites (the unify's ReShape, through holes, the local Boolean, features.cpp's blend rebuild): the shell and solid now FORWARD. dx's document +922.936632 mm³ as live; the Boolean corpus as before (the same 4 of 974 differ without it); T1 model kernel_robustness::a_boss_on_a_drafted_blocks_top_adds_to_it, both pull directions) P1 ADD-INSIDE-OUT (core / bool; dx's parity suite 11-03, cf-parameter-pattern) an Extrude Add of a 2 mm boss
   on the top face of a drafted block leaves the part inside out: volume −922.937 mm³ (query_parts), the magnitude
   live's +922.937. The block: Extrude 1, a 20 × 10 mm rectangle on Top, depth 5 mm (#a / 2), draft 10° (#a deg,
@@ -3688,6 +3696,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   blends too (the fillet's merged-blends path skipped the joins). The rebuilt cone face is valid with its area, but
   the part isn't: the countersink's bottom circle is the hole cylinder's top, whose own seam ends at that circle's
   vertex, so the two seams must move together (to one angle) for the rim to join.
+  core 11-04 23:53: the volume, per countersink corner (live 2032's 9 × 9 grids; kernel T2
+  blend::countersink_corner_envelope_probe; scripts /root/core-scratch/pf): OCCT rolls the ball over the rim
+  (BRepBlend's surface / restriction) with its sections in radial planes: that model integrates to ours to the digit
+  (18314.950 mm³, tube dip 2.33 mm² a corner). Live's four boundaries are the true rolling ball's (tube contact,
+  lowest at 7.3133 mm; the rim arc; the end sections and the seam between its two faces arcs of the ball), its tube
+  1764.4895 mm² to 1e-4 of the true ball's; but inside, its surface lies up to 0.16 mm into the balls (not an
+  envelope: iso lines non-planar, r 8.03–8.13, its rim normals uneven, not a Coons patch either, 0.5 mm off), a fill
+  between those curves. The true rolling ball integrates to 18318.37 (live 18329.66, band ±7.8): ours would move
+  3.4 mm³ towards live and stay outside. Not changing it: live's fill isn't a construction we can derive.
 - [x] (core 11-03 15:05: OCCT patch 0020 (29d17a5a, lib synced) and the volume integral's u-isoline skip (acfb0433): the Wave Spring builds as live, 916.595 mm³ / 4402.375 mm² (live 916.533 / 4402.296, in its bands), its feature in 5.8 s instead of 16.6 (157 s reopened); T1 kernel surfacing::a_long_wavy_strip_thickens_along_it; the rest of the time is FS-WAVE-SPRING-SPEED) P1 FS-WAVE-SPRING (core; dx's FeatureScript corpus 11-03, cf-wave-spring) the community Wave Spring (FeatureScript
   336: two opFitSpline of 600 points each, opLoft between them into a wavy strip, opThicken 0.5 mm; Ø25 / Ø20,
   height 25 mm, 10 turns, 5 waves) builds an inside-out solid in ours: volume −555.401 mm³, box ±19 mm (live
