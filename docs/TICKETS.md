@@ -372,6 +372,20 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (r14.35 / r12.1) leaves each rim in three pieces (at the hole cylinder's seam and at its ±x sides); Parasolid's are one
   closed edge each. Seen in kernel_robustness::a_face_pattern_of_a_hole_through_a_tubes_wall (each pattern copy as the
   original). motor-mount-jack's elliptic slots don't show it.
+- [ ] P1 FS-QUERY-EDGE-ORDER (for dx; core 11-04 09:52) cf-sheet-metal-overcut-dogbone's Corner Overcut 1 (11 faces /
+  10679.314 mm³, live 12 / 10678.612; 8 features after it): createSMOvercut takes `edges[0]` / `edges[1]` of
+  `evaluateQuery(qIntersection([qAdjacent(wall, EDGE), qAdjacent(point, VERTEX, EDGE)]))` and compares the point with
+  edge 1's end (`evEdgeTangentLines(… [0, 1], face: wall)`) to choose the circle's direction: ours cuts the Ø6 circle
+  along the x = 30 edge (centre (30, 37): a plane x = 30 of 70 mm² and a cylinder), live's along the y = 40 edge
+  (faces JUK 115.635 at y = 40 to x = 23.127, JUG / JUC the circle). So the two edges come back in the other order (or
+  edge 1 runs the other way along the wall) in ours. Dump: vibe5 ~/core-dog (the rebuilt document; bodies_after_feature
+  now builds custom features).
+- [ ] P2 STRAIGHT-SPLINE-CORNER-EDGES (core 11-04 09:52) cf-straight-spline's Feature 5 (live 31/85/56, ours 31/78/49;
+  50 features after it): the faces are live's; live has eight 0.0106 mm edges at z = 101.595 where each slot's flat
+  meets its run-out (the revolved profile's cone is tangent to the extruded flat along the profile line, so
+  Parasolid's subtract leaves a sliver edge at each corner; ours ends the flat's line at the corner, at z = 101.607 on
+  two of them), and ours splits the −x run-out edge at the shaft's seam (two 5.469 mm pieces, live one 10.935). The
+  seam split is ours to fix; the sliver edges are Parasolid's tolerance artefact.
 - [ ] P2 REGION-UNION-ARC (core 11-04 09:05) sketch regions picked together are united when they share lines or a
   whole loop (sketch regions::union_touching, eval.rs picked_regions), not when they share only an arc of a loop:
   clamp-hms's Sketch 2 (a trapezoid whose top arc lies on a whole r8 circle, the r8–r5 ring inside) then made its

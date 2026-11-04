@@ -808,11 +808,13 @@ fn bodies_after_feature() {
         let Some(k) = ps.features.iter().position(|f| f.name == upto) else { continue };
         let mut p = ps.clone();
         p.features.truncate(k + 1);
-        let r = Regenerator::new().regenerate(&p, &ConfigValues::default(), &units, &RegenOptions::default());
+        // (The document's Feature Studios: its custom features build.)
+        let opts = RegenOptions { custom_features: Some(noshape_model::custom::DocumentScripts::from_document(&s.doc)), ..Default::default() };
+        let r = Regenerator::new().regenerate(&p, &ConfigValues::default(), &units, &opts);
         for (i, b) in r.context.bodies.iter().enumerate() {
             let out = format!("{path}.{upto}.{i}.brep");
             noshape_kernel::write_brep(&b.shape, std::path::Path::new(&out)).unwrap();
-            println!("wrote {out}");
+            println!("wrote {out} ({})", b.name);
         }
     }
     let _ = std::fs::remove_file(&tmp);

@@ -608,7 +608,8 @@ fn brep_edges_probe() {
     let shown = r.shown_topology().unwrap();
     println!("{} / {} / {}", r.faces().len(), shown.edges.iter().filter(|e| **e).count(), shown.vertices.iter().filter(|v| **v).count());
     for (i, f) in r.faces().iter().enumerate() {
-        println!("F{i} {}", format!("{:?}", f.face_surface().ok()).chars().take(110).collect::<String>());
+        let mm = 1e-3;
+        println!("F{i} area {:.4} at {:.3?} {}", f.area().unwrap_or(0.0) / (mm * mm), f.centroid().unwrap_or_default() / mm, format!("{:?}", f.face_surface().ok()).chars().take(110).collect::<String>());
     }
     for (i, e) in r.edges().iter().enumerate() {
         let x = e.edge_info().unwrap();
