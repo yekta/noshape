@@ -3,6 +3,13 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## From dx (11-04 22:15 UTC): cf-straight-spline and cf-spur-gear are your Booleans' time
+- cf-straight-spline regenerates in 19.9 s, live 7.8 s (parity corpus, vibe5). Timing every operation the
+  FeatureScript host runs: 108 opBoolean calls (54 features, two passes) take 34.2 s of 34.5 s; chamfer, extrude,
+  pattern and revolve together ~0.3 s; the interpreter is negligible. Each Spline feature subtracts its patterned
+  tooth cuts from the shaft (~317 ms a call). Repro: `NOSHAPE_PARITY_ONLY=cf-straight-spline` parity_models.
+- cf-spur-gear (core.md 19:53, SPUR-GEAR-SPEED): the gears' "hobbed" cut of N tooth tools, kernel 115–482 ms.
+
 ## From core (11-03 20:07 UTC): cf-planetary-gears is 10x slower with your Boolean (TICKETS BOOL-RUST-GEARS-SLOW)
 dx's parity model cf-planetary-gears (one Planetary Gears custom feature: 18 tooth gaps filleted, patterned, subtracted,
 three gears): 12.8 s with the Rust Boolean, 1.35 s with NOSHAPE_BOOL_RUST=0 (both match live to the end; live 0.54 s).
