@@ -180,7 +180,6 @@ pub struct FeatureDialog {
     /// collapses them until the row's chevron is clicked.
     tol_open: std::collections::HashSet<String>,
     focus: FocusHandle,
-    renaming: Option<Entity<InputState>>,
     /// Sources offered by the Derived feature's Part Studio picker.
     pub derived_sources: Vec<DerivedSource>,
     /// Tabs reference parameters can pick (file tabs, Part Studios).
@@ -404,7 +403,6 @@ impl FeatureDialog {
             tab_stops: HashMap::new(),
             tol_open: Default::default(),
             focus: cx.focus_handle(),
-            renaming: None,
             derived_sources: Vec::new(),
             ref_sources: Vec::new(),
             ref_picker: None,
@@ -4008,7 +4006,6 @@ impl Render for FeatureDialog {
         // The sketch's red title has no tooltip: the bubble asks for a plane.
         let error_tip: Option<String> = status.as_ref().filter(|s| matches!(s.0, FeatureStatus::Error | FeatureStatus::Warning) && !sketch).map(|s| format!("{tip_name} did not regenerate properly: {}", s.1));
         let ref_panel = self.render_reference_panel(window, cx);
-        let renaming = self.renaming.clone();
         v_flex()
             .id("feature-dialog")
             .map(|d| crate::ui_script::mark(d, || "dialog".into()))
@@ -4081,9 +4078,8 @@ impl Render for FeatureDialog {
                     .bg(pal.panel)
                     .border_b_1()
                     .border_color(pal.border)
-                    .child(match renaming {
-                        Some(state) => div().flex_1().child(Input::new(&state).xsmall()).into_any_element(),
-                        None => div()
+                    .child(
+                        div()
                             .id("dialog-title")
                             // Drag the title to move the dialog (Onshape; its
                             // drag area shows `grab`, docs/parity/cursors.md).
@@ -4100,30 +4096,8 @@ impl Render for FeatureDialog {
                             .truncate()
                             .child(crate::ui::user_text(name))
                             .when_some(error_tip, |d, m| d.tooltip(crate::ui::tooltip(m)))
-                            .on_click(cx.listener(|this, ev: &ClickEvent, window, cx| {
-                                if ev.click_count() >= 2 && !this.nested {
-                                    let name = this.feature.name.clone();
-                                    let st = cx.new(|cx| InputState::new(window, cx).default_value(name));
-                                    let sub = cx.subscribe_in(&st, window, |this: &mut FeatureDialog, st, ev: &InputEvent, _, cx| {
-                                        if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
-                                            let v = st.read(cx).value().to_string();
-                                            if !v.trim().is_empty() {
-                                                this.feature.name = v;
-                                                this.feature.custom_name = true;
-                                            }
-                                            this.renaming = None;
-                                            this.changed(cx);
-                                            cx.notify();
-                                        }
-                                    });
-                                    this.subs.push(sub);
-                                    st.update(cx, |s, cx| s.focus(window, cx));
-                                    this.renaming = Some(st);
-                                    cx.notify();
-                                }
-                            }))
-                            .into_any_element(),
-                    })
+                            // Live (behaviours 2388): the title isn't editable; features are renamed in the list.
+                    )
                     // Live (psb 10-21 g): a dialog in configure mode has only ✕.
                     .when(!self.configure_mode && !self.nested, |d| d.child(
                         Button::new("dlg-ok")
