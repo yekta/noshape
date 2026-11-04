@@ -1936,3 +1936,5 @@ NOSHAPE_PARITY_ONLY=<name>):
 - cf-hose-routing's display mesh: BRepMesh 14.5 s of CPU on the four hoses (noshape's mesher declines their seams),
   as you noted 11-03; now apart from the runner's speed line (it compares features' times).
 - Fix PCB 2, Spur Gear, Planetary Gears, the SAE splines: Boolean-bound (TICKETS PARITY-SPEED dx 11-04).
+- core 06:28: done as you suggested (detail.rs shell_part: opened when a removed face's point is off the result; the
+  volumes only otherwise): a Hose Routing ~450 -> ~280 ms of kernel time.

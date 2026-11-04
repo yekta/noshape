@@ -854,8 +854,15 @@ pub fn shell_part(part: &k::Shape, removed: &[k::Shape], t: f64, side: k::ShellS
     if res.shape.count(ShapeType::Solid) > part.count(ShapeType::Solid).max(1) || !shell_is_whole(part, removed, &res.shape, t) {
         return Err(failed());
     }
+    // (Opened where a removed face's own point is off the result: no volumes integrated, 80-170 ms each on a swept
+    // hose, dx 11-04; they decide only where every removed face still lies on it, as a strip narrower than the wall.)
+    let opened = || {
+        removed.iter().any(|f| {
+            super::helpers_a::point_on_face(f).is_some_and(|p| k::make_vertex(p).and_then(|v| k::distance(&v, &res.shape)).is_ok_and(|d| d.distance > t * 1e-3))
+        })
+    };
     let volume = |s: &k::Shape| k::volume_properties(s).map_or(0.0, |p| p.mass);
-    if side == k::ShellSide::Inside && !removed.is_empty() && volume(&res.shape) >= volume(part) * (1.0 - 1e-9) {
+    if side == k::ShellSide::Inside && !removed.is_empty() && !opened() && volume(&res.shape) >= volume(part) * (1.0 - 1e-9) {
         return Err(failed());
     }
     Ok(res)
