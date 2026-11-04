@@ -45,6 +45,43 @@ impl Feature {
         self.id == id || self.sub_features.iter().any(|s| s.id == id)
     }
 
+    /// A mate connector made inside a feature (its field's "Select mate connectors" button), as Onshape makes it:
+    /// no owner part, Move ticked, `isForSubFeature`; `origin` its origin entity (an inference point included).
+    pub fn in_feature_connector(origin: Reference, units: &UnitPrefs) -> Option<Feature> {
+        let ty = features::get("mateConnector")?;
+        let mut params = ParamValues::default();
+        fill_defaults(&ty.params, &mut params, units);
+        params.set("originQuery", ParamValue::Query(vec![origin]));
+        for (k, v) in [("allowOwnerEntity", false), ("requireOwnerPart", false), ("isForSubFeature", true), ("transform", true)] {
+            params.set(k, ParamValue::Bool(v));
+        }
+        Some(Feature {
+            id: FeatureId::new_random(),
+            type_id: ty.id.to_string(),
+            name: "Mate connector".into(),
+            suppressed: false,
+            params,
+            folder: None,
+            custom_name: false,
+            hidden: false,
+            suppression_expr: None,
+            sub_features: Vec::new(),
+        })
+    }
+
+    /// Drops the in-feature mate connectors none of its selections names any more (a chip removed).
+    pub fn drop_unused_sub_features(&mut self) {
+        fn named(v: &ParamValue, id: FeatureId) -> bool {
+            match v {
+                ParamValue::Query(q) => q.iter().any(|r| matches!(r, Reference::MateConnector { feature, .. } if *feature == id)),
+                ParamValue::Array(items) => items.iter().any(|it| it.0.values().any(|x| named(x, id))),
+                _ => false,
+            }
+        }
+        let params = &self.params;
+        self.sub_features.retain(|s| params.0.values().any(|v| named(v, s.id)));
+    }
+
     pub fn feature_type(&self) -> Option<&'static FeatureType> {
         features::get(&self.type_id)
     }

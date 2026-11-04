@@ -246,6 +246,9 @@ pub struct FeatureDialog {
     /// A pick filled the active field and moved on: the next field takes the keyboard at the next render (Onshape's
     /// autoAdvanceToNextControl focuses it; live ui-parity draft-on-side-face).
     focus_active_pending: bool,
+    /// The field whose "Select mate connectors" button is on: its picks make mate connectors inside the feature
+    /// (Onshape's subFeatures; live 1851).
+    pub mc_mode: Option<String>,
     /// The keyboard left the dialog: a press in the graphics area, or Esc out of a field (live: the page has the
     /// keyboard then, the selection field stays active; `ui_focus`). A press in the dialog or a field's focus
     /// brings it back.
@@ -430,6 +433,7 @@ impl FeatureDialog {
             edit_focus: None,
             focus_dialog_pending: false,
             focus_active_pending: false,
+            mc_mode: None,
             keyboard_left: false,
             create_var: None,
             external_field: None,
@@ -505,8 +509,10 @@ impl FeatureDialog {
     pub fn active_filter(&self) -> Option<(String, QueryFilter, Option<usize>)> {
         let path = self.active_query.clone()?;
         let spec = self.spec_for_path(&path)?;
+        // With its mate connector button on, a field takes what a mate connector's origin takes.
+        let mc = if self.mc_mode.as_deref() == Some(path.as_str()) { QueryFilter(QueryFilter::ANY_EDGE.0 | QueryFilter::POINT_LIKE.0 | QueryFilter::ANY_FACE.0) } else { QueryFilter(0) };
         match &spec.kind {
-            ParamKind::Query { filter, max_picks } => Some((path, *filter, *max_picks)),
+            ParamKind::Query { filter, max_picks } => Some((path, QueryFilter(filter.0 | mc.0), *max_picks)),
             // A driven array picks what its items' first query takes.
             ParamKind::Array { item, .. } if spec.hints.has(Hints::DRIVEN_QUERY) => item.iter().find_map(|i| match i.kind {
                 ParamKind::Query { filter, .. } => Some((path.clone(), filter, None)),
@@ -762,6 +768,26 @@ impl FeatureDialog {
     /// Returns false if no field is active.
     pub fn add_picks(&mut self, refs: impl IntoIterator<Item = Reference>, cx: &mut Context<Self>) -> bool {
         let Some((path, _filter, max)) = self.active_filter() else { return false };
+        // The field's mate connector button on: each pick (a face, an edge, a vertex, an inference point) becomes a
+        // mate connector made inside the feature, the field naming it (live 1851: chip "Mate connector").
+        let mc_mode = self.mc_mode.as_deref() == Some(path.as_str());
+        let units = self.units;
+        let mut made = Vec::new();
+        let refs: Vec<Reference> = refs
+            .into_iter()
+            .map(|r| match (&r, mc_mode) {
+                (Reference::MateConnector { .. }, _) | (_, false) => r,
+                _ => match noshape_model::partstudio::Feature::in_feature_connector(r.clone(), &units) {
+                    Some(sub) => {
+                        let mc = Reference::MateConnector { feature: sub.id, index: 0 };
+                        made.push(sub);
+                        mc
+                    }
+                    None => r,
+                },
+            })
+            .collect();
+        self.feature.sub_features.extend(made);
         self.user_set.insert(path.clone());
         if let Some(spec) = self.spec_for_path(&path)
             && let ParamKind::Array { item, .. } = &spec.kind
@@ -1336,6 +1362,8 @@ impl FeatureDialog {
     /// `canSubmit`: the dialog is dirty and no value fails validation).
     fn changed(&mut self, cx: &mut Context<Self>) {
         self.dirty = true;
+        // A chip removed takes its in-feature mate connector with it.
+        self.feature.drop_unused_sub_features();
         // The preview runs with every value, typed ones included: a commit
         // (Tab) that rewrote the text doesn't schedule a second run.
         self.typed_pending = false;
@@ -3062,6 +3090,8 @@ impl FeatureDialog {
                     // "Select mate connector" button at their right.
                     .when(takes_mc, |d| {
                         let p_mc = path.to_string();
+                        // Live 1851: a toggle; on (`os-active`), its picks make mate connectors in the feature.
+                        let on = self.mc_mode.as_deref() == Some(path);
                         d.child(
                             div()
                                 .id(SharedString::from(format!("mc-{path}")))
@@ -3072,11 +3102,13 @@ impl FeatureDialog {
                                 .justify_center()
                                 .rounded(px(3.))
                                 .cursor_pointer()
+                                .when(on, |d| d.bg(gpui_kit::rgb(0xeaeaea)))
                                 .hover(|d| d.bg(pal.panel_hover))
                                 .child(crate::assets::icon("mc-select", 20., cx))
                                 // Live (dom/dialog-draft.txt, dialog-hole.txt).
                                 .tooltip(crate::ui::tooltip(if *max_picks == Some(1) { "Select mate connector (ctrl+m)" } else { "Select mate connectors (ctrl+m)" }))
                                 .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                    this.mc_mode = if this.mc_mode.as_deref() == Some(p_mc.as_str()) { None } else { Some(p_mc.clone()) };
                                     this.active_query = Some(p_mc.clone());
                                     window.focus(&this.focus, cx);
                                     cx.emit(DialogEvent::QueryFocused);

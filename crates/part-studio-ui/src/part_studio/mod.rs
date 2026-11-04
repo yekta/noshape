@@ -1534,6 +1534,8 @@ impl PartStudioView {
                 Reference::SketchRegion { sketch, .. } => format!("Face of {}", fname(*sketch)),
                 Reference::Sketch(s) => fname(*s),
                 Reference::FeaturePlane(f) => fname(*f),
+                // One made inside a feature (no feature of the list): "Mate connector" (live 1851's chip).
+                Reference::MateConnector { feature, .. } if !names.iter().any(|(i, _)| i == feature) => "Mate connector".into(),
                 Reference::MateConnector { feature, .. } => fname(*feature),
                 // A FeatureScript feature's plane: its row under the feature (live 11-02 "Plane 1").
                 Reference::ConstructionPlane { index, .. } => format!("Plane {}", index + 1),

@@ -2107,3 +2107,36 @@ fn an_edge_midpoint_has_the_points_menu(cx: &mut TestAppContext) {
     }
     assert!(of_point.iter().any(|l| l == "Delete Extrude 1") && of_point.iter().any(|l| l == "Edit Extrude 1…"), "{of_point:?}");
 }
+
+/// IN-FEATURE-MATE-CONNECTOR (live 1851): with "Sketch points to place holes"' mate connector button on, a face
+/// picked makes a mate connector inside the Hole: chip "Mate connector", the hole at it, no Mate connector feature.
+#[gpui::test]
+fn a_hole_placed_on_an_in_feature_mate_connector(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "hole-in-feature-mc");
+    view.update(cx, |v, _| v.selection.clear());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("hole", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Hole dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.mc_mode = Some("locations".into());
+        d.active_query = Some("locations".into());
+        d.add_pick(top, cx);
+    }));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let (subs, chips) = cx.update_window(window, |_, w, cx| {
+        let d = dialog.read(cx);
+        let state = d.ui_state(w, cx);
+        let chips = state["fields"].as_array().unwrap().iter().find(|f| f["label"] == "Sketch points to place holes").map(|f| f["items"].clone()).unwrap_or_default();
+        (d.feature.sub_features.len(), chips)
+    }).unwrap();
+    assert_eq!((subs, chips), (1, serde_json::json!(["Mate connector"])));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let (features, hole_ok) = cx.update(|cx| {
+        let v = view.read(cx);
+        let s = v.studio(cx).unwrap();
+        let hole = s.features.iter().find(|f| f.type_id == "hole").expect("the Hole");
+        (s.features.iter().map(|f| f.type_id.clone()).collect::<Vec<_>>(), v.display.feature_state(hole.id).is_some_and(|st| st.status == noshape_model::display::FeatureStatus::Ok) && hole.sub_features.len() == 1)
+    });
+    assert!(hole_ok && !features.iter().any(|t| t == "mateConnector"), "{features:?}");
+}
