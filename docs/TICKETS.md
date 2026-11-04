@@ -486,6 +486,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   leaving an edge on three faces (no input has one) is done again with the tools fused first (bool_patterns::
   a_spline_shafts_run_outs_tangent_to_its_slots_cut_manifold). The document 5/59 -> 9/59; next there Feature 5's
   Part 5, live 31/85/56, ours 31/78/49.
+  prize-wheel-tim's knob isn't taken: its cylinder face's seam has both its vertices on the chain at z 19.8, the joint
+  (0, 1.88) and the notch's corner (-1.2, 1.447), so it isn't a seam from an end circle; not looked into further.
 - [x] (core 11-03 09:00: pieces of one straight edge between the same two planes, a gap between them, are filleted as one cut along the whole line (features.cpp fillet_as_cut's spans, before OCCT): live's one face a corner, rounding off the 0.3 mm the groove leaves in the corner; bracket03-mattie's Fillet 1 exactly live's (22/60/40, 9351.620768 mm², 26334.635 mm³); T1 kernel blend::fillet_over_a_groove_is_one_face; the blend corpus as recorded. Its Chamfer 1 then 58/144/88 vs live 58/136/80: a blend's lines split where nothing ends are joined (features.cpp join_split_lines), 58/136/80 as live; bracket03-mattie matches live to the end; T1 kernel blend::chamfered_groove_edges_stay_whole) P2 FILLET-SPLIT-EDGE-FACES (core; dx's parity suite 11-03) a Fillet of edges a groove cut in two makes one face
   per piece and more: bracket03-mattie Fillet 1 (r 3 mm, tangent propagation, four 7 mm corner edges, each beside
   its other half across a 6 mm groove; Onshape's query keeps both halves): live 22/60/40 faces/edges/vertices, one
