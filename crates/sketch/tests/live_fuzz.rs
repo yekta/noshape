@@ -324,8 +324,9 @@ fn everyday(seed: u64) -> Case {
         // on, seed 741, three more; batch 16 on, seed 781, three more; batch
         // 17 on, seed 821, three more; batch 18 on, seed 861, three more;
         // batch 19 on, seed 901, three more; batch 20 on, seed 941, three
-        // more; batch 21 on, seed 981, three more.)
-        match r.below(if seed >= 981 { 47 } else if seed >= 941 { 44 } else if seed >= 901 { 41 } else if seed >= 861 { 38 } else if seed >= 821 { 35 } else if seed >= 781 { 32 } else if seed >= 741 { 29 } else if seed >= 701 { 26 } else if seed >= 661 { 23 } else if seed >= 621 { 20 } else if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
+        // more; batch 21 on, seed 981, three more; batch 22 on, seed 1021,
+        // three more.)
+        match r.below(if seed >= 1021 { 50 } else if seed >= 981 { 47 } else if seed >= 941 { 44 } else if seed >= 901 { 41 } else if seed >= 861 { 38 } else if seed >= 821 { 35 } else if seed >= 781 { 32 } else if seed >= 741 { 29 } else if seed >= 701 { 26 } else if seed >= 661 { 23 } else if seed >= 621 { 20 } else if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
             // Corner rectangle (live's tool constraints), width and height.
             0 => {
                 let (w, h) = (r.range(15.0, 50.0), r.range(10.0, 35.0));
@@ -1350,6 +1351,124 @@ fn everyday(seed: u64) -> Case {
                 c.length(&l[0], arm2);
                 c.distance(&l[9], &l[3], span * fs);
             }
+            // A plate with two slots: a corner rectangle (live's tool
+            // constraints), width and height; two Horizontal slots one above
+            // the other, their arcs all Equal and their straight sides Equal;
+            // the lower slot's centre distance and radius, its left centre
+            // from the left and bottom sides, the upper's left centre from
+            // the lower's.
+            47 => {
+                let (w, h) = (r.range(45.0, 65.0), r.range(35.0, 50.0));
+                let p = [o, o + v(w, 0.0), o + v(w, h), o + v(0.0, h)];
+                let l: Vec<String> = (0..4).map(|i| c.line(p[i], p[(i + 1) % 4])).collect();
+                for i in 0..4 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 4]));
+                }
+                c.pair("PERPENDICULAR", &l[2], &l[3]);
+                c.pair("PARALLEL", &l[0], &l[2]);
+                c.pair("PARALLEL", &l[3], &l[1]);
+                c.hv(true, &l[2]);
+                let (len, rad) = (w * r.range(0.3, 0.45), h * r.range(0.07, 0.11));
+                let mut slots: Vec<[String; 4]> = Vec::new();
+                for s0 in [o + v(w * 0.25, h * 0.3), o + v(w * 0.25, h * 0.7)] {
+                    let m1 = c.line(s0 + v(0.0, -rad), s0 + v(len, -rad));
+                    let m2 = c.arc(s0 + v(len, 0.0), rad, -FRAC_PI_2, FRAC_PI_2);
+                    let m3 = c.line(s0 + v(len, rad), s0 + v(0.0, rad));
+                    let m4 = c.arc(s0, rad, FRAC_PI_2, 3.0 * FRAC_PI_2);
+                    c.coincident(&format!("{m1}.end"), &format!("{m2}.start"));
+                    c.coincident(&format!("{m2}.end"), &format!("{m3}.start"));
+                    c.coincident(&format!("{m3}.end"), &format!("{m4}.start"));
+                    c.coincident(&format!("{m4}.end"), &format!("{m1}.start"));
+                    for (a, b) in [(&m1, &m2), (&m2, &m3), (&m3, &m4), (&m4, &m1)] {
+                        c.pair("TANGENT", a, b);
+                    }
+                    c.pair("EQUAL", &m2, &m4);
+                    c.hv(true, &m1);
+                    slots.push([m1, m2, m3, m4]);
+                }
+                c.pair("EQUAL", &slots[0][1], &slots[1][1]);
+                c.pair("EQUAL", &slots[0][0], &slots[1][0]);
+                let fs: Vec<f64> = (0..7).map(|_| f(&mut r)).collect();
+                c.length(&l[0], w * fs[0]);
+                c.length(&l[1], h * fs[1]);
+                c.distance(&format!("{}.center", slots[0][3]), &format!("{}.center", slots[0][1]), len * fs[2]);
+                c.radius(&slots[0][1], rad * fs[3], false);
+                c.distance(&format!("{}.center", slots[0][3]), &l[3], w * 0.25 * fs[4]);
+                c.distance(&format!("{}.center", slots[0][3]), &l[0], h * 0.3 * fs[5]);
+                c.distance(&format!("{}.center", slots[1][3]), &format!("{}.center", slots[0][3]), h * 0.4 * fs[6]);
+            }
+            // A bolt-circle flange: an outer circle, a concentric bore and a
+            // construction bolt circle; four Equal holes centred on it, on a
+            // Horizontal and a Vertical construction line through the
+            // centre; the four diameters.
+            48 => {
+                let (ro, rb) = (r.range(20.0, 35.0), r.range(5.0, 9.0));
+                let rp = (ro + rb) / 2.0;
+                let rh = (ro - rb) * 0.15;
+                let outer = c.circle(o, ro);
+                let bore = c.circle(o, rb);
+                let pitch = c.circle(o, rp);
+                c.construction(&pitch);
+                c.pair("CONCENTRIC", &bore, &outer);
+                c.pair("CONCENTRIC", &pitch, &outer);
+                let hx = c.line(o + v(-rp, 0.0), o + v(rp, 0.0));
+                let vy = c.line(o + v(0.0, -rp), o + v(0.0, rp));
+                c.construction(&hx);
+                c.construction(&vy);
+                c.hv(true, &hx);
+                c.hv(false, &vy);
+                c.midpoint(&format!("{outer}.center"), &hx);
+                c.midpoint(&format!("{outer}.center"), &vy);
+                let at = [v(rp, 0.0), v(0.0, rp), v(-rp, 0.0), v(0.0, -rp)];
+                let ends = [format!("{hx}.end"), format!("{vy}.end"), format!("{hx}.start"), format!("{vy}.start")];
+                let holes: Vec<String> = at.iter().map(|d| c.circle(o + *d, rh)).collect();
+                for (k, hole) in holes.iter().enumerate() {
+                    c.coincident(&format!("{hole}.center"), &ends[k]);
+                    c.on_curve(&format!("{hole}.center"), &pitch);
+                }
+                for k in 1..4 {
+                    c.pair("EQUAL", &holes[0], &holes[k]);
+                }
+                let fs: Vec<f64> = (0..4).map(|_| f(&mut r)).collect();
+                let (ro2, rb2) = (ro * fs[0], (rb * fs[1]).min(ro * fs[0] * 0.4));
+                let rp2 = ((rp * fs[2]).max(rb2 * 1.6)).min(ro2 * 0.8);
+                c.radius(&outer, ro2, true);
+                c.radius(&bore, rb2, true);
+                c.radius(&pitch, rp2, true);
+                c.radius(&holes[0], (rh * fs[3]).min((ro2 - rp2).min(rp2 - rb2) * 0.6), true);
+            }
+            // A keyed shaft: an arc of the shaft's circle closed by a
+            // keyway's two Vertical sides and Horizontal bottom, the sides
+            // symmetric about a Vertical construction line through the
+            // centre; the shaft's radius, the key width and the depth from
+            // the keyway's bottom to the centre.
+            49 => {
+                let rad = r.range(10.0, 20.0);
+                let (kw, depth) = (rad * r.range(0.3, 0.5), rad * r.range(0.55, 0.75));
+                let top_y = (rad * rad - kw * kw / 4.0).sqrt();
+                let a0 = top_y.atan2(kw / 2.0);
+                let arc = c.arc(o, rad, a0, PI - a0);
+                let s1 = c.line(o + v(-kw / 2.0, top_y), o + v(-kw / 2.0, depth));
+                let bot = c.line(o + v(-kw / 2.0, depth), o + v(kw / 2.0, depth));
+                let s2 = c.line(o + v(kw / 2.0, depth), o + v(kw / 2.0, top_y));
+                c.coincident(&format!("{arc}.end"), &format!("{s1}.start"));
+                c.coincident(&format!("{s1}.end"), &format!("{bot}.start"));
+                c.coincident(&format!("{bot}.end"), &format!("{s2}.start"));
+                c.coincident(&format!("{s2}.end"), &format!("{arc}.start"));
+                c.hv(false, &s1);
+                c.hv(false, &s2);
+                c.hv(true, &bot);
+                let axis = c.line(o, o + v(0.0, rad));
+                c.construction(&axis);
+                c.hv(false, &axis);
+                c.coincident(&format!("{axis}.start"), &format!("{arc}.center"));
+                c.symmetric(&format!("{s1}.end"), &format!("{s2}.start"), &axis);
+                let fs: Vec<f64> = (0..3).map(|_| f(&mut r)).collect();
+                let rad2 = rad * fs[0];
+                c.radius(&arc, rad2, true);
+                c.length(&bot, (kw * fs[1]).min(rad2 * 0.8));
+                c.distance(&format!("{arc}.center"), &bot, (depth * fs[2]).min(rad2 * 0.85).max(rad2 * 0.3));
+            }
             // D shape: a Horizontal chord and an arc over it, the chord's
             // length and the arc's radius.
             _ => {
@@ -1661,7 +1780,7 @@ fn write_batch() {
 }
 
 /// The batches: (number, first seed, rich).
-const BATCHES: [(usize, u64, bool); 21] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true), (12, 621, true), (13, 661, true), (14, 701, true), (15, 741, true), (16, 781, true), (17, 821, true), (18, 861, true), (19, 901, true), (20, 941, true), (21, 981, true)];
+const BATCHES: [(usize, u64, bool); 22] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true), (12, 621, true), (13, 661, true), (14, 701, true), (15, 741, true), (16, 781, true), (17, 821, true), (18, 861, true), (19, 901, true), (20, 941, true), (21, 981, true), (22, 1021, true)];
 
 /// Batch 8's s464 / s475 stay as live answered: a component the pass can't
 /// close (a hexagon) takes the least change on its own, the rounded
