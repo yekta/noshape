@@ -225,6 +225,8 @@ pub struct FeatureDialog {
     drag_grab: Arc<parking_lot::Mutex<Point<Pixels>>>,
     /// Whether a reference is missing (its feature was deleted/suppressed).
     pub missing: Arc<dyn Fn(&Reference) -> bool + Send + Sync>,
+    /// References made by a feature after this one (it was moved above its input).
+    pub later: Arc<dyn Fn(&Reference) -> bool + Send + Sync>,
     /// Number of regions of a sketch (a field holding all of them shows
     /// one "Faces of Sketch 1" row).
     pub sketch_region_count: Arc<dyn Fn(FeatureId) -> usize + Send + Sync>,
@@ -424,6 +426,7 @@ impl FeatureDialog {
             preview_track: Default::default(),
             drag_grab: Default::default(),
             missing: Arc::new(|_| false),
+            later: Arc::new(|_| false),
             sketch_region_count: Arc::new(|_| 0),
             sketch_vertices: Arc::new(|_| Vec::new()),
             grouped_sketches: Default::default(),
@@ -2471,6 +2474,12 @@ impl FeatureDialog {
         self.tab_stops.entry(key.to_string()).or_insert_with(|| cx.focus_handle().tab_stop(true)).clone()
     }
 
+    /// A control's Tab stop (a click on it gives it the keyboard).
+    #[cfg(test)]
+    pub(crate) fn tab_stop_handle(&self, key: &str) -> Option<FocusHandle> {
+        self.tab_stops.get(key).cloned()
+    }
+
     /// Make `d` a Tab stop. Space activates it through `d`'s click handler
     /// (GPUI turns Space / Enter on the focused element into a keyboard
     /// click; a key handler of its own toggled a checkbox twice,
@@ -2480,7 +2489,8 @@ impl FeatureDialog {
     /// adds nothing here); the `?` link gets a ring.
     fn tab_stop_element(d: Stateful<Div>, h: &FocusHandle, look: Focus) -> Stateful<Div> {
         let blue: Hsla = gpui_kit::rgb(0x1651b0).into();
-        let d = d.track_focus(h);
+        // Undo / Redo do nothing while a control has the keyboard (live 1990 1.13: a checkbox just clicked).
+        let d = d.track_focus(h).on_action(|_: &crate::actions::Undo, _, cx| cx.stop_propagation()).on_action(|_: &crate::actions::Redo, _, cx| cx.stop_propagation());
         match look {
             Focus::Underline => d.focus(move |s| s.shadow(vec![BoxShadow { color: blue, offset: point(px(0.), px(-2.)), blur_radius: px(0.), spread_radius: px(0.), inset: true }])),
             Focus::Ring => d.focus(move |s| s.shadow(vec![BoxShadow { color: blue, offset: point(px(0.), px(0.)), blur_radius: px(0.), spread_radius: px(1.5), inset: false }])),
@@ -2977,6 +2987,8 @@ impl FeatureDialog {
                         let label_for_drag = label.clone();
                         // Missing references (deleted/suppressed creators) show red.
                         let missing = indices.iter().any(|i| self.ref_missing(&refs[*i]));
+                        // Made by a later feature: its name in light grey italic (live 1990 5.15, 90h-missing-chip).
+                        let later = !missing && indices.iter().any(|i| (self.later)(&refs[*i]));
                         let p2 = path_s.clone();
                         let hover_ref = r.clone();
                         let tip = label.clone();
@@ -2995,7 +3007,8 @@ impl FeatureDialog {
                             .pr(px(4.))
                             .when(row % 2 == 1, |d| d.bg(with_alpha(gpui_kit::rgb(0xffffff), 0.35)))
                             .text_size(px(13.33))
-                            .text_color(if missing { pal.error } else if active { gpui_kit::rgb(0x555555) } else { pal.text_muted })
+                            .text_color(if missing { pal.error } else if later { gpui_kit::rgb(0xcccccc) } else if active { gpui_kit::rgb(0x555555) } else { pal.text_muted })
+                            .when(later, |d| d.italic())
                             .child(div().flex_1().truncate().child(crate::ui::entity_text(label)))
                             .when(reorder_on && single, |d| d.child(self.reorder_grip(path, k, &label_for_drag, false)))
                             // A mate connector made inside the feature: its icon opens its editor (live 1851).

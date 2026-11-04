@@ -2348,6 +2348,10 @@ impl PartStudioView {
             Some(s) => Arc::new(noshape_ops::studio::missing_reference(&self.doc.read(cx).session.doc, s)),
             None => Arc::new(|_: &Reference| false),
         };
+        let later_refs: Arc<dyn Fn(&Reference) -> bool + Send + Sync> = match self.studio(cx).filter(|_| !is_new) {
+            Some(s) => Arc::new(later_reference(s, index)),
+            None => Arc::new(|_: &Reference| false),
+        };
         let (configured, configurable_inputs) = self.configured_of(feature_id, cx);
         let region_counts: std::collections::HashMap<FeatureId, usize> = self.display.sketches.iter().map(|s| (s.feature, s.regions.len())).collect();
         let vertex_sets: std::collections::HashMap<FeatureId, Vec<Reference>> = self.display.sketches.iter().map(|s| (s.feature, sketch_points(s))).collect();
@@ -2361,6 +2365,7 @@ impl PartStudioView {
                 d.extra = Some(Self::sketch_dialog_extra(studio_view));
             }
             d.missing = missing;
+            d.later = later_refs;
             d.configured = configured;
             d.configurable_inputs = configurable_inputs;
             d.sketch_region_count = Arc::new(move |id| region_counts.get(&id).copied().unwrap_or(0));
@@ -6750,3 +6755,16 @@ const TOGGLE_POINT_PX: f32 = 12.0;
 
 /// A FeatureScript points manipulator's dot (live 1709: Frame's alignment points, ≈7 px with a grey ring).
 const STD_POINT_PX: f32 = 7.0;
+
+/// Which references of the feature at `at` a feature after it makes (the feature was moved above its input).
+fn later_reference(ps: &noshape_model::partstudio::PartStudio, at: usize) -> impl Fn(&Reference) -> bool + Send + Sync + 'static {
+    let order: std::collections::HashMap<FeatureId, usize> = ps.features.iter().enumerate().map(|(i, f)| (f.id, i)).collect();
+    move |r: &Reference| {
+        let creator = match r {
+            Reference::Edge(n) | Reference::Vertex(n) => noshape_ops::studio::edge_creator_by(n, |f| order.get(&f).copied()),
+            r => r.depends_on(),
+        };
+        creator.and_then(|f| order.get(&f)).is_some_and(|i| *i > at)
+    }
+}
+

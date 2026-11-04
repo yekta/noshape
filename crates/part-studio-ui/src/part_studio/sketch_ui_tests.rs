@@ -650,6 +650,32 @@ fn what_the_dialog_fills_in_on_opening_is_no_undo_step(cx: &mut TestAppContext) 
     assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (false, true));
 }
 
+/// Live 1990 (1.13): with the keyboard on a dialog control (a checkbox just clicked), Ctrl+Z does nothing; with it
+/// elsewhere, it steps the dialog's last edit.
+#[gpui::test]
+fn undo_does_nothing_while_a_dialog_control_has_the_keyboard(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "undo-on-control");
+    view.update(cx, |v, _| v.selection = vec![top.clone()]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Extrude dialog").dialog.clone());
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    cx.update(|cx| dialog.update(cx, |d, cx| d.set_value("symmetric", noshape_model::ParamValue::Bool(true), cx)));
+    draw(cx, window);
+    let symmetric = |cx: &mut TestAppContext| cx.update(|cx| dialog.read(cx).feature.params.bool("symmetric"));
+    cx.update_window(window, |_, w, cx| {
+        let h = dialog.read(cx).tab_stop_handle("cb:symmetric").expect("the Symmetric checkbox");
+        w.focus(&h, cx);
+    }).unwrap();
+    keys(cx, window, &["secondary-z"]);
+    assert!(symmetric(cx), "the checkbox has the keyboard: nothing undone");
+    cx.update_window(window, |_, w, cx| {
+        let h = dialog.read(cx).focus_handle(cx);
+        w.focus(&h, cx);
+    }).unwrap();
+    keys(cx, window, &["secondary-z"]);
+    assert!(!symmetric(cx), "the keyboard elsewhere: the dialog's edit undone");
+}
+
 /// Live (behaviours request 1839): Enter on a selected feature row opens nothing, and ↑ after the row click doesn't
 /// move the rollback bar; once the bar is clicked ↑ steps it.
 #[gpui::test]
@@ -2031,6 +2057,43 @@ fn a_new_extrude_on_a_face_never_previews_as_new(cx: &mut TestAppContext) {
     }
     assert_eq!(cx.update(|cx| (dialog.read(cx).feature.params.enum_("operationType").to_string(), view.read(cx).display.bodies.len())), ("ADD".to_string(), 1));
     assert_eq!(most, 1, "no New preview with a second part on the way");
+}
+
+/// Live 1990 (5.15): a Fillet moved above the Extrude whose edge it takes: its chip is that edge made by a later
+/// feature (grey italic, not missing).
+#[gpui::test]
+fn a_chip_made_by_a_later_feature(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } },
+        { "type": "fillet", "name": "Fillet 1", "params": { "entities": ["edge through [20, 0, 10]"], "radius": "2 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "later-chip", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let fillet = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Fillet 1").unwrap().id);
+    let open = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(fillet, w, cx))).unwrap();
+        let d = view.update(cx, |v, _| v.edit.as_ref().expect("the Fillet dialog").dialog.clone());
+        cx.update(|cx| {
+            let d = d.read(cx);
+            let edge = d.feature.params.query("entities")[0].clone();
+            ((d.later)(&edge), d.ref_missing(&edge))
+        })
+    };
+    assert_eq!(open(cx), (false, false), "in place, its edge is an earlier feature's");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
+    let tab = cx.update(|cx| view.read(cx).tab);
+    view.update(cx, |v, cx| {
+        v.doc.update(cx, |doc, cx| {
+            doc.edit_studio(tab, "Move Fillet 1", cx, |ps| {
+                let f = ps.features.remove(2);
+                ps.features.insert(1, f);
+                Some(())
+            })
+        });
+    });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert_eq!(open(cx), (true, false), "above the Extrude: made by a later feature, not missing");
 }
 
 /// Live (ui-parity measure-fillet-face): an edge between an Extrude face and a Fillet face is Fillet 1's (the edge

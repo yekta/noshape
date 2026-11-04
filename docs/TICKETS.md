@@ -1814,11 +1814,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Shift+E. Live's recordings (extrude-remove-tab, boolean-union-two-parts, new-extrude-then-other-tool; /root/parity/ui/live):
   the Extrude 2 dialog opens with Undo **off**; it turns on at the first change in the dialog (the Remove tab). Ours (green
   7d35f2cb, qa-scratch/uip-score3/): Undo on as soon as the dialog opens. (qa 2026-11-03 08:04, build 7d35f2cb)
-- [ ] P3 MISSING-LATER-CHIP (psui, live 1990 5.15, live/skasm/sketch-audit-1969/90h-*) a selection whose creating
+- [ ] partly fixed (psui 11-04: the chip's look, grey #cccccc italic, `FeatureDialog::later`, T1 a_chip_made_by_a_later_feature; Edit healthy moment waits for live's answer to what it does, REQUESTS 11-04 11:06 (b)) P3 MISSING-LATER-CHIP (psui, live 1990 5.15, live/skasm/sketch-audit-1969/90h-*) a selection whose creating
   feature now comes after the edited feature (Fillet 1 dragged above Extrude 1) keeps its chip name ("Edge of Extrude
   1") in light grey italic, and its right-click menu is "Clear all" + "Edit healthy moment" (Help Document__repairing:
   opens the Repair panel at the feature's last healthy moment). Ours shows it as a normal chip, menu Clear all only.
-- [ ] P3 DIALOG-UNDO-ON-CONTROL (psui, live 1990 1.13) with the keyboard on a dialog control (a checkbox just
+- [x] fixed (psui 11-04: a dialog control's Tab stop swallows Undo / Redo; T1 undo_does_nothing_while_a_dialog_control_has_the_keyboard) P3 DIALOG-UNDO-ON-CONTROL (psui, live 1990 1.13) with the keyboard on a dialog control (a checkbox just
   clicked), Ctrl+Z does nothing in live; ours steps the dialog's last edit (the Undo action reaches the document).
 - [ ] P3 FS-SEARCH-BAR (feature-studio-ui / psui, live 1990 1.28, 90j-ctrl-shift-f.png) Ctrl+Shift+F in a Part Studio
   opens a Feature Studio search bar under the graphics: "Find text", Match case, Regex, a "Feature Studio name filter"
