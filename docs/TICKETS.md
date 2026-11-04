@@ -1567,6 +1567,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   ramp's curl lay 43 µm off its parametric offset (the offset folds there; 10 µm on the dumped body): allowed up to
   1e-3 of the part's size, the edge's tolerance what its curves are apart. The document: Shell 4 OK 13659.1 mm³ in
   1.5 s, nothing else changes (Shell 3 / 5 fail as before, 0.3 s); shell corpus unchanged.
+  core 11-04 06:12: live's 28 faces (behaviours "core (2026-11-04 04:42)"): 13 outer, 11 inner walls (no offset of the
+  skirt, as ours), 1 rim, and 4 slivers Parasolid fills the seams with where the front rounds' and the ramp's offsets
+  don't meet exactly (0.2-0.45 mm wide, at x 14 and 26). Ours meet exactly there (24 faces), the volume in live's
+  band (13661.23, ours 13659.04): the slivers are Parasolid's offset, not built.
   qa 11-04 05:34 (green a6ff8389, CLI): confirmed — bop-pairs-gpf-5267's Part 6 13659.0986 mm³ / 24 faces (was the unshelled
   82839.025), in live's band; the other 43 ticket documents, the volume sweep, dx's cf corpus and the vase unchanged.
 - [ ] P0 REGEN-SPEED (core 10-29 03:05: met in release on perf.yml run 40796942944 (main 34cbea98): live-30-features full regen 35 / 41 / 53 ms (macOS / Linux / Windows; budget 80, live 171), its Extrude 1 edit commit 34 / 38 / 60 ms (budget 200), big-plate regen 159 / 230 / 306 ms (live 617); qa, please re-measure the GUI commit on a release build, the 301–785 ms were a dev build at load ~30. Was 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
