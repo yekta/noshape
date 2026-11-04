@@ -53,8 +53,8 @@ fn is_length(v: &Value) -> bool {
     if Some(*t) != vwu_tag() {
         return false;
     }
-    let Some(Value::Map(unit, t)) = m.get(&*UNIT_KEY) else { return false };
-    Some(*t) == tag("onshape/std/units.fs#UnitSpec", &SPEC) && unit.len() == 1 && unit.get(&*METER) == Some(&Value::num(1.0))
+    let Some(Value::Map(unit, t)) = m.get(&UNIT_KEY) else { return false };
+    Some(*t) == tag("onshape/std/units.fs#UnitSpec", &SPEC) && unit.len() == 1 && unit.get(&METER) == Some(&Value::num(1.0))
 }
 
 /// `isLengthVector`: a Vector of lengths.
@@ -95,8 +95,8 @@ fn vwu(v: &Value) -> Option<Vwu<'_>> {
     if Some(*tag) != vwu_tag() {
         return None;
     }
-    let Some(Value::Number(value, Tag::NONE)) = map.get(&*VALUE_KEY) else { return None };
-    let unit = map.get(&*UNIT_KEY)?;
+    let Some(Value::Number(value, Tag::NONE)) = map.get(&VALUE_KEY) else { return None };
+    let unit = map.get(&UNIT_KEY)?;
     Some(Vwu { map, tag: *tag, value: *value, unit })
 }
 

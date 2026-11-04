@@ -16,6 +16,7 @@ pub mod compile;
 pub mod interp;
 pub mod ir;
 pub mod lexer;
+pub mod map;
 pub mod natives;
 pub mod parser;
 mod spline;

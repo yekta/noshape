@@ -17,6 +17,7 @@ causes of difference, each with its ticket.
 | 2026-11-04 | dx 12:19 (run 65: opPattern of a solid's faces repeats them in the body; ties between equal faces go to live's part (cf-fill-pattern 11/11)) | 34/56 | 358/482 (custom 28/111) | – |
 | 2026-11-04 | dx 12:54 (run 67: each studio compiles against the std of its own pin (54 releases shipped, FS-OLD-STD-COMPAT)) | 35/56 | 369/482 (custom 33/111) | – |
 | 2026-11-04 | dx 15:37 (run 69: 93 std releases shipped (39 more from live; TYPED_SINCE 2473); std's units / vector operators natively from 2506 (cf-o-ring-generator 11/11)) | 36/56 | 370/482 (custom 34/111) | – |
+| 2026-11-04 | dx 15:56 (run 70 on main 539b4d6f6 + FeatureScript maps as short vectors: cf-circular-pattern 9 -> 13/13, cf-linear-pattern-with-seed-location 8 -> 12/12, cf-curve-pattern-normal 4 -> 5 (main's); pulley02-maxwell 7 -> 2 (Fillet 1), clamp-hms 14 -> 11 (Extrude 5): from main since 14:53, not dx's (the same without it; core.md)) | 37/56 | 371/482 (custom 38/111) | – |
 
 dx 11-03 18:15: three documents are left out of the model score (tests/parity-models/unscored.json, printed as "not
 scored" by `parity_models`): cf-ansi-washers, cf-socket-head-cap-screw-creator and cf-thread-creator. Their Feature

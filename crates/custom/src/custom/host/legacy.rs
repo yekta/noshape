@@ -32,7 +32,9 @@ fn with_mesh_flags(v: Value) -> Value {
             .map(|side| match side {
                 Value::Map(s, st) => {
                     let mut s = (**s).clone();
-                    s.entry(Value::str("isMesh")).or_insert(Value::bool(false));
+                    if !s.contains_key(&Value::str("isMesh")) {
+                        s.insert(Value::str("isMesh"), Value::bool(false));
+                    }
                     Value::Map(Arc::new(s), *st)
                 }
                 other => other.clone(),
@@ -66,8 +68,10 @@ pub fn to_builtin(v: &Value) -> Value {
                 "BSplineCurve" => Some("SPLINE"),
                 _ => None,
             };
-            if let Some(c) = curve {
-                out.entry(Value::str("curveType")).or_insert_with(|| Value::str(c));
+            if let Some(c) = curve
+                && !out.contains_key(&Value::str("curveType"))
+            {
+                out.insert(Value::str("curveType"), Value::str(c));
             }
             Value::Map(Arc::new(out), Tag::NONE)
         }

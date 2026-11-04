@@ -13,7 +13,6 @@
 use parking_lot::{Mutex, RwLock};
 use std::any::Any;
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use std::sync::{Arc, LazyLock};
@@ -285,7 +284,7 @@ impl Func {
     }
 }
 
-pub type Map = BTreeMap<Value, Value>;
+pub use crate::map::Map;
 
 #[derive(Clone, Debug, Default)]
 pub enum Value {

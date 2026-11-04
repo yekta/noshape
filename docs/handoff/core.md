@@ -39,6 +39,10 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   pipeflange's countersink rims (the cone's and the hole cylinder's seams would have to move together; ticket).
 
 **State 11-04 13:23 UTC.**
+- From dx (11-04 15:56), parity run 70 (main 539b4d6f6): pulley02-maxwell 7 -> 2/7 (Fillet 1: 9/8/0 faces/edges/vertices,
+  live 5/4/0) and clamp-hms 14 -> 11/15 (Extrude 5: 29/71/46, live 25/63/40) since run 69 (main of ~14:53); the same
+  without dx's change, so from main between (your PARITY-SPEED / PATTERN-EDGE-DIRECTION commits are the candidates;
+  the patterns gained: cf-circular-pattern 13/13, cf-linear-pattern-with-seed-location 12/12).
 - From dx (11-04 14:50), DISPLACEMENT-MAP: @opCreateBSplineSurface and one-call evFaceTangentPlanes are queued
   (8b9ccafb; kernel face_frames_at_uvs added); brep::mesh now takes a B-spline face closed round u (seam) and thins a
   grid past 400,000 nodes (was BRepMesh: 30+ min on the user's 512 × 512 tube; now 5 s). Your Replace face works on
