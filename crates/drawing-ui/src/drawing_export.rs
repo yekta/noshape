@@ -61,17 +61,8 @@ impl DrawingEditor {
                     s.version = default_version(s.format);
                     s.text = 0;
                 }));
-            // Live dialog-export-drawing-all-formats: each format's note.
-            if f == DrawingFormat::Dwg {
-                body = body.child(div().pt(px(6.)).text_size(px(13.33)).child("In the exported file, dimensions added to a view with a scale different from the active sheet may be out of scale."));
-            }
-            if f == DrawingFormat::Svg || f.raster() {
-                body = body.child(div().pt(px(6.)).text_size(px(13.33)).child("Selected format only supports exporting the active sheet."));
-            }
-            match f {
-                DrawingFormat::InspectionList => body = body.child(div().pt(px(6.)).text_size(px(13.33)).child("Exported csv file will contain an ordered list of all inspection symbols.")),
-                DrawingFormat::DefinitionList => body = body.child(div().pt(px(6.)).text_size(px(13.33)).child("Exported csv file will contain all dimensions and annotations.")),
-                _ => {}
+            if let Some(note) = format_note(f) {
+                body = body.child(div().pt(px(6.)).text_size(px(13.33)).child(note));
             }
             if f == DrawingFormat::Pdf {
                 body = body.child(select("ex-version", "Version", strs(&PDF_VERSIONS), s.version, |s, i| s.version = i));
@@ -268,5 +259,32 @@ impl DrawingEditor {
             .ok();
         })
         .detach();
+    }
+}
+
+/// The note under Format (live dom/dialog-export-drawing-all-formats).
+fn format_note(f: DrawingFormat) -> Option<&'static str> {
+    match f {
+        DrawingFormat::Dwg | DrawingFormat::Dxf | DrawingFormat::Dwt => Some("In the exported file, dimensions added to a view with a scale different from the active sheet may be out of scale."),
+        DrawingFormat::InspectionList => Some("Exported csv file will contain an ordered list of all inspection symbols."),
+        DrawingFormat::DefinitionList => Some("Exported csv file will contain all dimensions and annotations."),
+        f if f == DrawingFormat::Svg || f.raster() => Some("Selected format only supports exporting the active sheet."),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DrawingFormat, format_note};
+
+    /// Live's dialog per format (dom/dialog-export-drawing-all-formats.txt): DWG, DXF and DWT warn about view scales.
+    #[test]
+    fn each_formats_note_is_lives() {
+        let scale = Some("In the exported file, dimensions added to a view with a scale different from the active sheet may be out of scale.");
+        for f in [DrawingFormat::Dwg, DrawingFormat::Dxf, DrawingFormat::Dwt] {
+            assert_eq!(format_note(f), scale, "{f:?}");
+        }
+        assert_eq!(format_note(DrawingFormat::Pdf), None);
+        assert_eq!(format_note(DrawingFormat::Svg), Some("Selected format only supports exporting the active sheet."));
     }
 }
