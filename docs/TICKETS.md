@@ -3109,6 +3109,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   5 mm vertical edge's R2.5 round (a quarter cylinder 12.87015 mm²) runs between two SPHERE patches (all 24 6.43507
   mm²) where it meets Fillet 1's tori (re-split into new tori 39.67877 mm²), the lobes' sides cut back (52.09821 /
   84.95923 mm²): plain vertex blends of three equal rounds, which OCCT's fillet over the earlier rounds can't make.
+  core 11-04 01:02: on Fillet 1's exact result, Fillet 2 builds now (OCCT's): its volume in live's band, area 7596.076
+  against 7596.223 mm², but 105 / 224 / 120 faces / edges / vertices against live's 81 / 152 / 72 (its corners in
+  OCCT's patches where live has one sphere each). 235 ms, live 22.
 - [x] (core 11-03 14:50: live 1897's rule, from the normal alone (±Z: x = +X; else y = +Z projected, x = y × n), for sketches and planes on faces (eval.rs raw_plane) and FeatureScript's evPlane (host query.rs); ScopeRule 8, studios saved with features before keep OCCT's (PartStudio::legacy_face_frames). exercise-martinl and learning-center-devon match live to the end; T1 model kernel_robustness::a_sketch_on_a_face_takes_onshapes_frame. Left: evPlane's origin is the face's box centre in live (ours the parameter box's middle), and sheet metal flanges (bracket00-ira's) untested) P2 SKETCH-FACE-FRAME (core; dx's parity suite 11-03) a sketch on a part face gets another x axis than live's in
   3 of the corpus's face sketches (the origin and normal agree; live's frames are features.json `sketches`
   transformMatrix): exercise-martinl Sketch 2 on a −X side face: ours x (0, 0, −1), y (0, −1, 0), live x (0, −1, 0),
@@ -3249,7 +3252,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   2's fit spline (its wire edges, construction filtered) Up to body into a surface; ours errs, so its later Curve
   Pattern Normal has nothing to follow. Model /root/parity/models/cf-curve-pattern-normal
   (NOSHAPE_PARITY_ONLY=cf-curve-pattern-normal). (dx 2026-11-03)
-- [ ] P2 FILLET-KNOB-JASON-VOLUME (core; dx's parity suite 11-03, knob-jason) knob-jason's Fillet 1 (two edges JPC /
+- [x] (core 11-04 01:02: OCCT's corners where two tori meet came out short by its edges' direction; noshape's blend now builds fillets of arcs meeting at corners exactly (the tori's meeting curve as a fitted NURBS), and a fillet it declines whole is split: the edge groups it takes first, OCCT's for the rest (the hole rims on cones). Fillet 1 as live (10/11 features), 20 ms (was 273); T1 kernel blend::rounds_of_arcs_meeting_at_corners_are_lives; parity 314/480, nothing else changed) P2 FILLET-KNOB-JASON-VOLUME (core; dx's parity suite 11-03, knob-jason) knob-jason's Fillet 1 (two edges JPC /
   JUK with tangent propagation, r 2.5 mm, "Allow edge overflow" on) has live's faces / edges / vertices (45/92/48)
   but 26977.368 mm³ where live's is 26981.111 (−3.7, outside live's band ±2) and area 7628.295 mm², live 7629.006.
   (Live's box there, ±30.1455 mm past the ±30 block, is the UI fetch's loose client bounds round fillet surfaces,
