@@ -1133,6 +1133,7 @@ impl PartStudioView {
         // Part tab of Mass and section properties, laid out like Onshape's dialog.
         let mut mass_view: Option<MassView> = None;
         let mut face_view: Option<FaceMassView> = None;
+        self.ui.mass_state = None;
         if self.show_mass && self.ui.mass_faces {
             // Face tab (live skb/851–854): Surface area, Perimeter and, for
             // coplanar planar faces, the area moments of inertia about their
@@ -1503,6 +1504,9 @@ impl PartStudioView {
                 }
                 (None, Some(m)) => {
                     let ref_active = self.ui.mass_ref_active;
+                    if crate::ui_script::active() {
+                        self.ui.mass_state = Some(mass_ui_state(&m, self.ui.mass_faces, ref_active, self.ui.mass_variance));
+                    }
                     body = body
                         // Live: 5 px between the tabs and the two fields, 8 under them.
                         // One field active at a time; a click on the other
@@ -1889,6 +1893,38 @@ impl MassView {
     fn mass_override_enabled(&self) -> bool {
         !self.volume.is_empty()
     }
+}
+
+/// The Part tab of Mass and section properties as live's ui-parity state reads Onshape's (a feature dialog: its tabs,
+/// the two selection fields, the checkboxes and every value row in order; the value rows have no label of their own).
+fn mass_ui_state(m: &MassView, faces: bool, ref_active: bool, variance: bool) -> serde_json::Value {
+    use serde_json::json;
+    let num = |label: serde_json::Value, text: &str| json!({ "label": label, "kind": "number", "text": text, "focused": false, "state": "ok" });
+    let check = |label: &str, checked: bool, enabled: bool| json!({ "label": label, "kind": "boolean", "checked": checked, "state": if enabled { "ok" } else { "disabled" } });
+    let override_on = m.override_part.as_ref().is_some_and(|(_, on, _)| *on);
+    let mut fields = vec![
+        json!({ "label": if faces { "Faces to measure" } else { "Parts to measure" }, "kind": "query", "items": m.parts, "active": !ref_active, "state": "ok" }),
+        json!({ "label": "Mate connector for reference frame", "kind": "query", "items": m.reference.iter().collect::<Vec<_>>(), "active": ref_active, "state": "ok" }),
+        check("Show calculation variance", variance, true),
+        check("Mass", override_on, m.override_part.is_some() && m.mass_override_enabled()),
+        num(serde_json::Value::Null, m.mass.as_deref().unwrap_or_default()),
+        num(json!("Volume"), &m.volume),
+        num(json!("Surface area"), &m.area),
+        check("Center of mass", false, false),
+    ];
+    fields.extend(m.center.iter().map(|c| num(json!(""), c)));
+    fields.push(check(&format!("Mass moments of inertia ({})", m.inertia_unit), false, false));
+    let names = [["Lxx", "Lxy", "Lxz"], ["Lyx", "Lyy", "Lyz"], ["Lzx", "Lzy", "Lzz"]];
+    for (r, row) in names.iter().enumerate() {
+        for (c, n) in row.iter().enumerate() {
+            fields.push(num(json!(n), &m.inertia.as_ref().map(|i| i[r][c].clone()).unwrap_or_default()));
+        }
+    }
+    json!({
+        "title": "Mass and section properties", "titleState": "ok", "kind": "feature",
+        "tabs": [{ "label": "Part", "selected": !faces }, { "label": "Face", "selected": faces }],
+        "fields": fields, "error": null, "ok": if m.changed { "enabled" } else { "disabled" },
+    })
 }
 
 /// Kind of a measurement for the measure type selector.

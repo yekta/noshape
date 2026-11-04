@@ -346,6 +346,8 @@ pub struct UiState {
     /// bounds of the parts last measured (by the model they came from: two
     /// more integrations a part, so only while ticked and once per model).
     pub mass_variance: bool,
+    /// The Mass and section properties panel as the ui-parity state reads it (kept only while the driver runs).
+    pub mass_state: Option<serde_json::Value>,
     pub mass_variance_cache: Option<(Vec<BodyId>, usize, Option<noshape_model::regen::measure::MassProperties>)>,
     pub mass_face_variance_cache: Option<(Vec<Reference>, usize, Option<noshape_model::regen::measure::FaceVariance>)>,
     /// Mass Override changed in the open dialog (live ui-mass/10–15): the
@@ -673,6 +675,7 @@ impl UiState {
             mass_ref_active: false,
             mass_reference: None,
             mass_variance: false,
+            mass_state: None,
             mass_variance_cache: None,
             mass_face_variance_cache: None,
             mass_override_edit: None,
