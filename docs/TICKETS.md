@@ -3958,7 +3958,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   dx 11-04 23:28: done: beside a curved wall the bend is the definition edge's fillet at the definition radius, the curved
   wall as the fillet trims it, the flat wall's setback where the fillet meets it (the planar formula overshot);
   T1 sheetmetal_std::a_bend_beside_a_rolled_wall (exact: 1059.6878 mm³, 14 faces). Up to Part's part now has live's
-  volume; left: 55/125/72 faces/edges/vertices against 50/112/76, area +0.15 %.
+  volume; left: 55/125/72 faces/edges/vertices against 50/112/76, area +0.15 %. dx 23:33: what is left: live's
+  4 bends are 8 exact cylinders (r 1 / r 3); ours beside the rolled wall are the kernel's B-spline fillets (one
+  bend's faces carry live's areas, 57.615 / 19.205 mm²; the other thickens into slivers: end planes 0.716, 0.715,
+  0.143 mm² where live has 5.121). Replacing each fillet by the exact cylinder through its tangent lines (revolve
+  of one about the axis) gave 54 faces but area +0.23 %: the arc side is wrong on one of them; settle it in the
+  T1 case with a second bend of the other hand.
   dx 11-04 21:39: cf-sheet-metal-shaped-flange's Shaped Flange 1 (flange a separate part, 78,922 vs 92,510 mm³):
   the definition sheet joins (the flange shares its partial edge with the base), but `addEdge` (its transient
   query ∪ startTracking) resolves to two edges after flangeEdgeChange + flange_boolean: the moved joint edge (z 2.5,
