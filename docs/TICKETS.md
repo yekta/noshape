@@ -3926,6 +3926,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qUnion([q, startTracking(q)]) for originals): Shaped Flange 1 as live (50/112/64, 92,513 mm³), the document
   4 -> 5/10; T1 ops_harness trackSketchLine. Next difference: Make joint 1 (std's sheetMetalMakeJoint) "An internal
   edge cannot be used to create a joint.", live OK.
+  dx 11-04 22:03: Make joint 1 (RIP between Flange 1's walls) needs their corner edges free (one face each); ours are
+  shared: std's Flange unions its walls with `matches` (the bend edges), Parasolid joins only there and leaves the
+  corners ripped, while the host's union (kernel fuse) merges every coincident edge, the corners too. Needs a
+  union of sheets joined only at the matched edge pairs (kernel: fuse leaving other coincident edges apart, or
+  faces copied apart and sewn pair by pair).
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our

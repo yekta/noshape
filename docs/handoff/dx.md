@@ -27,6 +27,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   counts; +0.12 % area is core's fill shape). Parity run 83: 367/471, custom 39/109, 2 documents failing to run
   (cf-sheet-metal-model-plus: up-to-part edge extrusion semantics, TICKETS 21:09; cf-fix-pcb: follows core's
   Extrude 5).
+- Landed / queued 21:50–22:00: a sheet union counts as joined by shared edges (b8a11342); startTracking never yields
+  a sketch entity (6a531840: Shaped Flange 1 as live, cf-sheet-metal-shaped-flange 4 -> 5/10; parity run 85
+  368/471, custom 40/109).
+- Next, first: host sheet unions with `matches` must join only there (std Flange's walls: Parasolid leaves the
+  corners ripped, our fuse joins them; Make joint 1 RIP fails on it; TICKETS PARITY-CUSTOM-RUN-FAILURES 22:03).
+  Careful: std sheet metal's tests lean on today's corners; run sheetmetal_std with --include-ignored and the corpus.
 - 21:29: DISPLACEMENT-MAP end to end with core's Replace face (297f49cdd): /root/dx-scratch/disp/e2e/run.py.
 - Next: FS-QUERY-EDGE-ORDER (creation-order key, ticket 20:14), the other failing custom features (cf-setback-
   fillet fill surface, Sheet Metal Up to Part, Fix PCB), DISPLACEMENT-MAP end to end when core's Replace face on
