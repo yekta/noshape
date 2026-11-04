@@ -423,6 +423,91 @@ impl Interp {
         self.invoke(&c, args, &[], false)
     }
 
+    /// `x = append(x, v)`, `x = concatenateArrays(x, y)` (std's) and `x = @resize(x, n, v)` on an array grow x in place:
+    /// amortized O(1) an element as in Onshape, where a copy per call made array building quadratic (copied only when
+    /// another value shares the array). Any other call runs as written. x is read after the other arguments: no
+    /// expression changes a local. None: not such a statement (nothing evaluated).
+    fn assign_grown(&mut self, slot: u32, callee: &Callee, args: &[Ex], pos: Pos) -> Option<R<Flow>> {
+        let is_x = |e: &Ex| matches!(e.k, ExK::Local(s) if s == slot);
+        let grows = match callee {
+            Callee::Native(_, name) => &**name == "resize",
+            Callee::Overloads(set) => matches!(&*set.name, "append" | "concatenateArrays"),
+            _ => false,
+        };
+        if !grows || !args.first().is_some_and(is_x) {
+            return None;
+        }
+        Some(self.call_grown(slot, callee, &args[1..], pos))
+    }
+
+    fn call_grown(&mut self, slot: u32, callee: &Callee, rest: &[Ex], pos: Pos) -> R<Flow> {
+        enum Grow {
+            Push,
+            Extend,
+            Resize(usize),
+        }
+        self.pos = pos;
+        let mut a = Vec::with_capacity(rest.len() + 1);
+        a.push(Value::Undefined);
+        for x in rest {
+            a.push(self.eval(x)?);
+        }
+        self.pos = pos;
+        let idx = self.base + slot as usize;
+        a[0] = self.stack[idx].clone();
+        let decl = match callee {
+            Callee::Overloads(set) => Some(self.resolve(set, &a)?),
+            _ => None,
+        };
+        let array = matches!(a[0], Value::Array(..));
+        let grow = match &decl {
+            Some(d) if array && a.len() == 2 && &*d.module == "onshape/std/containers.fs" => match &*d.name {
+                "append" => Some(Grow::Push),
+                _ => Some(Grow::Extend),
+            },
+            Some(_) => None,
+            None => match a.get(1) {
+                Some(Value::Number(n, _)) if array && *n >= 0.0 && n.fract() == 0.0 => Some(Grow::Resize(*n as usize)),
+                _ => None,
+            },
+        };
+        if let Some(grow) = grow {
+            a[0] = Value::Undefined;
+            if let Value::Array(arr, tag) = &mut self.stack[idx] {
+                let v = Arc::make_mut(arr);
+                match grow {
+                    Grow::Push => v.push(a.pop().unwrap_or_default()),
+                    Grow::Extend => {
+                        if let Some(Value::Array(b, _)) = a.pop() {
+                            v.extend(Arc::unwrap_or_clone(b));
+                        }
+                        // @concatenateArrays answers an untagged array.
+                        *tag = Tag::NONE;
+                    }
+                    Grow::Resize(n) => v.resize(n, a.get(2).cloned().unwrap_or_default()),
+                }
+            }
+            return Ok(Flow::Normal);
+        }
+        let r = match (decl, callee) {
+            (Some(d), _) => {
+                let Some(c) = d.compiled.get().cloned() else {
+                    return Err(self.error(format!("Function {} is not compiled", d.name)));
+                };
+                self.invoke(&c, a, &[], false)?
+            }
+            (None, Callee::Native(n, name)) => {
+                let saved = std::mem::replace(&mut self.native_name, name.clone());
+                let r = n(self, a);
+                self.native_name = saved;
+                r?
+            }
+            (None, _) => return Err(self.error("Not a call that grows an array")),
+        };
+        self.stack[idx] = r;
+        Ok(Flow::Normal)
+    }
+
     fn satisfies(types: &[Option<TypeRef>], args: &[Value]) -> bool {
         types.iter().zip(args).all(|(t, a)| t.is_none_or(|t| t.matches(a)))
     }
@@ -635,6 +720,13 @@ impl Interp {
                 Ok(Flow::Normal)
             }
             StK::Assign { slot, path, op, value } => {
+                if path.is_empty()
+                    && op.is_none()
+                    && let ExK::Call(callee, args) = &value.k
+                    && let Some(r) = self.assign_grown(*slot, callee, args, value.pos)
+                {
+                    return r;
+                }
                 let mut keys = Vec::with_capacity(path.len());
                 for a in path {
                     keys.push(match a {

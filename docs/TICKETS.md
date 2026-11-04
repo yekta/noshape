@@ -5,6 +5,21 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## From the user, 2026-11-04
+- [ ] P1 DISPLACEMENT-MAP (dx, lead 11-04 13:08, the user's case) the public Displacement map FeatureScript
+  (Evan Reese's, FeatureScript 3044; repro /root/lead-scratch/disp/displacementMap.fs and leather.csv, 512×512 pixel
+  values) fails in noshape: a cylinder (Sketch circle + Extrude), the CSV imported as a tab, the custom feature on the
+  cylinder's face, degree 5, black 0 mm, white 1 mm: "Regeneration timed out" in createPointsTable at `parameters =
+  append(parameters, vector(...))`, 262,144 appends. In order: (1) `x = append(x, v)` amortized O(1) as in Onshape
+  (every append copied the array: quadratic), with std's other array builders; (2) evFaceTangentPlanes with 262,144
+  parameters as one fast native call; (3) opCreateBSplineSurface (native_args.rs MISSING): periodic u / v (the
+  cylinder's side face), degree up to 15, 512×512 control points; (4) end to end as the user does it, the side face and
+  a flat top face, Replace face off and on, timed against live's result. Target: Onshape's time or better.
+  dx 11-04 13:13: (1) `x = append(x, v)`, `x = concatenateArrays(x, y)` (std's) and `x = @resize(x, n, v)` grow x's
+  array in place (mapArray and filter build with the last); `@resize` no longer copies an array it owns. 262,144
+  appends of vectors, a mapArray and a filter of them: under 0.5 s (was a time-out). T1 featurescript tests::building_large_arrays_is_linear,
+  growing_an_array_in_place_answers_as_the_call.
+
 ## From the user, 2026-11-02 (v0.4.19, macOS)
 - [x] (psui 11-03 00:10, fixed by "psui: VAR-AUTOCOMPLETE-ENTER …": (1) an open feature dialog kept the variables of
   the regeneration before it opened, so a dialog opened before the one defining `#wall_thickness` finished listed only

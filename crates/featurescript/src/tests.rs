@@ -181,6 +181,55 @@ function f() { const t = { 'n' : 1 } as T; return [g(1), g('s'), g(t), (t + t).n
     assert_eq!(run_str(src), "[ \"number\" , \"any\" , \"T\" , 2 ]");
 }
 
+/// `x = append(x, v)` and its kin grow x in place: the same values as the call written apart (`y = append(x, v); x =
+/// y`), with the type tag, another variable's copy, a module's own overload and the errors as written.
+#[test]
+fn growing_an_array_in_place_answers_as_the_call() {
+    let pre = "export type T typecheck isT;\nexport predicate isT(v) { v is array; }\n\
+               function append(arr is array, v is string) returns array { return ['own ' ~ v]; }\n";
+    let cases = [
+        ("var a = [1]; const b = a;", "append(a, 2)", "return [a, b];"),
+        ("var a = [1] as T;", "append(a, 2)", "return [a, a is T];"),
+        ("var a = [1] as T;", "concatenateArrays(a, [2, 3])", "return [a, a is T];"),
+        ("var a = [1] as T;", "@resize(a, 3, 7)", "return [a, a is T];"),
+        ("var a = [1, 2, 3];", "@resize(a, 1)", "return a;"),
+        ("var a = [1];", "append(a, 'x')", "return a;"),
+        ("var a = [1];", "append(a, a)", "return a;"),
+        ("var a = 5; try {", "append(a, 1)", "} catch (e) { return [a, e]; } return a;"),
+        ("var a = [1]; try {", "@resize(a, -1)", "} catch (e) { return [a, e]; } return a;"),
+        ("var a = [1]; try {", "concatenateArrays(a, 2)", "} catch (e) { return [a, e]; } return a;"),
+        ("var a = 5;", "append(a, 1)", "return a;"),
+        ("var a = [1];", "@resize(a, -1)", "return a;"),
+        ("var a = [1];", "concatenateArrays(a, 2)", "return a;"),
+    ];
+    let message = |r: String| r.split(" at test").next().unwrap_or_default().to_string();
+    for (head, call, tail) in cases {
+        let in_place = format!("{pre}function f() {{ {head} a = {call}; {tail} }}");
+        let apart = format!("{pre}function f() {{ {head} var y = {call}; a = y; {tail} }}");
+        assert_eq!(message(run_str(&in_place)), message(run_str(&apart)), "{head} {call}");
+    }
+}
+
+/// Building an array element by element is linear, as in Onshape (a Displacement map appends 262,144 parameters; a
+/// copy per append took minutes).
+#[test]
+fn building_large_arrays_is_linear() {
+    let src = "function f() {\n\
+               var p = [];\n\
+               for (var i = 0; i < 512; i += 1) { for (var j = 0; j < 512; j += 1) { p = append(p, vector(i / 511, j / 511)); } }\n\
+               const q = mapArray(p, function(v) { return v[0]; });\n\
+               const r = filter(q, function(x) { return x > 0.5; });\n\
+               var s = [];\n\
+               for (var k = 0; k < 512; k += 1) { s = concatenateArrays(s, [k, k]); }\n\
+               return [size(p), size(q), size(r), size(s)];\n}";
+    // std compiled first (once a process): only the run is timed. ~0.3 s alone; a copy per append took minutes.
+    assert_eq!(run_str("function f() { return size(append([], 1)); }"), "1");
+    let t = std::time::Instant::now();
+    assert_eq!(run_str(src), "[ 262144 , 262144 , 131072 , 1024 ]");
+    let secs = t.elapsed().as_secs_f64();
+    assert!(secs < 3.0, "262,144 appends, a mapArray and a filter of them took {secs:.2} s");
+}
+
 #[test]
 fn predicates_and_switch() {
     let src = r#"

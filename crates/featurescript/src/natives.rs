@@ -151,10 +151,13 @@ fn size(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     } as f64))
 }
 
-fn resize(i: &mut Interp, a: Vec<Value>) -> R<Value> {
-    let (arr, tag) = match arg(i, &a, 0)? {
-        Value::Array(x, t) => (x.clone(), *t),
-        other => return Err(i.error(format!("Cannot resize a value of type {}", other.type_description()))),
+fn resize(i: &mut Interp, mut a: Vec<Value>) -> R<Value> {
+    let (arr, tag) = match a.first_mut() {
+        Some(Value::Array(x, t)) => (std::mem::take(x), *t),
+        _ => {
+            let other = arg(i, &a, 0)?;
+            return Err(i.error(format!("Cannot resize a value of type {}", other.type_description())));
+        }
     };
     let n = int_arg(i, &a, 1)?;
     if n < 0 {
