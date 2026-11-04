@@ -7,6 +7,13 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 right (7607.301), mirror set and cli-fillet-segv right; published 08:43:30 (all three bundles); the release tarball is byte-identical to the smoked artifact.
 Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfmir2 B P0.
 
+**11-04 14:02: new release check (lead, AGENTS.md ad57a47b: the app is the same on macOS, Windows and Linux; a
+difference is a bug).** At every release: the start window's title bar (account menu, ? Help ▾) and a document's ☰ / Help ▾ /
+bell must open their menus on Windows (and macOS). Today they were dead on Windows (lead 4c9c1741, not in a green yet at
+14:00). qa can't run Windows here: requested a release workflow that clicks them on windows-latest / macos-15 (Requests to
+the lead); until then the 17:00 check is Linux only (all open on 399feb05, qa-scratch/tickets/titlebar-menus-linux-399feb05.png)
+plus the Release run's Windows job result. Check 4c9c1741 is in the 17:00 cut.
+
 **11-04 12:00:** greens 915bffd1 (touching regions extrude as one), 8d1106ad (SHELL-SLOW marching), e45c7ee4 (sub-features),
 51826f9e (glued face-pattern cut), b8c31b9e (construction-plane sketch frame), a82d8b82 (HOLE-RIM-PIECES): volume sweep = v0.4.25,
 the 44 ticket documents, dx's cf corpus, the user's cases unchanged. Fuzz 0 deaths: v0.4.25 60, 5363e4d8 100. Loops now: a82d8b82
