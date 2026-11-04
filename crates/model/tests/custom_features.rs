@@ -2349,10 +2349,12 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
             std::thread::sleep(std::time::Duration::from_secs_f64(t));
             let aborted_at = std::time::Instant::now();
             cancel.abort();
-            // NOSHAPE_CANCEL_STACKS=1: every thread's stack while the run is still going 150 ms after the abort.
-            if std::env::var_os("NOSHAPE_CANCEL_STACKS").is_some() {
+            // NOSHAPE_CANCEL_STACKS=<ms> (1: 150): every thread's stack while the run is still going that long after
+            // the abort.
+            if let Some(ms) = std::env::var("NOSHAPE_CANCEL_STACKS").ok().and_then(|v| v.parse::<u64>().ok()) {
+                let ms = if ms == 1 { 150 } else { ms };
                 for _ in 0..3 {
-                    std::thread::sleep(std::time::Duration::from_millis(150));
+                    std::thread::sleep(std::time::Duration::from_millis(ms));
                     if h.is_finished() {
                         break;
                     }

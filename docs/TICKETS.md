@@ -794,6 +794,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   custom_features::knurl_cancel_latency_probe (release, vibe2; NOSHAPE_CANCEL_STACKS=1 prints what still runs):
   before 14-1083 ms early and 10-19 s late in the run; now 12-116 ms up to 20 s, 18-950 ms at 24-50 s (vibe2 at load
   9-20). Patches 0010 (TKernel, TKGeomAlgo) and 0011 (TKBO, TKGeomAlgo); libs in /root/core-scratch/occt0010, occt0011.
+  core 11-04 11:38: (vibe5, release, the probe now takes NOSHAPE_CANCEL_STACKS=<ms>) the knurl runs 9-14 s; cancelled
+  late, 60-180 ms went to the FeatureScript thread's exit freeing its thread-local last Boolean (rust_boolean.cpp
+  t_built: the knurl's faces) while the regeneration joined it: those shapes are freed on a thread of their own now.
+  Cancel at 1 / 4 / 8 / 9 / 11 / 12 s: 18 / 36 / 66 / 89 / 133 / 26 ms (were 19-182).
   psui (11-01 01:57), the UI side, done: 66cf2194 (cancel shows the document as before the edit in the same frame, the
   spinner stops, input is accepted, late results are dropped; live 1688: the dialog closes at once, no toast) and
   6826d5f1 (also when the dialog opened while an earlier regeneration was still running: the last finished result

@@ -4,8 +4,12 @@
 #include "internal.hpp"
 
 #include <chrono>
+#include <condition_variable>
+#include <deque>
 #include <functional>
+#include <mutex>
 #include <optional>
+#include <thread>
 #include <cstdlib>
 
 #include <BRepAlgoAPI_Common.hxx>
@@ -696,6 +700,39 @@ const char* cached_body(const OcShape& s, BrepBody& b, double& max_tol)
   return why;
 }
 
+// Shapes freed on a thread of their own (one, for the process's life: its queue is never destroyed).
+void free_later(std::vector<TopoDS_Shape>&& shapes)
+{
+  struct Queue
+  {
+    std::mutex                             m;
+    std::condition_variable                cv;
+    std::deque<std::vector<TopoDS_Shape>> items;
+  };
+  static Queue* const q = [] {
+    Queue* made = new Queue();
+    std::thread([made] {
+      for (;;)
+      {
+        std::vector<TopoDS_Shape> next;
+        {
+          std::unique_lock<std::mutex> lock(made->m);
+          made->cv.wait(lock, [made] { return !made->items.empty(); });
+          next = std::move(made->items.front());
+          made->items.pop_front();
+        }
+        next.clear();
+      }
+    }).detach();
+    return made;
+  }();
+  {
+    const std::lock_guard<std::mutex> lock(q->m);
+    q->items.push_back(std::move(shapes));
+  }
+  q->cv.notify_one();
+}
+
 // This thread's last result (its flat body, the shapes built for its entities, the tolerance), for
 // rust_boolean_keep.
 struct Built
@@ -706,6 +743,24 @@ struct Built
   std::vector<char>         target_face;
   double                    tol = 0;
   bool                      set = false;
+  Built()                        = default;
+  Built(const Built&)            = delete;
+  Built& operator=(const Built&) = delete;
+  Built(Built&&)                 = default;
+  Built& operator=(Built&&)      = default;
+  // (The thread's exit frees them otherwise, and a regeneration waits for that: the cancelled 45 / 45 knurl's
+  // FeatureScript thread spent 60-180 ms freeing its last Boolean's faces, CANCEL-LATENCY.)
+  ~Built()
+  {
+    std::vector<TopoDS_Shape> all;
+    for (std::vector<TopoDS_Shape>* x : {&v, &e, &f, &s})
+    {
+      all.insert(all.end(), std::make_move_iterator(x->begin()), std::make_move_iterator(x->end()));
+      x->clear();
+    }
+    if (!all.empty())
+      free_later(std::move(all));
+  }
 };
 thread_local Built t_built;
 
