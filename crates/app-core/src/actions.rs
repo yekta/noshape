@@ -52,6 +52,8 @@ actions!(
         CloseWindow,
         Quit,
         ToggleVersionGraph,
+        // Ctrl+Shift+F in any tab: the Search Feature Studios pane (live 1990 1.28).
+        SearchFeatureStudios,
         /// The Release drafts panel (left rail).
         ToggleReleaseDrafts,
         CreateVersion,
@@ -214,6 +216,7 @@ pub fn default_key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new("secondary-w", CloseWindow, None),
         KeyBinding::new("secondary-q", Quit, None),
         KeyBinding::new("alt-h", ToggleVersionGraph, doc_mod),
+        KeyBinding::new("secondary-shift-f", SearchFeatureStudios, doc_mod),
         KeyBinding::new("secondary-alt-v", CreateVersion, doc_mod),
         // Part Studio
         KeyBinding::new("shift-s", NewSketch, ps),

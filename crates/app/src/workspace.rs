@@ -1865,6 +1865,7 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &Undo, _, cx| this.doc.update(cx, |d, cx| d.undo(cx))))
             .on_action(cx.listener(|this, _: &Redo, _, cx| this.doc.update(cx, |d, cx| d.redo(cx))))
             .on_action(cx.listener(|this, _: &ToggleVersionGraph, window, cx| this.toggle_history(window, cx)))
+            .on_action(cx.listener(|this, _: &SearchFeatureStudios, window, cx| this.open_fs_search(window, cx)))
             .on_action(cx.listener(|this, _: &ToggleReleaseDrafts, _, cx| this.toggle_release_drafts(cx)))
             .on_action(cx.listener(|_, _: &CloseWindow, window, _| window.remove_window()))
             .on_action(cx.listener(|this, _: &crate::actions::FocusNavbar, window, cx| window.focus(&this.notices_focus, cx)))
