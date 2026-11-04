@@ -3342,6 +3342,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   left at (195.8, ±70.8, 109.8)), before any rim. Tried (not kept): a rim group rounded analytically (ring less torus,
   overflow included) inside fillet_by_groups: never reached. Next there: why OCCT fails the outline group (each edge
   alone, then pairs), then the rims (rim_round as in the full round's coaxial tool).
+  core 11-04 10:00: each of the 23 edges alone (vibe5 ~/core-lcm/single, blend::dumped_fillet_faces_probe): OCCT builds
+  only the R25 bore rims (e8, e21) and the x = 130 line (e14); the R12.5 rims fail (overflow), and so does every edge of
+  the outline chains (the y = ±75 / ±25 lines, the arc, the prong ends: tangent to Fillet 1's vertical rounds, whose
+  edges e42–e47 are ellipses). So OCCT won't make it in any grouping: it needs noshape's blend (BLEND-RUST) for chains of
+  lines, arcs and Fillet 1's cylinders with sphere corners, plus the overflowing rims.
 - [x] (core 11-03 13:00: the boss went through boolean.cpp fuse_on_face, which rebuilt the shell from its iterator's faces (already in the solid's orientation) and then flipped the new shell once more by the shell's; a drafted extrude's solid holds its shell REVERSED, so the part came out inside out. The same at four other sites (the unify's ReShape, through holes, the local Boolean, features.cpp's blend rebuild): the shell and solid now FORWARD. dx's document +922.936632 mm³ as live; the Boolean corpus as before (the same 4 of 974 differ without it); T1 model kernel_robustness::a_boss_on_a_drafted_blocks_top_adds_to_it, both pull directions) P1 ADD-INSIDE-OUT (core / bool; dx's parity suite 11-03, cf-parameter-pattern) an Extrude Add of a 2 mm boss
   on the top face of a drafted block leaves the part inside out: volume −922.937 mm³ (query_parts), the magnitude
   live's +922.937. The block: Extrude 1, a 20 × 10 mm rectangle on Top, depth 5 mm (#a / 2), draft 10° (#a deg,
