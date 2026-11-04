@@ -324,8 +324,8 @@ fn everyday(seed: u64) -> Case {
         // on, seed 741, three more; batch 16 on, seed 781, three more; batch
         // 17 on, seed 821, three more; batch 18 on, seed 861, three more;
         // batch 19 on, seed 901, three more; batch 20 on, seed 941, three
-        // more.)
-        match r.below(if seed >= 941 { 44 } else if seed >= 901 { 41 } else if seed >= 861 { 38 } else if seed >= 821 { 35 } else if seed >= 781 { 32 } else if seed >= 741 { 29 } else if seed >= 701 { 26 } else if seed >= 661 { 23 } else if seed >= 621 { 20 } else if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
+        // more; batch 21 on, seed 981, three more.)
+        match r.below(if seed >= 981 { 47 } else if seed >= 941 { 44 } else if seed >= 901 { 41 } else if seed >= 861 { 38 } else if seed >= 821 { 35 } else if seed >= 781 { 32 } else if seed >= 741 { 29 } else if seed >= 701 { 26 } else if seed >= 661 { 23 } else if seed >= 621 { 20 } else if seed >= 541 { 17 } else if seed >= 461 { 14 } else if seed >= 421 { 11 } else if seed >= 381 { 8 } else { 5 }) {
             // Corner rectangle (live's tool constraints), width and height.
             0 => {
                 let (w, h) = (r.range(15.0, 50.0), r.range(10.0, 35.0));
@@ -1275,6 +1275,81 @@ fn everyday(seed: u64) -> Case {
                 c.distance(&format!("{hole}.center"), &lines[3], w * 0.35 * fs[4]);
                 c.distance(&format!("{hole}.center"), &lines[0], h * 0.5 * fs[5]);
             }
+            // The polygon tool's hexagon with a concentric hole: Equal sides
+            // on a construction circle, the bottom side Horizontal; the
+            // circle's and the hole's diameters.
+            44 => {
+                let rad = r.range(10.0, 20.0);
+                let step = PI / 3.0;
+                let p: Vec<DVec2> = (0..6).map(|i| o + DVec2::from_angle(-FRAC_PI_2 - step / 2.0 + i as f64 * step) * rad).collect();
+                let l: Vec<String> = (0..6).map(|i| c.line(p[i], p[(i + 1) % 6])).collect();
+                let circle = c.circle(o, rad);
+                c.construction(&circle);
+                for i in 0..6 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 6]));
+                    c.on_curve(&format!("{}.start", l[i]), &circle);
+                }
+                for i in 1..6 {
+                    c.pair("EQUAL", &l[0], &l[i]);
+                }
+                c.hv(true, &l[0]);
+                let hole_r = rad * 0.45;
+                let hole = c.circle(o, hole_r);
+                c.pair("CONCENTRIC", &hole, &circle);
+                let (fr, fh) = (f(&mut r), f(&mut r));
+                c.radius(&circle, rad * fr, true);
+                c.radius(&hole, (hole_r * fh).min(rad * fr * 0.7), true);
+            }
+            // A gusset: a right triangle with Horizontal and Vertical legs,
+            // the legs' lengths; a hole near the corner, its diameter and
+            // distances from both legs.
+            45 => {
+                let (w, h) = (r.range(25.0, 45.0), r.range(25.0, 45.0));
+                let a = c.line(o, o + v(w, 0.0));
+                let b = c.line(o + v(w, 0.0), o + v(0.0, h));
+                let d = c.line(o + v(0.0, h), o);
+                c.coincident(&format!("{a}.end"), &format!("{b}.start"));
+                c.coincident(&format!("{b}.end"), &format!("{d}.start"));
+                c.coincident(&format!("{d}.end"), &format!("{a}.start"));
+                c.hv(true, &a);
+                c.hv(false, &d);
+                let hole_r = w.min(h) * 0.08;
+                let (hx, hy) = (w * 0.25, h * 0.25);
+                let hole = c.circle(o + v(hx, hy), hole_r);
+                let fs: Vec<f64> = (0..5).map(|_| f(&mut r)).collect();
+                c.length(&a, w * fs[0]);
+                c.length(&d, h * fs[1]);
+                c.radius(&hole, hole_r * fs[2], true);
+                c.distance(&format!("{hole}.center"), &d, hx * fs[3]);
+                c.distance(&format!("{hole}.center"), &a, hy * fs[4]);
+            }
+            // A plus-shaped plate: 12 lines, Horizontal / Vertical, the four
+            // arm widths Equal and the four arm ends Equal; its overall
+            // width and an arm's width.
+            46 => {
+                let (span, arm) = (r.range(30.0, 50.0), r.range(8.0, 14.0));
+                let (a0, a1) = ((span - arm) / 2.0, (span + arm) / 2.0);
+                let p = [
+                    v(a0, 0.0), v(a1, 0.0), v(a1, a0), v(span, a0), v(span, a1), v(a1, a1),
+                    v(a1, span), v(a0, span), v(a0, a1), v(0.0, a1), v(0.0, a0), v(a0, a0),
+                ];
+                let l: Vec<String> = (0..12).map(|i| c.line(o + p[i], o + p[(i + 1) % 12])).collect();
+                for i in 0..12 {
+                    c.coincident(&format!("{}.end", l[i]), &format!("{}.start", l[(i + 1) % 12]));
+                    c.hv(i % 2 == 0, &l[i]);
+                }
+                // The arm ends (0, 3, 6, 9) Equal; the arms' sides Equal.
+                for i in [3, 6, 9] {
+                    c.pair("EQUAL", &l[0], &l[i]);
+                }
+                for i in [2, 4, 5, 7, 8, 10, 11] {
+                    c.pair("EQUAL", &l[1], &l[i]);
+                }
+                let (fs, fa) = (f(&mut r), f(&mut r));
+                let arm2 = (arm * fa).min(span * fs * 0.6);
+                c.length(&l[0], arm2);
+                c.distance(&l[9], &l[3], span * fs);
+            }
             // D shape: a Horizontal chord and an arc over it, the chord's
             // length and the arc's radius.
             _ => {
@@ -1586,7 +1661,7 @@ fn write_batch() {
 }
 
 /// The batches: (number, first seed, rich).
-const BATCHES: [(usize, u64, bool); 20] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true), (12, 621, true), (13, 661, true), (14, 701, true), (15, 741, true), (16, 781, true), (17, 821, true), (18, 861, true), (19, 901, true), (20, 941, true)];
+const BATCHES: [(usize, u64, bool); 21] = [(1, 1, false), (2, 101, true), (3, 201, true), (4, 301, true), (5, 341, true), (6, 381, true), (7, 421, true), (8, 461, true), (9, 501, true), (10, 541, true), (11, 581, true), (12, 621, true), (13, 661, true), (14, 701, true), (15, 741, true), (16, 781, true), (17, 821, true), (18, 861, true), (19, 901, true), (20, 941, true), (21, 981, true)];
 
 /// Batch 8's s464 / s475 stay as live answered: a component the pass can't
 /// close (a hexagon) takes the least change on its own, the rounded
