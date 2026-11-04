@@ -27,7 +27,7 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
 - cf-straight-spline's slowness (×3.2) is bool's (BOOL-RUST-GEARS-SLOW: its cuts decline after ~0.35 s, then OCCT).
   Next there: Feature 5's Part 5, live 31/85/56, ours 31/78/49. prize-wheel-tim's knob still isn't taken by
   seam_to_vertex (not looked into why yet).
-- End-of-day walk (04:00, green 38d75390a): live-30-features opens clean in the app (fresh HOME): 34 features, none in
+- End-of-day walk (03:57, green 38d75390a): live-30-features opens clean in the app (fresh HOME): 34 features, none in
   error, Part 1 as before, regeneration 362 ms (dev build); the Performance panel's red mark is llvmpipe's "Browser
   and platform". Full parity on this worktree (main + the queued kernel commits): 319/480 features, 29/55 documents
   (314 / 28 at 01:01: cf-pocket-holes and cf-straight-spline up, nothing down, no document slower).
