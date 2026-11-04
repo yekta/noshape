@@ -1553,9 +1553,10 @@ fn the_louvers_tools_build() {
 
 /// Live 2005 T2 (behaviours.md "P1 FS-NATIVE-OPDERIP"): a 100 × 60 plate with 30 mm flanges on its x = 100 and
 /// y = 60 edges (a corner rip between them); a Tab sketched on the x-flange's outer face, y 50 → 62, z 10 → 20,
-/// merged into that flange, fills the corner from that flange only (no derip): 21196.5854 mm³, 28 faces.
+/// merged into that flange, fills the corner from that flange only: std derips the corner (@opDerip: each wall's
+/// side of the rip edge moves onto its part face, so they come apart), then the Tab extends the x-wall; the other
+/// keeps its edge and the clearance stays. 21196.5854 mm³, 28 faces. T1.
 #[test]
-#[ignore = "T2: sheet metal, long std regenerations; fails until core's TAB-RIPPED-CORNER"]
 fn a_tab_into_a_ripped_corner_fills_it_from_its_flange() {
     let mut s = Studio::new();
     let region = s.rectangle(100.0, 60.0);
@@ -1594,9 +1595,11 @@ fn a_tab_into_a_ripped_corner_fills_it_from_its_flange() {
     let sketch = sketch_on(&mut s, sk);
     let r = s.ok();
     let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
-    let key = sk.regions.iter().max_by(|a, b| a.area.total_cmp(&b.area)).expect("region").key.clone();
+    // The rectangle's regions: not the face's outline, which the sketch imprints (and which is the biggest).
+    let tab: Vec<Reference> = sk.regions.iter().filter(|g| !g.imprinted).map(|g| Reference::SketchRegion { sketch, key: g.key.clone() }).collect();
+    assert!(!tab.is_empty(), "the rectangle's regions");
     s.add("sheetMetalTab", |p| {
-        p.set("tabFaces", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        p.set("tabFaces", ParamValue::Query(tab));
         p.set("booleanUnionScope", ParamValue::Query(vec![wall.clone()]));
     });
     let r = s.ok();

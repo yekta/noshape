@@ -21,7 +21,7 @@ use noshape_kernel as k;
 use noshape_kernel::Shape;
 use std::collections::BTreeMap;
 
-pub const NATIVES: &[(&str, NativeFn)] = &[("opEdgeChange", op_edge_change)];
+pub const NATIVES: &[(&str, NativeFn)] = &[("opEdgeChange", op_edge_change), ("opDerip", op_derip)];
 
 const TOL: f64 = 1e-7;
 
@@ -31,6 +31,15 @@ const TOL: f64 = 1e-7;
 enum Move {
     Offset(f64),
     Onto(DVec3, DVec3),
+}
+
+/// One edge change: the edges, by how much they move (or onto which face), and the face whose side of them moves
+/// (an edge between two faces moved on one side only comes apart there: std's derip).
+struct EdgeOption {
+    edges: Vec<crate::reference::Reference>,
+    offset: f64,
+    replace: Option<Vec<crate::reference::Reference>>,
+    face: Option<Vec<crate::reference::Reference>>,
 }
 
 fn op_edge_change(i: &mut Interp, a: Vec<Value>) -> R<Value> {
@@ -47,23 +56,86 @@ fn op_edge_change(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             Value::Undefined => None,
             f => Some(evaluate_refs(i, &cx, f)?),
         };
-        options.push((edges, length_of(o.get("offset")).unwrap_or(0.0), replace));
+        let face = match o.get("face") {
+            Value::Undefined => None,
+            f => Some(evaluate_refs(i, &cx, f)?),
+        };
+        options.push(EdgeOption { edges, offset: length_of(o.get("offset")).unwrap_or(0.0), replace, face });
     }
+    change_edges_op(i, &cx, &id, options)
+}
+
+/// `@opDerip` (std sheetMetalDeripCall): each sheet metal definition RIP edge comes apart, each of its faces' side
+/// moved onto the part face that corresponds to it: std's own createDeripOptions (moveFace.fs), found through the
+/// sheet metal association attributes (live 2005 T2: a Tab into a ripped corner extends its wall; the other wall
+/// keeps its edge, so the clearance stays).
+fn op_derip(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    use super::query::{EType, Ent, with_ents};
+    let cx = context_arg(i, &a)?;
+    let id = id_arg(i, &a, 1)?;
+    let def = def_arg(i, &a, 2)?;
+    let options = with_ents(i, &cx, def.get("edges"), |_, q, ents| {
+        let assoc = |e: &Ent| -> Vec<Value> {
+            q.st.attributes_of(&q.to_ref(e)).into_iter().map(|v| v.get("attribute").clone()).filter(|v| !v.get("attributeId").is_undefined()).collect()
+        };
+        let mut out = Vec::new();
+        for e in ents {
+            let Ent::Edge(b, ei) = e else { continue };
+            let sides = q.adjacent(&e, EType::Face, false);
+            let Some(edge) = q.st.ctx.bodies[b].shape.edges().get(ei).cloned() else { continue };
+            let Ok((p0, p1)) = edge.endpoints() else { continue };
+            let mid = (p0 + p1) * 0.5;
+            let own = assoc(&e);
+            // The part faces sharing the edge's association (solid bodies only).
+            let part_faces: Vec<Ent> = q
+                .st
+                .attributes()
+                .iter()
+                .filter(|(_, v)| own.contains(v.get("attribute")))
+                .flat_map(|(r, _)| q.from_ref(r))
+                .filter(|x| matches!(x, Ent::Face(pb, _) if q.st.ctx.bodies[*pb].kind == crate::display::BodyKind::Solid))
+                .collect();
+            for pf in super::query::uniq(part_faces) {
+                let Ent::Face(pb, pi) = pf else { continue };
+                // The definition face next to the edge that the part face's neighbours come from.
+                let near: Vec<Value> = q.adjacent(&pf, EType::Face, false).iter().flat_map(&assoc).collect();
+                let defs: Vec<&Ent> = sides.iter().filter(|f| assoc(f).iter().any(|v| near.contains(v))).collect();
+                let [side] = defs.as_slice() else { continue };
+                let Some(face) = q.st.ctx.bodies[pb].shape.faces().get(pi).cloned() else { continue };
+                let Ok(Some(pl)) = face.face_plane() else { continue };
+                let Ok(n) = normal(&face) else { continue };
+                // std's signed distance: from the edge to the part face, along the face's normal.
+                let offset = n.dot(pl.origin - mid);
+                out.push(EdgeOption { edges: vec![q.to_ref(&e)], offset, replace: None, face: Some(vec![q.to_ref(side)]) });
+            }
+        }
+        Ok(out)
+    })?;
+    if super::trace_ops() {
+        eprintln!("[fs op] derip options {:?}", options.iter().map(|o| (o.offset, &o.face)).collect::<Vec<_>>());
+    }
+    if options.is_empty() {
+        return Ok(Value::Undefined);
+    }
+    change_edges_op(i, &cx, &id, options)
+}
+
+fn change_edges_op(i: &mut Interp, cx: &super::FsContext, id: &[std::sync::Arc<str>], options: Vec<EdgeOption>) -> R<Value> {
     // The attributes on the edges it moves (Parasolid's stay on a moved edge; the operation's attribute remap, by
     // where they were, would drop them).
     let kept: Vec<(Value, crate::reference::Reference, super::query::Snapshot)> = {
         let st = cx.state.lock();
         options
             .iter()
-            .flat_map(|(edges, _, _)| edges.iter())
+            .flat_map(|o| o.edges.iter())
             .filter_map(|r| st.attr_snapshots.get(r).map(|(_, snap)| (r, snap.clone())))
             .flat_map(|(r, snap)| st.attributes_of(r).into_iter().map(move |v| (v.clone(), r.clone(), snap.clone())).collect::<Vec<_>>())
             .collect()
     };
-    let moves = run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
+    let moves = run_op(i, cx, id, "REGEN_ERROR", |ev| {
         let mut moves: Vec<(Vec<DVec3>, Vec<DVec3>)> = Vec::new();
-        let mut by_body: BTreeMap<usize, BTreeMap<usize, Move>> = BTreeMap::new();
-        for (edges, offset, replace) in &options {
+        let mut by_body: BTreeMap<usize, BTreeMap<(usize, Option<usize>), Move>> = BTreeMap::new();
+        for EdgeOption { edges, offset, replace, face } in &options {
             if super::trace_ops() {
                 eprintln!("[fs op] edgeChange {:?} -> {:?} offset {offset} replace {replace:?}", edges, ev.resolve_edges(edges));
             }
@@ -81,8 +153,18 @@ fn op_edge_change(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     }
                 },
             };
+            let side = face.as_ref().map(|f| ev.resolve_faces(f));
             for (b, e) in ev.resolve_edges(edges) {
-                by_body.entry(b).or_default().insert(e, mv);
+                match &side {
+                    None => {
+                        by_body.entry(b).or_default().insert((e, None), mv);
+                    }
+                    Some(faces) => {
+                        for &(_, fi) in faces.iter().filter(|(fb, _)| *fb == b) {
+                            by_body.entry(b).or_default().insert((e, Some(fi)), mv);
+                        }
+                    }
+                }
             }
         }
         for (b, offsets) in by_body {
@@ -91,7 +173,7 @@ fn op_edge_change(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             // Where each moved edge went (tracking finds it there).
             let (old, new) = (body.shape.edges(), shape.edges());
             for (i, from) in edge_from.iter().enumerate() {
-                if let Some(j) = from.filter(|j| offsets.contains_key(j))
+                if let Some(j) = from.filter(|j| offsets.keys().any(|(e, _)| e == j))
                     && let (Some(a), Some(b)) = (old.get(j).and_then(edge_points), new.get(i).and_then(edge_points))
                 {
                     moves.push((a, b));
@@ -283,9 +365,10 @@ fn change_curved_face(f: &Shape, moved: &[(Shape, Move)], all: &[Shape]) -> FRes
     Ok((face, segments))
 }
 
-/// The one offset every one of a sheet's `n` edges moves by, if they all do.
-fn uniform_offset(offsets: &BTreeMap<usize, Move>, n: usize) -> Option<f64> {
-    if offsets.len() != n {
+/// The one offset every one of a one-face sheet's `n` edges moves by, if they all do.
+fn uniform_offset(offsets: &BTreeMap<(usize, Option<usize>), Move>, n: usize) -> Option<f64> {
+    let edges: std::collections::BTreeSet<usize> = offsets.keys().map(|(e, _)| *e).collect();
+    if edges.len() != n || offsets.len() != n {
         return None;
     }
     let mut all = offsets.values().map(|m| match m {
@@ -341,10 +424,11 @@ fn offset_face(f: &Shape, o: f64) -> FResult<(Shape, Vec<usize>, Vec<Option<usiz
 /// The sheet with the edges moved, for each of its faces the index of the
 /// face it was, and for each of its edges the edge it was (on that edge's
 /// line, moved with it).
-fn change_edges(shape: &Shape, offsets: &BTreeMap<usize, Move>) -> FResult<(Shape, Vec<usize>, Vec<Option<usize>>)> {
+fn change_edges(shape: &Shape, offsets: &BTreeMap<(usize, Option<usize>), Move>) -> FResult<(Shape, Vec<usize>, Vec<Option<usize>>)> {
     let edges = shape.edges();
-    let moved: Vec<(Shape, Move)> = offsets.iter().filter_map(|(e, d)| edges.get(*e).map(|s| (s.clone(), *d))).collect();
     let faces = shape.faces();
+    // The edges that move on face `fi`'s side (a move for one face leaves the other side of its edge as it is).
+    let moved_on = |fi: usize| -> Vec<(Shape, Move)> { offsets.iter().filter(|((_, f), _)| f.is_none_or(|f| f == fi)).filter_map(|((e, _), d)| edges.get(*e).map(|s| (s.clone(), *d))).collect() };
     if let [f] = faces.as_slice()
         && let Some(o) = uniform_offset(offsets, edges.len())
         && (f.wires().len() > 1 || edges.iter().any(|e| e.edge_info().is_ok_and(|i| !matches!(i.curve, k::Curve::Line { .. }))))
@@ -352,17 +436,22 @@ fn change_edges(shape: &Shape, offsets: &BTreeMap<usize, Move>) -> FResult<(Shap
         return offset_face(f, o);
     }
     // Faces no edge of which moves stay as they are; a face with curved edges (a dogbone's arcs) is changed apart.
-    let touched = |f: &Shape| f.edges().iter().any(|e| moved.iter().any(|(m, _)| m.is_same(e)));
+    let touched = |f: &Shape, moved: &[(Shape, Move)]| f.edges().iter().any(|e| moved.iter().any(|(m, _)| m.is_same(e)));
     let curved = |f: &Shape| f.edges().iter().any(|e| e.edge_info().is_ok_and(|i| !matches!(i.curve, k::Curve::Line { .. })));
     let mut kept: Vec<Option<Shape>> = Vec::with_capacity(faces.len());
     let mut segments: Vec<(usize, DVec3, DVec3)> = Vec::new();
     let mut loops = Vec::new();
     let mut loop_faces = Vec::new();
-    for f in &faces {
+    for (fi, f) in faces.iter().enumerate() {
+        let moved = moved_on(fi);
+        if !touched(f, &moved) {
+            kept.push(Some(f.clone()));
+            continue;
+        }
         if f.face_plane().map_err(fe)?.is_none() {
             return err("Only edges of planar faces can be changed yet");
         }
-        if !touched(f) {
+        if !touched(f, &moved) {
             kept.push(Some(f.clone()));
             continue;
         }

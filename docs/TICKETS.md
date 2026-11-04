@@ -59,7 +59,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - Natives std calls that the FeatureScript host lacks (lead 11-04 13:08, after DISPLACEMENT-MAP; dx 11-04 14:53:
   native_args.rs MISSING and MISSING_OLDER; callers traced through std 3095). P1 where a standard feature noshape runs
   by std (regen::std_route, bridging curve) reaches it: the user sees that feature fail. Owner dx unless noted.
-  - [ ] P2 FS-NATIVE-OPDERIP (dx 11-04 18:31: live derips in none of the cases it tried, behaviours.md "P1
+  - [x] (skasm 11-04 22:08, with TAB-RIPPED-CORNER: @opDerip is native, edge_change.rs; live's Bend / Jog "Metal is connected on both sides of the bend." cases not checked) P2 FS-NATIVE-OPDERIP (dx 11-04 18:31: live derips in none of the cases it tried, behaviours.md "P1
     FS-NATIVE-OPDERIP" (request 2005): a Tab into a ripped corner fills it from its own flange, a Tab on Top errors
     "Tab can only be added to a free edge or rip.", a Bend / Jog through the corner "Metal is connected on both sides of
     the bend."; noshape doesn't reach @opDerip in live's Tab case either, so P2 until a case that derips is found;
@@ -112,7 +112,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     @evEdgeCurvature: a studio pinned to such a release that calls them fails (FS-OLD-STD-COMPAT). (dx 11-04 20:50:
     @opRoll done: opWrap serves it, RollSurface's fields being WrapSurface's.)
 
-- [ ] P1 TAB-RIPPED-CORNER (skasm, from core (lead 11-04 21:45); dx 11-04 18:31, live request 2005 T2) a 100 × 60 plate (thicken 2 mm, radius 2 mm)
+- [x] (skasm 11-04 22:08: the T2 picked the face's imprinted outline as the Tab, the biggest region; with the rectangle's regions std reaches @opDerip, now native (edge_change.rs: std's createDeripOptions through the association attributes, each face's side of the rip moved onto its part face, opEdgeChange takes per-face moves), and the result is live's 21196.5854 mm³ / 28 faces; T1 now) P1 TAB-RIPPED-CORNER (skasm, from core (lead 11-04 21:45); dx 11-04 18:31, live request 2005 T2) a 100 × 60 plate (thicken 2 mm, radius 2 mm)
   with 30 mm flanges on its x = 100 and y = 60 edges (a corner rip), and a Tab sketched on the x-flange's outer face
   (y 50 → 62, z 10 → 20) merged into that flange: live regenerates OK and fills the corner box from that flange,
   21196.5854 mm³ (+40.4), 28 faces / 62 edges / 36 vertices; ours regenerates OK but changes nothing (21156.1854 mm³,

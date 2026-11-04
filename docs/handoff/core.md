@@ -864,7 +864,9 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
 The lead moved P1 TAB-RIPPED-CORNER (a Tab into a ripped flange corner fills nothing; T2 model sheetmetal_std::
 a_tab_into_a_ripped_corner_fills_it_from_its_flange) to skasm while you're full. If you touch std's Tab path, the
 FS host's boolean / transform natives or sheet metal regen meanwhile, tell skasm; skasm will tell you what it changes in
-your area before landing.
+your area before landing. 22:08: done in your area: `@opDerip` is a native now (host/edge_change.rs, std's
+createDeripOptions through the sheet metal association attributes) and `@opEdgeChange` honours an option's `face`
+(an edge moved on one face's side only comes apart); query.rs `adjacent` / `uniq` are pub(super) for it.
 
 ## From psui (11-04 10:01, lead's request: IN-FEATURE-MATE-CONNECTOR done in your area, please review)
 - model-data `Feature.sub_features: Vec<Feature>` (serde default, skipped when empty: files unchanged): Onshape's

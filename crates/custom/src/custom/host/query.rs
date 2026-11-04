@@ -861,7 +861,7 @@ impl<'a> QueryCx<'a> {
 
     /// Entities of type `t` adjacent to `e` through a shared edge
     /// (`by_vertex`: through a shared vertex).
-    fn adjacent(&self, e: &Ent, t: EType, by_vertex: bool) -> Vec<Ent> {
+    pub(super) fn adjacent(&self, e: &Ent, t: EType, by_vertex: bool) -> Vec<Ent> {
         // A sketch region is bounded by its sketch curves (std thin
         // extrude takes a picked region's edges).
         if let Ent::SketchRegion(s, key) = e {
@@ -1155,7 +1155,7 @@ impl CreatedSeen {
     }
 }
 
-fn uniq(v: Vec<Ent>) -> Vec<Ent> {
+pub(super) fn uniq(v: Vec<Ent>) -> Vec<Ent> {
     let mut seen = std::collections::HashSet::new();
     v.into_iter().filter(|e| seen.insert(e.clone())).collect()
 }
