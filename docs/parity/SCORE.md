@@ -13,6 +13,7 @@ causes of difference, each with its ticket.
 | 2026-11-04 | dx 08:12 (run 56: live 1903's sketch wire bodies and REST ids for the 29 cf-* documents; a sketch line by id is that line (exercise-chino 9/9); the host runs cf-fill-pattern's Fill patterns (custom-failing documents 10 -> 8)) | 29/56 | 331/482 (custom 18/111) | – |
 | 2026-11-04 | dx 08:28 (run 57: on main with core's latest (knob-jason 11/11); qCreatedBy's face creators cached, attributes indexed) | 30/56 | 332/482 (custom 18/111) | – |
 | 2026-11-04 | dx 08:50 (run 58: a mate connector on a sketch region, a written CAP_VERTEX, a part pattern of a sketch region (cf-transform-pattern 14 -> 20/21); opThicken joins a sheet's faces (cf-belt 3/3)) | 32/56 | 340/482 (custom 22/111) | – |
+| 2026-11-04 | dx 11:29 (run 63: attribute-based corner breaks, a localized Boolean's edges and vertices, attributes go with their entity (cf-sheet-metal-overcut-dogbone 2 -> 9/10, cf-fill-pattern 8/11); the qCreatedBy and name lookup caches) | 33/56 | 355/482 (custom 26/111) | – |
 
 dx 11-03 18:15: three documents are left out of the model score (tests/parity-models/unscored.json, printed as "not
 scored" by `parity_models`): cf-ansi-washers, cf-socket-head-cap-screw-creator and cf-thread-creator. Their Feature

@@ -3611,6 +3611,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   ops_harness localizedBoolean. Next difference: Extrude 1 has one fillet more than live: after its sheet metal
   Boolean, corner attributes sit on vertices no feature broke ((37.5, 10) and (30, 40) mm): std's
   assignSMAttributesToNewOrSplitEntities through our tracking.
+  dx 11-04 11:29: 5 -> 9/10: those breaks were attributes left on a name after the vertex they were on went away
+  (a tangent point the rebuild left out; its name then named another corner). An attributed entity whose name
+  names something else now, with nothing that can carry it where it was, is gone, its attributes with it
+  (Parasolid's); T1 ops_harness attributeGoesWithItsVertex. Left: Fold SM 1 (its studio pins 1188: waits for
+  FS-OLD-STD-COMPAT). Run 63: 33/56, 355/482, custom 26/111 (cf-fill-pattern 8/11).
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our

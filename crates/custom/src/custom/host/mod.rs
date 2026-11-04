@@ -387,21 +387,33 @@ impl CtxState {
         // Each moved entity's new place, or its pieces when split (each
         // gets the attribute, as Parasolid's split keeps it on both).
         type Placed = (Reference, (BodyId, query::Snapshot));
-        let moves: Vec<(Reference, Vec<Placed>)> = {
+        let (moves, gone): (Vec<(Reference, Vec<Placed>)>, HashSet<Reference>) = {
             let q = query::QueryCx::new(self);
-            let mut out = Vec::new();
+            let (mut out, mut gone) = (Vec::new(), HashSet::new());
             for (r, (body, snap)) in &self.attr_snapshots {
                 if !changed.contains(body) {
                     continue;
                 }
                 let Some(pieces) = query::relocated_pieces(&q, r, snap) else { continue };
+                if pieces.is_empty() {
+                    gone.insert(r.clone());
+                    continue;
+                }
                 let to: Vec<Placed> = pieces.iter().filter_map(|e| Some((q.to_ref(e), q.attribute_snapshot(&q.to_ref(e))?))).collect();
-                if !to.is_empty() {
+                // Nothing that can carry it lies where it was (a sketch's point there): gone as well.
+                if to.is_empty() {
+                    gone.insert(r.clone());
+                } else {
                     out.push((r.clone(), to));
                 }
             }
-            out
+            (out, gone)
         };
+        // Gone entities' attributes first (by their old names: one renamed onto such a name keeps its own).
+        if !gone.is_empty() {
+            self.attributes_mut().retain(|(r, _)| !gone.contains(r));
+            self.attr_snapshots.retain(|r, _| !gone.contains(r));
+        }
         if moves.is_empty() {
             return;
         }

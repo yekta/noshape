@@ -956,7 +956,7 @@ impl QueryCx<'_> {
 }
 
 /// Where an attributed entity is now, if an operation renamed it (its name
-/// gone, or now naming another entity): what of its kind lies where it was,
+/// gone, or now naming another entity): what of its kind lies where it was (none: it's gone),
 /// its pieces when the operation split it (a definition edge a cut runs across: Parasolid gives
 /// every piece the attribute, and std's assignSMAttributesToNewOrSplitEntities
 /// sorts them out).
@@ -972,6 +972,12 @@ pub fn relocated_pieces(q: &QueryCx, r: &Reference, snap: &Snapshot) -> Option<V
         };
     }
     let pieces = q.tracked(snap, false);
+    // Its name names another entity now and nothing lies where it was: it is gone, and its attributes with it
+    // (Parasolid's; else they'd sit on whatever took the name: cf-sheet-metal-overcut-dogbone's corner breaks on
+    // a tangent point the rebuild left out landed on other corners).
+    if pieces.is_empty() && !found.is_empty() {
+        return Some(Vec::new());
+    }
     (!pieces.is_empty()).then_some(pieces)
 }
 

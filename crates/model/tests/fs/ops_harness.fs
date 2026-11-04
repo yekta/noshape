@@ -208,6 +208,23 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const after = size(evaluateQuery(context, qCreatedBy(sub + "b", EntityType.FACE)));
             check("qCreatedBy after a change", before == 6 && again == 6 && after == 0, [before, again, after]);
         });
+        step(context, id, "attributeGoesWithItsVertex", function(sub) {
+            // A sheet corner's attribute goes with the corner when a cut takes it away (Parasolid's); no other vertex
+            // gets it (cf-sheet-metal-overcut-dogbone's corner breaks).
+            fCuboid(context, sub + "b", { "corner1" : vector(0, 0, 1300) * mm, "corner2" : vector(20, 20, 1310) * mm });
+            opExtractSurface(context, sub + "x", { "faces" : qContainsPoint(qCreatedBy(sub + "b", EntityType.FACE), vector(1, 1, 1310) * mm) });
+            const corner = qContainsPoint(qCreatedBy(sub + "x", EntityType.VERTEX), vector(20, 20, 1310) * mm);
+            setAttribute(context, { "entities" : corner, "name" : "dxCorner", "attribute" : "the corner" });
+            const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, 1310) * mm, vector(0, 0, 1)) });
+            skCircle(sk, "c", { "center" : vector(20, 20) * mm, "radius" : 5 * mm });
+            skSolve(sk);
+            opBoolean(context, sub + "cut", { "tools" : qCreatedBy(sub + "sk", EntityType.FACE), "targets" : qCreatedBy(sub + "x", EntityType.FACE), "operationType" : BooleanOperationType.SUBTRACTION, "localizedInFaces" : true, "allowSheets" : true });
+            var holders = [];
+            for (var v in evaluateQuery(context, qOwnedByBody(qOwnerBody(qCreatedBy(sub + "x", EntityType.FACE)), EntityType.VERTEX)))
+                if (getAttribute(context, { "entity" : v, "name" : "dxCorner" }) != undefined)
+                    holders = append(holders, evVertexPoint(context, { "vertex" : v }));
+            check("an attribute goes with its vertex", holders == [], holders);
+        });
         step(context, id, "collisionWires", function(sub) {
             // Wire bodies collide where their edges meet (std Fill pattern's border check).
             fCuboid(context, sub + "a", { "corner1" : vector(0, 0, 950) * mm, "corner2" : vector(10, 10, 960) * mm });
