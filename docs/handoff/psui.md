@@ -882,6 +882,9 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- 11-04 16:04 start window Help ▾ finished (833cae3e): live was silent since 12:24, so I captured Onshape's documents
+  page ? menu in my own tab (behaviours "the documents page's ? Help menu", shots live/psui/docs-help-*): ours has its
+  offline rows, Keyboard shortcuts (opens the studios' sheet over the page) and About, around the two agent items.
 - 11-04 14:05 OS audit (AGENTS.md ad57a47b: the app alike on every OS), Part Studio / start window / Preferences
   and the app-core / app code they use: one behaviour differed, fixed (9c3b3337): closing a document's last window
   showed nothing on macOS; it now shows the start window as elsewhere (macOS only keeps running after the start window
