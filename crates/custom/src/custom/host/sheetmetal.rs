@@ -526,10 +526,21 @@ fn bend_geometry(topo: &Topo, e: usize, fa: usize, fb: usize, radius: f64, front
         let (p, n_mid) = face_normal(&topo.faces[f])?;
         // A curved (rolled) wall's normal where it meets the bend, not at its middle (live 2031: the angle the
         // bend attribute holds beside a rolled wall).
-        let n = topo.faces[f].normal_at_point((s + t) * 0.5).map(|n| n.normalize()).unwrap_or(n_mid);
+        let face = &topo.faces[f];
+        let joint = (s + t) * 0.5;
+        let n = face.normal_at_point(joint).map(|n| n.normalize()).unwrap_or(n_mid);
         let mut a = n.cross(dir).normalize();
-        if (p - s).dot(a) < 0.0 {
-            a = -a;
+        if face.face_plane().ok().flatten().is_some() {
+            if (p - s).dot(a) < 0.0 {
+                a = -a;
+            }
+        } else {
+            // A curved wall's middle may lie behind the joint (rolled far round): inward is the side a small step
+            // stays on the face.
+            let off = |v: DVec3| face.project_point(joint + v * 1e-5).map_or(f64::INFINITY, |pr| pr.point.distance(joint + v * 1e-5));
+            if off(a) > off(-a) {
+                a = -a;
+            }
         }
         Ok((a, n))
     };
