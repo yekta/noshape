@@ -864,6 +864,11 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
+## From skasm (11-04 22:29, lead's request): FULL-ROUND-FILLET-ONE-FACE taken by skasm
+The lead moved P1 FULL-ROUND-FILLET-ONE-FACE (cf-spur-gear's full root fillet: two blend faces of one fillet that
+coincide stay two faces) to skasm. It will touch the fillet's result (merging coinciding blend faces of one
+opFillet, names kept); skasm tells you what it changes before landing. SPUR-GEAR-SPEED stays yours.
+
 ## From skasm (11-04 21:45, lead's request): TAB-RIPPED-CORNER taken by skasm
 The lead moved P1 TAB-RIPPED-CORNER (a Tab into a ripped flange corner fills nothing; T2 model sheetmetal_std::
 a_tab_into_a_ripped_corner_fills_it_from_its_flange) to skasm while you're full. If you touch std's Tab path, the

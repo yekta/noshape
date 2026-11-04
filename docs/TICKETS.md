@@ -129,7 +129,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   already carry one (assignSMAttributesToNewOrSplitEntities); Parasolid keeps an edge's attributes as an operation
   moves it, ours lose them here. Repro: T2 model custom_features::bend_centerline_wire_of_a_flange_down_as_live.
 
-- [ ] P1 FULL-ROUND-FILLET-ONE-FACE (core; dx 11-04 19:53) two fillets of one opFillet whose surfaces coincide (a
+- [ ] P1 FULL-ROUND-FILLET-ONE-FACE (skasm, from core (lead 11-04 22:29); dx 11-04 19:53) two fillets of one opFillet whose surfaces coincide (a
   full round: cf-spur-gear's FULL root fillet, the fillet circle tangent to both involute flanks and the root
   circle) stay two faces here; live gives one. The double-helical 20-tooth gear: 226/612/388 faces/edges/vertices,
   live 186/512/328 (8 B-spline faces per gap, live 6). Repro: parity_models with NOSHAPE_PARITY_ONLY=cf-spur-gear.
