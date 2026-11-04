@@ -3560,7 +3560,8 @@ fn a_full_round_of_a_bore_or_a_boss_is_a_half_torus() {
 }
 
 /// Live motor-mount-jack's Circular pattern 1: a face pattern of a hole's wall through a tube's wall (its boundary on
-/// the tube's cylinders, not planar) cuts the copies, each with the original's edges also where the tube's seam was.
+/// the tube's cylinders, not planar) cuts the copies; each rim one closed edge (HOLE-RIM-PIECES: OCCT's intersection
+/// in pieces where it turns, joined), also where the tube's seam was.
 #[test]
 fn a_face_pattern_of_a_hole_through_a_tubes_wall() {
     let mut t = T::new();
@@ -3578,12 +3579,11 @@ fn a_face_pattern_of_a_hole_through_a_tubes_wall() {
     let r = t.ok(hole);
     let one = solid - volume(&r);
     assert!(one > 1.0, "{one}");
-    let rims = shown(&r).1 - 4;
+    assert_eq!(shown(&r), (5, 6, 0), "the hole's rims one closed edge each");
     let wall = t.faces_where(|c| c.x.hypot(c.y) > 11.0 && (c.z - 20.0).abs() < 1.0);
     assert_eq!(wall.len(), 1);
     let p = t.add("circularPattern", &[("patternType", en("FACE")), ("faces", q(wall)), ("axis", q(vec![Reference::Plane(DatumPlane::Top)])), ("instanceCount", e("4"))]);
     let r = t.ok(p);
     assert!((volume(&r) - (solid - 4.0 * one)).abs() < 1e-5 * solid, "{} vs {}", volume(&r), solid - 4.0 * one);
-    assert_eq!(shown(&r).0, 8);
-    assert_eq!(shown(&r).1, 4 + 4 * rims);
+    assert_eq!(shown(&r), (8, 12, 0));
 }

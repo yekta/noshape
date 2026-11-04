@@ -1735,9 +1735,10 @@ TopoDS_Shape merge_cylinder_bands(const TopoDS_Shape& s, HHist& hist)
 // round would add its area). One face's area, not the solid's volume twice (motor-mount-jack's pattern: 41 ms).
 static bool same_area(const TopoDS_Face& a, const TopoDS_Face& f)
 {
+  // (Adaptively, to 1e-7: the fixed rule was 1e-3 off on a tube's face with holes bounded by joined B-spline rims.)
   GProp_GProps g0, g1;
-  BRepGProp::SurfaceProperties(a, g0);
-  BRepGProp::SurfaceProperties(f, g1);
+  BRepGProp::SurfaceProperties(a, g0, 1e-7);
+  BRepGProp::SurfaceProperties(f, g1, 1e-7);
   return std::abs(g1.Mass() - g0.Mass()) <= 1e-5 * std::abs(g0.Mass());
 }
 
@@ -3200,13 +3201,30 @@ bool one_circle(const TopoDS_Edge& a, const TopoDS_Edge& b)
   return x.Location().Distance(y.Location()) <= tol && std::abs(x.Radius() - y.Radius()) <= tol && x.Axis().Direction().IsParallel(y.Axis().Direction(), 1e-9);
 }
 
+// Two B-spline edges meeting smoothly at `v` (OCCT's pieces of one intersection curve, split where it turns: a hole's
+// rim through a tube's wall in three, HOLE-RIM-PIECES; Parasolid's is one closed edge).
+bool smooth_pieces(const TopoDS_Edge& a, const TopoDS_Edge& b, const TopoDS_Vertex& v)
+{
+  BRepAdaptor_Curve ca(a), cb(b);
+  if (ca.GetType() != GeomAbs_BSplineCurve || cb.GetType() != GeomAbs_BSplineCurve)
+    return false;
+  gp_Pnt pa, pb;
+  gp_Vec ta, tb;
+  ca.D1(BRep_Tool::Parameter(v, a), pa, ta);
+  cb.D1(BRep_Tool::Parameter(v, b), pb, tb);
+  if (ta.Magnitude() < 1e-12 || tb.Magnitude() < 1e-12)
+    return false;
+  return ta.Crossed(tb).Magnitude() <= 1e-6 * ta.Magnitude() * tb.Magnitude();
+}
+
 bool loop_joint_candidates(const TopoDS_Shape& s)
 {
   {
     ShapeAncMap ve;
     TopExp::MapShapesAndUniqueAncestors(s, TopAbs_VERTEX, TopAbs_EDGE, ve);
     for (int i = 1; i <= ve.Extent(); ++i)
-      if (ve(i).Extent() == 2 && one_circle(TopoDS::Edge(ve(i).First()), TopoDS::Edge(ve(i).Last())))
+      if (ve(i).Extent() == 2
+          && (one_circle(TopoDS::Edge(ve(i).First()), TopoDS::Edge(ve(i).Last())) || (!legacy_topology() && smooth_pieces(TopoDS::Edge(ve(i).First()), TopoDS::Edge(ve(i).Last()), TopoDS::Vertex(ve.FindKey(i))))))
         return true;
   }
   for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More(); fx.Next())
@@ -3270,8 +3288,8 @@ TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist)
       continue;
     if (BRep_Tool::IsClosed(a, TopoDS::Face(fa->First())) || BRep_Tool::IsClosed(a, TopoDS::Face(fa->Last())) || BRep_Tool::IsClosed(b, TopoDS::Face(fa->First())) || BRep_Tool::IsClosed(b, TopoDS::Face(fa->Last())))
       continue;
-    // Only where a seam split the loop (at u = 0, a whole period, of a periodic face's surface, OCCT's seams' place) or
-    // two arcs of one circle meet alone.
+    // Only where a seam split the loop (at u = 0, a whole period, of a periodic face's surface, OCCT's seams' place),
+    // two arcs of one circle meet alone, or two B-spline pieces meet smoothly.
     bool at_seam = false;
     for (const TopoDS_Shape& fx : {fa->First(), fa->Last()})
     {
@@ -3282,7 +3300,7 @@ TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist)
       const gp_Pnt2d uv = BRep_Tool::Parameters(TopoDS::Vertex(ve.FindKey(i)), f);
       at_seam = at_seam || std::abs(std::remainder(uv.X(), g->UPeriod())) < 1e-7;
     }
-    if (at_seam || one_circle(a, b))
+    if (at_seam || one_circle(a, b) || (!legacy_topology() && smooth_pieces(a, b, TopoDS::Vertex(ve.FindKey(i)))))
       joints.push_back(i);
   }
   if (joints.empty())

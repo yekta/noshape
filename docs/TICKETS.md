@@ -368,7 +368,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   has the right volume, but its half torus is two faces: OCCT's torus has its v seam on the outer equator, which the
   outer half crosses (the bore's inner half is one face, as live's). Live: one face (not checked live; Parasolid's
   tori have no seams). T1 model kernel_robustness::a_full_round_of_a_bore_or_a_boss_is_a_half_torus asserts 4 faces.
-- [ ] P2 HOLE-RIM-PIECES (core 11-04 09:05) a Ø6 hole cut Through all from a Front-plane sketch through a tube's wall
+- [x] (core 11-04 11:09: a loop's pieces are joined also where two B-spline edges of the same two faces meet smoothly and alone (OCCT's intersection split where it turns; exactly, boolean.cpp join_loop_pieces / smooth_pieces, not in studios saved before), and the seam movers measure areas adaptively (the fixed rule was 1e-3 off on such faces, so the tube's seam stayed on a copy): the tube with four holes 8/12/0 (T1 model kernel_robustness::a_face_pattern_of_a_hole_through_a_tubes_wall now asserts it). Parity 330 -> 333 (cf-sheet-metal-overcut-dogbone 2 -> 5), nothing lost) P2 HOLE-RIM-PIECES (core 11-04 09:05) a Ø6 hole cut Through all from a Front-plane sketch through a tube's wall
   (r14.35 / r12.1) leaves each rim in three pieces (at the hole cylinder's seam and at its ±x sides); Parasolid's are one
   closed edge each. Seen in kernel_robustness::a_face_pattern_of_a_hole_through_a_tubes_wall (each pattern copy as the
   original). motor-mount-jack's elliptic slots don't show it.
