@@ -94,6 +94,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
   kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
+- 11-04 00:54 lead (00:15), until live's 04:10: (1) the Drawing shortcut "Edge condition symbol" belongs to a drawing tool
+  we don't have (ISO 13715 edge symbol, between Weld symbol and Note): live capture asked (REQUESTS dx 11-04 00:19);
+  tool + toolbar + shortcut row + op once it's in. (2) import matrix: g50 F8 is live's import simplification of a
+  pinched ruled B-surface into an extrusion, McMaster F0 lies within its tolerant helices: both explained in the sheet,
+  nothing of ours to fix. (3) pipeflange-steven's drawing = live's but the rib / boss junction (Fillet 2, core;
+  CUT-CLOSED-EDGES-SPLIT note); knob-tim's one tangent edge (core). (4) walk on green b0310d17: drawing toolbar,
+  Insert view, Export Drawing (all formats against live's dump), Part Studio Export: one fix, DXF / DWT show the
+  view-scale note as live. Also: live's std 1024 / 392 (1942) tried and not landed (TICKETS PARITY-CUSTOM-RUN-FAILURES:
+  needs old natives; std 1260 asked, P3).
 - 11-03 23:18 lead (22:30): PARITY-CUSTOM-RUN-FAILURES and FS-FEATURE-LIST-NONDETERMINISTIC are mine. FS-FEATURE-LIST
   closed (valuesSortedById in start order; T1 both id orders). Custom failures: cf-o-ring-generator 10/11 (old
   studios' lowercase types; translator: id-only faces by tessellated area / nearest centroid), pinned studio imports
