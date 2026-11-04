@@ -3795,7 +3795,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   fold now gets past the split, then the edge it rotates about isn't found on the moving piece (its edge is
   credited to the split on the fixed piece only: the moving piece's body id, last touched before the split, isn't
   among the split's owners when it's queried); left there, next for dx. Run 72: 37/55, 366/471 (custom 38/109).
-  dx 11-04 18:05: the "re-id" was a hidden piece: qCreatedBy answers visible entities first, and the split left the
+  dx 11-04 17:54: the "re-id" was a hidden piece: qCreatedBy answers visible entities first, and the split left the
   definition sheet's new piece visible; pieces of a hidden body are now hidden as it is. A split's edges and vertices
   follow their body through opTransform (they're found where they lie; T1 ops_harness splitSheet: a moved piece
   keeps its split edge). Fold SM 1 now fails at its opEdgeChange: the definition face has the dogbone's arcs, and our
@@ -3974,6 +3974,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (booleanStepEditLogic's evCollision) only in the dialog. Now only for RegenOptions::touch_probe, the new feature
   the app's or the agent API's dialog is open on (its cached result keyed apart); T1 model
   features_a::the_touched_parts_probe_runs_only_when_asked.
+  dx 11-04 18:01, cf-spur-gear (×2.5: 4.95 s, live 2.11 s), with NOSHAPE_FS_PROFILE=1 (each custom feature's slowest
+  FeatureScript lines on stderr; parity runner or CLI): the Spur Gear feature's 2.0 s is 1.7 s in one opBoolean (its
+  "hobbed" subtraction of the 20 patterned teeth from the blank, studio line 348) and 0.3 s FeatureScript; with
+  Boolean 2's 1.6 s, the document's time is the Booleans' (bool). Its first difference (3 parts, live 2) is that
+  subtraction's result too.
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet

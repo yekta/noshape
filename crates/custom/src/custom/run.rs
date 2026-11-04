@@ -264,12 +264,22 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
                     let mut i = Interp::new();
                     i.set_deadline(Some(Instant::now() + TIME_LIMIT));
                     i.set_cancel(cancel.clone().map(|c| Box::new(move || c.aborted()) as Box<dyn Fn() -> bool + Send>));
-                    if profiling() {
+                    // NOSHAPE_FS_PROFILE=1: each custom feature's slowest lines on stderr, as the dialog's editing logic.
+                    let print = std::env::var_os("NOSHAPE_FS_PROFILE").is_some();
+                    if profiling() || print {
                         i.profile = Some(Default::default());
                     }
+                    let t = Instant::now();
                     let f = i.global(&cell);
                     let r = f.and_then(|f| i.call_value(&f, vec![ctx_value, host::id_value(&feature_id), definition]));
-                    let lines = i.profile.take().map(|p| p.times.into_iter().map(|((m, l), t)| (m, l, t)).collect()).unwrap_or_default();
+                    let mut lines: Vec<(Arc<str>, u32, std::time::Duration)> = i.profile.take().map(|p| p.times.into_iter().map(|((m, l), t)| (m, l, t)).collect()).unwrap_or_default();
+                    if print {
+                        lines.sort_by_key(|l| std::cmp::Reverse(l.2));
+                        eprintln!("[fs profile] {feature_id:?}: {:?}", t.elapsed());
+                        for (m, l, d) in lines.iter().take(30) {
+                            eprintln!("  {d:>10.2?} {m}:{l}");
+                        }
+                    }
                     (r.map(|_| ()).map_err(|e| e.message()), std::mem::take(&mut i.notices), std::mem::take(&mut i.output), lines)
                 };
                 let go = || match &declines {
