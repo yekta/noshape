@@ -90,6 +90,16 @@ pub(crate) struct DispatchNode {
     parent: Option<DispatchNodeId>,
 }
 
+/// NOSHAPE PATCH (agent psui): for `Window::focus_changed`.
+impl DispatchNode {
+    pub(crate) fn view_id(&self) -> Option<EntityId> {
+        self.view_id
+    }
+    pub(crate) fn parent(&self) -> Option<DispatchNodeId> {
+        self.parent
+    }
+}
+
 pub(crate) struct ReusedSubtree {
     old_range: Range<usize>,
     new_range: Range<usize>,

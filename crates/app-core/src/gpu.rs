@@ -64,7 +64,7 @@ impl Gpu {
         gpui_wgpu::request_device_features(noshape_render::Renderer::WANTED_FEATURES);
         if noshape_render::perf::enabled() {
             // GPUI's draw phases (render + layout requests, prepaint, paint, present).
-            gpui_kit::set_draw_stats_hook(noshape_render::perf::record);
+            gpui_kit::set_draw_stats_hook(draw_stat);
         }
         // The shaders compile once the first window has drawn (Workspace and
         // StartView call `release_prewarm`).
@@ -429,3 +429,21 @@ mod metal {
 /// Global handle so any window can open new document windows.
 pub struct GpuGlobal(pub Gpu);
 impl gpui_kit::Global for GpuGlobal {}
+
+/// A window draw phase's time (wall clock, `gpui.<phase>`) and the UI thread's CPU in it (`gpui.<phase>_cpu`: the
+/// thread's CPU time since the previous phase ended, at most the phase's wall time): CPU time is what a frame costs
+/// whatever else the machine runs (a loaded box's wall clock varied ±15 ms).
+fn draw_stat(phase: &'static str, wall: std::time::Duration) {
+    noshape_render::perf::record(phase, wall);
+    thread_local!(static LAST: std::cell::Cell<Option<std::time::Duration>> = const { std::cell::Cell::new(None) });
+    let Some(cpu) = noshape_render::perf::thread_cpu_time() else { return };
+    let Some(prev) = LAST.with(|l| l.replace(Some(cpu))) else { return };
+    let name = match phase {
+        "gpui.request_layout" => "gpui.request_layout_cpu",
+        "gpui.prepaint" => "gpui.prepaint_cpu",
+        "gpui.paint" => "gpui.paint_cpu",
+        "gpui.present" => "gpui.present_cpu",
+        _ => return,
+    };
+    noshape_render::perf::record(name, cpu.saturating_sub(prev).min(wall));
+}

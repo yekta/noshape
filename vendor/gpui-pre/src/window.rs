@@ -1082,7 +1082,59 @@ pub(crate) struct PaintIndex {
     line_layout_index: LineLayoutIndex,
 }
 
+/// NOSHAPE PATCH (agent psui): the indices of a cached view nested in one that is reused carried into the next frame
+/// with it: `self` was recorded in the rendered frame inside a range starting at `from`, which the next frame copies
+/// to `to` item for item. The nested view stays reusable in the frame after (its parent may be redrawn while it isn't
+/// dirty); otherwise its indices are stale and it is drawn again with its parent.
+impl PrepaintStateIndex {
+    pub(crate) fn moved(&self, from: &Self, to: &Self) -> Self {
+        Self {
+            hitboxes_index: self.hitboxes_index - from.hitboxes_index + to.hitboxes_index,
+            tooltips_index: self.tooltips_index - from.tooltips_index + to.tooltips_index,
+            deferred_draws_index: self.deferred_draws_index - from.deferred_draws_index + to.deferred_draws_index,
+            dispatch_tree_index: self.dispatch_tree_index - from.dispatch_tree_index + to.dispatch_tree_index,
+            accessed_element_states_index: self.accessed_element_states_index - from.accessed_element_states_index
+                + to.accessed_element_states_index,
+            line_layout_index: self.line_layout_index.moved(&from.line_layout_index, &to.line_layout_index),
+        }
+    }
+}
+
+/// NOSHAPE PATCH (agent psui): see `PrepaintStateIndex::moved`.
+impl PaintIndex {
+    pub(crate) fn moved(&self, from: &Self, to: &Self) -> Self {
+        Self {
+            scene_index: self.scene_index - from.scene_index + to.scene_index,
+            #[cfg(any(test, feature = "test-support"))]
+            debug_bounds_index: self.debug_bounds_index - from.debug_bounds_index + to.debug_bounds_index,
+            mouse_listeners_index: self.mouse_listeners_index - from.mouse_listeners_index + to.mouse_listeners_index,
+            input_handlers_index: self.input_handlers_index - from.input_handlers_index + to.input_handlers_index,
+            cursor_styles_index: self.cursor_styles_index - from.cursor_styles_index + to.cursor_styles_index,
+            accessed_element_states_index: self.accessed_element_states_index - from.accessed_element_states_index
+                + to.accessed_element_states_index,
+            tab_handle_index: self.tab_handle_index - from.tab_handle_index + to.tab_handle_index,
+            line_layout_index: self.line_layout_index.moved(&from.line_layout_index, &to.line_layout_index),
+        }
+    }
+}
+
 impl Frame {
+    /// NOSHAPE PATCH (agent psui): the views nested in a reused range of this (the rendered) frame, accessed through
+    /// `accessed` (its element states' index range): see `PrepaintStateIndex::moved`.
+    fn nested_views(&mut self, accessed: Range<usize>, mut f: impl FnMut(&mut crate::view::ViewElementState)) {
+        let Self { accessed_element_states, element_states, .. } = self;
+        let view = TypeId::of::<crate::view::ViewElementState>();
+        for key in &accessed_element_states[accessed] {
+            if key.1 != view {
+                continue;
+            }
+            // Stored as `Option<S>` (`with_element_state`).
+            if let Some(state) = element_states.get_mut(key).and_then(|b| b.inner.downcast_mut::<Option<crate::view::ViewElementState>>()).and_then(Option::as_mut) {
+                f(state);
+            }
+        }
+    }
+
     #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn record_debug_bounds(&mut self, selector: String, bounds: Bounds<Pixels>) {
         self.debug_bounds.insert(selector.clone(), bounds);
@@ -2426,11 +2478,43 @@ impl Window {
             return;
         }
 
-        self.focus = Some(handle.id);
+        let blurred = self.focus.replace(handle.id);
         self.focus_generation = self.focus_generation.wrapping_add(1);
         self.clear_pending_keystrokes(cx);
 
-        self.refresh();
+        self.focus_changed([blurred, Some(handle.id)]);
+    }
+
+    /// NOSHAPE PATCH (agent psui): a focus change redraws the views around the element that lost focus and the one
+    /// that gained it, not the whole window (upstream `refresh`: every cached view drawn again, e.g. a Part Studio's
+    /// lists, ~70 rows, on each dialog open and close). A cached view elsewhere that shows another element's focus
+    /// must observe it. `NOSHAPE_FOCUS_REFRESH=1` refreshes the window as upstream.
+    fn focus_changed(&mut self, ids: [Option<FocusId>; 2]) {
+        static UPSTREAM: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        if *UPSTREAM.get_or_init(|| std::env::var("NOSHAPE_FOCUS_REFRESH").is_ok_and(|v| v == "1")) {
+            self.refresh();
+            return;
+        }
+        if !self.invalidator.not_drawing() {
+            return;
+        }
+        let tree = &self.rendered_frame.dispatch_tree;
+        let mut views: SmallVec<[EntityId; 2]> = SmallVec::new();
+        for id in ids.into_iter().flatten() {
+            let mut node = tree.focusable_node_id(id);
+            while let Some(n) = node {
+                let d = tree.node(n);
+                if let Some(v) = d.view_id() {
+                    views.push(v);
+                    break;
+                }
+                node = d.parent();
+            }
+        }
+        for v in views {
+            self.mark_view_dirty(v);
+        }
+        self.invalidator.set_dirty(true);
     }
 
     /// NOSHAPE PATCH: focus the nearest focusable ancestor of `handle` in
@@ -2455,8 +2539,8 @@ impl Window {
         if self.focus.is_some() {
             self.focus_generation = self.focus_generation.wrapping_add(1);
         }
-        self.focus = None;
-        self.refresh();
+        let blurred = self.focus.take();
+        self.focus_changed([blurred, None]);
     }
 
     /// Blur the window and don't allow anything in it to be focused again.
@@ -4041,6 +4125,13 @@ impl Window {
     }
 
     pub(crate) fn reuse_prepaint(&mut self, range: Range<PrepaintStateIndex>) {
+        let (to, frame) = (self.prepaint_index(), self.noshape_frame);
+        self.rendered_frame.nested_views(range.start.accessed_element_states_index..range.end.accessed_element_states_index, |v| {
+            if v.frame + 1 == frame && v.paint_frame + 1 == frame {
+                v.prepaint_range = v.prepaint_range.start.moved(&range.start, &to)..v.prepaint_range.end.moved(&range.start, &to);
+                v.frame = frame;
+            }
+        });
         self.next_frame.hitboxes.extend(
             self.rendered_frame.hitboxes[range.start.hitboxes_index..range.end.hitboxes_index]
                 .iter()
@@ -4106,6 +4197,13 @@ impl Window {
     }
 
     pub(crate) fn reuse_paint(&mut self, range: Range<PaintIndex>) {
+        let (to, frame) = (self.paint_index(), self.noshape_frame);
+        self.rendered_frame.nested_views(range.start.accessed_element_states_index..range.end.accessed_element_states_index, |v| {
+            if v.frame == frame && v.paint_frame + 1 == frame {
+                v.paint_range = v.paint_range.start.moved(&range.start, &to)..v.paint_range.end.moved(&range.start, &to);
+                v.paint_frame = frame;
+            }
+        });
         // Cached elements still exist in the frame even when their paint methods don't run.
         #[cfg(any(test, feature = "test-support"))]
         for (selector, bounds) in &self.rendered_frame.debug_bounds_records

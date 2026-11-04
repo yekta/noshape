@@ -4002,7 +4002,12 @@ impl PartStudioView {
             Some((k, e)) if *k == key => e.clone(),
             _ => {
                 let me = cx.entity();
-                let e = crate::cached_slice::Slice::unobserved(&me, move |this: &mut Self, _, cx| div().size_full().debug_selector(|| format!("feature-row-{id:?}")).child(this.render_feature_row_view(id, slot, cx)).into_any_element(), cx);
+                let e = crate::cached_slice::Slice::unobserved(&me, move |this: &mut Self, _, cx| {
+                    let _t = noshape_render::perf::scope("ps.row_feature");
+                    div().size_full().debug_selector(|| format!("feature-row-{id:?}")).child(this.render_feature_row_view(id, slot, cx)).into_any_element()
+                }, cx);
+                // A document edit (a parameter its tooltip reads) redraws it too.
+                crate::cached_slice::Slice::observing(&e, &self.doc, cx);
                 self.row_cache.insert(id, (key, e.clone()));
                 e
             }
@@ -4016,14 +4021,26 @@ impl PartStudioView {
     /// an open row menu, a drag, the ui-parity driver's marks).
     fn feature_row_key(&self, id: FeatureId, slot: (usize, f32), cx: &App) -> Option<u64> {
         use std::hash::{Hash, Hasher};
-        if crate::ui_script::active() || cx.has_active_drag() || self.ui.feature_drop.get().is_some() || self.ui.list_menu.is_some() || self.row_ctx.editing_id == Some(id) || self.renaming.as_ref().is_some_and(|r| r.0 == id) {
+        if crate::ui_script::active() || crate::cached_slice::perf_skip("rowcache") || cx.has_active_drag() || self.ui.feature_drop.get().is_some() || self.ui.list_menu.is_some() || self.row_ctx.editing_id == Some(id) || self.renaming.as_ref().is_some_and(|r| r.0 == id) {
             return None;
         }
         let s = self.studio(cx)?;
         let i = s.features.iter().position(|f| f.id == id)?;
         let f = &s.features[i];
         let mut h = std::hash::DefaultHasher::new();
-        (Arc::as_ptr(&self.display) as usize, i, slot.0, slot.1.to_bits()).hash(&mut h);
+        (i, slot.0, slot.1.to_bits()).hash(&mut h);
+        // What the row shows of the regenerated display (not the display itself: a dialog's preview regenerates
+        // without changing most rows).
+        if let Some(st) = self.display.feature_state(id) {
+            (format!("{:?}", st.status), &st.message, st.underdefined, st.missing).hash(&mut h);
+        }
+        self.display.derived_sketches.iter().filter(|(d, _)| *d == id).count().hash(&mut h);
+        self.display.planes.iter().filter(|p| p.reference.depends_on() == Some(id)).count().hash(&mut h);
+        let rc = &self.row_ctx;
+        (rc.makes_faces.contains(&id), rc.sketches.contains(&id), rc.planes.contains(&id), rc.appearances.contains(&id)).hash(&mut h);
+        if f.type_id == "sketch" {
+            format!("{:?}", self.sketch_swatch(id, cx)).hash(&mut h);
+        }
         (f.name.as_str(), f.type_id.as_str(), f.suppressed, f.hidden, f.suppression_expr.is_some(), self.shown_feature_name(f, cx)).hash(&mut h);
         if s.configuration.configured.iter().any(|c| c.feature == id) {
             format!("{:?}", self.current_config(s)).hash(&mut h);
@@ -4084,6 +4101,7 @@ impl PartStudioView {
                 let e = crate::cached_slice::Slice::unobserved(
                     &me,
                     move |this: &mut Self, _, cx| {
+                        let _t = noshape_render::perf::scope("ps.row_part");
                         let d = this.display.clone();
                         match d.body(&id2) {
                             Some(b) => this.render_part_row(b, cx),
@@ -4092,6 +4110,7 @@ impl PartStudioView {
                     },
                     cx,
                 );
+                crate::cached_slice::Slice::observing(&e, &self.doc, cx);
                 self.part_row_cache.insert(id, (key, e.clone()));
                 e
             }
@@ -4102,11 +4121,13 @@ impl PartStudioView {
     /// What a part row shows, as a number; `None` while it is renamed, dragged over or marked for the ui-parity driver.
     fn part_row_key(&self, b: &noshape_model::display::BodyDisplay, cx: &App) -> Option<u64> {
         use std::hash::{Hash, Hasher};
-        if crate::ui_script::active() || cx.has_active_drag() || self.ui.part_renaming.as_ref().is_some_and(|(x, ..)| *x == b.id) {
+        if crate::ui_script::active() || crate::cached_slice::perf_skip("rowcache") || cx.has_active_drag() || self.ui.part_renaming.as_ref().is_some_and(|(x, ..)| *x == b.id) {
             return None;
         }
         let mut h = std::hash::DefaultHasher::new();
-        (Arc::as_ptr(&self.display) as usize, &b.id, self.part_row_flags(b, cx), self.show_part_props(cx)).hash(&mut h);
+        // What the row shows of its body (not the display itself: a dialog's preview regenerates without changing it).
+        (&b.id, &b.name, b.hidden, format!("{:?}", b.kind), b.composite.is_some(), b.is_mesh, self.display.bodies.len() > 1).hash(&mut h);
+        (self.part_row_flags(b, cx), self.show_part_props(cx)).hash(&mut h);
         let props = self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).map(|p| format!("{p:?}"));
         props.hash(&mut h);
         if let Some(pn) = self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).and_then(|p| p.part_number.clone()).filter(|p| !p.is_empty()) {

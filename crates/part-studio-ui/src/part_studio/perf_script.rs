@@ -49,6 +49,13 @@ pub(super) fn from_env() -> Option<Script> {
 
 /// A window frame's stages on the UI thread (gpui's own timings).
 const FRAME_STAGES: [&str; 3] = ["gpui.request_layout", "gpui.prepaint", "gpui.paint"];
+/// Their UI-thread CPU time (app-core gpu.rs `draw_stat`).
+const FRAME_STAGES_CPU: [&str; 3] = ["gpui.request_layout_cpu", "gpui.prepaint_cpu", "gpui.paint_cpu"];
+/// Where a ui-latency sample's time goes (wall ms, summed over the action and its frame): the regenerated model's
+/// scene, the Part Studio's and the dialog's renders, each slice's, then GPUI's phases.
+/// A ui-latency sample: (the action, waiting, the frame, the action's CPU, the frame's CPU), and [`PARTS`].
+type Sample = ([f32; 5], [f32; PARTS.len()]);
+const PARTS: [&str; 14] = ["ps.apply_display", "s.build", "ps.render", "fd.render", "ps.slice_toolbar", "ps.slice_underlay", "ps.slice_overlay", "ps.slice_features", "ps.slice_parts", "ps.row_feature", "ps.row_part", "gpui.request_layout", "gpui.prepaint", "gpui.paint"];
 
 impl PartStudioView {
     /// A stage of the step in progress (the regeneration scheduled, its result in, its display applied), logged
@@ -163,27 +170,41 @@ impl PartStudioView {
             for (kind, n) in [("dialog-open", 20usize), ("row-click", 20)] {
                 let mut ms = Vec::new();
                 let (mut handler, mut wait, mut frame) = (Vec::new(), Vec::new(), Vec::new());
+                let mut cpu = Vec::new();
+                let mut parts: Vec<Vec<f32>> = vec![Vec::new(); PARTS.len()];
                 for k in 0..n {
                     cx.background_executor().timer(pause()).await;
                     let id = features[k % features.len()];
-                    let shown: std::sync::Arc<std::sync::Mutex<Option<[f32; 3]>>> = Default::default();
+                    let shown: std::sync::Arc<std::sync::Mutex<Option<Sample>>> = Default::default();
                     let tx = shown.clone();
                     let ok = cx.update_window(window, |_, w, cx| {
-                        for st in FRAME_STAGES {
+                        for st in FRAME_STAGES.iter().chain(&FRAME_STAGES_CPU).chain(PARTS.iter().filter(|p| !FRAME_STAGES.contains(p))) {
                             noshape_render::perf::series_start(st);
                         }
                         let t0 = Instant::now();
+                        let c0 = noshape_render::perf::thread_cpu_time().unwrap_or_default();
                         let _ = this.update(cx, |this: &mut Self, cx| match kind {
                             "dialog-open" => this.edit_feature(id, w, cx),
                             _ => this.click_feature(id, false, cx),
                         });
                         let handler = t0.elapsed().as_secs_f32() * 1e3;
+                        let handler_cpu = noshape_render::perf::thread_cpu_time().unwrap_or_default().saturating_sub(c0).as_secs_f32() * 1e3;
                         // The first frame after the action draws it: its start, then its layout, prepaint and paint.
                         w.on_next_frame(move |w, _| {
                             let start = t0.elapsed().as_secs_f32() * 1e3;
                             w.on_next_frame(move |_, _| {
-                                let draw: f32 = FRAME_STAGES.iter().map(|st| noshape_render::perf::series_take(st).first().copied().unwrap_or(0.0)).sum();
-                                *tx.lock().unwrap_or_else(|e| e.into_inner()) = Some([handler, start - handler, draw]);
+                                let firsts: Vec<f32> = FRAME_STAGES.iter().map(|st| noshape_render::perf::series_take(st).first().copied().unwrap_or(0.0)).collect();
+                                let draw: f32 = firsts.iter().sum();
+                                let draw_cpu: f32 = FRAME_STAGES_CPU.iter().map(|st| noshape_render::perf::series_take(st).first().copied().unwrap_or(0.0)).sum();
+                                let parts = PARTS.map(|p| match FRAME_STAGES.iter().position(|f| *f == p) {
+                                    Some(i) => firsts[i],
+                                    None => {
+                                        let v = noshape_render::perf::series_take(p);
+                                        // Whole ms, and the count in thousandths.
+                                        v.iter().sum::<f32>().round() + v.len().min(999) as f32 / 1000.0
+                                    }
+                                });
+                                *tx.lock().unwrap_or_else(|e| e.into_inner()) = Some(([handler, start - handler, draw, handler_cpu, draw_cpu], parts));
                             });
                         });
                     });
@@ -191,8 +212,10 @@ impl PartStudioView {
                         return;
                     }
                     for _ in 0..1000 {
-                        if let Some([h, w, f]) = *shown.lock().unwrap_or_else(|e| e.into_inner()) {
+                        if let Some(([h, w, f, hc, fc], ps)) = *shown.lock().unwrap_or_else(|e| e.into_inner()) {
+                            parts.iter_mut().zip(ps).for_each(|(v, x)| v.push(x));
                             ms.push(h + w + f);
+                            cpu.push(hc + fc);
                             handler.push(h);
                             wait.push(w);
                             frame.push(f);
@@ -209,7 +232,10 @@ impl PartStudioView {
                 }
                 let st = noshape_render::perf::Stats::of(&mut ms);
                 let (h, w, f) = (noshape_render::perf::Stats::of(&mut handler), noshape_render::perf::Stats::of(&mut wait), noshape_render::perf::Stats::of(&mut frame));
-                log::info!(target: "perf", "BENCH SUMMARY {kind}: {} samples | action to the end of the paint of the first frame showing it mean {:.1} p50 {:.1} p95 {:.1} max {:.1} ms | the action p50 {:.1} p95 {:.1}, waiting for the frame p50 {:.1} p95 {:.1}, the frame's layout + prepaint + paint p50 {:.1} p95 {:.1} ms", ms.len(), st.mean, st.p50, st.p95, st.max, h.p50, h.p95, w.p50, w.p95, f.p50, f.p95);
+                let c = noshape_render::perf::Stats::of(&mut cpu);
+                let split: Vec<String> = PARTS.iter().zip(&mut parts).map(|(p, v)| format!("{p} {:.3}", noshape_render::perf::Stats::of(v).p50)).collect();
+                log::info!(target: "perf", "BENCH SUMMARY {kind}: {} samples | action to the end of the paint of the first frame showing it mean {:.1} p50 {:.1} p95 {:.1} max {:.1} ms | the action p50 {:.1} p95 {:.1}, waiting for the frame p50 {:.1} p95 {:.1}, the frame's layout + prepaint + paint p50 {:.1} p95 {:.1} ms | UI-thread CPU (the action + that frame) p50 {:.1} p95 {:.1} ms", ms.len(), st.mean, st.p50, st.p95, st.max, h.p50, h.p95, w.p50, w.p95, f.p50, f.p95, c.p50, c.p95);
+                log::info!(target: "perf", "BENCH SPLIT {kind} (p50 ms.calls, nested): {}", split.join(", "));
             }
             noshape_render::perf::flush();
         })

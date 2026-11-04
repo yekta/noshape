@@ -323,14 +323,17 @@ fn nested_views_refresh() -> bool {
     *ON.get_or_init(|| std::env::var("NOSHAPE_NESTED_VIEW_REFRESH").is_ok_and(|v| v == "1"))
 }
 
-struct ViewElementState {
+pub(crate) struct ViewElementState {
     /// NOSHAPE PATCH (agent qa4): the frame (`Window::noshape_frame`) whose
-    /// indices `prepaint_range` and `paint_range` are. A view inside a cached
-    /// view that was reused keeps the indices of the frame it was last drawn
-    /// in, which only that frame's successor may reuse.
-    frame: u64,
-    prepaint_range: Range<PrepaintStateIndex>,
-    paint_range: Range<PaintIndex>,
+    /// indices `prepaint_range` is. A view inside a cached view that was
+    /// reused keeps the indices of the frame it was last drawn in, which only
+    /// that frame's successor may reuse (unless the reuse carried them along:
+    /// `Window::reuse_prepaint`, agent psui).
+    pub(crate) frame: u64,
+    /// NOSHAPE PATCH (agent psui): the frame whose indices `paint_range` is.
+    pub(crate) paint_frame: u64,
+    pub(crate) prepaint_range: Range<PrepaintStateIndex>,
+    pub(crate) paint_range: Range<PaintIndex>,
     cache_key: ViewElementCacheKey,
     accessed_entities: FxHashSet<EntityId>,
 }
@@ -550,6 +553,7 @@ fn prepaint_view(
                     && !window.dirty_views.contains(&entity_id)
                     && !window.refreshing
                     && element_state.frame + 1 == window.noshape_frame
+                    && element_state.paint_frame == element_state.frame
                 {
                     let prepaint_start = window.prepaint_index();
                     window.reuse_prepaint(element_state.prepaint_range.clone());
@@ -581,6 +585,7 @@ fn prepaint_view(
                     Some(element),
                     ViewElementState {
                         frame: window.noshape_frame,
+                        paint_frame: 0,
                         accessed_entities,
                         prepaint_range: prepaint_start..prepaint_end,
                         paint_range: PaintIndex::default()..PaintIndex::default(),
@@ -638,6 +643,7 @@ fn paint_view(
 
                     let paint_end = window.paint_index();
                     element_state.paint_range = paint_start..paint_end;
+                    element_state.paint_frame = window.noshape_frame;
 
                     ((), element_state)
                 },

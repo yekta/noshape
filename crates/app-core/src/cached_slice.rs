@@ -103,7 +103,7 @@ impl<V: 'static> Slice<V> {
     }
 
     fn parent_notified(&mut self, parent: Entity<V>, cx: &mut Context<Self>) {
-        if let Some((key, last)) = &mut self.key {
+        if let Some((key, last)) = self.key.as_mut().filter(|_| !perf_skip("keyed")) {
             let now = key(parent.read(cx), cx);
             if *last == Some(now) {
                 return;
@@ -154,4 +154,12 @@ impl<V: 'static> Render for Slice<V> {
         );
         div().w_full().relative().child(el).child(probe.absolute().top_0().left_0().size_full()).into_any_element()
     }
+}
+
+/// `NOSHAPE_PERF_SKIP=<token>,…` (benchmarks only; the renderer reads the same variable): `keyed` invalidates keyed
+/// slices on every parent notification again, `rowcache` draws list rows inline: the costs they save, measured with
+/// the same build.
+pub fn perf_skip(token: &str) -> bool {
+    static SKIP: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    SKIP.get_or_init(|| std::env::var("NOSHAPE_PERF_SKIP").unwrap_or_default()).split([',', '+']).any(|t| t == token)
 }

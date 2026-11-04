@@ -706,7 +706,7 @@ fn a_row_click_redraws_only_the_rows_that_change(cx: &mut TestAppContext) {
 }
 
 /// Cached feature rows keep their height in a list taller than its panel (they shrank to nothing and were drawn over
-/// each other in cf-straight-spline's 63 features), and stay in place when a dialog opens.
+/// each other in cf-straight-spline's 63 features), and stay in place and cached when a dialog opens and previews.
 #[gpui::test]
 fn cached_rows_stack_in_a_long_list(cx: &mut TestAppContext) {
     let planes: Vec<serde_json::Value> = (1..=120).map(|i| serde_json::json!({ "type": "cPlane", "name": format!("Plane {i}"), "params": { "entities": ["plane:top"], "offset": format!("{i} mm") } })).collect();
@@ -723,12 +723,17 @@ fn cached_rows_stack_in_a_long_list(cx: &mut TestAppContext) {
     for w in shown.windows(2) {
         assert!((w[1].1 - w[0].1 - crate::ui::ROW_H).abs() < 0.5, "one row below the other: {shown:?}");
     }
-    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(ids[0], w, cx))).unwrap();
+    let cached = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).row_cache.iter().map(|(id, (_, e))| (*id, e.entity_id())).collect::<std::collections::HashMap<_, _>>());
+    let before = cached(cx);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(ids[119], w, cx))).unwrap();
     wait_until(cx, window, |cx| !view.read(cx).ui_busy());
     draw(cx, window);
+    let after = cached(cx);
+    let kept = before.iter().filter(|(id, e)| after.get(id) == Some(e)).count();
+    assert!(kept + 1 >= before.len(), "the other rows keep their cached views through the dialog's preview: {kept} of {}", before.len());
     let now = tops(cx);
     assert!(now.len() >= 5, "{now:?}");
-    for (id, y) in &now[1..] {
+    for (id, y) in &now {
         assert_eq!(shown.iter().find(|(i, _)| i == id).map(|r| r.1), Some(*y), "the other rows stay put: {now:?}");
     }
 }
@@ -2438,4 +2443,84 @@ fn remembered_hole_values_follow_the_document_units(cx: &mut TestAppContext) {
     let (style, dia) = reopened(&inch, cx);
     assert_eq!(style, "C_BORE");
     assert_ne!(dia, "7 mm", "the mm diameter isn't an inch document's");
+}
+
+/// A view with a cached slice holding a nested cached row, and a focusable element outside both: counts their renders.
+struct CacheHost {
+    renders: std::rc::Rc<std::cell::RefCell<std::collections::HashMap<&'static str, usize>>>,
+    list: Option<Entity<crate::cached_slice::Slice<CacheHost>>>,
+    row: Option<Entity<crate::cached_slice::Slice<CacheHost>>>,
+    /// What the list shows ([`crate::cached_slice::Slice::keyed`]).
+    version: u64,
+    other: gpui_kit::FocusHandle,
+}
+
+impl Render for CacheHost {
+    fn render(&mut self, _: &mut Window, cx: &mut gpui_kit::Context<Self>) -> impl IntoElement {
+        use crate::cached_slice::Slice;
+        let me = cx.entity();
+        let bump = |r: &std::rc::Rc<std::cell::RefCell<std::collections::HashMap<&'static str, usize>>>, k| *r.borrow_mut().entry(k).or_default() += 1;
+        bump(&self.renders, "host");
+        if self.row.is_none() {
+            self.row = Some(Slice::unobserved(&me, move |this: &mut Self, _, _| {
+                bump(&this.renders, "row");
+                div().size_full().debug_selector(|| "cached-row".into()).child("row").into_any_element()
+            }, cx));
+            self.list = Some(Slice::new(&me, move |this: &mut Self, _, _| {
+                bump(&this.renders, "list");
+                let row = this.row.clone().unwrap().cached(gpui_kit::StyleRefinement::default().w_full().h(px(20.)).flex_none());
+                div().size_full().flex().flex_col().child(div().h(px(30.)).flex_none()).child(row).into_any_element()
+            }, cx));
+            Slice::keyed(self.list.as_ref().unwrap(), |this: &Self, _| this.version, cx);
+        }
+        // Read, so the window keeps tracking them (the app's slices are made inside a cached view's render).
+        for e in [&self.list, &self.row].into_iter().flatten() {
+            e.read(cx);
+        }
+        let style = || gpui_kit::StyleRefinement::default().w_full().h(px(100.)).flex_none();
+        div()
+            .size_full()
+            .flex()
+            .flex_col()
+            .child(self.list.clone().unwrap().cached(style()))
+            .child(div().id("other").track_focus(&self.other).size(px(10.)))
+    }
+}
+
+/// GPUI's view cache (vendor gpui-pre NOSHAPE PATCHes, agent psui): a cached row nested in a cached list stays cached
+/// when the list is redrawn the frame after one that reused the list whole, and a focus change elsewhere redraws
+/// neither (upstream refreshed the whole window: a Part Studio's ~70 cached rows drawn again on every dialog open
+/// and close). The reused row is painted where it was.
+#[gpui::test]
+fn cached_views_survive_a_reused_parent_and_a_focus_change(cx: &mut TestAppContext) {
+    let renders: std::rc::Rc<std::cell::RefCell<std::collections::HashMap<&'static str, usize>>> = Default::default();
+    let r2 = renders.clone();
+    let window = cx.add_window(move |_, cx| CacheHost { renders: r2, list: None, row: None, version: 0, other: cx.focus_handle() });
+    let any: AnyWindowHandle = window.into();
+    let count = |k: &str| renders.borrow().get(k).copied().unwrap_or(0);
+    // Settle: the first frames, and the list's key read on its first parent notify.
+    draw(cx, any);
+    window.update(cx, |_, _, cx| cx.notify()).unwrap();
+    draw(cx, any);
+    let row_at = |cx: &mut TestAppContext| gpui_kit::VisualTestContext::from_window(any, cx).debug_bounds("cached-row");
+    let first = row_at(cx).expect("the row is painted");
+    let (list0, row0) = (count("list"), count("row"));
+    // The host redraws, reusing the list (and the row in it) whole.
+    window.update(cx, |_, _, cx| cx.notify()).unwrap();
+    draw(cx, any);
+    assert_eq!((count("list") - list0, count("row") - row0), (0, 0), "the list is reused");
+    // What the list shows changes: it is drawn again, the row (not dirty) reused.
+    window.update(cx, |h, _, cx| {
+        h.version += 1;
+        cx.notify();
+    })
+    .unwrap();
+    draw(cx, any);
+    assert_eq!((count("list") - list0, count("row") - row0), (1, 0), "the row stays cached under its redrawn list");
+    assert_eq!(row_at(cx), Some(first), "and is painted in place");
+    // Focus moves to an element outside the slices.
+    window.update(cx, |h, w, cx| w.focus(&h.other.clone(), cx)).unwrap();
+    draw(cx, any);
+    assert_eq!((count("list") - list0, count("row") - row0), (1, 0), "a focus change elsewhere redraws no cached view");
+    assert_eq!(row_at(cx), Some(first));
 }
