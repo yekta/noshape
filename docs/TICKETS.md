@@ -38,6 +38,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   33/111); cf-spur-gear 16.8 -> 5.1 s, cf-straight-spline 23.8 -> 17.0 s. Left: the points loop (~5 s), the 262,144
   plane values (~2.5 s), the face's display mesh (5 s); core: Replace face on the 512 × 512 side runs > 10 min in
   OCCT's point projection onto the B-spline (Extrema_GenExtPS::BuildGrid per point; core.md).
+  dx 11-04 15:58: the brep mesher evaluates grid nodes once (5.1 -> 2.6 s); FeatureScript maps are short sorted vectors
+  up to 16 entries (one allocation per ValueWithUnits; the feature 8.9 -> 6.6 s, peak memory was 1.5 GB). Side face,
+  Replace off: 9.2 s (feature 6.6 s, mesh 2.6 s), from 29 s at 13:13. As the user does it, through the CLI
+  (/root/dx-scratch/disp/e2e/run.py: document_create, Sketch circle Ø50, Extrude 50 mm, import_files leather.csv,
+  the Feature Studio, feature_add; a build before the maps): side 14.7 s, top 17.4 s, both OK "262144 samples" (the
+  CLI regenerates the document on open as well); Replace face on, side and top: stopped after 818 s and 1,167 s
+  in core's projection (above). Waiting on live's times for the target.
 
 - Natives std calls that the FeatureScript host lacks (lead 11-04 13:08, after DISPLACEMENT-MAP; dx 11-04 14:53:
   native_args.rs MISSING and MISSING_OLDER; callers traced through std 3095). P1 where a standard feature noshape runs
