@@ -1,0 +1,33 @@
+{
+ "name": "sm-edit-model-thickness",
+ "about": "Edit the sheet metal model from its row, thickness 3 mm, accept",
+ "area": "skasm",
+ "source": "everyday sheet metal (lead 11-04: the commonest sheet metal workflows)",
+ "start": "plate",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Sheet metal model 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Thickness"
+   }
+  },
+  {
+   "do": "type",
+   "text": "3"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

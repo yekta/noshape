@@ -1,0 +1,30 @@
+{
+ "name": "sm-hem-edge",
+ "about": "Hem on the plate's x = 0 top edge, accept",
+ "area": "skasm",
+ "source": "everyday sheet metal (lead 11-04: the commonest sheet metal workflows)",
+ "start": "plate",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sheet metal model",
+    "menu": "Hem"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     0,
+     20,
+     2
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

@@ -1,0 +1,40 @@
+{
+ "name": "sm-flange-two-edges",
+ "about": "Flange on two top edges meeting at a corner (x = 60 and y = 40), accept: a corner relief between them",
+ "area": "skasm",
+ "source": "everyday sheet metal (lead 11-04: the commonest sheet metal workflows)",
+ "start": "plate",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sheet metal model",
+    "menu": "Flange"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     60,
+     20,
+     2
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     30,
+     40,
+     2
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

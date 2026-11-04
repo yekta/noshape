@@ -1,0 +1,30 @@
+{
+ "name": "sm-finish-dialog",
+ "about": "Finish sheet metal model: the dialog before a pick, then the part, then Escape",
+ "area": "skasm",
+ "source": "everyday sheet metal (lead 11-04: the commonest sheet metal workflows)",
+ "start": "plate",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sheet metal model",
+    "menu": "Finish sheet metal model"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     30,
+     20,
+     2
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

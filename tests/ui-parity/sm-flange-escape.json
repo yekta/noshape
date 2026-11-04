@@ -1,0 +1,30 @@
+{
+ "name": "sm-flange-escape",
+ "about": "Flange with an edge picked, then Escape: nothing added",
+ "area": "skasm",
+ "source": "everyday sheet metal (lead 11-04: the commonest sheet metal workflows)",
+ "start": "plate",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sheet metal model",
+    "menu": "Flange"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     60,
+     20,
+     2
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

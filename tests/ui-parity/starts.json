@@ -386,5 +386,67 @@
    ],
    "mates": []
   }
+ },
+ "sm-sketch": {
+  "units": "mm",
+  "features": [
+   {
+    "type": "newSketch",
+    "name": "Sketch 1",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        0,
+        0
+       ],
+       [
+        60,
+        40
+       ]
+      ]
+     }
+    ]
+   }
+  ],
+  "about": "a 60 x 40 rectangle sketched on Top at the origin (for a sheet metal model)"
+ },
+ "plate": {
+  "units": "mm",
+  "features": [
+   {
+    "type": "newSketch",
+    "name": "Sketch 1",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        0,
+        0
+       ],
+       [
+        60,
+        40
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "sheetMetalStart",
+    "name": "Sheet metal model 1",
+    "params": {
+     "process": "THICKEN",
+     "regions": [
+      "Sketch 1 region 0"
+     ],
+     "thickness": "2 mm",
+     "radius": "2 mm"
+    }
+   }
+  ],
+  "about": "a 60 x 40 sheet metal plate on Top (Sheet metal model, Thicken 2 mm, bend radius 2 mm; z 0 to 2)"
  }
 }
