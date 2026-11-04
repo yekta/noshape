@@ -101,7 +101,7 @@ impl AssemblyView {
         // Live: related (with the folder) once a connector is picked.
         let picked = new_mate.is_some_and(|d| d.a.is_some() || d.b.is_some());
         if let Some(d) = new_mate {
-            items.push((d.id, row(&d.name, if d.a.is_some() && d.b.is_some() { "ok" } else { "error" }, true, true, picked, !self.show_mates)));
+            items.push((d.id, row(&d.name, if d.a.is_some() && d.b.is_some() && !d.same_instance() { "ok" } else { "error" }, true, true, picked, !self.show_mates)));
         }
         let folder_related = self.selected_mate.is_some_and(|id| asm.mates.iter().any(|m| m.id == id)) || picked;
         rows.push(row(&format!("Mate features ({})", items.len()), "ok", false, false, folder_related, false));
@@ -130,7 +130,7 @@ impl AssemblyView {
         }
         let dialog = self.mate.as_ref().map(|s| {
             let d = s.dialog.read(cx);
-            let complete = d.a.is_some() && d.b.is_some();
+            let complete = d.a.is_some() && d.b.is_some() && !d.same_instance();
             json!({
                 "title": d.name, "titleState": if complete { "ok" } else { "error" }, "kind": "feature", "tabs": [],
                 "fields": d.ui_fields(),

@@ -131,6 +131,9 @@ impl Focusable for MateDialog {
     }
 }
 
+/// A mate's error with both connectors on one instance (live).
+pub const SAME_INSTANCE: &str = "Mate connectors are on same instance.";
+
 /// What an unset limit field reads (live).
 const NO_LIMIT: [&str; 2] = ["No minimum", "No maximum"];
 
@@ -479,15 +482,10 @@ impl MateDialog {
             if others.iter().any(|i| same(self.slot(*i))) {
                 return false;
             }
-        } else {
-            // Live (E1): a second pick on the same instance is not accepted;
-            // the title keeps "Mate needs two mate connectors.". (A full
-            // field's new pick sits next to its newest, which moves up.)
-            let other = if field == 1 && !full { &self.a } else { &self.b };
-            if same(other) {
-                return false;
-            }
         }
+        // Live (behaviours "skasm (2026-11-04 00:22, P3)", superseding E1): a
+        // second pick on the same instance goes in; the mate is flagged
+        // "Mate connectors are on same instance." (`same_instance`).
         if full && field_slots.len() > 1 {
             for w in 0..field_slots.len() - 1 {
                 let next = self.slot(field_slots[w + 1]).clone();
@@ -534,6 +532,18 @@ impl MateDialog {
     }
 
     /// Live's title tooltip text: "<name> did not regenerate properly: <message>".
+    /// Both connectors on one instance (not the origin): the mate can't be
+    /// made (live: "Mate connectors are on same instance.").
+    pub fn same_instance(&self) -> bool {
+        if matches!(self.mate_type, MateType::Tangent | MateType::Width) {
+            return false;
+        }
+        match (&self.a, &self.b) {
+            (Some(a), Some(b)) => a.instance == b.instance && a.path == b.path && !a.is_origin(),
+            _ => false,
+        }
+    }
+
     fn regen_error(&self, cx: &App) -> Option<String> {
         let incomplete = match self.mate_type {
             // Live: "Nothing selected." while empty, then "Tangent mate needs two entities.".
@@ -542,6 +552,7 @@ impl MateDialog {
             MateType::Width if self.a.is_none() || self.b.is_none() || self.c.is_none() => Some("Two width mate connectors are required."),
             MateType::Tangent | MateType::Width => None,
             _ if self.a.is_none() || self.b.is_none() => Some("Mate needs two mate connectors."),
+            _ if self.same_instance() => Some(SAME_INSTANCE),
             _ => None,
         };
         let msg = incomplete.map(str::to_string).or_else(|| (!self.crossed_limits(cx).is_empty()).then(|| "Minimum mate limit should be smaller than maximum limit. A parameter value is not valid.".to_string())).or_else(|| self.status.clone())?;
@@ -550,6 +561,9 @@ impl MateDialog {
 
     /// The mate as currently defined (None until both connectors are set).
     pub fn to_mate(&self, cx: &App) -> Option<Mate> {
+        if self.same_instance() {
+            return None;
+        }
         let (a, b) = (self.a.clone()?, self.b.clone()?);
         let extra = if self.mate_type == MateType::Width { std::iter::once(self.c.clone()?).chain(self.d.clone()).collect() } else { vec![] };
         let (ox, oy, oz, orot) = offset_axes(self.mate_type);
@@ -1167,6 +1181,21 @@ mod advance_tests {
         assert_eq!(state(cx, &d), (Some(1), Some(1), Some(2)), "the last field keeps the focus");
         assert!(set(cx, &d, 3));
         assert_eq!(state(cx, &d), (Some(1), Some(1), Some(3)), "a new pick replaces");
+    }
+
+    /// Live (behaviours "skasm (2026-11-04 00:22, P3)" (a)): a second pick on the same instance goes in, and the
+    /// mate can't be made: "Mate connectors are on same instance.".
+    #[gpui::test]
+    fn two_picks_on_one_instance_are_taken_and_flagged(cx: &mut TestAppContext) {
+        let d = dialog(cx, MateType::Fastened);
+        assert!(set(cx, &d, 1));
+        assert!(set(cx, &d, 1), "the second pick on the same instance goes in");
+        assert_eq!(state(cx, &d).1.zip(state(cx, &d).2), Some((1, 1)));
+        cx.update(|cx| {
+            let d = d.read(cx);
+            assert!(d.same_instance() && d.to_mate(cx).is_none(), "✓ stays disabled");
+            assert!(d.regen_error(cx).is_some_and(|e| e.ends_with(super::SAME_INSTANCE)));
+        });
     }
 
     /// Fastened's one "Mate connectors" field (≤2) takes two and keeps the focus (no field after it); a third pick

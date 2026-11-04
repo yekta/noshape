@@ -790,7 +790,7 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         (_, None, None) => return Err(OpError::param("b", "required for a new mate")),
     };
     if ca.instance == cb.instance && ca.instance != InstanceId::ORIGIN && mate_type != MateType::Width {
-        return Err(OpError::param("b", "both connectors are on the same instance"));
+        return Err(OpError::param("b", "Mate connectors are on same instance."));
     }
     let id = editing.unwrap_or_else(|| MateId(asm.next_id()));
     let name = match (a.opt_str("name")?, &old) {

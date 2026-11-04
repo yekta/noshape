@@ -4339,9 +4339,10 @@ impl AssemblyView {
         // Live (assembly/2219): a new mate's row ("Revolute 1", selected, red
         // until both connectors are picked) is in the list while its dialog
         // is open.
-        let new_mate = self.mate.as_ref().filter(|m| m.editing.is_none()).map(|m| m.dialog.read(cx)).filter(|d| !asm.mates.iter().any(|m| m.id == d.id)).map(|d| (d.id, d.mate_type, d.name.clone(), d.a.is_some() && d.b.is_some(), d.a.is_some() || d.b.is_some()));
-        if let Some((id, mate_type, name, complete, _)) = new_mate.clone() {
-            let row = self.feature_row(FeatureRow { id, icon: mate_icon(mate_type), name, ok: complete, inactive: false, message: (!complete).then(|| "Mate cannot resolve mate connectors.".to_string()), has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx);
+        let new_mate = self.mate.as_ref().filter(|m| m.editing.is_none()).map(|m| m.dialog.read(cx)).filter(|d| !asm.mates.iter().any(|m| m.id == d.id)).map(|d| (d.id, d.mate_type, d.name.clone(), d.a.is_some() && d.b.is_some() && !d.same_instance(), d.a.is_some() || d.b.is_some(), d.same_instance()));
+        if let Some((id, mate_type, name, complete, _, same)) = new_mate.clone() {
+            let message = if same { Some(crate::assembly_mate_dialog::SAME_INSTANCE.to_string()) } else { (!complete).then(|| "Mate cannot resolve mate connectors.".to_string()) };
+            let row = self.feature_row(FeatureRow { id, icon: mate_icon(mate_type), name, ok: complete, inactive: false, message, has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx);
             mate_rows.push(div().bg(pal.accent_soft).child(row).into_any_element());
             mate_ids.push(id);
         }
