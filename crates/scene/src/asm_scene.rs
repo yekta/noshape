@@ -429,14 +429,9 @@ pub struct Highlights {
     pub triads: Vec<Triad>,
     /// Inference dots (world positions).
     pub dots: Vec<DVec3>,
-    /// Inference points of the hovered entity (live: small white dots).
-    pub light_dots: Vec<DVec3>,
     /// The face whose boundary is outlined (live: hovering a face while
     /// picking a mate connector outlines it, no fill).
     pub hover_outline: Option<(InstancePath, Reference)>,
-    /// The inferred mate connector under the pointer: live's glyph, a khaki
-    /// disc with a notch and a small triad (frame, disc radius).
-    pub inference_glyph: Option<(Frame, f64)>,
     /// Move manipulator (triad with pickable axis arrows and rotation rings)
     /// and the hovered handle.
     pub manipulator: Option<(Frame, f64, Option<ManipHandle>)>,
@@ -677,17 +672,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     for d in &h.dots {
         pts.points.push(PointSprite { position: d.as_vec3().into(), color: DARK, pick_id: 0, size: 6.0, style: LineSegment::ON_TOP, _pad: 0 });
     }
-    for d in &h.light_dots {
-        // Live (qa5/asm-041): white with a soft grey rim, hidden behind
-        // other parts (depth tested; qa5 A5: points of the hovered face
-        // under a shaft / bracket showed on those parts).
-        pts.points.push(PointSprite { position: d.as_vec3().into(), color: [0x9f, 0x9f, 0x9f, 255], pick_id: 0, size: 7.0, style: 0, _pad: 0 });
-        pts.points.push(PointSprite { position: d.as_vec3().into(), color: [0xfd, 0xfd, 0xfd, 255], pick_id: 0, size: 5.0, style: 0, _pad: 0 });
-    }
     let mut lines = LineData::default();
-    if let Some((f, r)) = &h.inference_glyph {
-        push_connector_glyph(&mut lines, f, *r);
-    }
     for t in &h.triads {
         let w = if t.strong { 2.5 } else { 1.5 };
         push_triad(&mut lines, &t.frame, t.size, w, 0, false);

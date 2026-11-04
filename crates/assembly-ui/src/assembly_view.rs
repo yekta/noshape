@@ -1176,6 +1176,9 @@ impl AssemblyView {
                 h.triads.push(Triad { frame: f, size, strong: false });
             }
         }
+        // Inference points to draw (origin, X, Z) and the one under the pointer.
+        let mut marks: Vec<(DVec3, DVec3, DVec3)> = Vec::new();
+        let mut chosen = None;
         if picking
             && self.pick_mode(cx) == Some(PickMode::Inference)
             && let Some(((_, entity), occ, cands)) = &self.infer
@@ -1191,14 +1194,8 @@ impl AssemblyView {
                 _ => h.hover_entity = Some((o.path.clone(), entity.clone())),
             }
             let t = noshape_model::assembly::eval::matrix_frame(&o.transform);
-            for (i, p) in cands.iter().enumerate() {
-                let w = t.mul(&p.frame);
-                if Some(i) == self.infer_choice {
-                    h.inference_glyph = Some((w, size * 0.25));
-                } else {
-                    h.light_dots.push(w.origin);
-                }
-            }
+            marks = cands.iter().map(|p| t.mul(&p.frame)).map(|w| (w.origin, w.x(), w.z())).collect();
+            chosen = self.infer_choice;
         }
         // A dragged section base on geometry: the snapped entity in orange
         // and the mate-connector glyph at the point (live: unsnapped, the
@@ -1210,9 +1207,25 @@ impl AssemblyView {
                 Reference::Face(_) => h.hover_outline = Some((s.path.clone(), s.entity.clone())),
                 _ => h.hover_entity = Some((s.path.clone(), s.entity.clone())),
             }
-            h.light_dots.extend(s.dots.iter().copied());
-            h.inference_glyph = Some((Frame::from_axes(s.point, d.plane0.dir(), d.plane0.x), size * 0.25));
+            let (z, x) = (d.plane0.dir(), d.plane0.x);
+            marks = s.dots.iter().map(|p| (*p, x, z)).chain([(s.point, x, z)]).collect();
+            chosen = Some(s.dots.len());
         }
+        // Live 1851 / qa5 asm-041: white dots and the hovered connector's
+        // glyph at screen size, as the Part Studio's (scene InferenceMarks).
+        let marks: Vec<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = if marks.is_empty() {
+            self.ui.inference_marks = None;
+            Vec::new()
+        } else {
+            let key: Vec<u64> = marks.iter().flat_map(|(o, x, z)| [o.x, o.y, o.z, x.x, x.y, x.z, z.x, z.y, z.z]).map(f64::to_bits).chain([chosen.map_or(u64::MAX, |c| c as u64)]).collect();
+            let fresh = self.ui.inference_marks.as_ref().filter(|(k, _)| *k == key).map(|(_, m)| m.clone());
+            let m = fresh.unwrap_or_else(|| {
+                let m = crate::scene_builder::InferenceMarks::new(marks.iter().copied(), chosen);
+                self.ui.inference_marks = Some((key, m.clone()));
+                m
+            });
+            vec![m]
+        };
         if let Some(p) = self.placing_point
             && self.placing.is_some()
         {
@@ -1272,6 +1285,7 @@ impl AssemblyView {
             } else {
                 snapping.then_some(crate::cursor::AppCursor::SnapMate)
             };
+            vp.set_camera_geometry(marks, cx);
             vp.set_scene(Arc::new(scene), geometry_changed, cx)
         });
     }
@@ -6213,8 +6227,9 @@ impl AssemblyView {
                 cx.notify();
             }))
             .on_modifiers_changed(cx.listener(|this, ev: &ModifiersChangedEvent, _, cx| {
-                // Ctrl (Cmd on macOS) tap cycles the dragged connector in snap mode.
-                let ctrl = ev.modifiers.control || ev.modifiers.platform;
+                // Ctrl (also Cmd on macOS, provisional until live's Mac key
+                // list) tap cycles the dragged connector in snap mode.
+                let ctrl = ev.modifiers.control || (cfg!(target_os = "macos") && ev.modifiers.platform);
                 if ctrl && !this.ctrl_down {
                     this.cycle_snap_source(cx);
                 }

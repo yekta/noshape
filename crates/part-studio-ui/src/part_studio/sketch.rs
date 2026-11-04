@@ -628,7 +628,7 @@ impl PartStudioView {
                     // The press goes on to the editor too, which turns it
                     // into a label drag / selection.
                     MouseButton::Left => {
-                        let additive = modifiers.shift || modifiers.control || modifiers.platform;
+                        let additive = modifiers.shift || modifiers.control || mac_cmd(modifiers);
                         if *click_count >= 2 && d.driving {
                             if let Some(ed) = &mut self.sketch {
                                 ed.pressed_label = Some((cid, additive, false));
@@ -825,7 +825,7 @@ impl PartStudioView {
                 {
                     ed.link_edge_snap(id);
                 }
-                let (shift, dbl) = (modifiers.shift || modifiers.control || modifiers.platform, *click_count >= 2);
+                let (shift, dbl) = (modifiers.shift || modifiers.control || mac_cmd(modifiers), *click_count >= 2);
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_down(data, p, hovered, shift, dbl)) {
                     self.apply_outcome(out, window, cx);
                 }
@@ -3448,7 +3448,7 @@ impl PartStudioView {
                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
                         // Not consumed: the viewport receives the press too and the
                         // editor turns it into a label drag / selection.
-                        let additive = ev.modifiers.shift || ev.modifiers.control || ev.modifiers.platform;
+                        let additive = ev.modifiers.shift || ev.modifiers.control || mac_cmd(&ev.modifiers);
                         if ev.click_count >= 2 && driving {
                             if let Some(ed) = &mut this.sketch {
                                 ed.pressed_label = Some((cid, additive, false));
@@ -3657,7 +3657,7 @@ impl PartStudioView {
                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, _, _| {
                         // Drag to move the glyph, click to select its constraint.
                         if let Some(ed) = &mut this.sketch {
-                            ed.pressed_glyph = Some((cid, gent, ev.modifiers.shift || ev.modifiers.control || ev.modifiers.platform));
+                            ed.pressed_glyph = Some((cid, gent, ev.modifiers.shift || ev.modifiers.control || mac_cmd(&ev.modifiers)));
                         }
                     }))
                     .into_any_element(),
@@ -4919,3 +4919,10 @@ mod ui_tests;
 /// Label prefix of a "Configure dimension ▸" submenu entry in
 /// `dimension_menu_items` (several configuration inputs).
 const CONFIGURE_SUBMENU: &str = "Configure dimension\u{25b8}";
+
+/// Cmd on macOS only (on Windows and Linux `platform` is the Windows / Super
+/// key, which Onshape doesn't use for selection). Provisional until live's Mac
+/// key list says which of these Onshape takes Cmd for (lead 11-04).
+fn mac_cmd(m: &gpui_kit::Modifiers) -> bool {
+    cfg!(target_os = "macos") && m.platform
+}

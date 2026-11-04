@@ -273,6 +273,8 @@ pub struct AsmUi {
     /// The mate dialog's connectors box holds the page focus (live's DOM
     /// focus): from its opening until a click in the graphics area.
     pub mate_field_focus: bool,
+    /// The drawn inference marks and their key (the viewport resends only a new one).
+    pub inference_marks: Option<(Vec<u64>, std::sync::Arc<crate::scene_builder::InferenceMarks>)>,
     /// Make transparent (Shift+T): instances drawn transparent.
     pub transparent: Option<noshape_model::assembly::OccurrenceSet>,
     /// S shortcut toolbar position (viewport-local).
