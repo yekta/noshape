@@ -16,6 +16,17 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-04 13:23 UTC.**
+- Queued: DISPLACEMENT-MAP's opReplaceFace (lead's P1 from the user): a curved face, and a template on both sides of
+  the face, replaced by the face's slab split by the template carried past its edges (direct.rs replace_by_slabs,
+  kernel extend_face); T1 custom_features::replace_face_on_curved_faces_and_by_crossing_templates (exact volumes for
+  the Ø22 cylinder and the crossing plane). The user's own script needs dx's @opCreateBSplineSurface; then compare
+  with live's volumes (lead: live is measuring).
+- Fresh models (12:20 resync): parity 358/482, 34/56. Speed list now led by cf-spur-gear's Extrude 2 (11.8 s, live
+  5 ms): next.
+- Parked: cones' seams to a vertex (patch /root/core-scratch/cone-seam.patch: builds, but pipeflange's countersink
+  rims still split: the fillet's result doesn't reach it yet).
+
 **State 11-04 12:55 UTC.**
 - Landed since 10:55: HOLE-RIM-PIECES (OCCT's intersection pieces of the same two faces meeting smoothly are joined
   exactly; the seam movers measure areas adaptively: parity 330 -> 333 on yesterday's models), CANCEL-LATENCY (a
