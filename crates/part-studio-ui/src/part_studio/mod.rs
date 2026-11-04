@@ -666,6 +666,8 @@ impl PartStudioView {
             log::info!(target: "perf", "schedule_regen #{seq} from {caller} (upto {upto:?}, {} features)", studio.features.len());
         }
         let editing_sketch = self.sketch.as_ref().map(|s| s.feature).or_else(|| self.editing_sketch_id(cx));
+        // A new feature's dialog picks its Boolean from the parts its tool touches (the others skip that probe).
+        let touch_probe = self.edit.as_ref().filter(|e| e.is_new).map(|e| e.dialog.read(cx).feature.id);
         let full = (upto.is_none() && editing_sketch.is_none()).then(|| doc_vars.clone());
         // The studio's head as the document thumbnail draws it.
         let head = upto.is_none() && editing_sketch.is_none() && config == studio.configuration.defaults();
@@ -698,7 +700,7 @@ impl PartStudioView {
             }
             let result = cx
                 .background_spawn(async move {
-                    let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, relative_deflection: deflection, derived: Some(derived), custom_features: Some(custom), cancel: Some(cancel), ..Default::default() };
+                    let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, relative_deflection: deflection, derived: Some(derived), custom_features: Some(custom), cancel: Some(cancel), touch_probe, ..Default::default() };
                     // Where a slow round trip waits (COMMIT-LATENCY): the background thread starting, the regenerator's lock.
                     let started = asked.elapsed();
                     let mut regen = regen.lock();
@@ -753,7 +755,7 @@ impl PartStudioView {
                 let regen2 = regen2;
                 let fine = cx
                     .background_spawn(async move {
-                        let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, preview_meshes: false, relative_deflection: deflection, derived: Some(derived2), custom_features: Some(custom2), cancel: Some(cancel2), ..Default::default() };
+                        let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, preview_meshes: false, relative_deflection: deflection, derived: Some(derived2), custom_features: Some(custom2), cancel: Some(cancel2), touch_probe, ..Default::default() };
                         let r = regen2.lock().regenerate(&studio, &config, &units, &opts);
                         (r, studio, config)
                     })

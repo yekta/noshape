@@ -2238,3 +2238,25 @@ fn blends_saved_with_occt_stay_occt() {
     fresh.upgrade_saved_params();
     assert!(!fresh.legacy_blends, "nothing to keep");
 }
+
+/// The dialog's preselection probe (std booleanStepEditLogic's touched parts) runs only for the feature the caller asks
+/// it of (`RegenOptions::touch_probe`, a new feature's dialog; live runs it in the dialog only): a box standing on a
+/// block reports the block then, nothing in a plain regeneration, and the cached result of either isn't the other's.
+#[test]
+fn the_touched_parts_probe_runs_only_when_asked() {
+    let mut t = T::new();
+    let (_, a) = t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let top = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+    let s = t.sketch(Reference::FeaturePlane(top), rect(0.01, 0.005, 0.02, 0.015));
+    let r = t.regions(s)[0].clone();
+    let bx = t.extrude(r, "5 mm", "NEW");
+    let touched = |t: &mut T, probe: Option<FeatureId>| {
+        let opts = RegenOptions { touch_probe: probe, ..RegenOptions::default() };
+        let r = t.reg.regenerate(&t.ps, &ConfigValues::default(), &t.units, &opts);
+        r.display.features.iter().find(|f| f.id == bx).unwrap().touched.iter().map(|b| b.feature).collect::<Vec<_>>()
+    };
+    assert_eq!(touched(&mut t, None), Vec::<FeatureId>::new());
+    assert_eq!(touched(&mut t, Some(bx)), vec![a]);
+    assert_eq!(touched(&mut t, None), Vec::<FeatureId>::new());
+    assert_eq!(touched(&mut t, Some(bx)), vec![a]);
+}

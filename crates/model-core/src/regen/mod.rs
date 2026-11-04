@@ -56,6 +56,10 @@ pub struct RegenOptions {
     pub custom_features: Option<std::sync::Arc<dyn custom_features::CustomFeatureProvider>>,
     /// Lets the caller stop this run when a newer edit makes it stale.
     pub cancel: Option<RegenCancel>,
+    /// The feature whose tool's touched parts the caller wants ([`FeatureState::touched`]: a new feature's dialog
+    /// picks its Boolean from them, std booleanStepEditLogic); the others skip that probe, as live runs it only in
+    /// the dialog (cf-spur-gear's Extrude 2: 100 ms of exact distances, live 5 ms).
+    pub touch_probe: Option<FeatureId>,
 }
 
 /// Stops a running regeneration that a newer edit made stale (live
@@ -128,7 +132,7 @@ impl RegenCancel {
 
 impl Default for RegenOptions {
     fn default() -> Self {
-        Self { upto: None, editing_sketch: None, relative_deflection: 8e-4, angular_deflection: 0.35, document_variables: BTreeMap::new(), preview_meshes: false, derived: None, custom_features: None, cancel: None }
+        Self { upto: None, editing_sketch: None, relative_deflection: 8e-4, angular_deflection: 0.35, document_variables: BTreeMap::new(), preview_meshes: false, derived: None, custom_features: None, cancel: None, touch_probe: None }
     }
 }
 
@@ -289,7 +293,7 @@ fn result_key(studio: &PartStudio, config: &ConfigValues, units: &UnitPrefs, opt
     if !studio.contexts.is_empty() {
         return None;
     }
-    let settings = (config, units, opts.upto, opts.editing_sketch, opts.relative_deflection.to_bits(), opts.angular_deflection.to_bits(), display::angle_display_mesh());
+    let settings = (config, units, opts.upto, opts.editing_sketch, opts.touch_probe, opts.relative_deflection.to_bits(), opts.angular_deflection.to_bits(), display::angle_display_mesh());
     let mut key = hash_bytes(hash_bytes(1, &serde_json::to_vec(studio).ok()?), &serde_json::to_vec(&settings).ok()?);
     for (name, v) in &opts.document_variables {
         key = hash_bytes(hash_bytes(key, name.as_bytes()), &v.value.to_le_bytes());
@@ -428,6 +432,9 @@ impl Regenerator {
                 let v = opts.custom_features.clone().unwrap_or_else(custom_features::fallback_provider).version(tab);
                 key = hash_bytes(key, &v.to_le_bytes());
             }
+            // (The probed feature's results apart from the others': its touched parts.)
+            let probing = opts.touch_probe == Some(f.id);
+            let (ekey, elocal) = if probing { (hash_bytes(key, b"touch probe"), hash_bytes(local, b"touch probe")) } else { (key, local) };
             // Reused when its inputs are (not custom, std-run, derived or Assembly-context features: they read more
             // than the context).
             let reusable = reuse
@@ -442,7 +449,7 @@ impl Regenerator {
                 continue;
             }
             if let Some(versions) = self.entries.get_mut(&f.id)
-                && let Some(i) = versions.iter().position(|e| e.key == key)
+                && let Some(i) = versions.iter().position(|e| e.key == ekey)
             {
                 let mut e = versions.remove(i);
                 e.last_run = run;
@@ -455,7 +462,7 @@ impl Regenerator {
             if reusable
                 && expr_error.is_none()
                 && let Some(versions) = self.entries.get_mut(&f.id)
-                && let Some((e, out)) = versions.iter().filter(|e| e.local == local).find_map(|e| match reused(e, &ctx) {
+                && let Some((e, out)) = versions.iter().filter(|e| e.local == elocal).find_map(|e| match reused(e, &ctx) {
                     Ok(out) => Some((e, out)),
                     Err(why) => {
                         if context::trace_reads() {
@@ -470,7 +477,7 @@ impl Regenerator {
                 state.time_ms = t.elapsed().as_secs_f32() * 1000.0;
                 let input = ctx.clone();
                 ctx = Arc::new(out);
-                versions.insert(0, CacheEntry { key, ctx: ctx.clone(), state: state.clone(), last_run: run, local, input: Some(input), reads });
+                versions.insert(0, CacheEntry { key: ekey, ctx: ctx.clone(), state: state.clone(), last_run: run, local: elocal, input: Some(input), reads });
                 versions.truncate(VERSIONS);
                 states.push(state);
                 cached += 1;
@@ -523,6 +530,7 @@ impl Regenerator {
                         }
                         let mut ev = EvalCtx::new(f.id, &f.name, params, units, base, &outer_vars);
                         ev.cancel = opts.cancel.clone();
+                        ev.probe_touched = probing;
                         ev.editing_sketch = opts.editing_sketch;
                         ev.features = eval::Features::new(&effective, body_reads.as_deref());
                         // The sheet metal form library's studios too (`library:<id>`).
@@ -642,7 +650,7 @@ impl Regenerator {
             }
             let reads = body_reads.filter(|r| !r.all.load(std::sync::atomic::Ordering::Relaxed)).map(|r| Arc::new(ReadSet { bodies: r.bodies.lock().clone(), lookups: r.lookups.lock().clone(), bounds: *r.bounds.lock(), scopes: r.scopes.lock().clone() }));
             let versions = self.entries.entry(f.id).or_default();
-            versions.insert(0, CacheEntry { key, ctx: ctx.clone(), state: state.clone(), last_run: run, local, input: Some(input), reads });
+            versions.insert(0, CacheEntry { key: ekey, ctx: ctx.clone(), state: state.clone(), last_run: run, local: elocal, input: Some(input), reads });
             versions.truncate(VERSIONS);
             states.push(state);
         }

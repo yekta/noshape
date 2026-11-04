@@ -3927,6 +3927,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   220 B-spline-faced part, 1.7 s a call, to prove they don't touch. The probe now tests a part of more than 64 faces by
   the tool's vertices and a point inside each tool face only (in or on the part: touching); the merge scope of
   surfaces stays exact. Extrude 2 0.1 s, the document 16.4 -> 4.8 s (live 2.1).
+  core 11-04 15:53: the rest of it (100 ms, live 5): the probe ran in every regeneration; live runs it
+  (booleanStepEditLogic's evCollision) only in the dialog. Now only for RegenOptions::touch_probe, the new feature
+  the app's or the agent API's dialog is open on (its cached result keyed apart); T1 model
+  features_a::the_touched_parts_probe_runs_only_when_asked.
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet

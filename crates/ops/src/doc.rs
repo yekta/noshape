@@ -126,9 +126,10 @@ impl OpenDoc {
     }
 
     /// Regenerate an edited copy of a Part Studio tab without committing it
-    /// (a dialog's preview), in the active configuration.
-    pub fn preview(&mut self, tab: TabId, edited: &noshape_model::partstudio::PartStudio) -> Result<RegenResult, OpError> {
-        let opts = self.regen_options(tab);
+    /// (a dialog's preview), in the active configuration; `probe`: the new
+    /// feature whose tool's touched parts the dialog wants.
+    pub fn preview(&mut self, tab: TabId, edited: &noshape_model::partstudio::PartStudio, probe: Option<noshape_model::reference::FeatureId>) -> Result<RegenResult, OpError> {
+        let opts = RegenOptions { touch_probe: probe, ..self.regen_options(tab) };
         let units = self.session.doc.settings.units;
         let values = crate::config::current(edited, self.active_config.get(&tab).unwrap_or(&ConfigValues::default()));
         let reg = self.regens.entry(tab).or_default();
