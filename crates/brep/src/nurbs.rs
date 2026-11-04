@@ -596,6 +596,32 @@ impl NurbsSurface {
     }
 
     /// The point at (u, v) and its derivatives: [S, Su, Sv, Suu, Suv, Svv].
+    /// The point at (u, v) and its first derivatives: [S, Su, Sv] (a mesh node's point and normal).
+    pub fn d1(&self, u: f64, v: f64) -> [DVec3; 3] {
+        let (p, q) = (self.udegree, self.vdegree);
+        let (su, sv) = (span(&self.uknots, p, self.nu, u), span(&self.vknots, q, self.nv, v));
+        let bu = basis_derivs(&self.uknots, su, u, p, 1);
+        let bv = basis_derivs(&self.vknots, sv, v, q, 1);
+        // Homogeneous point and derivatives, then the quotient rule.
+        let (mut a, mut au, mut av) = (DVec3::ZERO, DVec3::ZERO, DVec3::ZERO);
+        let (mut w, mut wu, mut wv) = (0.0, 0.0, 0.0);
+        for (ia, (&n0, &n1)) in bu[0].iter().zip(&bu[1]).enumerate().take(p + 1) {
+            let i = su - p + ia;
+            for (jb, (&m0, &m1)) in bv[0].iter().zip(&bv[1]).enumerate().take(q + 1) {
+                let idx = i * self.nv + sv - q + jb;
+                let wi = if self.weights.is_empty() { 1.0 } else { self.weights[idx] };
+                a += self.poles[idx] * (n0 * m0 * wi);
+                au += self.poles[idx] * (n1 * m0 * wi);
+                av += self.poles[idx] * (n0 * m1 * wi);
+                w += wi * n0 * m0;
+                wu += wi * n1 * m0;
+                wv += wi * n0 * m1;
+            }
+        }
+        let s = a / w;
+        [s, (au - s * wu) / w, (av - s * wv) / w]
+    }
+
     pub fn derivs(&self, u: f64, v: f64) -> [DVec3; 6] {
         let (p, q) = (self.udegree, self.vdegree);
         let (su, sv) = (span(&self.uknots, p, self.nu, u), span(&self.vknots, q, self.nv, v));
@@ -842,6 +868,9 @@ mod tests {
         for (u, v) in [(0.1, 0.2), (0.5, 0.5), (0.9, 0.95)] {
             let d = s.derivs(u, v);
             assert!((d[0].truncate().length() - 2.0).abs() < 1e-14 && (d[0].z - 3.0 * v).abs() < 1e-14);
+            // The point and first derivatives alone, as the full evaluation's.
+            let [p, su, sv] = s.d1(u, v);
+            assert!((p - d[0]).length() < 1e-14 && (su - d[1]).length() < 1e-12 && (sv - d[2]).length() < 1e-12, "({u}, {v}): {p} {su} {sv}");
             let fd = |f: &dyn Fn(f64, f64) -> DVec3, du: f64, dv: f64| (f(u + du, v + dv) - f(u - du, v - dv)) / (2.0 * h);
             let at = |a: f64, b: f64| s.at(a, b);
             let su = |a: f64, b: f64| s.derivs(a, b)[1];

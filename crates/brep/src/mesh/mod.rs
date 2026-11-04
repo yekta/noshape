@@ -811,7 +811,7 @@ fn mesh_grid(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, nodes: &
 }
 
 /// A surface [`mesh_grid`] meshes: its parameters' box, its derivatives, a point's parameters.
-trait GridSurface {
+trait GridSurface: Sync {
     fn name(&self) -> &'static str;
     /// Closed round u (a seam's two uses at u and a period on, from [`GridSurface::param_of`]'s seed).
     fn closed(&self) -> bool;
@@ -821,6 +821,11 @@ trait GridSurface {
     /// [S, Su, Sv, Suu, Suv, Svv] at (u, v).
     fn derivs(&self, u: f64, v: f64) -> [DVec3; 6];
     fn at(&self, u: f64, v: f64) -> DVec3;
+    /// A node's point and first derivatives: [S, Su, Sv].
+    fn d1(&self, u: f64, v: f64) -> [DVec3; 3] {
+        let d = self.derivs(u, v);
+        [self.at(u, v), d[1], d[2]]
+    }
     /// The parameters of a point near the surface (the nearest to `seed`'s where the surface closes) and its
     /// distance from there.
     fn param_of(&self, p: DVec3, seed: Option<DVec2>) -> (DVec2, f64);
@@ -844,6 +849,9 @@ impl GridSurface for NurbsSurface {
     }
     fn at(&self, u: f64, v: f64) -> DVec3 {
         NurbsSurface::at(self, u, v)
+    }
+    fn d1(&self, u: f64, v: f64) -> [DVec3; 3] {
+        NurbsSurface::d1(self, u, v)
     }
     /// Closed round u: a node the iteration from `seed` can't reach across the seam is found afresh, and one on the
     /// seam is at u0 or u1, the one nearer `seed`.
@@ -1133,12 +1141,15 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
     let all: Vec<cdt::Pt> = uv.iter().chain(&interior).map(|q| scaled(*q)).map(|q| cdt::Pt { x: q.x, y: q.y }).collect();
     let inner: Vec<usize> = (nb..nb + interior.len()).collect();
     let triangles = cdt::triangulate_with(&all, &rings, &inner).ok_or("the triangulation failed")?;
-    points.extend(interior.iter().map(|q| s.at(q.x, q.y)));
-    // Normals ∂u × ∂v (at a degenerate point, its triangles').
-    let mut normals: Vec<DVec3> = uv.iter().chain(&interior).map(|q| {
-        let d = s.derivs(q.x, q.y);
-        d[1].cross(d[2]).normalize_or_zero()
-    }).collect();
+    // Each node's point and derivatives once (a big face's on several threads); normals ∂u × ∂v (at a degenerate
+    // point, its triangles').
+    let nodes: Vec<DVec2> = uv.iter().chain(&interior).copied().collect();
+    let mut d1 = vec![[DVec3::ZERO; 3]; nodes.len()];
+    for (k, d) in in_parallel(nodes.len(), 8192, |k| s.d1(nodes[k].x, nodes[k].y)) {
+        d1[k] = d;
+    }
+    points.extend(d1[nb..].iter().map(|d| d[0]));
+    let mut normals: Vec<DVec3> = d1.iter().map(|d| d[1].cross(d[2]).normalize_or_zero()).collect();
     if normals.contains(&DVec3::ZERO) {
         let mut acc = vec![DVec3::ZERO; normals.len()];
         for t in &triangles {
