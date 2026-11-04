@@ -3901,7 +3901,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   wires each (its wires' check goes by pairs). Now 0.8 s (OCCT's 8.2 s there), the same result. The region's two
   face-by-1735-disk cuts stay OCCT's (0.9 s each): noshape's Boolean doesn't take a sheet cut by sheets yet (tried:
   it can, 0.16 s each, but OCCT says Modified for the region's untouched edges in this document and Kept for a
-  box's face, the rule not found). The document on vibe3 (8 cores; noisy, the same binary 94 / 116 s): main 94.1 s
+  box's face, the rule not found). bool 11-04 18:00: the rule is op_boolean's (ScaledInputs: a cut of 64+ tools runs
+  on scaled copies, every input entity Modified); the face cuts are now noshape's, 0.16 s each. cf-fill-pattern
+  (current model) on vibe3: main 11.5 s, with this 9.3 s, live 4.7 s. The document on vibe3 (8 cores; noisy, the same binary 94 / 116 s): main 94.1 s
   and 116.2 s, this 80.8 s (with the sheet cuts) and 66.8 s; the rest is not the Booleans (props_surface 69 s,
   props_volume 22 s summed over threads in a profiled run: core's / dx's).
   core 11-04 01:16: live's faces (behaviours.md "core (2026-11-04 00:09, P2) exact faces"): stef-radijator's Fillet 1 is

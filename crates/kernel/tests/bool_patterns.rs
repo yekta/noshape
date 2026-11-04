@@ -180,6 +180,34 @@ fn a_fill_pattern_of_holes_in_a_plate() {
     bench("fill pattern of 1600 holes", k::BooleanOp::Cut, &plate, &holes, &k::BooleanOptions::default());
 }
 
+/// A face cut by disks on its plane (a fill pattern's region less its instances, its 1735 disks: OCCT's 0.9 s, ours
+/// 0.16 s): the face's pieces on no disk, as OCCT's, history too: the face's untouched edges and vertices Kept by 25
+/// disks, Modified by 72 (64 or more: OCCT's path cuts scaled copies of the inputs).
+#[test]
+fn a_face_cut_by_disks_on_its_plane_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let top = |s: &k::Shape, z: f64| s.faces().into_iter().find(|f| (f.centroid().unwrap().z - z).abs() < 1e-9).expect("its top");
+    let face = top(&k::make_box_corners(DVec3::ZERO, DVec3::new(0.06, 0.04, 0.01)).unwrap(), 0.01);
+    let near = |a: &std::collections::BTreeMap<String, Vec<Vec<f64>>>, b: &std::collections::BTreeMap<String, Vec<Vec<f64>>>| {
+        a.len() == b.len() && a.iter().all(|(k, v)| b.get(k).is_some_and(|w| v.len() == w.len() && v.iter().all(|x| w.iter().any(|y| x.len() == y.len() && x.iter().zip(y).all(|(p, q)| (p - q).abs() <= 1e-9)))))
+    };
+    for (nx, ny, r) in [(5, 5, 0.002), (9, 8, 0.001)] {
+        let disks: Vec<k::Shape> = (0..nx * ny).map(|i| top(&k::make_cylinder(&z_frame(DVec3::new(0.06 * ((i % nx) as f64 + 0.5) / nx as f64, 0.04 * ((i / nx) as f64 + 0.5) / ny as f64, 0.0)), r, 0.01, TAU).unwrap(), 0.01)).collect();
+        let run = |rust: bool| {
+            k::set_rust_boolean(Some(rust));
+            let r = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&face), &disks, &k::BooleanOptions::default()).expect("the cut");
+            let path = k::last_boolean_path();
+            k::set_rust_boolean(None);
+            (r, path)
+        };
+        let ((ours, path), (occt, _)) = (run(true), run(false));
+        assert_eq!(path, "rust", "{}", k::last_rust_decline());
+        assert!((ours.shape.area().unwrap() - occt.shape.area().unwrap()).abs() <= 1e-12);
+        assert_eq!(ours.shape.count(k::ShapeType::Edge), occt.shape.count(k::ShapeType::Edge));
+        assert!(near(&placed_records(&ours), &placed_records(&occt)), "{} disks, history: ours {:?}\nOCCT's {:?}", disks.len(), placed_records(&ours).keys().filter(|k| k.starts_with("arg0")).collect::<Vec<_>>(), placed_records(&occt).keys().filter(|k| k.starts_with("arg0")).collect::<Vec<_>>());
+    }
+}
+
 /// A result's history records, each output by where it lies (a face by its centroid and area, an edge by its ends
 /// and length, a vertex by its point: none by a curve's parameters), grouped by what they say.
 fn placed_records(r: &k::OpResult) -> std::collections::BTreeMap<String, Vec<Vec<f64>>> {

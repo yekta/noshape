@@ -3318,6 +3318,36 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         }
         sheet_common = !crossing && boxes_meet(l0, h0, l1, h1, GREY * tol);
     }
+    // A sheet cut by sheets on its planes (a fill pattern's region less its 1735 instances' disks): the object's
+    // pieces on no tool's face; each tool sheet on the object's plane within the tolerance, or apart from it.
+    let mut sheet_cut = false;
+    if op == Op::Cut && args.len() >= 2 && args.iter().all(|b| b.solids.is_empty() && !b.faces.is_empty()) {
+        let plane = |f: &Face| match f.surface {
+            Surface::Plane { origin, normal } => Some((origin, normal)),
+            _ => None,
+        };
+        let bx = |b: &Body| b.vertices.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(lo, hi), &p| (lo.min(p), hi.max(p)));
+        let round = |b: &Body| b.edges.iter().fold(0.0f64, |m, e| if let Curve::Circle { radius, .. } = e.curve { m.max(radius) } else { m });
+        let (l0, h0) = bx(args[0]);
+        for b in &args[1..] {
+            let (l1, h1) = bx(b);
+            if !boxes_meet(l0, h0, l1, h1, GREY * tol + 2.0 * round(b).max(round(args[0]))) {
+                continue;
+            }
+            let on_plane = args[0].faces.iter().all(|f| b.faces.iter().all(|g| match (plane(f), plane(g)) {
+                (Some((o1, n1)), Some((o2, n2))) => n1.cross(n2).length() <= 1e-9 && (o2 - o1).dot(n1).abs() <= tol,
+                _ => false,
+            }));
+            if !on_plane {
+                return Err(Decline("sheets that meet"));
+            }
+        }
+        sheet_cut = true;
+    }
+    // (Its edges and vertices untouched: Modified where OCCT's path of 64 tools or more cuts scaled copies of the
+    // inputs (op_boolean's ScaledInputs: every input entity Modified, a fill pattern's region less its 1735 disks),
+    // else Kept.)
+    let rebuilt = sheet_cut && args.len() > 64;
     if op == Op::Common && args.len() == 2 && args.iter().all(|b| b.solids.is_empty() && !b.faces.is_empty()) && !sheet_common {
         let mut out = Output::default();
         for (a, b) in args.iter().enumerate() {
@@ -3488,7 +3518,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     // Sheets: a fuse of sheets alone, or a sheet cut by solids or in common with them (else not yet).
     let sheet_arg: Vec<bool> = (0..args.len()).map(|a| cx.solids.iter().any(|s| s.sheet && s.arg == a as u32)).collect();
     let sheets = sheet_arg.iter().any(|&x| x);
-    if sheets && !sheet_common && !((op == Op::Fuse && sheet_arg.iter().all(|&x| x)) || (op != Op::Fuse && sheet_arg[0] && !sheet_arg[1..].iter().any(|&x| x))) {
+    if sheets && !sheet_common && !sheet_cut && !((op == Op::Fuse && sheet_arg.iter().all(|&x| x)) || (op != Op::Fuse && sheet_arg[0] && !sheet_arg[1..].iter().any(|&x| x))) {
         return Err(Decline("sheets with solids"));
     }
     // Each face: its parameter range (a partial cylinder's starts in the gap), boundary, box.
@@ -3969,7 +3999,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     // left two strips overlapping by 5 µm, one's corner on the other's edge, as they were: 0c538d2c).
     for k in 0..cx.coplanar.len() {
         let (f, g) = cx.coplanar[k];
-        if (!cx.solids[cx.faces[f].solid].sheet && !cx.solids[cx.faces[g].solid].sheet) || sheet_common {
+        if (!cx.solids[cx.faces[f].solid].sheet && !cx.solids[cx.faces[g].solid].sheet) || sheet_common || sheet_cut {
             continue;
         }
         for (a, b) in [(f, g), (g, f)] {
@@ -4779,7 +4809,8 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             coplanar_of[b].push(a);
         }
     }
-    // (By solid, in that order within each: asked for one solid at a time.)
+    // (By solid, in that order within each: a sheet's face with 1739 disks on it, asked for each of its pieces and
+    // each disk's solid.)
     for v in &mut coplanar_of {
         v.sort_by_key(|&g| cx.faces[g].solid);
     }
@@ -4976,8 +5007,13 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             }
         }
         let ons: Vec<(usize, State)> = states.iter().copied().filter(|x| matches!(x.1, State::OnSame | State::OnOpposite)).collect();
-        if !ons.is_empty() && (cx.solids[s].sheet || ons.iter().any(|&(t, _)| cx.solids[t].sheet)) && !sheet_common {
+        if !ons.is_empty() && (cx.solids[s].sheet || ons.iter().any(|&(t, _)| cx.solids[t].sheet)) && !sheet_common && !sheet_cut {
             return Err(Decline("sheets coincident"));
+        }
+        // (A sheet cut by sheets: the object's pieces on none of theirs, as they were.)
+        if sheet_cut {
+            keep[pi] = (arg == 0 && ons.is_empty()).then_some(false);
+            continue;
         }
         // (Two sheets' common: the object's pieces on the tool's faces, either way round; the tool's there go to them.)
         if sheet_common {
@@ -5155,6 +5191,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         // (Its tolerance where an input's or merged ones' was more than the Boolean's: the C++ build keeps it.)
         out.body.vertex_tol.push(cx.pool.t[w as usize]);
         out.vertex_origin.push(match cx.pool.inputs[w as usize].as_slice() {
+            [(0, i)] if vertex_same(w) && rebuilt => Origin::Piece { arg: 0, index: *i },
             [(a, i)] if vertex_same(w) => Origin::Same { arg: *a, index: *i },
             _ => Origin::New,
         });
@@ -5222,7 +5259,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             None => Origin::New,
             Some(&e) => {
                 let g = &cx.edges[e];
-                if edge_same[s] { Origin::Same { arg: g.arg, index: g.index } } else { Origin::Piece { arg: g.arg, index: g.index } }
+                if edge_same[s] && !(rebuilt && g.arg == 0) { Origin::Same { arg: g.arg, index: g.index } } else { Origin::Piece { arg: g.arg, index: g.index } }
             }
         });
     }
@@ -5232,7 +5269,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         let f = pieces[p].face;
         let flip = keep[p] == Some(true);
         let g = &cx.faces[f];
-        let same = !face_split[f] && pieces[p].loops.iter().flatten().map(|x| x.0).chain(pieces[p].inner.iter().copied()).all(|s| edge_same[s]);
+        let same = !face_split[f] && pieces[p].loops.iter().flatten().map(|x| x.0).chain(pieces[p].inner.iter().copied()).all(|s| edge_same[s]) && !(rebuilt && g.arg == 0);
         face_same[f] = same;
         let src = &args[g.arg as usize].faces[g.index as usize];
         // Each loop from where the input face's starts (its first edge's first piece), as OCCT's pieces.
@@ -5374,7 +5411,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     for e in 0..cx.edges.len() {
         let g = &cx.edges[e];
         let outs: Vec<u32> = edge_pieces[e].iter().filter_map(|p| emap.get(p.0)).collect();
-        if outs.len() == 1 && edge_same[edge_pieces[e][0].0] {
+        if outs.len() == 1 && edge_same[edge_pieces[e][0].0] && !(rebuilt && g.arg == 0) {
             continue;
         }
         if outs.is_empty() {
@@ -5390,7 +5427,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             match o {
                 None => h.push(rec(Kind::Vertex, a, i, Relation::Deleted, Kind::Vertex, u32::MAX)),
                 Some(_) if deleted_v.contains(&w) => h.push(rec(Kind::Vertex, a, i, Relation::Deleted, Kind::Vertex, u32::MAX)),
-                Some(o) if !vertex_same(w) => h.push(rec(Kind::Vertex, a, i, Relation::Modified, Kind::Vertex, o)),
+                Some(o) if !vertex_same(w) || (rebuilt && a == 0) => h.push(rec(Kind::Vertex, a, i, Relation::Modified, Kind::Vertex, o)),
                 _ => {}
             }
         }

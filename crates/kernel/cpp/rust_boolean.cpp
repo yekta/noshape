@@ -2283,6 +2283,11 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
       fail_op("cancelled");
   };
   stop();
+  // A sheet cut by 64 sheets or more: ours says its untouched edges and vertices Modified, as OCCT's path does where it
+  // cuts scaled copies (op_boolean's ScaledInputs); where it doesn't scale, OCCT's.
+  if (op == 1 && args.size() > 64 && (working_scale() == 1.0 || std::getenv("NOSHAPE_BOOL_NO_SCALE") != nullptr)
+      && std::none_of(args.begin(), args.end(), [](const TopoDS_Shape& a) { return TopExp_Explorer(a, TopAbs_SOLID).More(); }))
+    return decline("a sheet cut by many sheets, unscaled");
   srcs.resize(args.size(), nullptr);
   for (size_t i = 0; i < args.size(); ++i)
     if (srcs[i] == nullptr || !srcs[i]->shape.IsEqual(args[i]))
