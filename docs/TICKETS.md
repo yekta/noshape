@@ -86,6 +86,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   REGEN-SPEED's third undo (cached, 1.2 ms; was 207 ms). Interaction suite 124/136 of live's recordings (the rest owned,
   SCORE.md). Fuzz: v0.4.24 120 seeds 0 deaths; greens 1fda3bc9 / c4d5d8af / 444855b1 / eed2bdc8 / d347d276 300 seeds, one
   death (seed 3151, below).
+- **qa 04:29: also open, old (in v0.4.23 too): P0 CRASH-3388** (core) — fuzz seed 3388's 21-step document segfaults on open / at its fillet every time (OCCT BRepCheck in a worker thread). Not a blocker for this cut: not new.
 - **Open P0, already in v0.4.24 (not new to this cut): CRASH-3151** (core) — fuzz seed 3151's saved document aborts the app
   and CLI on open (OCCT fillet → TopOpeBRepBuild, heap corrupt): v0.4.24 3 / 3, green 56a0f49b 3 / 3; v0.4.23 opens it
   (its features fail earlier). Also open, not new: P0 CRASH-2045 (same OCCT fillet family), P1 DIALOG-SWITCH-DISCARDS-NEW.
@@ -356,6 +357,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P0 CRASH-3388 (core; OCCT shape check segfault) **a 21-step fuzz document segfaults the CLI on open and at its
+  fillet, every time, in v0.4.23, v0.4.24 and main**: /root/qa-scratch/tickets/crash3388/fz3388.noshape (+ -wal; CLI fuzz
+  seed 3388, `bin/clifuzz_time.py 3388 106`: step 21 is a fillet of 12 mm). The fuzz session dies at step 21 6 / 6 (v0.4.24
+  3, green 56a0f49b 3), also v0.4.23 and NOSHAPE_BOOL_RUST=0 (not bool's); `python3 tickets/crash3388/open.py <cli>` dies 2 / 2
+  (exit 139). gdb (tickets/crash3388/gdb-56a0f49b.txt): SIGSEGV in a worker thread, BRepTopAdaptor_FClass2d::BRepTopAdaptor_
+  FClass2d ← BRepCheck_Face::ClassifyWires ← OrientationOfWires ← BRepCheck_ParallelAnalyzer (OSD_ThreadPool): the
+  parallel BRepCheck of the fillet's result reads a face it can't classify (a null / freed pcurve?). Deterministic and
+  fast: the easiest of the fuzz crashes to run under ASan. live: a failing fillet fails with a message; ours: the process
+  dies. (qa 2026-11-04 04:29, builds v0.4.23 / v0.4.24 / 56a0f49b)
 - [ ] P0 CRASH-3151 (core; OCCT fillet heap corruption, same family as CRASH-2045) **a saved document crashes the app and
   the CLI on open in v0.4.24 and on main**: /root/qa-scratch/tickets/crash3151/fz3151-step63.noshape (+ -wal; fuzz seed 3151,
   45 features, the last Fillet 6). `python3 tickets/crash3151/open.py <cli-wrapper>` (document_open + feature_list): the
