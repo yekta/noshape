@@ -58,8 +58,9 @@ registry), with the same options and results as the app's dialogs.
 - Do not start editing code, committing or changing anything in response to a question. Answer the question. We'll
   tell you when to change something.
 - The app is the same on macOS, Windows and Linux: every window, menu, button and behaviour exists and acts alike on
-  all three. The macOS menu bar is an extra: whatever it holds is also in the app's own UI. Only OS conventions differ
-  (Cmd for Ctrl, native file dialogs).
+  all three. The macOS menu bar is an extra: whatever it holds is also in the app's own UI. Keys are Onshape's on each
+  OS (on a Mac Onshape uses Cmd for some shortcuts and keeps Control for others: check, never swap them wholesale);
+  file dialogs are the OS's.
 - Onshape parity is the requirement: check how live Onshape looks and behaves before you implement or change
   something, and match it exactly. Don't propose deviations.
 - Speed is a feature: no blocking work on the UI thread (`cx.background_spawn`), cache derived data, no per-frame
