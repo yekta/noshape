@@ -1,5 +1,15 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-04 02:43 UTC)
+Lead 01:5x round done: batch 21 answered (37/40 first; s993 / s998 fixed: `hold_the_base` orders pieces by their
+lowest point, level ones leftmost first; batches 1-21 726 of 790; s996 left, 0.24 mm); the mate dialog's Ctrl+Z
+(live 1962: Undo / Redo take its picks back, newest first, the dialog stays; the toolbar pair shows that history);
+same-instance picks flagged "Mate connectors are on same instance." (1956); all six live assembly recordings match
+(asm-fastened-undo-picks asked). psui's midpoint note (1954): a still rest (250 ms) within 9 px of a sketch line's
+midpoint, then a click, selects nothing. With it the sketch recordings are 71 of 81: the nine that select the line
+there (made before live's runner rested) are asked of live for a re-record (02:43); sketch-extend-to-line: live
+never extends there (1912; its runner), left as is.
+
 ## Resume here (2026-11-04 01:02 UTC)
 Since 23:22 landed: Show constraints default off (6083a99f); live's two assembly recordings match (0e2eb1cf: the
 list's root "start <name> asm" row, Origin, "Mate features (n)"; the full mate dialog; a mate row is a FEATURE item
