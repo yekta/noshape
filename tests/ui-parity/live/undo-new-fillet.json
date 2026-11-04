@@ -1,6 +1,6 @@
 {
  "scenario": "undo-new-fillet",
- "recorded": "2026-11-03T23:13:10.770Z",
+ "recorded": "2026-11-04T03:35:18.693Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "07494b3aa50fe9a2aaadbbe2",
+  "element": "4a11236221a123e28a45634a",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -66,7 +66,7 @@
     "do": "click",
     "on": {
      "edge": [
-      20,
+      10,
       0,
       10
      ]
@@ -77,8 +77,8 @@
     "JHV"
    ],
    "at": [
-    1142,
-    506
+    1112,
+    498
    ],
    "state": {
     "focus": {
@@ -132,7 +132,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 36341
+   "t": 53970
   },
   {
    "step": 2,
@@ -150,7 +150,7 @@
     },
     "dialog": {
      "title": "Fillet 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [
       {
@@ -166,7 +166,9 @@
       {
        "label": "Entities to fillet",
        "kind": "query",
-       "items": [],
+       "items": [
+        "Edge of Extrude 1"
+       ],
        "active": true,
        "state": "ok"
       },
@@ -227,12 +229,12 @@
       }
      ],
      "error": null,
-     "ok": "disabled"
+     "ok": "enabled"
     },
     "dialogs": [
      {
       "title": "Fillet 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [
        {
@@ -248,7 +250,9 @@
        {
         "label": "Entities to fillet",
         "kind": "query",
-        "items": [],
+        "items": [
+         "Edge of Extrude 1"
+        ],
         "active": true,
         "state": "ok"
        },
@@ -309,13 +313,19 @@
        }
       ],
       "error": null,
-      "ok": "disabled"
+      "ok": "enabled"
      }
     ],
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHV"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -333,18 +343,18 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": ""
+       "cls": "related-highlight"
       },
       {
        "name": "Fillet 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Fillet 1"
@@ -361,7 +371,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 40679
+   "t": 63060
   },
   {
    "step": 3,
@@ -380,170 +390,8 @@
     "focus": {
      "kind": "none"
     },
-    "dialog": {
-     "title": "Fillet 1",
-     "titleState": "error",
-     "kind": "feature",
-     "tabs": [
-      {
-       "label": "Edge",
-       "selected": true
-      },
-      {
-       "label": "Full round",
-       "selected": false
-      }
-     ],
-     "fields": [
-      {
-       "label": "Entities to fillet",
-       "kind": "query",
-       "items": [],
-       "active": true,
-       "state": "ok"
-      },
-      {
-       "label": "Tangent propagation",
-       "kind": "boolean",
-       "checked": true,
-       "state": "ok"
-      },
-      {
-       "label": "Measurement",
-       "kind": "enum",
-       "text": "Radius",
-       "state": "ok"
-      },
-      {
-       "label": "Control",
-       "kind": "enum",
-       "text": "Distance",
-       "state": "ok"
-      },
-      {
-       "label": "Radius",
-       "kind": "number",
-       "text": "5 mm",
-       "focused": false,
-       "state": "ok"
-      },
-      {
-       "label": "Asymmetric",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Partial fillet",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Variable fillet",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Allow edge overflow",
-       "kind": "boolean",
-       "checked": true,
-       "state": "ok"
-      },
-      {
-       "label": "Smooth fillet corners",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      }
-     ],
-     "error": null,
-     "ok": "disabled"
-    },
-    "dialogs": [
-     {
-      "title": "Fillet 1",
-      "titleState": "error",
-      "kind": "feature",
-      "tabs": [
-       {
-        "label": "Edge",
-        "selected": true
-       },
-       {
-        "label": "Full round",
-        "selected": false
-       }
-      ],
-      "fields": [
-       {
-        "label": "Entities to fillet",
-        "kind": "query",
-        "items": [],
-        "active": true,
-        "state": "ok"
-       },
-       {
-        "label": "Tangent propagation",
-        "kind": "boolean",
-        "checked": true,
-        "state": "ok"
-       },
-       {
-        "label": "Measurement",
-        "kind": "enum",
-        "text": "Radius",
-        "state": "ok"
-       },
-       {
-        "label": "Control",
-        "kind": "enum",
-        "text": "Distance",
-        "state": "ok"
-       },
-       {
-        "label": "Radius",
-        "kind": "number",
-        "text": "5 mm",
-        "focused": false,
-        "state": "ok"
-       },
-       {
-        "label": "Asymmetric",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Partial fillet",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Variable fillet",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Allow edge overflow",
-        "kind": "boolean",
-        "checked": true,
-        "state": "ok"
-       },
-       {
-        "label": "Smooth fillet corners",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       }
-      ],
-      "error": null,
-      "ok": "disabled"
-     }
-    ],
+    "dialog": null,
+    "dialogs": [],
     "list": null,
     "selection": {
      "count": 0,
@@ -571,12 +419,12 @@
       },
       {
        "name": "Fillet 1",
-       "state": "error",
-       "selected": true,
-       "editing": true,
+       "state": "ok",
+       "selected": false,
+       "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Fillet 1"
@@ -586,14 +434,14 @@
     ],
     "partsHeading": "Parts (1)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
     "message": null,
     "tooltip": null,
     "sketch": null
    },
-   "t": 42987
+   "t": 70668
   },
   {
    "step": 4,
@@ -606,170 +454,8 @@
     "focus": {
      "kind": "none"
     },
-    "dialog": {
-     "title": "Fillet 1",
-     "titleState": "error",
-     "kind": "feature",
-     "tabs": [
-      {
-       "label": "Edge",
-       "selected": true
-      },
-      {
-       "label": "Full round",
-       "selected": false
-      }
-     ],
-     "fields": [
-      {
-       "label": "Entities to fillet",
-       "kind": "query",
-       "items": [],
-       "active": true,
-       "state": "ok"
-      },
-      {
-       "label": "Tangent propagation",
-       "kind": "boolean",
-       "checked": true,
-       "state": "ok"
-      },
-      {
-       "label": "Measurement",
-       "kind": "enum",
-       "text": "Radius",
-       "state": "ok"
-      },
-      {
-       "label": "Control",
-       "kind": "enum",
-       "text": "Distance",
-       "state": "ok"
-      },
-      {
-       "label": "Radius",
-       "kind": "number",
-       "text": "5 mm",
-       "focused": false,
-       "state": "ok"
-      },
-      {
-       "label": "Asymmetric",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Partial fillet",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Variable fillet",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Allow edge overflow",
-       "kind": "boolean",
-       "checked": true,
-       "state": "ok"
-      },
-      {
-       "label": "Smooth fillet corners",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      }
-     ],
-     "error": null,
-     "ok": "disabled"
-    },
-    "dialogs": [
-     {
-      "title": "Fillet 1",
-      "titleState": "error",
-      "kind": "feature",
-      "tabs": [
-       {
-        "label": "Edge",
-        "selected": true
-       },
-       {
-        "label": "Full round",
-        "selected": false
-       }
-      ],
-      "fields": [
-       {
-        "label": "Entities to fillet",
-        "kind": "query",
-        "items": [],
-        "active": true,
-        "state": "ok"
-       },
-       {
-        "label": "Tangent propagation",
-        "kind": "boolean",
-        "checked": true,
-        "state": "ok"
-       },
-       {
-        "label": "Measurement",
-        "kind": "enum",
-        "text": "Radius",
-        "state": "ok"
-       },
-       {
-        "label": "Control",
-        "kind": "enum",
-        "text": "Distance",
-        "state": "ok"
-       },
-       {
-        "label": "Radius",
-        "kind": "number",
-        "text": "5 mm",
-        "focused": false,
-        "state": "ok"
-       },
-       {
-        "label": "Asymmetric",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Partial fillet",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Variable fillet",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Allow edge overflow",
-        "kind": "boolean",
-        "checked": true,
-        "state": "ok"
-       },
-       {
-        "label": "Smooth fillet corners",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       }
-      ],
-      "error": null,
-      "ok": "disabled"
-     }
-    ],
+    "dialog": null,
+    "dialogs": [],
     "list": null,
     "selection": {
      "count": 0,
@@ -797,12 +483,12 @@
       },
       {
        "name": "Fillet 1",
-       "state": "error",
-       "selected": true,
-       "editing": true,
+       "state": "ok",
+       "selected": false,
+       "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Fillet 1"
@@ -812,14 +498,14 @@
     ],
     "partsHeading": "Parts (1)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
     "message": null,
     "tooltip": null,
     "sketch": null
    },
-   "t": 47349
+   "t": 75011
   },
   {
    "step": 5,
@@ -832,170 +518,8 @@
     "focus": {
      "kind": "none"
     },
-    "dialog": {
-     "title": "Fillet 1",
-     "titleState": "error",
-     "kind": "feature",
-     "tabs": [
-      {
-       "label": "Edge",
-       "selected": true
-      },
-      {
-       "label": "Full round",
-       "selected": false
-      }
-     ],
-     "fields": [
-      {
-       "label": "Entities to fillet",
-       "kind": "query",
-       "items": [],
-       "active": true,
-       "state": "ok"
-      },
-      {
-       "label": "Tangent propagation",
-       "kind": "boolean",
-       "checked": true,
-       "state": "ok"
-      },
-      {
-       "label": "Measurement",
-       "kind": "enum",
-       "text": "Radius",
-       "state": "ok"
-      },
-      {
-       "label": "Control",
-       "kind": "enum",
-       "text": "Distance",
-       "state": "ok"
-      },
-      {
-       "label": "Radius",
-       "kind": "number",
-       "text": "5 mm",
-       "focused": false,
-       "state": "ok"
-      },
-      {
-       "label": "Asymmetric",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Partial fillet",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Variable fillet",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Allow edge overflow",
-       "kind": "boolean",
-       "checked": true,
-       "state": "ok"
-      },
-      {
-       "label": "Smooth fillet corners",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      }
-     ],
-     "error": null,
-     "ok": "disabled"
-    },
-    "dialogs": [
-     {
-      "title": "Fillet 1",
-      "titleState": "error",
-      "kind": "feature",
-      "tabs": [
-       {
-        "label": "Edge",
-        "selected": true
-       },
-       {
-        "label": "Full round",
-        "selected": false
-       }
-      ],
-      "fields": [
-       {
-        "label": "Entities to fillet",
-        "kind": "query",
-        "items": [],
-        "active": true,
-        "state": "ok"
-       },
-       {
-        "label": "Tangent propagation",
-        "kind": "boolean",
-        "checked": true,
-        "state": "ok"
-       },
-       {
-        "label": "Measurement",
-        "kind": "enum",
-        "text": "Radius",
-        "state": "ok"
-       },
-       {
-        "label": "Control",
-        "kind": "enum",
-        "text": "Distance",
-        "state": "ok"
-       },
-       {
-        "label": "Radius",
-        "kind": "number",
-        "text": "5 mm",
-        "focused": false,
-        "state": "ok"
-       },
-       {
-        "label": "Asymmetric",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Partial fillet",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Variable fillet",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Allow edge overflow",
-        "kind": "boolean",
-        "checked": true,
-        "state": "ok"
-       },
-       {
-        "label": "Smooth fillet corners",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       }
-      ],
-      "error": null,
-      "ok": "disabled"
-     }
-    ],
+    "dialog": null,
+    "dialogs": [],
     "list": null,
     "selection": {
      "count": 0,
@@ -1020,18 +544,9 @@
        "related": false,
        "hidden": false,
        "cls": ""
-      },
-      {
-       "name": "Fillet 1",
-       "state": "error",
-       "selected": true,
-       "editing": true,
-       "related": false,
-       "hidden": false,
-       "cls": "edited selected ns-list-item-error"
       }
      ],
-     "rollbackAfter": "Fillet 1"
+     "rollbackAfter": "Extrude 1"
     },
     "parts": [
      "Part 1"
@@ -1039,13 +554,13 @@
     "partsHeading": "Parts (1)",
     "undo": {
      "undo": false,
-     "redo": false
+     "redo": true
     },
     "message": null,
     "tooltip": null,
     "sketch": null
    },
-   "t": 49161
+   "t": 77623
   },
   {
    "step": 6,
@@ -1058,170 +573,8 @@
     "focus": {
      "kind": "none"
     },
-    "dialog": {
-     "title": "Fillet 1",
-     "titleState": "error",
-     "kind": "feature",
-     "tabs": [
-      {
-       "label": "Edge",
-       "selected": true
-      },
-      {
-       "label": "Full round",
-       "selected": false
-      }
-     ],
-     "fields": [
-      {
-       "label": "Entities to fillet",
-       "kind": "query",
-       "items": [],
-       "active": true,
-       "state": "ok"
-      },
-      {
-       "label": "Tangent propagation",
-       "kind": "boolean",
-       "checked": true,
-       "state": "ok"
-      },
-      {
-       "label": "Measurement",
-       "kind": "enum",
-       "text": "Radius",
-       "state": "ok"
-      },
-      {
-       "label": "Control",
-       "kind": "enum",
-       "text": "Distance",
-       "state": "ok"
-      },
-      {
-       "label": "Radius",
-       "kind": "number",
-       "text": "5 mm",
-       "focused": false,
-       "state": "ok"
-      },
-      {
-       "label": "Asymmetric",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Partial fillet",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Variable fillet",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Allow edge overflow",
-       "kind": "boolean",
-       "checked": true,
-       "state": "ok"
-      },
-      {
-       "label": "Smooth fillet corners",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      }
-     ],
-     "error": null,
-     "ok": "disabled"
-    },
-    "dialogs": [
-     {
-      "title": "Fillet 1",
-      "titleState": "error",
-      "kind": "feature",
-      "tabs": [
-       {
-        "label": "Edge",
-        "selected": true
-       },
-       {
-        "label": "Full round",
-        "selected": false
-       }
-      ],
-      "fields": [
-       {
-        "label": "Entities to fillet",
-        "kind": "query",
-        "items": [],
-        "active": true,
-        "state": "ok"
-       },
-       {
-        "label": "Tangent propagation",
-        "kind": "boolean",
-        "checked": true,
-        "state": "ok"
-       },
-       {
-        "label": "Measurement",
-        "kind": "enum",
-        "text": "Radius",
-        "state": "ok"
-       },
-       {
-        "label": "Control",
-        "kind": "enum",
-        "text": "Distance",
-        "state": "ok"
-       },
-       {
-        "label": "Radius",
-        "kind": "number",
-        "text": "5 mm",
-        "focused": false,
-        "state": "ok"
-       },
-       {
-        "label": "Asymmetric",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Partial fillet",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Variable fillet",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Allow edge overflow",
-        "kind": "boolean",
-        "checked": true,
-        "state": "ok"
-       },
-       {
-        "label": "Smooth fillet corners",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       }
-      ],
-      "error": null,
-      "ok": "disabled"
-     }
-    ],
+    "dialog": null,
+    "dialogs": [],
     "list": null,
     "selection": {
      "count": 0,
@@ -1246,18 +599,9 @@
        "related": false,
        "hidden": false,
        "cls": ""
-      },
-      {
-       "name": "Fillet 1",
-       "state": "error",
-       "selected": true,
-       "editing": true,
-       "related": false,
-       "hidden": false,
-       "cls": "edited selected ns-list-item-error"
       }
      ],
-     "rollbackAfter": "Fillet 1"
+     "rollbackAfter": "Extrude 1"
     },
     "parts": [
      "Part 1"
@@ -1265,13 +609,13 @@
     "partsHeading": "Parts (1)",
     "undo": {
      "undo": false,
-     "redo": false
+     "redo": true
     },
     "message": null,
     "tooltip": null,
     "sketch": null
    },
-   "t": 53453
+   "t": 81960
   },
   {
    "step": 7,
@@ -1284,170 +628,8 @@
     "focus": {
      "kind": "none"
     },
-    "dialog": {
-     "title": "Fillet 1",
-     "titleState": "error",
-     "kind": "feature",
-     "tabs": [
-      {
-       "label": "Edge",
-       "selected": true
-      },
-      {
-       "label": "Full round",
-       "selected": false
-      }
-     ],
-     "fields": [
-      {
-       "label": "Entities to fillet",
-       "kind": "query",
-       "items": [],
-       "active": true,
-       "state": "ok"
-      },
-      {
-       "label": "Tangent propagation",
-       "kind": "boolean",
-       "checked": true,
-       "state": "ok"
-      },
-      {
-       "label": "Measurement",
-       "kind": "enum",
-       "text": "Radius",
-       "state": "ok"
-      },
-      {
-       "label": "Control",
-       "kind": "enum",
-       "text": "Distance",
-       "state": "ok"
-      },
-      {
-       "label": "Radius",
-       "kind": "number",
-       "text": "5 mm",
-       "focused": false,
-       "state": "ok"
-      },
-      {
-       "label": "Asymmetric",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Partial fillet",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Variable fillet",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Allow edge overflow",
-       "kind": "boolean",
-       "checked": true,
-       "state": "ok"
-      },
-      {
-       "label": "Smooth fillet corners",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      }
-     ],
-     "error": null,
-     "ok": "disabled"
-    },
-    "dialogs": [
-     {
-      "title": "Fillet 1",
-      "titleState": "error",
-      "kind": "feature",
-      "tabs": [
-       {
-        "label": "Edge",
-        "selected": true
-       },
-       {
-        "label": "Full round",
-        "selected": false
-       }
-      ],
-      "fields": [
-       {
-        "label": "Entities to fillet",
-        "kind": "query",
-        "items": [],
-        "active": true,
-        "state": "ok"
-       },
-       {
-        "label": "Tangent propagation",
-        "kind": "boolean",
-        "checked": true,
-        "state": "ok"
-       },
-       {
-        "label": "Measurement",
-        "kind": "enum",
-        "text": "Radius",
-        "state": "ok"
-       },
-       {
-        "label": "Control",
-        "kind": "enum",
-        "text": "Distance",
-        "state": "ok"
-       },
-       {
-        "label": "Radius",
-        "kind": "number",
-        "text": "5 mm",
-        "focused": false,
-        "state": "ok"
-       },
-       {
-        "label": "Asymmetric",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Partial fillet",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Variable fillet",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Allow edge overflow",
-        "kind": "boolean",
-        "checked": true,
-        "state": "ok"
-       },
-       {
-        "label": "Smooth fillet corners",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       }
-      ],
-      "error": null,
-      "ok": "disabled"
-     }
-    ],
+    "dialog": null,
+    "dialogs": [],
     "list": null,
     "selection": {
      "count": 0,
@@ -1475,12 +657,12 @@
       },
       {
        "name": "Fillet 1",
-       "state": "error",
-       "selected": true,
-       "editing": true,
+       "state": "ok",
+       "selected": false,
+       "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Fillet 1"
@@ -1490,14 +672,14 @@
     ],
     "partsHeading": "Parts (1)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
     "message": null,
     "tooltip": null,
     "sketch": null
    },
-   "t": 55200
+   "t": 83809
   },
   {
    "step": 8,
@@ -1510,170 +692,8 @@
     "focus": {
      "kind": "none"
     },
-    "dialog": {
-     "title": "Fillet 1",
-     "titleState": "error",
-     "kind": "feature",
-     "tabs": [
-      {
-       "label": "Edge",
-       "selected": true
-      },
-      {
-       "label": "Full round",
-       "selected": false
-      }
-     ],
-     "fields": [
-      {
-       "label": "Entities to fillet",
-       "kind": "query",
-       "items": [],
-       "active": true,
-       "state": "ok"
-      },
-      {
-       "label": "Tangent propagation",
-       "kind": "boolean",
-       "checked": true,
-       "state": "ok"
-      },
-      {
-       "label": "Measurement",
-       "kind": "enum",
-       "text": "Radius",
-       "state": "ok"
-      },
-      {
-       "label": "Control",
-       "kind": "enum",
-       "text": "Distance",
-       "state": "ok"
-      },
-      {
-       "label": "Radius",
-       "kind": "number",
-       "text": "5 mm",
-       "focused": false,
-       "state": "ok"
-      },
-      {
-       "label": "Asymmetric",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Partial fillet",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Variable fillet",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Allow edge overflow",
-       "kind": "boolean",
-       "checked": true,
-       "state": "ok"
-      },
-      {
-       "label": "Smooth fillet corners",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      }
-     ],
-     "error": null,
-     "ok": "disabled"
-    },
-    "dialogs": [
-     {
-      "title": "Fillet 1",
-      "titleState": "error",
-      "kind": "feature",
-      "tabs": [
-       {
-        "label": "Edge",
-        "selected": true
-       },
-       {
-        "label": "Full round",
-        "selected": false
-       }
-      ],
-      "fields": [
-       {
-        "label": "Entities to fillet",
-        "kind": "query",
-        "items": [],
-        "active": true,
-        "state": "ok"
-       },
-       {
-        "label": "Tangent propagation",
-        "kind": "boolean",
-        "checked": true,
-        "state": "ok"
-       },
-       {
-        "label": "Measurement",
-        "kind": "enum",
-        "text": "Radius",
-        "state": "ok"
-       },
-       {
-        "label": "Control",
-        "kind": "enum",
-        "text": "Distance",
-        "state": "ok"
-       },
-       {
-        "label": "Radius",
-        "kind": "number",
-        "text": "5 mm",
-        "focused": false,
-        "state": "ok"
-       },
-       {
-        "label": "Asymmetric",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Partial fillet",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Variable fillet",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Allow edge overflow",
-        "kind": "boolean",
-        "checked": true,
-        "state": "ok"
-       },
-       {
-        "label": "Smooth fillet corners",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       }
-      ],
-      "error": null,
-      "ok": "disabled"
-     }
-    ],
+    "dialog": null,
+    "dialogs": [],
     "list": null,
     "selection": {
      "count": 0,
@@ -1701,12 +721,12 @@
       },
       {
        "name": "Fillet 1",
-       "state": "error",
-       "selected": true,
-       "editing": true,
+       "state": "ok",
+       "selected": false,
+       "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Fillet 1"
@@ -1716,14 +736,14 @@
     ],
     "partsHeading": "Parts (1)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
     "message": null,
     "tooltip": null,
     "sketch": null
    },
-   "t": 59539
+   "t": 88614
   }
  ]
 }

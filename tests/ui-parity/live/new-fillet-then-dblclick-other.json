@@ -1,6 +1,6 @@
 {
  "scenario": "new-fillet-then-dblclick-other",
- "recorded": "2026-11-04T00:24:01.767Z",
+ "recorded": "2026-11-04T03:49:53.473Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "7aff9577b2835b5259704d13",
+  "element": "04563062cdcf387b4407687b",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -66,7 +66,7 @@
     "do": "click",
     "on": {
      "edge": [
-      20,
+      10,
       0,
       10
      ]
@@ -77,8 +77,8 @@
     "JHV"
    ],
    "at": [
-    1142,
-    506
+    1112,
+    498
    ],
    "state": {
     "focus": {
@@ -132,7 +132,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 35227
+   "t": 51715
   },
   {
    "step": 2,
@@ -150,7 +150,7 @@
     },
     "dialog": {
      "title": "Fillet 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [
       {
@@ -166,7 +166,9 @@
       {
        "label": "Entities to fillet",
        "kind": "query",
-       "items": [],
+       "items": [
+        "Edge of Extrude 1"
+       ],
        "active": true,
        "state": "ok"
       },
@@ -227,12 +229,12 @@
       }
      ],
      "error": null,
-     "ok": "disabled"
+     "ok": "enabled"
     },
     "dialogs": [
      {
       "title": "Fillet 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [
        {
@@ -248,7 +250,9 @@
        {
         "label": "Entities to fillet",
         "kind": "query",
-        "items": [],
+        "items": [
+         "Edge of Extrude 1"
+        ],
         "active": true,
         "state": "ok"
        },
@@ -309,13 +313,19 @@
        }
       ],
       "error": null,
-      "ok": "disabled"
+      "ok": "enabled"
      }
     ],
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHV"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -333,18 +343,18 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": ""
+       "cls": "related-highlight"
       },
       {
        "name": "Fillet 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Fillet 1"
@@ -361,7 +371,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 39746
+   "t": 60559
   },
   {
    "step": 3,
@@ -379,7 +389,7 @@
     },
     "dialog": {
      "title": "Fillet 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [
       {
@@ -395,7 +405,9 @@
       {
        "label": "Entities to fillet",
        "kind": "query",
-       "items": [],
+       "items": [
+        "Edge of Extrude 1"
+       ],
        "active": true,
        "state": "ok"
       },
@@ -456,12 +468,12 @@
       }
      ],
      "error": null,
-     "ok": "disabled"
+     "ok": "enabled"
     },
     "dialogs": [
      {
       "title": "Fillet 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [
        {
@@ -477,7 +489,9 @@
        {
         "label": "Entities to fillet",
         "kind": "query",
-        "items": [],
+        "items": [
+         "Edge of Extrude 1"
+        ],
         "active": true,
         "state": "ok"
        },
@@ -538,13 +552,19 @@
        }
       ],
       "error": null,
-      "ok": "disabled"
+      "ok": "enabled"
      }
     ],
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHV"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -562,18 +582,18 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": ""
+       "cls": "related-highlight"
       },
       {
        "name": "Fillet 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Fillet 1"
@@ -590,7 +610,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 43976
+   "t": 65066
   },
   {
    "step": 4,
@@ -685,9 +705,18 @@
        "related": false,
        "hidden": false,
        "cls": "not-computed"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "rolled-back",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "not-computed"
       }
      ],
-     "rollbackAfter": "Extrude 1"
+     "rollbackAfter": "Fillet 1"
     },
     "parts": [],
     "partsHeading": "Parts (0)",
@@ -705,7 +734,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 79065
+   "t": 101640
   },
   {
    "step": 5,
@@ -794,9 +823,18 @@
        "related": false,
        "hidden": false,
        "cls": "not-computed"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "rolled-back",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "not-computed"
       }
      ],
-     "rollbackAfter": "Extrude 1"
+     "rollbackAfter": "Fillet 1"
     },
     "parts": [],
     "partsHeading": "Parts (0)",
@@ -814,7 +852,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 112785
+   "t": 135812
   },
   {
    "step": 6,
@@ -903,9 +941,18 @@
        "related": false,
        "hidden": false,
        "cls": "not-computed"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "rolled-back",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "not-computed"
       }
      ],
-     "rollbackAfter": "Extrude 1"
+     "rollbackAfter": "Fillet 1"
     },
     "parts": [],
     "partsHeading": "Parts (0)",
@@ -923,7 +970,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 146972
+   "t": 170048
   }
  ]
 }

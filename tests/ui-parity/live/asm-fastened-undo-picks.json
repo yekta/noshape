@@ -1,6 +1,6 @@
 {
  "scenario": "asm-fastened-undo-picks",
- "recorded": "2026-11-04T02:17:25.494Z",
+ "recorded": "2026-11-04T03:39:29.350Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "3773d288fdc6c804b32716a5",
+  "element": "f24b114f01b8f88c7c0bf950",
   "start": "two-blocks",
   "startElement": "94efa1d13f38aa3acb2f1952"
  },
@@ -257,7 +257,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 1",
+       "name": "start two-blocks asm Copy 2",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -371,7 +371,7 @@
      "mates": []
     }
    },
-   "t": 49716
+   "t": 37098
   },
   {
    "step": 2,
@@ -503,14 +503,14 @@
       {
        "kind": "FEATURE",
        "owner": null,
-       "id": "M1Rao4czViEi52s7X"
+       "id": "MvWiUfSc9r67Zlret"
       }
      ]
     },
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 1",
+       "name": "start two-blocks asm Copy 2",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -624,7 +624,7 @@
      "mates": []
     }
    },
-   "t": 68750
+   "t": 54366
   },
   {
    "step": 3,
@@ -741,7 +741,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 1",
+       "name": "start two-blocks asm Copy 2",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -855,7 +855,7 @@
      "mates": []
     }
    },
-   "t": 72457
+   "t": 56742
   },
   {
    "step": 4,
@@ -863,8 +863,8 @@
     "do": "click",
     "on": {
      "face": [
-      70,
-      10,
+      74,
+      14,
       10
      ],
      "instance": "Part 2 <1>"
@@ -873,8 +873,8 @@
    "ok": true,
    "hover": [],
    "at": [
-    1388,
-    691
+    1468,
+    681
    ],
    "state": {
     "focus": {
@@ -984,7 +984,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 1",
+       "name": "start two-blocks asm Copy 2",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1098,7 +1098,7 @@
      "mates": []
     }
    },
-   "t": 79528
+   "t": 67969
   },
   {
    "step": 5,
@@ -1230,14 +1230,14 @@
       {
        "kind": "FEATURE",
        "owner": null,
-       "id": "M/eLGkx4gU+cJMVzZ"
+       "id": "MBNcAMwtNTc4XLrHh"
       }
      ]
     },
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 1",
+       "name": "start two-blocks asm Copy 2",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1351,7 +1351,7 @@
      "mates": []
     }
    },
-   "t": 94110
+   "t": 82357
   },
   {
    "step": 6,
@@ -1468,7 +1468,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 1",
+       "name": "start two-blocks asm Copy 2",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1582,7 +1582,7 @@
      "mates": []
     }
    },
-   "t": 96761
+   "t": 87225
   },
   {
    "step": 7,
@@ -1699,7 +1699,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 1",
+       "name": "start two-blocks asm Copy 2",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1813,7 +1813,7 @@
      "mates": []
     }
    },
-   "t": 99100
+   "t": 89906
   },
   {
    "step": 8,
@@ -1941,7 +1941,7 @@
      "mates": []
     }
    },
-   "t": 103309
+   "t": 95735
   }
  ]
 }

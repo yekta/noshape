@@ -1,6 +1,6 @@
 {
  "scenario": "section-view-front",
- "recorded": "2026-11-04T03:08:07.015Z",
+ "recorded": "2026-11-04T03:53:32.834Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "fd5d5d9127ec22f37e79abfa",
+  "element": "0d41c783301ead26ebe9de3c",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -121,7 +121,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 34854
+   "t": 71359
   },
   {
    "step": 2,
@@ -182,7 +182,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 43756
+   "t": 79608
   },
   {
    "step": 3,
@@ -237,7 +237,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 45679
+   "t": 81403
   }
  ]
 }

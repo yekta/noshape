@@ -1,6 +1,6 @@
 {
  "scenario": "chamfer-two-distances",
- "recorded": "2026-11-04T03:16:32.936Z",
+ "recorded": "2026-11-04T03:48:10.065Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "3a70a659340fdcf83e1186b8",
+  "element": "cc6314a084f1f9563d6b9212",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -74,7 +74,7 @@
    },
    "ok": true,
    "hover": [
-    "JHK"
+    "JHV"
    ],
    "at": [
     1112,
@@ -84,240 +84,16 @@
     "focus": {
      "kind": "none"
     },
-    "dialog": {
-     "title": "Extrude 2",
-     "titleState": "ok",
-     "kind": "feature",
-     "tabs": [
-      {
-       "label": "Solid",
-       "selected": true
-      },
-      {
-       "label": "Surface",
-       "selected": false
-      },
-      {
-       "label": "Thin",
-       "selected": false
-      },
-      {
-       "label": "New",
-       "selected": false
-      },
-      {
-       "label": "Add",
-       "selected": true
-      },
-      {
-       "label": "Remove",
-       "selected": false
-      },
-      {
-       "label": "Intersect",
-       "selected": false
-      }
-     ],
-     "fields": [
-      {
-       "label": "Faces and sketch regions to extrude",
-       "kind": "query",
-       "items": [
-        "Face of Extrude 1"
-       ],
-       "active": true,
-       "state": "ok"
-      },
-      {
-       "label": null,
-       "kind": "enum",
-       "text": "Blind",
-       "state": "ok"
-      },
-      {
-       "label": "icon:svg-icon-flip-direction-opposite",
-       "kind": "toggle",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Depth",
-       "kind": "number",
-       "text": "25 mm",
-       "focused": false,
-       "state": "ok"
-      },
-      {
-       "label": "Direction",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Starting offset",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Symmetric",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Draft",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Second end position",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Merge with all",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Merge scope",
-       "kind": "query",
-       "items": [
-        "Part 1"
-       ],
-       "active": false,
-       "state": "ok"
-      }
-     ],
-     "error": null,
-     "ok": "enabled"
-    },
-    "dialogs": [
-     {
-      "title": "Extrude 2",
-      "titleState": "ok",
-      "kind": "feature",
-      "tabs": [
-       {
-        "label": "Solid",
-        "selected": true
-       },
-       {
-        "label": "Surface",
-        "selected": false
-       },
-       {
-        "label": "Thin",
-        "selected": false
-       },
-       {
-        "label": "New",
-        "selected": false
-       },
-       {
-        "label": "Add",
-        "selected": true
-       },
-       {
-        "label": "Remove",
-        "selected": false
-       },
-       {
-        "label": "Intersect",
-        "selected": false
-       }
-      ],
-      "fields": [
-       {
-        "label": "Faces and sketch regions to extrude",
-        "kind": "query",
-        "items": [
-         "Face of Extrude 1"
-        ],
-        "active": true,
-        "state": "ok"
-       },
-       {
-        "label": null,
-        "kind": "enum",
-        "text": "Blind",
-        "state": "ok"
-       },
-       {
-        "label": "icon:svg-icon-flip-direction-opposite",
-        "kind": "toggle",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Depth",
-        "kind": "number",
-        "text": "25 mm",
-        "focused": false,
-        "state": "ok"
-       },
-       {
-        "label": "Direction",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Starting offset",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Symmetric",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Draft",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Second end position",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Merge with all",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Merge scope",
-        "kind": "query",
-        "items": [
-         "Part 1"
-        ],
-        "active": false,
-        "state": "ok"
-       }
-      ],
-      "error": null,
-      "ok": "enabled"
-     }
-    ],
+    "dialog": null,
+    "dialogs": [],
     "list": null,
     "selection": {
      "count": 1,
      "items": [
       {
-       "kind": "FACE",
+       "kind": "EDGE",
        "owner": "Part 1",
-       "id": "JHK"
+       "id": "JHV"
       }
      ]
     },
@@ -340,32 +116,23 @@
        "related": true,
        "hidden": false,
        "cls": "related-highlight"
-      },
-      {
-       "name": "Extrude 2",
-       "state": "ok",
-       "selected": true,
-       "editing": true,
-       "related": false,
-       "hidden": false,
-       "cls": "edited selected"
       }
      ],
-     "rollbackAfter": "Extrude 2"
+     "rollbackAfter": "Extrude 1"
     },
     "parts": [
      "Part 1"
     ],
     "partsHeading": "Parts (1)",
     "undo": {
-     "undo": true,
+     "undo": false,
      "redo": false
     },
     "message": null,
     "tooltip": null,
     "sketch": null
    },
-   "t": 43192
+   "t": 43220
   },
   {
    "step": 2,
@@ -389,14 +156,16 @@
     },
     "dialog": {
      "title": "Chamfer 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [],
      "fields": [
       {
        "label": "Entities to chamfer",
        "kind": "query",
-       "items": [],
+       "items": [
+        "Edge of Extrude 1"
+       ],
        "active": true,
        "state": "ok"
       },
@@ -427,19 +196,21 @@
       }
      ],
      "error": null,
-     "ok": "disabled"
+     "ok": "enabled"
     },
     "dialogs": [
      {
       "title": "Chamfer 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [],
       "fields": [
        {
         "label": "Entities to chamfer",
         "kind": "query",
-        "items": [],
+        "items": [
+         "Edge of Extrude 1"
+        ],
         "active": true,
         "state": "ok"
        },
@@ -470,13 +241,19 @@
        }
       ],
       "error": null,
-      "ok": "disabled"
+      "ok": "enabled"
      }
     ],
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHV"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -494,27 +271,18 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": ""
-      },
-      {
-       "name": "Extrude 2",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
+       "cls": "related-highlight"
       },
       {
        "name": "Chamfer 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Chamfer 1"
@@ -531,7 +299,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 49126
+   "t": 50058
   },
   {
    "step": 3,
@@ -545,32 +313,28 @@
    "ok": true,
    "at": [
     343,
-    208
+    224
    ],
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": "Chamfer type",
-     "text": "",
-     "selection": [
-      0,
-      0
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Direction overrides",
      "dialog": "Chamfer 1"
     },
     "dialog": {
      "title": "Chamfer 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [],
      "fields": [
       {
        "label": "Entities to chamfer",
        "kind": "query",
-       "items": [],
-       "active": true,
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": false,
        "state": "ok"
       },
       {
@@ -609,7 +373,7 @@
        "label": "Direction overrides",
        "kind": "query",
        "items": [],
-       "active": false,
+       "active": true,
        "state": "ok"
       },
       {
@@ -625,15 +389,17 @@
     "dialogs": [
      {
       "title": "Chamfer 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [],
       "fields": [
        {
         "label": "Entities to chamfer",
         "kind": "query",
-        "items": [],
-        "active": true,
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": false,
         "state": "ok"
        },
        {
@@ -672,7 +438,7 @@
         "label": "Direction overrides",
         "kind": "query",
         "items": [],
-        "active": false,
+        "active": true,
         "state": "ok"
        },
        {
@@ -712,22 +478,13 @@
        "cls": ""
       },
       {
-       "name": "Extrude 2",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
        "name": "Chamfer 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Chamfer 1"
@@ -744,7 +501,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 55507
+   "t": 59155
   },
   {
    "step": 4,
@@ -757,7 +514,7 @@
    "ok": true,
    "at": [
     370,
-    234
+    250
    ],
    "state": {
     "focus": {
@@ -774,15 +531,17 @@
     },
     "dialog": {
      "title": "Chamfer 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [],
      "fields": [
       {
        "label": "Entities to chamfer",
        "kind": "query",
-       "items": [],
-       "active": true,
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": false,
        "state": "ok"
       },
       {
@@ -821,7 +580,7 @@
        "label": "Direction overrides",
        "kind": "query",
        "items": [],
-       "active": false,
+       "active": true,
        "state": "ok"
       },
       {
@@ -837,15 +596,17 @@
     "dialogs": [
      {
       "title": "Chamfer 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [],
       "fields": [
        {
         "label": "Entities to chamfer",
         "kind": "query",
-        "items": [],
-        "active": true,
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": false,
         "state": "ok"
        },
        {
@@ -884,7 +645,7 @@
         "label": "Direction overrides",
         "kind": "query",
         "items": [],
-        "active": false,
+        "active": true,
         "state": "ok"
        },
        {
@@ -924,22 +685,13 @@
        "cls": ""
       },
       {
-       "name": "Extrude 2",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
        "name": "Chamfer 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Chamfer 1"
@@ -956,7 +708,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 60461
+   "t": 63250
   },
   {
    "step": 5,
@@ -967,19 +719,30 @@
    "ok": true,
    "state": {
     "focus": {
-     "kind": "none"
+     "kind": "field",
+     "tag": "input",
+     "label": "Distance 1",
+     "text": "1",
+     "selection": [
+      1,
+      1
+     ],
+     "all": false,
+     "dialog": "Chamfer 1"
     },
     "dialog": {
      "title": "Chamfer 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [],
      "fields": [
       {
        "label": "Entities to chamfer",
        "kind": "query",
-       "items": [],
-       "active": true,
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": false,
        "state": "ok"
       },
       {
@@ -997,8 +760,8 @@
       {
        "label": "Distance 1",
        "kind": "number",
-       "text": "5 mm",
-       "focused": false,
+       "text": "1",
+       "focused": true,
        "state": "ok"
       },
       {
@@ -1018,7 +781,7 @@
        "label": "Direction overrides",
        "kind": "query",
        "items": [],
-       "active": false,
+       "active": true,
        "state": "ok"
       },
       {
@@ -1034,15 +797,17 @@
     "dialogs": [
      {
       "title": "Chamfer 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [],
       "fields": [
        {
         "label": "Entities to chamfer",
         "kind": "query",
-        "items": [],
-        "active": true,
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": false,
         "state": "ok"
        },
        {
@@ -1060,8 +825,8 @@
        {
         "label": "Distance 1",
         "kind": "number",
-        "text": "5 mm",
-        "focused": false,
+        "text": "1",
+        "focused": true,
         "state": "ok"
        },
        {
@@ -1081,7 +846,7 @@
         "label": "Direction overrides",
         "kind": "query",
         "items": [],
-        "active": false,
+        "active": true,
         "state": "ok"
        },
        {
@@ -1121,22 +886,13 @@
        "cls": ""
       },
       {
-       "name": "Extrude 2",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
        "name": "Chamfer 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Chamfer 1"
@@ -1153,7 +909,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 63298
+   "t": 65147
   },
   {
    "step": 6,
@@ -1166,7 +922,7 @@
    "ok": true,
    "at": [
     371,
-    260
+    276
    ],
    "state": {
     "focus": {
@@ -1183,15 +939,17 @@
     },
     "dialog": {
      "title": "Chamfer 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [],
      "fields": [
       {
        "label": "Entities to chamfer",
        "kind": "query",
-       "items": [],
-       "active": true,
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": false,
        "state": "ok"
       },
       {
@@ -1209,7 +967,7 @@
       {
        "label": "Distance 1",
        "kind": "number",
-       "text": "5 mm",
+       "text": "1 mm",
        "focused": false,
        "state": "ok"
       },
@@ -1230,7 +988,7 @@
        "label": "Direction overrides",
        "kind": "query",
        "items": [],
-       "active": false,
+       "active": true,
        "state": "ok"
       },
       {
@@ -1246,15 +1004,17 @@
     "dialogs": [
      {
       "title": "Chamfer 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [],
       "fields": [
        {
         "label": "Entities to chamfer",
         "kind": "query",
-        "items": [],
-        "active": true,
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": false,
         "state": "ok"
        },
        {
@@ -1272,7 +1032,7 @@
        {
         "label": "Distance 1",
         "kind": "number",
-        "text": "5 mm",
+        "text": "1 mm",
         "focused": false,
         "state": "ok"
        },
@@ -1293,7 +1053,7 @@
         "label": "Direction overrides",
         "kind": "query",
         "items": [],
-        "active": false,
+        "active": true,
         "state": "ok"
        },
        {
@@ -1333,22 +1093,13 @@
        "cls": ""
       },
       {
-       "name": "Extrude 2",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
        "name": "Chamfer 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Chamfer 1"
@@ -1365,7 +1116,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 65441
+   "t": 70110
   },
   {
    "step": 7,
@@ -1389,15 +1140,17 @@
     },
     "dialog": {
      "title": "Chamfer 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [],
      "fields": [
       {
        "label": "Entities to chamfer",
        "kind": "query",
-       "items": [],
-       "active": true,
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": false,
        "state": "ok"
       },
       {
@@ -1415,7 +1168,7 @@
       {
        "label": "Distance 1",
        "kind": "number",
-       "text": "5 mm",
+       "text": "1 mm",
        "focused": false,
        "state": "ok"
       },
@@ -1436,7 +1189,7 @@
        "label": "Direction overrides",
        "kind": "query",
        "items": [],
-       "active": false,
+       "active": true,
        "state": "ok"
       },
       {
@@ -1452,15 +1205,17 @@
     "dialogs": [
      {
       "title": "Chamfer 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [],
       "fields": [
        {
         "label": "Entities to chamfer",
         "kind": "query",
-        "items": [],
-        "active": true,
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": false,
         "state": "ok"
        },
        {
@@ -1478,7 +1233,7 @@
        {
         "label": "Distance 1",
         "kind": "number",
-        "text": "5 mm",
+        "text": "1 mm",
         "focused": false,
         "state": "ok"
        },
@@ -1499,7 +1254,7 @@
         "label": "Direction overrides",
         "kind": "query",
         "items": [],
-        "active": false,
+        "active": true,
         "state": "ok"
        },
        {
@@ -1539,22 +1294,13 @@
        "cls": ""
       },
       {
-       "name": "Extrude 2",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
        "name": "Chamfer 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Chamfer 1"
@@ -1571,7 +1317,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 67390
+   "t": 72039
   },
   {
    "step": 8,
@@ -1595,15 +1341,17 @@
     },
     "dialog": {
      "title": "Chamfer 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [],
      "fields": [
       {
        "label": "Entities to chamfer",
        "kind": "query",
-       "items": [],
-       "active": true,
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": false,
        "state": "ok"
       },
       {
@@ -1621,7 +1369,7 @@
       {
        "label": "Distance 1",
        "kind": "number",
-       "text": "5 mm",
+       "text": "1 mm",
        "focused": false,
        "state": "ok"
       },
@@ -1642,7 +1390,7 @@
        "label": "Direction overrides",
        "kind": "query",
        "items": [],
-       "active": false,
+       "active": true,
        "state": "ok"
       },
       {
@@ -1658,15 +1406,17 @@
     "dialogs": [
      {
       "title": "Chamfer 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [],
       "fields": [
        {
         "label": "Entities to chamfer",
         "kind": "query",
-        "items": [],
-        "active": true,
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": false,
         "state": "ok"
        },
        {
@@ -1684,7 +1434,7 @@
        {
         "label": "Distance 1",
         "kind": "number",
-        "text": "5 mm",
+        "text": "1 mm",
         "focused": false,
         "state": "ok"
        },
@@ -1705,7 +1455,7 @@
         "label": "Direction overrides",
         "kind": "query",
         "items": [],
-        "active": false,
+        "active": true,
         "state": "ok"
        },
        {
@@ -1745,22 +1495,13 @@
        "cls": ""
       },
       {
-       "name": "Extrude 2",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
        "name": "Chamfer 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Chamfer 1"
@@ -1777,7 +1518,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 70980
+   "t": 75125
   },
   {
    "step": 9,
@@ -1801,15 +1542,17 @@
     },
     "dialog": {
      "title": "Chamfer 1",
-     "titleState": "error",
+     "titleState": "ok",
      "kind": "feature",
      "tabs": [],
      "fields": [
       {
        "label": "Entities to chamfer",
        "kind": "query",
-       "items": [],
-       "active": true,
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": false,
        "state": "ok"
       },
       {
@@ -1827,7 +1570,7 @@
       {
        "label": "Distance 1",
        "kind": "number",
-       "text": "5 mm",
+       "text": "1 mm",
        "focused": false,
        "state": "ok"
       },
@@ -1848,7 +1591,7 @@
        "label": "Direction overrides",
        "kind": "query",
        "items": [],
-       "active": false,
+       "active": true,
        "state": "ok"
       },
       {
@@ -1864,15 +1607,17 @@
     "dialogs": [
      {
       "title": "Chamfer 1",
-      "titleState": "error",
+      "titleState": "ok",
       "kind": "feature",
       "tabs": [],
       "fields": [
        {
         "label": "Entities to chamfer",
         "kind": "query",
-        "items": [],
-        "active": true,
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": false,
         "state": "ok"
        },
        {
@@ -1890,7 +1635,7 @@
        {
         "label": "Distance 1",
         "kind": "number",
-        "text": "5 mm",
+        "text": "1 mm",
         "focused": false,
         "state": "ok"
        },
@@ -1911,7 +1656,7 @@
         "label": "Direction overrides",
         "kind": "query",
         "items": [],
-        "active": false,
+        "active": true,
         "state": "ok"
        },
        {
@@ -1951,22 +1696,13 @@
        "cls": ""
       },
       {
-       "name": "Extrude 2",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      },
-      {
        "name": "Chamfer 1",
-       "state": "error",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
      "rollbackAfter": "Chamfer 1"
@@ -1983,7 +1719,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 75196
+   "t": 79506
   },
   {
    "step": 10,
@@ -2024,22 +1760,13 @@
        "cls": ""
       },
       {
-       "name": "Extrude 2",
+       "name": "Chamfer 1",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
        "cls": ""
-      },
-      {
-       "name": "Chamfer 1",
-       "state": "error",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "ns-list-item-error"
       }
      ],
      "rollbackAfter": "Chamfer 1"
@@ -2056,7 +1783,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 79197
+   "t": 83896
   },
   {
    "step": 11,
@@ -2071,31 +1798,7 @@
     },
     "dialog": null,
     "dialogs": [],
-    "list": {
-     "kind": "context-menu",
-     "rows": [
-      "Rename",
-      "Edit…",
-      "Copy sketch",
-      "Show dimensions",
-      "Add selection to folder…",
-      "Show",
-      "Create Drawing of Sketch 1…",
-      "Export as DXF/DWG…",
-      "Section view…",
-      "Suppress",
-      "Dynamic suppression",
-      "Add comment",
-      "Zoom to selection",
-      "View normal to",
-      "Show dependencies…",
-      "Roll to here",
-      "Edit sketch appearance…",
-      "Delete"
-     ],
-     "highlighted": null,
-     "disabled": []
-    },
+    "list": null,
     "selection": {
      "count": 0,
      "items": []
@@ -2109,7 +1812,7 @@
        "editing": false,
        "related": false,
        "hidden": true,
-       "cls": "ns-list-item-hidden fake-hover context-menu-active"
+       "cls": "ns-list-item-hidden"
       },
       {
        "name": "Extrude 1",
@@ -2121,22 +1824,13 @@
        "cls": ""
       },
       {
-       "name": "Extrude 2",
+       "name": "Chamfer 1",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
        "cls": ""
-      },
-      {
-       "name": "Chamfer 1",
-       "state": "error",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "ns-list-item-error"
       }
      ],
      "rollbackAfter": "Chamfer 1"
@@ -2153,7 +1847,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 83941
+   "t": 88239
   }
  ]
 }
