@@ -16,13 +16,16 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
-**State 11-04 23:58 UTC.**
+**State 11-04 00:28 UTC.**
 - Since 23:20: the torus merge landed (main green 23:46); queued: whole-result cache keeps 32 full results only
   (REGEN-SPEED's third undo, qa to re-time). Tried and not landed (TICKETS notes): ChFi3d 10x tighter (knob Fillet 1's
   bottom tori exact, but drafted corner tests break), extruded-ellipse surface sharing (motor-mount-jack's slot wall).
 - stef-radijator's declined corners are arcs (fins round a cylinder): vertex blends between toroidal rounds, a big
   piece for BLEND-RUST.
 - Next: end-of-day walk on /root/green/noshape around 04:00 (TICKETS), then the list above.
+- 00:28: Shell's quadric fold check fixed (own surface, signed): Shell 4 now stops at a four-face vertex whose offsets
+  need a new edge (SHELL-SLOW note, probe in /root/core-scratch/s4). Asked live (REQUESTS 00:09) for pipeflange
+  Fillet 2's and stef-radijator Fillet 1's exact faces.
 
 **State 11-03 23:21 UTC.**
 - Landed since 22:30: fillet_by_groups (overlapping rounds of edge groups sharing no vertex: each group alone, their
