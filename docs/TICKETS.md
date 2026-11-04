@@ -392,6 +392,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (faces JUK 115.635 at y = 40 to x = 23.127, JUG / JUC the circle). So the two edges come back in the other order (or
   edge 1 runs the other way along the wall) in ours. Dump: vibe5 ~/core-dog (the rebuilt document; bodies_after_feature
   now builds custom features).
+  dx 11-04 12:21: taken. For a DOGBONE with oppositeSide the circle moves perpendicular to `edges[1]` (the loop-oriented
+  tangents make both of createSMOvercut's branches do that), so ours has the y = 40 edge as edges[1] and live the
+  x = 30 one: our qIntersection / qAdjacent order is the reverse of live's here. Onshape's rule for the order of
+  evaluateQuery's results isn't known: asked live (REQUESTS 12:21: the three lists in this document and on a plain
+  block, with transient ids and tangents).
 - [ ] P2 STRAIGHT-SPLINE-CORNER-EDGES (core 11-04 09:31) cf-straight-spline's Feature 5 (live 31/85/56, ours 31/78/49;
   50 features after it): the faces are live's; live has eight 0.0106 mm edges at z = 101.595 where each slot's flat
   meets its run-out (the revolved profile's cone is tangent to the extruded flat along the profile line, so
