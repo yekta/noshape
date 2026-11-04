@@ -43,6 +43,13 @@ fn base_step(dim: Dim, prefs: &UnitPrefs) -> f64 {
     }
 }
 
+/// A step's Ctrl: Control, or Cmd on macOS only (on Windows and Linux the
+/// Windows / Super key does nothing here). Cmd is provisional until live's Mac
+/// key list says whether Onshape takes it (lead 11-04).
+pub fn step_ctrl(m: &gpui_kit::Modifiers) -> bool {
+    m.control || (cfg!(target_os = "macos") && m.platform)
+}
+
 /// The modifiers of a step.
 #[derive(Clone, Copy, Default)]
 pub struct StepMods {
@@ -539,13 +546,13 @@ impl gpui_kit::Render for QuantityInput {
             }))
             .capture_action(cx.listener(|this, _: &MoveUp, window, cx| {
                 let m = window.modifiers();
-                if this.step(true, StepMods { shift: m.shift, ctrl: m.control || m.platform }, window, cx) {
+                if this.step(true, StepMods { shift: m.shift, ctrl: step_ctrl(&m) }, window, cx) {
                     cx.stop_propagation();
                 }
             }))
             .capture_action(cx.listener(|this, _: &MoveDown, window, cx| {
                 let m = window.modifiers();
-                if this.step(false, StepMods { shift: m.shift, ctrl: m.control || m.platform }, window, cx) {
+                if this.step(false, StepMods { shift: m.shift, ctrl: step_ctrl(&m) }, window, cx) {
                     cx.stop_propagation();
                 }
             }))
@@ -559,7 +566,7 @@ impl gpui_kit::Render for QuantityInput {
                     return;
                 }
                 cx.stop_propagation();
-                this.step(dy > 0., StepMods { shift: e.modifiers.shift, ctrl: e.modifiers.control || e.modifiers.platform }, window, cx);
+                this.step(dy > 0., StepMods { shift: e.modifiers.shift, ctrl: step_ctrl(&e.modifiers) }, window, cx);
             }))
     }
 }

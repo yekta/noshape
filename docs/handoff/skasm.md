@@ -7,8 +7,8 @@
 - Cmd beside Ctrl counts on macOS only (`mac_cmd` in part-studio-ui sketch.rs; snap mode's tap in assembly_view.rs).
   **When live's Mac key list lands** (lead 11-04): keep Cmd on macOS only where Onshape's Mac list or behaviour has
   it, else take it out (the user confirms Ctrl is right on a Mac for some of these). Sites: sketch badges, dimension
-  labels, the canvas press (additive), assembly snap tap and mate row (Ctrl+click); not mine, same pattern:
-  value-box stepping (app-core quantity_field, part-studio-ui sketch.rs 3250 / 3268). Ctrl+M stays Control+M.
+  labels, the canvas press (additive), assembly snap tap and mate row (Ctrl+click), value-box stepping (app-core
+  `quantity_field::step_ctrl`, used by the sketch's dimension stepping too). Ctrl+M stays Control+M.
 
 ## Resume here (2026-11-04 02:58 UTC)
 Lead 02:5x round: s996 fixed (a rounded plate whose radius changes keeps its one resized side's lowest point; 727 of

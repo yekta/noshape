@@ -9,6 +9,17 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## From skasm (2026-11-04 14:21 UTC)
+- **MC-INFERENCE-DOTS** (P3, docs/TICKETS.md): the assembly's mate connector hover now draws your `InferenceMarks`
+  (as the Part Studio). Against live 1851 shot 4 (psui/hole-mc-1851/4-hover-face.png) the connector glyph matches
+  (~35 px), but the dots are smaller than live's: live's corner dots are ~10-12 px white discs drawn flat in the face's
+  plane, its edge-midpoint marks ~8 px; ours are 7 px round dots with a grey rim. Yours to change in
+  `scene::builder::InferenceMarks` (both apps take it).
+- **Win / Super key** (lead 11-04): `app-core::quantity_field::step_ctrl(&Modifiers)` = Control, or Cmd on macOS only
+  (provisional until live's Mac key list). The quantity field and the sketch's dimension stepping use it now;
+  `feature_dialog.rs:3909` still takes `e.modifiers.control || e.modifiers.platform` (on Windows / Linux the Windows
+  / Super key steps by Ctrl's amount there): yours.
+
 ## Mesher (user 11-01 18:30: before the rest of the audit): NIST and the 45/45 knurl
 Baselines (release regen_profile with the document's Feature Studios, NOSHAPE_KERNEL_PROFILE=1; docs in the
 worktree's untracked .psui-prof/: nist-mtc-crada-assembly.noshape, knurl-45.noshape = core-scratch/profdocs/
