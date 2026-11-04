@@ -384,7 +384,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   ~/agents/shared-cases; `NOSHAPE_BOOL_CORPUS=<dir> … bool_replay::bool_corpus_replay` now prints the decline) and
   motor-mount-jack's Extrude 3 (80 ms) / Fillet 2 (39 ms). prize-wheel regenerates in ~75-130 ms against live's 61:
   Revolve 1 is half of it.
-- [ ] P1 FS-QUERY-EDGE-ORDER (for dx; core 11-04 09:31) cf-sheet-metal-overcut-dogbone's Corner Overcut 1 (11 faces /
+- [x] (core 11-04 11:11: not the host's order: with HOLE-RIM-PIECES's joins Corner Overcut 1 and 2 match live (the document 2 -> 5/10); nothing for dx) P1 FS-QUERY-EDGE-ORDER (for dx; core 11-04 09:31) cf-sheet-metal-overcut-dogbone's Corner Overcut 1 (11 faces /
   10679.314 mm³, live 12 / 10678.612; 8 features after it): createSMOvercut takes `edges[0]` / `edges[1]` of
   `evaluateQuery(qIntersection([qAdjacent(wall, EDGE), qAdjacent(point, VERTEX, EDGE)]))` and compares the point with
   edge 1's end (`evEdgeTangentLines(… [0, 1], face: wall)`) to choose the circle's direction: ours cuts the Ø6 circle
