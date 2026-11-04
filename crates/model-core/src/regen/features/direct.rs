@@ -601,21 +601,28 @@ pub fn replace_face(ev: &mut EvalCtx) -> FResult<()> {
             None => k::offset_shape(&template, off, k::JoinType::Arc).map_err(|_| fe(REPLACE_FAILED))?.shape,
         };
     }
-    for (bi, faces) in groups.into_iter().rev() {
-        let names: Vec<Name> = faces.iter().map(|&f| ev.ctx.bodies[bi].faces[f].clone()).collect();
-        for n in names {
-            replace_with(ev, bi, &n, &template, sense).map_err(|e| {
-                log::debug!("replace face: {}", e.message);
-                fe(REPLACE_FAILED)
-            })?;
+    // (Within a deadline: a dense template's Booleans can run for minutes. Live's own error then.)
+    let (r, late) = k::with_deadline(REPLACE_DEADLINE_S, || -> FResult<()> {
+        for (bi, faces) in groups.into_iter().rev() {
+            let names: Vec<Name> = faces.iter().map(|&f| ev.ctx.bodies[bi].faces[f].clone()).collect();
+            for n in names {
+                replace_with(ev, bi, &n, &template, sense)?;
+            }
         }
-    }
-    Ok(())
+        Ok(())
+    });
+    r.map_err(|e| {
+        log::debug!("replace face: {}{}", e.message, if late { " (past its deadline)" } else { "" });
+        fe(REPLACE_FAILED)
+    })
 }
 
+/// How long a Replace face may take (the user's 512 x 512 displacement map: live 11 s).
+const REPLACE_DEADLINE_S: f64 = 90.0;
+
 /// Replace face by the face's own slab: the face thickened past the template's offsets both ways, split by the
-/// template (carried past the face's edges), the part with the outer slab added and the slab's pieces past the template
-/// removed. So a curved face (live: a cylinder's side by a bumpy periodic B-spline) and a template crossing the face
+/// template (carried past the face's edges), the part less the slab, and the slab's pieces on its side of the template
+/// put back. So a curved face (live: a cylinder's side by a bumpy periodic B-spline) and a template crossing the face
 /// (a displacement map's black below, white above) are replaced; the neighbours run on along the face's normals.
 fn replace_by_slabs(ev: &mut EvalCtx, bi: usize, fi_name: &Name, face: &Shape, template: &Shape, sense: f64, (lo, hi): (f64, f64)) -> FResult<()> {
     let feature = ev.feature;
@@ -624,43 +631,47 @@ fn replace_by_slabs(ev: &mut EvalCtx, bi: usize, fi_name: &Name, face: &Shape, t
     let margin = 0.25 * (hi - lo).abs() + 1e-3 * size;
     let (out, inward) = (hi.max(0.0) + margin, (-lo).max(0.0) + margin);
     let ext = if template.shape_type() == ShapeType::Face { k::extend_face(template, 0.25 * size + margin)? } else { template.clone() };
-    // Thickened along the face's outward normal first (checked: the kernel's sense is the face's orientation).
+    // The slab: the face thickened both ways (checked: the kernel's sense is the face's orientation).
     let c = super::helpers_a::point_on_face(face).ok_or_else(|| fe(REPLACE_FAILED))?;
     let n = face.normal_at_point(c)?;
-    let thick = |a: f64, b: f64| -> FResult<Shape> {
-        let s = k::thicken(face, a, b)?.shape;
-        Ok(if s.classify_point(c + n * (0.5 * a.max(1e-12)), 1e-9)? == k::PointClass::Inside || a == 0.0 { s } else { k::thicken(face, b, a)?.shape })
-    };
-    let up = thick(out, 0.0)?;
-    let col = thick(out, inward)?;
-    // The slab's pieces past the template: its face on the template faces against the template's outward normal.
-    let pieces = k::split(&[col], std::slice::from_ref(&ext), &k::BooleanOptions::default())?.shape.solids();
-    let past: Vec<Shape> = pieces
+    let mut slab = k::thicken(face, out, inward)?.shape;
+    if slab.classify_point(c + n * (0.5 * out), 1e-9)? != k::PointClass::Inside {
+        slab = k::thicken(face, inward, out)?.shape;
+    }
+    // Its pieces on the part's side of the template: their face on the template faces along its outward normal.
+    // (A dense template in patches: OCCT's edge-face checks project onto a whole face, 7 s each on the user's 512 x 512
+    // displacement map; the patches' pieces on one surface are joined by the unify below.)
+    let tools = if ext.shape_type() == ShapeType::Face { k::face_patches(&ext, 64)? } else { ext.clone() };
+    let pieces = k::split(&[slab.clone()], std::slice::from_ref(&tools), &k::BooleanOptions::default())?.shape.solids();
+    let kept: Vec<Shape> = pieces
         .into_iter()
         .filter(|piece| {
-            piece.faces().iter().any(|g| {
+            !piece.faces().iter().any(|g| {
                 let Some(p) = super::helpers_a::point_on_face(g) else { return false };
                 let Some((q, t)) = nearest_on(&ext, p) else { return false };
                 q.distance(p) < 1e-7 * size && g.normal_at_point(p).is_ok_and(|m| m.dot(t * sense) < 0.0)
             })
         })
         .collect();
-    let fused = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&body.shape), std::slice::from_ref(&up), &k::BooleanOptions::default())?;
     let tool_names = |s: &Shape, from: u16| -> crate::regen::eval::NamedShape {
         let names = (0..s.count(ShapeType::Face) as u16).map(|i| Arc::new(TopoName::face(feature, Role::Generated(Arc::new(TopoName::Split { parent: fi_name.clone(), by: feature, ordinal: from + i }))))).collect();
         crate::regen::eval::NamedShape::new(s.clone(), names)
     };
-    let up_names = tool_names(&up, 0);
-    let names = ev.name_result(&[&body.shape_names(), &up_names.names], &fused.history, &fused.shape, &BTreeMap::new(), None);
-    let (shape, names) = if past.is_empty() {
-        (fused.shape, names)
+    // The part less the slab (no template in it), then the kept pieces on it: they share the slab's inner face only,
+    // so glued (a Boolean against the dense template again took 15 GB on the user's 512 x 512 displacement map).
+    let slab_names = tool_names(&slab, 0);
+    let inner = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&body.shape), std::slice::from_ref(&slab), &k::BooleanOptions::default())?;
+    let names = ev.name_result(&[&body.shape_names(), &slab_names.names], &inner.history, &inner.shape, &BTreeMap::new(), None);
+    let (shape, names) = if kept.is_empty() {
+        (inner.shape, names)
     } else {
-        let cutter = Shape::compound(&past);
-        let cut = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&fused.shape), std::slice::from_ref(&cutter), &k::BooleanOptions::default())?;
-        let fn_ = crate::regen::eval::names_for(&fused.shape, names);
-        let cut_names = tool_names(&cutter, up.count(ShapeType::Face) as u16);
-        let names = ev.name_result(&[&fn_, &cut_names.names], &cut.history, &cut.shape, &BTreeMap::new(), None);
-        (cut.shape, names)
+        let adds = Shape::compound(&kept);
+        let glued = k::BooleanOptions { glue: k::Glue::ShiftChecked, ..Default::default() };
+        let fused = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&inner.shape), std::slice::from_ref(&adds), &glued)?;
+        let inner_names = crate::regen::eval::names_for(&inner.shape, names);
+        let add_names = tool_names(&adds, slab.count(ShapeType::Face) as u16);
+        let names = ev.name_result(&[&inner_names, &add_names.names], &fused.history, &fused.shape, &BTreeMap::new(), None);
+        (fused.shape, names)
     };
     let un = k::unify_same_domain(&shape)?;
     let rn = crate::regen::eval::names_for(&shape, names);
@@ -668,7 +679,33 @@ fn replace_by_slabs(ev: &mut EvalCtx, bi: usize, fi_name: &Name, face: &Shape, t
     if un.shape.count(ShapeType::Solid) != 1 {
         return err(REPLACE_FAILED);
     }
-    ev.replace_body(bi, un.shape, names);
+    // (The slab's seam can stay inside a cap as a slit edge: a face the display mesher won't take. Faces in place.)
+    let result = k::drop_open_wires(&un.shape)?;
+    // The template's pieces (a piece on each patch) merged into one face, as live's: faces left alone keep their
+    // names, a merged one takes its first piece's.
+    let (result, names) = match ext.shape_type() {
+        ShapeType::Face => {
+            let merged = k::merge_faces_on(&result, &ext)?;
+            if merged.is_same(&result) {
+                (result, names)
+            } else {
+                let old = result.faces();
+                let gone: Vec<usize> = (0..old.len()).filter(|&i| merged.index_of(&old[i], ShapeType::Face).is_none()).collect();
+                let mut fresh = gone.iter();
+                let renamed: Vec<Name> = merged
+                    .faces()
+                    .iter()
+                    .map(|f| match result.index_of(f, ShapeType::Face) {
+                        Some(i) => names[i].clone(),
+                        None => fresh.next().map_or_else(|| Arc::new(TopoName::face(feature, Role::New(0))), |&i| names[i].clone()),
+                    })
+                    .collect();
+                (merged, renamed)
+            }
+        }
+        _ => (result, names),
+    };
+    ev.replace_body(bi, result, names);
     Ok(())
 }
 
@@ -686,6 +723,18 @@ fn replace_with(ev: &mut EvalCtx, bi: usize, fi_name: &Name, template: &Shape, s
     let body = ev.ctx.bodies[bi].clone();
     let Some(&fi) = body.find_faces(fi_name).first() else { return Ok(()) };
     let face = body.shape.sub_shape(ShapeType::Face, fi)?;
+    // A template built over the face's own parameters (a displacement map's): the face's edges carried onto it, no
+    // intersection with it (the user's 512 x 512 map); its faces in place, so their names stay.
+    let one = if template.shape_type() == ShapeType::Face { Some(template.clone()) } else { template.faces().into_iter().next().filter(|_| template.count(ShapeType::Face) == 1) };
+    let mapped = one.filter(|t| matches!(t.face_surface(), Ok(k::Surface::BSpline { .. }))).map(|t| k::replace_face_mapped(&body.shape, &face, &t));
+    if let Some(Ok(shape)) = mapped
+        && shape.count(ShapeType::Solid) == 1
+        && shape.count(ShapeType::Face) == body.shape.count(ShapeType::Face)
+    {
+        let names = body.faces.clone();
+        ev.replace_body(bi, shape, names);
+        return Ok(());
+    }
     // The template's offsets from the face along its normal, over the face.
     let [u0, u1, v0, v1] = face.uv_bounds()?;
     let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
@@ -698,8 +747,10 @@ fn replace_with(ev: &mut EvalCtx, bi: usize, fi_name: &Name, template: &Shape, s
             hi = hi.max(d);
         }
     }
-    // A curved face, or a template on both sides of it (a displacement map's black and white): by slabs.
-    if !face.is_planar() || (lo < -1e-9 && hi > 1e-9) {
+    // A curved face, a template on both sides of it (a displacement map's black and white) or a dense one (its prism
+    // up to it ran for minutes): by slabs.
+    let dense = template.faces().iter().any(|f| matches!(f.face_surface(), Ok(k::Surface::BSpline { nb_u_poles, nb_v_poles, .. }) if nb_u_poles * nb_v_poles >= 4096));
+    if !face.is_planar() || (lo < -1e-9 && hi > 1e-9) || dense {
         return replace_by_slabs(ev, bi, fi_name, &face, template, sense, (lo, hi));
     }
     let c = face.centroid()?;

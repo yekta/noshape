@@ -108,3 +108,34 @@ fn projection_onto_a_face_with_many_holes() {
         assert!((q.distance - h).abs() < 1e-9 && q.point.distance(p) < 1e-9, "{p:?} + h: {q:?}");
     }
 }
+
+/// A B-spline face of many poles (a displacement map's template, here 64 × 64 bumps): a point's projection is its
+/// nearest point on the face as the exhaustive distance finds it, or nearer (on the surface, above a bump, past its
+/// edges), the point it gives lies on the face, and its distance is the distance to that point.
+#[test]
+fn projection_onto_a_bspline_of_many_poles() {
+    let n = 64;
+    let knots: Vec<f64> = (0..n + 4).map(|i| ((i as f64 - 3.0) / (n as f64 - 3.0)).clamp(0.0, 1.0)).collect();
+    let poles: Vec<DVec3> = (0..n * n)
+        .map(|k| {
+            let (i, j) = ((k / n) as f64, (k % n) as f64);
+            DVec3::new(i, j, 0.3 * (0.7 * i).sin() * (0.5 * j).cos()) * 1e-3
+        })
+        .collect();
+    let data = k::BSplineSurfaceData { poles, nu: n, nv: n, weights: None, u_knots: knots.clone(), v_knots: knots, u_degree: 3, v_degree: 3, u_periodic: false, v_periodic: false };
+    let face = k::make_bspline_surface(&data, &[], false).unwrap().faces().remove(0);
+    let mm = |x: f64, y: f64, z: f64| DVec3::new(x, y, z) * 1e-3;
+    let points = [mm(10.0, 20.0, 0.0), mm(31.3, 7.7, 0.8), mm(5.5, 50.2, -1.5), mm(-3.0, 30.0, 0.2), mm(70.0, 70.0, 1.0), mm(40.0, -2.0, -0.4), mm(22.2, 41.1, 5.0)];
+    for p in points {
+        let q = face.project_point(p).unwrap();
+        let reference = k::distance(&k::make_vertex(p).unwrap(), &face).unwrap().distance;
+        assert!(q.distance <= reference + 1e-9, "{p:?}: {} against {reference}", q.distance);
+        assert!((q.point.distance(p) - q.distance).abs() < 1e-12, "{p:?}: {q:?}");
+        let on = k::distance(&k::make_vertex(q.point).unwrap(), &face).unwrap().distance;
+        assert!(on < 1e-9, "{p:?}: the point given is {on} off the face");
+    }
+    // A point of the surface is its own projection.
+    let s = face.point_at_uv(0.37, 0.61).unwrap();
+    let q = face.project_point(s).unwrap();
+    assert!(q.distance < 1e-9 && q.point.distance(s) < 1e-9, "{q:?}");
+}

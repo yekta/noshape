@@ -525,6 +525,185 @@ static bool face_interior_nearest(const TopoDS_Face& f, const gp_Pnt& p, double&
   return true;
 }
 
+// The point of a B-spline face of many poles (a displacement map's 512 x 512 template) nearest `P`, or false where it
+// doesn't apply: OCCT's projection evaluates a fine grid of the surface on every call (0.9 s each there). Here the
+// surface's points at its knots and spans' middles are kept per surface (the faces a split leaves on it share them),
+// the nearest few inside the face refined (a local extremum on the surface), and the face's edges measured.
+static bool big_bspline_nearest(const TopoDS_Face& f, const gp_Pnt& P, ProjPoint& r)
+{
+  TopLoc_Location                        loc;
+  const occ::handle<Geom_Surface>        gs = BRep_Tool::Surface(f, loc);
+  const occ::handle<Geom_BSplineSurface> bs = occ::down_cast<Geom_BSplineSurface>(gs);
+  if (bs.IsNull() || bs->NbUPoles() * bs->NbVPoles() < 4096)
+    return false;
+  struct Grid
+  {
+    occ::handle<Geom_Surface>          surf;
+    TopLoc_Location                    loc;
+    std::vector<std::array<double, 5>> pts;  // x, y, z, u, v
+  };
+  struct Face
+  {
+    TopoDS_Face                              face;
+    std::unique_ptr<BRepAdaptor_Surface>     surf;
+    std::unique_ptr<BRepTopAdaptor_FClass2d> cls;
+    double                                   u0, u1, v0, v1;
+  };
+  thread_local std::vector<std::unique_ptr<Grid>> grids;  // the latest first
+  thread_local std::vector<std::unique_ptr<Face>> faces;
+  Grid*                                           g = nullptr;
+  for (size_t i = 0; i < grids.size() && g == nullptr; ++i)
+    if (grids[i]->surf == gs && grids[i]->loc.IsEqual(loc))
+    {
+      std::rotate(grids.begin(), grids.begin() + i, grids.begin() + i + 1);
+      g = grids.front().get();
+    }
+  if (g == nullptr)
+  {
+    auto n  = std::make_unique<Grid>();
+    n->surf = gs;
+    n->loc  = loc;
+    const gp_Trsf           t   = loc.Transformation();
+    // (Each knot and each span's middle.)
+    auto params = [](const NCollection_Array1<double>& k) {
+      std::vector<double> out;
+      for (int i = k.Lower(); i < k.Upper(); ++i)
+      {
+        out.push_back(k(i));
+        out.push_back(0.5 * (k(i) + k(i + 1)));
+      }
+      out.push_back(k(k.Upper()));
+      return out;
+    };
+    const std::vector<double> us = params(bs->UKnots()), vs = params(bs->VKnots());
+    n->pts.reserve(us.size() * vs.size());
+    for (double u : us)
+      for (double v : vs)
+      {
+        const gp_Pnt q = bs->Value(u, v).Transformed(t);
+        n->pts.push_back({q.X(), q.Y(), q.Z(), u, v});
+      }
+    grids.insert(grids.begin(), std::move(n));
+    if (grids.size() > 2)
+      grids.pop_back();
+    g = grids.front().get();
+  }
+  Face* fc = nullptr;
+  for (size_t i = 0; i < faces.size() && fc == nullptr; ++i)
+    if (faces[i]->face.IsEqual(f))
+    {
+      std::rotate(faces.begin(), faces.begin() + i, faces.begin() + i + 1);
+      fc = faces.front().get();
+    }
+  if (fc == nullptr)
+  {
+    auto n  = std::make_unique<Face>();
+    n->face = f;
+    n->surf = std::make_unique<BRepAdaptor_Surface>(f, true);
+    n->cls  = std::make_unique<BRepTopAdaptor_FClass2d>(f, 1e-9);
+    BRepTools::UVBounds(f, n->u0, n->u1, n->v0, n->v1);
+    faces.insert(faces.begin(), std::move(n));
+    if (faces.size() > 8)
+      faces.pop_back();
+    fc = faces.front().get();
+  }
+  // The nearest samples within the face's bounds, then a local extremum from each inside it.
+  constexpr size_t                         K  = 16;
+  const double                             eu = 1e-9 * (1 + std::abs(fc->u1 - fc->u0)), ev = 1e-9 * (1 + std::abs(fc->v1 - fc->v0));
+  std::array<std::pair<double, size_t>, K> best;
+  best.fill({std::numeric_limits<double>::infinity(), 0});
+  for (size_t i = 0; i < g->pts.size(); ++i)
+  {
+    const auto& q = g->pts[i];
+    if (q[3] < fc->u0 - eu || q[3] > fc->u1 + eu || q[4] < fc->v0 - ev || q[4] > fc->v1 + ev)
+      continue;
+    const double d = (q[0] - P.X()) * (q[0] - P.X()) + (q[1] - P.Y()) * (q[1] - P.Y()) + (q[2] - P.Z()) * (q[2] - P.Z());
+    if (d >= best[K - 1].first)
+      continue;
+    size_t k = K - 1;
+    for (; k > 0 && best[k - 1].first > d; --k)
+      best[k] = best[k - 1];
+    best[k] = {d, i};
+  }
+  double bd = std::numeric_limits<double>::infinity(), bu = 0, bv = 0;
+  for (const auto& [d, i] : best)
+  {
+    if (!std::isfinite(d))
+      break;
+    double u = g->pts[i][3], v = g->pts[i][4], dd = fc->cls->Perform(gp_Pnt2d(u, v)) == TopAbs_OUT ? std::numeric_limits<double>::infinity() : d;
+    Extrema_GenLocateExtPS lx(*fc->surf, 1e-12, 1e-12);
+    lx.Perform(P, u, v, true);
+    if (lx.IsDone() && lx.SquareDistance() < dd)
+    {
+      double lu, lv;
+      lx.Point().Parameter(lu, lv);
+      if (fc->cls->Perform(gp_Pnt2d(lu, lv)) != TopAbs_OUT)
+      {
+        u  = lu;
+        v  = lv;
+        dd = lx.SquareDistance();
+      }
+    }
+    if (dd < bd)
+    {
+      bd = dd;
+      bu = u;
+      bv = v;
+    }
+  }
+  // The boundary: the nearest point of its edges (none nearer than a point on the face, nor an edge whose box is
+  // farther than the inside's).
+  const double        inside = std::isfinite(bd) ? std::sqrt(bd) : std::numeric_limits<double>::infinity();
+  const TopoDS_Vertex vx     = BRepBuilderAPI_MakeVertex(P);
+  double              ed     = std::numeric_limits<double>::infinity(), et = 0;
+  gp_Pnt              eq;
+  TopoDS_Edge         ee;
+  ShapeIMap           es;
+  if (inside > 1e-12)
+    TopExp::MapShapes(f, TopAbs_EDGE, es);
+  for (int i = 1; i <= es.Extent(); ++i)
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(es(i));
+    if (BRep_Tool::Degenerated(e))
+      continue;
+    Bnd_Box b;
+    BRepBndLib::Add(e, b);
+    if (!b.IsVoid() && b.Distance(Bnd_Box(P, P)) >= std::min(inside, ed))
+      continue;
+    BRepExtrema_DistShapeShape de(vx, e);
+    if (!de.IsDone() || de.NbSolution() < 1 || de.Value() >= ed)
+      continue;
+    ed = de.Value();
+    eq = de.PointOnShape2(1);
+    ee = e;
+    if (de.SupportTypeShape2(1) == BRepExtrema_IsVertex)
+      et = BRep_Tool::Parameter(TopoDS::Vertex(de.SupportOnShape2(1)), e);
+    else
+      de.ParOnEdgeS2(1, et);
+  }
+  if (std::isfinite(bd) && (std::sqrt(bd) <= ed + 1e-12 || ee.IsNull()))
+  {
+    const gp_Pnt bq = fc->surf->Value(bu, bv);
+    r.point         = from_pnt(bq);
+    r.distance      = bq.Distance(P);
+    r.u             = bu;
+    r.v             = bv;
+    return true;
+  }
+  if (ee.IsNull())
+    return false;
+  r.point    = from_pnt(eq);
+  r.distance = ed;
+  double                          f0, l0;
+  const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(ee, f, f0, l0);
+  if (pc.IsNull())
+    return false;
+  const gp_Pnt2d uv = pc->Value(et);
+  r.u               = uv.X();
+  r.v               = uv.Y();
+  return true;
+}
+
 ProjPoint face_project_point(const OcShape& fs, P3 p)
 {
   const TopoDS_Face& f = as_face(fs.shape, "shape");
@@ -555,6 +734,12 @@ ProjPoint face_project_point(const OcShape& fs, P3 p)
         }
       }
     }
+  }
+  if (kind == GeomAbs_BSplineSurface)
+  {
+    ProjPoint r{};
+    if (big_bspline_nearest(f, to_pnt(p), r))
+      return r;
   }
   TopoDS_Vertex v = BRepBuilderAPI_MakeVertex(to_pnt(p));
   // Off a face of many edges (a plate's 1,700 holes): the nearest point of its edges, visited by their boxes' distance

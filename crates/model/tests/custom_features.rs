@@ -559,6 +559,8 @@ fn displacement_map_on_a_cylinder() {
         let (r, _) = displacement_map(&csv, face, true);
         assert_samples(&r, "576 samples");
         assert_eq!(r.context.bodies.len(), 1, "{face}: the face replaced");
+        // (Live: the replaced face one B-spline face, the part's 3 faces still.)
+        assert_eq!(r.context.bodies[0].shape.faces().len(), 3, "{face}: the part's faces");
         let v = solid_volume(&r);
         let grown = match face {
             "side" => PI * 0.026f64.powi(2) * 0.06,
@@ -596,7 +598,7 @@ fn displacement_map_probe() {
             }
             let status: Vec<String> = r.display.features.iter().map(|s| format!("{:?} {:?}", s.status, s.message)).collect();
             let notices: Vec<String> = custom::run::outputs().values().flat_map(|o| o.notices.iter().map(|n| format!("{} {}: {}", n.module, n.pos, n.message))).collect();
-            let kinds: Vec<_> = r.context.bodies.iter().map(|b| (b.kind, b.shape.volume().unwrap_or(0.0).abs())).collect();
+            let kinds: Vec<_> = r.context.bodies.iter().map(|b| (b.kind, b.shape.volume().unwrap_or(0.0).abs() * 1e9, b.shape.faces().len(), b.shape.bounding_box(true).ok().map(|x| (x.min * 1e3, x.max * 1e3)))).collect();
             println!("DISP {face} replace={replace}: {secs:.2} s, bodies {kinds:?}, {status:?} {notices:?}");
         }
     }

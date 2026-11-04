@@ -635,3 +635,89 @@ fn brep_edges_probe() {
         }
     }
 }
+
+/// A face's open wire (a slit: one straight edge inside a face, as a thickened seam leaves after a unify) is dropped;
+/// its closed wires stay, and a shape without one comes back as it is.
+#[test]
+fn open_wires_are_dropped() {
+    let pl = Plane::xy();
+    let outer = make_wire(&make_edges_2d(&pl, &rect(0.04, 0.02)).unwrap()).unwrap();
+    let slit = make_wire(&make_edges_2d(&pl, &[Segment2d::Line { a: glam::DVec2::new(0.01, 0.01), b: glam::DVec2::new(0.012, 0.01) }]).unwrap()).unwrap();
+    let face = make_face(&pl, &outer, &[slit]).unwrap();
+    assert_eq!(face.sub_shapes(ShapeType::Wire).len(), 2);
+    let clean = drop_open_wires(&face).unwrap();
+    assert_eq!(clean.sub_shapes(ShapeType::Wire).len(), 1);
+    assert!(clean.is_valid() && close(clean.area().unwrap(), 0.04 * 0.02, 1e-15));
+    let plain = make_face(&pl, &outer, &[]).unwrap();
+    assert!(drop_open_wires(&plain).unwrap().is_same(&plain));
+}
+
+/// A dense B-spline face in patches over its knot spans: the patches cover it (their areas add up to its own), and a
+/// face of few spans comes back whole.
+#[test]
+fn a_dense_face_comes_in_patches() {
+    let n = 40;
+    let knots: Vec<f64> = (0..n + 4).map(|i| ((i as f64 - 3.0) / (n as f64 - 3.0)).clamp(0.0, 1.0)).collect();
+    let poles: Vec<glam::DVec3> = (0..n * n).map(|k| glam::DVec3::new((k / n) as f64, (k % n) as f64, 0.2 * ((k / n) as f64 * 0.6).sin()) * 1e-3).collect();
+    let data = BSplineSurfaceData { poles, nu: n, nv: n, weights: None, u_knots: knots.clone(), v_knots: knots, u_degree: 3, v_degree: 3, u_periodic: false, v_periodic: false };
+    let face = make_bspline_surface(&data, &[], false).unwrap().faces().remove(0);
+    let patches = face_patches(&face, 10).unwrap();
+    assert_eq!(patches.faces().len(), 16);
+    let sum: f64 = patches.faces().iter().map(|f| f.area().unwrap()).sum();
+    assert!(close(sum, face.area().unwrap(), 1e-4 * face.area().unwrap()), "{sum} vs {}", face.area().unwrap());
+    assert_eq!(face_patches(&face, 64).unwrap().faces().len(), 1);
+}
+
+/// with_deadline: an operation past its deadline stops (fails) and says so; one within it runs as usual.
+#[test]
+fn a_deadline_stops_a_long_operation() {
+    let plate = make_box_corners(glam::DVec3::ZERO, glam::DVec3::new(0.2, 0.2, 0.002)).unwrap();
+    let holes: Vec<Shape> = (0..900).map(|k| make_cylinder(&Plane::from_normal(glam::DVec3::new(0.005 + 0.0065 * (k / 30) as f64, 0.005 + 0.0065 * (k % 30) as f64, -0.001), glam::DVec3::Z), 0.002, 0.004, 2.0 * PI).unwrap()).collect();
+    let tools = Shape::compound(&holes);
+    let (r, late) = with_deadline(0.01, || cut(&plate, &tools));
+    assert!(late && r.is_err(), "{:?}", r.map(|x| x.shape.faces().len()));
+    let (r, late) = with_deadline(60.0, || cut(&plate, &make_box_corners(glam::DVec3::ZERO, glam::DVec3::splat(0.01)).unwrap()));
+    assert!(!late && r.is_ok());
+}
+
+/// A face's template as a displacement map makes it: the face's points at its normalized parameters (an n × n grid,
+/// std evFaceTangentPlanes) moved `d` along its normals, as a degree-3 B-spline's poles.
+fn moved_face(face: &Shape, n: usize, d: f64) -> Shape {
+    let [u0, u1, v0, v1] = face.uv_bounds().unwrap();
+    let mut poles = Vec::with_capacity(n * n);
+    for i in 0..n {
+        for j in 0..n {
+            let (u, v) = (u0 + (u1 - u0) * i as f64 / (n - 1) as f64, v0 + (v1 - v0) * j as f64 / (n - 1) as f64);
+            poles.push(face.point_at_uv(u, v).unwrap() + face.normal_at_uv(u, v).unwrap() * d);
+        }
+    }
+    let knots: Vec<f64> = (0..n + 4).map(|i| ((i as f64 - 3.0) / (n as f64 - 3.0)).clamp(0.0, 1.0)).collect();
+    let data = BSplineSurfaceData { poles, nu: n, nv: n, weights: None, u_knots: knots.clone(), v_knots: knots, u_degree: 3, v_degree: 3, u_periodic: false, v_periodic: false };
+    make_bspline_surface(&data, &[], false).unwrap().faces().remove(0)
+}
+
+/// DISPLACEMENT-MAP: a face replaced by a template built over its own parameters takes the face's boundary carried
+/// onto the template, its neighbours the new edges (no intersection with the template): a block's top 1 mm up gives
+/// exactly 40 × 20 × 11 mm, a cylinder's round top exactly π 10² 21 mm (the wall's seam drawn to the moved vertex),
+/// each with the faces it had. A template that isn't such a surface (a tilted one) is refused.
+#[test]
+fn a_face_is_replaced_by_its_moved_template() {
+    let mm = 1e-3;
+    let top_of = |s: &Shape, z: f64| s.faces().into_iter().find(|f| f.is_planar() && (f.centroid().unwrap().z - z).abs() < 1e-9).unwrap();
+    let block = make_box_corners(glam::DVec3::ZERO, glam::DVec3::new(40.0, 20.0, 10.0) * mm).unwrap();
+    let top = top_of(&block, 10.0 * mm);
+    let out = replace_face_mapped(&block, &top, &moved_face(&top, 12, mm)).unwrap();
+    assert!(out.is_valid() && out.faces().len() == 6);
+    // (Within the volume integral's own accuracy over a B-spline face.)
+    let want = 40.0 * 20.0 * 11.0 * mm * mm * mm;
+    assert!(close(out.volume().unwrap(), want, 1e-6 * want), "{}", out.volume().unwrap() / (mm * mm * mm));
+    let cyl = make_cylinder(&Plane::xy(), 10.0 * mm, 20.0 * mm, 2.0 * PI).unwrap();
+    let top = top_of(&cyl, 20.0 * mm);
+    let out = replace_face_mapped(&cyl, &top, &moved_face(&top, 12, mm)).unwrap();
+    assert!(out.is_valid() && out.faces().len() == 3);
+    let want = PI * 100.0 * 21.0 * mm * mm * mm;
+    assert!(close(out.volume().unwrap(), want, 1e-6 * want), "{} vs {}", out.volume().unwrap() / (mm * mm * mm), want / (mm * mm * mm));
+    // Tilted: not the face moved along its normals.
+    let tilted = transform(&moved_face(&top_of(&block, 10.0 * mm), 12, mm), &Transform::Rotate { origin: glam::DVec3::ZERO, axis: glam::DVec3::X, angle: 0.3 }, true).unwrap().shape;
+    assert!(replace_face_mapped(&block, &top_of(&block, 10.0 * mm), &tilted).is_err());
+}

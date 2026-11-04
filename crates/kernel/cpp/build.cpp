@@ -1,3 +1,7 @@
+#include <BRepTools_ReShape.hxx>
+#include <BRepCheck_Analyzer.hxx>
+#include <TopoDS_Iterator.hxx>
+#include <NCollection_DataMap.hxx>
 #include <ShapeFix_Face.hxx>
 // Construction: vertices, edges and wires from 2D sketch data and 3D data,
 // planar faces, primitives.
@@ -6,6 +10,7 @@
 #include <BRepBuilderAPI_Copy.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepBuilderAPI_Sewing.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
@@ -23,6 +28,25 @@
 #include <Geom_RectangularTrimmedSurface.hxx>
 #include <Geom_Plane.hxx>
 #include <BRepTools.hxx>
+#include <ShapeAnalysis_Surface.hxx>
+#include <gp_Dir2d.hxx>
+#include <BSplCLib.hxx>
+#include <Geom2dAPI_Interpolate.hxx>
+#include <TopAbs.hxx>
+#include <Bnd_Box.hxx>
+#include <BRepBndLib.hxx>
+#include <Precision.hxx>
+#include <BRepAdaptor_Surface.hxx>
+#include <BRepAdaptor_Curve.hxx>
+#include <Geom_Line.hxx>
+#include <TopExp.hxx>
+#include <GeomAPI_ProjectPointOnSurf.hxx>
+#include <GeomProjLib.hxx>
+#include <Geom2d_BSplineCurve.hxx>
+#include <Geom2d_TrimmedCurve.hxx>
+#include <Geom2dConvert.hxx>
+#include <ShapeUpgrade_UnifySameDomain.hxx>
+#include <TopoDS_Compound.hxx>
 #include <GeomConvert.hxx>
 #include <Geom_BSplineSurface.hxx>
 #include <GeomLib.hxx>
@@ -403,6 +427,606 @@ std::unique_ptr<OcShape> make_face_on(const OcShape& on, const OcShape& wire)
 // `on`'s face on its surface carried `len` past its edges (a template that must reach past the faces it replaces):
 // a B-spline extended in its non-periodic directions (GeomLib, curvature-continuous), another surface by its
 // parameters (a plane's by length, a periodic direction whole).
+// `face` of `solid` replaced by a template built over its own parameters: a B-spline surface whose points at the
+// face's normalized (u, v) are the face's points moved along its normals (a displacement map's, std
+// evFaceTangentPlanes then bSplineSurface over the samples). The face's edge curves on it are carried into the
+// template's parameters (an affine map, its axes swapped or flipped as the samples' are), so the new face is the
+// template within the face's own boundary; the neighbours keep their surfaces and take the new edges (each checked
+// to lie on them), and a straight edge along the move at a moved vertex (a wall's seam line) is drawn to the new
+// vertex. No intersection with the dense surface: the user's 512 x 512 map. Fails where any of that doesn't hold.
+std::unique_ptr<OcShape> replace_face_mapped(const OcShape& solid_in, const OcShape& face_in, const OcShape& tmpl_in)
+{
+  const TopoDS_Shape&                    solid = solid_in.shape;
+  const TopoDS_Face                      F     = TopoDS::Face(as_face(face_in.shape, "face").Oriented(TopAbs_FORWARD));
+  const TopoDS_Face&                     T     = as_face(tmpl_in.shape, "template");
+  TopLoc_Location                        tl;
+  const occ::handle<Geom_BSplineSurface> S = occ::down_cast<Geom_BSplineSurface>(BRep_Tool::Surface(T, tl));
+  if (S.IsNull())
+    fail_op("the template is not a B-spline surface");
+  const gp_Trsf tt = tl.Transformation();
+  double        fu0, fu1, fv0, fv1, su0, su1, sv0, sv1;
+  BRepTools::UVBounds(F, fu0, fu1, fv0, fv1);
+  S->Bounds(su0, su1, sv0, sv1);
+  if (!(fu1 > fu0 && fv1 > fv0))
+    fail_op("the face has no extent");
+  BRepAdaptor_Surface fs(F, false);
+  // The map from the face's (u, v): normalized, maybe swapped or flipped, onto the template's parameters. Along a
+  // clamped direction the sample at fractional index x sits where the knots' index function sum_j N_j(t) j is x (a
+  // B-spline repeats data linear in the index exactly: a plane's points); along a periodic one, linearly.
+  struct Axis
+  {
+    double                          lo, hi, last;
+    occ::handle<Geom2d_BSplineCurve> index;  // null: periodic
+    double at(double s) const
+    {
+      if (index.IsNull())
+        return lo + s * (hi - lo);
+      const double x = std::clamp(s, 0.0, 1.0) * last;
+      double       a = lo, b = hi;
+      for (int k = 0; k < 64; ++k)
+      {
+        const double mid = 0.5 * (a + b);
+        (index->Value(mid).X() < x ? a : b) = mid;
+      }
+      return 0.5 * (a + b);
+    }
+  };
+  auto axis = [&](bool along_u) -> Axis {
+    const int  n        = along_u ? S->NbUPoles() : S->NbVPoles();
+    const bool periodic = along_u ? S->IsUPeriodic() : S->IsVPeriodic();
+    Axis       x{along_u ? su0 : sv0, along_u ? su1 : sv1, double(n - 1), {}};
+    if (periodic)
+      return x;
+    NCollection_Array1<gp_Pnt2d> poles(1, n);
+    for (int i = 1; i <= n; ++i)
+      poles(i) = gp_Pnt2d(i - 1, 0);
+    x.index = new Geom2d_BSplineCurve(poles, along_u ? S->UKnots() : S->VKnots(), along_u ? S->UMultiplicities() : S->VMultiplicities(), along_u ? S->UDegree() : S->VDegree());
+    return x;
+  };
+  const Axis ua = axis(true), va = axis(false);
+  struct Map
+  {
+    bool swap, flip_u, flip_v;
+  };
+  auto norm = [&](const gp_Pnt2d& p) { return gp_XY((p.X() - fu0) / (fu1 - fu0), (p.Y() - fv0) / (fv1 - fv0)); };
+  auto apply = [&](const Map& m, const gp_XY& q0) {
+    gp_XY q = m.swap ? gp_XY(q0.Y(), q0.X()) : q0;
+    if (m.flip_u)
+      q.SetX(1 - q.X());
+    if (m.flip_v)
+      q.SetY(1 - q.Y());
+    return gp_Pnt2d(ua.at(q.X()), va.at(q.Y()));
+  };
+  const double size = [&] {
+    Bnd_Box b;
+    BRepBndLib::Add(F, b);
+    return b.IsVoid() ? 1.0 : std::sqrt(b.SquareExtent());
+  }();
+  // The template moves each sampled point along the face's normal: the move's sideways part small against it and
+  // against the face.
+  int best = -1;
+  for (int k = 0; k < 8 && best < 0; ++k)
+  {
+    const Map m{(k & 4) != 0, (k & 1) != 0, (k & 2) != 0};
+    bool      ok = true;
+    for (int i = 0; i <= 6 && ok; ++i)
+      for (int j = 0; j <= 6 && ok; ++j)
+      {
+        const double u = fu0 + (fu1 - fu0) * (0.1 + 0.8 * i / 6.0), v = fv0 + (fv1 - fv0) * (0.1 + 0.8 * j / 6.0);
+        gp_Pnt       p;
+        gp_Vec       du, dv;
+        fs.D1(u, v, p, du, dv);
+        const gp_Vec n = du.Crossed(dv);
+        if (n.Magnitude() < 1e-12)
+          continue;
+        const gp_Pnt2d st = apply(m, norm(gp_Pnt2d(u, v)));
+        const gp_Vec   d(p, S->Value(st.X(), st.Y()).Transformed(tt));
+        const gp_Vec   nn = n.Normalized();
+        const double   side = (d - nn * d.Dot(nn)).Magnitude();
+        ok = side <= 0.05 * size;
+      }
+    if (ok)
+      best = k;
+  }
+  if (best < 0)
+    fail_op("the template is not the face moved along its normals");
+  const Map    m{(best & 4) != 0, (best & 1) != 0, (best & 2) != 0};
+  const bool   odd = m.swap != (m.flip_u != m.flip_v);
+  // The face's box as the samples were taken over it: the template's corners back on the face (OCCT's bounds of
+  // a disk's edges came out microns wider, and its rim then missed the wall by as much). Not round a period.
+  {
+    TopLoc_Location                 floc;
+    const occ::handle<Geom_Surface> fsurf = BRep_Tool::Surface(F, floc);
+    auto                            back  = [&](const gp_XY& q, double& pu, double& pv) {
+      const gp_Pnt2d             st = apply(m, q);
+      GeomAPI_ProjectPointOnSurf pr(S->Value(st.X(), st.Y()).Transformed(tt).Transformed(floc.Transformation().Inverted()), fsurf);
+      if (!pr.IsDone() || pr.NbPoints() == 0)
+        return false;
+      pr.LowerDistanceParameters(pu, pv);
+      return true;
+    };
+    double a_u, a_v, b_u, b_v;
+    if (back(gp_XY(0, 0), a_u, a_v) && back(gp_XY(1, 1), b_u, b_v))
+    {
+      const bool near_u = std::abs(a_u - fu0) <= 0.01 * (fu1 - fu0) && std::abs(b_u - fu1) <= 0.01 * (fu1 - fu0);
+      const bool near_v = std::abs(a_v - fv0) <= 0.01 * (fv1 - fv0) && std::abs(b_v - fv1) <= 0.01 * (fv1 - fv0);
+      if (near_u && !fsurf->IsUPeriodic())
+      {
+        fu0 = a_u;
+        fu1 = b_u;
+      }
+      if (near_v && !fsurf->IsVPeriodic())
+      {
+        fv0 = a_v;
+        fv1 = b_v;
+      }
+    }
+  }
+  const double tol = std::max(BRep_Tool::Tolerance(F), 1e-7);
+  BRep_Builder B;
+  // An edge's curve on the face, carried into the template's parameters: sampled, mapped and interpolated.
+  bool last_iso = false;
+  auto carried  = [&](const TopoDS_Edge& e, const TopoDS_Face& on, double& f, double& l) -> occ::handle<Geom2d_BSplineCurve> {
+    last_iso = false;
+    const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(e, on, f, l);
+    if (c.IsNull())
+      return {};
+    // (Four points a span of the template: the map bends within its first spans at each clamped side.)
+    const int                                   n   = std::clamp(4 * (S->NbUKnots() + S->NbVKnots()) + 1, 129, 40001);
+    occ::handle<NCollection_HArray1<gp_Pnt2d>> pts = new NCollection_HArray1<gp_Pnt2d>(1, n);
+    for (int k = 0; k < n; ++k)
+      pts->SetValue(k + 1, apply(m, norm(c->Value(f + (l - f) * k / (n - 1)))));
+    // A line of constant u or v (a rim or seam carried onto the template's own boundary): that iso line, exactly.
+    const gp_Pnt2d p0 = pts->Value(1), p1 = pts->Value(n);
+    bool           iso_u = true, iso_v = true;
+    for (int k = 1; k <= n; ++k)
+    {
+      iso_u = iso_u && std::abs(pts->Value(k).X() - p0.X()) <= 1e-12 * (1 + std::abs(su1 - su0));
+      iso_v = iso_v && std::abs(pts->Value(k).Y() - p0.Y()) <= 1e-12 * (1 + std::abs(sv1 - sv0));
+    }
+    if (iso_u != iso_v)
+    {
+      const gp_Vec2d d(p0, p1);
+      if (d.Magnitude() > 0)
+      {
+        occ::handle<Geom2d_BSplineCurve> b = Geom2dConvert::CurveToBSplineCurve(new Geom2d_TrimmedCurve(new Geom2d_Line(p0, gp_Dir2d(d)), 0, d.Magnitude()));
+        f        = b->FirstParameter();
+        l        = b->LastParameter();
+        last_iso = true;
+        return b;
+      }
+    }
+    Geom2dAPI_Interpolate in(pts, false, 1e-12);
+    in.Perform();
+    if (!in.IsDone())
+      return {};
+    const occ::handle<Geom2d_BSplineCurve> b = in.Curve();
+    f = b->FirstParameter();
+    l = b->LastParameter();
+    return b;
+  };
+  // New vertices (by the old ones) and edges.
+  NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher> vmap, emap;
+  auto vertex_at = [&](const TopoDS_Vertex& old, const gp_Pnt& p) -> TopoDS_Vertex {
+    const TopoDS_Shape key = old.Oriented(TopAbs_FORWARD);
+    if (const TopoDS_Shape* found = vmap.Seek(key))
+      return TopoDS::Vertex(*found);
+    TopoDS_Vertex nv;
+    B.MakeVertex(nv, p, tol);
+    vmap.Bind(key, nv);
+    return nv;
+  };
+  // A curve projected onto a periodic surface shifted by whole periods to pass where an old one does (`want` at `t`):
+  // the face's other curves are in that period.
+  auto align = [](occ::handle<Geom2d_Curve>& pc, double t, const gp_Pnt2d& want, const occ::handle<Geom_Surface>& on) {
+    const gp_Pnt2d got = pc->Value(t);
+    const double   du  = on->IsUPeriodic() ? std::round((want.X() - got.X()) / on->UPeriod()) * on->UPeriod() : 0;
+    const double   dv  = on->IsVPeriodic() ? std::round((want.Y() - got.Y()) / on->VPeriod()) * on->VPeriod() : 0;
+    if (du != 0 || dv != 0)
+      pc = occ::down_cast<Geom2d_Curve>(pc->Translated(gp_Vec2d(du, dv)));
+  };
+  TopoDS_Face G;
+  B.MakeFace(G, S, tl, tol);
+  for (TopoDS_Iterator wi(F); wi.More(); wi.Next())
+  {
+    TopoDS_Wire w;
+    B.MakeWire(w);
+    for (TopoDS_Iterator ei(wi.Value()); ei.More(); ei.Next())
+    {
+      const TopoDS_Edge  e   = TopoDS::Edge(ei.Value());
+      const TopoDS_Shape key = e.Oriented(TopAbs_FORWARD);
+      if (!emap.IsBound(key))
+      {
+        const TopoDS_Edge ef = TopoDS::Edge(key);
+        double            f, l;
+        const occ::handle<Geom2d_BSplineCurve> c = carried(ef, F, f, l);
+        if (c.IsNull())
+          fail_op("an edge of the face has no curve on it");
+        const bool iso_edge = last_iso;
+        TopoDS_Edge ne;
+        B.MakeEdge(ne);
+        TopoDS_Vertex v0, v1;
+        TopExp::Vertices(ef, v0, v1);
+        if (v0.IsNull() || v1.IsNull())
+          fail_op("an edge of the face has no vertices");
+        const gp_Pnt2d a = c->Value(f), z = c->Value(l);
+        const TopoDS_Vertex n0 = vertex_at(v0, S->Value(a.X(), a.Y()).Transformed(tt)), n1 = vertex_at(v1, S->Value(z.X(), z.Y()).Transformed(tt));
+        B.Add(ne, n0.Oriented(TopAbs_FORWARD));
+        B.Add(ne, n1.Oriented(TopAbs_REVERSED));
+        if (BRep_Tool::IsClosed(ef, F))
+        {
+          double f2, l2;
+          const occ::handle<Geom2d_BSplineCurve> c2 = carried(TopoDS::Edge(ef.Reversed()), F, f2, l2);
+          if (c2.IsNull())
+            fail_op("a seam of the face has no second curve");
+          B.UpdateEdge(ne, c, c2, S, tl, tol);
+        }
+        else
+          B.UpdateEdge(ne, c, S, tl, tol);
+        B.Range(ne, f, l);
+        // Its 3D curve dense on the template (BRepLib's fit of a curve across hundreds of the template's spans
+        // strayed microns off the walls it must lie on): points of the template along it, interpolated at its
+        // own parameters. An iso line's comes from BRepLib below.
+        if (!iso_edge)
+        {
+          const int n = std::clamp(16 * (S->NbUKnots() + S->NbVKnots()), 257, 100001);
+          occ::handle<NCollection_HArray1<gp_Pnt>> ps = new NCollection_HArray1<gp_Pnt>(1, n);
+          occ::handle<NCollection_HArray1<double>> ts = new NCollection_HArray1<double>(1, n);
+          for (int k = 0; k < n; ++k)
+          {
+            const double   t = f + (l - f) * k / (n - 1);
+            const gp_Pnt2d w = c->Value(t);
+            ps->SetValue(k + 1, S->Value(w.X(), w.Y()));
+            ts->SetValue(k + 1, t);
+          }
+          GeomAPI_Interpolate in3(ps, ts, false, 1e-12);
+          in3.Perform();
+          if (!in3.IsDone())
+            fail_op("a new edge's curve could not be made");
+          B.UpdateEdge(ne, in3.Curve(), tl, tol);
+          B.Range(ne, f, l);
+        }
+        emap.Bind(key, ne);
+      }
+      // (A map turning the parameters over runs the loops the other way round on the template.)
+      const TopAbs_Orientation o = e.Orientation();
+      B.Add(w, TopoDS::Edge(emap.Find(key)).Oriented(odd ? TopAbs::Reverse(o) : o));
+    }
+    w.Closed(BRep_Tool::IsClosed(TopoDS::Wire(wi.Value())));
+    B.Add(G, w);
+  }
+  if (!BRepLib::BuildCurves3d(G, tol))
+    fail_op("the new face's edges have no 3D curves");
+  // Standing for the face as its surface faces: the template's normal against the face's at a point.
+  bool same;
+  {
+    const double u = 0.5 * (fu0 + fu1), v = 0.5 * (fv0 + fv1);
+    gp_Pnt       p;
+    gp_Vec       du, dv, su, sv;
+    fs.D1(u, v, p, du, dv);
+    const gp_Pnt2d st = apply(m, norm(gp_Pnt2d(u, v)));
+    gp_Pnt         q;
+    S->D1(st.X(), st.Y(), q, su, sv);
+    same = du.Crossed(dv).Dot(su.Crossed(sv).Transformed(tt)) > 0;
+  }
+  if (same == odd)
+    fail_op("the template faces against its parameters' map");
+  // The neighbours: each new edge's curve on them, checked to lie on them.
+  ShapeAncMap ef;
+  TopExp::MapShapesAndAncestors(solid, TopAbs_EDGE, TopAbs_FACE, ef);
+  for (NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher>::Iterator it(emap); it.More(); it.Next())
+  {
+    const TopoDS_Edge& old = TopoDS::Edge(it.Key());
+    const TopoDS_Edge& ne  = TopoDS::Edge(it.Value());
+    if (!ef.Contains(old))
+      fail_op("an edge of the face is not in the part");
+    double                        f, l;
+    TopLoc_Location               cl;
+    const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(ne, cl, f, l);
+    if (c3.IsNull())
+      fail_op("a new edge has no 3D curve");
+    for (ShapeList::Iterator fi(ef.FindFromKey(old)); fi.More(); fi.Next())
+    {
+      const TopoDS_Face N = TopoDS::Face(fi.Value());
+      if (N.IsSame(F))
+        continue;
+      TopLoc_Location                 nl;
+      const occ::handle<Geom_Surface> ns = BRep_Tool::Surface(N, nl);
+      const occ::handle<Geom_Curve>   local = occ::down_cast<Geom_Curve>(c3->Transformed(cl.Transformation().Multiplied(nl.Transformation().Inverted())));
+      double                          dmax = 0;
+      for (int k = 0; k <= 32; ++k)
+      {
+        GeomAPI_ProjectPointOnSurf pr(local->Value(f + (l - f) * k / 32.0), ns);
+        if (!pr.IsDone() || pr.NbPoints() == 0)
+          fail_op("a new edge can't be projected onto a neighbour");
+        dmax = std::max(dmax, pr.LowerDistance());
+      }
+      if (dmax > 1e-6 * size + 1e-7)
+        fail_op("a new edge leaves a neighbouring face");
+      // Its curve there: its points' parameters on the surface, each from the last (continuous round a period),
+      // interpolated at the 3D curve's own parameters, so the two agree point for point.
+      occ::handle<Geom2d_Curve> pc;
+      double                    dev = 0;
+      {
+        // (Eight points a span of the 3D curve: it carries the image's detail.)
+        const occ::handle<Geom_BSplineCurve> bc = occ::down_cast<Geom_BSplineCurve>(local);
+        const int n = std::clamp(bc.IsNull() ? 257 : 8 * bc->NbKnots() * std::max(1, bc->Degree() / 2) + 1, 257, 80001);
+        occ::handle<NCollection_HArray1<gp_Pnt2d>> uv = new NCollection_HArray1<gp_Pnt2d>(1, n);
+        occ::handle<NCollection_HArray1<double>>   ts = new NCollection_HArray1<double>(1, n);
+        ShapeAnalysis_Surface                       sas(ns);
+        gp_Pnt2d                                    last;
+        for (int k = 0; k < n; ++k)
+        {
+          const double t = f + (l - f) * k / (n - 1);
+          const gp_Pnt q = local->Value(t);
+          gp_Pnt2d     w = k == 0 ? sas.ValueOfUV(q, 1e-9) : sas.NextValueOfUV(last, q, 1e-9);
+          // (Unwrapped: each within half a period of the last.)
+          if (k > 0 && ns->IsUPeriodic())
+            w.SetX(w.X() + std::round((last.X() - w.X()) / ns->UPeriod()) * ns->UPeriod());
+          if (k > 0 && ns->IsVPeriodic())
+            w.SetY(w.Y() + std::round((last.Y() - w.Y()) / ns->VPeriod()) * ns->VPeriod());
+          last = w;
+          uv->SetValue(k + 1, last);
+          ts->SetValue(k + 1, t);
+        }
+        Geom2dAPI_Interpolate in(uv, ts, false, 1e-12);
+        in.Perform();
+        if (!in.IsDone())
+          fail_op("a new edge has no curve on a neighbour");
+        pc = in.Curve();
+        for (int k = 0; k < n - 1; ++k)
+        {
+          const double   t = f + (l - f) * (k + 0.5) / (n - 1);
+          const gp_Pnt2d w = pc->Value(t);
+          dev              = std::max(dev, ns->Value(w.X(), w.Y()).Distance(local->Value(t)));
+        }
+        if (dev > 2e-5 * size + 1e-7)
+          fail_op("a new edge's curve on a neighbour strays from it");
+      }
+      double                          of, ol;
+      const occ::handle<Geom2d_Curve> was = BRep_Tool::CurveOnSurface(old, N, of, ol);
+      if (!was.IsNull())
+        align(pc, f, was->Value(of), ns);
+      B.UpdateEdge(ne, pc, ns, nl, std::max({tol, dmax * 2, dev * 2}));
+    }
+  }
+  // Edges elsewhere at a moved vertex: a straight one along the move drawn to the new vertex.
+  ShapeAncMap ve;
+  TopExp::MapShapesAndAncestors(solid, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+  rs->Replace(F, same ? G : TopoDS::Face(G.Reversed()));
+  for (NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher>::Iterator it(emap); it.More(); it.Next())
+    rs->Replace(it.Key(), it.Value());
+  ShapeIMap face_edges;
+  TopExp::MapShapes(F, TopAbs_EDGE, face_edges);
+  std::vector<TopoDS_Shape> rebuilt;
+  for (NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher>::Iterator it(vmap); it.More(); it.Next())
+  {
+    const TopoDS_Vertex& ov = TopoDS::Vertex(it.Key());
+    const TopoDS_Vertex& nv = TopoDS::Vertex(it.Value());
+    const gp_Pnt         po = BRep_Tool::Pnt(ov), pn = BRep_Tool::Pnt(nv);
+    if (!ve.Contains(ov))
+      continue;
+    for (ShapeList::Iterator gi(ve.FindFromKey(ov)); gi.More(); gi.Next())
+    {
+      const TopoDS_Edge g = TopoDS::Edge(gi.Value().Oriented(TopAbs_FORWARD));
+      if (face_edges.Contains(g))
+        continue;
+      if (po.Distance(pn) <= tol)
+        fail_op("an edge at an unmoved vertex");  // (none in the cases this is for)
+      TopoDS_Vertex a, z;
+      TopExp::Vertices(g, a, z);
+      BRepAdaptor_Curve gc(g);
+      if (gc.GetType() != GeomAbs_Line || a.IsSame(z))
+        fail_op("a curved edge at a moved vertex");
+      const bool    at_start = a.IsSame(ov);
+      const gp_Pnt  other    = BRep_Tool::Pnt(at_start ? z : a);
+      const gp_Vec  along(other, pn);
+      if (along.Magnitude() < tol || along.Crossed(gp_Vec(other, po)).Magnitude() > 1e-9 * along.Magnitude() * std::max(gp_Vec(other, po).Magnitude(), tol))
+        fail_op("an edge at a moved vertex isn't along the move");
+      TopoDS_Edge ng;
+      B.MakeEdge(ng, new Geom_Line(at_start ? pn : other, gp_Dir(at_start ? gp_Vec(pn, other) : gp_Vec(other, pn))), tol);
+      const TopoDS_Vertex na = at_start ? nv : TopoDS::Vertex(a), nz = at_start ? TopoDS::Vertex(z) : nv;
+      B.Add(ng, na.Oriented(TopAbs_FORWARD));
+      B.Add(ng, nz.Oriented(TopAbs_REVERSED));
+      B.Range(ng, 0, along.Magnitude());
+      // Its curves on its faces (seams twice): straight in their parameters, from the old curve's point at the
+      // unmoved end to the new vertex's parameters (on a plane, cylinder or cone a ruling runs with its length).
+      const double len = along.Magnitude();
+      for (ShapeList::Iterator fi(ef.FindFromKey(g)); fi.More(); fi.Next())
+      {
+        const TopoDS_Face               N = TopoDS::Face(fi.Value());
+        TopLoc_Location                 nl;
+        const occ::handle<Geom_Surface> ns = BRep_Tool::Surface(N, nl);
+        GeomAPI_ProjectPointOnSurf      pr(pn.Transformed(nl.Transformation().Inverted()), ns);
+        if (!pr.IsDone() || pr.NbPoints() == 0 || pr.LowerDistance() > 1e-6 * size + 1e-7)
+          fail_op("a moved vertex leaves a face along it");
+        double mu, mv;
+        pr.LowerDistanceParameters(mu, mv);
+        auto line = [&](const occ::handle<Geom2d_Curve>& p, double ff, double ll) -> occ::handle<Geom2d_Curve> {
+          const gp_Pnt2d keep = p->Value(at_start ? ll : ff);
+          gp_Pnt2d       moved(mu, mv);
+          // (The moved end on the same ruling: its u as the old curve's where the surface is periodic in u.)
+          if (ns->IsUPeriodic())
+            moved.SetX(moved.X() + std::round((keep.X() - moved.X()) / ns->UPeriod()) * ns->UPeriod());
+          if (std::abs(moved.X() - keep.X()) <= 1e-9 * (1 + std::abs(keep.X())))
+            moved.SetX(keep.X());
+          const gp_Pnt2d from = at_start ? moved : keep, to = at_start ? keep : moved;
+          const gp_Vec2d d(from, to);
+          if (d.Magnitude() < 1e-15)
+            return {};
+          // Parameter t in [0, len] along the 3D line: the 2D line's speed |d| / len.
+          return new Geom2d_TrimmedCurve(new Geom2d_Line(from, gp_Dir2d(d)), 0, d.Magnitude());
+        };
+        double                    ff, ll;
+        occ::handle<Geom2d_Curve> p1 = BRep_Tool::CurveOnSurface(g, N, ff, ll);
+        if (p1.IsNull())
+          fail_op("an edge at a moved vertex has no curve on its face");
+        occ::handle<Geom2d_Curve> q1 = line(p1, ff, ll);
+        if (q1.IsNull())
+          fail_op("an edge at a moved vertex is a point in its face's parameters");
+        // (Its parameter scaled to the 3D line's: a 2D B-spline line over [0, len].)
+        auto scaled = [&](const occ::handle<Geom2d_Curve>& q) -> occ::handle<Geom2d_Curve> {
+          occ::handle<Geom2d_BSplineCurve> b = Geom2dConvert::CurveToBSplineCurve(q);
+          NCollection_Array1<double>       k(1, b->NbKnots());
+          b->Knots(k);
+          BSplCLib::Reparametrize(0, len, k);
+          b->SetKnots(k);
+          return b;
+        };
+        if (BRep_Tool::IsClosed(g, N))
+        {
+          double                          f2, l2;
+          const occ::handle<Geom2d_Curve> p2 = BRep_Tool::CurveOnSurface(TopoDS::Edge(g.Reversed()), N, f2, l2);
+          const occ::handle<Geom2d_Curve> q2 = p2.IsNull() ? occ::handle<Geom2d_Curve>() : line(p2, f2, l2);
+          if (q2.IsNull())
+            fail_op("a seam at a moved vertex has no second curve");
+          B.UpdateEdge(ng, scaled(q1), scaled(q2), ns, nl, tol);
+        }
+        else
+          B.UpdateEdge(ng, scaled(q1), ns, nl, tol);
+      }
+      rs->Replace(g, ng);
+      rebuilt.push_back(ng);
+    }
+  }
+  // Every new edge's curves agreeing parameter for parameter (a projection's needn't).
+  for (NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher>::Iterator it(emap); it.More(); it.Next())
+    BRepLib::SameParameter(TopoDS::Edge(it.Value()), tol);
+  for (const TopoDS_Shape& g : rebuilt)
+    BRepLib::SameParameter(TopoDS::Edge(g), tol);
+  const TopoDS_Shape out = rs->Apply(solid);
+  if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+    fail_op("the part with the face replaced isn't valid");
+  return wrap(out);
+}
+
+std::unique_ptr<OcShape> merge_faces_on(const OcShape& in, const OcShape& on)
+{
+  const TopoDS_Shape&             s  = in.shape;
+  TopLoc_Location                 l0;
+  const occ::handle<Geom_Surface> g0 = BRep_Tool::Surface(as_face(on.shape, "face"), l0);
+  // The faces on it; every other face, edge and vertex kept as it is.
+  int       n = 0;
+  ShapeList keep;
+  ShapeIMap mine;
+  for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More(); fx.Next())
+  {
+    TopLoc_Location l;
+    if (BRep_Tool::Surface(TopoDS::Face(fx.Current()), l) == g0 && l.IsEqual(l0))
+    {
+      ++n;
+      TopExp::MapShapes(fx.Current(), TopAbs_EDGE, mine);
+    }
+  }
+  if (n < 2)
+    return wrap(s);
+  ShapeIMap all;
+  TopExp::MapShapes(s, TopAbs_EDGE, all);
+  for (int i = 1; i <= all.Extent(); ++i)
+    if (!mine.Contains(all(i)))
+      keep.Append(all(i));
+  ShapeUpgrade_UnifySameDomain u(s, true, true, false);
+  for (ShapeList::Iterator it(keep); it.More(); it.Next())
+    u.KeepShape(it.Value());
+  u.Build();
+  const TopoDS_Shape out = u.Shape();
+  if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+    return wrap(s);
+  return wrap(out);
+}
+
+std::unique_ptr<OcShape> face_patches(const OcShape& in, uint32_t spans)
+{
+  const TopoDS_Face&                     f = as_face(in.shape, "face");
+  TopLoc_Location                        loc;
+  const occ::handle<Geom_Surface>        s  = BRep_Tool::Surface(f, loc);
+  const occ::handle<Geom_BSplineSurface> bs = occ::down_cast<Geom_BSplineSurface>(s);
+  if (bs.IsNull() || spans == 0)
+    return wrap(f);
+  double u0, u1, v0, v1;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  // The cuts: every `spans`-th knot inside the bounds.
+  auto cuts = [spans](const NCollection_Array1<double>& k, double a, double b) {
+    std::vector<double> out{a};
+    int                 n = 0;
+    for (int i = k.Lower(); i <= k.Upper(); ++i)
+      if (k(i) > a + 1e-12 * (b - a) && k(i) < b - 1e-12 * (b - a) && ++n % (int)spans == 0)
+        out.push_back(k(i));
+    out.push_back(b);
+    return out;
+  };
+  const std::vector<double> us = cuts(bs->UKnots(), u0, u1), vs = cuts(bs->VKnots(), v0, v1);
+  if (us.size() == 2 && vs.size() == 2)
+    return wrap(f);
+  // Sewn into one sheet: as a split's tool, faces that only lie side by side don't cut a solid apart.
+  const double            tol = BRep_Tool::Tolerance(f);
+  BRepBuilderAPI_Sewing   sew(std::max(tol, 1e-7));
+  for (size_t i = 0; i + 1 < us.size(); ++i)
+    for (size_t j = 0; j + 1 < vs.size(); ++j)
+    {
+      BRepBuilderAPI_MakeFace mf(s, us[i], us[i + 1], vs[j], vs[j + 1], tol);
+      if (!mf.IsDone())
+        fail_op("a patch of the face could not be made");
+      sew.Add(mf.Face().Located(loc).Oriented(f.Orientation()));
+    }
+  sew.Perform();
+  const TopoDS_Shape out = sew.SewedShape();
+  if (out.IsNull() || out.ShapeType() != TopAbs_SHELL)
+    fail_op("the face's patches could not be sewn into one sheet");
+  return wrap(out);
+}
+
+std::unique_ptr<OcShape> drop_open_wires(const OcShape& in)
+{
+  const TopoDS_Shape&            s = in.shape;
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+  bool                           any = false;
+  for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More(); fx.Next())
+  {
+    const TopoDS_Face         f = TopoDS::Face(fx.Current().Oriented(TopAbs_FORWARD));
+    std::vector<TopoDS_Shape> keep;
+    bool                      open = false;
+    for (TopoDS_Iterator w(f); w.More(); w.Next())
+    {
+      const TopoDS_Shape& x = w.Value();
+      // (A wire whose ends don't meet: its vertices aren't each used twice.)
+      bool closed = x.ShapeType() == TopAbs_WIRE;
+      if (closed)
+      {
+        NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> uses;
+        for (TopoDS_Iterator e(x); e.More(); e.Next())
+          for (TopoDS_Iterator v(e.Value()); v.More(); v.Next())
+          {
+            int* n = uses.ChangeSeek(v.Value().Oriented(TopAbs_FORWARD));
+            if (n == nullptr)
+              uses.Bind(v.Value().Oriented(TopAbs_FORWARD), 1);
+            else
+              ++*n;
+          }
+        for (NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher>::Iterator it(uses); it.More() && closed; it.Next())
+          closed = it.Value() % 2 == 0;
+        closed = closed && !uses.IsEmpty();
+      }
+      if (closed)
+        keep.push_back(x);
+      else
+        open = true;
+    }
+    if (!open || keep.empty())
+      continue;
+    TopoDS_Face  g = TopoDS::Face(f.EmptyCopied());
+    BRep_Builder B;
+    for (const TopoDS_Shape& x : keep)
+      B.Add(g, x);
+    if (!BRepCheck_Analyzer(g).IsValid())
+      continue;
+    rs->Replace(f, g);
+    any = true;
+  }
+  return wrap(any ? rs->Apply(s) : s);
+}
+
 std::unique_ptr<OcShape> extend_face(const OcShape& on, double len)
 {
   const TopoDS_Face& f = as_face(on.shape, "face");

@@ -713,27 +713,48 @@ fn loop_nodes(edges: &[MeshEdge], uses: &[Use], nodes: &[Option<EdgeNodes>]) -> 
     };
     // In order round the loop (wires needn't list their edges so): each use's end the next one's start. At a
     // vertex several uses start from (a seam's: the rim on and the seam back), not back along the edge just
-    // walked, then the next one in the given order.
+    // walked, then the next one in the given order; a turn that can't go round every use is taken back (a rim cut in
+    // two at the seam's vertex: its other piece first leads back to a dead end, a Replace face's displaced tube).
     let mut from: Vec<(u32, usize)> = uses.iter().enumerate().map(|(k, u)| Some((ends(u)?.0, k))).collect::<Option<_>>()?;
     from.sort_unstable();
-    let mut used = vec![false; uses.len()];
-    let mut order = Vec::with_capacity(uses.len());
-    let mut i = 0;
+    let n = uses.len();
+    let mut used = vec![false; n];
+    used[0] = true;
+    let mut order = vec![0usize];
+    // The other choices left at each step after the first (the last one tried next).
+    let mut alts: Vec<Vec<usize>> = Vec::new();
+    let mut budget = 4 * n * n + 64;
     loop {
-        order.push(i);
-        used[i] = true;
-        if order.len() == uses.len() {
-            break;
-        }
+        budget = budget.checked_sub(1)?;
+        let i = *order.last()?;
         let end = ends(&uses[i])?.1;
-        let at = from.partition_point(|&(v, _)| v < end);
-        let next = from[at..]
-            .iter()
-            .take_while(|&&(v, _)| v == end)
-            .map(|&(_, k)| k)
-            .filter(|&k| !used[k])
-            .min_by_key(|&k| (uses[k].edge == uses[i].edge, (k + uses.len() - i) % uses.len()))?;
-        i = next;
+        if order.len() == n {
+            if end == ends(&uses[order[0]])?.0 {
+                break;
+            }
+        } else {
+            let at = from.partition_point(|&(v, _)| v < end);
+            let mut next: Vec<usize> = from[at..].iter().take_while(|&&(v, _)| v == end).map(|&(_, k)| k).filter(|&k| !used[k]).collect();
+            next.sort_by_key(|&k| std::cmp::Reverse((uses[k].edge == uses[i].edge, (k + n - i) % n)));
+            if let Some(k) = next.pop() {
+                alts.push(next);
+                used[k] = true;
+                order.push(k);
+                continue;
+            }
+        }
+        // Back to the last step with another choice.
+        loop {
+            let mut a = alts.pop()?;
+            let k = order.pop()?;
+            used[k] = false;
+            if let Some(k) = a.pop() {
+                alts.push(a);
+                used[k] = true;
+                order.push(k);
+                break;
+            }
+        }
     }
     if ends(&uses[*order.last()?])?.1 != ends(&uses[order[0]])?.0 {
         return None;
@@ -853,15 +874,18 @@ impl GridSurface for NurbsSurface {
     fn d1(&self, u: f64, v: f64) -> [DVec3; 3] {
         NurbsSurface::d1(self, u, v)
     }
-    /// Closed round u: a node the iteration from `seed` can't reach across the seam is found afresh, and one on the
-    /// seam is at u0 or u1, the one nearer `seed`.
+    /// Closed round u: a node the iteration from `seed` can't reach across the seam (it stops short, as far off as
+    /// the step from the seed's point) is found afresh, and one on the seam is at u0 or u1, the one nearer `seed`.
+    /// (Not every node a little off the surface: an intersection curve's are, and each searched afresh took 12-54 ms
+    /// on a displacement map's tube.)
     fn param_of(&self, p: DVec3, seed: Option<DVec2>) -> (DVec2, f64) {
         let mut r = NurbsSurface::param_of(self, p, seed);
         let Some(s) = seed else { return r };
         if !self.closed_in_u() {
             return r;
         }
-        if r.1 > 1e-9 * (1.0 + p.abs().max_element()) {
+        let step = (p - NurbsSurface::at(self, s.x, s.y)).length();
+        if r.1 > (1e-9 * (1.0 + p.abs().max_element())).max(0.25 * step) {
             let fresh = NurbsSurface::param_of(self, p, None);
             if fresh.1 < r.1 {
                 r = fresh;
@@ -956,10 +980,23 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
     let off = (defl.linear * 0.25).max(1e-7);
     let mut uv: Vec<DVec2> = Vec::with_capacity(points.len());
     let mut seed = None;
-    for p in &points {
-        let (q, d) = s.param_of(*p, seed);
+    for (k, p) in points.iter().enumerate() {
+        let (mut q, d) = s.param_of(*p, seed);
         if d.is_nan() || d > off || !q.is_finite() {
             return Err("a boundary node off the surface");
+        }
+        // A closed surface's first node on its seam: on the side its next node goes on from (a rim running towards
+        // smaller u from u0 crossed the whole period: a Replace face's displaced tube).
+        if k == 0 && s.closed() && points.len() > 1 {
+            let ((a, b), _) = s.range();
+            let eps = 1e-9 * (b - a).abs().max(1.0);
+            if (q.x - a).abs() <= eps || (q.x - b).abs() <= eps {
+                let other = DVec2::new(if (q.x - a).abs() <= eps { b } else { a }, q.y);
+                let step = |c: DVec2| (s.param_of(points[1], Some(c)).0 - c).length();
+                if step(other) < step(q) {
+                    q = other;
+                }
+            }
         }
         uv.push(q);
         seed = Some(q);

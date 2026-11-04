@@ -779,6 +779,10 @@ std::unique_ptr<OcShape> make_face_on_plane(const PlaneF& plane, const OcShape& 
 std::unique_ptr<OcShape> make_face_from_wire(const OcShape& wire, bool only_plane);
 std::unique_ptr<OcShape> make_face_on(const OcShape& on, const OcShape& wire);
 std::unique_ptr<OcShape> extend_face(const OcShape& on, double len);
+std::unique_ptr<OcShape> drop_open_wires(const OcShape& shape);
+std::unique_ptr<OcShape> face_patches(const OcShape& face, uint32_t spans);
+std::unique_ptr<OcShape> merge_faces_on(const OcShape& shape, const OcShape& on);
+std::unique_ptr<OcShape> replace_face_mapped(const OcShape& solid, const OcShape& face, const OcShape& tmpl);
 std::unique_ptr<OcShape> make_plane_face(const PlaneF& plane, double umin, double umax,
                                          double vmin, double vmax);
 std::unique_ptr<OcShape> make_polyline(rust::Slice<const double> pts, bool closed);

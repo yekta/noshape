@@ -188,6 +188,33 @@ pub fn make_face_on(on: &Shape, wire: &Shape) -> Result<Shape> {
     Shape::from_res(ffi::make_face_on(on.raw(), wire.raw()))
 }
 
+/// `shape` without its faces' open wires (slits: a thickened seam's edge left inside a face after a unify), or as it
+/// is when it has none; each face rebuilt is checked.
+pub fn drop_open_wires(shape: &Shape) -> Result<Shape> {
+    Shape::from_res(ffi::drop_open_wires(shape.raw()))
+}
+
+/// `solid` with `face` replaced by `template`, a B-spline surface built over the face's own parameters (its points
+/// at the face's normalized (u, v) the face's moved along its normals: a displacement map's): the face's edges carried
+/// into the template's parameters, its neighbours taking the new edges, no intersection computed. An error where the
+/// template isn't such a surface or the neighbours can't take the new edges (then the general way).
+pub fn replace_face_mapped(solid: &Shape, face: &Shape, template: &Shape) -> Result<Shape> {
+    Shape::from_res(ffi::replace_face_mapped(solid.raw(), face.raw(), template.raw()))
+}
+
+/// `shape` with the faces lying on `on`'s surface merged where they meet (OCCT's same-domain unify of them alone:
+/// a split by [`face_patches`] leaves a piece on each patch). As it is when it has at most one.
+pub fn merge_faces_on(shape: &Shape, on: &Shape) -> Result<Shape> {
+    Shape::from_res(ffi::merge_faces_on(shape.raw(), on.raw()))
+}
+
+/// A B-spline `face` (bounded by its surface's parameters) as a sheet of faces sewn together on the same surface, each over at
+/// most `spans` x `spans` of its knot spans: a dense surface's patches for a Boolean, whose projections onto a face
+/// search all of it (a displacement map's 512 x 512 template). Other faces as they are.
+pub fn face_patches(face: &Shape, spans: u32) -> Result<Shape> {
+    Shape::from_res(ffi::face_patches(face.raw(), spans))
+}
+
 /// `face` on its surface carried `len` past its edges (a B-spline extended in its non-periodic directions).
 pub fn extend_face(face: &Shape, len: f64) -> Result<Shape> {
     Shape::from_res(ffi::extend_face(face.raw(), len))

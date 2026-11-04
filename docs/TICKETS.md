@@ -508,7 +508,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   rings** (Part 3 456.159 → 812.416, Parts 1 and 2 change too). live: each body's cut face is its own (a chamfer of one ring's top
   changes that ring only). qa verifies with both matrices + tickets/gyro/chamfer1.py when the fix lands (only the picked body may
   change). (qa 2026-11-04 20:44, green 40b44000)
-- [ ] P1 DISPLACEMENT-MAP (user, lead 11-04; core: opReplaceFace, dx: the rest incl. opCreateBSplineSurface) the user's
+- [x] (core 11-04 20:28: Replace face on the user's 512 x 512 map: side 3.5 s, top 6.6 s, volumes in live's bands, 3 faces) P1 DISPLACEMENT-MAP (user, lead 11-04; core: opReplaceFace, dx: the rest incl. opCreateBSplineSurface) the user's
   Displacement map FeatureScript (/root/lead-scratch/disp/) replaces a face by a B-spline surface. core 11-04 13:19:
   opReplaceFace failed (a) on a curved face and (b) with a template partly below and partly above the face; now such
   a face is replaced by its slab: the face thickened past the template's offsets both ways, split by the template
@@ -519,6 +519,22 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   side by a Ø22 cylinder's (7602.654 = π·121·20 exactly), by a loft through bumpy closed splines (6931.99), a 40 × 20
   × 10 block's top by z = 9 + 0.1x (8800 exactly). Live's volumes for the user's own case: pending (lead: live is
   measuring); the host's @opCreateBSplineSurface isn't there yet (dx), so the user's script itself isn't run here.
+  core 11-04 20:28: the user's 512 x 512 map on live's Ø50 x 60 cylinder: side 3.5 s, 123,041.28 mm³ (live 11.2 s,
+  123,034.961 [122,428, 123,642]); top 6.6 s with its display mesh, 118,922.26 mm³ (live 12.2 s, 118,888.675
+  [118,714, 119,063]); both 3 faces as live's. Replace face first tries the template as built over the face's own
+  parameters (kernel replace_face_mapped: the face's edge curves carried into the template's parameters, the
+  knots' index function inverted along clamped directions, its neighbours taking the new edges, a ruling at a moved
+  vertex redrawn; no intersection with the dense surface), else the slabs, now split by the template in sewn patches
+  of 64 x 64 spans (kernel face_patches, merge_faces_on), the part less the slab plus its kept pieces glued, slit
+  wires dropped (drop_open_wires); all of it within a 90 s deadline (kernel with_deadline) failing with Onshape's
+  "Could not replace faces as requested.". Projections onto a B-spline face of >= 4096 poles: a knot grid kept per
+  surface, refined locally (0.9 s -> ~ms a call). brep::mesh (dx / psui, for review): a loop's walk backs up at a
+  seam vertex, a closed surface's first boundary node takes the seam side its next node goes on from, and a closed
+  B-spline's node is searched afresh only when the seeded search stops a step short (469 s -> 0.4 s on the 256
+  tube). Left: our mesher's triangulation fails on the top case's wall (its rim follows the image): BRepMesh 2.7 s.
+  T1 kernel core::a_face_is_replaced_by_its_moved_template, open_wires_are_dropped, a_dense_face_comes_in_patches,
+  a_deadline_stops_a_long_operation, projection::projection_onto_a_bspline_of_many_poles; model
+  custom_features::displacement_map_on_a_cylinder (3 faces). (T2 probe on 60 mm since dx 11-04.)
 - [x] (core 11-04 14:55: both fixed; cf-linear-pattern-with-seed-location 8 -> 12/12 to the end; T1 model
   kernel_robustness::extruded_edges_run_as_their_sketch_lines_are_drawn, kernel_robustness::a_reapplied_draft_drafts_
   its_instances_boss, custom_features::a_feature_list_rerun_drafts_its_instances_boss) P1 PATTERN-EDGE-DIRECTION

@@ -286,6 +286,43 @@ pub fn with_cancel<R>(flag: &std::sync::atomic::AtomicBool, f: impl FnOnce() -> 
     f()
 }
 
+/// Runs `f` stopping this thread's kernel operations after `seconds` (they fail as cancelled) or when the
+/// [`with_cancel`] flag it runs under is set; also whether the deadline passed. For work that can hang (an operation on
+/// a dense surface: AGENTS.md "background work that can hang has a timeout").
+pub fn with_deadline<R>(seconds: f64, f: impl FnOnce() -> R) -> (R, bool) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    let stop = Arc::new(AtomicBool::new(false));
+    let timed_out = Arc::new(AtomicBool::new(false));
+    // SAFETY (below): the outer flag outlives the `with_cancel` call around this one, so it outlives the watcher,
+    // which ends before this returns.
+    let outer = noshape_brep::thread_cancel();
+    let (done, wait) = std::sync::mpsc::channel::<()>();
+    let watcher = {
+        let (stop, timed_out) = (stop.clone(), timed_out.clone());
+        std::thread::spawn(move || {
+            let until = std::time::Instant::now() + std::time::Duration::from_secs_f64(seconds);
+            loop {
+                match wait.recv_timeout(std::time::Duration::from_millis(50)) {
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                    _ => return,
+                }
+                let cancelled = outer != 0 && unsafe { &*(outer as *const AtomicBool) }.load(Ordering::Relaxed);
+                let late = std::time::Instant::now() >= until;
+                if cancelled || late {
+                    timed_out.store(late && !cancelled, Ordering::Relaxed);
+                    stop.store(true, Ordering::Relaxed);
+                    return;
+                }
+            }
+        })
+    };
+    let r = with_cancel(&stop, f);
+    drop(done);
+    let _ = watcher.join();
+    (r, timed_out.load(Ordering::Relaxed))
+}
+
 /// Whether this thread runs under a [`with_cancel`] flag that is set (a cancelled regeneration: what's left of an
 /// operation that came back just before is skipped).
 pub fn thread_cancelled() -> bool {

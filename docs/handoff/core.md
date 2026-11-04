@@ -16,6 +16,12 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-04 20:28 UTC.**
+- DISPLACEMENT-MAP done on core's side: the user's 512 x 512 map on live's Ø50 x 60 cylinder, side 3.5 s / top 6.6 s,
+  volumes in live's bands, 3 faces (TICKETS). Replace face's fast path is kernel replace_face_mapped (build.cpp);
+  the slab fallback has a 90 s deadline. brep::mesh got three small fixes (loop walk, seam side, fresh-search test):
+  dx / psui, please review. Open: our mesher's triangulation of the top case's wall (BRepMesh 2.7 s instead).
+
 **State 11-04 15:56 UTC.**
 - Parity run 14:05 (main 74aba98a): 370/482 features, 36/56 documents. Since then cf-linear-pattern-with-seed-location
   8 -> 12/12 and cf-circular-pattern 9 -> 13/13 (PATTERN-EDGE-DIRECTION: a region's edges run as drawn, ScopeRule 10;
