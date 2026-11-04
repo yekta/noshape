@@ -36,6 +36,21 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**v0.4.26 (published 16:34, cut 5b449900 = 477c41683 + bump; Release run 41852299915, "Check macOS arm64" cancelled at
+16:10 yet published) smoked 16:35–17:00: good, no blocker.** Artifacts: the published Linux tarball, CLI tarball and .deb are
+byte-identical to the run's linux-x86_64 artifact; SHA256SUMS OK; 11 assets. CLI / app as CLI "0.4.26"; round trip 67643.716875
+/ 18; volume sweep = v0.4.25; the 44 ticket documents = green 5f0c5d10; fixed tickets hold (RUST-SHELL-2AFC, CRASH-957, wf-block,
+cli-shell-gpf, slow1151 1.3 s, CRASH-3151 / 3388 documents open); the user's cases pass (knurl CP12 9.5 s 11598.041; vase;
+split-and-chamfer; Y Ribs). **Updater v0.4.25 → v0.4.26 works** (fetched 16:35:24, ~1 min after publish; Restart → 0.4.26, g34
+reopened; upd426-0/-1.png). **Title bar (platform rule), Linux release app: the start window's ? Help ▾ and account menu, a
+document's ☰ / Help ▾ / bell all open** (tickets/titlebar-menus-linux-v0426.png); Windows: the Release run's Windows check
+passed but clicks no GUI — qa still can't check it (workflow requested). Memory: 508 peak 780 MB, 685 499 MB.
+**/tmp was pruned (files older than ~22 h) at some point on 11-04**: qa's smoke / volume / status scripts and the halfmir2
+documents were gone. Rebuilt in qa-scratch/bin (qa-vols.py, qa-fstat.py, qa-tixvol.sh, qa-fget.py, qa-presmoke.sh,
+qa-relsmoke.sh, qa-cliwrap-mem.sh; /tmp links), halfmir2 docs in qa-scratch/docs/hm2-{a,b,c}.noshape (bin/mirsetgui.sh updated).
+**Lost and not yet rebuilt: SM-CLOSED-BUTT's /tmp/qa-smbutt2.py and RUST-MIRROR-NEGATIVE's /tmp/qa-mir972.py** (not in this
+smoke). GUI rows re-running with the new halfmir2 docs.
+
 **v0.4.25 (published 05:49, cut d9fb8f44 = 38d75390 + bump, contains greens through ad60edf9; Release run 41775622951)
 smoked 05:51–06:11: good, no new blocker.** Artifacts: the published Linux tarball, CLI tarball and .deb are
 byte-identical to the run's linux-x86_64 artifact; SHA256SUMS OK; 11 assets. CLI / app as CLI "0.4.25"; round trip 67643.716875
