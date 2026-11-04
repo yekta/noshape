@@ -389,7 +389,11 @@ impl Sketch {
         if held.is_empty() {
             let resized: Vec<EntityId> = comp.iter().copied().filter(|u| self.kind(*u) == Some(EntityKind::Line) && cons.iter().any(|(c, us)| us.as_slice() == [*u] && unheld.contains(c) && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Length { .. })))).collect();
             let anchors: Vec<EntityId> = resized.iter().filter_map(|u| self.anchor(*u)).collect();
-            let shared = anchors.len() >= 2 && anchors.iter().all(|a| *a == anchors[0] || self.coincident_class(anchors[0]).contains(a));
+            // One such line when a corner radius changes too (fuzz s996: a rounded plate's growing side keeps its
+            // lowest point while its arcs shrink).
+            let radius_changes = cons.iter().any(|(c, _)| unheld.contains(c) && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Radius { .. } | ConstraintKind::Diameter { .. })));
+            let enough = anchors.len() >= 2 || (anchors.len() == 1 && radius_changes);
+            let shared = enough && anchors.iter().all(|a| *a == anchors[0] || self.coincident_class(anchors[0]).contains(a));
             if shared
                 && let Some(mut sub) = self.sub_sketch(comp, cons, &|_| true, &BTreeSet::from([anchors[0]]))
                 && matches!(sub.solve_with(&opts).status, SolveStatus::Solved)
