@@ -1646,6 +1646,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   "Could not shell part with selections.", delete + add again 9.3 s on v0.4.25, 10.3 s on v0.4.24) vs shell14-v24.noshape
   (the same steps on v0.4.24, body 49633.40226 vs 49633.402857 mm³: 0.4 s on both). tickets/shellslow508/shadd.py <cli> <doc>. Not a
   release regression (same time on both builds for the same body); it made seed 508's v0.4.25 session 3x slower.
+  core 11-04 10:19: on main (Part 1 regenerates as v0.4.24's body, 49633.402857) Shell 1 fails in 3.7 s (dump vibe5
+  ~/core-sh508/ops/shell-4, shell::dumped_shell_probe): it removes a vertical R5 corner round (tangent to both its
+  planes) and a Ø12 hole's wall. Quadrics decline (a kept face tangent to a removed one: on purpose, live ends such walls
+  in flat rims normal to them, 1752, which the slabs make); the slabs then fuse 12 slabs in 2.39 s (noshape's Boolean
+  declines "two edges leave a vertex in one direction": bool) and their common comes out empty (0.65 s). Next: the
+  flat rims in the quadric path (a tangent removed face's rim, per edge, the plane through it normal to the kept face),
+  then this shell is a quadric one and fast.
 - [ ] P0 REGEN-SPEED (core 10-29 03:05: met in release on perf.yml run 40796942944 (main 34cbea98): live-30-features full regen 35 / 41 / 53 ms (macOS / Linux / Windows; budget 80, live 171), its Extrude 1 edit commit 34 / 38 / 60 ms (budget 200), big-plate regen 159 / 230 / 306 ms (live 617); qa, please re-measure the GUI commit on a release build, the 301–785 ms were a dev build at load ~30. Was 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left
