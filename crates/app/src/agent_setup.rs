@@ -215,7 +215,8 @@ fn file_checks() -> Checker {
 /// Once, on the first launch of an installed (release) app: offer what isn't
 /// set up yet, if anything is (checked first: this isn't a click).
 pub fn first_launch(cx: &mut App) {
-    let flag = noshape_app_core::paths::config_dir().join("setup-offered");
+    // "setup-offered" (before 11-04) was written even when nothing showed: everyone sees the status once more.
+    let flag = noshape_app_core::paths::config_dir().join("setup-shown");
     let installed = option_env!("NOSHAPE_VERSION").is_some() && !cfg!(debug_assertions);
     let quiet = ["NOSHAPE_NO_SETUP_PROMPT", "NOSHAPE_NO_NATIVE_DIALOGS", "NOSHAPE_SMOKE"].iter().any(|k| std::env::var_os(k).is_some());
     if !installed || quiet || flag.exists() {
@@ -230,8 +231,9 @@ pub fn first_launch(cx: &mut App) {
             let r = timed(cx.background_executor().clone(), async move { check(what, &env) }, CHECK_TIMEOUT).await;
             setup.checked(i, r);
         }
+        // Shown either way, so the user sees what is set up: with nothing to offer it is only the status and Close.
         if !setup.rows.iter().any(|r| r.check == Check::Offer) {
-            return;
+            setup.phase = Phase::Finished;
         }
         cx.update(|cx| {
             let Some(w) = cx.active_window().or_else(|| cx.windows().first().copied()) else { return };
@@ -282,7 +284,7 @@ fn show(setup: Rc<RefCell<Setup>>, env: Env, window: &mut Window, cx: &mut App) 
         };
         let choosing = s.phase == Phase::Choosing;
         let any = s.rows.iter().any(|r| r.on && r.check == Check::Offer);
-        let none_found = scope == Scope::Agents && !s.checking() && s.rows.iter().all(|r| r.check == Check::Unavailable);
+        let none_found = scope != Scope::Cli && !s.checking() && s.rows.iter().filter(|r| matches!(r.what, What::Agent(_))).all(|r| r.check == Check::Unavailable);
         let list = v_flex().gap(px(6.)).children(s.rows.iter().enumerate().map(|(i, r)| {
             let toggles = choosing && r.check == Check::Offer;
             let shown_on = r.check == Check::Done || (r.on && r.check == Check::Offer);

@@ -98,6 +98,21 @@ fn claude_desktop_without_a_config_file_gets_one() {
 }
 
 #[test]
+fn the_store_build_of_claude_desktop_is_found_in_its_package_folder() {
+    let home = scratch("desktop-store");
+    let pkg = home.join("AppData/Local/Packages/Claude_pzs8sxrjxfjjc/LocalCache/Roaming/Claude");
+    std::fs::create_dir_all(&pkg).unwrap();
+    let e = env(&home, Os::Windows);
+    let exe = r"C:\Program Files\noshape\noshape.exe";
+    assert_ne!(install::status(&e, Agent::ClaudeDesktop, Path::new(exe)).state, State::Missing);
+    install::connect(&e, Agent::ClaudeDesktop, Path::new(exe)).expect("connect");
+    let v = read_json(&pkg.join("claude_desktop_config.json"));
+    assert_eq!(v["mcpServers"]["noshape"]["args"], json!(["mcp"]));
+    assert!(!home.join("AppData/Roaming/Claude").exists(), "the classic folder is left alone");
+    let _ = std::fs::remove_dir_all(home);
+}
+
+#[test]
 fn codex_config_toml_table_is_added_replaced_and_removed_as_text() {
     let text = "model = \"o4\"\n\n[mcp_servers.files]\ncommand = \"npx\"\nargs = [\"-y\", \"files\"]\n";
     let added = install::toml_with_server(text, Some(APP));
