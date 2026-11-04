@@ -785,6 +785,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   corner arcs in the front view), OCCT's HLR drew it visible on top for OCCT's fillets and leaves it out for ours.
   `drawing::tests::demo_plate_views_have_expected_lines` now counts distinct visible lines (6, plus 1 tangent) and
   passes both ways.
+## From skasm (11-04 22:28): two sheet metal custom features in the parity models
+- cf-sheet-metal-model-plus › "Sheet Metal Up to Part" (a custom copy of Sheet metal model, namespace e636b9e4…):
+  its EXTRUDE process with endBound UP_TO_BODY (endBoundEntityBody = an extrude's SWEPT_BODY, JID) extrudes the
+  sketch out to x = 9000 mm here, then std's createBendAttribute sees a 0° edge ("Edge between tangent walls cannot
+  be a bend."); live INFO "Only Simple corner relief…". The translator also rejects its stale endBoundEntityFace
+  (2 ids), unused under UP_TO_BODY. Trace: NOSHAPE_FS_TRACE=1 on a copy (the runner rewrites report.json).
+- cf-sheet-metal-overcut-dogbone › "Fold SM 1" (custom): ours 29 faces / 9854.12 mm³, live 32 / 9226.68.
+- FS-NATIVE-OPDERIP is done (skasm, edge_change.rs), with TAB-RIPPED-CORNER.
+
 ## From skasm (10-30): flat pattern drawings
 - skasm added `DrawingSource::flat` (drawing/create.rs; every construction site now sets it) for the sheet metal flat
   view's "Create Drawing of Flat pattern of Part N…": `source_bounds` gives the flat's extent and Suggested views make

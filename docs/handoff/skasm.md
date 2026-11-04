@@ -1,5 +1,17 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-04 22:28 UTC)
+- Sheet metal (lead 22:10): TAB-RIPPED-CORNER fixed with a native @opDerip (edge_change.rs; opEdgeChange takes an
+  option's `face`); T1 a_bend_through_a_ripped_corner_is_refused pins live's B2. workflow-sheet-metal.md's status
+  table is all ✅; the std flange / tab / bend / rip / flat / table rows hold. New: 7 sheet metal ui-parity scenarios
+  (sm-*, starts sm-sketch / plate), asked of live (REQUESTS 22:26).
+- Parity models (sheet metal, run 22:20 on a copy in /root/skasm-scratch/pm): shaped-flange's first difference is
+  std's Make joint 1 ("An internal edge cannot be used to create a joint."): ours has one shared definition edge
+  where std wants two free ones; live's definition asked with a probe (live/skasm/smdef-probe.fs, REQUESTS 22:21).
+  overcut-dogbone (Fold SM, custom), hem (Offset surface), model-plus ("Sheet Metal Up to Part": a custom copy of
+  Sheet metal model whose up-to-body extrude runs to x = 9000 mm; its stale endBoundEntityFace (2 ids) is
+  rejected but unused) are custom-feature / core work: told dx below.
+
 ## Resume here (2026-11-04 21:16 UTC)
 - ui-parity: all 81 recorded sketch scenarios match live (836 / 836 states; Extend's first pick now takes the line
   even 2 mm from its end and selects it, Esc drops it). Assembly: 5 of 6 run here match; asm-fastened-undo-picks
