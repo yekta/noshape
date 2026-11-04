@@ -98,10 +98,12 @@ impl AssemblyView {
         items.sort_by_key(|(id, _)| id.0);
         // A new mate's row while its dialog is open: selected, red until both connectors are picked.
         let new_mate = self.mate.as_ref().filter(|m| m.editing.is_none()).map(|m| m.dialog.read(cx)).filter(|d| !asm.mates.iter().any(|m| m.id == d.id));
+        // Live: related (with the folder) once a connector is picked.
+        let picked = new_mate.is_some_and(|d| d.a.is_some() || d.b.is_some());
         if let Some(d) = new_mate {
-            items.push((d.id, row(&d.name, if d.a.is_some() && d.b.is_some() { "ok" } else { "error" }, true, true, false, !self.show_mates)));
+            items.push((d.id, row(&d.name, if d.a.is_some() && d.b.is_some() { "ok" } else { "error" }, true, true, picked, !self.show_mates)));
         }
-        let folder_related = self.selected_mate.is_some_and(|id| asm.mates.iter().any(|m| m.id == id));
+        let folder_related = self.selected_mate.is_some_and(|id| asm.mates.iter().any(|m| m.id == id)) || picked;
         rows.push(row(&format!("Mate features ({})", items.len()), "ok", false, false, folder_related, false));
         if !self.expanded.contains(&vec![MATE_FEATURES_COLLAPSED]) {
             rows.extend(items.into_iter().map(|(_, r)| r));
@@ -113,13 +115,19 @@ impl AssemblyView {
             let r = |x: f64| (x * 1e6).round() / 1e6;
             (0..4).flat_map(|row| (0..4).map(move |col| (row, col))).map(|(row, col)| r(m.col(col)[row] * if col == 3 && row < 3 { 1e3 } else { 1.0 })).collect::<Vec<f64>>()
         };
-        let instances: Vec<Value> = asm.instances.iter().map(|i| json!({ "name": i.name, "fixed": i.fixed, "transform": transform(placed.get(&i.id).unwrap_or(&i.placement)) })).collect();
+        // Live reads them over REST: a mate dialog's preview isn't stored yet.
+        let previewing = self.mate.is_some();
+        let instances: Vec<Value> = asm.instances.iter().map(|i| json!({ "name": i.name, "fixed": i.fixed, "transform": transform(if previewing { &i.placement } else { placed.get(&i.id).unwrap_or(&i.placement) }) })).collect();
         // As live's REST gives them: the mateType enum ("PIN_SLOT") and the feature status ("OK").
         let mates: Vec<Value> = asm.mates.iter().map(|m| json!({ "name": m.name, "type": m.mate_type.name().to_uppercase().replace(' ', "_"), "status": mate_state(m).to_uppercase() })).collect();
         // A mate selected in the list is a FEATURE (live), listed before the instances.
         let mates_selected = self.selected_mate.into_iter().chain(self.ui.more_mates.iter().copied().filter(|_| self.selected_mate.is_some()));
         let mut items: Vec<Value> = mates_selected.filter_map(|id| asm.mates.iter().find(|m| m.id == id)).map(|m| json!({ "kind": "FEATURE", "owner": m.name })).collect();
         items.extend(asm.instances.iter().filter(|i| self.selected.contains(&i.id)).map(|i| json!({ "kind": "INSTANCE", "owner": i.name })));
+        // A mate dialog's picked connectors are selected (live: implicit mate connector FEATUREs).
+        if let Some(d) = self.mate.as_ref().map(|s| s.dialog.read(cx)) {
+            items.extend([&d.a, &d.b].into_iter().flatten().map(|_| json!({ "kind": "FEATURE", "owner": null })));
+        }
         let dialog = self.mate.as_ref().map(|s| {
             let d = s.dialog.read(cx);
             let complete = d.a.is_some() && d.b.is_some();
@@ -130,7 +138,7 @@ impl AssemblyView {
             })
         });
         // The mate dialog's empty query box has the focus (live: field "Mate connectors").
-        let focus = self.mate.as_ref().map(|s| s.dialog.read(cx)).filter(|d| d.active.is_some()).map(|d| json!({ "kind": "field", "label": if matches!(d.mate_type(), MateType::Tangent) { "Face, edge or vertex" } else if d.mate_type() == MateType::Width { "Tab mate connector(s)" } else { "Mate connectors" } })).unwrap_or_else(|| json!({ "kind": "none" }));
+        let focus = self.mate.as_ref().map(|s| s.dialog.read(cx)).filter(|d| d.active.is_some() && self.ui.mate_field_focus).map(|d| json!({ "kind": "field", "label": if matches!(d.mate_type(), MateType::Tangent) { "Face, edge or vertex" } else if d.mate_type() == MateType::Width { "Tab mate connector(s)" } else { "Mate connectors" } })).unwrap_or_else(|| json!({ "kind": "none" }));
         let doc = self.doc.read(cx);
         json!({
             "focus": focus,

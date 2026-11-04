@@ -325,6 +325,18 @@ impl MateDialog {
         self.active.is_some()
     }
 
+    /// Whether the flip button shows `flip-direction` (else `-opposite`):
+    /// until both connectors are picked it points up-right (live qa5 MT1);
+    /// then `-opposite` while the connectors' Z axes agree (live ui-parity
+    /// asm-fastened-two-faces: two top faces, nothing turned). Tangent shows
+    /// its flag alone.
+    fn flip_icon_on(&self) -> bool {
+        match self.mate_type {
+            MateType::Tangent => self.flip_primary,
+            _ => self.a.is_none() || self.b.is_none() || !self.flip_primary,
+        }
+    }
+
     /// The dialog's fields as the ui-parity runner reads live's (top to
     /// bottom; a query box's items are its chips' text).
     pub fn ui_fields(&self) -> Vec<serde_json::Value> {
@@ -361,7 +373,7 @@ impl MateDialog {
         }
         // Live: the flip is read by its icon (README "toggle"); the help row after it.
         if t != MateType::Width {
-            let flip_shown = self.flip_primary || (t != MateType::Tangent && (self.a.is_none() || self.b.is_none()));
+            let flip_shown = self.flip_icon_on();
             fields.push(json!({ "label": "toggle", "kind": "toggle", "checked": flip_shown, "state": "ok" }));
         }
         fields.push(json!({ "label": null, "kind": "other", "text": "", "state": "ok" }));
@@ -848,15 +860,9 @@ impl Render for MateDialog {
             MateType::Width => vec![self.query_box("mate-q-tab", "Tab mate connector(s)", &[0, 3], cx), self.query_box("mate-q-width", "Width mate connectors", &[1, 2], cx)],
             _ => vec![self.query_box("mate-q-mc", "Mate connectors", &[0, 1], cx)],
         };
-        // Live dialog-mate-revolute: flip-direction-opposite, realign-mate-dialog.
-        // Live (dom/dialog-mate-fastened-empty / -filled): the flip is a
-        // boolean icon parameter shown by its icon, never pressed:
-        // flip-direction while Onshape's flip flag is off, -opposite when on.
-        // Live (qa5 MT1): until both connectors are picked the icon points
-        // up-right, whatever the flag.
-        // Live dom/dialog-mate-tangent-empty / -filled: Tangent shows the flag
-        // alone (-opposite in both).
-        let flip_shown = self.flip_primary || (t != MateType::Tangent && (self.a.is_none() || self.b.is_none()));
+        // Live (dom/dialog-mate-*): the flip is a boolean icon parameter
+        // shown by its icon, never pressed (`flip_icon_on`).
+        let flip_shown = self.flip_icon_on();
         let full_row = !matches!(t, MateType::Tangent | MateType::Width);
         let (flip_icon, reorient_icon) = (crate::assets::icon(flip_icon_name(flip_shown), 20., cx), crate::assets::icon("realign-mate-dialog", 20., cx));
         let small_tool = |id: &'static str, icon: AnyElement, tip: &'static str, on: bool| {
@@ -1070,10 +1076,10 @@ impl Render for MateDialog {
 /// Tangent and Width are separate tools.
 const MATE_TYPE_ORDER: [MateType; 8] = [MateType::Slider, MateType::Cylindrical, MateType::Revolute, MateType::PinSlot, MateType::Planar, MateType::Ball, MateType::Fastened, MateType::Parallel];
 
-/// The Flip primary axis icon for a mate's alignment (`flip_primary`: the
-/// connectors' Z axes agree, which is Onshape's flip flag off).
-pub fn flip_icon_name(flip_primary: bool) -> &'static str {
-    if flip_primary { "flip-direction" } else { "flip-direction-opposite" }
+/// The Flip primary axis icon: `on` = `flip-direction`, else `-opposite`
+/// (see `MateDialog::flip_icon_on`).
+pub fn flip_icon_name(on: bool) -> &'static str {
+    if on { "flip-direction" } else { "flip-direction-opposite" }
 }
 
 #[cfg(test)]

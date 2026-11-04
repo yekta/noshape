@@ -1764,6 +1764,7 @@ impl AssemblyView {
         });
         dialog.update(cx, |d, cx| window.focus(&d.focus_handle(cx), cx));
         self.mate = Some(MateSession { dialog, editing, solve_all: false, hud: None, _sub: sub });
+        self.ui.mate_field_focus = true;
         self.viewport.update(cx, |vp, _| vp.tool_captures_left = false);
         self.schedule_eval(window, cx);
         cx.notify();
@@ -4338,8 +4339,8 @@ impl AssemblyView {
         // Live (assembly/2219): a new mate's row ("Revolute 1", selected, red
         // until both connectors are picked) is in the list while its dialog
         // is open.
-        let new_mate = self.mate.as_ref().filter(|m| m.editing.is_none()).map(|m| m.dialog.read(cx)).filter(|d| !asm.mates.iter().any(|m| m.id == d.id)).map(|d| (d.id, d.mate_type, d.name.clone(), d.a.is_some() && d.b.is_some()));
-        if let Some((id, mate_type, name, complete)) = new_mate.clone() {
+        let new_mate = self.mate.as_ref().filter(|m| m.editing.is_none()).map(|m| m.dialog.read(cx)).filter(|d| !asm.mates.iter().any(|m| m.id == d.id)).map(|d| (d.id, d.mate_type, d.name.clone(), d.a.is_some() && d.b.is_some(), d.a.is_some() || d.b.is_some()));
+        if let Some((id, mate_type, name, complete, _)) = new_mate.clone() {
             let row = self.feature_row(FeatureRow { id, icon: mate_icon(mate_type), name, ok: complete, inactive: false, message: (!complete).then(|| "Mate cannot resolve mate connectors.".to_string()), has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx);
             mate_rows.push(div().bg(pal.accent_soft).child(row).into_any_element());
             mate_ids.push(id);
@@ -4370,7 +4371,8 @@ impl AssemblyView {
         if !filtering || (tree && !mate_rows.is_empty()) {
             rows.push(
                 crate::ui::tree_row("mates-folder", false)
-                    .when(self.selected_mate.is_some_and(|id| asm.mates.iter().any(|m| m.id == id)), related_row)
+                    // Live (ui-parity asm-fastened-two-faces): also while a new mate has a picked connector.
+                    .when(self.selected_mate.is_some_and(|id| asm.mates.iter().any(|m| m.id == id)) || new_mate.as_ref().is_some_and(|m| m.4), related_row)
                     .cursor_pointer()
                     .child(crate::ui::caret(mates_open))
                     // Live (request 1559, cf-6): a red ⬇ disc before the name
@@ -4601,7 +4603,7 @@ impl AssemblyView {
                     .child(type_select)
                     .child(div().flex_1())
                     // Live mate-hud.txt: the same icon as the dialog's flip.
-                    .child(icon_btn("mate-hud-flip", crate::assembly_mate_dialog::flip_icon_name(d2.read(cx).flip_primary), "Flip primary axis", cx).on_click(move |_, _, cx| d2.update(cx, |d, cx| d.flip(cx))))
+                    .child(icon_btn("mate-hud-flip", crate::assembly_mate_dialog::flip_icon_name(!d2.read(cx).flip_primary), "Flip primary axis", cx).on_click(move |_, _, cx| d2.update(cx, |d, cx| d.flip(cx))))
                     .child(icon_btn("mate-hud-reorient", "flip-circular-opposite", "Reorient secondary axis", cx).on_click(move |_, _, cx| d3.update(cx, |d, cx| d.reorient(cx))))
                     .child(
                         div()

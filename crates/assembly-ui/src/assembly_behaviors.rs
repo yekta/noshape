@@ -270,6 +270,9 @@ pub struct AsmUi {
     /// The graphics menu opened on the selected instance's triad or face:
     /// it starts with Move to origin (live ~14029; ASM-TRIAD-MENU).
     pub menu_handle: Option<ManipHandle>,
+    /// The mate dialog's connectors box holds the page focus (live's DOM
+    /// focus): from its opening until a click in the graphics area.
+    pub mate_field_focus: bool,
     /// Make transparent (Shift+T): instances drawn transparent.
     pub transparent: Option<noshape_model::assembly::OccurrenceSet>,
     /// S shortcut toolbar position (viewport-local).
@@ -702,6 +705,7 @@ impl AssemblyView {
     /// A click in the graphics area leaves text fields (like Onshape): the
     /// open mate dialog keeps the keyboard (Enter, a), else the view takes it.
     pub(super) fn focus_from_viewport(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.ui.mate_field_focus = false;
         if let Some(d) = self.mate.as_ref().map(|m| m.dialog.clone()) {
             let fh = d.read(cx).focus_handle(cx);
             if !fh.is_focused(window) {
