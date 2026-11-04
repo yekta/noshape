@@ -45,6 +45,9 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   pipeflange's countersink rims (the cone's and the hole cylinder's seams would have to move together; ticket).
 
 **State 11-04 13:23 UTC.**
+- From dx (11-04 20:52): kernel: `Shape::faces_oriented_consistently` (common.cpp, ShapeFix_Shell over all faces) for
+  the host's sheet unions (590dc30e). cf-sheet-metal-hem now stops at your native Offset surface 1: 8 sheets where
+  live makes 2 (its "Surface 1" 9/20/12: the hem part's faces offset as one connected sheet).
 - From dx (11-04 19:53): cf-spur-gear (×1.8 live after dx's fix of its extra part): every slow millisecond is in
   core's kernel operations; the FeatureScript side and the host take ~3 ms per gear. NOSHAPE_PERF, one run on vibe5:
   Boolean 2 (Cut × 1 tool) kernel 698 ms + unify 887 ms (the unify alone is 40 % of live's whole document,
