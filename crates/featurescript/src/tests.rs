@@ -35,6 +35,26 @@ fn every_shipped_standard_library_unpacks_and_parses() {
 
 /// Every shipped release compiles (geometry.fs and what it imports: a release's modules import its own, whatever
 /// version their imports name: 3044's box.fs names math.fs at 3008).
+/// The older releases' packs are made against the embedded release's bytes: a checkout that turns std's line ends
+/// into CRLF (git's text conversion on Windows, without .gitattributes' `-text`) fails here on every platform, not
+/// only when a pack unpacks on Windows.
+#[test]
+fn the_embedded_standard_library_has_no_carriage_returns() {
+    let crlf: Vec<&str> = crate::STD_SOURCES.iter().filter(|(_, src)| src.contains('\r')).map(|(name, _)| *name).collect();
+    assert!(crlf.is_empty(), "carriage returns in {crlf:?} (.gitattributes: -text on crates/featurescript/std/**)");
+}
+
+/// A pack that doesn't unpack (made against other bytes) and a release not shipped are errors, never a panic.
+#[test]
+fn a_pack_that_does_not_unpack_is_an_error() {
+    let (_, pack) = crate::STD_PACKS[0];
+    let mut bad = pack.to_vec();
+    let mid = bad.len() / 2;
+    bad[mid] ^= 0xff;
+    assert!(crate::unpack(&bad).is_err());
+    assert_eq!(crate::std_files(1).err().as_deref(), Some("Standard library 1 is not available"));
+}
+
 #[test]
 fn every_shipped_standard_library_compiles() {
     let failures: Vec<String> = crate::std_versions()

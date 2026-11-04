@@ -261,6 +261,9 @@ fn load_std(version: u32, name: &str, cache: &mut StdCache, pending: Option<&Pen
         return Ok(m.clone());
     }
     let path: Arc<str> = format!("{STD_PREFIX}{name}").into();
+    if let Err(message) = crate::std_files(version) {
+        return Err(vec![CompileError { module: path, pos: Pos::default(), message, parse: false, level: Level::Error }]);
+    }
     let Some(src) = crate::std_source_at(version, name) else {
         return Err(vec![CompileError { module: path, pos: Pos::default(), message: format!("Standard library module {name} not found"), parse: false, level: Level::Error }]);
     };

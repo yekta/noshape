@@ -53,21 +53,27 @@ pub fn std_version_for(version: u32) -> u32 {
 }
 
 /// Every module (file name, source) of a shipped release, sorted by name; an older release is unpacked the first
-/// time it's asked for (only studios that pin one pay for it).
-pub fn std_files(version: u32) -> Option<&'static [(&'static str, &'static str)]> {
-    type Unpacked = std::collections::HashMap<u32, &'static [(&'static str, &'static str)]>;
+/// time it's asked for (only studios that pin one pay for it). A release that doesn't unpack (its pack made against
+/// other bytes of the embedded release: a CRLF checkout) is an error for the studio that pins it, never a panic.
+pub fn std_files(version: u32) -> Result<&'static [(&'static str, &'static str)], String> {
+    type Unpacked = std::collections::HashMap<u32, Result<&'static [(&'static str, &'static str)], String>>;
     static UNPACKED: std::sync::LazyLock<parking_lot::Mutex<Unpacked>> = std::sync::LazyLock::new(Default::default);
     if version == STD_VERSION {
-        return Some(STD_SOURCES);
+        return Ok(STD_SOURCES);
     }
-    let (_, pack) = STD_PACKS.iter().find(|(v, _)| *v == version)?;
+    let Some((_, pack)) = STD_PACKS.iter().find(|(v, _)| *v == version) else {
+        return Err(format!("Standard library {version} is not available"));
+    };
     let mut unpacked = UNPACKED.lock();
-    if let Some(files) = unpacked.get(&version) {
-        return Some(files);
-    }
-    let files: &'static [(&'static str, &'static str)] = Vec::leak(unpack(pack).unwrap_or_else(|e| panic!("std {version}: {e}")));
-    unpacked.insert(version, files);
-    Some(files)
+    unpacked
+        .entry(version)
+        .or_insert_with(|| {
+            unpack(pack).map(|files| &*Vec::leak(files)).map_err(|e| {
+                log::error!("std {version}: {e}");
+                format!("Standard library {version} could not be loaded")
+            })
+        })
+        .clone()
 }
 
 /// The modules of a packed release: `pack` decompressed with the embedded release's blob as its zstd prefix, then
@@ -110,7 +116,7 @@ fn blob(files: &[(&str, &str)]) -> Vec<u8> {
 
 /// Source of a standard library module at a shipped release.
 pub fn std_source_at(version: u32, name: &str) -> Option<&'static str> {
-    let files = std_files(version)?;
+    let files = std_files(version).ok()?;
     files.binary_search_by(|(n, _)| (*n).cmp(name)).ok().map(|i| files[i].1)
 }
 
