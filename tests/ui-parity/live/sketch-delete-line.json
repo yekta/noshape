@@ -1,6 +1,6 @@
 {
  "scenario": "sketch-delete-line",
- "recorded": "2026-11-03T21:08:53.405Z",
+ "recorded": "2026-11-04T02:42:51.992Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "eda38996f7e09b8a2c266c50",
+  "element": "9bc2ab813aabb809e820e53d",
   "start": "empty",
   "startElement": "16c3ef729d456774c1da81b8"
  },
@@ -139,7 +139,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 41709
+   "t": 28461
   },
   {
    "step": 2,
@@ -152,7 +152,7 @@
    "ok": true,
    "at": [
     1083,
-    667
+    568
    ],
    "state": {
     "focus": {
@@ -245,7 +245,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 49311
+   "t": 35730
   },
   {
    "step": 3,
@@ -345,7 +345,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 52520
+   "t": 39068
   },
   {
    "step": 4,
@@ -456,7 +456,7 @@
      "dimensions": []
     }
    },
-   "t": 58474
+   "t": 45470
   },
   {
    "step": 5,
@@ -570,7 +570,7 @@
      "dimensions": []
     }
    },
-   "t": 67055
+   "t": 52941
   },
   {
    "step": 6,
@@ -674,7 +674,7 @@
      "dimensions": []
     }
    },
-   "t": 69243
+   "t": 56238
   },
   {
    "step": 7,
@@ -753,8 +753,63 @@
     ],
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": null,
+       "id": "JFB",
+       "raw": {
+        "ctor": "M",
+        "keys": [
+         "selectionId",
+         "occurrence",
+         "source",
+         "childSelections",
+         "secondarySelectionData",
+         "suppressInteriorHighlight",
+         "sourcePick",
+         "entityMetaData",
+         "featureType",
+         "isChildFeature",
+         "isInSMFlat",
+         "bodyMetaData",
+         "meshPointData",
+         "entityInferenceData",
+         "isPartStudioMateConnector",
+         "usage",
+         "action",
+         "mateDOFType",
+         "mateType",
+         "occurrenceTypes",
+         "suppressed",
+         "partStudioInstanceType",
+         "tableRowId",
+         "deterministicIdList",
+         "featureIdList",
+         "name",
+         "subfeatureId",
+         "inContextImports",
+         "patternedOccurrence",
+         "annotationType",
+         "annotationId",
+         "dimensionSelectionDetails",
+         "calloutSelectionDetails",
+         "annotationSelectionDetails",
+         "inContextEntityData",
+         "id",
+         "cid",
+         "type",
+         "featureId",
+         "isAssemblyDerivedFeature"
+        ],
+        "type": 0,
+        "meta": "{\"_serializedByteLength\":0,\"isPreviewEntity\":false,\"featureIds\":[\"FzouN3W1F4SJJNN_0\"],\"geometries\":[{\"_serializedByteLength\":0,\"settingIndex\":3,\"errorCode\":0,\"points\":{},\"isInternalEdge\":false,\"edgeType\":1,\"isClosed\":false,\"compressedPoints\":{},\"edgeSmoothnessStatus\":2,\"meshState\":0}],\"domainSpecificMetadata\":[],\"meshIncrement\":{\"primitiveType\":1,\"points\":{\"0\":0,\"1\":0,\"2\":0,\"3\":0.02964196540415287,\"4\":0,\"5\":0,\"6\":0.02964196540415287,\"7\":0,\"8\":0,\"9\":0,\"10\":0,\"11\":0},\"properties\":{\"indices\":{\"0\":0,\"1\":1,\"2\":2,\"3\":0,\"4\":2,\"5\":3},\"pickId\":[6],\"ownerId\":\"34\",\"boundingBox\":{\"min\":[0,0,0],\"max\":[0.02",
+        "getEntityType": "1",
+        "getType": "0"
+       }
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -763,9 +818,9 @@
        "state": "ok",
        "selected": true,
        "editing": true,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": "edited selected"
+       "cls": "related-highlight edited selected"
       }
      ],
      "rollbackAfter": "Sketch 1"
@@ -790,7 +845,7 @@
      "dimensions": []
     }
    },
-   "t": 73419
+   "t": 60216
   },
   {
    "step": 8,
@@ -884,17 +939,12 @@
     "tooltip": null,
     "sketch": {
      "tool": null,
-     "entities": [
-      "line"
-     ],
-     "constraints": [
-      "COINCIDENT",
-      "HORIZONTAL"
-     ],
+     "entities": [],
+     "constraints": [],
      "dimensions": []
     }
    },
-   "t": 75262
+   "t": 62807
   }
  ]
 }

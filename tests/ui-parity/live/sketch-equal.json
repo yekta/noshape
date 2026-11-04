@@ -1,6 +1,6 @@
 {
  "scenario": "sketch-equal",
- "recorded": "2026-11-03T21:32:50.708Z",
+ "recorded": "2026-11-04T02:31:20.141Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "f82d66b6f5e48e3eafb32de1",
+  "element": "84699f1c858aa6a4badf8bdf",
   "start": "empty",
   "startElement": "16c3ef729d456774c1da81b8"
  },
@@ -139,7 +139,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 54004
+   "t": 44742
   },
   {
    "step": 2,
@@ -152,7 +152,7 @@
    "ok": true,
    "at": [
     1083,
-    667
+    568
    ],
    "state": {
     "focus": {
@@ -245,7 +245,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 75040
+   "t": 50805
   },
   {
    "step": 3,
@@ -345,7 +345,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 81615
+   "t": 54700
   },
   {
    "step": 4,
@@ -456,7 +456,7 @@
      "dimensions": []
     }
    },
-   "t": 96095
+   "t": 61783
   },
   {
    "step": 5,
@@ -570,7 +570,7 @@
      "dimensions": []
     }
    },
-   "t": 105171
+   "t": 70501
   },
   {
    "step": 6,
@@ -674,7 +674,7 @@
      "dimensions": []
     }
    },
-   "t": 108095
+   "t": 73865
   },
   {
    "step": 7,
@@ -778,7 +778,7 @@
      "dimensions": []
     }
    },
-   "t": 111086
+   "t": 76630
   },
   {
    "step": 8,
@@ -894,7 +894,7 @@
      "dimensions": []
     }
    },
-   "t": 127140
+   "t": 84614
   },
   {
    "step": 9,
@@ -1011,7 +1011,7 @@
      "dimensions": []
     }
    },
-   "t": 141459
+   "t": 93678
   },
   {
    "step": 10,
@@ -1118,7 +1118,7 @@
      "dimensions": []
     }
    },
-   "t": 143657
+   "t": 97146
   },
   {
    "step": 11,
@@ -1225,7 +1225,7 @@
      "dimensions": []
     }
    },
-   "t": 145486
+   "t": 100478
   },
   {
    "step": 12,
@@ -1350,7 +1350,7 @@
      "dimensions": []
     }
    },
-   "t": 151771
+   "t": 105821
   },
   {
    "step": 13,
@@ -1480,7 +1480,7 @@
      "dimensions": []
     }
    },
-   "t": 162506
+   "t": 110735
   },
   {
    "step": 14,
@@ -1588,7 +1588,7 @@
      "dimensions": []
     }
    },
-   "t": 167493
+   "t": 113811
   }
  ]
 }

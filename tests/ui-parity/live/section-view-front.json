@@ -1,6 +1,6 @@
 {
  "scenario": "section-view-front",
- "recorded": "2026-11-04T00:56:15.946Z",
+ "recorded": "2026-11-04T03:08:07.015Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "3e7216c54f06f2a2f235147d",
+  "element": "fd5d5d9127ec22f37e79abfa",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -68,8 +68,74 @@
      "button": "Section view"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"button\":\"Section view\"}",
+   "ok": true,
+   "at": [
+    1793,
+    596
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Section planes"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": "Select a plane, planar face, cylinder, cone, or mate connector. × Close",
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 34854
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "plane": "Front"
+    }
+   },
+   "ok": true,
+   "at": [
+    89,
+    235
+   ],
    "state": {
     "focus": {
      "kind": "none"
@@ -116,74 +182,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 21941
-  },
-  {
-   "step": 2,
-   "do": {
-    "do": "click",
-    "on": {
-     "plane": "Front"
-    }
-   },
-   "ok": true,
-   "at": [
-    89,
-    235
-   ],
-   "state": {
-    "focus": {
-     "kind": "none"
-    },
-    "dialog": null,
-    "dialogs": [],
-    "list": null,
-    "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "PLANE",
-       "owner": "Front",
-       "id": "JCC"
-      }
-     ]
-    },
-    "features": {
-     "rows": [
-      {
-       "name": "Sketch 1",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": true,
-       "cls": "ns-list-item-hidden"
-      },
-      {
-       "name": "Extrude 1",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      }
-     ],
-     "rollbackAfter": "Extrude 1"
-    },
-    "parts": [
-     "Part 1"
-    ],
-    "partsHeading": "Parts (1)",
-    "undo": {
-     "undo": false,
-     "redo": false
-    },
-    "message": null,
-    "tooltip": null,
-    "sketch": null
-   },
-   "t": 27639
+   "t": 43756
   },
   {
    "step": 3,
@@ -200,14 +199,8 @@
     "dialogs": [],
     "list": null,
     "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "PLANE",
-       "owner": "Front",
-       "id": "JCC"
-      }
-     ]
+     "count": 0,
+     "items": []
     },
     "features": {
      "rows": [
@@ -244,7 +237,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 29561
+   "t": 45679
   }
  ]
 }

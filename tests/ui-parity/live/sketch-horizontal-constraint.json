@@ -1,6 +1,6 @@
 {
  "scenario": "sketch-horizontal-constraint",
- "recorded": "2026-11-03T21:47:03.607Z",
+ "recorded": "2026-11-04T02:33:24.507Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "7c471a3ed92df5c492032aeb",
+  "element": "de33cdf484683a6668641e91",
   "start": "empty",
   "startElement": "16c3ef729d456774c1da81b8"
  },
@@ -139,7 +139,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 69383
+   "t": 45931
   },
   {
    "step": 2,
@@ -245,7 +245,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 75840
+   "t": 53454
   },
   {
    "step": 3,
@@ -345,7 +345,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 79410
+   "t": 57192
   },
   {
    "step": 4,
@@ -456,7 +456,7 @@
      "dimensions": []
     }
    },
-   "t": 85966
+   "t": 63881
   },
   {
    "step": 5,
@@ -569,7 +569,7 @@
      "dimensions": []
     }
    },
-   "t": 94425
+   "t": 73760
   },
   {
    "step": 6,
@@ -672,7 +672,7 @@
      "dimensions": []
     }
    },
-   "t": 97726
+   "t": 77122
   },
   {
    "step": 7,
@@ -793,7 +793,7 @@
      "dimensions": []
     }
    },
-   "t": 102477
+   "t": 81917
   },
   {
    "step": 8,
@@ -897,7 +897,7 @@
      "dimensions": []
     }
    },
-   "t": 107540
+   "t": 85597
   }
  ]
 }

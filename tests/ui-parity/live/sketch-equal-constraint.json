@@ -1,6 +1,6 @@
 {
  "scenario": "sketch-equal-constraint",
- "recorded": "2026-11-03T21:36:04.380Z",
+ "recorded": "2026-11-04T02:29:14.725Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "962d647af68421a9f866eb65",
+  "element": "2b1eab7a29d8c2dbc673c9d8",
   "start": "empty",
   "startElement": "16c3ef729d456774c1da81b8"
  },
@@ -139,7 +139,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 68077
+   "t": 67301
   },
   {
    "step": 2,
@@ -245,7 +245,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 84745
+   "t": 75594
   },
   {
    "step": 3,
@@ -345,7 +345,7 @@
      "error": "sketch model not reached"
     }
    },
-   "t": 89926
+   "t": 78970
   },
   {
    "step": 4,
@@ -456,7 +456,7 @@
      "dimensions": []
     }
    },
-   "t": 107266
+   "t": 85585
   },
   {
    "step": 5,
@@ -570,7 +570,7 @@
      "dimensions": []
     }
    },
-   "t": 123146
+   "t": 94311
   },
   {
    "step": 6,
@@ -674,7 +674,7 @@
      "dimensions": []
     }
    },
-   "t": 126701
+   "t": 97661
   },
   {
    "step": 7,
@@ -778,7 +778,7 @@
      "dimensions": []
     }
    },
-   "t": 129747
+   "t": 99905
   },
   {
    "step": 8,
@@ -894,7 +894,7 @@
      "dimensions": []
     }
    },
-   "t": 139171
+   "t": 106092
   },
   {
    "step": 9,
@@ -1011,7 +1011,7 @@
      "dimensions": []
     }
    },
-   "t": 151340
+   "t": 114821
   },
   {
    "step": 10,
@@ -1118,7 +1118,7 @@
      "dimensions": []
     }
    },
-   "t": 154930
+   "t": 118168
   },
   {
    "step": 11,
@@ -1243,7 +1243,7 @@
      "dimensions": []
     }
    },
-   "t": 164648
+   "t": 123832
   },
   {
    "step": 12,
@@ -1373,7 +1373,7 @@
      "dimensions": []
     }
    },
-   "t": 175466
+   "t": 129977
   },
   {
    "step": 13,
@@ -1481,7 +1481,7 @@
      "dimensions": []
     }
    },
-   "t": 180778
+   "t": 133549
   },
   {
    "step": 14,
@@ -1589,7 +1589,7 @@
      "dimensions": []
     }
    },
-   "t": 187364
+   "t": 136814
   }
  ]
 }

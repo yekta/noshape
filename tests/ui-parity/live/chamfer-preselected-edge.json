@@ -1,6 +1,6 @@
 {
  "scenario": "chamfer-preselected-edge",
- "recorded": "2026-11-03T23:33:03.802Z",
+ "recorded": "2026-11-04T03:10:16.148Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "76889070dae48b165d169156",
+  "element": "59360ca268886ee2e5983b7a",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -56,7 +56,7 @@
    "redo": false
   },
   "message": null,
-  "tooltip": null,
+  "tooltip": "Create new sketch (shift+s)",
   "sketch": null
  },
  "steps": [
@@ -66,7 +66,7 @@
     "do": "click",
     "on": {
      "edge": [
-      20,
+      10,
       0,
       10
      ]
@@ -74,18 +74,68 @@
    },
    "ok": true,
    "hover": [
-    "JHV"
+    "JDC"
    ],
    "at": [
-    1142,
-    506
+    1112,
+    498
    ],
    "state": {
     "focus": {
      "kind": "none"
     },
-    "dialog": null,
-    "dialogs": [],
+    "dialog": {
+     "title": "Sketch 2",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 2",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
     "list": null,
     "selection": {
      "count": 1,
@@ -116,23 +166,38 @@
        "related": true,
        "hidden": false,
        "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
       }
      ],
-     "rollbackAfter": "Extrude 1"
+     "rollbackAfter": "Sketch 2"
     },
     "parts": [
      "Part 1"
     ],
     "partsHeading": "Parts (1)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": {
+     "tool": null,
+     "entities": null,
+     "constraints": null,
+     "dimensions": null,
+     "error": "sketch model not reached"
+    }
    },
-   "t": 59254
+   "t": 55257
   },
   {
    "step": 2,
@@ -143,101 +208,65 @@
     }
    },
    "ok": true,
+   "via": "search tools",
    "at": [
-    463,
+    1593,
     58
    ],
    "state": {
     "focus": {
-     "kind": "field",
-     "tag": "div",
-     "label": "Entities to chamfer",
-     "dialog": "Chamfer 1"
+     "kind": "none"
     },
     "dialog": {
-     "title": "Chamfer 1",
-     "titleState": "error",
-     "kind": "feature",
+     "title": "Sketch 2",
+     "titleState": "ok",
+     "kind": "sketch",
      "tabs": [],
      "fields": [
       {
-       "label": "Entities to chamfer",
+       "label": "Sketch plane",
        "kind": "query",
-       "items": [],
-       "active": true,
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
        "state": "ok"
       },
       {
-       "label": "Measurement",
-       "kind": "enum",
-       "text": "Offset",
-       "state": "ok"
-      },
-      {
-       "label": "Chamfer type",
-       "kind": "enum",
-       "text": "Equal distance",
-       "state": "ok"
-      },
-      {
-       "label": "Distance",
-       "kind": "number",
-       "text": "5 mm",
-       "focused": false,
-       "state": "ok"
-      },
-      {
-       "label": "Tangent propagation",
+       "label": "Disable imprinting",
        "kind": "boolean",
-       "checked": true,
+       "checked": false,
        "state": "ok"
       }
      ],
      "error": null,
-     "ok": "disabled"
+     "ok": "enabled"
     },
     "dialogs": [
      {
-      "title": "Chamfer 1",
-      "titleState": "error",
-      "kind": "feature",
+      "title": "Sketch 2",
+      "titleState": "ok",
+      "kind": "sketch",
       "tabs": [],
       "fields": [
        {
-        "label": "Entities to chamfer",
+        "label": "Sketch plane",
         "kind": "query",
-        "items": [],
-        "active": true,
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
         "state": "ok"
        },
        {
-        "label": "Measurement",
-        "kind": "enum",
-        "text": "Offset",
-        "state": "ok"
-       },
-       {
-        "label": "Chamfer type",
-        "kind": "enum",
-        "text": "Equal distance",
-        "state": "ok"
-       },
-       {
-        "label": "Distance",
-        "kind": "number",
-        "text": "5 mm",
-        "focused": false,
-        "state": "ok"
-       },
-       {
-        "label": "Tangent propagation",
+        "label": "Disable imprinting",
         "kind": "boolean",
-        "checked": true,
+        "checked": false,
         "state": "ok"
        }
       ],
       "error": null,
-      "ok": "disabled"
+      "ok": "enabled"
      }
     ],
     "list": null,
@@ -266,30 +295,35 @@
        "cls": ""
       },
       {
-       "name": "Chamfer 1",
-       "state": "error",
+       "name": "Sketch 2",
+       "state": "ok",
        "selected": true,
        "editing": true,
        "related": false,
        "hidden": false,
-       "cls": "edited selected ns-list-item-error"
+       "cls": "edited selected"
       }
      ],
-     "rollbackAfter": "Chamfer 1"
+     "rollbackAfter": "Sketch 2"
     },
     "parts": [
      "Part 1"
     ],
     "partsHeading": "Parts (1)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": {
+     "tool": "Sketch chamfer",
+     "entities": [],
+     "constraints": [],
+     "dimensions": []
+    }
    },
-   "t": 69895
+   "t": 64148
   }
  ]
 }
