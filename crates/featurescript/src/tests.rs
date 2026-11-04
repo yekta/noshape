@@ -112,6 +112,45 @@ fn arithmetic_and_strings() {
     assert_eq!(run_str("function f() { var x = undefined; return x ?? 5; }"), "5");
 }
 
+/// Operator precedence as live answers it (behaviours.md "FeatureScript precedence", request 1999): `is` / `as`
+/// below `==` and above `&&`, `~` looser than all of them, even `||`.
+#[test]
+fn precedence_is_lives() {
+    let cases = [
+        ("1 + 1 is number", "true"),
+        ("\"a\" ~ 1 is string", "afalse"),
+        ("1 < 2 is boolean", "true"),
+        ("1 == 1 is boolean", "true"),
+        ("2 + 2 as number", "4"),
+        ("\"a\" ~ 1 == 1", "atrue"),
+        ("true && 1 is number", "true"),
+        ("false || 1 is boolean", "false"),
+        ("2 * 3 is number", "true"),
+        ("\"a\" ~ 2 + 2", "a4"),
+        ("\"a\" ~ 2 as number", "a2"),
+        ("1 is number ? \"y\" : \"n\"", "y"),
+        ("!true is boolean", "true"),
+        ("1 is number == true", "true"),
+        ("\"a\" ~ 1 < 2", "atrue"),
+        ("1 + 1 as number is number", "true"),
+        ("1 is number is boolean", "true"),
+        ("\"a\" ~ true && false", "afalse"),
+        ("\"a\" ~ false || true", "atrue"),
+        ("2 * 3 as number", "6"),
+        ("2 ^ 2 is number", "true"),
+        ("1 is number && 2 is number", "true"),
+        ("1 == 1 as boolean", "true"),
+        ("1 < 2 as boolean", "true"),
+        ("-1 is number", "true"),
+        ("true ? 1 : 2 is number", "1"),
+        ("1 != 2 is boolean", "true"),
+        ("5 % 3 is number", "true"),
+    ];
+    for (expr, want) in cases {
+        assert_eq!(run_str(&format!("function f() {{ return {expr}; }}")), want, "{expr}");
+    }
+}
+
 /// String literals: plain runs, escapes after and between them, either
 /// quote, and an unterminated string's error.
 #[test]

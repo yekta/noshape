@@ -73,6 +73,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     `matrix(result) * meter ^ -2 as MatrixWithUnits` tagged meter ^ -2 alone). T1 ops_harness torusCurvature: a torus's
     curvatures and R sin φ / (r (R + r cos φ)²); parser::tests::expressions. Live asked for the exact level of
     `is` / `as` between `&&` and `*` (REQUESTS 16:17).)
+    dx 11-04 18:15: live's answer (behaviours.md "FeatureScript precedence", request 1999): `is` / `as` sit just
+    below `==` and above `&&`, and `~` is looser than every binary operator, even `||`; the parser now has live's
+    order (T1 tests::precedence_is_lives: live's 28 expressions).
     P1 FS-NATIVE-EVFACECURVATUREDERIVATIVES @evFaceCurvatureDerivatives: std's bridgingCurve (Bridging curve always
     runs by std when the host is loaded) through evFaceCurvatureDerivative.
   - [ ] P1 FS-NATIVE-OPSMFLATOPERATION (dx 11-04 17:32: its only caller is std's SMFlatOp, the feature a sketch on a

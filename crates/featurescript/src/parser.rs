@@ -637,58 +637,60 @@ impl<'a> Parser<'a> {
         Ok(cond)
     }
 
-    /// Binary operators by level: 0 `??`, 1 `||`, 2 `&&`, 3 `== !=`,
-    /// 4 `< > <= >=`, 5 `~` (below `+`: `"n " ~ i + 1` is `"n " ~ (i + 1)`),
-    /// 6 `+ -`, 7 `is as` (postfix, below `*`: std's `matrix(r) * meter ^ -2 as MatrixWithUnits` tags the product;
-    /// `p as Vector * meter` is `(p as Vector) * meter`), 8 `* / %`, then unary.
+    /// Binary operators by level (live, behaviours.md "FeatureScript precedence", request 1999): 0 `??`, 1 `~`
+    /// (looser than all the others: `"a" ~ 1 == 1` is `"a" ~ (1 == 1)`), 2 `||`, 3 `&&`, 4 `is as` (postfix: std's
+    /// `matrix(r) * meter ^ -2 as MatrixWithUnits` tags the product; `x == undefined || x is array`), 5 `== !=`,
+    /// 6 `< > <= >=`, 7 `+ -`, 8 `* / %`, then unary. A tighter operator after `is` / `as` takes the type
+    /// expression as its left operand (`p as Vector * meter`, `1 is number == true`).
     fn binary(&mut self, level: u8) -> PResult<Expr> {
         if level == 9 {
             return self.unary();
         }
-        let mut lhs = self.binary(level + 1)?;
+        let lhs = self.binary(level + 1)?;
+        self.binary_after(level, lhs)
+    }
+
+    /// The operator at `level` (with its operands' tighter ones), `lhs` parsed.
+    fn binary_op(&self, level: u8) -> Option<BinOp> {
+        Some(match (level, self.peek()) {
+            (0, Tok::Op(Op::Coalesce)) => BinOp::Coalesce,
+            (1, Tok::Op(Op::Tilde)) => BinOp::Cat,
+            (2, Tok::Op(Op::Or)) => BinOp::Or,
+            (3, Tok::Op(Op::And)) => BinOp::And,
+            (5, Tok::Op(Op::Eq)) => BinOp::Eq,
+            (5, Tok::Op(Op::Ne)) => BinOp::Ne,
+            (6, Tok::Op(Op::Lt)) => BinOp::Lt,
+            (6, Tok::Op(Op::Gt)) => BinOp::Gt,
+            (6, Tok::Op(Op::Le)) => BinOp::Le,
+            (6, Tok::Op(Op::Ge)) => BinOp::Ge,
+            (7, Tok::Op(Op::Plus)) => BinOp::Add,
+            (7, Tok::Op(Op::Minus)) => BinOp::Sub,
+            (8, Tok::Op(Op::Star)) => BinOp::Mul,
+            (8, Tok::Op(Op::Slash)) => BinOp::Div,
+            (8, Tok::Op(Op::Percent)) => BinOp::Mod,
+            _ => return None,
+        })
+    }
+
+    /// The rest of an expression at `level` whose first operand is `lhs`.
+    fn binary_after(&mut self, level: u8, mut lhs: Expr) -> PResult<Expr> {
         loop {
             let pos = lhs.pos;
-            if level == 7 {
-                if self.is_kw(Kw::Is) || self.is_kw(Kw::As) {
-                    let is = self.is_kw(Kw::Is);
-                    self.bump();
-                    let ty = self.type_name()?;
-                    lhs = Expr::new(pos, if is { ExprKind::Is(lhs, ty) } else { ExprKind::As(lhs, ty) });
-                    continue;
-                }
-                // `* / %` after a type expression take it as their left operand (`(p as Vector) * meter`).
-                let op = match self.peek() {
-                    Tok::Op(Op::Star) => BinOp::Mul,
-                    Tok::Op(Op::Slash) => BinOp::Div,
-                    Tok::Op(Op::Percent) => BinOp::Mod,
-                    _ => return Ok(lhs),
-                };
-                if !matches!(&*lhs.kind, ExprKind::Is(..) | ExprKind::As(..) | ExprKind::Binary(BinOp::Mul | BinOp::Div | BinOp::Mod, ..)) {
+            if level == 4 {
+                if !(self.is_kw(Kw::Is) || self.is_kw(Kw::As)) {
                     return Ok(lhs);
                 }
+                let is = self.is_kw(Kw::Is);
                 self.bump();
-                let rhs = self.binary(9)?;
-                lhs = Expr::new(pos, ExprKind::Binary(op, lhs, rhs));
+                let ty = self.type_name()?;
+                lhs = Expr::new(pos, if is { ExprKind::Is(lhs, ty) } else { ExprKind::As(lhs, ty) });
+                // The tighter operators after it, tightest first.
+                for l in (5..9).rev() {
+                    lhs = self.binary_after(l, lhs)?;
+                }
                 continue;
             }
-            let op = match (level, self.peek()) {
-                (0, Tok::Op(Op::Coalesce)) => BinOp::Coalesce,
-                (1, Tok::Op(Op::Or)) => BinOp::Or,
-                (2, Tok::Op(Op::And)) => BinOp::And,
-                (3, Tok::Op(Op::Eq)) => BinOp::Eq,
-                (3, Tok::Op(Op::Ne)) => BinOp::Ne,
-                (4, Tok::Op(Op::Lt)) => BinOp::Lt,
-                (4, Tok::Op(Op::Gt)) => BinOp::Gt,
-                (4, Tok::Op(Op::Le)) => BinOp::Le,
-                (4, Tok::Op(Op::Ge)) => BinOp::Ge,
-                (5, Tok::Op(Op::Tilde)) => BinOp::Cat,
-                (6, Tok::Op(Op::Plus)) => BinOp::Add,
-                (6, Tok::Op(Op::Minus)) => BinOp::Sub,
-                (8, Tok::Op(Op::Star)) => BinOp::Mul,
-                (8, Tok::Op(Op::Slash)) => BinOp::Div,
-                (8, Tok::Op(Op::Percent)) => BinOp::Mod,
-                _ => return Ok(lhs),
-            };
+            let Some(op) = self.binary_op(level) else { return Ok(lhs) };
             self.bump();
             let rhs = self.binary(level + 1)?;
             // Located at the left operand's start, like Onshape's notices.
@@ -1057,6 +1059,10 @@ export const myFeature = defineFeature(function(context is Context, id is Id, de
         assert!(matches!(&*e.kind, ExprKind::As(x, _) if matches!(&*x.kind, ExprKind::Binary(BinOp::Mul, ..))));
         let e = parse_expr("a == undefined || a is array").unwrap();
         assert!(matches!(&*e.kind, ExprKind::Binary(BinOp::Or, _, r) if matches!(&*r.kind, ExprKind::Is(..))));
+        let e = parse_expr("a == b as T").unwrap();
+        assert!(matches!(&*e.kind, ExprKind::As(x, _) if matches!(&*x.kind, ExprKind::Binary(BinOp::Eq, ..))));
+        let e = parse_expr("s ~ a || b").unwrap();
+        assert!(matches!(&*e.kind, ExprKind::Binary(BinOp::Cat, _, r) if matches!(&*r.kind, ExprKind::Binary(BinOp::Or, ..))));
         let e = parse_expr("x => { 'k' : x }").unwrap();
         assert!(matches!(&*e.kind, ExprKind::Lambda(f) if matches!(f.body, Body::Expr(_))));
         let e = parse_expr("try silent(f(x))").unwrap();
