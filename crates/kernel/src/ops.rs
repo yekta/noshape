@@ -464,6 +464,12 @@ pub fn fillet_checked(shape: &Shape, edges: &[Shape], radii: &[f64]) -> Result<O
     recorded(|| Blend::Fillet { radii: radii.to_vec() }, true, shape, edges, &[], || op(ffi::op_fillet(shape.raw(), &l, radii, true)))
 }
 
+/// Whether noshape's own blend makes this fillet (nothing is kept: a caller deciding how to split one).
+pub fn fillet_rust_accepts(shape: &Shape, edges: &[Shape], radii: &[f64]) -> bool {
+    let l = vec_to_list(edges);
+    ffi::fillet_rust_accepts(shape.raw(), &l, radii)
+}
+
 /// Variable-radius fillet of one edge: `(relative parameter in [0, 1],
 /// radius)` pairs, increasing parameters.
 pub fn fillet_variable(shape: &Shape, edge: &Shape, law: &[(f64, f64)]) -> Result<OpResult> {

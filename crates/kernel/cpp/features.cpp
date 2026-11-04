@@ -5366,6 +5366,33 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
   }
 }
 
+// Whether noshape's own blend makes this fillet (nothing kept: a caller deciding how to split it).
+bool fillet_rust_accepts(const OcShape& s, const OcShapeList& edges, rust::Slice<const double> radii)
+{
+  if (s.shape.IsNull() || edges.items.empty() || (radii.size() != 1 && radii.size() != edges.items.size()))
+    return false;
+  try
+  {
+    std::vector<TopoDS_Edge>            es;
+    std::vector<std::array<double, 3>> sp;
+    for (size_t i = 0; i < edges.items.size(); ++i)
+    {
+      if (edges.items[i].IsNull() || edges.items[i].ShapeType() != TopAbs_EDGE)
+        return false;
+      es.push_back(TopoDS::Edge(edges.items[i]));
+      const double r = radii.size() == 1 ? radii[0] : radii[i];
+      sp.push_back({0, r, r});
+    }
+    TopoDS_Shape r;
+    HHist        h;
+    return rust_blend(s, es, sp, {}, r, h);
+  }
+  catch (const Standard_Failure&)
+  {
+    return false;
+  }
+}
+
 OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const double> radii,
                 bool checked)
 {

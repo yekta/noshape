@@ -404,6 +404,18 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             Some(Overrun::PastUnselected) => return err("Failed to fillet selections."),
             None => {}
         }
+        // noshape's blend takes some of the edge groups but not all (knob-jason's Fillet 1: arcs it rounds exactly,
+        // hole rims on cones it doesn't): those first, OCCT's for the rest on that result, each named in turn.
+        if let Some((first, rest)) = rust_groups(&body.shape, &shapes, &radii)
+            && let Ok(r1) = k::fillet_checked(&body.shape, &first.0, &first.1)
+            && let Some(rest_edges) = rest.0.iter().map(|e| r1.shape.edges().into_iter().find(|x| x.is_same(e))).collect::<Option<Vec<_>>>()
+            && let Ok(r2) = k::fillet_checked(&r1.shape, &rest_edges, &rest.1)
+        {
+            let names1 = ev.name_result(&[&body.shape_names()], &r1.history, &r1.shape, &BTreeMap::new(), Some(&blend_role));
+            let names2 = ev.name_result(&[&crate::regen::eval::names_for(&r1.shape, names1)], &r2.history, &r2.shape, &BTreeMap::new(), Some(&blend_role));
+            ev.replace_body(bi, r2.shape, names2);
+            continue;
+        }
         let res = match k::fillet_checked(&body.shape, &shapes, &radii) {
             Ok(r) => r,
             // Without propagation a single straight edge whose ball fits its faces
@@ -426,6 +438,56 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         log::debug!("fillet: kernel {:?}, naming {:?}, body {:?} (history records {})", t1 - t0, t2 - t1, t2.elapsed(), res.history.records.len());
     }
     Ok(())
+}
+
+/// Edges and their radii.
+type EdgeSet = (Vec<k::Shape>, Vec<f64>);
+
+/// When noshape's blend declines the whole fillet but takes some of its edge groups (edges joined through shared
+/// vertices): those groups, and the rest. None when it takes all or none, or there's one group.
+fn rust_groups(shape: &k::Shape, edges: &[k::Shape], radii: &[f64]) -> Option<(EdgeSet, EdgeSet)> {
+    if edges.len() < 2 || k::fillet_rust_accepts(shape, edges, radii) {
+        return None;
+    }
+    let radius = |i: usize| radii.get(i).or(radii.first()).copied().unwrap_or(0.0);
+    let verts: Vec<Vec<k::Shape>> = edges.iter().map(|e| e.vertices()).collect();
+    let mut group: Vec<usize> = (0..edges.len()).collect();
+    fn root(g: &mut [usize], mut i: usize) -> usize {
+        while g[i] != i {
+            g[i] = g[g[i]];
+            i = g[i];
+        }
+        i
+    }
+    for i in 0..edges.len() {
+        for j in i + 1..edges.len() {
+            if verts[i].iter().any(|a| verts[j].iter().any(|b| a.is_same(b))) {
+                let (a, b) = (root(&mut group, i), root(&mut group, j));
+                group[a] = b;
+            }
+        }
+    }
+    let roots: Vec<usize> = (0..edges.len()).map(|i| root(&mut group, i)).collect();
+    let mut ids: Vec<usize> = roots.clone();
+    ids.sort_unstable();
+    ids.dedup();
+    if ids.len() < 2 {
+        return None;
+    }
+    let set = |pick: &dyn Fn(usize) -> bool| -> EdgeSet {
+        let idx: Vec<usize> = (0..edges.len()).filter(|&i| pick(i)).collect();
+        (idx.iter().map(|&i| edges[i].clone()).collect(), idx.iter().map(|&i| radius(i)).collect())
+    };
+    let taken: Vec<usize> = ids
+        .into_iter()
+        .filter(|&g| {
+            let (es, rs) = set(&|i| roots[i] == g);
+            k::fillet_rust_accepts(shape, &es, &rs)
+        })
+        .collect();
+    let first = set(&|i| taken.contains(&roots[i]));
+    let rest = set(&|i| !taken.contains(&roots[i]));
+    (!first.0.is_empty() && !rest.0.is_empty() && k::fillet_rust_accepts(shape, &first.0, &first.1)).then_some((first, rest))
 }
 
 /// Blends that meet on one surface are one face, as Parasolid's (pulley02: a groove's two rounds, each half its
