@@ -587,6 +587,10 @@ fn displacement_map_probe() {
                 continue;
             }
             let (r, secs) = displacement_map(&csv, face, replace);
+            // (NOSHAPE_DISP_DUMP=<file.brep>: the part, for kernel probes.)
+            if let (Ok(out), Some(b)) = (std::env::var("NOSHAPE_DISP_DUMP"), r.context.bodies.first()) {
+                noshape_kernel::write_brep(&b.shape, std::path::Path::new(&out)).unwrap();
+            }
             let feature = r.display.features.last().expect("the feature");
             println!("DISP feature {:.2} s", feature.time_ms / 1000.0);
             if profile {

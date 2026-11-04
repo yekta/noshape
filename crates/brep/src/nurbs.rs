@@ -692,23 +692,34 @@ impl NurbsSurface {
         if let Some(s) = seed {
             return self.refine(p, s);
         }
-        // The nearest of a grid of samples, refined: at most 64 a side first (a 512 × 512 pole surface had 16 M), all
-        // 8 a span when that lands off the surface.
+        // The nearest of a grid of samples, refined: at most 64 a side first (a 512 × 512 pole surface had 16 M), then
+        // 8 a span within two coarse cells of that sample when it lands off the surface (the whole grid took a second
+        // a node on a displaced top's rim).
         let full = (8 * (self.nu - self.udegree).max(1), 8 * (self.nv - self.vdegree).max(1));
         let coarse = (full.0.min(64), full.1.min(64));
-        let r = self.refine(p, self.nearest_sample(p, coarse));
+        let c = self.nearest_sample(p, coarse, None);
+        let r = self.refine(p, c);
         if r.1 <= 1e-9 * (1.0 + p.abs().max_element()) || coarse == full {
             return r;
         }
-        self.refine(p, self.nearest_sample(p, full))
+        let ((u0, u1), (v0, v1)) = self.range();
+        let (cu, cv) = (2.0 * (u1 - u0) / coarse.0 as f64, 2.0 * (v1 - v0) / coarse.1 as f64);
+        let near = self.refine(p, self.nearest_sample(p, full, Some(((c.x - cu, c.x + cu), (c.y - cv, c.y + cv)))));
+        if near.1 < r.1 { near } else { r }
     }
 
-    fn nearest_sample(&self, p: DVec3, (mu, mv): (usize, usize)) -> DVec2 {
+    /// The nearest of an `mu` × `mv` grid of samples over the surface (or only those within `window`).
+    fn nearest_sample(&self, p: DVec3, (mu, mv): (usize, usize), window: Option<((f64, f64), (f64, f64))>) -> DVec2 {
         let ((u0, u1), (v0, v1)) = self.range();
         let mut best = (DVec2::new(u0, v0), f64::INFINITY);
-        for i in 0..=mu {
+        let index = |t: f64, a: f64, b: f64, m: usize| ((t - a) / (b - a) * m as f64).clamp(0.0, m as f64);
+        let (ia, ib, ja, jb) = match window {
+            Some(((ua, ub), (va, vb))) => (index(ua, u0, u1, mu).floor() as usize, index(ub, u0, u1, mu).ceil() as usize, index(va, v0, v1, mv).floor() as usize, index(vb, v0, v1, mv).ceil() as usize),
+            None => (0, mu, 0, mv),
+        };
+        for i in ia..=ib {
             let u = u0 + (u1 - u0) * i as f64 / mu as f64;
-            for j in 0..=mv {
+            for j in ja..=jb {
                 let v = v0 + (v1 - v0) * j as f64 / mv as f64;
                 let d = (self.at(u, v) - p).length_squared();
                 if d < best.1 {

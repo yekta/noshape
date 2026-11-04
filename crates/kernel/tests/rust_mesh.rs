@@ -408,3 +408,71 @@ fn a_bspline_tube_with_a_seam_meshes_here_within_brepmeshs_area() {
     assert!((a - b).abs() <= 2e-3 * b, "area {a} against BRepMesh's {b}");
     assert_normals(&s, &rust, &occt);
 }
+
+/// A Ø50 × 60 cylinder's round top replaced by an `n` × `n` template over its parameters, moved 0..1 mm along its
+/// normal by a leather-like pattern (a Displacement map's): the wall's top rim follows the bumps.
+fn displaced_top(n: usize) -> Shape {
+    let cyl = make_cylinder(&Plane::xy(), 25.0 * MM, 60.0 * MM, TAU).unwrap();
+    let top = cyl.faces().into_iter().find(|f| f.is_planar() && (f.centroid().unwrap().z - 60.0 * MM).abs() < 1e-9).unwrap();
+    let [u0, u1, v0, v1] = top.uv_bounds().unwrap();
+    let mut poles = Vec::with_capacity(n * n);
+    for i in 0..n {
+        for j in 0..n {
+            let (u, v) = (u0 + (u1 - u0) * i as f64 / (n - 1) as f64, v0 + (v1 - v0) * j as f64 / (n - 1) as f64);
+            // (A deterministic speckle: two incommensurate waves and a hashed jitter.)
+            let h = ((i * 7919 + j * 104729) % 1000) as f64 / 1000.0;
+            let d = 0.5 + 0.25 * ((0.37 * i as f64).sin() * (0.23 * j as f64).cos()) + 0.25 * (h - 0.5);
+            poles.push(top.point_at_uv(u, v).unwrap() + top.normal_at_uv(u, v).unwrap() * d * MM);
+        }
+    }
+    let knots: Vec<f64> = (0..n + 6).map(|i| ((i as f64 - 5.0) / (n as f64 - 5.0)).clamp(0.0, 1.0)).collect();
+    let data = BSplineSurfaceData { poles, nu: n, nv: n, weights: None, u_knots: knots.clone(), v_knots: knots, u_degree: 5, v_degree: 5, u_periodic: false, v_periodic: false };
+    let t = make_bspline_surface(&data, &[], false).unwrap().faces().remove(0);
+    replace_face_mapped(&cyl, &top, &t).unwrap()
+}
+
+#[test]
+#[ignore = "T2 probe: NOSHAPE_DISPLACED_TOP_N"]
+fn displaced_top_probe() {
+    let n: usize = std::env::var("NOSHAPE_DISPLACED_TOP_N").ok().and_then(|v| v.parse().ok()).unwrap_or(128);
+    // (NOSHAPE_DISPLACED_TOP_BREP: a dumped part instead.)
+    let s = match std::env::var("NOSHAPE_DISPLACED_TOP_BREP") {
+        Ok(p) => read_brep(std::path::Path::new(&p)).unwrap(),
+        Err(_) => displaced_top(n),
+    };
+    let t0 = std::time::Instant::now();
+    let rust = mesh(&s, true);
+    println!("DTOP n {n}: rust took {} of {} faces in {:.2?}", rust.rust_faces, s.count(ShapeType::Face), t0.elapsed());
+    let copy = transform(&s, &Transform::Translate(DVec3::ZERO), true).unwrap().shape;
+    let occt = mesh(&copy, false);
+    for (who, t) in [("rust", &rust), ("occt", &occt)] {
+        for (fi, r) in t.faces.iter().enumerate() {
+            let tris = &t.indices[r.first_index as usize..(r.first_index + r.index_count) as usize];
+            let (mut bad, mut worst) = (0, 0.0f64);
+            for c in tris.chunks(3) {
+                let (a, b, cc) = (p(t.positions[c[0] as usize]), p(t.positions[c[1] as usize]), p(t.positions[c[2] as usize]));
+                let nn = (b - a).cross(cc - a);
+                if nn.dot(p(t.normals[c[0] as usize])) < 0.0 {
+                    bad += 1;
+                    worst = worst.max(nn.length() / 2.0);
+                }
+            }
+            println!("DTOP {who} face {fi}: {} triangles, {bad} against their normal (largest {worst:e} m²)", tris.len() / 3);
+        }
+    }
+}
+
+/// DISPLACEMENT-MAP's top case (its wall's rim follows the bumps): every face meshed here (BRepMesh's own mesh of the
+/// bumpy top has triangles turned against the surface), each turned like its normals, its area the face's within
+/// 2e-3, watertight.
+#[test]
+fn a_displaced_top_and_its_wall_mesh_here() {
+    let s = displaced_top(256);
+    let rust = mesh(&s, true);
+    assert_eq!(rust.rust_faces, 3, "meshed here");
+    for (i, (m, f)) in faces(&rust).into_iter().zip(s.faces()).enumerate() {
+        let a = f.area().unwrap();
+        assert!((m.0 - a).abs() <= 2e-3 * a, "face {i}: mesh area {} against the face's {a}", m.0);
+    }
+    assert_watertight(&rust);
+}

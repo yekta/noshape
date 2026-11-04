@@ -881,15 +881,17 @@ impl GridSurface for NurbsSurface {
     fn param_of(&self, p: DVec3, seed: Option<DVec2>) -> (DVec2, f64) {
         let mut r = NurbsSurface::param_of(self, p, seed);
         let Some(s) = seed else { return r };
-        if !self.closed_in_u() {
-            return r;
-        }
+        // (Open too: on a bumpy surface the iteration from the last node can settle in a dip beside it, a displaced
+        // top's rim.)
         let step = (p - NurbsSurface::at(self, s.x, s.y)).length();
         if r.1 > (1e-9 * (1.0 + p.abs().max_element())).max(0.25 * step) {
             let fresh = NurbsSurface::param_of(self, p, None);
             if fresh.1 < r.1 {
                 r = fresh;
             }
+        }
+        if !self.closed_in_u() {
+            return r;
         }
         let ((u0, u1), _) = NurbsSurface::range(self);
         let eps = 1e-9 * (u1 - u0);

@@ -16,6 +16,13 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-04 22:30 UTC.**
+- Since 20:28: P0 SPLIT-FACE-SAME-ID landed (Split and one-tool Booleans name their faces apart per part; qa verified);
+  parity run 70's regressions fixed (profiles built in loop order again, Extrude reverses only the cap edges drawn the
+  other way; the seam movers' uv area only accepts quickly): pulley02 7/7, clamp-hms 14/15, cf-straight-spline 9;
+  the displaced top's mesh all ours (brep::mesh: cdt sliver check, fresh searches, windowed fallback; psui told in
+  TICKETS DISPLACEMENT-MAP-WALL-MESH). Next: pipeflange's countersink round, learning-center-michael, Shell 4's speed.
+
 **State 11-04 20:28 UTC.**
 - DISPLACEMENT-MAP done on core's side: the user's 512 x 512 map on live's Ø50 x 60 cylinder, side 3.5 s / top 6.6 s,
   volumes in live's bands, 3 faces (TICKETS). Replace face's fast path is kernel replace_face_mapped (build.cpp);

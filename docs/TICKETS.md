@@ -502,6 +502,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [x] (core 11-04 22:30) P1 DISPLACEMENT-MAP-WALL-MESH (lead 11-04 21:20) the top case's display mesh: our mesher declined
+  the wall ("the triangulation failed") and the bumpy top, BRepMesh took 2.7 s (and turns some of the top's triangles
+  against the surface: 921 of 5172 on a 256 x 256 top). brep::mesh, for psui: (1) cdt.rs checked(): a triangle turned
+  over off the snapped grid by less than a grid step times its longest edge is a flat sliver, kept (the wall's rim nodes
+  follow the bumps); (2) a B-spline's node searched afresh when the seeded search stops a step short on open surfaces
+  too (it settled in a dip beside the rim); (3) nurbs.rs param_of(None): its full-resolution fallback searches only two
+  coarse cells round the coarse sample (the whole 16 M-sample grid took ~1 s a node). The user's 512 x 512 top: 3.1 s
+  with its mesh (was 6.6; live 12.2), every face ours. T1 kernel rust_mesh::a_displaced_top_and_its_wall_mesh_here.
 - [x] (core 11-04 22:12) P1 PARITY-REGRESSION-RUN70 (lead 11-04 21:20; dx's runs 69 -> 70) pulley02-maxwell 7 -> 2/7 (Fillet 1:
   9/8/0, live 5/4/0) and clamp-hms 14 -> 11/15 (Extrude 5: 29/71/46, live 25/63/40): PATTERN-EDGE-DIRECTION built
   the profile's edges as drawn, so the swept faces of reversed lines and arcs had their surfaces turned (cones and

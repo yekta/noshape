@@ -559,8 +559,15 @@ fn checked(pts: &[Pt], tris: Vec<[u32; 3]>, nv: usize, rings: usize, want: f64, 
     let mut sum = 0.0;
     for t in &tris {
         let ar = orient(pts[t[0] as usize], pts[t[1] as usize], pts[t[2] as usize]);
+        // (A sliver thinner than the grid's step may turn over off the grid it was made on: a displaced rim's nodes
+        // along a cylinder wall. Flat, not inverted.)
         if ar.is_nan() || ar <= 0.0 {
-            return None;
+            let (a, b, c) = (pts[t[0] as usize], pts[t[1] as usize], pts[t[2] as usize]);
+            let len = |p: Pt, q: Pt| ((p.x - q.x).powi(2) + (p.y - q.y).powi(2)).sqrt();
+            let longest = len(a, b).max(len(b, c)).max(len(c, a));
+            if ar.is_nan() || -ar > 2.0 * size / 4_194_304.0 * longest {
+                return None;
+            }
         }
         sum += ar / 2.0;
     }
