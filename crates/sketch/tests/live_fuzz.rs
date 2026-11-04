@@ -2040,6 +2040,20 @@ fn a_t_keeps_its_stem_when_its_top_widens() {
     }
 }
 
+/// Batch 22's keyed shafts s1043 / s1044 stay as live answered: the keyway's
+/// bottom, its ends mirrored about the axis from the shaft's centre, narrows
+/// about that axis; the centre stays and the walls lengthen to the bigger
+/// circle (ours moved the whole key, centre included, 3 mm). T1.
+#[test]
+fn a_keyway_narrows_about_the_shafts_axis() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-22.live.json")).unwrap()).unwrap();
+    for seed in [1043, 1044] {
+        let ours = batch(1, seed, true);
+        let d = differences(&ours["cases"][0], &live["cases"][format!("s{seed}")]);
+        assert!(d.is_empty(), "s{seed}: {}", d.join("; "));
+    }
+}
+
 /// Batch 15's s754 / s769 stay as live answered: a rectangle's two rounded
 /// top corners (Equal arcs) grow: the bottom and the top keep their levels,
 /// the sides shorten and the top shrinks from both ends (the top's far end

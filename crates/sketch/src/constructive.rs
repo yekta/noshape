@@ -864,6 +864,33 @@ impl Sketch {
                         light.push(n);
                     }
                 }
+                // A line whose ends mirror each other about an axis not
+                // placed yet, the axis joined to other geometry, resizes about
+                // it, held where it is (live fuzz s1043: a keyway narrows
+                // about the shaft's axis, from the shaft's centre; a free
+                // axis moves instead, s653 / s547).
+                if let Some((s0, s1)) = self.endpoints(u).filter(|_| self.kind(u) == Some(EntityKind::Line)) {
+                    let class = |p: EntityId| {
+                        let mut v = self.coincident_class(p);
+                        v.push(p);
+                        v
+                    };
+                    let (c0, c1) = (class(s0), class(s1));
+                    let axes: Vec<EntityId> = self
+                        .constraints()
+                        .filter_map(|c| match c.kind {
+                            ConstraintKind::Symmetric { a, b, axis } if !placed.contains(&axis) && ((c0.contains(&a) && c1.contains(&b)) || (c0.contains(&b) && c1.contains(&a))) && self.endpoints(axis).is_some_and(|(p, q)| !self.coincident_class(p).is_empty() || !self.coincident_class(q).is_empty()) => Some(axis),
+                            _ => None,
+                        })
+                        .collect();
+                    for axis in axes {
+                        let Some(crate::geom::Curve2::Line { a, b }) = self.curve(axis) else { continue };
+                        let held_axis = sub.add_line(a, b);
+                        let _ = sub.set_construction(held_axis, true);
+                        let _ = sub.add_constraint(ConstraintKind::Fix { entity: held_axis });
+                        let _ = sub.add_constraint(ConstraintKind::Symmetric { a: s0, b: s1, axis: held_axis });
+                    }
+                }
                 let opts = SolveOptions { light, still: still.into_iter().collect(), analyze: false, constructive: false, ..Default::default() };
                 let st = sub.solve_with(&opts).status;
                 // With its neighbours let go: only when each of them can
