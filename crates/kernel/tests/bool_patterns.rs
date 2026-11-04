@@ -572,6 +572,14 @@ fn a_10_by_71_knurl() {
     knurl_as_recorded("613d362cd8436f28", 1e-7);
 }
 
+/// cf-spur-gear's cut of 20 tooth gaps from the blank (recorded): each gap's B-spline face lies on the blank's
+/// cylinder, which its seam splits where the face isn't; those coincident pieces, all dropped, need no partners (it
+/// declined "coincident pieces differ": OCCT's 4.2 s instead of 0.25 s).
+#[test]
+fn a_gear_blanks_seam_under_a_tooth_gaps_face() {
+    as_recorded("9bcf777667a133d5");
+}
+
 /// A common keeping a piece of an argument's half circle from its start (recorded): the piece's range from the
 /// edge's own start (its angle a rounding below it went a turn on: "an edge outside its face's range").
 #[test]

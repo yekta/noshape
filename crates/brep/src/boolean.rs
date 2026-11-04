@@ -5090,8 +5090,19 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             e.0 = pi;
         }
     }
-    for &(pi, _) in &on_pairs {
+    for &(pi, t) in &on_pairs {
         let (o, n) = by_key[&piece_key(&pieces[pi])];
+        // (Alone, and dropped as every piece of its coincident faces of that solid on its own: split differently with
+        // nothing kept (a gear blank's cylinder split at its seam where a tooth gap's B-spline face on it isn't), no
+        // partner.)
+        let s = cx.faces[pieces[pi].face].solid;
+        let gone = |q: usize| keep[q].is_none();
+        if n < 2
+            && gone(pi)
+            && on_pairs.iter().filter(|&&(q, u)| u == s && cx.faces[pieces[q].face].solid == t && coplanar_of[pieces[pi].face].contains(&pieces[q].face)).all(|&(q, _)| gone(q))
+        {
+            continue;
+        }
         if n < 2 {
             return Err(Decline("coincident pieces differ"));
         }

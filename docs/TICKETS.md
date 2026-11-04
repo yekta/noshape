@@ -3992,6 +3992,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   "hobbed" subtraction of the 20 patterned teeth from the blank, studio line 348) and 0.3 s FeatureScript; with
   Boolean 2's 1.6 s, the document's time is the Booleans' (bool). Its first difference (3 parts, live 2) is that
   subtraction's result too.
+  bool 11-04 18:29: that subtraction (20 tooth gaps from the blank) is noshape's Boolean now: 0.25 s, OCCT's 2.0 s
+  (it declined "coincident pieces differ": the blank's cylinder split at its seam under a gap's B-spline face). All 14
+  of the document's Booleans are taken, 2-8x OCCT's speed.
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet

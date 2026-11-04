@@ -58,13 +58,18 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   past that the cheap checks as past 2000 faces). T2 bool_patterns::a_fill_pattern_of_holes_in_a_plate (40 x 40,
   first column notches so through_holes declines: ours 1.08 s, OCCT 7.3 s). A sheet cut by coplanar sheets (a region
   face less 1735 disks, recorded vibe4 ~/agents/bool-corpora/fill3: 08e50949dd5b7f9f, d4d9ccaf6bbc8b5d): ours 0.16 s,
-  OCCT's 0.9 s (landed 11-04 18:00). Its history: OCCT's path (op_boolean) cuts scaled copies of the inputs where a
+  OCCT's 0.9 s (landed 11-04 17:53). Its history: OCCT's path (op_boolean) cuts scaled copies of the inputs where a
   cut has 64 tools or more (ScaledInputs, at the working scale): then every input entity is Modified, untouched ones
   too; below 64, Kept. sheet_cut says so (`rebuilt`); the C++ declines 64+ sheets unscaled (scale 1 or
   NOSHAPE_BOOL_NO_SCALE). Solids: noshape's Boolean says Kept for untouched entities of a 64+ tool cut where OCCT's
   path says Modified (the same shapes; the corpora don't tell, being recorded with Rust on); left as is. T1
   bool_patterns::a_face_cut_by_disks_on_its_plane_as_occt (25 disks Kept, 72 Modified, as OCCT). The fill sweep: Ø100 x 71 / x 100 CP30 80/30 and Ø63 x 100 CP30 45/45 now stop
   at the memory budget (15 GB on vibe5, af0547aa), as intended.
+- cf-spur-gear (bool, 11-04 18:29): the Spur Gear's cut of its 20 tooth gaps from the blank declined "coincident
+  pieces differ" (OCCT 2.0 s): each gap's B-spline face lies on the blank's cylinder, which the cylinder's seam splits
+  where the B-spline face isn't; those coincident pieces, all dropped, need no partner. Ours 0.25 s; all 14 of the
+  document's recorded Booleans taken (vibe4 ~/agents/bool-corpora/cf-spur-gear), 0 differ. T1
+  bool_patterns::a_gear_blanks_seam_under_a_tooth_gaps_face.
 
 ## From core (11-02 07:20): two Boolean costs found profiling FeatureScript-driven regenerations
 Sampled warm on vibe4 (model tests' `custom_features::fs_warm_profile` / `sheetmetal_std::fs_sheet_metal_profile`,
