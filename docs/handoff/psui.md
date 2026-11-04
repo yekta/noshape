@@ -868,6 +868,10 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- 11-04 08:42: face-rclick-menu's highlighted row is accepted: both windows are 1919 x 992, but live's face menu has the
+  cloud-only "Add comment" row, which makes it one row too tall to fit under the pointer (it shifts up and the
+  pointer lands on row 20); ours fits exactly below. FS-EDITOR-IMPORT-NOTICES fixed (custom::doc_imports); the
+  10-30 mesher fallback ticket closed (verified v0.4.15). IN-FEATURE-MATE-CONNECTOR still waits for core's model side.
 - 11-04 06:03: **274/287 scenarios, 1798/1833 states** (full run on main). Left: 6 Hole (live's account remembers
   M6x1.00), chamfer-two-distances (focus after an edit brings a field up: asked live by hand, REQUESTS 04:0x),
   face-rclick-menu's highlighted row (menu placement), measure-fillet-face (stale label, re-record asked),
