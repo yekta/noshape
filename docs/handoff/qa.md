@@ -41,8 +41,11 @@ under qa's own Xvfb displays — :61 the GUI fuzz, :63 the release GUI rows (vib
 with paths rewritten, :63, no fuzz-pause lines), :64 the updater app (vibe3 ~/qa/updhome, HOME=that; it took v0.4.27 → v0.4.28:
 found / verified / staged on start, Restart → 0.4.28, g34 reopened; qa-scratch/upd428-0/-1.png), :65 one-off app checks.
 **v0.4.28** (published 19:56, cut 71bc7202 = main 68f3378a: greens through 771c24c0 + 634c8ca6) so far: artifacts byte-identical,
-SHA256SUMS OK; CLI smoke = v0.4.27 (round trip, volume sweep, all fixed tickets, the user's cases); updater works; GUI rows and the
-44 ticket documents running on vibe3; memory run on vibe3 (~/qa/cli/rss*-r428.txt).
+SHA256SUMS OK; CLI smoke = v0.4.27 (round trip, volume sweep, all fixed tickets, the user's cases); updater works; **done 20:52:
+good, no blocker** — the 44 ticket documents = v0.4.27; GUI rows (vibe3 :63) all pixel-identical to v0.4.26 / r424 (after copying
+cylmirerr / cylpaterr1 / loftmir-loft to vibe3); memory 508 peak 755 MB, 685 470 MB; title bar on the Linux release app: start
+window ? Help ▾ (now with Keyboard shortcuts) and account menu, a document's ☰ / Help ▾ / bell all open
+(tickets/titlebar-menus-linux-v0428.png; on vibe3 the account is "ngyekta", so ? Help ▾ sits at x 1258, not 1287).
 **New user's case (lead, P0): the Gyro.** P0 SPLIT-FACE-SAME-ID filed: one Split across several bodies gives their cut faces one id.
 Repro + matrix: bin/splitface_matrix.py (chamfer / fillet / shell / Move face / delete face on one body's cut face; Gyro and the
 generic tickets/gyro/qa-3box.noshape), tickets/gyro/chamfer1.py; both in qa-presmoke.sh now. Verify when core's fix lands: only
