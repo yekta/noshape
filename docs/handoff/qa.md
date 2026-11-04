@@ -942,7 +942,17 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
 - Shared prefs touched by testing: ~/.config/noshape/preferences.json got `featureDialogWidths.extrude 278` from a resize
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
-## Requests to the lead (qa, updated 2026-11-03 01:40)
+## Requests to the lead (qa, updated 2026-11-04 14:02)
+- **(11-04 14:02) A Windows / macOS title-bar check qa can run on a release** (the new same-on-every-platform rule, the lead's
+  17:00 ask): qa can't run the Windows app here, and no workflow clicks the GUI except nav.yml's view navigation. Please
+  add a workflow_dispatch job (nav.yml's pattern: the release asset on windows-latest and macos-15, a driver like
+  .github/nav/win-replay.ps1 with SendInput / CGEvent) that, with an empty NOSHAPE_CONFIG_DIR: opens the start window,
+  clicks the account menu and ? Help ▾, opens a document and clicks ☰, Help ▾ and the bell, screenshots each (and the
+  window's menu / popup list if it can be read) and uploads them as artifacts. qa then runs it at every release
+  (`gh workflow run … -f tag=v0.4.x`) and compares with Linux (qa-scratch/tickets/titlebar-menus-linux-399feb05.png: on
+  Linux green 399feb05 the account menu, ☰, Help and the bell all open). Until it exists qa can only report Linux.
+
+## Requests to the lead (qa, earlier, 2026-11-03 01:40)
 - **11-03 01:40: SCORE.md's model numbers.** dx's handoff (d821e749b) has qa run `NOSHAPE_RB_LOCAL=1 tools/tiers/rb.sh cargo test -q -p noshape-ops --test all parity::parity_models -- --ignored`, which is a build; qa's rule is never to build. Until you say otherwise qa takes the model line from the report.json dx's own run leaves next to /root/parity/models (and asks dx in its handoff to run it before 11-03 evening). The scenario line qa makes itself: green binary + tools/ui-parity/run.py (no build) against /root/parity/ui/live — 6/28 scenarios, 50/139 states on green 2723f7fb at 01:35.
 - **09:09: a CLI built from each green's commit** (e.g. next to /root/green/noshape as noshape-cli + SHA). qa never builds, and the
   only CLIs on the box are the agents' worktree builds (bool's 07:17, core's 06:35, which held unlanded work at times: a false
