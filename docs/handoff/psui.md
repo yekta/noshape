@@ -870,6 +870,16 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- 11-04 14:05 OS audit (AGENTS.md ad57a47b: the app alike on every OS), Part Studio / start window / Preferences
+  and the app-core / app code they use: one behaviour differed, fixed (9c3b3337): closing a document's last window
+  showed nothing on macOS; it now shows the start window as elsewhere (macOS only keeps running after the start window
+  closes, its convention). The macOS app menu's Install command line tool… / Connect to coding agents… are in both
+  Help menus; its Quit is Ctrl/Cmd+Q on every OS (Onshape has no Quit row; closing the windows quits elsewhere).
+  The other cfg branches are conventions or platform plumbing: client decorations on Linux, native file dialogs,
+  Cmd for Ctrl / no Windows-key modifier, per-OS wheel units (each normalised to Chromium's notch), GPU / cursors,
+  Claude Desktop not offered on Linux (none exists). Start window Help ▾: mine (a7fac69b) and the lead's 6418da8a
+  were the same menu, the lead's conflicted; its About row ported (2e2a62bf). Onshape's own rows wait for live
+  (REQUESTS 13:29).
 - 11-04 13:15 (lead: Part Studio speed, then the three P3s): see "Speed targets" (hover / pick / dialog open / row
   click rows). Fixed: a selected feature row's highlight (56 → 2 ms on cf-straight-spline), PickMap hashing. Left
   over target: GPUI prepaint of the list slices after a click (30–50 ms on 117 rows; next: time the views in prepaint),
