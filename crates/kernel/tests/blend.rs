@@ -1302,3 +1302,19 @@ fn a_round_off_a_thin_rim_is_not_taken_the_wrong_way() {
     assert!(r.is_valid());
     assert!((vol_mm3(&r) - 31406.528).abs() < 1e-2, "{}", vol_mm3(&r));
 }
+
+/// CRASH-3388 (qa's fuzz seed 3388, step 21: R12 on 17 edges of a 60 mm part): one of OCCT's attempts leaves a blend
+/// face with a 4.8 mm edge, and BRepCheck's classification of it segfaulted on the pool's threads (the process died
+/// on open). Such a result is refused before the check: the fillet fails, nothing crashes.
+#[test]
+fn a_blend_with_a_loose_edge_fails_without_a_crash() {
+    setup();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/blend");
+    let s = read_brep(&dir.join("crash3388-fillet.brep")).unwrap();
+    let all = s.edges();
+    let es: Vec<Shape> = [0, 3, 5, 6, 7, 9, 10, 11, 12, 14, 16, 17, 18, 19, 20, 21, 26].iter().map(|&i| all[i].clone()).collect();
+    match fillet_checked(&s, &es, &[12.0 * MM; 17]) {
+        Ok(r) => assert!(r.shape.is_valid()),
+        Err(e) => assert!(!e.to_string().contains("crashed"), "{e}"),
+    }
+}

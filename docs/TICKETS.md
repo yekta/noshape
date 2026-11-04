@@ -367,7 +367,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   ticket documents, the volume sweep, dx's cf corpus and the user's cases are unchanged on 4570b4e5. live: Fillet 2 rounds
   the edges (OCCT's 189 mm³ is the plausible one: a negative part is never right); ours: wrong solid. (qa 2026-11-04 06:26,
   build 4570b4e5)
-- [ ] P0 CRASH-3388 (core; OCCT shape check segfault) **a 21-step fuzz document segfaults the CLI on open and at its
+- [x] (core 11-04 06:52: one of OCCT's fillet attempts leaves a blend face with a 4.8 mm edge on the 60 mm part, and BRepCheck_Face's classification of it segfaults, on the pool's threads past our signal handler; blends whose edges or vertices are looser than a hundredth of the part are refused before the check (features.cpp valid_shape): the document opens, its Fillet 2 "Unfilleted edge overlapped by fillet."; T1 kernel blend::a_blend_with_a_loose_edge_fails_without_a_crash; blend corpus unchanged) P0 CRASH-3388 (core; OCCT shape check segfault) **a 21-step fuzz document segfaults the CLI on open and at its
   fillet, every time, in v0.4.23, v0.4.24 and main**: /root/qa-scratch/tickets/crash3388/fz3388.noshape (+ -wal; CLI fuzz
   seed 3388, `bin/clifuzz_time.py 3388 106`: step 21 is a fillet of 12 mm). The fuzz session dies at step 21 6 / 6 (v0.4.24
   3, green 56a0f49b 3), also v0.4.23 and NOSHAPE_BOOL_RUST=0 (not bool's); `python3 tickets/crash3388/open.py <cli>` dies 2 / 2

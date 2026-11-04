@@ -3229,11 +3229,24 @@ using BlendBuild = std::function<bool(double scale, TopoDS_Shape& out, HHist& h)
 
 bool valid_shape(const TopoDS_Shape& s)
 {
+  if (s.IsNull())
+    return false;
+  // An edge or vertex as loose as a hundredth of the part is a blend gone wrong, not one to check: BRepCheck's
+  // classification of its face segfaults on the pool's threads (CRASH-3388: a 4.8 mm edge on a 60 mm part).
+  Bnd_Box box;
+  BRepBndLib::Add(s, box);
+  const double loose = box.IsVoid() ? 0 : 1e-2 * std::sqrt(box.SquareExtent());
+  for (TopExp_Explorer x(s, TopAbs_EDGE); x.More() && loose > 0; x.Next())
+    if (BRep_Tool::Tolerance(TopoDS::Edge(x.Current())) > loose)
+      return false;
+  for (TopExp_Explorer x(s, TopAbs_VERTEX); x.More() && loose > 0; x.Next())
+    if (BRep_Tool::Tolerance(TopoDS::Vertex(x.Current())) > loose)
+      return false;
   // In parallel: the check of a whole part after each blend cost more than
   // the blend (live's 30-feature part, REGEN-SPEED). Not left by a budget
   // mid-check (the pool's workers use this frame).
   BudgetHold hold;
-  return !s.IsNull() && BRepCheck_Analyzer(s, true, true).IsValid();
+  return BRepCheck_Analyzer(s, true, true).IsValid();
 }
 
 // Remove faces narrower than `width` (slivers left by a blend that almost
