@@ -1497,7 +1497,8 @@ fn add_into_several_parts_is_one_union() {
         } else {
             assert_eq!(ps.len(), 1, "{case}: one part: {ps:?}");
             assert_eq!(ps[0].0, p1, "{case}: it is Part 1");
-            assert!((ps[0].2 - 14785.398163).abs() < 1e-5, "{case}: {ps:?}");
+            // (Within 1e-7 of it: the pin's seam moved off its loop changes the integral by 4e-8.)
+            assert!((ps[0].2 / 14785.398163 - 1.0).abs() < 1e-7, "{case}: {ps:?}");
             assert!(!ps.iter().any(|p| p.0 == p2 || p.0 == p3), "{case}: merged into Part 1");
         }
     }

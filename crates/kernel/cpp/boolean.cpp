@@ -106,6 +106,8 @@
 #include <memory>
 #include <algorithm>
 #include <limits>
+#include <ElCLib.hxx>
+#include <GCPnts_AbscissaPoint.hxx>
 #include <TopoDS_Compound.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
@@ -1777,13 +1779,25 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
   for (int i = 1; i <= seam_v.Extent(); ++i)
     if (chain_v.Contains(seam_v(i)) && !joint(TopoDS::Vertex(seam_v(i))))
       return {};
+  // (No chain edge runs at a candidate's angle between its ends: a line along the axis from it would sit on the seam,
+  // on one side of it or the other.)
+  auto clear_at = [&](double alpha) {
+    for (const TopoDS_Edge& e : rest)
+    {
+      BRepAdaptor_Curve c(e);
+      for (int k = 1; k < 32; ++k)
+        if (std::abs(std::remainder(uv(c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * k / 32.0)).X() - alpha, 2 * M_PI)) < 1e-6)
+          return false;
+    }
+    return true;
+  };
   TopoDS_Vertex V;
   double        best = std::numeric_limits<double>::infinity();
   for (int i = 1; i <= chain_v.Extent(); ++i)
   {
     const TopoDS_Vertex& x = TopoDS::Vertex(chain_v(i));
     const double         d = std::abs(uv(BRep_Tool::Pnt(x)).Y() - v_ring);
-    if (!seam_v.Contains(x) && d < best - 1e-12 && !joint(x))
+    if (!seam_v.Contains(x) && d < best - 1e-12 && !joint(x) && clear_at(uv(BRep_Tool::Pnt(x)).X()))
     {
       best = d;
       V    = x;
@@ -1806,20 +1820,23 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
         return {};
     }
   }
-  const double  r = ca.Radius();
   const gp_Ax3& A = ca.Position();
   BRep_Builder  B;
   double        tol = std::max(BRep_Tool::Tolerance(a), BRep_Tool::Tolerance(end));
   const gp_Dir  n   = gp_Dir(gp_Vec(A.XDirection()).Crossed(gp_Vec(A.YDirection())));
+  // (The end circle as it was, framed so its parameter is the cylinder's u: rebuilt from the cylinder, its radius a
+  // nanometre off the Boolean's moved a pin's union by 6e-4 mm³.)
+  const gp_Circ oc = ec.Circle();
+  const gp_Circ rc(gp_Ax2(oc.Location(), n, A.XDirection()), oc.Radius());
   TopoDS_Vertex vr;
-  B.MakeVertex(vr, ElSLib::Value(alpha, v_ring, ca), tol);
+  B.MakeVertex(vr, ElCLib::Value(alpha, rc), tol);
   TopoDS_Edge ring;
-  B.MakeEdge(ring, new Geom_Circle(gp_Ax2(A.Location().Translated(gp_Vec(A.Direction()) * v_ring), n, A.XDirection()), r), tol);
+  B.MakeEdge(ring, new Geom_Circle(rc), tol);
   B.Add(ring, vr.Oriented(TopAbs_FORWARD));
   B.Add(ring, vr.Oriented(TopAbs_REVERSED));
   B.Range(ring, alpha, alpha + 2 * M_PI);
   TopoDS_Edge seam;
-  B.MakeEdge(seam, new Geom_Line(ElSLib::Value(alpha, v_ring, ca), up ? A.Direction() : A.Direction().Reversed()), tol);
+  B.MakeEdge(seam, new Geom_Line(ElCLib::Value(alpha, rc), up ? A.Direction() : A.Direction().Reversed()), tol);
   B.Add(seam, vr.Oriented(TopAbs_FORWARD));
   B.Add(seam, V.Oriented(TopAbs_REVERSED));
   B.Range(seam, 0, std::abs(pV.Y() - v_ring));
@@ -3375,17 +3392,81 @@ TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist)
     }
     if (!ok)
       continue;
-    const occ::handle<Geom_BSplineCurve> curve = c3;
-    TopoDS_Edge                          E;
-    B.MakeEdge(E, curve, tol);
+    occ::handle<Geom_Curve>   curve = c3;
+    occ::handle<Geom2d_Curve> on[2] = {c2[0], c2[1]};
+    double                    p0 = c3->FirstParameter(), p1 = c3->LastParameter();
     const TopoDS_Vertex vs = TopExp::FirstVertex(chain.front(), true), vl = TopExp::LastVertex(chain.back(), true);
+    // Arcs of one circle: one circle again, its curves on the faces projected (a plane's a circle, a cylinder's a
+    // line), so the edge stays analytic (the B-spline's integrals moved a pin-and-plate union's volume 3e-7).
+    {
+      gp_Circ circ;
+      bool    one = true;
+      double  len = 0;
+      for (size_t k = 0; k < chain.size() && one; ++k)
+      {
+        BRepAdaptor_Curve ck(chain[k]);
+        one = ck.GetType() == GeomAbs_Circle;
+        if (!one)
+          break;
+        const gp_Circ c = ck.Circle();
+        if (k == 0)
+          circ = c;
+        else
+          one = c.Location().Distance(circ.Location()) <= tol && std::abs(c.Radius() - circ.Radius()) <= tol && c.Axis().Direction().IsParallel(circ.Axis().Direction(), 1e-9);
+        len += GCPnts_AbscissaPoint::Length(ck);
+      }
+      if (one)
+      {
+        // Along the chain: the first piece's way from vs.
+        BRepAdaptor_Curve c0(TopoDS::Edge(chain.front().Oriented(TopAbs_FORWARD)));
+        gp_Pnt            q;
+        gp_Vec            d;
+        const bool        fwd = chain.front().Orientation() != TopAbs_REVERSED;
+        c0.D1(fwd ? c0.FirstParameter() : c0.LastParameter(), q, d);
+        if (!fwd)
+          d.Reverse();
+        const gp_Pnt Pv = BRep_Tool::Pnt(vs);
+        gp_Pnt       cq;
+        gp_Vec       cd;
+        ElCLib::D1(ElCLib::Parameter(circ, Pv), circ, cq, cd);
+        if (cd.Dot(d) < 0)
+          circ = gp_Circ(gp_Ax2(circ.Location(), circ.Axis().Direction().Reversed(), circ.XAxis().Direction()), circ.Radius());
+        const double                  a  = ElCLib::Parameter(circ, Pv), b = a + len / circ.Radius();
+        const occ::handle<Geom_Curve> cc = new Geom_Circle(circ);
+        occ::handle<Geom2d_Curve>     pc[2];
+        for (int k = 0; k < 2 && one; ++k)
+        {
+          const occ::handle<Geom_Surface> g = BRep_Tool::Surface(F[k]);
+          pc[k]                            = GeomProjLib::Curve2d(new Geom_TrimmedCurve(cc, a, b), a, b, g);
+          one                              = !pc[k].IsNull();
+          if (!one)
+            break;
+          const gp_Pnt2d want = c2[k]->Value(c2[k]->FirstParameter()), got = pc[k]->Value(a);
+          const double   du   = g->IsUPeriodic() ? std::round((want.X() - got.X()) / g->UPeriod()) * g->UPeriod() : 0;
+          const double   dv   = g->IsVPeriodic() ? std::round((want.Y() - got.Y()) / g->VPeriod()) * g->VPeriod() : 0;
+          if (du != 0 || dv != 0)
+            pc[k]->Translate(gp_Vec2d(du, dv));
+          one = pc[k]->Value(a).Distance(want) < 1e-6 && g->Value(pc[k]->Value(0.5 * (a + b)).X(), pc[k]->Value(0.5 * (a + b)).Y()).Distance(cc->Value(0.5 * (a + b))) <= tol;
+        }
+        if (one)
+        {
+          curve = cc;
+          on[0] = pc[0];
+          on[1] = pc[1];
+          p0    = a;
+          p1    = b;
+        }
+      }
+    }
+    TopoDS_Edge E;
+    B.MakeEdge(E, curve, tol);
     B.Add(E, vs.Oriented(TopAbs_FORWARD));
     B.Add(E, vl.Oriented(TopAbs_REVERSED));
-    B.Range(E, curve->FirstParameter(), curve->LastParameter());
+    B.Range(E, p0, p1);
     for (int k = 0; k < 2; ++k)
     {
-      B.UpdateEdge(E, c2[k], F[k], tol);
-      B.Range(E, F[k], curve->FirstParameter(), curve->LastParameter());
+      B.UpdateEdge(E, on[k], F[k], tol);
+      B.Range(E, F[k], p0, p1);
     }
     if (!ok)
       continue;
