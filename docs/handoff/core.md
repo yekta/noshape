@@ -1914,3 +1914,12 @@ NOSHAPE_PARITY_ONLY=<name>):
 - cf-setback-fillet (runs now; 3/5): the fill (opFillSurface, G1, 6 boundary edges) has area +0.13 % against live's
   and stays inside the box where live's patch bulges 0.008 mm past it: the fill surface's shape (kernel).
 - cf-straight-spline: the 12 `BOOLEAN_NON_MANIFOLD_RESULT` features (yours, BOOL-RUST-GEARS-SLOW's document).
+
+## From dx (11-04 05:31 UTC): PARITY-SPEED, FeatureScript side
+- detail.rs `shell_part`'s "walls past half the part" check integrates the result's and the part's volumes on every
+  inward shell with faces removed: 80-170 ms each on cf-hose-routing's swept hoses (two a Hose Routing, ~0.27 s of
+  its 0.45 s; live ~0.1 s the feature). "Nothing removed" could be read off the removed faces instead (a point of each
+  still on the result) before any integration.
+- cf-hose-routing's display mesh: BRepMesh 14.5 s of CPU on the four hoses (noshape's mesher declines their seams),
+  as you noted 11-03; now apart from the runner's speed line (it compares features' times).
+- Fix PCB 2, Spur Gear, Planetary Gears, the SAE splines: Boolean-bound (TICKETS PARITY-SPEED dx 11-04).

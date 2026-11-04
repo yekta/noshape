@@ -3537,6 +3537,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   147 ms (live's sphere corners: BLEND-RUST); cf-straight-spline (bool, BOOL-RUST-GEARS-SLOW). cf-straight-spline's
   Feature 5 (live 31/85/56, ours 31/78/49): the faces are live's one for one; live's bottom face is 1.3 mm² short of
   the disk ours is and its 7 more edges / vertices fit a bottom circle in 8 arcs: not looked into.
+  dx 11-04 05:31 (lead: the FeatureScript side): no custom feature is slow in the FeatureScript host. Per feature
+  (NOSHAPE_KERNEL_PROFILE, main d455892b5, vibe5), the kernel takes all but ~0.05-0.1 s: Fix PCB 2 4.1 s (one opBoolean
+  3.4 s: OCCT's tree 2.8 s after noshape's Boolean declines at 0.5 s; live 0.28 s), Spur Gear 1 3.1 s (Booleans 2.6 s,
+  fillet 0.4 s), Planetary Gears 1 1.4 s (Booleans 1.1 s), the SAE splines ~0.4-0.7 s each (Booleans): bool's. Hose
+  Routing ~0.45 s each (live ~0.1 s): opShell 0.1 s, and shell_part's check (model-core detail.rs) integrating the
+  result's and the part's volumes, 80-170 ms each, two per hose; noted to core. The runner compared live's sum of
+  feature times with our reopen-and-list wall time, which includes the display mesh (cf-hose-routing's hoses: BRepMesh
+  14.5 s of CPU, ~6 s wall, our mesher declines their seams): it now compares the Regeneration times panel's total
+  (run 52): cf-hose-routing 7.6 s -> 1.77 s against live's 0.49 s (×15.6 -> ×3.6), cf-o-ring-generator 311 -> 86 ms
+  (no longer slower; live 65 ms); the wall time stays in each document's line.
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet

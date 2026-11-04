@@ -28,6 +28,8 @@ struct ModelResult {
     /// rest is query_parts' measures.
     open_ms: f64,
     list_ms: f64,
+    /// The Regeneration times panel's total (its features' times), ms: what live's full regeneration sums.
+    features_ms: Option<f64>,
     /// Our slowest features in it (name, ms).
     slowest: Vec<(String, f64)>,
     /// Features at least ×10 and 50 ms slower than live's own time for them:
@@ -48,7 +50,7 @@ struct ModelResult {
 fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelResult {
     let mut ctx = Ctx::new();
     let path = scratch(&format!("{name}.noshape"));
-    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, untranslated: Vec::new(), regen_ms: None, open_ms: 0.0, list_ms: 0.0, slowest: Vec::new(), slow_features: Vec::new(), custom_compared: 0, custom_matching: 0, custom: Vec::new(), std_pins: Vec::new(), unfetched: Vec::new() };
+    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, untranslated: Vec::new(), regen_ms: None, open_ms: 0.0, list_ms: 0.0, features_ms: None, slowest: Vec::new(), slow_features: Vec::new(), custom_compared: 0, custom_matching: 0, custom: Vec::new(), std_pins: Vec::new(), unfetched: Vec::new() };
     // refs.jsonl wins over the geometry read from live's bodydetails.
     let mut all = refs_from_bodies(live);
     all.extend(parse_refs(refs));
@@ -147,6 +149,7 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         res.regen_ms = Some((t0.elapsed().as_secs_f64() * 1000.0, live.iter().find_map(|l| l["full_regen_ms"].as_f64())));
         // Its slowest features (the Regeneration times panel's).
         if let Some(Ok(list)) = list {
+            res.features_ms = list.value["regen_ms"].as_f64();
             for f in list.value["features"].as_array().into_iter().flatten() {
                 let (Some(id), Some(name), Some(ours)) = (f["id"].as_str(), f["name"].as_str(), f["regen_ms"].as_f64()) else { continue };
                 if let Some(l) = live_times.get(id).filter(|l| ours >= 10.0 * l.max(1.0) && ours - **l >= 50.0) {
@@ -321,7 +324,7 @@ fn parity_models() {
         };
         let r = run_model(&name, &features, &live, &refs);
         let speed = match r.regen_ms {
-            Some((ours, Some(l))) => format!("; reopened and regenerated in {ours:.0} ms (open {:.0} ms, regenerate {:.0} ms; live full regeneration {l:.0} ms)", r.open_ms, r.list_ms),
+            Some((ours, Some(l))) => format!("; regenerated in {:.0} ms, live {l:.0} ms (its features' times; reopened, listed and measured in {ours:.0} ms: open {:.0} ms, feature list {:.0} ms with the display)", r.features_ms.unwrap_or(r.list_ms), r.open_ms, r.list_ms),
             Some((ours, None)) => format!("; reopened and regenerated in {ours:.0} ms (open {:.0} ms, regenerate {:.0} ms)", r.open_ms, r.list_ms),
             None => String::new(),
         };
@@ -355,9 +358,9 @@ fn parity_models() {
     let (custom_matching, custom_total) = results.iter().fold((0, 0), |(m, t), r| (m + r.custom_matching, t + r.custom_compared));
     let custom_failed = results.iter().filter(|r| !r.custom.is_empty()).count();
     println!("parity_models score: {docs}/{} documents match to the end, {matching}/{total} features match; custom features {custom_matching}/{custom_total}, {custom_failed} documents with custom features failing to compile / run", whole.len());
-    // Speed (PLAN 2.7): our regeneration of the reopened document against
-    // the sum of live's features' regeneration times.
-    let mut slower: Vec<(f64, &str, f64, f64)> = results.iter().filter_map(|r| Some((r.list_ms, r.regen_ms?.1?, r.name.as_str()))).filter(|(ours, l, _)| ours > l).map(|(ours, l, n)| (ours / l.max(1.0), n, ours, l)).collect();
+    // Speed (PLAN 2.7): the sum of our features' regeneration times (the reopened document's Regeneration times
+    // panel) against the sum of live's; the display mesh and the file's opening are apart in each document's line.
+    let mut slower: Vec<(f64, &str, f64, f64)> = results.iter().filter_map(|r| Some((r.features_ms.unwrap_or(r.list_ms), r.regen_ms?.1?, r.name.as_str()))).filter(|(ours, l, _)| ours > l).map(|(ours, l, n)| (ours / l.max(1.0), n, ours, l)).collect();
     slower.sort_by(|a, b| b.0.total_cmp(&a.0));
     let timed = results.iter().filter(|r| r.regen_ms.is_some_and(|t| t.1.is_some())).count();
     println!("speed: {} of {timed} documents regenerate slower than live{}", slower.len(), slower.iter().map(|(x, n, o, l)| format!("; {n} {o:.0} ms, live {l:.0} ms (×{x:.1})")).collect::<String>());
