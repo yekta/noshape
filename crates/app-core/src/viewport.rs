@@ -223,6 +223,8 @@ pub struct Viewport {
     /// Frames go to a layer under the window (`Gpu::attach_layer`): GPUI paints a hole where the viewport is and
     /// doesn't redraw for them.
     underlay: bool,
+    /// The layer was asked for once (attaching isn't retried every paint when it can't be done).
+    underlay_tried: bool,
     /// The camera and frame texture size of the last render: a new frame
     /// texture of that size for that camera needs no re-render (overlays
     /// such as the view cube follow the camera), only a present.
@@ -555,6 +557,7 @@ impl Viewport {
             shown_texture: None,
             retired_textures: Vec::new(),
             underlay: false,
+            underlay_tried: false,
             rendered: None,
             traced_camera: None,
             cube: None,
@@ -1463,10 +1466,11 @@ impl Viewport {
     /// Once frames stay on the GPU, present them to a layer under the window from now on (macOS,
     /// [`Gpu::layers_enabled`]): the window shows a hole there and redraws only when its own content changes.
     fn attach_underlay(&mut self, window: &Window) {
-        if self.underlay {
+        if self.underlay || self.underlay_tried {
             return;
         }
         let Some(texture) = self.shown_texture.clone() else { return };
+        self.underlay_tried = true;
         let Some(layer) = window.underlay_layer(self.target_id) else { return };
         if !self.gpu.attach_layer(self.target_id, layer, Some(&texture)) {
             return;

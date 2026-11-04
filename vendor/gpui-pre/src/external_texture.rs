@@ -107,6 +107,11 @@ pub fn underlay_hole_for_atlas_id(id: AtlasTextureId) -> Option<u64> {
     external_texture_for_atlas_id(id)?.texture.downcast_ref::<UnderlayHole>().map(|h| h.0)
 }
 
+/// Whether an [`UnderlayHole`] for `key` is registered (its layer is still wanted).
+pub fn underlay_hole_registered(key: u64) -> bool {
+    registry().lock().values().any(|t| t.texture.downcast_ref::<UnderlayHole>().is_some_and(|h| h.0 == key))
+}
+
 /// The texture registered under `id`.
 pub fn external_texture(id: ExternalTextureId) -> Option<ExternalTexture> {
     registry().lock().get(&id).cloned()

@@ -2073,7 +2073,7 @@ impl PlatformWindow for MacWindow {
         let mut this = self.0.lock();
         this.renderer.draw(scene);
         if !this.underlays.is_empty() {
-            place_underlays(&this);
+            place_underlays(&mut this);
         }
     }
 
@@ -2410,8 +2410,16 @@ impl rwh::HasDisplayHandle for MacWindow {
 }
 
 /// NOSHAPE PATCH (agent psui): each underlay's NSView where the last draw put its hole, hidden in a frame without
-/// one. Core Animation's implicit animations are off: the layer jumps with the frame.
-fn place_underlays(state: &MacWindowState) {
+/// one, removed once its hole is no longer registered (its viewport is gone). Core Animation's implicit animations
+/// are off: the layer jumps with the frame.
+fn place_underlays(state: &mut MacWindowState) {
+    state.underlays.retain(|(key, view, _)| {
+        let keep = gpui::underlay_hole_registered(*key);
+        if !keep {
+            view.removeFromSuperview();
+        }
+        keep
+    });
     let scale = get_scale_factor(state.native_window) as f64;
     // SAFETY: main-thread AppKit / Core Animation calls on the window's own views.
     unsafe {
