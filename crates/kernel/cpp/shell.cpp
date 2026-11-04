@@ -4654,6 +4654,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     an.MergeEdgeMode()      = false;
     an.ContinuityMode()     = false;
     an.CurveOnSurfaceMode() = false;
+    an.SetRunParallel(true);
     an.Perform();
     // (Only where an offset takes part: the part's own shapes can touch within their tolerances, Shell 4's two
     // vertices 0.1 mm apart, one 0.1 mm loose.)

@@ -1561,7 +1561,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   same parameters, its tolerance what they're apart); the self-interference check ignores the part's own shapes
   (two of its vertices 0.1 mm apart, one 0.1 mm loose). Shell corpus unchanged (211). T1 kernel shell::
   shell4_ramp_round_a_hole_on_a_skirt_shells_as_live. Left: 24 faces against live's 28; 2.4 s against 0.63 (the
-  self-interference check 1.7 s of it).
+  self-interference check 1.7 s of it). core 11-04 04:36: that check in parallel (OCCT's own): 1.7 -> 0.56 s, Shell 4
+  1.26 s; next the marched edges (0.4 s).
 - [ ] P0 REGEN-SPEED (core 10-29 03:05: met in release on perf.yml run 40796942944 (main 34cbea98): live-30-features full regen 35 / 41 / 53 ms (macOS / Linux / Windows; budget 80, live 171), its Extrude 1 edit commit 34 / 38 / 60 ms (budget 200), big-plate regen 159 / 230 / 306 ms (live 617); qa, please re-measure the GUI commit on a release build, the 301–785 ms were a dev build at load ~30. Was 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left
