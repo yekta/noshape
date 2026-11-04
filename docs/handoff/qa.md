@@ -36,6 +36,18 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-04 20:44:** **Xvfb :110, :131 and :149 are gone locally** (with the updater app on :149): qa's GUI checks now run on vibe3
+under qa's own Xvfb displays — :61 the GUI fuzz, :63 the release GUI rows (vibe3 ~/qa/bin/qa-relgui<NNN>.sh: the local script
+with paths rewritten, :63, no fuzz-pause lines), :64 the updater app (vibe3 ~/qa/updhome, HOME=that; it took v0.4.27 → v0.4.28:
+found / verified / staged on start, Restart → 0.4.28, g34 reopened; qa-scratch/upd428-0/-1.png), :65 one-off app checks.
+**v0.4.28** (published 19:56, cut 71bc7202 = main 68f3378a: greens through 771c24c0 + 634c8ca6) so far: artifacts byte-identical,
+SHA256SUMS OK; CLI smoke = v0.4.27 (round trip, volume sweep, all fixed tickets, the user's cases); updater works; GUI rows and the
+44 ticket documents running on vibe3; memory run on vibe3 (~/qa/cli/rss*-r428.txt).
+**New user's case (lead, P0): the Gyro.** P0 SPLIT-FACE-SAME-ID filed: one Split across several bodies gives their cut faces one id.
+Repro + matrix: bin/splitface_matrix.py (chamfer / fillet / shell / Move face / delete face on one body's cut face; Gyro and the
+generic tickets/gyro/qa-3box.noshape), tickets/gyro/chamfer1.py; both in qa-presmoke.sh now. Verify when core's fix lands: only
+the picked body may change, and every op Ok or failing for its own reason.
+
 **v0.4.27 (published 18:26, cut 7f0a43a2 = v0.4.26 + lead da79fadca: .gitattributes keeps std sources LF on a Windows
 checkout — a Windows-only patch, not on main) smoked 18:27–18:42: good, = v0.4.26.** Artifacts byte-identical to the Release run's
 (41876313694, all checks green), SHA256SUMS OK, 11 assets; CLI / app "0.4.27"; round trip, volume sweep, fixed tickets (incl.
