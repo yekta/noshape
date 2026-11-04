@@ -16,6 +16,13 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-04 00:45 UTC.**
+- Landed / queued since 00:30: Shell's quadric fold check (own surface, signed); BLEND-RUST arc corners (queued: fillets
+  of arcs meeting at a corner, a NURBS meeting curve; rust_blend.cpp reads NURBS edges). The knob's outline is live's
+  through it; its whole Fillet 1 needs the mixed run (TICKETS FILLET-KNOB-JASON-VOLUME).
+- Next: the mixed run; then BLEND-RUST vertex blends between tori (stef-radijator, knob Fillet 2's spheres); end-of-day
+  walk ~04:00.
+
 **State 11-04 00:28 UTC.**
 - Since 23:20: the torus merge landed (main green 23:46); queued: whole-result cache keeps 32 full results only
   (REGEN-SPEED's third undo, qa to re-time). Tried and not landed (TICKETS notes): ChFi3d 10x tighter (knob Fillet 1's
