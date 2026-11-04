@@ -3963,7 +3963,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   bend's faces carry live's areas, 57.615 / 19.205 mm²; the other thickens into slivers: end planes 0.716, 0.715,
   0.143 mm² where live has 5.121). Replacing each fillet by the exact cylinder through its tangent lines (revolve
   of one about the axis) gave 54 faces but area +0.23 %: the arc side is wrong on one of them; settle it in the
-  T1 case with a second bend of the other hand.
+  T1 case with a second bend of the other hand. dx 23:44: the T1 cases (both hands, a
+  spline rolled wall) build exactly with the exact cylinders, so they're in (T1 a_bend_beside_a_spline_rolled_wall_
+  is_a_cylinder). Up to Part: 54/124/72 against 50/112/76, live's volume, area 8,812.57 against 8,792.51 (+0.23 %);
+  the rest is elsewhere in the part (4 faces, 12 edges).
   dx 11-04 21:39: cf-sheet-metal-shaped-flange's Shaped Flange 1 (flange a separate part, 78,922 vs 92,510 mm³):
   the definition sheet joins (the flange shares its partial edge with the base), but `addEdge` (its transient
   query ∪ startTracking) resolves to two edges after flangeEdgeChange + flange_boolean: the moved joint edge (z 2.5,

@@ -1710,3 +1710,34 @@ fn bends_of_both_hands_beside_a_rolled_wall() {
     let want = (2.0 * length - 2.0 * q) * 15.0;
     assert!(parts == 1 && (volume_mm3(&r) - want).abs() < 1e-2, "{parts} parts, {faces} faces, {} mm³ (want {want}): {:#?}", volume_mm3(&r), face_report(&r));
 }
+
+/// A bend beside a spline rolled wall (cf-sheet-metal-model-plus's Up to Part, live 2031: its bends there are exact
+/// cylinders): a line (0,0)–(20,0) and a fit spline through (20,0), (23,6), (30,10), 15 mm, thickness 2, R1: one part,
+/// 14 faces, the bend's two a cylinder each (the kernel's own fillet against the spline is a B-spline), no slivers.
+#[test]
+fn a_bend_beside_a_spline_rolled_wall_is_a_cylinder() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = [(0.0, 0.0), (20.0, 0.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+    let line = sk.add_line_between(p[0], p[1]).unwrap();
+    let spline = sk.add_fit_spline(&[(20.0, 0.0), (23.0, 6.0), (30.0, 10.0)].map(|(x, y)| glam::DVec2::new(mm(x), mm(y)))).unwrap();
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    s.ok();
+    s.add("sheetMetalStart", |pv| {
+        pv.set("process", en("EXTRUDE"));
+        pv.set("sketchCurves", ParamValue::Query([line, spline].iter().map(|e| Reference::SketchEntity { sketch, entity: e.0 }).collect()));
+        pv.set("depth", expr("15 mm"));
+        pv.set("thickness", expr("2 mm"));
+        pv.set("radius", expr("1 mm"));
+    });
+    let r = s.ok();
+    let parts = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count();
+    let shape = &r.context.bodies[part(&r)].shape;
+    let faces = shape.faces();
+    let cylinders = faces.iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. }))).count();
+    let slivers = faces.iter().filter(|f| f.area().is_ok_and(|a| a < 1e-6)).count();
+    assert!(parts == 1 && faces.len() == 14 && cylinders == 2 && slivers == 0, "{parts} parts, {} faces, {cylinders} cylinders, {slivers} slivers, {} mm³: {:#?}", faces.len(), volume_mm3(&r), face_report(&r));
+}

@@ -1719,6 +1719,12 @@ fn curved_wall_bends(topo: &Topo, bends: &[(usize, usize, usize, Bend)]) -> Curv
         };
         let fillets: Option<Vec<Shape>> = picked.iter().map(|(i, _)| generated(*i)).collect();
         let Some(fillets) = fillets else { continue };
+        // Each the exact cylinder through its two tangent lines (the kernel approximates a fillet against a
+        // B-spline wall; Parasolid's, live 2031's, is a cylinder).
+        let fillets: Vec<Shape> = mine.iter().zip(fillets).map(|((e, _, _, b), f)| {
+            let (s, t) = topo.edge_ends[*e];
+            exact_bend_face(&f, (t - s).normalize_or_zero(), b.def_radius).unwrap_or(f)
+        }).collect();
         // The curved wall as the fillets left it: the result's face lying on the wall's middle.
         let (mid, _) = match face_normal(&topo.faces[c]) {
             Ok(x) => x,
@@ -1743,6 +1749,36 @@ fn curved_wall_bends(topo: &Topo, bends: &[(usize, usize, usize, Bend)]) -> Curv
         walls.insert(c, wall);
     }
     (by_edge, walls, setbacks)
+}
+
+/// Fillet face `f` along `dir` as the exact cylinder of `radius` through its two straight tangent edges, facing
+/// the same way.
+fn exact_bend_face(f: &Shape, dir: DVec3, radius: f64) -> Option<Shape> {
+    let lines: Vec<(DVec3, DVec3)> = f.edges().iter().filter_map(|e| e.endpoints().ok()).filter(|(a, b)| (*b - *a).length() > 1e-9 && (*b - *a).normalize().cross(dir).length() < 1e-6).collect();
+    let [(a0, a1), (b0, _)] = lines.as_slice() else { return None };
+    let flat = |p: DVec3| p - dir * (p - *a0).dot(dir);
+    let (a, b) = (*a0, flat(*b0));
+    let half = a.distance(b) * 0.5;
+    if half <= 1e-12 || half > radius {
+        return None;
+    }
+    let m = (a + b) * 0.5;
+    let perp = dir.cross(b - a).normalize();
+    let h = (radius * radius - half * half).max(0.0).sqrt();
+    let inside = flat(inner_point(f)?);
+    let c = [m + perp * h, m - perp * h].into_iter().min_by(|x, y| (inside.distance(*x) - radius).abs().total_cmp(&(inside.distance(*y) - radius).abs()))?;
+    let (ra, rb) = ((a - c).normalize(), (b - c).normalize());
+    let angle = ra.dot(rb).clamp(-1.0, 1.0).acos();
+    let axis = if ra.cross(rb).dot(dir) >= 0.0 { dir } else { -dir };
+    let mut face = k::revolve(&k::make_line(*a0, *a1).ok()?, c, axis, angle).ok()?.shape.faces().into_iter().next()?;
+    // Facing as the fillet did (the definition sheet's side).
+    let probe = c + (ra + rb).normalize() * radius;
+    if let (Ok(n0), Ok(n1)) = (f.normal_at_point(probe), face.normal_at_point(probe))
+        && n0.dot(n1) < 0.0
+    {
+        face = face.reversed().ok()?;
+    }
+    Some(face)
 }
 
 /// A rolled bend: definition face `fi` thickened (`front` along its normal).
