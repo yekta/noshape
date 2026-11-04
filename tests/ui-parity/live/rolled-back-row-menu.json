@@ -1,0 +1,335 @@
+{
+ "scenario": "rolled-back-row-menu",
+ "recorded": "2026-11-04T00:53:44.458Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)"
+ },
+ "live": {
+  "document": "372245a4cbbdaa48cb0bdfdb",
+  "workspace": "4c74b00690b3ab194f1c78a9",
+  "element": "53da14616bcd8e7cff26bae6",
+  "start": "block",
+  "startElement": "23614b0537e04a173a620e75"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "feature": "Sketch 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    70,
+    287
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Rename",
+      "Edit…",
+      "Copy sketch",
+      "Paste into sketch",
+      "Show dimensions",
+      "Add selection to folder…",
+      "Show",
+      "Create Drawing of Sketch 1…",
+      "Export as DXF/DWG…",
+      "Section view…",
+      "Suppress",
+      "Dynamic suppression",
+      "Add comment",
+      "Zoom to selection",
+      "View normal to",
+      "Show dependencies…",
+      "Roll to here",
+      "Edit sketch appearance…",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden fake-hover context-menu-active"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 22370
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Roll to here"
+    }
+   },
+   "ok": true,
+   "at": [
+    179,
+    672
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Extrude 1",
+       "state": "rolled-back",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "not-computed"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 56490
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Extrude 1",
+       "state": "rolled-back",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "not-computed"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 108923
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "feature": "Extrude 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    70,
+    339
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Rename",
+      "Add selection to folder…",
+      "Suppress",
+      "Dynamic suppression",
+      "Add comment",
+      "Roll to here",
+      "Roll to end",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Extrude 1",
+       "state": "rolled-back",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "not-computed fake-hover context-menu-active"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 143110
+  }
+ ]
+}

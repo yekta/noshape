@@ -483,6 +483,10 @@ T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this
   Found: Thicken 4 (L17) now = live; navigation 1.18's zoom-out stop needs live's plane-size rule (REQUESTS 03:00);
   SM-THICKEN-SKETCH-INFO and SM-MAKE-JOINT-ONE-EDGE (TICKETS, live G34 c2). assembly.md: ten rows had their evidence
   one column late (moved into Verified), LA12's `||` split its row.
+- 11-04 01:47 (psui): live 1954 answered the midpoint question: a click **resting** on a sketch line's midpoint selects
+  **nothing** (off the midpoint it selects the line): sketch-delete-line / sketch-vertical-constraint / sketch-offset's
+  differences are that. In the Part Studio ours now snaps a still dwell (250 ms) on an edge's midpoint to the
+  midpoint point (behaviors.rs MIDPOINT_DWELL); the sketch side is yours.
 - 11-01 03:00–04:00: landed b6ba4390 (SM-THICKEN-SKETCH-INFO), 42ce4965 (a dimension's menu starts Configure dimension,
   live's toast). GUI-stamped rows: assembly.md LA8/9/16/25/26/29/30/33/34/38/40/41/46/48/50, I13, K10, K28; advanced
   ADV3 / TAB1 rows; sketch 4.33 / 12.9. **Still unverified**: assembly.md K9 / K11 (snap-mode q / Ctrl: in snap mode

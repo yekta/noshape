@@ -1,0 +1,259 @@
+{
+ "scenario": "rib-dialog",
+ "recorded": "2026-11-04T00:53:12.607Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)"
+ },
+ "live": {
+  "document": "372245a4cbbdaa48cb0bdfdb",
+  "workspace": "4c74b00690b3ab194f1c78a9",
+  "element": "21caa2b6e29d0eed1d93c2ba",
+  "start": "block",
+  "startElement": "23614b0537e04a173a620e75"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Rib"
+    }
+   },
+   "ok": true,
+   "at": [
+    549,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Sketch profiles",
+     "dialog": "Rib 1"
+    },
+    "dialog": {
+     "title": "Rib 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch profiles",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Parts",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "2.5 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Parallel to sketch plane",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Draft",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Extend profiles to part",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Merge ribs",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Rib 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch profiles",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Parts",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "2.5 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Parallel to sketch plane",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Draft",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Extend profiles to part",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Merge ribs",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Rib 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Rib 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 27279
+  }
+ ]
+}

@@ -1,0 +1,2768 @@
+{
+ "scenario": "new-variable-then-use-at-once",
+ "recorded": "2026-11-04T00:28:41.760Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)"
+ },
+ "live": {
+  "document": "372245a4cbbdaa48cb0bdfdb",
+  "workspace": "4c74b00690b3ab194f1c78a9",
+  "element": "a7b4c57ea4517b4f406fd6da",
+  "start": "block",
+  "startElement": "23614b0537e04a173a620e75"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "key",
+    "key": "alt+c"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "search-tools",
+     "tag": "input",
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 27495
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "type",
+    "text": "Variable"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "search-tools",
+     "tag": "input",
+     "text": "Variable",
+     "selection": [
+      8,
+      8
+     ],
+     "all": false
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 30076
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Name",
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false,
+     "dialog": "#? = 0 mm"
+    },
+    "dialog": {
+     "title": "#? = 0 mm",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Assigned",
+       "selected": true
+      },
+      {
+       "label": "Measured",
+       "selected": false
+      },
+      {
+       "label": "From import",
+       "selected": false
+      },
+      {
+       "label": "Length",
+       "selected": true
+      },
+      {
+       "label": "Angle",
+       "selected": false
+      },
+      {
+       "label": "Number",
+       "selected": false
+      },
+      {
+       "label": "Any",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Name",
+       "kind": "text",
+       "text": "",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Value",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Description",
+       "kind": "text",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "#? = 0 mm",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Assigned",
+        "selected": true
+       },
+       {
+        "label": "Measured",
+        "selected": false
+       },
+       {
+        "label": "From import",
+        "selected": false
+       },
+       {
+        "label": "Length",
+        "selected": true
+       },
+       {
+        "label": "Angle",
+        "selected": false
+       },
+       {
+        "label": "Number",
+        "selected": false
+       },
+       {
+        "label": "Any",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Name",
+        "kind": "text",
+        "text": "",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Value",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Description",
+        "kind": "text",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "#? = 0 mm",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "#? = 0 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 35626
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Name"
+    }
+   },
+   "ok": true,
+   "at": [
+    364,
+    177
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Name",
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false,
+     "dialog": "#? = 0 mm"
+    },
+    "dialog": {
+     "title": "#? = 0 mm",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Assigned",
+       "selected": true
+      },
+      {
+       "label": "Measured",
+       "selected": false
+      },
+      {
+       "label": "From import",
+       "selected": false
+      },
+      {
+       "label": "Length",
+       "selected": true
+      },
+      {
+       "label": "Angle",
+       "selected": false
+      },
+      {
+       "label": "Number",
+       "selected": false
+      },
+      {
+       "label": "Any",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Name",
+       "kind": "text",
+       "text": "",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Value",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Description",
+       "kind": "text",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "#? = 0 mm",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Assigned",
+        "selected": true
+       },
+       {
+        "label": "Measured",
+        "selected": false
+       },
+       {
+        "label": "From import",
+        "selected": false
+       },
+       {
+        "label": "Length",
+        "selected": true
+       },
+       {
+        "label": "Angle",
+        "selected": false
+       },
+       {
+        "label": "Number",
+        "selected": false
+       },
+       {
+        "label": "Any",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Name",
+        "kind": "text",
+        "text": "",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Value",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Description",
+        "kind": "text",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "#? = 0 mm",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "#? = 0 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 40912
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "type",
+    "text": "wall_thickness"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Name",
+     "text": "wall_thickness",
+     "selection": [
+      14,
+      14
+     ],
+     "all": false,
+     "dialog": "#? = 0 mm"
+    },
+    "dialog": {
+     "title": "#? = 0 mm",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Assigned",
+       "selected": true
+      },
+      {
+       "label": "Measured",
+       "selected": false
+      },
+      {
+       "label": "From import",
+       "selected": false
+      },
+      {
+       "label": "Length",
+       "selected": true
+      },
+      {
+       "label": "Angle",
+       "selected": false
+      },
+      {
+       "label": "Number",
+       "selected": false
+      },
+      {
+       "label": "Any",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Name",
+       "kind": "text",
+       "text": "wall_thickness",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Value",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Description",
+       "kind": "text",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "#? = 0 mm",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Assigned",
+        "selected": true
+       },
+       {
+        "label": "Measured",
+        "selected": false
+       },
+       {
+        "label": "From import",
+        "selected": false
+       },
+       {
+        "label": "Length",
+        "selected": true
+       },
+       {
+        "label": "Angle",
+        "selected": false
+       },
+       {
+        "label": "Number",
+        "selected": false
+       },
+       {
+        "label": "Any",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Name",
+        "kind": "text",
+        "text": "wall_thickness",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Value",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Description",
+        "kind": "text",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "#? = 0 mm",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "#? = 0 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 44368
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Value"
+    }
+   },
+   "ok": true,
+   "at": [
+    363,
+    203
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Value",
+     "text": "0 mm",
+     "selection": [
+      0,
+      4
+     ],
+     "all": true,
+     "dialog": "#wall_thickness = 0 mm"
+    },
+    "dialog": {
+     "title": "#wall_thickness = 0 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Assigned",
+       "selected": true
+      },
+      {
+       "label": "Measured",
+       "selected": false
+      },
+      {
+       "label": "From import",
+       "selected": false
+      },
+      {
+       "label": "Length",
+       "selected": true
+      },
+      {
+       "label": "Angle",
+       "selected": false
+      },
+      {
+       "label": "Number",
+       "selected": false
+      },
+      {
+       "label": "Any",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Name",
+       "kind": "text",
+       "text": "wall_thickness",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Value",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Description",
+       "kind": "text",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "#wall_thickness = 0 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Assigned",
+        "selected": true
+       },
+       {
+        "label": "Measured",
+        "selected": false
+       },
+       {
+        "label": "From import",
+        "selected": false
+       },
+       {
+        "label": "Length",
+        "selected": true
+       },
+       {
+        "label": "Angle",
+        "selected": false
+       },
+       {
+        "label": "Number",
+        "selected": false
+       },
+       {
+        "label": "Any",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Name",
+        "kind": "text",
+        "text": "wall_thickness",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Value",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Description",
+        "kind": "text",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "#wall_thickness = 0 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "#wall_thickness = 0 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 49114
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "type",
+    "text": "2"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Value",
+     "text": "2",
+     "selection": [
+      1,
+      1
+     ],
+     "all": false,
+     "dialog": "#wall_thickness = 0 mm"
+    },
+    "dialog": {
+     "title": "#wall_thickness = 0 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Assigned",
+       "selected": true
+      },
+      {
+       "label": "Measured",
+       "selected": false
+      },
+      {
+       "label": "From import",
+       "selected": false
+      },
+      {
+       "label": "Length",
+       "selected": true
+      },
+      {
+       "label": "Angle",
+       "selected": false
+      },
+      {
+       "label": "Number",
+       "selected": false
+      },
+      {
+       "label": "Any",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Name",
+       "kind": "text",
+       "text": "wall_thickness",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Value",
+       "kind": "number",
+       "text": "2",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Description",
+       "kind": "text",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "#wall_thickness = 0 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Assigned",
+        "selected": true
+       },
+       {
+        "label": "Measured",
+        "selected": false
+       },
+       {
+        "label": "From import",
+        "selected": false
+       },
+       {
+        "label": "Length",
+        "selected": true
+       },
+       {
+        "label": "Angle",
+        "selected": false
+       },
+       {
+        "label": "Number",
+        "selected": false
+       },
+       {
+        "label": "Any",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Name",
+        "kind": "text",
+        "text": "wall_thickness",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Value",
+        "kind": "number",
+        "text": "2",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Description",
+        "kind": "text",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "#wall_thickness = 0 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "#wall_thickness = 0 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 50989
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Value",
+     "text": "2 mm",
+     "selection": [
+      0,
+      4
+     ],
+     "all": true,
+     "dialog": "#wall_thickness = 2 mm"
+    },
+    "dialog": {
+     "title": "#wall_thickness = 2 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Assigned",
+       "selected": true
+      },
+      {
+       "label": "Measured",
+       "selected": false
+      },
+      {
+       "label": "From import",
+       "selected": false
+      },
+      {
+       "label": "Length",
+       "selected": true
+      },
+      {
+       "label": "Angle",
+       "selected": false
+      },
+      {
+       "label": "Number",
+       "selected": false
+      },
+      {
+       "label": "Any",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Name",
+       "kind": "text",
+       "text": "wall_thickness",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Value",
+       "kind": "number",
+       "text": "2 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Description",
+       "kind": "text",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "#wall_thickness = 2 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Assigned",
+        "selected": true
+       },
+       {
+        "label": "Measured",
+        "selected": false
+       },
+       {
+        "label": "From import",
+        "selected": false
+       },
+       {
+        "label": "Length",
+        "selected": true
+       },
+       {
+        "label": "Angle",
+        "selected": false
+       },
+       {
+        "label": "Number",
+        "selected": false
+       },
+       {
+        "label": "Any",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Name",
+        "kind": "text",
+        "text": "wall_thickness",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Value",
+        "kind": "number",
+        "text": "2 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Description",
+        "kind": "text",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "#wall_thickness = 2 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "#wall_thickness = 2 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 54224
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "dblclick",
+    "on": {
+     "feature": "Extrude 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    70,
+    313
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Faces and sketch regions to extrude",
+     "dialog": "Extrude 1"
+    },
+    "dialog": {
+     "title": "Extrude 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Solid",
+       "selected": true
+      },
+      {
+       "label": "Surface",
+       "selected": false
+      },
+      {
+       "label": "Thin",
+       "selected": false
+      },
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Faces and sketch regions to extrude",
+       "kind": "query",
+       "items": [
+        "Face of Sketch 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Depth",
+       "kind": "number",
+       "text": "10 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Direction",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Starting offset",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Symmetric",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Draft",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Second end position",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Extrude 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Solid",
+        "selected": true
+       },
+       {
+        "label": "Surface",
+        "selected": false
+       },
+       {
+        "label": "Thin",
+        "selected": false
+       },
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Faces and sketch regions to extrude",
+        "kind": "query",
+        "items": [
+         "Face of Sketch 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Depth",
+        "kind": "number",
+        "text": "10 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Direction",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Starting offset",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Symmetric",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Draft",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Second end position",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Sketch 1",
+       "id": "JGC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      },
+      {
+       "name": "#wall_thickness = 2 mm",
+       "state": "rolled-back",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "not-computed"
+      }
+     ],
+     "rollbackAfter": "#wall_thickness = 2 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 88633
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Depth"
+    }
+   },
+   "ok": true,
+   "at": [
+    359,
+    257
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Depth",
+     "text": "10 mm",
+     "selection": [
+      0,
+      5
+     ],
+     "all": true,
+     "dialog": "Extrude 1"
+    },
+    "dialog": {
+     "title": "Extrude 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Solid",
+       "selected": true
+      },
+      {
+       "label": "Surface",
+       "selected": false
+      },
+      {
+       "label": "Thin",
+       "selected": false
+      },
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Faces and sketch regions to extrude",
+       "kind": "query",
+       "items": [
+        "Face of Sketch 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Depth",
+       "kind": "number",
+       "text": "10 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Direction",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Starting offset",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Symmetric",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Draft",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Second end position",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Extrude 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Solid",
+        "selected": true
+       },
+       {
+        "label": "Surface",
+        "selected": false
+       },
+       {
+        "label": "Thin",
+        "selected": false
+       },
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Faces and sketch regions to extrude",
+        "kind": "query",
+        "items": [
+         "Face of Sketch 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Depth",
+        "kind": "number",
+        "text": "10 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Direction",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Starting offset",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Symmetric",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Draft",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Second end position",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Sketch 1",
+       "id": "JGC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      },
+      {
+       "name": "#wall_thickness = 2 mm",
+       "state": "rolled-back",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "not-computed"
+      }
+     ],
+     "rollbackAfter": "#wall_thickness = 2 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 122367
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "type",
+    "text": "#wall"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Depth",
+     "text": "#wall",
+     "selection": [
+      5,
+      5
+     ],
+     "all": false,
+     "dialog": "Extrude 1"
+    },
+    "dialog": {
+     "title": "Extrude 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Solid",
+       "selected": true
+      },
+      {
+       "label": "Surface",
+       "selected": false
+      },
+      {
+       "label": "Thin",
+       "selected": false
+      },
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Faces and sketch regions to extrude",
+       "kind": "query",
+       "items": [
+        "Face of Sketch 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Depth",
+       "kind": "number",
+       "text": "#wall",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Direction",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Starting offset",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Symmetric",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Draft",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Second end position",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Extrude 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Solid",
+        "selected": true
+       },
+       {
+        "label": "Surface",
+        "selected": false
+       },
+       {
+        "label": "Thin",
+        "selected": false
+       },
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Faces and sketch regions to extrude",
+        "kind": "query",
+        "items": [
+         "Face of Sketch 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Depth",
+        "kind": "number",
+        "text": "#wall",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Direction",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Starting offset",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Symmetric",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Draft",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Second end position",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": {
+     "kind": "autocomplete",
+     "rows": [
+      "New variable…"
+     ],
+     "detail": [
+      "New variable…"
+     ],
+     "highlighted": 0
+    },
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Sketch 1",
+       "id": "JGC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      },
+      {
+       "name": "#wall_thickness = 2 mm",
+       "state": "rolled-back",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "not-computed"
+      }
+     ],
+     "rollbackAfter": "#wall_thickness = 2 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 153772
+  },
+  {
+   "step": 12,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Value",
+     "text": "10 mm",
+     "selection": [
+      0,
+      5
+     ],
+     "all": true,
+     "dialog": "Create variable"
+    },
+    "dialog": {
+     "title": "Create variable",
+     "titleState": "ok",
+     "kind": "create-variable",
+     "tabs": [
+      {
+       "label": "Feature",
+       "selected": true
+      },
+      {
+       "label": "Configuration",
+       "selected": false
+      },
+      {
+       "label": "Length",
+       "selected": true
+      },
+      {
+       "label": "Angle",
+       "selected": false
+      },
+      {
+       "label": "Number",
+       "selected": false
+      },
+      {
+       "label": "Any",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Name",
+       "kind": "text",
+       "text": "wall",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Value",
+       "kind": "number",
+       "text": "10 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Description",
+       "kind": "text",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Extrude 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Solid",
+        "selected": true
+       },
+       {
+        "label": "Surface",
+        "selected": false
+       },
+       {
+        "label": "Thin",
+        "selected": false
+       },
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Faces and sketch regions to extrude",
+        "kind": "query",
+        "items": [
+         "Face of Sketch 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Depth",
+        "kind": "number",
+        "text": "#wall",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Direction",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Starting offset",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Symmetric",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Draft",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Second end position",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     },
+     {
+      "title": "Create variable",
+      "titleState": "ok",
+      "kind": "create-variable",
+      "tabs": [
+       {
+        "label": "Feature",
+        "selected": true
+       },
+       {
+        "label": "Configuration",
+        "selected": false
+       },
+       {
+        "label": "Length",
+        "selected": true
+       },
+       {
+        "label": "Angle",
+        "selected": false
+       },
+       {
+        "label": "Number",
+        "selected": false
+       },
+       {
+        "label": "Any",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Name",
+        "kind": "text",
+        "text": "wall",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Value",
+        "kind": "number",
+        "text": "10 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Description",
+        "kind": "text",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Sketch 1",
+       "id": "JGC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      },
+      {
+       "name": "#wall_thickness = 2 mm",
+       "state": "rolled-back",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "not-computed"
+      }
+     ],
+     "rollbackAfter": "#wall_thickness = 2 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 185253
+  },
+  {
+   "step": 13,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Value",
+     "text": "10 mm",
+     "selection": [
+      0,
+      5
+     ],
+     "all": true,
+     "dialog": "Create variable"
+    },
+    "dialog": {
+     "title": "Create variable",
+     "titleState": "ok",
+     "kind": "create-variable",
+     "tabs": [
+      {
+       "label": "Feature",
+       "selected": true
+      },
+      {
+       "label": "Configuration",
+       "selected": false
+      },
+      {
+       "label": "Length",
+       "selected": true
+      },
+      {
+       "label": "Angle",
+       "selected": false
+      },
+      {
+       "label": "Number",
+       "selected": false
+      },
+      {
+       "label": "Any",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Name",
+       "kind": "text",
+       "text": "wall",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Value",
+       "kind": "number",
+       "text": "10 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Description",
+       "kind": "text",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Extrude 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Solid",
+        "selected": true
+       },
+       {
+        "label": "Surface",
+        "selected": false
+       },
+       {
+        "label": "Thin",
+        "selected": false
+       },
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Faces and sketch regions to extrude",
+        "kind": "query",
+        "items": [
+         "Face of Sketch 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Depth",
+        "kind": "number",
+        "text": "#wall",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Direction",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Starting offset",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Symmetric",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Draft",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Second end position",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     },
+     {
+      "title": "Create variable",
+      "titleState": "ok",
+      "kind": "create-variable",
+      "tabs": [
+       {
+        "label": "Feature",
+        "selected": true
+       },
+       {
+        "label": "Configuration",
+        "selected": false
+       },
+       {
+        "label": "Length",
+        "selected": true
+       },
+       {
+        "label": "Angle",
+        "selected": false
+       },
+       {
+        "label": "Number",
+        "selected": false
+       },
+       {
+        "label": "Any",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Name",
+        "kind": "text",
+        "text": "wall",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Value",
+        "kind": "number",
+        "text": "10 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Description",
+        "kind": "text",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Sketch 1",
+       "id": "JGC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      },
+      {
+       "name": "#wall_thickness = 2 mm",
+       "state": "rolled-back",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "not-computed"
+      }
+     ],
+     "rollbackAfter": "#wall_thickness = 2 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 237895
+  }
+ ]
+}
