@@ -699,5 +699,13 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const after = evaluateQuery(context, tracked);
             check("startTracking of a sketch line", before == 0 && size(after) >= 1 && size(evaluateQuery(context, qSketchFilter(qUnion(after), SketchObject.YES))) == 0, [before, size(after)]);
         });
+        step(context, id, "fitSplineDerivatives", function(sub) {
+            // Two points and their derivatives (std's parameter on [0, 1]): the cubic Hermite, through
+            // (P0 + P1) / 2 + (D0 - D1) / 8 at its middle (the Hose Routing feature's segments).
+            const z = 4800;
+            opFitSpline(context, sub + "s", { "points" : [vector(0, 0, z) * mm, vector(100, 0, z) * mm], "startDerivative" : vector(0, 100, 0) * mm, "endDerivative" : vector(0, -100, 0) * mm });
+            const d = evDistance(context, { "side0" : qCreatedBy(sub + "s", EntityType.EDGE), "side1" : vector(50, 25, z) * mm }).distance;
+            check("opFitSpline with derivatives", d < 1e-6 * mm, d);
+        });
         println("done");
     });

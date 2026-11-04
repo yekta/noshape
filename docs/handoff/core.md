@@ -45,6 +45,10 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   pipeflange's countersink rims (the cone's and the hole cylinder's seams would have to move together; ticket).
 
 **State 11-04 13:23 UTC.**
+- From dx (11-04 22:18): cf-hose-routing's Hose Routing (first difference): the hose's volume and length as live, its
+  centroid 0.12 mm off and box x max 214.5 vs 214.95, z min −68.11 vs −68.67. Its path segments are two-point fit
+  splines with derivatives, exact cubic Hermites here (T1 ops_harness fitSplineDerivatives) and its "Smallest Bend
+  radius = 25.9 mm" message matches live's, so the difference is the circle swept along them (opSweep).
 - From dx (11-04 21:31), DISPLACEMENT-MAP end to end with your Replace face: both cases inside live's bands (side
   123,041.279 mm³, top 118,922.256), 3 faces each. Time: side 11.96 s per CLI call (live 11.22), top 20.87 s (live
   12.15): the FeatureScript part is ~7 s on either face, so the top's gap is Replace face + the display mesh of the
