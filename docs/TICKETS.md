@@ -3472,7 +3472,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (22.45, ±1.42, 20). Live doesn't round that arc: its result has no torus (behaviours "core (2026-11-04 00:09)":
   72 new cylinders + 2 planes = 36 rounds and the faces they trim), ours rounds it (a torus, 82 faces against 81,
   11177.195 mm³ against live's 11179.174). So the 20th query is most likely one of the vertical edges again. Without
-  the arc, noshape's blend takes the whole fillet (every chain one vertical edge; with it OCCT's 171 ms, live 31).
+  the arc (the dumped fillet, kernel T2 blend::dumped_fillet_faces_probe) the result is live's: 81 faces, 11179.174277
+  mm³, 5211.1405 mm². (Still OCCT's, ~170 ms against live's 31: noshape's blend wants a planar face along each
+  edge, and these run between two cylinders; BLEND-RUST.)
 
 - [ ] P1 PARITY-SPEED (core; dx's parity suite 11-03 run 31, the runner's new "speed:" line) 10 of the 41 corpus
   documents with live's times regenerate slower than live (ours: the reopened document's regeneration on vibe5;
