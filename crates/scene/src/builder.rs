@@ -1613,35 +1613,84 @@ pub fn connector_glyphs(display: &StudioDisplay, lit: impl Fn(&Reference) -> Con
 /// entity's inference points as small white dots, and the one nearest the pointer as a hovered connector glyph.
 /// Shared by the Part Studio (Mate connector, in-feature connectors) and the assembly (mates, snap mode).
 pub struct InferenceMarks {
-    dots: Vec<DVec3>,
+    marks: Vec<InferenceMark>,
     glyph: ConnectorGlyphs,
 }
 
+/// One inference point: its origin, X and Z (the plane its mark lies in), and whether it is a corner (a vertex:
+/// the bigger mark).
+#[derive(Clone, Copy, Debug)]
+pub struct InferenceMark {
+    pub origin: DVec3,
+    pub x: DVec3,
+    pub z: DVec3,
+    pub corner: bool,
+}
+
+impl From<(DVec3, DVec3, DVec3)> for InferenceMark {
+    fn from((origin, x, z): (DVec3, DVec3, DVec3)) -> Self {
+        Self { origin, x, z, corner: false }
+    }
+}
+
+/// Live (psui/hole-mc-1851/4): a corner's mark is a ~12 px disc, an edge midpoint's (and the other points') ~8 px,
+/// both lying in the point's plane (ellipses at an angle), white with a thin grey rim.
+const MARK_CORNER_PX: f64 = 6.0;
+const MARK_POINT_PX: f64 = 4.0;
+
 impl InferenceMarks {
-    /// `points`: each point's origin, X and Z; `chosen` the one under the pointer.
-    pub fn new(points: impl IntoIterator<Item = (DVec3, DVec3, DVec3)>, chosen: Option<usize>) -> Arc<Self> {
-        let mut dots = Vec::new();
+    /// `points`: each point's mark (an `(origin, x, z)` is a non-corner one); `chosen` the one under the pointer.
+    pub fn new<P: Into<InferenceMark>>(points: impl IntoIterator<Item = P>, chosen: Option<usize>) -> Arc<Self> {
+        let mut marks = Vec::new();
         let mut items = Vec::new();
-        for (i, (o, x, z)) in points.into_iter().enumerate() {
+        for (i, m) in points.into_iter().map(Into::into).enumerate() {
             if Some(i) == chosen {
-                items.push((o, x, z.cross(x), z, ConnectorLook::Hovered));
+                items.push((m.origin, m.x, m.z.cross(m.x), m.z, ConnectorLook::Hovered));
             } else {
-                dots.push(o);
+                marks.push(m);
             }
         }
-        Arc::new(Self { dots, glyph: ConnectorGlyphs { items } })
+        Arc::new(Self { marks, glyph: ConnectorGlyphs { items } })
     }
 }
 
 impl noshape_render::camera_geometry::CameraGeometry for InferenceMarks {
     fn build(&self, view: &noshape_render::camera_geometry::View, up: &Uploader) -> Vec<Instance> {
         let mut out = noshape_render::camera_geometry::CameraGeometry::build(&self.glyph, view, up);
-        if !self.dots.is_empty() {
-            // Live (qa5/asm-041): white with a soft grey rim, hidden behind other parts.
-            let sprite = |p: &DVec3, color: [u8; 4], size: f32| PointSprite { position: p.as_vec3().into(), color, pick_id: 0, size, style: 0, _pad: 0 };
-            let points = self.dots.iter().flat_map(|p| [sprite(p, [0x9f, 0x9f, 0x9f, 255], 7.0), sprite(p, [0xfd, 0xfd, 0xfd, 255], 5.0)]).collect();
-            out.push(Instance::new(Drawable::Points(up.upload_points(&PointData { points }))).per_primitive_color().unpickable().ignore_clip().layer(22));
+        if self.marks.is_empty() {
+            return out;
         }
+        const N: usize = 24;
+        let f = |p: DVec3| -> [f32; 3] { p.as_vec3().into() };
+        let mut m = MeshData { positions: Vec::new(), normals: Vec::new(), pick_ids: Vec::new(), indices: Vec::new() };
+        let mut rim = LineData::default();
+        for mk in &self.marks {
+            let Some(px) = view.world_per_px(mk.origin) else { continue };
+            let (z, x) = (mk.z.normalize_or_zero(), mk.x.normalize_or_zero());
+            let y = z.cross(x);
+            let r = px * if mk.corner { MARK_CORNER_PX } else { MARK_POINT_PX };
+            // 3 px toward the eye: over the face and its edge lines (live: the white disc covers the outline), with
+            // no shift on screen; other parts in front still hide it.
+            let o = mk.origin - view.camera.forward().normalize_or_zero() * (3.0 * px);
+            let at = |k: usize| {
+                let a = k as f64 / N as f64 * std::f64::consts::TAU;
+                o + x * (r * a.cos()) + y * (r * a.sin())
+            };
+            let base = m.positions.len() as u32;
+            m.positions.push(f(o));
+            m.positions.extend((0..N).map(|k| f(at(k))));
+            for k in 0..N as u32 {
+                m.indices.extend([base, base + 1 + k, base + 1 + (k + 1) % N as u32]);
+            }
+            let ring: Vec<[f32; 3]> = (0..=N).map(|k| f(at(k % N))).collect();
+            rim.push_polyline(&ring, [0x9f, 0x9f, 0x9f, 255], 0, 1.0, 0);
+        }
+        let n = m.positions.len();
+        m.normals = vec![[0.0, 0.0, 1.0]; n];
+        m.pick_ids = vec![0; n];
+        let white = theme::lin(0xfdfdfd);
+        out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([white[0], white[1], white[2], 1.0]).unlit().unpickable().ignore_clip().layer(22));
+        out.push(Instance::new(Drawable::Lines(up.upload_lines(&rim))).per_primitive_color().unpickable().ignore_clip().layer(22));
         out
     }
 }
@@ -1846,3 +1895,22 @@ mod connector_zoom_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod inference_mark_tests {
+    use super::{InferenceMark, InferenceMarks};
+    use glam::DVec3;
+
+    /// The point under the pointer becomes the connector glyph, the others marks; a plain (origin, x, z) is a
+    /// non-corner mark (MC-INFERENCE-DOTS: corners ~12 px, other points ~8 px).
+    #[test]
+    fn the_chosen_point_is_the_glyph_and_corners_keep_their_kind() {
+        let p = |x: f64, corner| InferenceMark { origin: DVec3::new(x, 0.0, 0.0), x: DVec3::X, z: DVec3::Z, corner };
+        let m = InferenceMarks::new([p(0.0, true), p(1.0, false), p(2.0, true)], Some(1));
+        assert_eq!(m.glyph.items.len(), 1);
+        assert_eq!(m.marks.iter().map(|k| (k.origin.x, k.corner)).collect::<Vec<_>>(), vec![(0.0, true), (2.0, true)]);
+        let plain = InferenceMarks::new([(DVec3::ZERO, DVec3::X, DVec3::Z)], None);
+        assert!(!plain.marks[0].corner);
+    }
+}
+

@@ -81,7 +81,9 @@ impl PartStudioView {
             return false;
         }
         i.choice = choice;
-        i.marks = Some(scene_builder::InferenceMarks::new(points.iter().map(|p| (p.frame.origin, p.frame.x(), p.frame.z())), choice));
+        let corner = |r: &Reference| matches!(r, Reference::Implicit { inference: noshape_model::reference::Inference::Vertex, .. });
+        let marks = points.iter().map(|p| scene_builder::InferenceMark { origin: p.frame.origin, x: p.frame.x(), z: p.frame.z(), corner: corner(&p.reference) });
+        i.marks = Some(scene_builder::InferenceMarks::new(marks, choice));
         true
     }
 
