@@ -3280,6 +3280,76 @@ export const depthPattern = defineFeature(function(context is Context, id is Id,
     }
 }
 
+/// PATTERN-INSTANCE-REFS (live cf-linear-pattern-with-seed-location): std applyPattern re-running an Extrude and the
+/// Draft of its sides: each instance's Draft drafts that instance's boss (std runs an instance's features under its
+/// id). A 60 × 20 × 10 block, a 10 × 10 boss to z = 20 added, its sides drafted 10° about the block's top, both
+/// patterned 30 mm along x: the copy takes off what the Draft took off the seed.
+#[test]
+fn a_feature_list_rerun_drafts_its_instances_boss() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Shift" }
+export const shift = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Features" }
+        definition.features is FeatureList;
+    }
+    {
+        applyPattern(context, id, { "patternType" : PatternType.FEATURE, "instanceFunction" : definition.features,
+                "fullFeaturePattern" : true, "transforms" : [transform(vector(30, 0, 0) * millimeter)], "instanceNames" : ["1"] }, identityTransform());
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    let extrude = |ps: &mut PartStudio, (x0, y0, x1, y1): (f64, f64, f64, f64), depth: &str, op: &str| {
+        let mut sk = noshape_sketch::Sketch::new();
+        sk.corner_rectangle(glam::DVec2::new(x0 * 1e-3, y0 * 1e-3), glam::DVec2::new(x1 * 1e-3, y1 * 1e-3));
+        let mut s = ps.new_feature("sketch", &fx.units).unwrap();
+        s.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(noshape_model::reference::DatumPlane::Top)]));
+        s.params.set("sketch", ParamValue::Sketch(Box::new(noshape_model::sketch_feature::SketchData { sketch: sk, ..Default::default() })));
+        let sid = s.id;
+        ps.features.push(s);
+        let r = fx.regen(&mut Regenerator::new(), ps);
+        let region: Vec<Reference> = r.display.sketches.iter().find(|g| g.feature == sid).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: sid, key: g.key.clone() }).collect();
+        let mut x = ps.new_feature("extrude", &fx.units).unwrap();
+        x.params.set("entities", ParamValue::Query(region));
+        x.params.set("depth", expr(depth));
+        x.params.set("operationType", ParamValue::Enum(op.into()));
+        x.params.set("defaultScope", ParamValue::Bool(true));
+        let id = x.id;
+        ps.features.push(x);
+        id
+    };
+    extrude(&mut ps, (0.0, 0.0, 60.0, 20.0), "10 mm", "NEW");
+    let volume = |r: &RegenResult| r.context.bodies.iter().map(|b| b.shape.volume().unwrap() * 1e9).sum::<f64>();
+    let v_block = volume(&fx.regen(&mut Regenerator::new(), &ps));
+    let boss = extrude(&mut ps, (5.0, 5.0, 15.0, 15.0), "20 mm", "ADD");
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    let b = &r.context.bodies[0];
+    let faces = |f: &dyn Fn(glam::DVec3) -> bool| -> Vec<Reference> { b.shape.faces().iter().zip(&b.faces).filter(|(x, _)| f(x.centroid().unwrap() * 1e3)).map(|(_, n)| Reference::Face((**n).clone())).collect() };
+    let (sides, top) = (faces(&|c| c.z > 10.0 && c.z < 20.0), faces(&|c| (c.z - 10.0).abs() < 1e-6));
+    assert_eq!((sides.len(), top.len()), (4, 1));
+    let mut d = ps.new_feature("draft", &fx.units).unwrap();
+    d.params.set("neutralPlane", ParamValue::Query(top));
+    d.params.set("draftFaces", ParamValue::Query(sides));
+    d.params.set("angle", expr("10 deg"));
+    let did = d.id;
+    ps.features.push(d);
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+    let drafted = volume(&r) - v_block;
+    assert!(drafted < 1000.0 - 1.0, "the Draft takes material off: {drafted}");
+    let mut f = ps.new_feature(&fx.ty("shift"), &fx.units).unwrap();
+    f.params.set("features", ParamValue::Query(vec![Reference::Feature(boss), Reference::Feature(did)]));
+    ps.features.push(f);
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+    let v = volume(&r) - v_block;
+    assert!((v - 2.0 * drafted).abs() < 1e-6 * v, "two drafted bosses {}, got {v}", 2.0 * drafted);
+}
+
 /// PARITY-CUSTOM-RUN-FAILURES (cf-setback-fillet): the edges an opSplitFace made stay `qCreatedBy` it after
 /// opDeleteFace leaves the body open there (a solid becomes an open sheet, `leaveOpen`); an opFillSurface over them
 /// joined with `makeSolid` closes it again: the 10 mm cube back.

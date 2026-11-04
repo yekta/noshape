@@ -135,6 +135,14 @@ fn feature_list_function(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     };
     let Some(def) = def else { return Err(i.error("A picked feature cannot be re-run")) };
     let params = crate::regen::eval::expand_query_variables(&def.params, &cx.state.lock().ctx).unwrap_or(def.params.clone());
+    // What the picked features run before it in this instance made: theirs under the instance's id.
+    let params = {
+        let st = cx.state.lock();
+        let under = |f: crate::reference::FeatureId| super::marker_of(&instance.iter().cloned().chain([std::sync::Arc::from(f.to_string())]).collect::<Vec<_>>());
+        let before: Vec<_> = st.feature_defs.iter().map(|g| g.id).filter(|&f| f != def.id && st.ops.contains_key(&under(f))).collect();
+        let copy = |n: &crate::naming::Name| before.iter().fold(n.clone(), |n, &f| crate::regen::features::pattern::rebased_name(&n, f, under(f)));
+        if before.is_empty() { None } else { crate::regen::features::pattern::instance_references(&st.ctx, &params, &copy) }.unwrap_or(params)
+    };
     // Each picked feature under the instance's id (std calls them all with it), its own id appended.
     let mut id = instance;
     id.extend(picked);

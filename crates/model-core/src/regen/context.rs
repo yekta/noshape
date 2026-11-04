@@ -248,6 +248,8 @@ pub struct SketchResult {
     pub dimension_text: BTreeMap<u32, String>,
     /// Inserted images (Insert image): drawn in their solved boxes.
     pub images: Vec<SketchResultImage>,
+    /// Its regions' edges run their loops' way, not their curves' ([`Context::legacy_edge_directions`]).
+    pub legacy_edge_directions: bool,
 }
 
 /// An inserted sketch image: its box corner points and encoded file.
@@ -550,6 +552,8 @@ pub struct Context {
     /// The studio's sketches on construction planes keep the planes' own frames
     /// ([`crate::partstudio::PartStudio::legacy_plane_sketch_frames`]).
     pub legacy_plane_sketch_frames: bool,
+    /// The studio's sketch regions' edges run their loops' way ([`crate::partstudio::PartStudio::legacy_edge_directions`]).
+    pub legacy_edge_directions: bool,
     pub bodies: Bodies,
     pub sketches: Vec<Arc<SketchResult>>,
     /// Sketches a Derived feature brought in from its source: (the Derived
@@ -718,6 +722,7 @@ impl Context {
         let Context {
             legacy_face_frames,
             legacy_plane_sketch_frames,
+            legacy_edge_directions,
             bodies: _,
             sketches,
             derived_sketches,
@@ -755,6 +760,7 @@ impl Context {
         }
         *legacy_face_frames == o.legacy_face_frames
             && *legacy_plane_sketch_frames == o.legacy_plane_sketch_frames
+            && *legacy_edge_directions == o.legacy_edge_directions
             && same_arcs(sketches, &o.sketches)
             && *derived_sketches == o.derived_sketches
             && *sketch_copies == o.sketch_copies

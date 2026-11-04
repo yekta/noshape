@@ -429,6 +429,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   side by a Ø22 cylinder's (7602.654 = π·121·20 exactly), by a loft through bumpy closed splines (6931.99), a 40 × 20
   × 10 block's top by z = 9 + 0.1x (8800 exactly). Live's volumes for the user's own case: pending (lead: live is
   measuring); the host's @opCreateBSplineSurface isn't there yet (dx), so the user's script itself isn't run here.
+- [x] (core 11-04 14:55: both fixed; cf-linear-pattern-with-seed-location 8 -> 12/12 to the end; T1 model
+  kernel_robustness::extruded_edges_run_as_their_sketch_lines_are_drawn, kernel_robustness::a_reapplied_draft_drafts_
+  its_instances_boss, custom_features::a_feature_list_rerun_drafts_its_instances_boss) P1 PATTERN-EDGE-DIRECTION
+  (core; parity suite 11-04 14:05) cf-linear-pattern-with-seed-location's Feature Pattern (a community linear pattern
+  of Extrude 3 + Draft 1 along two cap edges): (1) ours 4 parts, live 1: a sketch region's line and arc edges ran the
+  region loop's way, live's run as each line was drawn (behaviours "spec: core revolve/surface frames and edge
+  directions" (G)), so a pattern along the plate's x = 142 edge (drawn −y) went +y, a row off the plate. Now
+  region_profile builds each edge along its sketch curve; studios saved before keep the loop's way (ScopeRule 10,
+  legacy_edge_directions). (2) The instances' bosses undrafted (+4096.8 mm³ each, live 1886.6): a re-run feature's
+  references to what a feature picked before it made stayed on the seed's faces; now they take that instance's copy
+  (native Reapply: pattern.rs instance_references; std's FeatureList re-run: the faces made under the instance's id,
+  also through the pattern's merge). Also: the parity runner takes a sheet's box from live's UI fetch as an outer
+  bound (cf-curve-pattern-normal's Extrude 2 matches; its next is a custom feature not loading, dx).
 - [ ] P1 PARITY-SPEED-MOTOR-MOUNT (core 11-04 09:05) motor-mount-jack matches live to the end now but regenerates in
   ~440 ms against live's 53: Circular pattern 1 (a face pattern of two elliptic slot walls through the tube, ×4) 244 ms
   (live 5), Extrude 3 86 ms (live 6), Fillet 2 (the bore's full round) 71 ms (live 3). Next for core.

@@ -1592,8 +1592,22 @@ pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region
             holes_m.extend(it);
         }
     }
-    let outer: Vec<k::Segment2d> = outer_m.iter().map(|(sg, _)| to_segment(sg)).collect();
-    let holes: Vec<Vec<k::Segment2d>> = holes_m.iter().map(|h| h.iter().map(|(sg, _)| to_segment(sg)).collect()).collect();
+    // Each line and arc edge runs its sketch curve's way, as drawn (live: an extruded rectangle's edges keep the
+    // drawing order, a pattern along one goes its way), not the loop's.
+    let edge = |(sg, e): &(noshape_sketch::regions::ProfileSegment, u32)| {
+        use noshape_sketch::regions::ProfileSegment as P;
+        let x = to_segment(sg);
+        if s.legacy_edge_directions {
+            return x;
+        }
+        match (x, sg, s.sketch.curve(noshape_sketch::EntityId(*e))) {
+            (k::Segment2d::Line { a, b }, _, Some(noshape_sketch::Curve2::Line { a: ca, b: cb })) if (b - a).dot(cb - ca) < 0.0 => k::Segment2d::Line { a: b, b: a },
+            (k::Segment2d::Arc3 { a, mid, b }, P::Arc { ccw: false, .. }, _) => k::Segment2d::Arc3 { a: b, mid, b: a },
+            (x, ..) => x,
+        }
+    };
+    let outer: Vec<k::Segment2d> = outer_m.iter().map(edge).collect();
+    let holes: Vec<Vec<k::Segment2d>> = holes_m.iter().map(|h| h.iter().map(edge).collect()).collect();
     let tracked = k::make_face_2d_tracked(&plane, &outer, &holes)?;
     let mut sources_in: Vec<Source> = Vec::new();
     let mut count: BTreeMap<u32, u16> = BTreeMap::new();

@@ -147,13 +147,14 @@ impl Feature {
 /// ([`PartStudio::legacy_blends`]); 7, the topology clean-ups of 11-03
 /// ([`PartStudio::legacy_topology`]); 8, a planar face's frame as Onshape's evPlane gives it
 /// ([`PartStudio::legacy_face_frames`]); 9, a sketch on a construction plane in std newSketch's frame
-/// ([`PartStudio::legacy_plane_sketch_frames`]); 0, older studios.
+/// ([`PartStudio::legacy_plane_sketch_frames`]); 10, a sketch region's edges along their sketch curves
+/// ([`PartStudio::legacy_edge_directions`]); 0, older studios.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScopeRule(pub u8);
 
 impl Default for ScopeRule {
     fn default() -> Self {
-        ScopeRule(9)
+        ScopeRule(10)
     }
 }
 
@@ -355,6 +356,11 @@ pub struct PartStudio {
     /// their geometry stays where it was.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub legacy_plane_sketch_frames: bool,
+    /// Saved with features before a sketch region's edges ran along their sketch curves (ScopeRule < 10: the
+    /// region's loop direction; live's run as drawn, so a pattern along an extruded edge goes its way): its edges
+    /// keep the loop's direction, so patterns along them stay where they were.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub legacy_edge_directions: bool,
     /// Rollback bar position: number of features evaluated (None = all).
     #[serde(default)]
     pub rollback: Option<usize>,
@@ -568,6 +574,10 @@ impl PartStudio {
         // And with the planes' own frames for sketches on them.
         if self.scope_rule.0 < 9 && !self.features.is_empty() {
             self.legacy_plane_sketch_frames = true;
+        }
+        // And with the region loops' edge directions.
+        if self.scope_rule.0 < 10 && !self.features.is_empty() {
+            self.legacy_edge_directions = true;
         }
         self.scope_rule = ScopeRule::default();
     }

@@ -1479,6 +1479,60 @@ fn transformed_sketch(s: &SketchResult, m: &DMat4) -> SketchResult {
     SketchResult { frame: transform_frame(&s.frame, m), ..s.clone() }
 }
 
+/// `params` with each face, edge and vertex reference that `map` names otherwise and the context has, taken by that
+/// name: what a feature picked before made, as this pattern instance's copy (std's applyPattern runs an instance's
+/// features under its id, so a Draft re-run after its Extrude drafts the instance's boss: live
+/// cf-linear-pattern-with-seed-location). None when nothing moves.
+pub fn instance_references(ctx: &crate::regen::context::Context, params: &crate::params::ParamValues, map: &dyn Fn(&Name) -> Name) -> Option<crate::params::ParamValues> {
+    use crate::params::{ParamValue, ParamValues};
+    fn walk(ctx: &crate::regen::context::Context, p: &mut ParamValues, map: &dyn Fn(&Name) -> Name) -> bool {
+        let mut moved = false;
+        for v in p.0.values_mut() {
+            match v {
+                ParamValue::Query(q) => {
+                    for r in q.iter_mut() {
+                        let (n, of): (&TopoName, fn(&Body) -> &Vec<Name>) = match r {
+                            Reference::Face(n) => (n, |b| &b.faces),
+                            Reference::Edge(n) => (n, |b| &b.edges),
+                            Reference::Vertex(n) => (n, |b| &b.vertices),
+                            _ => continue,
+                        };
+                        let m = map(&Arc::new(n.clone()));
+                        if *m == *n {
+                            continue;
+                        }
+                        // (Or a face an operation since made of it: the instance's tool merged by the pattern.)
+                        fn made_of(x: &TopoName, m: &TopoName) -> bool {
+                            x == m || matches!(x, TopoName::Face { role: Role::Generated(inner), .. } if made_of(inner, m))
+                        }
+                        let Some(x) = ctx.bodies.iter().find_map(|b| of(b).iter().find(|x| made_of(x, &m))) else { continue };
+                        *r = match r {
+                            Reference::Face(_) => Reference::Face((**x).clone()),
+                            Reference::Edge(_) => Reference::Edge((**x).clone()),
+                            _ => Reference::Vertex((**x).clone()),
+                        };
+                        moved = true;
+                    }
+                }
+                ParamValue::Array(items) => {
+                    for i in items.iter_mut() {
+                        moved |= walk(ctx, i, map);
+                    }
+                }
+                _ => {}
+            }
+        }
+        moved
+    }
+    let mut out = params.clone();
+    walk(ctx, &mut out, map).then_some(out)
+}
+
+/// `n` with what feature `from` made named as made by `to` (a picked feature re-run under a pattern instance's id).
+pub fn rebased_name(n: &Name, from: FeatureId, to: FeatureId) -> Name {
+    Renamer { tmp: from, seed: to, pattern: to, code: 0 }.to_seed(n)
+}
+
 /// A feature re-run as one instance of a feature pattern, transformed by `m` (FeatureScript's FeatureList functions,
 /// std applyPattern's per-instance call): `ev` holds its parameters; the sketches it reads are moved while it runs.
 /// A sketch is solved again (the variables may have changed) and stands in for the original `id`'s, which is
@@ -1568,10 +1622,16 @@ fn reapply_features(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance
             Some(outer) => m * *outer,
             None => m,
         };
+        let mut done: Vec<FeatureId> = Vec::new();
         for seed in &seeds {
             let tmp = FeatureId(mix(&[ev.feature.0, seed.id.0, inst.code as u64]) | (1 << 62));
             let expanded = crate::regen::eval::expand_query_variables(&seed.params, &ev.ctx);
             let params = expanded.as_ref().unwrap_or(&seed.params);
+            // (What the features before it made in this instance: their copies.)
+            let (pattern, code) = (ev.feature, inst.code);
+            let copy = |n: &Name| done.iter().fold(n.clone(), |n, &s| Renamer { tmp: s, seed: s, pattern, code }.rename(&n));
+            let moved = if done.is_empty() { None } else { instance_references(&ev.ctx, params, &copy) };
+            let params = moved.as_ref().unwrap_or(params);
             // Scratch context: the seed's sketches moved to the instance.
             let mut scratch = ev.ctx.clone();
             let mut sk = BTreeSet::new();
@@ -1599,6 +1659,7 @@ fn reapply_features(ev: &mut EvalCtx, feats: &[FeatureId], instances: &[Instance
                     }
                     let rn = Renamer { tmp, seed: seed.id, pattern: ev.feature, code: inst.code };
                     merge_instance(ev, sub.ctx, &rn);
+                    done.push(seed.id);
                 }
                 Err(e) => failures.push(e.message),
             }

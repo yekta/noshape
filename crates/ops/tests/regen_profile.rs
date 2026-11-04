@@ -801,6 +801,10 @@ fn bodies_after_feature() {
     let (Ok(path), Ok(upto)) = (std::env::var("NOSHAPE_BODY_DOC"), std::env::var("NOSHAPE_BODY_UPTO")) else { return };
     let tmp = std::env::temp_dir().join(format!("noshape-bodies-{}.noshape", std::process::id()));
     std::fs::copy(&path, &tmp).unwrap();
+    // (A document a test left open: its write-ahead log too.)
+    for ext in ["-wal", "-shm"] {
+        let _ = std::fs::copy(format!("{path}{ext}"), format!("{}{ext}", tmp.display()));
+    }
     let s = noshape_ops::session::Session::open(&tmp).unwrap();
     let units = s.doc.settings.units;
     for tab in &s.doc.tabs {
@@ -814,7 +818,8 @@ fn bodies_after_feature() {
         for (i, b) in r.context.bodies.iter().enumerate() {
             let out = format!("{path}.{upto}.{i}.brep");
             noshape_kernel::write_brep(&b.shape, std::path::Path::new(&out)).unwrap();
-            println!("wrote {out} ({})", b.name);
+            let bb = b.shape.bounding_box(false).ok();
+            println!("wrote {out} ({}): {} faces, volume {:?}, box {:?}", b.name, b.shape.faces().len(), b.shape.volume().ok(), bb.map(|x| (x.min * 1e3, x.max * 1e3)));
         }
     }
     let _ = std::fs::remove_file(&tmp);

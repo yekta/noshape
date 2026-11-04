@@ -3587,3 +3587,72 @@ fn a_face_pattern_of_a_hole_through_a_tubes_wall() {
     assert!((volume(&r) - (solid - 4.0 * one)).abs() < 1e-5 * solid, "{} vs {}", volume(&r), solid - 4.0 * one);
     assert_eq!(shown(&r), (8, 12, 0));
 }
+
+/// EDGE-DIRECTIONS (live cf-linear-pattern-with-seed-location; behaviours "spec: core revolve/surface frames and edge
+/// directions" (G): an extruded rectangle's edges run as its lines were drawn): a 40 × 20 rectangle whose sides are
+/// drawn −x, −x, −y, −y, not round the loop. The x = 20 side's edges run −y on both caps, so a Part pattern along
+/// one goes −y. A studio saved before keeps the loop's way (+y there).
+#[test]
+fn extruded_edges_run_as_their_sketch_lines_are_drawn() {
+    for legacy in [false, true] {
+        let mut t = T::new();
+        t.ps.legacy_edge_directions = legacy;
+        let mut sk = noshape_sketch::Sketch::new();
+        let [a, b, c, d] = [(20.0, 10.0), (-20.0, 10.0), (20.0, -10.0), (-20.0, -10.0)].map(|(x, y)| sk.add_point(DVec2::new(x * 1e-3, y * 1e-3)));
+        for (p0, p1) in [(a, b), (c, d), (a, c), (b, d)] {
+            sk.add_line_between(p0, p1).unwrap();
+        }
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let r = t.regen();
+        let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+        let x = t.add("extrude", &[("entities", q(regions)), ("depth", e("5 mm")), ("operationType", en("NEW"))]);
+        t.ok(x);
+        let side = |i: &noshape_kernel::EdgeInfo| (i.start.x - 0.02).abs() < 1e-9 && (i.end.x - 0.02).abs() < 1e-9 && !vertical(i);
+        let r = t.regen();
+        let dys: Vec<f64> = r.context.bodies[0].shape.edges().iter().filter_map(|e| e.edge_info().ok()).filter(side).map(|i| i.end.y - i.start.y).collect();
+        assert_eq!(dys.len(), 2);
+        assert!(dys.iter().all(|&dy| if legacy { dy > 0.0 } else { dy < 0.0 }), "legacy {legacy}: {dys:?}");
+        let edge = t.edges_where(|i| side(i) && i.start.z.abs() < 1e-9);
+        let body = Reference::Body(noshape_model::reference::BodyId { feature: x, index: 0 });
+        let p = t.add("linearPattern", &[("patternType", en("PART")), ("entities", q(vec![body])), ("directionOne", q(edge)), ("distance", e("30 mm")), ("instanceCount", e("2")), ("operationType", en("NEW"))]);
+        let r = t.ok(p);
+        let ys: Vec<f64> = r.context.bodies.iter().map(|b| b.shape.bounding_box(false).unwrap().center().y * 1e3).collect();
+        let want = if legacy { 30.0 } else { -30.0 };
+        assert!(ys.len() == 2 && ys.iter().any(|y| (y - want).abs() < 1e-3), "legacy {legacy}: {ys:?}");
+    }
+}
+
+/// PATTERN-INSTANCE-REFS (live cf-linear-pattern-with-seed-location: a Feature pattern of an Extrude and the Draft of
+/// its sides, Reapply on): each instance's Draft drafts that instance's boss, as std runs an instance's features under
+/// its id. A 60 × 20 × 10 block, a 10 × 10 × 10 boss added on top, its sides drafted 10° about the block's top, the two
+/// patterned 30 mm along x: the copy takes off what the Draft took off the seed.
+#[test]
+fn a_reapplied_draft_drafts_its_instances_boss() {
+    let mut t = T::new();
+    t.block(60.0, 20.0, 10.0);
+    let v_block = volume(&t.regen());
+    let (_, regions) = {
+        let top = t.faces_where(|c| (c.z - 10.0).abs() < 1e-6);
+        let mut sk = noshape_sketch::Sketch::new();
+        let pts: Vec<_> = [(5.0, 5.0), (15.0, 5.0), (15.0, 15.0), (5.0, 15.0)].iter().map(|(x, y)| sk.add_point(DVec2::new(x * 1e-3, y * 1e-3))).collect();
+        for i in 0..4 {
+            sk.add_line_between(pts[i], pts[(i + 1) % 4]).unwrap();
+        }
+        let s = t.add("sketch", &[("sketchPlane", q(top)), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let r = t.regen();
+        (s, r.display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().filter(|g| !g.imprinted).map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect::<Vec<_>>())
+    };
+    let boss = t.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
+    t.ok(boss);
+    let sides = t.faces_where(|c| c.z > 10.0 && c.z < 20.0);
+    assert_eq!(sides.len(), 4);
+    let neutral = t.faces_where(|c| (c.z - 10.0).abs() < 1e-6);
+    let draft = t.add("draft", &[("neutralPlane", q(neutral)), ("draftFaces", q(sides)), ("angle", e("10 deg"))]);
+    let drafted = volume(&t.ok(draft)) - v_block;
+    assert!(drafted < 1000.0 - 1.0, "the Draft takes material off: {drafted}");
+    let p = t.add("linearPattern", &[("patternType", en("FEATURE")), ("instanceFunction", q(vec![Reference::Feature(boss), Reference::Feature(draft)])), ("directionOne", q(vec![Reference::Plane(DatumPlane::Right)])), ("distance", e("30 mm")), ("instanceCount", e("2")), ("fullFeaturePattern", ParamValue::Bool(true))]);
+    let r = t.ok(p);
+    assert_eq!(r.context.bodies.len(), 1);
+    let v = volume(&r) - v_block;
+    assert!((v - 2.0 * drafted).abs() < 1e-6 * v, "two drafted bosses {}, got {v}", 2.0 * drafted);
+}

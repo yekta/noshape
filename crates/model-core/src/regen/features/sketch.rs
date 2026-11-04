@@ -252,7 +252,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         .iter()
         .map(|i| crate::regen::context::SketchResultImage { id: i.id, box_points: i.box_points.clone(), data_base64: i.data_base64.clone() })
         .collect();
-    ev.ctx.sketches.push(Arc::new(SketchResult { feature: ev.feature, name, frame, sketch: sk, report, regions, imprinted, split, wires, dimension_text, images }));
+    ev.ctx.sketches.push(Arc::new(SketchResult { feature: ev.feature, name, frame, sketch: sk, report, regions, imprinted, split, wires, dimension_text, images, legacy_edge_directions: ev.ctx.legacy_edge_directions }));
     Ok(())
 }
 
