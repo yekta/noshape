@@ -73,6 +73,16 @@ document's display mesh is under 0.5 s.
 
 ## Landed on main
 
+- 11-04 20:48 a8c24d3b **P0 fix**: since d2eccf9f (18:16) the cached feature/part rows collapsed in any list taller
+  than its panel (cf-straight-spline: all 59 rows drawn on one line): a cached view's content doesn't hold its size,
+  so flex-shrink squeezed them to 0. `flex_none` on the rows' cached style; T1 cached_rows_stack_in_a_long_list (120
+  features; the small T1 documents never overflowed, which is how it got through).
+- 11-04 21:00 queued 3580968e: 27922298 scene pick targets cached per body mesh (s.build p50 22 → 14 ms on
+  cf-straight-spline); ef6fbdfb dialog open/close redraws 1 list row, not 73 (vendor gpui-pre: `Window::focus`
+  marks only the old/new focus paths dirty instead of `refresh()`; a cached view nested in a reused one carries its
+  frame indices along; row keys from what the row shows, not the display pointer). Dialog open UI CPU p50 46/43 →
+  26/27 ms, frame 51/40 → 20/21 ms.
+
 - 10-27 00:15 (cdde1c06..8ef8c97b): e6b2a956 dialog audit model side; 396eea65 plane names (within 1 px of live), hollow
   points' thick ring, renderer preview mix (`Scene::preview_mix`, not used by the app yet); c7f26470 dialog audit app side
   (✓ rule, Skip instances field + points, FOCUS_ON_VISIBLE, active-field-only highlight, drag bench); 8ef8c97b offscreen
@@ -209,7 +219,7 @@ document's display mesh is under 0.5 s.
 | orbit / pan / zoom, NIST assembly at Retina | 120 fps | 10-30 (perf 40987999836, main 7523035a, silhouette cull on, 2× frames-driven): presented 79–85 fps, GPU frame mean 12.8–15 ms (before the cull: 48.7–55.7 fps, perf 40973793607). Earlier: v0.4.11 (perf.yml 40528877198, macOS 14, 2388×1588 device px, frame-driven): presented 76.7 / 73.6 / 64.9 fps, UI CPU p95 0.35 / 0.33 / 0.37 ms; GPU time not reported on Metal (r.done_ms lands with ab488e30, after v0.4.11). At 1× the runner presents ~30 fps (its timer) |
 | cold start to first frame | ≤ 1 s | 10-28 (perf 40755981437, Metal cache cleared each launch, precompiled metallibs): median 1364 ms (macOS 14) / 1560 ms (macOS 15), shader compile 65–141 ms (was 540–900); the window itself is the rest. Earlier: | v0.4.11: the job's first launch 1356 ms (OS first run: gpui_kit::init 285 ms vs 20 warm; the held shader compile 421 ms starts at the first window draw, 784 ms); warm launches 276–385 ms ✓. COLD=1 run 40526882894 (Metal shader cache cleared each launch) pending |
 | hover, pick (pointer / click to the frame showing it) | within a frame | 11-04: viewport benches `NOSHAPE_PERF_BENCH=hover` (new) / `pick`; their summary splits the UI thread's part (to the frame's submission) from the GPU's. cf-straight-spline (3662 faces, 230k triangles, model suite, local Xvfb): hover's pick 1.5 ms p50, scene refresh 1.4 ms; the GPU part is lavapipe's here (~1.1 s), only perf.yml's runners say |
-| dialog open, list row click (action to the end of the paint of its first frame, UI thread) | within a frame | 11-04: `NOSHAPE_PERF_SCRIPT=ui-latency` (perf_script.rs). cf-straight-spline, a feature row click: `ps.refresh_scene` p50 56.5 → 1.8–2.4 ms (mean 64.9 → 2.8–4.3: a lit face's boundary from its pick id and a per-mesh face → edges table, not a search of every face and edge per face); scene build: PickMap indexes references by a 4-level hash (deep TopoName hashing was ~45 % of the UI thread's samples; the run's busy samples −28 %). Then (frame-pointer profile, vibe5 `target-fp`, `RUSTFLAGS=-C force-frame-pointers=yes`; perf `-g`, report `--no-inline`): a dialog's open and cancel each rebuild the scene (`schedule_preview_before`, `restore_last_done`); PickMap was 25 % of the UI thread: `s.build` p50 99–131 → 25–52 ms, `ps.apply_display` 150–390 → 40–111 ms. Still over: GPUI prepaint of the Part Studio's cached slices (~25 % of the UI thread in the run, spread over taffy layout and copies; no single hot spot) |
+| dialog open, list row click (action to the end of the paint of its first frame, UI thread) | within a frame | **11-04 21:00 (ef6fbdfb, cf-straight-spline, :102, interleaved A/B, load 9-28): dialog open UI-thread CPU (action + its frame) p50 26-27 ms (was 43-46), p95 31-32 (50-67); its frame's layout+prepaint+paint p50 20-21 ms (40-51); row click CPU p50 9.4-12.7 ms, frame 8.7-17 ms. `BENCH SPLIT` lines give each sample's parts: the dialog open's remaining UI-thread cost is the preview's `ps.apply_display` (2 calls, ~60 ms summed, `s.build` ~33 of it) that lands before or right after the first frame, then prepaint ~13 ms (the dialog itself, the edited row, the overlay ~2 ms).** Earlier 11-04: `NOSHAPE_PERF_SCRIPT=ui-latency` (perf_script.rs). cf-straight-spline, a feature row click: `ps.refresh_scene` p50 56.5 → 1.8–2.4 ms (mean 64.9 → 2.8–4.3: a lit face's boundary from its pick id and a per-mesh face → edges table, not a search of every face and edge per face); scene build: PickMap indexes references by a 4-level hash (deep TopoName hashing was ~45 % of the UI thread's samples; the run's busy samples −28 %). Then (frame-pointer profile, vibe5 `target-fp`, `RUSTFLAGS=-C force-frame-pointers=yes`; perf `-g`, report `--no-inline`): a dialog's open and cancel each rebuild the scene (`schedule_preview_before`, `restore_last_done`); PickMap was 25 % of the UI thread: `s.build` p50 99–131 → 25–52 ms, `ps.apply_display` 150–390 → 40–111 ms. Still over: GPUI prepaint of the Part Studio's cached slices (~25 % of the UI thread in the run, spread over taffy layout and copies; no single hot spot) |
 | pins-assembly-1000 on perf.yml's macOS runners (real GPU) | 120 fps / a frame | 11-04 run 41840797973 (main 60f4813f, fixture pins-assembly-1000, variant `hov@hover:`): GPU 8.7 ms a frame mean, 13 ms p95 (over 8.3 ms: the renderer's next item); presented 33 fps (the runners cap a 1x window near 30); hover p50 23-32 ms (UI 10-15 ms), pick p50 106-113 ms (UI 11-15 ms; the rest the runner's pacing) |
 | open a document | ≤ 0.5 s | v0.4.11 warm: opening → first viewport frame 130–200 ms ✓; first launch 800 ms |
 
@@ -549,6 +559,18 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N0. (11-04 21:00, lead's speed list) (a) Dialog open: the preview's `apply_display` (~30 ms each, scene build ~16)
+    is UI-thread work; build the scene off the UI thread with the regen (`scene_builder::build` needs `&mut GpuCache` +
+    the uploader: move the cache into the worker or split upload from build), or skip `build_preview_base` when the
+    blend base didn't change. (b) The overlay's view cube / right strip / evaluation tools as keyed sub-slices: a
+    WIP is in /root/psui-scratch/mod.rs.wip-with-overlay-slices (`PsSlices` cube/toggles/eval), held back because
+    the cube key doesn't cover everything `render_camera_menu` reads; the overlay slice is ~2 ms of a dialog open,
+    2-5 ms of a row click. (c) Orbit on perf.yml: NIST at 2× has a ~9-10 ms per-frame floor even for an empty
+    frame (handoff 0e above: GPUI's compositing / present of our texture at Retina), our scene adds 2-5 ms; next is
+    timing GPUI's present on the runners (r.* scopes / Metal capture), not our passes. Run 41885259563's
+    texture+variant orbit runs (1×) all present ~19 fps whatever is skipped: the 1× runs are pacing-bound, use 2×
+    frames-driven variants (`retina@orbit:NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames,...`) for ablations.
+
 N12. (11-01) Part Studio audit (user 11-01): docs/parity/audit-part-studio.md. Dialogs: tests/std_oracle.rs
      `print_all` diffs every toolbar feature with std (STD_MODULES maps the rest to their std files;
      custom::std_feature::std_dialog_of); /root/psui-scratch/audit_gen.py + audit_doc.py turn its output into the D
@@ -882,6 +904,13 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- 11-04 21:05 **P0 found and fixed on main**: my d2eccf9f (18:16) collapsed the feature list's rows in any studio
+  with more features than the panel shows (all rows drawn on one line); a8c24d3b (landed 20:48) fixes it, with a T1
+  on a 120-feature list. Releases cut between 18:16 and 20:48 carry it. Your list's (1) row click is within a frame
+  on CPU (9-13 ms p50); (2) dialog open went 43-46 → 26-27 ms CPU p50 (queued 3580968e; it patches vendor
+  gpui-pre's focus handling and view cache for every studio: all UI crates' tests pass, focus rings checked by hand),
+  the rest is the preview's scene apply (N0 a); (3) orbit: not started today beyond reading 41885259563 (pacing-bound
+  at 1×, N0 c).
 - 11-04 17:37 lead's list (step_ctrl, MC-INFERENCE-DOTS, Part Studio speed, MISSING-LATER-CHIP): all done. Speed
   state, cf-straight-spline on :102 (box at load ~26 on 16 cores: ±15 ms noise): hover's UI part p50 6.5 ms, pick's
   3.7 ms; a row click's frame 55-59 ms (layout + prepaint + paint), of which the toolbar ~20 ms is gone with
