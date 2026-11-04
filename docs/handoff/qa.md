@@ -7,6 +7,11 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 right (7607.301), mirror set and cli-fillet-segv right; published 08:43:30 (all three bundles); the release tarball is byte-identical to the smoked artifact.
 Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfmir2 B P0.
 
+**11-04 08:12:** no green since 4570b4e5 (06:09): core's OCCT patch 0021 (CRASH-3151, likely CRASH-2045 too) needs a
+lib sync before main can go green. When a green has it: re-run tickets/crash3151/open.py (and crash3388/open.py, crash2045's
+replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
+now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
+
 **v0.4.25 (published 05:49, cut d9fb8f44 = 38d75390 + bump, contains greens through ad60edf9; Release run 41775622951)
 smoked 05:51–06:11: good, no new blocker.** Artifacts: the published Linux tarball, CLI tarball and .deb are
 byte-identical to the run's linux-x86_64 artifact; SHA256SUMS OK; 11 assets. CLI / app as CLI "0.4.25"; round trip 67643.716875
