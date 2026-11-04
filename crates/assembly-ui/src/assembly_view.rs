@@ -3899,9 +3899,10 @@ impl AssemblyView {
                     this.open_dof_chooser(cx);
                     return;
                 }
-                // Ctrl / Cmd+click adds a mate to the selection (or takes it out).
+                // Ctrl+click (also Cmd on macOS, provisional until live's Mac
+                // key list) adds a mate to the selection (or takes it out).
                 let m = ev.modifiers();
-                if (m.control || m.platform) && this.selected_mate.is_some_and(|s| s != id) {
+                if (m.control || (cfg!(target_os = "macos") && m.platform)) && this.selected_mate.is_some_and(|s| s != id) {
                     if let Some(i) = this.ui.more_mates.iter().position(|x| *x == id) {
                         this.ui.more_mates.remove(i);
                     } else {
