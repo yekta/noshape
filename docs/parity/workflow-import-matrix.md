@@ -233,3 +233,16 @@ is an error naming both ids since cab8e36c). Imported alone the x_t reads as bef
   B-surface (which pinches to the apex); ours is the B-surface's whole range. Needs the face rebuilt on an extended
   surface; not done.
 - 141 of 146 samples unchanged; g49 chamfer 1 / 2 +0.0002 / +0.022 mm³ (both in band).
+
+## The last ✗ rows explained (2026-11-04 00:21 UTC, dx; probe Feature Studio on the imported g50, /root/dx-scratch/f8)
+- **g50 F8**: the file's surface is a B-surface of degree 1 × 3 whose two rows run from (48, 0, 27) and (50, 2, 27)
+  mm to one apex (47, 3, 30): a ruled surface pinching to a point, whose two boundary curves are not translates of
+  each other, so no extrusion holds both. Ours is that surface (8.321612 mm², its trimmed area exactly). Live reports
+  EXTRUDED along (−1, −1, 0) with a profile that ends 0.019 mm off the apex and a uv range past the face (behaviours
+  "api (10-24) IM2b follow-up"): Onshape's import simplifies the surface into an extrusion within the edges'
+  tolerance, and 8.330890 is that approximation's area. Matching it means reproducing Parasolid's simplification;
+  left as is (0.1 % of one face; the part's volume and area in band).
+- **McMaster F0 cylinder** (13.932682 mm², live 13.912244): bounded by the two tolerant helices (2.94 µm, 159 mm),
+  whose pcurves on it are its own fins' SP-curves; a 2.94 µm placement band along 159 mm moves the area by up to
+  ±0.46 mm², so the +0.020 lies within the edges' tolerance (the volume in band). Thread flanks F1 / F2 likewise.
+So every ✗ left in this sheet is a tolerance-level difference of a tolerant or simplified surface, not a reading error.
