@@ -1318,3 +1318,21 @@ fn a_blend_with_a_loose_edge_fails_without_a_crash() {
         Err(e) => assert!(!e.to_string().contains("crashed"), "{e}"),
     }
 }
+
+/// CRASH-3151 (qa's fuzz seed 3151, Fillet 6: R12 on three edges): ChFi3d's corner build ran TopOpeBRepBuild_Builder::
+/// BuildEdges, which counted point interferences past its points' array and corrupted the heap (the process aborted
+/// in a later malloc). OCCT patch 0021 bounds them: the fillet builds, 12 faces, 42765.26 mm³, every time.
+#[test]
+fn a_fillet_corner_build_keeps_the_heap_whole() {
+    setup();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/blend");
+    let s = read_brep(&dir.join("crash3151-fillet.brep")).unwrap();
+    let all = s.edges();
+    let es: Vec<Shape> = [6, 12, 17].iter().map(|&i| all[i].clone()).collect();
+    for _ in 0..3 {
+        let r = fillet_checked(&s, &es, &[12.0 * MM; 3]).unwrap().shape;
+        assert!(r.is_valid());
+        assert_eq!(r.faces().len(), 12);
+        assert!((vol_mm3(&r) - 42765.260729).abs() < 1e-3, "{}", vol_mm3(&r));
+    }
+}

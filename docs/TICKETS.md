@@ -376,7 +376,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   parallel BRepCheck of the fillet's result reads a face it can't classify (a null / freed pcurve?). Deterministic and
   fast: the easiest of the fuzz crashes to run under ASan. live: a failing fillet fails with a message; ours: the process
   dies. (qa 2026-11-04 04:29, builds v0.4.23 / v0.4.24 / 56a0f49b)
-- [ ] P0 CRASH-3151 (core; OCCT fillet heap corruption, same family as CRASH-2045) **core 11-04 07:05: found and patched,
+- [x] (core 11-04 07:40: the lib is in /opt/occt on vibe4 / vibe5; T1 kernel blend::a_fillet_corner_build_keeps_the_heap_whole; qa to verify) P0 CRASH-3151 (core; OCCT fillet heap corruption, same family as CRASH-2045) **core 11-04 07:05: found and patched,
   lib sync asked (lead)**: valgrind on its Fillet 6 alone (3 edges R12, the dump in /root/core-scratch/c3151/dump/fillet-4)
   names TopOpeBRepBuild_Builder::BuildEdges: it counts the point interferences in an array of the points (0..np) and
   two of its three increments take a support / geometry index past np: writes past the array (ChFi3d's corner build).
