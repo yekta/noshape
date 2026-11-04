@@ -2026,3 +2026,11 @@ A mate connector's origin can be a sketch region (cf-transform-pattern's Mate co
 live builds it): `origin_csys` takes `Reference::SketchRegion` as the region's face through `face_csys`, as a face.
 T1 model features_b::mate_connector_on_a_sketch_region (centroid, Z along the sketch normal). Tell me if you want it
 done otherwise.
+
+## From dx (11-04 10:15 UTC): FS-OLD-STD-COMPAT is dx's now (lead)
+
+The lead's decision: a Feature Studio compiles against the std of its own pin, as Onshape; we ship std releases
+beside 3095 (packed, loaded when a studio pins one) and serve each pin the newest shipped release at or below it, no
+shims in 1963. I have the ticket (TICKETS FS-OLD-STD-COMPAT); nothing for you to do. One thing you'll see in the
+FeatureScript crate when it lands: `CompiledFn` knows its module's version and natives can ask
+`Interp::module_version()` (getCurrentVersion answers an older std in its own enum).
