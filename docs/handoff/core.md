@@ -16,6 +16,20 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-04 03:21 UTC.**
+- Landed / queued since 01:30: an inch is std's `2.54 * centimeter` (0.025400000000000002 m; live's 1 in circle has that
+  radius): FS-POCKET-HOLES fixed (cf-pocket-holes to the end). cf-straight-spline 5/59 -> 9/59: a cut by several tools
+  leaving an edge on three faces is redone with the tools fused (its 12 BOOLEAN_NON_MANIFOLD_RESULT features build, dx's
+  note below); boolean.cpp seam_to_vertex moves a cylinder's seam off a chain it splits (one end circle) and
+  join_loop_pieces' walk starts by the edge back to the joint. My first version hopped seams at an ellipse's tangent
+  lines (motor-mount-jack Extrude 3 17 ms -> 3.4 s); fixed forward (joints are two pieces on the same faces), T1
+  bool_patterns::a_slot_of_ellipses_and_tangent_lines_keeps_its_seam_quickly.
+- cf-straight-spline's slowness (×3.2) is bool's (BOOL-RUST-GEARS-SLOW: its cuts decline after ~0.35 s, then OCCT).
+  Next there: Feature 5's Part 5, live 31/85/56, ours 31/78/49. prize-wheel-tim's knob still isn't taken by
+  seam_to_vertex (not looked into why yet).
+- Probe: `NOSHAPE_CUT_CASE=<dir>/<n>` kernel T2 bool_replay::dumped_cut_probe (`<n>-target.brep`, `<n>-tools.brep`;
+  NOSHAPE_CUT_PLAIN, NOSHAPE_CUT_FUZZY, NOSHAPE_CUT_STEPS=fuse|each).
+
 **State 11-04 00:45 UTC.**
 - Landed / queued since 00:30: Shell's quadric fold check (own surface, signed); BLEND-RUST arc corners (queued: fillets
   of arcs meeting at a corner, a NURBS meeting curve; rust_blend.cpp reads NURBS edges). The knob's outline is live's
