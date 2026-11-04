@@ -3293,8 +3293,21 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   every curve, the Ø10 and all four constraint badges red, nothing singled out. That sketch was posted whole over REST;
   what live's UI does when the 10 mm is added last (red over-defining dimension?) is not captured. Model:
   /root/parity/models-dx/live-hole-row (parity_models, NOSHAPE_PARITY_MODELS). (dx 2026-11-03)
-- [ ] P2 FS-OLD-STD-COMPAT (core; dx's FeatureScript corpus 11-03, parity_feature_studios) community Feature Studios
-  pinned to old std versions that live compiles and ours doesn't (we serve 1963 for every pin below 3095):
+- [ ] P2 FS-OLD-STD-COMPAT (dx since 11-04, lead's decision; was core; dx's FeatureScript corpus 11-03,
+  parity_feature_studios) **Lead 11-04: do what Onshape does: a studio compiles against the std of its own pin.**
+  Ship more std releases beside 1963 and 3095 (the corpus pins and every other release live can fetch), serve each
+  pin the newest shipped release at or below it, no compatibility shims in 1963; the extra releases small in the
+  bundle (compressed, loaded only when a studio pins one), the app's size and startup measured before and after.
+  dx 11-04 10:15, in progress (branch dx-std-wip, not landed until live's releases cover the pins): each release
+  packed with zstd against the embedded 3095 as prefix (`std-versions/<v>.zst`, 22-52 KB each; tools/std-pack.py),
+  unpacked the first time a studio pins it; 1963's raw 4.7 MB leave the binary. Older std's natives added (the
+  report/getFeature* pair, isTransientId, getCurrentSubfeatureId, detectSurfaceJoinEnabled) and getCurrentVersion
+  answers in the calling release's terms (the interpreter knows its function's module version). With 13 releases:
+  cf-sheet-metal-flange-plus 3/3 and the 392 pattern studios compile; studios pinned between shipped releases get
+  an older one meanwhile (cf-belt 1576 -> 1403 fails), so it waits for live (REQUESTS 1986 / 09:51: all releases,
+  3095 down to 46). Baseline before: app 343.88 MB stripped (dev profile), first window median 639 ms (15 launches,
+  Xvfb), CLI start median 42 ms.
+  Earlier notes, from when we served 1963 for every pin below 3095:
   cf-o-ring-generator (FeatureScript 369) `var … is vector = vector(…)` → "Type vector not found" (line 103: the
   lowercase type name, accepted at its pin); cf-straight-spline (455) an enum ending in a trailing comma
   (`sixteenSpline,\n}`) → "mismatched input '}' expecting ID" (line 14); cf-sheet-metal-hem (1024) imports
@@ -3564,6 +3577,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   sides along the boundary (one face per plane, live's 22 faces); T1 ops_harness thickenJoinedFaces. Run 58: 32/56,
   340/482, custom 22/111, 7 documents with custom features failing (old std: FS-OLD-STD-COMPAT; cf-curve-pattern-normal's
   unfetchable import; cf-sheet-metal-overcut-dogbone's Fold SM 1).
+  dx 11-04 10:15: cf-sheet-metal-overcut-dogbone 2 -> 5/10: the host's sheet metal rebuild applies std's
+  attribute-based corner breaks (a CORNER attribute's cornerBreaks: the edge through the thickness at that definition
+  vertex filleted / chamfered; std 3095 still ships sheetMetalCornerBreakAttributeBased.fs), and a localized opBoolean
+  (localizedInFaces) creates the edges and vertices it cuts (qCreatedBy; the overcut breaks those corners). T1
+  ops_harness localizedBoolean. Next difference: Extrude 1 has one fillet more than live: after its sheet metal
+  Boolean, corner attributes sit on vertices no feature broke ((37.5, 10) and (30, 40) mm): std's
+  assignSMAttributesToNewOrSplitEntities through our tracking.
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our
