@@ -342,6 +342,8 @@ pub struct AssemblyView {
     evaluator: Arc<Mutex<AssemblyEvaluator>>,
     result: Arc<AssemblyResult>,
     built: Option<AsmBuilt>,
+    /// What `built` was built from: its occurrences' signature and the options.
+    built_key: Option<(Vec<u64>, AsmSceneOptions)>,
     cache: AsmGpuCache,
     eval_seq: u64,
     eval_task: Option<Task<()>>,
@@ -551,6 +553,7 @@ impl AssemblyView {
             })),
             result: Arc::new(AssemblyResult::default()),
             built: None,
+            built_key: None,
             cache: AsmGpuCache::default(),
             eval_seq: 0,
             eval_task: None,
@@ -809,7 +812,15 @@ impl AssemblyView {
             self.apply_display(cx);
         }
         self.update_pattern_preview(cx);
-        self.rebuild_scene(true, cx);
+        // Only placements changed (a mate dialog's preview, a solve): the
+        // built scene follows them (pins-assembly-1000: a rebuild was ~17 ms
+        // on the UI thread).
+        let same = self.built_key.as_ref().is_some_and(|(sig, opts)| *sig == assembly_scene::occurrence_signature(&self.result) && opts.same_display(&self.scene_options(cx)));
+        if same && self.built.as_mut().is_some_and(|b| assembly_scene::retransform(b, &self.result)) {
+            self.refresh_scene(true, cx);
+        } else {
+            self.rebuild_scene(true, cx);
+        }
         if !self.fitted_once && let Some(bounds) = self.result.bounds() {
             self.fitted_once = true;
             // The panel over the view's left: the 300 px Insert dialog
@@ -883,7 +894,9 @@ impl AssemblyView {
     }
 
     fn rebuild_scene(&mut self, geometry_changed: bool, cx: &mut Context<Self>) {
-        let built = assembly_scene::build(&self.result, &self.scene_options(cx), &mut self.cache, self.gpu.uploader());
+        let opts = self.scene_options(cx);
+        let built = assembly_scene::build(&self.result, &opts, &mut self.cache, self.gpu.uploader());
+        self.built_key = Some((assembly_scene::occurrence_signature(&self.result), opts));
         let prio = built.picks.priority_fn();
         self.built = Some(built);
         self.viewport.update(cx, |vp, _| vp.pick_priority = prio);
@@ -1719,6 +1732,12 @@ impl AssemblyView {
     }
 
     fn start_mate(&mut self, t: MateType, window: &mut Window, cx: &mut Context<Self>) {
+        let started = std::time::Instant::now();
+        self.start_mate_inner(t, window, cx);
+        noshape_render::perf::record("a.mate_open", started.elapsed());
+    }
+
+    fn start_mate_inner(&mut self, t: MateType, window: &mut Window, cx: &mut Context<Self>) {
         self.close_mate(window, cx);
         self.insert_open = false;
         let Some(asm) = self.assembly(cx) else { return };

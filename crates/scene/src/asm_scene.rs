@@ -181,6 +181,47 @@ pub struct AsmSceneOptions {
     pub graphics: crate::graphics_prefs::GraphicsPrefs,
 }
 
+impl AsmSceneOptions {
+    /// Whether a scene built with `self` draws as one built with `other`
+    /// (a reflection environment always counts as changed).
+    pub fn same_display(&self, other: &Self) -> bool {
+        self.reflection.is_none()
+            && other.reflection.is_none()
+            && self.isolate == other.isolate
+            && self.error_tops == other.error_tops
+            && self.ghost_tops == other.ghost_tops
+            && self.ghost_paths == other.ghost_paths
+            && self.section == other.section
+            && self.section_skip == other.section_skip
+            && self.section_selected == other.section_selected
+            && self.dim_alpha == other.dim_alpha
+            && self.pick_dimmed == other.pick_dimmed
+            && self.zebra == other.zebra
+            && self.hide_edges == other.hide_edges
+            && self.display_mode == other.display_mode
+            && self.hidden_edges_visible == other.hidden_edges_visible
+            && self.tangent_edges == other.tangent_edges
+            && self.graphics == other.graphics
+    }
+}
+
+/// What a built scene depends on in `result` besides the placements: each
+/// occurrence's path, meshes, colour, state and source (a scene whose
+/// signature is unchanged only needs [`retransform`]).
+pub fn occurrence_signature(result: &AssemblyResult) -> Vec<u64> {
+    let mut out = Vec::with_capacity(result.occurrences.len() * 8);
+    for o in &result.occurrences {
+        out.push(o.path.len() as u64);
+        out.extend(o.path.iter().map(|i| i.0));
+        out.push(Arc::as_ptr(&o.mesh) as usize as u64);
+        out.extend(o.coarser.iter().map(|m| Arc::as_ptr(m) as usize as u64));
+        out.push(Arc::as_ptr(&o.context) as usize as u64);
+        out.extend(o.color.iter().map(|c| u64::from(c.to_bits())));
+        out.push(u64::from(o.levels_from) | u64::from(o.hidden) << 8 | u64::from(o.mirrored) << 9 | (o.kind as u64) << 10);
+    }
+    out
+}
+
 fn to_mat4(m: &DMat4) -> Mat4 {
     m.as_mat4()
 }
