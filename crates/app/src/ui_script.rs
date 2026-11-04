@@ -57,13 +57,13 @@ pub fn prepare() -> PathBuf {
     doc
 }
 
-/// Whether the scenario's start has an assembly (it opens on that tab).
-fn opens_on_assembly() -> bool {
+/// The tab of the scenario start's assembly ("start <name> asm"), which it opens on.
+fn opens_on_assembly() -> Option<String> {
     let path = scenario_path();
-    let Ok(scenario) = read_json(&path) else { return false };
+    let scenario = read_json(&path).ok()?;
     let name = scenario["start"].as_str().unwrap_or("empty");
     let starts = std::env::var_os("NOSHAPE_UI_STARTS").map(PathBuf::from).unwrap_or_else(|| path.with_file_name("starts.json"));
-    read_json(&starts).is_ok_and(|s| s[name].get("assembly").is_some())
+    read_json(&starts).ok()?[name].get("assembly").map(|_| format!("start {name} asm"))
 }
 
 /// A key name of the scenario format as a GPUI keystroke ("Enter", "mod+z", "shift+e", "#").
@@ -292,8 +292,8 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             eprintln!("UI-SCRIPT warning: the window is not active, fields get no focus events");
         }
         // A start with an assembly opens on it (README "start").
-        if opens_on_assembly() {
-            let _ = ws.update_in(cx, |w, window, cx| w.activate_named("Assembly 1", window, cx));
+        if let Some(tab) = opens_on_assembly() {
+            let _ = ws.update_in(cx, |w, window, cx| w.activate_named(&tab, window, cx));
         }
         settle(cx).await;
         let start = read(cx).await;

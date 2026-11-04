@@ -3594,8 +3594,8 @@ impl AssemblyView {
                     }
                     return;
                 }
-                this.selected_mate = None;
-                // Clicks are additive (a selected row toggles off); Shift+click
+                // Clicks are additive, a selected mate's row included (live
+                // asm-select-mate-row); a selected row toggles off; Shift+click
                 // adds the visible rows from the last clicked one.
                 let order = this.visible_list_order(cx);
                 let current: Vec<ListItem> = this.selected.iter().copied().map(ListItem::Instance).chain(this.ui.range_patterns.iter().copied().map(ListItem::Pattern)).collect();
@@ -3761,8 +3761,8 @@ impl AssemblyView {
     fn feature_row(&self, f: FeatureRow, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let FeatureRow { id, icon, name, ok, inactive, message, has_limits, hidden, tooltip, implicit } = f;
-        // The added mates only count beside a selected one (other clicks
-        // clear `selected_mate` alone).
+        // The added mates only count beside a selected one (clicks that
+        // clear `selected_mate` leave them).
         let selected = self.selected_mate == Some(id) || (self.selected_mate.is_some() && self.ui.more_mates.contains(&id));
         let accent = pal.accent;
         let dim = hidden == Some(true);

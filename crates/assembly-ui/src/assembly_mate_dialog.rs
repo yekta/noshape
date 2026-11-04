@@ -334,6 +334,47 @@ impl MateDialog {
         self.active.is_some()
     }
 
+    /// The dialog's fields as the ui-parity runner reads live's (top to
+    /// bottom; `picked`: each query box's chips).
+    pub fn ui_fields(&self, picked: &[Vec<String>]) -> Vec<serde_json::Value> {
+        use serde_json::json;
+        let t = self.mate_type;
+        let (ox, oy, oz, orot) = offset_axes(t);
+        let full_row = !matches!(t, MateType::Tangent | MateType::Width);
+        let labels: &[&str] = match t {
+            MateType::Tangent => &["Face, edge or vertex", "Face, edge or vertex"],
+            MateType::Width => &["Tab mate connector(s)", "Width mate connectors"],
+            _ => &["Mate connectors"],
+        };
+        let mut fields = Vec::new();
+        if full_row {
+            fields.push(json!({ "label": null, "kind": "enum", "text": t.name(), "state": "ok" }));
+        }
+        for (k, label) in labels.iter().enumerate() {
+            fields.push(json!({ "label": label, "kind": "query", "items": picked.get(k).cloned().unwrap_or_default(), "active": self.active.is_some(), "state": "ok" }));
+        }
+        let check = |label: &str, on: bool| json!({ "label": label, "kind": "boolean", "checked": on, "state": "ok" });
+        if t == MateType::Tangent {
+            fields.push(check("Tangent propagation", self.tangent_propagation));
+        }
+        if ox || oy || oz || orot {
+            fields.push(check("Offset", self.use_offset));
+        }
+        if !limit_keys(t).is_empty() {
+            fields.push(check("Limits", self.use_limits));
+        }
+        if t.has_simulation_connection() {
+            fields.push(check("Simulation connection", self.simulation_connection));
+        }
+        // Live: the flip is read by its icon (README "toggle"); the help row after it.
+        if t != MateType::Width {
+            let flip_shown = self.flip_primary || (t != MateType::Tangent && (self.a.is_none() || self.b.is_none()));
+            fields.push(json!({ "label": "toggle", "kind": "toggle", "checked": flip_shown, "state": "ok" }));
+        }
+        fields.push(json!({ "label": null, "kind": "other", "text": "", "state": "ok" }));
+        fields
+    }
+
     /// Every connector field is filled. The last field keeps the focus once
     /// full (live R5), so this, not [`Self::awaiting_pick`], says both picks
     /// are in (the heads-up panel, the default flip).

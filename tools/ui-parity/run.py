@@ -122,6 +122,10 @@ def normalize_live(state):
     for f in ((state or {}).get("dialog") or {}).get("fields") or []:
         if f.get("kind") == "toggle" and str(f.get("label", "")).startswith("icon:"):
             f["checked"] = not str(f["label"]).endswith("-opposite")
+    # Live's runner opens a copy of the start's Assembly, whose root row can read "<name> Copy 1" while it opens.
+    for r in (((state or {}).get("features") or {}).get("rows") or []):
+        if "is-instance" in str(r.get("cls", "")) and isinstance(r.get("name"), str):
+            r["name"] = re.sub(r" Copy \d+$", "", r["name"])
     # The sketch model is read from live's page once a canvas event touched it: before, its lists are null
     # ("not recorded", not empty) and aren't compared.
     sk = (state or {}).get("sketch")
@@ -173,6 +177,9 @@ def placed_alike(a, b):
     ib = ((b or {}).get("assembly") or {}).get("instances")
     if not (isinstance(ia, list) and isinstance(ib, list)):
         return
+    # Live reads them over REST, in no order the list shows: compared by name.
+    ia.sort(key=lambda i: str(i.get("name")))
+    ib.sort(key=lambda i: str(i.get("name")))
     for x, y in zip(ia, ib):
         ta, tb = x.get("transform"), y.get("transform")
         if isinstance(ta, list) and isinstance(tb, list) and len(ta) == len(tb) == 16:

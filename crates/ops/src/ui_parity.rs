@@ -90,6 +90,9 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
     }
     if let Some(asm) = start.get("assembly") {
         build_assembly(ctx, asm)?;
+        // Live's runner names it after the start ("start pin-block asm").
+        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("start");
+        call(ctx, "tab_rename", json!({ "tab": "Assembly 1", "name": format!("start {stem} asm") }))?;
     }
     Ok(())
 }
@@ -176,6 +179,7 @@ mod tests {
         let t: Vec<f64> = pin["translation"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
         assert!((t[0] + 60.0).abs() < 1e-6 && t[1].abs() < 1e-6 && (t[2] + 5.0).abs() < 1e-6, "{pin}");
         assert_eq!(list["mates"][0]["name"], "Revolute 1", "{list}");
+        call(&mut ctx, "tab_activate", json!({ "tab": "start pin asm" })).unwrap();
         let _ = std::fs::remove_dir_all(dir);
     }
 }

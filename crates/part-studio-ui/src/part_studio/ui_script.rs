@@ -130,6 +130,8 @@ impl PartStudioView {
             }
         }
         let message = self.message.as_ref().filter(|(_, m)| self.edit.is_some() || m != behaviors::NO_INTERSECTION).map(|(_, m)| m.clone());
+        // A sketch tool's prompt at the bottom of the view is live's message too.
+        let message = message.or_else(|| self.sketch.as_ref().and_then(|ed| ed.message.clone()));
         // The canceled-sketch toast's Restore link is part of its text in live.
         let message = message.map(|m| if self.canceled_edit.as_ref().is_some_and(|c| c.3 == m) { format!("{m} Restore") } else { m });
         json!({
@@ -166,10 +168,17 @@ impl PartStudioView {
         // The Sketch dialog before its plane is picked: no sketch model yet.
         let Some(ed) = self.sketch.as_ref() else { return json!({ "tool": null }) };
         let sk = &data.sketch;
-        // The first active toolbar button (live): the tool, else Construction while it shows active.
-        let tool = (ed.tool != crate::sketch_mode::Tool::Select)
-            .then(|| crate::ui::onshape_title(ed.tool.label()).split(" (").next().unwrap_or_default().to_string())
-            .or_else(|| ed.construction_shown(sk).then(|| "Construction".to_string()));
+        // The first active toolbar button (live): Construction while it shows active, unless a drawing tool (left of it) is on.
+        use crate::sketch_mode::Tool as T;
+        let right_of_construction = matches!(
+            ed.tool,
+            T::Select | T::Fillet | T::Chamfer | T::Trim | T::Extend | T::Split | T::Offset | T::Slot | T::Mirror | T::LinearPattern | T::CircularPattern | T::Transform | T::InsertDxf | T::InsertImage | T::Dimension | T::Constraint(_)
+        );
+        let tool = if right_of_construction && ed.construction_shown(sk) {
+            Some("Construction".to_string())
+        } else {
+            (ed.tool != T::Select).then(|| crate::ui::onshape_title(ed.tool.label()).split(" (").next().unwrap_or_default().to_string())
+        };
         let owned: std::collections::HashSet<_> = sk.entities().filter(|e| e.kind() != EntityKind::Point).flat_map(|e| e.point_refs()).collect();
         let mut entities: Vec<String> = sk
             .entities()

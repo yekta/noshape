@@ -42,10 +42,14 @@ A name from `starts.json`: a units setting and a feature list in FeatureScript t
 parameter ids; sketches as shapes with corner / centre points in mm on a named plane), so live builds it over REST
 and noshape through crates/ops. `"empty"` is a new Part Studio in mm.
 
-An assembly start (proposed by skasm 11-03, not yet recorded by live) adds, after the features, `"assembly":
+An assembly start adds, after the features, `"assembly":
 {"instances": [{"part": "Part 1", "fixed": true}, {"part": "Part 2", "at": [60, 0, 0]}], "mates": [{"type":
 "Revolute", "name": "Revolute 1", "a": {"instance": "Part 2 <1>", "face": [65, 0, 15], "inference": "mid_axis"},
-"b": {…}}]}` (positions in the document's unit, a face by a point on it); ours builds it (ops `ui_parity::build_start`).
+"b": {…}}]}` (positions in the document's unit, a face by a point on it); ours builds it (ops `ui_parity::build_start`)
+as the Assembly tab "start <name> asm" (live's name) and opens on it. Its state's `features.rows` are the instance
+list's rows (the assembly's own, Origin, instances, "Mate features (n)", its rows); `assembly` is `{"instances":
+[{"name", "fixed", "transform"}], "mates": [{"name", "type", "status"}]}` as live's REST gives them (type
+"REVOLUTE", status "OK"); a mate selected in the list is a `FEATURE` item.
 
 ### steps
 - `{"do": "click" | "dblclick" | "rclick" | "hover", "on": TARGET}`; `hover` waits `ms` (default 1500); a click may
@@ -144,7 +148,8 @@ Two keys added 11-03 (skasm, for the sketch scenarios; the runner compares each 
 line's or circle's length in the sketch value box, or its dimension before a value is typed) is equal when within
 10 %: each side's pointer is at whole pixels, so the same `sketch_point` steps draw lengths a pixel or two apart (a
 10 mm circle is 9.53 mm in live). An assembly instance's transform (the `assembly` key) is equal within 0.5 mm and
-0.002 per rotation entry, for the same reason after a drag.
+0.002 per rotation entry, for the same reason after a drag; the instances are compared by name (live's REST order
+isn't the list's). Live's root row reading "<name> Copy 1" (its runner opens a copy) is read as "<name>".
 
 ## noshape side
 

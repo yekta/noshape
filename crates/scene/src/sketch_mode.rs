@@ -1285,6 +1285,12 @@ impl SketchEditor {
                 }
                 EditOutcome::redraw()
             }
+            // Live (sketch-mirror recording): a lone preselected line is the mirror line.
+            Tool::Mirror if self.selection.len() == 1 && data.sketch.kind(self.selection[0]) == Some(EntityKind::Line) => {
+                self.mirror_axis = Some(self.selection[0]);
+                self.message = Some("Select entities to be mirrored.".into());
+                EditOutcome::redraw()
+            }
             _ => EditOutcome::none(),
         }
     }
@@ -2019,7 +2025,8 @@ impl SketchEditor {
                 if target.1.is_none() {
                     self.selection = vec![target.0];
                 }
-                self.message = Some("Adjust the preview, then press Enter to confirm".into());
+                // Live shows no prompt for it (ui-parity sketch-fillet-corner).
+                self.message = None;
                 EditOutcome::redraw()
             }
             // Live (behaviours "qa (2026-10-28) SKETCH-FILLET-STUCK-RADIUS: two
@@ -2916,7 +2923,8 @@ impl SketchEditor {
                     }
                     self.polygon_base_sides = self.polygon_sides.clamp(3, 50);
                     self.clicks.push(click);
-                    self.message = Some(format!("Sides: {} (drag toward / away from the polygon, type a number, click or press Enter to set)", self.polygon_sides));
+                    // Live shows no prompt for it (ui-parity sketch-polygon).
+                    self.message = None;
                     return EditOutcome::redraw();
                 }
                 // Any click commits (live: it doesn't start the next polygon).
@@ -9143,6 +9151,21 @@ mod tests {
         }
         assert_eq!(count(&d, EntityKind::EllipticalArc), 1);
         assert_eq!(ed.otf.as_ref().map(|o| o.fields.len()), Some(2));
+    }
+
+    #[test]
+    fn mirror_takes_a_lone_preselected_line_as_its_line() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let axis = d.sketch.add_line(v(0.0, 0.0), v(0.0, 0.04));
+        let c = d.sketch.add_circle(v(0.01, 0.02), 0.003);
+        ed.selection = vec![axis];
+        ed.set_tool(Tool::Mirror);
+        ed.apply_preselection(&mut d);
+        assert_eq!(ed.message.as_deref(), Some("Select entities to be mirrored."));
+        click(&mut ed, &mut d, v(0.013, 0.02));
+        let _ = c;
+        assert_eq!(count(&d, EntityKind::Circle), 2);
+        assert_eq!(ed.tool, Tool::Mirror);
     }
 
     #[test]
