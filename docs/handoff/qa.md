@@ -36,6 +36,15 @@ Restart → `noshape --version` 0.4.23 and g34 reopened (qa-scratch/upd423-0c.pn
 VAR-AUTOCOMPLETE-ENTER's psui fixes, CRASH-2045's saved-document fix; not in it: the later sketch undo, feature-row,
 variable-focus fixes (after bdbba238). Release fuzz on v0.4.23 running (/tmp/qa-cfloop69.sh, seeds 2481–2540).
 
+**11-04 00:04: night state.** Greens since 21:20 checked (dx's cf corpus 12 documents, volume sweep = v0.4.23, the 44
+ticket documents): d70c9eb2 (kernel tight box), 84a01921 (bool point-in-face speed, opBoolean localizedInFaces), bfc130c8
+(fillet groups rounded alone), 2b5807f7 (tori / spheres one surface) — no change. Interaction suite **124/136** on 9cb98b67
+(SCORE.md; the 12 left all owned). Fuzz, 0 deaths: v0.4.24 115 seeds (/tmp/qa-cfloop72.sh running, to 3140), eed2bdc8 60
+fallback-off, 444855b1 40. Now: green d347d276 /tmp/qa-nfloop33.sh (3141–3200), /tmp/qa-gfloop16.sh (3201–3240); keep/x/y
+noshape-d347d276, -2b5807f7, -0531f66e (CRASH-2045). Next: the 04:30 list for the 05:00 cut (check on the newest green:
+/tmp/qa-presmoke.sh <wrapper> g<sha> v0424 + tixvol), then the 05:00 release checks (/tmp/qa-relsmoke.sh 0.4.25 v0424; make
+qa-relgui425 / qa-mem425 by sed from the 424 ones; the updater on :149 now runs v0.4.24).
+
 **11-03 17:06: waiting for the 17:00 cut (no Release run yet).** 16:30 list: no blocker (checked 19c09884, then
 51469a47: volume sweep = v0.4.23, 44 ticket documents = 19c09884; a6c9ad94's std-text batch 3 flips no status on the four
 status documents; d55587a0's knurl change: CP12 / CP20 results unchanged, times are machine load (load ≈ 50), not the build).
