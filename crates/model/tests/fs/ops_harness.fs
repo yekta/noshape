@@ -124,6 +124,10 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             opBoolean(context, sub + "cut", { "tools" : qCreatedBy(sub + "sk", EntityType.FACE), "targets" : qCreatedBy(sub + "x", EntityType.FACE), "operationType" : BooleanOperationType.SUBTRACTION, "localizedInFaces" : true, "allowSheets" : true });
             const a = evArea(context, { "entities" : qCreatedBy(sub + "x", EntityType.FACE) });
             check("opBoolean localizedInFaces", abs(a - (400 - 25 * PI / 4) * mm ^ 2) < 1e-9 * meter ^ 2, a);
+            // Its arc and the arc's ends are created by it (the corner overcut's corner breaks go there).
+            const madeEdges = size(evaluateQuery(context, qCreatedBy(sub + "cut", EntityType.EDGE)));
+            const madeVertices = size(evaluateQuery(context, qCreatedBy(sub + "cut", EntityType.VERTEX)));
+            check("opBoolean localizedInFaces creates its arc", madeEdges == 1 && madeVertices == 2, [madeEdges, madeVertices]);
         });
         step(context, id, "edgeChangeReplace", function(sub) {
             // A sheet's edge run onto another face (std sheet metal's Shaped Flange): 20 x 20 -> 25 x 20.
@@ -166,7 +170,7 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             skCircle(sk, "c", { "center" : vector(5, 5) * mm, "radius" : 2 * mm });
             skSolve(sk);
             opBoolean(context, sub + "cut", { "tools" : qCreatedBy(sub + "sk", EntityType.FACE), "targets" : qCreatedBy(sub + "x", EntityType.FACE), "operationType" : BooleanOperationType.SUBTRACTION, "localizedInFaces" : true, "allowSheets" : true });
-            const hole = qGeometry(qCreatedBy(sub + "x", EntityType.EDGE), GeometryType.CIRCLE);
+            const hole = qGeometry(qCreatedBy(sub + "cut", EntityType.EDGE), GeometryType.CIRCLE);
             opPattern(context, sub + "p", { "entities" : hole, "transforms" : [transform(vector(10, 0, 0) * mm), transform(vector(0, 10, 0) * mm), transform(vector(10, 10, 0) * mm)], "instanceNames" : ["1", "2", "3"] });
             const faces = evaluateQuery(context, qCreatedBy(sub + "x", EntityType.FACE));
             const a = evArea(context, { "entities" : qCreatedBy(sub + "x", EntityType.FACE) });

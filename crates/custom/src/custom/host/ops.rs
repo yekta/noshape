@@ -433,6 +433,8 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     };
     // A subtraction's targets and its tools' faces (theirs in its result are the Boolean's).
     let mut before: Option<(Vec<BodyId>, HashSet<TopoName>)> = None;
+    // A localized subtraction's new edges and vertices (bodies, edge midpoints, vertex points).
+    let mut made: (Vec<BodyId>, Vec<DVec3>, Vec<DVec3>) = Default::default();
     let merged = run_op(i, &cx, &id, failure, |ev| {
         // localizedInFaces (std's sheet metal Tab, the community corner overcut): the tool faces (sheet faces or
         // sketch regions) cut out of the target faces only; the rest of their bodies stay as they were.
@@ -460,6 +462,14 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 }
                 let body = crate::regen::features::helpers_a::body_named(&ev.ctx.bodies[bi]);
                 let res = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&body.shape), &[local.shape], &k::BooleanOptions::default())?;
+                // What it made (Parasolid's created by the Boolean): the edges off every old edge (one it trimmed
+                // keeps its identity) and the vertices that weren't there.
+                let old_edges = body.shape.edges();
+                let on_old = |p: DVec3| k::make_vertex(p).is_ok_and(|v| old_edges.iter().any(|e| k::distance(&v, e).is_ok_and(|d| d.distance < 1e-7)));
+                let old_points = vertex_points(&body.shape);
+                made.1.extend(edge_midpoints(&res.shape).into_iter().filter(|p| !on_old(*p)));
+                made.2.extend(vertex_points(&res.shape).into_iter().filter(|p| !old_points.iter().any(|o| o.distance(*p) < 1e-7)));
+                made.0.push(ev.ctx.bodies[bi].id.clone());
                 let names = ev.name_result(&[&body.names], &res.history, &res.shape, &BTreeMap::new(), None);
                 ev.replace_body(bi, res.shape, names);
             }
@@ -565,6 +575,12 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     if let Some(all) = merged {
         cx.state.lock().record_merge(&all[0], &all, &id);
     }
+    let (bodies, mids, points) = made;
+    if !mids.is_empty() || !points.is_empty() {
+        let mut st = cx.state.lock();
+        st.split_face_edges.push((id.clone(), bodies.clone(), mids));
+        st.made_vertices.push((id.clone(), bodies, points));
+    }
     if let Some((targets, tools)) = before {
         let mut st = cx.state.lock();
         if let Some(op) = st.ops.values().find(|o| o.id == id).cloned() {
@@ -575,6 +591,16 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
     }
     Ok(Value::Undefined)
+}
+
+/// Each edge's middle.
+fn edge_midpoints(s: &Shape) -> Vec<DVec3> {
+    s.edges().iter().filter_map(|e| e.edge_info().ok().and_then(|i| e.point_at((i.first_param + i.last_param) * 0.5).ok())).collect()
+}
+
+/// Each vertex's point.
+fn vertex_points(s: &Shape) -> Vec<DVec3> {
+    s.vertices().iter().filter_map(|v| v.vertex_point().ok()).collect()
 }
 
 fn by_body(items: Vec<(usize, usize)>) -> BTreeMap<usize, Vec<usize>> {

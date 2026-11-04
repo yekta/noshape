@@ -97,6 +97,65 @@ struct Definition {
     /// The walls' WALL attribute ids by definition face ("<feature>.<n>",
     /// numbered in the order std made them: a Flange's pick order).
     wall_ids: BTreeMap<usize, String>,
+    /// Corner breaks by definition vertex (std's attribute-based ones: the CORNER attribute's cornerBreaks).
+    breaks: BTreeMap<usize, CornerBreak>,
+}
+
+/// A corner break at a free wall corner: a fillet of this radius or a chamfer of this distance.
+#[derive(Clone, Copy, Debug)]
+enum CornerBreak {
+    Fillet(f64),
+    Chamfer(f64),
+}
+
+/// The corner breaks on a definition body's vertices (`cornerBreaks` of their CORNER attributes: std
+/// sheetMetalCornerBreakAttributeBased, the community corner overcut's fillet).
+fn corner_breaks(st: &CtxState, q: &QueryCx, b: usize) -> BTreeMap<usize, CornerBreak> {
+    let mut out = BTreeMap::new();
+    for v in 0..st.ctx.bodies[b].vertices.len() {
+        let Some(corner) = sm_attribute(st, &q.to_ref(&Ent::Vertex(b, v)), "CORNER") else { continue };
+        let Some(first) = corner.get("cornerBreaks").as_array().and_then(|a| a.first().cloned()) else { continue };
+        let brk = first.get("value");
+        let Some(range) = length_of(brk.get("range")) else { continue };
+        match enum_field(brk, "cornerBreakStyle").as_deref() {
+            Some("FILLET") => out.insert(v, CornerBreak::Fillet(range)),
+            Some("CHAMFER") => out.insert(v, CornerBreak::Chamfer(range)),
+            _ => None,
+        };
+    }
+    out
+}
+
+/// The part's corner breaks: at each broken definition vertex, the edge through the thickness filleted or chamfered;
+/// the faces that makes come from the vertex.
+fn apply_corner_breaks(part: &mut Shape, pieces: &mut Vec<Piece>, def: &Definition, topo: &Topo) {
+    let t = def.front + def.back;
+    let key = |f: &Shape| f.bounding_box(false).map(|b| (b.center(), b.diagonal())).ok();
+    for (&v, brk) in &def.breaks {
+        let Some(&p) = topo.vertices.get(v) else { continue };
+        let through = |e: &Shape| {
+            e.edge_info().is_ok_and(|i| {
+                let d = (i.end - i.start).normalize_or_zero();
+                let r = p - i.start;
+                matches!(i.curve, k::Curve::Line { .. }) && (i.length - t).abs() < 1e-6 && (r - d * r.dot(d)).length() < 1e-6
+            })
+        };
+        let edges: Vec<Shape> = part.edges().into_iter().filter(through).collect();
+        let [edge] = edges.as_slice() else { continue };
+        let before: Vec<_> = part.faces().iter().map(key).collect();
+        let made = match brk {
+            CornerBreak::Fillet(r) => k::fillet(part, std::slice::from_ref(edge), *r),
+            CornerBreak::Chamfer(d) => k::chamfer(part, std::slice::from_ref(edge), k::ChamferSpec::Equal(*d), &[]),
+        };
+        let Ok(made) = made else { continue };
+        *part = made.shape;
+        for f in part.faces() {
+            let kf = key(&f);
+            if !before.iter().any(|b| matches!((b, kf), (Some(b), Some(kf)) if b.0.distance(kf.0) < 1e-9 && (b.1 - kf.1).abs() < 1e-9)) {
+                pieces.push(Piece { face: f, from: Def::Vertex(v) });
+            }
+        }
+    }
 }
 
 /// A definition body's bends (edge index → radius), rips (edge indices),
@@ -1784,7 +1843,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     }
                 }
             }
-            defs.push(Definition { forms, body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous, wall_ids });
+            defs.push(Definition { forms, body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous, wall_ids, breaks: corner_breaks(&st, &q, b) });
             let faces: Vec<Reference> = (0..body.faces.len()).map(|f| q.to_ref(&Ent::Face(b, f))).collect();
             let edges: Vec<Reference> = (0..body.edges.len()).map(|e| q.to_ref(&Ent::Edge(b, e))).collect();
             let vertices: Vec<Reference> = (0..body.vertices.len()).map(|v| q.to_ref(&Ent::Vertex(b, v))).collect();
@@ -1828,6 +1887,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     form_shapes.push((ft.face, tools, sketch, n_removes));
                 }
             }
+            apply_corner_breaks(&mut part, &mut pieces, def, &topo);
             // The definition body's own topology order (references are by index).
             let def_topo = (ev.ctx.bodies[bi].faces.len(), ev.ctx.bodies[bi].edges.len());
             if def_topo != (topo.faces.len(), topo.edges.len()) {
@@ -2591,7 +2651,7 @@ fn ev_sheet_metal_flat_transformation(i: &mut Interp, a: Vec<Value>) -> R<Value>
             let body = &st.ctx.bodies[b];
             let (bends, rips, rolled, rip_styles, joint_ids) = joints(&st, &q, b);
             let k_factor = model.get("k-factor").get("value").as_number().unwrap_or(0.45);
-            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new(), forms: Vec::new(), wall_ids: BTreeMap::new() };
+            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new(), forms: Vec::new(), wall_ids: BTreeMap::new(), breaks: BTreeMap::new() };
             (e, body.shape.clone(), def, k_factor)
         })
     };
