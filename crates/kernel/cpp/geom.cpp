@@ -716,6 +716,43 @@ rust::Vec<double> face_frames_at_uvs(const OcShape& fs, rust::Slice<const double
   return r;
 }
 
+// First and second derivatives and the outward normal (face orientation) at each (u, v) of `uvs`: Su, Sv, Suu, Suv,
+// Svv, N, 18 values a parameter (curvatures and their derivatives).
+rust::Vec<double> face_d2_at_uvs(const OcShape& fs, rust::Slice<const double> uvs)
+{
+  const TopoDS_Face&  f = as_face(fs.shape, "shape");
+  BRepAdaptor_Surface s(f);
+  const bool          reversed = f.Orientation() == TopAbs_REVERSED;
+  rust::Vec<double>   r;
+  r.reserve(uvs.size() / 2 * 18);
+  for (size_t k = 0; k + 1 < uvs.size(); k += 2)
+  {
+    const double u = uvs[k], v = uvs[k + 1];
+    gp_Pnt       p;
+    gp_Vec       du, dv, duu, dvv, duv;
+    s.D2(u, v, p, du, dv, duu, dvv, duv);
+    gp_Vec n = du.Crossed(dv);
+    if (n.Magnitude() < 1e-15)
+    {
+      BRepLProp_SLProps props(s, u, v, 1, 1e-9);
+      if (!props.IsNormalDefined())
+        fail_op("normal is undefined at this point");
+      n = gp_Vec(props.Normal());
+    }
+    else
+      n.Normalize();
+    if (reversed)
+      n.Reverse();
+    for (const gp_Vec& w : {du, dv, duu, duv, dvv, n})
+    {
+      r.push_back(w.X());
+      r.push_back(w.Y());
+      r.push_back(w.Z());
+    }
+  }
+  return r;
+}
+
 rust::Vec<double> face_uv_bounds(const OcShape& fs)
 {
   const TopoDS_Face& f = as_face(fs.shape, "shape");

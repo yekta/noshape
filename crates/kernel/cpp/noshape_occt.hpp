@@ -748,6 +748,7 @@ P3    face_point_at_uv(const OcShape& face, double u, double v);
 ProjPoint                face_project_point(const OcShape& face, P3 p);
 rust::Vec<double>        face_uv_bounds(const OcShape& face);
 rust::Vec<double>        face_frames_at_uvs(const OcShape& face, rust::Slice<const double> uvs);
+rust::Vec<double>        face_d2_at_uvs(const OcShape& face, rust::Slice<const double> uvs);
 P3    edge_point_at(const OcShape& edge, double t);
 P3    edge_tangent_at(const OcShape& edge, double t);
 rust::Vec<double> edge_derivatives_at(const OcShape& edge, double t);

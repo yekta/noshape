@@ -477,7 +477,7 @@ fn new_feature_studio_template_compiles() {
     assert!(c.features.is_empty());
 }
 
-/// The public Displacement map feature (tests/fs/displacement_map.fs, FeatureScript 3044) on a Ø50 × 50 mm cylinder's
+/// The public Displacement map feature (tests/fs/displacement_map.fs, FeatureScript 3044) on a Ø50 × 60 mm cylinder (live's case, behaviours.md "P1 DISPLACEMENT-MAP")'s
 /// `face` ("side" or "top") with the pixel values `csv`: degree 5, black 0 mm, white 1 mm. The regeneration, its
 /// seconds.
 fn displacement_map(csv: &str, face: &str, replace: bool) -> (RegenResult, f64) {
@@ -489,7 +489,7 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
     {
     }
     {
-        fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * meter, "topCenter" : vector(0, 0, 50) * millimeter, "radius" : 25 * millimeter });
+        fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * meter, "topCenter" : vector(0, 0, 60) * millimeter, "radius" : 25 * millimeter });
     });
 "#,
     );
@@ -514,7 +514,7 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
             let s = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().face_surface().unwrap();
             match face {
                 "side" => matches!(s, noshape_kernel::Surface::Cylinder { .. }),
-                _ => matches!(s, noshape_kernel::Surface::Plane(_)) && b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().centroid().unwrap().z > 0.025,
+                _ => matches!(s, noshape_kernel::Surface::Plane(_)) && b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().centroid().unwrap().z > 0.03,
             }
         })
         .expect("the face");
@@ -549,7 +549,7 @@ fn assert_samples(r: &RegenResult, info: &str) {
 #[test]
 fn displacement_map_on_a_cylinder() {
     let csv = wave_csv(24);
-    let plain = PI * 0.025f64.powi(2) * 0.05;
+    let plain = PI * 0.025f64.powi(2) * 0.06;
     let solid_volume = |r: &RegenResult| r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| b.shape.volume().unwrap().abs()).sum::<f64>();
     for face in ["side", "top"] {
         let (r, _) = displacement_map(&csv, face, false);
@@ -561,8 +561,8 @@ fn displacement_map_on_a_cylinder() {
         assert_eq!(r.context.bodies.len(), 1, "{face}: the face replaced");
         let v = solid_volume(&r);
         let grown = match face {
-            "side" => PI * 0.026f64.powi(2) * 0.05,
-            _ => PI * 0.025f64.powi(2) * 0.051,
+            "side" => PI * 0.026f64.powi(2) * 0.06,
+            _ => PI * 0.025f64.powi(2) * 0.061,
         };
         assert!(v > plain && v < grown, "{face}: volume {v} between {plain} and {grown}");
     }
@@ -575,18 +575,19 @@ fn displacement_map_on_a_cylinder() {
 fn displacement_map_probe() {
     let Ok(path) = std::env::var("NOSHAPE_DISP_CSV") else { return };
     let csv = std::fs::read_to_string(path).expect("the CSV");
-    // NOSHAPE_DISP_ONLY=side:false: one case, its FeatureScript lines profiled.
+    // NOSHAPE_DISP_ONLY=side:false,top:false: those cases; NOSHAPE_DISP_PROFILE=1: their FeatureScript lines timed.
     let only = std::env::var("NOSHAPE_DISP_ONLY").ok();
-    custom::run::set_profiling(only.is_some());
+    let profile = std::env::var_os("NOSHAPE_DISP_PROFILE").is_some();
+    custom::run::set_profiling(profile);
     for face in ["side", "top"] {
         for replace in [false, true] {
-            if only.as_ref().is_some_and(|o| *o != format!("{face}:{replace}")) {
+            if only.as_ref().is_some_and(|o| !o.split(',').any(|c| c == format!("{face}:{replace}"))) {
                 continue;
             }
             let (r, secs) = displacement_map(&csv, face, replace);
             let feature = r.display.features.last().expect("the feature");
             println!("DISP feature {:.2} s", feature.time_ms / 1000.0);
-            if only.is_some() {
+            if profile {
                 let mut lines: Vec<_> = custom::run::outputs().values().flat_map(|o| o.line_times.clone()).collect();
                 lines.sort_by_key(|l| std::cmp::Reverse(l.2));
                 for (m, l, t) in lines.iter().take(40) {

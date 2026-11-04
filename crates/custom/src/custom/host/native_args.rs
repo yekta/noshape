@@ -218,7 +218,6 @@ const IGNORES_MAP: &[&str] = &[
 /// Natives std calls that are not implemented (whatever their arguments).
 const MISSING: &[&str] = &[
     "evApproximateBSplineSurface",
-    "evFaceCurvatureDerivatives",
     "evFaults",
     "evMaxTolerance",
     "evSheetMetalBendUp",
@@ -238,7 +237,6 @@ const MISSING_OLDER: &[&str] = &[
     "endSheetMetalFeature",
     "evApproximateBSplineSurface",
     "evEdgeCurvature",
-    "evFaceCurvatureDerivatives",
     "evFaults",
     "evMaxTolerance",
     "evSheetMetalBendUp",

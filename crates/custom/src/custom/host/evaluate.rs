@@ -2,7 +2,7 @@
 
 use super::query::{EType, Ent, QueryCx, entity_axis, entity_type_of, with_ents};
 use super::{FsContext, context_arg, convert::*, raise_error, raise_faulty, std_enum, std_tag};
-use glam::{DVec2, DVec3};
+use glam::{DMat3, DVec2, DVec3};
 use noshape_featurescript::interp::{Interp, NativeFn, R};
 use noshape_featurescript::value::{Map, Value};
 use noshape_kernel as k;
@@ -42,6 +42,7 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("evFilletRadius", ev_fillet_radius),
     ("evEdgeCurvatures", ev_edge_curvatures),
     ("evFaceCurvatures", ev_face_curvatures),
+    ("evFaceCurvatureDerivatives", ev_face_curvature_derivatives),
     ("evRaycast", ev_raycast),
     ("evCollisionDetection", ev_collision_detection),
     ("evFacePeriodicity", ev_face_periodicity),
@@ -807,23 +808,120 @@ fn curve_frame(s: &k::Shape, u: f64) -> Option<(DVec3, DVec3, DVec3, DVec3)> {
     let dk = (dn / (l * l) - n * (4.0 * m) / (l * l * l)) / l.sqrt();
     Some((p, a / l.sqrt(), kappa, dk))
 }
+/// Parameters in [0, 1]² of a face's uv bounds, as the surface's.
+fn face_uvs(s: &k::Shape, params: &[DVec2]) -> Option<Vec<DVec2>> {
+    let b = s.uv_bounds().ok()?;
+    Some(params.iter().map(|uv| DVec2::new(b[0] + (b[1] - b[0]) * uv.x, b[2] + (b[3] - b[2]) * uv.y)).collect())
+}
+
+/// std's second fundamental form at a point ([Su, Sv, Suu, Suv, Svv, N] there) as a world matrix: `t·M·t` is the
+/// normal curvature ⟨S″, N⟩ along a unit tangent t, minus std's curvature (convex towards the outside positive:
+/// `secondFF = -minCurvature · d dᵀ - maxCurvature · d dᵀ`). Also the shape operator's 2 × 2 matrix in (u, v).
+fn second_form(d: &[DVec3; 6]) -> Option<(DMat3, [[f64; 2]; 2])> {
+    let [su, sv, suu, suv, svv, n] = *d;
+    let (e, f, g) = (su.dot(su), su.dot(sv), sv.dot(sv));
+    let det = e * g - f * f;
+    if det.abs() < 1e-300 {
+        return None;
+    }
+    let (l, m, nn) = (suu.dot(n), suv.dot(n), svv.dot(n));
+    // P = J G⁻¹: M = P B Pᵀ.
+    let (p1, p2) = ((su * g - sv * f) / det, (sv * e - su * f) / det);
+    let outer = |a: DVec3, b: DVec3| DMat3::from_cols(a * b.x, a * b.y, a * b.z);
+    let mat = outer(p1, p1) * l + (outer(p1, p2) + outer(p2, p1)) * m + outer(p2, p2) * nn;
+    // G⁻¹ B.
+    let shape = [[(g * l - f * m) / det, (g * m - f * nn) / det], [(e * m - f * l) / det, (e * nn - f * m) / det]];
+    Some((mat, shape))
+}
+
+/// std's curvatures at a point: (min, max, min direction, max direction), convex towards the outside positive.
+fn principal_curvatures(d: &[DVec3; 6]) -> Option<(f64, f64, DVec3, DVec3)> {
+    let (_, s) = second_form(d)?;
+    let (tr, det) = (s[0][0] + s[1][1], s[0][0] * s[1][1] - s[0][1] * s[1][0]);
+    let disc = (tr * tr * 0.25 - det).max(0.0).sqrt();
+    // ⟨S″, N⟩ along each principal direction; std's curvature is its negative.
+    let (l1, l2) = (tr * 0.5 + disc, tr * 0.5 - disc);
+    let [su, sv, .., n] = *d;
+    let dir = |lam: f64| {
+        let (a, b) = ((s[0][1], lam - s[0][0]), (lam - s[1][1], s[1][0]));
+        let (x, y) = if a.0.abs() + a.1.abs() >= b.0.abs() + b.1.abs() { a } else { b };
+        (su * x + sv * y).try_normalize()
+    };
+    let (d1, d2) = match (dir(l1), dir(l2)) {
+        (Some(a), Some(b)) if disc > 1e-12 * (1.0 + tr.abs()) => (a, b),
+        _ => {
+            let a = su.try_normalize().unwrap_or_else(|| any_perpendicular(n));
+            (a, n.cross(a))
+        }
+    };
+    // -l1 <= -l2: the max curvature goes with l2's direction.
+    Some((-l1, -l2, d1, d2))
+}
+
 fn ev_face_curvatures(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let params: Vec<DVec2> = field(&a, "parameters").as_array().map(|v| v.iter().filter_map(vec2_of).collect()).unwrap_or_default();
     let out = on_first(i, &cx, &a, "face", "INVALID_INPUT", |q, e| {
         let s = q.shape(e)?;
         let surf = s.face_surface().ok()?;
-        let mut out = Vec::new();
-        for pl in face_tangent_planes(&s, &params)? {
-            let (k1, k2) = match &surf {
-                k::Surface::Plane(_) => (0.0, 0.0),
-                k::Surface::Cylinder { radius, .. } => (1.0 / radius, 0.0),
-                k::Surface::Sphere { radius, .. } => (1.0 / radius, 1.0 / radius),
-                _ => (0.0, 0.0),
-            };
-            out.push(Value::map_from([("minCurvature", Value::num(k2.min(k1))), ("maxCurvature", Value::num(k1.max(k2))), ("minDirection", dir_value(pl.y)), ("maxDirection", dir_value(pl.x))]));
+        let analytic = match &surf {
+            k::Surface::Plane(_) => Some((0.0, 0.0)),
+            k::Surface::Cylinder { radius, .. } => Some((1.0 / radius, 0.0)),
+            k::Surface::Sphere { radius, .. } => Some((1.0 / radius, 1.0 / radius)),
+            _ => None,
+        };
+        // std's FaceCurvatureResult (an older std's evaluate.fs gets them raw: legacy.rs).
+        let result = |kmin: f64, kmax: f64, dmin: DVec3, dmax: DVec3| {
+            Value::map_from([("minCurvature", meter_power_value(kmin, -1.0)), ("maxCurvature", meter_power_value(kmax, -1.0)), ("minDirection", dir_value(dmin)), ("maxDirection", dir_value(dmax))])
+                .with_tag(std_tag("evaluate.fs", "FaceCurvatureResult"))
+        };
+        let Some((k1, k2)) = analytic else {
+            return s.d2_at_uvs(&face_uvs(&s, &params)?).ok()?.iter().map(|d| principal_curvatures(d).map(|(a, b, c, e)| result(a, b, c, e))).collect();
+        };
+        Some(face_tangent_planes(&s, &params)?.iter().map(|pl| result(k2.min(k1), k1.max(k2), pl.y, pl.x)).collect())
+    })?;
+    Ok(Value::array(out))
+}
+
+/// The second fundamental form's derivative along each unit tangent `directions[k]` at `parameters[k]` (per length:
+/// 1 / m², std multiplies by meter ^ -2): the form across a 10 µm step each way on the surface.
+fn ev_face_curvature_derivatives(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let params: Vec<DVec2> = field(&a, "parameters").as_array().map(|v| v.iter().filter_map(vec2_of).collect()).unwrap_or_default();
+    let dirs: Vec<DVec3> = field(&a, "directions").as_array().map(|v| v.iter().filter_map(vec3_of).collect()).unwrap_or_default();
+    if dirs.len() != params.len() {
+        return Err(raise_error(i, "INVALID_INPUT", None));
+    }
+    const H: f64 = 1e-5;
+    let out = on_first(i, &cx, &a, "face", "INVALID_INPUT", |q, e| {
+        let s = q.shape(e)?;
+        let uvs = face_uvs(&s, &params)?;
+        let at = s.d2_at_uvs(&uvs).ok()?;
+        let mut steps = Vec::with_capacity(2 * uvs.len());
+        for ((uv, d), t) in uvs.iter().zip(&at).zip(&dirs) {
+            let [su, sv, ..] = *d;
+            let (e, f, g) = (su.dot(su), su.dot(sv), sv.dot(sv));
+            let det = e * g - f * f;
+            let (bu, bv) = (su.dot(*t), sv.dot(*t));
+            let w = DVec2::new(g * bu - f * bv, e * bv - f * bu) / det;
+            let len = (su * w.x + sv * w.y).length();
+            if !(len > 0.0 && len.is_finite()) {
+                return None;
+            }
+            let step = w * (H / len);
+            steps.extend([*uv + step, *uv - step]);
         }
-        Some(out)
+        let around = s.d2_at_uvs(&steps).ok()?;
+        around
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|[plus, minus]| {
+                let ((m1, _), (m0, _)) = (second_form(plus)?, second_form(minus)?);
+                let dm = (m1 - m0) * (0.5 / H);
+                Some(Value::array((0..3).map(|r| Value::array((0..3).map(|c| Value::num(dm.col(c)[r])).collect())).collect()))
+            })
+            .collect()
     })?;
     Ok(Value::array(out))
 }

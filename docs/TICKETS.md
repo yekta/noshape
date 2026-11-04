@@ -45,6 +45,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the Feature Studio, feature_add; a build before the maps): side 14.7 s, top 17.4 s, both OK "262144 samples" (the
   CLI regenerates the document on open as well); Replace face on, side and top: stopped after 818 s and 1,167 s
   in core's projection (above). Waiting on live's times for the target.
+  dx 11-04 16:17, live's times (behaviours.md "P1 DISPLACEMENT-MAP", Ø50 × 60 cylinder): the feature 11.14 / 11.22 /
+  11.17 / 12.15 s (side off / on, top off / on). Ours on the same cylinder (T2 displacement_map_probe, now Ø50 × 60):
+  side off 7.4 s (10.1 s with the display mesh), top off 7.3 s (8.1 s): faster than live. Left: Replace face on
+  (core: > 10 min in OCCT's projection; live's volumes 123,034.961 mm³ side, 118,888.675 mm³ top).
 
 - Natives std calls that the FeatureScript host lacks (lead 11-04 13:08, after DISPLACEMENT-MAP; dx 11-04 14:53:
   native_args.rs MISSING and MISSING_OLDER; callers traced through std 3095). P1 where a standard feature noshape runs
@@ -54,7 +58,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - [ ] P1 FS-NATIVE-OPMOVECURVEBOUNDARY @opMoveCurveBoundary: std's sheetMetalLoft (run by std here); also std's
     trimCurve and offsetCurveOnFace (ours run natively).
   - [ ] P1 FS-NATIVE-EVSHEETMETALBENDUP @evSheetMetalBendUp: std's pcbEnd (run by std here).
-  - [ ] P1 FS-NATIVE-EVFACECURVATUREDERIVATIVES @evFaceCurvatureDerivatives: std's bridgingCurve (Bridging curve always
+  - [x] (dx 11-04 16:17: the second fundamental form's derivative along a tangent, from the kernel's second
+    derivatives (`face_d2_at_uvs`) 10 µm each way; evFaceCurvatures answers std's typed FaceCurvatureResult (it
+    returned plain numbers, so evFaceCurvature always failed under std 3095) with general surfaces' curvatures (it
+    gave 0 but on planes, cylinders and spheres); the parser takes `is` / `as` below `* / %` (std's
+    `matrix(result) * meter ^ -2 as MatrixWithUnits` tagged meter ^ -2 alone). T1 ops_harness torusCurvature: a torus's
+    curvatures and R sin φ / (r (R + r cos φ)²); parser::tests::expressions. Live asked for the exact level of
+    `is` / `as` between `&&` and `*` (REQUESTS 16:17).)
+    P1 FS-NATIVE-EVFACECURVATUREDERIVATIVES @evFaceCurvatureDerivatives: std's bridgingCurve (Bridging curve always
     runs by std when the host is loaded) through evFaceCurvatureDerivative.
   - [ ] P1 FS-NATIVE-OPSMFLATOPERATION @opSMFlatOperation: std's SMFlatOp (sketching on a sheet metal flat; noshape
     has no such feature yet), its only caller.

@@ -225,6 +225,25 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
                     holders = append(holders, evVertexPoint(context, { "vertex" : v }));
             check("an attribute goes with its vertex", holders == [], holders);
         });
+        step(context, id, "torusCurvature", function(sub) {
+            // A torus R 20, r 5 (a revolved circle: no analytic shortcut). At its outer equator the curvatures are
+            // 1 / (R + r) along the major circle and 1 / r along the minor; at 45° up the minor circle the major
+            // direction's normal curvature changes along the minor circle by R sin φ / (r (R + r cos φ)²) (a Bridging
+            // curve's curvature match).
+            const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, 2000) * mm, vector(0, -1, 0), vector(1, 0, 0)) });
+            skCircle(sk, "c", { "center" : vector(20, 0) * mm, "radius" : 5 * mm });
+            skSolve(sk);
+            opRevolve(context, sub + "r", { "entities" : qSketchRegion(sub + "sk"), "axis" : line(vector(0, 0, 2000) * mm, vector(0, 0, 1)), "angleForward" : 2 * PI * radian });
+            const face = qCreatedBy(sub + "r", EntityType.FACE);
+            const at = function(p) { return evDistance(context, { "side0" : face, "side1" : p }).sides[0].parameter; };
+            const c = evFaceCurvature(context, { "face" : face, "parameter" : at(vector(25, 0, 2000) * mm) });
+            check("evFaceCurvature on a torus", abs(c.minCurvature - 1 / (25 * mm)) < 1e-6 / mm && abs(c.maxCurvature - 1 / (5 * mm)) < 1e-6 / mm && abs(abs(c.minDirection[1]) - 1) < 1e-9 && abs(abs(c.maxDirection[2]) - 1) < 1e-9, c);
+            const p = vector(20 + 5 * cos(45 * degree), 0, 2000 + 5 * sin(45 * degree)) * mm;
+            const d = evFaceCurvatureDerivative(context, { "face" : face, "parameter" : at(p), "direction" : normalize(vector(-1, 0, 1)) });
+            const kd = dot(vector(0, 1, 0), d * vector(0, 1, 0));
+            const want = 0.020 * sin(45 * degree) / (0.005 * (0.020 + 0.005 * cos(45 * degree)) ^ 2) * meter ^ -2;
+            check("evFaceCurvatureDerivative on a torus", abs(kd - want) < 1e-3 * want, [kd, want]);
+        });
         step(context, id, "patternSolidFaces", function(sub) {
             // A solid's hole face patterned (std's FACE pattern, a Fill pattern of holes): the holes repeated in that
             // part, no copies of it.
