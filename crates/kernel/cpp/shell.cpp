@@ -122,7 +122,10 @@
 #include <TColStd_HArray1OfReal.hxx>
 #include <Geom_Plane.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
-#include <BOPAlgo_ArgumentAnalyzer.hxx>
+#include <BOPDS_IteratorSI.hxx>
+#include <IntTools_Context.hxx>
+#include <BOPAlgo_CheckerSI.hxx>
+#include <BOPDS_DS.hxx>
 #include <Geom_ConicalSurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <ShapeFix_Edge.hxx>
@@ -161,6 +164,14 @@ using HHist = occ::handle<BRepTools_History>;
 double volume_of(const TopoDS_Shape& s)
 {
   return volume_props(s).Mass();
+}
+
+// OCCT's own integral: to ~1e-4 on free-form faces, a fifth of the time of volume_of's segmented one (a check's).
+double rough_volume_of(const TopoDS_Shape& s)
+{
+  GProp_GProps g;
+  BRepGProp::VolumeProperties(s, g);
+  return g.Mass();
 }
 
 int solid_count(const TopoDS_Shape& s)
@@ -411,7 +422,11 @@ bool by_offset(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
   lap("valid");
   // A correct offset lies inside the outer solid: the volumes must add up
   // (catches self-intersecting offsets that BRepCheck accepts).
-  const double vo = volume_of(outer), vi = volume_of(inner), vr = volume_of(r);
+  // (The inner first: an offset that came out empty fails without the others.)
+  const double vi = volume_of(inner);
+  if (!(vi > 0))
+    return no("the offset is empty");
+  const double vo = volume_of(outer), vr = volume_of(r);
   lap("volumes");
   if (std::getenv("NOSHAPE_SHELL_DEBUG"))
     std::fprintf(stderr, "offset: outer %.9g inner %.9g result %.9g mm3\n", vo * 1e9, vi * 1e9, vr * 1e9);
@@ -2915,7 +2930,7 @@ bool by_smooth(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
 // vertex's offset where its faces' offsets meet (Newton; two tangent faces: along their offset tangent line; a seam's
 // vertex: along the offset seam); each edge's offset the two offsets' intersection through its ends (GeomAPI_IntSS,
 // exact for these), tangent faces' edges moved along their normal. The wall as by_planes builds it, then checked:
-// valid, free of self-interference (BOPAlgo_ArgumentAnalyzer: the offsets crossing each other or the part), its
+// valid, free of self-interference (OCCT's checker: the offsets crossing each other or the part), its
 // volume inside the part's.
 namespace quad {
 struct Surf
@@ -3121,6 +3136,62 @@ bool solve_line(const Surf& s, const gp_XYZ& o, const gp_XYZ& d, gp_XYZ& x, doub
 } // namespace quad
 
 namespace quad {
+// Box-overlapping pairs of a shape's sub-shapes, less those whose two shapes are both in `old`.
+class NewPairsIteratorSI : public BOPDS_IteratorSI
+{
+public:
+  NewPairsIteratorSI(const occ::handle<NCollection_BaseAllocator>& a, const ShapeIMap& old) : BOPDS_IteratorSI(a), old_(old) {}
+
+protected:
+  void Intersect(const occ::handle<IntTools_Context>& ctx, const bool obb, const double fuzzy) override
+  {
+    BOPDS_IteratorSI::Intersect(ctx, obb, fuzzy);
+    std::vector<char> is_old((size_t)myDS->NbSourceShapes());
+    for (int i = 0; i < myDS->NbSourceShapes(); ++i)
+      is_old[(size_t)i] = old_.Contains(myDS->Shape(i));
+    for (int k = 0; k < myLists.Length(); ++k)
+    {
+      NCollection_DynamicArray<BOPDS_Pair> kept;
+      for (const BOPDS_Pair& p : myLists(k))
+      {
+        int n1, n2;
+        p.Indices(n1, n2);
+        if (!is_old[(size_t)n1] || !is_old[(size_t)n2])
+          kept.Append(p);
+      }
+      myLists(k) = std::move(kept);
+    }
+  }
+
+private:
+  const ShapeIMap& old_;
+};
+
+// OCCT's self-interference check of a shape, over the pairs where a shape not in `old` takes part.
+class NewPairsCheckerSI : public BOPAlgo_CheckerSI
+{
+public:
+  explicit NewPairsCheckerSI(const ShapeIMap& old) : old_(old) {}
+
+protected:
+  void Init(const Message_ProgressRange&) override
+  {
+    Clear();
+    myDS = new BOPDS_DS(myAllocator);
+    myDS->SetArguments(myArguments);
+    myDS->Init(myFuzzyValue);
+    myContext   = new IntTools_Context;
+    auto* it    = new NewPairsIteratorSI(myAllocator, old_);
+    it->SetDS(myDS);
+    it->Prepare(myContext, myUseOBB, myFuzzyValue);
+    it->UpdateByLevelOfCheck(myLevelOfCheck);
+    myIterator = it;
+  }
+
+private:
+  const ShapeIMap& old_;
+};
+
 // Edge `ne`'s curve on face `nf` (an offset of `of`, its surface the offset of `of`'s in the same frame): projected,
 // then moved by whole turns in u to start where `oe`'s curve on `of` starts (a seam: both of its curves, in `oe`'s
 // order).
@@ -4743,50 +4814,40 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   }
   lap("check");
   {
-    BOPAlgo_ArgumentAnalyzer an;
-    an.SetShape1(wall);
-    an.ArgumentTypeMode()   = false;
-    an.SelfInterMode()      = true;
-    an.SmallEdgeMode()      = false;
-    an.RebuildFaceMode()    = false;
-    an.TangentMode()        = false;
-    an.MergeVertexMode()    = false;
-    an.MergeEdgeMode()      = false;
-    an.ContinuityMode()     = false;
-    an.CurveOnSurfaceMode() = false;
-    an.SetRunParallel(true);
-    an.Perform();
-    // (Only where an offset takes part: the part's own shapes can touch within their tolerances, Shell 4's two
-    // vertices 0.1 mm apart, one 0.1 mm loose.)
-    bool crossing = false;
-    if (an.HasFaulty())
+    // Only where an offset takes part: the part's own shapes can touch within their tolerances (Shell 4's two
+    // vertices 0.1 mm apart, one 0.1 mm loose), and checking them took Shell 4 0.5 s.
+    ShapeIMap in;
+    TopExp::MapShapes(so, in);
+    quad::NewPairsCheckerSI        checker(in);
+    NCollection_List<TopoDS_Shape> args;
+    args.Append(wall);
+    checker.SetArguments(args);
+    checker.SetNonDestructive(true);
+    checker.SetRunParallel(true);
+    checker.Perform();
+    const BOPDS_DS& ds       = *checker.PDS();
+    bool            crossing = false;
+    for (NCollection_Map<BOPDS_Pair>::Iterator it(ds.Interferences()); it.More(); it.Next())
     {
-      ShapeIMap in;
-      TopExp::MapShapes(so, in);
-      for (const BOPAlgo_CheckResult& cr : an.GetCheckResult())
-        for (const TopoDS_Shape& x : cr.GetFaultyShapes1())
-          crossing = crossing || !in.Contains(x);
+      int n1, n2;
+      it.Value().Indices(n1, n2);
+      if (ds.IsNewShape(n1) || ds.IsNewShape(n2) || (in.Contains(ds.Shape(n1)) && in.Contains(ds.Shape(n2))))
+        continue;
+      crossing = true;
+      if (dbg)
+        for (const int n : {n1, n2})
+        {
+          Bnd_Box bb;
+          BRepBndLib::Add(ds.Shape(n), bb);
+          const gp_Pnt c = bb.IsVoid() ? gp_Pnt() : gp_Pnt((bb.CornerMin().XYZ() + bb.CornerMax().XYZ()) / 2);
+          std::fprintf(stderr, "quadrics: interference [type %d at %.3f %.3f %.3f]\n", (int)ds.Shape(n).ShapeType(), c.X() * 1e3, c.Y() * 1e3, c.Z() * 1e3);
+        }
     }
     if (crossing)
-    {
-      if (dbg)
-        for (const BOPAlgo_CheckResult& cr : an.GetCheckResult())
-        {
-          std::fprintf(stderr, "quadrics: interference %d:", (int)cr.GetCheckStatus());
-          for (const TopoDS_Shape& x : cr.GetFaultyShapes1())
-          {
-            Bnd_Box bb;
-            BRepBndLib::Add(x, bb);
-            const gp_Pnt c = bb.IsVoid() ? gp_Pnt() : gp_Pnt((bb.CornerMin().XYZ() + bb.CornerMax().XYZ()) / 2);
-            std::fprintf(stderr, " [type %d at %.3f %.3f %.3f]", (int)x.ShapeType(), c.X() * 1e3, c.Y() * 1e3, c.Z() * 1e3);
-          }
-          std::fprintf(stderr, "\n");
-        }
       return no("the offsets cross each other or the part");
-    }
   }
   lap("self-interference");
-  const double vw = volume_of(wall), vs = volume_of(so);
+  const double vw = rough_volume_of(wall), vs = rough_volume_of(so);
   lap("volumes");
   if (dbg)
     std::fprintf(stderr, "quadrics: wall volume %.17g solid %.17g\n", vw, vs);

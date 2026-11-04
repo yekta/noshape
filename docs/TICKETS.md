@@ -1905,6 +1905,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   declines "two edges leave a vertex in one direction": bool) and their common comes out empty (0.65 s). Next: the
   flat rims in the quadric path (a tangent removed face's rim, per edge, the plane through it normal to the kept face),
   then this shell is a quadric one and fast.
+  core 11-04 22:57: **Shell 4 0.46 s (live 0.63)**, its test 1.10 -> 0.57 s: the self-interference check skips the
+  part's own pairs before intersecting them (561 -> 268 ms; what is left is two lines touching the ramp's offset at a
+  vertex, 155 ms each in OCCT's edge/face intersector), the wall's volume check by OCCT's integral (120 -> 26 ms), and
+  the offset path gives up on an empty offset before its other volumes (87 -> 17 ms). Shell corpus (211): same outcomes,
+  volumes and faces; same times.
 - [ ] P0 REGEN-SPEED (core 10-29 03:05: met in release on perf.yml run 40796942944 (main 34cbea98): live-30-features full regen 35 / 41 / 53 ms (macOS / Linux / Windows; budget 80, live 171), its Extrude 1 edit commit 34 / 38 / 60 ms (budget 200), big-plate regen 159 / 230 / 306 ms (live 617); qa, please re-measure the GUI commit on a release build, the 301–785 ms were a dev build at load ~30. Was 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left
