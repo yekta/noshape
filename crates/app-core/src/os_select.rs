@@ -34,7 +34,9 @@ const LIST_PAD_TOP: f32 = 5.;
 const LIST_PAD_BOTTOM: f32 = 4.;
 const TEXT_INSET: f32 = 12.;
 /// Height of the closed select with its 1 px underline (live: 26 px in a
-/// 28 px row); the open search input is 1 px taller (2 px underline).
+/// 28 px row); the open search input keeps it, its 2 px underline inside (live:
+/// the Configurations box's select stays [74,112,161,26] open, nothing around
+/// it moves).
 const FIELD_H: f32 = 26.;
 /// Tallest open list (live: a 9-item list shows 7½ rows and scrolls).
 const LIST_MAX_H: f32 = 200.;
@@ -383,11 +385,12 @@ impl Render for OsSelect {
                     // the 9 px × centered 11 px from the right edge.
                     h_flex()
                         .w_full()
-                        .h(px(self.height + 1.))
+                        .h(px(self.height))
                         .items_end()
                         .border_b_2()
                         .border_color(accent)
-                        .child(div().flex_1().min_w_0().ml(px(-6.)).relative().top(px(4.)).child(Input::new(st).appearance(false).text_size(px(14.))))
+                        // 5 px down from the content's bottom: the text where a 1 px taller field put it 4 px down.
+                        .child(div().flex_1().min_w_0().ml(px(-6.)).relative().top(px(5.)).child(Input::new(st).appearance(false).text_size(px(14.))))
                         .when(!self.query.is_empty(), |d| {
                             d.child(
                                 div()
@@ -415,9 +418,11 @@ impl Render for OsSelect {
                 .child(div().w_full().h_0().child(self.render_list(cx)))
                 .into_any_element(),
         };
+        let selector = format!("os-select:{}", self.id);
         div()
             .relative()
             .w_full()
+            .debug_selector(move || selector)
             .key_context("OsSelect")
             // Esc with the list closed goes on to the dialog (cancel; qa5 SM9).
             .on_action(cx.listener(|this, _: &SelectDismiss, window, cx| {

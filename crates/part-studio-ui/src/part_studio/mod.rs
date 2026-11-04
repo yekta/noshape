@@ -3719,6 +3719,7 @@ impl PartStudioView {
         }
         v_flex()
             .id("feature-list")
+            .debug_selector(|| "feature-list".into())
             .key_context("FeatureList")
             .track_focus(&self.ui.list_focus)
             .track_scroll(&self.ui.list_scroll)
