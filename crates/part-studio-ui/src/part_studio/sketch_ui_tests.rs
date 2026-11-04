@@ -2587,3 +2587,30 @@ fn opening_the_configuration_select_moves_nothing(cx: &mut TestAppContext) {
         assert_eq!(a, b, "{name} moved when the select opened");
     }
 }
+
+/// Cached list rows span the list (the hover highlight from edge to edge), with the eye at the row's right end
+/// (live): a part row was sized to its content, the eye right after the name.
+#[gpui::test]
+fn list_rows_span_the_list_with_the_eye_at_the_right(cx: &mut TestAppContext) {
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "row-width", Some(block));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let (part, sketch) = cx.update(|cx| {
+        let v = view.read(cx);
+        (v.display.bodies[0].id.clone(), v.studio(cx).unwrap().features.iter().find(|f| f.type_id == "sketch").unwrap().id)
+    });
+    assert!(cx.update(|cx| view.read(cx).part_row_cache.contains_key(&part)), "the part row is cached");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let mut at = |s: String| vcx.debug_bounds(Box::leak(s.into_boxed_str())).unwrap_or_else(|| panic!("no bounds"));
+    let list = at("feature-list".into());
+    let (part_row, part_eye) = (at(format!("part-row-{part}")), at(format!("part-eye-{part}")));
+    let (sketch_row, sketch_eye) = (at(format!("feature-row-{sketch:?}")), at(format!("feat-eye-{sketch:?}")));
+    for (name, row, eye) in [("part", part_row, part_eye), ("sketch", sketch_row, sketch_eye)] {
+        assert!((row.left() - list.left()).abs() < px(1.) && (row.right() - list.right()).abs() < px(20.), "{name} row {row:?} spans the list {list:?}");
+        assert!(row.right() - eye.right() < px(20.), "{name} eye {eye:?} at the right of {row:?}");
+    }
+}

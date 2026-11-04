@@ -4163,10 +4163,14 @@ impl PartStudioView {
                     move |this: &mut Self, _, cx| {
                         let _t = noshape_render::perf::scope("ps.row_part");
                         let d = this.display.clone();
-                        match d.body(&id2) {
+                        // Full width: a cached view's content is laid out on its own, and sized to itself otherwise
+                        // (the hover ended at the eye, the eye after the name).
+                        let row = match d.body(&id2) {
                             Some(b) => this.render_part_row(b, cx),
                             None => div().into_any_element(),
-                        }
+                        };
+                        let key = id2.clone();
+                        div().size_full().debug_selector(move || format!("part-row-{key}")).child(row).into_any_element()
                     },
                     cx,
                 );
@@ -4296,6 +4300,10 @@ impl PartStudioView {
             .child(
                 div()
                     .id(SharedString::from(format!("part-eye-{}", b.id)))
+                    .debug_selector({
+                        let id = b.id.clone();
+                        move || format!("part-eye-{id}")
+                    })
                     .map(|d| crate::ui_script::mark(d, || format!("button:eye-part:{}", b.name)))
                     .mr(px(9.))
                     .when(renaming, |d| d.hidden())
@@ -5235,6 +5243,10 @@ impl PartStudioView {
                 d.child(
                     div()
                         .id(SharedString::from(format!("feat-eye-{}", f.id)))
+                        .debug_selector({
+                            let id = f.id;
+                            move || format!("feat-eye-{id:?}")
+                        })
                         .map(|d| crate::ui_script::mark(d, || format!("button:eye:{}", f.name)))
                         .when(!hidden, |d| crate::ui::hover_reveal(d, "feature-row"))
                         .cursor_pointer()
