@@ -3613,6 +3613,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   On core 05:26's reading: the two props_volume calls a Hose Routing are shell_part's (their backtraces run through
   run_op › op_shell, not the runner's measures), and the "~5 s of the 6.9" is the display mesh after the features
   (mesh.brepmesh in the profile's closing block), not the FeatureScript host.
+  dx 11-04 08:12: cf-fill-pattern's first Fill pattern now runs (it failed in 56 ms before) and takes ~34 s (37 s in
+  run 56; live's whole document 4.7 s): our sheet metal rebuild of a plate with ~1,735 holes 12 s, std's
+  separateEntitiesForFacePattern 7.8 s, the instance loop's qCreatedBy(targetFace) 9.8 s (every face's creator,
+  ~2 ms a call). dx's (FeatureScript host); handoff/dx.md 11-04 08:04.
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet
