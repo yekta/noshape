@@ -270,6 +270,11 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const sheets = size(evaluateQuery(context, qBodyType(qOwnerBody(qCreatedBy(sub + "split", EntityType.EDGE)), BodyType.SHEET)));
             const cut = size(evaluateQuery(context, qCreatedBy(sub + "split", EntityType.EDGE)));
             check("opSplitPart of a sheet", sheets == 2 && cut == 2, [sheets, cut]);
+            // A piece moved after keeps its edge (std's Fold rotates the split piece, then edits that edge).
+            const piece = qOwnerBody(qContainsPoint(qOwnedByBody(qCreatedBy(sub + "split", EntityType.EDGE)->qOwnerBody(), EntityType.FACE), vector(4, 5, 2205) * mm));
+            opTransform(context, sub + "move", { "bodies" : piece, "transform" : rotationAround(line(vector(0, 0, 2205) * mm, vector(0, 1, 0)), 30 * degree) });
+            const moved = size(evaluateQuery(context, qCreatedBy(sub + "split", EntityType.EDGE)));
+            check("a split edge moves with its piece", moved == 2, moved);
         });
         step(context, id, "patternSolidFaces", function(sub) {
             // A solid's hole face patterned (std's FACE pattern, a Fill pattern of holes): the holes repeated in that

@@ -3795,6 +3795,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   fold now gets past the split, then the edge it rotates about isn't found on the moving piece (its edge is
   credited to the split on the fixed piece only: the moving piece's body id, last touched before the split, isn't
   among the split's owners when it's queried); left there, next for dx. Run 72: 37/55, 366/471 (custom 38/109).
+  dx 11-04 18:05: the "re-id" was a hidden piece: qCreatedBy answers visible entities first, and the split left the
+  definition sheet's new piece visible; pieces of a hidden body are now hidden as it is. A split's edges and vertices
+  follow their body through opTransform (they're found where they lie; T1 ops_harness splitSheet: a moved piece
+  keeps its split edge). Fold SM 1 now fails at its opEdgeChange: the definition face has the dogbone's arcs, and our
+  opEdgeChange rebuilds straight-sided faces only ("Only straight edges can be changed yet"): next.
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our

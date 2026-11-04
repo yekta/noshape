@@ -664,10 +664,24 @@ fn op_transform(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (cx, id, def) = args(i, &a)?;
     let refs = evaluate_refs(i, &cx, def.get("bodies"))?;
     let Some(m) = transform_of(def.get("transform")) else { return Err(i.error("opTransform: transform should be a Transform")) };
-    run_op(i, &cx, &id, "TRANSFORM_FAILED", |ev| {
+    let moved = run_op(i, &cx, &id, "TRANSFORM_FAILED", |ev| {
         transform_refs(ev, &refs, &m)?;
-        Ok(())
+        Ok(ev.resolve_bodies(&refs).into_iter().map(|b| ev.ctx.bodies[b].id.clone()).collect::<Vec<_>>())
     })?;
+    // The edges and vertices a split made on a moved body go with it (they're found where they lie).
+    let mut st = cx.state.lock();
+    let follow = |owners: &[BodyId], points: &mut Vec<DVec3>| {
+        if owners.iter().any(|o| moved.contains(o)) {
+            let more: Vec<DVec3> = points.iter().map(|p| m.transform_point3(*p)).collect();
+            points.extend(more);
+        }
+    };
+    for (_, owners, mids, _) in st.split_face_edges.iter_mut() {
+        follow(owners, mids);
+    }
+    for (_, owners, points) in st.made_vertices.iter_mut() {
+        follow(owners, points);
+    }
     Ok(Value::Undefined)
 }
 
@@ -1269,6 +1283,7 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         Some("KEEP_BACK") => Some(false),
         _ => None,
     };
+    let before_ids: Vec<BodyId> = cx.state.lock().ctx.bodies.iter().map(|b| b.id.clone()).collect();
     let (split_targets, plane, mids) = run_op(i, &cx, &id, "SPLIT_FAILED", |ev| {
         // Onshape's opSplitPart texts (std splitpart.fs leaves them to it).
         if ev.resolve_bodies(&targets).is_empty() {
@@ -1345,6 +1360,12 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         st.record_merge(piece, &split_targets, &id);
     }
     let all: Vec<BodyId> = split_targets.iter().chain(&pieces).cloned().collect();
+    // Pieces of a hidden body (a sheet metal definition) are hidden as it is.
+    if split_targets.iter().any(|t| st.hidden.contains(t)) {
+        let before: HashSet<BodyId> = before_ids.iter().cloned().collect();
+        let new: Vec<BodyId> = st.ctx.bodies.iter().map(|b| b.id.clone()).filter(|b| !before.contains(b)).collect();
+        st.hidden.extend(new);
+    }
     if !mids.is_empty() {
         // The bodies the new edges are on now (the pieces' ids are settled only after the operation).
         let on_edges: Vec<BodyId> = st
