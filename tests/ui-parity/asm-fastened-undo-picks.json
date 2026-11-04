@@ -1,0 +1,64 @@
+{
+ "name": "asm-fastened-undo-picks",
+ "about": "Undo in an open Fastened dialog takes the newest connector pick back out (live 1962): pick, Ctrl+Z, two picks, Ctrl+Z twice.",
+ "area": "skasm",
+ "source": "live 1962",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fastened mate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     20,
+     20
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

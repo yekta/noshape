@@ -1770,6 +1770,32 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// Undo / redo in an open mate dialog: its connector picks (live 1962).
+    /// False when no mate dialog is open (the document's undo then).
+    fn mate_undo(&mut self, redo: bool, cx: &mut Context<Self>) -> bool {
+        let Some(d) = self.mate.as_ref().map(|m| m.dialog.clone()) else { return false };
+        d.update(cx, |d, cx| d.undo_pick(redo, cx));
+        self.refresh_scene(false, cx);
+        cx.notify();
+        true
+    }
+
+    /// The toolbar's Undo / Redo (they dispatch the actions, so an open mate dialog takes them).
+    fn undo_redo(&self, cx: &App) -> AnyElement {
+        crate::ui::undo_redo_actions(self.history_state(cx), cx)
+    }
+
+    /// Undo / Redo for the toolbar: a mate dialog's pick history while it is open.
+    pub(super) fn history_state(&self, cx: &App) -> (bool, bool) {
+        match &self.mate {
+            Some(m) => m.dialog.read(cx).pick_history(),
+            None => {
+                let d = self.doc.read(cx);
+                (d.can_undo(), d.can_redo())
+            }
+        }
+    }
+
     fn accept_mate(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(s) = &self.mate else { return };
         let Some(m) = s.dialog.read(cx).to_mate(cx) else {
@@ -3195,7 +3221,7 @@ impl AssemblyView {
             return crate::ui::toolbar()
                 .w_full()
                 .relative()
-                .child(crate::ui::undo_redo(&self.doc, cx))
+                .child(self.undo_redo(cx))
                 .child(div().absolute().top(px(0.)).left_0().right_0().flex().justify_center().child(banner))
                 .into_any_element();
         }
@@ -3208,7 +3234,7 @@ impl AssemblyView {
         // Tool sets in the user's order without removed tools (Customize
         // toolbar), each built by its id.
         let prefs = self.toolbar_prefs();
-        let mut bar = crate::ui::toolbar().child(crate::ui::undo_redo(&self.doc, cx));
+        let mut bar = crate::ui::toolbar().child(self.undo_redo(cx));
         let sets = prefs.sets();
         let collapse_from = if self.ui.tb_custom.is_some() { usize::MAX } else { toolbar::collapse_from(&sets, prefs.hide_search, viewport_w) };
         for (pos, (set, ids)) in sets.into_iter().enumerate() {
@@ -6203,6 +6229,17 @@ impl AssemblyView {
             }))
             .on_action(cx.listener(|this, _: &SearchTools, window, cx| this.open_tool_search(window, cx)))
             .on_action(cx.listener(Self::on_cancel))
+            // Live 1962: in an open mate dialog Undo / Redo take its connector picks back (the dialog stays).
+            .on_action(cx.listener(|this, _: &Undo, _, cx| {
+                if !this.mate_undo(false, cx) {
+                    cx.propagate();
+                }
+            }))
+            .on_action(cx.listener(|this, _: &Redo, _, cx| {
+                if !this.mate_undo(true, cx) {
+                    cx.propagate();
+                }
+            }))
             .on_action(cx.listener(|this, _: &ViewFront, _, cx| this.view(StandardView::Front, cx)))
             .on_action(cx.listener(|this, _: &ViewBack, _, cx| this.view(StandardView::Back, cx)))
             .on_action(cx.listener(|this, _: &ViewLeft, _, cx| this.view(StandardView::Left, cx)))

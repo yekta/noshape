@@ -80,6 +80,10 @@ pub struct MateDialog {
     /// The field (its slots) a removal left without auto-advance: refilled, it keeps the focus until the user
     /// clicks another field and back (live auto-advance rule 6, as the Part Studio's dialogs).
     advance_disarmed: Option<Vec<usize>>,
+    /// The connectors before each pick, and picks undone (live 1962: Undo
+    /// in the open dialog takes the newest pick back out).
+    picks_undo: Vec<PickState>,
+    picks_redo: Vec<PickState>,
     pub flip_primary: bool,
     /// The connector field the Mate connector panel is editing (its chip is
     /// bold, live 578).
@@ -129,6 +133,13 @@ impl Focusable for MateDialog {
     fn focus_handle(&self, _: &App) -> FocusHandle {
         self.focus.clone()
     }
+}
+
+/// The dialog's connectors at one point of its pick history.
+#[derive(Clone)]
+struct PickState {
+    slots: [Option<MateConnectorRef>; 4],
+    active: Option<usize>,
 }
 
 /// A mate's error with both connectors on one instance (live).
@@ -292,6 +303,8 @@ impl MateDialog {
             d,
             active,
             advance_disarmed: None,
+            picks_undo: Vec::new(),
+            picks_redo: Vec::new(),
             flip_primary: mate.flip_primary,
             editing_field: None,
             reorient: mate.reorient_secondary,
@@ -326,6 +339,30 @@ impl MateDialog {
 
     pub fn awaiting_pick(&self) -> bool {
         self.active.is_some()
+    }
+
+    fn pick_state(&self) -> PickState {
+        PickState { slots: [self.a.clone(), self.b.clone(), self.c.clone(), self.d.clone()], active: self.active }
+    }
+
+    /// Undo (`redo` false) or redo a connector pick (live 1962: Ctrl+Z or the
+    /// toolbar Undo in the open dialog removes the newest pick; the dialog
+    /// stays). False when there is nothing to take back.
+    pub fn undo_pick(&mut self, redo: bool, cx: &mut Context<Self>) -> bool {
+        let Some(state) = (if redo { self.picks_redo.pop() } else { self.picks_undo.pop() }) else { return false };
+        let now = self.pick_state();
+        if redo { self.picks_undo.push(now) } else { self.picks_redo.push(now) }
+        let [a, b, c, d] = state.slots;
+        (self.a, self.b, self.c, self.d) = (a, b, c, d);
+        self.active = state.active;
+        cx.emit(MateDialogEvent::Changed);
+        cx.notify();
+        true
+    }
+
+    /// Whether Undo / Redo have a pick to act on.
+    pub fn pick_history(&self) -> (bool, bool) {
+        (!self.picks_undo.is_empty(), !self.picks_redo.is_empty())
     }
 
     /// Whether the flip button shows `flip-direction` (else `-opposite`):
@@ -486,6 +523,9 @@ impl MateDialog {
         // Live (behaviours "skasm (2026-11-04 00:22, P3)", superseding E1): a
         // second pick on the same instance goes in; the mate is flagged
         // "Mate connectors are on same instance." (`same_instance`).
+        let before = self.pick_state();
+        self.picks_undo.push(before);
+        self.picks_redo.clear();
         if full && field_slots.len() > 1 {
             for w in 0..field_slots.len() - 1 {
                 let next = self.slot(field_slots[w + 1]).clone();
@@ -1181,6 +1221,28 @@ mod advance_tests {
         assert_eq!(state(cx, &d), (Some(1), Some(1), Some(2)), "the last field keeps the focus");
         assert!(set(cx, &d, 3));
         assert_eq!(state(cx, &d), (Some(1), Some(1), Some(3)), "a new pick replaces");
+    }
+
+    /// Live (behaviours "skasm (2026-11-04 01:43, P2)", 1962): Undo takes the newest pick back out, newest first;
+    /// Redo puts it back.
+    #[gpui::test]
+    fn undo_takes_the_newest_pick_back(cx: &mut TestAppContext) {
+        let d = dialog(cx, MateType::Fastened);
+        let history = |cx: &mut TestAppContext| cx.update(|cx| d.read(cx).pick_history());
+        let undo = |cx: &mut TestAppContext, redo: bool| cx.update(|cx| d.update(cx, |d, cx| d.undo_pick(redo, cx)));
+        assert_eq!(history(cx), (false, false));
+        assert!(set(cx, &d, 1));
+        assert!(set(cx, &d, 2));
+        assert_eq!(history(cx), (true, false));
+        assert!(undo(cx, false));
+        assert_eq!(state(cx, &d).1.zip(Some(state(cx, &d).2)), Some((1, None)), "the last pick out");
+        assert_eq!(history(cx), (true, true));
+        assert!(undo(cx, false));
+        assert_eq!((state(cx, &d).1, state(cx, &d).2), (None, None));
+        assert_eq!(history(cx), (false, true));
+        assert!(!undo(cx, false), "nothing left");
+        assert!(undo(cx, true));
+        assert_eq!(state(cx, &d).1, Some(1), "Redo puts it back");
     }
 
     /// Live (behaviours "skasm (2026-11-04 00:22, P3)" (a)): a second pick on the same instance goes in, and the

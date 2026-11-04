@@ -139,7 +139,7 @@ impl AssemblyView {
         });
         // The mate dialog's empty query box has the focus (live: field "Mate connectors").
         let focus = self.mate.as_ref().map(|s| s.dialog.read(cx)).filter(|d| d.active.is_some() && self.ui.mate_field_focus).map(|d| json!({ "kind": "field", "label": if matches!(d.mate_type(), MateType::Tangent) { "Face, edge or vertex" } else if d.mate_type() == MateType::Width { "Tab mate connector(s)" } else { "Mate connectors" } })).unwrap_or_else(|| json!({ "kind": "none" }));
-        let doc = self.doc.read(cx);
+        let history = self.history_state(cx);
         json!({
             "focus": focus,
             "dialog": dialog,
@@ -149,7 +149,7 @@ impl AssemblyView {
             "features": { "rows": rows, "rollbackAfter": null },
             "parts": [],
             "message": self.message.as_ref().map(|(_, m)| m.clone()),
-            "undo": { "undo": doc.can_undo(), "redo": doc.can_redo() },
+            "undo": { "undo": history.0, "redo": history.1 },
             "sketch": null,
             "assembly": { "instances": instances, "mates": mates }
         })

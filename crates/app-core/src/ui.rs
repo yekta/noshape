@@ -747,6 +747,30 @@ pub fn undo_redo(doc: &Entity<crate::doc_model::DocModel>, cx: &App) -> AnyEleme
     undo_redo_with(doc, TOOL_CELL, ("Undo (cmd+z/ctrl+z)", "Redo (ctrl+y/shift+cmd+z)"), cx)
 }
 
+/// [`undo_redo`] for a view that takes Undo / Redo itself while a dialog is
+/// open (the assembly's mate dialog): the buttons dispatch the actions and
+/// show `state` (can undo, can redo).
+pub fn undo_redo_actions(state: (bool, bool), cx: &App) -> AnyElement {
+    let (can_undo, can_redo) = state;
+    let button = |id: &'static str, icon: &'static str, tip: &'static str, enabled: bool, action: Box<dyn gpui_kit::Action>, cx: &App| {
+        with_tooltip(
+            SharedString::from(format!("tt-{id}")),
+            SharedString::from(tip),
+            tool_button(SharedString::from(format!("tb-{id}")), icon, false, cx).w(px(TOOL_CELL)).h(px(TOOL_CELL)).opacity(if enabled { 1.0 } else { 0.4 }).when(!enabled, |b| b.cursor(CursorStyle::OperationNotAllowed)).on_click(move |_, window, cx| {
+                if enabled {
+                    window.dispatch_action(action.boxed_clone(), cx);
+                }
+            }),
+        )
+    };
+    h_flex()
+        .flex_none()
+        .gap(px(2.))
+        .child(button("undo", "undo", "Undo (cmd+z/ctrl+z)", can_undo, Box::new(crate::actions::Undo), cx))
+        .child(button("redo", "redo", "Redo (ctrl+y/shift+cmd+z)", can_redo, Box::new(crate::actions::Redo), cx))
+        .into_any_element()
+}
+
 /// [`undo_redo`] with `cell` px buttons and the (undo, redo) titles (the
 /// drawing toolbar: 30 px, "Undo (ctrl+z)", live drawing-toolbar-widths).
 pub fn undo_redo_with(doc: &Entity<crate::doc_model::DocModel>, cell: f32, tips: (&'static str, &'static str), cx: &App) -> AnyElement {
