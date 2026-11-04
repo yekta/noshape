@@ -40,6 +40,8 @@ fn replay(dir: &Path, only_faces_below: Option<usize>) -> (usize, Vec<String>, S
         let r = boolean(c.op, &c.objects, &c.tools, &c.opts);
         let ms = t.elapsed().as_secs_f64() * 1e3;
         let path = last_boolean_path();
+        // (Where OCCT built it: why noshape's Boolean declined.)
+        let path = if path.contains("rust") { path } else { format!("{path} ({})", noshape_kernel::last_rust_decline()) };
         match r {
             Ok(r) if std::env::var_os("NOSHAPE_BOOL_REBASE").is_some() => {
                 let _ = noshape_kernel::bool_corpus::rebase(dir, name, &Summary::of(&r));

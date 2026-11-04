@@ -378,6 +378,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   is 75b1e14a9's import mapping, `query_with`: a query whose ids only a sketch body places now goes by its text
   first). So Extrude 2 (Add, qSketchRegion(Sketch 3, true), booleanScope a packed query) now picks other entities.
   Still 7/8 features either way, but the part's geometry is off.
+- [ ] P1 BOOL-RUST-LATE-DECLINE (for bool; core 11-04 10:30) noshape's Boolean spends ~90 ms in `boolean.rust.brep` and
+  then declines "a non-manifold result", after which OCCT builds the same in ~15 ms: prize-wheel-tim's Revolve 1 (a
+  Ø9.8 sphere knob fused onto the wheel; recorded case vibe5 ~/core-pw/bool/b2a1c0a5aff95e9f, also in
+  ~/agents/shared-cases; `NOSHAPE_BOOL_CORPUS=<dir> … bool_replay::bool_corpus_replay` now prints the decline) and
+  motor-mount-jack's Extrude 3 (80 ms) / Fillet 2 (39 ms). prize-wheel regenerates in ~75-130 ms against live's 61:
+  Revolve 1 is half of it.
 - [ ] P1 FS-QUERY-EDGE-ORDER (for dx; core 11-04 09:31) cf-sheet-metal-overcut-dogbone's Corner Overcut 1 (11 faces /
   10679.314 mm³, live 12 / 10678.612; 8 features after it): createSMOvercut takes `edges[0]` / `edges[1]` of
   `evaluateQuery(qIntersection([qAdjacent(wall, EDGE), qAdjacent(point, VERTEX, EDGE)]))` and compares the point with
