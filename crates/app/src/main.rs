@@ -517,3 +517,7 @@ fn main() {
         cx.on_action(move |_: &actions::OpenDocument, cx| files::prompt_open(g3.clone(), cx));
     });
 }
+
+// UI tests get their own settings directory, not the user's ~/.config/noshape (noshape-ui-test-support).
+#[cfg(test)]
+use noshape_ui_test_support as _;

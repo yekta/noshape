@@ -70,3 +70,11 @@ fn the_reopen_list_is_read_once() {
     assert!(!list.exists(), "read once");
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// The settings the UI tests read are their own: another run's or an app's panel widths, columns and preferences on
+/// the same machine made simulated clicks miss.
+#[test]
+fn ui_tests_have_their_own_settings_directory() {
+    let dir = noshape_app_core::paths::config_dir();
+    assert!(noshape_ui_test_support::is_not_the_users(&dir), "{dir:?} is the user's");
+}

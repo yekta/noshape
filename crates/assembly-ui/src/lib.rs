@@ -14,3 +14,16 @@ pub mod assembly_mate_dialog;
 pub mod assembly_scene;
 pub mod assembly_view;
 pub mod measure_panel;
+
+// UI tests get their own settings directory, not the user's ~/.config/noshape (noshape-ui-test-support).
+#[cfg(test)]
+use noshape_ui_test_support as _;
+
+/// The settings the UI tests read are their own: another run's or an app's panel widths, columns and preferences on
+/// the same machine made simulated clicks miss.
+#[cfg(test)]
+#[test]
+fn ui_tests_have_their_own_settings_directory() {
+    let dir = noshape_app_core::paths::config_dir();
+    assert!(noshape_ui_test_support::is_not_the_users(&dir), "{dir:?} is the user's");
+}
