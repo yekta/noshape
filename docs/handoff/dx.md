@@ -24,6 +24,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   (9.8 s; now 4.4 s: `CtxState::face_creators`, cleared by begin_op / adopt / alias_op; attributes only through
   `attributes()` / `attributes_mut()` / `attributes_of()`, the last from an index the mutator drops).
 - core: SKETCH-PLANE-FRAME (handoff/core.md 11-04 06:35).
+- Later (to 08:52): cf-transform-pattern 20/21 (mate connector on a sketch region in core's refgeom.rs; written
+  CAP_VERTEX; opPattern of a sketch region copies its sketch), cf-belt 3/3 (opThicken joins a sheet's faces). Run 58:
+  32/56, 340/482, custom 22/111. Left of PARITY-CUSTOM-RUN-FAILURES: old std pins (FS-OLD-STD-COMPAT, the lead's
+  call: Face/Feature/Part Pattern on 392's checkInput, Fold SM 1 on 1188's createBendAttribute, the sheet metal plus
+  studios), cf-curve-pattern-normal's unfetchable import; cf-sheet-metal-overcut-dogbone's Corner Overcut 1 has one
+  face fewer than live (not looked at). cf-fill-pattern's rebuild: the holes' two Booleans ~4.9 s of 6.9 s.
 
 ## 11-02 23:35 UTC: model parity suite (lead 11-02 23:35, top item; docs/PARITY-SUITES.md §1)
 - Translator `crates/ops/src/parity.rs` (`Translator::open` / `step(k)`, through the ops registry): sketches
