@@ -1877,6 +1877,7 @@ impl PartStudioView {
                 if self.sketch.is_none() && self.ui.select_other.is_none() && self.hover.is_some() && (self.ui.midpoint_armed.is_some() || self.ui.hover_pick.as_ref().is_some_and(|t| matches!(t.kind, PickKind::Edge | PickKind::SketchCurve))) && self.update_hover(cx) {
                     self.refresh_scene(false, cx);
                 }
+                self.schedule_midpoint_dwell(cx);
                 // Hovering a manipulator arrow outlines it (Onshape).
                 let on_manip = vp.read(cx).manipulator_index_at(*position);
                 if on_manip != self.ui.manip_hover {
@@ -1951,6 +1952,7 @@ impl PartStudioView {
                 if self.rehover(cx) {
                     self.refresh_scene(false, cx);
                 }
+                self.schedule_midpoint_dwell(cx);
             }
             // Shown dimensions: a click elsewhere hides them (Onshape).
             ViewportEvent::Click { .. } if self.ui.shown_dims.is_some() => {
@@ -1996,9 +1998,10 @@ impl PartStudioView {
                     }
                     _ => target,
                 };
+                let dbl = target.as_ref().is_some_and(|t| self.edit.is_none() && self.is_double_click(&t.reference));
                 match target {
                     // Double-clicking a sketch in the graphics area edits it.
-                    Some(t) if self.edit.is_none() && self.is_double_click(&t.reference) && matches!(t.kind, PickKind::SketchCurve | PickKind::SketchPoint | PickKind::SketchRegion) => {
+                    Some(t) if dbl && matches!(t.kind, PickKind::SketchCurve | PickKind::SketchPoint | PickKind::SketchRegion) => {
                         if let Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } = t.reference {
                             self.selection.clear();
                             self.edit_feature(sketch, window, cx);
@@ -2012,6 +2015,15 @@ impl PartStudioView {
                         if let Some(b) = self.owning_body(&t.reference) {
                             self.pick_body(b, cx);
                         }
+                    }
+                    // A part face double-clicked: its second click deselects it as a click does, and the face's feature
+                    // and that feature's sketch stay lit in the list (live 1957 (4), behaviours 4644).
+                    Some(t) if dbl && t.kind == PickKind::Face && !self.show_mass && self.sketch.is_none() => {
+                        let made = self.creating_feature(&t.reference, cx);
+                        let sketch = made.and_then(|f| self.studio(cx).and_then(|s| s.feature(f).and_then(|g| noshape_model::interaction::source_sketch(&s.features, g))));
+                        self.pick(t, cx);
+                        self.ui.dblclick_related = Some((made.into_iter().chain(sketch).collect(), self.selection.clone()));
+                        cx.notify();
                     }
                     Some(t) => {
                         // Only planes picked here drag their rings (live).
@@ -2047,6 +2059,11 @@ impl PartStudioView {
                     return;
                 }
                 let target = pick.and_then(|id| self.built.as_ref()?.picks.get(id).cloned());
+                // The pointer rested on an edge's midpoint: the menu is the point's (live 1954: a vertex's rows).
+                let target = match (&self.hover, target) {
+                    (Some(r @ Reference::Implicit { on, .. }), Some(t)) if **on == t.reference => Some(scene_builder::PickTarget { reference: r.clone(), kind: PickKind::Vertex, anchor: self.edge_midpoint(on) }),
+                    (_, t) => t,
+                };
                 self.open_context_menu(target, *position, window, cx);
             }
             _ => {}

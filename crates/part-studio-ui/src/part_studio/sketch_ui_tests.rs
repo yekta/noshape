@@ -2086,3 +2086,24 @@ fn a_pick_that_moves_on_gives_the_next_field_the_keyboard(cx: &mut TestAppContex
     draw(cx, window);
     assert_eq!((focus(cx)["kind"].clone(), focus(cx)["label"].clone()), ("field".into(), "Entities to draft".into()));
 }
+
+/// Live 1954: the menu of an edge's midpoint point (the pointer rested on it) is a corner's without Delete part,
+/// material and appearance; the edge itself still has Fillet… and Chamfer….
+#[gpui::test]
+fn an_edge_midpoint_has_the_points_menu(cx: &mut TestAppContext) {
+    let (window, view, _top, _) = block_part(cx, "midpoint-menu");
+    let edge = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).and_then(|b| b.edge_refs.first().cloned())).expect("an edge");
+    let menu = |cx: &mut TestAppContext, r: Reference, kind| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_context_menu(Some(noshape_scene::builder::PickTarget { reference: r, kind, anchor: None }), gpui_kit::point(px(600.), px(400.)), w, cx))).unwrap();
+        draw(cx, window);
+        cx.update(|cx| view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_default())
+    };
+    let of_edge = menu(cx, edge.clone(), noshape_scene::builder::PickKind::Edge);
+    assert!(of_edge.iter().any(|l| l == "Fillet…") && of_edge.iter().any(|l| l == "Delete Part 1…"), "{of_edge:?}");
+    let point = Reference::Implicit { on: Box::new(edge), inference: noshape_model::reference::Inference::Midpoint };
+    let of_point = menu(cx, point, noshape_scene::builder::PickKind::Vertex);
+    for gone in ["Fillet…", "Chamfer…", "Zoom to selection", "Delete Part 1…", "Assign material for Part 1…", "Edit appearance for Part 1…"] {
+        assert!(!of_point.iter().any(|l| l == gone), "{gone} in {of_point:?}");
+    }
+    assert!(of_point.iter().any(|l| l == "Delete Extrude 1") && of_point.iter().any(|l| l == "Edit Extrude 1…"), "{of_point:?}");
+}

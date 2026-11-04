@@ -150,6 +150,8 @@ pub struct OsMenu {
     items: Vec<OsMenuItem>,
     focus: FocusHandle,
     hovered: Option<usize>,
+    /// The row under a pointer that hasn't moved since the menu opened is found once, on the first paint.
+    hover_checked: bool,
     /// Painted bounds of this menu and of its open submenu (outside clicks).
     bounds: Rc<Cell<Bounds<Pixels>>>,
     /// Submenu rows' painted tops (window coordinates): a wrapped label above
@@ -215,7 +217,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, text_px: None, camera: false, on_escape: None, ring: None, truncate: false }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, text_px: None, camera: false, on_escape: None, ring: None, truncate: false }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -507,6 +509,10 @@ impl Render for OsMenu {
             .collect();
 
         let row_top_painted = self.row_tops.clone();
+        // A menu opened over the pointer highlights the row under it at once, as a browser's hover does without a
+        // move (live ui-parity face-rclick-menu: the menu flipped up over the pointer, its row highlighted).
+        let check_hover = !std::mem::replace(&mut self.hover_checked, true);
+        let me = cx.entity().downgrade();
         let rows: Vec<AnyElement> = self
             .items
             .iter()
@@ -560,6 +566,29 @@ impl Render for OsMenu {
                                 cx.notify();
                             }
                         }))
+                        .when(check_hover, |d| {
+                            let me = me.clone();
+                            d.child(
+                                canvas(
+                                    move |bounds, window, cx| {
+                                        if bounds.contains(&window.mouse_position()) {
+                                            let me = me.clone();
+                                            cx.defer(move |cx| {
+                                                let _ = me.update(cx, |m, cx| {
+                                                    if m.hovered.is_none() {
+                                                        m.hovered = Some(ix);
+                                                        cx.notify();
+                                                    }
+                                                });
+                                            });
+                                        }
+                                    },
+                                    |_, _, _, _| {},
+                                )
+                                .absolute()
+                                .size_full(),
+                            )
+                        })
                 };
                 match item {
                     // Bootstrap dropdown dividers have 7 px margins.

@@ -69,7 +69,11 @@ impl PartStudioView {
                 let (kind, owner) = self.selection_kind_owner(r, cx);
                 // Live gives the open sketch's own entities no owner.
                 let own = matches!(r, Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } if self.sketch.as_ref().is_some_and(|ed| ed.feature == *sketch));
-                json!({ "kind": kind, "owner": if own { Value::Null } else { owner.into() } })
+                // An inferred point (an edge's midpoint) reads as a POINT of its entity (live's reader since 11-04 00:34).
+                match r {
+                    Reference::Implicit { .. } => json!({ "kind": "POINT", "owner": owner, "of": kind }),
+                    _ => json!({ "kind": kind, "owner": if own { Value::Null } else { owner.into() } }),
+                }
             })
             .chain(self.selected_features.iter().filter(|f| picked.is_none() && !self.selection.contains(&Reference::Feature(**f))).map(|f| json!({ "kind": "FEATURE", "owner": feature_name(*f) })))
             .collect();

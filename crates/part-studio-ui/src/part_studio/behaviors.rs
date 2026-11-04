@@ -176,6 +176,10 @@ pub struct UiState {
     pub midpoint_armed: Option<Reference>,
     /// Where the pointer was when that edge was armed: the midpoint snaps only once it moved from there.
     pub midpoint_armed_at: Option<DVec2>,
+    /// When that edge was armed: a pointer resting in the midpoint's window snaps to it after [`MIDPOINT_DWELL`].
+    pub midpoint_armed_since: Option<std::time::Instant>,
+    /// Re-checks the hover once the dwell is over (nothing else does while the pointer rests).
+    pub midpoint_dwell_task: Option<Task<()>>,
     pub select_other: Option<SelectOther>,
     /// S shortcut toolbar position (viewport-local).
     pub mini_toolbar: Option<DVec2>,
@@ -190,6 +194,9 @@ pub struct UiState {
     pub anchor: Option<FeatureId>,
     /// Last clicked part row (anchor of the Parts list's Shift+click ranges).
     pub part_anchor: Option<BodyId>,
+    /// A face's feature and its sketch, lit in the list after a double-click on the face, while the selection
+    /// stays as that left it (live 1957 (4): the related highlight stays after a face double-click).
+    pub dblclick_related: Option<(HashSet<FeatureId>, Vec<Reference>)>,
     /// Last viewport click (double-click detection).
     pub last_click: Option<(Reference, Instant)>,
     /// Focus of the feature list (rollback bar arrow keys).
@@ -589,6 +596,9 @@ impl UiState {
             hover_pick: None,
             midpoint_armed: None,
             midpoint_armed_at: None,
+            midpoint_armed_since: None,
+            dblclick_related: None,
+            midpoint_dwell_task: None,
             select_other: None,
             mini_toolbar: None,
             camera_menu: None,
@@ -939,6 +949,12 @@ impl PartStudioView {
 
     pub(super) fn related_features(&self, cx: &App) -> HashSet<FeatureId> {
         let mut out = self.variable_users(cx);
+        if let Some((lit, sel)) = &self.ui.dblclick_related
+            && *sel == self.selection
+            && self.selected_features.is_empty()
+        {
+            out.extend(lit.iter().copied());
+        }
         // A hovered Characteristics row lights up its feature (live tl-99a).
         out.extend(self.ui.insp.hover_feature);
         // In a sketch: the sketch, while something of it is selected or picked by the Dimension tool (live ui-parity
@@ -3176,12 +3192,33 @@ impl PartStudioView {
         vec![Instance::new(Drawable::Points(up.upload_points(&PointData { points }))).per_primitive_color().unpickable().ignore_clip().layer(22)]
     }
 
+    /// An edge armed and not yet snapped: re-check the hover once the dwell is over (the pointer may rest).
+    pub(super) fn schedule_midpoint_dwell(&mut self, cx: &mut Context<Self>) {
+        let pending = self.ui.midpoint_armed.is_some() && !matches!(self.hover, Some(Reference::Implicit { .. }));
+        let Some(since) = self.ui.midpoint_armed_since.filter(|_| pending) else {
+            self.ui.midpoint_dwell_task = None;
+            return;
+        };
+        let wait = MIDPOINT_DWELL.saturating_sub(since.elapsed()) + std::time::Duration::from_millis(5);
+        self.ui.midpoint_dwell_task = Some(cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(wait).await;
+            let _ = this.update(cx, |this: &mut Self, cx| {
+                this.ui.midpoint_dwell_task = None;
+                if this.update_hover(cx) {
+                    this.refresh_scene(false, cx);
+                }
+            });
+        }));
+    }
+
     /// Sets the hover target from the pick under the pointer and returns
     /// whether it changed. Live (behaviours "icons2 midpoint radius"): once
     /// an edge is hovered (its dark midpoint marker showing), its midpoint
     /// is the target while the pointer stays in the 9 px square around the
     /// marker, over the adjacent faces too (orange marker, the edge loses
-    /// its highlight); arriving straight on the midpoint gives the edge.
+    /// its highlight); arriving straight on the midpoint gives the edge, and
+    /// resting there the midpoint after a short dwell (live 1954: a click
+    /// after a still rest picks the midpoint point, even 8 px off).
     /// Not in sketch mode, nor with a field that takes no points.
     pub(super) fn update_hover(&mut self, cx: &App) -> bool {
         let raw = self.ui.hover_pick.as_ref().map(|t| t.reference.clone());
@@ -3189,18 +3226,16 @@ impl PartStudioView {
         let points_ok = self.sketch.is_none() && self.active_field_filter(cx).is_none_or(field_takes_points);
         // Out of the graphics nothing snaps (HOVER-VERTEX-STAYS: the pointer's
         // last place inside kept an armed edge's midpoint lit after it left);
-        // nor before the pointer moved from where it armed the edge: arriving
-        // and staying on the midpoint keeps the edge (another hover update
-        // with the pointer still made it the midpoint: a click then picked
-        // the midpoint, which Fillet doesn't take; ui-parity fillet-*).
+        // nor right after arriving: the pointer moves on in the window, or
+        // rests there for the dwell (the dwell timer re-checks then).
         let in_window = points_ok
             && self.viewport.read(cx).pointer_inside()
             && match (&self.ui.midpoint_armed, self.ui.pointer) {
                 (Some(e), Some(p)) => self.edge_midpoint(e).and_then(|m| self.viewport.read(cx).project(m)).is_some_and(|s| in_midpoint_window(s, p)),
                 _ => false,
             };
-        let moved = self.ui.pointer != self.ui.midpoint_armed_at;
-        let (snap, armed) = midpoint_hover_step(self.ui.midpoint_armed.is_some(), points_ok && raw_edge.is_some(), in_window, moved);
+        let ready = self.ui.pointer != self.ui.midpoint_armed_at || self.ui.midpoint_armed_since.is_some_and(|t| t.elapsed() >= MIDPOINT_DWELL);
+        let (snap, armed) = midpoint_hover_step(self.ui.midpoint_armed.is_some(), points_ok && raw_edge.is_some(), in_window, ready);
         let target = match self.ui.midpoint_armed.clone().filter(|_| snap) {
             Some(e) => Some(Reference::Implicit { on: Box::new(e), inference: noshape_model::reference::Inference::Midpoint }),
             None => raw,
@@ -3209,6 +3244,7 @@ impl PartStudioView {
             let next = if armed { raw_edge } else { None };
             if next != self.ui.midpoint_armed {
                 self.ui.midpoint_armed_at = self.ui.pointer;
+                self.ui.midpoint_armed_since = Some(std::time::Instant::now());
             }
             self.ui.midpoint_armed = next;
         }
@@ -3757,6 +3793,12 @@ impl PartStudioView {
             return;
         }
         let creating = self.edit.as_ref().is_some_and(|e| e.is_new);
+        // An existing feature keeps its direction: std's flips (New → Remove, toward an up-to entity) only turn a
+        // feature being created (live 1957: an edited Extrude switched to Remove keeps its arrow, a new one turns).
+        let mut user_set = user_set;
+        if !creating {
+            user_set.extend(["oppositeDirection", "secondDirectionOppositeDirection"].map(String::from));
+        }
         let units = self.doc.read(cx).session.doc.settings.units;
         let dialog = dialog.clone();
         let sent = params.clone();
@@ -4131,12 +4173,15 @@ pub(super) fn in_midpoint_window(mid: DVec2, pointer: DVec2) -> bool {
     d.x <= MIDPOINT_WINDOW_PX && d.y <= MIDPOINT_WINDOW_PX
 }
 
+/// How long a pointer resting by an armed edge's midpoint takes to snap to it.
+pub(super) const MIDPOINT_DWELL: std::time::Duration = std::time::Duration::from_millis(250);
+
 /// One hover update near an edge midpoint: (the midpoint is the target,
 /// an edge stays armed). `armed`: an edge's midpoint marker already shows;
 /// `on_edge`: the pick under the pointer is an edge; `in_window`: the
-/// pointer is in the armed midpoint's window; `moved`: it moved since the edge was armed.
-pub(super) fn midpoint_hover_step(armed: bool, on_edge: bool, in_window: bool, moved: bool) -> (bool, bool) {
-    let snap = armed && in_window && moved;
+/// pointer is in the armed midpoint's window; `ready`: it moved since the edge was armed, or rested the dwell.
+pub(super) fn midpoint_hover_step(armed: bool, on_edge: bool, in_window: bool, ready: bool) -> (bool, bool) {
+    let snap = armed && in_window && ready;
     (snap, snap || on_edge)
 }
 
@@ -4168,8 +4213,10 @@ mod midpoint_target_tests {
     fn hovering_near_an_edge_midpoint_targets_the_midpoint() {
         // Arriving straight on the midpoint: the edge (its marker appears).
         assert_eq!(midpoint_hover_step(false, true, false, true), (false, true));
-        // Staying there (another hover update, the pointer still): still the edge (ui-parity fillet-*).
+        // Staying there before the dwell (another hover update, the pointer still): still the edge.
         assert_eq!(midpoint_hover_step(true, true, true, false), (false, true));
+        // After the dwell (live 1954): the midpoint.
+        assert_eq!(midpoint_hover_step(true, true, true, true), (true, true));
         // Then moved within the window: the midpoint.
         assert_eq!(midpoint_hover_step(true, true, true, true), (true, true));
         // Over the adjacent face, still in the window: the midpoint.

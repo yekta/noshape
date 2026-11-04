@@ -27,6 +27,7 @@ impl PartStudioView {
     pub(super) fn owning_body(&self, r: &Reference) -> Option<BodyId> {
         match r {
             Reference::Body(b) => Some(b.clone()),
+            Reference::Implicit { on, .. } => self.owning_body(on),
             _ => self.display.bodies.iter().find(|b| b.face_refs.contains(r) || b.edge_refs.contains(r) || b.vertex_refs.contains(r)).map(|b| b.id.clone()),
         }
     }
@@ -40,6 +41,7 @@ impl PartStudioView {
             Reference::Body(b) => Some(b.feature),
             Reference::FeaturePlane(f) => Some(*f),
             Reference::MateConnector { feature, .. } => Some(*feature),
+            Reference::Implicit { on, .. } => self.creating_feature(on, cx),
             _ => None,
         }
     }
@@ -572,7 +574,12 @@ impl PartStudioView {
                         let ra = r.clone();
                         m = m.item(item("Align view with vertical axis", Box::new(move |this, _, cx| this.align_view_vertical(&ra, cx))));
                     }
-                    if let Some(b) = body.clone() {
+                    // An edge's midpoint point (live 1954): the corner's rows without Delete part, material and appearance.
+                    let point = matches!(r, Reference::Implicit { .. });
+                    if point && let (Some(id), Some(name)) = (creator, creator_name.clone()) {
+                        m = m.separator().item(icon_item(&format!("Delete {name}"), "menu-delete", Box::new(move |this, _, cx| this.delete_features(vec![id], cx))));
+                    }
+                    if let Some(b) = body.clone().filter(|_| !point) {
                         let bd = b.clone();
                         m = m.separator().item(icon_item(&format!("Delete {body_name}…"), "menu-delete", Box::new(move |this, w, cx| {
                             // Live (qa5 DEL2): the Delete part dialog, the part prefilled.
