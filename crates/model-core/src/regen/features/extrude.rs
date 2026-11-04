@@ -64,6 +64,7 @@ fn eval_inner(ev: &mut EvalCtx) -> FResult<()> {
             tools.push(extrude_profile(ev, p, dir)?);
         }
     }
+    let tools = tools.into_iter().map(|t| drawn_edge_directions(ev, t)).collect::<FResult<Vec<_>>>()?;
     let t_tools = t0.elapsed();
     let op = ev.enum_("operationType").to_string();
     let scope = scope(ev);
@@ -444,4 +445,44 @@ pub fn curve_to_segment(c: &noshape_sketch::Curve2) -> Option<k::Segment2d> {
         }
         _ => return None,
     })
+}
+
+/// The tool's cap edges running as their sketch lines and arcs were drawn (live: an extruded rectangle's edges keep the
+/// drawing order, a pattern along one goes its way; PATTERN-EDGE-DIRECTION), where the profile's loop runs them the
+/// other way: their curves reversed, the swept faces as the loop made them (a unify merges those; built from the
+/// drawn ways they didn't merge, pulley02's fillet and clamp-hms's extrude). Studios saved before keep the loop's.
+fn drawn_edge_directions(ev: &EvalCtx, t: NamedShape) -> FResult<NamedShape> {
+    use crate::reference::{Role, Source, TopoName};
+    let side = |f: &TopoName| match f {
+        TopoName::Face { role: Role::Side(Source::Sketch { sketch, entity, .. }), .. } => Some((*sketch, *entity)),
+        _ => None,
+    };
+    let cap = |f: &TopoName| matches!(f, TopoName::Face { role: Role::CapStart(_) | Role::CapEnd(_), .. });
+    let edges = t.shape.edges();
+    let mut flip = Vec::new();
+    for (i, n) in t.names.edges.iter().enumerate() {
+        let TopoName::Edge { faces: [a, b], .. } = &**n else { continue };
+        let Some((sk, entity)) = side(a).filter(|_| cap(b)).or_else(|| side(b).filter(|_| cap(a))) else { continue };
+        let (Some(s), Some(e)) = (ev.ctx.sketch(sk), edges.get(i)) else { continue };
+        if s.legacy_edge_directions {
+            return Ok(t);
+        }
+        let (Some(curve), Ok(info)) = (s.sketch.curve(noshape_sketch::EntityId(entity)), e.edge_info()) else { continue };
+        let against = match (curve, info.curve) {
+            (noshape_sketch::Curve2::Line { a, b }, k::Curve::Line { .. }) => {
+                let d = b - a;
+                (info.end - info.start).dot(s.frame.x * d.x + s.frame.y * d.y) < 0.0
+            }
+            // (Sketch arcs and circles run counter-clockwise about the sketch's normal.)
+            (noshape_sketch::Curve2::Arc { .. } | noshape_sketch::Curve2::Circle { .. }, k::Curve::Circle { axis, .. }) => axis.dot(s.frame.x.cross(s.frame.y)) < 0.0,
+            _ => false,
+        };
+        if against {
+            flip.push(e.clone());
+        }
+    }
+    if flip.is_empty() {
+        return Ok(t);
+    }
+    Ok(NamedShape { shape: k::reverse_edge_curves(&t.shape, &flip)?, names: t.names })
 }

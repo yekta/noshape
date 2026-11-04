@@ -1737,7 +1737,7 @@ TopoDS_Shape merge_cylinder_bands(const TopoDS_Shape& s, HHist& hist)
 // A face bounded otherwise (its seam moved) covers what it did: only the integration's noise (a hole the wrong way
 // round would add its area). One face's area, not the solid's volume twice (motor-mount-jack's pattern: 41 ms).
 // A face's parameter-domain area, ∮ u dv over its edges' curves on it (Green), each edge by a 16-point Gauss rule per
-// smooth span: on faces whose edges' curves are the same up to whole turns, equal to rounding however coarse the rule.
+// knot span: on faces whose edges' curves are the same up to whole turns, equal to rounding however coarse the rule.
 static double uv_area(const TopoDS_Face& f)
 {
   math_Vector gp(1, 16), gw(1, 16);
@@ -1752,9 +1752,11 @@ static double uv_area(const TopoDS_Face& f)
     if (pc.IsNull())
       return std::numeric_limits<double>::quiet_NaN();
     Geom2dAdaptor_Curve ac(pc, a, b);
-    const int           n = ac.NbIntervals(GeomAbs_C2);
+    // (Every knot span on its own: a rule across spans of a C2 spline isn't exact, and the faces' period shifts then
+    // don't cancel: cf-straight-spline's shaft kept its seam.)
+    const int           n = ac.NbIntervals(GeomAbs_CN);
     NCollection_Array1<double> cuts(1, n + 1);
-    ac.Intervals(cuts, GeomAbs_C2);
+    ac.Intervals(cuts, GeomAbs_CN);
     double edge = 0;
     for (int i = 1; i <= n; ++i)
     {
@@ -1774,13 +1776,15 @@ static double uv_area(const TopoDS_Face& f)
 
 static bool same_area(const TopoDS_Face& a, const TopoDS_Face& f)
 {
-  // Cylinders: r times the domain's area (a tube's face with holes bounded by B-spline rims: 8 ms a face adaptively).
+  // Cylinders: r times the domain's area, to accept quickly (a tube's face with holes bounded by B-spline rims: 8 ms a
+  // face adaptively).
   TopLoc_Location l0, l1;
   if (!occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(a, l0)).IsNull() && !occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(f, l1)).IsNull())
   {
     const double d0 = std::abs(uv_area(a)), d1 = std::abs(uv_area(f));
-    if (std::isfinite(d0) && std::isfinite(d1))
-      return std::abs(d1 - d0) <= 1e-9 * d0;
+    // (Equal there: the same. Else measured: a move rebuilds some edges' curves a little, cf-straight-spline's shafts.)
+    if (std::isfinite(d0) && std::isfinite(d1) && std::abs(d1 - d0) <= 1e-9 * d0)
+      return true;
   }
   // (Adaptively, to 1e-7: the fixed rule was 1e-3 off on a tube's face with holes bounded by joined B-spline rims.)
   GProp_GProps g0, g1;

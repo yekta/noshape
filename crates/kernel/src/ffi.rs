@@ -529,6 +529,7 @@ pub(crate) mod ffi {
         fn make_face_on(on: &OcShape, wire: &OcShape) -> Result<UniquePtr<OcShape>>;
         fn extend_face(on: &OcShape, len: f64) -> Result<UniquePtr<OcShape>>;
         fn drop_open_wires(shape: &OcShape) -> Result<UniquePtr<OcShape>>;
+        fn reverse_edge_curves(shape: &OcShape, edges: &OcShapeList) -> Result<UniquePtr<OcShape>>;
         fn face_patches(face: &OcShape, spans: u32) -> Result<UniquePtr<OcShape>>;
         fn merge_faces_on(shape: &OcShape, on: &OcShape) -> Result<UniquePtr<OcShape>>;
         fn replace_face_mapped(solid: &OcShape, face: &OcShape, tmpl: &OcShape) -> Result<UniquePtr<OcShape>>;

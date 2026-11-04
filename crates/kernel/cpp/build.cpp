@@ -977,6 +977,66 @@ std::unique_ptr<OcShape> face_patches(const OcShape& in, uint32_t spans)
   return wrap(out);
 }
 
+std::unique_ptr<OcShape> reverse_edge_curves(const OcShape& in, const OcShapeList& edges)
+{
+  const TopoDS_Shape& s = in.shape;
+  ShapeAncMap         ef;
+  TopExp::MapShapesAndAncestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+  BRep_Builder                   B;
+  bool                           any = false;
+  for (const TopoDS_Shape& x : edges.items)
+  {
+    const TopoDS_Edge e = TopoDS::Edge(x.Oriented(TopAbs_FORWARD));
+    if (!ef.Contains(e) || BRep_Tool::Degenerated(e))
+      continue;
+    double                        f, l;
+    TopLoc_Location               cl;
+    const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, cl, f, l);
+    if (c.IsNull())
+      continue;
+    bool seam = false;
+    for (ShapeList::Iterator fi(ef.FindFromKey(e)); fi.More(); fi.Next())
+      seam = seam || BRep_Tool::IsClosed(e, TopoDS::Face(fi.Value()));
+    if (seam)
+      continue;
+    const occ::handle<Geom_Curve> rc = c->Reversed();
+    const double                  rf = c->ReversedParameter(l), rl = c->ReversedParameter(f);
+    const double                  tol = BRep_Tool::Tolerance(e);
+    TopoDS_Edge                   ne;
+    B.MakeEdge(ne, rc, cl, tol);
+    TopoDS_Vertex v0, v1;
+    TopExp::Vertices(e, v0, v1);
+    if (v0.IsNull() || v1.IsNull())
+      continue;
+    B.Add(ne, v1.Oriented(TopAbs_FORWARD));
+    B.Add(ne, v0.Oriented(TopAbs_REVERSED));
+    B.Range(ne, rf, rl);
+    for (ShapeList::Iterator fi(ef.FindFromKey(e)); fi.More(); fi.Next())
+    {
+      const TopoDS_Face&              F = TopoDS::Face(fi.Value());
+      double                          pf, pl;
+      const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, F, pf, pl);
+      if (pc.IsNull())
+        continue;
+      TopLoc_Location                 sl;
+      const occ::handle<Geom_Surface> su = BRep_Tool::Surface(F, sl);
+      B.UpdateEdge(ne, pc->Reversed(), su, sl, tol);
+      B.Range(ne, su, sl, pc->ReversedParameter(pl), pc->ReversedParameter(pf));
+    }
+    B.SameRange(ne, BRep_Tool::SameRange(e));
+    B.SameParameter(ne, BRep_Tool::SameParameter(e));
+    rs->Replace(e, ne.Reversed());
+    any = true;
+  }
+  if (!any)
+    return wrap(s);
+  const TopoDS_Shape out = rs->Apply(s);
+  if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+    return wrap(s);
+  return wrap(out);
+}
+
 std::unique_ptr<OcShape> drop_open_wires(const OcShape& in)
 {
   const TopoDS_Shape&            s = in.shape;

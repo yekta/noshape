@@ -202,6 +202,14 @@ pub fn replace_face_mapped(solid: &Shape, face: &Shape, template: &Shape) -> Res
     Shape::from_res(ffi::replace_face_mapped(solid.raw(), face.raw(), template.raw()))
 }
 
+/// `shape` with `edges` (its own) running the other way: each one's 3D curve and its curves on its faces reversed, its
+/// vertices swapped, the faces as they were (a sketch line's extruded edge running as the line was drawn, where the
+/// profile's loop runs it the other way; its swept faces stay the loop's, which the unify needs). Seams stay.
+pub fn reverse_edge_curves(shape: &Shape, edges: &[Shape]) -> Result<Shape> {
+    let l = vec_to_list(edges);
+    Shape::from_res(ffi::reverse_edge_curves(shape.raw(), &l))
+}
+
 /// `shape` with the faces lying on `on`'s surface merged where they meet (OCCT's same-domain unify of them alone:
 /// a split by [`face_patches`] leaves a piece on each patch). As it is when it has at most one.
 pub fn merge_faces_on(shape: &Shape, on: &Shape) -> Result<Shape> {
