@@ -180,6 +180,9 @@ pub struct UiState {
     pub midpoint_armed_since: Option<std::time::Instant>,
     /// Re-checks the hover once the dwell is over (nothing else does while the pointer rests).
     pub midpoint_dwell_task: Option<Task<()>>,
+    /// Mate connector inference points of the hovered entity (inference.rs) and their computation.
+    pub inference: Option<super::inference::InferenceHover>,
+    pub inference_task: Option<Task<()>>,
     pub select_other: Option<SelectOther>,
     /// S shortcut toolbar position (viewport-local).
     pub mini_toolbar: Option<DVec2>,
@@ -604,6 +607,8 @@ impl UiState {
             midpoint_armed_since: None,
             dblclick_related: None,
             midpoint_dwell_task: None,
+            inference: None,
+            inference_task: None,
             select_other: None,
             mini_toolbar: None,
             camera_menu: None,
@@ -1039,8 +1044,11 @@ impl PartStudioView {
                 // nothing tells you so.
                 return;
             }
-            dialog.update(cx, |d, cx| {
-                d.add_pick(target.reference.clone(), cx);
+            // A mate connector field takes the inference point under the pointer (inference.rs).
+            let inferred = self.inferred_origin(&target.reference);
+            dialog.update(cx, |d, cx| match inferred {
+                Some(o) => d.pick_connector(o, cx),
+                None => d.add_pick(target.reference.clone(), cx),
             });
         } else if let Some(pos) = self.selection.iter().position(|r| *r == target.reference) {
             self.selection.remove(pos);
@@ -3274,7 +3282,7 @@ impl PartStudioView {
     pub(super) fn update_hover(&mut self, cx: &App) -> bool {
         let raw = self.ui.hover_pick.as_ref().map(|t| t.reference.clone());
         let raw_edge = self.ui.hover_pick.as_ref().filter(|t| matches!(t.kind, PickKind::Edge | PickKind::SketchCurve)).map(|t| t.reference.clone());
-        let points_ok = self.sketch.is_none() && self.active_field_filter(cx).is_none_or(field_takes_points);
+        let points_ok = self.sketch.is_none() && self.active_field_filter(cx).is_none_or(field_takes_points) && !self.inference_applies(cx);
         // Out of the graphics nothing snaps (HOVER-VERTEX-STAYS: the pointer's
         // last place inside kept an armed edge's midpoint lit after it left);
         // nor right after arriving: the pointer moves on in the window, or

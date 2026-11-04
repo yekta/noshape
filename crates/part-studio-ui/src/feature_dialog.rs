@@ -15,7 +15,7 @@ use gpui_kit::*;
 use noshape_model::display::FeatureStatus;
 use noshape_model::features::FeatureType;
 use noshape_model::params::{Hints, ParamKind, ParamSpec, ParamValue, ParamValues, QueryFilter, fill_defaults};
-use noshape_model::partstudio::Feature;
+use noshape_model::partstudio::{ConnectorOrigin, Feature};
 use noshape_model::reference::{FeatureId, Reference};
 use noshape_units::UnitPrefs;
 use std::collections::HashMap;
@@ -764,6 +764,42 @@ impl FeatureDialog {
         self.add_picks([r], cx)
     }
 
+    /// Whether the active field takes mate connector inference points: a Mate connector's Origin entity, or a
+    /// field with its mate connector button on.
+    pub fn takes_inference(&self) -> bool {
+        let Some((path, _, _)) = self.active_filter() else { return false };
+        self.mc_mode.as_deref() == Some(path.as_str()) || (self.feature.type_id == "mateConnector" && path == "originQuery")
+    }
+
+    /// A hovered inference point picked into the active field ([`Self::takes_inference`]): a new in-feature mate
+    /// connector there, or the Mate connector's origin (the same entity again with another point moves it there).
+    pub fn pick_connector(&mut self, origin: ConnectorOrigin, cx: &mut Context<Self>) -> bool {
+        let Some((path, _, _)) = self.active_filter() else { return false };
+        if self.mc_mode.as_deref() == Some(path.as_str()) {
+            let Some(sub) = Feature::in_feature_connector(&origin, &self.units) else { return false };
+            let r = Reference::MateConnector { feature: sub.id, index: 0 };
+            self.feature.sub_features.push(sub);
+            return self.add_picks([r], cx);
+        }
+        if path != "originQuery" || self.feature.type_id != "mateConnector" || origin.is_in(&self.feature.params) {
+            return self.add_pick(origin.entity, cx);
+        }
+        let same_entity = self.feature.params.query("originQuery") == std::slice::from_ref(&origin.entity);
+        let mut params = self.feature.params.clone();
+        origin.apply(&mut params);
+        if !same_entity {
+            // The entity goes in through the field (its limit, the focus moving on).
+            params.set("originQuery", ParamValue::Query(self.feature.params.query("originQuery").to_vec()));
+            self.feature.params = params;
+            return self.add_pick(origin.entity, cx);
+        }
+        self.feature.params = params;
+        self.user_set.insert(path);
+        self.changed(cx);
+        cx.notify();
+        true
+    }
+
     /// Picks into the active selection field as one edit (a box selection, a list row's entities): each toggles
     /// off when already there; a field at its pick limit drops its oldest entry for the new one (Onshape's
     /// `processItemAdd`: a full list loses its first item). Then, the field holding its maximum, the focus moves on
@@ -780,7 +816,7 @@ impl FeatureDialog {
             .into_iter()
             .map(|r| match (&r, mc_mode) {
                 (Reference::MateConnector { .. }, _) | (_, false) => r,
-                _ => match noshape_model::partstudio::Feature::in_feature_connector(r.clone(), &units) {
+                _ => match Feature::in_feature_connector(&ConnectorOrigin::plain(r.clone()), &units) {
                     Some(sub) => {
                         let mc = Reference::MateConnector { feature: sub.id, index: 0 };
                         made.push(sub);

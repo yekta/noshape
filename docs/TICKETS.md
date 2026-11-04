@@ -1810,7 +1810,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Shift+E. Live's recordings (extrude-remove-tab, boolean-union-two-parts, new-extrude-then-other-tool; /root/parity/ui/live):
   the Extrude 2 dialog opens with Undo **off**; it turns on at the first change in the dialog (the Remove tab). Ours (green
   7d35f2cb, qa-scratch/uip-score3/): Undo on as soon as the dialog opens. (qa 2026-11-03 08:04, build 7d35f2cb)
-- [ ] P2 MC-INFERENCE-HOVER (psui, split from IN-FEATURE-MATE-CONNECTOR 11-04) a field taking mate connectors (its
+- [x] fixed (psui 11-04: the hovered face / edge / sketch region shows the assembly's inference points (`inference_candidates`, computed off the UI thread) as white dots and the nearest one as the hovered connector glyph (scene `InferenceMarks`, constant pixel size), Shift keeps them; a click stores the point as live does (`ConnectorOrigin`: the face, POINT / MID_POINT / CENTER / LOOP_CENTER and the vertex or edge as secondaryOriginQuery), in the Mate connector's Origin entity, its nested editor and fields with the mate connector button on; T1 a_mate_connector_picked_at_a_hovered_faces_corner) P2 MC-INFERENCE-HOVER (psui, split from IN-FEATURE-MATE-CONNECTOR 11-04) a field taking mate connectors (its
   button on, or the Mate connector feature's Origin entity) shows, while a face is hovered, its inference points
   (face centre, edge midpoints, corners as white dots) and a triad preview at the pointer, and a click takes the
   point under it (live 1851 shot 4, psui/hole-mc-1851/). Ours infers only an edge's midpoint (behaviors.rs

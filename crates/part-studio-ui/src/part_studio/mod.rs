@@ -42,6 +42,7 @@ mod draft_tool;
 pub mod export;
 mod flat_export;
 mod connector_look;
+mod inference;
 mod plane_handles;
 mod shown_dims;
 pub mod toolbar_prefs;
@@ -1163,6 +1164,7 @@ impl PartStudioView {
         // Mate connector glyphs and their owner parts (connector_look.rs).
         let (mc_glyphs, mc_owners) = self.connector_overlays(&selection, cx);
         manip.extend(mc_glyphs.map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>));
+        manip.extend(self.inference_marks().filter(|_| self.inference_applies(cx)).map(|g| g as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>));
         extra.extend(mc_owners);
         self.viewport.update(cx, |vp, cx| vp.set_camera_geometry(manip, cx));
         let changed = self.changed_picks(&selection);
@@ -1864,8 +1866,11 @@ impl PartStudioView {
             }
         }
         match ev {
-            ViewportEvent::PointerMove { position, .. } => {
+            ViewportEvent::PointerMove { position, modifiers } => {
                 self.ui.pointer = Some(*position);
+                if self.update_inference(modifiers.shift, cx) {
+                    self.refresh_scene(false, cx);
+                }
                 self.select_other_pointer(*position, cx);
                 // A plane's resize ring under the pointer: darker, nothing
                 // pre-highlighted (live).
@@ -1954,7 +1959,8 @@ impl PartStudioView {
                 // highlighted; on a plane's resize ring nothing is.
                 let id = id.filter(|_| self.ui.plane_ring_hover.is_none());
                 self.ui.hover_raw = id.and_then(|id| self.built.as_ref()?.picks.get(id).cloned());
-                if self.rehover(cx) {
+                let shift = window.modifiers().shift;
+                if self.rehover(cx) | self.update_inference(shift, cx) {
                     self.refresh_scene(false, cx);
                 }
                 self.schedule_midpoint_dwell(cx);

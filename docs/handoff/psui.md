@@ -868,6 +868,12 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- 11-04 10:57: **MC-INFERENCE-HOVER** (lead): a field taking mate connectors (Mate connector's Origin entity, its
+  nested editor, a field's mate connector button on) shows the hovered face / edge / region's inference points
+  (skasm's `inference_candidates`, background task in part_studio/inference.rs) as white dots and the nearest as the
+  hovered glyph (scene `InferenceMarks`, shared; skasm told in skasm.md); a click stores live's way (model-data
+  `ConnectorOrigin`: face + POINT / MID_POINT / CENTER / LOOP_CENTER + secondary). A vertex hover picks the vertex.
+  Checked in the app against psui/hole-mc-1851/4 (same dots and glyph). Note: my app display is :102, not :101.
 - 11-04 10:38 (lead's three items): (1) **Hole remembered values** are Onshape's (live 1987: server-side per user and feature
   type, on ✓ only, quantities per document unit). Ours now persists them (app-core feature_settings.json; off under
   NOSHAPE_UI_SCRIPT and in tests); asked live to commit std's default Hole and re-record hole-* (REQUESTS 11-04 10:38).

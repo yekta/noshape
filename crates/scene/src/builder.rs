@@ -1514,6 +1514,43 @@ pub fn connector_glyphs(display: &StudioDisplay, lit: impl Fn(&Reference) -> Con
     (!items.is_empty()).then(|| Arc::new(ConnectorGlyphs { items }))
 }
 
+/// Mate connector inference while hovering (live behaviours 1327, 33725, psui/hole-mc-1851/4): the hovered
+/// entity's inference points as small white dots, and the one nearest the pointer as a hovered connector glyph.
+/// Shared by the Part Studio (Mate connector, in-feature connectors) and the assembly (mates, snap mode).
+pub struct InferenceMarks {
+    dots: Vec<DVec3>,
+    glyph: ConnectorGlyphs,
+}
+
+impl InferenceMarks {
+    /// `points`: each point's origin, X and Z; `chosen` the one under the pointer.
+    pub fn new(points: impl IntoIterator<Item = (DVec3, DVec3, DVec3)>, chosen: Option<usize>) -> Arc<Self> {
+        let mut dots = Vec::new();
+        let mut items = Vec::new();
+        for (i, (o, x, z)) in points.into_iter().enumerate() {
+            if Some(i) == chosen {
+                items.push((o, x, z.cross(x), z, ConnectorLook::Hovered));
+            } else {
+                dots.push(o);
+            }
+        }
+        Arc::new(Self { dots, glyph: ConnectorGlyphs { items } })
+    }
+}
+
+impl noshape_render::camera_geometry::CameraGeometry for InferenceMarks {
+    fn build(&self, view: &noshape_render::camera_geometry::View, up: &Uploader) -> Vec<Instance> {
+        let mut out = noshape_render::camera_geometry::CameraGeometry::build(&self.glyph, view, up);
+        if !self.dots.is_empty() {
+            // Live (qa5/asm-041): white with a soft grey rim, hidden behind other parts.
+            let sprite = |p: &DVec3, color: [u8; 4], size: f32| PointSprite { position: p.as_vec3().into(), color, pick_id: 0, size, style: 0, _pad: 0 };
+            let points = self.dots.iter().flat_map(|p| [sprite(p, [0x9f, 0x9f, 0x9f, 255], 7.0), sprite(p, [0xfd, 0xfd, 0xfd, 255], 5.0)]).collect();
+            out.push(Instance::new(Drawable::Points(up.upload_points(&PointData { points }))).per_primitive_color().unpickable().ignore_clip().layer(22));
+        }
+        out
+    }
+}
+
 /// A hovered / selected mate connector's owner part: its edges in the
 /// secondary yellow-green (#f2ff80; live (235,246,146) / (208,219,117) /
 /// (218,235,137) across an edge: 0.86 over the black edge and the face).

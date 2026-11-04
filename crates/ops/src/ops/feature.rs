@@ -644,7 +644,7 @@ fn in_feature_connectors(feature: &mut noshape_model::partstudio::Feature, param
     }
     let Some(ty) = noshape_model::features::get("mateConnector") else { return Ok(()) };
     let mut make = |p: &serde_json::Map<String, Value>, path: &str| -> Result<String, OpError> {
-        let mut sub = noshape_model::partstudio::Feature::in_feature_connector(noshape_model::reference::Reference::Origin, units).ok_or_else(|| OpError::invalid("mate connectors are not available"))?;
+        let mut sub = noshape_model::partstudio::Feature::in_feature_connector(&noshape_model::partstudio::ConnectorOrigin::plain(noshape_model::reference::Reference::Origin), units).ok_or_else(|| OpError::invalid("mate connectors are not available"))?;
         sub.params.set("originQuery", ParamValue::Query(Vec::new()));
         values::apply(&ty.params, &mut sub.params, p, units, doc).map_err(|e| e.under(&format!("{path}.mate_connector")))?;
         let id = sub.id;

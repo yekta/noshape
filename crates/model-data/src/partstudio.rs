@@ -39,6 +39,57 @@ pub struct Feature {
     pub sub_features: Vec<Feature>,
 }
 
+/// A mate connector's origin as its feature stores it: Onshape's `originQuery`, `entityInferenceType` and
+/// `secondaryOriginQuery` (live 1704: a circular edge's centre is the edge with CENTER; a point of a hovered face
+/// is the face with the point's entity as the secondary, so its Z is the face normal).
+#[derive(Clone, Debug, PartialEq)]
+pub struct ConnectorOrigin {
+    pub entity: Reference,
+    pub inference: &'static str,
+    pub secondary: Option<Reference>,
+}
+
+impl ConnectorOrigin {
+    /// An entity picked as it is (the inference left at its default).
+    pub fn plain(entity: Reference) -> Self {
+        Self { entity, inference: "PART_ORIGIN", secondary: None }
+    }
+
+    /// A hovered inference point: `point` an implicit connector, `align` the entity whose axis it takes (the face
+    /// or edge hovered, when the point is on one of its edges or vertices).
+    pub fn inferred(point: &Reference, align: Option<&Reference>) -> Self {
+        use crate::reference::Inference as I;
+        let Reference::Implicit { on, inference } = point else { return Self::plain(point.clone()) };
+        let kind = match (inference, align.is_some()) {
+            (I::Vertex, _) => "POINT",
+            (I::Midpoint, _) => "MID_POINT",
+            (I::Center, _) => "CENTER",
+            (I::Centroid, true) => "LOOP_CENTER",
+            (I::Centroid, false) => "CENTROID",
+            (I::TopAxis, _) => "TOP_AXIS_POINT",
+            (I::MidAxis, _) => "MID_AXIS_POINT",
+            (I::BottomAxis, _) => "BOTTOM_AXIS_POINT",
+            (I::Origin, _) => "PART_ORIGIN",
+        };
+        match align {
+            Some(a) => Self { entity: a.clone(), inference: kind, secondary: Some((**on).clone()) },
+            None => Self { entity: (**on).clone(), inference: kind, secondary: None },
+        }
+    }
+
+    /// Sets a Mate connector's origin parameters.
+    pub fn apply(&self, params: &mut ParamValues) {
+        params.set("originQuery", ParamValue::Query(vec![self.entity.clone()]));
+        params.set("entityInferenceType", ParamValue::Enum(self.inference.into()));
+        params.set("secondaryOriginQuery", ParamValue::Query(self.secondary.iter().cloned().collect()));
+    }
+
+    /// Whether `params` already hold this origin.
+    pub fn is_in(&self, params: &ParamValues) -> bool {
+        params.query("originQuery") == std::slice::from_ref(&self.entity) && params.enum_("entityInferenceType") == self.inference && params.query("secondaryOriginQuery") == self.secondary.as_slice()
+    }
+}
+
 impl Feature {
     /// Feature `id` is this one or one of its sub-features.
     pub fn owns(&self, id: FeatureId) -> bool {
@@ -46,12 +97,12 @@ impl Feature {
     }
 
     /// A mate connector made inside a feature (its field's "Select mate connectors" button), as Onshape makes it:
-    /// no owner part, Move ticked, `isForSubFeature`; `origin` its origin entity (an inference point included).
-    pub fn in_feature_connector(origin: Reference, units: &UnitPrefs) -> Option<Feature> {
+    /// no owner part, Move ticked, `isForSubFeature`; `origin` its origin (an inference point included).
+    pub fn in_feature_connector(origin: &ConnectorOrigin, units: &UnitPrefs) -> Option<Feature> {
         let ty = features::get("mateConnector")?;
         let mut params = ParamValues::default();
         fill_defaults(&ty.params, &mut params, units);
-        params.set("originQuery", ParamValue::Query(vec![origin]));
+        origin.apply(&mut params);
         for (k, v) in [("allowOwnerEntity", false), ("requireOwnerPart", false), ("isForSubFeature", true), ("transform", true)] {
             params.set(k, ParamValue::Bool(v));
         }

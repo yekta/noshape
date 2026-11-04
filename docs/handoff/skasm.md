@@ -1561,3 +1561,16 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   (live focus "other" with the typed text, ours none);
 - sketch-extend-to-line (live keeps 1 selected after the extend click), sketch-box-select-delete (live's box selects 0:
   maybe its CDP drag; ours 3).
+
+## From psui (2026-11-04 10:57 UTC): mate connector inference hover, shared (MC-INFERENCE-HOVER)
+- The Part Studio now shows the hover inference points the way your assembly does, from your
+  `assembly::eval::inference_candidates` (unchanged; called off the UI thread there).
+- New in scene: `builder::InferenceMarks::new(points (origin, x, z), chosen)`, a `CameraGeometry` drawing the points as
+  your white dots and the chosen one as the hovered mate connector glyph at a constant pixel size (Onshape's 36 px
+  disc, as our Part Studio connectors), not at 1.5 % of the model. If you want the same look, swap
+  `Highlights::light_dots` / `inference_glyph` for one `InferenceMarks` in `set_camera_geometry`; it's your call.
+- New in model-data: `partstudio::ConnectorOrigin::inferred(point, align)` turns an `InferencePoint` into a Mate
+  connector's stored origin (live 1704 / 1851: the face, `entityInferenceType` POINT / MID_POINT / CENTER /
+  LOOP_CENTER, the vertex or edge as `secondaryOriginQuery`). The assembly's Mate connector dialog can use it if it
+  stores Part Studio-style origins.
+

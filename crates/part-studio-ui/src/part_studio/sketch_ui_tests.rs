@@ -2148,6 +2148,45 @@ fn a_hole_placed_on_an_in_feature_mate_connector(cx: &mut TestAppContext) {
     assert!(hole_ok && !features.iter().any(|t| t == "mateConnector"), "{features:?}");
 }
 
+/// MC-INFERENCE-HOVER (live behaviours 1327, psui/hole-mc-1851/4): in a Mate connector's Origin entity, the hovered
+/// top face offers its inference points; with the pointer at a corner a click picks that corner, stored as live does
+/// (the face, POINT, the vertex), so the connector sits at the corner with its Z the face normal.
+#[gpui::test]
+fn a_mate_connector_picked_at_a_hovered_faces_corner(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "mc-inference-corner");
+    view.update(cx, |v, _| v.selection.clear());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("mateConnector", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let corner = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+        let i = b.face_refs.iter().position(|r| *r == top).expect("the top face");
+        let (first, count) = b.mesh.face_ranges[i];
+        let p = b.mesh.indices[first as usize..(first + count) as usize].iter().map(|&k| b.mesh.positions[k as usize]).max_by(|a, c| (a[0] + a[1]).total_cmp(&(c[0] + c[1]))).unwrap();
+        glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)
+    });
+    view.update(cx, |v, cx| {
+        v.ui.pointer = v.viewport.read(cx).project(corner);
+        v.ui.hover_pick = Some(noshape_scene::builder::PickTarget { reference: top.clone(), kind: noshape_scene::builder::PickKind::Face, anchor: None });
+        v.update_inference(false, cx);
+    });
+    wait_until(cx, window, |cx| view.read(cx).inference_choice().is_some());
+    let chosen = cx.update(|cx| view.read(cx).inference_choice().map(|p| p.frame.origin)).unwrap();
+    assert!(chosen.distance(corner) < 1e-6, "{chosen} for the corner {corner}");
+    view.update(cx, |v, cx| v.pick(noshape_scene::builder::PickTarget { reference: top.clone(), kind: noshape_scene::builder::PickKind::Face, anchor: None }, cx));
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Mate connector dialog").dialog.clone());
+    let (origin, inference, secondary) = cx.update(|cx| {
+        let p = &dialog.read(cx).feature.params;
+        (p.query("originQuery").to_vec(), p.enum_("entityInferenceType").to_string(), p.query("secondaryOriginQuery").to_vec())
+    });
+    assert_eq!((origin, inference.as_str()), (vec![top], "POINT"));
+    assert!(matches!(secondary.as_slice(), [Reference::Vertex(_)]), "{secondary:?}");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).display.connectors.is_empty());
+    let (o, z) = cx.update(|cx| view.read(cx).display.connectors.first().map(|c| (c.origin, c.z))).unwrap();
+    assert!(o.distance(corner) < 1e-6 && z.distance(glam::DVec3::Z) < 1e-9, "{o} {z}");
+}
+
 /// Live 1987: a committed Hole's remembered values open the next new Hole; its Units / Style tabs (no units) in every
 /// document, its diameter only in documents of the same length unit.
 #[gpui::test]
