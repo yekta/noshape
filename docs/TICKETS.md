@@ -3951,7 +3951,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   cutting the rolled wall back by the setback along its surface (walk + plane cut) leaves it apart from the revolved
   bend (4 parts): beside a curved wall the bend is the definition edge's fillet (a cylinder: both faces are swept
   along x), so the rebuild needs that edge's bend from a fillet of the definition sheet, trimming both walls,
-  rather than a revolve about an axis set from the planar side.
+  rather than a revolve about an axis set from the planar side. dx 23:17: a first try (each curved wall
+  sewn with its bend neighbours, k::fillet_radii at the definition radius, the fillet faces thickened as the bends,
+  the filleted wall thickened) left 5 parts: the fillet's side or the thickening's direction doesn't match the
+  walls'. Next: a T1 case (a plate, a bend, a rolled wall swept along x) to settle it before the corpus.
   dx 11-04 21:39: cf-sheet-metal-shaped-flange's Shaped Flange 1 (flange a separate part, 78,922 vs 92,510 mm³):
   the definition sheet joins (the flange shares its partial edge with the base), but `addEdge` (its transient
   query ∪ startTracking) resolves to two edges after flangeEdgeChange + flange_boolean: the moved joint edge (z 2.5,
