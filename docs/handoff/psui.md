@@ -570,6 +570,15 @@ N0. (11-04 21:00, lead's speed list) (a) Dialog open: the preview's `apply_displ
     timing GPUI's present on the runners (r.* scopes / Metal capture), not our passes. Run 41885259563's
     texture+variant orbit runs (1×) all present ~19 fps whatever is skipped: the 1× runs are pacing-bound, use 2×
     frames-driven variants (`retina@orbit:NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames,...`) for ablations.
+    The floor's likely cause (read 11-04 21:30): every orbit frame GPUI's Metal renderer (gpui-pre-apple
+    metal_renderer.rs `draw`) takes a new drawable and redraws the whole window scene at 2388×1588 (every UI quad and
+    glyph, our texture as one sprite) although only the viewport changed. Proposed fix: the viewport presents
+    through its own CAMetalLayer, a sublayer below GPUI's (GPUI's layer non-opaque, transparent over the viewport
+    rect; overlays, dialogs and menus stay in GPUI's layer above it), so an orbit frame touches only that layer and
+    GPUI draws nothing. Needs: gpui-pre-macos a hook to add/position a sublayer for a view's bounds (z below the
+    window layer), app-core gpu.rs presenting into it (CAMetalLayer drawable instead of the shared texture),
+    resize/scale/occlusion handling; measure with 2× frames-driven perf.yml variants (base vs the same with the
+    sublayer off by env). Linux/Windows keep the current path.
 
 N12. (11-01) Part Studio audit (user 11-01): docs/parity/audit-part-studio.md. Dialogs: tests/std_oracle.rs
      `print_all` diffs every toolbar feature with std (STD_MODULES maps the rest to their std files;
