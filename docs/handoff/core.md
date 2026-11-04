@@ -16,6 +16,14 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-04 14:04 UTC.**
+- Since 13:51: cf-spur-gear's Extrude 2 11.8 -> 0.1 s (the dialog's preselection probe no longer proves non-contact
+  with a many-faced part by the exact distance; the merge scope stays exact); cf-o-ring-generator to the end (evAxis
+  of a cylinder face through the middle of its current extent, live 1992). DISPLACEMENT-MAP's Replace face landed;
+  the user's script waits for dx's @opCreateBSplineSurface.
+- Looked at, not changed: cf-hose-routing (per hose: Shell 0.10 s, the translator's measures, min_distance 0.05 s);
+  pipeflange's countersink rims (the cone's and the hole cylinder's seams would have to move together; ticket).
+
 **State 11-04 13:23 UTC.**
 - Queued: DISPLACEMENT-MAP's opReplaceFace (lead's P1 from the user): a curved face, and a template on both sides of
   the face, replaced by the face's slab split by the template carried past its edges (direct.rs replace_by_slabs,
