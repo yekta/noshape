@@ -153,6 +153,21 @@ pub const RECENT_TAB_CONTEXT: &str = "Workspace && !(FeatureStudio > Input)";
 /// Onshape's default key bindings (before user customizations; the app binds them with the user's customizations,
 /// Preferences › Keyboard shortcuts, through its `shortcuts::init`).
 pub fn default_key_bindings() -> Vec<KeyBinding> {
+    key_bindings_for(cfg!(target_os = "macos"))
+}
+
+/// Live's shortcut map gives a Control and a Meta sequence for most commands (behaviours "Keys on macOS"): on a Mac
+/// both work (Ctrl+Z and ⌘Z undo); elsewhere Onshape ignores every key with Meta held, so only the Control one. The
+/// keys of `key` (e.g. "z", "shift-f") for `mac`.
+pub fn ctrl_cmd(key: &str, mac: bool) -> Vec<String> {
+    let mut keys = vec![format!("ctrl-{key}")];
+    if mac {
+        keys.push(format!("cmd-{key}"));
+    }
+    keys
+}
+
+fn key_bindings_for(mac: bool) -> Vec<KeyBinding> {
     // Bare-letter bindings must not fire while typing in an input.
     let ps = Some("PartStudio && !Input");
     let sk = Some("Sketch && !Input");
@@ -162,13 +177,26 @@ pub fn default_key_bindings() -> Vec<KeyBinding> {
     let doc = Some("Workspace && !Input");
     // (Not in a sketch, whose own `a` / `q` are the 3 point arc and construction.)
     let dlg = Some("FeatureDialog && !Input && !Sketch");
-    vec![
+    let mut pairs: Vec<KeyBinding> = Vec::new();
+    for k in ctrl_cmd("z", mac) {
+        pairs.push(KeyBinding::new(&k, Undo, doc_mod));
+    }
+    // Redo: Ctrl+Y, and Shift+⌘Z on a Mac (not Ctrl+Shift+Z anywhere).
+    pairs.push(KeyBinding::new("ctrl-y", Redo, doc_mod));
+    if mac {
+        pairs.push(KeyBinding::new("cmd-shift-z", Redo, doc_mod));
+    }
+    for k in ctrl_cmd("c", mac) {
+        pairs.push(KeyBinding::new(&k, Copy, doc));
+    }
+    for k in ctrl_cmd("v", mac) {
+        pairs.push(KeyBinding::new(&k, Paste, doc));
+    }
+    for k in ctrl_cmd("shift-f", mac) {
+        pairs.push(KeyBinding::new(&k, SearchFeatureStudios, doc_mod));
+    }
+    pairs.extend([
         // General / document
-        KeyBinding::new("secondary-z", Undo, doc_mod),
-        KeyBinding::new("secondary-shift-z", Redo, doc_mod),
-        KeyBinding::new("ctrl-y", Redo, doc_mod),
-        KeyBinding::new("secondary-c", Copy, doc),
-        KeyBinding::new("secondary-v", Paste, doc),
         KeyBinding::new("delete", DeleteSelection, doc),
         KeyBinding::new("backspace", DeleteSelection, doc),
         KeyBinding::new("space", ClearSelection, doc),
@@ -218,7 +246,6 @@ pub fn default_key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new("secondary-w", CloseWindow, None),
         KeyBinding::new("secondary-q", Quit, None),
         KeyBinding::new("alt-h", ToggleVersionGraph, doc_mod),
-        KeyBinding::new("secondary-shift-f", SearchFeatureStudios, doc_mod),
         KeyBinding::new("secondary-alt-v", CreateVersion, doc_mod),
         // Part Studio
         KeyBinding::new("shift-s", NewSketch, ps),
@@ -324,7 +351,8 @@ pub fn default_key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new("q", ReorientSecondaryAxis, asm),
         // Drawing
         KeyBinding::new("ctrl-q", DrawingUpdate, Some("Drawing")),
-    ]
+    ]);
+    pairs
 }
 
 /// Tab to activate, set by views that are not subscribed to by the
@@ -357,6 +385,43 @@ mod recent_tab_tests {
         assert!(p.depth_of(&ctx(&["Workspace", "PartStudio", "Input"])).is_some(), "a Part Studio field");
         assert!(p.depth_of(&ctx(&["Workspace", "FeatureStudio", "Input"])).is_none());
         assert!(p.depth_of(&ctx(&["Workspace", "FeatureStudio", "CodePane", "Input"])).is_none());
+    }
+}
+
+#[cfg(test)]
+mod mac_key_tests {
+    use super::*;
+    use gpui_kit::{Action, KeyContext, Keymap, Keystroke};
+
+    fn action_for(mac: bool, key: &str) -> Option<&'static str> {
+        let keymap = Keymap::new(key_bindings_for(mac));
+        let stack: Vec<KeyContext> = ["Workspace", "PartStudio"].iter().map(|n| KeyContext::parse(n).unwrap()).collect();
+        let (found, _) = keymap.bindings_for_input(&[Keystroke::parse(key).unwrap()], &stack);
+        found.first().map(|b| b.action().name())
+    }
+
+    /// Live's key list per OS (behaviours "Keys on macOS"): each Control/Meta pair takes both keys on a Mac and only
+    /// Control elsewhere; Redo is Ctrl+Y everywhere and Shift+⌘Z on a Mac, never Ctrl+Shift+Z; Control-only commands
+    /// stay on the Control key on a Mac.
+    #[test]
+    fn shared_keys_follow_lives_list_per_os() {
+        for (key, want) in [("z", Undo.name()), ("c", Copy.name()), ("v", Paste.name()), ("shift-f", SearchFeatureStudios.name())] {
+            assert_eq!(action_for(true, &format!("ctrl-{key}")), Some(want), "mac ctrl-{key}");
+            assert_eq!(action_for(true, &format!("cmd-{key}")), Some(want), "mac cmd-{key}");
+            assert_eq!(action_for(false, &format!("ctrl-{key}")), Some(want), "ctrl-{key}");
+            assert_eq!(action_for(false, &format!("cmd-{key}")), None, "Meta ignored off a Mac: cmd-{key}");
+        }
+        assert_eq!(action_for(true, "ctrl-y"), Some(Redo.name()));
+        assert_eq!(action_for(true, "cmd-shift-z"), Some(Redo.name()));
+        assert_eq!(action_for(false, "ctrl-y"), Some(Redo.name()));
+        for mac in [true, false] {
+            assert_eq!(action_for(mac, "ctrl-shift-z"), None, "no Ctrl+Shift+Z redo (mac {mac})");
+            assert_eq!(action_for(mac, "cmd-y"), None);
+            assert_eq!(action_for(mac, "ctrl-m"), Some(MateConnectorTool.name()));
+            assert_eq!(action_for(mac, "alt-c"), Some(SearchTools.name()));
+            assert_eq!(action_for(mac, "alt-t"), Some(TabManager.name()));
+        }
+        assert_eq!(action_for(true, "cmd-m"), None, "Control-only on a Mac");
     }
 }
 

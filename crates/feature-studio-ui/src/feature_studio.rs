@@ -35,17 +35,30 @@ actions!(feature_studio, [Commit, CommitAll, SearchStudios, ModuleOutline, BackR
 pub fn bind_keys(cx: &mut App) {
     let c = Some("FeatureStudio");
     let code = Some("FeatureStudio > Input");
-    cx.bind_keys([
-        KeyBinding::new("secondary-s", Commit, c),
-        KeyBinding::new("secondary-shift-s", CommitAll, c),
-        KeyBinding::new("secondary-shift-f", SearchStudios, c),
-        KeyBinding::new("secondary-shift-o", ModuleOutline, c),
-        KeyBinding::new("secondary-[", BackReference, c),
-        KeyBinding::new("secondary-]", ForwardReference, c),
-        KeyBinding::new("secondary-shift-o", ModuleOutline, code),
-        KeyBinding::new("secondary-[", BackReference, code),
-        KeyBinding::new("secondary-]", ForwardReference, code),
-    ]);
+    // Each a Control/Meta pair in live's map: both keys on a Mac, Control elsewhere (behaviours "Keys on macOS").
+    let mac = cfg!(target_os = "macos");
+    let mut bindings = Vec::new();
+    for k in noshape_app_core::actions::ctrl_cmd("s", mac) {
+        bindings.push(KeyBinding::new(&k, Commit, c));
+    }
+    for k in noshape_app_core::actions::ctrl_cmd("shift-s", mac) {
+        bindings.push(KeyBinding::new(&k, CommitAll, c));
+    }
+    for k in noshape_app_core::actions::ctrl_cmd("shift-f", mac) {
+        bindings.push(KeyBinding::new(&k, SearchStudios, c));
+    }
+    for ctx in [c, code] {
+        for k in noshape_app_core::actions::ctrl_cmd("shift-o", mac) {
+            bindings.push(KeyBinding::new(&k, ModuleOutline, ctx));
+        }
+        for k in noshape_app_core::actions::ctrl_cmd("[", mac) {
+            bindings.push(KeyBinding::new(&k, BackReference, ctx));
+        }
+        for k in noshape_app_core::actions::ctrl_cmd("]", mac) {
+            bindings.push(KeyBinding::new(&k, ForwardReference, ctx));
+        }
+    }
+    cx.bind_keys(bindings);
 }
 
 /// Pause after the last keystroke before the text is saved (not committed).
