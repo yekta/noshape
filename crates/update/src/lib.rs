@@ -446,7 +446,7 @@ if mv "$bundle" "$old" 2>/dev/null && mv "$new" "$bundle" 2>/dev/null; then
 else
   [ -d "$bundle" ] || mv "$old" "$bundle"
   # Applications not writable by this user: the system's password prompt.
-  /usr/bin/osascript -e "do shell script \"rm -rf '$old' && mv '$bundle' '$old' && mv '$new' '$bundle' && rm -rf '$old'\" with administrator privileges" || { log "swap failed"; exit 1; }
+  /usr/bin/osascript -e "do shell script \"rm -rf '$old' && mv '$bundle' '$old' && mv '$new' '$bundle' && rm -rf '$old'\" with administrator privileges" || { log "swap failed"; open -n "$bundle" --args --update-failed "The update was not installed: noshape could not be replaced in its folder (the password prompt was declined or failed). Restart from the update card to try again." --reopen "$list"; exit 1; }
 fi
 log "swapped $bundle"
 if [ -n "$NOSHAPE_UPDATE_LOG" ]; then
@@ -464,10 +464,10 @@ log() { [ -n "$NOSHAPE_UPDATE_LOG" ] && echo "helper: $*" >> "$NOSHAPE_UPDATE_LO
 # Until it has ended (a zombie its parent hasn't reaped yet counts as ended).
 while kill -0 "$pid" 2>/dev/null && ! ps -o stat= -p "$pid" | grep -q Z; do sleep 0.2; done
 if [ "$mode" = deb ]; then
-  pkexec apt-get install -y "$new" || { log "pkexec apt-get failed"; exit 1; }
+  pkexec apt-get install -y "$new" || { log "pkexec apt-get failed"; env -u NOSHAPE_UPDATE_AUTORESTART setsid "$bin" --update-failed "The update was not installed: the package install was declined or failed. Restart from the update card to try again." --reopen "$list" > /dev/null 2>&1 < /dev/null & exit 1; }
 elif ! { cp "$new/noshape" "$bin.new" 2>/dev/null && chmod 755 "$bin.new" && mv -f "$bin.new" "$bin"; }; then
   rm -f "$bin.new"
-  pkexec install -m 755 "$new/noshape" "$bin" || { log "install failed"; exit 1; }
+  pkexec install -m 755 "$new/noshape" "$bin" || { log "install failed"; env -u NOSHAPE_UPDATE_AUTORESTART setsid "$bin" --update-failed "The update was not installed: noshape could not be replaced (the password prompt was declined or failed). Restart from the update card to try again." --reopen "$list" > /dev/null 2>&1 < /dev/null & exit 1; }
 fi
 log "swapped $bin"
 env -u NOSHAPE_UPDATE_AUTORESTART setsid "$bin" --reopen "$list" > /dev/null 2>&1 < /dev/null &
@@ -475,19 +475,34 @@ env -u NOSHAPE_UPDATE_AUTORESTART setsid "$bin" --reopen "$list" > /dev/null 2>&
 
 const WINDOWS_HELPER: &str = r#"# noshape's update helper (crates/update): once the app has quit, run the new installer silently (the install
 # folder, its PATH entry and the agents' connections stay) or swap the portable exe, then start noshape with the
-# documents that were open.
+# documents that were open. If the update can't be installed, the old noshape starts again and says why.
 param([int]$AppPid, [string]$Mode, [string]$Exe, [string]$Payload, [string]$List)
-function Log($m) { if ($env:NOSHAPE_UPDATE_LOG) { Add-Content -Path $env:NOSHAPE_UPDATE_LOG -Value "helper: $m" } }
+$HelperLog = Join-Path (Split-Path $Payload) 'update-helper.log'
+function Log($m) {
+  Add-Content -Path $HelperLog -Value "$(Get-Date -Format o) helper: $m" -ErrorAction SilentlyContinue
+  if ($env:NOSHAPE_UPDATE_LOG) { Add-Content -Path $env:NOSHAPE_UPDATE_LOG -Value "helper: $m" }
+}
+function Failed($why) {
+  Log "failed: $why"
+  Remove-Item Env:NOSHAPE_UPDATE_AUTORESTART -ErrorAction SilentlyContinue
+  Start-Process -FilePath $Exe -ArgumentList '--update-failed', ('"' + $why + '"'), '--reopen', ('"' + $List + '"')
+  exit 1
+}
 while (Get-Process -Id $AppPid -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 200 }
+# Other copies from the install folder (a coding agent's `noshape mcp`, a terminal's `noshape`) hold the files Windows
+# won't replace; the agents start them again when they need them.
+$dir = Split-Path $Exe
+Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and (Split-Path $_.Path) -eq $dir } | ForEach-Object { Log "closing $($_.Path) ($($_.Id))"; Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
 if ($Mode -eq 'installer') {
-  $p = Start-Process -FilePath $Payload -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/NOCANCEL' -Verb RunAs -Wait -PassThru
-  if ($p.ExitCode -ne 0) { Log "installer exit $($p.ExitCode)"; exit 1 }
+  try {
+    $p = Start-Process -FilePath $Payload -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/NOCANCEL', '/FORCECLOSEAPPLICATIONS' -Verb RunAs -Wait -PassThru -ErrorAction Stop
+  } catch { Failed "The update was not installed: Windows' permission prompt was declined or failed. Restart from the update card to try again." }
+  if ($p.ExitCode -ne 0) { Failed "The update was not installed: its installer stopped (code $($p.ExitCode)). Close noshape everywhere it runs, then restart from the update card. Details: $HelperLog" }
 } else {
   try {
-    $dir = Split-Path $Exe
     Copy-Item (Join-Path $Payload 'noshape.exe') $Exe -Force -ErrorAction Stop
     if (Test-Path (Join-Path $Payload 'noshape.com')) { Copy-Item (Join-Path $Payload 'noshape.com') (Join-Path $dir 'noshape.com') -Force -ErrorAction Stop }
-  } catch { Log "copy failed: $_"; exit 1 }
+  } catch { Failed "The update was not installed: $_" }
 }
 Log "swapped $Exe"
 Remove-Item Env:NOSHAPE_UPDATE_AUTORESTART -ErrorAction SilentlyContinue

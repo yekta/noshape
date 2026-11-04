@@ -436,6 +436,12 @@ fn main() {
         args.drain(i..(i + 2).min(args.len()));
         updates::reopen_list(std::path::Path::new(&list))
     });
+    // `--update-failed <message>`: an update's helper couldn't install the new version and started this one again.
+    let update_failed = args.iter().position(|a| a == "--update-failed").map(|i| {
+        let message = args.get(i + 1).cloned().unwrap_or_default();
+        args.drain(i..(i + 2).min(args.len()));
+        message
+    });
     let demo = args.iter().any(|a| a == "--demo");
     let path = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from);
     // A ui-parity scenario opens its own start document.
@@ -476,6 +482,10 @@ fn main() {
         // Updates: checked at launch and every 5 minutes, a card floating at the bottom of every window.
         updates::init(cx);
         noshape_render::perf::milestone("app initialized");
+        if let Some(message) = update_failed.filter(|m| !m.is_empty()) {
+            updates::note(&format!("update failed: {message}"));
+            start_window::show_with_error(message, cx);
+        }
         if let Some(docs) = reopen.filter(|d| !d.is_empty()) {
             let mut opened = 0;
             for doc in docs {
