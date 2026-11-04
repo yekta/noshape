@@ -3942,6 +3942,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Its sheet is live's (5 faces, x −25…−10); the part 64/146/84, 7,727.9 mm³ against live's 50/112/76, 7,600.0
   (next: the rolled walls' rebuild). T1 ops_harness upToPart. Parity run 87: 1 document left failing to run
   (cf-fix-pcb, after core's Extrude 5).
+  dx 11-04 23:13, with live's face list (behaviours "SM up 2031"): its definition has 5 walls, one an EXTRUDED
+  (rolled) wall, 4 BEND joints r 1 (two of them 73.356° beside the rolled wall), no corner reliefs. Ours differs only
+  at those two bends: our cylinders there are 38.751 mm² (≈49°) with a 30 mm² and a 19.98 mm² flat strip each, live's
+  57.614 / 19.205 mm² (73.36°, the attribute's angle). The rebuild's bend_geometry takes a curved wall's normal at
+  the face's middle, not at the joint; taking it at the joint gives the right angle but the wall is still pulled back
+  in a plane (73 faces): a rolled wall beside a bend must be cut back along its own surface by the setback.
   dx 11-04 21:39: cf-sheet-metal-shaped-flange's Shaped Flange 1 (flange a separate part, 78,922 vs 92,510 mm³):
   the definition sheet joins (the flange shares its partial edge with the base), but `addEdge` (its transient
   query ∪ startTracking) resolves to two edges after flangeEdgeChange + flange_boolean: the moved joint edge (z 2.5,
