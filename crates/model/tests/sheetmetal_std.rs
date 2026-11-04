@@ -1676,3 +1676,37 @@ fn a_bend_beside_a_rolled_wall() {
     let want = 2.0 * (30.0 - 120f64.sqrt() + 11.0 * (std::f64::consts::FRAC_PI_2 - phi)) * 15.0;
     assert!(parts == 1 && faces == 14 && (volume_mm3(&r) - want).abs() < 1e-3, "{parts} parts, {faces} faces, {} mm³ (want {want}): {:#?}", volume_mm3(&r), face_report(&r));
 }
+
+/// The same with a second bend of the other hand after the rolled wall: on to (40,0), a 45° turn the material lies
+/// inside of (its definition radius 3). The definition curve: 19.045549 + (π/2 − φ) + 10 (π/2 − φ − θ) +
+/// 3 (θ + π/4) + (10√2 − 1.3766489), φ = atan(1/√120), θ = 0.1647326 (the R3 fillet's tangent on the arc), turning
+/// −π/4 in all: the section 2 L − 2 (π/4), 1455.1802 mm³.
+#[test]
+fn bends_of_both_hands_beside_a_rolled_wall() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = [(0.0, 0.0), (20.0, 0.0), (30.0, 10.0), (30.0, 0.0), (40.0, 0.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+    let line = sk.add_line_between(p[0], p[1]).unwrap();
+    let arc = sk.add_arc_between(p[3], p[2], p[1]).unwrap();
+    let last = sk.add_line_between(p[2], p[4]).unwrap();
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    s.ok();
+    s.add("sheetMetalStart", |pv| {
+        pv.set("process", en("EXTRUDE"));
+        pv.set("sketchCurves", ParamValue::Query([line, arc, last].iter().map(|e| Reference::SketchEntity { sketch, entity: e.0 }).collect()));
+        pv.set("depth", expr("15 mm"));
+        pv.set("thickness", expr("2 mm"));
+        pv.set("radius", expr("1 mm"));
+    });
+    let r = s.ok();
+    let parts = r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count();
+    let faces = r.context.bodies[part(&r)].shape.faces().len();
+    let (phi, theta) = ((1.0f64 / 120f64.sqrt()).atan(), 0.1647326f64);
+    let q = std::f64::consts::FRAC_PI_4;
+    let length = 30.0 - 120f64.sqrt() + (std::f64::consts::FRAC_PI_2 - phi) + 10.0 * (std::f64::consts::FRAC_PI_2 - phi - theta) + 3.0 * (theta + q) + (200f64.sqrt() - 1.3766489);
+    let want = (2.0 * length - 2.0 * q) * 15.0;
+    assert!(parts == 1 && (volume_mm3(&r) - want).abs() < 1e-2, "{parts} parts, {faces} faces, {} mm³ (want {want}): {:#?}", volume_mm3(&r), face_report(&r));
+}
