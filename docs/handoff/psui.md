@@ -868,7 +868,12 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
-- 11-04 02:59: **edge midpoint rule under review (lead 03:00)**. Ours (92095b8d): a pointer resting 250 ms on an edge's
+- 11-04 03:36: since 01:05 (landed or queued): Mass Override without a material (live 1959), Section view's keyboard after a
+  graphics press, the no-material notice waited for by the driver, Rib's Parts empty until a profile, an existing
+  feature keeps its direction on Remove, face double-click keeps its features lit, the point's menu, menus highlight
+  the row under a resting pointer, the driver waits for the hover to settle; 15 edge scenarios click a quarter of the
+  edge (live re-recording them). Full run 02:00: 254/282.
+- 11-04 02:59: **edge midpoint rule confirmed by hand (11-04 03:36, live 1981: a 2 s still rest then click takes the midpoint point, Fillet empty, the point's menu; a quick click takes the edge; the sketch side differs)**. Was under review (lead 03:00). Ours (92095b8d): a pointer resting 250 ms on an edge's
   midpoint snaps to the midpoint point (behaviors.rs MIDPOINT_DWELL, schedule_midpoint_dwell; the point's menu; POINT
   of EDGE in the state). Every Part Studio recording agrees (select-edge-then-chamfer-tool 00:56 POINT; edge-rclick-menu
   without Fillet…; fillet-* fields empty), but skasm's sketch version was reverted at 03:00 (live's 02:24–02:40
