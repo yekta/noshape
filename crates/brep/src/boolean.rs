@@ -4770,6 +4770,19 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     let mut within: Vec<Vec<usize>> = vec![Vec::new(); pieces.len()];
     // Solids another argument's piece is in or on (OCCT builds them anew).
     let mut reached = vec![false; cx.solids.len()];
+    // (Each face's coplanar faces, in the order their pairs were found: a plate's two faces, each with 1739 holes'
+    // cutters' caps on it, were asked each pair for each piece and solid.)
+    let mut coplanar_of: Vec<Vec<usize>> = vec![Vec::new(); cx.faces.len()];
+    for &(a, b) in &cx.coplanar {
+        coplanar_of[a].push(b);
+        if b != a {
+            coplanar_of[b].push(a);
+        }
+    }
+    // (By solid, in that order within each: asked for one solid at a time.)
+    for v in &mut coplanar_of {
+        v.sort_by_key(|&g| cx.faces[g].solid);
+    }
     // (Each piece's states against the solids, on all threads; taken in order below.)
     let state_of = |pi: usize| -> R<Vec<(usize, State)>> {
         let f = pieces[pi].face;
@@ -4785,14 +4798,9 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 continue;
             }
             let mut st = None;
-            for &(a, b) in &cx.coplanar {
-                let g = if a == f && cx.faces[b].solid == t {
-                    b
-                } else if b == f && cx.faces[a].solid == t {
-                    a
-                } else {
-                    continue;
-                };
+            let on = &coplanar_of[f];
+            let from = on.partition_point(|&g| cx.faces[g].solid < t);
+            for &g in on[from..].iter().take_while(|&&g| cx.faces[g].solid == t) {
                 // (A free-form face: past its patch the point's parameters are clamped to its edge; off it there,
                 // not on that face (a knurl's grooves: their faces on one surface, each groove's its own part of it).)
                 if matches!(cx.faces[g].s, Surf::Nurbs { .. }) && free::surface_distance(&cx.faces[g], pieces[pi].inside) > tol {

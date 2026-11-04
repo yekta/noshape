@@ -168,6 +168,18 @@ fn the_b94_diamond_knurl() {
     bench_within("B94.6 diamond knurl", c.op, &c.objects[0], &c.tools, &c.opts, 1e-7);
 }
 
+/// A fill pattern's holes: a plate cut by 40 x 40 cylinders through it, its first column notches in its side (so not
+/// the holes' own path) (cf-fill-pattern's 1739: its faces' pieces asked against each cylinder's coplanar caps one
+/// pair at a time, 7.9 s; and OCCT's check of its faces with 1739 wires each, 0.8 s).
+#[test]
+#[ignore = "T2: timed pattern Booleans"]
+fn a_fill_pattern_of_holes_in_a_plate() {
+    let plate = k::make_box_corners(DVec3::ZERO, DVec3::new(0.2, 0.2, 0.004)).unwrap();
+    let hole = k::make_cylinder(&z_frame(DVec3::new(0.0, 0.0025, 0.0)), 0.0015, 0.004, TAU).unwrap();
+    let holes: Vec<k::Shape> = (0..1600).map(|i| k::transform(&hole, &k::Transform::Translate(DVec3::new(0.005 * (i % 40) as f64, 0.005 * (i / 40) as f64, 0.0)), true).unwrap().shape).collect();
+    bench("fill pattern of 1600 holes", k::BooleanOp::Cut, &plate, &holes, &k::BooleanOptions::default());
+}
+
 /// A result's history records, each output by where it lies (a face by its centroid and area, an edge by its ends
 /// and length, a vertex by its point: none by a curve's parameters), grouped by what they say.
 fn placed_records(r: &k::OpResult) -> std::collections::BTreeMap<String, Vec<Vec<f64>>> {

@@ -2453,15 +2453,25 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   stop();
   if (const char* why = build(r, srcs, max_tol > 0 ? max_tol : 1e-7, out, hist))
     return decline(why);
-  // The result as OCCT's checker sees it, up to 2000 faces (a bigger one's check costs seconds: the knurl's 2 s): an
-  // invalid one declines and OCCT builds the Boolean (invalid results of ours, fed into later OCCT operations, crashed
-  // them: fuzz seed 1144's mirror fuse and Shell common).
-  if (r.face_origin.size() / 3 <= 2000 && !BRepCheck_Analyzer(out).IsValid())
+  // The result as OCCT's checker sees it, up to 2000 faces and 256 wires a face (a bigger one's check costs seconds:
+  // the knurl's 2 s; its wires' check goes by pairs: a plate's face with 1739 holes 0.4 s): an invalid one declines
+  // and OCCT builds the Boolean (invalid results of ours, fed into later OCCT operations, crashed them: fuzz seed
+  // 1144's mirror fuse and Shell common).
+  size_t most_wires = 0;
+  for (const TopoDS_Shape& f : t_built.f)
+  {
+    size_t n = 0;
+    for (TopoDS_Iterator it(f); it.More(); it.Next())
+      ++n;
+    most_wires = std::max(most_wires, n);
+  }
+  const bool full_check = r.face_origin.size() / 3 <= 2000 && most_wires <= 256;
+  if (full_check && !BRepCheck_Analyzer(out).IsValid())
     return decline("an invalid result");
   // (Past that: each made face on a cylinder or cone its wires closed on its surface (a curve's piece on the wrong
   // part of its curve on the face left a Ø25 x 25 knurl's cylinder pieces open there: an invalid result, 0.6 % of
   // its volume off).)
-  if (r.face_origin.size() / 3 > 2000)
+  if (!full_check)
     for (size_t i = 0; i < t_built.f.size(); ++i)
     {
       if (r.face_origin[3 * i] == 0)

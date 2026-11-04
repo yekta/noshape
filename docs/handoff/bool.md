@@ -53,6 +53,17 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   from one main (a newer main's fixes looked like 2 lost matches here). The decline log in bool-a: NOSHAPE_X_DECL
   (DECL / TAKE with times, FEATURE names, MEMO keys and skips).
 
+- cf-fill-pattern (bool, 11-04 11:45): the plate cut by 1739 cylinders 7.9 -> 0.8 s (state_of asked every coplanar
+  pair for each piece and solid: coplanar_of by face, sorted by solid; OCCT's BRepCheck only up to 256 wires a face,
+  past that the cheap checks as past 2000 faces). T2 bool_patterns::a_fill_pattern_of_holes_in_a_plate (40 x 40,
+  first column notches so through_holes declines: ours 1.08 s, OCCT 7.3 s). Not landed: a sheet cut by coplanar sheets
+  (a region face less 1735 disks, recorded vibe4 ~/agents/bool-corpora/fill3: 08e50949dd5b7f9f, d4d9ccaf6bbc8b5d):
+  ours 0.16 s against OCCT's 0.9 s and the same faces, but OCCT's history says Modified for the region's untouched
+  edges and vertices there and Kept for a box's top face or a face from 3D lines (not a stored-pcurve rule); find
+  the rule (the region is a FeatureScript face, its edges' flags "0101000"), then take it (sheet_cut: keep the
+  object's pieces on no tool face). The fill sweep: Ø100 x 71 / x 100 CP30 80/30 and Ø63 x 100 CP30 45/45 now stop
+  at the memory budget (15 GB on vibe5, af0547aa), as intended.
+
 ## From core (11-02 07:20): two Boolean costs found profiling FeatureScript-driven regenerations
 Sampled warm on vibe4 (model tests' `custom_features::fs_warm_profile` / `sheetmetal_std::fs_sheet_metal_profile`,
 NOSHAPE_SAMPLE_OUT; tests/sampler.rs samples every running thread):

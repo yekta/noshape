@@ -3716,6 +3716,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   cf-planetary-gears 15.1 s -> 2.1 s (OCCT 3.0 s, live 0.54 s). Whole suite on vibe3, main vs bool's: hose-routing
   20.8 -> 18.3 s, setback-fillet 2.6 -> 1.6 s, sheet-metal-shaped-flange 1.9 -> 1.2 s, spur-gear 8.4 -> 7.4 s,
   stef-radijator 1.4 -> 0.9 s; the others within 0.5 s.
+  bool 11-04 11:45, cf-fill-pattern's Booleans (recorded exactly, replayed on vibe4): the plate's cut by 1739
+  cylinders took noshape's Boolean 7.9 s (OCCT's 7.8 s): each piece asked against every coplanar face pair (3478,
+  the cylinders' caps on the plate's faces) for each solid, and OCCT's check of the result's two faces with 1739
+  wires each (its wires' check goes by pairs). Now 0.8 s (OCCT's 8.2 s there), the same result. The region's two
+  face-by-1735-disk cuts stay OCCT's (0.9 s each): noshape's Boolean doesn't take a sheet cut by sheets yet (tried:
+  it can, 0.16 s each, but OCCT says Modified for the region's untouched edges in this document and Kept for a
+  box's face, the rule not found). The document on vibe3 (8 cores; noisy, the same binary 94 / 116 s): main 94.1 s
+  and 116.2 s, this 80.8 s (with the sheet cuts) and 66.8 s; the rest is not the Booleans (props_surface 69 s,
+  props_volume 22 s summed over threads in a profiled run: core's / dx's).
   core 11-04 01:16: live's faces (behaviours.md "core (2026-11-04 00:09, P2) exact faces"): stef-radijator's Fillet 1 is
   75 cylinders + 6 planes, no corner patch where three R1 rounds meet round the fins (the cylinders meet each other
   directly): what noshape's blend would make if its chain ends at such vertices took the three rounds' pairwise
