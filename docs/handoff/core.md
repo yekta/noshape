@@ -16,6 +16,22 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-04 10:56 UTC.**
+- Landed / queued since 09:58: the face pattern's cut glued and checked (Glue::InsideChecked, motor-mount's pattern
+  Boolean 176 -> 118 ms); SKETCH-PLANE-FRAME (sketches on construction planes in std newSketch's frame, ScopeRule 9);
+  SM-LOUVER-KERNEL-ABORT (an OCCT exception in a callback noshape's Boolean makes was a std::terminate: the callbacks
+  catch and decline; the louver's tools build as live's). The Boolean replay prints noshape's decline reasons.
+- For bool: BOOL-RUST-LATE-DECLINE (90 ms of brep work before declining "a non-manifold result": prize-wheel's
+  Revolve 1, motor-mount's Extrude 3 / Fillet 2; recorded case in vibe5 ~/agents/shared-cases).
+- Looked into, not changed (tickets updated): learning-center-michael's Fillet 2 (every outline edge fails alone in
+  OCCT: it needs noshape's blend with sphere corners and overflowing rims), qa's slow failing shell (seed 508: the
+  quadric path would need live's flat rims for a removed tangent round), bushing's seam (no free angle: needs seam-split
+  pieces counted and picked as one), the dogbone's edge order (dx), straight-spline's sliver edges (Parasolid's).
+- cf-o-ring O Ring 5: live 1989 says chamfers / fillets / splits keep a cylinder's frame; O Ring 5 reads evAxis, whose
+  origin may be the face's middle (62.865 = the chamfered face's): asked live (REQUESTS 10:55), then host
+  entity_axis.
+- Parity on this worktree: 330/480 features, 32/55 documents.
+
 **State 11-04 09:51 UTC.**
 - Landed: motor-mount-jack as live to the end (915bffd1 with its fix-forward 480bdf02: a face pattern's cap on a curved
   face only where the faces leave one face all round, the gusset mirror as before; the seam movers check the rebuilt
