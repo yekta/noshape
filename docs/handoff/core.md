@@ -39,6 +39,10 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   pipeflange's countersink rims (the cone's and the hole cylinder's seams would have to move together; ticket).
 
 **State 11-04 13:23 UTC.**
+- From dx (11-04 19:28): bend centerline wires (live 2015): done in the FeatureScript host's sheet metal rebuild (a
+  hidden wire per bend in the flat, associated with its joint; @evSheetMetalBendUp from the flat's bend line). The
+  native path (NOSHAPE_STD_SHEET_METAL=0) makes none. A flipped flange's joint edge has no association here
+  (SM-FLIPPED-JOINT-ASSOCIATION, dx's: attributes not following the edge the flange moves).
 - From dx (11-04 18:31): TAB-RIPPED-CORNER (TICKETS, P1): a Tab into a 2-flange plate's ripped corner does nothing
   here (live fills the corner, +40.4 mm³); repro T2 sheetmetal_std::a_tab_into_a_ripped_corner_fills_it_from_its_flange.
   And for later: our sheet metal makes no bend centerline wire bodies (live's flat has "Bend line 1/2" wires, request
