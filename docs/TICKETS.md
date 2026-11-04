@@ -76,6 +76,20 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-04 05:00 release (qa list 03:14, checked on newest green 56a0f49b)
+- **qa 03:14: no new blocker; nothing new since v0.4.24 needs the cut stopped.** On green 56a0f49b: CLI round trip Parasolid /
+  ACIS / STEP / IGES / JT / Rhino 67643.716875 / 18 (= v0.4.24); volume sweep = v0.4.24; the 44 ticket documents = v0.4.24
+  but five fuzz documents ≤ 1e-6 relative (2ac2afb7, same parts and faces); fixed tickets hold (SM-CLOSED-BUTT,
+  RUST-MIRROR-NEGATIVE, CRASH-957, wf-block, cli-shell-gpf, slow1151 1.4 s); the user's four cases pass (knurl CP12 10.2 s
+  11598.041; vase 47331.776 / 58694.861 / 63464.509; split-and-chamfer; Y Ribs). Greens since the cut checked one by one
+  (sweep + ticket documents + dx's cf corpus): no geometry change. Verified since v0.4.24: SKETCH-TOOL-PICK-SELECTION,
+  REGEN-SPEED's third undo (cached, 1.2 ms; was 207 ms). Interaction suite 124/136 of live's recordings (the rest owned,
+  SCORE.md). Fuzz: v0.4.24 120 seeds 0 deaths; greens 1fda3bc9 / c4d5d8af / 444855b1 / eed2bdc8 / d347d276 300 seeds, one
+  death (seed 3151, below).
+- **Open P0, already in v0.4.24 (not new to this cut): CRASH-3151** (core) — fuzz seed 3151's saved document aborts the app
+  and CLI on open (OCCT fillet → TopOpeBRepBuild, heap corrupt): v0.4.24 3 / 3, green 56a0f49b 3 / 3; v0.4.23 opens it
+  (its features fail earlier). Also open, not new: P0 CRASH-2045 (same OCCT fillet family), P1 DIALOG-SWITCH-DISCARDS-NEW.
+
 ## Release blockers for the 2026-11-03 17:00 release (qa list 15:47, newest green 45c8921d, checked on 19c09884)
 - **qa 18:00: core's one-face-pattern Feature pattern / mirror (2ac2afb7, after the v0.4.24 cut)**: volume sweep = v0.4.23; of the 44 ticket documents five fuzz documents move by ≤ 0.08 mm³ (≤ 1e-6 relative: bop-pairs-gpf-5267, cli-fillet-hang, cli-suppress-segv Part 5, draft-pool-hang-2133 / -b184), same parts and face counts; within live's band, not a ticket.
 - **qa 16:28: still no blocker on green 51469a47** (FeatureList Reapply, surface Extrude of every curve): volume sweep = v0.4.23, the 44 ticket documents = 19c09884; cf-parameter-pattern and cf-wave-spring build (Part 1 922.9366 / 11 as live at Extrude 2; Wave Spring 916.60 mm³, live 916.53).
