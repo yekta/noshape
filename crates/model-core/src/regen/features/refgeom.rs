@@ -215,6 +215,11 @@ fn origin_csys(ev: &EvalCtx, r: &Reference, inference: &str, secondary: &[Refere
             }
             Ok(Csys::new(DVec3::ZERO, DVec3::Z, Some(DVec3::X)))
         }
+        // A sketch region: as its face (cf-transform-pattern's Mate connector 8, live: its centroid).
+        Reference::SketchRegion { .. } => {
+            let face = ev.profiles(one)?.into_iter().next().ok_or_else(|| not_found("sketch region"))?.shape;
+            face_csys(ev, &face, inference, secondary)
+        }
         _ => err("Failed to resolve mate connector origin."),
     }
 }

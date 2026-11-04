@@ -148,6 +148,28 @@ fn mate_connector_on_face_with_offset_drives_plane_and_sketch() {
     assert!(near(bb.center().x, 0.055, 1e-6));
 }
 
+/// A mate connector on a sketch region (cf-transform-pattern's Mate connector 8): at its centroid, Z along the
+/// sketch's normal.
+#[test]
+fn mate_connector_on_a_sketch_region() {
+    let mut s = block();
+    let mut sk = noshape_sketch::Sketch::new();
+    rect(&mut sk, 0.0, 0.0, 0.04, 0.02);
+    let sketch = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let r = s.ok();
+    let key = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch").regions[0].key.clone();
+    let part = r.context.bodies[0].id.clone();
+    s.add("mateConnector", |p| {
+        p.set("originQuery", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        p.set("entityInferenceType", ParamValue::Enum("CENTROID".into()));
+        p.set("ownerPart", ParamValue::Query(vec![Reference::Body(part)]));
+    });
+    let r = s.ok();
+    let c = &r.context.connectors[0];
+    assert!(vnear(c.origin, DVec3::new(0.02, 0.01, 0.0)), "{:?}", c.origin);
+    assert!(vnear(c.z.abs(), DVec3::Z), "{:?}", c.z);
+}
+
 #[test]
 fn mate_connector_on_edge_origin_and_flips() {
     let mut s = block();

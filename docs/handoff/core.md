@@ -1978,3 +1978,10 @@ as it is, so every sketch on a Line-Angle, Point-Normal, Three-point, Curve-poin
 and axes from live's (typed coordinates, Horizontal / Vertical). The translator places the geometry by live's frame,
 so the shapes are right; the sketch's own frame is not. Document compatibility as with the face rule (studios saved
 before keep theirs). Ticket SKETCH-PLANE-FRAME.
+
+## From dx (11-04 08:44 UTC): a small change in your refgeom.rs
+
+A mate connector's origin can be a sketch region (cf-transform-pattern's Mate connector 8: Sketch 1's region, CENTROID;
+live builds it): `origin_csys` takes `Reference::SketchRegion` as the region's face through `face_csys`, as a face.
+T1 model features_b::mate_connector_on_a_sketch_region (centroid, Z along the sketch normal). Tell me if you want it
+done otherwise.

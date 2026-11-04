@@ -1681,7 +1681,7 @@ impl<'a> Translator<'a> {
         let rest = text.trim_start_matches("query=").trim_start().strip_prefix("makeQuery(id+\"")?;
         let (op, rest) = rest.split_once('"')?;
         let name = rest.split('"').nth(1)?;
-        if !["CAP_FACE", "SWEPT_FACE", "CAP_EDGE", "SWEPT_EDGE"].contains(&name) {
+        if !["CAP_FACE", "SWEPT_FACE", "CAP_EDGE", "SWEPT_EDGE", "CAP_VERTEX"].contains(&name) {
             return None;
         }
         let (op, revolve) = match (op.strip_suffix(".opExtrude"), op.strip_suffix(".opRevolve")) {
@@ -1805,6 +1805,28 @@ impl<'a> Translator<'a> {
         };
         // A line is its two ends; arcs and splines are finely sampled.
         let mid = |c: &Vec<[f64; 2]>| if c.len() == 2 { [(c[0][0] + c[1][0]) / 2.0, (c[0][1] + c[1][1]) / 2.0] } else { c[c.len() / 2] };
+        // A cap's vertex: over the corner the two curves share, on the part the extrude made, the nearest
+        // (start) or farthest (end) along the extrude (cf-transform-pattern's Transform pattern 2).
+        if name == "CAP_VERTEX" {
+            let (a, b) = (curves.first().ok_or("CAP_VERTEX: no curves")?, curves.get(1).ok_or("CAP_VERTEX: one curve")?);
+            let corner = [a[0], a[a.len() - 1]].into_iter().find(|p| [b[0], b[b.len() - 1]].iter().any(|q| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-9)).ok_or("CAP_VERTEX: its curves share no vertex")?;
+            let at = world(corner);
+            let made = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 200 }))?;
+            let parts: Vec<String> = made["faces"].as_array().into_iter().flatten().filter_map(|f| f["part"].as_str().map(str::to_string)).collect();
+            let found = self.call("query_entities", json!({ "kind": "vertices", "limit": 100000 }))?;
+            let k = per_unit(&found["units"]);
+            let on: Vec<(String, f64)> = found["vertices"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|v| v["part"].as_str().is_some_and(|p| parts.iter().any(|x| x == p)))
+                .filter_map(|v| Some((v["id"].as_str()?.to_string(), f3(&v["position"])?.map(|c| c * k))))
+                .filter(|(_, q)| lateral(*q, at) < 1e-6)
+                .map(|(id, q)| (id, dot(sub(q, o), n).abs()))
+                .collect();
+            let pick = if is_start { on.iter().min_by(|x, y| x.1.total_cmp(&y.1)) } else { on.iter().max_by(|x, y| x.1.total_cmp(&y.1)) };
+            return pick.map(|x| x.0.clone()).ok_or_else(|| format!("{name} of {op}: no vertex of ours over {:?} mm", mm(at)));
+        }
         let (kind, key, at) = match name {
             // The edge swept from the vertex the two curves share, else from
             // the `crossing`th point where they cross (an imprinted vertex).

@@ -1605,3 +1605,35 @@ fn a_constraint_to_another_sketchs_line_takes_that_line() {
     let ys: Vec<f64> = g["entities"].as_array().unwrap().iter().filter(|e| e["type"] == "point").filter_map(|e| e["at"][1].as_f64()).map(|y| y * k).collect();
     assert!(!ys.is_empty() && ys.iter().all(|y| (y - 0.01).abs() < 1e-9), "{ys:?} {g}");
 }
+
+/// A written-out cap vertex (`makeQuery(id+"F….opExtrude","CAP_VERTEX",…, two sketch lines …, "isStart":false)`;
+/// cf-transform-pattern's Transform pattern 2): our extrude's end-cap vertex over the lines' shared corner.
+#[test]
+fn a_written_out_cap_vertex_query() {
+    let line = |id: &str, a: [f64; 2], b: [f64; 2]| {
+        let l = ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2)).sqrt();
+        json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "startParam": 0.0, "endParam": l,
+            "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": a[0], "pntY": a[1], "dirX": (b[0] - a[0]) / l, "dirY": (b[1] - a[1]) / l } })
+    };
+    let entities = json!([line("b", [0.0, 0.0], [0.02, 0.0]), line("r", [0.02, 0.0], [0.02, 0.01]), line("t", [0.02, 0.01], [0.0, 0.01]), line("l", [0.0, 0.01], [0.0, 0.0])]);
+    let region = json!({ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": "FS1", "queryString": "" });
+    let (mut features, mut live) = one_extrude("FS1", entities, region, json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 6, "edges": 12, "vertices": 8, "volume": 0.02 * 0.01 * 0.01 }));
+    let text = "query=makeQuery(id+\"FE1.opExtrude\",\"CAP_VERTEX\",EntityType.VERTEX,{\"disambiguationData\":[originalSetDisambiguation([sketchEntityQuery(id+\"FS1.wireOp\",EntityType.EDGE,\"t\"),sketchEntityQuery(id+\"FS1.wireOp\",EntityType.EDGE,\"r\")])],\"isStart\":false});";
+    features["features"].as_array_mut().unwrap().push(json!({ "btType": "BTMFeature-134", "featureType": "mateConnector", "featureId": "FM1", "name": "Mate connector 1", "parameters": [
+        { "btType": "BTMParameterEnum-145", "parameterId": "originType", "value": "ON_ENTITY" },
+        { "btType": "BTMParameterQueryList-148", "parameterId": "originQuery", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JIc"], "queryString": text }] },
+        { "btType": "BTMParameterEnum-145", "parameterId": "entityInferenceType", "value": "POINT" }] }));
+    live.push(json!({ "index": 2, "status": "OK", "parts": [] }));
+    let mut ctx = Ctx::new();
+    let path = scratch("cap-vertex.noshape");
+    let mut t = Translator::open(&mut ctx, &path, &features, Default::default()).unwrap();
+    for k in 0..2 {
+        assert!(t.step(k).ours.is_some());
+    }
+    let s = t.step(2);
+    assert!(s.problems.is_empty(), "{:?}", s.problems);
+    let f = t.call("feature_get", json!({ "feature": s.ours.unwrap() })).unwrap();
+    let picked = f["params"]["originQuery"][0].as_str().unwrap().to_string();
+    let corner = t.call("query_entities", json!({ "kind": "vertices", "near": [20.0, 10.0, 10.0], "limit": 1 })).unwrap();
+    assert_eq!(corner["vertices"][0]["id"].as_str(), Some(picked.as_str()), "{corner}");
+}

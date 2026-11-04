@@ -173,6 +173,15 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const bodies = size(evaluateQuery(context, qOwnerBody(qCreatedBy(sub + "x", EntityType.FACE))));
             check("opPattern of a sheet's hole", size(faces) == 1 && bodies == 1 && abs(a - (400 - 16 * PI) * mm ^ 2) < 1e-9 * meter ^ 2, [size(faces), bodies, a]);
         });
+        step(context, id, "patternSketchRegion", function(sub) {
+            // A part pattern of a sketch region copies its sketch (its owner), no part (cf-transform-pattern's Transform pattern 4).
+            const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, 930) * mm, vector(0, 0, 1)) });
+            skCircle(sk, "c", { "center" : vector(0, 0) * mm, "radius" : 2 * mm });
+            skSolve(sk);
+            const parts = size(evaluateQuery(context, qAllModifiableSolidBodies()));
+            opPattern(context, sub + "p", { "entities" : qSketchRegion(sub + "sk"), "transforms" : [transform(vector(10, 0, 0) * mm)], "instanceNames" : ["1"] });
+            check("opPattern of a sketch region", size(evaluateQuery(context, qAllModifiableSolidBodies())) == parts, size(evaluateQuery(context, qAllModifiableSolidBodies())));
+        });
         step(context, id, "collisionWires", function(sub) {
             // Wire bodies collide where their edges meet (std Fill pattern's border check).
             fCuboid(context, sub + "a", { "corner1" : vector(0, 0, 950) * mm, "corner2" : vector(10, 10, 960) * mm });

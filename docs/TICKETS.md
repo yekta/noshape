@@ -3492,6 +3492,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (edgeChangeHoles, patternSheetHoles, collisionWires, qContainsPoint), featurescript tests::arithmetic_and_strings.
   Its first Fill pattern still takes ~34 s (live's whole document 4.7 s): PARITY-SPEED. The two FeatureScript 392
   pattern studios now translate whole and fail on checkInput (FS-OLD-STD-COMPAT), as counted.
+  dx 11-04 08:44: cf-transform-pattern 14 -> 20/21 (custom 4/5): a mate connector on a sketch region (core's
+  refgeom.rs, T1 features_b::mate_connector_on_a_sketch_region), the translator's written CAP_VERTEX (T1
+  parity::a_written_out_cap_vertex_query), opPattern of a sketch region copies its sketch, no part, as live (T1
+  ops_harness patternSketchRegion). Left: Transform pattern 7's in-feature mate connector (translation).
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our

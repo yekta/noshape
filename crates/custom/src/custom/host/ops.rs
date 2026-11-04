@@ -701,7 +701,16 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     if transforms.len() > 2500 {
         return Err(raise_error(i, "PATTERN_INPUT_TOO_MANY_INSTANCES", None));
     }
-    let sketch_refs: Vec<crate::reference::FeatureId> = refs.iter().filter_map(|r| if let Reference::Sketch(f) = r { Some(*f) } else { None }).collect();
+    // Sketches, and the sketches of regions and sketch entities (a part pattern copies their owner, the sketch
+    // body: cf-transform-pattern's Transform pattern 4 makes no part in live).
+    let mut sketch_refs: Vec<crate::reference::FeatureId> = Vec::new();
+    for r in &refs {
+        if let Reference::Sketch(f) | Reference::SketchRegion { sketch: f, .. } | Reference::SketchEntity { sketch: f, .. } = r
+            && !sketch_refs.contains(f)
+        {
+            sketch_refs.push(*f);
+        }
+    }
     let only_edges = !refs.is_empty() && refs.iter().all(|r| matches!(r, Reference::Edge(_)));
     let (made, sketches) = run_op(i, &cx, &id, "PATTERN_BODY_FAILED", |ev| {
         // A sheet's hole loops (std sheet metal's edge pattern: a Fill pattern of holes): the holes cut again
