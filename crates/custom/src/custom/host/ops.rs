@@ -327,7 +327,9 @@ fn orient_like(ev: &mut EvalCtx, bi: usize, (p, n): (DVec3, DVec3)) -> FResult<(
     let body = ev.ctx.bodies[bi].clone();
     let old = body.shape.faces();
     let sewn = k::sew(&old, 1e-6, false).ok().map(|s| s.shape).filter(|s| s.count(ShapeType::Face) == old.len()).unwrap_or_else(|| body.shape.clone());
-    let joined = sewn.count(ShapeType::Edge) < body.shape.count(ShapeType::Edge);
+    // Joined: more edges shared by two faces (a flange along part of a plate's edge splits that edge to share it).
+    let shared = |s: &Shape| s.edge_faces().map(|ef| ef.iter().filter(|f| f.len() == 2).count()).unwrap_or(0);
+    let joined = shared(&sewn) > shared(&body.shape);
     let Ok(mut fixed) = sewn.faces_oriented_consistently() else { return Ok(()) };
     let at_p = |f: &Shape| k::make_vertex(p).ok().and_then(|v| k::distance(&v, f).ok()).is_some_and(|d| d.distance < 1e-7);
     if fixed.faces().iter().find(|f| at_p(f)).is_some_and(|f| f.normal_at_point(p).is_ok_and(|m| m.dot(n) < 0.0)) {

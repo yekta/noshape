@@ -3913,6 +3913,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   surface"); the face profiles' path has it (prism until). Also done for it: opFillet createDetachedSurface (std's
   bendAngle measures a temporary detached fillet; ours filleted the sheet itself and failed), sheets extruded from a
   chain of curves sewn one way round.
+  dx 11-04 21:39: cf-sheet-metal-shaped-flange's Shaped Flange 1 (flange a separate part, 78,922 vs 92,510 mm³):
+  the definition sheet joins (the flange shares its partial edge with the base), but `addEdge` (its transient
+  query ∪ startTracking) resolves to two edges after flangeEdgeChange + flange_boolean: the moved joint edge (z 2.5,
+  two faces) and a stale one-face edge where the edge was before the move (z 5, another body); the transient alone
+  gives both (our tracking follows the move and also what lies at the old place). createBendAttribute then fails
+  (bendAngle "Expects 2-sided edge"), no bend: our rebuild leaves the flange apart. The flangeEdgeChange's own input
+  resolves to a sketch entity plus the edge. Next: a moved edge's transient id resolving to where it went only (as
+  the Hem's `hemEdges` does), then the bend.
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our
