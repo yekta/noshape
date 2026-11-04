@@ -18,6 +18,8 @@ pub struct Hooks {
     /// Import files…'s "Import to Onshape" modal for these CAD files; Import calls back with the options and whether to
     /// split them into a document each.
     pub import_dialog: fn(Vec<PathBuf>, ImportCallback, &mut Window, &mut App),
+    /// The app's rows of the Help menu (Install command line tool…, Connect to coding agents…).
+    pub help_items: fn(crate::os_menu::OsMenu) -> crate::os_menu::OsMenu,
 }
 
 /// What Import does with the modal's options (and "Split into multiple documents").
@@ -44,6 +46,10 @@ pub fn open_document_at(path: PathBuf, tab: noshape_model::document::TabId, gpu:
 
 pub fn import_dialog(paths: Vec<PathBuf>, on_import: ImportCallback, window: &mut Window, cx: &mut App) {
     (hooks().import_dialog)(paths, on_import, window, cx)
+}
+
+pub fn help_items(menu: crate::os_menu::OsMenu) -> crate::os_menu::OsMenu {
+    (hooks().help_items)(menu)
 }
 
 pub fn build_label() -> String {

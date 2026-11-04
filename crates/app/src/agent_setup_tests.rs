@@ -4,7 +4,7 @@
 
 use super::{Agent, Arc, CHECK_TIMEOUT, Check, CheckFuture, Checker, ConnectCodingAgents, Duration, Env, Scope, What, file_checks, init, install, open_with};
 use gpui_kit::component::WindowExt as _;
-use gpui_kit::{AnyWindowHandle, AppContext as _, Bounds, IntoElement, Point, Render, Styled as _, TestAppContext, Window, WindowBounds, WindowOptions, div, px, size};
+use gpui_kit::{AnyWindowHandle, AppContext as _, ParentElement as _, Bounds, IntoElement, Point, Render, Styled as _, TestAppContext, Window, WindowBounds, WindowOptions, div, px, size};
 
 struct Blank;
 
@@ -83,4 +83,32 @@ fn the_menu_actions_open_the_dialog(cx: &mut TestAppContext) {
     cx.update_window(w, |_, window, cx| window.dispatch_action(Box::new(ConnectCodingAgents), cx)).unwrap();
     cx.run_until_parked();
     assert!(cx.update_window(w, |_, window, cx| window.has_active_dialog(cx)).unwrap(), "no dialog after the menu action");
+}
+
+struct HelpHost;
+
+impl Render for HelpHost {
+    fn render(&mut self, _: &mut Window, cx: &mut gpui_kit::Context<Self>) -> impl IntoElement {
+        div().size_full().child(noshape_start_ui::start_window::help_menu(cx))
+    }
+}
+
+/// The start window's ? Help menu (lead 11-04: the agent items couldn't be reached from it) opens on a click and
+/// lists the app's two items.
+#[gpui::test]
+fn the_start_windows_help_menu_lists_the_agent_items(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::init);
+    crate::register_start_hooks();
+    let bounds = Bounds { origin: Point::default(), size: size(px(900.), px(700.)) };
+    let w = cx.update(|cx| gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |_, cx| cx.new(|_| HelpHost)).unwrap().0);
+    draw(cx, w);
+    let menu = noshape_start_ui::start_window::HELP_MENU;
+    let mut vcx = gpui_kit::VisualTestContext::from_window(w, cx);
+    let b = vcx.debug_bounds(menu).expect("the Help button");
+    vcx.simulate_click(b.center(), gpui_kit::Modifiers::default());
+    draw(cx, w);
+    let rows = cx.update(|cx| noshape_app_core::os_ui::open_dropdown_labels(menu, cx)).expect("the Help menu is open");
+    for item in ["Install command line tool…", "Connect to coding agents…"] {
+        assert!(rows.iter().any(|r| r == item), "{item} in {rows:?}");
+    }
 }

@@ -662,6 +662,12 @@ pub fn dropdown_open(id: &str, cx: &App) -> bool {
     OPEN_DROPDOWNS.with(|o| o.borrow().get(id).is_some_and(|m| crate::os_menu::is_open_menu(m, cx)))
 }
 
+/// The rows of dropdown `id`'s open menu, if it is open (tests).
+pub fn open_dropdown_labels(id: &str, cx: &App) -> Option<Vec<String>> {
+    let menu = OPEN_DROPDOWNS.with(|o| o.borrow().get(id).cloned())?;
+    crate::os_menu::is_open_menu(&menu, cx).then(|| menu.upgrade()).flatten().map(|m| m.read(cx).labels())
+}
+
 /// A context-menu-style list opening upward from a button at the bottom of
 /// the window, its bottom-right corner on the button's top-right (live
 /// dom/menu-analysis-tools.txt: the Show analysis tools menu).

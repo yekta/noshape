@@ -2322,7 +2322,7 @@ impl StartView {
                     // Live documents/23: the search box is centred between the 220 px left
                     // column and a 388 px right block (x 681–1071 at 1919 px).
                     // The update banner (the app's, start_hooks) beside the account menu, inside the block's fixed width.
-                    .child(div().w(px(388.)).flex_none().flex().justify_end().items_center().gap(px(8.)).pr(px(10.)).child(user_menu(cx))),
+                    .child(div().w(px(388.)).flex_none().flex().justify_end().items_center().gap(px(8.)).pr(px(10.)).child(help_menu(cx)).child(user_menu(cx))),
             )
             .into_any_element()
     }
@@ -3604,6 +3604,25 @@ struct PropsEdit {
 /// Onshape's account button at the top-right (avatar, name, ▾). Its menu
 /// has the local items only: Preferences… (the account page: the name used
 /// as the author in Versions and history, keyboard shortcuts, …).
+/// Onshape's ? Help menu, in the documents page's navbar beside the account menu: its rows, then the app's
+/// (Install command line tool…, Connect to coding agents…, as a document's Help menu has them).
+pub fn help_menu(cx: &App) -> AnyElement {
+    let pal = p();
+    let variant = ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).foreground(pal.text.into()).hover(pal.border.into()).active(pal.border.into()).shadow(false);
+    Button::new("start-help-menu")
+        .custom(variant)
+        .h(px(30.))
+        .px(px(4.))
+        .rounded(px(3.))
+        .child(h_flex().gap(px(5.)).child(crate::assets::icon("help", 20., cx)).child(os::glyph(os::GLYPH_CARET, 8., pal.text)))
+        .os_dropdown_menu(HELP_MENU, false, |m, _, _| crate::start_hooks::help_items(m))
+        .debug_selector(|| HELP_MENU.into())
+        .into_any_element()
+}
+
+/// The Help dropdown's id.
+pub const HELP_MENU: &str = "start-help-menu-dd";
+
 fn user_menu(cx: &App) -> AnyElement {
     let pal = p();
     let name = noshape_store::local_user_name();
