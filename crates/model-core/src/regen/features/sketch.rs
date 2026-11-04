@@ -19,7 +19,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     let Some(plane_ref) = ev.query("sketchPlane").first() else {
         return crate::regen::eval::err_at(&["sketchPlane"], NO_SKETCH_PLANE);
     };
-    let Some(frame) = ev.resolve_plane(plane_ref) else {
+    let Some(frame) = ev.resolve_sketch_plane(plane_ref) else {
         return err("Select a sketch plane.");
     };
     let data = match ev.params.get("sketch") {

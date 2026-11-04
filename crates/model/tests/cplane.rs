@@ -435,3 +435,36 @@ fn preselection_picks_the_plane_type() {
     // Nothing recognisable: the type is left alone.
     assert_eq!(logic(vec![cyl, pts[0].clone(), pts[1].clone()]), "CURVE_POINT");
 }
+
+/// SKETCH-PLANE-FRAME (live cf-fill-pattern, std newSketch): a sketch on a construction plane is framed as std frames
+/// it: the world origin projected onto the plane, x as a face's (±Z: +X; else y = +Z in the plane, x = y × normal),
+/// not the plane's own (here a three-point plane's: origin the points' centroid). A studio saved before keeps those.
+#[test]
+fn a_sketch_on_a_plane_takes_std_newsketchs_frame() {
+    for legacy in [false, true] {
+        let mut s = Studio::new();
+        s.ps.legacy_plane_sketch_frames = legacy;
+        let mut sk = noshape_sketch::Sketch::new();
+        let ids: Vec<_> = [(10.0, 0.0), (10.0, 30.0), (40.0, 0.0)].iter().map(|&(x, y)| sk.add_point(DVec2::new(mm(x), mm(y)))).collect();
+        let sid = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+        let pts: Vec<Reference> = ids.iter().map(|&e| Reference::SketchEntity { sketch: sid, entity: e.0 }).collect();
+        let a = s.plane(|p| {
+            p.set("cplaneType", en("THREE_POINT"));
+            p.set("entities", qs(pts));
+        });
+        let k = s.sketch(Reference::FeaturePlane(a), noshape_sketch::Sketch::new());
+        let r = s.ok();
+        let (plane, _, _) = Studio::frame(&r, a);
+        let f = r.context.sketches.iter().find(|x| x.feature == k).unwrap().frame;
+        assert!(near3(f.normal, plane.normal), "{f:?}");
+        if legacy {
+            assert!(near3(f.origin, plane.origin) && near3(f.x, plane.x), "{f:?} vs {plane:?}");
+        } else {
+            let n = plane.normal;
+            assert!(near3(f.origin, n * plane.origin.dot(n)), "{f:?}");
+            let want_x = if n.z.abs() > 1.0 - 1e-12 { DVec3::X } else { (DVec3::Z - n * n.z).normalize().cross(n) };
+            assert!(near3(f.x, want_x) && near3(f.y, n.cross(want_x)), "{f:?}");
+            assert!(!near3(f.origin, plane.origin), "the plane's own origin is elsewhere: {plane:?}");
+        }
+    }
+}

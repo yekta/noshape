@@ -619,6 +619,24 @@ impl<'a> EvalCtx<'a> {
         })
     }
 
+    /// A sketch's frame on a plane-like reference: std newSketch's on a construction plane (the world origin projected
+    /// onto it, axes as a face's: live cf-fill-pattern's sketches on Line-Angle planes), the plane's own elsewhere;
+    /// pattern transform applied after.
+    pub fn resolve_sketch_plane(&self, r: &Reference) -> Option<PlaneFrame> {
+        let base = self.qv_first(r).unwrap_or_else(|| r.clone());
+        if self.ctx.legacy_plane_sketch_frames || !matches!(base, Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }) {
+            return self.resolve_plane(r);
+        }
+        let f = self.raw_plane(&base)?;
+        let n = f.normal;
+        let x = PlaneFrame::face_x(n);
+        let canonical = PlaneFrame { origin: n * f.origin.dot(n), x, y: n.cross(x), normal: n };
+        Some(match &self.xform {
+            Some(m) => transform_frame(&canonical, m),
+            None => canonical,
+        })
+    }
+
     /// Like [`Self::resolve_plane`] without the pattern transform.
     pub fn raw_plane(&self, r: &Reference) -> Option<PlaneFrame> {
         match r {

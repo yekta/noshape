@@ -3297,7 +3297,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   learning-center-devon Sketch 3 on a top face (z 50.8): ours x (−1, 0, 0), live (1, 0, 0).
   Ours takes OCCT's plane x (eval.rs raw_plane, Reference::Face). parity_models now counts a sketch frame that isn't
   live's as a difference. /root/dx-scratch/frames.py lists them (CLI against the rebuilt documents). (dx 2026-11-03)
-- [ ] P2 SKETCH-PLANE-FRAME (core; dx's parity suite 11-04, cf-fill-pattern) a sketch on a construction plane takes
+- [x] (core 11-04 10:43: a sketch on a construction plane (FeaturePlane / ConstructionPlane, also through a query variable) is framed as std newSketch frames it: the world origin projected, x by the face rule (eval.rs resolve_sketch_plane; the pattern transform after); studios saved before keep the plane's frame (ScopeRule 9, legacy_plane_sketch_frames). T1 model cplane::a_sketch_on_a_plane_takes_std_newsketchs_frame (a three-point plane, and legacy). Parity unchanged (330/480): cf-fill-pattern stops before at Plane 1's translation) P2 SKETCH-PLANE-FRAME (core; dx's parity suite 11-04, cf-fill-pattern) a sketch on a construction plane takes
   the plane's own frame (eval.rs raw_plane, FeaturePlane / ConstructionPlane); live's is std newSketch's for every plane
   that isn't a mate connector: the world origin projected onto it, axes by alignCanonically (SKETCH-FACE-FRAME's rule).
   cf-fill-pattern Sketch 1 on a Line-Angle plane through a sloped line on Front: ours origin (107.06, 0, 33.75) mm,

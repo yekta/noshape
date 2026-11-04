@@ -95,13 +95,14 @@ impl Feature {
 /// chamfers by noshape's own blends where they build them exactly
 /// ([`PartStudio::legacy_blends`]); 7, the topology clean-ups of 11-03
 /// ([`PartStudio::legacy_topology`]); 8, a planar face's frame as Onshape's evPlane gives it
-/// ([`PartStudio::legacy_face_frames`]); 0, older studios.
+/// ([`PartStudio::legacy_face_frames`]); 9, a sketch on a construction plane in std newSketch's frame
+/// ([`PartStudio::legacy_plane_sketch_frames`]); 0, older studios.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScopeRule(pub u8);
 
 impl Default for ScopeRule {
     fn default() -> Self {
-        ScopeRule(8)
+        ScopeRule(9)
     }
 }
 
@@ -298,6 +299,11 @@ pub struct PartStudio {
     /// 1897): its faces keep OCCT's plane x, so sketches on them and planes from them stay where they were.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub legacy_face_frames: bool,
+    /// Saved with features before sketches on construction planes took std newSketch's frame (ScopeRule < 9: the
+    /// world origin projected, axes as a face's, live cf-fill-pattern): their sketches keep the plane's own frame, so
+    /// their geometry stays where it was.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub legacy_plane_sketch_frames: bool,
     /// Rollback bar position: number of features evaluated (None = all).
     #[serde(default)]
     pub rollback: Option<usize>,
@@ -507,6 +513,10 @@ impl PartStudio {
         // And with OCCT's frames on planar faces.
         if self.scope_rule.0 < 8 && !self.features.is_empty() {
             self.legacy_face_frames = true;
+        }
+        // And with the planes' own frames for sketches on them.
+        if self.scope_rule.0 < 9 && !self.features.is_empty() {
+            self.legacy_plane_sketch_frames = true;
         }
         self.scope_rule = ScopeRule::default();
     }
