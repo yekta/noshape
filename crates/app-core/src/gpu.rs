@@ -493,6 +493,9 @@ mod metal {
                 let () = objc2::msg_send![&*layer, setDevice: &*raw_device];
                 let () = objc2::msg_send![&*layer, setPixelFormat: BGRA8_UNORM];
                 let () = objc2::msg_send![&*layer, setFramebufferOnly: false];
+                // Not paced by the display: the render thread doesn't wait a refresh for a drawable (it serves picks
+                // and other viewports too); the compositor shows the newest frame at each refresh.
+                let () = objc2::msg_send![&*layer, setDisplaySyncEnabled: false];
                 let queue: Option<Retained<AnyObject>> = objc2::msg_send![&*raw_device, newCommandQueue];
                 Some(Self { layer, queue: queue?, state: Default::default() })
             }
