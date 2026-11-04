@@ -650,6 +650,8 @@ fn differences_use_lives_bands() {
     let d = differences(&[live.clone()], &[part(1.002e-6, 7)]);
     assert!(d.iter().any(|x| x.contains("7/12/8 faces/edges/vertices, live 6/12/8")) && d.iter().any(|x| x.contains("volume")), "{d:?}");
     assert_eq!(differences(&[live.clone()], &[]), ["0 parts, live 1"]);
+    let d = differences(&[], &[part(1e-6, 6)]);
+    assert!(d.len() == 2 && d[1].starts_with("not in live: ") && d[1].contains("6/"), "{d:?}");
     // The same counts but other geometry: a fillet face live makes a cylinder.
     let kinds = |pairs: &[(&str, usize)]| Some(pairs.iter().map(|(k, n)| (k.to_string(), *n)).collect());
     let (mut a, mut b) = (live.clone(), part(1.0e-6, 6));

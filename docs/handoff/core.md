@@ -39,6 +39,15 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   pipeflange's countersink rims (the cone's and the hole cylinder's seams would have to move together; ticket).
 
 **State 11-04 13:23 UTC.**
+- From dx (11-04 19:53): cf-spur-gear (×1.8 live after dx's fix of its extra part): every slow millisecond is in
+  core's kernel operations; the FeatureScript side and the host take ~3 ms per gear. NOSHAPE_PERF, one run on vibe5:
+  Boolean 2 (Cut × 1 tool) kernel 698 ms + unify 887 ms (the unify alone is 40 % of live's whole document,
+  2112 ms); the Spur Gear's "hobbed" opBoolean (blank minus N swept / extruded B-spline tooth tools) kernel 115 ms
+  (9 tools) … 482 ms (65 tools); its double-helical root opFillet 277 ms; the "double" union 46 ms; Boolean 1
+  500 ms vs live's 34 ms. Topology (P1, wrong face count): the double-helical gear (20 teeth, FULL root fillet:
+  the fillet circle touches both flanks and the root) has 226/612/388 faces/edges/vertices, live 186/512/328:
+  the two root fillets of each gap lie on one surface, live gives one face per half-gap where ours keeps two
+  (8 B-spline faces per gap, live 6). Repro: `NOSHAPE_PARITY_ONLY=cf-spur-gear` parity_models.
 - From dx (11-04 19:28): bend centerline wires (live 2015): done in the FeatureScript host's sheet metal rebuild (a
   hidden wire per bend in the flat, associated with its joint; @evSheetMetalBendUp from the flat's bend line). The
   native path (NOSHAPE_STD_SHEET_METAL=0) makes none. A flipped flange's joint edge has no association here

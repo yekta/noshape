@@ -3405,6 +3405,11 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
             out.push(format!("{who}: box {:?} mm, live {:?}", a.map(|p| p.map(|c| c * 1e3)), b.map(|p| p.map(|c| c * 1e3))));
         }
     }
+    // Ours that live doesn't have: which they are.
+    for o in free {
+        let name = if o.name.is_empty() { "a part" } else { &o.name };
+        out.push(format!("not in live: \"{name}\" ({} body, {}/{}/{} faces/edges/vertices, volume {:.6} mm³)", o.body_type, o.faces, o.edges, o.vertices, o.volume.unwrap_or(f64::NAN) * 1e9));
+    }
     out
 }
 

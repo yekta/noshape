@@ -932,10 +932,6 @@ impl<'a> QueryCx<'a> {
 
 // ---------------------------------------------------------------- evaluation
 
-fn same_box(a: &noshape_sketch::BBox, b: &noshape_sketch::BBox) -> bool {
-    (a.min - b.min).length() < 1e-9 && (a.max - b.max).length() < 1e-9
-}
-
 /// A large planar face on a plane (for distance and intersection tests).
 pub fn plane_face(p: &PlaneFrame) -> Result<Shape, k::KernelError> {
     k::make_plane_face(&crate::regen::eval::kernel_plane(p), -1e3, 1e3, -1e3, 1e3)
@@ -1276,8 +1272,12 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
                         if sk.imprinted.get(i).copied().unwrap_or(false) {
                             continue;
                         }
-                        // Inner loops: regions inside another region's hole.
-                        if filter_inner && sk.regions.iter().any(|o| o.holes.iter().any(|h| same_box(&h.bbox(), &r.outer.bbox()))) {
+                        // Inner loops: regions lying in another region's hole (one of several inside a hole too: a
+                        // bore with a keyway, the Spur Gear's).
+                        if filter_inner && {
+                            let p = r.interior_point();
+                            sk.regions.iter().any(|o| o.holes.iter().any(|h| h.contains(p)))
+                        } {
                             continue;
                         }
                         out.push(Ent::SketchRegion(s, encode_region_key(&r.id)));

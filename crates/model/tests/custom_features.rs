@@ -3588,3 +3588,34 @@ fn bend_centerline_case(flip: bool, up: &str) {
         assert!(r.context.bodies.iter().all(|b| b.kind != noshape_model::display::BodyKind::Wire || r.display.bodies.iter().all(|d| d.id != b.id)), "the wire is hidden");
     }
 }
+
+/// qSketchRegion(id, true) leaves out every region in another's hole, also when a hole holds several (a bore with a
+/// keyway, the Spur Gear's blank): cf-spur-gear's gear is one part with neither, as live.
+#[test]
+fn inner_loops_filter_every_region_in_a_hole() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Keyway probe" }
+export const keywayProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        const s = newSketchOnPlane(context, id + "s", { "sketchPlane" : plane(vector(0, 0, 0) * millimeter, vector(0, 0, 1)) });
+        skCircle(s, "outer", { "center" : vector(0, 0) * millimeter, "radius" : 22 * millimeter });
+        skPolyline(s, "keyway", { "points" : [vector(1.5, 0) * millimeter, vector(1.5, 6.5) * millimeter, vector(-1.5, 6.5) * millimeter, vector(-1.5, 0) * millimeter] });
+        skCircle(s, "bore", { "center" : vector(0, 0) * millimeter, "radius" : 5 * millimeter });
+        skSolve(s);
+        const all = size(evaluateQuery(context, qSketchRegion(id + "s")));
+        const outer = size(evaluateQuery(context, qSketchRegion(id + "s", true)));
+        if (all != 3 || outer != 1)
+            throw regenError("regions " ~ all ~ ", without inner loops " ~ outer);
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("keywayProbe"), &fx.units).unwrap();
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
+}
