@@ -570,16 +570,16 @@ impl FeatureDialog {
         let active = self.active_query.clone();
         self.set_value_auto(path, v, cx);
         self.focus_new_empty_field(&shown);
-        // A selection field the edit brought up and activated takes the keyboard from the control clicked: from a tab
-        // always (live ui-parity edit-feature-remove-tab: Remove, Merge scope focused), from a checkbox when the
-        // field active before went away (shell-hollow-toggle: Hollow ticked, "Parts to hollow" focused; linear-
-        // pattern-two-directions: Second direction ticked, the checkbox keeps it), from a dropdown never
-        // (mirror-feature-type: Feature mirror chosen, the select focused).
+        // A selection field the edit brought up and activated takes the keyboard from the control clicked (live 1983,
+        // by hand, per control): from a tab always (Remove: Merge scope focused); from a checkbox when the field
+        // active before went away (Hollow: "Parts to hollow" focused; Second direction: the checkbox keeps it); from
+        // a dropdown when that field stays (Chamfer's Two distances: Direction overrides focused; Feature mirror,
+        // replacing Entities to mirror: the select keeps it).
         let kind = self.spec_for_path(path).map(|s| (matches!(s.kind, ParamKind::Enum { .. }), s.hints.has(Hints::HORIZONTAL_ENUM)));
         let before_gone = active.as_deref().is_none_or(|a| !self.visible_selection_fields().contains(&a));
         let takes = match kind {
             Some((true, true)) => true,
-            Some((true, false)) => false,
+            Some((true, false)) => !before_gone,
             _ => before_gone,
         };
         if takes && self.active_query != active && self.active_query.as_ref().is_some_and(|q| !shown.contains(&q.as_str())) {
