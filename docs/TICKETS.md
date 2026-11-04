@@ -376,7 +376,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   parallel BRepCheck of the fillet's result reads a face it can't classify (a null / freed pcurve?). Deterministic and
   fast: the easiest of the fuzz crashes to run under ASan. live: a failing fillet fails with a message; ours: the process
   dies. (qa 2026-11-04 04:29, builds v0.4.23 / v0.4.24 / 56a0f49b)
-- [ ] P0 CRASH-3151 (core; OCCT fillet heap corruption, same family as CRASH-2045) **a saved document crashes the app and
+- [ ] P0 CRASH-3151 (core; OCCT fillet heap corruption, same family as CRASH-2045) **core 11-04 07:05: found and patched,
+  lib sync asked (lead)**: valgrind on its Fillet 6 alone (3 edges R12, the dump in /root/core-scratch/c3151/dump/fillet-4)
+  names TopOpeBRepBuild_Builder::BuildEdges: it counts the point interferences in an array of the points (0..np) and
+  two of its three increments take a support / geometry index past np: writes past the array (ChFi3d's corner build).
+  OCCT patch 0021 (patches/occt/0021-topopebrepbuild-buildedges-bounds.patch) bounds them; libTKBool.a built on vibe4
+  (~/agents/core-occt) and in /root/occt (the old one /root/core-scratch/p0021/libTKBool.a.pre0021): the fillet 5 / 5
+  (12 faces, 42765.26 mm³; unpatched it aborted 3 / 3), valgrind 0 errors. **Lead: please sync /root/occt/lib/libTKBool.a
+  to /opt/occt (and CI's OCCT)**; the T1 test lands after that (it aborts on unpatched libraries). CRASH-2045 may be
+  the same write. **a saved document crashes the app and
   the CLI on open in v0.4.24 and on main**: /root/qa-scratch/tickets/crash3151/fz3151-step63.noshape (+ -wal; fuzz seed 3151,
   45 features, the last Fillet 6). `python3 tickets/crash3151/open.py <cli-wrapper>` (document_open + feature_list): the
   CLI aborts `malloc(): unsorted double linked list corrupted` / "noshape: the kernel aborted; not recoverable" in

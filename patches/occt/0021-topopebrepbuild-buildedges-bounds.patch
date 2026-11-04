@@ -1,0 +1,31 @@
+--- a/src/ModelingAlgorithms/TKBool/TopOpeBRepBuild/TopOpeBRepBuild_BuildEdges.cxx
++++ b/src/ModelingAlgorithms/TKBool/TopOpeBRepBuild/TopOpeBRepBuild_BuildEdges.cxx
+@@ -165,7 +165,9 @@
+       {
+         int               is = I->Support();
+         TopOpeBRepDS_Kind ks = I->SupportType();
+-        if (ks == TopOpeBRepDS_POINT)
++        // noshape (patch 0021): within the points' array, as the geometry's count above (a support past it wrote
++        // past the array: heap corruption in ChFi3d's corner build, CRASH-3151).
++        if (ks == TopOpeBRepDS_POINT && is >= 0 && is <= np)
+         {
+           tp.ChangeValue(is) = tp.Value(is) + 1;
+         }
+@@ -193,7 +195,7 @@
+       {
+         int               ig = I->Geometry();
+         TopOpeBRepDS_Kind kg = I->GeometryType();
+-        if (kg == TopOpeBRepDS_POINT)
++        if (kg == TopOpeBRepDS_POINT && ig >= 0 && ig <= np)
+         {
+           tp.ChangeValue(ig) = tp.Value(ig) + 1;
+         }
+@@ -201,7 +203,7 @@
+       {
+         int               is1 = I->Support();
+         TopOpeBRepDS_Kind ks  = I->SupportType();
+-        if (ks == TopOpeBRepDS_POINT)
++        if (ks == TopOpeBRepDS_POINT && is1 >= 0 && is1 <= np)
+         {
+           tp.ChangeValue(is1) = tp.Value(is1) + 1;
+         }
