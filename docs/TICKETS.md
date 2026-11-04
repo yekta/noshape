@@ -1586,7 +1586,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 11-04 06:38: a failing Shell that takes ~10 s (OCCT op_shell_solid, NOSHAPE_KERNEL_PROFILE) on one body and 0.4 s on a
   0.0006 mm³ different one: qa-scratch/tickets/shellslow508/shell14.noshape (fuzz seed 508 to step 14 on v0.4.25; Shell 1
   "Could not shell part with selections.", delete + add again 9.3 s on v0.4.25, 10.3 s on v0.4.24) vs shell14-v24.noshape
-  (the same steps on v0.4.24, body 49633.40226 vs 49633.402857 mm³: 0.4 s on both). /tmp/qa-shadd.py <cli> <doc>. Not a
+  (the same steps on v0.4.24, body 49633.40226 vs 49633.402857 mm³: 0.4 s on both). tickets/shellslow508/shadd.py <cli> <doc>. Not a
   release regression (same time on both builds for the same body); it made seed 508's v0.4.25 session 3x slower.
 - [ ] P0 REGEN-SPEED (core 10-29 03:05: met in release on perf.yml run 40796942944 (main 34cbea98): live-30-features full regen 35 / 41 / 53 ms (macOS / Linux / Windows; budget 80, live 171), its Extrude 1 edit commit 34 / 38 / 60 ms (budget 200), big-plate regen 159 / 230 / 306 ms (live 617); qa, please re-measure the GUI commit on a release build, the 301–785 ms were a dev build at load ~30. Was 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,

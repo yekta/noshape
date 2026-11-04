@@ -17,7 +17,8 @@ pixel-identical to v0.4.24. Open P0s CRASH-3151 (open dies 3 / 3) and CRASH-3388
 bottom ("Updated — restart to finish", Restart, What's new); Restart → 0.4.25, g34 reopened (qa-scratch/upd425-0.png, -1.png).
 Memory: seed 508 peak 771 MB (v0.4.24 652; at the same steps ~120 MB higher), 685 495 MB; the session took 459 s vs 168 s but
 under the smoke's load. A/B back to back (cli/memab.txt): v0.4.24 158 s / 647 MB twice, v0.4.25 494 s / 770 MB — but the
-two sessions diverge from step 6 (the fuzz picks from what the model offers), so it's seed 508's path, not the build: over many
+two sessions run the same ops but v0.4.25's body at step 14 differs by 0.0006 mm³, on which OCCT's failing Shell takes 10 s
+(0.4 s on v0.4.24's body, on either build: SHELL-SLOW note, tickets/shellslow508), so it's seed 508's path, not the build: over many
 seeds (qa 06:30) v0.4.24 mean session 101 / 185 s, greens = v0.4.25's code 94–114 s, mean Shell op 1.6–2.7 s alike.
 Saved ticket documents open in the same time on both (8–35 s). No speed or memory regression in v0.4.25.
 
