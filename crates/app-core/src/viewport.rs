@@ -692,6 +692,11 @@ impl Viewport {
         self.pointer_inside
     }
 
+    /// A hover query is in flight (what is under the pointer isn't known yet).
+    pub fn hover_pending(&self) -> bool {
+        self.hover_query
+    }
+
     /// World-space ray through a viewport-local position.
     pub fn ray(&self, local: DVec2) -> (DVec3, DVec3) {
         self.camera.ray(local, self.size())

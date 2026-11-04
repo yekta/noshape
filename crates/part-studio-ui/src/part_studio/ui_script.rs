@@ -427,6 +427,12 @@ impl PartStudioView {
         self.pending.is_some() || self.context.is_none() || self.ui.preview_task.is_some() || self.ui.std_edit_task.is_some()
     }
 
+    /// The hover under a resting pointer isn't settled yet: a hover query in flight, or an edge's midpoint dwell
+    /// pending (the driver waits for it before pressing, as a hand rests before clicking).
+    pub fn ui_hover_settling(&self, cx: &App) -> bool {
+        self.ui.midpoint_dwell_task.is_some() || self.viewport.read(cx).hover_pending()
+    }
+
     /// Redraw the studio and its dialog, so every named control records where it is now.
     pub fn ui_redraw(&self, cx: &mut Context<Self>) {
         if let Some(e) = &self.edit {

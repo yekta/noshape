@@ -329,6 +329,15 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                         pointer = Some(at);
                         // The graphics area picks what is under the pointer before the press.
                         sleep(cx, if what == "hover" { step["ms"].as_u64().unwrap_or(1500) } else { 500 }).await;
+                        // Then until the hover under the resting pointer has settled (a loaded machine answers the
+                        // hover query late; an edge's midpoint snaps after its dwell).
+                        for _ in 0..40 {
+                            let settling = cx.update(|_, cx| ps.as_ref().is_some_and(|ps| ps.read(cx).ui_hover_settling(cx))).unwrap_or(false);
+                            if !settling {
+                                break;
+                            }
+                            sleep(cx, 50).await;
+                        }
                         let (button, clicks) = match what {
                             "rclick" => (MouseButton::Right, 1),
                             "dblclick" => (MouseButton::Left, 2),
