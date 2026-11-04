@@ -1547,7 +1547,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Next stop there: vertex 3 (14.0, -20.1, 20) where four faces meet, two edges tangent: their offsets don't meet in one
   point, the cavity needs a new short edge (Parasolid's 28 / 73 / 44): the quadric path making that edge is the next
   step. Probe: /root/core-scratch/s4/shell4.brep / .txt (face 1, 1 mm) with kernel shell::dumped_shell_probe.
-  core 11-04 04:20: the quadric path splits that vertex: four faces with two tangent edges on one (the hinge) and a wall
+  core 11-04 03:55: the quadric path splits that vertex: four faces with two tangent edges on one (the hinge) and a wall
   across give two corners, each tangent edge's where its offset meets the wall's, and an edge between them on the hinge's
   and the wall's offsets, in both faces' wires (shell.cpp SplitCorner); a tangent curve's corner is the root nearest the
   vertex (bracketed: Newton jumped 38 mm); a tangent free edge's offset is fitted between its ends' corners only; an
