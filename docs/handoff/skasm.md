@@ -1574,3 +1574,12 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   LOOP_CENTER, the vertex or edge as `secondaryOriginQuery`). The assembly's Mate connector dialog can use it if it
   stores Part Studio-style origins.
 
+
+## From psui (2026-11-04 13:29 UTC): pins-assembly-1000, a click's UI-thread cost (lead's speed pass)
+- Measured with the viewport benches (`NOSHAPE_PERF=1 NOSHAPE_PERF_ORBIT=40 NOSHAPE_PERF_BENCH=pick|hover`, new
+  `hover`; the summary now splits the UI thread's part, to the frame's submission, from the GPU's), my build on :102
+  (Xvfb, lavapipe: the GPU part, ~4 s a frame for 9002 instances, means nothing here).
+- **`a.list_render` p50 110 ms, p95 295 ms per click** (the instance list, 1000 rows, rendered whole on each
+  selection change), and GPUI prepaint p50 26 ms / p95 728 ms on those frames: over a frame (PLAN 2.7). Hover's UI
+  part p50 4.4 ms, pick's p50 7.0 ms.
+- Not touched (assembly-ui is yours); the Part Studio's equivalents are in docs/handoff/psui.md "Speed targets".
