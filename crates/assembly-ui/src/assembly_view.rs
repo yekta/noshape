@@ -6213,8 +6213,8 @@ impl AssemblyView {
                 cx.notify();
             }))
             .on_modifiers_changed(cx.listener(|this, ev: &ModifiersChangedEvent, _, cx| {
-                // Ctrl (tap) cycles the dragged connector in snap mode.
-                let ctrl = ev.modifiers.control;
+                // Ctrl (Cmd on macOS) tap cycles the dragged connector in snap mode.
+                let ctrl = ev.modifiers.control || ev.modifiers.platform;
                 if ctrl && !this.ctrl_down {
                     this.cycle_snap_source(cx);
                 }
