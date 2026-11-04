@@ -372,6 +372,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (r14.35 / r12.1) leaves each rim in three pieces (at the hole cylinder's seam and at its ±x sides); Parasolid's are one
   closed edge each. Seen in kernel_robustness::a_face_pattern_of_a_hole_through_a_tubes_wall (each pattern copy as the
   original). motor-mount-jack's elliptic slots don't show it.
+- [ ] P1 PRIZE-WHEEL-IMPORT-REGRESSION (for dx; core 11-04 09:51) prize-wheel-tim's Extrude 2 went from 20/50/33 (live
+  20/49/32, volume in band) to 21/57/36 and **1088.162 mm³ against live's 1086.572** with main's crates/ops (bisected
+  on vibe5: the tree of 6ed6a9acb plus main's crates/ops reproduces it, plus main's crates/custom doesn't; the change
+  is 75b1e14a9's import mapping, `query_with`: a query whose ids only a sketch body places now goes by its text
+  first). So Extrude 2 (Add, qSketchRegion(Sketch 3, true), booleanScope a packed query) now picks other entities.
+  Still 7/8 features either way, but the part's geometry is off.
 - [ ] P1 FS-QUERY-EDGE-ORDER (for dx; core 11-04 09:31) cf-sheet-metal-overcut-dogbone's Corner Overcut 1 (11 faces /
   10679.314 mm³, live 12 / 10678.612; 8 features after it): createSMOvercut takes `edges[0]` / `edges[1]` of
   `evaluateQuery(qIntersection([qAdjacent(wall, EDGE), qAdjacent(point, VERTEX, EDGE)]))` and compares the point with
