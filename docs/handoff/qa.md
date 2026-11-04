@@ -36,6 +36,11 @@ Restart → `noshape --version` 0.4.23 and g34 reopened (qa-scratch/upd423-0c.pn
 VAR-AUTOCOMPLETE-ENTER's psui fixes, CRASH-2045's saved-document fix; not in it: the later sketch undo, feature-row,
 variable-focus fixes (after bdbba238). Release fuzz on v0.4.23 running (/tmp/qa-cfloop69.sh, seeds 2481–2540).
 
+**11-04 03:14:** 05:00 list written (no new blocker; CRASH-3151 open, in v0.4.24). Loops: green 56a0f49b
+/tmp/qa-nfloop34.sh (3241–3300), /tmp/qa-gfloop17.sh (3301–3340); v0.4.24 /tmp/qa-cfloop73.sh (3341–3400). keep/x/y:
+noshape-56a0f49b, -0531f66e. At publish: /tmp/qa-relsmoke.sh 0.4.25 v0424, /tmp/qa-relgui425.sh, /tmp/qa-mem425.sh (made),
+artifact cmp, the updater on :149 (v0.4.24), tixvol on the release CLI, tickets/crash3151/open.py on it.
+
 **11-04 02:17:** new **P0 CRASH-3151** (core): fuzz seed 3151's saved document aborts the CLI / app on open
 (OCCT fillet → TopOpeBRepBuild, heap corrupt) in v0.4.24 and main, not v0.4.23 (its features fail before) — list it in
 the 04:30 list as open, in v0.4.24 already. Repro tickets/crash3151/open.py. The watch's fuzz baselines now persist
