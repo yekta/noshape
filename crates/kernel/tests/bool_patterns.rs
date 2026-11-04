@@ -580,6 +580,14 @@ fn a_gear_blanks_seam_under_a_tooth_gaps_face() {
     as_recorded("9bcf777667a133d5");
 }
 
+/// motor-mount-jack's Extrude 3 (recorded: a boss fused onto the tube with four elliptic slots through it): OCCT's
+/// result. Each slot is a hole in the tube's cylinders: the region bounded by its loop alone is outside the face, no
+/// point deep inside it sought (86 ms against OCCT's 31 before, with the slot walls' ray patches).
+#[test]
+fn a_tube_with_slots_fused_as_occt() {
+    as_recorded("e104843a9d579bfb");
+}
+
 /// A common keeping a piece of an argument's half circle from its start (recorded): the piece's range from the
 /// edge's own start (its angle a rounding below it went a turn on: "an edge outside its face's range").
 #[test]

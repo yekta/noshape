@@ -1,6 +1,6 @@
 //! The regions a set of curves divides a face's parameter plane into (a face split by the edges on it).
 
-use crate::curve2::{inside, C2};
+use crate::curve2::{inside, ray_misses_box, SpanBoxes, C2};
 use crate::Decline;
 use glam::DVec2;
 use std::f64::consts::{PI, TAU};
@@ -187,37 +187,44 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
 /// at fractions of the way across.
 pub(crate) fn deeper(segs: &[([u32; 2], C2)], r: &Region) -> DVec2 {
     let curves: Vec<C2> = r.outer.iter().chain(r.holes.iter().flatten()).map(|&(s, rev)| if rev { segs[s as usize].1.reversed() } else { segs[s as usize].1.clone() }).collect();
-    // (The nearest curve's distance, the curves taken by how near their boxes are, none farther than the nearest
-    // yet: the same distance, not each curve's (a gear's face, 294 curves round its 42 tooth gaps: 7 s a face). The
-    // boxes hold the curves: their poles' (on a cylinder, the poles' angles where they span less than half a turn:
-    // a convex wedge).)
+    // (The nearest curve's distance: the curve with the nearest box first, then those whose boxes are nearer than
+    // the nearest found yet: the same distance, not each curve's (a gear's face, 294 curves round its 42 tooth gaps:
+    // 7 s a face). The boxes hold the curves: their poles' (on a cylinder, the poles' angles where they span less
+    // than half a turn: a convex wedge).)
     let boxes: Vec<Option<(DVec2, DVec2)>> = curves.iter().map(|c| c.quick_box()).collect();
+    let spans: Vec<SpanBoxes> = curves.iter().map(|c| c.span_boxes2()).collect();
     let depth = |q: DVec2| {
-        let mut order: Vec<(f64, usize)> = boxes.iter().enumerate().map(|(i, b)| (b.map_or(0.0, |(lo, hi)| (lo - q).max(q - hi).max(DVec2::ZERO).length()), i)).collect();
-        order.sort_by(|a, b| a.0.total_cmp(&b.0));
-        let mut best = f64::INFINITY;
-        for (away, i) in order {
-            if away >= best {
-                break;
+        let away: Vec<f64> = boxes.iter().map(|b| b.map_or(0.0, |(lo, hi)| (lo - q).max(q - hi).max(DVec2::ZERO).length())).collect();
+        let first = (0..away.len()).min_by(|&a, &b| away[a].total_cmp(&away[b]));
+        let mut best = first.map_or(f64::INFINITY, |i| curves[i].distance_by(q, Some(&spans[i])));
+        for (i, &a) in away.iter().enumerate() {
+            if a < best && Some(i) != first {
+                best = best.min(curves[i].distance_by(q, Some(&spans[i])));
             }
-            best = best.min(curves[i].distance(q));
         }
         best
     };
     let mut best = (depth(r.inside), r.inside);
     for c in &curves {
+        let len = c.length();
         for t in [0.5, 0.25, 0.75, 0.1, 0.9, 0.02, 0.98] {
             let m = c.at(t);
             let dir = c.tangent(t).perp();
             let mut hits = Vec::new();
-            for g in &curves {
-                g.ray_hits(m, dir, &mut hits);
+            for (g, b) in curves.iter().zip(&boxes) {
+                if !b.is_some_and(|b| ray_misses_box(b, m, dir)) {
+                    g.ray_hits(m, dir, &mut hits);
+                }
             }
-            let nearest = hits.into_iter().filter(|&s| s > 1e-9 * c.length()).fold(f64::INFINITY, f64::min);
+            let nearest = hits.into_iter().filter(|&s| s > 1e-9 * len).fold(f64::INFINITY, f64::min);
             if !nearest.is_finite() {
                 continue;
             }
-            for k in [0.5, 0.25, 0.1, 0.03, 0.01] {
+            for k in [0.5_f64, 0.25, 0.1, 0.03, 0.01] {
+                // (No deeper than its way from `m` on its curve or to the curve the ray met.)
+                if nearest * k.min(1.0 - k) * (1.0 + 1e-9) <= best.0 {
+                    continue;
+                }
                 let q = m + dir * (nearest * k);
                 let d = depth(q);
                 if d > best.0 {

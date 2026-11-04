@@ -69,7 +69,22 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   pieces differ" (OCCT 2.0 s): each gap's B-spline face lies on the blank's cylinder, which the cylinder's seam splits
   where the B-spline face isn't; those coincident pieces, all dropped, need no partner. Ours 0.25 s; all 14 of the
   document's recorded Booleans taken (vibe4 ~/agents/bool-corpora/cf-spur-gear), 0 differ. T1
-  bool_patterns::a_gear_blanks_seam_under_a_tooth_gaps_face.
+  bool_patterns::a_gear_blanks_seam_under_a_tooth_gaps_face. The document on vibe3 (loaded): 20.0 -> 13.3 s.
+- motor-mount-jack (bool, 11-04 20:31): its recorded Booleans (vibe4 ~/agents/bool-corpora/motor-mount-jack) 217 ->
+  122 ms in all on vibe3 (OCCT 122); the document there 881 -> 712 ms (Extrude 3 219 -> 112, Fillet 2 197 -> 125).
+  (a) A free-form face's ray patches (an extrusion of a 128-span curve: 4096 patches, 102k evaluations with second
+  derivatives and a copy of 25 points each) are boxes only, the points made on the surface's grid (a curve point
+  once a u), again where a ray's fallback needs them: 11 -> ~1 ms a face. (b) piece_box / length sample the spans the
+  piece is on, not the curve's all. (c) A region with no holes bounded by one of its face's loops alone (a face of
+  more loops, plane or cylinder) is a hole's: skipped, no point deep inside it sought (cross-checked on every corpus:
+  9197 skipped, none inside). An own edge's direction does not tell (a partial cylinder's regions run the other way;
+  the area its loops enclose doesn't tell either). (d) deeper: the spans' boxes and sample runs of a mapped curve
+  made once per curve (SpanBoxes), probe rays skip curves whose boxes they miss, the curve's length once, the
+  nearest curve without sorting, depths that can't beat the best skipped: cf-spur-gear's end face 510 -> 75 ms. (e)
+  A whole cylinder's arcs are put on it before the sections (an arc across its seam: Fillet 2's decline after 10 ms,
+  not 35). Left: Fillet 2's cut declines "an arc across a cylinder's seam" (the bore's own full circle starts off its
+  seam; taking it means splitting an untouched input edge, which OCCT keeps); Circular pattern 1's sections are
+  OCCT's. T1 bool_patterns::a_tube_with_slots_fused_as_occt. corpus5 small cases -11 %.
 
 ## From core (11-02 07:20): two Boolean costs found profiling FeatureScript-driven regenerations
 Sampled warm on vibe4 (model tests' `custom_features::fs_warm_profile` / `sheetmetal_std::fs_sheet_metal_profile`,

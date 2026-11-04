@@ -14,7 +14,7 @@
 //! Cylinders are taken where every cylinder of the inputs is parallel to one axis and every plane is square
 //! or parallel to it: then surfaces meet in lines along the axis or circles around it.
 
-use crate::arrange::{deeper, regions};
+use crate::arrange::{deeper, regions, Region};
 use crate::curve2::{distance as distance2, inside as inside2, Map, C2};
 use crate::freeform::FreeSurface;
 use crate::nurbs::NurbsCurve;
@@ -239,6 +239,8 @@ struct GFace {
     s: Surf,
     /// Its input boundary, every loop together.
     edges: Vec<(usize, bool)>,
+    /// How many of `edges` each loop has, in order.
+    loop_lens: Vec<usize>,
     /// The same in its parameter plane (a seam twice), made when first asked for ([`Ctx::bound`]).
     bound: std::sync::OnceLock<R<Vec<C2>>>,
     /// Each of those curves' sample points, made when first asked for (curves crossing it: `intervals_on`).
@@ -3445,6 +3447,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         let face0 = cx.faces.len();
         for (i, f) in body.faces.iter().enumerate() {
             let edges: Vec<(usize, bool)> = f.loops.iter().flatten().map(|u| (first_edge[ai] + u.edge as usize, u.reversed)).filter(|x| !cx.edges[x.0].micro).collect();
+            let loop_lens: Vec<usize> = f.loops.iter().map(|l| l.iter().filter(|u| !cx.edges[first_edge[ai] + u.edge as usize].micro).count()).collect();
             let s = match f.surface {
                 Surface::Nurbs { .. } | Surface::Torus { .. } | Surface::Sphere { .. } | Surface::Extrusion { .. } | Surface::Revolution { .. } if cx.src.is_none() => {
                     return Err(Decline("a curved face"));
@@ -3484,7 +3487,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 Some(fs) => free::nurbs_surf(fs, uvbox, f.reversed),
                 None => s,
             };
-            cx.faces.push(GFace { arg: a, index: i as u32, t: body.face_tol.get(i).copied().unwrap_or(0.0), solid: usize::MAX, s, edges, bound: Default::default(), bound_pts: Default::default(), right: Vec::new(), wrap_eps: 0.0, lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default(), hulls: Default::default(), inner: body.face_inner_edges.iter().filter(|x| x[0] as usize == i).map(|x| first_edge[ai] + x[1] as usize).collect() });
+            cx.faces.push(GFace { arg: a, index: i as u32, t: body.face_tol.get(i).copied().unwrap_or(0.0), solid: usize::MAX, s, edges, loop_lens, bound: Default::default(), bound_pts: Default::default(), right: Vec::new(), wrap_eps: 0.0, lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default(), hulls: Default::default(), inner: body.face_inner_edges.iter().filter(|x| x[0] as usize == i).map(|x| first_edge[ai] + x[1] as usize).collect() });
         }
         for (i, s) in body.solids.iter().enumerate() {
             let si = cx.solids.len();
@@ -3739,6 +3742,22 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     crate::check_cancel()?;
     // Pairs of solids that may meet, and their faces.
     let ns = cx.solids.len();
+    // (A whole cylinder's face another solid's box reaches: its own arcs on it now, before the sections (an arc
+    // across its seam declines).)
+    for s in 0..ns {
+        for t in 0..ns {
+            let (a, b) = (&cx.solids[s], &cx.solids[t]);
+            if a.arg == b.arg || !boxes_meet(a.lo, a.hi, b.lo, b.hi, GREY * tol) {
+                continue;
+            }
+            for &f in &a.faces {
+                let g = &cx.faces[f];
+                if matches!(g.s, Surf::Cyl { full: true, .. }) && g.edges.iter().any(|&(e, _)| matches!(cx.edges[e].g, Geo::Arc { .. })) && boxes_meet(g.lo, g.hi, b.lo, b.hi, GREY * tol) {
+                    cx.bound(f)?;
+                }
+            }
+        }
+    }
     // (OCCT's sections free-form faces' pairs below will ask for, a copied pair's the pair it is moved from, made
     // ahead on all threads; any other as asked.)
     // (Whether edges lie on other arguments' faces, where that takes points along them, on all threads ahead for
@@ -4664,7 +4683,34 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         let mut out = Vec::new();
         // (Each piece's loops, where the face has edges inside it.)
         let mut shapes: Vec<(Vec<C2>, Vec<Vec<C2>>)> = Vec::new();
+        // (A region bounded by one of the face's loops alone, all of it and nothing else, without holes, of a face of
+        // more loops: inside one of its holes (the outer loop holds the others, so its region has holes), on a plane or
+        // a cylinder.)
+        let loop_segs: Vec<Vec<usize>> = {
+            let mut at = 0;
+            let mut out = Vec::new();
+            for &n in &cx.faces[f].loop_lens {
+                let mut l: Vec<usize> = cx.faces[f].edges[at..at + n].iter().flat_map(|&(e, _)| edge_pieces[e].iter().map(|x| x.0)).collect();
+                l.sort_unstable();
+                at += n;
+                if !l.iter().any(|s| seams.contains(s)) {
+                    out.push(l);
+                }
+            }
+            out
+        };
+        let beyond = |r: &Region| {
+            if matches!(cx.faces[f].s, Surf::Nurbs { .. }) || cx.faces[f].loop_lens.len() < 2 || !r.holes.is_empty() || !r.inner.is_empty() {
+                return false;
+            }
+            let mut segs: Vec<usize> = r.outer.iter().map(|&(sg, _)| lsrc[sg as usize]).collect();
+            segs.sort_unstable();
+            loop_segs.contains(&segs)
+        };
         for mut r in regions(&pts, &lsegs)? {
+            if beyond(&r) {
+                continue;
+            }
             let mut dist = distance2(r.inside, cx.bound(f)?);
             // (A piece a few tolerances across (two coplanar knurl tool caps' corners overlapping in 3 um): its
             // first point can be in the grey band of a side that is another face's boundary.)

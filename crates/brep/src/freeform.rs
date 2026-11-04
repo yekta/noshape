@@ -104,6 +104,39 @@ impl FreeSurface {
         }
     }
 
+    /// Its points at each (u, v) of `us` × `vs`, row by row in u (as [`Self::at`]: an extrusion's curve evaluated
+    /// once a u, a revolution's once a v).
+    pub fn grid(&self, us: &[f64], vs: &[f64]) -> Vec<DVec3> {
+        let mut out = Vec::with_capacity(us.len() * vs.len());
+        match self {
+            FreeSurface::Extrusion { c, d } => {
+                for &u in us {
+                    let p = c.derivs(u)[0];
+                    out.extend(vs.iter().map(|&v| p + *d * v));
+                }
+            }
+            FreeSurface::Revolution { c, o, a } => {
+                let rows: Vec<(DVec3, DVec3, DVec3)> = vs
+                    .iter()
+                    .map(|&v| {
+                        let rel = c.derivs(v)[0] - *o;
+                        (*o + *a * rel.dot(*a), rel - *a * rel.dot(*a), a.cross(rel))
+                    })
+                    .collect();
+                for &u in us {
+                    let (cu, su) = (u.cos(), u.sin());
+                    out.extend(rows.iter().map(|&(base, perp, side)| base + (perp * cu + side * su)));
+                }
+            }
+            _ => {
+                for &u in us {
+                    out.extend(vs.iter().map(|&v| self.at(u, v)));
+                }
+            }
+        }
+        out
+    }
+
     /// The parameters of the point of it nearest `p` within `uv` (u0, u1, v0, v1), from `seed` (Newton's method on
     /// the distance's gradient), and the distance.
     pub fn param_of(&self, p: DVec3, seed: DVec2, uv: [f64; 4]) -> (DVec2, f64) {

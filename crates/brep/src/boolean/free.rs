@@ -78,7 +78,7 @@ pub(super) fn samples(ns: &FreeSurface, uv: [f64; 4]) -> Vec<(DVec2, DVec3)> {
     out
 }
 
-/// A NURBS curve's length from `t0` to `t1` (Gauss–Legendre, 4 points on each of 4 pieces a knot span).
+/// A NURBS curve's length from `t0` to `t1` (Gauss–Legendre, 4 points on each of 4 pieces a knot span it is on).
 pub(super) fn length(c: &NurbsCurve, t0: f64, t1: f64) -> f64 {
     const G: [(f64, f64); 4] = [
         (0.069_431_844_202_973_71, 0.173_927_422_568_726_9),
@@ -86,7 +86,7 @@ pub(super) fn length(c: &NurbsCurve, t0: f64, t1: f64) -> f64 {
         (0.669_990_521_792_428_1, 0.326_072_577_431_273_1),
         (0.930_568_155_797_026_3, 0.173_927_422_568_726_9),
     ];
-    let n = 4 * (c.poles.len() - c.degree).max(1);
+    let n = 4 * spans_over(c, t0, t1);
     let h = (t1 - t0) / n as f64;
     (0..n).map(|k| G.iter().map(|&(x, w)| w * c.derivs(t0 + h * (k as f64 + x))[1].length()).sum::<f64>() * h.abs()).sum()
 }
@@ -107,7 +107,7 @@ pub(super) struct Patch {
     uv: [f64; 4],
     /// A Bézier piece's (its box its control points'): Newton from a 3 × 3 grid of starts in it.
     piece: bool,
-    /// A Bézier piece's control points (holding it); another's 5 × 5 grid of points, row by row in u.
+    /// A Bézier piece's control points (holding it); none for another ([`patch_points`]).
     pts: Vec<DVec3>,
 }
 
@@ -141,25 +141,35 @@ pub(super) fn patches(g: &GFace) -> Vec<Patch> {
             *s = (0..=8).map(|k| s[0] + (s[s.len() - 1] - s[0]) * k as f64 / 8.0).collect();
         }
     }
-    let mut out = Vec::new();
+    // (Each patch's 5 × 5 points, at its own parameters (its last row needn't be the next one's first), for its
+    // box; [`patch_points`] makes them again where a ray needs them.)
+    let fifths = |s: &[f64]| s.windows(2).flat_map(|w| (0..=4).map(move |i| w[0] + (w[1] - w[0]) * i as f64 / 4.0)).collect::<Vec<f64>>();
+    let vl = fifths(&vs);
+    let mut out = Vec::with_capacity((us.len() - 1) * (vs.len() - 1));
     for w in us.windows(2) {
-        for z in vs.windows(2) {
-            let (ua, ub, va, vb) = (w[0], w[1], z[0], z[1]);
+        let ul: Vec<f64> = (0..=4).map(|i| w[0] + (w[1] - w[0]) * i as f64 / 4.0).collect();
+        let grid = ns.grid(&ul, &vl);
+        for (zi, z) in vs.windows(2).enumerate() {
             let (mut lo, mut hi) = (DVec3::splat(f64::INFINITY), DVec3::splat(f64::NEG_INFINITY));
-            let mut pts = Vec::with_capacity(25);
-            for j in 0..=4 {
-                for i in 0..=4 {
-                    let q = ns.at(ua + (ub - ua) * i as f64 / 4.0, va + (vb - va) * j as f64 / 4.0);
+            for row in grid.chunks(vl.len()) {
+                for &q in &row[zi * 5..zi * 5 + 5] {
                     lo = lo.min(q);
                     hi = hi.max(q);
-                    pts.push(q);
                 }
             }
             let grow = DVec3::splat(0.25 * (hi - lo).length() + 1e-9);
-            out.push(Patch { lo: lo - grow, hi: hi + grow, uv: [ua, ub, va, vb], piece: false, pts });
+            out.push(Patch { lo: lo - grow, hi: hi + grow, uv: [w[0], w[1], z[0], z[1]], piece: false, pts: Vec::new() });
         }
     }
     out
+}
+
+/// A patch's (not a Bézier piece's) 5 × 5 grid of points, row by row in u.
+fn patch_points(ns: &FreeSurface, pa: &Patch) -> Vec<DVec3> {
+    let [ua, ub, va, vb] = pa.uv;
+    let (ul, vl): (Vec<f64>, Vec<f64>) = (0..=4).map(|i| (ua + (ub - ua) * i as f64 / 4.0, va + (vb - va) * i as f64 / 4.0)).unzip();
+    let grid = ns.grid(&ul, &vl);
+    (0..25).map(|k| grid[(k % 5) * 5 + k / 5]).collect()
 }
 
 /// Where the ray `p + t r` crosses a NURBS surface: from the middle of each of its patches whose box the ray
@@ -245,9 +255,10 @@ pub(super) fn ray_hits(ns: &FreeSurface, patches: &Patches, uv: [f64; 4], p: DVe
         // end).)
         let (ax, bx) = r.any_orthonormal_pair();
         let seen = |q: DVec3| DVec3::new((q - p).dot(ax), (q - p).dot(bx), (q - p).dot(r));
+        let pts = patch_points(ns, pa);
         for k in 0..16 {
             let (i, j) = (k % 4, k / 4);
-            let c = [pa.pts[j * 5 + i], pa.pts[j * 5 + i + 1], pa.pts[j * 5 + i + 5], pa.pts[j * 5 + i + 6]].map(seen);
+            let c = [pts[j * 5 + i], pts[j * 5 + i + 1], pts[j * 5 + i + 5], pts[j * 5 + i + 6]].map(seen);
             let (lo, hi) = c.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(lo, hi), &x| (lo.min(x), hi.max(x)));
             let grow = 0.1 * (hi - lo).max_element();
             if lo.x - grow > 0.0 || lo.y - grow > 0.0 || hi.x + grow < 0.0 || hi.y + grow < 0.0 || hi.z + grow < 0.0 {
@@ -306,9 +317,21 @@ pub(super) fn mapped(g: &GFace, c: &Arc<NurbsCurve>, t0: f64, t1: f64) -> R<C2> 
     Ok(C2::Mapped { c: c.clone(), t0, t1, m })
 }
 
-/// A box around a NURBS curve's part from `t0` to `t1`: 16 samples a span, grown by their chords' sag.
+/// How many of a NURBS curve's knot spans its part from `t0` to `t1` is on (all where that part reaches past its
+/// knots).
+fn spans_over(c: &NurbsCurve, t0: f64, t1: f64) -> usize {
+    let all = (c.poles.len() - c.degree).max(1);
+    let (lo, hi) = (t0.min(t1), t0.max(t1));
+    let (Some(&k0), Some(&k1)) = (c.knots.first(), c.knots.last()) else { return all };
+    if lo < k0 || hi > k1 || c.spans().is_empty() {
+        return all;
+    }
+    (c.span_of(hi) - c.span_of(lo) + 1).min(all)
+}
+
+/// A box around a NURBS curve's part from `t0` to `t1`: 16 samples a span it is on, grown by their chords' sag.
 pub(super) fn piece_box(c: &NurbsCurve, t0: f64, t1: f64) -> (DVec3, DVec3) {
-    let n = 16 * (c.poles.len() - c.degree).max(1);
+    let n = 16 * spans_over(c, t0, t1);
     let (mut lo, mut hi) = (DVec3::splat(f64::INFINITY), DVec3::splat(f64::NEG_INFINITY));
     let mut step = 0.0_f64;
     let mut prev = c.at(t0);

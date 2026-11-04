@@ -476,6 +476,11 @@ impl C2 {
 
     /// The parameter of the point nearest `p`, and its distance.
     pub fn param_of(&self, p: DVec2) -> (f64, f64) {
+        self.param_of_by(p, None)
+    }
+
+    /// [`Self::param_of`], its spans' boxes from `boxes` (made by [`Self::span_boxes2`]).
+    pub(crate) fn param_of_by(&self, p: DVec2, boxes: Option<&SpanBoxes>) -> (f64, f64) {
         match *self {
             C2::Seg { a, b } => {
                 let e = b - a;
@@ -491,7 +496,7 @@ impl C2 {
             }
             C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => {
                 // The nearest sample, then Newton on (q - p)·q' (within 0..1).
-                let mut t = self.nearest_sample(p).0;
+                let mut t = self.nearest_sample(p, boxes).0;
                 for _ in 0..30 {
                     let (d1, d2) = self.derivs(t);
                     let q = self.at(t) - p;
@@ -549,7 +554,7 @@ impl C2 {
 
     /// The sample (of [`Self::samples`]' evenly along it) nearest `p`, the first of equals: its parameter and
     /// distance.
-    fn nearest_sample(&self, p: DVec2) -> (f64, f64) {
+    fn nearest_sample(&self, p: DVec2, boxes: Option<&SpanBoxes>) -> (f64, f64) {
         let n = self.samples();
         let mut best = (0, f64::INFINITY);
         let look = |k: usize, best: &mut (usize, f64)| {
@@ -566,17 +571,24 @@ impl C2 {
             }
             return (best.0 as f64 / n as f64, best.1);
         };
-        let mut runs: Vec<(f64, usize, usize)> = Vec::new();
-        let mut from = 0;
-        let mut span = c.span_of(t0);
-        for k in 1..=n + 1 {
-            let next = if k <= n { c.span_of(t0 + (t1 - t0) * (k as f64 / n as f64)) } else { usize::MAX };
-            if next != span {
-                runs.push((away(span_box2(c, span, m), p), from, k));
-                from = k;
-                span = next;
+        let by_span = || {
+            let mut out: Vec<(usize, usize, usize)> = Vec::new();
+            let mut from = 0;
+            let mut span = c.span_of(t0);
+            for k in 1..=n + 1 {
+                let next = if k <= n { c.span_of(t0 + (t1 - t0) * (k as f64 / n as f64)) } else { usize::MAX };
+                if next != span {
+                    out.push((span, from, k));
+                    from = k;
+                    span = next;
+                }
             }
-        }
+            out
+        };
+        let mut runs: Vec<(f64, usize, usize)> = match boxes.filter(|b| !b.boxes.is_empty()) {
+            Some(b) => b.runs.get_or_init(by_span).iter().map(|&(span, k0, k1)| (away(*b.boxes[span].get_or_init(|| span_box2(c, span, m)), p), k0, k1)).collect(),
+            None => by_span().into_iter().map(|(span, k0, k1)| (away(span_box2(c, span, m), p), k0, k1)).collect(),
+        };
         runs.sort_by(|a, b| a.0.total_cmp(&b.0));
         for (away, k0, k1) in runs {
             if away > best.1 {
@@ -590,6 +602,16 @@ impl C2 {
     }
 
     pub fn distance(&self, p: DVec2) -> f64 {
+        self.distance_by(p, None)
+    }
+
+    /// Its spans' boxes, each made when first needed: for many distances from it ([`Self::distance_by`]).
+    pub(crate) fn span_boxes2(&self) -> SpanBoxes {
+        SpanBoxes { boxes: self.spans2().map_or_else(Vec::new, |(c, ..)| (0..c.spans().len()).map(|_| OnceLock::new()).collect()), runs: OnceLock::new() }
+    }
+
+    /// [`Self::distance`], its spans' boxes from `boxes`.
+    pub(crate) fn distance_by(&self, p: DVec2, boxes: Option<&SpanBoxes>) -> f64 {
         match *self {
             C2::Seg { a, b } => {
                 let e = b - a;
@@ -605,7 +627,7 @@ impl C2 {
                     (self.start() - p).length().min((self.end() - p).length())
                 }
             }
-            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => self.param_of(p).1,
+            C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. } => self.param_of_by(p, boxes).1,
         }
     }
 
@@ -624,6 +646,23 @@ impl C2 {
             C2::Trig { .. } | C2::Hyp { .. } | C2::Conic { .. } => None,
         }
     }
+}
+
+/// Whether the ray from `m` along `d` clearly misses box `b`: the box all on one side of its line (as
+/// [`C2::ray_hits`] sees it) or all behind `m`.
+pub(crate) fn ray_misses_box(b: (DVec2, DVec2), m: DVec2, d: DVec2) -> bool {
+    let corners = [b.0, DVec2::new(b.0.x, b.1.y), DVec2::new(b.1.x, b.0.y), b.1];
+    let margin = 1e-12 * (b.0.abs().max(b.1.abs()).max(m.abs()).max_element() * d.length() + 1e-300);
+    let across = corners.map(|q| (q - m).perp_dot(d));
+    let along = corners.map(|q| (q - m).dot(d));
+    across.iter().all(|&x| x > margin) || across.iter().all(|&x| x < -margin) || along.iter().all(|&x| x < -margin)
+}
+
+/// A NURBS part's spans' boxes on the parameter plane, by span, and its samples' runs on each span (span, first,
+/// past the last) ([`C2::span_boxes2`]).
+pub(crate) struct SpanBoxes {
+    boxes: Vec<OnceLock<(DVec2, DVec2)>>,
+    runs: OnceLock<Vec<(usize, usize, usize)>>,
 }
 
 /// A box a 3D NURBS curve's part from `t0` to `t1` seen in a plane's or cylinder's parameter plane lies in: its

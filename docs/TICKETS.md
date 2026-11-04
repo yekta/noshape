@@ -534,6 +534,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   face's area as r times its domain's (∮ u dv over the edges' curves, a fixed Gauss rule: the faces share those
   curves up to whole turns) instead of two adaptive surface integrals (8 ms a face here), and check only the faces
   using the replaced edges, not the whole solid. The rest of the feature is the Boolean (79 ms, bool).
+  bool 11-04 20:31: the document's recorded Booleans 217 -> 122 ms on vibe3 (OCCT 122): Extrude 3's fuse 86 -> 37 ms
+  (vibe4; OCCT 31), Fillet 2's cut declines after 10 ms instead of 35 (an arc across the bore's seam, then OCCT's).
+  The document there 881 -> 712 ms (Extrude 3 219 -> 112, Fillet 2 197 -> 125; Circular pattern 1 unchanged).
 - [ ] P2 FULL-ROUND-BOSS-TWO-FACES (core 11-04 09:05) a full round of a boss's whole cylinder (a Ø16 × 3 mm puck's rim)
   has the right volume, but its half torus is two faces: OCCT's torus has its v seam on the outer equator, which the
   outer half crosses (the bore's inner half is one face, as live's). Live: one face (not checked live; Parasolid's
