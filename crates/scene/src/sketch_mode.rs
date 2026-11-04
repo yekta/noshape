@@ -475,6 +475,17 @@ pub fn glyph_key(c: ConstraintId, e: EntityId) -> String {
     format!("{}:{}", c.0, e.0)
 }
 
+/// What a dragged point dropped on its snap target becomes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Drop {
+    /// Merged with a point (or coincident with the origin).
+    Merge,
+    /// Coincident with a curve.
+    OnCurve,
+    /// The line's midpoint.
+    Midpoint,
+}
+
 /// Snap to model geometry (from the 3D hover) supplied by the view.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExternalSnap {
@@ -519,8 +530,8 @@ pub struct SketchEditor {
     box_end: Option<DVec2>,
     /// Ctrl held during the box selection: it removes from the selection.
     pub box_remove: bool,
-    /// Point snapped to while dragging a point (coincident on release).
-    drag_snap: Option<(EntityId, DVec2, bool)>,
+    /// Point snapped to while dragging a point (constrained on release).
+    drag_snap: Option<(EntityId, DVec2, Drop)>,
     /// Entities picked so far for a constraint/dimension tool.
     picks: Vec<(EntityId, DVec2)>,
     /// Picks of the dimension being placed (click positions decide min/max).
@@ -613,6 +624,8 @@ pub struct SketchEditor {
     pub dxf_use_origin: bool,
     /// Mirror line chosen in tool-first mode.
     mirror_axis: Option<EntityId>,
+    /// Extend: the curve picked first, waiting for its boundary.
+    pub extend_from: Option<EntityId>,
     /// On-the-fly dimension boxes of the geometry created last.
     pub otf: Option<OnTheFly>,
     /// The user started typing into the active on-the-fly box.
@@ -777,6 +790,8 @@ const MANIPULATOR_OUTLINE: [u8; 4] = [0x98, 0x9f, 0xa3, 255];
 /// The fillet radius manipulator's stem (live sketch/1934: the arrow starts
 /// at the preview arc's midpoint and points at its centre).
 const FILLET_ARROW_STEM_PX: f64 = 28.0;
+/// One previewed pattern instance: where a seed point goes.
+type PointMap = Box<dyn Fn(DVec2) -> DVec2>;
 /// Linear pattern manipulators (live sketch/136): a 16 px hollow square at
 /// the first instance, the count arrow's 30 px stem from its edge; labels
 /// ~95 px off diagonally; the spacing dimension 101 px to the side.
@@ -991,6 +1006,11 @@ pub fn tolerance_allowed(k: &ConstraintKind) -> bool {
 /// [`SketchEditor::apply_dimension`]'s error for a value the sketch can't
 /// be solved with (Onshape's warning toast text).
 pub const SKETCH_NOT_SOLVED: &str = "Sketch could not be solved.";
+/// [`SketchEditor::apply_dimension`]'s refusals of a value the dimension
+/// can't take (a negative radius, a zero length). Live shows no message: the
+/// box turns pink and ✓ greys out.
+pub const DIM_NOT_POSITIVE: &str = "Value must be positive";
+pub const DIM_NOT_NEGATIVE: &str = "This dimension can't be negative";
 /// Live's warning when the picked items can't be dimensioned.
 pub const DIMENSION_FAILED: &str = "A dimension cannot be created between these items.";
 
@@ -1190,6 +1210,7 @@ impl SketchEditor {
             slot_width: 0.005,
             slot_session: None,
             mirror_axis: None,
+            extend_from: None,
             pending_image: None,
             dxf_unit_scale: None,
             dxf_use_origin: false,
@@ -1251,6 +1272,7 @@ impl SketchEditor {
         self.offset_pending = None;
         self.offset_repeat = false;
         self.mirror_axis = None;
+        self.extend_from = None;
         self.otf = None;
         self.otf_typing = false;
         self.woken.clear();
@@ -1820,8 +1842,15 @@ impl SketchEditor {
                     return EditOutcome::none();
                 };
                 let r = match self.tool {
-                    Tool::Extend if double_click => data.sketch.extend(id, p),
-                    Tool::Extend => data.sketch.extend(id, p),
+                    // Live: the first pick is the curve to extend (it stays
+                    // lit), the second the boundary.
+                    Tool::Extend => match self.extend_from.take().filter(|c| *c != id && data.sketch.entity(*c).is_some()) {
+                        None => {
+                            self.extend_from = Some(id);
+                            return EditOutcome::redraw();
+                        }
+                        Some(curve) => data.sketch.extend(curve, id),
+                    },
                     _ => {
                         let at = data.sketch.curve(id).map(|c| c.closest(p).1).unwrap_or(p);
                         data.sketch.split(id, at)
@@ -2049,7 +2078,7 @@ impl SketchEditor {
             // Live's text alone (i18n; FILLET-POINT-MSG: the solver's reason
             // isn't shown).
             Err(_) => {
-                self.message = Some(if chamfer { "Cannot chamfer selected point.".to_string() } else { "Cannot fillet selected point.".to_string() });
+                self.message = Some(if chamfer { "Cannot chamfer selected point.".to_string() } else { "Cannot add sketch fillet.".to_string() });
                 EditOutcome::redraw()
             }
         }
@@ -3241,12 +3270,17 @@ impl SketchEditor {
         Some(self.finish_spline(data, false))
     }
 
-    /// Confirm spline (context menu): finish at the point before the cursor.
+    /// Confirm spline / Confirm bezier (context menu): the curve through the
+    /// clicked points, then the tool turns off (live).
     pub fn confirm_spline(&mut self, data: &mut SketchData) -> EditOutcome {
-        if self.tool == Tool::Spline && self.clicks.len() >= 2 {
-            return self.finish_spline(data, false);
+        if !matches!(self.tool, Tool::Spline | Tool::Bezier) || self.clicks.len() < 2 {
+            return EditOutcome::none();
         }
-        EditOutcome::none()
+        self.otf = None;
+        self.otf_typing = false;
+        let out = self.finish_spline(data, false);
+        self.set_tool(Tool::Select);
+        out
     }
 
     // ------------------------------------------------------------ on-the-fly dimensions
@@ -3347,7 +3381,7 @@ impl SketchEditor {
     fn commit_otf_value(&mut self, data: &mut SketchData, o: OnTheFly, f: OtfField, value: f64, expr: Option<&str>) -> Result<(), String> {
         let q = Quantity::new(value, dim_unit(&f.kind));
         if !(q.value.is_finite() && q.value > 0.0) {
-            return Err("Value must be positive".into());
+            return Err(DIM_NOT_POSITIVE.into());
         }
         let mut kind = f.kind.clone();
         kind.set_value(q.value / f.scale);
@@ -3609,7 +3643,7 @@ impl SketchEditor {
     }
 
     /// Point or curve under a dragged point (coincident on release).
-    fn point_drop_target(&self, sk: &Sketch, id: EntityId) -> Option<(EntityId, DVec2, bool)> {
+    fn point_drop_target(&self, sk: &Sketch, id: EntityId) -> Option<(EntityId, DVec2, Drop)> {
         let pos = sk.point(id)?;
         let r = self.world_per_px * 9.0;
         let users: Vec<EntityId> = sk.users_of_point(id);
@@ -3622,21 +3656,33 @@ impl SketchEditor {
             .filter(|x| x.2 <= r)
             .min_by(|a, b| a.2.total_cmp(&b.2));
         if let Some((e, q, _)) = best_pt {
-            return Some((e, q, true));
+            return Some((e, q, Drop::Merge));
         }
         // The sketch origin (a fixed point is created on drop).
         if pos.length() <= r && !sk.entity(id).is_some_and(|e| e.external) {
-            return Some((noshape_sketch::ORIGIN, DVec2::ZERO, true));
+            return Some((noshape_sketch::ORIGIN, DVec2::ZERO, Drop::Merge));
         }
-        sk.entities()
-            .filter(|e| e.kind() != EntityKind::Point && !users.contains(&e.id) && !e.point_refs().contains(&id))
+        let curves = || sk.entities().filter(|e| e.kind() != EntityKind::Point && !users.contains(&e.id) && !e.point_refs().contains(&id));
+        // Live (audit 1969): by a line's midpoint the drop takes it (MIDPOINT).
+        let mid = curves()
+            .filter_map(|e| {
+                let Some(Curve2::Line { a, b }) = sk.curve(e.id) else { return None };
+                let q = (a + b) * 0.5;
+                let d = (q - pos).length();
+                (d <= r).then_some((e.id, q, d))
+            })
+            .min_by(|a, b| a.2.total_cmp(&b.2));
+        if let Some((e, q, _)) = mid {
+            return Some((e, q, Drop::Midpoint));
+        }
+        curves()
             .filter_map(|e| {
                 let c = sk.curve(e.id)?;
                 let (_, q, d) = c.closest(pos);
                 (d <= r).then_some((e.id, q, d))
             })
             .min_by(|a, b| a.2.total_cmp(&b.2))
-            .map(|(e, q, _)| (e, q, false))
+            .map(|(e, q, _)| (e, q, Drop::OnCurve))
     }
 
     pub fn tool_up(&mut self, data: &mut SketchData, p: DVec2) -> EditOutcome {
@@ -3689,10 +3735,10 @@ impl SketchEditor {
                 EditOutcome::redraw()
             }
             Some(DragState::Geometry { handle, .. }) => {
-                if let (DragHandle::Point(id), Some((target, _, is_pt))) = (handle, self.drag_snap.take()) {
+                if let (DragHandle::Point(id), Some((target, at, drop))) = (handle, self.drag_snap.take()) {
                     let target = if target == noshape_sketch::ORIGIN { origin_point(&mut data.sketch) } else { target };
                     // The hidden Origin stand-in is constrained to, not merged into.
-                    let is_pt = is_pt && !data.sketch.entity(target).is_some_and(|e| e.reference_only);
+                    let is_pt = drop == Drop::Merge && !data.sketch.entity(target).is_some_and(|e| e.reference_only);
                     // Already coincident with it (a point held on the origin,
                     // dragged and released where it stays): nothing to add
                     // (DUP-COINCIDENT: every release added another one).
@@ -3703,6 +3749,10 @@ impl SketchEditor {
                         // Keep the fixed/external point when merging.
                         let ext = data.sketch.entity(target).is_some_and(|e| e.external);
                         if ext || !data.sketch.entity(id).is_some_and(|e| e.external) { data.sketch.merge_points(id, target).is_ok() } else { data.sketch.merge_points(target, id).is_ok() }
+                    } else if drop == Drop::Midpoint {
+                        // The point lands on the midpoint; the line stays.
+                        let _ = data.sketch.set_point(id, at);
+                        data.sketch.add_constraint(ConstraintKind::Midpoint { point: id, curve: target }).is_ok()
                     } else {
                         data.sketch.add_constraint(ConstraintKind::Coincident { a: id, b: target }).is_ok()
                     };
@@ -3816,17 +3866,23 @@ impl SketchEditor {
 
     // ------------------------------------------------------------ patterns / transform
 
-    fn pattern_transforms(&self) -> Vec<Box<dyn Fn(DVec2) -> DVec2>> {
-        let mut out: Vec<Box<dyn Fn(DVec2) -> DVec2>> = Vec::new();
+    /// The previewed instances (each with whether it is drawn dashed).
+    /// Live: a linear pattern previews at most 7 per direction; with more,
+    /// the original, 5 copies and a dashed 7th that says more follow.
+    fn pattern_transforms(&self) -> Vec<(PointMap, bool)> {
+        let mut out: Vec<(PointMap, bool)> = Vec::new();
+        let shown = |n: usize| -> Vec<(usize, bool)> {
+            if n <= 7 { (0..n.max(1)).map(|k| (k, false)).collect() } else { (0..7).map(|k| (k, k == 6)).collect() }
+        };
         match self.tool {
             Tool::LinearPattern => {
                 let step = DVec2::from_angle(self.pattern_angle) * self.pattern_distance;
                 let second = DVec2::from_angle(self.pattern_second_angle) * self.pattern_second_distance;
-                for j in 0..self.pattern_second_count.clamp(1, 10) {
-                    for k in 0..self.pattern_count.clamp(1, 10) {
+                for (j, dj) in shown(self.pattern_second_count) {
+                    for (k, dk) in shown(self.pattern_count) {
                         if j == 0 && k == 0 { continue; }
                         let off = step * k as f64 + second * j as f64;
-                        out.push(Box::new(move |p| p + off));
+                        out.push((Box::new(move |p| p + off), dj || dk));
                     }
                 }
             }
@@ -3837,13 +3893,13 @@ impl SketchEditor {
                     let step = if full { self.circular_angle / n as f64 } else { self.circular_angle / (n - 1) as f64 };
                     for k in 1..n {
                         let t = Transform::Rotate { center: self.pattern_center, angle: step * k as f64 };
-                        out.push(Box::new(move |p| t.apply(p)));
+                        out.push((Box::new(move |p| t.apply(p)), false));
                     }
                 }
             }
             Tool::Transform => {
                 let (c, a, s, d) = (self.pattern_center, self.xf_angle, self.xf_scale, self.xf_offset);
-                out.push(Box::new(move |p| c + DVec2::from_angle(a).rotate(p - c) * s + d));
+                out.push((Box::new(move |p| c + DVec2::from_angle(a).rotate(p - c) * s + d), false));
             }
             _ => {}
         }
@@ -4361,11 +4417,11 @@ impl SketchEditor {
             _ => false,
         };
         if value == 0.0 && dim != Dim::ANGLE && !matches!(c.kind, ConstraintKind::Distance { .. } | ConstraintKind::HorizontalDistance { .. } | ConstraintKind::VerticalDistance { .. }) {
-            return Err("Value must be positive".into());
+            return Err(DIM_NOT_POSITIVE.into());
         }
         if value < 0.0 {
             if positive_only {
-                return Err("This dimension can't be negative".into());
+                return Err(DIM_NOT_NEGATIVE.into());
             }
             match &c.kind {
                 // A negative line length flips the line about its start point.
@@ -5267,6 +5323,14 @@ impl SketchEditor {
                 points.points.push(PointSprite { position: w(q), color, pick_id: 0, size: 9.0, style: on_top, _pad: 0 });
             }
         }
+        // Extend: the curve picked first, lit yellow-green (live 12e).
+        if self.tool == Tool::Extend
+            && let Some(id) = self.extend_from
+            && data.sketch.entity(id).is_some()
+        {
+            let color = crate::palette::rgb8(crate::palette::viewport::QUERY_HOVER);
+            wide.push((data.sketch.tessellate(id, self.world_per_px * 0.25), color, 4.0));
+        }
         // Split marker on the hovered curve.
         if self.tool == Tool::Split
             && let (Some(h), Some(c)) = (self.hover, self.cursor)
@@ -5279,10 +5343,10 @@ impl SketchEditor {
         if self.tool.is_pattern() && !self.selection.is_empty() {
             let tol = self.world_per_px;
             let shapes: Vec<Vec<DVec2>> = self.selection.iter().filter(|e| !is_point(&data.sketch, **e)).map(|e| data.sketch.tessellate(*e, tol * 0.25)).collect();
-            for t in self.pattern_transforms() {
+            for (t, dashed) in self.pattern_transforms() {
                 for s in &shapes {
                     let pts: Vec<DVec2> = s.iter().map(|p| t(*p)).collect();
-                    poly(&pts, preview_color, false);
+                    poly(&pts, preview_color, dashed);
                 }
             }
         }
@@ -6613,16 +6677,11 @@ pub fn smart_dimension(sk: &Sketch, ids: &[EntityId], cursor: DVec2) -> Option<C
     }
     match ids {
         [a] => match kind(*a)? {
+            // Live: one line is always its aligned length, wherever the label
+            // goes; the horizontal / vertical forms come from its two points.
             EntityKind::Line => {
                 let (pa, pb) = sk.endpoints(*a)?;
-                let (qa, qb) = (sk.point(pa)?, sk.point(pb)?);
-                let len = ConstraintKind::Length { curve: *a, value: (qb - qa).length() };
-                // Axis-aligned lines always get their length.
-                let d = qb - qa;
-                if d.x.abs() < 1e-9 * d.length().max(1e-300) || d.y.abs() < 1e-9 * d.length().max(1e-300) {
-                    return Some(len);
-                }
-                Some(directed(pa, pb, qa, qb, cursor).unwrap_or(len))
+                Some(ConstraintKind::Length { curve: *a, value: (sk.point(pb)? - sk.point(pa)?).length() })
             }
             EntityKind::Circle => Some(ConstraintKind::Diameter { curve: *a, value: 0.0 }),
             EntityKind::Arc => Some(ConstraintKind::Radius { curve: *a, value: 0.0 }),
@@ -7565,12 +7624,19 @@ mod tests {
     }
 
     #[test]
-    fn extend_without_a_boundary_reports_the_onshape_error() {
+    fn extend_takes_the_curve_then_its_boundary() {
+        // Live (audit 1969): one click only picks the curve; the second
+        // click's curve is the boundary, taken as its infinite line.
         let (mut ed, mut data) = editor(Tool::Extend);
-        data.sketch.add_line(v(0.01, 0.01), v(0.03, 0.01));
-        click(&mut ed, &mut data, v(0.025, 0.01));
-        assert_eq!(ed.message.as_deref(), Some("Unable to extend the selected geometry."));
-        assert_eq!(count(&data, EntityKind::Line), 1);
+        let l = data.sketch.add_line(v(0.01, 0.06), v(0.03, 0.06));
+        data.sketch.add_line(v(0.05, 0.03), v(0.05, 0.05));
+        click(&mut ed, &mut data, v(0.025, 0.06));
+        assert_eq!(ed.extend_from, Some(l));
+        assert!((data.sketch.curve(l).unwrap().end_point() - v(0.03, 0.06)).length() < 1e-12);
+        click(&mut ed, &mut data, v(0.05, 0.04));
+        assert!((data.sketch.curve(l).unwrap().end_point() - v(0.05, 0.06)).length() < 1e-9);
+        assert_eq!(ed.message, None);
+        assert_eq!(ed.extend_from, None);
         assert_eq!(ed.tool, Tool::Extend);
     }
 
@@ -7707,6 +7773,21 @@ mod tests {
         let Some(Curve2::Circle { center, .. }) = d.sketch.curve(c) else { panic!() };
         assert!((at(&d, l4).1 - center * 1e3).length() < 1e-6, "on the centre: {:?} {center}", at(&d, l4));
         let _ = h;
+    }
+
+    #[test]
+    fn a_point_dropped_by_a_lines_midpoint_takes_it() {
+        // Live (audit 1969 (8)): dropping a point onto a line by its middle
+        // gives MIDPOINT; elsewhere on the line, a coincident.
+        let (mut ed, mut data) = editor(Tool::Select);
+        let l = data.sketch.add_line(v(0.0, 0.0), v(0.04, 0.0));
+        let p = data.sketch.add_point(v(0.01, 0.01));
+        drag(&mut ed, &mut data, v(0.01, 0.01), v(0.02 + PX, PX));
+        assert!(data.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Midpoint { point, curve } if point == p && curve == l)));
+        assert!((data.sketch.point(p).unwrap() - v(0.02, 0.0)).length() < 1e-9);
+        let q = data.sketch.add_point(v(0.03, 0.01));
+        drag(&mut ed, &mut data, v(0.03, 0.01), v(0.032, PX));
+        assert!(data.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Coincident { a, b } if a == q && b == l)));
     }
 
     #[test]
@@ -7949,6 +8030,18 @@ mod tests {
         }
         assert!(ed.confirm_spline(&mut d).changed);
         assert_eq!(count(&d, EntityKind::FitSpline), 2);
+        assert_eq!(ed.tool, Tool::Select, "Confirm spline turns the tool off");
+    }
+
+    #[test]
+    fn confirm_bezier_finishes_with_the_clicked_points() {
+        let (mut ed, mut d) = editor(Tool::Bezier);
+        for p in [v(0.01, 0.01), v(0.03, 0.03), v(0.05, 0.01)] {
+            click(&mut ed, &mut d, p);
+        }
+        assert!(ed.confirm_spline(&mut d).changed);
+        assert_eq!(count(&d, EntityKind::BSpline), 1);
+        assert_eq!(ed.tool, Tool::Select);
     }
 
     #[test]
@@ -8434,6 +8527,15 @@ mod tests {
         ed.pattern_second_distance = 0.015;
         ed.pattern_second_count = 2;
         assert_eq!(ed.pattern_transforms().len(), 5);
+        // Live: 15 previews the original, 5 copies and a dashed 7th.
+        ed.pattern_second_count = 1;
+        ed.pattern_count = 15;
+        let shown = ed.pattern_transforms();
+        assert_eq!(shown.len(), 6);
+        assert_eq!(shown.iter().filter(|(_, dashed)| *dashed).count(), 1);
+        assert!(shown[5].1);
+        ed.pattern_count = 3;
+        ed.pattern_second_count = 2;
         assert!(ed.apply_pattern(&mut d).changed);
         assert_eq!(count(&d, EntityKind::Circle), 6);
         assert!(d.sketch.solve().is_solved());

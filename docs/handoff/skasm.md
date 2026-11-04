@@ -1,5 +1,20 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-04 19:30 UTC)
+- Sketch audit 1969 applied: Confirm bezier (no "Escape bezier"; Confirm spline / bezier turn the tool off), the
+  degree editor (✓ / ×, 16 → pink and ✓ greyed, no message), "Cannot add sketch fillet.", Alt+arrows do nothing,
+  one line's dimension is always aligned, linear pattern previews 7 per direction (the 7th dashed), Shift no longer
+  shows every glyph, Extend takes the curve then its boundary (infinite line / circle; op `sketch_extend` takes click
+  pairs), a point dropped by a line's midpoint gets MIDPOINT, a refused value (negative radius) marks the box
+  invalid instead of a message. Open: which end a free line's length edit moves (audit vs probes 1774, asked
+  19:21), the tool search's order in a sketch (row 2.10), keyed shaft (s1043 / s1044 / s1057).
+- Live's Mac key list (behaviours "Keys on macOS (lead, 2026-11-04 14:54)") applied to sketch / assembly: the
+  sketch canvas takes no Cmd (`mac_cmd` gone: graphics selection uses no modifier), the mate list row takes Ctrl or
+  Cmd on every OS (live lists: `metaKey || ctrlKey`), snap mode's tap and value-box stepping are Control only.
+  **For the lead / psui (app-core actions.rs, not changed):** live binds each ctrl/cmd pair to BOTH Control and Cmd
+  on a Mac (Ctrl+Z and Cmd+Z undo there; ours: `secondary-z` = Cmd only), and Redo is only Ctrl+Y and Shift+Cmd+Z
+  (ours also takes Ctrl+Shift+Z on Linux / Windows).
+
 ## Resume here (2026-11-04 14:17 UTC)
 - The assembly's mate connector hover now draws psui's `InferenceMarks` (camera geometry, cached per points /
   choice), as the Part Studio; the scene's `light_dots` / `inference_glyph` are gone. Live 1851: the glyph matches,

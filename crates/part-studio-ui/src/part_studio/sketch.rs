@@ -27,16 +27,14 @@ use noshape_units::{Dim, Quantity};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-actions!(sketch_entry, [SketchEntryNext, SketchEntryPrev, SketchEntryTab, SketchEntryBackTab, SketchEntryCancel, SketchHintTab, SketchHintBackTab]);
+actions!(sketch_entry, [SketchEntryTab, SketchEntryBackTab, SketchEntryCancel, SketchHintTab, SketchHintBackTab]);
 
 /// Keys of the on-the-fly value box: Tab (the value with its unit,
-/// selected), Alt+arrows to the other box, Esc.
+/// selected, or the other box), Esc. Alt+arrows do nothing (live).
 pub(super) fn entry_key_bindings() -> Vec<KeyBinding> {
     vec![
         KeyBinding::new("tab", SketchEntryTab, Some("SketchEntry")),
         KeyBinding::new("shift-tab", SketchEntryBackTab, Some("SketchEntry")),
-        KeyBinding::new("alt-right", SketchEntryNext, Some("SketchEntry")),
-        KeyBinding::new("alt-left", SketchEntryPrev, Some("SketchEntry")),
         KeyBinding::new("escape", SketchEntryCancel, Some("SketchEntry")),
         // With no input open (the hints showing): the other hint (live).
         KeyBinding::new("tab", SketchHintTab, Some("Sketch")),
@@ -628,7 +626,7 @@ impl PartStudioView {
                     // The press goes on to the editor too, which turns it
                     // into a label drag / selection.
                     MouseButton::Left => {
-                        let additive = modifiers.shift || modifiers.control || mac_cmd(modifiers);
+                        let additive = modifiers.shift || modifiers.control;
                         if *click_count >= 2 && d.driving {
                             if let Some(ed) = &mut self.sketch {
                                 ed.pressed_label = Some((cid, additive, false));
@@ -825,7 +823,7 @@ impl PartStudioView {
                 {
                     ed.link_edge_snap(id);
                 }
-                let (shift, dbl) = (modifiers.shift || modifiers.control || mac_cmd(modifiers), *click_count >= 2);
+                let (shift, dbl) = (modifiers.shift || modifiers.control, *click_count >= 2);
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_down(data, p, hovered, shift, dbl)) {
                     self.apply_outcome(out, window, cx);
                 }
@@ -1341,6 +1339,10 @@ impl PartStudioView {
                 self.message = Some((FeatureStatus::Warning, e));
                 window.focus(&self.focus, cx);
             }
+            Some(Err(e)) if e == crate::sketch_mode::DIM_NOT_POSITIVE || e == crate::sketch_mode::DIM_NOT_NEGATIVE => {
+                // Live (audit 1969: RADIUS −5): the box stays, pink, ✓ greyed.
+                self.ui.dim_invalid = true;
+            }
             Some(Err(e)) => {
                 // Show the resulting (possibly conflicting) state, red where it fails.
                 self.regen_sync(window, cx);
@@ -1412,14 +1414,7 @@ impl PartStudioView {
             return;
         }
         let Some(ed) = &mut self.sketch else { return };
-        // Alt+arrows switch between the boxes of a rectangle / ellipse.
         if m.alt {
-            if ed.otf.is_some() && matches!(ev.keystroke.key.as_str(), "left" | "right") {
-                ed.otf_step(if ev.keystroke.key == "left" { -1 } else { 1 });
-                self.refresh_scene(false, cx);
-                cx.notify();
-                cx.stop_propagation();
-            }
             return;
         }
         let ch = ev.keystroke.key_char.clone().unwrap_or_else(|| ev.keystroke.key.clone());
@@ -1577,7 +1572,7 @@ impl PartStudioView {
         cx.notify();
     }
 
-    /// Tab / Alt+arrows in the box: switch to the other box.
+    /// Tab in the box on the untouched suggestion: switch to the other box.
     fn otf_switch(&mut self, delta: isize, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(ed) = &mut self.sketch {
             ed.otf_step(delta);
@@ -2602,40 +2597,10 @@ impl PartStudioView {
 
     fn open_degree_edit(&mut self, id: noshape_sketch::EntityId, deg: usize, window: &mut Window, cx: &mut Context<Self>) {
         let st = cx.new(|cx| InputState::new(window, cx).default_value(deg.to_string()));
-        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
-            if let InputEvent::PressEnter { .. } = ev {
-                let text = st.read(cx).value().trim().to_string();
-                let res = match text.parse::<usize>() {
-                    Ok(n) => this.with_sketch(cx, |_, data| {
-                        let r = data.sketch.set_bezier_degree(id, n).map_err(|e| match e {
-                            noshape_sketch::SketchError::InvalidGeometry(m) => m,
-                            e => e.to_string(),
-                        });
-                        data.sketch.solve();
-                        r
-                    }),
-                    Err(_) => Some(Err("Enter a whole number".into())),
-                };
-                match res {
-                    Some(Ok(())) => {
-                        if let Some(ui) = this.ui_mut() {
-                            ui.degree_edit = None;
-                        }
-                        if let Some(ed) = &mut this.sketch {
-                            ed.message = None;
-                        }
-                        this.regen_sync(window, cx);
-                        window.focus(&this.focus, cx);
-                    }
-                    Some(Err(m)) => {
-                        if let Some(ed) = &mut this.sketch {
-                            ed.message = Some(m);
-                        }
-                    }
-                    None => {}
-                }
-                cx.notify();
-            }
+        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, _, ev: &InputEvent, window, cx| match ev {
+            InputEvent::PressEnter { .. } => this.commit_degree(id, window, cx),
+            InputEvent::Change => cx.notify(),
+            _ => {}
         });
         st.update(cx, |s, cx| {
             s.focus(window, cx);
@@ -2644,6 +2609,35 @@ impl PartStudioView {
         if let Some(ui) = self.ui_mut() {
             ui.degree_edit = Some((id, st, sub));
         }
+        cx.notify();
+    }
+
+    /// The degree typed in a Bezier's degree box, when it is one live
+    /// accepts (1..=15); otherwise the box is pink and ✓ greyed (live).
+    fn typed_degree(st: &Entity<InputState>, cx: &App) -> Option<usize> {
+        st.read(cx).value().trim().parse::<usize>().ok().filter(|n| (1..=15).contains(n))
+    }
+
+    fn commit_degree(&mut self, id: noshape_sketch::EntityId, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(st) = self.ui_ref().and_then(|u| u.degree_edit.as_ref()).map(|(_, st, _)| st.clone()) else { return };
+        let Some(n) = Self::typed_degree(&st, cx) else { return };
+        let ok = self.with_sketch(cx, |_, data| {
+            let r = data.sketch.set_bezier_degree(id, n);
+            data.sketch.solve();
+            r.is_ok()
+        });
+        if ok != Some(true) {
+            return;
+        }
+        self.close_degree_edit(window, cx);
+        self.regen_sync(window, cx);
+    }
+
+    fn close_degree_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(ui) = self.ui_mut() {
+            ui.degree_edit = None;
+        }
+        window.focus(&self.focus, cx);
         cx.notify();
     }
 
@@ -3448,7 +3442,7 @@ impl PartStudioView {
                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
                         // Not consumed: the viewport receives the press too and the
                         // editor turns it into a label drag / selection.
-                        let additive = ev.modifiers.shift || ev.modifiers.control || mac_cmd(&ev.modifiers);
+                        let additive = ev.modifiers.shift || ev.modifiers.control;
                         if ev.click_count >= 2 && driving {
                             if let Some(ed) = &mut this.sketch {
                                 ed.pressed_label = Some((cid, additive, false));
@@ -3474,7 +3468,40 @@ impl PartStudioView {
             if let Some((ee, st)) = &degree_edit
                 && *ee == id
             {
-                out.push(div().absolute().left(px(x + 10.0)).top(px(y - 26.0)).w(px(60.)).occlude().child(Input::new(st).xsmall()).into_any_element());
+                let invalid = Self::typed_degree(st, cx).is_none();
+                let button = |id: &'static str| div().id(id).ml(px(4.)).size(px(22.)).flex().items_center().justify_center().rounded(px(4.));
+                out.push(
+                    div()
+                        .absolute()
+                        .left(px(x + 10.0))
+                        .top(px(y - 28.0))
+                        .flex()
+                        .items_center()
+                        .p(px(2.))
+                        .rounded(px(4.))
+                        .bg(pal.panel)
+                        .shadow_md()
+                        .occlude()
+                        .child(gpui_kit::base::input::input_frame(crate::quantity_field::invalid_field(div().id("bez-deg-field").w(px(44.)).child(Input::new(st).xsmall()), invalid)))
+                        .child(
+                            button("bez-deg-ok")
+                                .bg(pal.accept)
+                                .when(invalid, crate::ui::disabled_accept)
+                                .when(!invalid, |d| d.cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.commit_degree(id, window, cx))))
+                                .child(Icon::new(gpui_kit::component::IconName::Check).with_size(px(16.)).text_color(gpui_kit::rgb_static(0xffffff))),
+                        )
+                        .child(
+                            button("bez-deg-cancel")
+                                .bg(rgb(0xffffff))
+                                .border_1()
+                                .border_color(rgb(0xcccccc))
+                                .cursor_pointer()
+                                .hover(|d| d.bg(pal.panel_hover))
+                                .child(crate::assets::icon("dim-cancel", 22., cx))
+                                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_degree_edit(window, cx))),
+                        )
+                        .into_any_element(),
+                );
                 continue;
             }
             out.push(
@@ -3503,7 +3530,9 @@ impl PartStudioView {
         }
 
         // ---- constraint glyphs
-        let show_all = ed.show_constraints || ed.shift_held;
+        // Live (audit 1969): Shift with Show constraints off shows only the
+        // hovered entity's glyphs, as hover does anyway.
+        let show_all = ed.show_constraints;
         let recent = ed.glyph_entity.filter(|(_, t)| t.elapsed().as_millis() < 750).map(|(e, _)| e);
         let glyphs: Vec<_> = ed
             .constraint_glyphs(&data)
@@ -3657,7 +3686,7 @@ impl PartStudioView {
                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, _, _| {
                         // Drag to move the glyph, click to select its constraint.
                         if let Some(ed) = &mut this.sketch {
-                            ed.pressed_glyph = Some((cid, gent, ev.modifiers.shift || ev.modifiers.control || mac_cmd(&ev.modifiers)));
+                            ed.pressed_glyph = Some((cid, gent, ev.modifiers.shift || ev.modifiers.control));
                         }
                     }))
                     .into_any_element(),
@@ -3767,8 +3796,6 @@ impl PartStudioView {
                         .w(px(100.))
                         .occlude()
                         .key_context("SketchEntry")
-                        .on_action(cx.listener(|this, _: &SketchEntryNext, window, cx| this.otf_switch(1, window, cx)))
-                        .on_action(cx.listener(|this, _: &SketchEntryPrev, window, cx| this.otf_switch(-1, window, cx)))
                         .on_action(cx.listener(|this, _: &SketchEntryTab, window, cx| this.otf_tab(1, window, cx)))
                         .on_action(cx.listener(|this, _: &SketchEntryBackTab, window, cx| this.otf_tab(-1, window, cx)))
                         .on_action(cx.listener(|this, _: &SketchEntryCancel, window, cx| this.cancel_otf(window, cx)))
@@ -4353,15 +4380,14 @@ impl PartStudioView {
             m = m.item(item(&format!("Confirm {sketch_name}"), Box::new(|this, window, cx| this.accept_edit(false, window, cx))));
             m = m.separator();
             if drawing_spline {
-                if tool == Tool::Spline {
-                    m = m.item(item("Confirm spline", Box::new(|this, w, cx| {
+                let confirm = || -> SketchMenuAction {
+                    Box::new(|this, w, cx| {
                         if let Some(out) = this.with_sketch(cx, |ed, data| ed.confirm_spline(data)) {
                             this.apply_outcome(out, w, cx);
                         }
-                    })));
-                } else {
-                    m = m.item(item("Escape bezier", Box::new(|this, _, cx| this.sketch_cancel(cx))));
-                }
+                    })
+                };
+                m = if tool == Tool::Spline { m.item(item("Confirm spline", confirm())) } else { m.item(item("Confirm bezier", confirm())) };
                 m = m.separator();
             }
             // Live Onshape order (sketch/31, 37, 204): Confirm | Use | copy &
@@ -4920,9 +4946,3 @@ mod ui_tests;
 /// `dimension_menu_items` (several configuration inputs).
 const CONFIGURE_SUBMENU: &str = "Configure dimension\u{25b8}";
 
-/// Cmd on macOS only (on Windows and Linux `platform` is the Windows / Super
-/// key, which Onshape doesn't use for selection). Provisional until live's Mac
-/// key list says which of these Onshape takes Cmd for (lead 11-04).
-fn mac_cmd(m: &gpui_kit::Modifiers) -> bool {
-    cfg!(target_os = "macos") && m.platform
-}

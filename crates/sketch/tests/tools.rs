@@ -92,7 +92,7 @@ fn split_and_extend() {
     let mut sk = Sketch::new();
     let l = sk.add_line(v(0.0, 0.0), v(2.0, 0.0));
     let wall = sk.add_line(v(5.0, -1.0), v(5.0, 1.0));
-    sk.extend(l, v(1.9, 0.0)).unwrap();
+    sk.extend(l, wall).unwrap();
     assert!((sk.curve(l).unwrap().end_point() - v(5.0, 0.0)).length() < 1e-9);
     let rep = sk.solve();
     assert!(rep.is_solved());
@@ -104,12 +104,26 @@ fn split_and_extend() {
     // arc extend
     let mut sk = Sketch::new();
     let a = sk.add_arc(v(0.0, 0.0), v(1.0, 0.0), v(0.0, 1.0));
-    sk.add_line(v(-2.0, 0.0), v(-0.5, 0.0));
-    sk.add_line(v(-0.5, 0.0), v(-2.0, 0.0001));
+    let to = sk.add_line(v(-2.0, 0.0), v(-1.5, 0.0));
     sk.add_line(v(-2.0, -0.2), v(2.0, -0.2));
-    let _ = sk.extend(a, v(0.0, 1.0));
+    sk.extend(a, to).unwrap();
     let c = sk.curve(a).unwrap();
-    assert!(c.end_point().x < -0.99, "{c:?}");
+    assert!((c.end_point() - v(-1.0, 0.0)).length() < 1e-9, "{c:?}");
+
+    // Live (audit 1969): the boundary counts as its infinite line, and the
+    // end that reaches it moves.
+    let mut sk = Sketch::new();
+    let l = sk.add_line(v(0.0, 0.06), v(0.02, 0.06));
+    let short = sk.add_line(v(0.05, 0.03), v(0.05, 0.05));
+    sk.extend(l, short).unwrap();
+    let c = sk.curve(l).unwrap();
+    assert!((c.start_point() - v(0.0, 0.06)).length() < 1e-12);
+    assert!((c.end_point() - v(0.05, 0.06)).length() < 1e-9, "{c:?}");
+    assert!(sk.solve().is_solved());
+    let left = sk.add_line(v(-0.01, -0.01), v(-0.01, 0.01));
+    sk.extend(l, left).unwrap();
+    let c = sk.curve(l).unwrap();
+    assert!((c.start_point() - v(-0.01, 0.06)).length() < 1e-9, "the start reaches the left boundary: {c:?}");
 }
 
 #[test]

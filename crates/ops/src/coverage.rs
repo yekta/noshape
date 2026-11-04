@@ -526,7 +526,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Edit sketch appearance…", Op("part_set_appearance")),
     ("partStudio:Edit thickness analysis", Op("analysis_thickness")),
     ("partStudio:Edit…", Op("feature_edit")),
-    ("partStudio:Escape bezier", Op("sketch_draw")),
+    ("partStudio:Confirm bezier", Op("sketch_draw")),
     ("partStudio:Expand all", Op("ui_list")),
     ("partStudio:Export as DXF/DWG…", Op("sketch_export")),
     ("partStudio:Export…", Op("export_parts")),

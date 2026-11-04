@@ -3922,10 +3922,10 @@ impl AssemblyView {
                     this.open_dof_chooser(cx);
                     return;
                 }
-                // Ctrl+click (also Cmd on macOS, provisional until live's Mac
-                // key list) adds a mate to the selection (or takes it out).
+                // Ctrl+click or Cmd+click adds a mate to the selection (or takes
+                // it out), on every OS (live's lists: `metaKey || ctrlKey`).
                 let m = ev.modifiers();
-                if (m.control || (cfg!(target_os = "macos") && m.platform)) && this.selected_mate.is_some_and(|s| s != id) {
+                if (m.control || m.platform) && this.selected_mate.is_some_and(|s| s != id) {
                     if let Some(i) = this.ui.more_mates.iter().position(|x| *x == id) {
                         this.ui.more_mates.remove(i);
                     } else {
@@ -6328,9 +6328,9 @@ impl AssemblyView {
                 cx.notify();
             }))
             .on_modifiers_changed(cx.listener(|this, ev: &ModifiersChangedEvent, _, cx| {
-                // Ctrl (also Cmd on macOS, provisional until live's Mac key
-                // list) tap cycles the dragged connector in snap mode.
-                let ctrl = ev.modifiers.control || (cfg!(target_os = "macos") && ev.modifiers.platform);
+                // A Control tap cycles the dragged connector in snap mode
+                // (Control on a Mac too: live's Control-only keys).
+                let ctrl = ev.modifiers.control;
                 if ctrl && !this.ctrl_down {
                     this.cycle_snap_source(cx);
                 }

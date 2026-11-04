@@ -60,9 +60,9 @@ pub fn ops() -> Vec<Op> {
         ),
         op(
             "extend",
-            "Extend lines or arcs to the next curve (the Extend tool)",
-            "Each click extends the line or arc under it, from its end nearest the click, to the next curve it meets. `entities` (optional, same length) names the curve under each click.",
-            vec![req("points", points(), "Clicks near the end to extend."), opt("entities", json!({ "type": "array", "items": { "type": "string" } }), "The curve under each click (optional).")],
+            "Extend lines or arcs to a boundary curve (the Extend tool)",
+            "Clicks go in pairs, as in Onshape: first the line or arc to extend, then the boundary curve. The boundary counts whole (a line as its infinite line, an arc as its circle); the end that reaches it first moves onto it. `entities` (optional, same length) names the curve under each click.",
+            vec![req("points", points(), "Clicks in pairs: on the curve to extend, then on its boundary."), opt("entities", json!({ "type": "array", "items": { "type": "string" } }), "The curve under each click (optional).")],
             extend,
         ),
         op(

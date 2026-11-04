@@ -93,7 +93,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("sketch_export", &[r##"{"sketch": "Sketch 1", "file": "/tmp/profile.dxf"}"##, r##"{"face": "face:…", "file": "/tmp/face.svg", "format": "svg"}"##]),
     ("sketch_copy_entities", &[r##"{"sketch": "Sketch 1", "entities": ["entity:…"], "offset": [20, 0]}"##, r##"{"sketch": "Sketch 1", "entities": ["entity:…"], "to": "Sketch 2"}"##]),
     ("sketch_trim", &[r##"{"sketch": "Sketch 1", "points": [[15, 0]]}"##]),
-    ("sketch_extend", &[r##"{"sketch": "Sketch 1", "points": [[29, 10]]}"##]),
+    ("sketch_extend", &[r##"{"sketch": "Sketch 1", "points": [[29, 10], [40, 0]]}"##]),
     ("sketch_split", &[r##"{"sketch": "Sketch 1", "points": [[20, 0]]}"##]),
     ("sketch_spline_point", &[r##"{"sketch": "Sketch 1", "entity": "entity:…", "point": [12, 4]}"##]),
     ("sketch_fillet", &[r##"{"sketch": "Sketch 1", "entities": ["entity:…", "entity:…"], "radius": "5 mm"}"##]),

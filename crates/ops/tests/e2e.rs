@@ -495,7 +495,7 @@ fn sketch_trim_extend_split() {
     // Extend a short horizontal line to the vertical one.
     let c = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "line", "points": [[-10, 6], [-4, 6]] }));
     let c = id_of(created(&c, "line")[0]);
-    call(&mut ctx, "sketch_extend", json!({ "sketch": sk, "points": [[-4.5, 6]], "entities": [c] }));
+    call(&mut ctx, "sketch_extend", json!({ "sketch": sk, "points": [[-4.5, 6], [0, 8]] }));
     let ext = entities(&mut ctx, &sk, "line").into_iter().find(|l| l["id"] == c.as_str()).unwrap();
     assert!(near(&ext["end"], 0.0, 6.0) || near(&ext["start"], 0.0, 6.0), "{ext}");
     // A drag path trims what it crosses: a lone line is deleted.

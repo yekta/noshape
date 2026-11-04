@@ -1410,14 +1410,14 @@ Examples:
 
 #### sketch_extend
 
-Extend lines or arcs to the next curve (the Extend tool) (edits the document (one undoable history entry)).
+Extend lines or arcs to a boundary curve (the Extend tool) (edits the document (one undoable history entry)).
 
-Each click extends the line or arc under it, from its end nearest the click, to the next curve it meets. `entities` (optional, same length) names the curve under each click.
+Clicks go in pairs, as in Onshape: first the line or arc to extend, then the boundary curve. The boundary counts whole (a line as its infinite line, an arc as its circle); the end that reaches it first moves onto it. `entities` (optional, same length) names the curve under each click.
 
 Examples:
 
 ```json
-{"sketch": "Sketch 1", "points": [[29, 10]]}
+{"sketch": "Sketch 1", "points": [[29, 10], [40, 0]]}
 ```
 
 | field | type | | description |
@@ -1425,7 +1425,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
-| `points` | array of array of number or string | required | Clicks near the end to extend. |
+| `points` | array of array of number or string | required | Clicks in pairs: on the curve to extend, then on its boundary. |
 | `entities` | array of string |  | The curve under each click (optional). |
 
 #### sketch_split

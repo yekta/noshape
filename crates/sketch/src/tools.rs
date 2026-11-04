@@ -360,55 +360,62 @@ impl Sketch {
         Ok(res)
     }
 
-    /// Extends a line or arc at the end nearest to `pick` up to the next
-    /// intersection with another curve.
-    pub fn extend(&mut self, id: EntityId, pick: DVec2) -> Result<EditResult> {
+    /// The Extend tool (live: two picks): extends the line or arc `id` to
+    /// `boundary`, taken whole (a line as its infinite line, an arc as its
+    /// circle), from whichever end reaches it first.
+    pub fn extend(&mut self, id: EntityId, boundary: EntityId) -> Result<EditResult> {
         let tol = self.tool_tol();
         let e = self.entity(id).ok_or(SketchError::UnknownEntity(id))?.clone();
         let (s, en) = e.endpoints().ok_or_else(|| SketchError::OperationFailed("cannot extend a closed curve".into()))?;
         let (ps, pe) = (self.point(s).unwrap(), self.point(en).unwrap());
-        let at_end = (pick - pe).length() <= (pick - ps).length();
-        let moving = if at_end { en } else { s };
         let extent = self.bbox().size().max_element().max(1.0) * 100.0;
-        let mut best: Option<(f64, DVec2, EntityId, Option<EntityId>)> = None;
-        let mut consider = |sk: &Sketch, probe: &Curve2, score: &dyn Fn(f64, DVec2) -> Option<f64>| {
-            for other in sk.curve_ids() {
-                if other == id {
-                    continue;
-                }
-                let Some(oc) = sk.curve(other) else { continue };
-                for x in intersect(probe, &oc, tol) {
-                    if let Some(sc) = score(x.t1, x.point)
-                        && best.is_none_or(|b| sc < b.0) {
-                            let at_point = sk.endpoints(other).and_then(|(a, b)| {
-                                [a, b].into_iter().find(|p| sk.point(*p).is_some_and(|q| (q - x.point).length() <= 4.0 * tol))
-                            });
-                            best = Some((sc, x.point, other, at_point));
-                        }
+        let whole = match self.curve(boundary).ok_or(SketchError::UnknownEntity(boundary))? {
+            Curve2::Line { a, b } => {
+                let d = (b - a).normalize();
+                Curve2::Line { a: a - d * extent, b: b + d * extent }
+            }
+            Curve2::Arc { center, radius, .. } => Curve2::Circle { center, radius },
+            Curve2::EllipticalArc { center, major, minor, .. } => Curve2::Ellipse { center, major, minor },
+            c => c,
+        };
+        // (score, point, moving end)
+        let mut best: Option<(f64, DVec2, EntityId)> = None;
+        let mut consider = |probe: &Curve2, moving: EntityId, score: &dyn Fn(f64) -> Option<f64>| {
+            for x in intersect(probe, &whole, tol) {
+                if let Some(sc) = score(x.t1)
+                    && best.is_none_or(|b| sc < b.0)
+                {
+                    best = Some((sc, x.point, moving));
                 }
             }
         };
         match &e.geometry {
             Geometry::Line { .. } => {
-                let (from, dir) = if at_end { (pe, (pe - ps).normalize()) } else { (ps, (ps - pe).normalize()) };
-                let probe = Curve2::Line { a: from, b: from + dir * extent };
-                consider(self, &probe, &|t, _| (t * extent > tol * 10.0).then_some(t));
+                for (from, dir, moving) in [(pe, (pe - ps).normalize(), en), (ps, (ps - pe).normalize(), s)] {
+                    let probe = Curve2::Line { a: from, b: from + dir * extent };
+                    consider(&probe, moving, &|t| (t * extent > tol * 10.0).then_some(t * extent));
+                }
             }
             Geometry::Arc { .. } => {
                 let Some(Curve2::Arc { center, radius, start_angle, end_angle }) = self.curve(id) else { unreachable!() };
                 let probe = Curve2::Circle { center, radius };
                 let eps = 10.0 * tol / radius;
-                consider(self, &probe, &|t, _| {
-                    let d = if at_end { norm_angle(t - end_angle) } else { norm_angle(start_angle - t) };
-                    let max_ext = TAU - (end_angle - start_angle);
-                    (d > eps && d < max_ext - eps).then_some(d)
+                let max_ext = TAU - (end_angle - start_angle);
+                consider(&probe, en, &|t| {
+                    let d = norm_angle(t - end_angle);
+                    (d > eps && d < max_ext - eps).then_some(d * radius)
+                });
+                consider(&probe, s, &|t| {
+                    let d = norm_angle(start_angle - t);
+                    (d > eps && d < max_ext - eps).then_some(d * radius)
                 });
             }
             _ => return Err(SketchError::OperationFailed("extend supports lines and arcs".into())),
         }
-        let (_, p, other, at_point) = best.ok_or_else(|| SketchError::OperationFailed("nothing to extend to".into()))?;
+        let (_, p, moving) = best.ok_or_else(|| SketchError::OperationFailed("nothing to extend to".into()))?;
+        let at_point = self.endpoints(boundary).and_then(|(a, b)| [a, b].into_iter().find(|q| self.point(*q).is_some_and(|q| (q - p).length() <= 4.0 * tol)));
         let mut res = EditResult::default();
-        let cut = Cut { t: 0.0, p, other, at_point };
+        let cut = Cut { t: 0.0, p, other: boundary, at_point };
         let np = self.point_at_cut(&cut, &mut res);
         if let Some(ent) = self.entity_mut(id) {
             ent.replace_point(moving, np);

@@ -43,11 +43,10 @@ fn base_step(dim: Dim, prefs: &UnitPrefs) -> f64 {
     }
 }
 
-/// A step's Ctrl: Control, or Cmd on macOS only (on Windows and Linux the
-/// Windows / Super key does nothing here). Cmd is provisional until live's Mac
-/// key list says whether Onshape takes it (lead 11-04).
+/// A step's Ctrl: the Control key on every OS, a Mac included (live's Mac key
+/// list: only its ctrl/cmd pairs take Cmd, and this isn't one).
 pub fn step_ctrl(m: &gpui_kit::Modifiers) -> bool {
-    m.control || (cfg!(target_os = "macos") && m.platform)
+    m.control
 }
 
 /// The modifiers of a step.
