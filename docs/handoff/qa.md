@@ -7,6 +7,17 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 right (7607.301), mirror set and cli-fillet-segv right; published 08:43:30 (all three bundles); the release tarball is byte-identical to the smoked artifact.
 Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfmir2 B P0.
 
+**v0.4.25 (published 05:49, cut d9fb8f44 = 38d75390 + bump, contains greens through ad60edf9; Release run 41775622951)
+smoked 05:51–06:11: good, no new blocker.** Artifacts: the published Linux tarball, CLI tarball and .deb are
+byte-identical to the run's linux-x86_64 artifact; SHA256SUMS OK; 11 assets. CLI / app as CLI "0.4.25"; round trip 67643.716875
+/ 18 (= v0.4.24); volume sweep = v0.4.24; the 44 ticket documents = green 56a0f49b (the 05:00 list's); fixed tickets hold;
+the user's cases pass (knurl CP12 9.3 s 11598.041; vase 47331.776 / 58694.861 / 63464.509; split-and-chamfer; Y Ribs). App rows
+pixel-identical to v0.4.24. Open P0s CRASH-3151 (open dies 3 / 3) and CRASH-3388 (1 of 2 opens dies) as on v0.4.24.
+**Updater: v0.4.24 → v0.4.25 works**: fetched 05:53:54 (~5 min after publish), staged 05:53:58, the notice now a toast at the
+bottom ("Updated — restart to finish", Restart, What's new); Restart → 0.4.25, g34 reopened (qa-scratch/upd425-0.png, -1.png).
+Memory: seed 508 peak 771 MB (v0.4.24 652; at the same steps ~120 MB higher), 685 495 MB; the session took 459 s vs 168 s but
+under the smoke's load — A/B back to back running (/tmp/qa-memab.sh → cli/memab.txt).
+
 **v0.4.24 (published 18:19, cut 0c383064 = 45c8921d + lead's secondary-z test fix; Release run 41682389383) smoked
 18:22–18:39: good, no blocker.** Artifacts: the published Linux tarball, CLI tarball and .deb are byte-identical to the
 run's linux-x86_64 artifact; SHA256SUMS OK; 11 assets. CLI / app as CLI "0.4.24"; round trip Parasolid / ACIS / STEP /
