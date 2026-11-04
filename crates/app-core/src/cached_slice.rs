@@ -40,7 +40,12 @@ pub struct Slice<V: 'static> {
     followed: Option<(EntityId, Subscription)>,
     /// See [`Slice::sized`].
     measure: Rc<Measure>,
+    /// See [`Slice::keyed`]: the key, and its value at the last invalidation by the parent.
+    key: Option<(SliceKey<V>, Option<u64>)>,
 }
+
+/// What a slice shows of its parent, as a number ([`Slice::keyed`]).
+type SliceKey<V> = Box<dyn Fn(&V, &App) -> u64>;
 
 #[derive(Default)]
 struct Measure {
@@ -57,8 +62,8 @@ impl<V: 'static> Slice<V> {
     /// own notifications.
     pub fn new(parent: &Entity<V>, render: impl Fn(&mut V, &mut Window, &mut Context<V>) -> AnyElement + 'static, cx: &mut App) -> Entity<Self> {
         cx.new(|cx| {
-            let sub = cx.observe(parent, Self::invalidate);
-            Self { parent: parent.downgrade(), render: Rc::new(render), subs: vec![sub], followed: None, measure: Rc::default() }
+            let sub = cx.observe(parent, Self::parent_notified);
+            Self { parent: parent.downgrade(), render: Rc::new(render), subs: vec![sub], followed: None, measure: Rc::default(), key: None }
         })
     }
 
@@ -81,6 +86,25 @@ impl<V: 'static> Slice<V> {
         this.update(cx, |s, cx| {
             s.followed = other.map(|o| (o.entity_id(), cx.observe(o, Self::invalidate)));
         });
+    }
+
+    /// Invalidate the slice on its parent's notifications only when `key` (what it shows of the parent; the
+    /// entities it observes still invalidate it) changed: a Part Studio's row click re-rendered its toolbar
+    /// (~20 ms of layout on a big studio). The key must cover everything the slice reads from the parent; when in
+    /// doubt it should change (a new value each call re-renders always).
+    pub fn keyed(this: &Entity<Self>, key: impl Fn(&V, &App) -> u64 + 'static, cx: &mut App) {
+        this.update(cx, |s, _| s.key = Some((Box::new(key), None)));
+    }
+
+    fn parent_notified(&mut self, parent: Entity<V>, cx: &mut Context<Self>) {
+        if let Some((key, last)) = &mut self.key {
+            let now = key(parent.read(cx), cx);
+            if *last == Some(now) {
+                return;
+            }
+            *last = Some(now);
+        }
+        self.invalidate(parent, cx);
     }
 
     fn invalidate<T>(&mut self, _: Entity<T>, cx: &mut Context<Self>) {

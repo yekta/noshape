@@ -5953,6 +5953,26 @@ impl PartStudioView {
             Slice::observing(s, &self.doc, cx);
         }
         Slice::observing(&toolbar, &self.doc, cx);
+        // The toolbar re-renders when what it shows changes, not on every notify (a row click: ~20 ms of layout on
+        // cf-straight-spline). In a sketch or customizing the toolbar every notify counts.
+        Slice::keyed(&toolbar, |this: &PartStudioView, cx: &App| {
+            use std::hash::{Hash, Hasher};
+            static ALWAYS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            if this.sketch.is_some() || this.ui.tb_custom.is_some() {
+                return ALWAYS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) | (1 << 63);
+            }
+            let mut h = std::hash::DefaultHasher::new();
+            this.edit.as_ref().map(|e| e.dialog.read(cx).feature.type_id.clone()).hash(&mut h);
+            this.ui.regen_paused.is_some().hash(&mut h);
+            format!("{:?}", this.ui.toolbar).hash(&mut h);
+            let mut faces: Vec<_> = this.ui.toolbar_faces.iter().collect();
+            faces.sort();
+            faces.hash(&mut h);
+            this.ui.configure_pick.hash(&mut h);
+            this.palette.is_some().hash(&mut h);
+            this.palette_found_tool(cx).hash(&mut h);
+            h.finish() & !(1 << 63)
+        }, cx);
         let s = PsSlices { toolbar, underlay, overlay, features, parts };
         self.slices = Some(s.clone());
         s
