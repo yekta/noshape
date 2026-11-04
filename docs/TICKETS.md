@@ -53,14 +53,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - Natives std calls that the FeatureScript host lacks (lead 11-04 13:08, after DISPLACEMENT-MAP; dx 11-04 14:53:
   native_args.rs MISSING and MISSING_OLDER; callers traced through std 3095). P1 where a standard feature noshape runs
   by std (regen::std_route, bridging curve) reaches it: the user sees that feature fail. Owner dx unless noted.
-  - [ ] P1 FS-NATIVE-OPDERIP @opDerip: std's sheetMetalBend, sheetMetalJog and sheetMetalTab (run by std here) call it
+  - [ ] P1 FS-NATIVE-OPDERIP (dx 11-04 17:32: std derips by moving each definition face's rip edge onto its part
+    face, std's own createDeripOptions (moveFace.fs) giving one option per face, our opEdgeChange keying moves by edge
+    only; what the faces become after (joined or left apart) needs live: REQUESTS 17:32, a Tab / Bend across a
+    corner rip) @opDerip: std's sheetMetalBend, sheetMetalJog and sheetMetalTab (run by std here) call it
     through sheetMetalDeripCall (also moveFace and SMFlatOp in std).
   - [x] (dx 11-04 16:59: Trim curve's evaluator for the documented fields; sheet metal Loft's `trimToPoints` with
     `helpPointPosition` splits the wire at those points and keeps the piece by the help point (core's curves.rs
     `trim_wire_at`, split out of trim_curve). T1 ops_harness moveCurveBoundary.)
     P1 FS-NATIVE-OPMOVECURVEBOUNDARY @opMoveCurveBoundary: std's sheetMetalLoft (run by std here); also std's
     trimCurve and offsetCurveOnFace (ours run natively).
-  - [ ] P1 FS-NATIVE-EVSHEETMETALBENDUP @evSheetMetalBendUp: std's pcbEnd (run by std here).
+  - [ ] P1 FS-NATIVE-EVSHEETMETALBENDUP (dx 11-04 17:32: unreachable here yet: pcbEnd asks it of the bend
+    centerline wire bodies associated with the definition's bends, which our sheet metal doesn't make, and calls it in
+    `try silent` (a failure reads as "down")) @evSheetMetalBendUp: std's pcbEnd (run by std here).
   - [x] (dx 11-04 16:17: the second fundamental form's derivative along a tangent, from the kernel's second
     derivatives (`face_d2_at_uvs`) 10 µm each way; evFaceCurvatures answers std's typed FaceCurvatureResult (it
     returned plain numbers, so evFaceCurvature always failed under std 3095) with general surfaces' curvatures (it
@@ -70,7 +75,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     `is` / `as` between `&&` and `*` (REQUESTS 16:17).)
     P1 FS-NATIVE-EVFACECURVATUREDERIVATIVES @evFaceCurvatureDerivatives: std's bridgingCurve (Bridging curve always
     runs by std when the host is loaded) through evFaceCurvatureDerivative.
-  - [ ] P1 FS-NATIVE-OPSMFLATOPERATION @opSMFlatOperation: std's SMFlatOp (sketching on a sheet metal flat; noshape
+  - [ ] P1 FS-NATIVE-OPSMFLATOPERATION (dx 11-04 17:32: its only caller is std's SMFlatOp, the feature a sketch on a
+    sheet metal flat makes; noshape has no such feature yet, so nothing reaches it) @opSMFlatOperation: std's SMFlatOp (sketching on a sheet metal flat; noshape
     has no such feature yet), its only caller.
   - [ ] P2 FS-NATIVE-OPIMPORTFOREIGN @opImportForeign: std's importForeign (ours runs natively): custom features only.
   - [ ] P2 FS-NATIVE-OPOFFSETCURVEONFACE @opOffsetCurveOnFace: std's offsetCurveOnFace (ours natively): custom
