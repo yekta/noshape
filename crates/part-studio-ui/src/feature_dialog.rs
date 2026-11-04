@@ -28,6 +28,8 @@ pub use ui_state::field_focus;
 pub enum DialogEvent {
     /// The chip of a mate connector made inside the feature asks for its own editor (live 1851: "Click to edit").
     EditSubFeature(noshape_model::reference::FeatureId),
+    /// A broken chip's Edit healthy moment (live 1993 (b)): the history's last moment where this selection held.
+    EditHealthyMoment(Reference),
     /// The draft changed; regenerate the preview.
     Changed,
     Accept { repeat: bool },
@@ -3076,6 +3078,9 @@ impl FeatureDialog {
                                 let view = cx.entity();
                                 let p3 = path_s.clone();
                                 let pick_configure = pick_configure.clone();
+                                // A broken pick (its creator gone, or after this feature) has Edit healthy moment
+                                // last (live 1990 5.15 / 1993 (c)).
+                                let healthy_ref = (missing || later).then(|| r.clone());
                                 move |menu, _, _| {
                                     let v2 = view.clone();
                                     let pb = p3.clone();
@@ -3098,6 +3103,13 @@ impl FeatureDialog {
                                                 this.changed(cx);
                                                 cx.notify();
                                             })
+                                        }));
+                                    }
+                                    if let Some(hr) = healthy_ref.clone() {
+                                        let v = view.clone();
+                                        m = m.item(crate::os_menu::OsMenuItem::new("Edit healthy moment").on_click(move |_, _, cx| {
+                                            let hr = hr.clone();
+                                            v.update(cx, |_, cx| cx.emit(DialogEvent::EditHealthyMoment(hr)));
                                         }));
                                     }
                                     match &pick_configure {

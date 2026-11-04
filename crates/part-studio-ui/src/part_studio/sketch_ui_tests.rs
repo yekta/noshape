@@ -2079,6 +2079,37 @@ fn a_selected_faces_edges_are_outlined(cx: &mut TestAppContext) {
     assert_eq!(outlined, expected);
 }
 
+/// Live 1993 (b): Edit healthy moment on a broken chip (the Fillet moved above its Extrude) opens the Repair panel at
+/// the last moment the pick held, the one before the move.
+#[gpui::test]
+fn edit_healthy_moment_opens_the_moment_before_the_break(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } },
+        { "type": "fillet", "name": "Fillet 1", "params": { "entities": ["edge through [20, 0, 10]"], "radius": "2 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "healthy-moment", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let tab = cx.update(|cx| view.read(cx).tab);
+    let (fillet, edge) = cx.update(|cx| {
+        let f = view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Fillet 1").unwrap().clone();
+        (f.id, f.params.query("entities")[0].clone())
+    });
+    view.update(cx, |v, cx| {
+        v.doc.update(cx, |doc, cx| {
+            doc.edit_studio(tab, "Move Fillet 1", cx, |ps| {
+                let f = ps.features.remove(2);
+                ps.features.insert(1, f);
+                Some(())
+            })
+        });
+    });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    view.update(cx, |v, cx| v.edit_healthy_moment(fillet, edge, cx));
+    wait_until(cx, window, |cx| crate::repair_mode::is_open(&view.read(cx).doc, cx));
+    assert!(cx.update(|cx| crate::repair_mode::is_open(&view.read(cx).doc, cx)), "the Repair panel at the moment before the move");
+}
+
 /// Live 1993 (c): the Extrude a Fillet's edge came from deleted, its chip reads "Missing Edge", in the error state.
 #[gpui::test]
 fn a_chip_whose_creator_is_deleted_reads_missing_edge(cx: &mut TestAppContext) {

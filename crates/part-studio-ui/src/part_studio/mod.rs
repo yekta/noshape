@@ -43,6 +43,7 @@ pub mod export;
 mod flat_export;
 mod connector_look;
 mod inference;
+mod healthy;
 mod plane_handles;
 mod shown_dims;
 pub mod toolbar_prefs;
@@ -2289,7 +2290,7 @@ impl PartStudioView {
         if is_derived || dialog.read(cx).ty.id == "sheetMetalFormed" || dialog.read(cx).ty.params.iter().any(|s| matches!(s.kind, noshape_model::params::ParamKind::Reference { .. })) {
             self.set_reference_sources(&dialog, cx);
         }
-        let sub = cx.subscribe_in(&dialog, window, |this: &mut Self, _, ev: &DialogEvent, window, cx| match ev {
+        let sub = cx.subscribe_in(&dialog, window, |this: &mut Self, emitter, ev: &DialogEvent, window, cx| match ev {
             DialogEvent::Changed => {
                 if let Some(e) = &mut this.edit
                     && e.dialog.update(cx, |d, _| d.take_no_undo_step())
@@ -2304,6 +2305,10 @@ impl PartStudioView {
             }
             DialogEvent::Accept { repeat } => this.accept_edit(*repeat, window, cx),
             DialogEvent::EditSubFeature(sub) => this.open_sub_editor(*sub, window, cx),
+            DialogEvent::EditHealthyMoment(pick) => {
+                let feature = emitter.read(cx).feature.id;
+                this.edit_healthy_moment(feature, pick.clone(), cx);
+            }
             // Live (behaviours "psui (10-27, PANEL-BLEED)"): an analysis panel
             // opened over the dialog closes on the first Esc, the dialog on
             // the second.
