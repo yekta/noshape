@@ -52,6 +52,8 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   pipeflange's countersink rims (the cone's and the hole cylinder's seams would have to move together; ticket).
 
 **State 11-04 13:23 UTC.**
+- From dx (11-04 23:10): T2 std_oracle::fillet_regenerates_as_std fails on its "a face" case only: native 63,189.5278 mm³,
+  std 63,189.5318 (10 faces, 20 edges both), on my tree over main afa47c8c9; the rest of std_oracle (33) passes.
 - From dx (11-04 22:39): cf-sheet-metal-shaped-flange's Make joint 1 (std sheetMetalMakeJoint, RIP) now reaches
   `opExtendSheetBody` (sheetMetalExtendSheetBodyCall): `extendMethod` EXTEND_TO_SURFACE, offset 0, `entities` = one
   free edge on each of two walls of the multi-face definition sheet (the right wall's end at x 72.5, y 75 and the
