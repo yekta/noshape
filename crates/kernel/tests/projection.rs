@@ -71,3 +71,32 @@ fn curved_draft_face_interior_points() {
     let drafted = r.faces().into_iter().find(|f| matches!(f.face_surface(), Ok(k::Surface::BSpline { .. }))).unwrap();
     check(&drafted, &|p| r.classify_point(p, 1e-7).unwrap() == k::PointClass::OnBoundary);
 }
+
+/// A plate's face with 400 holes (a Fill pattern's): a point over the face projects onto the plane, a point over a
+/// hole onto the hole's rim, a point over the plate's corner onto the corner (the fast paths: the plane's foot when
+/// inside, else the nearest edge by the edges' boxes).
+#[test]
+fn projection_onto_a_face_with_many_holes() {
+    let mut s = k::make_box_corners(DVec3::ZERO, DVec3::new(0.1, 0.1, 0.002)).unwrap();
+    let mut holes = Vec::new();
+    for i in 0..20 {
+        for j in 0..20 {
+            let c = DVec3::new(0.0025 + 0.005 * i as f64, 0.0025 + 0.005 * j as f64, -0.001);
+            holes.push(k::make_cylinder(&k::Plane::from_normal(c, DVec3::Z), 0.001, 0.004, 2.0 * PI).unwrap());
+        }
+    }
+    s = k::cut(&s, &k::fuse_all(&holes, &k::BooleanOptions::default()).unwrap().shape).unwrap().shape;
+    let top = s.faces().into_iter().find(|f| f.is_planar() && (f.centroid().unwrap().z - 0.002).abs() < 1e-9).unwrap();
+    assert_eq!(top.edges().len(), 404);
+    let h = 0.003;
+    // Over the face between holes.
+    let q = top.project_point(DVec3::new(0.005, 0.005, 0.002 + h)).unwrap();
+    assert!((q.distance - h).abs() < 1e-12 && q.point.distance(DVec3::new(0.005, 0.005, 0.002)) < 1e-12, "{q:?}");
+    // Over a hole's centre: its rim, r 1 mm away sideways.
+    let c = DVec3::new(0.0475, 0.0525, 0.002);
+    let q = top.project_point(c + DVec3::Z * h).unwrap();
+    assert!((q.distance - (h * h + 0.001f64.powi(2)).sqrt()).abs() < 1e-9 && ((q.point - c).length() - 0.001).abs() < 1e-9, "{q:?}");
+    // Past the plate's corner.
+    let q = top.project_point(DVec3::new(-0.001, -0.001, 0.002)).unwrap();
+    assert!(q.point.distance(DVec3::new(0.0, 0.0, 0.002)) < 1e-9, "{q:?}");
+}

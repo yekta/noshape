@@ -3781,6 +3781,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   all the hole tools); live's whole document is 4.7 s. dx 11:49: the time is in noshape's own Boolean: boolean_in's piece
   classification walks every coplanar pair for every piece and solid (crates/brep/src/boolean.rs ~4788), half of the
   document's time; handoff/bool.md "From dx (11-04 11:49)".
+  core 11-04 12:54 (lead: cf-fill-pattern's evArea / evVolume): there are none in the feature; sampled stacks (vibe5,
+  release, NOSHAPE_KERNEL_PROFILE): (1) 18 s of the Fill pattern's 40 s were face projections in the sheet metal
+  rebuild (host sheetmetal.rs part_sources / keep_names: 31,546 calls), 126 of them ~140 ms each on the plate's face
+  with 1,744 edges (BRepExtrema measured every edge, then face_interior_nearest 220 ms). Kernel fix: on an elementary
+  surface the foot when the face classifier says inside; off a face of many edges the nearest edge by the edges'
+  boxes; no interior search on a plane (geom.cpp face_project_point; T1 kernel
+  projection::projection_onto_a_face_with_many_holes). The feature 42.9 -> 25.0 s. (2) **For dx**: the ~195,000
+  props_surface calls (12 s + 13 s + 5.6 s in the marks) come from the parity translator, ops parity.rs `query_with`
+  (each face's centroid and area per query, a new Shape each time so the kernel's per-shape cache never hits): runner
+  time, not the regeneration's; a per-face cache there (or one centroid per face per document) removes it. (3) The
+  Fill pattern makes 1,737 parts where live makes 2 (the first difference), so the runner's end-of-document measures
+  (props_surface / props_volume over 1,737 parts, ~16 s) follow from that (dx). Left in the feature: Booleans 9.7 s
+  (bool) and the host's own work.
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet

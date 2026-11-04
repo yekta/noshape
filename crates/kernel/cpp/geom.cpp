@@ -1,5 +1,7 @@
 // Geometry queries, mass properties, measurement.
 #include "internal.hpp"
+#include <GeomAPI_ProjectPointOnSurf.hxx>
+#include <BRepClass_FaceClassifier.hxx>
 #include <Poly_Triangulation.hxx>
 
 #include <BRepAdaptor_Curve.hxx>
@@ -49,7 +51,6 @@
 #include <IntCurvesFace_ShapeIntersector.hxx>
 #include <IntCurveSurface_TransitionOnCurve.hxx>
 #include <TopoDS_Iterator.hxx>
-#include <BRepClass_FaceClassifier.hxx>
 #include <gp_Sphere.hxx>
 #include <gp_Torus.hxx>
 
@@ -526,8 +527,105 @@ static bool face_interior_nearest(const TopoDS_Face& f, const gp_Pnt& p, double&
 
 ProjPoint face_project_point(const OcShape& fs, P3 p)
 {
-  const TopoDS_Face&         f = as_face(fs.shape, "shape");
-  TopoDS_Vertex              v = BRepBuilderAPI_MakeVertex(to_pnt(p));
+  const TopoDS_Face& f = as_face(fs.shape, "shape");
+  // On an elementary surface, the foot on it when it is inside the face: the nearest point there. (BRepExtrema below
+  // also measures the point against every edge and vertex: 0.6 ms a call on a plate's face with a Fill pattern's 1,700
+  // holes. Not on free-form ones: their projection can stop at another extremum, PROJ-RULED.)
+  const GeomAbs_SurfaceType kind = BRepAdaptor_Surface(f, false).GetType();
+  if (kind == GeomAbs_Plane || kind == GeomAbs_Cylinder || kind == GeomAbs_Cone || kind == GeomAbs_Sphere || kind == GeomAbs_Torus)
+  {
+    const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(f);
+    if (!surf.IsNull())
+    {
+      GeomAPI_ProjectPointOnSurf pr(to_pnt(p), surf);
+      if (pr.IsDone() && pr.NbPoints() > 0)
+      {
+        double u, v;
+        pr.LowerDistanceParameters(u, v);
+        BRepClass_FaceClassifier fc(f, gp_Pnt2d(u, v), BRep_Tool::Tolerance(f));
+        if (fc.State() == TopAbs_IN)
+        {
+          ProjPoint r{};
+          r.point    = from_pnt(pr.NearestPoint());
+          r.distance = pr.LowerDistance();
+          r.u        = u;
+          r.v        = v;
+          return r;
+        }
+      }
+    }
+  }
+  TopoDS_Vertex v = BRepBuilderAPI_MakeVertex(to_pnt(p));
+  // Off a face of many edges (a plate's 1,700 holes): the nearest point of its edges, visited by their boxes' distance
+  // (BRepExtrema measured every edge, 140 ms a call), unless an interior point is nearer (as below).
+  {
+    ShapeIMap es;
+    TopExp::MapShapes(f, TopAbs_EDGE, es);
+    if (es.Extent() >= 64)
+    {
+      const gp_Pnt                         P = to_pnt(p);
+      std::vector<std::pair<double, int>> order;
+      for (int i = 1; i <= es.Extent(); ++i)
+      {
+        if (BRep_Tool::Degenerated(TopoDS::Edge(es(i))))
+          continue;
+        Bnd_Box b;
+        BRepBndLib::Add(es(i), b);
+        if (b.IsVoid())
+          continue;
+        double x0, y0, z0, x1, y1, z1;
+        b.Get(x0, y0, z0, x1, y1, z1);
+        const double dx = std::max({x0 - P.X(), 0.0, P.X() - x1}), dy = std::max({y0 - P.Y(), 0.0, P.Y() - y1}), dz = std::max({z0 - P.Z(), 0.0, P.Z() - z1});
+        order.emplace_back(std::sqrt(dx * dx + dy * dy + dz * dz), i);
+      }
+      std::sort(order.begin(), order.end());
+      double      best = std::numeric_limits<double>::infinity(), bt = 0;
+      gp_Pnt      bp;
+      TopoDS_Edge be;
+      for (const auto& [bd, i] : order)
+      {
+        if (bd > best)
+          break;
+        const TopoDS_Edge&         e = TopoDS::Edge(es(i));
+        BRepExtrema_DistShapeShape de(v, e);
+        if (!de.IsDone() || de.NbSolution() < 1 || de.Value() >= best)
+          continue;
+        best = de.Value();
+        bp   = de.PointOnShape2(1);
+        be   = e;
+        if (de.SupportTypeShape2(1) == BRepExtrema_IsVertex)
+          bt = BRep_Tool::Parameter(TopoDS::Vertex(de.SupportOnShape2(1)), e);
+        else
+          de.ParOnEdgeS2(1, bt);
+      }
+      if (!be.IsNull())
+      {
+        ProjPoint r{};
+        double    iu, iv;
+        gp_Pnt    iq;
+        // (A plane's only interior candidate is the foot found outside above; that search took 220 ms there.)
+        if (kind != GeomAbs_Plane && face_interior_nearest(f, P, iu, iv, iq) && iq.Distance(P) < best - 1e-12)
+        {
+          r.point    = from_pnt(iq);
+          r.distance = iq.Distance(P);
+          r.u        = iu;
+          r.v        = iv;
+          return r;
+        }
+        r.point    = from_pnt(bp);
+        r.distance = best;
+        double                          f0, l0;
+        const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(be, f, f0, l0);
+        if (!pc.IsNull())
+        {
+          const gp_Pnt2d uv = pc->Value(bt);
+          r.u               = uv.X();
+          r.v               = uv.Y();
+        }
+        return r;
+      }
+    }
+  }
   BRepExtrema_DistShapeShape d(v, f);
   if (!d.IsDone() || d.NbSolution() < 1)
     fail_op("point projection onto face failed");
