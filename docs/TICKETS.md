@@ -495,6 +495,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P0 SPLIT-FACE-SAME-ID (core; the user's Gyro case, lead 11-04 20:35, core fixing) **one Split across several bodies gives
+  their cut faces one id, so a face feature on one body's cut face acts on every body with that id**: the faces of Split 1 on
+  the three rings of /root/qa-scratch/tickets/gyro/Gyro.noshape (the user's; = lead-scratch/gyro) all have the same id
+  (query_entities: 3 of 3 "Split 1" faces share `face:bcpBCo…`); the app's pick ("Face of Split 1") stores that id. In the app
+  (green 40b44000, vibe3): pick the outer ring's top face, Chamfer → the preview's edges run on all three rings; 0.5 mm → "Failed
+  to chamfer selections." (5 mm, the user's value, is too big for 4.4 mm rings: "Distance of chamfer on face too large." on any).
+  **Generic, scripted**: tickets/gyro/mk3box.py builds three separate 10 × 4 × 10 boxes and one Split by Right (6 parts, 3 of the 6
+  cut faces share an id); `bin/splitface_matrix.py <cli> tickets/gyro/qa-3box.noshape "Split 1" "Part 3"` picks Part 3's cut face:
+  **chamfer, fillet, shell (remove the face), Move face offset each change Part 3 and Parts 1 and 5** (all Ok), delete face fails;
+  on Gyro (`bin/splitface_matrix.py <cli>`) chamfer / fillet / shell / Move face fail and **delete face deletes it on all three
+  rings** (Part 3 456.159 → 812.416, Parts 1 and 2 change too). live: each body's cut face is its own (a chamfer of one ring's top
+  changes that ring only). qa verifies with both matrices + tickets/gyro/chamfer1.py when the fix lands (only the picked body may
+  change). (qa 2026-11-04 20:44, green 40b44000)
 - [ ] P1 DISPLACEMENT-MAP (user, lead 11-04; core: opReplaceFace, dx: the rest incl. opCreateBSplineSurface) the user's
   Displacement map FeatureScript (/root/lead-scratch/disp/) replaces a face by a B-spline surface. core 11-04 13:19:
   opReplaceFace failed (a) on a curved face and (b) with a template partly below and partly above the face; now such
