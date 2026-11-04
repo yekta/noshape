@@ -2114,7 +2114,8 @@ impl PartStudioView {
             self.ui.recent_tools.truncate(8);
         }
         let index = studio.rollback_index();
-        self.apply_remembered(&mut feature);
+        let units = self.doc.read(cx).session.doc.settings.units;
+        self.apply_remembered(&mut feature, &units);
         // Preselection fills the first compatible selection field (Onshape behavior).
         if let Some(ty) = features::get(type_id) {
             // Features selected in the list preselect too (a selected
@@ -2452,7 +2453,8 @@ impl PartStudioView {
         let type_id = feature.type_id.clone();
         let name = feature.name.clone();
         let (index, is_new) = (e.index, e.is_new);
-        self.remember_values(&feature);
+        let units = self.doc.read(cx).session.doc.settings.units;
+        self.remember_values(&feature, &units);
         let config_values = self.config_values.clone();
         self.doc.update(cx, |doc, cx| {
             let desc = if is_new { noshape_ops::studio::insert_description(&name) } else { noshape_ops::studio::edit_description(&name) };

@@ -401,6 +401,11 @@ fn main() {
         return;
     }
     noshape_render::perf::process_start();
+    // Feature dialogs' remembered values last across sessions (live 1987); not under the ui-parity driver, whose
+    // runs must not depend on one another.
+    if std::env::var_os("NOSHAPE_UI_SCRIPT").is_none() {
+        noshape_app_core::feature_settings::enable();
+    }
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,naga=warn,wgpu=warn,zbus=warn,tracing=warn")).init();
     // Initializes the GPU on a background thread; the first use waits for it.
     let gpu = gpu::Gpu::new().expect("could not start the GPU thread");

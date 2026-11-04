@@ -462,7 +462,8 @@ pub struct UiState {
     pub oriented: bool,
     /// Values of REMEMBER_PREVIOUS_VALUE parameters from the last accepted
     /// feature of each type (Onshape defaults new features to them).
-    pub remembered: std::collections::HashMap<(String, &'static str), ParamValue>,
+    /// Remembered values committed this session, per feature type (see app-core feature_settings).
+    pub remembered: std::collections::HashMap<String, crate::feature_settings::Groups>,
     /// Feature list: "Default geometry" and "Parts" folders collapsed.
     pub default_geometry_collapsed: bool,
     /// Folders the user opened (true) or closed (false) in this view, over
@@ -3734,20 +3735,30 @@ impl PartStudioView {
 
     // ------------------------------------------------------------ remembered values
 
-    /// Store the REMEMBER_PREVIOUS_VALUE parameters of an accepted feature.
-    pub(super) fn remember_values(&mut self, f: &noshape_model::partstudio::Feature) {
+    /// Store the REMEMBER_PREVIOUS_VALUE parameters of a committed feature (live 1987: per feature type, for the
+    /// user, in every document; lengths and angles per the document's units, the rest everywhere).
+    pub(super) fn remember_values(&mut self, f: &noshape_model::partstudio::Feature, units: &noshape_units::UnitPrefs) {
         let Some(ty) = f.feature_type() else { return };
+        let mut groups = crate::feature_settings::Groups::new();
         for spec in ty.params.iter().filter(|s| s.hints.has(noshape_model::params::Hints::REMEMBER_PREVIOUS_VALUE)) {
             if let Some(v) = f.params.get(spec.id) {
-                self.ui.remembered.insert((f.type_id.clone(), spec.id), v.clone());
+                groups.entry(remembered_group(&spec.kind, units)).or_default().insert(spec.id.to_string(), v.clone());
             }
         }
+        let mine = self.ui.remembered.entry(f.type_id.clone()).or_default();
+        for (g, values) in &groups {
+            mine.insert(g.clone(), values.clone());
+        }
+        crate::feature_settings::put(&f.type_id, &groups);
     }
 
-    /// Defaults of a new feature from the last accepted one of its type.
-    pub(super) fn apply_remembered(&self, f: &mut noshape_model::partstudio::Feature) {
-        for ((ty, id), v) in &self.ui.remembered {
-            if *ty == f.type_id {
+    /// A new feature opens with what the user last committed in its type: the values without units and those of
+    /// the document's length and angle units.
+    pub(super) fn apply_remembered(&self, f: &mut noshape_model::partstudio::Feature, units: &noshape_units::UnitPrefs) {
+        let saved = self.ui.remembered.get(&f.type_id).cloned().unwrap_or_else(|| crate::feature_settings::get(&f.type_id));
+        let groups = [String::new(), format!("length:{:?}", units.length), format!("angle:{:?}", units.angle)];
+        for values in groups.iter().filter_map(|g| saved.get(g)) {
+            for (id, v) in values {
                 f.params.set(id, v.clone());
             }
         }
@@ -4462,5 +4473,15 @@ mod edge_end_tests {
         assert!(!super::has_ends(&circle));
         assert!(super::has_ends(&[DVec3::ZERO, DVec3::new(60.0, 0.0, 0.0)]));
         assert!(super::has_ends(&circle[..33]));
+    }
+}
+
+/// Which list a remembered parameter is kept in: lengths and angles per the document's unit, the rest everywhere.
+fn remembered_group(kind: &noshape_model::params::ParamKind, units: &noshape_units::UnitPrefs) -> String {
+    use noshape_model::params::{NumKind, ParamKind};
+    match kind {
+        ParamKind::Num(n) if n.kind == NumKind::Length => format!("length:{:?}", units.length),
+        ParamKind::Num(n) if n.kind == NumKind::Angle => format!("angle:{:?}", units.angle),
+        _ => String::new(),
     }
 }

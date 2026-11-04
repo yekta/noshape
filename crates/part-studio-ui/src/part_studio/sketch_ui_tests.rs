@@ -2147,3 +2147,29 @@ fn a_hole_placed_on_an_in_feature_mate_connector(cx: &mut TestAppContext) {
     });
     assert!(hole_ok && !features.iter().any(|t| t == "mateConnector"), "{features:?}");
 }
+
+/// Live 1987: a committed Hole's remembered values open the next new Hole; its Units / Style tabs (no units) in every
+/// document, its diameter only in documents of the same length unit.
+#[gpui::test]
+fn remembered_hole_values_follow_the_document_units(cx: &mut TestAppContext) {
+    let (_window, view, _top, _) = block_part(cx, "remembered-hole");
+    let (mm, inch) = {
+        let mm = noshape_units::UnitPrefs::default();
+        let mut inch = mm;
+        inch.length = noshape_units::LengthUnit::Inch;
+        (mm, inch)
+    };
+    let mut hole = cx.update(|cx| view.read(cx).studio(cx).unwrap().new_feature("hole", &mm).unwrap());
+    hole.params.set("styleV2", noshape_model::ParamValue::Enum("C_BORE".into()));
+    hole.params.set("holeDiameterV3", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("7 mm")));
+    view.update(cx, |v, _| v.remember_values(&hole, &mm));
+    let reopened = |units: &noshape_units::UnitPrefs, cx: &mut TestAppContext| {
+        let mut f = cx.update(|cx| view.read(cx).studio(cx).unwrap().new_feature("hole", units).unwrap());
+        cx.update(|cx| view.read(cx).apply_remembered(&mut f, units));
+        (f.params.enum_("styleV2").to_string(), f.params.expr("holeDiameterV3").map(|e| e.text.clone()).unwrap_or_default())
+    };
+    assert_eq!(reopened(&mm, cx), ("C_BORE".to_string(), "7 mm".to_string()));
+    let (style, dia) = reopened(&inch, cx);
+    assert_eq!(style, "C_BORE");
+    assert_ne!(dia, "7 mm", "the mm diameter isn't an inch document's");
+}
