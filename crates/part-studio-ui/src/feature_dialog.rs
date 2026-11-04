@@ -1732,7 +1732,14 @@ impl FeatureDialog {
                 rows.push((format!("Edges of {}", (self.labeler)(r)), vec![k], r.clone()));
                 continue;
             }
-            rows.push(((self.labeler)(r), vec![k], r.clone()));
+            // An entity whose creating feature is gone reads by its kind (live 1993 (c): "Missing Edge").
+            let missing = match r {
+                Reference::Face(_) if self.ref_missing(r) => Some("Missing Face"),
+                Reference::Edge(_) if self.ref_missing(r) => Some("Missing Edge"),
+                Reference::Vertex(_) if self.ref_missing(r) => Some("Missing Vertex"),
+                _ => None,
+            };
+            rows.push((missing.map(String::from).unwrap_or_else(|| (self.labeler)(r)), vec![k], r.clone()));
         }
         rows
     }

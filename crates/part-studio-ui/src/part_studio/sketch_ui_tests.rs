@@ -2079,6 +2079,36 @@ fn a_selected_faces_edges_are_outlined(cx: &mut TestAppContext) {
     assert_eq!(outlined, expected);
 }
 
+/// Live 1993 (c): the Extrude a Fillet's edge came from deleted, its chip reads "Missing Edge", in the error state.
+#[gpui::test]
+fn a_chip_whose_creator_is_deleted_reads_missing_edge(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } },
+        { "type": "fillet", "name": "Fillet 1", "params": { "entities": ["edge through [20, 0, 10]"], "radius": "2 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "deleted-creator-chip", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let tab = cx.update(|cx| view.read(cx).tab);
+    view.update(cx, |v, cx| {
+        v.doc.update(cx, |doc, cx| {
+            doc.edit_studio(tab, "Delete Extrude 1", cx, |ps| {
+                ps.features.retain(|f| f.name != "Extrude 1");
+                Some(())
+            })
+        });
+    });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let fillet = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Fillet 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(fillet, w, cx))).unwrap();
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Fillet dialog").dialog.clone());
+    let field = cx.update_window(window, |_, w, cx| {
+        let state = dialog.read(cx).ui_state(w, cx);
+        state["fields"].as_array().unwrap().iter().find(|f| f["kind"] == "query").cloned().unwrap()
+    }).unwrap();
+    assert_eq!((field["items"].clone(), field["state"].clone()), (serde_json::json!(["Missing Edge"]), serde_json::json!("error")));
+}
+
 /// Live 1990 (5.15): a Fillet moved above the Extrude whose edge it takes: its chip is that edge made by a later
 /// feature (grey italic, not missing).
 #[gpui::test]

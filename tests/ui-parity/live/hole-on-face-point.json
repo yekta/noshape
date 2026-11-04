@@ -1,6 +1,6 @@
 {
  "scenario": "hole-on-face-point",
- "recorded": "2026-11-04T11:02:14.912Z",
+ "recorded": "2026-11-04T11:27:04.576Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "7d78c2c423d178cd0ff99ad4",
+  "element": "81dd209a61049bb3a70cd787",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -122,9 +122,17 @@
        "state": "ok"
       },
       {
-       "label": null,
+       "label": "Hole type",
        "kind": "enum",
        "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
        "state": "ok"
       },
       {
@@ -212,9 +220,17 @@
         "state": "ok"
        },
        {
-        "label": null,
+        "label": "Hole type",
         "kind": "enum",
         "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
         "state": "ok"
        },
        {
@@ -309,7 +325,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 26162
+   "t": 29031
   },
   {
    "step": 2,
@@ -375,9 +391,17 @@
        "state": "ok"
       },
       {
-       "label": null,
+       "label": "Hole type",
        "kind": "enum",
        "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
        "state": "ok"
       },
       {
@@ -465,9 +489,17 @@
         "state": "ok"
        },
        {
-        "label": null,
+        "label": "Hole type",
         "kind": "enum",
         "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
         "state": "ok"
        },
        {
@@ -562,7 +594,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 39844
+   "t": 44117
   },
   {
    "step": 3,
@@ -617,9 +649,17 @@
        "state": "ok"
       },
       {
-       "label": null,
+       "label": "Hole type",
        "kind": "enum",
        "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
        "state": "ok"
       },
       {
@@ -707,9 +747,17 @@
         "state": "ok"
        },
        {
-        "label": null,
+        "label": "Hole type",
         "kind": "enum",
         "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
         "state": "ok"
        },
        {
@@ -804,7 +852,7 @@
     "tooltip": null,
     "sketch": null
    },
-   "t": 44220
+   "t": 48374
   }
  ]
 }

@@ -192,15 +192,21 @@ impl FeatureDialog {
                     let missing = refs.iter().any(|r| self.ref_missing(r)) || (!refs.is_empty() && self.field_error(s.id).is_some());
                     fields.push(json!({ "label": label, "kind": "query", "items": items, "active": self.active_query.as_deref() == Some(s.id), "state": if missing { "error" } else { "ok" } }));
                 }
-                // A table (the Hole's type and size): one select per level, its name drawn beside it (live: no label).
-                // Live's recorder reads only the first level's select (1991: "Drilled", not its drill size), so the
-                // state lists that one.
+                // A table (the Hole's type and size): one select per level, each with its own label (live's recorder
+                // since 1994: "Hole type", "Drill size", …, `lookup: true`).
                 ParamKind::Lookup { table } => {
                     let cur = values.lookup(s.id).to_vec();
-                    let opts = noshape_model::features::hole_tables::table_levels(table, &[]);
-                    let chosen = cur.first().cloned().or_else(|| noshape_model::features::hole_tables::table_level_default(table, &[])).unwrap_or_default();
-                    if let Some(text) = opts.iter().find(|o| o.0 == chosen).map(|o| o.1.to_string()).or_else(|| (!opts.is_empty()).then(|| chosen.clone())) {
-                        fields.push(json!({ "label": null, "kind": "enum", "text": text, "state": "ok" }));
+                    let mut prefix: Vec<String> = Vec::new();
+                    for level in 0..7 {
+                        let opts = noshape_model::features::hole_tables::table_levels(table, &prefix);
+                        if opts.is_empty() {
+                            break;
+                        }
+                        let name = noshape_model::features::hole_tables::table_level_name(table, &prefix);
+                        let chosen = cur.get(level).cloned().or_else(|| noshape_model::features::hole_tables::table_level_default(table, &prefix)).unwrap_or_default();
+                        let text = opts.iter().find(|o| o.0 == chosen).map(|o| o.1.to_string()).unwrap_or_else(|| chosen.clone());
+                        fields.push(json!({ "label": name, "kind": "enum", "text": text, "lookup": true, "state": "ok" }));
+                        prefix.push(chosen);
                     }
                 }
                 // An array: live reads its box's text (its label, its entries and an item array's add button).
