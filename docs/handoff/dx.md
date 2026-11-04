@@ -11,6 +11,23 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-04 15:02 UTC: DISPLACEMENT-MAP (P1 from the user; TICKETS "From the user, 2026-11-04")
+- Landed: `x = append(x, v)` in place (interp.rs `assign_grown`; 58b8577c); evFaceTangentPlanes in one kernel call
+  (kernel `face_frames_at_uvs`), @opCreateBSplineSurface (ops.rs), brep::mesh takes B-spline faces closed round u and
+  thins grids past 400,000 nodes (4ded8d56); std's units / vector operators and length predicates natively from std
+  2506 (`featurescript/src/std_ops.rs`, each falling back to the FeatureScript body where it would answer otherwise;
+  T1 tests::std_unit_and_vector_operators_answer_as_their_bodies compares both; c14fea83). Queued: the mesher's
+  one-pass node evaluation (5.1 -> 2.6 s).
+- Probe: T2 model custom_features::displacement_map_probe (NOSHAPE_DISP_CSV=leather.csv; NOSHAPE_DISP_ONLY=side:false
+  adds the FeatureScript line profile). Locally: build on vibe5 (`rb.sh cargo test -p noshape-model --test all
+  --no-run`), copy target/debug/deps/all-72aab93f74ef6a9a to /root/dx-scratch/disp/all-test, run/perf here.
+- Side face, Replace off: 29 s -> 11.5 s (feature ~9 s, display mesh 2.6 s). Left: the points loop (~5 s; map-based
+  ValueWithUnits: allocation and BTreeMap work), 262,144 plane values (~1-2.4 s, the same), core's Replace face on the
+  512 side (> 10 min in OCCT's projection; core.md). Live's times: the lead is asking live.
+- Then: the 14 + 8 missing natives (TICKETS, P1: opDerip, opMoveCurveBoundary, evSheetMetalBendUp,
+  evFaceCurvatureDerivatives, opSMFlatOperation); the lead's platform rule for drawings and import/export (AGENTS.md
+  ad57a47b8: nothing only in the macOS menu bar).
+
 ## 11-04 12:54 UTC: std releases per pin (FS-OLD-STD-COMPAT, lead's decision)
 - `crates/featurescript/std-versions/<v>.zst`: each release's modules (`\0name\0len\0src`, sorted) packed by
   zstd with the embedded 3095 blob as prefix; `tools/std-pack.py --all` packs every live/std-<v> (skips 3095), ~10 s
