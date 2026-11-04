@@ -45,6 +45,28 @@ pub fn thread_cancel() -> usize {
 
 static STOP_HOOK: std::sync::OnceLock<fn() -> bool> = std::sync::OnceLock::new();
 
+/// The kernel's own per-thread stop state (its cancel flag and its budgets' deadlines) carried onto the Boolean's
+/// worker threads: what the calling thread has (`capture`), taken on a worker (`enter`, giving what to put back) and
+/// put back there (`leave`).
+#[derive(Clone, Copy)]
+pub struct ThreadHooks {
+    pub capture: fn() -> usize,
+    pub enter: fn(usize) -> usize,
+    pub leave: fn(usize),
+}
+
+static THREAD_HOOKS: std::sync::OnceLock<ThreadHooks> = std::sync::OnceLock::new();
+
+/// Sets the [`ThreadHooks`] (once).
+pub fn set_thread_hooks(hooks: ThreadHooks) {
+    let _ = THREAD_HOOKS.set(hooks);
+}
+
+/// The calling thread's state for its workers ([`ThreadHooks`]), if the kernel gave the hooks.
+pub(crate) fn thread_state() -> Option<(ThreadHooks, usize)> {
+    THREAD_HOOKS.get().map(|h| (*h, (h.capture)()))
+}
+
 /// A stop check asked with the thread's cancel flag (set once; the kernel's: its budgets' deadlines too, so a
 /// budgeted op's Boolean stops by declining instead of the budget's timer jumping out of it).
 pub fn set_stop_hook(hook: fn() -> bool) {

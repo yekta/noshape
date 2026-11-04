@@ -674,7 +674,9 @@ fn a_deadline_stops_a_long_operation() {
     let plate = make_box_corners(glam::DVec3::ZERO, glam::DVec3::new(0.2, 0.2, 0.002)).unwrap();
     let holes: Vec<Shape> = (0..900).map(|k| make_cylinder(&Plane::from_normal(glam::DVec3::new(0.005 + 0.0065 * (k / 30) as f64, 0.005 + 0.0065 * (k % 30) as f64, -0.001), glam::DVec3::Z), 0.002, 0.004, 2.0 * PI).unwrap()).collect();
     let tools = Shape::compound(&holes);
-    let (r, late) = with_deadline(0.01, || cut(&plate, &tools));
+    // (No time: stopped at the cut's first check whatever its path and the machine's speed (a 10 ms deadline let a fast
+    // machine finish it, the watcher's first look being at 50 ms).)
+    let (r, late) = with_deadline(0.0, || cut(&plate, &tools));
     assert!(late && r.is_err(), "{:?}", r.map(|x| x.shape.faces().len()));
     let (r, late) = with_deadline(60.0, || cut(&plate, &make_box_corners(glam::DVec3::ZERO, glam::DVec3::splat(0.01)).unwrap()));
     assert!(!late && r.is_ok());

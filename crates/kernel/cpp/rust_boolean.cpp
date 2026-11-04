@@ -77,6 +77,8 @@
 #include <TopoDS_Solid.hxx>
 #include <TopoDS_Wire.hxx>
 
+// boolean.cpp: this thread's cancel flag, budget deadline or memory watch says stop.
+extern "C" int noshape_should_break();
 
 namespace noshape {
 
@@ -2458,6 +2460,10 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   stop();
   if (const char* why = build(r, srcs, max_tol > 0 ? max_tol : 1e-7, out, hist))
     return decline(why);
+  // (Stopped while building (the cancel flag, a budget's deadline): OCCT's path stops at once with its error.)
+  stop();
+  if (noshape_should_break() != 0)
+    return decline(nullptr);
   // The result as OCCT's checker sees it, up to 2000 faces and 256 wires a face (a bigger one's check costs seconds:
   // the knurl's 2 s; its wires' check goes by pairs: a plate's face with 1739 holes 0.4 s): an invalid one declines
   // and OCCT builds the Boolean (invalid results of ours, fed into later OCCT operations, crashed them: fuzz seed
@@ -2473,6 +2479,9 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   const bool full_check = r.face_origin.size() / 3 <= 2000 && most_wires <= 256;
   if (full_check && !BRepCheck_Analyzer(out).IsValid())
     return decline("an invalid result");
+  stop();
+  if (noshape_should_break() != 0)
+    return decline(nullptr);
   // (Past that: each made face on a cylinder or cone its wires closed on its surface (a curve's piece on the wrong
   // part of its curve on the face left a Ø25 x 25 knurl's cylinder pieces open there: an invalid result, 0.6 % of
   // its volume off).)

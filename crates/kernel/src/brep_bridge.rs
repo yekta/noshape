@@ -358,6 +358,25 @@ impl SectionSource for Occt {
 unsafe extern "C" {
     // boolean.cpp: this thread's cancel flag or its budget's deadline says stop (OCCT's break hook).
     fn noshape_should_break() -> i32;
+    // boolean.cpp: this thread's cancel flag and deadline, for a worker (OCCT's pool's hooks).
+    fn noshape_pool_capture() -> *mut std::ffi::c_void;
+    fn noshape_pool_enter(context: *mut std::ffi::c_void) -> *mut std::ffi::c_void;
+    fn noshape_pool_leave(previous: *mut std::ffi::c_void);
+}
+
+fn pool_capture() -> usize {
+    // SAFETY: a plain C function of the kernel's, reading this thread's state.
+    unsafe { noshape_pool_capture() as usize }
+}
+
+fn pool_enter(context: usize) -> usize {
+    // SAFETY: `context` is a capture of the Boolean's calling thread, which waits for this worker.
+    unsafe { noshape_pool_enter(context as *mut std::ffi::c_void) as usize }
+}
+
+fn pool_leave(previous: usize) {
+    // SAFETY: `previous` is what `pool_enter` gave on this thread.
+    unsafe { noshape_pool_leave(previous as *mut std::ffi::c_void) }
 }
 
 fn kernel_should_break() -> bool {
@@ -367,6 +386,7 @@ fn kernel_should_break() -> bool {
 
 pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: bool, out: &mut BrepResult) -> bool {
     noshape_brep::set_stop_hook(kernel_should_break);
+    noshape_brep::set_thread_hooks(noshape_brep::ThreadHooks { capture: pool_capture, enter: pool_enter, leave: pool_leave });
     let op = match op {
         0 => Op::Fuse,
         1 => Op::Cut,

@@ -3148,24 +3148,35 @@ pub(crate) fn par_map<T: Send>(n: usize, f: &(dyn Fn(usize) -> T + Sync)) -> R<V
     }
     let next = std::sync::atomic::AtomicUsize::new(0);
     let flag = crate::thread_cancel();
+    let state = crate::thread_state();
+    let work = || {
+        let mut out = Vec::new();
+        loop {
+            let k = next.fetch_add(16, std::sync::atomic::Ordering::Relaxed);
+            if k >= n || crate::cancelled() {
+                break;
+            }
+            out.extend((k..(k + 16).min(n)).map(|i| (i, f(i))));
+        }
+        out
+    };
+    // (The calling thread works too: a budget's deadline on its CPU clock goes on running.)
     let mut parts: Vec<Vec<(usize, T)>> = std::thread::scope(|sc| {
-        let hs: Vec<_> = (0..threads)
+        let hs: Vec<_> = (1..threads)
             .map(|_| {
                 sc.spawn(|| {
                     crate::set_thread_cancel(flag);
-                    let mut out = Vec::new();
-                    loop {
-                        let k = next.fetch_add(16, std::sync::atomic::Ordering::Relaxed);
-                        if k >= n || crate::cancelled() {
-                            break;
-                        }
-                        out.extend((k..(k + 16).min(n)).map(|i| (i, f(i))));
+                    let back = state.map(|(h, s)| (h, (h.enter)(s)));
+                    let out = work();
+                    if let Some((h, b)) = back {
+                        (h.leave)(b);
                     }
                     out
                 })
             })
             .collect();
-        hs.into_iter().map(|h| h.join().expect("a worker")).collect()
+        let mine = work();
+        std::iter::once(mine).chain(hs.into_iter().map(|h| h.join().expect("a worker"))).collect()
     });
     crate::check_cancel()?;
     let mut all: Vec<(usize, T)> = parts.drain(..).flatten().collect();

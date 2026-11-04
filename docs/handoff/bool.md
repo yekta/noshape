@@ -97,6 +97,18 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   15 faces, 23 edges, 0 vertices after it (live.jsonl): Parasolid's bore rim is one closed edge with no vertex, so
   splitting it at our seam would add an edge live doesn't have. Taking that cut means the circle crossing the face's
   seam in the parameter plane only (two curves there of one edge, no vertex); not done.
+- Deadlines (bool, 11-04 22:38, lead P1: kernel_core::a_deadline_stops_a_long_operation failed on macOS, Ok(906)):
+  with_deadline's watcher looks first at 50 ms, so a fast machine finished the 900-hole cut under a 10 ms deadline.
+  Now with_deadline(0.0) is stopped from the start (the test uses it: deterministic on every platform). Our Boolean's
+  workers (par_map) take the calling thread's C++ cancel flag and deadline (OCCT's pool hooks, noshape_pool_capture /
+  enter / leave), so a ScopedDeadline or budget (fillet fallbacks, run_budgeted ops) stops their loops, not only the
+  calling thread's checks; the calling thread works a share too, so a budget's CPU-clock deadline (Linux) keeps
+  running through parallel stages. rust_boolean.cpp checks again after building the result and after BRepCheck; a
+  deadline hit there declines and OCCT's path stops at once with its own error (the flag: "cancelled", as OCCT's).
+  Parked (lead 11-04 21:16): the knurls below; live builds Ø63 x 33 CP30 45/30 (request 1914), Ø100 x 33 asked
+  (REQUESTS 21:16). motor-mount-jack's two declines are a jogged seam (a ruling, an arc, a ruling: core's seam movers),
+  not a crossing circle: day-scale work for ~0.2 s in one document; deferred. bool-dt (bool-c): arc quick boxes by
+  their sweep, the face boundary's span boxes cached (cf-drive-train-generator), not yet measured.
 - Knurls (bool, 11-04 21:09): bool-seam's two commits (7e0399baf, 865d8ce74) cherry-picked onto main: branch
   bool-knurl (8a051d476, in bool-c). The recorded Ø63 x 33 CP30 45/30 (vibe4 ~/agents/bool-corpora/k63-33-30) then
   goes from "a non-manifold result" (edges at the seam, x = -31.5 mm) to "two edges leave a vertex in one

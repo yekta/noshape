@@ -292,8 +292,9 @@ pub fn with_cancel<R>(flag: &std::sync::atomic::AtomicBool, f: impl FnOnce() -> 
 pub fn with_deadline<R>(seconds: f64, f: impl FnOnce() -> R) -> (R, bool) {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
-    let stop = Arc::new(AtomicBool::new(false));
-    let timed_out = Arc::new(AtomicBool::new(false));
+    // (No time at all: stopped from the start, at the work's first check.)
+    let stop = Arc::new(AtomicBool::new(seconds <= 0.0));
+    let timed_out = Arc::new(AtomicBool::new(seconds <= 0.0));
     // SAFETY (below): the outer flag outlives the `with_cancel` call around this one, so it outlives the watcher,
     // which ends before this returns.
     let outer = noshape_brep::thread_cancel();
