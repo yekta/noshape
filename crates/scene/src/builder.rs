@@ -51,13 +51,55 @@ pub struct PickTarget {
 
 #[derive(Clone, Debug, Default)]
 pub struct PickMap {
-    targets: Vec<PickTarget>,
+    /// Runs of consecutive ids, ascending by their first id − 1: a body's faces, edges and vertices are shared with
+    /// the previous build's while the body is unchanged ([`GpuCache`]'s `picks`: cloning every name each build took
+    /// most of a scene build on a dialog's open and close).
+    runs: Vec<(u32, PickRun)>,
+    /// The targets pushed one by one (planes, sketches, connectors), in [`PickRun::Own`] runs.
+    own: Vec<PickTarget>,
+    len: u32,
     /// Ids by [`shallow_hash`] of their reference: one group per distinct reference (a custom feature's faces are
     /// named from earlier faces, recursively; cloning and hashing every name whole took most of a scene build).
     by_ref: HashMap<u64, IdGroups, std::hash::BuildHasherDefault<KeyHasher>>,
     /// Per pickable body, ascending: (its first face id − 1, face count, its first edge id − 1, its index in the
     /// display's bodies).
     bodies: Vec<(u32, u32, u32, usize)>,
+}
+
+#[derive(Clone, Debug)]
+enum PickRun {
+    Shared(Arc<[PickTarget]>),
+    /// `own[from..from + len]`.
+    Own { from: usize, len: usize },
+}
+
+/// A body's pick targets and their [`shallow_hash`]es, kept across builds while its mesh lives and its names stay.
+struct BodyPicks {
+    faces: Arc<[PickTarget]>,
+    edges: Arc<[PickTarget]>,
+    vertices: Arc<[PickTarget]>,
+    hashes: [Vec<u64>; 3],
+}
+
+impl BodyPicks {
+    fn of(b: &noshape_model::display::BodyDisplay) -> Self {
+        let faces: Arc<[PickTarget]> = b.face_refs.iter().map(|r| PickTarget { reference: r.clone(), kind: PickKind::Face, anchor: None }).collect();
+        let edges: Arc<[PickTarget]> = b.edge_refs.iter().map(|r| PickTarget { reference: r.clone(), kind: PickKind::Edge, anchor: None }).collect();
+        let vertices: Arc<[PickTarget]> = b
+            .vertex_refs
+            .iter()
+            .enumerate()
+            .map(|(i, r)| PickTarget { reference: r.clone(), kind: PickKind::Vertex, anchor: b.mesh.vertices.get(i).map(|p| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)) })
+            .collect();
+        let hashes = [&faces, &edges, &vertices].map(|ts| ts.iter().map(|t| shallow_hash(&t.reference)).collect());
+        BodyPicks { faces, edges, vertices, hashes }
+    }
+
+    /// Whether these are `b`'s (same mesh, so the same vertex anchors): its names unchanged.
+    fn matches(&self, b: &noshape_model::display::BodyDisplay) -> bool {
+        let same = |ts: &[PickTarget], rs: &[Reference]| ts.len() == rs.len() && ts.iter().zip(rs).all(|(t, r)| t.reference == *r);
+        same(&self.faces, &b.face_refs) && same(&self.edges, &b.edge_refs) && same(&self.vertices, &b.vertex_refs)
+    }
 }
 
 /// The pick ids of one [`shallow_hash`]: one reference's (most), or groups of the references that share it.
@@ -183,11 +225,37 @@ fn shallow_hash(r: &Reference) -> u64 {
 impl PickMap {
     fn push(&mut self, t: PickTarget) -> u32 {
         let h = shallow_hash(&t.reference);
-        self.targets.push(t);
-        let id = self.targets.len() as u32;
-        let targets = &self.targets;
-        let same = |a: u32| targets[a as usize - 1].reference == targets[id as usize - 1].reference;
-        match self.by_ref.entry(h) {
+        self.own.push(t);
+        match self.runs.last_mut() {
+            Some((_, PickRun::Own { len, .. })) => *len += 1,
+            _ => self.runs.push((self.len, PickRun::Own { from: self.own.len() - 1, len: 1 })),
+        }
+        self.len += 1;
+        self.index(h, self.len);
+        self.len
+    }
+
+    /// Appends a run of targets with their hashes, returning the base such that its `k`-th (1-based) has id
+    /// `base + k`.
+    fn extend(&mut self, targets: &Arc<[PickTarget]>, hashes: &[u64]) -> u32 {
+        let base = self.len;
+        if targets.is_empty() {
+            return base;
+        }
+        self.runs.push((base, PickRun::Shared(targets.clone())));
+        self.len += targets.len() as u32;
+        for (k, &h) in hashes.iter().enumerate() {
+            self.index(h, base + k as u32 + 1);
+        }
+        base
+    }
+
+    /// Files id `id` (already stored) under its reference's hash `h`.
+    fn index(&mut self, h: u64, id: u32) {
+        let Self { runs, own, by_ref, .. } = self;
+        let at = |a: u32| target_in(runs, own, a).map(|t| &t.reference);
+        let same = |a: u32| at(a) == at(id);
+        match by_ref.entry(h) {
             std::collections::hash_map::Entry::Vacant(e) => {
                 e.insert(IdGroups::One(id));
             }
@@ -202,19 +270,15 @@ impl PickMap {
                 }
             }
         }
-        id
-    }
-    /// Reserve `n` consecutive ids, returning the base such that local id
-    /// `k` (1-based) maps to `base + k`.
-    fn reserve(&mut self, items: impl IntoIterator<Item = PickTarget>) -> u32 {
-        let base = self.targets.len() as u32;
-        for t in items {
-            self.push(t);
-        }
-        base
     }
     pub fn get(&self, id: u32) -> Option<&PickTarget> {
-        if id == 0 { None } else { self.targets.get(id as usize - 1) }
+        target_in(&self.runs, &self.own, id)
+    }
+    fn iter(&self) -> impl Iterator<Item = &PickTarget> {
+        self.runs.iter().flat_map(|(_, r)| match r {
+            PickRun::Shared(ts) => &ts[..],
+            PickRun::Own { from, len } => &self.own[*from..from + len],
+        })
     }
     /// The body (index in the display's bodies), face index and edge id base of face pick `id`.
     pub fn face_at(&self, id: u32) -> Option<(usize, usize, u32)> {
@@ -223,7 +287,7 @@ impl PickMap {
         (id > base && id - base <= count).then(|| (body, (id - base - 1) as usize, edge_base))
     }
     pub fn ids_for(&self, r: &Reference) -> &[u32] {
-        let same = |a: u32| self.targets[a as usize - 1].reference == *r;
+        let same = |a: u32| self.get(a).is_some_and(|t| t.reference == *r);
         match self.by_ref.get(&shallow_hash(r)) {
             Some(IdGroups::One(a)) if same(*a) => std::slice::from_ref(a),
             Some(IdGroups::Many(groups)) => groups.iter().find(|g| same(g[0])).map(|g| g.as_slice()).unwrap_or(&[]),
@@ -231,14 +295,14 @@ impl PickMap {
         }
     }
     pub fn len(&self) -> usize {
-        self.targets.len()
+        self.len as usize
     }
     /// Ids of the targets `f` accepts.
     pub fn ids_where<'a>(&'a self, f: impl Fn(&PickTarget) -> bool + 'a) -> impl Iterator<Item = u32> + 'a {
-        self.targets.iter().enumerate().filter(move |(_, t)| f(t)).map(|(i, _)| i as u32 + 1)
+        self.iter().enumerate().filter(move |(_, t)| f(t)).map(|(i, _)| i as u32 + 1)
     }
     pub fn is_empty(&self) -> bool {
-        self.targets.is_empty()
+        self.len == 0
     }
     pub fn priority_fn(&self) -> Arc<dyn Fn(u32) -> i32 + Send + Sync> {
         self.priority_fn_filtered(|_| true)
@@ -247,8 +311,19 @@ impl PickMap {
     /// Like [`Self::priority_fn`], but kinds `allow` rejects are never
     /// picked or hovered (a dialog field's selection filter, Onshape).
     pub fn priority_fn_filtered(&self, allow: impl Fn(PickKind) -> bool) -> Arc<dyn Fn(u32) -> i32 + Send + Sync> {
-        let prio: Vec<i32> = self.targets.iter().map(|t| if allow(t.kind) { t.kind.priority() } else { i32::MIN }).collect();
+        let prio: Vec<i32> = self.iter().map(|t| if allow(t.kind) { t.kind.priority() } else { i32::MIN }).collect();
         Arc::new(move |id| if id == 0 { -1 } else { prio.get(id as usize - 1).copied().unwrap_or(0) })
+    }
+}
+
+/// Pick `id`'s target in `runs` (ascending by first id − 1) and the singly pushed `own`.
+fn target_in<'a>(runs: &'a [(u32, PickRun)], own: &'a [PickTarget], id: u32) -> Option<&'a PickTarget> {
+    let k = runs.partition_point(|(base, _)| *base < id).checked_sub(1)?;
+    let (base, run) = &runs[k];
+    let i = (id - base - 1) as usize;
+    match run {
+        PickRun::Shared(ts) => ts.get(i),
+        PickRun::Own { from, len } => (i < *len).then(|| &own[from + i]),
     }
 }
 
@@ -286,6 +361,8 @@ pub struct GpuCache {
     lod_box: Option<MeshHandle>,
     /// Decal images decoded, keyed by their (shared) encoded bytes.
     decal_images: HashMap<usize, (std::sync::Weak<Vec<u8>>, Option<DecodedImage>)>,
+    /// Bodies' pick targets keyed by their mesh's pointer.
+    picks: HashMap<usize, (std::sync::Weak<noshape_model::display::MeshBuffers>, Arc<BodyPicks>)>,
 }
 
 
@@ -468,6 +545,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     cache.hidden_edges.retain(|_, (w, _)| w.strong_count() > 0);
     cache.tangent.retain(|_, (w, _)| w.strong_count() > 0);
     cache.images.retain(|_, (w, _)| w.strong_count() > 0);
+    cache.picks.retain(|_, (w, _)| w.strong_count() > 0);
     let mut bodies = 0u32;
     let bodies_from = scene.instances.len();
     for (part_index, b) in display.bodies.iter().enumerate().filter(|(_, b)| !b.hidden) {
@@ -484,15 +562,16 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
         let (face_base, edge_base, vert_base) = if display_only {
             (DISPLAY_ONLY_PICK_BASE, DISPLAY_ONLY_PICK_BASE, DISPLAY_ONLY_PICK_BASE)
         } else {
-            (
-                picks.reserve(b.face_refs.iter().map(|r| PickTarget { reference: r.clone(), kind: PickKind::Face, anchor: None })),
-                picks.reserve(b.edge_refs.iter().map(|r| PickTarget { reference: r.clone(), kind: PickKind::Edge, anchor: None })),
-                picks.reserve(b.vertex_refs.iter().enumerate().map(|(i, r)| PickTarget {
-                    reference: r.clone(),
-                    kind: PickKind::Vertex,
-                    anchor: b.mesh.vertices.get(i).map(|p| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)),
-                })),
-            )
+            let key = Arc::as_ptr(&b.mesh) as usize;
+            let bp = match cache.picks.get(&key).filter(|(_, bp)| bp.matches(b)) {
+                Some((_, bp)) => bp.clone(),
+                None => {
+                    let bp = Arc::new(BodyPicks::of(b));
+                    cache.picks.insert(key, (Arc::downgrade(&b.mesh), bp.clone()));
+                    bp
+                }
+            };
+            (picks.extend(&bp.faces, &bp.hashes[0]), picks.extend(&bp.edges, &bp.hashes[1]), picks.extend(&bp.vertices, &bp.hashes[2]))
         };
         if !display_only {
             picks.bodies.push((face_base, b.face_refs.len() as u32, edge_base, part_index));

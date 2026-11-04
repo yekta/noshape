@@ -230,3 +230,42 @@ fn a_failing_feature_leaves_the_hovered_part_unred() {
     assert!(flags(&edge).iter().all(|f| f & state::ERROR != 0), "the failing feature's input is red: {:?}", flags(&edge));
     assert!(flags(&top).iter().all(|f| f & state::ACCENT != 0 && f & state::ERROR == 0), "the hovered part's face isn't: {:?}", flags(&top));
 }
+
+/// A rebuild reuses each unchanged body's pick targets (the cache keyed by its mesh): the same ids for the same
+/// references; a body whose names changed over the same mesh (an earlier feature renamed) gets its new names.
+#[test]
+fn a_rebuild_keeps_the_pick_ids_and_follows_renamed_faces() {
+    let r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let display = block();
+    let (edge, top) = top_front(&display);
+    let up = r.uploader();
+    let mut cache = GpuCache::default();
+    let opts = SceneOptions { display_mode: DisplayMode::ShadedWithEdges, show_planes: true, show_origin: true, show_sketches: true, ..Default::default() };
+    let first = builder::build(&display, &opts, &mut cache, &up);
+    let again = builder::build(&display, &opts, &mut cache, &up);
+    assert_eq!(first.picks.len(), again.picks.len());
+    for id in 1..=first.picks.len() as u32 {
+        let (a, b) = (first.picks.get(id).unwrap(), again.picks.get(id).unwrap());
+        assert!(a.reference == b.reference && a.kind == b.kind && a.anchor == b.anchor, "pick {id}: {a:?} vs {b:?}");
+    }
+    assert!(first.picks.get(first.picks.len() as u32 + 1).is_none());
+    for r in [&edge, &top, &Reference::Origin, &Reference::Plane(DatumPlane::Top)] {
+        assert_eq!(first.picks.ids_for(r).len(), 1, "{r:?}");
+        assert_eq!(first.picks.ids_for(r), again.picks.ids_for(r), "{r:?}");
+    }
+    // The same mesh with two faces' names swapped.
+    let mut renamed = display.clone();
+    let b = &mut renamed.bodies[0];
+    let ti = b.face_refs.iter().position(|f| *f == top).unwrap();
+    let other = (ti + 1) % b.face_refs.len();
+    b.face_refs.swap(ti, other);
+    let swapped = builder::build(&renamed, &opts, &mut cache, &up);
+    assert_eq!(swapped.picks.ids_for(&top), first.picks.ids_for(&display.bodies[0].face_refs[other]));
+    assert_eq!(swapped.picks.get(swapped.picks.ids_for(&top)[0]).map(|t| &t.reference), Some(&top));
+}
