@@ -3858,7 +3858,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   220 B-spline-faced part, 1.7 s a call, to prove they don't touch. The probe now tests a part of more than 64 faces by
   the tool's vertices and a point inside each tool face only (in or on the part: touching); the merge scope of
   surfaces stays exact. Extrude 2 0.1 s, the document 16.4 -> 4.8 s (live 2.1).
-- [x] fixed (psui 11-04: scene InferenceMarks draws each point as a constant-pixel white disc with a grey rim lying in its plane, 12 px at corners and 8 px elsewhere, over the face's outline; the Part Studio passes corners; the assembly's plain (origin, x, z) points get the 8 px mark until it passes corners too: `InferenceMark { corner: true, .. }` for Implicit … Vertex) P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
+- [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet
   splits a fillet and a flat face, deletes the corner (opDeleteFace leaveOpen) and fills the hole with those split
