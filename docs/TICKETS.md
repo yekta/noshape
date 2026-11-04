@@ -1546,6 +1546,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   undo goes back to. Now only full results are kept, 32 of them (meshes shared, the 256 MB cap as before): T1
   open_undo_fins::undoing_three_typed_edits_back_evaluates_nothing (each edit typed in steps; it re-evaluated
   before). qa: please re-time Ctrl+Z ×3 on live-30 in the next green.
+  qa 11-04 00:32 (app, NOSHAPE_PERF, load 17–21, A/B back to back): **the 3rd undo is cached now.** green dc680be5:
+  Extrude 1 → 12.5 / 11.5 / 13.5 commit in 162+16 / 171+17 / 148+12 ms (preview + refine; all within 200), Ctrl+Z ×3
+  1.5 / 1.2 / 1.2 ms (nothing re-evaluated); green 2b5807f7 (before): commits 207+27 / 291+33 / 305+14 ms, Ctrl+Z ×3
+  1.6 / 1.4 / **191.5+15.6 ms** (29 features). The undo half of REGEN-SPEED holds on dc680be5 (/tmp/qa-undo3.sh).
 - [x] not a bug (live answered 10-26, behaviours "qa (2026-10-26, P0 check)"): PATTERN-OFFPART-PARTS — live also keeps
   each fully-off copy of a Reapply feature pattern as its own floating part (OK, no message), so ours matches (qa)
 - [x] verified watcher CLI 04:06 (≥ green bcf401ca, has 239fa250; qa5 pass28/build.py: 2.5 mm 8503.961 mm³ / 47 faces, 1 mm 3998.630 / 33, live 8503.961 / 47 and 3998.627 / 33) (core 10-27: live's numbers exactly, 1 mm 3998.632 / 33 faces, 2.5 mm 8503.961 / 47; kernel test shell.rs shell_block_with_close_holes_like_onshape back in T1) P1 P1-16 / P1-6 (qa5, carried over) Shell 1 mm on live's p2 model fails "Could not shell part with selections."
