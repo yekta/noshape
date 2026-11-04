@@ -137,6 +137,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-04 17:00 release (qa list 15:37, checked on newest green b8935557)
+- **qa 15:37: no blocker.** On green b8935557: CLI round trip Parasolid / ACIS / STEP / IGES / JT / Rhino 67643.716875 / 18
+  (= v0.4.25); volume sweep = v0.4.25; the 44 ticket documents = v0.4.25 but bop-pairs-gpf-5267's Part 6 (SHELL-SLOW's Shell 4
+  now builds, 13659.1 mm³, in live's band) — everything else part for part; dx's cf corpus unchanged; fixed tickets hold; the
+  user's four cases pass (knurl CP12 11.4 s 11598.041; vase 47331.776 / 58694.861 / 63464.509; split-and-chamfer; Y Ribs).
+  **Fixed and verified since v0.4.25 (P0s): CRASH-3151, CRASH-3388, CRASH-2045** (10 / 10 each on 5363e4d8; both crash
+  documents open again on b8935557), BLEND-RUST-STRAIGHT-WRONG (a regression of 4570b4e5, fixed before any release).
+  Fuzz since the 05:00 list: v0.4.25 120 seeds, greens 5363e4d8 / 12525bc9 200 seeds, 0 deaths. Platform rule (new): the
+  Windows title bar fix (lead 477c41683) is in; on Linux the start window's account menu and ? Help ▾ and a document's ☰ /
+  Help ▾ / bell all open (477c4168); Windows itself not checkable by qa yet (workflow requested). Open, not blockers: P3
+  ABOUT-DISABLED, P1 DIALOG-SWITCH-DISCARDS-NEW.
+
 ## Release blockers for the 2026-11-04 05:00 release (qa list 03:14, checked on newest green 56a0f49b)
 - **qa 03:14: no new blocker; nothing new since v0.4.24 needs the cut stopped.** On green 56a0f49b: CLI round trip Parasolid /
   ACIS / STEP / IGES / JT / Rhino 67643.716875 / 18 (= v0.4.24); volume sweep = v0.4.24; the 44 ticket documents = v0.4.24
