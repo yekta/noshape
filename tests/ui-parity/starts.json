@@ -307,5 +307,84 @@
     }
    ]
   }
+ },
+ "two-blocks": {
+  "units": "mm",
+  "features": [
+   {
+    "type": "newSketch",
+    "name": "Sketch 1",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        0,
+        0
+       ],
+       [
+        40,
+        40
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 1",
+    "params": {
+     "entities": [
+      "Sketch 1 region 0"
+     ],
+     "endBound": "BLIND",
+     "depth": "20 mm",
+     "operationType": "NEW"
+    }
+   },
+   {
+    "type": "newSketch",
+    "name": "Sketch 2",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        60,
+        0
+       ],
+       [
+        80,
+        20
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 2",
+    "params": {
+     "entities": [
+      "Sketch 2 region 0"
+     ],
+     "endBound": "BLIND",
+     "depth": "10 mm",
+     "operationType": "NEW"
+    }
+   }
+  ],
+  "assembly": {
+   "instances": [
+    {
+     "part": "Part 1",
+     "fixed": true
+    },
+    {
+     "part": "Part 2"
+    }
+   ],
+   "mates": []
+  }
  }
 }

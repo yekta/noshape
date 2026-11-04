@@ -20,7 +20,9 @@ impl AssemblyView {
     }
 
     /// Where target `t` shows now, in window coordinates: `face` / `edge` /
-    /// `vertex` [x, y, z] (mm, assembly coordinates), `origin`.
+    /// `vertex` [x, y, z] (mm; with `instance`, in that part's coordinates
+    /// through its current placement, as live's runner reads it; else
+    /// assembly coordinates), `origin`.
     pub fn ui_target_point(&self, t: &Value, cx: &App) -> Result<Point<Pixels>, String> {
         let vp = self.viewport.read(cx);
         let mm = |v: &Value| -> Option<DVec3> {
@@ -30,7 +32,16 @@ impl AssemblyView {
         let world = if t.get("origin").is_some() {
             DVec3::ZERO
         } else if let Some(p) = ["face", "edge", "vertex"].iter().find_map(|k| t.get(*k)) {
-            mm(p).ok_or("a model point: [x, y, z] mm")?
+            let local = mm(p).ok_or("a model point: [x, y, z] mm")?;
+            match t.get("instance").and_then(Value::as_str) {
+                Some(name) => {
+                    let asm = self.assembly(cx).ok_or("no assembly")?;
+                    let inst = asm.instances.iter().find(|i| i.name == name).ok_or_else(|| format!("no instance {name}"))?;
+                    let pl = self.result.solved.placement(inst.id).unwrap_or(inst.placement);
+                    glam::DQuat::from_array(pl.rotation) * local + DVec3::from(pl.translation)
+                }
+                None => local,
+            }
         } else {
             return Err(format!("not a geometry target: {t}"));
         };
@@ -111,12 +122,10 @@ impl AssemblyView {
         items.extend(asm.instances.iter().filter(|i| self.selected.contains(&i.id)).map(|i| json!({ "kind": "INSTANCE", "owner": i.name })));
         let dialog = self.mate.as_ref().map(|s| {
             let d = s.dialog.read(cx);
-            let side = |c: &Option<MateConnectorRef>| c.as_ref().and_then(|c| asm.instance(c.instance)).map(|i| i.name.clone());
             let complete = d.a.is_some() && d.b.is_some();
-            let picked: Vec<Vec<String>> = if d.mate_type() == MateType::Tangent { vec![side(&d.a).into_iter().collect(), side(&d.b).into_iter().collect()] } else { vec![[&d.a, &d.b].into_iter().filter_map(side).collect()] };
             json!({
                 "title": d.name, "titleState": if complete { "ok" } else { "error" }, "kind": "feature", "tabs": [],
-                "fields": d.ui_fields(&picked),
+                "fields": d.ui_fields(),
                 "error": null, "ok": if complete { "enabled" } else { "disabled" }
             })
         });

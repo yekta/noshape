@@ -1,0 +1,17 @@
+{
+ "name": "asm-m-fastened-escape",
+ "about": "m opens the Fastened mate dialog (a new row in Mate features); Escape closes it.",
+ "area": "skasm",
+ "source": "lead 11-03: assembly scenarios",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "key",
+   "key": "m"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

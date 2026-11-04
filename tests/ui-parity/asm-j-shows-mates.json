@@ -1,0 +1,17 @@
+{
+ "name": "asm-j-shows-mates",
+ "about": "j shows the (hidden by default) mates, j again hides them.",
+ "area": "skasm",
+ "source": "lead 11-03: assembly scenarios",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "key",
+   "key": "j"
+  },
+  {
+   "do": "key",
+   "key": "j"
+  }
+ ]
+}

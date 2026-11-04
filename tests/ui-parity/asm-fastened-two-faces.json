@@ -1,0 +1,41 @@
+{
+ "name": "asm-fastened-two-faces",
+ "about": "Fastened mate: the small block's top face, then the big block's top face; Enter accepts.",
+ "area": "skasm",
+ "source": "lead 11-03: assembly scenarios",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fastened mate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     20,
+     20
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

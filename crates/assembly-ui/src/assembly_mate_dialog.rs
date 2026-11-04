@@ -326,23 +326,25 @@ impl MateDialog {
     }
 
     /// The dialog's fields as the ui-parity runner reads live's (top to
-    /// bottom; `picked`: each query box's chips).
-    pub fn ui_fields(&self, picked: &[Vec<String>]) -> Vec<serde_json::Value> {
+    /// bottom; a query box's items are its chips' text).
+    pub fn ui_fields(&self) -> Vec<serde_json::Value> {
         use serde_json::json;
         let t = self.mate_type;
         let (ox, oy, oz, orot) = offset_axes(t);
         let full_row = !matches!(t, MateType::Tangent | MateType::Width);
-        let labels: &[&str] = match t {
-            MateType::Tangent => &["Face, edge or vertex", "Face, edge or vertex"],
-            MateType::Width => &["Tab mate connector(s)", "Width mate connectors"],
-            _ => &["Mate connectors"],
+        let boxes: &[(&str, &[usize])] = match t {
+            MateType::Tangent => &[("Face, edge or vertex", &[0]), ("Face, edge or vertex", &[1])],
+            MateType::Width => &[("Tab mate connector(s)", &[0, 3]), ("Width mate connectors", &[1, 2])],
+            _ => &[("Mate connectors", &[0, 1])],
         };
         let mut fields = Vec::new();
         if full_row {
             fields.push(json!({ "label": null, "kind": "enum", "text": t.name(), "state": "ok" }));
         }
-        for (k, label) in labels.iter().enumerate() {
-            fields.push(json!({ "label": label, "kind": "query", "items": picked.get(k).cloned().unwrap_or_default(), "active": self.active.is_some(), "state": "ok" }));
+        for (label, slots) in boxes {
+            let items: Vec<String> = slots.iter().filter_map(|f| self.slot(*f).as_ref()).map(|c| (self.labeler)(c)).collect();
+            let active = self.active.is_some_and(|a| slots.contains(&a));
+            fields.push(json!({ "label": label, "kind": "query", "items": items, "active": active, "state": "ok" }));
         }
         let check = |label: &str, on: bool| json!({ "label": label, "kind": "boolean", "checked": on, "state": "ok" });
         if t == MateType::Tangent {

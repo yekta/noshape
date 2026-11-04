@@ -1,0 +1,23 @@
+{
+ "name": "asm-delete-mate-undo",
+ "about": "Select the Revolute row, Delete removes the mate, Ctrl+Z brings it back.",
+ "area": "skasm",
+ "source": "lead 11-03: assembly scenarios",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "mate": "Revolute 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Delete"
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  }
+ ]
+}
