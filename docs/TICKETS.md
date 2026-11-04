@@ -3334,6 +3334,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   alone and their common (features.cpp fillet_by_groups; T1 kernel blend::overlapping_rounds_of_a_narrow_rib_are_
   their_common; cf-spur-gear's Spur Gear runs now). Michael's Fillet 2 still fails: its R12.5 rims' rounds fail
   even alone (they run past the prong's walls: overflow, the next step).
+  core 11-04 09:58: live's 44 faces (live.jsonl): tori on the R25 / R12.5 rims and the R75 arc, cylinders along the
+  straight edges, **spheres at the prong ends' corners** (three R14.485 rounds meeting: Fillet 1's vertical rounds and
+  the top / bottom edges), the rims' tori trimmed by the side rounds' cylinders. So "the part less each round's own
+  removal" can't be it (that makes no sphere: the 1.3 % above). fillet_by_groups splits the 23 edges into 8 groups and
+  OCCT already fails on the first, the top outline alone (lines y = ±75, the R75 arc and the two elliptic edges Fillet 1
+  left at (195.8, ±70.8, 109.8)), before any rim. Tried (not kept): a rim group rounded analytically (ring less torus,
+  overflow included) inside fillet_by_groups: never reached. Next there: why OCCT fails the outline group (each edge
+  alone, then pairs), then the rims (rim_round as in the full round's coaxial tool).
 - [x] (core 11-03 13:00: the boss went through boolean.cpp fuse_on_face, which rebuilt the shell from its iterator's faces (already in the solid's orientation) and then flipped the new shell once more by the shell's; a drafted extrude's solid holds its shell REVERSED, so the part came out inside out. The same at four other sites (the unify's ReShape, through holes, the local Boolean, features.cpp's blend rebuild): the shell and solid now FORWARD. dx's document +922.936632 mm³ as live; the Boolean corpus as before (the same 4 of 974 differ without it); T1 model kernel_robustness::a_boss_on_a_drafted_blocks_top_adds_to_it, both pull directions) P1 ADD-INSIDE-OUT (core / bool; dx's parity suite 11-03, cf-parameter-pattern) an Extrude Add of a 2 mm boss
   on the top face of a drafted block leaves the part inside out: volume −922.937 mm³ (query_parts), the magnitude
   live's +922.937. The block: Extrude 1, a 20 × 10 mm rectangle on Top, depth 5 mm (#a / 2), draft 10° (#a deg,
