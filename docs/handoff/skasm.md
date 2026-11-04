@@ -367,6 +367,15 @@ Setup: worktree /root/projects/noshape-wt/skasm (branch agent/skasm), CARGO_TARG
 ## Speed targets (PLAN 2.7), current numbers
 On vibe3 (tools/tiers/perf.sh: release, the machine to itself, 3 runs; 10-30 evening at 94056b26). Each is a timed
 T2/perf test with the target as its gate. (The 10-27 dev-profile numbers on this machine are superseded.)
+- Sketch, 11-04 04:29 UTC (vibe3, 3 runs, medians; PLAN 2.7: drag step under a 60 Hz frame, a 200-entity solve < 8 ms):
+  speed_target (219 entities) drag step 2.15 ms (solve 0.77, regeneration 1.38), full solve with DOF 0.36 ms: as
+  11-03 (two runs of d9d85e08 vary 2.2-3.7 ms: take best of 3). s300 drag a point 4.2 ms (worst 13.5), drag a corner
+  5.8 ms; 1000 entities drag 4.2 ms (worst 13.4). The model suite's biggest sketches (ops sketch_open_perf: cf-fix-pcb
+  Sketch 3, cf-straight-spline, the screw creator, flange-josh): open, a dimension change, a drag step all under 6 ms.
+  The worst are the broken spline fixtures: sk211 (94-point spline) open 9.8 / a dimension 11.8 / drag 2.1 ms; qa's
+  fz211 (438 entities, five splines, over defined) after 78462fa1: re-solve 58.8 (62.5), with DOF 75.0 (78.8), a
+  dimension 121 (139), drag 14.7 (15.9) ms. Its time: the conflict search (up to 8 full rebuild + solve rounds) and the
+  fit spline gradients (probes + basis ~45%); next: re-solve only the components a round's exclusion touches.
 - Sketch drag step, ~200 entities (219 entities, 178 constraints; pointer move + solve + the sketch's regeneration):
   11-03 17:31 at d9d85e08 (vibe3, 3 runs): **median 2.2 ms** (solve 0.77, regeneration 1.42), worst 5.0-5.4 ms, always
   step 61 and in the regeneration (the slowest solve 1.1 ms, step 1); target < 8 ms. 10-30 it was 1.37 (solve 0.43,
