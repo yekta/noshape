@@ -21,10 +21,9 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   cylinders about axes along it) that end on planar caps square to them, one round a vertex: the section's 2D fillet
   swept between the caps; rust_blend.cpp now takes pieces of input arcs too. stef-radijator's 36 fin rounds live's to
   the last digit in 2.3 ms (OCCT 170, live 31); the document also needs dx's PARITY-STEF-FILLET-QUERY (its 37th edge).
-  Next there: knob-jason's Fillet 2 (OCCT 236 ms, live 22): its 12 vertical edges end on Fillet 1's tori (not caps)
-  and its chains run on over them (tangent propagation); live makes sphere corners where the three R2.5 rounds meet
-  and re-trims the tori. Needs prism rounds whose ends meet earlier rounds (a sphere where two tori and the new
-  cylinder meet). Blend corpus (vibe5 ~/core-blend-corpus): 21 + 8 taken by noshape's blend, 0 differ from it; one
+  06:10: knob-jason's Fillet 2 done the same way (queued): a prism round's end where two earlier tori of its radius
+  meet (their meeting curve given) is a sphere about the point on both spines, the tori cut back to their meridians;
+  knob-jason 11/11 to the end, 60 ms (live 125). Blend corpus (vibe5 ~/core-blend-corpus): 21 + 8 taken by noshape's blend, 0 differ from it; one
   OCCT case (333e241127c2a7e5) is 13 faces against the 07:27 record's 15 since the torus merge (one torus in one face).
 - cf-o-ring-generator (dx's note): live's cylinder origins are per feature (revolve mid-height, a hole's start), and
   live's own face dumps (behaviours IM2) put imported cylinders' origins at their faces' middles; whether a chamfer
