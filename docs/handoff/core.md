@@ -16,7 +16,7 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
-**State 11-04 09:20 UTC.**
+**State 11-04 09:11 UTC.**
 - Queued 2c24ee7b: **motor-mount-jack matches live to the end (10/10, was 3/10)**: touching sketch regions picked
   together are united (a shared line or a whole shared loop; sketch regions::union_touching), a face pattern's caps lie
   on the curved face they leave (kernel make_face_on), move_seams_off_holes' volume guard 1e-4, the import's
