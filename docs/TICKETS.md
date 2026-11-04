@@ -342,6 +342,20 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P0 CRASH-3151 (core; OCCT fillet heap corruption, same family as CRASH-2045) **a saved document crashes the app and
+  the CLI on open in v0.4.24 and on main**: /root/qa-scratch/tickets/crash3151/fz3151-step63.noshape (+ -wal; fuzz seed 3151,
+  45 features, the last Fillet 6). `python3 tickets/crash3151/open.py <cli-wrapper>` (document_open + feature_list): the
+  CLI aborts `malloc(): unsorted double linked list corrupted` / "noshape: the kernel aborted; not recoverable" in
+  v0.4.24 3 / 3, green 0e9162ad 3 / 4 (Rust Boolean on), 3 / 3 with NOSHAPE_BOOL_RUST=0, so not bool's; the v0.4.24 app
+  (`noshape fz3151-step63.noshape`) aborts the same 1 of 2. v0.4.23 opens it 3 / 3, but there Linear pattern 8, Shell 4
+  and Fillet 6 fail, so it never reaches the fillet that crashes. gdb (tickets/crash3151/gdb-0e9162ad-open.txt, 2 / 2
+  the same): regenerate → regen/features/detail.rs:419 fillet → kernel ops.rs:464 fillet_checked → op_fillet
+  (features.cpp:5400) → scaled_blend → checked_blend (features.cpp:3268) → BRepFilletAPI_MakeFillet::Build →
+  ChFi3d_Builder::Compute → TopOpeBRepBuild_Builder::BuildFaces → ProcessAddStartElement → Standard::Allocate → malloc
+  aborts (the heap already corrupt: the culprit wrote earlier, ASan / valgrind would name it). The fuzz session itself:
+  seed 3151 (clifuzz_nf, fallback off) dies at step 64's fillet 3 / 4 on d347d276 / 0e9162ad and 3 / 3 on v0.4.24.
+  live: opens and regenerates any document (a failing feature fails with a message); ours: the process dies. (qa
+  2026-11-04 02:12, builds v0.4.24 / 0e9162ad)
 - [x] verified 92cf4505 (qa 11-03 11:13: rust-zero-solid-f197 back to 13 parts / 308.3626 mm³, bin/rbbisect.py identical to 0531f66e feature by feature; core c4def47a: studios saved before the 11-03 clean-ups regenerate without them) (core 11-03 11:00: it was 2027df5d (a blend's split lines joined: the fillet's edges change, then Mirror 3's Boolean returns its pieces in another order), not e77387ec; studios saved before the 11-03 topology clean-ups (ScopeRule < 7) now regenerate without any of them (PartStudio::legacy_topology, the kernel's thread setting): rust-zero-solid-f197 308.36 mm³ again, Part 1 9.304; new studios keep them; a unify also keeps its input's solid order; T1 kernel_robustness::a_hole_through_a_tube_as_live_and_old_studios_as_they_were) P2 MIRROR-PIECE-ORDER-CHANGE (core; new on main since green bcb87c5c, in e77387ec — likely e77387ec's unify change,
   CUT-CLOSED-EDGES-SPLIT) a saved document's later features now act on other bodies: qa-scratch/tickets/rust-zero-solid-f197.noshape
   (fuzz seed 197, 32 features). bin/rbbisect.py, 0531f66e vs e77387ec: identical through Fillet 3, then **Mirror 3 gives the
