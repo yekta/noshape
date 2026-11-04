@@ -1,5 +1,14 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-04 02:58 UTC)
+Lead 02:5x round: s996 fixed (a rounded plate whose radius changes keeps its one resized side's lowest point; 727 of
+790); batch 22 sent (s1021-s1060: two slots in a plate, a bolt-circle flange, a keyed shaft; ours solves 40/40);
+sketch.md: 76 rows matched to live captures, 108 asked of live in one session (REQUESTS 02:58); workflow-sketch-tools
+and audit-sketch-assembly already cite live. Live's nine midpoint re-recordings (02:24-02:40) select the line after a
+rest, contradicting 1937 / 1954 and two older recordings: the sketch rule is reverted (ours selects), asked of live
+again (psui's edge dwell may need the same check). asm-fastened-undo-picks: its second pick moved 5 mm (live's runner
+got no hover at the same pixel), re-record asked. Waiting: batch 22, the sketch audit, those re-records.
+
 ## Resume here (2026-11-04 02:43 UTC)
 Lead 01:5x round done: batch 21 answered (37/40 first; s993 / s998 fixed: `hold_the_base` orders pieces by their
 lowest point, level ones leftmost first; batches 1-21 726 of 790; s996 left, 0.24 mm); the mate dialog's Ctrl+Z
