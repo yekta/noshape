@@ -1551,6 +1551,43 @@ fn the_louvers_tools_build() {
     assert!(v.len() == 2 && (v[0] - 1975.3626).abs() < 1e-3 && (v[1] - 1889.368549).abs() < 1e-3, "{v:?}; {st:?}");
 }
 
+/// Live 2005 B2 (behaviours.md "P1 FS-NATIVE-OPDERIP"): on the same two-flange plate, a Bend through the ripped
+/// corner's region, line (80, 60) → (100, 40) on Top, the plate's bottom as its face, is refused: "Metal is
+/// connected on both sides of the bend." (no derip; std's own check). T1.
+#[test]
+fn a_bend_through_a_ripped_corner_is_refused() {
+    let mut s = Studio::new();
+    let region = s.rectangle(100.0, 60.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    let r = s.ok();
+    let edges = vec![edge_at(&r, DVec3::new(100.0, 30.0, 2.0)), edge_at(&r, DVec3::new(50.0, 60.0, 2.0))];
+    s.add("sheetMetalFlange", |p| {
+        p.set("edges", ParamValue::Query(edges));
+        p.set("distance", expr("30 mm"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    let (a, b) = (sk.add_point(glam::DVec2::new(mm(80.0), mm(60.0))), sk.add_point(glam::DVec2::new(mm(100.0), mm(40.0))));
+    let line = sk.add_line_between(a, b).unwrap().0;
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let bottom = face_at(&r, DVec3::new(50.0, 30.0, 0.0));
+    s.add("sheetMetalBend", move |p| {
+        p.set("bendReference", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: line }]));
+        p.set("face", ParamValue::Query(vec![bottom]));
+    });
+    let r = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions::default());
+    let st = r.display.features.last().expect("the bend");
+    assert!(matches!(st.status, FeatureStatus::Error) && st.message.as_deref().is_some_and(|m| m.contains("Metal is connected on both sides of the bend.")), "{:?} {:?}", st.status, st.message);
+}
+
 /// Live 2005 T2 (behaviours.md "P1 FS-NATIVE-OPDERIP"): a 100 × 60 plate with 30 mm flanges on its x = 100 and
 /// y = 60 edges (a corner rip between them); a Tab sketched on the x-flange's outer face, y 50 → 62, z 10 → 20,
 /// merged into that flange, fills the corner from that flange only: std derips the corner (@opDerip: each wall's
