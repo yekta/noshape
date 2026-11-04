@@ -16,6 +16,20 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-04 05:50 UTC.**
+- BLEND-RUST: blend/prism.rs (queued) rounds straight edges between faces ruled along them (planes along the edge,
+  cylinders about axes along it) that end on planar caps square to them, one round a vertex: the section's 2D fillet
+  swept between the caps; rust_blend.cpp now takes pieces of input arcs too. stef-radijator's 36 fin rounds live's to
+  the last digit in 2.3 ms (OCCT 170, live 31); the document also needs dx's PARITY-STEF-FILLET-QUERY (its 37th edge).
+  Next there: knob-jason's Fillet 2 (OCCT 236 ms, live 22): its 12 vertical edges end on Fillet 1's tori (not caps)
+  and its chains run on over them (tangent propagation); live makes sphere corners where the three R2.5 rounds meet
+  and re-trims the tori. Needs prism rounds whose ends meet earlier rounds (a sphere where two tori and the new
+  cylinder meet). Blend corpus (vibe5 ~/core-blend-corpus): 21 + 8 taken by noshape's blend, 0 differ from it; one
+  OCCT case (333e241127c2a7e5) is 13 faces against the 07:27 record's 15 since the torus merge (one torus in one face).
+- cf-o-ring-generator (dx's note): live's cylinder origins are per feature (revolve mid-height, a hole's start), and
+  live's own face dumps (behaviours IM2) put imported cylinders' origins at their faces' middles; whether a chamfer
+  re-frames a revolved cylinder that way needs more than the one case: not changed.
+
 **State 11-04 05:14 UTC.**
 - Land trouble (fixed forward): my 03:06 commit's first seam_to_vertex hopped seams vertex to vertex (each move made
   another candidate) and hung noshape-assembly's tests in the land queue for 90 min (timeout; everything stacked on it
