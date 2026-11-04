@@ -1,6 +1,6 @@
 //! The regions a set of curves divides a face's parameter plane into (a face split by the edges on it).
 
-use crate::curve2::{inside, Map, C2};
+use crate::curve2::{inside, C2};
 use crate::Decline;
 use glam::DVec2;
 use std::f64::consts::{PI, TAU};
@@ -188,9 +188,10 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
 pub(crate) fn deeper(segs: &[([u32; 2], C2)], r: &Region) -> DVec2 {
     let curves: Vec<C2> = r.outer.iter().chain(r.holes.iter().flatten()).map(|&(s, rev)| if rev { segs[s as usize].1.reversed() } else { segs[s as usize].1.clone() }).collect();
     // (The nearest curve's distance, the curves taken by how near their boxes are, none farther than the nearest
-    // yet: the same distance, not each curve's (a gear's face, 294 curves round its 42 tooth gaps: 7 s a face). A
-    // curve on a cylinder has no box sure to hold it: always asked.)
-    let boxes: Vec<Option<(DVec2, DVec2)>> = curves.iter().map(|c| if matches!(c, C2::Mapped { m: Map::Cyl { .. }, .. }) { None } else { c.quick_box() }).collect();
+    // yet: the same distance, not each curve's (a gear's face, 294 curves round its 42 tooth gaps: 7 s a face). The
+    // boxes hold the curves: their poles' (on a cylinder, the poles' angles where they span less than half a turn:
+    // a convex wedge).)
+    let boxes: Vec<Option<(DVec2, DVec2)>> = curves.iter().map(|c| c.quick_box()).collect();
     let depth = |q: DVec2| {
         let mut order: Vec<(f64, usize)> = boxes.iter().enumerate().map(|(i, b)| (b.map_or(0.0, |(lo, hi)| (lo - q).max(q - hi).max(DVec2::ZERO).length()), i)).collect();
         order.sort_by(|a, b| a.0.total_cmp(&b.0));

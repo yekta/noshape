@@ -21,6 +21,28 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   (idle): before 15.1 s (OCCT 3.0 s), after 2.07 s (OCCT 2.96 s); live 0.54 s. Corpora unchanged, corpus5's small
   cases -2.7 %. T2 bool_patterns::a_gears_tooth_gaps_cut_as_fast_as_occts (on main before: 12756 ms, OCCT 513 ms).
 
+- cf-straight-spline (bool, 11-04 00:56): vibe3 (8 cores, idle), the document's regeneration: main 122 s with
+  noshape's Boolean, 35 s with OCCT's (live 7.8 s); now 55 s. Its 116 cuts (32 patterned cutters each): 8 taken, 108
+  declined (recorded exactly: vibe4 ~/agents/bool-corpora/spline, 77 distinct). Per decline (NOSHAPE_X_DECL in bool-a
+  prints each with its time): 66 "a seam off a ruling", 38 "two edges leave a vertex in one direction", 2 "a plane at
+  an angle to a cone", 2 "a face lost". Landing: (a) cylinders' and cones' pairs whose section is OCCT's (at an angle,
+  a cone off the other's axis) asked in the parallel batch (they ran one by one: 37 % of a cut); (b) deeper prunes
+  curves on cylinders too (their pole boxes hold them: the poles' angles span under half a turn, a convex wedge);
+  (c) a round stops once vertices are to be merged (boolean_with does it again from the start anyway); (d) the
+  sections of a Boolean kept for its later rounds; (e) a cylinder's / cone's seam whose ends, where this round's
+  groups put them, are more than half the tolerance apart round the axis: declined at the round's start. The seam
+  ends: in round 0 the cutter cone's seam is fine; a group (a section's end within reach of the cone's seam end and
+  another vertex) moves the end to the group's middle, 0.15 um round, and its base circle then crosses the seam
+  ("an arc across a cylinder's seam" before). Tried and dropped: the group's middle at the seam end (pinned): those
+  cuts go on to "two edges leave a vertex in one direction" (96, ~0.5 s each, worse); a whole circle's vertex near
+  the seam taken as on it: also on to "two edges". The two-edges ones: on the shaft's cylinder a cutter's edge 15 um
+  long, 0.6 um off the cylinder, and the section beside it leave one vertex the same way. Left: each decline costs
+  round 0's OCCT sections (~0.2-0.35 s, about OCCT's own for the cut); a cache of IntTools_FaceFace results by face
+  pair that OCCT's PaveFiller reads (an OCCT patch) would make a decline nearly free; or take these cuts (the seam
+  group and the sliver at the shaft's end). Tools: /root/bool-scratch/obin.sh <worktree> <commit> <name> builds the ops test binary
+  and copies it to vibe3 ~/bool-obin (models in ~/bool-obin/models); run it with NOSHAPE_PARITY_MODELS and
+  NOSHAPE_PARITY_ONLY; sweep.sh now runs 2 cases at a time and refuses to start beside a running sweep (lead 11-03).
+
 ## From core (11-02 07:20): two Boolean costs found profiling FeatureScript-driven regenerations
 Sampled warm on vibe4 (model tests' `custom_features::fs_warm_profile` / `sheetmetal_std::fs_sheet_metal_profile`,
 NOSHAPE_SAMPLE_OUT; tests/sampler.rs samples every running thread):

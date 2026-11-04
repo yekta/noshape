@@ -747,7 +747,7 @@ struct FreeSections
   std::vector<std::optional<Moved>> moved;
   // The section `id`, built if it is a moved one.
   const std::pair<std::array<TopoDS_Face, 2>, IntTools_Curve>& curve(uint32_t id);
-  // OCCT's sections made ahead (brep_occt_ahead), by pair (the earlier argument's face first) until asked for.
+  // OCCT's sections made ahead (brep_occt_ahead) or when asked for, by pair (the earlier argument's face first).
   std::map<std::array<uint32_t, 4>, std::vector<IntTools_Curve>> ahead;
 };
 
@@ -2079,11 +2079,9 @@ rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg,
       return rust::String("OCCT's section failed");
     }
   }
+  // (Kept for the Boolean's later rounds (boolean_with: again with vertices merged), whose input faces are these.)
   else if (made != t_free->ahead.end())
-  {
-    lines = std::move(made->second);
-    t_free->ahead.erase(made);
-  }
+    lines = made->second;
   else
   {
     IntTools_FaceFace ff;
@@ -2101,6 +2099,7 @@ rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg,
       return rust::String("OCCT's section failed");
     for (const IntTools_Curve& ic : ff.Lines())
       lines.push_back(ic);
+    t_free->ahead.emplace(swap ? std::array<uint32_t, 4>{b_arg, b_face, a_arg, a_face} : std::array<uint32_t, 4>{a_arg, a_face, b_arg, b_face}, lines);
   }
   for (const IntTools_Curve& ic : lines)
   {

@@ -3204,6 +3204,28 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     if op == Op::Common && args.len() > 2 {
         return Err(Decline("common with several tools"));
     }
+    // A cylinder's or cone's seam not along a ruling, its ends where this round's groups put them: at angles round
+    // the axis more than half the tolerance apart (a patterned spline cutter's cone, its end merged 0.15 um round
+    // with the shaft's), where the edges at its ends then cross it; declined before anything is made (it cost a
+    // spline shaft's cuts 0.4 s each, then OCCT's).
+    for body in args {
+        for f in &body.faces {
+            let (Surface::Cylinder { origin: o, axis: a, xdir: x, .. } | Surface::Cone { origin: o, axis: a, xdir: x, .. }) = f.surface else { continue };
+            let mut seen = HashSet::default();
+            let Some(e) = f.loops.iter().flatten().find(|u| !seen.insert(u.edge)).map(|u| u.edge as usize) else { continue };
+            let y = a.cross(x);
+            let at = |w: u32| {
+                let (p, tp) = (body.vertices[w as usize], body.vertex_tol.get(w as usize).copied().unwrap_or(0.0));
+                let q = groups.iter().find(|g| (p - g.0).length() <= g.1 + tp).map_or(p, |g| g.0) - o;
+                let q = q - a * q.dot(a);
+                (q.dot(y).atan2(q.dot(x)), q.length())
+            };
+            let ((t0, r0), (t1, r1)) = (at(body.edges[e].v[0]), at(body.edges[e].v[1]));
+            if r0.min(r1) > tol && ((t1 - t0 + PI).rem_euclid(TAU) - PI).abs() * r0.min(r1) > 0.5 * tol {
+                return Err(Decline("a seam off a ruling"));
+            }
+        }
+    }
     let mut cx = Ctx {
         tol,
         pool: Pool::new(tol, Vec::new(), regroup),
@@ -3727,8 +3749,27 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         let found = par_map(ahead.len(), &|k| cx.on_free_surface(ahead[k].0, ahead[k].1))?;
         cx.on_surface = ahead.into_iter().zip(found).collect();
     }
+    // (Vertices to merge found: done again with them from the start (boolean_with), nothing more of this round.)
+    if !cx.pool.regroup.lock().expect("the groups").is_empty() {
+        return Err(Decline("vertices to merge first"));
+    }
     if let Some(src) = cx.src {
         let mut pairs: Vec<(usize, usize)> = Vec::new();
+        // (Cylinders and cones whose section is OCCT's too (cyl_cyl: at an angle, a cone off the other's axis): asked
+        // ahead with the rest, not one by one later (a spline shaft's 32 slot cutters' cones: 37 % of a cut).)
+        let mut round_pairs: Vec<(usize, usize)> = Vec::new();
+        let occt_round = |x: &GFace, y: &GFace| {
+            let (&Surf::Cyl { o: o1, a: a1, r: r1, k: k1, .. }, &Surf::Cyl { o: o2, a: a2, r: r2, k: k2, .. }) = (&x.s, &y.s) else { return false };
+            let w = o2 - o1;
+            if a1.cross(a2).length() > 1e-12 {
+                if k1 != 0.0 || k2 != 0.0 {
+                    return true;
+                }
+                let dist = a1.cross(a2).normalize().dot(w).abs();
+                return dist <= r1 + r2 + GREY * tol && (dist > 1e-9 || (r1 - r2).abs() / r1.max(r2) > 1e-14);
+            }
+            (k1 != 0.0 || k2 != 0.0) && (w - a1 * w.dot(a1)).length() > GREY * tol
+        };
         for s in 0..ns {
             for t in s + 1..ns {
                 let (a, b) = (&cx.solids[s], &cx.solids[t]);
@@ -3738,8 +3779,13 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 for &fs in &a.faces {
                     for &ft in &b.faces {
                         let (x, y) = (&cx.faces[fs], &cx.faces[ft]);
-                        if boxes_meet(x.lo, x.hi, y.lo, y.hi, GREY * tol) && matches!((&x.s, &y.s), (Surf::Nurbs { .. }, _) | (_, Surf::Nurbs { .. })) {
+                        if !boxes_meet(x.lo, x.hi, y.lo, y.hi, GREY * tol) {
+                            continue;
+                        }
+                        if matches!((&x.s, &y.s), (Surf::Nurbs { .. }, _) | (_, Surf::Nurbs { .. })) {
                             pairs.push((fs, ft));
+                        } else if occt_round(x, y) {
+                            round_pairs.push((fs, ft));
                         }
                     }
                 }
@@ -3754,6 +3800,13 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             if x {
                 continue;
             }
+            let (x, y) = (&cx.faces[fs], &cx.faces[ft]);
+            let pair = cx.moved_pair(fs, ft).map_or(((x.arg, x.index), (y.arg, y.index)), |m| m.0);
+            if seen.insert(pair) {
+                ahead.push(pair);
+            }
+        }
+        for &(fs, ft) in &round_pairs {
             let (x, y) = (&cx.faces[fs], &cx.faces[ft]);
             let pair = cx.moved_pair(fs, ft).map_or(((x.arg, x.index), (y.arg, y.index)), |m| m.0);
             if seen.insert(pair) {
@@ -4441,6 +4494,9 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         Geo::Nurbs { id, .. } if cx.ncurves[id as usize].sec.is_some() => cx.ncurves[id as usize].acc,
         _ => 0.0,
     };
+    if !cx.pool.regroup.lock().expect("the groups").is_empty() {
+        return Err(Decline("vertices to merge first"));
+    }
     let section_chains = by_period(cx.sections.len(), &|k| cx.sections[k].0, &|k| cx.split_reach(&cx.sections[k].0, &by_x, sec_acc(&cx.sections[k].0), false))?;
     let own: Vec<usize> = (0..extra_segs.len()).filter(|&k| extra_of[k] == usize::MAX).collect();
     let mut own_chains = by_period(own.len(), &|i| extra_segs[own[i]].1, &|i| cx.split_reach(&extra_segs[own[i]].1, &by_x, sec_acc(&extra_segs[own[i]].1), false))?.into_iter();

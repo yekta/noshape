@@ -3378,6 +3378,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   regeneration take ~2.5 s each in boolean.rust.brep. Data and rerun in docs/handoff/bool.md (core 11-03).
   core 11-03 21:34: the same on cf-straight-spline (54 SAE spline features): 44.2 s with the Rust Boolean, 15.3 s
   without (both 5/59 features as live; live 7.8 s); boolean.rust.sections 43 s over 45764 calls.
+  bool 11-04 00:56: **gears fixed** (ce9e019d, landed 11-03 21:48): arrange::deeper took 35 N² distances on the
+  gear face's 294 curves, 7 s a face; vibe3 15.1 s -> 2.07 s (OCCT 2.96 s, live 0.54 s); T2 bool_patterns::
+  a_gears_tooth_gaps_cut_as_fast_as_occts. **cf-straight-spline: 122 s -> 55 s on vibe3 (OCCT 35 s, live 7.8 s), not
+  yet at OCCT's.** 108 of its 116 cuts (32 patterned cutters each) decline after ~0.35 s of work, then OCCT does the
+  cut: 66 because merging vertices (a group's middle) moves a cutter cone's seam end 0.15 um round off its ruling,
+  38 "two edges leave a vertex in one direction" (a cutter edge 0.6 um off the shaft at its end). Landing (bool):
+  cylinders' / cones' OCCT sections in the parallel batch, deeper prunes curves on cylinders too, a round stops as
+  soon as vertices are to be merged, a seam off a ruling declined at a round's start, sections kept for later
+  rounds. Left: the decline costs one round's OCCT sections (as many as OCCT's own then); next a cache of
+  IntTools_FaceFace results OCCT's PaveFiller would read (an OCCT patch), or taking these cuts (handoff).
 - [ ] P1 PARITY-SPEED (core; dx's parity suite 11-03 run 31, the runner's new "speed:" line) 10 of the 41 corpus
   documents with live's times regenerate slower than live (ours: the reopened document's regeneration on vibe5;
   live: the sum of its features' regeneration times, live.jsonl's last line). Worst: **cf-hose-routing 116 s vs live
