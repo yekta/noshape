@@ -53,7 +53,7 @@ Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; Value
 
 [Run]
 Filename: "{app}\noshape.exe"; Parameters: "agents connect"; Description: "Connect noshape to {code:FoundAgents} (its MCP server)"; Flags: postinstall runasoriginaluser runhidden waituntilterminated; Check: AgentsFound
-Filename: "{app}\noshape.exe"; Description: "Start noshape"; Flags: postinstall nowait skipifsilent runasoriginaluser unchecked
+Filename: "{app}\noshape.exe"; Description: "Start noshape"; Flags: postinstall nowait skipifsilent runasoriginaluser
 
 [UninstallRun]
 ; Before the files go: the agents this install connected forget it (another noshape's entries stay).
@@ -63,6 +63,7 @@ Filename: "{app}\noshape.exe"; Parameters: "agents disconnect --command ""{app}\
 var
   Found: String;
   Checked: Boolean;
+  StatusRead: Boolean;
 
 function NeedsAddPath(Dir: String): Boolean;
 var
@@ -91,6 +92,7 @@ begin
     if ExecAsOriginalUser('powershell.exe', '-NoProfile -NonInteractive -Command "& ''' + ExpandConstant('{app}\noshape.exe') + ''' agents status | Out-File -Encoding ascii ''' + ExpandConstant('{tmp}\agents.json') + '''"', '', SW_HIDE, ewWaitUntilTerminated, Code)
       and LoadStringFromFile(ExpandConstant('{tmp}\agents.json'), Raw) then
     begin
+      StatusRead := True;
       Text := String(Raw);
       Key := '"found_names": "';
       P := Pos(Key, Text);
@@ -107,6 +109,27 @@ end;
 function AgentsFound: Boolean;
 begin
   Result := FoundAgents('') <> '';
+end;
+
+// The last page says what was set up, also when there was nothing to connect (it said nothing before 11-04).
+procedure CurPageChanged(CurPageID: Integer);
+var
+  Note: String;
+  Grown: Integer;
+begin
+  if CurPageID <> wpFinished then
+    exit;
+  Note := 'The noshape command is on your PATH (in a new terminal window).';
+  if AgentsFound then
+    Note := Note + #13#10#13#10 + 'Coding agents found: ' + Found + '. Leave the box below ticked to connect them.'
+  else if StatusRead then
+    Note := Note + #13#10#13#10 + 'No coding agent was found (Claude Code, Codex CLI, Claude Desktop). After installing one, connect it from noshape: Help > Connect to coding agents...'
+  else
+    Note := Note + #13#10#13#10 + 'Setup could not check for coding agents. Connect them from noshape: Help > Connect to coding agents...';
+  WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 + Note;
+  Grown := WizardForm.AdjustLabelHeight(WizardForm.FinishedLabel);
+  WizardForm.RunList.Top := WizardForm.RunList.Top + Grown;
+  WizardForm.RunList.Height := WizardForm.RunList.Height - Grown;
 end;
 
 // Uninstall: the install folder off the user's PATH.

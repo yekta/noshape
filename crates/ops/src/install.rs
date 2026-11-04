@@ -83,7 +83,14 @@ impl Env {
     fn claude_desktop_dir(&self) -> Option<PathBuf> {
         match self.os {
             Os::Mac => Some(self.home.join("Library/Application Support/Claude")),
-            Os::Windows => Some(self.appdata.clone().unwrap_or_else(|| self.home.join("AppData/Roaming")).join("Claude")),
+            Os::Windows => {
+                let classic = self.appdata.clone().unwrap_or_else(|| self.home.join("AppData/Roaming")).join("Claude");
+                // The Microsoft Store (MSIX) build keeps its folder in its package's virtual AppData, and reads that.
+                let store = std::fs::read_dir(self.home.join("AppData/Local/Packages")).ok().and_then(|it| {
+                    it.flatten().filter(|e| e.file_name().to_string_lossy().starts_with("Claude_")).map(|e| e.path().join("LocalCache/Roaming/Claude")).find(|d| d.is_dir())
+                });
+                Some(store.unwrap_or(classic))
+            }
             Os::Linux => None,
         }
     }
