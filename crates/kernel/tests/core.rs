@@ -615,4 +615,19 @@ fn brep_edges_probe() {
         let x = e.edge_info().unwrap();
         println!("  E{i} shown {} {} {:.3?} -> {:.3?} len {:.4}", shown.edges[i], format!("{:?}", x.curve).chars().take(10).collect::<String>(), x.start / mm, x.end / mm, x.length / mm);
     }
+    // Shown vertices where just two shown edges of the same two faces meet (Parasolid would have one edge there).
+    let ve = r.vertex_edges().unwrap();
+    let ef = r.edge_faces().unwrap();
+    for (v, es) in ve.iter().enumerate() {
+        let es: Vec<usize> = es.iter().map(|&e| e as usize).filter(|&e| shown.edges[e]).collect();
+        if !shown.vertices[v] || es.len() != 2 {
+            continue;
+        }
+        let (mut a, mut b) = (ef[es[0]].clone(), ef[es[1]].clone());
+        a.sort();
+        b.sort();
+        if a == b {
+            println!("  joint V{v} between E{} and E{} (faces {a:?})", es[0], es[1]);
+        }
+    }
 }

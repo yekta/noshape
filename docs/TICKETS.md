@@ -3418,6 +3418,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   four tori 309.756 mm², four blends 31.32 mm² and four 28.742 mm² (OTHER), the cylinder 1764.49 mm², a plane
   434.112 mm² (live.jsonl line 9 bodies). Model: /root/parity/models/pipeflange-steven (`parity_models`,
   NOSHAPE_PARITY_ONLY=pipeflange-steven; feature 9). (dx 2026-11-03)
+  core 11-04 11:52: its 2 extra edges / vertices (36/81/42, live 36/79/40) are the −y countersinks' rim circles on the
+  top face in two arcs each, split at (±18, −22, 0) where the cone's seam ends (kernel core::brep_edges_probe now lists
+  such joints). They join once the cone's seam runs to a vertex the rim already has (boolean.cpp seam_to_vertex is
+  for cylinders only). The volume (18314.95 vs 18329.66) is OCCT's blend there, a separate difference.
 - [x] (core 11-03 15:05: OCCT patch 0020 (29d17a5a, lib synced) and the volume integral's u-isoline skip (acfb0433): the Wave Spring builds as live, 916.595 mm³ / 4402.375 mm² (live 916.533 / 4402.296, in its bands), its feature in 5.8 s instead of 16.6 (157 s reopened); T1 kernel surfacing::a_long_wavy_strip_thickens_along_it; the rest of the time is FS-WAVE-SPRING-SPEED) P1 FS-WAVE-SPRING (core; dx's FeatureScript corpus 11-03, cf-wave-spring) the community Wave Spring (FeatureScript
   336: two opFitSpline of 600 points each, opLoft between them into a wavy strip, opThicken 0.5 mm; Ø25 / Ø20,
   height 25 mm, 10 turns, 5 waves) builds an inside-out solid in ours: volume −555.401 mm³, box ±19 mm (live
