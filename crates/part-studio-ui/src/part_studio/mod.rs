@@ -4002,12 +4002,14 @@ impl PartStudioView {
             Some((k, e)) if *k == key => e.clone(),
             _ => {
                 let me = cx.entity();
-                let e = crate::cached_slice::Slice::unobserved(&me, move |this: &mut Self, _, cx| this.render_feature_row_view(id, slot, cx), cx);
+                let e = crate::cached_slice::Slice::unobserved(&me, move |this: &mut Self, _, cx| div().size_full().debug_selector(|| format!("feature-row-{id:?}")).child(this.render_feature_row_view(id, slot, cx)).into_any_element(), cx);
                 self.row_cache.insert(id, (key, e.clone()));
                 e
             }
         };
-        row.cached(StyleRefinement::default().w_full().h(px(crate::ui::ROW_H))).into_any_element()
+        // Its own size: a cached view's content doesn't hold it open, so in a list taller than its panel the rows shrank
+        // to nothing, drawn over each other.
+        row.cached(StyleRefinement::default().w_full().h(px(crate::ui::ROW_H)).flex_none()).into_any_element()
     }
 
     /// What a feature row shows, as a number; `None` when it follows state outside it (the edited or renamed row,
@@ -4094,7 +4096,7 @@ impl PartStudioView {
                 e
             }
         };
-        row.cached(StyleRefinement::default().w_full().h(px(24.))).into_any_element()
+        row.cached(StyleRefinement::default().w_full().h(px(24.)).flex_none()).into_any_element()
     }
 
     /// What a part row shows, as a number; `None` while it is renamed, dragged over or marked for the ui-parity driver.

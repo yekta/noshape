@@ -705,6 +705,34 @@ fn a_row_click_redraws_only_the_rows_that_change(cx: &mut TestAppContext) {
     assert!(cx.update(|cx| view.read(cx).selected_features == vec![plane]));
 }
 
+/// Cached feature rows keep their height in a list taller than its panel (they shrank to nothing and were drawn over
+/// each other in cf-straight-spline's 63 features), and stay in place when a dialog opens.
+#[gpui::test]
+fn cached_rows_stack_in_a_long_list(cx: &mut TestAppContext) {
+    let planes: Vec<serde_json::Value> = (1..=120).map(|i| serde_json::json!({ "type": "cPlane", "name": format!("Plane {i}"), "params": { "entities": ["plane:top"], "offset": format!("{i} mm") } })).collect();
+    let (window, view) = part_studio_from(cx, "row-stack", Some(serde_json::json!({ "units": "mm", "features": planes })));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let ids: Vec<_> = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().map(|f| f.id).collect());
+    let tops = |cx: &mut TestAppContext| {
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        ids.iter().filter_map(|id| vcx.debug_bounds(Box::leak(format!("feature-row-{id:?}").into_boxed_str())).map(|b| (*id, f32::from(b.origin.y)))).collect::<Vec<_>>()
+    };
+    let shown = tops(cx);
+    assert!(shown.len() >= 5, "the rows in view are cached: {shown:?}");
+    for w in shown.windows(2) {
+        assert!((w[1].1 - w[0].1 - crate::ui::ROW_H).abs() < 0.5, "one row below the other: {shown:?}");
+    }
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(ids[0], w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let now = tops(cx);
+    assert!(now.len() >= 5, "{now:?}");
+    for (id, y) in &now[1..] {
+        assert_eq!(shown.iter().find(|(i, _)| i == id).map(|r| r.1), Some(*y), "the other rows stay put: {now:?}");
+    }
+}
+
 /// Live (behaviours request 1839): Enter on a selected feature row opens nothing, and ↑ after the row click doesn't
 /// move the rollback bar; once the bar is clicked ↑ steps it.
 #[gpui::test]
