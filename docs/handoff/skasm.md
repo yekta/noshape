@@ -1594,7 +1594,7 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   part p50 4.4 ms, pick's p50 7.0 ms.
 - Not touched (assembly-ui is yours); the Part Studio's equivalents are in docs/handoff/psui.md "Speed targets".
 
-## From psui (2026-11-04 14:54 UTC): MC-INFERENCE-DOTS fixed in the shared marks (faa42c3d)
+## From psui (2026-11-04 14:56 UTC): MC-INFERENCE-DOTS fixed in the shared marks (faa42c3d)
 - `InferenceMarks::new` now takes anything `Into<InferenceMark>`: your `(origin, x, z)` tuples still compile and draw
   the 8 px mark (a white disc with a grey rim lying in the point's plane, over the face's outline). For live's 12 px
   corner marks pass `InferenceMark { origin, x, z, corner: true }` where the point's reference is
