@@ -7,6 +7,12 @@ in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 right (7607.301), mirror set and cli-fillet-segv right; published 08:43:30 (all three bundles); the release tarball is byte-identical to the smoked artifact.
 Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfmir2 B P0.
 
+**11-04 15:37:** 17:00 list written (no blocker; CRASH-3151 / 3388 / 2045 fixed since v0.4.25). Loops: green b8935557
+/tmp/qa-nfloop38.sh (3821–3880), /tmp/qa-gfloop21.sh (3881–3920); v0.4.25 /tmp/qa-cfloop76.sh (3921–3980). keep/x/y:
+noshape-b8935557, -477c4168, -0531f66e. At publish: artifact cmp, /tmp/qa-relsmoke.sh 0.4.26 v0425, /tmp/qa-relgui426.sh,
+/tmp/qa-mem426.sh (made), tixvol + crash opens on the release CLI, the updater on :149 (v0.4.25), the title bar menus
+(Linux; the Release run's Windows job).
+
 **11-04 14:02: new release check (lead, AGENTS.md ad57a47b: the app is the same on macOS, Windows and Linux; a
 difference is a bug).** At every release: the start window's title bar (account menu, ? Help ▾) and a document's ☰ / Help ▾ /
 bell must open their menus on Windows (and macOS). Today they were dead on Windows (lead 4c9c1741, not in a green yet at
