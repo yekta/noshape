@@ -868,6 +868,15 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- 11-04 01:07: **187/221 scenarios, 1433/1532 states**. Since 23:00 (all landed): the graphics context menu in the state
+  (app-core os_menu::menu_state); a pick that fills a field and moves on gives the next field the keyboard; which
+  control keeps the keyboard when an edit brings up a field (tab: the field; checkbox: only if the old active field
+  went away; dropdown: keeps it); dialog angles read "3 deg" focused; Loft's End conditions group title left out of
+  the state; the Mass panel's state (mass_ui_state). Open with live (REQUESTS 00:0x–01:0x): **edge / line midpoint
+  after a still hover** (explains fillet-* / chamfer-* / undo-new-fillet / edge-rclick-menu / sketch midpoint
+  clicks: if live targets the midpoint, move the scenarios' clicks off it and make ours snap after a still dwell),
+  Remove on an existing Extrude flipping (specifiedParameters), Paste sketch with a clipboard, face-dblclick's lit
+  rows, Mass Override without material, edit-feature-flip-direction's runner miss.
 - 11-03 23:14: **134/150 scenarios, 1101/1142 states** (tests/ui-parity/live, kept in sync with /root/parity/ui/live after each
   live batch). Left: 7 fillet-* (live's account), 8 sketch (notes in skasm.md), extrude-end-type-up-to-face (live's
   runner). Since 19:00: rolled-back rows aren't reported hidden (variable-edit-focus). Live's batch reads scenarios from
