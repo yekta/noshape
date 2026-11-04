@@ -1845,6 +1845,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P3 ABOUT-DISABLED (psui) "About noshape" at the end of both Help ▾ menus (the start window's, a document's) is a
+  placeholder: always disabled (`OsMenuItem::new("About noshape").disabled(true)`, start_window.rs / workspace.rs) on every
+  OS, and the macOS app menu has no About item. Clicking it does nothing (green 477c4168, Linux). Either make it open an About
+  window (version, the build's commit: the start window's footer shows "0.0.0-dev.<sha>") on all three OSs, or drop it.
+  (qa 2026-11-04 14:46, build 477c4168; found during the lead's platform title-bar check)
 - [x] fixed dbd2f298 (psui 11-03: what the editing logic fills in on opening is no step; UI test what_the_dialog_fills_in_on_opening_is_no_undo_step; ui-parity extrude-remove-tab matches) P3 NEW-DIALOG-UNDO-STEP (psui) opening a new feature's dialog enables Undo in ours: with the box's top face selected,
   Shift+E. Live's recordings (extrude-remove-tab, boolean-union-two-parts, new-extrude-then-other-tool; /root/parity/ui/live):
   the Extrude 2 dialog opens with Undo **off**; it turns on at the first change in the dialog (the Remove tab). Ours (green
