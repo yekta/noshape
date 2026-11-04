@@ -26,6 +26,8 @@ pub use ui_state::field_focus;
 
 #[derive(Clone, Debug)]
 pub enum DialogEvent {
+    /// The chip of a mate connector made inside the feature asks for its own editor (live 1851: "Click to edit").
+    EditSubFeature(noshape_model::reference::FeatureId),
     /// The draft changed; regenerate the preview.
     Changed,
     Accept { repeat: bool },
@@ -294,6 +296,8 @@ pub struct FeatureDialog {
     /// header has only ✕ and an "Unsuppressed" checkbox ends the list
     /// (live psb 10-21 g).
     pub configure_mode: bool,
+    /// An in-feature mate connector's own editor beside its feature's dialog (live 1851): only ✕, not renamed.
+    pub nested: bool,
     /// This feature's configured parameters (`__suppressed` included): a
     /// dotted amber outline and the tooltip "Configured" (live psb 10-21 g).
     pub configured: std::collections::HashSet<String>,
@@ -383,6 +387,7 @@ impl FeatureDialog {
             open_items: std::collections::HashSet::new(),
             pick_drop: None,
             configure_mode: false,
+            nested: false,
             configured: Default::default(),
             configurable_inputs: false,
             active_query: None,
@@ -1360,6 +1365,36 @@ impl FeatureDialog {
 
     /// A user edit: the preview re-runs and ✓ may enable (live
     /// `canSubmit`: the dialog is dirty and no value fails validation).
+    /// Ctrl+M: the active field's "Select mate connectors" button on or off; false when that field takes none.
+    pub fn toggle_mc_mode(&mut self, cx: &mut Context<Self>) -> bool {
+        let Some(path) = self.active_query.clone() else { return false };
+        let takes = self.spec_for_path(&path).is_some_and(|s| matches!(s.kind, ParamKind::Query { filter, .. } if filter.intersects(QueryFilter::MATE_CONNECTOR) && !filter.intersects(QueryFilter::SOLID_BODY)) && !s.hints.has(Hints::NO_MATE_CONNECTOR_BUTTON));
+        if !takes {
+            return false;
+        }
+        self.mc_mode = if self.mc_mode.as_deref() == Some(path.as_str()) { None } else { Some(path) };
+        cx.notify();
+        true
+    }
+
+    /// A picked reference whose creator is gone, but not one of this feature's in-feature mate connectors (not in the
+    /// saved studio while it is new).
+    pub(crate) fn ref_missing(&self, r: &Reference) -> bool {
+        let own = matches!(r, Reference::MateConnector { feature, .. } if self.feature.sub_features.iter().any(|s| s.id == *feature));
+        !own && (self.missing)(r)
+    }
+
+    /// The nested editor changed sub-feature `sub` (an in-feature mate connector): the feature previews with it.
+    pub fn set_sub_feature(&mut self, sub: &Feature, cx: &mut Context<Self>) {
+        let Some(s) = self.feature.sub_features.iter_mut().find(|s| s.id == sub.id) else { return };
+        if s.params == sub.params {
+            return;
+        }
+        s.params = sub.params.clone();
+        self.changed(cx);
+        cx.notify();
+    }
+
     fn changed(&mut self, cx: &mut Context<Self>) {
         self.dirty = true;
         // A chip removed takes its in-feature mate connector with it.
@@ -2884,7 +2919,7 @@ impl FeatureDialog {
                 let active = self.active_query.as_deref() == Some(path) && !cs_open;
                 let takes_cs = s.hints.has(Hints::SHOW_CREATE_SELECTION);
                 let path_s = path.to_string();
-                let any_missing = refs.iter().any(|r| (self.missing)(r));
+                let any_missing = refs.iter().any(|r| self.ref_missing(r));
                 // Right-click on a pick: Configure (live psb 10-21 g) after
                 // Clear all, with a configuration input.
                 let pick_configure = (self.configurable_inputs && !self.configure_mode && prefix.is_none() && !s.hints.has(Hints::UNCONFIGURABLE)).then(|| (s.id.to_string(), self.configured.contains(s.id)));
@@ -2907,7 +2942,7 @@ impl FeatureDialog {
                         let single = indices.len() == 1;
                         let label_for_drag = label.clone();
                         // Missing references (deleted/suppressed creators) show red.
-                        let missing = indices.iter().any(|i| (self.missing)(&refs[*i]));
+                        let missing = indices.iter().any(|i| self.ref_missing(&refs[*i]));
                         let p2 = path_s.clone();
                         let hover_ref = r.clone();
                         let tip = label.clone();
@@ -2929,6 +2964,21 @@ impl FeatureDialog {
                             .text_color(if missing { pal.error } else if active { gpui_kit::rgb(0x555555) } else { pal.text_muted })
                             .child(div().flex_1().truncate().child(crate::ui::entity_text(label)))
                             .when(reorder_on && single, |d| d.child(self.reorder_grip(path, k, &label_for_drag, false)))
+                            // A mate connector made inside the feature: its icon opens its editor (live 1851).
+                            .when_some(match &r { Reference::MateConnector { feature, .. } if self.feature.sub_features.iter().any(|s| s.id == *feature) => Some(*feature), _ => None }, |d, sub| d.child(
+                                div()
+                                    .id(SharedString::from(format!("chipmc-{path}-{row}")))
+                                    .map(|d| crate::ui_script::mark(d, || format!("button:mc:{}:{row}", crate::i18n::spec(s.label))))
+                                    .w(px(20.))
+                                    .h(px(24.))
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .cursor_pointer()
+                                    .child(crate::assets::icon("mc-select", 14., cx))
+                                    .tooltip(crate::ui::tooltip("Mate connector (Click to edit)"))
+                                    .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| cx.emit(DialogEvent::EditSubFeature(sub)))),
+                            ))
                             .when(!reorder_on, |d| d.child(
                                 div()
                                     .id(SharedString::from(format!("chipx-{path}-{row}")))
@@ -3105,6 +3155,7 @@ impl FeatureDialog {
                                 .when(on, |d| d.bg(gpui_kit::rgb(0xeaeaea)))
                                 .hover(|d| d.bg(pal.panel_hover))
                                 .child(crate::assets::icon("mc-select", 20., cx))
+                                .map(|d| crate::ui_script::mark(d, || format!("button:Select mate connector{} (ctrl+m)", if *max_picks == Some(1) { "" } else { "s" })))
                                 // Live (dom/dialog-draft.txt, dialog-hole.txt).
                                 .tooltip(crate::ui::tooltip(if *max_picks == Some(1) { "Select mate connector (ctrl+m)" } else { "Select mate connectors (ctrl+m)" }))
                                 .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
@@ -4050,7 +4101,7 @@ impl Render for FeatureDialog {
                             .child(crate::ui::user_text(name))
                             .when_some(error_tip, |d, m| d.tooltip(crate::ui::tooltip(m)))
                             .on_click(cx.listener(|this, ev: &ClickEvent, window, cx| {
-                                if ev.click_count() >= 2 {
+                                if ev.click_count() >= 2 && !this.nested {
                                     let name = this.feature.name.clone();
                                     let st = cx.new(|cx| InputState::new(window, cx).default_value(name));
                                     let sub = cx.subscribe_in(&st, window, |this: &mut FeatureDialog, st, ev: &InputEvent, _, cx| {
@@ -4074,7 +4125,7 @@ impl Render for FeatureDialog {
                             .into_any_element(),
                     })
                     // Live (psb 10-21 g): a dialog in configure mode has only ✕.
-                    .when(!self.configure_mode, |d| d.child(
+                    .when(!self.configure_mode && !self.nested, |d| d.child(
                         Button::new("dlg-ok")
                             .debug_selector(|| "dialog-ok".into())
                             // Live: the ✓ / ✕ are not Tab stops.
@@ -4158,7 +4209,8 @@ impl Render for FeatureDialog {
                     .gap_2()
                     .text_size(px(13.33))
                     .text_color(pal.text_muted)
-                    .when(self.final_available, |d| d.child(
+                    // The nested mate connector editor previews in its feature: no Final, no slider.
+                    .when(self.final_available && !self.nested, |d| d.child(
                         gpui_kit::component::checkbox::Checkbox::new("dlg-final")
                             .checked(self.show_final)
                             .label("Final")
@@ -4173,7 +4225,7 @@ impl Render for FeatureDialog {
                     // Preview slider: before (left) to after (right) the feature.
                     // Features without a preview (Sketch; FeatureScript
                     // NO_PREVIEW_PROVIDED: Variable) have no slider (live).
-                    .when(!sketch && self.feature.type_id != "assignVariable", |d| d.child(self.render_preview_slider(cx)))
+                    .when(!sketch && self.feature.type_id != "assignVariable" && !self.nested, |d| d.child(self.render_preview_slider(cx)))
                     .child(div().flex_1())
                     .children(footer_extra)
                     .child(

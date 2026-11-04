@@ -1797,7 +1797,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Shift+E. Live's recordings (extrude-remove-tab, boolean-union-two-parts, new-extrude-then-other-tool; /root/parity/ui/live):
   the Extrude 2 dialog opens with Undo **off**; it turns on at the first change in the dialog (the Remove tab). Ours (green
   7d35f2cb, qa-scratch/uip-score3/): Undo on as soon as the dialog opens. (qa 2026-11-03 08:04, build 7d35f2cb)
-- [ ] P2 IN-FEATURE-MATE-CONNECTOR (psui + core; dx's parity suite 11-03) Onshape's fields that take mate connectors
+- [ ] P2 MC-INFERENCE-HOVER (psui, split from IN-FEATURE-MATE-CONNECTOR 11-04) a field taking mate connectors (its
+  button on, or the Mate connector feature's Origin entity) shows, while a face is hovered, its inference points
+  (face centre, edge midpoints, corners as white dots) and a triad preview at the pointer, and a click takes the
+  point under it (live 1851 shot 4, psui/hole-mc-1851/). Ours infers only an edge's midpoint (behaviors.rs
+  update_hover); a face click makes the connector at the face's own origin.
+- [x] fixed (psui 11-04: model, regeneration, op and dialog: Feature.sub_features evaluated before their feature and gone after it, in its cache key, read by std's editing logic; feature_add / feature_edit `{"mate_connector": {…}}` items; the parity translator places live's subFeatures; the field's button a toggle (also Ctrl+M), picks make in-feature connectors with chip "Mate connector" and its icon opening the nested "Mate connector" editor (only ✕) beside the dialog; e2e a_hole_on_an_in_feature_mate_connector, T1 a_hole_placed_on_an_in_feature_mate_connector; the hover's inference points split to MC-INFERENCE-HOVER) P2 IN-FEATURE-MATE-CONNECTOR (psui + core; dx's parity suite 11-03) Onshape's fields that take mate connectors
   (Hole's "Sketch points to place holes", …) can make a mate connector inside the feature: features.json stores it in
   the feature's `subFeatures` (a mateConnector, here "On entity", origin Extrude 3's cap face / edge centre) and the
   field names it by qCreatedBy(subFeature, BODY, MATE_CONNECTOR) (clamp-abhil Holes 2 and 3). Ours has no mate

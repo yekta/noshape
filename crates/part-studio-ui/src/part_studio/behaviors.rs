@@ -355,6 +355,8 @@ pub struct UiState {
     pub mass_variance: bool,
     /// The Mass and section properties panel as the ui-parity state reads it (kept only while the driver runs).
     pub mass_state: Option<serde_json::Value>,
+    /// An in-feature mate connector's own editor beside the feature's dialog (live 1851), while open.
+    pub sub_dialog: Option<(Entity<crate::feature_dialog::FeatureDialog>, Subscription)>,
     /// The no-material notice is due (shown ≈ 1 s after measuring; the ui-parity driver waits for it).
     pub material_notice_pending: bool,
     pub mass_variance_cache: Option<(Vec<BodyId>, usize, Option<noshape_model::regen::measure::MassProperties>)>,
@@ -688,6 +690,7 @@ impl UiState {
             mass_reference: None,
             mass_variance: false,
             mass_state: None,
+            sub_dialog: None,
             material_notice_pending: false,
             mass_variance_cache: None,
             mass_face_variance_cache: None,
@@ -1013,8 +1016,7 @@ impl PartStudioView {
         if self.edit.as_ref().is_some_and(|e| made_by(&target.reference, e.dialog.read(cx).feature.id)) {
             return;
         }
-        if let Some(e) = &self.edit {
-            let dialog = e.dialog.clone();
+        if let Some(dialog) = self.picking_dialog() {
             let Some((_, filter, _)) = dialog.read(cx).active_filter() else {
                 self.flash_info("Click a selection field in the dialog first.".into(), cx);
                 return;
@@ -1062,7 +1064,52 @@ impl PartStudioView {
     /// The part of a face/edge/vertex when `filter` takes parts but not that kind.
     /// The active dialog field's selection filter.
     pub(super) fn active_field_filter(&self, cx: &App) -> Option<QueryFilter> {
-        self.edit.as_ref().and_then(|e| e.dialog.read(cx).active_filter().map(|(_, f, _)| f))
+        self.picking_dialog().and_then(|d| d.read(cx).active_filter().map(|(_, f, _)| f))
+    }
+
+    /// The dialog graphics picks go to: an open in-feature mate connector's editor, else the feature's.
+    pub(super) fn picking_dialog(&self) -> Option<Entity<crate::feature_dialog::FeatureDialog>> {
+        let e = self.edit.as_ref()?;
+        Some(self.ui.sub_dialog.as_ref().map(|s| s.0.clone()).unwrap_or_else(|| e.dialog.clone()))
+    }
+
+    /// Opens the editor of in-feature mate connector `sub` of the open feature (its chip's icon, live 1851): a
+    /// "Mate connector" dialog with only ✕ beside the feature's, its changes previewed in the feature.
+    pub(super) fn open_sub_editor(&mut self, sub: FeatureId, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(parent) = self.edit.as_ref().map(|e| e.dialog.clone()) else { return };
+        let Some(feature) = parent.read(cx).feature.sub_features.iter().find(|s| s.id == sub).cloned() else { return };
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let labeler = self.labeler(cx);
+        let nested = cx.new(|cx| {
+            let mut d = crate::feature_dialog::FeatureDialog::new(feature, units, labeler, cx);
+            d.nested = true;
+            d
+        });
+        let sub = cx.subscribe_in(&nested, window, |this: &mut Self, nested, ev: &crate::feature_dialog::DialogEvent, _, cx| {
+            use crate::feature_dialog::DialogEvent;
+            match ev {
+                DialogEvent::Changed => {
+                    let f = nested.read(cx).feature.clone();
+                    if let Some(parent) = this.edit.as_ref().map(|e| e.dialog.clone()) {
+                        parent.update(cx, |p, cx| p.set_sub_feature(&f, cx));
+                    }
+                }
+                // Its ✕ closes it alone; the feature stays open (live).
+                DialogEvent::Cancel | DialogEvent::Accept { .. } => {
+                    this.ui.sub_dialog = None;
+                    this.refresh_scene(false, cx);
+                    cx.notify();
+                }
+                DialogEvent::QueryFocused => this.refresh_scene(false, cx),
+                DialogEvent::HoverRef(r) if this.ui.query_hover != *r => {
+                    this.ui.query_hover = r.clone();
+                    this.refresh_scene(false, cx);
+                }
+                _ => {}
+            }
+        });
+        self.ui.sub_dialog = Some((nested, sub));
+        cx.notify();
     }
 
     /// Which pick kinds the graphics area offers: what the active dialog
