@@ -882,6 +882,12 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- 11-04 17:37 lead's list (step_ctrl, MC-INFERENCE-DOTS, Part Studio speed, MISSING-LATER-CHIP): all done. Speed
+  state, cf-straight-spline on :102 (box at load ~26 on 16 cores: ±15 ms noise): hover's UI part p50 6.5 ms, pick's
+  3.7 ms; a row click's frame 55-59 ms (layout + prepaint + paint), of which the toolbar ~20 ms is gone with
+  `Slice::keyed` (renders 23 → 1 in a run) and the two lists ~18 ms remain (they do change); dialog open: the
+  lists ~40 ms, the overlays ~17 ms of its frame. Orbit on a real GPU only from perf.yml: the NIST Part Studio's
+  GPU 12.8-15 ms a frame at Retina (over 8.3), pins-assembly-1000 8.7 ms; the model-suite documents can't go to CI.
 - 11-04 16:04 start window Help ▾ finished (833cae3e): live was silent since 12:24, so I captured Onshape's documents
   page ? menu in my own tab (behaviours "the documents page's ? Help menu", shots live/psui/docs-help-*): ours has its
   offline rows, Keyboard shortcuts (opens the studios' sheet over the page) and About, around the two agent items.
