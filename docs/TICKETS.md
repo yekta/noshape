@@ -3518,6 +3518,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   directly): what noshape's blend would make if its chain ends at such vertices took the three rounds' pairwise
   meeting curves (now "a corner between blended edges"). pipeflange-steven's Fillet 2: the R8 foot round is 4 tori +
   2 free-form faces at each countersink, trimmed by the cones (not blended into them).
+  core 11-04 05:26 (full parity run 03:30, 319/480): left over ×3: cf-hose-routing 6.9 s (live 0.49): the kernel is
+  ~0.45 s a Hose Routing feature (op_shell 0.12 s; the props_volume / props_surface calls in its marks are the
+  runner's own measures), so ~5 s of the 6.9 is the FeatureScript host's (for dx); cf-fix-pcb's Fix PCB 2 (OCCT's
+  Boolean tree, bool); knob-jason's Fillet 2 236 ms: OCCT's fillet as it is fails in 73 ms, then scaled builds in
+  147 ms (live's sphere corners: BLEND-RUST); cf-straight-spline (bool, BOOL-RUST-GEARS-SLOW). cf-straight-spline's
+  Feature 5 (live 31/85/56, ours 31/78/49): the faces are live's one for one; live's bottom face is 1.3 mm² short of
+  the disk ours is and its 7 more edges / vertices fit a bottom circle in 8 arcs: not looked into.
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet
