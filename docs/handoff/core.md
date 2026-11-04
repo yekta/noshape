@@ -16,6 +16,17 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-04 05:14 UTC.**
+- Land trouble (fixed forward): my 03:06 commit's first seam_to_vertex hopped seams vertex to vertex (each move made
+  another candidate) and hung noshape-assembly's tests in the land queue for 90 min (timeout; everything stacked on it
+  superseded). Then the qa5 union tests (model engine.rs) failed: a seam moved to the foot of a line along its angle.
+  Now: a seam moves only where it splits one curve, to a vertex no chain edge runs along from; arcs of one circle
+  rejoin as one circle. One assertion (add_into_several_parts_is_one_union) within 1e-7 relative: the moved seam
+  shifts that union's volume 4e-8 (6e-4 mm³, not integration noise: the bound is 6.5e-6; cause not found).
+- SHELL-SLOW: Shell 4 builds (quadrics; split corners, vanishing strips, marched edges), live's volume, 1.3 s probe /
+  1.5 s in qa's document (failed after 8.8-10.8 s). Asked live for its 28 faces (REQUESTS 04:38; ours 24).
+- Re-queued at 05:07 as one stack (a6ff8389).
+
 **State 11-04 03:21 UTC.**
 - Landed / queued since 01:30: an inch is std's `2.54 * centimeter` (0.025400000000000002 m; live's 1 in circle has that
   radius): FS-POCKET-HOLES fixed (cf-pocket-holes to the end). cf-straight-spline 5/59 -> 9/59: a cut by several tools
