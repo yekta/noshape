@@ -477,6 +477,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   edges (arcs at z 19.8 and 20.0 and short vertical lines where the rectangle notches its top): move_seams_off_holes
   only takes a band between two whole end circles. Needs the seam moved onto an existing vertex of a notched end
   (then join_loop_pieces joins the arc at the old seam).
+  core 11-04 03:05: that, for a cylinder face with one end circle (boolean.cpp seam_to_vertex: the seam to the chain's
+  vertex nearest the circle, only where the seam splits the chain smoothly); join_loop_pieces walked off a corner's
+  other edge (its chain began at any edge on the same faces), now the edge back to the joint. cf-straight-spline's
+  shafts 31/77/48 as live (T1 kernel bool_patterns::a_spline_shafts_run_out_across_its_seam_is_one_edge); its 12
+  `BOOLEAN_NON_MANIFOLD_RESULT` features (dx 11-03, handoff) build: each slot's flat side and its run-out's cone touch
+  along the profile edge and OCCT's cut by all the tools kept the cone's half inside the slot; a cut by several tools
+  leaving an edge on three faces (no input has one) is done again with the tools fused first (bool_patterns::
+  a_spline_shafts_run_outs_tangent_to_its_slots_cut_manifold). The document 5/59 -> 9/59; next there Feature 5's
+  Part 5, live 31/85/56, ours 31/78/49.
 - [x] (core 11-03 09:00: pieces of one straight edge between the same two planes, a gap between them, are filleted as one cut along the whole line (features.cpp fillet_as_cut's spans, before OCCT): live's one face a corner, rounding off the 0.3 mm the groove leaves in the corner; bracket03-mattie's Fillet 1 exactly live's (22/60/40, 9351.620768 mm², 26334.635 mm³); T1 kernel blend::fillet_over_a_groove_is_one_face; the blend corpus as recorded. Its Chamfer 1 then 58/144/88 vs live 58/136/80: a blend's lines split where nothing ends are joined (features.cpp join_split_lines), 58/136/80 as live; bracket03-mattie matches live to the end; T1 kernel blend::chamfered_groove_edges_stay_whole) P2 FILLET-SPLIT-EDGE-FACES (core; dx's parity suite 11-03) a Fillet of edges a groove cut in two makes one face
   per piece and more: bracket03-mattie Fillet 1 (r 3 mm, tangent propagation, four 7 mm corner edges, each beside
   its other half across a 6 mm groove; Onshape's query keeps both halves): live 22/60/40 faces/edges/vertices, one

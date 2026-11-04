@@ -1029,3 +1029,47 @@ fn a_ten_millimetre_knurl() {
     let v = r.shape.volume().unwrap();
     assert!((v - 6.77883072e-7).abs() <= 1e-5 * 6.77883072e-7, "volume {v}");
 }
+
+/// cf-straight-spline's SAE Straight-Sided Spline feature (recorded): a shaft cut by four slots and their run-outs
+/// with the model's many-tools options, unified as the model does; faces and shown edges / vertices.
+fn spline_shaft(n: u32) -> (k::Shape, (usize, usize, usize)) {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let target = k::read_brep(&dir.join(format!("spline-shaft-{n}-target.brep"))).expect("the shaft");
+    let tools = k::read_brep(&dir.join(format!("spline-shaft-{n}-tools.brep"))).expect("the cutters").solids();
+    let opts = k::BooleanOptions { glue: k::Glue::ShiftChecked, obb: true, parallel: true, ..Default::default() };
+    let r = k::boolean(k::BooleanOp::Cut, &[target], &tools, &opts).expect("cut");
+    let s = k::unify_same_domain(&r.shape).expect("unified").shape;
+    let t = s.shown_topology().expect("shown topology");
+    let counts = (s.count(k::ShapeType::Face), t.edges.iter().filter(|&&x| x).count(), t.vertices.iter().filter(|&&x| x).count());
+    (s, counts)
+}
+
+/// The first shaft (live: Part 1 31 / 77 / 48, 38747.8297 mm³): the run-out across the shaft cylinder's seam was two
+/// edges (the seam's vertex between them; live's faces have no seams): the seam moved to a run-out's vertex.
+#[test]
+fn a_spline_shafts_run_out_across_its_seam_is_one_edge() {
+    let (s, counts) = spline_shaft(1);
+    assert!(s.is_valid());
+    assert_eq!(counts, (31, 77, 48));
+    let v = s.volume().unwrap() * 1e9;
+    assert!((v / 38747.8297 - 1.0).abs() < 1e-6, "{v}");
+}
+
+/// The second shaft (live: Part 2 31 / 77 / 48, 52687.29 mm³): each slot's flat side and its run-out's cone touch
+/// along the profile edge, and OCCT's cut by all eight kept the cone's half inside the slot (an edge on three faces:
+/// "would result in non-manifold body", where live builds it): cut by the tools fused instead.
+#[test]
+fn a_spline_shafts_run_outs_tangent_to_its_slots_cut_manifold() {
+    let (s, counts) = spline_shaft(2);
+    assert!(s.is_valid());
+    let ef = s.edge_faces().unwrap();
+    assert!(ef.iter().all(|f| {
+        let mut f = f.clone();
+        f.sort_unstable();
+        f.dedup();
+        f.len() <= 2
+    }));
+    assert_eq!(counts, (31, 77, 48));
+    let v = s.volume().unwrap() * 1e9;
+    assert!((v / 52687.29 - 1.0).abs() < 1e-6, "{v}");
+}

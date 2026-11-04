@@ -118,3 +118,55 @@ fn parallel_booleans_give_the_same_result() {
         assert_eq!(run(true), serial, "parallel differs from serial");
     }
 }
+
+/// A cut dumped by a regeneration: `NOSHAPE_CUT_CASE=<dir>/<n>` reads `<n>-target.brep` and `<n>-tools.brep` (a
+/// compound of the tools), cuts with the many-tools options from 8 tools, and prints the path taken and every edge of
+/// the result bounding more than two faces.
+#[test]
+#[ignore = "T2: a probe of a dumped cut (NOSHAPE_CUT_CASE)"]
+fn dumped_cut_probe() {
+    let Ok(case) = std::env::var("NOSHAPE_CUT_CASE") else { return };
+    let target = read_brep(Path::new(&format!("{case}-target.brep"))).unwrap();
+    let tools = read_brep(Path::new(&format!("{case}-tools.brep"))).unwrap().solids();
+    let opts = if tools.len() >= 8 && std::env::var_os("NOSHAPE_CUT_PLAIN").is_none() { BooleanOptions { glue: Glue::ShiftChecked, obb: true, parallel: true, ..Default::default() } } else { BooleanOptions::default() };
+    let mut opts = opts;
+    if let Some(f) = std::env::var("NOSHAPE_CUT_FUZZY").ok().and_then(|v| v.parse().ok()) {
+        opts.fuzzy = f;
+    }
+    let t = std::time::Instant::now();
+    let r = match std::env::var("NOSHAPE_CUT_STEPS").ok().as_deref() {
+        // Fused tools first, then one cut.
+        Some("fuse") => {
+            let u = boolean(BooleanOp::Fuse, &tools[..1], &tools[1..], &BooleanOptions::default()).unwrap();
+            println!("fused tools: {} faces", u.shape.faces().len());
+            boolean(BooleanOp::Cut, &[target], &[u.shape], &opts).unwrap()
+        }
+        // One cut per tool.
+        Some("each") => {
+            let mut s = target;
+            for x in &tools {
+                s = boolean(BooleanOp::Cut, &[s], std::slice::from_ref(x), &BooleanOptions::default()).unwrap().shape;
+            }
+            OpResult { shape: s, history: Default::default() }
+        }
+        _ => boolean(BooleanOp::Cut, &[target], &tools, &opts).unwrap(),
+    };
+    println!("{} tools, {:.1} ms, path {:?}, {}/{}/{} faces/edges/vertices", tools.len(), t.elapsed().as_secs_f64() * 1e3, last_boolean_path(), r.shape.faces().len(), r.shape.edges().len(), r.shape.vertices().len());
+    let faces = r.shape.faces();
+    for (i, f) in r.shape.edge_faces().unwrap().iter().enumerate() {
+        let mut f = f.clone();
+        f.sort_unstable();
+        f.dedup();
+        if f.len() <= 2 {
+            continue;
+        }
+        let e = &r.shape.edges()[i];
+        let x = e.edge_info().unwrap();
+        println!("edge {i} {} {:.4?} -> {:.4?}", format!("{:?}", x.curve).chars().take(10).collect::<String>(), x.start * 1e3, x.end * 1e3);
+        for &j in &f {
+            let j = j as usize;
+            let c = faces[j].centroid().unwrap() * 1e3;
+            println!("  face {j} {} area {:.4} at {:.4?}", format!("{:?}", faces[j].face_surface().ok()).chars().take(12).collect::<String>(), faces[j].area().unwrap() * 1e6, c);
+        }
+    }
+}
