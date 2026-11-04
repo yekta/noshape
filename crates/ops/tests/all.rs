@@ -19,6 +19,7 @@ mod mate_flip;
 mod mesh_pixels;
 mod parity;
 mod regen_profile;
+mod sketch_open_perf;
 mod sketch_recursion;
 mod smoke;
 mod spawn_guard;

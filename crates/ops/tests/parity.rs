@@ -169,7 +169,7 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
     res
 }
 
-fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
+pub(crate) fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
     let mut features: Value = serde_json::from_str(&std::fs::read_to_string(dir.join("features.json")).ok()?).ok()?;
     read_studios(dir, &mut features);
     // Import features' files: imports/<foreign id>.json names the file beside it.
