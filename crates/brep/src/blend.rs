@@ -11,6 +11,7 @@
 //! The result is OCCT's: the same faces, edges and vertices, the same surfaces, P and the walls Modified, each
 //! blended edge Generated its blend face, the shortened edges Modified to their pieces.
 
+use crate::nurbs::NurbsCurve;
 use crate::{Body, Curve, Decline, Edge, Face, Kind, Origin, Output, Record, Relation, Solid, Surface, Use};
 
 mod corner;
@@ -466,8 +467,9 @@ fn chains(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdg
                     };
                     let tp = if prev.reversed { -tp } else { tp };
                     let tu = if u.reversed { -tu } else { tu };
-                    // A corner between them: the two blends meet along their intersection (lines only).
-                    if tp.dot(tu) < 1.0 - 1e-12 && (ep.curve != Curve::Line || eu.curve != Curve::Line) {
+                    // A corner between them: the two blends meet along their intersection (lines, or fillets).
+                    let fillets = matches!(spec_of[prev.edge as usize].map(|s| s.spec), Some(Spec::Fillet { .. })) && matches!(spec_of[u.edge as usize].map(|s| s.spec), Some(Spec::Fillet { .. }));
+                    if tp.dot(tu) < 1.0 - 1e-12 && (ep.curve != Curve::Line || eu.curve != Curve::Line) && !fillets {
                         return no("a corner between blended edges not lines");
                     }
                 }
@@ -484,7 +486,8 @@ fn chains(b: &Body, uses: &EdgeUses, ve: &[Vec<u32>], spec_of: &[Option<BlendEdg
                 };
                 let tl = if last.reversed { -tl } else { tl };
                 let tf = if first.reversed { -tf } else { tf };
-                if tl.dot(tf) < 1.0 - 1e-12 && (el.curve != Curve::Line || ef.curve != Curve::Line) {
+                let fillets = matches!(spec_of[last.edge as usize].map(|s| s.spec), Some(Spec::Fillet { .. })) && matches!(spec_of[first.edge as usize].map(|s| s.spec), Some(Spec::Fillet { .. }));
+                if tl.dot(tf) < 1.0 - 1e-12 && (el.curve != Curve::Line || ef.curve != Curve::Line) && !fillets {
                     return no("a corner between blended edges not lines");
                 }
                 closed = true;
@@ -768,6 +771,109 @@ fn chain(
 }
 
 /// Into P from link `x`'s edge at its point `p`, square to it.
+/// At a corner between two links' fillets, one of them on an arc: the loci of their balls' centres seen in P (an
+/// offset circle about the arc's centre, an offset line), each with how far a point lies from it towards its edge.
+#[derive(Clone, Copy, Debug)]
+struct ArcCorner {
+    /// Per link: (centre, offset radius, sign) for an arc, or (a point of the offset line, 0, 0) with `q` into P.
+    loci: [(DVec3, f64, f64, DVec3); 2],
+    /// P's normal at the corner and the fillet's radius (its reach `d1` in P).
+    n: DVec3,
+    r: f64,
+}
+
+fn arc_corner(b: &Body, c: &Chain, i0: usize, i1: usize, p: DVec3) -> Option<ArcCorner> {
+    let n = plane_normal(&b.faces[c.face as usize])?;
+    let mut any_arc = false;
+    let mut loci = [(DVec3::ZERO, 0.0, 0.0, DVec3::ZERO); 2];
+    for (k, i) in [i0, i1].into_iter().enumerate() {
+        let x = &c.links[i];
+        let q = into_p_at(b, x, p);
+        let l = p + q * c.d1;
+        loci[k] = match b.edges[x.edge as usize].curve {
+            Curve::Circle { center, .. } => {
+                any_arc = true;
+                let rad = (l - center) - n * (l - center).dot(n);
+                // Towards the edge (against q): the radius growing (+1) or shrinking (-1).
+                (center, rad.length(), -q.dot(rad.normalize()).signum(), q)
+            }
+            Curve::Line => (l, 0.0, 0.0, q),
+            _ => return None,
+        };
+    }
+    any_arc.then_some(ArcCorner { loci, n, r: c.d1 })
+}
+
+impl ArcCorner {
+    /// How far `y` (in P's plane) lies from locus `k`, towards its edge.
+    fn g(&self, k: usize, y: DVec3) -> f64 {
+        let (o, rad, sign, q) = self.loci[k];
+        if sign == 0.0 {
+            return -(y - o).dot(q);
+        }
+        let d = (y - o) - self.n * (y - o).dot(self.n);
+        (d.length() - rad) * sign
+    }
+
+    /// The point in P's plane (through `start`) at `s` from both loci, Newton from `start`.
+    fn meet(&self, start: DVec3, s: f64) -> Option<DVec3> {
+        let e1 = self.n.any_orthonormal_vector();
+        let e2 = self.n.cross(e1);
+        let mut y = start;
+        let h = 1e-7 * self.r.max(1e-9);
+        for _ in 0..50 {
+            let f = [self.g(0, y) - s, self.g(1, y) - s];
+            if f[0].abs().max(f[1].abs()) < 1e-14 * (1.0 + self.r) {
+                return Some(y);
+            }
+            let grad = |k: usize| [(self.g(k, y + e1 * h) - self.g(k, y - e1 * h)) / (2.0 * h), (self.g(k, y + e2 * h) - self.g(k, y - e2 * h)) / (2.0 * h)];
+            let (a, b2) = (grad(0), grad(1));
+            let det = a[0] * b2[1] - a[1] * b2[0];
+            if det.abs() < 1e-12 {
+                return None;
+            }
+            let du = (f[0] * b2[1] - a[1] * f[1]) / det;
+            let dv = (a[0] * f[1] - f[0] * b2[0]) / det;
+            y -= e1 * du + e2 * dv;
+        }
+        None
+    }
+
+    /// The two rounds' meeting curve from `p1` (on P) down to the walls' edge (along `down`, to depth r): its points at
+    /// s = r sin θ from both loci, r (1 - cos θ) down; a cubic through 33 of them in θ, checked half-way between.
+    fn curve(&self, p1: DVec3, down: DVec3, margin: f64) -> Option<NurbsCurve> {
+        let m = 32;
+        let at = |th: f64, start: DVec3| -> Option<(DVec3, DVec3)> {
+            let y = self.meet(start, self.r * th.sin())?;
+            Some((y, y + down * (self.r * (1.0 - th.cos()))))
+        };
+        let mut t = Vec::new();
+        let mut pts = Vec::new();
+        let mut y = p1;
+        for k in 0..=m {
+            let th = std::f64::consts::FRAC_PI_2 * k as f64 / m as f64;
+            let (ny, x) = at(th, y)?;
+            y = ny;
+            t.push(th);
+            pts.push(x);
+        }
+        let knots = corner::averaged_knots(&t, 3);
+        let rows: Vec<[glam::DVec4; 3]> = pts.iter().map(|x| [x.extend(1.0), glam::DVec4::ZERO, glam::DVec4::ZERO]).collect();
+        let poles: Vec<DVec3> = corner::interpolate(&t, &knots, 3, &rows)?.into_iter().map(|r| r[0].truncate()).collect();
+        let nc = NurbsCurve { degree: 3, knots, poles, weights: Vec::new(), spans: Default::default() };
+        let mut y = p1;
+        for k in 0..m {
+            let th = std::f64::consts::FRAC_PI_2 * (k as f64 + 0.5) / m as f64;
+            let (ny, x) = at(th, y)?;
+            y = ny;
+            if nc.at(th).distance(x) > 0.1 * margin {
+                return None;
+            }
+        }
+        Some(nc)
+    }
+}
+
 fn into_p_at(b: &Body, x: &Link, p: DVec3) -> DVec3 {
     match b.edges[x.edge as usize].curve {
         Curve::Circle { center, normal, .. } => {
@@ -1036,7 +1142,12 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], corners: &[Option<VCorn
             // At a corner: where the two offset lines on P meet (d1 from both edges).
             let w = if c.corner[j] {
                 let qb = into_p_at(body, &c.links[before.unwrap()], p);
-                c.d1 * (q + qb) / (1.0 + q.dot(qb))
+                let w = c.d1 * (q + qb) / (1.0 + q.dot(qb));
+                // (Arcs: where their offset circles meet, from the lines' point on.)
+                match arc_corner(body, c, before.unwrap(), after.unwrap(), p) {
+                    Some(ac) => ac.meet(p + w, 0.0).ok_or(Decline("a corner's offset arcs don't meet"))? - p,
+                    None => w,
+                }
             } else {
                 q * c.d1
             };
@@ -1104,6 +1215,16 @@ fn build(body: &Body, ve: &[Vec<u32>], chains: &[Chain], corners: &[Option<VCorn
                     let normal = xdir.cross(ydir).normalize();
                     let n2 = (u32::MAX, u32::MAX);
                     Curve::Ellipse { center: ctr, normal, xdir, major: radius / xdir.cross(ea).length(), minor: radius, faces: [n2, n2] }
+                }
+                Spec::Fillet { .. } if c.corner[j] && turn.is_none() && arc_corner(body, c, before.unwrap(), after.unwrap(), p).is_some() => {
+                    // Rounds of arcs: their tori (and cylinders) meet along a curve no conic: exact points of it, a
+                    // cubic through them.
+                    let ac = arc_corner(body, c, before.unwrap(), after.unwrap(), p).unwrap();
+                    let Some(n) = plane_normal(&body.faces[c.face as usize]) else { return no("a corner off P") };
+                    let nc = ac.curve(p1, -n * c.sigma, margin).ok_or(Decline("a corner of arcs' rounds not fitted"))?;
+                    let (t0, t1) = nc.range();
+                    b.nurbs_curves.push(nc);
+                    Curve::Nurbs { index: b.nurbs_curves.len() as u32 - 1, t0, t1 }
                 }
                 Spec::Fillet { radius } if c.corner[j] => {
                     // The two cylinders' intersection: an ellipse about where their axes meet (below p1), from p1

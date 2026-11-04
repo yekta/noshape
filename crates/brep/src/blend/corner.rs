@@ -115,7 +115,7 @@ impl RollCorner {
 }
 
 /// Knots for interpolating at `t` with degree `p` (The NURBS Book (9.8): each inner knot the mean of `p` parameters).
-fn averaged_knots(t: &[f64], p: usize) -> Vec<f64> {
+pub(super) fn averaged_knots(t: &[f64], p: usize) -> Vec<f64> {
     let n = t.len() - 1;
     let mut k = vec![t[0]; p + 1];
     for j in 1..=n - p {
@@ -146,7 +146,7 @@ fn basis(knots: &[f64], p: usize, s: usize, u: f64) -> Vec<f64> {
 
 /// Poles (one row of three homogeneous points each) whose degree-`p` curve on `knots` passes through `rows` at `t`
 /// (A9.1: the collocation system, solved by Gaussian elimination with partial pivoting); None if singular.
-fn interpolate(t: &[f64], knots: &[f64], p: usize, rows: &[[DVec4; 3]]) -> Option<Vec<[DVec4; 3]>> {
+pub(super) fn interpolate(t: &[f64], knots: &[f64], p: usize, rows: &[[DVec4; 3]]) -> Option<Vec<[DVec4; 3]>> {
     let n = t.len();
     let mut a = vec![vec![0.0; n]; n];
     for (k, &u) in t.iter().enumerate() {

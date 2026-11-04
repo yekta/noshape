@@ -1192,3 +1192,27 @@ fn a_grooves_two_rounds_on_one_torus_unify_to_one_face() {
     assert_eq!(u.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Torus { .. }))).count(), 1);
     assert!((vol_mm3(&u) - vol_mm3(&r)).abs() < 1e-9 * vol_mm3(&r), "{} {}", vol_mm3(&u), vol_mm3(&r));
 }
+
+/// FILLET-KNOB-JASON-VOLUME (knob-jason's Fillet 1, live's exact faces in behaviours.md "core (2026-11-03 20:58, P1)
+/// knob-jason after Fillet 1"): R2.5 round the knob's top and bottom outlines, arcs meeting at the lobes' sharp
+/// corners. noshape's blend takes the corners where two arcs' rounds meet (their tori's meeting curve, exact points
+/// fitted): every torus live's to 1e-5 mm² (OCCT's corners left them 0.02-0.05 mm² short, by its edges' direction).
+#[test]
+fn rounds_of_arcs_meeting_at_corners_are_lives() {
+    setup();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/blend");
+    let s = read_brep(&dir.join("knob-outline.brep")).unwrap();
+    let all = s.edges();
+    let es: Vec<Shape> = [0, 2, 4, 5, 7, 9, 10, 11, 13, 15, 16, 17, 19, 21, 22, 23, 26, 27, 28, 29, 32, 33, 34, 36].iter().map(|&i| all[i].clone()).collect();
+    set_rust_blend(Some(true));
+    let r = fillet_checked(&s, &es, &[2.5 * MM; 24]);
+    set_rust_blend(None);
+    let r = r.unwrap().shape;
+    assert_eq!(last_blend_decline(), "");
+    assert!(r.is_valid());
+    let tori: Vec<f64> = r.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Torus { .. }))).map(|f| f.area().unwrap() / (MM * MM)).collect();
+    assert_eq!(tori.len(), 24);
+    for a in tori {
+        assert!((a - 47.162566997).abs() < 1e-5 || (a - 78.315557040).abs() < 1e-5, "{a}");
+    }
+}

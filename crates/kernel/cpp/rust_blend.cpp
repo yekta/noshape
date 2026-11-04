@@ -28,6 +28,7 @@
 #include <Geom2d_Curve.hxx>
 #include <Geom_Circle.hxx>
 #include <Geom_Ellipse.hxx>
+#include <Geom_BSplineCurve.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <Geom_BSplineSurface.hxx>
@@ -58,6 +59,49 @@ namespace
 gp_Pnt pnt(const BrepBody& b, uint32_t v) { return gp_Pnt(b.vertices[3 * v], b.vertices[3 * v + 1], b.vertices[3 * v + 2]); }
 
 gp_Dir dir3(const double* p) { return gp_Dir(p[0], p[1], p[2]); }
+
+// A NURBS curve of the flat body's (crates/brep's layout: 0, 3, degree, knot count, pole count, rational, knots (each
+// as often as its multiplicity), poles, weights), or null.
+occ::handle<Geom_BSplineCurve> nurbs_curve(const BrepBody& b, size_t at)
+{
+  const auto& x = b.nurbs;
+  if (at + 6 > x.size() || x[at] != 0 || x[at + 1] != 3)
+    return nullptr;
+  const int    deg = (int)x[at + 2], nk = (int)x[at + 3], np = (int)x[at + 4];
+  const bool   rational = x[at + 5] != 0;
+  if (at + 6 + nk + 3 * (size_t)np + (rational ? (size_t)np : 0) > x.size() || np < 2 || deg < 1)
+    return nullptr;
+  std::vector<double> d;
+  std::vector<int>    m;
+  for (int i = 0; i < nk; ++i)
+  {
+    const double k = x[at + 6 + i];
+    if (!d.empty() && std::abs(k - d.back()) <= 1e-12 * std::max(1.0, std::abs(k)))
+      ++m.back();
+    else
+      d.push_back(k), m.push_back(1);
+  }
+  NCollection_Array1<double> kv(1, (int)d.size());
+  NCollection_Array1<int>    mv(1, (int)m.size());
+  for (size_t i = 0; i < d.size(); ++i)
+    kv((int)i + 1) = d[i], mv((int)i + 1) = m[i];
+  NCollection_Array1<gp_Pnt> poles(1, np);
+  NCollection_Array1<double> w(1, np);
+  const double*              p = &x[at + 6 + nk];
+  for (int i = 0; i < np; ++i)
+  {
+    poles(i + 1) = gp_Pnt(p[3 * i], p[3 * i + 1], p[3 * i + 2]);
+    w(i + 1)     = rational ? p[3 * (size_t)np + i] : 1.0;
+  }
+  try
+  {
+    return rational ? new Geom_BSplineCurve(poles, w, kv, mv, deg) : new Geom_BSplineCurve(poles, kv, mv, deg);
+  }
+  catch (const Standard_Failure&)
+  {
+    return nullptr;
+  }
+}
 
 // A NURBS surface of the flat body's (crates/brep's layout: 1, degrees, knot counts, pole counts, rational, knots
 // (u, v, each as often as its multiplicity), poles row by row (u first), weights), or null.
@@ -820,9 +864,22 @@ bool rust_blend(const OcShape& s, const std::vector<TopoDS_Edge>& es, const std:
           d = 2 * M_PI;
         t1 = t0 + d;
       }
+      else if (cv[0] == 5)
+      {
+        // A NURBS (a corner where two rounds of arcs meet), from its parameter t0 to t1.
+        const occ::handle<Geom_BSplineCurve> nc = nurbs_curve(o, (size_t)cv[1]);
+        if (nc.IsNull())
+        {
+          brep_decline("a new NURBS edge unreadable");
+          return false;
+        }
+        c  = nc;
+        t0 = cv[2];
+        t1 = cv[3];
+      }
       else
       {
-        brep_decline("a new edge not a line, an arc or an ellipse");
+        brep_decline("a new edge not a line, an arc, an ellipse or a NURBS");
         return false;
       }
       bb.MakeEdge(e, c, tol);
