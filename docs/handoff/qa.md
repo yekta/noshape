@@ -36,6 +36,13 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**v0.4.29 (published 23:14, cut b71b0324 = 6c3decf4, the Gyro fix; Release run 41923108124 green) 23:19:** artifacts
+byte-identical to the run's, SHA256SUMS OK. **Updater with `noshape mcp` running (Linux, vibe3; v0.4.28's helper, before the
+lead's fix):** fetched 23:18:05 (~4 min after publish), staged; Restart → the app 0.4.29 (new pid), g34 reopened — the update
+works with the mcp copy open; the mcp copy (pid 363405) kept running on the old binary (/proc/…/exe "(deleted)"): its client
+stays on 0.4.28 until it reconnects; no update-helper.log (old helper). Once the lead's helper ships: on the update after it,
+check the mcp copy is closed and the log names it, on Linux too (same-app rule). Smoke / tixvol of v0.4.29 running on vibe3.
+
 **11-04 23:05: new release check (lead: the user's Windows update bug).** Update from the previous release with a
 `noshape mcp` running from the install folder must end on the new version, the log saying what the helper closed. Windows:
 qa can't run it (request to the lead: check_update.py --with-mcp in the Release Check job). Linux (vibe3): the updater app
