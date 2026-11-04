@@ -2054,6 +2054,17 @@ fn a_keyway_narrows_about_the_shafts_axis() {
     }
 }
 
+/// Batch 22's s1057, a keyed shaft whose circle shrinks: the centre and the
+/// keyway stay, the circle's ends go down the keyway's walls (ours moved the
+/// whole key 0.6 mm). The axis line's free end is 0.003 mm off live's. T1.
+#[test]
+fn a_shrinking_shaft_keeps_its_centre_and_keyway() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-22.live.json")).unwrap()).unwrap();
+    let ours = batch(1, 1057, true);
+    let d: Vec<String> = differences(&ours["cases"][0], &live["cases"]["s1057"]).into_iter().filter(|x| !x.starts_with("l5.end")).collect();
+    assert!(d.is_empty(), "s1057: {}", d.join("; "));
+}
+
 /// Batch 15's s754 / s769 stay as live answered: a rectangle's two rounded
 /// top corners (Equal arcs) grow: the bottom and the top keep their levels,
 /// the sides shorten and the top shrinks from both ends (the top's far end

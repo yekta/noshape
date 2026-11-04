@@ -891,6 +891,34 @@ impl Sketch {
                         let _ = sub.add_constraint(ConstraintKind::Symmetric { a: s0, b: s1, axis: held_axis });
                     }
                 }
+                // An arc placed before its neighbours, its ends on two parallel
+                // unplaced lines of fixed direction that aren't tangent to it:
+                // the ends slide along those lines (live fuzz s1057: a keyed
+                // shaft's circle shrinks, its ends going down the keyway's
+                // walls, the centre kept).
+                if self.kind(u) == Some(EntityKind::Arc)
+                    && let Some((s0, s1)) = self.endpoints(u)
+                {
+                    let tangent = |w: EntityId| self.constraints().any(|c| matches!(c.kind, ConstraintKind::Tangent { a, b, .. } if (a == u && b == w) || (a == w && b == u)));
+                    let wall = |end: EntityId| {
+                        self.coincident_class(end).into_iter().filter_map(|q| unit_of.get(&q).copied()).find(|x| *x != u && !placed.contains(x) && self.kind(*x) == Some(EntityKind::Line) && self.direction_bound(*x) && !tangent(*x))
+                    };
+                    let line = |w: Option<EntityId>| match w.and_then(|w| self.curve(w)) {
+                        Some(crate::geom::Curve2::Line { a, b }) => Some((a, b)),
+                        _ => None,
+                    };
+                    if let (Some((a0, b0)), Some((a1, b1))) = (line(wall(s0)), line(wall(s1)))
+                        && (b0 - a0).normalize_or_zero().perp_dot((b1 - a1).normalize_or_zero()).abs() < 1e-9
+                    {
+                        for (end, (a, b)) in [(s0, (a0, b0)), (s1, (a1, b1))] {
+                            let d = (b - a).normalize_or_zero();
+                            let rail = sub.add_line(a - d, b + d);
+                            let _ = sub.set_construction(rail, true);
+                            let _ = sub.add_constraint(ConstraintKind::Fix { entity: rail });
+                            let _ = sub.add_constraint(ConstraintKind::Coincident { a: end, b: rail });
+                        }
+                    }
+                }
                 let opts = SolveOptions { light, still: still.into_iter().collect(), analyze: false, constructive: false, ..Default::default() };
                 let st = sub.solve_with(&opts).status;
                 // With its neighbours let go: only when each of them can
