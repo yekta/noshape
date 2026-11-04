@@ -103,7 +103,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - [ ] P2 FS-NATIVE-OPSPLITBYSELFSHADOW @opSplitBySelfShadow: no std feature; custom features only.
   - [ ] P2 FS-NATIVE-OLD-STD only older pinned std releases call these (their own sheet metal): @startSheetMetalFeature,
     @endSheetMetalFeature, @opBendAtEdgeInternal, @opFlattenInternal, @opFoldInternal, @opPrepareForBendingInternal,
-    @opRoll, @evEdgeCurvature: a studio pinned to such a release that calls them fails (FS-OLD-STD-COMPAT).
+    @evEdgeCurvature: a studio pinned to such a release that calls them fails (FS-OLD-STD-COMPAT). (dx 11-04 20:50:
+    @opRoll done: opWrap serves it, RollSurface's fields being WrapSurface's.)
 
 - [ ] P1 TAB-RIPPED-CORNER (core; dx 11-04 18:31, live request 2005 T2) a 100 × 60 plate (thicken 2 mm, radius 2 mm)
   with 30 mm flanges on its x = 100 and y = 60 edges (a corner rip), and a Tab sketched on the x-flange's outer face
@@ -3890,6 +3891,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   trackMovedEdge: moved, then joined to another sheet at an angle and renamed). Fold SM 1 now makes one part with its
   bend, the box as live's; it differs in detail: 29/69/42 faces / edges / vertices (live 32/82/52), volume 9854.12
   mm³ (live 9226.68), and it takes 220 ms (live 270 for the document): next.
+  dx 11-04 20:50 (parity run 81: 367/471, custom 39/109, 3 documents failing to run): cf-sheet-metal-hem's Hem 1
+  (pinned std 1024) builds as live (2 -> 3/6): @opRoll served by opWrap (sketch regions taken, orientWithDestination
+  honoured), opExtrude of edges between UP_TO_SURFACE ends (was 0 long), startTracking of a sheet edge no longer
+  lands on the sketch line it came from (the Hem's moved edge came back twice), a union of sheets sewn where they
+  meet and faced the first sheet's way (Parasolid's; kernel faces_oriented_consistently); T1 ops_harness "hem".
+  Its next difference, Offset surface 1 (8 sheets, live 2 with 9/20/12), is core's native offsetSurface. Left
+  failing: cf-setback-fillet (opFillSurface "multiple loops"), cf-sheet-metal-model-plus (Up to Part: ERROR, live
+  INFO), Fix PCB 2 ("No components selected").
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our

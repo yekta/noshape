@@ -484,6 +484,7 @@ pub(crate) mod ffi {
         fn is_valid(s: &OcShape) -> Result<bool>;
         fn self_intersects(s: &OcShape) -> Result<bool>;
         fn fix_shape(s: &OcShape, tolerance: f64) -> Result<UniquePtr<OcShape>>;
+        fn orient_faces_consistently(s: &OcShape) -> Result<UniquePtr<OcShape>>;
         fn dump_shape(s: &OcShape) -> Result<String>;
 
         // ---- geometry

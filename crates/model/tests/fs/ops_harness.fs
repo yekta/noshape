@@ -627,5 +627,40 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
                 both.queryType == QueryType.UNION;
             check("qCompressed", ok, [top, prefixed, both]);
         });
+        step(context, id, "hem", function(sub) {
+            // std sheet metal Hem (pinned std 1024): a sketch region rolled with @opRoll (opWrap's old name) half
+            // round a 5 mm cylinder, its normal outward; united with the plate it turns to face the plate's way.
+            const z = 4000;
+            // The plate first (the Hem's definition sheet is the older body). A wrap keeps handedness: the plane's
+            // +z turns to the cylinder's outward normal, its +y to −y, so the plate lies at y −20 → 0.
+            fCuboid(context, sub + "b", { "corner1" : vector(0, -20, z - 5) * mm, "corner2" : vector(100, 0, z) * mm });
+            opExtractSurface(context, sub + "plate", { "faces" : qContainsPoint(qCreatedBy(sub + "b", EntityType.FACE), vector(50, -10, z) * mm) });
+            const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, z) * mm, vector(0, 0, 1), vector(1, 0, 0)) });
+            skRectangle(sk, "r", { "firstCorner" : vector(100, 0) * mm, "secondCorner" : vector(100 + 5 * PI, 20) * mm });
+            skSolve(sk);
+            const flat = { "plane" : plane(vector(100, 0, z) * mm, vector(0, 0, 1), vector(1, 0, 0)), "anchorPoint" : vector(100, 0, z) * mm, "anchorDirection" : vector(1, 0, 0) };
+            const round = { "cylinder" : cylinder(coordSystem(vector(100, 0, z + 5) * mm, vector(1, 0, 0), vector(0, 1, 0)), 5 * mm), "anchorPoint" : vector(100, 0, z) * mm, "anchorDirection" : vector(1, 0, 0) };
+            @opRoll(context, sub + "roll", { "entities" : qSketchRegion(sub + "sk"), "source" : flat, "destination" : round });
+            const arc = qCreatedBy(sub + "roll", EntityType.FACE);
+            check("opRoll", abs(evArea(context, { "entities" : arc }) - 100 * PI * mm ^ 2) < 1e-6 * mm ^ 2, evArea(context, { "entities" : arc }));
+            check("opRoll faces out", dot(evFaceTangentPlane(context, { "face" : arc, "parameter" : vector(0.5, 0.5) }).normal, vector(1, 0, 0)) > 0.99, "");
+            opBoolean(context, sub + "join", { "tools" : qUnion([qCreatedBy(sub + "plate", EntityType.BODY), qCreatedBy(sub + "roll", EntityType.BODY)]),
+                        "operationType" : BooleanOperationType.UNION, "allowSheets" : true });
+            const n = evFaceTangentPlane(context, { "face" : arc, "parameter" : vector(0.5, 0.5) }).normal;
+            check("a sheet union faces the first sheet's way", size(evaluateQuery(context, qCreatedBy(sub + "plate", EntityType.BODY))) == 1 && dot(n, vector(-1, 0, 0)) > 0.99, n);
+            const edges = size(evaluateQuery(context, qOwnedByBody(qCreatedBy(sub + "plate", EntityType.BODY), EntityType.EDGE)));
+            check("a sheet union shares the edge its sheets meet on", edges == 7, edges);
+            // An edge extruded between two planes, one slanted: the sheet reaches each.
+            const lsk = newSketchOnPlane(context, sub + "lsk", { "sketchPlane" : plane(vector(0, 0, z + 100) * mm, vector(0, 0, 1), vector(1, 0, 0)) });
+            skLineSegment(lsk, "l", { "start" : vector(0, 0) * mm, "end" : vector(0, 20) * mm });
+            skSolve(lsk);
+            opPlane(context, sub + "p0", { "plane" : plane(vector(-10, 0, z + 100) * mm, vector(-1, 0, 0)) });
+            opPlane(context, sub + "p1", { "plane" : plane(vector(30, 0, z + 100) * mm, normalize(vector(1, 1, 0))) });
+            opExtrude(context, sub + "x", { "entities" : qCreatedBy(sub + "lsk", EntityType.EDGE), "direction" : vector(1, 0, 0),
+                        "startBound" : BoundingType.UP_TO_SURFACE, "startBoundEntity" : qCreatedBy(sub + "p0", EntityType.FACE),
+                        "endBound" : BoundingType.UP_TO_SURFACE, "endBoundEntity" : qCreatedBy(sub + "p1", EntityType.FACE) });
+            const a = evArea(context, { "entities" : qCreatedBy(sub + "x", EntityType.FACE) });
+            check("opExtrude of edges up to surfaces", abs(a - 600 * mm ^ 2) < 1e-6 * mm ^ 2, a);
+        });
         println("done");
     });

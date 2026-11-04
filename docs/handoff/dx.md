@@ -11,6 +11,22 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-04 20:43 UTC: natives, spur gear, hem (lead's 17:xx list)
+- Landed: bend centerline wires + @evSheetMetalBendUp (7fcc9f62), opEdgeChange keeps moved edges' attributes
+  (f84f36f5, SM-FLIPPED-JOINT-ASSOCIATION), qSketchRegion(id, true) leaves out every region in a hole (20fc166e:
+  cf-spur-gear's 3rd part was its keyway bore; lead's 20:4x item done: parts / volume / area as live), parity names
+  the parts live lacks, FS-QUERY-EDGE-ORDER analysis + T1 (40b44000).
+- cf-spur-gear: the rest is core's (FULL-ROUND-FILLET-ONE-FACE, SPUR-GEAR-SPEED in TICKETS, core.md 19:53): the
+  FeatureScript side is ~3 ms per gear; Boolean 2's unify 887 ms + kernel 698 ms.
+- In progress (tests running, /root/dx-scratch/run81.log): cf-sheet-metal-hem's Hem 1 as live (2 -> 3/6): @opRoll
+  served by opWrap (+ sketch regions, orientWithDestination), edges extruded up to surfaces, tracking never lands
+  on a sketch entity, a union of sheets sewn and oriented the first sheet's way (kernel
+  `faces_oriented_consistently`, ShapeFix_Shell); T1 ops_harness "hem". Next there: Offset surface 1 (8 parts,
+  live 2: core's native offsetSurface).
+- Next: FS-QUERY-EDGE-ORDER (creation-order key, ticket 20:14), the other failing custom features (cf-setback-
+  fillet fill surface, Sheet Metal Up to Part, Fix PCB), DISPLACEMENT-MAP end to end when core's Replace face on
+  the 512 side lands.
+
 ## 11-04 16:48 UTC: daily parity run (PARITY-MODELS-DAILY-RUN)
 - /root/dx-scratch/pm-daily.sh on main b3acf8a5 with live's corpus resynced: 37/56, 371/482, custom 38/111, every
   document as runs 70 / 71; 7 of 41 documents slower than live (9 in run 70), the worst motor-mount-jack ×5.7 and

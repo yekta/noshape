@@ -50,6 +50,7 @@ extern "C" char etext;
 #include <BRep_Builder.hxx>
 #include <TopoDS_Shell.hxx>
 #include <ShapeFix_Shape.hxx>
+#include <ShapeFix_Shell.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Iterator.hxx>
@@ -1522,6 +1523,24 @@ std::unique_ptr<OcShape> fix_shape(const OcShape& s, double tolerance)
     fix->SetMaxTolerance(std::max(tolerance * 10.0, 1e-3));
   }
   fix->Perform();
+  return wrap(fix->Shape());
+}
+
+std::unique_ptr<OcShape> orient_faces_consistently(const OcShape& s)
+{
+  require_non_null(s.shape, "shape");
+  // Every face in one shell, turned to agree with its neighbours across the edges they share (one shell per
+  // connected piece).
+  BRep_Builder b;
+  TopoDS_Shell shell;
+  b.MakeShell(shell);
+  int n = 0;
+  for (TopExp_Explorer f(s.shape, TopAbs_FACE); f.More(); f.Next(), ++n)
+    b.Add(shell, f.Current());
+  if (n == 0)
+    return wrap(s.shape);
+  occ::handle<ShapeFix_Shell> fix = new ShapeFix_Shell();
+  fix->FixFaceOrientation(shell, Standard_True, Standard_False);
   return wrap(fix->Shape());
 }
 

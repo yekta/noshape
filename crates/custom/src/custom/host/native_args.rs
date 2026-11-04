@@ -247,7 +247,6 @@ const MISSING_OLDER: &[&str] = &[
     "opImportForeign",
     "opOffsetCurveOnFace",
     "opPrepareForBendingInternal",
-    "opRoll",
     "opSMFlatOperation",
     "opSplitBySelfShadow",
     "startSheetMetalFeature",

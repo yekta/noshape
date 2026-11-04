@@ -371,6 +371,12 @@ impl Shape {
         Shape::from_res(ffi::fix_shape(self.raw(), tolerance))
     }
 
+    /// The faces as shells whose faces agree in orientation with their neighbours (ShapeFix_Shell), one shell per
+    /// connected piece; which side each shell faces is left to the caller.
+    pub fn faces_oriented_consistently(&self) -> Result<Shape> {
+        Shape::from_res(ffi::orient_faces_consistently(self.raw()))
+    }
+
     /// Human-readable dump of the topology (BRepTools::Dump), for debugging.
     pub fn dump(&self) -> String {
         ffi::dump_shape(self.raw()).unwrap_or_default()

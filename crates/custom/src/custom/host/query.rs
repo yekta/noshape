@@ -658,6 +658,9 @@ impl<'a> QueryCx<'a> {
                 let t = self.body_type(e);
                 (t == "SOLID") == (snap.body_type == "SOLID") || (to_sheets && snap.body_type == "SOLID" && t == "SHEET")
             })
+            // Nothing in a sketch is made from a body's entity: a sheet edge isn't followed onto the sketch line it
+            // was built from (std Hem's moved edge would come back twice).
+            .filter(|e| snap.sketch || !self.is_sketch(e))
             .filter(|e| {
                 if self.shape(e).is_some_and(|s| wheres.iter().any(|w| all_on(&s, w, TOL))) {
                     return true;

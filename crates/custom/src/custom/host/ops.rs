@@ -24,6 +24,8 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("opEditCurve", op_edit_curve),
     ("opModifyCompositePart", op_modify_composite_part),
     ("opWrap", op_wrap),
+    // Older std's name for it (RollSurface: the same plane / cylinder and anchor fields, a SIMPLE wrap).
+    ("opRoll", op_wrap),
     ("opExtrude", op_extrude),
     ("opRevolve", op_revolve),
     ("opBoolean", op_boolean),
@@ -191,9 +193,20 @@ fn op_extrude(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         // Edges extrude to sheets; connected curves give one sheet (live: an
         // open polyline extrudes to one sheet body, dom/fs-smprobe-3.txt).
         let mut sheets = Vec::new();
+        // An up-to end: the sheet runs far that way, then is cut back at the end surface (a hem between its two
+        // bounding planes, std's sheet metal Hem).
+        let far = ev.model_extent() * 4.0 + 1.0;
+        let bounds: Vec<Shape> = [(start.is_none(), &start_entity, start_bound.as_deref().unwrap_or_default()), (end.is_none(), &end_entity, &*end_bound)]
+            .into_iter()
+            .filter(|(up_to, ..)| *up_to)
+            .map(|(_, refs, bound)| target(refs, bound))
+            .collect::<FResult<_>>()?;
         for (n, edge) in edge_shapes(ev, &refs)?.into_iter().enumerate() {
-            let (s, e) = (start.unwrap_or(0.0), end.unwrap_or(0.0));
+            let (s, e) = (start.unwrap_or(far), end.unwrap_or(far));
             let mut res = k::extrude_between(&edge, -d * s, d * e, 0.0).map_err(|e| fe(format!("Extrude failed: {e}")))?;
+            if !bounds.is_empty() {
+                res = trim_to_bounds(&res, &bounds, &edge, start.map(|s| -d * s).or(end.map(|e| d * e)))?;
+            }
             // Onshape's sheet faces the side `tangent × direction` (live sm3:
             // (0,0)→(30,0) extruded +z faces −y).
             if let Ok(info) = edge.edge_info() {
@@ -221,6 +234,61 @@ fn op_extrude(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         add_bodies(ev, tools, kind)
     })?;
     Ok(Value::Undefined)
+}
+
+/// An edge's sheet run far toward its up-to ends, cut back at the end surfaces `bounds`: the piece touching every
+/// bound (and, with one blind end, the edge moved to that end by `blind`). No history: these sheets are named by
+/// their roles alone.
+fn trim_to_bounds(res: &k::OpResult, bounds: &[Shape], edge: &Shape, blind: Option<DVec3>) -> FResult<k::OpResult> {
+    let split = k::split(std::slice::from_ref(&res.shape), bounds, &k::BooleanOptions::default())?;
+    let touches = |a: &Shape, b: &Shape| k::distance(a, b).is_ok_and(|x| x.distance < 1e-7);
+    let blind_edge = match blind {
+        Some(v) => Some(edge.translated(v)?),
+        None => None,
+    };
+    let kept: Vec<Shape> = split.shape.faces().into_iter().filter(|f| bounds.iter().all(|b| touches(f, b)) && blind_edge.as_ref().is_none_or(|e| touches(f, e))).collect();
+    if kept.is_empty() {
+        return err("The extrude does not reach its end surface");
+    }
+    let shape = if kept.len() == 1 { kept[0].clone() } else { Shape::compound(&kept) };
+    Ok(k::OpResult { shape, history: k::History::default() })
+}
+
+/// A point inside a shape's first face and the face's normal there.
+fn face_sample(s: &Shape) -> Option<(DVec3, DVec3)> {
+    let f = s.faces().into_iter().next()?;
+    let [u0, u1, v0, v1] = f.uv_bounds().ok()?;
+    let (u, v) = ((u0 + u1) * 0.5, (v0 + v1) * 0.5);
+    Some((f.point_at_uv(u, v).ok()?, f.normal_at_uv(u, v).ok()?))
+}
+
+/// Sheet `bi`'s faces joined where they touch along an edge (Parasolid's union shares it; the kernel's fuse leaves
+/// two) and turned to agree with their neighbours, the face at `side`'s point facing `side`'s normal. The body is
+/// left as it is when nothing changed (or its faces can't be matched back to their names).
+fn orient_like(ev: &mut EvalCtx, bi: usize, (p, n): (DVec3, DVec3)) -> FResult<()> {
+    let body = ev.ctx.bodies[bi].clone();
+    let old = body.shape.faces();
+    let sewn = k::sew(&old, 1e-6, false).ok().map(|s| s.shape).filter(|s| s.count(ShapeType::Face) == old.len()).unwrap_or_else(|| body.shape.clone());
+    let joined = sewn.count(ShapeType::Edge) < body.shape.count(ShapeType::Edge);
+    let Ok(mut fixed) = sewn.faces_oriented_consistently() else { return Ok(()) };
+    let at_p = |f: &Shape| k::make_vertex(p).ok().and_then(|v| k::distance(&v, f).ok()).is_some_and(|d| d.distance < 1e-7);
+    if fixed.faces().iter().find(|f| at_p(f)).is_some_and(|f| f.normal_at_point(p).is_ok_and(|m| m.dot(n) < 0.0)) {
+        fixed = fixed.reversed()?;
+    }
+    let key = |f: &Shape| f.bounding_box(false).map(|b| (b.center(), b.diagonal())).ok();
+    let keys: Vec<_> = old.iter().map(key).collect();
+    let mut turned = false;
+    let mut names = Vec::new();
+    for f in fixed.faces() {
+        let Some(kf) = key(&f) else { return Ok(()) };
+        let Some(i) = keys.iter().position(|k| k.is_some_and(|k| k.0.distance(kf.0) < 1e-9 && (k.1 - kf.1).abs() < 1e-9)) else { return Ok(()) };
+        turned |= f.orientation() != old[i].orientation();
+        names.push(body.faces[i].clone());
+    }
+    if (turned || joined) && names.len() == old.len() {
+        ev.replace_body(bi, fixed, names);
+    }
+    Ok(())
 }
 
 /// A united sheet's faces sewn into shells and coplanar neighbours merged:
@@ -501,6 +569,10 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     return err("Need at least two parts or surfaces for a Boolean operation.");
                 }
                 let first = index(ev, &all[0]).ok_or_else(|| fe("missing body"))?;
+                // Sheets only: the union faces the first one's way (Parasolid's: a hem's arc, rolled facing out,
+                // turns to agree with the plate it joins).
+                let sheets = all.iter().filter_map(|id| index(ev, id)).all(|i| ev.ctx.bodies[i].kind == BodyKind::Surface);
+                let side = if sheets { face_sample(&ev.ctx.bodies[first].shape) } else { None };
                 let others: Vec<NamedShape> = all[1..].iter().filter_map(|id| index(ev, id)).map(|i| body_named(ev, i)).collect();
                 let remove: Vec<BodyId> = all[1..].to_vec();
                 ev.ctx.bodies.retain(|b| !remove.contains(&b.id));
@@ -518,6 +590,9 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     ev.replace_body(first, res.shape, names);
                 }
                 stitch_sheet_pieces(ev, &all[0])?;
+                if let (Some(side), Some(bi)) = (side, index(ev, &all[0])) {
+                    orient_like(ev, bi, side)?;
+                }
                 if erase && let Some(bi) = index(ev, &all[0]) {
                     merge_sheet_faces(ev, bi)?;
                 }
@@ -2271,6 +2346,26 @@ fn wrap_flat_dir(d: &k::Developable, f: glam::DVec2, ref_angle: f64, v: DVec3) -
     glam::DVec2::new(v.dot(ax), v.dot(ay)).normalize_or_zero()
 }
 
+/// The wrapped faces' normals the destination's way (`along`, std's orientWithDestination) or against it: a face's
+/// own normal, an infinite cylinder's or cone's outward.
+fn orient_wrapped(shape: &Shape, d: &k::Developable, face: Option<&Shape>, along: bool) -> FResult<Shape> {
+    let Some(f) = shape.faces().into_iter().next() else { return Ok(shape.clone()) };
+    let [u0, u1, v0, v1] = f.uv_bounds()?;
+    let (u, v) = ((u0 + u1) * 0.5, (v0 + v1) * 0.5);
+    let (p, n) = (f.point_at_uv(u, v)?, f.normal_at_uv(u, v)?);
+    let radial = |origin: DVec3, axis: DVec3| {
+        let r = p - origin;
+        (r - axis * r.dot(axis)).normalize_or_zero()
+    };
+    let want = match (face, d) {
+        (Some(df), _) => df.normal_at_point(p)?,
+        (None, k::Developable::Plane { normal, .. }) => *normal,
+        (None, k::Developable::Cylinder { origin, axis, .. }) => radial(*origin, *axis),
+        (None, k::Developable::Cone { origin, axis, half_angle, .. }) => radial(*origin, *axis) * half_angle.cos() - *axis * half_angle.sin(),
+    };
+    if (n.dot(want) < 0.0) == along { Ok(shape.reversed()?) } else { Ok(shape.clone()) }
+}
+
 /// `opWrap`: `entities` (faces on `source`) wrapped or unwrapped onto
 /// `destination`, the anchor points and directions matched; `wrapType`
 /// SIMPLE (new surface), TRIM (trimmed to the destination face) or IMPRINT
@@ -2281,8 +2376,16 @@ fn op_wrap(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let src = wrap_surface(i, &cx, def.get("source"))?;
     let dst = wrap_surface(i, &cx, def.get("destination"))?;
     let wrap_type = def_enum(&def, "wrapType").map(|s| s.to_string()).unwrap_or_else(|| "SIMPLE".into());
+    let along = def_bool(&def, "orientWithDestination", true);
     run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
-        let faces: Vec<Shape> = ev.resolve_faces(&entities).into_iter().map(|(b, f)| ev.face_shape(b, f)).collect::<FResult<_>>()?;
+        let mut faces: Vec<Shape> = ev.resolve_faces(&entities).into_iter().map(|(b, f)| ev.face_shape(b, f)).collect::<FResult<_>>()?;
+        // Sketch regions too (std's sheet metal Hem rolls one onto its arc's cylinder).
+        let regions: Vec<Reference> = entities.iter().filter(|r| matches!(r, Reference::SketchRegion { .. })).cloned().collect();
+        if !regions.is_empty() {
+            for p in ev.profiles(&regions)? {
+                faces.extend(p.shape.faces());
+            }
+        }
         if faces.is_empty() {
             return err("Select faces to wrap");
         }
@@ -2315,7 +2418,12 @@ fn op_wrap(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let s = glam::DMat2::from_diagonal(glam::DVec2::new(radius / a, 1.0));
             placement = k::Placement2d { m: s * placement.m, t: f_dst + s * (placement.t - f_dst) };
         }
-        let res = k::wrap_faces(&faces, &s, src_ref, &d, dst_ref, &placement, 1e-7).map_err(|e| FeatureError::new(format!("Wrap failed: {e}")))?;
+        let mut res = k::wrap_faces(&faces, &s, src_ref, &d, dst_ref, &placement, 1e-7).map_err(|e| FeatureError::new(format!("Wrap failed: {e}")))?;
+        let dst_shape = match dst_face {
+            Some((bi, fi)) => Some(ev.face_shape(bi, fi)?),
+            None => None,
+        };
+        res.shape = orient_wrapped(&res.shape, &d, dst_shape.as_ref(), along)?;
         let names: Vec<Name> = (0..res.shape.faces().len()).map(|n| Arc::new(TopoName::face(ev.feature, Role::New(n as u32)))).collect();
         let mut wrapped = NamedShape::new(res.shape.clone(), names);
         match wrap_type.as_str() {
