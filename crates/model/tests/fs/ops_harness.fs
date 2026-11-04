@@ -182,6 +182,18 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             opPattern(context, sub + "p", { "entities" : qSketchRegion(sub + "sk"), "transforms" : [transform(vector(10, 0, 0) * mm)], "instanceNames" : ["1"] });
             check("opPattern of a sketch region", size(evaluateQuery(context, qAllModifiableSolidBodies())) == parts, size(evaluateQuery(context, qAllModifiableSolidBodies())));
         });
+        step(context, id, "thickenJoinedFaces", function(sub) {
+            // The faces of one sheet thickened together: one solid, one face per end (cf-belt, live).
+            const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, 1000) * mm, vector(0, 0, 1)) });
+            skLineSegment(sk, "a", { "start" : vector(0, 0) * mm, "end" : vector(20, 0) * mm });
+            skLineSegment(sk, "b", { "start" : vector(20, 0) * mm, "end" : vector(20, 10) * mm });
+            skSolve(sk);
+            opExtrude(context, sub + "e", { "entities" : qCreatedBy(sub + "sk", EntityType.EDGE), "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : 5 * mm });
+            opThicken(context, sub + "t", { "entities" : qCreatedBy(sub + "e", EntityType.FACE), "thickness1" : 0.5 * mm, "thickness2" : 0.5 * mm });
+            const bodies = evaluateQuery(context, qCreatedBy(sub + "t", EntityType.BODY));
+            const faces = size(evaluateQuery(context, qCreatedBy(sub + "t", EntityType.FACE)));
+            check("opThicken of a sheet's joined faces", size(bodies) == 1 && faces == 8, [size(bodies), faces]);
+        });
         step(context, id, "collisionWires", function(sub) {
             // Wire bodies collide where their edges meet (std Fill pattern's border check).
             fCuboid(context, sub + "a", { "corner1" : vector(0, 0, 950) * mm, "corner2" : vector(10, 10, 960) * mm });

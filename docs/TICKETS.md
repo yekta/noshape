@@ -3496,6 +3496,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   refgeom.rs, T1 features_b::mate_connector_on_a_sketch_region), the translator's written CAP_VERTEX (T1
   parity::a_written_out_cap_vertex_query), opPattern of a sketch region copies its sketch, no part, as live (T1
   ops_harness patternSketchRegion). Left: Transform pattern 7's in-feature mate connector (translation).
+  dx 11-04 08:50: cf-belt 3/3: opThicken thickens the faces of one sheet together (sewn: one solid) and merges its
+  sides along the boundary (one face per plane, live's 22 faces); T1 ops_harness thickenJoinedFaces. Run 58: 32/56,
+  340/482, custom 22/111, 7 documents with custom features failing (old std: FS-OLD-STD-COMPAT; cf-curve-pattern-normal's
+  unfetchable import; cf-sheet-metal-overcut-dogbone's Fold SM 1).
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our

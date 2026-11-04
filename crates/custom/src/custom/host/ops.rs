@@ -916,7 +916,28 @@ fn op_thicken(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let t1 = def_length(i, &def, "thickness1")?;
     let t2 = def_length(i, &def, "thickness2")?;
     run_op(i, &cx, &id, "THICKEN_FAILED", |ev| {
-        let mut shapes: Vec<Shape> = ev.resolve_faces(&refs).iter().filter_map(|(b, f)| ev.face_shape(*b, *f).ok()).collect();
+        // Faces of one sheet thicken together where they join (cf-belt: a belt's ten faces make one solid, live).
+        let mut by_body: BTreeMap<usize, Vec<Shape>> = BTreeMap::new();
+        for (b, f) in ev.resolve_faces(&refs) {
+            if let Ok(face) = ev.face_shape(b, f) {
+                by_body.entry(b).or_default().push(face);
+            }
+        }
+        let mut shapes: Vec<Shape> = Vec::new();
+        for (_, faces) in by_body {
+            match faces.len() {
+                1 => shapes.extend(faces),
+                n => {
+                    // Every face in a shell, else each on its own.
+                    let shells = k::sew(&faces, 1e-7, false).map(|r| r.shape.shells()).unwrap_or_default();
+                    if !shells.is_empty() && shells.iter().map(|s| s.faces().len()).sum::<usize>() == n {
+                        shapes.extend(shells);
+                    } else {
+                        shapes.extend(faces);
+                    }
+                }
+            }
+        }
         // Sheet bodies given as bodies; a face stands for itself, not its
         // body (std's sheet metal boolean thickens one definition face of a
         // many-face sheet: the whole sheet came out too, qa4 S1's slot cut
@@ -932,7 +953,11 @@ fn op_thicken(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
         let mut tools = Vec::new();
         for s in shapes {
-            let res = k::thicken(&s, t1, t2)?;
+            let mut res = k::thicken(&s, t1, t2)?;
+            // The sides along a many-face sheet's boundary: one face per plane (cf-belt's end rings, live 22 faces).
+            if s.faces().len() > 1 {
+                res.shape = k::unify_same_domain(&res.shape)?.shape;
+            }
             let names = fresh_names(ev, &res.shape);
             tools.push(NamedShape::new(res.shape, names));
         }
