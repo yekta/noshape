@@ -1097,6 +1097,10 @@ fn dumped_chamfer_faces_probe() {
     let es: Vec<Shape> = idx.iter().map(|&i| all[i].clone()).collect();
     let out = chamfer_checked(&s, &es, ChamferSpec::Equal(d), &[]).unwrap().shape;
     println!("faces {} edges {} vertices {}, volume {:.6}", out.faces().len(), out.edges().len(), out.count(ShapeType::Vertex), vol_mm3(&out));
+    // (NOSHAPE_CHAMFER_OUT=<path>: the result written as BREP, for the faces probe.)
+    if let Ok(p) = std::env::var("NOSHAPE_CHAMFER_OUT") {
+        write_brep(&out, std::path::Path::new(&p)).unwrap();
+    }
     let mut at: std::collections::HashMap<[i64; 3], Vec<String>> = Default::default();
     for e in out.edges() {
         let x = e.edge_info().unwrap();
