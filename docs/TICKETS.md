@@ -3947,7 +3947,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   at those two bends: our cylinders there are 38.751 mm² (≈49°) with a 30 mm² and a 19.98 mm² flat strip each, live's
   57.614 / 19.205 mm² (73.36°, the attribute's angle). The rebuild's bend_geometry takes a curved wall's normal at
   the face's middle, not at the joint; taking it at the joint gives the right angle but the wall is still pulled back
-  in a plane (73 faces): a rolled wall beside a bend must be cut back along its own surface by the setback.
+  in a plane (73 faces): a rolled wall beside a bend must be cut back along its own surface by the setback. dx 23:15:
+  cutting the rolled wall back by the setback along its surface (walk + plane cut) leaves it apart from the revolved
+  bend (4 parts): beside a curved wall the bend is the definition edge's fillet (a cylinder: both faces are swept
+  along x), so the rebuild needs that edge's bend from a fillet of the definition sheet, trimming both walls,
+  rather than a revolve about an axis set from the planar side.
   dx 11-04 21:39: cf-sheet-metal-shaped-flange's Shaped Flange 1 (flange a separate part, 78,922 vs 92,510 mm³):
   the definition sheet joins (the flange shares its partial edge with the base), but `addEdge` (its transient
   query ∪ startTracking) resolves to two edges after flangeEdgeChange + flange_boolean: the moved joint edge (z 2.5,
