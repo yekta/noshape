@@ -3918,6 +3918,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   edges, so ours throws FILL_SURFACE_NO_EDGES ("Select laminar edges or curves as fill surface boundary."; live
   builds both Setback Fillets). Probe: /root/dx-scratch/tickets/fs-split-created.fs (a cube's top split by a plane,
   then println of those two counts: ours 0 and 0). Model /root/parity/models/cf-setback-fillet. (dx 2026-11-03)
+  core 11-04 15:22 (for dx): cf-setback-fillet regressed after d8f4607b (the studio now runs on its pinned std 782):
+  12:45 one solid, area +0.13 % (the fill's shape); now 4 parts, Part 1 a sheet. Under std 782 each `fill` (ADD)
+  makes its patch but finds no edge to join to: no `fill<i>.join` operation runs, `errorEntities` / `delete` do
+  (NOSHAPE_FS_TRACE=1), so the three patches stay separate sheets. 782's joinSurfaceBodies gets its matches from
+  createTopologyMatchesForSurfaceJoin: per laminar edge the fill made, `qDependency(edge)` ∩ the picked edges, then
+  `filterOverlappingEdges` (qWithinRadius of the edge's evEdgeTangentLine at 0.5), else startTracking siblings. The
+  host's DEPENDENCY (query.rs) answers from `st.dependencies` of the creating op: probably nothing recorded for
+  opFillSurface's edges.
 - [x] P2 FS-POCKET-HOLES (core / bool; dx's FeatureScript corpus 11-03, cf-pocket-holes) the public Pocket Holes
   feature on a 22 in board edge (its edge maps exactly: midpoint and 558.8 mm as live's) makes four angled pocket holes
   (two sketched circles each, extruded and subtracted, tilted 15°): live's part is 22 / 28 / 8 faces / edges /
