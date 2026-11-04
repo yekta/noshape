@@ -1283,3 +1283,22 @@ fn lobe_edge_rounds_meeting_earlier_rounds_end_in_spheres_as_live() {
     assert!((u.area().unwrap() / (MM * MM) - 7596.222510).abs() < 1e-4);
     eprintln!("lobe edge rounds: {ms:.1} ms");
 }
+
+/// qa's slow1151 Fillet 2 (BLEND-RUST-STRAIGHT-WRONG): R12 on the edge where a shelled box's 0.5 mm rim (its open
+/// end) meets the inside of its top wall. A convex edge, the rim on the far side of its end edge at that corner: the
+/// straight-edge rounds took it for concave and filled 12 mm the wrong way (−1205 mm³ against OCCT's −189). Declined
+/// now (the round runs off the rim), OCCT's as before: 31406.528 mm³, 51 faces.
+#[test]
+fn a_round_off_a_thin_rim_is_not_taken_the_wrong_way() {
+    setup();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/blend");
+    let s = read_brep(&dir.join("shelled-rim-edge.brep")).unwrap();
+    let e = s.edges()[33].clone();
+    set_rust_blend(Some(true));
+    let r = fillet_checked(&s, &[e], &[12.0 * MM]);
+    set_rust_blend(None);
+    let r = r.unwrap().shape;
+    assert_ne!(last_blend_decline(), "");
+    assert!(r.is_valid());
+    assert!((vol_mm3(&r) - 31406.528).abs() < 1e-2, "{}", vol_mm3(&r));
+}

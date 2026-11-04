@@ -3,7 +3,7 @@
 //! round a hub, between the fin's end and the gaps' cylinders): each round is the section's 2D fillet swept between
 //! the caps, a cylinder touching both faces along a line; the caps' corners at its ends become its arcs.
 
-use super::{no, BlendEdge, EdgeUses, Spec};
+use super::{curve_point, no, BlendEdge, EdgeUses, Spec};
 use crate::{Body, Curve, Decline, Edge, Face, Kind, Origin, Output, Record, Relation, Surface, Use};
 use glam::{DVec2, DVec3};
 
@@ -87,6 +87,40 @@ fn foot(f: &Face, c: DVec3, d: DVec3) -> Option<DVec3> {
         }
         _ => None,
     }
+}
+
+/// A box round face `f`: its edges' (arcs along their span), a free-form surface's poles.
+fn face_box(b: &Body, f: &Face) -> (DVec3, DVec3) {
+    let (mut lo, mut hi) = (DVec3::splat(f64::INFINITY), DVec3::splat(f64::NEG_INFINITY));
+    let mut add = |p: DVec3| {
+        lo = lo.min(p);
+        hi = hi.max(p);
+    };
+    for u in f.loops.iter().flatten() {
+        let e = &b.edges[u.edge as usize];
+        match e.curve {
+            Curve::Line | Curve::Degenerate => {
+                add(b.vertices[e.v[0] as usize]);
+                add(b.vertices[e.v[1] as usize]);
+            }
+            Curve::Circle { .. } => {
+                for k in 0..=32 {
+                    if let Some(p) = curve_point(b, e, k as f64 / 32.0) {
+                        add(p);
+                    }
+                }
+            }
+            Curve::Nurbs { index, .. } => b.nurbs_curves[index as usize].poles.iter().for_each(|&p| add(p)),
+            _ => return (DVec3::splat(f64::NEG_INFINITY), DVec3::splat(f64::INFINITY)),
+        }
+    }
+    match f.surface {
+        Surface::Nurbs { index } => b.nurbs_surfaces[index as usize].poles.iter().for_each(|&p| add(p)),
+        // (A sphere's or torus's patch: a blend's, within its arcs' boxes.)
+        Surface::Plane { .. } | Surface::Cylinder { .. } | Surface::Cone { .. } | Surface::Sphere { .. } | Surface::Torus { .. } => {}
+        _ => return (DVec3::splat(f64::NEG_INFINITY), DVec3::splat(f64::INFINITY)),
+    }
+    (lo, hi)
 }
 
 /// One round's end: the cap, the vertex, the edges along the round's two faces there, the ball's centre and the
@@ -193,8 +227,21 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
                     _ => None,
                 }
             };
-            let (Some(qa), Some(_)) = (away(g[0]), away(g[1])) else { return no("a prism round's end edge not a line or an arc") };
+            let (Some(along_a), Some(along_b)) = (away(g[0]), away(g[1])) else { return no("a prism round's end edge not a line or an arc") };
             if sigma == 0.0 {
+                // Into A across the edge: its outward normal across the edge's way as A's loop runs it (the face is on
+                // its left looking against the normal; at a face's reflex corner its end edge runs the other way).
+                let fa = &body.faces[fs[0] as usize];
+                let na = match fa.surface {
+                    Surface::Plane { normal, .. } => normal,
+                    Surface::Cylinder { origin, axis, .. } => {
+                        let a = axis.normalize();
+                        (p - origin - a * (p - origin).dot(a)).normalize()
+                    }
+                    _ => return no("a prism round's face not ruled along it"),
+                } * if fa.reversed { -1.0 } else { 1.0 };
+                let Some(rev) = uses[be.edge as usize].iter().find(|x| x.0 == fs[0]).map(|x| x.3) else { return no("a prism round's edge not in its face") };
+                let qa = na.cross(if rev { -d } else { d });
                 let fb = &body.faces[fs[1] as usize];
                 let nb = match fb.surface {
                     Surface::Plane { normal, .. } => normal,
@@ -219,7 +266,17 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
             let (Some(t0), Some(t1)) = (foot(&body.faces[fs[0] as usize], c, d), foot(&body.faces[fs[1] as usize], c, d)) else { return no("a prism round's tangent points") };
             // Each tangent point on its end edge, short of its far end (no overflow).
             for (k, t) in [t0, t1].into_iter().enumerate() {
+                let along = [along_a, along_b][k];
                 let oe = &body.edges[g[k] as usize];
+                let on_edge = match oe.curve {
+                    Curve::Line => (t - p).normalize_or_zero().dot(along) > 1.0 - 1e-9,
+                    // (Along the arc's way from the vertex: its chord's turn from the tangent within a half turn.)
+                    Curve::Circle { .. } => (t - p).normalize_or_zero().dot(along) > 0.0,
+                    _ => false,
+                };
+                if !on_edge {
+                    return no("a prism round's tangent point off its end edge");
+                }
                 let far = body.vertices[if oe.v[0] == v { oe.v[1] } else { oe.v[0] } as usize];
                 let reach = (t - p).length();
                 let room = match oe.curve {
@@ -244,6 +301,37 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
         let [a, b] = <[End; 2]>::try_from(ends).map_err(|_| Decline("a prism round without two ends"))?;
         if (b.c - a.c).cross(d).length() > margin {
             return no("a prism round's ends not on one axis");
+        }
+        // Nothing else within the round: the box of what it takes or adds (between the edge and its arcs, a corner's
+        // sphere too) meets no face but its own two, its caps and its corners' rounds (slow1151's Fillet 2: an R12 round
+        // through a 0.5 mm wall cut the wall's other side away).
+        let (mut lo, mut hi) = (DVec3::splat(f64::INFINITY), DVec3::splat(f64::NEG_INFINITY));
+        let mut own = vec![fs[0], fs[1]];
+        for end in [&a, &b] {
+            let mid = end.c + ((end.t[0] + end.t[1]) * 0.5 - end.c).normalize_or_zero() * r;
+            let mut pts = vec![body.vertices[end.v as usize], end.t[0], end.t[1], mid];
+            match &end.corner {
+                Some(cn) => {
+                    pts.push(body.vertices[cn.p as usize]);
+                    own.extend(cn.tori);
+                }
+                None => own.push(end.cap),
+            }
+            for p in pts {
+                lo = lo.min(p);
+                hi = hi.max(p);
+            }
+        }
+        let shrink = DVec3::splat(10.0 * margin);
+        let region = (lo + shrink, hi - shrink);
+        for (fi, face) in body.faces.iter().enumerate() {
+            if own.contains(&(fi as u32)) {
+                continue;
+            }
+            let fb = face_box(body, face);
+            if (region.0.cmplt(fb.1)).all() && (fb.0.cmplt(region.1)).all() {
+                return no("another face within a prism round");
+            }
         }
         plans.push(Plan { edge: be.edge, r, fs, sigma, ends: [a, b] });
     }
