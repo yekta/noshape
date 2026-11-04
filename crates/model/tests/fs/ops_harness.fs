@@ -661,6 +661,12 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
                         "endBound" : BoundingType.UP_TO_SURFACE, "endBoundEntity" : qCreatedBy(sub + "p1", EntityType.FACE) });
             const a = evArea(context, { "entities" : qCreatedBy(sub + "x", EntityType.FACE) });
             check("opExtrude of edges up to surfaces", abs(a - 600 * mm ^ 2) < 1e-6 * mm ^ 2, a);
+            // A detached fillet (std sheet metal measures a bend's angle on one): a new sheet, the box untouched.
+            fCuboid(context, sub + "c", { "corner1" : vector(0, 0, z + 200) * mm, "corner2" : vector(10, 10, z + 210) * mm });
+            opFillet(context, sub + "f", { "entities" : qContainsPoint(qCreatedBy(sub + "c", EntityType.EDGE), vector(5, 0, z + 210) * mm), "radius" : 2 * mm, "createDetachedSurface" : true });
+            const fa = evArea(context, { "entities" : qCreatedBy(sub + "f", EntityType.FACE) });
+            check("opFillet createDetachedSurface", size(evaluateQuery(context, qOwnedByBody(qCreatedBy(sub + "c", EntityType.BODY), EntityType.FACE))) == 6 &&
+                    size(evaluateQuery(context, qBodyType(qCreatedBy(sub + "f", EntityType.BODY), BodyType.SHEET))) == 1 && abs(fa - PI * mm * 10 * mm) < 1e-6 * mm ^ 2, fa);
         });
         println("done");
     });

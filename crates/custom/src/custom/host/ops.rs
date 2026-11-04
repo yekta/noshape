@@ -237,8 +237,8 @@ fn op_extrude(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 }
 
 /// An edge's sheet run far toward its up-to ends, cut back at the end surfaces `bounds`: the piece touching every
-/// bound (and, with one blind end, the edge moved to that end by `blind`). No history: these sheets are named by
-/// their roles alone.
+/// bound (and, with one blind end, the edge moved to that end by `blind`) that holds the edge, else the only such
+/// piece. No history: these sheets are named by their roles alone.
 fn trim_to_bounds(res: &k::OpResult, bounds: &[Shape], edge: &Shape, blind: Option<DVec3>) -> FResult<k::OpResult> {
     let split = k::split(std::slice::from_ref(&res.shape), bounds, &k::BooleanOptions::default())?;
     let touches = |a: &Shape, b: &Shape| k::distance(a, b).is_ok_and(|x| x.distance < 1e-7);
@@ -246,12 +246,70 @@ fn trim_to_bounds(res: &k::OpResult, bounds: &[Shape], edge: &Shape, blind: Opti
         Some(v) => Some(edge.translated(v)?),
         None => None,
     };
-    let kept: Vec<Shape> = split.shape.faces().into_iter().filter(|f| bounds.iter().all(|b| touches(f, b)) && blind_edge.as_ref().is_none_or(|e| touches(f, e))).collect();
-    if kept.is_empty() {
+    let reach: Vec<Shape> = split.shape.faces().into_iter().filter(|f| bounds.iter().all(|b| touches(f, b)) && blind_edge.as_ref().is_none_or(|e| touches(f, e))).collect();
+    // The piece the edge lies in, else the only one between the ends (a part crossed several times: not yet).
+    let with_edge: Vec<Shape> = reach.iter().filter(|f| touches(f, edge)).cloned().collect();
+    let kept = if with_edge.is_empty() { reach } else { with_edge };
+    if kept.len() != 1 {
         return err("The extrude does not reach its end surface");
     }
     let shape = if kept.len() == 1 { kept[0].clone() } else { Shape::compound(&kept) };
     Ok(k::OpResult { shape, history: k::History::default() })
+}
+
+/// Shell `p` with its faces agreeing, facing the way of the first of `sides` (a point and normal) that lies on it.
+fn oriented_piece(p: &Shape, sides: &[(DVec3, DVec3)]) -> Shape {
+    let Ok(fixed) = p.faces_oriented_consistently() else { return p.clone() };
+    let faces = fixed.faces();
+    let on = |f: &Shape, x: DVec3| k::make_vertex(x).ok().and_then(|v| k::distance(&v, f).ok()).is_some_and(|d| d.distance < 1e-7);
+    let Some((f, n)) = sides.iter().find_map(|(x, n)| faces.iter().find(|f| on(f, *x)).map(|f| (f.normal_at_point(*x), *n))) else { return p.clone() };
+    match f {
+        Ok(m) if m.dot(n) < 0.0 => fixed.reversed().unwrap_or(fixed),
+        Ok(_) => fixed,
+        Err(_) => p.clone(),
+    }
+}
+
+/// Whether an opFillet call asks for a detached surface (`createDetachedSurface`).
+pub(super) fn detached_fillet(a: &[Value]) -> bool {
+    a.get(2).is_some_and(|d| d.get("createDetachedSurface").as_bool() == Some(true))
+}
+
+/// opFillet with `createDetachedSurface`: the fillet faces alone as a new sheet, the bodies left as they are (std's
+/// sheet metal measures a bend's angle on one: computeFilletAngle).
+pub(super) fn op_fillet_detached(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let (cx, id, def) = args(i, &a)?;
+    let refs = evaluate_refs(i, &cx, def.get("entities"))?;
+    let radius = length_of(def.get("radius")).unwrap_or(0.0);
+    run_op(i, &cx, &id, "FILLET_FAILED", |ev| {
+        let mut by_body: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+        for (b, e) in ev.resolve_edges(&refs) {
+            by_body.entry(b).or_default().push(e);
+        }
+        if by_body.is_empty() || radius <= 0.0 {
+            return Err(super::code_error("FILLET_FAILED"));
+        }
+        let mut sheets = Vec::new();
+        for (b, edges) in by_body {
+            let shape = ev.ctx.bodies[b].shape.clone();
+            let shapes: Vec<Shape> = edges.iter().map(|e| shape.sub_shape(ShapeType::Edge, *e)).collect::<Result<_, _>>()?;
+            let res = k::fillet(&shape, &shapes, radius)?;
+            let faces: Vec<Shape> = edges
+                .iter()
+                .flat_map(|e| res.history.generated(0, ShapeType::Edge, *e as u32))
+                .filter(|(t, _)| *t == ShapeType::Face)
+                .filter_map(|(_, f)| res.shape.sub_shape(ShapeType::Face, f as usize).ok())
+                .collect();
+            if faces.is_empty() {
+                return Err(super::code_error("FILLET_FAILED"));
+            }
+            let sheet = if faces.len() == 1 { faces[0].clone() } else { Shape::compound(&faces) };
+            let names = fresh_names(ev, &sheet);
+            sheets.push(NamedShape::new(sheet, names));
+        }
+        add_bodies(ev, sheets, BodyKind::Surface)
+    })?;
+    Ok(Value::Undefined)
 }
 
 /// A point inside a shape's first face and the face's normal there.
@@ -413,10 +471,14 @@ fn sew_sheets(sheets: Vec<NamedShape>) -> FResult<Vec<NamedShape>> {
     let Ok(sewn) = k::sew(&shapes, 1e-7, false) else { return Ok(sheets) };
     let key = |f: &Shape| f.bounding_box(false).map(|b| (b.center(), b.diagonal())).ok();
     let named: Vec<(Option<(DVec3, f64)>, Name)> = sheets.iter().flat_map(|s| s.shape.faces().iter().map(key).zip(s.names.faces.iter().cloned()).collect::<Vec<_>>()).collect();
+    // Each piece one way round (Parasolid's sheet from a chain of curves: a tangent line and arc drawn opposite ways
+    // meet smooth), the side of its first curve's sheet.
+    let sides: Vec<(DVec3, DVec3)> = sheets.iter().filter_map(|s| face_sample(&s.shape)).collect();
     let mut out = Vec::new();
     let shells = sewn.shape.shells();
     let pieces = if shells.is_empty() { vec![sewn.shape.clone()] } else { shells };
     for p in pieces {
+        let p = oriented_piece(&p, &sides);
         let names: Option<Vec<Name>> = p
             .faces()
             .iter()

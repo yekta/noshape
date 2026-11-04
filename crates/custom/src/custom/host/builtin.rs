@@ -32,7 +32,7 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("opFullRoundFillet", |i, a| BuiltinOp { enums: &[("filletType", "FULL_ROUND")], ..BuiltinOp::new("fillet", "FILLET_FAILED") }.run(i, a, crate::regen::features::detail::fillet)),
     // Every opFillet option (cross sections, width, asymmetric, partial,
     // variable) as the Fillet feature builds it.
-    ("opFillet", |i, a| BuiltinOp { enums: &[("filletType", "EDGE")], defaults: &[("tangentPropagation", ParamValue::Bool(false))], ..BuiltinOp::new("fillet", "FILLET_FAILED") }.run(i, a, crate::regen::features::detail::fillet)),
+    ("opFillet", |i, a| if super::ops::detached_fillet(&a) { super::ops::op_fillet_detached(i, a) } else { BuiltinOp { enums: &[("filletType", "EDGE")], defaults: &[("tangentPropagation", ParamValue::Bool(false))], ..BuiltinOp::new("fillet", "FILLET_FAILED") }.run(i, a, crate::regen::features::detail::fillet) }),
     ("evRuledSurfaceBases", ev_ruled_surface_bases),
     ("opDropCurve", |i, a| {
         let op = BuiltinOp { renames: &[("dropTools", "tools")], vectors: &[("directionQuery", "direction")], enums: &[("curveProjectionType", "CURVE_TO_FACE")], ..BuiltinOp::new("projectCurves", "REGEN_ERROR") };

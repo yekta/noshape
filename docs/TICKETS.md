@@ -3899,6 +3899,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Its next difference, Offset surface 1 (8 sheets, live 2 with 9/20/12), is core's native offsetSurface. Left
   failing: cf-setback-fillet (opFillSurface "multiple loops"), cf-sheet-metal-model-plus (Up to Part: ERROR, live
   INFO), Fix PCB 2 ("No components selected").
+  dx 11-04 21:30: cf-sheet-metal-model-plus's Sheet Metal Up to Part (std 1403 studio) extrudes 5 sketch edges at x = 0
+  along −x with startBound UP_TO_SURFACE (the part's x = −0.02 face, startDepth 11.8 mm as offset) and endBound
+  UP_TO_BODY (the part, x −0.05…−0.02, faces stepping between −0.02 and −0.025). Live's sheet metal part spans x
+  −0.0257…−0.0093: an edge's sheet ends where it first meets the part, location by location, and starts offset from
+  its surface. Ours: opExtrude of edges with a body bound has no such trim yet (it fails: "does not reach its end
+  surface"); the face profiles' path has it (prism until). Also done for it: opFillet createDetachedSurface (std's
+  bendAngle measures a temporary detached fillet; ours filleted the sheet itself and failed), sheets extruded from a
+  chain of curves sewn one way round.
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our
