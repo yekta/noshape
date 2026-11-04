@@ -3320,13 +3320,15 @@ fn inference_points_on_cones_spheres_arcs_and_vertices() {
         }
         panic!("no such face")
     };
-    // N4: conical face — bottom, middle, top of the axis and the virtual sharp (apex).
+    // N4: conical face — bottom, middle and top of the axis; no virtual sharp (live audit 1943 (1)).
     let (cb, rc) = body_of(&mut ev, &f.doc, f.studios[0]);
     let (_, cone_face) = face_of(&rc, |k| matches!(k, Surface::Cone { .. }));
     let pts = inference_candidates(&rc.context, Some(&cb), &cone_face, &units);
-    assert_eq!(pts.len(), 4, "{:?}", pts.iter().map(|p| p.frame.origin).collect::<Vec<_>>());
+    assert_eq!(pts.len(), 3, "{:?}", pts.iter().map(|p| p.frame.origin).collect::<Vec<_>>());
     assert!(pts.iter().all(|p| p.frame.z().cross(DVec3::Z).length() < 1e-6), "Z along the cone axis");
-    assert!(pts.iter().any(|p| (p.frame.origin - DVec3::new(0.0, 0.0, 0.04)).length() < 1e-6), "virtual sharp at the apex: {:?}", pts.iter().map(|p| p.frame.origin).collect::<Vec<_>>());
+    let mut zs: Vec<f64> = pts.iter().map(|p| p.frame.origin.z).collect();
+    zs.sort_by(f64::total_cmp);
+    assert!(zs.iter().zip([0.0, 0.01, 0.02]).all(|(z, w)| (z - w).abs() < 1e-6), "bottom, middle, top: {zs:?}");
     // N5: spherical face — its center.
     let (sb, rs) = body_of(&mut ev, &f.doc, f.studios[1]);
     let (_, sphere_face) = face_of(&rs, |k| matches!(k, Surface::Sphere { .. }));

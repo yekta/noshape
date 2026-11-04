@@ -269,7 +269,7 @@ pub struct AsmUi {
     pub menu_face: Option<AsmPickTarget>,
     /// The graphics menu opened on the selected instance's triad or face:
     /// it starts with Move to origin (live ~14029; ASM-TRIAD-MENU).
-    pub menu_move_origin: bool,
+    pub menu_handle: Option<ManipHandle>,
     /// Make transparent (Shift+T): instances drawn transparent.
     pub transparent: Option<noshape_model::assembly::OccurrenceSet>,
     /// S shortcut toolbar position (viewport-local).
@@ -1091,8 +1091,11 @@ impl AssemblyView {
                 m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Instance(top), false));
             }
         }
-        let tg = targets.clone();
-        m.push(icon_item(if fixed { "Unfix" } else { "Fix" }, "fix-instance", move |t, _, cx| t.set_fixed(tg.clone(), !fixed, cx)));
+        // Live (assembly/538, audit 1943 (2)): a subassembly's menu has no Fix.
+        if !is_asm {
+            let tg = targets.clone();
+            m.push(icon_item(if fixed { "Unfix" } else { "Fix" }, "fix-instance", move |t, _, cx| t.set_fixed(tg.clone(), !fixed, cx)));
+        }
         // Use best available tessellation (finest meshes for these instances).
         let best = inst.best_tessellation;
         let tg = targets.clone();
@@ -2644,8 +2647,19 @@ impl AssemblyView {
     /// general menu on empty space).
     pub(super) fn open_graphics_menu(&mut self, top: Option<InstanceId>, position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
         let entries = match top {
-            Some(t) if std::mem::take(&mut self.ui.menu_move_origin) => {
-                let mut m = vec![item("Move to origin", |t, _, cx| t.triad_action(TriadAction::MoveToOrigin, cx))];
+            Some(t) if self.ui.menu_handle.is_some() => {
+                let mut m = match self.ui.menu_handle.take() {
+                    Some(ManipHandle::Axis(k)) => vec![
+                        item("Align with Z", move |t, _, cx| t.triad_action(TriadAction::AlignZ(k, false), cx)),
+                        item("Anti-align with Z", move |t, _, cx| t.triad_action(TriadAction::AlignZ(k, true), cx)),
+                    ],
+                    Some(ManipHandle::Ring(k)) => vec![
+                        item("Rotate 90 deg", move |t, _, cx| t.triad_action(TriadAction::Rotate(k, std::f64::consts::FRAC_PI_2), cx)),
+                        item("Rotate 180 deg", move |t, _, cx| t.triad_action(TriadAction::Rotate(k, std::f64::consts::PI), cx)),
+                    ],
+                    Some(ManipHandle::Center) => vec![item("Move to origin", |t, _, cx| t.triad_action(TriadAction::MoveToOrigin, cx))],
+                    _ => Vec::new(),
+                };
                 m.extend(self.instance_menu(t, true, cx));
                 m
             }

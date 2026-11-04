@@ -403,13 +403,9 @@ pub struct AssemblyView {
     /// relative to the first one's placement (follows the part).
     triad: Option<(Vec<InstanceId>, Frame)>,
     /// Manipulator context menu (position, handle).
-    triad_menu: Option<(Point<Pixels>, ManipHandle)>,
     snap_drag: Option<SnapDrag>,
     /// The snap drag was started on a fixed instance (only a click picks).
     snap_fixed: bool,
-    /// Snapped placement of the dragged instance, used as the start of the
-    /// mate dialog's preview (until the dialog closes).
-    snap_start: Option<(InstanceId, Placement)>,
     /// A Part Studio changed: re-sync part patterns / replicates after the next evaluation.
     pattern_resync: bool,
     step_edit: Option<StepEdit>,
@@ -598,10 +594,8 @@ impl AssemblyView {
             config_panel: None,
             replace_panel: None,
             triad: None,
-            triad_menu: None,
             snap_drag: None,
             snap_fixed: false,
-            snap_start: None,
             pattern_resync: false,
             step_edit: None,
             ctrl_down: false,
@@ -713,12 +707,6 @@ impl AssemblyView {
             // live qa5 A4: Slider flip turns the block over onto the plate).
             if s.editing.is_none() && !s.solve_all {
                 opts.hold_values.extend(noshape_model::assembly::eval::new_mate_holds(&m));
-            }
-            // After a snap drag the dragged instance starts at its snapped placement.
-            if let Some((id, p)) = self.snap_start {
-                let mut start: HashMap<InstanceId, Placement> = asm.instances.iter().map(|i| (i.id, i.placement)).collect();
-                start.insert(id, p);
-                opts.start = Some(start);
             }
             match s.editing.and_then(|id| asm.mates.iter().position(|x| x.id == id)) {
                 Some(i) => asm.mates[i] = m,
@@ -1790,7 +1778,6 @@ impl AssemblyView {
         };
         let editing = s.editing;
         self.mate = None;
-        self.snap_start = None;
         if self.anim.as_ref().is_some_and(|a| a.preview) {
             self.anim = None;
         }
@@ -1818,7 +1805,6 @@ impl AssemblyView {
         if self.anim.as_ref().is_some_and(|a| a.preview) {
             self.anim = None;
         }
-        self.snap_start = None;
         if self.mate.take().is_some() {
             window.focus(&self.focus, cx);
             self.infer = None;
@@ -2437,7 +2423,6 @@ impl AssemblyView {
                 self.ui.select_other = None;
                 self.ui.ctx_menu = None;
                 self.ui.mini_toolbar = None;
-                self.triad_menu = None;
                 self.pointer = *position;
                 // Clicking a triad handle selects it (its context menu needs that).
                 let manip = match self.overlay(*pick) {
@@ -2539,7 +2524,6 @@ impl AssemblyView {
                 self.focus_from_viewport(window, cx);
                 self.ui.ctx_menu = None;
                 self.ui.mini_toolbar = None;
-                self.triad_menu = None;
                 if self.start_section_drag(*position, cx) {
                     return;
                 }
@@ -2847,16 +2831,6 @@ impl AssemblyView {
                 cx.notify();
             }
             ViewportEvent::ContextMenu { pick, position } => {
-                // Triad menu: right-click the selected handle (Onshape);
-                // otherwise the triad is ignored.
-                if let Some(OverlayPick::Manip(h)) = self.overlay(*pick)
-                    && self.ui.manip_selected == Some(h)
-                {
-                    self.ui.ctx_menu = None;
-                    self.triad_menu = Some((*position, h));
-                    cx.notify();
-                    return;
-                }
                 if let Some(OverlayPick::Mate(i)) = self.overlay(*pick)
                     && let Some(id) = self.ui.overlay_mates.get(i).copied()
                 {
@@ -2866,18 +2840,23 @@ impl AssemblyView {
                     self.open_mate_menu(id, *position, window, cx);
                     return;
                 }
-                self.triad_menu = None;
                 // Live (skb-move-origin-menu-graphics.png, behaviours "skb
                 // (10-24) section base snap + move to origin" (2)): an instance,
                 // selected or not, gets the instance menu; empty space the
                 // general menu. The selected instance's triad or face: its menu
                 // with Move to origin first (live ~14029, ~4632; ASM-TRIAD-MENU).
                 self.ui.menu_face = self.pick(*pick).filter(|t| t.kind == PickKind::Face);
-                let on_triad = matches!(self.overlay(*pick), Some(OverlayPick::Manip(_)));
-                let top = if on_triad { self.selected.first().copied() } else { self.pick(*pick).map(|t| t.path[0]) };
+                let handle = match self.overlay(*pick) {
+                    Some(OverlayPick::Manip(h)) => Some(h),
+                    _ => None,
+                };
+                let top = if handle.is_some() { self.selected.first().copied() } else { self.pick(*pick).map(|t| t.path[0]) };
                 // The triad shows for a list selection too (at its bounds
                 // centre, ASM-TRIAD-MENU reopened), not only a placed one.
-                self.ui.menu_move_origin = self.manipulator(cx).is_some() && top.is_some_and(|t| self.selected.contains(&t));
+                // Live (audit 1943 (5)): a handle's own items come first
+                // (the selected instance's face: the centre's).
+                let selected = self.manipulator(cx).is_some() && top.is_some_and(|t| self.selected.contains(&t));
+                self.ui.menu_handle = selected.then(|| handle.unwrap_or(ManipHandle::Center));
                 self.open_graphics_menu(top, *position, window, cx);
                 cx.notify();
             }
@@ -3638,6 +3617,14 @@ impl AssemblyView {
             }));
         let view = cx.entity();
         row.os_context_menu(move |menu, window, cx| {
+            // Live (audit 1943 (2)): with instances selected, the right-clicked row joins them.
+            view.update(cx, |v, cx| {
+                if !v.selected.is_empty() && !v.selected.contains(&top) {
+                    v.selected.push(top);
+                    v.refresh_scene(false, cx);
+                    cx.notify();
+                }
+            });
             let entries = view.read(cx).instance_menu(top, false, cx);
             fill_menu(menu, entries, view.clone(), window, cx)
         })
@@ -5637,9 +5624,6 @@ impl AssemblyView {
         if let Some(m) = self.render_graphics_menu() {
             out.push(m);
         }
-        if let Some(m) = self.render_triad_menu(cx) {
-            out.push(m);
-        }
         out
     }
 
@@ -6066,9 +6050,6 @@ impl AssemblyView {
         }
         if self.cancel_bom_cell(cx) {
             window.focus(&self.focus, cx);
-        } else if self.triad_menu.is_some() {
-            self.triad_menu = None;
-            cx.notify();
         } else if self.step_edit.is_some() {
             self.cancel_step_edit(cx);
             cx.notify();

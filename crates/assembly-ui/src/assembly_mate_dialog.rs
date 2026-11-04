@@ -132,7 +132,7 @@ impl Focusable for MateDialog {
 }
 
 /// What an unset limit field reads (live).
-const NO_LIMIT: [&str; 3] = ["No minimum", "No maximum", "No maximum angle"];
+const NO_LIMIT: [&str; 2] = ["No minimum", "No maximum"];
 
 /// The unit kind of a mate limit: rotations (`rz`, the ball's `cone`) are
 /// angles, translations lengths.
@@ -222,9 +222,9 @@ impl MateDialog {
         let mut limits = HashMap::new();
         for key in ["rz", "x", "y", "z", "cone"] {
             let l = mate.limits.iter().find(|(k, _)| k == key).map(|(_, l)| l.clone());
-            // Onshape's empty limit fields read "No minimum" / "No maximum".
+            // Onshape's empty limit fields read "No minimum" / "No maximum" (the Ball's cone too, audit 1943 (4)).
             let lo = mk(l.as_ref().map(|l| text_of(&l.min)).unwrap_or_default(), "No minimum", window, cx);
-            let hi = mk(l.as_ref().map(|l| text_of(&l.max)).unwrap_or_default(), if key == "cone" { "No maximum angle" } else { "No maximum" }, window, cx);
+            let hi = mk(l.as_ref().map(|l| text_of(&l.max)).unwrap_or_default(), "No maximum", window, cx);
             limits.insert(key, (lo, hi));
         }
         let limit_applied: HashMap<EntityId, String> = limits.values().flat_map(|(a, b)| [a, b]).map(|e| (e.entity_id(), e.read(cx).value().to_string())).collect();
@@ -314,15 +314,6 @@ impl MateDialog {
             _subs: subs,
             type_select,
         }
-    }
-
-    /// Fill both connectors (snap mode: the dragged and the target connector).
-    pub fn prefill(&mut self, a: MateConnectorRef, b: MateConnectorRef, cx: &mut Context<Self>) {
-        self.a = Some(a);
-        self.b = Some(b);
-        self.active = self.next_active();
-        cx.emit(MateDialogEvent::Changed);
-        cx.notify();
     }
 
     /// The mate type being edited (its toolbar button shows as active).

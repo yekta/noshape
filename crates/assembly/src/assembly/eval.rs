@@ -1865,13 +1865,9 @@ pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Refe
             }
             match kind {
                 Some(noshape_kernel::Surface::Plane(_)) => {}
-                Some(noshape_kernel::Surface::Cylinder { .. }) => {
+                // Live (audit 1943 (1)): no virtual sharp (apex) on a cone, as a cylinder.
+                Some(noshape_kernel::Surface::Cylinder { .. } | noshape_kernel::Surface::Cone { .. }) => {
                     for inf in [Inference::MidAxis, Inference::TopAxis, Inference::BottomAxis] {
-                        refs.push((implicit(on, inf), None));
-                    }
-                }
-                Some(noshape_kernel::Surface::Cone { .. }) => {
-                    for inf in [Inference::MidAxis, Inference::TopAxis, Inference::BottomAxis, Inference::Center] {
                         refs.push((implicit(on, inf), None));
                     }
                 }

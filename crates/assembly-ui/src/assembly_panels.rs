@@ -721,7 +721,8 @@ impl AssemblyView {
                     cx.notify();
                     return;
                 }
-                if this.pick_mode(cx).is_some() {
+                // Live (audit 1943 (4)): a mate dialog doesn't take the Origin row.
+                if this.mate.is_none() && this.pick_mode(cx).is_some() {
                     this.deliver_connector(MateConnectorRef::origin(), window, cx);
                     this.refresh_scene(false, cx);
                     cx.notify();
@@ -3253,7 +3254,6 @@ impl AssemblyView {
     }
 
     pub(super) fn triad_action(&mut self, action: TriadAction, cx: &mut Context<Self>) {
-        self.triad_menu = None;
         let Some(f) = self.manipulator(cx) else { return };
         let ids = self.manip_targets(cx);
         let axes = [f.x(), f.y(), f.z()];
@@ -3294,40 +3294,6 @@ impl AssemblyView {
         self.apply_solved(solved, cx);
         self.edit(&format!("{what} : {name}"), cx, |_| {});
         cx.notify();
-    }
-
-    pub(super) fn render_triad_menu(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let pal = p();
-        let (pos, handle) = self.triad_menu?;
-        let item = |id: SharedString, label: String, cx: &mut Context<Self>, a: TriadAction| {
-            h_flex()
-                .id(id)
-                .h(px(26.))
-                .px_3()
-                .rounded_sm()
-                .text_sm()
-                .cursor_pointer()
-                .hover(|d| d.bg(pal.panel_hover))
-                .child(label)
-                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.triad_action(a, cx)))
-        };
-        let mut menu = v_flex().id("triad-menu").occlude().w(px(210.)).p_1().rounded_md().border_1().border_color(pal.border_strong).bg(pal.panel_raised).shadow_lg().text_color(pal.text);
-        // Onshape's manipulator menus: the center offers Move to origin, an
-        // axis arrow Align / Anti-align with Z, a rotation arc Rotate 90 / 180 degrees.
-        match handle {
-            ManipHandle::Axis(k) => {
-                menu = menu.child(item("tm-align".into(), "Align with Z".into(), cx, TriadAction::AlignZ(k, false))).child(item("tm-anti".into(), "Anti-align with Z".into(), cx, TriadAction::AlignZ(k, true)));
-            }
-            ManipHandle::Ring(k) => {
-                menu = menu
-                    .child(item("tm-rot90".into(), "Rotate 90 degrees".into(), cx, TriadAction::Rotate(k, std::f64::consts::FRAC_PI_2)))
-                    .child(item("tm-rot180".into(), "Rotate 180 degrees".into(), cx, TriadAction::Rotate(k, std::f64::consts::PI)));
-            }
-            ManipHandle::Center | ManipHandle::Plane(_) => {
-                menu = menu.child(item("tm-origin".into(), "Move to origin".into(), cx, TriadAction::MoveToOrigin));
-            }
-        }
-        Some(deferred(anchored().position(pos).snap_to_window().child(menu)).with_priority(3).into_any_element())
     }
 
     // ------------------------------------------------------------ snap mode drag
@@ -3511,22 +3477,18 @@ impl AssemblyView {
             cx.notify();
             return;
         }
-        let (Some(src), Some(dst)) = (s.sources.get(s.source_ix).cloned(), s.target.clone()) else {
+        if s.target.is_none() {
             // Dropped on nothing: back to where it was.
             self.message = Some((false, "Snap: no target mate connector under the cursor.".into()));
             self.schedule_eval(window, cx);
             return;
-        };
-        let snapped = self.result.solved.placement(s.top).unwrap_or(s.start);
-        // The mate dialog opens with both connectors filled (Fastened by default).
+        }
+        // Live (behaviours "skasm (2026-11-03 23:11, P3) assembly parity
+        // audit" (6)): the instance stays where it snapped; no mate dialog, no mate.
         self.snap = None;
         self.message = None;
-        self.start_mate(MateType::Fastened, window, cx);
-        self.snap_start = Some((s.top, snapped));
-        if let Some(d) = self.mate.as_ref().map(|m| m.dialog.clone()) {
-            d.update(cx, |d, cx| d.prefill(src, dst, cx));
-        }
-        self.update_capture(cx);
+        let name = self.assembly(cx).and_then(|a| a.instance(s.top).map(|i| i.name.clone())).unwrap_or_default();
+        self.edit(&format!("Move : {name}"), cx, |_| {});
         self.schedule_eval(window, cx);
         cx.notify();
     }
