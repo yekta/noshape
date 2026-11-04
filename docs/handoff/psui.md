@@ -868,6 +868,12 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- 11-04 10:38 (lead's three items): (1) **Hole remembered values** are Onshape's (live 1987: server-side per user and feature
+  type, on ✓ only, quantities per document unit). Ours now persists them (app-core feature_settings.json; off under
+  NOSHAPE_UI_SCRIPT and in tests); asked live to commit std's default Hole and re-record hole-* (REQUESTS 11-04 10:38).
+  (2) **IN-FEATURE-MATE-CONNECTOR done** (model, regen, op, dialog, nested editor, Ctrl+M; note in core.md); its hover
+  inference points split to MC-INFERENCE-HOVER. (3) **part-studio.md audit**: 233 of 258 rows cite live; corrected
+  1.3 / 1.9 / 1.10 / 5.26 (the dialog title no longer renames); 25 rows asked of live in one session.
 - 11-04 08:42: face-rclick-menu's highlighted row is accepted: both windows are 1919 x 992, but live's face menu has the
   cloud-only "Add comment" row, which makes it one row too tall to fit under the pointer (it shifts up and the
   pointer lands on row 20); ours fits exactly below. FS-EDITOR-IMPORT-NOTICES fixed (custom::doc_imports); the
