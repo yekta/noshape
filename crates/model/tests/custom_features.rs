@@ -3516,3 +3516,76 @@ export const axisProbe = defineFeature(function(context is Context, id is Id, de
     let out = custom::run::output_of(fid).unwrap().output;
     assert_eq!(out, "10\n9\n", "{out}");
 }
+
+/// Live 2015 (behaviours.md "P1 FS-NATIVE-EVSHEETMETALBENDUP"): a 100 × 60 plate (thicken 2 mm, bend radius 3 mm)
+/// with a 30 mm Flange on its x = 100 edge has one bend centerline wire, hidden, associated with the bend's joint
+/// edge: its edge in the flat at x 100.063053, y 0 → 60, z 0, evSheetMetalBendUp true; the Flange flipped, false
+/// (live's own probe, tests/fs/bend_centerlines_probe.fs).
+#[test]
+fn bend_centerline_wires_as_live() {
+    bend_centerline_case(false, "true");
+}
+
+/// The same with the Flange flipped down: live's wire answers up false.
+#[test]
+#[ignore = "T2: fails until SM-FLIPPED-JOINT-ASSOCIATION (the flipped flange's joint edge has no association)"]
+fn bend_centerline_wire_of_a_flange_down_as_live() {
+    bend_centerline_case(true, "false");
+}
+
+fn bend_centerline_case(flip: bool, up: &str) {
+    use noshape_model::reference::DatumPlane;
+    custom::std_feature::set_std_sheet_metal(true);
+    {
+        let fx = Fixture::new(include_str!("fs/bend_centerlines_probe.fs"));
+        let mut ps = PartStudio::new();
+        let mut reg = Regenerator::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let p = [(0.0, 0.0), (0.1, 0.0), (0.1, 0.06), (0.0, 0.06)].map(|(x, y)| sk.add_point(glam::DVec2::new(x, y)));
+        for i in 0..4 {
+            sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
+        }
+        let mut f = ps.new_feature("sketch", &fx.units).unwrap();
+        let sketch = f.id;
+        f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        f.params.set("sketch", ParamValue::Sketch(Box::new(noshape_model::sketch_feature::SketchData { sketch: sk, ..Default::default() })));
+        ps.features.push(f);
+        let r = fx.regen(&mut reg, &ps);
+        let key = r.display.sketches.iter().find(|s| s.feature == sketch).unwrap().regions[0].key.clone();
+        let mut f = ps.new_feature("sheetMetalStart", &fx.units).unwrap();
+        f.params.set("process", ParamValue::Enum("THICKEN".into()));
+        f.params.set("regions", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        f.params.set("thickness", expr("2 mm"));
+        f.params.set("radius", expr("3 mm"));
+        ps.features.push(f);
+        let r = fx.regen(&mut reg, &ps);
+        assert_ok(&r);
+        let part = r.context.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let v = noshape_kernel::make_vertex(glam::DVec3::new(0.1, 0.03, 0.002)).unwrap();
+        let e = (0..part.edges.len()).find(|&i| noshape_kernel::distance(&v, &part.shape.sub_shape(noshape_kernel::ShapeType::Edge, i).unwrap()).is_ok_and(|d| d.distance < 1e-9)).expect("the x = 100 top edge");
+        let mut f = ps.new_feature("sheetMetalFlange", &fx.units).unwrap();
+        f.params.set("edges", ParamValue::Query(vec![Reference::Edge((*part.edges[e]).clone())]));
+        f.params.set("distance", expr("30 mm"));
+        f.params.set("oppositeDirection", ParamValue::Bool(flip));
+        ps.features.push(f);
+        let r = fx.regen(&mut reg, &ps);
+        assert_ok(&r);
+        let part = r.context.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let mut f = ps.new_feature(&fx.ty("bendCenterlineProbe"), &fx.units).unwrap();
+        f.params.set("part", ParamValue::Query(vec![Reference::Body(part.id.clone())]));
+        let probe = f.id;
+        ps.features.push(f);
+        let r = fx.regen(&mut reg, &ps);
+        assert_ok(&r);
+        let out = custom::run::output_of(probe).expect("probe output").output;
+        let wires: Vec<&str> = out.lines().filter(|l| l.starts_with("wire ")).collect();
+        assert_eq!(wires.len(), 1, "{out}");
+        assert!(wires[0].contains("joint BEND") && wires[0].ends_with(&format!("up {up}")), "{out}");
+        let edge = out.lines().find(|l| l.trim_start().starts_with("edge ")).expect("its edge");
+        let nums: Vec<f64> = edge.split(|c: char| !(c.is_ascii_digit() || c == '.' || c == '-' || c == 'e')).filter_map(|t| t.parse().ok()).collect();
+        let (a, b) = (glam::DVec3::new(nums[0], nums[1], nums[2]), glam::DVec3::new(nums[3], nums[4], nums[5]));
+        let (lo, hi) = if a.y < b.y { (a, b) } else { (b, a) };
+        assert!((lo - glam::DVec3::new(0.100063053, 0.0, 0.0)).length() < 1e-7 && (hi - glam::DVec3::new(0.100063053, 0.06, 0.0)).length() < 1e-7, "{edge}");
+        assert!(r.context.bodies.iter().all(|b| b.kind != noshape_model::display::BodyKind::Wire || r.display.bodies.iter().all(|d| d.id != b.id)), "the wire is hidden");
+    }
+}

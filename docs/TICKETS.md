@@ -67,9 +67,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     `trim_wire_at`, split out of trim_curve). T1 ops_harness moveCurveBoundary.)
     P1 FS-NATIVE-OPMOVECURVEBOUNDARY @opMoveCurveBoundary: std's sheetMetalLoft (run by std here); also std's
     trimCurve and offsetCurveOnFace (ours run natively).
-  - [ ] P1 FS-NATIVE-EVSHEETMETALBENDUP (dx 11-04 17:32: unreachable here yet: pcbEnd asks it of the bend
-    centerline wire bodies associated with the definition's bends, which our sheet metal doesn't make, and calls it in
-    `try silent` (a failure reads as "down")) @evSheetMetalBendUp: std's pcbEnd (run by std here).
+  - [x] (dx 11-04 19:28, live 2015: one hidden WIRE body per bend, in the flat, associated with the bend's joint
+    edge: the host's sheet metal rebuild makes them from the flat's bend lines (old ones dropped on the next
+    rebuild), and @evSheetMetalBendUp answers the flat bend line's up; T1 custom_features::bend_centerline_wires_as_live
+    (live's own probe: x 100.063053, y 0 → 60, z 0, up true). Left: a flipped flange's joint edge has no
+    association here, so its wire has none (T2 bend_centerline_wire_of_a_flange_down_as_live;
+    SM-FLIPPED-JOINT-ASSOCIATION).) P1 FS-NATIVE-EVSHEETMETALBENDUP (dx 11-04 17:32: unreachable here yet: pcbEnd asks
+    it of the bend centerline wire bodies associated with the definition's bends, which our sheet metal doesn't make,
+    and calls it in `try silent` (a failure reads as "down")) @evSheetMetalBendUp: std's pcbEnd (run by std here).
   - [x] (dx 11-04 16:17: the second fundamental form's derivative along a tangent, from the kernel's second
     derivatives (`face_d2_at_uvs`) 10 µm each way; evFaceCurvatures answers std's typed FaceCurvatureResult (it
     returned plain numbers, so evFaceCurvature always failed under std 3095) with general surfaces' curvatures (it
@@ -107,6 +112,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   24 faces: the base, which matches live exactly). Repro: T2 model sheetmetal_std::
   a_tab_into_a_ripped_corner_fills_it_from_its_flange (NOSHAPE_FS_TRACE=1: the Tab's group subtract / transform /
   copyTool / boolean all run "ok").
+
+- [ ] P1 SM-FLIPPED-JOINT-ASSOCIATION (dx; 11-04 19:28) a 100 × 60 plate (thicken 2 mm, radius 3 mm) with a Flange
+  flipped down on its x = 100 edge: the definition's joint edge (x = 102, z = 2) carries no sheet metal association
+  attribute here (the unflipped flange's, at x = 100, keeps the plate edge's), so std's getSMAssociationAttributes
+  finds nothing on it: the part's bend edges and the bend centerline wire get no association, and live's probe
+  (request 2015 (b)) finds the wire with joint BEND, up false. std re-assigns associations only on entities that
+  already carry one (assignSMAttributesToNewOrSplitEntities); Parasolid keeps an edge's attributes as an operation
+  moves it, ours lose them here. Repro: T2 model custom_features::bend_centerline_wire_of_a_flange_down_as_live.
 
 ## From the user, 2026-11-02 (v0.4.19, macOS)
 - [x] (psui 11-03 00:10, fixed by "psui: VAR-AUTOCOMPLETE-ENTER …": (1) an open feature dialog kept the variables of

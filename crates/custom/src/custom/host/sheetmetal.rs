@@ -32,6 +32,7 @@ use std::sync::Arc;
 pub const NATIVES: &[(&str, NativeFn)] = &[
     ("updateSheetMetalGeometry", update_sheet_metal_geometry),
     ("evSheetMetalFlatTransformation", ev_sheet_metal_flat_transformation),
+    ("evSheetMetalBendUp", ev_sheet_metal_bend_up),
     ("evCornerType", ev_corner_type),
     ("evSheetMetalHoleToolBodies", ev_sheet_metal_hole_tool_bodies),
     ("evSheetMetalFormToolBodies", ev_sheet_metal_form_tool_bodies),
@@ -1847,7 +1848,17 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let faces: Vec<Reference> = (0..body.faces.len()).map(|f| q.to_ref(&Ent::Face(b, f))).collect();
             let edges: Vec<Reference> = (0..body.edges.len()).map(|e| q.to_ref(&Ent::Edge(b, e))).collect();
             let vertices: Vec<Reference> = (0..body.vertices.len()).map(|v| q.to_ref(&Ent::Vertex(b, v))).collect();
-            def_refs.push((body_ref, faces, edges, vertices));
+            // Its bend centerline wires from before: the wires associated with its edges or faces.
+            let def_assoc: Vec<Value> = faces.iter().chain(&edges).flat_map(|r| associations(&st, r)).collect();
+            let wires: Vec<BodyId> = st
+                .ctx
+                .bodies
+                .iter()
+                .enumerate()
+                .filter(|(wb, w)| w.kind == BodyKind::Wire && !def_assoc.is_empty() && associations(&st, &q.to_ref(&Ent::Body(*wb))).iter().any(|x| def_assoc.contains(x)))
+                .map(|(_, w)| w.id.clone())
+                .collect();
+            def_refs.push((body_ref, faces, edges, vertices, wires));
         }
         (defs, def_refs)
     };
@@ -1895,7 +1906,8 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             }
             // The parts this rebuild replaces (by `previous`' order).
             let before: Vec<Option<Arc<crate::regen::context::Body>>> = def.previous.iter().map(|id| ev.ctx.bodies.iter().find(|b| &b.id == id).cloned()).collect();
-            ev.ctx.bodies.retain(|b| !def.previous.contains(&b.id));
+            let old_wires = def_refs.get(n).map(|r| &r.4).cloned().unwrap_or_default();
+            ev.ctx.bodies.retain(|b| !def.previous.contains(&b.id) && !old_wires.contains(&b.id));
             // Walls joined only by rips are separate parts (live G34d), first
             // the one holding the lowest definition face.
             let solids = part.solids();
@@ -1943,6 +1955,17 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 let own_forms: Vec<FormShapes> = form_shapes.iter().filter(|f| p.members.contains(&f.0)).cloned().collect();
                 let own_cuts: Vec<(usize, Vec<Shape>)> = cut_shapes.iter().filter(|f| p.members.contains(&f.0)).cloned().collect();
                 let flat = flat_of(def, &topo, &walls, &own, &own_forms, &own_cuts);
+                // A centerline wire per bend, in the flat (live 2015: "Bend line 1", hidden), for std (pcbEnd).
+                let mut wires = Vec::new();
+                for line in flat.iter().flat_map(|f| f.bend_lines.iter().map(move |l| (f, l))) {
+                    let (f, l) = line;
+                    let Some(strip) = own.get(l.bend) else { continue };
+                    let Ok(shape) = k::make_line(f.frame.to_world(l.a), f.frame.to_world(l.b)) else { continue };
+                    fresh += 1;
+                    let wid = BodyId { feature: ev.feature, index: fresh - 1 };
+                    push_body(ev, wid.clone(), BodyKind::Wire, shape, Vec::new());
+                    wires.push((wid, strip.rolled.map_or(Def::Edge(strip.edge), Def::Face), l.up));
+                }
                 let data = sheet_data(def, &topo, &own, &p, flat.as_ref(), &others, &births);
                 let id = def.previous.get(k).cloned().unwrap_or_else(|| {
                     fresh += 1;
@@ -1954,7 +1977,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     Some(Some(b)) => ev.ctx.bodies.push(Arc::new(crate::regen::context::Body::new(id.clone(), b.name.clone(), BodyKind::Solid, p.solid, p.names, b.color, ev.feature))),
                     _ => push_body(ev, id.clone(), BodyKind::Solid, p.solid, p.names),
                 }
-                out.push((n, id, p.sources, flat, data));
+                out.push((n, id, p.sources, flat, data, wires));
             }
         }
         Ok(out)
@@ -1981,8 +2004,8 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             }
         }
     }
-    for (n, part_id, (faces, edges, vertices), flat, data) in built {
-        let Some((body_ref, dfaces, dedges, dverts)) = def_refs.get(n) else { continue };
+    for (n, part_id, (faces, edges, vertices), flat, data, wires) in built {
+        let Some((body_ref, dfaces, dedges, dverts, _)) = def_refs.get(n) else { continue };
         // New parts were renamed to the feature after the operation.
         let part_id = super::wrap_body_id(&part_id, marker, st.op_bits(marker), feature);
         // Its face names as the operation's bodies were renamed after it.
@@ -2032,9 +2055,41 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
         if let Reference::Body(def_body) = body_ref {
             st.hidden.insert(def_body.clone());
+            // The bend centerlines: hidden, with their bend's definition entity's association.
+            for (wid, d, _) in &wires {
+                let wid = super::wrap_body_id(wid, marker, st.op_bits(marker), feature);
+                if let Some(from) = def_ref(d) {
+                    for attr in associations(&st, &from) {
+                        st.push_attribute(Reference::Body(wid.clone()), Value::map_from([("attribute", attr)]));
+                    }
+                }
+                st.hidden.insert(wid);
+            }
         }
     }
     Ok(Value::Undefined)
+}
+
+/// evSheetMetalBendUp: whether a bend centerline wire's bend goes up (toward the viewer of the flat, the definition
+/// face's normal side; live 2015): the flat pattern's bend line the wire lies on.
+fn ev_sheet_metal_bend_up(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let arg = a.get(1).cloned().unwrap_or_default();
+    let wires = evaluate_refs(i, &cx, arg.get("wireBody"))?;
+    let st = cx.state.lock();
+    let ends = |b: &BodyId| st.ctx.bodies.iter().find(|x| &x.id == b).and_then(|x| x.shape.edges().first().and_then(|e| e.endpoints().ok()));
+    let up = wires.iter().find_map(|r| {
+        let Reference::Body(b) = r else { return None };
+        let (p, q) = ends(b)?;
+        st.ctx.sheet_metal_flats.values().flat_map(|f| f.bend_lines.iter().map(move |l| (f.frame.to_world(l.a), f.frame.to_world(l.b), l.up))).find(|(a, b, _)| {
+            (a.distance(p) < 1e-9 && b.distance(q) < 1e-9) || (a.distance(q) < 1e-9 && b.distance(p) < 1e-9)
+        }).map(|x| x.2)
+    });
+    drop(st);
+    match up {
+        Some(up) => Ok(Value::bool(up)),
+        None => Err(super::raise_error(i, "INVALID_INPUT", None)),
+    }
 }
 
 // ---------------------------------------------------------------- flat pattern
