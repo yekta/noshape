@@ -630,9 +630,17 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
 
 rust::String brep_body_of(const OcShape& s, BrepBody& out)
 {
-  double      tol = 0;
-  const char* why = to_body(s, out, tol);
-  return rust::String(why != nullptr ? why : "");
+  // (Called noexcept from Rust: an exception would terminate the process.)
+  try
+  {
+    double      tol = 0;
+    const char* why = to_body(s, out, tol);
+    return rust::String(why != nullptr ? why : "");
+  }
+  catch (...)
+  {
+    return rust::String("OCCT threw converting it");
+  }
 }
 
 namespace
@@ -1927,7 +1935,7 @@ const std::pair<std::array<TopoDS_Face, 2>, IntTools_Curve>& FreeSections::curve
   return curves[id];
 }
 
-rust::Vec<uint32_t> brep_occt_moved(rust::Slice<const uint32_t> ids, uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, rust::Slice<const double> moved)
+static rust::Vec<uint32_t> occt_moved(rust::Slice<const uint32_t> ids, uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, rust::Slice<const double> moved)
 {
   rust::Vec<uint32_t> out;
   if (t_free == nullptr || t_free->srcs == nullptr || moved.size() != 16)
@@ -1953,7 +1961,7 @@ rust::Vec<uint32_t> brep_occt_moved(rust::Slice<const uint32_t> ids, uint32_t a_
   return out;
 }
 
-void brep_occt_ahead(rust::Slice<const uint32_t> pairs)
+static void occt_ahead(rust::Slice<const uint32_t> pairs)
 {
   if (t_free == nullptr || t_free->srcs == nullptr)
     return;
@@ -2056,7 +2064,7 @@ static std::vector<IntTools_Curve> seeded_sections(const TopoDS_Face& fa, const 
   return out;
 }
 
-rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, rust::Slice<const double> ends, BrepSections& out)
+static rust::String occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, rust::Slice<const double> ends, BrepSections& out)
 {
   if (t_free == nullptr || t_free->srcs == nullptr)
     return rust::String("no Boolean running");
@@ -2170,6 +2178,43 @@ rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg,
       out.curves.push_back(v);
   }
   return rust::String("");
+}
+
+// The callbacks noshape's Boolean makes (cxx calls them noexcept: an exception out of one terminated the process, the
+// sheet metal louver's tools' fuse, SM-LOUVER-KERNEL-ABORT): one thrown in OCCT is a failed section, so a decline.
+rust::String brep_occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, rust::Slice<const double> ends, BrepSections& out)
+{
+  try
+  {
+    return occt_sections(a_arg, a_face, b_arg, b_face, ends, out);
+  }
+  catch (...)
+  {
+    return rust::String("OCCT's section threw");
+  }
+}
+
+rust::Vec<uint32_t> brep_occt_moved(rust::Slice<const uint32_t> ids, uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, rust::Slice<const double> moved)
+{
+  try
+  {
+    return occt_moved(ids, a_arg, a_face, b_arg, b_face, moved);
+  }
+  catch (...)
+  {
+    return rust::Vec<uint32_t>();
+  }
+}
+
+void brep_occt_ahead(rust::Slice<const uint32_t> pairs)
+{
+  try
+  {
+    occt_ahead(pairs);
+  }
+  catch (...)
+  {
+  }
 }
 
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,

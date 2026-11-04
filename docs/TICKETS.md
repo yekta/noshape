@@ -460,7 +460,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the block's top edge reaches beyond the back face's edges) is OK in live and gives 10/24/16 faces/edges/vertices,
   145345.65 mm³; ours errors on that one piece (the others are inside the block). Live request filed to confirm
   the simple repro.
-- [ ] P2 SM-LOUVER-KERNEL-ABORT (core; found by skasm's T2) the sheet metal form library's **louver** studio no longer
+- [x] (core 11-04 10:54: not OCCT aborting: a Standard_ConstructionError thrown in OCCT's section of two faces that noshape's Boolean asked for (rust_boolean.cpp brep_occt_sections), a callback cxx calls noexcept, so std::terminate; the callbacks (sections, moved, ahead) and brep_body_of now catch and decline, OCCT's Boolean builds the louver's fuse: both form T2s green (37 sheetmetal_std), T1 model sheetmetal_std::the_louvers_tools_build) P2 SM-LOUVER-KERNEL-ABORT (core; found by skasm's T2) the sheet metal form library's **louver** studio no longer
   builds its tools: two of its features fail with "Geometry operation failed: geometry kernel exception: the kernel
   crashed (signal 6)" (an OCCT abort), then "Form must be tagged with at least one part to add or remove." Red in the
   lead's T2 since at least f8e5323e (11-03 00:53): model sheetmetal_std::library_form_tools_as_live (louver: no

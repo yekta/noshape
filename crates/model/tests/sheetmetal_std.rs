@@ -1537,3 +1537,16 @@ fn fs_sheet_metal_profile() {
     crate::sampler::sample(std::path::Path::new(&out), qa4_s1_enclosure_as_live);
     eprintln!("fs sheet metal warm: {:.2?}", t.elapsed());
 }
+
+/// SM-LOUVER-KERNEL-ABORT: the louver's tools build (an OCCT exception in a section noshape's Boolean asked for
+/// terminated the process: a decline now, OCCT's Boolean builds them), live's volumes (dom/sm-forms-v4).
+#[test]
+fn the_louvers_tools_build() {
+    let studio = noshape_model::sheetmetal::forms::studio("louver").expect("studio");
+    let mut config = studio.configuration.defaults();
+    config.0.insert("height".to_string(), "5 mm".to_string());
+    let r = Regenerator::new().regenerate(&studio, &config, &UnitPrefs::default(), &RegenOptions::default());
+    let st: Vec<_> = r.display.features.iter().map(|f| (f.status, f.message.clone())).collect();
+    let v: Vec<f64> = r.context.bodies.iter().map(|b| b.shape.volume().unwrap_or(0.0) * 1e9).collect();
+    assert!(v.len() == 2 && (v[0] - 1975.3626).abs() < 1e-3 && (v[1] - 1889.368549).abs() < 1e-3, "{v:?}; {st:?}");
+}
