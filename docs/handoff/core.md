@@ -22,6 +22,9 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   through it; its whole Fillet 1 needs the mixed run (TICKETS FILLET-KNOB-JASON-VOLUME).
 - Next: the mixed run; then BLEND-RUST vertex blends between tori (stef-radijator, knob Fillet 2's spheres); end-of-day
   walk ~04:00.
+- End-of-day walk (01:17, green b407d3a6): live-30-features opens and regenerates clean in the app (fresh HOME), no
+  feature errors; the parity models on main's source (55 documents): 314/480 features as live, nothing lost against
+  the 23:40 run (knob-jason 9 -> 10). No regressions found.
 
 **State 11-04 00:28 UTC.**
 - Since 23:20: the torus merge landed (main green 23:46); queued: whole-result cache keeps 32 full results only
