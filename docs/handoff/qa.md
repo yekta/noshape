@@ -36,6 +36,12 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-04 23:04:** **SPLIT-FACE-SAME-ID (the user's Gyro) verified on 6c3decf4** (both matrices: only the picked body changes; the
+outer ring's chamfer still fails at its Y-Ribs rim, noted for core). The whole CLI smoke can run on vibe3 now:
+`ssh vibe3 'cd ~/qa; bash bin/qa-presmoke.sh /home/ngyekta/qa/bin/w-<sha>.sh g<sha>-p v0427'` (qa-presmoke.sh copied there with
+paths rewritten; copy it again after editing the local one); the round trip's source moved from /tmp/qa-rt/src.noshape to
+qa-scratch/docs/rt-src.noshape (bin/roundtrip_qa.py). Green ca3a5eab (core's profile-order / Extrude-cap fix): everything = before.
+
 **11-04 20:44:** **Xvfb :110, :131 and :149 are gone locally** (with the updater app on :149): qa's GUI checks now run on vibe3
 under qa's own Xvfb displays — :61 the GUI fuzz, :63 the release GUI rows (vibe3 ~/qa/bin/qa-relgui<NNN>.sh: the local script
 with paths rewritten, :63, no fuzz-pause lines), :64 the updater app (vibe3 ~/qa/updhome, HOME=that; it took v0.4.27 → v0.4.28:
