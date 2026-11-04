@@ -26,6 +26,17 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
 - 00:28: Shell's quadric fold check fixed (own surface, signed): Shell 4 now stops at a four-face vertex whose offsets
   need a new edge (SHELL-SLOW note, probe in /root/core-scratch/s4). Asked live (REQUESTS 00:09) for pipeflange
   Fillet 2's and stef-radijator Fillet 1's exact faces.
+- Design for arc corners in noshape's blend (knob-jason Fillet 1: exact tori, and 170 -> ~5 ms; brep/src/blend.rs
+  declines "a corner between blended edges not lines" in chains()):
+  - P's corner point p1: the two links' offset circles in P (an arc's radius ra + side·d1 about its centre; a line's
+    offset line), their intersection nearest p + w (build(), where `w` is the lines' formula now).
+  - The wall point p2: as now (p + t·d2: square walls meet along the edge down).
+  - The corner edge: on both tori (major R_i = the offset radius, minor r, tube centres d2 below P) where
+    ρ1 - R1 = σ(ρ2 - R2) (σ = +1 when both arcs bend the same way in P): with s = s_end·sin θ, θ in [0, π/2],
+    ρ1 = R1 + s, ρ2 = R2 + σs, the point in P where the circles ρ1 about c1 and ρ2 about c2 meet (the branch through
+    p1's), lifted r·cos θ - r below P (sigma for concave): exact, sampled and interpolated (corner.rs has C2 cubic
+    interpolation), as Curve::Nurbs; then check rust_blend.cpp gives a NURBS edge its curves on the two tori.
+  - Faces: the tori end on that edge as the lines' cylinders end on their ellipse (build's corner branch).
 
 **State 11-03 23:21 UTC.**
 - Landed since 22:30: fillet_by_groups (overlapping rounds of edge groups sharing no vertex: each group alone, their
