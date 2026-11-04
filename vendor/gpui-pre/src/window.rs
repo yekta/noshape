@@ -5346,6 +5346,12 @@ impl Window {
         });
     }
 
+    /// NOSHAPE PATCH (agent psui): the platform layer under this window's frame for `key` (see
+    /// [`crate::UnderlayHole`]; macOS: a `CAMetalLayer`), made on first use. `None` where the platform has none.
+    pub fn underlay_layer(&self, key: u64) -> Option<std::ptr::NonNull<std::ffi::c_void>> {
+        self.platform_window.underlay_layer(key)
+    }
+
     /// NOSHAPE PATCH (agent perf): rasterize one line of `text` (a single
     /// run, left aligned) the way `paint_line` and [`Self::paint_glyph`] paint
     /// it with its line box's top-left corner at `origin`: same shaping,

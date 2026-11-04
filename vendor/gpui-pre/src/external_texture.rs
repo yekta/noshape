@@ -92,6 +92,21 @@ pub fn set_external_texture(id: ExternalTextureId, texture: Option<(Arc<dyn Any 
     }
 }
 
+/// NOSHAPE PATCH (agent psui): registered under an id in place of a texture
+/// ([`set_external_texture`]), the sprites painted for the id are drawn as a
+/// transparent hole in the window's frame, through which the platform layer
+/// for `key` under the window shows ([`crate::Window::underlay_layer`]). The
+/// renderer places that layer where it drew the hole, and hides it in frames
+/// without one (also when a cached view's paint is replayed). The application
+/// presents its frames to the layer itself: the window doesn't redraw for
+/// them.
+pub struct UnderlayHole(pub u64);
+
+/// The key of the [`UnderlayHole`] registered under an atlas texture id (for renderers).
+pub fn underlay_hole_for_atlas_id(id: AtlasTextureId) -> Option<u64> {
+    external_texture_for_atlas_id(id)?.texture.downcast_ref::<UnderlayHole>().map(|h| h.0)
+}
+
 /// The texture registered under `id`.
 pub fn external_texture(id: ExternalTextureId) -> Option<ExternalTexture> {
     registry().lock().get(&id).cloned()

@@ -220,6 +220,9 @@ pub struct Viewport {
     texture_id: ExternalTextureId,
     shown_texture: Option<Arc<PresentTexture>>,
     retired_textures: Vec<(Arc<PresentTexture>, u64)>,
+    /// Frames go to a layer under the window (`Gpu::attach_layer`): GPUI paints a hole where the viewport is and
+    /// doesn't redraw for them.
+    underlay: bool,
     /// The camera and frame texture size of the last render: a new frame
     /// texture of that size for that camera needs no re-render (overlays
     /// such as the view cube follow the camera), only a present.
@@ -551,6 +554,7 @@ impl Viewport {
             texture_id: ExternalTextureId::new(),
             shown_texture: None,
             retired_textures: Vec::new(),
+            underlay: false,
             rendered: None,
             traced_camera: None,
             cube: None,
@@ -1283,7 +1287,9 @@ impl Viewport {
         let shown = self.shown_texture.as_ref().map(|t| (camera, (t.width, t.height)));
         if self.image.is_none() && shown.is_some() && shown == self.rendered {
             noshape_render::perf::record_ms("v.present_only_count", 1.0);
-            window.request_present();
+            if !self.underlay {
+                window.request_present();
+            }
             // Shown in the tree last laid out, so still on screen (camera
             // moves need no layout; see `request_frame`).
             self.last_layout = Some(Instant::now());
@@ -1441,12 +1447,34 @@ impl Viewport {
     /// Show a frame texture: register it for GPUI and keep the replaced one
     /// until the GPU frames that may sample it have finished.
     fn show_texture(&mut self, texture: Arc<PresentTexture>) {
+        if self.underlay {
+            // Already presented to the layer (render thread); kept as the latest frame.
+            self.shown_texture = Some(texture);
+            return;
+        }
         let size = size(DevicePixels(texture.width as i32), DevicePixels(texture.height as i32));
         set_external_texture(self.texture_id, Some((Gpu::compositor_texture(&texture), size)));
         if let Some(old) = self.shown_texture.replace(texture) {
             self.retired_textures.push((old, gpu_frames_submitted()));
         }
         self.retired_textures.retain(|(_, frame)| !gpu_frames_completed_through(*frame));
+    }
+
+    /// Once frames stay on the GPU, present them to a layer under the window from now on (macOS,
+    /// [`Gpu::layers_enabled`]): the window shows a hole there and redraws only when its own content changes.
+    fn attach_underlay(&mut self, window: &Window) {
+        if self.underlay {
+            return;
+        }
+        let Some(texture) = self.shown_texture.clone() else { return };
+        let Some(layer) = window.underlay_layer(self.target_id) else { return };
+        if !self.gpu.attach_layer(self.target_id, layer, Some(&texture)) {
+            return;
+        }
+        let size = size(DevicePixels(texture.width as i32), DevicePixels(texture.height as i32));
+        set_external_texture(self.texture_id, Some((Arc::new(UnderlayHole(self.target_id)), size)));
+        self.underlay = true;
+        log::info!(target: "perf", "viewport {}: frames go to a layer under the window", self.target_id);
     }
 
     /// Record presentation stats of the running orbit benchmark.
@@ -2701,7 +2729,11 @@ impl Render for Viewport {
                     {
                         let entity = cx.entity();
                         move |bounds, hitbox: Hitbox, window: &mut Window, _cx: &mut App| {
-                            // The frame texture, if frames stay on the GPU.
+                            if Gpu::layers_enabled() {
+                                entity.update(_cx, |this, _| this.attach_underlay(window));
+                            }
+                            // The frame texture, if frames stay on the GPU (or the hole the layer under the window
+                            // shows through).
                             window.paint_external_texture(bounds, texture_id);
                             // Touchscreen: raw touches that start on this
                             // viewport (nothing in front of it) are claimed

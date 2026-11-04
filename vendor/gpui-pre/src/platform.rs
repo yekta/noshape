@@ -1276,6 +1276,12 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn draw(&self, scene: &Scene);
     fn schedule_frame(&self) {}
     fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas>;
+    /// NOSHAPE PATCH (agent psui): a platform layer under the window's own frame for `key`, shown through the
+    /// [`crate::UnderlayHole`] sprites painted for `key` (macOS: a `CAMetalLayer` the application presents to
+    /// itself). `None` where the platform has none.
+    fn underlay_layer(&self, _key: u64) -> Option<std::ptr::NonNull<std::ffi::c_void>> {
+        None
+    }
     fn is_subpixel_rendering_supported(&self) -> bool;
 
     // macOS specific methods

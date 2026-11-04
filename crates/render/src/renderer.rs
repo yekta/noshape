@@ -3852,6 +3852,11 @@ pub struct Uploader {
 }
 
 impl Uploader {
+    /// The render device (e.g. to present its textures elsewhere on the same GPU).
+    pub fn device(&self) -> &wgpu::Device {
+        &self.device
+    }
+
     /// An image as an sRGB texture (alpha premultiplied in linear space)
     /// with a full mip chain built on the CPU, and its bind group (group 2 of
     /// the image pipelines). Images larger than the device's texture limit
