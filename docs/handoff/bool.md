@@ -85,6 +85,21 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   not 35). Left: Fillet 2's cut declines "an arc across a cylinder's seam" (the bore's own full circle starts off its
   seam; taking it means splitting an untouched input edge, which OCCT keeps); Circular pattern 1's sections are
   OCCT's. T1 bool_patterns::a_tube_with_slots_fused_as_occt. corpus5 small cases -11 %.
+  Rechecked 21:00 on vibe3 (idle), main before (40b44000d) and after (1b674c06), 5 interleaved pairs: Circular
+  pattern 1 237 / 239 ms (no change; the earlier 340 -> 385 was load), the document 572 -> 420 ms. Fillet 2 on live:
+  15 faces, 23 edges, 0 vertices after it (live.jsonl): Parasolid's bore rim is one closed edge with no vertex, so
+  splitting it at our seam would add an edge live doesn't have. Taking that cut means the circle crossing the face's
+  seam in the parameter plane only (two curves there of one edge, no vertex); not done.
+- Knurls (bool, 11-04 21:09): bool-seam's two commits (7e0399baf, 865d8ce74) cherry-picked onto main: branch
+  bool-knurl (8a051d476, in bool-c). The recorded Ø63 x 33 CP30 45/30 (vibe4 ~/agents/bool-corpora/k63-33-30) then
+  goes from "a non-manifold result" (edges at the seam, x = -31.5 mm) to "two edges leave a vertex in one
+  direction" on the cylinder 0:0 at its top circle (z = 33): a 1.3 um piece of tools 119 / 351's common cap edge
+  (sedge origins (119,10), (351,1), section faces 0:0 / 351:0) from the circle's piece end to the tools' vertex 1.2 um
+  outside the cylinder (tolerance 0.13 um). In 3D it leaves the cylinder at ~65 degrees; in the face's parameter plane
+  the radial offset vanishes, so it runs along the circle and its far end lies on the circle's piece without
+  splitting it. Growing a vertex a section is cut at to reach the curve (OCCT's pave) changes nothing: the piece is
+  the tools' edge put on the face, not a section pave. Next: why that edge piece counts as on the cylinder (1.2 um
+  off, against tolerances of 0.1-0.2 um).
 
 ## From core (11-02 07:20): two Boolean costs found profiling FeatureScript-driven regenerations
 Sampled warm on vibe4 (model tests' `custom_features::fs_warm_profile` / `sheetmetal_std::fs_sheet_metal_profile`,
