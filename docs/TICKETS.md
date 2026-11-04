@@ -156,6 +156,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-04 17:00 release (qa list 15:37, checked on newest green b8935557)
+- **qa 16:30: an early v0.4.26 Release run (41852299915, tag 5b449900 = 477c41683 + bump, started 14:54) was not published**: builds, sign and the Linux / Windows checks succeeded, "Check macOS arm64" was cancelled at 16:10 after 15 min (its timeout is 60; no log), so publish was skipped. 477c41683 has the three crash fixes and the Windows title bar fix; qa's list below was checked on the later b8935557 / 5a9089c7.
 - **qa 15:37: no blocker.** On green b8935557: CLI round trip Parasolid / ACIS / STEP / IGES / JT / Rhino 67643.716875 / 18
   (= v0.4.25); volume sweep = v0.4.25; the 44 ticket documents = v0.4.25 but bop-pairs-gpf-5267's Part 6 (SHELL-SLOW's Shell 4
   now builds, 13659.1 mm³, in live's band) — everything else part for part; dx's cf corpus unchanged; fixed tickets hold; the
