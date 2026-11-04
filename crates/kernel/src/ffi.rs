@@ -523,6 +523,7 @@ pub(crate) mod ffi {
         ) -> Result<UniquePtr<OcShape>>;
         fn make_face_from_wire(wire: &OcShape, only_plane: bool) -> Result<UniquePtr<OcShape>>;
         fn make_face_on(on: &OcShape, wire: &OcShape) -> Result<UniquePtr<OcShape>>;
+        fn extend_face(on: &OcShape, len: f64) -> Result<UniquePtr<OcShape>>;
         fn make_plane_face(
             plane: &PlaneF,
             umin: f64,

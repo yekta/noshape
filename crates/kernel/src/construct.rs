@@ -188,6 +188,11 @@ pub fn make_face_on(on: &Shape, wire: &Shape) -> Result<Shape> {
     Shape::from_res(ffi::make_face_on(on.raw(), wire.raw()))
 }
 
+/// `face` on its surface carried `len` past its edges (a B-spline extended in its non-periodic directions).
+pub fn extend_face(face: &Shape, len: f64) -> Result<Shape> {
+    Shape::from_res(ffi::extend_face(face.raw(), len))
+}
+
 /// A rectangular planar face on `plane` covering `[umin, umax] x [vmin, vmax]`.
 pub fn make_plane_face(plane: &Plane, umin: f64, umax: f64, vmin: f64, vmax: f64) -> Result<Shape> {
     Shape::from_res(ffi::make_plane_face(&plane.ffi(), umin, umax, vmin, vmax))

@@ -357,6 +357,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P1 DISPLACEMENT-MAP (user, lead 11-04; core: opReplaceFace, dx: the rest incl. opCreateBSplineSurface) the user's
+  Displacement map FeatureScript (/root/lead-scratch/disp/) replaces a face by a B-spline surface. core 11-04 13:19:
+  opReplaceFace failed (a) on a curved face and (b) with a template partly below and partly above the face; now such
+  a face is replaced by its slab: the face thickened past the template's offsets both ways, split by the template
+  (carried past the face's edges: kernel extend_face, a B-spline extended in its open directions), the part with the
+  outer slab added and the slab's pieces past the template removed (direct.rs replace_by_slabs; planar faces with
+  the template on one side as before). The sense check takes a point on the face (a whole cylinder's centroid is on
+  its axis). T1 model custom_features::replace_face_on_curved_faces_and_by_crossing_templates: a Ø20 × 20 cylinder's
+  side by a Ø22 cylinder's (7602.654 = π·121·20 exactly), by a loft through bumpy closed splines (6931.99), a 40 × 20
+  × 10 block's top by z = 9 + 0.1x (8800 exactly). Live's volumes for the user's own case: pending (lead: live is
+  measuring); the host's @opCreateBSplineSurface isn't there yet (dx), so the user's script itself isn't run here.
 - [ ] P1 PARITY-SPEED-MOTOR-MOUNT (core 11-04 09:05) motor-mount-jack matches live to the end now but regenerates in
   ~440 ms against live's 53: Circular pattern 1 (a face pattern of two elliptic slot walls through the tube, ×4) 244 ms
   (live 5), Extrude 3 86 ms (live 6), Fillet 2 (the bore's full round) 71 ms (live 3). Next for core.

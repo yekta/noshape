@@ -296,7 +296,7 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
                     let rp = k::Plane::new(m.transform_point3(pl.origin), m.transform_vector3(pl.unit_normal()), m.transform_vector3(pl.unit_x()));
                     let template = k::make_plane_face(&rp, -extent, extent, -extent, extent)?;
                     let name = body.faces[fi].clone();
-                    replace_with(ev, bi, &name, &template).map_err(|_| fe(failed_msg))?;
+                    replace_with(ev, bi, &name, &template, 1.0).map_err(|_| fe(failed_msg))?;
                 }
             } else {
                 move_rigid(ev, bi, &faces, &m).map_err(|_| fe(failed_msg))?;
@@ -585,7 +585,8 @@ pub fn replace_face(ev: &mut EvalCtx) -> FResult<()> {
     for (bi, faces) in &groups {
         for &f in faces {
             let face = ev.ctx.bodies[*bi].shape.sub_shape(ShapeType::Face, f)?;
-            let c = face.centroid()?;
+            // (A point on the face: a whole cylinder's centroid is on its axis.)
+            let c = point_on_face(&face).ok_or_else(|| fe(REPLACE_FAILED))?;
             if let (Ok(n), Some(t)) = (face.normal_at_point(c), template_normal(c))
                 && n.dot(t * sense) < 0.0
             {
@@ -603,12 +604,71 @@ pub fn replace_face(ev: &mut EvalCtx) -> FResult<()> {
     for (bi, faces) in groups.into_iter().rev() {
         let names: Vec<Name> = faces.iter().map(|&f| ev.ctx.bodies[bi].faces[f].clone()).collect();
         for n in names {
-            replace_with(ev, bi, &n, &template).map_err(|e| {
+            replace_with(ev, bi, &n, &template, sense).map_err(|e| {
                 log::debug!("replace face: {}", e.message);
                 fe(REPLACE_FAILED)
             })?;
         }
     }
+    Ok(())
+}
+
+/// Replace face by the face's own slab: the face thickened past the template's offsets both ways, split by the
+/// template (carried past the face's edges), the part with the outer slab added and the slab's pieces past the template
+/// removed. So a curved face (live: a cylinder's side by a bumpy periodic B-spline) and a template crossing the face
+/// (a displacement map's black below, white above) are replaced; the neighbours run on along the face's normals.
+fn replace_by_slabs(ev: &mut EvalCtx, bi: usize, fi_name: &Name, face: &Shape, template: &Shape, sense: f64, (lo, hi): (f64, f64)) -> FResult<()> {
+    let feature = ev.feature;
+    let body = ev.ctx.bodies[bi].clone();
+    let size = face.bounding_box(false)?.diagonal().max(1e-9);
+    let margin = 0.25 * (hi - lo).abs() + 1e-3 * size;
+    let (out, inward) = (hi.max(0.0) + margin, (-lo).max(0.0) + margin);
+    let ext = if template.shape_type() == ShapeType::Face { k::extend_face(template, 0.25 * size + margin)? } else { template.clone() };
+    // Thickened along the face's outward normal first (checked: the kernel's sense is the face's orientation).
+    let c = super::helpers_a::point_on_face(face).ok_or_else(|| fe(REPLACE_FAILED))?;
+    let n = face.normal_at_point(c)?;
+    let thick = |a: f64, b: f64| -> FResult<Shape> {
+        let s = k::thicken(face, a, b)?.shape;
+        Ok(if s.classify_point(c + n * (0.5 * a.max(1e-12)), 1e-9)? == k::PointClass::Inside || a == 0.0 { s } else { k::thicken(face, b, a)?.shape })
+    };
+    let up = thick(out, 0.0)?;
+    let col = thick(out, inward)?;
+    // The slab's pieces past the template: its face on the template faces against the template's outward normal.
+    let pieces = k::split(&[col], std::slice::from_ref(&ext), &k::BooleanOptions::default())?.shape.solids();
+    let past: Vec<Shape> = pieces
+        .into_iter()
+        .filter(|piece| {
+            piece.faces().iter().any(|g| {
+                let Some(p) = super::helpers_a::point_on_face(g) else { return false };
+                let Some((q, t)) = nearest_on(&ext, p) else { return false };
+                q.distance(p) < 1e-7 * size && g.normal_at_point(p).is_ok_and(|m| m.dot(t * sense) < 0.0)
+            })
+        })
+        .collect();
+    let fused = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&body.shape), std::slice::from_ref(&up), &k::BooleanOptions::default())?;
+    let tool_names = |s: &Shape, from: u16| -> crate::regen::eval::NamedShape {
+        let names = (0..s.count(ShapeType::Face) as u16).map(|i| Arc::new(TopoName::face(feature, Role::Generated(Arc::new(TopoName::Split { parent: fi_name.clone(), by: feature, ordinal: from + i }))))).collect();
+        crate::regen::eval::NamedShape::new(s.clone(), names)
+    };
+    let up_names = tool_names(&up, 0);
+    let names = ev.name_result(&[&body.shape_names(), &up_names.names], &fused.history, &fused.shape, &BTreeMap::new(), None);
+    let (shape, names) = if past.is_empty() {
+        (fused.shape, names)
+    } else {
+        let cutter = Shape::compound(&past);
+        let cut = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&fused.shape), std::slice::from_ref(&cutter), &k::BooleanOptions::default())?;
+        let fn_ = crate::regen::eval::names_for(&fused.shape, names);
+        let cut_names = tool_names(&cutter, up.count(ShapeType::Face) as u16);
+        let names = ev.name_result(&[&fn_, &cut_names.names], &cut.history, &cut.shape, &BTreeMap::new(), None);
+        (cut.shape, names)
+    };
+    let un = k::unify_same_domain(&shape)?;
+    let rn = crate::regen::eval::names_for(&shape, names);
+    let names = ev.name_result(&[&rn], &un.history, &un.shape, &BTreeMap::new(), None);
+    if un.shape.count(ShapeType::Solid) != 1 {
+        return err(REPLACE_FAILED);
+    }
+    ev.replace_body(bi, un.shape, names);
     Ok(())
 }
 
@@ -621,11 +681,27 @@ fn nearest_on(template: &Shape, p: DVec3) -> Option<(DVec3, DVec3)> {
     Some((q.point, f.normal_at_point(q.point).ok()?))
 }
 
-fn replace_with(ev: &mut EvalCtx, bi: usize, fi_name: &Name, template: &Shape) -> FResult<()> {
+fn replace_with(ev: &mut EvalCtx, bi: usize, fi_name: &Name, template: &Shape, sense: f64) -> FResult<()> {
     let feature = ev.feature;
     let body = ev.ctx.bodies[bi].clone();
     let Some(&fi) = body.find_faces(fi_name).first() else { return Ok(()) };
     let face = body.shape.sub_shape(ShapeType::Face, fi)?;
+    // The template's offsets from the face along its normal, over the face.
+    let [u0, u1, v0, v1] = face.uv_bounds()?;
+    let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+    for i in 0..=8 {
+        for j in 0..=8 {
+            let p = face.point_at_uv(u0 + (u1 - u0) * i as f64 / 8.0, v0 + (v1 - v0) * j as f64 / 8.0)?;
+            let (Ok(n), Some((q, _))) = (face.normal_at_point(p), nearest_on(template, p)) else { continue };
+            let d = (q - p).dot(n);
+            lo = lo.min(d);
+            hi = hi.max(d);
+        }
+    }
+    // A curved face, or a template on both sides of it (a displacement map's black and white): by slabs.
+    if !face.is_planar() || (lo < -1e-9 && hi > 1e-9) {
+        return replace_by_slabs(ev, bi, fi_name, &face, template, sense, (lo, hi));
+    }
     let c = face.centroid()?;
     let n = face.normal_at_point(c)?;
     let Some((q, _)) = nearest_on(template, c) else { return err(REPLACE_FAILED) };

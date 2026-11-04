@@ -20,6 +20,12 @@
 #include <BRepPrimAPI_MakeWedge.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
+#include <Geom_RectangularTrimmedSurface.hxx>
+#include <Geom_Plane.hxx>
+#include <BRepTools.hxx>
+#include <GeomConvert.hxx>
+#include <Geom_BSplineSurface.hxx>
+#include <GeomLib.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <GProp_GProps.hxx>
 #include <Geom2d_Line.hxx>
@@ -392,6 +398,56 @@ std::unique_ptr<OcShape> make_face_on(const OcShape& on, const OcShape& wire)
   fix.FixOrientation();
   fix.Perform();
   return wrap(fix.Face());
+}
+
+// `on`'s face on its surface carried `len` past its edges (a template that must reach past the faces it replaces):
+// a B-spline extended in its non-periodic directions (GeomLib, curvature-continuous), another surface by its
+// parameters (a plane's by length, a periodic direction whole).
+std::unique_ptr<OcShape> extend_face(const OcShape& on, double len)
+{
+  const TopoDS_Face& f = as_face(on.shape, "face");
+  if (!(len > 0))
+    fail_invalid("the extension must be positive");
+  double u0, u1, v0, v1;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  occ::handle<Geom_Surface> s = BRep_Tool::Surface(f);
+  if (const auto t = occ::down_cast<Geom_RectangularTrimmedSurface>(s); !t.IsNull())
+    s = t->BasisSurface();
+  TopoDS_Face out;
+  if (occ::handle<Geom_BSplineSurface> bs = occ::down_cast<Geom_BSplineSurface>(s->Copy()); !bs.IsNull())
+  {
+    occ::handle<Geom_BoundedSurface> b = bs;
+    for (const bool in_u : {true, false})
+    {
+      // (Not round a closed direction: a loft through closed curves would overlap itself.)
+      if (in_u ? (bs->IsUPeriodic() || bs->IsUClosed()) : (bs->IsVPeriodic() || bs->IsVClosed()))
+        continue;
+      for (const bool after : {false, true})
+        GeomLib::ExtendSurfByLength(b, len, 1, in_u, after);
+    }
+    BRepBuilderAPI_MakeFace mk(b, 1e-7);
+    if (!mk.IsDone())
+      fail_op("could not build the extended face");
+    out = mk.Face();
+  }
+  else
+  {
+    // (Plane: lengths; others: a periodic direction whole, else by the length over the surface's scale there.)
+    const bool   plane = !occ::down_cast<Geom_Plane>(s).IsNull();
+    const double su = plane ? len : (s->IsUPeriodic() ? 0 : len), sv = plane ? len : (s->IsVPeriodic() ? 0 : len);
+    double       a0 = u0 - su, a1 = u1 + su, b0 = v0 - sv, b1 = v1 + sv;
+    if (s->IsUPeriodic())
+      a0 = u0, a1 = u0 + s->UPeriod();
+    if (s->IsVPeriodic())
+      b0 = v0, b1 = v0 + s->VPeriod();
+    BRepBuilderAPI_MakeFace mk(s, a0, a1, b0, b1, 1e-7);
+    if (!mk.IsDone())
+      fail_op("could not build the extended face");
+    out = mk.Face();
+  }
+  if (f.Orientation() == TopAbs_REVERSED)
+    out.Reverse();
+  return wrap(out);
 }
 
 std::unique_ptr<OcShape> make_plane_face(const PlaneF& plane, double umin, double umax,

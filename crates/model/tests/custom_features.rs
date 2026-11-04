@@ -3224,4 +3224,69 @@ export const oldPin = defineFeature(function(context is Context, id is Id, defin
     assert_ok(&fx.regen(&mut reg, &ps));
     let out = custom::run::output_of(fid).unwrap().output;
     assert_eq!(out, "V975_BEND_LINE_EXTENTS\ntrue\n", "{out}");
+
+/// DISPLACEMENT-MAP (the user's displacement map, whose template is an opCreateBSplineSurface face as big as the face):
+/// opReplaceFace (a) on a curved face, the Ø20 × 20 mm cylinder's side by a coaxial Ø22 cylinder's (exactly π·121·20)
+/// and by a loft through bumpy closed splines (r 10.5 + 0.4 cos 4a: about π·20·(10.5² + 0.4²/2) = 6,937), and (b) with a template partly below and partly above
+/// the face, the 40 × 20 × 10 mm block's top by a loft between two sloped lines, z = 9 + 0.1 x (exactly 8,800 mm³).
+#[test]
+fn replace_face_on_curved_faces_and_by_crossing_templates() {
+    const SRC: &str = r#"
+annotation { "Feature Type Name" : "Wider cylinder" }
+export const widerCylinder = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 20) * millimeter, "radius" : 10 * millimeter });
+        fCylinder(context, id + "t", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 20) * millimeter, "radius" : 11 * millimeter });
+        opReplaceFace(context, id + "r", { "replaceFaces" : qCreatedBy(id + "c", EntityType.FACE)->qGeometry(GeometryType.CYLINDER), "templateFace" : qCreatedBy(id + "t", EntityType.FACE)->qGeometry(GeometryType.CYLINDER), "oppositeSense" : false });
+        opDeleteBodies(context, id + "d", { "entities" : qCreatedBy(id + "t", EntityType.BODY) });
+    });
+
+annotation { "Feature Type Name" : "Bumpy cylinder" }
+export const bumpyCylinder = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * millimeter, "topCenter" : vector(0, 0, 20) * millimeter, "radius" : 10 * millimeter });
+        var curves = [];
+        for (var j = 0; j < 3; j += 1)
+        {
+            var pts = [];
+            for (var i = 0; i <= 24; i += 1)
+            {
+                const a = i * 2 * PI / 24 * radian;
+                const r = 10.5 + 0.4 * cos(4 * a);
+                pts = append(pts, vector(r * cos(a), r * sin(a), 10 * j) * millimeter);
+            }
+            opFitSpline(context, id + ("f" ~ j), { "points" : pts });
+            curves = append(curves, qCreatedBy(id + ("f" ~ j), EntityType.EDGE));
+        }
+        opLoft(context, id + "s", { "profileSubqueries" : curves, "bodyType" : ToolBodyType.SURFACE });
+        opReplaceFace(context, id + "r", { "replaceFaces" : qCreatedBy(id + "c", EntityType.FACE)->qGeometry(GeometryType.CYLINDER), "templateFace" : qCreatedBy(id + "s", EntityType.FACE), "oppositeSense" : false });
+        opDeleteBodies(context, id + "d", { "entities" : qUnion([qCreatedBy(id + "s", EntityType.BODY), qCreatedBy(id + "f0", EntityType.BODY), qCreatedBy(id + "f1", EntityType.BODY), qCreatedBy(id + "f2", EntityType.BODY)]) });
+    });
+
+annotation { "Feature Type Name" : "Tilted block" }
+export const tiltedBlock = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCuboid(context, id + "b", { "corner1" : vector(0, 0, 0) * millimeter, "corner2" : vector(40, 20, 10) * millimeter });
+        opFitSpline(context, id + "f0", { "points" : [vector(0, 0, 9) * millimeter, vector(40, 0, 13) * millimeter] });
+        opFitSpline(context, id + "f1", { "points" : [vector(0, 20, 9) * millimeter, vector(40, 20, 13) * millimeter] });
+        opLoft(context, id + "s", { "profileSubqueries" : [qCreatedBy(id + "f0", EntityType.EDGE), qCreatedBy(id + "f1", EntityType.EDGE)], "bodyType" : ToolBodyType.SURFACE });
+        opReplaceFace(context, id + "r", { "replaceFaces" : qCreatedBy(id + "b", EntityType.FACE)->qParallelPlanes(vector(0, 0, 1) * millimeter, true)->qNthElement(0), "templateFace" : qCreatedBy(id + "s", EntityType.FACE), "oppositeSense" : false });
+        opDeleteBodies(context, id + "d", { "entities" : qUnion([qCreatedBy(id + "s", EntityType.BODY), qCreatedBy(id + "f0", EntityType.BODY), qCreatedBy(id + "f1", EntityType.BODY)]) });
+    });
+"#;
+    let fx = Fixture::new(&studio(SRC));
+    let pi = std::f64::consts::PI;
+    for (name, lo, hi) in [("widerCylinder", pi * 121.0 * 20.0 * (1.0 - 1e-7), pi * 121.0 * 20.0 * (1.0 + 1e-7)), ("bumpyCylinder", 6900.0, 6970.0), ("tiltedBlock", 8800.0 - 1e-5, 8800.0 + 1e-5)] {
+        let mut ps = PartStudio::new();
+        ps.features.push(ps.new_feature(&fx.ty(name), &fx.units).unwrap());
+        let r = fx.regen(&mut Regenerator::new(), &ps);
+        assert_ok(&r);
+        assert_eq!(r.context.bodies.len(), 1, "{name}");
+        assert!(r.context.bodies[0].shape.is_valid(), "{name}");
+        let v = total_volume(&r) * 1e9;
+        assert!(v > lo && v < hi, "{name}: {v} mm³, not in {lo}..{hi}");
+    }
 }
