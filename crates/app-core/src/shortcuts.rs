@@ -570,8 +570,8 @@ mod tests {
     #[test]
     fn registry_matches_onshape_lists() {
         let count = |t| entries(t).count();
-        // Sketch: 55 since live added Flow (request 1724).
-        assert_eq!((count(Tab::General), count(Tab::PartStudio), count(Tab::Assembly), count(Tab::View3d), count(Tab::Sketch), count(Tab::Drawing)), (24, 77, 16, 35, 55, 57));
+        // Sketch: 55 since live added Flow, Drawing 58 with Edge condition symbol (request 1724).
+        assert_eq!((count(Tab::General), count(Tab::PartStudio), count(Tab::Assembly), count(Tab::View3d), count(Tab::Sketch), count(Tab::Drawing)), (24, 77, 16, 35, 55, 58));
         let mut ids = std::collections::HashSet::new();
         for en in ENTRIES {
             assert!(ids.insert(en.id), "{} twice", en.id);
