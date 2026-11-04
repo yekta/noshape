@@ -1,5 +1,15 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-04 14:17 UTC)
+- The assembly's mate connector hover now draws psui's `InferenceMarks` (camera geometry, cached per points /
+  choice), as the Part Studio; the scene's `light_dots` / `inference_glyph` are gone. Live 1851: the glyph matches,
+  the dots are smaller than live's (ticket MC-INFERENCE-DOTS, psui's).
+- Cmd beside Ctrl counts on macOS only (`mac_cmd` in part-studio-ui sketch.rs; snap mode's tap in assembly_view.rs).
+  **When live's Mac key list lands** (lead 11-04): keep Cmd on macOS only where Onshape's Mac list or behaviour has
+  it, else take it out (the user confirms Ctrl is right on a Mac for some of these). Sites: sketch badges, dimension
+  labels, the canvas press (additive), assembly snap tap; pre-existing: assembly mate row (`m.control || m.platform`),
+  value-box stepping (app-core quantity_field, part-studio-ui sketch.rs 3250 / 3268). Ctrl+M stays Control+M.
+
 ## Resume here (2026-11-04 02:58 UTC)
 Lead 02:5x round: s996 fixed (a rounded plate whose radius changes keeps its one resized side's lowest point; 727 of
 790); batch 22 sent (s1021-s1060: two slots in a plate, a bolt-circle flange, a keyed shaft; ours solves 40/40);
