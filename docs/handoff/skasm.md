@@ -1,5 +1,14 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-04 21:16 UTC)
+- ui-parity: all 81 recorded sketch scenarios match live (836 / 836 states; Extend's first pick now takes the line
+  even 2 mm from its end and selects it, Esc drops it). Assembly: 5 of 6 run here match; asm-fastened-undo-picks
+  differs at step 4 (live's re-pick on Part 2 after Ctrl+Z picks nothing): asked of live by hand (REQUESTS 20:03).
+- Fuzz 766 of 830: s1043 / s1044 fixed (a line whose ends mirror about an axis joined to other geometry resizes
+  about it; a free axis still moves, s653 / s547). s1057 open: live moves the centre a little there (0.6 mm).
+- After the server restart Xvfb :103 was gone (restarted by hand); 9 part-studio-ui sketch::ui_tests fail on this
+  machine on the base commit as well (main's watcher is green), so they're the machine's, not the code's.
+
 ## Resume here (2026-11-04 19:30 UTC)
 - Sketch audit 1969 applied: Confirm bezier (no "Escape bezier"; Confirm spline / bezier turn the tool off), the
   degree editor (✓ / ×, 16 → pink and ✓ greyed, no message), "Cannot add sketch fillet.", Alt+arrows do nothing,
