@@ -24,6 +24,17 @@ fn default_tool_list_fits_an_agents_context() {
 }
 
 #[test]
+fn instructions_name_the_apps_documents_folder() {
+    let mut ctx = Ctx::new();
+    for all in [false, true] {
+        let text = rpc(&mut ctx, "initialize", json!({ "protocolVersion": "2025-06-18" }), all)["instructions"].as_str().unwrap().to_string();
+        assert!(!text.contains("{documents}"), "placeholder left in the instructions");
+        let line = text.lines().find(|l| l.contains("Save new documents in")).expect("the documents folder line");
+        assert!(line.contains("noshape") && line.contains(std::path::MAIN_SEPARATOR), "{line}");
+    }
+}
+
+#[test]
 fn core_tools_show_their_required_fields() {
     for c in CORE {
         let op = registry::by_tool_name(c.tool).unwrap_or_else(|| panic!("no tool {}", c.tool));

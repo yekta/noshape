@@ -14,6 +14,12 @@ const PROTOCOL_VERSIONS: [&str; 4] = ["2025-06-18", "2025-03-26", "2024-11-05", 
 
 const INSTRUCTIONS: &str = include_str!("mcp_instructions.md");
 
+/// The app's documents folder (app-core's `documents_dir`), the one its documents list shows.
+fn documents_dir() -> std::path::PathBuf {
+    let base = dirs::document_dir().or_else(|| dirs::home_dir().map(|h| h.join("Documents"))).unwrap_or_else(|| ".".into());
+    base.join("noshape")
+}
+
 /// Run the server on stdin/stdout until stdin closes.
 pub fn serve(mut ctx: Ctx, all_tools: bool) -> anyhow::Result<()> {
     let stdin = std::io::stdin();
@@ -56,7 +62,7 @@ pub fn handle(ctx: &mut Ctx, msg: &Value, all_tools: bool) -> Option<Value> {
                 "protocolVersion": version,
                 "capabilities": { "tools": { "listChanged": false } },
                 "serverInfo": { "name": "noshape", "title": "noshape CAD", "version": noshape_ops::VERSION },
-                "instructions": if all_tools { INSTRUCTIONS.replace(LISTED_NOTE, ALL_NOTE) } else { INSTRUCTIONS.to_string() },
+                "instructions": instructions(all_tools),
             }))
         }
         "ping" => Ok(json!({})),
@@ -81,6 +87,11 @@ fn error_reply(id: Value, code: i64, message: &str) -> Value {
 /// with every tool listed.
 const LISTED_NOTE: &str = "The tool list shows the common tools with short descriptions and their main fields (they accept every field ops_describe lists).";
 const ALL_NOTE: &str = "The tool list shows every tool in full.";
+
+fn instructions(all_tools: bool) -> String {
+    let s = INSTRUCTIONS.replace("{documents}", &documents_dir().display().to_string());
+    if all_tools { s.replace(LISTED_NOTE, ALL_NOTE) } else { s }
+}
 
 /// The MCP tools: every operation in full (`all`), else the common ones
 /// ([`crate::core_tools::CORE`]) with short descriptions and main fields.
