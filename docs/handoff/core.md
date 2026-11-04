@@ -16,6 +16,18 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-04 09:20 UTC.**
+- Queued 2c24ee7b: **motor-mount-jack matches live to the end (10/10, was 3/10)**: touching sketch regions picked
+  together are united (a shared line or a whole shared loop; sketch regions::union_touching), a face pattern's caps lie
+  on the curved face they leave (kernel make_face_on), move_seams_off_holes' volume guard 1e-4, the import's
+  filterInnerLoops by the sketch's own curves, a full round of a whole cylinder (half torus). Full parity on this
+  worktree: **330/480 features, 32/55 documents**, no other document changed (logs /root/core-scratch/parity-all9.log).
+- New tickets: P1 PARITY-SPEED-MOTOR-MOUNT (~440 ms vs live 53: the face pattern 244 ms), P2 REGION-UNION-ARC (regions
+  sharing only an arc of a loop stay apart: clamp-hms's Extrude 5 split a bore when united), P2 FULL-ROUND-BOSS-TWO-
+  FACES, P2 HOLE-RIM-PIECES.
+- Next: learning-center-michael's Fillet 2 (FILLET-OVERLAP-FAIL), pipeflange's Fillet 2, the motor-mount speed, Shell
+  4's speed.
+
 **State 11-04 08:17 UTC.**
 - Landed since 07:49: op_join_edges after fillets / chamfers (two arcs of one circle meeting alone joined): stef-
   radijator 6/6. Full parity on this worktree: **323/480 features, 31/55 documents** (03:30: 319 / 29).
