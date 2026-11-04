@@ -518,6 +518,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Edit appearance…", Op("part_set_appearance")),
     ("partStudio:Edit definition…", Op("config_edit_input")),
     ("partStudio:Edit expression…", Op("feature_dynamic_suppression")),
+    ("partStudio:Edit healthy moment", Op("history_repair_view")),
     ("partStudio:Remove expression", Op("feature_dynamic_suppression")),
     ("partStudio:Expand selected", Op("ui_list")),
     ("partStudio:Collapse selected", Op("ui_list")),
