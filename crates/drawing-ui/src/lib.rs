@@ -74,4 +74,5 @@ pub mod drawing_view;
 pub mod drawing_view_sketches;
 pub mod drawing_watermark;
 pub mod drawing_weld;
+pub mod drawing_edge_condition;
 pub mod drawing_wt;

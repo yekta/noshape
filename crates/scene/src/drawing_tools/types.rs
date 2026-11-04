@@ -137,6 +137,8 @@ pub enum Tool {
     SurfaceFinish,
     /// Weld symbol (drawing_weld.rs): click the joint, then the place.
     Weld,
+    /// Edge condition symbol (drawing_edge_condition.rs): click the edge, then the place.
+    EdgeCondition,
     /// Place a revision callout of `revision` (drawing_revision.rs).
     RevisionCallout { revision: String },
     /// Broken-out section: profile points in the view (view coordinates),
@@ -190,6 +192,7 @@ impl Tool {
             Tool::Datum { .. } => "Datum",
             Tool::SurfaceFinish => "Surface finish",
             Tool::Weld => "Weld symbol",
+            Tool::EdgeCondition => "Edge condition symbol",
             Tool::RevisionCallout { .. } => "Revision callout",
             Tool::BrokenOut { .. } => "Broken-out section",
             Tool::CropPoly { spline: false, .. } => "Crop view (polygon)",

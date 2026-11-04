@@ -183,6 +183,7 @@ impl DrawingEditor {
                 tool("dr-gdt", "gdt", "Geometric tolerance", matches!(t, Tool::Gdt), || Tool::Gdt),
                 tool("dr-sf", "surface-finish", "Surface finish symbol", matches!(t, Tool::SurfaceFinish), || Tool::SurfaceFinish),
                 tool("dr-weld", "weld-symbol", "Weld symbol", matches!(t, Tool::Weld), || Tool::Weld),
+                tool("dr-edge-condition", "drawing-edge-condition", "Edge condition symbol", matches!(t, Tool::EdgeCondition), || Tool::EdgeCondition),
             ],
             vec![
                 tool("dr-note", "note", "Note (n)", matches!(t, Tool::Note), || Tool::Note),

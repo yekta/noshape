@@ -502,6 +502,12 @@ impl SheetPick<'_> {
 /// the segment's ends (sheet mm).
 type DimSegment = (DatumOn, [f64; 2], [f64; 2], [f64; 2]);
 
+/// The Edge condition symbol tool's second click: the symbol with `spec`, its glyph's corner at `position`, the
+/// leader to the edge point `target`.
+pub fn edge_condition(id: u64, view: Option<ViewId>, target: [f64; 2], spec: noshape_model::drawing::edge_condition::EdgeConditionSpec, position: [f64; 2]) -> Annotation {
+    Annotation { id, kind: AnnotationKind::EdgeCondition { view, target, spec: Box::new(spec) }, position, ..Default::default() }
+}
+
 /// The Weld symbol tool's second click: the symbol with `spec`, its
 /// reference line starting at `position`.
 pub fn weld(id: u64, view: Option<ViewId>, target: [f64; 2], spec: noshape_model::drawing::weld::WeldSpec, position: [f64; 2]) -> Annotation {

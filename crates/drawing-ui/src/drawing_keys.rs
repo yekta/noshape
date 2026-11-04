@@ -110,9 +110,9 @@ impl DrawingEditor {
 type Act = fn(&mut DrawingEditor, &mut Window, &mut Context<DrawingEditor>);
 
 /// Every tool the drawing S toolbar can hold (Preferences › Shortcut
-/// toolbars › Drawing, live REQUESTS z3: 64 tools in this order): name,
+/// toolbars › Drawing, live REQUESTS z3: 64 tools in this order, and 1724's Edge condition symbol after Weld symbol): name,
 /// icon, action.
-pub const SHORTCUT_CATALOGUE: [(&str, &str, Act); 64] = [
+pub const SHORTCUT_CATALOGUE: [(&str, &str, Act); 65] = [
     ("Dimension", "linear-dim", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)),
     ("Maximum/minimum dimension", "driven-dimension", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::MaxMin, picks: vec![] }, cx)),
     ("2 point linear dimension", "dim-point-to-point", |e, _, cx| e.set_tool(Tool::Dimension { kind: DimTool::Point2, picks: vec![] }, cx)),
@@ -131,6 +131,7 @@ pub const SHORTCUT_CATALOGUE: [(&str, &str, Act); 64] = [
     ("Geometric tolerance", "gdt", |e, _, cx| e.set_tool(Tool::Gdt, cx)),
     ("Surface finish symbol", "surface-finish", |e, _, cx| e.set_tool(Tool::SurfaceFinish, cx)),
     ("Weld symbol", "weld-symbol", |e, _, cx| e.set_tool(Tool::Weld, cx)),
+    ("Edge condition symbol", "drawing-edge-condition", |e, _, cx| e.set_tool(Tool::EdgeCondition, cx)),
     ("Note", "note", |e, _, cx| e.set_tool(Tool::Note, cx)),
     ("Callout", "callout", |e, _, cx| e.set_tool(Tool::Balloon { anchor: None }, cx)),
     ("Table", "table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::General, view: None, origin: None }, cx)),

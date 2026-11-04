@@ -962,7 +962,7 @@ fn annotation_cad_layers(k: &AnnotationKind) -> (CadLayer, CadLayer) {
         // Live drw2-k-dxf2018: a note's leader goes with its text; hole
         // callout, GD&T, datum, surface finish and weld leaders and symbol
         // lines on ANNOTATION_LINES.
-        A::Balloon { .. } | A::HoleCallout { .. } | A::RevisionCallout { .. } | A::Gdt { .. } | A::Datum { .. } | A::SurfaceFinish { .. } | A::Weld { .. } => (CadLayer::AnnotationLines, CadLayer::AnnotationText),
+        A::Balloon { .. } | A::HoleCallout { .. } | A::RevisionCallout { .. } | A::Gdt { .. } | A::Datum { .. } | A::SurfaceFinish { .. } | A::Weld { .. } | A::EdgeCondition { .. } => (CadLayer::AnnotationLines, CadLayer::AnnotationText),
         _ => (CadLayer::AnnotationText, CadLayer::AnnotationText),
     }
 }

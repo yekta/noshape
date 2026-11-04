@@ -214,6 +214,7 @@ pub const SHORTCUTS: &[(&str, Cover)] = &[
     ("drawing:Update drawing", Op("drawing_update")),
     ("drawing:Virtual sharp", Op("drawing_virtual_sharp")),
     ("drawing:Weld symbol", Op("drawing_weld")),
+    ("drawing:Edge condition symbol", Op("drawing_edge_condition")),
 ];
 
 /// Context and dropdown menu items of the Part Studio (with the sketch and

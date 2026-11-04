@@ -2302,6 +2302,16 @@ fn drawing_callouts_ordinates_and_datums() {
     assert!(last(&mut ctx).ends_with(":: Weld symbol"));
     let e = try_call(&mut ctx, "drawing_weld", json!({ "drawing": tab, "target": a0, "position": [10, 10], "spec": { "arrow": { "joint": "Glue" } } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("spec"), "{e:?}");
+    // Edge condition symbol (live 1955): on an edge, a row's sign and value, All around, ( ).
+    let ec = call(&mut ctx, "drawing_edge_condition", json!({ "drawing": tab, "target": a0, "position": [a0[0] + 15.0, a0[1] + 15.0], "rows": [{ "sign": "+", "value": "0.3 mm" }], "all_around": true, "parens": true }));
+    let ecid = ec["annotation"].clone();
+    assert_eq!(kind_of(&mut ctx, ecid.as_u64().unwrap()), "EdgeCondition");
+    assert!(last(&mut ctx).ends_with(":: Edge condition symbol"));
+    // Drawn in the drawing's length format (this ISO drawing: "+0,3").
+    let ann = ec["annotations"].as_array().unwrap().iter().find(|x| x["id"] == ecid).unwrap().clone();
+    assert_eq!(ann["text"], "+0,3", "{ann}");
+    let e = try_call(&mut ctx, "drawing_edge_condition", json!({ "drawing": tab, "target": a0, "position": [10, 10], "rows": [{ "sign": "*" }] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("rows"), "{e:?}");
 
     let rt = call(&mut ctx, "drawing_revision_table", json!({ "drawing": tab, "position": [400, 290], "visible_rows": 3 }));
     assert!(rt["table"].as_u64().is_some(), "{rt}");

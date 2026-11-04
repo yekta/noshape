@@ -1723,6 +1723,27 @@ impl SheetGeometry {
                         self.leader_paths.push((a.id, li, LeaderPath { points, head: 1 }));
                     }
                 }
+                AnnotationKind::EdgeCondition { view, target, spec } => {
+                    let to_sheet = |v: Option<ViewId>, p: [f64; 2]| v.map_or(p, |v| env.to_sheet(v, p));
+                    let tip = to_sheet(*view, *target);
+                    // Each shown row's sign and value in the drawing's length format (live: ".300" in inch,
+                    // "0,3" in mm).
+                    let values: Vec<String> = spec.shown_rows().iter().map(|r| format!("{}{}", r.sign.prefix(), env.text(a, r.value, false, "").main)).collect();
+                    let ansi = env.weld_ansi();
+                    super::edge_condition::render(self, spec, &values, (tip, a.position), ah, ansi, pick);
+                    for (li, l) in spec.leaders.iter().enumerate() {
+                        let t = to_sheet(l.view, l.point);
+                        let mut points = vec![a.position];
+                        points.extend(l.nodes.iter().copied());
+                        points.push(t);
+                        let last = points[points.len() - 2];
+                        self.lines.push(Polyline2 { points: points.clone(), style: LineStyle::Thin, closed: false, pick });
+                        if ansi {
+                            self.arrow(t, [t[0] - last[0], t[1] - last[1]], 3.0);
+                        }
+                        self.leader_paths.push((a.id, li, LeaderPath { points, head: 1 }));
+                    }
+                }
                 AnnotationKind::SurfaceFinish { anchor, value, leaders, on, spec, ext } => {
                     // On an edge: standing on it, turned square to it, on
                     // the upper / right side (Flip: the other).

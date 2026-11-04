@@ -329,6 +329,7 @@ pub struct DrawingEditor {
     pub menu_broken_out: Option<(ViewId, usize)>,
     /// Weld symbol dialog (drawing_weld.rs).
     pub weld_dlg: Option<crate::drawing_weld::WeldDlg>,
+    pub edge_condition_dlg: Option<crate::drawing_edge_condition::EdgeConditionDlg>,
     /// The note editor's formatting ruler (drawing_ruler.rs).
     pub ruler: crate::drawing_ruler::RulerState,
     /// Callout dialog and Add stacked callouts panel (drawing_callout.rs).
@@ -601,6 +602,7 @@ impl DrawingEditor {
             view_sketches: None,
             hide_parts: None,
             weld_dlg: None,
+            edge_condition_dlg: None,
             ruler: Default::default(),
             callout_dlg: None,
             stack_dlg: None,
@@ -1615,6 +1617,7 @@ impl DrawingEditor {
         self.sync_chooser(window, cx);
         self.sync_revision_dlg(window, cx);
         self.sync_weld_dlg(window, cx);
+        self.sync_edge_condition_dlg(window, cx);
         self.sync_callout_dlg(window, cx);
         self.sync_table_dlg();
         self.sync_hole_table_dlg();
@@ -1741,6 +1744,7 @@ impl DrawingEditor {
             .children(self.render_crop_dlg(cx))
             .children(self.render_revision_dlg(cx))
             .children(self.render_weld_dlg(cx))
+            .children(self.render_edge_condition_dlg(cx))
             .children(self.render_callout_dlg(cx))
             .children(self.render_stack_dlg(cx))
             .children(self.render_table_dlg(cx))

@@ -127,6 +127,10 @@ impl DrawingEditor {
             self.close_weld_dlg(false, cx);
             return;
         }
+        if self.edge_condition_dlg.is_some() {
+            self.close_edge_condition_dlg(false, cx);
+            return;
+        }
         if self.gdt_dlg.is_some() {
             self.close_gdt_dlg(false, cx);
             return;
@@ -314,6 +318,8 @@ impl DrawingEditor {
             Tool::SurfaceFinish => "Click an edge or an extension line the symbol sits on, or a face for a leader",
             Tool::Weld if self.weld_dlg.as_ref().is_some_and(|d| d.target.is_some()) => "Click to place the symbol",
             Tool::Weld => "Select an entity to associate the symbol",
+            Tool::EdgeCondition if self.edge_condition_dlg.as_ref().is_some_and(|d| d.target.is_some()) => "Click to place the symbol",
+            Tool::EdgeCondition => "Select an edge",
             Tool::RevisionCallout { .. } => "Click to place the revision callout",
             _ => return None,
         })
@@ -456,6 +462,7 @@ impl DrawingEditor {
             | Tool::Datum { anchor: None }
             | Tool::Note
             | Tool::Weld
+            | Tool::EdgeCondition
             | Tool::Crop { .. } => self.snap_at(c),
             _ => None,
         };
@@ -624,6 +631,7 @@ impl DrawingEditor {
             }
             Tool::Sketch { .. } => self.sketch_overlay(&mut overlay),
             Tool::Weld => self.weld_overlay(&mut overlay),
+            Tool::EdgeCondition => self.edge_condition_overlay(&mut overlay),
             Tool::Note | Tool::Gdt | Tool::SurfaceFinish if self.note_leader.is_some() => {
                 if let Some(a) = self.note_leader.as_ref().and_then(|l| Some(self.placement(l.view?)?.to_sheet(l.point))) {
                     overlay.lines.push((vec![a, self.cursor], true));
@@ -730,7 +738,7 @@ impl DrawingEditor {
         if matches!(self.tool, Tool::Detail { radius: Some(_), .. }) && self.detail_dlg.as_ref().is_some_and(|d| d.edit.is_some()) {
             return;
         }
-        if self.weld_click(cx) || self.stack_click(cx) || self.table_dlg_click(cx) || self.custom_dlg_click(cx) || self.table_tool_click(cx) || self.gdt_click(cx) {
+        if self.weld_click(cx) || self.edge_condition_click(cx) || self.stack_click(cx) || self.table_dlg_click(cx) || self.custom_dlg_click(cx) || self.table_tool_click(cx) || self.gdt_click(cx) {
             return;
         }
         if self.extra_tool_click(window, cx) {
@@ -1828,6 +1836,7 @@ impl DrawingEditor {
                         }
                     }
                     Some(Annotation { kind: AnnotationKind::Weld { .. }, .. }) => self.open_weld_edit(id, window, cx),
+                    Some(Annotation { kind: AnnotationKind::EdgeCondition { .. }, .. }) => self.open_edge_condition_edit(id, window, cx),
                     Some(a) => self.open_annotation_panel(&a, window, cx),
                     None => {}
                 }
@@ -2289,6 +2298,23 @@ impl DrawingEditor {
                     }));
                     out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
                     let _ = a;
+                    out.extend(Self::selection_tail());
+                    return out;
+                }
+                // Edge condition symbols (live 1955 f-rclick): Edit… · Copy · Paste as table · Add leader · Remove
+                // leaders (even with none added) · Move to ▸ | Clear selection · Zoom to fit · Delete; no Paste.
+                if let Some(a) = a.as_ref().filter(|a| matches!(a.kind, AnnotationKind::EdgeCondition { .. })) {
+                    let mut out = vec![MenuEntry::item("Edit...", move |t, w, cx| t.open_edge_condition_edit(id, w, cx))];
+                    out.push(MenuEntry::item("Copy", move |t, _, cx| {
+                        if !t.selection.contains(&Sel::Annotation(id)) {
+                            t.selection = vec![Sel::Annotation(id)];
+                        }
+                        t.copy_entities(cx);
+                    }));
+                    out.push(MenuEntry::item("Paste as table", |t, _, cx| t.paste_as_table(cx)));
+                    out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
+                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| noshape_scene::drawing_tools::annotation_edit::remove_leaders(s, id))));
+                    out.push(Self::move_to_entry(a));
                     out.extend(Self::selection_tail());
                     return out;
                 }

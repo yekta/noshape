@@ -94,6 +94,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   tangent or sharp (kernel hlr.cpp seam_edges / same_surface; Parasolid has no such edge): pipeflange-steven's
   drawing now differs from live 1857 only in where the views sit (asked live for three sizes, REQUESTS 11:22). T1
   kernel hlr::an_edge_between_faces_of_one_surface_is_not_drawn. PDFs: ours 65 / 77 KB, live 86 / 98 KB.
+- 11-04 02:13 live 1955 taken first: the drawing tool **Edge condition symbol** (ISO 13715) built: toolbar button after
+  Weld symbol, the "Edge condition" panel (Direction, main value, two sign / value rows, All around, ( ), preview),
+  pick an edge then place (the panel stays open, ✓ ends), double-click / Edit… reopens it, live's right-click menu,
+  the Shortcut toolbars catalogue (65) and the Keyboard shortcuts row (skasm's note), op drawing_edge_condition. Drawn
+  from live's ANSI DXF proportions (model-data edge_condition.rs; values in the drawing's length format: ".300",
+  "0,3"), exported on ANNOTATION_TEXT / ANNOTATION_LINES. Not captured by live, so left as drawn: Vertical /
+  Horizontal look like Undefined, and ( ) around an Asymmetric pair encloses the glyph only. Live 1958 (std 1260)
+  answered; it waits on the old-std project (TICKETS PARITY-CUSTOM-RUN-FAILURES).
 - 11-04 00:54 lead (00:15), until live's 04:10: (1) the Drawing shortcut "Edge condition symbol" belongs to a drawing tool
   we don't have (ISO 13715 edge symbol, between Weld symbol and Note): live capture asked (REQUESTS dx 11-04 00:19);
   tool + toolbar + shortcut row + op once it's in. (2) import matrix: g50 F8 is live's import simplification of a

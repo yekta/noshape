@@ -314,6 +314,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("drawing_gdt", &[r##"{"drawing": "Part 1 Drawing 1", "position": [240, 120], "rows": [{"symbol": "position", "tolerance": "⌀0.1", "datums": ["A", "B"]}]}"##]),
     ("drawing_surface_finish", &[r##"{"drawing": "Part 1 Drawing 1", "position": [210, 175], "value": "Ra 1.6"}"##]),
     ("drawing_weld", &[r##"{"drawing": "Part 1 Drawing 1", "target": [200, 150], "position": [230, 120], "spec": {"arrow": {"symbol": "fillet", "size": "5"}}}"##]),
+    ("drawing_edge_condition", &[r##"{"drawing": "Part 1 Drawing 1", "target": [200, 150], "position": [215, 165], "rows": [{"sign": "+", "value": 0.3}]}"##, r##"{"drawing": "Part 1 Drawing 1", "target": [200, 150], "position": [185, 165], "direction": "Asymmetric", "rows": [{"sign": "+", "value": "0.3 mm"}, {"sign": "-", "value": "0.1 mm"}], "all_around": true}"##]),
     ("drawing_revision_table", &[r##"{"drawing": "Part 1 Drawing 1", "position": [415, 290]}"##]),
     ("drawing_revision_callout", &[r##"{"drawing": "Part 1 Drawing 1", "position": [100, 100], "revision": "B"}"##]),
     ("drawing_table", &[r##"{"drawing": "Part 1 Drawing 1", "position": [20, 280], "rows": 3, "columns": 2, "header_row": true}"##]),

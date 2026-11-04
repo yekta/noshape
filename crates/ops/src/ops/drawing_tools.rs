@@ -725,6 +725,27 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "edge_condition",
+            summary: "Edge condition symbol",
+            description: "The Edge condition symbol tool and panel (ISO 13715): the leader points at `target` (an edge of a view, sheet mm), the glyph's corner at `position`. `direction` (Undefined, Vertical, Horizontal, Asymmetric), `main` (the main value, drawn as typed), `rows` (up to two {sign: None, +, -, ±; value: a number in drawing units or a length}: the first is drawn, both with Asymmetric), `all_around`, `parens` (the symbol in parentheses). One edit (\"Edge condition symbol\").",
+            fields: with(
+                common(),
+                vec![
+                    req("target", point(), "The edge the leader points at (sheet mm)."),
+                    req("position", point(), "Where the symbol goes (sheet mm): its glyph's corner."),
+                    opt("direction", json!({ "type": "string", "enum": ["Undefined", "Vertical", "Horizontal", "Asymmetric"], "default": "Undefined" }), "Direction."),
+                    opt("main", s(), "The main value (left of the glyph), as typed."),
+                    opt("rows", json!({ "type": "array", "maxItems": 2, "items": { "type": "object" } }), "The panel's two rows: {sign, value}."),
+                    opt("all_around", json!({ "type": "boolean" }), "All around."),
+                    opt("parens", json!({ "type": "boolean" }), "( ): the symbol in parentheses."),
+                ],
+            ),
+            mutates: true,
+            destructive: false,
+            run: edge_condition,
+        },
+        Op {
+            group: "drawing",
             verb: "revision_table",
             summary: "Revision table (rows from the document's releases)",
             description: "The Revision table tool and dialog: the table with its fixed corner at `position` (sheet mm). Its rows are the drawing's revisions from releases. One edit (\"Revision table\").",
@@ -1754,6 +1775,49 @@ fn weld(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let id = t.d.sheets[sheet].next_annotation_id();
     t.d.sheets[sheet].annotations.push(dt::weld(id, view, target, spec, pt_arg(a, "position")?));
     done(od, t, "Weld symbol", "annotation", id)
+}
+
+fn edge_condition(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::drawing::edge_condition::{EdgeConditionSpec, EdgeDirection, EdgeRow, EdgeSign};
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t = target(od, a)?;
+    let mut spec = EdgeConditionSpec::default();
+    if let Some(d) = a.opt_str("direction")? {
+        spec.direction = EdgeDirection::ALL.into_iter().find(|x| x.label().eq_ignore_ascii_case(d)).ok_or_else(|| OpError::param("direction", "Undefined, Vertical, Horizontal or Asymmetric"))?;
+    }
+    spec.main = a.opt_str("main")?.unwrap_or_default().to_string();
+    let unit = noshape_model::drawing::format::length_units(&t.d, &Default::default()).meters();
+    let rows = a.get("rows").and_then(Value::as_array).cloned().unwrap_or_default();
+    if rows.len() > 2 {
+        return Err(OpError::param("rows", "at most two rows"));
+    }
+    for (i, r) in rows.iter().enumerate() {
+        let sign = match r.get("sign").and_then(Value::as_str).unwrap_or("None") {
+            "None" | "none" | "" => EdgeSign::None,
+            "+" | "Plus" | "plus" => EdgeSign::Plus,
+            "-" | "−" | "Minus" | "minus" => EdgeSign::Minus,
+            "±" | "+/-" | "PlusMinus" | "plus_minus" => EdgeSign::PlusMinus,
+            _ => return Err(OpError::param("rows", "a row's sign is None, +, - or ±")),
+        };
+        let value = match r.get("value") {
+            None | Some(Value::Null) => 0.0,
+            Some(Value::Number(n)) => n.as_f64().unwrap_or(0.0) * unit,
+            Some(Value::String(v)) => match v.trim().parse::<f64>() {
+                Ok(x) => x * unit,
+                Err(_) => noshape_units::evaluate_as(v, noshape_units::Dim::LENGTH, &Default::default(), &noshape_units::EmptyScope).map_err(|e| OpError::param("rows", &e.to_string()))?.value,
+            },
+            Some(_) => return Err(OpError::param("rows", "a row's value is a number or a length")),
+        };
+        spec.rows[i] = EdgeRow { sign, value };
+    }
+    spec.all_around = a.get("all_around").and_then(Value::as_bool).unwrap_or(false);
+    spec.parens = a.get("parens").and_then(Value::as_bool).unwrap_or(false);
+    let c = pt_arg(a, "target")?;
+    let (view, target) = t.m.pick(&Tool::EdgeCondition, &[], c).weld_target(c);
+    let sheet = t.sheet;
+    let id = t.d.sheets[sheet].next_annotation_id();
+    t.d.sheets[sheet].annotations.push(dt::edge_condition(id, view, target, spec, pt_arg(a, "position")?));
+    done(od, t, "Edge condition symbol", "annotation", id)
 }
 
 fn revision_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

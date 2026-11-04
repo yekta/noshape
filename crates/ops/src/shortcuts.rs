@@ -325,6 +325,7 @@ pub const ENTRIES: &[Entry] = entries! {
         ("Diameter dimension", Some("shift-d"), N),
         ("Display sheet menu", Some("ctrl-s"), N),
         ("Drawing properties panel", N, N),
+        ("Edge condition symbol", N, N),
         ("Edge to edge centerline", N, N),
         ("First sheet", Some("home"), N),
         ("Foreshorten dimension", Some("shift-h"), N),

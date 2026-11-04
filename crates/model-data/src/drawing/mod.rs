@@ -970,6 +970,14 @@ pub enum AnnotationKind {
         target: [f64; 2],
         spec: Box<weld::WeldSpec>,
     },
+    /// Edge condition symbol (ISO 13715): the leader points at `target` (view coordinates in `view`, else sheet),
+    /// the glyph's corner at the annotation's position.
+    EdgeCondition {
+        #[serde(default)]
+        view: Option<ViewId>,
+        target: [f64; 2],
+        spec: Box<edge_condition::EdgeConditionSpec>,
+    },
     /// Revision callout: a triangle with the revision label (Add revision
     /// callout; shown while the drawing has a revision table). Grouped with
     /// a dimension (`group`, dropped onto it), `anchor` is the offset from
@@ -2714,6 +2722,7 @@ impl AnnotationKind {
             AnnotationKind::Balloon { .. } => "Callout",
             AnnotationKind::SurfaceFinish { .. } => "Surface finish",
             AnnotationKind::Weld { .. } => "Weld symbol",
+            AnnotationKind::EdgeCondition { .. } => "Edge condition symbol",
             AnnotationKind::RevisionCallout { .. } => "Revision callout",
             AnnotationKind::Gdt { .. } => "Geometric tolerance",
             AnnotationKind::OrdinateDimension { .. } => "Ordinate dimension",
@@ -4555,6 +4564,7 @@ impl Drawing {
 
 pub mod sheet;
 pub mod note;
+pub mod edge_condition;
 pub mod weld;
 pub mod tb_lang;
 pub mod sheet_sketch;

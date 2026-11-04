@@ -95,6 +95,7 @@ pub fn leaders_mut(a: &mut Annotation) -> Option<&mut Vec<Leader>> {
         AnnotationKind::Gdt { leaders, .. } | AnnotationKind::SurfaceFinish { leaders, .. } => Some(leaders),
         AnnotationKind::Note { style, .. } => Some(&mut style.leaders),
         AnnotationKind::Weld { spec, .. } => Some(&mut spec.leaders),
+        AnnotationKind::EdgeCondition { spec, .. } => Some(&mut spec.leaders),
         AnnotationKind::Balloon { callout, .. } => Some(&mut callout.leaders),
         AnnotationKind::HoleCallout { leaders, .. } => Some(leaders),
         _ => None,
@@ -107,6 +108,7 @@ pub fn leaders(a: &Annotation) -> Option<&Vec<Leader>> {
         AnnotationKind::Gdt { leaders, .. } | AnnotationKind::SurfaceFinish { leaders, .. } => Some(leaders),
         AnnotationKind::Note { style, .. } => Some(&style.leaders),
         AnnotationKind::Weld { spec, .. } => Some(&spec.leaders),
+        AnnotationKind::EdgeCondition { spec, .. } => Some(&spec.leaders),
         AnnotationKind::Balloon { callout, .. } => Some(&callout.leaders),
         AnnotationKind::HoleCallout { leaders, .. } => Some(leaders),
         _ => None,
@@ -266,6 +268,7 @@ pub fn all_leaders(a: &Annotation) -> Option<Vec<Leader>> {
         AnnotationKind::Note { style, .. } => Some(style.leaders.clone()),
         AnnotationKind::Gdt { leaders, .. } | AnnotationKind::SurfaceFinish { leaders, .. } => Some(leaders.clone()),
         AnnotationKind::Weld { spec, .. } => Some(spec.leaders.clone()),
+        AnnotationKind::EdgeCondition { spec, .. } => Some(spec.leaders.clone()),
         AnnotationKind::Balloon { view, anchor, callout, .. } => Some(callout.all_leaders(*view, *anchor)),
         _ => None,
     }
@@ -277,6 +280,7 @@ pub fn with_all_leaders(a: &mut Annotation, f: impl FnOnce(&mut Vec<Leader>)) ->
         AnnotationKind::Note { style, .. } => f(&mut style.leaders),
         AnnotationKind::Gdt { leaders, .. } | AnnotationKind::SurfaceFinish { leaders, .. } => f(leaders),
         AnnotationKind::Weld { spec, .. } => f(&mut spec.leaders),
+        AnnotationKind::EdgeCondition { spec, .. } => f(&mut spec.leaders),
         AnnotationKind::Balloon { view, anchor, callout, .. } => {
             let mut all = callout.all_leaders(*view, *anchor);
             f(&mut all);
@@ -305,7 +309,7 @@ pub fn leader_paths(built: Option<&BuiltSheet>, a: &Annotation) -> Vec<(usize, L
         }
         // As last drawn (help A5: geometric tolerances and surface finish
         // symbols take nodes too).
-        AnnotationKind::Balloon { .. } | AnnotationKind::Gdt { .. } | AnnotationKind::SurfaceFinish { .. } | AnnotationKind::Weld { .. } => {
+        AnnotationKind::Balloon { .. } | AnnotationKind::Gdt { .. } | AnnotationKind::SurfaceFinish { .. } | AnnotationKind::Weld { .. } | AnnotationKind::EdgeCondition { .. } => {
             built.map(|b| b.geometry.leader_paths.iter().filter(|(id, ..)| *id == a.id).map(|(_, i, p)| (*i, p.clone())).collect()).unwrap_or_default()
         }
         _ => Vec::new(),

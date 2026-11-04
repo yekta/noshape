@@ -4986,3 +4986,30 @@ fn ansi_projection_symbol_as_live() {
     let (x0, x1) = lines.iter().fold((f64::MAX, f64::MIN), |(a, b), l| (a.min(l[0]).min(l[2]), b.max(l[0]).max(l[2])));
     assert!((x0 - 4.564).abs() < 1e-6 && (x1 - 10.639).abs() < 1e-6, "{x0} – {x1}");
 }
+
+/// Live 1955 (samples/dx-edge-condition/edge-condition-ansi.dxf): an edge condition symbol exports its value as an
+/// MTEXT on ANNOTATION_TEXT ("+.300" on an ANSI inch drawing: the drawing's length format), its glyph and leader
+/// on ANNOTATION_LINES, an arrowhead (ANSI), All around a CIRCLE and the parentheses two ARCs.
+#[test]
+fn edge_condition_symbol_exports_as_lives() {
+    use acadrust::EntityType;
+    use super::edge_condition::{EdgeConditionSpec, EdgeRow, EdgeSign};
+    let mut d = Drawing::default();
+    let t = templates::DrawingTemplate::standard("ANSI A", SheetSize::AnsiA, TitleBlockStyle::Ansi, true, Projection::ThirdAngle);
+    d.props = templates::template_props(&t, "ANSI_A_INCH.dwt");
+    templates::apply_template(&mut d, 0, &t);
+    let spec = EdgeConditionSpec { rows: [EdgeRow { sign: EdgeSign::Plus, value: 0.3 * 0.0254 }, EdgeRow::default()], all_around: true, parens: true, ..Default::default() };
+    d.sheets[0].annotations.push(Annotation { id: 1, kind: AnnotationKind::EdgeCondition { view: None, target: [81.5, 140.0], spec: Box::new(spec) }, position: [70.0, 160.0], ..Default::default() });
+    let b = render_sheet(&d, 0, &super::views::Sources::new(), &ViewCache::new(), false).unwrap();
+    let dxf = super::cad_export::to_dxf_version(&b.geometry, 1, acadrust::DxfVersion::AC1014).unwrap();
+    let doc = acadrust::DxfReader::from_reader(std::io::Cursor::new(dxf)).unwrap().read().unwrap();
+    let on = |layer: &str| doc.entities().filter(|e| e.common().layer == layer).count();
+    let texts: Vec<String> = doc.entities().filter_map(|e| match e {
+        EntityType::MText(t) if t.common.layer == "ANNOTATION_TEXT" => Some(t.value.clone()),
+        _ => None,
+    }).collect();
+    assert!(texts.iter().any(|t| t.ends_with("+.300")), "{texts:?}");
+    assert!(on("ANNOTATION_LINES") >= 4, "glyph, line, leader, arrowhead: {}", on("ANNOTATION_LINES"));
+    assert!(doc.entities().any(|e| matches!(e, EntityType::Circle(c) if c.common.layer == "ANNOTATION_LINES")), "All around");
+    assert_eq!(doc.entities().filter(|e| matches!(e, EntityType::Arc(a) if a.common.layer == "ANNOTATION_LINES")).count(), 2, "( )");
+}
