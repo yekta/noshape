@@ -53,7 +53,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - Natives std calls that the FeatureScript host lacks (lead 11-04 13:08, after DISPLACEMENT-MAP; dx 11-04 14:53:
   native_args.rs MISSING and MISSING_OLDER; callers traced through std 3095). P1 where a standard feature noshape runs
   by std (regen::std_route, bridging curve) reaches it: the user sees that feature fail. Owner dx unless noted.
-  - [ ] P1 FS-NATIVE-OPDERIP (dx 11-04 17:32: std derips by moving each definition face's rip edge onto its part
+  - [ ] P2 FS-NATIVE-OPDERIP (dx 11-04 18:31: live derips in none of the cases it tried, behaviours.md "P1
+    FS-NATIVE-OPDERIP" (request 2005): a Tab into a ripped corner fills it from its own flange, a Tab on Top errors
+    "Tab can only be added to a free edge or rip.", a Bend / Jog through the corner "Metal is connected on both sides of
+    the bend."; noshape doesn't reach @opDerip in live's Tab case either, so P2 until a case that derips is found;
+    TAB-RIPPED-CORNER below) (dx 11-04 17:32: std derips by moving each definition face's rip edge onto its part
     face, std's own createDeripOptions (moveFace.fs) giving one option per face, our opEdgeChange keying moves by edge
     only; what the faces become after (joined or left apart) needs live: REQUESTS 17:32, a Tab / Bend across a
     corner rip) @opDerip: std's sheetMetalBend, sheetMetalJog and sheetMetalTab (run by std here) call it
@@ -95,6 +99,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - [ ] P2 FS-NATIVE-OLD-STD only older pinned std releases call these (their own sheet metal): @startSheetMetalFeature,
     @endSheetMetalFeature, @opBendAtEdgeInternal, @opFlattenInternal, @opFoldInternal, @opPrepareForBendingInternal,
     @opRoll, @evEdgeCurvature: a studio pinned to such a release that calls them fails (FS-OLD-STD-COMPAT).
+
+- [ ] P1 TAB-RIPPED-CORNER (core; dx 11-04 18:31, live request 2005 T2) a 100 × 60 plate (thicken 2 mm, radius 2 mm)
+  with 30 mm flanges on its x = 100 and y = 60 edges (a corner rip), and a Tab sketched on the x-flange's outer face
+  (y 50 → 62, z 10 → 20) merged into that flange: live regenerates OK and fills the corner box from that flange,
+  21196.5854 mm³ (+40.4), 28 faces / 62 edges / 36 vertices; ours regenerates OK but changes nothing (21156.1854 mm³,
+  24 faces: the base, which matches live exactly). Repro: T2 model sheetmetal_std::
+  a_tab_into_a_ripped_corner_fills_it_from_its_flange (NOSHAPE_FS_TRACE=1: the Tab's group subtract / transform /
+  copyTool / boolean all run "ok").
 
 ## From the user, 2026-11-02 (v0.4.19, macOS)
 - [x] (psui 11-03 00:10, fixed by "psui: VAR-AUTOCOMPLETE-ENTER …": (1) an open feature dialog kept the variables of
@@ -3809,7 +3821,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   tracking of the split's edges (edgeForTransform) loses them through the edge changes and the union (they moved,
   then the union renamed them). Next: tracking an edge through opEdgeChange and a sheet union. Run 74: 37/55,
   366/471 (custom 38/109), documents with custom features failing 5 -> 4.
-  dx 11-04 18:33: a tracked edge is found where opEdgeChange moved it (CtxState::edge_moves; T1 ops_harness
+  dx 11-04 18:28: a tracked edge is found where opEdgeChange moved it (CtxState::edge_moves; T1 ops_harness
   trackMovedEdge: moved, then joined to another sheet at an angle and renamed). Fold SM 1 now makes one part with its
   bend, the box as live's; it differs in detail: 29/69/42 faces / edges / vertices (live 32/82/52), volume 9854.12
   mm³ (live 9226.68), and it takes 220 ms (live 270 for the document): next.

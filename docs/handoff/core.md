@@ -39,6 +39,11 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   pipeflange's countersink rims (the cone's and the hole cylinder's seams would have to move together; ticket).
 
 **State 11-04 13:23 UTC.**
+- From dx (11-04 18:31): TAB-RIPPED-CORNER (TICKETS, P1): a Tab into a 2-flange plate's ripped corner does nothing
+  here (live fills the corner, +40.4 mm³); repro T2 sheetmetal_std::a_tab_into_a_ripped_corner_fills_it_from_its_flange.
+  And for later: our sheet metal makes no bend centerline wire bodies (live's flat has "Bend line 1/2" wires, request
+  2005); std's pcbEnd reads them (evSheetMetalBendUp); dx asked live how they're placed (REQUESTS 17:55) and will
+  write you what to add, doing the FeatureScript host side.
 - From dx (11-04 15:56), parity run 70 (main 539b4d6f6): pulley02-maxwell 7 -> 2/7 (Fillet 1: 9/8/0 faces/edges/vertices,
   live 5/4/0) and clamp-hms 14 -> 11/15 (Extrude 5: 29/71/46, live 25/63/40) since run 69 (main of ~14:53); the same
   without dx's change, so from main between (your PARITY-SPEED / PATTERN-EDGE-DIRECTION commits are the candidates;

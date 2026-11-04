@@ -1550,3 +1550,57 @@ fn the_louvers_tools_build() {
     let v: Vec<f64> = r.context.bodies.iter().map(|b| b.shape.volume().unwrap_or(0.0) * 1e9).collect();
     assert!(v.len() == 2 && (v[0] - 1975.3626).abs() < 1e-3 && (v[1] - 1889.368549).abs() < 1e-3, "{v:?}; {st:?}");
 }
+
+/// Live 2005 T2 (behaviours.md "P1 FS-NATIVE-OPDERIP"): a 100 × 60 plate with 30 mm flanges on its x = 100 and
+/// y = 60 edges (a corner rip between them); a Tab sketched on the x-flange's outer face, y 50 → 62, z 10 → 20,
+/// merged into that flange, fills the corner from that flange only (no derip): 21196.5854 mm³, 28 faces.
+#[test]
+#[ignore = "T2: sheet metal, long std regenerations; fails until core's TAB-RIPPED-CORNER"]
+fn a_tab_into_a_ripped_corner_fills_it_from_its_flange() {
+    let mut s = Studio::new();
+    let region = s.rectangle(100.0, 60.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    let r = s.ok();
+    let edges = vec![edge_at(&r, DVec3::new(100.0, 30.0, 2.0)), edge_at(&r, DVec3::new(50.0, 60.0, 2.0))];
+    s.add("sheetMetalFlange", |p| {
+        p.set("edges", ParamValue::Query(edges));
+        p.set("distance", expr("30 mm"));
+    });
+    let r = s.ok();
+    let base = volume_mm3(&r);
+    let wall = face_at(&r, DVec3::new(102.0, 30.0, 15.0));
+    // The sketch on the flange's outer face; its rectangle placed through the face's frame.
+    let sketch_on = |s: &mut Studio, sk: noshape_sketch::Sketch| {
+        s.add("sketch", |pv| {
+            pv.set("sketchPlane", ParamValue::Query(vec![wall.clone()]));
+            pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+        })
+    };
+    let probe = sketch_on(&mut s, noshape_sketch::Sketch::new());
+    let r = s.ok();
+    let frame = r.display.sketches.iter().find(|x| x.feature == probe).expect("sketch").frame;
+    s.ps.features.retain(|f| f.id != probe);
+    let to2 = |p: DVec3| glam::DVec2::new((p - frame.origin).dot(frame.x), (p - frame.origin).dot(frame.y));
+    let mut sk = noshape_sketch::Sketch::new();
+    let pts = [(50.0, 10.0), (62.0, 10.0), (62.0, 20.0), (50.0, 20.0)].map(|(y, z)| sk.add_point(to2(DVec3::new(mm(102.0), mm(y), mm(z)))));
+    for i in 0..4 {
+        sk.add_line_between(pts[i], pts[(i + 1) % 4]).unwrap();
+    }
+    let sketch = sketch_on(&mut s, sk);
+    let r = s.ok();
+    let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
+    let key = sk.regions.iter().max_by(|a, b| a.area.total_cmp(&b.area)).expect("region").key.clone();
+    s.add("sheetMetalTab", |p| {
+        p.set("tabFaces", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        p.set("booleanUnionScope", ParamValue::Query(vec![wall.clone()]));
+    });
+    let r = s.ok();
+    let faces = r.context.bodies[part(&r)].shape.faces().len();
+    assert!((base - 21156.1854).abs() < 1e-3, "base {base} mm³");
+    assert!((volume_mm3(&r) - 21196.5854).abs() < 1e-3 && faces == 28, "{} mm³, {faces} faces: {:#?}", volume_mm3(&r), face_report(&r));
+}
