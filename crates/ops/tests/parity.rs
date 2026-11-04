@@ -630,6 +630,10 @@ fn a_zero_centroid_is_unknown() {
     let line = |c: [f64; 3]| json!({ "index": 0, "parts": [{ "name": "Part 1", "faces": 12, "centroid": c, "bbox": { "min": [-0.01775, -0.00575, -0.00555], "max": [0.01775, 0.00575, 0.00555] } }] });
     assert_eq!(live_parts(&line([0.0; 3]))[0].centroid, None);
     assert_eq!(live_parts(&line([0.0027, 0.0, 0.002]))[0].centroid, Some([0.0027, 0.0, 0.002]));
+    assert!(live_parts(&line([0.0; 3]))[0].bbox_outer && !live_parts(&line([0.0027, 0.0, 0.002]))[0].bbox_outer);
+    // A sheet of the UI fetch has no centroid; its box is the client's loose one too.
+    let sheet = json!({ "index": 0, "parts": [{ "name": "Surface 1", "bodyType": "sheet", "faces": 1, "centroid": null, "bbox": { "min": [-0.074, -0.085, -0.014], "max": [0.074, 0.105, 0.103] } }] });
+    assert!(live_parts(&sheet)[0].bbox_outer);
 }
 
 /// The comparison: counts exact; volume, area and centroid within live's
