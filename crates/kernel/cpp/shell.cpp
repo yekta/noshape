@@ -3549,6 +3549,17 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   }
   // Vertices: three faces (two tangent: along their offset tangent line), or a closed face's seam and one face.
   std::vector<gp_XYZ> pts(nv + 1);
+  // Vertices whose offsets are two corners and an edge between them (four faces, two tangent edges on one): the
+  // second corner, for the tangent edge e2 and the edge w2 across; pts holds the first, for e1 and w1.
+  struct SplitCorner
+  {
+    int           v, hinge, wall, e1, e2, w1, w2;
+    gp_XYZ        pb;
+    TopoDS_Vertex vb;
+    TopoDS_Edge   bridge;
+  };
+  std::vector<SplitCorner> splits;
+  std::vector<int>         vsplit(nv + 1, -1);
   for (int i = 1; i <= nv; ++i)
   {
     const TopoDS_Vertex& v  = TopoDS::Vertex(verts(i));
@@ -3561,6 +3572,105 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     for (ShapeList::Iterator it(ve.FindFromKey(v)); it.More(); it.Next())
       es.push_back(edges.FindIndex(it.Value()));
     auto n_at = [&](int f) { return gp_Vec(normal_at(TopoDS::Face(faces(f)), V)).XYZ(); };
+    // The corner on tangent edge `tp` (between `a` and another face) where its offset meets face `third`'s; the reason
+    // where it isn't found.
+    auto tangent_corner = [&](int tp, int a, int third, gp_XYZ& x) -> const char* {
+      BRepAdaptor_Curve c(TopoDS::Edge(edges(tp)));
+      if (c.GetType() == GeomAbs_Circle)
+      {
+        // Faces tangent along a circle: their offsets meet along the circle moved along the normals, in its plane.
+        const gp_Circ     ci = c.Circle();
+        quad::Surf        pl;
+        pl.kind               = GeomAbs_Plane;
+        pl.n                  = ci.Axis().Direction().XYZ();
+        pl.c                  = pl.n.Dot(ci.Location().XYZ());
+        const quad::Surf* s3[3] = {&sf[(size_t)a], &sf[(size_t)third], &pl};
+        x = V.XYZ() - n_at(a) * t - n_at(third) * (third >= 0 && kept[(size_t)third] ? t : 0.0);
+        if (third < 0 || !quad::solve3(s3, x, size))
+          return "a tangent circle's corner not found";
+      }
+      else if (c.GetType() == GeomAbs_Line)
+      {
+        gp_Pnt p0;
+        gp_Vec d0;
+        c.D1(c.FirstParameter(), p0, d0);
+        const gp_XYZ o = V.XYZ() - n_at(a) * t;
+        if (third < 0 || !quad::solve_line(sf[(size_t)third], o, d0.Normalized().XYZ(), x, size))
+          return "a tangent line's corner not found";
+      }
+      else
+      {
+        // Tangent along another curve: on the curve moved along the faces' common normal (as its offset edge, below),
+        // where it meets the third face's offset (Newton in the curve's parameter, from the vertex's end).
+        if (third < 0)
+          return "a tangent curve's corner not found";
+        const double s0 = c.FirstParameter(), s1 = c.LastParameter();
+        double       s  = c.Value(s0).Distance(V) <= c.Value(s1).Distance(V) ? s0 : s1;
+        const TopoDS_Face fa = TopoDS::Face(faces(a));
+        // (On a free-form face: its curve there traced on the offset, exact and on past the face.)
+        double                          g0, g1;
+        const occ::handle<Geom2d_Curve> pc = sf[(size_t)a].general && kept[(size_t)a] ? BRep_Tool::CurveOnSurface(TopoDS::Edge(edges(tp)), fa, g0, g1) : nullptr;
+        auto q = [&](double u) {
+          if (!pc.IsNull())
+          {
+            const gp_Pnt2d uv = pc->Value(u);
+            return sf[(size_t)a].off->Value(uv.X(), uv.Y()).XYZ();
+          }
+          const gp_Pnt p = c.Value(u);
+          return p.XYZ() - gp_Vec(normal_at(fa, p)).XYZ() * t;
+        };
+        bool found = false;
+        {
+          // The root nearest the vertex first: the first sign change from its end (samples closer near it), bisected
+          // (Newton from the end can jump to another crossing: Shell 4's ramp edge, 38 mm off).
+          const double end = s == s0 ? s1 : s0;
+          double       pa = s, fa0 = quad::eval(sf[(size_t)third], q(s));
+          for (int k = 1; k <= 64 && !found; ++k)
+          {
+            const double pb = s + (end - s) * (k / 64.0) * (k / 64.0), fb = quad::eval(sf[(size_t)third], q(pb));
+            if ((fa0 < 0) == (fb < 0))
+            {
+              pa  = pb;
+              fa0 = fb;
+              continue;
+            }
+            double lo = pa, hi = pb, flo = fa0;
+            for (int it = 0; it < 100 && std::abs(hi - lo) > 1e-15 * std::abs(s1 - s0); ++it)
+            {
+              const double m = 0.5 * (lo + hi), fm = quad::eval(sf[(size_t)third], q(m));
+              if ((fm < 0) == (flo < 0))
+              {
+                lo  = m;
+                flo = fm;
+              }
+              else
+                hi = m;
+            }
+            s     = 0.5 * (lo + hi);
+            x     = q(s);
+            found = true;
+          }
+        }
+        for (int it = 0; it < 60 && !found; ++it)
+        {
+          const double f = quad::eval(sf[(size_t)third], q(s));
+          if (std::abs(f) < 1e-13 * size)
+          {
+            x     = q(s);
+            found = true;
+            break;
+          }
+          const double h  = 1e-7 * (s1 - s0);
+          const double df = (quad::eval(sf[(size_t)third], q(s + h)) - quad::eval(sf[(size_t)third], q(s - h))) / (2 * h);
+          if (std::abs(df) < 1e-300)
+            break;
+          s -= f / df;
+        }
+        if (!found)
+          return "a tangent curve's corner not found";
+      }
+      return nullptr;
+    };
     gp_XYZ x;
     const auto col = std::find_if(fs.begin(), fs.end(), [&](int f) { return collapse[(size_t)f] != 0; });
     // Every face tangent there (a sphere's pole on a plane, a corner sphere's point on two fillets and a side): each
@@ -3601,69 +3711,8 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         for (int f : fs)
           if (f != a && f != b)
             third = f;
-        BRepAdaptor_Curve c(TopoDS::Edge(edges(tp)));
-        if (c.GetType() == GeomAbs_Circle)
-        {
-          // Faces tangent along a circle: their offsets meet along the circle moved along the normals, in its plane.
-          const gp_Circ     ci = c.Circle();
-          quad::Surf        pl;
-          pl.kind               = GeomAbs_Plane;
-          pl.n                  = ci.Axis().Direction().XYZ();
-          pl.c                  = pl.n.Dot(ci.Location().XYZ());
-          const quad::Surf* s3[3] = {&sf[(size_t)a], &sf[(size_t)third], &pl};
-          x = V.XYZ() - n_at(a) * t - n_at(third) * (third >= 0 && kept[(size_t)third] ? t : 0.0);
-          if (third < 0 || !quad::solve3(s3, x, size))
-            return no("a tangent circle's corner not found");
-        }
-        else if (c.GetType() == GeomAbs_Line)
-        {
-          gp_Pnt p0;
-          gp_Vec d0;
-          c.D1(c.FirstParameter(), p0, d0);
-          const gp_XYZ o = V.XYZ() - n_at(a) * t;
-          if (third < 0 || !quad::solve_line(sf[(size_t)third], o, d0.Normalized().XYZ(), x, size))
-            return no("a tangent line's corner not found");
-        }
-        else
-        {
-          // Tangent along another curve: on the curve moved along the faces' common normal (as its offset edge, below),
-          // where it meets the third face's offset (Newton in the curve's parameter, from the vertex's end).
-          if (third < 0)
-            return no("a tangent curve's corner not found");
-          const double s0 = c.FirstParameter(), s1 = c.LastParameter();
-          double       s  = c.Value(s0).Distance(V) <= c.Value(s1).Distance(V) ? s0 : s1;
-          const TopoDS_Face fa = TopoDS::Face(faces(a));
-          // (On a free-form face: its curve there traced on the offset, exact and on past the face.)
-          double                          g0, g1;
-          const occ::handle<Geom2d_Curve> pc = sf[(size_t)a].general && kept[(size_t)a] ? BRep_Tool::CurveOnSurface(TopoDS::Edge(edges(tp)), fa, g0, g1) : nullptr;
-          auto q = [&](double u) {
-            if (!pc.IsNull())
-            {
-              const gp_Pnt2d uv = pc->Value(u);
-              return sf[(size_t)a].off->Value(uv.X(), uv.Y()).XYZ();
-            }
-            const gp_Pnt p = c.Value(u);
-            return p.XYZ() - gp_Vec(normal_at(fa, p)).XYZ() * t;
-          };
-          bool found = false;
-          for (int it = 0; it < 60 && !found; ++it)
-          {
-            const double f = quad::eval(sf[(size_t)third], q(s));
-            if (std::abs(f) < 1e-13 * size)
-            {
-              x     = q(s);
-              found = true;
-              break;
-            }
-            const double h  = 1e-7 * (s1 - s0);
-            const double df = (quad::eval(sf[(size_t)third], q(s + h)) - quad::eval(sf[(size_t)third], q(s - h))) / (2 * h);
-            if (std::abs(df) < 1e-300)
-              break;
-            s -= f / df;
-          }
-          if (!found)
-            return no("a tangent curve's corner not found");
-        }
+        if (const char* why = tangent_corner(tp, a, third, x))
+          return no(why);
       }
       else
       {
@@ -3721,6 +3770,48 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         }
       }
     }
+    else if (fs.size() == 4 && es.size() == 4 && std::count_if(es.begin(), es.end(), [&](int e) { return tangent[(size_t)e] != 0; }) == 2
+             && std::none_of(es.begin(), es.end(), [&](int e) { return seam[(size_t)e] != 0 || group[(size_t)e] != 0; })
+             && std::all_of(fs.begin(), fs.end(), [&](int f) { return kept[(size_t)f] != 0; }))
+    {
+      // Two tangent edges on one face (the hinge) and a wall across (Shell 4: a ramp tangent to a fillet tangent to
+      // the top, ending on a round wall): the offsets meet in two corners, each tangent edge's where it meets the
+      // wall's offset, and the cavity has an edge between them on the hinge's and the wall's offsets (Parasolid's).
+      SplitCorner sp{};
+      sp.v = i;
+      sp.e1 = sp.e2 = sp.w1 = sp.w2 = -1;
+      for (int e : es)
+        if (tangent[(size_t)e])
+          (sp.e1 < 0 ? sp.e1 : sp.e2) = e;
+      const int a1 = efi[(size_t)sp.e1][0], b1 = efi[(size_t)sp.e1][1], a2 = efi[(size_t)sp.e2][0], b2 = efi[(size_t)sp.e2][1];
+      sp.hinge = (a1 == a2 || a1 == b2) ? a1 : (b1 == a2 || b1 == b2) ? b1 : -1;
+      if (sp.hinge < 0)
+        return no("a corner of two tangent edges on no common face");
+      const int x1 = a1 == sp.hinge ? b1 : a1, x2 = a2 == sp.hinge ? b2 : a2;
+      sp.wall = -1;
+      for (int f : fs)
+        if (f != sp.hinge && f != x1 && f != x2)
+          sp.wall = f;
+      for (int e : es)
+      {
+        const int p = efi[(size_t)e][0], q = efi[(size_t)e][1];
+        if ((p == x1 && q == sp.wall) || (q == x1 && p == sp.wall))
+          sp.w1 = e;
+        if ((p == x2 && q == sp.wall) || (q == x2 && p == sp.wall))
+          sp.w2 = e;
+      }
+      if (sp.wall < 0 || sp.w1 < 0 || sp.w2 < 0 || find(i) != i)
+        return no("a corner of four faces not two tangent edges and a wall");
+      if (const char* why = tangent_corner(sp.e1, efi[(size_t)sp.e1][0], sp.wall, x))
+        return no(why);
+      if (const char* why = tangent_corner(sp.e2, efi[(size_t)sp.e2][0], sp.wall, sp.pb))
+        return no(why);
+      if ((sp.pb - x).Modulus() > 10 * tol)
+      {
+        vsplit[(size_t)i] = (int)splits.size();
+        splits.push_back(sp);
+      }
+    }
     else if (fs.size() > 3 && es.size() == fs.size() && std::none_of(es.begin(), es.end(), [&](int e) { return tangent[(size_t)e] != 0 || seam[(size_t)e] != 0; }))
     {
       // More faces: one corner only where all their offsets meet in a point (a pyramid's apex); else the cavity
@@ -3763,6 +3854,13 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   for (int i = 1; i <= nv; ++i)
     if (find(i) == i)
       bld.MakeVertex(vx[(size_t)i], gp_Pnt(pts[(size_t)i]), 1e3 * tol);
+  for (SplitCorner& sp : splits)
+    bld.MakeVertex(sp.vb, gp_Pnt(sp.pb), 1e3 * tol);
+  // An edge's end at vertex v (by its index): the second corner of a split one for its e2 and w2.
+  auto second = [&](int e, int v) {
+    const int k = vsplit[(size_t)v];
+    return k >= 0 && (e == splits[(size_t)k].e2 || e == splits[(size_t)k].w2) ? k : -1;
+  };
   for (int i = 1; i <= nv; ++i)
     if (find(i) != i)
     {
@@ -3806,7 +3904,8 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       flip[(size_t)i] = find(verts.FindIndex(ka)) != ia;
       continue;
     }
-    const gp_Pnt      A = gp_Pnt(pts[(size_t)ia]), B = gp_Pnt(pts[(size_t)ib]);
+    const int         sa = second(i, ia), sb = second(i, ib);
+    const gp_Pnt      A = gp_Pnt(sa >= 0 ? splits[(size_t)sa].pb : pts[(size_t)ia]), B = gp_Pnt(sb >= 0 ? splits[(size_t)sb].pb : pts[(size_t)ib]);
     BRepAdaptor_Curve oc(e);
     gp_Pnt            o0;
     gp_Vec            t0;
@@ -3878,7 +3977,21 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       }
       else if (tangent_free)
       {
-        const double               a0 = oc.FirstParameter(), a1 = oc.LastParameter();
+        // (Between where its ends' corners lie along it: a split corner can lie well along the edge.)
+        double a0 = oc.FirstParameter(), a1 = oc.LastParameter();
+        {
+          double                        c0, c1;
+          const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(e, c0, c1);
+          if (!c3.IsNull())
+          {
+            GeomAPI_ProjectPointOnCurve pa(A, c3, c0, c1), pb(B, c3, c0, c1);
+            if (pa.NbPoints() > 0 && pb.NbPoints() > 0 && pb.LowerDistanceParameter() > pa.LowerDistanceParameter())
+            {
+              a0 = pa.LowerDistanceParameter();
+              a1 = pb.LowerDistanceParameter();
+            }
+          }
+        }
         const int                  n  = 32;
         NCollection_Array1<gp_Pnt> q(1, n + 1);
         for (int k = 0; k <= n; ++k)
@@ -3943,6 +4056,58 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         p0 = u0;
         p1 = u1;
       }
+      if (c.IsNull() && !tangent[(size_t)i] && sf[(size_t)fa].general != sf[(size_t)fb].general)
+      {
+        // No one piece of the offsets' intersection runs from end to end (a free-form offset's intersection comes in
+        // pieces with gaps at its patches: Shell 4's ramp round the half cylinder): marched along the edge instead,
+        // each point on both offsets in the plane across the edge there, fitted.
+        double                        c0, c1;
+        const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(e, c0, c1);
+        double                        m0 = oc.FirstParameter(), m1 = oc.LastParameter();
+        if (!c3.IsNull())
+        {
+          GeomAPI_ProjectPointOnCurve pa(A, c3, c0, c1), pb(B, c3, c0, c1);
+          if (pa.NbPoints() > 0 && pb.NbPoints() > 0 && pb.LowerDistanceParameter() > pa.LowerDistanceParameter())
+          {
+            m0 = pa.LowerDistanceParameter();
+            m1 = pb.LowerDistanceParameter();
+          }
+        }
+        const int                  n = 32;
+        NCollection_Array1<gp_Pnt> q(1, n + 1);
+        bool                       marched = true;
+        for (int k = 1; k < n && marched; ++k)
+        {
+          gp_Pnt p;
+          gp_Vec d;
+          oc.D1(m0 + (m1 - m0) * k / n, p, d);
+          if (d.Magnitude() < 1e-12)
+          {
+            marched = false;
+            break;
+          }
+          quad::Surf pl;
+          pl.kind                 = GeomAbs_Plane;
+          pl.n                    = d.Normalized().XYZ();
+          pl.c                    = pl.n.Dot(p.XYZ());
+          const quad::Surf* s3[3] = {&sf[(size_t)fa], &sf[(size_t)fb], &pl};
+          gp_XYZ            y     = p.XYZ() - (gp_Vec(normal_at(TopoDS::Face(faces(fa)), p)).XYZ() + gp_Vec(normal_at(TopoDS::Face(faces(fb)), p)).XYZ()) * t;
+          marched                 = quad::solve3(s3, y, size) && (y - p.XYZ()).Modulus() < 10 * thickness;
+          q(k + 1)                = gp_Pnt(y);
+        }
+        q(1)     = A;
+        q(n + 1) = B;
+        if (marched)
+        {
+          GeomAPI_PointsToBSpline fit(q, 3, 8, GeomAbs_C2, 1e-7 * size);
+          if (fit.IsDone())
+          {
+            c  = fit.Curve();
+            p0 = c->FirstParameter();
+            p1 = c->LastParameter();
+          }
+        }
+      }
       if (c.IsNull())
       {
         if (dbg)
@@ -3959,12 +4124,48 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         return no("no intersection of two offsets through an edge's ends");
       }
     }
-    BRepBuilderAPI_MakeEdge mk(c, vx[(size_t)ia], vx[(size_t)ib], p0, p1);
+    BRepBuilderAPI_MakeEdge mk(c, sa >= 0 ? splits[(size_t)sa].vb : vx[(size_t)ia], sb >= 0 ? splits[(size_t)sb].vb : vx[(size_t)ib], p0, p1);
     if (!mk.IsDone())
       return no("an offset edge failed");
     ex[(size_t)i] = mk.Edge();
     if (group[(size_t)i] != 0)
       group_edge[(size_t)group[(size_t)i]] = i;
+  }
+  // The split corners' edges: on the hinge's and the wall's offsets, from the first corner to the second.
+  for (SplitCorner& sp : splits)
+  {
+    const gp_Pnt            A = gp_Pnt(pts[(size_t)sp.v]), B = gp_Pnt(sp.pb);
+    GeomAPI_IntSS           is(sf[(size_t)sp.hinge].off, sf[(size_t)sp.wall].off, 1e-9 * size);
+    occ::handle<Geom_Curve> c;
+    double                  u0 = 0, u1 = 0;
+    for (int k = 1; is.IsDone() && k <= is.NbLines() && c.IsNull(); ++k)
+    {
+      occ::handle<Geom_Curve>     cand = is.Line(k);
+      GeomAPI_ProjectPointOnCurve pa(A, cand), pb(B, cand);
+      if (pa.NbPoints() == 0 || pb.NbPoints() == 0 || pa.LowerDistance() > 1e3 * tol || pb.LowerDistance() > 1e3 * tol)
+        continue;
+      u0 = pa.LowerDistanceParameter();
+      u1 = pb.LowerDistanceParameter();
+      if (cand->IsPeriodic())
+      {
+        // The short way round.
+        const double per = cand->Period();
+        u1 = u0 + std::remainder(u1 - u0, per);
+      }
+      if (u1 < u0)
+      {
+        cand = cand->Reversed();
+        u0   = cand->ReversedParameter(u0);
+        u1   = cand->ReversedParameter(u1);
+      }
+      c = cand;
+    }
+    if (c.IsNull())
+      return no("a split corner's edge not found");
+    BRepBuilderAPI_MakeEdge mk(c, vx[(size_t)sp.v], sp.vb, u0, u1);
+    if (!mk.IsDone())
+      return no("a split corner's edge failed");
+    sp.bridge = mk.Edge();
   }
   lap("edges");
   bool ok_wires = true;
@@ -3988,6 +4189,26 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         continue;
       }
       bld.Add(ow, ex[(size_t)k].Oriented(flip[(size_t)k] ? TopAbs::Reverse(it.Value().Orientation()) : it.Value().Orientation()));
+    }
+    // A split corner's edge in the hinge's wire (it has both tangent edges) and the wall's (both edges across): from
+    // the first corner where the wire comes into the vertex by the first's edge.
+    for (const SplitCorner& sp : splits)
+    {
+      for (const auto [first, other] : {std::pair{sp.e1, sp.e2}, std::pair{sp.w1, sp.w2}})
+      {
+        TopoDS_Edge in_first;
+        bool        has_other = false;
+        for (TopoDS_Iterator it(w, false); it.More(); it.Next())
+        {
+          if (it.Value().IsSame(edges(first)))
+            in_first = TopoDS::Edge(it.Value());
+          has_other = has_other || it.Value().IsSame(edges(other));
+        }
+        if (in_first.IsNull() || !has_other)
+          continue;
+        const bool into = TopExp::LastVertex(in_first, true).IsSame(verts(sp.v));
+        bld.Add(ow, into ? sp.bridge : TopoDS::Edge(sp.bridge.Reversed()));
+      }
     }
     ow.Closed(true);
     return ow;
@@ -4032,6 +4253,28 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           }
           if (!quad::add_pcurve(ex[(size_t)k], of, TopoDS::Edge(edges(k).Oriented(TopAbs_FORWARD)), ff, seam[(size_t)k] != 0, 1e3 * tol))
             return no("an offset edge's curve on its face failed");
+        }
+        for (const SplitCorner& sp : splits)
+        {
+          if (sp.hinge != i && sp.wall != i)
+            continue;
+          // A split corner's edge: projected, a whole number of periods on to start where its first corner's edge
+          // ends on the face.
+          const TopoDS_Edge&              by = ex[(size_t)(sp.hinge == i ? sp.e1 : sp.w1)];
+          double                          f0, f1, b0, b1;
+          const occ::handle<Geom2d_Curve> pby = BRep_Tool::CurveOnSurface(by, of, f0, f1);
+          const occ::handle<Geom_Curve>   c3  = BRep_Tool::Curve(sp.bridge, b0, b1);
+          occ::handle<Geom2d_Curve>       pc  = c3.IsNull() ? nullptr : GeomProjLib::Curve2d(c3, b0, b1, sf[(size_t)i].off);
+          if (pby.IsNull() || pc.IsNull())
+            return no("a split corner's edge's curve on its face failed");
+          const gp_Pnt2d at = pby->Value(TopExp::FirstVertex(by).IsSame(vx[(size_t)sp.v]) ? f0 : f1), p = pc->Value(b0);
+          const occ::handle<Geom_Surface>& g = sf[(size_t)i].off;
+          const double du = g->IsUPeriodic() ? std::round((at.X() - p.X()) / g->UPeriod()) * g->UPeriod() : 0;
+          const double dv = g->IsVPeriodic() ? std::round((at.Y() - p.Y()) / g->VPeriod()) * g->VPeriod() : 0;
+          if (du != 0 || dv != 0)
+            pc = occ::down_cast<Geom2d_Curve>(pc->Translated(gp_Vec2d(du, dv)));
+          bld.UpdateEdge(sp.bridge, pc, of, 1e3 * tol);
+          bld.Range(sp.bridge, of, b0, b1);
         }
       }
       const TopoDS_Face inner = TopoDS::Face(of.Oriented(outward ? f.Orientation() : TopAbs::Reverse(f.Orientation())));

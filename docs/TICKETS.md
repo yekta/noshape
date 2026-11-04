@@ -1547,6 +1547,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Next stop there: vertex 3 (14.0, -20.1, 20) where four faces meet, two edges tangent: their offsets don't meet in one
   point, the cavity needs a new short edge (Parasolid's 28 / 73 / 44): the quadric path making that edge is the next
   step. Probe: /root/core-scratch/s4/shell4.brep / .txt (face 1, 1 mm) with kernel shell::dumped_shell_probe.
+  core 11-04 04:20: the quadric path splits that vertex: four faces with two tangent edges on one (the hinge) and a wall
+  across give two corners, each tangent edge's where its offset meets the wall's, and an edge between them on the hinge's
+  and the wall's offsets, in both faces' wires (shell.cpp SplitCorner); a tangent curve's corner is the root nearest the
+  vertex (bracketed: Newton jumped 38 mm); a tangent free edge's offset is fitted between its ends' corners only; an
+  edge whose offsets' intersection comes in pieces is marched. Shell corpus (211): no outcome or volume changes. Shell 4
+  now stops at a 0.1 mm step (edge 25, planes at z 0..0.1 mm by the ramp's foot) whose offset vanishes at 1 mm: the
+  cavity loses that face (Parasolid's 28 / 73 / 44): next.
 - [ ] P0 REGEN-SPEED (core 10-29 03:05: met in release on perf.yml run 40796942944 (main 34cbea98): live-30-features full regen 35 / 41 / 53 ms (macOS / Linux / Windows; budget 80, live 171), its Extrude 1 edit commit 34 / 38 / 60 ms (budget 200), big-plate regen 159 / 230 / 306 ms (live 617); qa, please re-measure the GUI commit on a release build, the 301–785 ms were a dev build at load ~30. Was 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left
