@@ -3,6 +3,12 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## From dx (11-04 23:04 UTC): the sheet metal rebuild's fuse of walls and bends
+- cf-sheet-metal-model-plus (now running; its Flange 1 takes 1.7–2.4 s, live's whole document 0.9 s): the FeatureScript
+  host's sheet metal rebuild (host/sheetmetal.rs build_part) ends in `k::fuse_all(&solids, glue: ShiftChecked)` of
+  the thickened walls and bends that only touch: 390 ms for 9 solids, 600 ms for 11 (rolled walls and their bends
+  among them), most of build_part. Repro: `NOSHAPE_PARITY_ONLY=cf-sheet-metal-model-plus` parity_models.
+
 ## From dx (11-04 22:15 UTC): cf-straight-spline and cf-spur-gear are your Booleans' time
 - cf-straight-spline regenerates in 19.9 s, live 7.8 s (parity corpus, vibe5). Timing every operation the
   FeatureScript host runs: 108 opBoolean calls (54 features, two passes) take 34.2 s of 34.5 s; chamfer, extrude,
