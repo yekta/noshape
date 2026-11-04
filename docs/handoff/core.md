@@ -16,6 +16,17 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-04 07:28 UTC.**
+- qa's P0s of the morning, all mine, fixed and landed: BLEND-RUST-STRAIGHT-WRONG (c9c634ae: the straight-edge rounds
+  read convexity off an end edge, wrong at a thin rim's reflex corner; now off the face across the edge, tangent points
+  on their end edges, no other face within the round); CRASH-3388 (9fcc03d2: a blend with an edge looser than 1/100
+  of the part is refused before the parallel BRepCheck that segfaulted on it); CRASH-3151 (1eeb2fb2: **OCCT patch
+  0021**, TopOpeBRepBuild_Builder::BuildEdges wrote past its points' array; libTKBool.a built on vibe4 and put in
+  /root/occt, the old one in /root/core-scratch/p0021; **the lead's /opt/occt + CI sync is needed**, then the T1 test
+  with /root/core-scratch/c3151/dump/fillet-4 lands). On a local CLI with the patched lib: 3151's document opens 3 / 3
+  (all 45 features OK), 2045's delete 5 / 5; the seed-2045 fuzz session (clifuzz_nf 2045 106) is being re-run.
+- detail.rs shell_part (dx's note): 'nothing removed' read off the removed faces first (a Hose Routing 450 -> 280 ms).
+
 **State 11-04 05:50 UTC.**
 - BLEND-RUST: blend/prism.rs (queued) rounds straight edges between faces ruled along them (planes along the edge,
   cylinders about axes along it) that end on planar caps square to them, one round a vertex: the section's 2D fillet
