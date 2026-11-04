@@ -54,10 +54,59 @@ pub struct PickMap {
     targets: Vec<PickTarget>,
     /// Ids by [`shallow_hash`] of their reference: one group per distinct reference (a custom feature's faces are
     /// named from earlier faces, recursively; cloning and hashing every name whole took most of a scene build).
-    by_ref: HashMap<u64, Vec<Vec<u32>>>,
+    by_ref: HashMap<u64, IdGroups, std::hash::BuildHasherDefault<KeyHasher>>,
     /// Per pickable body, ascending: (its first face id − 1, face count, its first edge id − 1, its index in the
     /// display's bodies).
     bodies: Vec<(u32, u32, u32, usize)>,
+}
+
+/// The pick ids of one [`shallow_hash`]: one reference's (most), or groups of the references that share it.
+#[derive(Clone, Debug)]
+enum IdGroups {
+    One(u32),
+    Many(Vec<Vec<u32>>),
+}
+
+/// A fast multiply-rotate hasher for [`shallow_hash`] (SipHash's per-write cost dominated the scene build), also
+/// keying the map by those hashes.
+#[derive(Default)]
+struct KeyHasher(u64);
+
+impl KeyHasher {
+    fn add(&mut self, w: u64) {
+        self.0 = (self.0.rotate_left(5) ^ w).wrapping_mul(0x517c_c1b7_2722_0a95);
+    }
+}
+
+impl std::hash::Hasher for KeyHasher {
+    fn write(&mut self, bytes: &[u8]) {
+        for c in bytes.chunks(8) {
+            let mut b = [0u8; 8];
+            b[..c.len()].copy_from_slice(c);
+            self.add(u64::from_le_bytes(b));
+        }
+    }
+    fn write_u8(&mut self, n: u8) {
+        self.add(n as u64);
+    }
+    fn write_u16(&mut self, n: u16) {
+        self.add(n as u64);
+    }
+    fn write_u32(&mut self, n: u32) {
+        self.add(n as u64);
+    }
+    fn write_u64(&mut self, n: u64) {
+        self.add(n);
+    }
+    fn write_usize(&mut self, n: usize) {
+        self.add(n as u64);
+    }
+    fn write_isize(&mut self, n: isize) {
+        self.add(n as u64);
+    }
+    fn finish(&self) -> u64 {
+        self.0
+    }
 }
 
 /// A reference's hash from its first few levels only: equal references hash alike, and names that differ that
@@ -122,7 +171,7 @@ fn shallow_hash(r: &Reference) -> u64 {
             }
         }
     }
-    let mut h = std::hash::DefaultHasher::new();
+    let mut h = KeyHasher::default();
     std::mem::discriminant(r).hash(&mut h);
     match r {
         Reference::Face(n) | Reference::Edge(n) | Reference::Vertex(n) => name(n, &mut h, DEPTH),
@@ -137,10 +186,21 @@ impl PickMap {
         self.targets.push(t);
         let id = self.targets.len() as u32;
         let targets = &self.targets;
-        let groups = self.by_ref.entry(h).or_default();
-        match groups.iter_mut().find(|g| targets[g[0] as usize - 1].reference == targets[id as usize - 1].reference) {
-            Some(g) => g.push(id),
-            None => groups.push(vec![id]),
+        let same = |a: u32| targets[a as usize - 1].reference == targets[id as usize - 1].reference;
+        match self.by_ref.entry(h) {
+            std::collections::hash_map::Entry::Vacant(e) => {
+                e.insert(IdGroups::One(id));
+            }
+            std::collections::hash_map::Entry::Occupied(mut e) => {
+                let g = e.get_mut();
+                match g {
+                    IdGroups::One(a) => *g = if same(*a) { IdGroups::Many(vec![vec![*a, id]]) } else { IdGroups::Many(vec![vec![*a], vec![id]]) },
+                    IdGroups::Many(groups) => match groups.iter_mut().find(|g| same(g[0])) {
+                        Some(g) => g.push(id),
+                        None => groups.push(vec![id]),
+                    },
+                }
+            }
         }
         id
     }
@@ -163,8 +223,12 @@ impl PickMap {
         (id > base && id - base <= count).then(|| (body, (id - base - 1) as usize, edge_base))
     }
     pub fn ids_for(&self, r: &Reference) -> &[u32] {
-        let Some(groups) = self.by_ref.get(&shallow_hash(r)) else { return &[] };
-        groups.iter().find(|g| self.targets[g[0] as usize - 1].reference == *r).map(|g| g.as_slice()).unwrap_or(&[])
+        let same = |a: u32| self.targets[a as usize - 1].reference == *r;
+        match self.by_ref.get(&shallow_hash(r)) {
+            Some(IdGroups::One(a)) if same(*a) => std::slice::from_ref(a),
+            Some(IdGroups::Many(groups)) => groups.iter().find(|g| same(g[0])).map(|g| g.as_slice()).unwrap_or(&[]),
+            _ => &[],
+        }
     }
     pub fn len(&self) -> usize {
         self.targets.len()
