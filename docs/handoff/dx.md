@@ -30,9 +30,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Landed / queued 21:50–22:00: a sheet union counts as joined by shared edges (b8a11342); startTracking never yields
   a sketch entity (6a531840: Shaped Flange 1 as live, cf-sheet-metal-shaped-flange 4 -> 5/10; parity run 85
   368/471, custom 40/109).
-- Next, first: Flange 1's corners in the definition sheet (ours shared, live's apart: Make joint 1 RIP fails on
-  it); no matches there, so waiting on live (REQUESTS 22:11) for how its corners look before changing anything.
-  Careful: std sheet metal's tests lean on today's corners; run sheetmetal_std with --include-ignored and the corpus.
+- 22:37–22:59: transient ids unique across a regeneration's features (777c4574; std's association ids are made from
+  them: Make joint's wall edge had shared one with a later flange's vertex; live's corners are shared edges with a
+  RIP attribute, as ours). Make joint 1 now waits on core's opExtendSheetBody (EXTEND_TO_SURFACE on a many-face
+  sheet; core.md 22:39). Queued a3ed3da8: edges extruded up to a part as live 2026 (first face per point, offsets,
+  planar up-to faces as planes), abortFeature frees ids: Sheet Metal Up to Part runs; its sheet is live's, the part
+  64/146/84 vs 50/112/76 (rolled walls in our rebuild: next). Parity run 87: 368/471, custom 40/109, 1 document
+  failing to run (cf-fix-pcb, after core's Extrude 5).
+- Next: cf-sheet-metal-model-plus's rolled walls in the rebuild; FS-QUERY-EDGE-ORDER (cross-feature creation order);
+  04:00 daily walk on the newest green.
 - 21:29: DISPLACEMENT-MAP end to end with core's Replace face (297f49cdd): /root/dx-scratch/disp/e2e/run.py.
 - Next: FS-QUERY-EDGE-ORDER (creation-order key, ticket 20:14), the other failing custom features (cf-setback-
   fillet fill surface, Sheet Metal Up to Part, Fix PCB), DISPLACEMENT-MAP end to end when core's Replace face on
