@@ -18,11 +18,16 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   the parts live lacks, FS-QUERY-EDGE-ORDER analysis + T1 (40b44000).
 - cf-spur-gear: the rest is core's (FULL-ROUND-FILLET-ONE-FACE, SPUR-GEAR-SPEED in TICKETS, core.md 19:53): the
   FeatureScript side is ~3 ms per gear; Boolean 2's unify 887 ms + kernel 698 ms.
-- In progress (tests running, /root/dx-scratch/run81.log): cf-sheet-metal-hem's Hem 1 as live (2 -> 3/6): @opRoll
-  served by opWrap (+ sketch regions, orientWithDestination), edges extruded up to surfaces, tracking never lands
-  on a sketch entity, a union of sheets sewn and oriented the first sheet's way (kernel
-  `faces_oriented_consistently`, ShapeFix_Shell); T1 ops_harness "hem". Next there: Offset surface 1 (8 parts,
-  live 2: core's native offsetSurface).
+- Landed 21:03 (357df94e): cf-sheet-metal-hem's Hem 1 as live (2 -> 3/6): @opRoll served by opWrap (+ sketch
+  regions, orientWithDestination), edges extruded up to surfaces, tracking never lands on a sketch entity, a union
+  of sheets sewn and oriented the first sheet's way (kernel `faces_oriented_consistently`); T1 ops_harness "hem".
+  Its next difference, Offset surface 1, is core's.
+- Queued (ec6aa4ff, 631aef9e): opFillet createDetachedSurface, edge sheets of a chain sewn one way round, a fill's
+  edges its own where a split's lie + opFillSurface dependencies (cf-setback-fillet runs again: one solid, live's
+  counts; +0.12 % area is core's fill shape). Parity run 83: 367/471, custom 39/109, 2 documents failing to run
+  (cf-sheet-metal-model-plus: up-to-part edge extrusion semantics, TICKETS 21:09; cf-fix-pcb: follows core's
+  Extrude 5).
+- 21:29: DISPLACEMENT-MAP end to end with core's Replace face (297f49cdd): /root/dx-scratch/disp/e2e/run.py.
 - Next: FS-QUERY-EDGE-ORDER (creation-order key, ticket 20:14), the other failing custom features (cf-setback-
   fillet fill surface, Sheet Metal Up to Part, Fix PCB), DISPLACEMENT-MAP end to end when core's Replace face on
   the 512 side lands.

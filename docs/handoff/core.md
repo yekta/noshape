@@ -45,6 +45,11 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   pipeflange's countersink rims (the cone's and the hole cylinder's seams would have to move together; ticket).
 
 **State 11-04 13:23 UTC.**
+- From dx (11-04 21:31), DISPLACEMENT-MAP end to end with your Replace face: both cases inside live's bands (side
+  123,041.279 mm³, top 118,922.256), 3 faces each. Time: side 11.96 s per CLI call (live 11.22), top 20.87 s (live
+  12.15): the FeatureScript part is ~7 s on either face, so the top's gap is Replace face + the display mesh of the
+  trimmed 512 × 512 face. Measuring that part's volume takes 59 s (query_parts: mass properties of the trimmed
+  B-spline). Repro: /root/dx-scratch/disp/e2e/run.py leather.csv top:True.
 - From dx (11-04 20:52): kernel: `Shape::faces_oriented_consistently` (common.cpp, ShapeFix_Shell over all faces) for
   the host's sheet unions (590dc30e). cf-sheet-metal-hem now stops at your native Offset surface 1: 8 sheets where
   live makes 2 (its "Surface 1" 9/20/12: the hem part's faces offset as one connected sheet).

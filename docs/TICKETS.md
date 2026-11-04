@@ -49,6 +49,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   11.17 / 12.15 s (side off / on, top off / on). Ours on the same cylinder (T2 displacement_map_probe, now Ø50 × 60):
   side off 7.4 s (10.1 s with the display mesh), top off 7.3 s (8.1 s): faster than live. Left: Replace face on
   (core: > 10 min in OCCT's projection; live's volumes 123,034.961 mm³ side, 118,888.675 mm³ top).
+  dx 11-04 21:31, end to end through the CLI with core's Replace face (297f49cdd; /root/dx-scratch/disp/e2e/run.py,
+  Ø50 × 60, leather.csv, degree 5, 0 → 1 mm): side, Replace on: INFO "262144 samples", Part 1 only, 3 faces,
+  123,041.279 mm³ (live 123,034.961, band 122,428–123,642), 11.96 s for the CLI call (live's feature 11.22 s); top,
+  Replace on: INFO, 3 faces, 118,922.256 mm³ (live 118,888.675, band 118,714–119,063), 20.87 s (live 12.15 s). Left
+  for live's time on the top: core's Replace face (6.6 s by core's count) and its display mesh; the textured top's
+  volume takes 59 s to measure (query_parts; kernel mass properties). Core.md 21:31.
 
 - Natives std calls that the FeatureScript host lacks (lead 11-04 13:08, after DISPLACEMENT-MAP; dx 11-04 14:53:
   native_args.rs MISSING and MISSING_OLDER; callers traced through std 3095). P1 where a standard feature noshape runs
@@ -3899,7 +3905,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Its next difference, Offset surface 1 (8 sheets, live 2 with 9/20/12), is core's native offsetSurface. Left
   failing: cf-setback-fillet (opFillSurface "multiple loops"), cf-sheet-metal-model-plus (Up to Part: ERROR, live
   INFO), Fix PCB 2 ("No components selected").
-  dx 11-04 21:30: cf-sheet-metal-model-plus's Sheet Metal Up to Part (std 1403 studio) extrudes 5 sketch edges at x = 0
+  dx 11-04 21:09: cf-sheet-metal-model-plus's Sheet Metal Up to Part (std 1403 studio) extrudes 5 sketch edges at x = 0
   along −x with startBound UP_TO_SURFACE (the part's x = −0.02 face, startDepth 11.8 mm as offset) and endBound
   UP_TO_BODY (the part, x −0.05…−0.02, faces stepping between −0.02 and −0.025). Live's sheet metal part spans x
   −0.0257…−0.0093: an edge's sheet ends where it first meets the part, location by location, and starts offset from
@@ -4089,7 +4095,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   bool 11-04 18:29: that subtraction (20 tooth gaps from the blank) is noshape's Boolean now: 0.25 s, OCCT's 2.0 s
   (it declined "coincident pieces differ": the blank's cylinder split at its seam under a gap's B-spline face). All 14
   of the document's Booleans are taken, 2-8x OCCT's speed.
-- [x] (dx 11-04 21:45: both Setback Fillets run again, one solid with live's counts: a body another operation made
+- [x] (dx 11-04 21:29: both Setback Fillets run again, one solid with live's counts: a body another operation made
   after a split (the fill's patch) keeps its own edges where the split's lie, and opFillSurface's edges depend on its
   boundary, so std 782's join finds its matches; T1 ops_harness fillAfterSplit. Left: +0.12 % area, the fill's
   shape, core's fill surface.) P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
