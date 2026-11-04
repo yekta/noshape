@@ -3981,6 +3981,7 @@ fn item_slice(item: &Arc<Vec<ParamSpec>>) -> &'static [ParamSpec] {
 
 impl Render for FeatureDialog {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let _t = noshape_render::perf::scope("fd.render");
         if std::mem::take(&mut self.focus_dialog_pending) {
             window.focus(&self.focus, cx);
         }

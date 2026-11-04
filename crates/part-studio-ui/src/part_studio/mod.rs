@@ -1125,7 +1125,10 @@ impl PartStudioView {
                 // psui/m-03, lp-03); the other fields' stay unlit.
                 (with_geometry(d.active_refs()), Vec::new())
             }
-            None => (self.highlighted_selection(), Vec::new()),
+            None => {
+                let _t = noshape_render::perf::scope("ps.highlighted_selection");
+                (self.highlighted_selection(), Vec::new())
+            }
         };
         // Hovering a feature or part in the list lights up all of its
         // geometry; a single hovered entity uses the hover highlight.
@@ -5910,16 +5913,29 @@ impl PartStudioView {
         use crate::cached_slice::Slice;
         let me = cx.entity();
         let toolbar = Slice::new(&me, |this, window, cx| {
+            let _t = noshape_render::perf::scope("ps.slice_toolbar");
             let viewport_w = f32::from(window.viewport_size().width);
             // A new sketch's dialog shows the (disabled) sketch toolbar before
             // its plane is picked (live sketch/00).
             let sketch_dialog = this.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.type_id == "sketch");
             if this.sketch.is_some() || sketch_dialog { this.render_sketch_toolbar(viewport_w, cx) } else { this.render_toolbar(viewport_w, cx) }
         }, cx);
-        let underlay = Slice::new(&me, |this, window, cx| this.render_underlay_slice(window, cx), cx);
-        let overlay = Slice::new(&me, |this, window, cx| this.render_overlay_slice(window, cx), cx);
-        let features = Slice::new(&me, |this, window, cx| this.render_feature_list(window, cx), cx);
-        let parts = Slice::new(&me, |this, _, cx| this.render_parts_list(cx), cx);
+        let underlay = Slice::new(&me, |this, window, cx| {
+            let _t = noshape_render::perf::scope("ps.slice_underlay");
+            this.render_underlay_slice(window, cx)
+        }, cx);
+        let overlay = Slice::new(&me, |this, window, cx| {
+            let _t = noshape_render::perf::scope("ps.slice_overlay");
+            this.render_overlay_slice(window, cx)
+        }, cx);
+        let features = Slice::new(&me, |this, window, cx| {
+            let _t = noshape_render::perf::scope("ps.slice_features");
+            this.render_feature_list(window, cx)
+        }, cx);
+        let parts = Slice::new(&me, |this, _, cx| {
+            let _t = noshape_render::perf::scope("ps.slice_parts");
+            this.render_parts_list(cx)
+        }, cx);
         // Labels, the view cube and manipulators follow the camera (the
         // lists don't: orbiting rebuilt every row each frame); all read the
         // document (undo state, features) besides the studio.
@@ -6054,6 +6070,7 @@ impl PartStudioView {
 
 impl Render for PartStudioView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let _t = noshape_render::perf::scope("ps.render");
         let pal = p();
         // What GPUI still draws that follows the camera (perf: otherwise camera
         // moves are only presented): the sketch's boxes, glyphs and counts

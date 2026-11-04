@@ -2059,6 +2059,26 @@ fn a_new_extrude_on_a_face_never_previews_as_new(cx: &mut TestAppContext) {
     assert_eq!(most, 1, "no New preview with a second part on the way");
 }
 
+/// A selected face's boundary: its four edges outlined (found from its pick id, scene builder `face_at`), no other
+/// edge of the part.
+#[gpui::test]
+fn a_selected_faces_edges_are_outlined(cx: &mut TestAppContext) {
+    let (_window, view, top, _) = block_part(cx, "face-outline");
+    let (outlined, expected) = cx.update(|cx| {
+        let v = view.read(cx);
+        let built = v.built.as_ref().expect("a scene");
+        let scene = crate::scene_builder::with_highlights(built, &v.display, std::slice::from_ref(&top), None, &[], Vec::new(), false, v.gpu.uploader());
+        let edges: Vec<u32> = (1..scene.states.len() as u32).filter(|&id| built.picks.get(id).is_some_and(|t| t.kind == crate::scene_builder::PickKind::Edge)).collect();
+        let outlined: Vec<u32> = edges.iter().copied().filter(|&id| scene.states[id as usize] & noshape_render::scene::state::OUTLINE != 0).collect();
+        let expected: Vec<u32> = crate::scene_builder::face_edges(&v.display, &top).iter().flat_map(|e| built.picks.ids_for(e).to_vec()).collect();
+        (outlined, expected)
+    });
+    let mut expected = expected;
+    expected.sort_unstable();
+    assert_eq!(outlined.len(), 4, "the top face's four edges: {outlined:?}");
+    assert_eq!(outlined, expected);
+}
+
 /// Live 1990 (5.15): a Fillet moved above the Extrude whose edge it takes: its chip is that edge made by a later
 /// feature (grey italic, not missing).
 #[gpui::test]

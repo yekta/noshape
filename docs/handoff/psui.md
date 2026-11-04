@@ -197,6 +197,8 @@ document's display mesh is under 0.5 s.
 |---|---|---|
 | orbit / pan / zoom, NIST assembly at Retina | 120 fps | 10-30 (perf 40987999836, main 7523035a, silhouette cull on, 2× frames-driven): presented 79–85 fps, GPU frame mean 12.8–15 ms (before the cull: 48.7–55.7 fps, perf 40973793607). Earlier: v0.4.11 (perf.yml 40528877198, macOS 14, 2388×1588 device px, frame-driven): presented 76.7 / 73.6 / 64.9 fps, UI CPU p95 0.35 / 0.33 / 0.37 ms; GPU time not reported on Metal (r.done_ms lands with ab488e30, after v0.4.11). At 1× the runner presents ~30 fps (its timer) |
 | cold start to first frame | ≤ 1 s | 10-28 (perf 40755981437, Metal cache cleared each launch, precompiled metallibs): median 1364 ms (macOS 14) / 1560 ms (macOS 15), shader compile 65–141 ms (was 540–900); the window itself is the rest. Earlier: | v0.4.11: the job's first launch 1356 ms (OS first run: gpui_kit::init 285 ms vs 20 warm; the held shader compile 421 ms starts at the first window draw, 784 ms); warm launches 276–385 ms ✓. COLD=1 run 40526882894 (Metal shader cache cleared each launch) pending |
+| hover, pick (pointer / click to the frame showing it) | within a frame | 11-04: viewport benches `NOSHAPE_PERF_BENCH=hover` (new) / `pick`; their summary splits the UI thread's part (to the frame's submission) from the GPU's. cf-straight-spline (3662 faces, 230k triangles, model suite, local Xvfb): hover's pick 1.5 ms p50, scene refresh 1.4 ms; the GPU part is lavapipe's here (~1.1 s), only perf.yml's runners say |
+| dialog open, list row click (action to the end of the paint of its first frame, UI thread) | within a frame | 11-04: `NOSHAPE_PERF_SCRIPT=ui-latency` (perf_script.rs). cf-straight-spline, a feature row click: `ps.refresh_scene` p50 56.5 → 1.8–2.4 ms (mean 64.9 → 2.8–4.3: a lit face's boundary from its pick id and a per-mesh face → edges table, not a search of every face and edge per face); scene build: PickMap indexes references by a 4-level hash (deep TopoName hashing was ~45 % of the UI thread's samples; the run's busy samples −28 %). Still over: GPUI prepaint of the re-rendered list slices, p50 30–50 ms on that frame (next) |
 | open a document | ≤ 0.5 s | v0.4.11 warm: opening → first viewport frame 130–200 ms ✓; first launch 800 ms |
 
 ## In progress
@@ -868,6 +870,15 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- 11-04 13:15 (lead: Part Studio speed, then the three P3s): see "Speed targets" (hover / pick / dialog open / row
+  click rows). Fixed: a selected feature row's highlight (56 → 2 ms on cf-straight-spline), PickMap hashing. Left
+  over target: GPUI prepaint of the list slices after a click (30–50 ms on 117 rows; next: time the views in prepaint),
+  `ps.apply_display` 150–390 ms on the UI thread per regeneration (scene build 100–130 ms of it). The model-suite
+  documents can't go to perf.yml (not ours); their translations: vibe5 `~/psui-parity-saved/`, here
+  /root/psui-scratch/perf/ (NOSHAPE_PARITY_SAVE). Bench runner: /root/psui-scratch/benchrun.sh (own config dir: the
+  shared ~/.config/noshape has left_panel_width 1240). cf-straight-spline regenerates in 16.2 s (vibe5 release), live
+  7.8 s: told core. P3s: DIALOG-UNDO-ON-CONTROL, FS-SEARCH-BAR fixed; MISSING-LATER-CHIP's look done, its menu waits
+  for live (1993 (b)).
 - 11-04 11:06: live's 1990 answers (behaviours l.34565) put in part-studio.md: 22 rows match. Corrected: a
   double-click on a sketch's line in the graphics no longer opens the sketch (3.18), a click on empty list space keeps
   the selection (6.29). New P3 tickets MISSING-LATER-CHIP, DIALOG-UNDO-ON-CONTROL, FS-SEARCH-BAR. 9.15 inertia and

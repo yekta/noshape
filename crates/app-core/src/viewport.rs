@@ -456,6 +456,8 @@ struct OrbitBench {
     /// scene came), and the click to highlighted frame times (ms).
     click: Option<(Instant, Option<u64>)>,
     click_ms: Vec<f32>,
+    /// The same up to the frame's submission to the GPU (the UI thread's part).
+    click_submit_ms: Vec<f32>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -469,6 +471,9 @@ enum BenchKind {
     /// Clicks across the model, each timed from the click to the first presented frame with its selection
     /// (`NOSHAPE_PERF_ORBIT` clicks, at most 60).
     Pick,
+    /// The pointer resting on points across the model and then on empty space, each timed from its arrival to the
+    /// first presented frame with the new highlight (at most 60).
+    Hover,
 }
 
 static BENCH_CLAIMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -483,9 +488,10 @@ fn orbit_bench_from_env() -> Option<OrbitBench> {
         Ok("pan") => BenchKind::Pan,
         Ok("drag") => BenchKind::Drag,
         Ok("pick") => BenchKind::Pick,
+        Ok("hover") => BenchKind::Hover,
         _ => BenchKind::Orbit,
     };
-    Some(OrbitBench { frames, started: None, frames_at_start: 0, last_present: None, kind, grab: None, hover_wait: 0, ticks: 0, renders: 0, intervals: Vec::new(), ui_cpu: Vec::new(), cpu_at_present: None, window_draw: Vec::new(), drawable_wait: Vec::new(), draw_at_present: None, fitted: false, last_tick: None, click: None, click_ms: Vec::new() })
+    Some(OrbitBench { frames, started: None, frames_at_start: 0, last_present: None, kind, grab: None, hover_wait: 0, ticks: 0, renders: 0, intervals: Vec::new(), ui_cpu: Vec::new(), cpu_at_present: None, window_draw: Vec::new(), drawable_wait: Vec::new(), draw_at_present: None, fitted: false, last_tick: None, click: None, click_ms: Vec::new(), click_submit_ms: Vec::new() })
 }
 
 impl EventEmitter<ViewportEvent> for Viewport {}
@@ -647,6 +653,7 @@ impl Viewport {
 
     /// Replace the scene (geometry or highlight state changed).
     pub fn set_scene(&mut self, scene: Arc<Scene>, geometry_changed: bool, cx: &mut Context<Self>) {
+        let _t = noshape_render::perf::scope("v.set_scene");
         if !geometry_changed && (Arc::ptr_eq(&scene, &self.scene) || scene.same_as(&self.scene)) {
             // Nothing visible changed (e.g. a refresh with the same highlights).
             return;
@@ -1124,6 +1131,12 @@ impl Viewport {
             self.schedule_hover_refresh(cx);
         }
         self.seq += 1;
+        if let Some(b) = &mut self.bench
+            && let Some((t, Some(need))) = b.click
+            && need == self.seq
+        {
+            b.click_submit_ms.push(t.elapsed().as_secs_f32() * 1000.0);
+        }
         self.in_flight.push_back((self.seq, now, interactive));
         self.gpu.submit(RenderJob {
             target: self.target_id,
@@ -1224,7 +1237,7 @@ impl Viewport {
             && seq >= need
         {
             let ms = t.elapsed().as_secs_f32() * 1000.0;
-            log::info!(target: "perf", "pick bench: click {} shown after {ms:.1} ms", b.click_ms.len() + 1);
+            log::info!(target: "perf", "pick bench: {} {} shown after {ms:.1} ms", if b.kind == BenchKind::Hover { "rest" } else { "click" }, b.click_ms.len() + 1);
             b.click_ms.push(ms);
             b.click = None;
             b.last_tick = Some(Instant::now());
@@ -1504,13 +1517,13 @@ impl Viewport {
             b.started = Some(Instant::now());
             b.frames_at_start = self.frames_presented;
             match b.kind {
-                BenchKind::Zoom | BenchKind::Pick => {}
+                BenchKind::Zoom | BenchKind::Pick | BenchKind::Hover => {}
                 BenchKind::Drag => self.drag = Drag::Tool,
                 BenchKind::Orbit | BenchKind::Pan => self.drag = Drag::Nav,
             }
         }
         let Some(b) = &mut self.bench else { return false };
-        if b.kind == BenchKind::Pick {
+        if matches!(b.kind, BenchKind::Pick | BenchKind::Hover) {
             return self.pick_bench_tick(cx);
         }
         let presented = self.frames_presented - b.frames_at_start;
@@ -1545,6 +1558,7 @@ impl Viewport {
                     BenchKind::Pan => "pan",
                     BenchKind::Drag => "drag",
                     BenchKind::Pick => "pick",
+                    BenchKind::Hover => "hover",
                 },
                 match (self.shown_texture.is_some(), bench_driven_by_frames()) {
                     (true, false) => "frames on the GPU",
@@ -1590,7 +1604,7 @@ impl Viewport {
             // A drag back and forth that keeps the model in view.
             BenchKind::Pan => self.camera.pan(if (ticks / 30) % 2 == 0 { DVec2::new(6.0, 2.0) } else { DVec2::new(-6.0, -2.0) }, h),
             BenchKind::Orbit => self.camera.orbit(DVec2::new(3.0, 0.75), h),
-            BenchKind::Pick => return true,
+            BenchKind::Pick | BenchKind::Hover => return true,
             // A triangle wave ±60 px about the grab point; the camera stays.
             BenchKind::Drag => {
                 let phase = (ticks % 120) as f64;
@@ -1612,16 +1626,23 @@ impl Viewport {
         if b.click_ms.len() >= clicks {
             let n = b.click_ms.len();
             let st = noshape_render::perf::Stats::of(&mut b.click_ms);
-            log::info!(target: "perf", "BENCH SUMMARY pick: {n} clicks, {instances} instances | click to the frame with its selection mean {:.1} p50 {:.1} p95 {:.1} max {:.1} ms", st.mean, st.p50, st.p95, st.max);
+            let sub = noshape_render::perf::Stats::of(&mut b.click_submit_ms);
+            let (kind, each, until) = if b.kind == BenchKind::Hover { ("hover", "rests", "pointer to the frame with its highlight") } else { ("pick", "clicks", "click to the frame with its selection") };
+            log::info!(target: "perf", "BENCH SUMMARY {kind}: {n} {each}, {instances} instances | {until} mean {:.1} p50 {:.1} p95 {:.1} max {:.1} ms | to its submission (UI thread) mean {:.1} p50 {:.1} p95 {:.1} max {:.1} ms", st.mean, st.p50, st.p95, st.max, sub.mean, sub.p50, sub.p95, sub.max);
             noshape_render::perf::flush();
             self.bench = None;
             return false;
         }
+        let hover = b.kind == BenchKind::Hover;
         if let Some((t, need)) = b.click {
-            if t.elapsed() < Duration::from_secs(10) {
+            // A rest that changes no highlight (the same entity, empty space twice) isn't counted.
+            let limit = if hover && need.is_none() { Duration::from_secs(1) } else { Duration::from_secs(10) };
+            if t.elapsed() < limit {
                 return true;
             }
-            log::info!(target: "perf", "pick bench: no frame with a new selection within 10 s ({})", if need.is_some() { "the scene changed" } else { "the scene stayed" });
+            if !hover {
+                log::info!(target: "perf", "pick bench: no frame with a new selection within 10 s ({})", if need.is_some() { "the scene changed" } else { "the scene stayed" });
+            }
             b.click = None;
         }
         // 300 ms between clicks, so each starts from a settled view.
@@ -1634,7 +1655,19 @@ impl Viewport {
         let k = b.ticks as usize % AT.len();
         let p = DVec2::new(size.x * AT[k].0, size.y * AT[k].1);
         b.click = Some((Instant::now(), None));
-        self.click_at(p, Modifiers::default(), cx);
+        if !hover {
+            self.click_at(p, Modifiers::default(), cx);
+            return true;
+        }
+        // Every other rest on empty space (a corner), so each one changes the highlight.
+        let p = if b.ticks % 2 == 0 { DVec2::new(4.0, 4.0) } else { p };
+        self.pointer_inside = true;
+        self.last_pos = p;
+        match self.pick_at(p) {
+            Some(id) => self.set_hover(id, cx),
+            None => self.request_hover(),
+        }
+        cx.emit(ViewportEvent::PointerMove { position: p, modifiers: Modifiers::default() });
         true
     }
 

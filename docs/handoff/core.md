@@ -2066,3 +2066,9 @@ beside 3095 (packed, loaded when a studio pins one) and serve each pin the newes
 shims in 1963. I have the ticket (TICKETS FS-OLD-STD-COMPAT); nothing for you to do. One thing you'll see in the
 FeatureScript crate when it lands: `CompiledFn` knows its module's version and natives can ask
 `Interp::module_version()` (getCurrentVersion answers an older std in its own enum).
+
+## From psui (2026-11-04 13:18 UTC): cf-straight-spline regenerates 2x slower than live
+- The model suite's biggest Part Studio (cf-straight-spline, 59 features, 3662 faces) regenerates in **16.2 s**
+  (vibe5, release, `parity_models` with NOSHAPE_PARITY_ONLY) against live's **7.8 s** (its features' regenTimes,
+  live.jsonl). Its translation is in vibe5 `~/psui-parity-saved/cf-straight-spline.noshape` (NOSHAPE_PARITY_SAVE) if
+  you want to profile it; the custom "SAE Straight-Sided Spline" features dominate (`regen[...]` perf log lines).

@@ -52,14 +52,96 @@ pub struct PickTarget {
 #[derive(Clone, Debug, Default)]
 pub struct PickMap {
     targets: Vec<PickTarget>,
-    by_ref: HashMap<Reference, Vec<u32>>,
+    /// Ids by [`shallow_hash`] of their reference: one group per distinct reference (a custom feature's faces are
+    /// named from earlier faces, recursively; cloning and hashing every name whole took most of a scene build).
+    by_ref: HashMap<u64, Vec<Vec<u32>>>,
+    /// Per pickable body, ascending: (its first face id − 1, face count, its first edge id − 1, its index in the
+    /// display's bodies).
+    bodies: Vec<(u32, u32, u32, usize)>,
+}
+
+/// A reference's hash from its first few levels only: equal references hash alike, and names that differ that
+/// close to the top rarely collide.
+fn shallow_hash(r: &Reference) -> u64 {
+    use noshape_model::reference::{Role, Source, TopoName};
+    use std::hash::{Hash, Hasher};
+    const DEPTH: u32 = 4;
+    fn source(s: &Source, h: &mut impl Hasher, depth: u32) {
+        std::mem::discriminant(s).hash(h);
+        match s {
+            Source::Topo(n) => name(n, h, depth),
+            other => other.hash(h),
+        }
+    }
+    fn role(r: &Role, h: &mut impl Hasher, depth: u32) {
+        std::mem::discriminant(r).hash(h);
+        match r {
+            Role::Side(s) | Role::Profile(s) => source(s, h, depth),
+            Role::CapStart(s) | Role::CapEnd(s) => {
+                if let Some(s) = s {
+                    source(s, h, depth);
+                }
+            }
+            Role::Blend(n) | Role::Generated(n) | Role::Offset(n) => name(n, h, depth),
+            Role::New(i) | Role::Datum(i) => i.hash(h),
+            Role::Copy { instance, of } => {
+                instance.hash(h);
+                name(of, h, depth);
+            }
+        }
+    }
+    fn name(n: &TopoName, h: &mut impl Hasher, depth: u32) {
+        std::mem::discriminant(n).hash(h);
+        let Some(d) = depth.checked_sub(1) else { return };
+        match n {
+            TopoName::Face { feature, role: r } => {
+                feature.hash(h);
+                role(r, h, d);
+            }
+            TopoName::Split { parent, by, ordinal } => {
+                by.hash(h);
+                ordinal.hash(h);
+                name(parent, h, d);
+            }
+            TopoName::Edge { faces, ordinal } => {
+                ordinal.hash(h);
+                faces.iter().for_each(|f| name(f, h, d));
+            }
+            TopoName::Vertex { faces, ordinal } => {
+                ordinal.hash(h);
+                faces.len().hash(h);
+                faces.iter().take(3).for_each(|f| name(f, h, d));
+            }
+            TopoName::Wire { feature, source: s } => {
+                feature.hash(h);
+                source(s, h, d);
+            }
+            TopoName::Boundary { face, ordinal } => {
+                ordinal.hash(h);
+                name(face, h, d);
+            }
+        }
+    }
+    let mut h = std::hash::DefaultHasher::new();
+    std::mem::discriminant(r).hash(&mut h);
+    match r {
+        Reference::Face(n) | Reference::Edge(n) | Reference::Vertex(n) => name(n, &mut h, DEPTH),
+        other => other.hash(&mut h),
+    }
+    h.finish()
 }
 
 impl PickMap {
     fn push(&mut self, t: PickTarget) -> u32 {
+        let h = shallow_hash(&t.reference);
         self.targets.push(t);
         let id = self.targets.len() as u32;
-        self.by_ref.entry(self.targets[id as usize - 1].reference.clone()).or_default().push(id);
+        let targets = &self.targets;
+        let groups = self.by_ref.entry(h).or_default();
+        match groups.iter_mut().find(|g| targets[g[0] as usize - 1].reference == targets[id as usize - 1].reference) {
+            Some(g) => g.push(id),
+            None => groups.push(vec![id]),
+        }
         id
     }
     /// Reserve `n` consecutive ids, returning the base such that local id
@@ -74,8 +156,15 @@ impl PickMap {
     pub fn get(&self, id: u32) -> Option<&PickTarget> {
         if id == 0 { None } else { self.targets.get(id as usize - 1) }
     }
+    /// The body (index in the display's bodies), face index and edge id base of face pick `id`.
+    pub fn face_at(&self, id: u32) -> Option<(usize, usize, u32)> {
+        let k = self.bodies.partition_point(|b| b.0 < id).checked_sub(1)?;
+        let (base, count, edge_base, body) = self.bodies[k];
+        (id > base && id - base <= count).then(|| (body, (id - base - 1) as usize, edge_base))
+    }
     pub fn ids_for(&self, r: &Reference) -> &[u32] {
-        self.by_ref.get(r).map(|v| v.as_slice()).unwrap_or(&[])
+        let Some(groups) = self.by_ref.get(&shallow_hash(r)) else { return &[] };
+        groups.iter().find(|g| self.targets[g[0] as usize - 1].reference == *r).map(|g| g.as_slice()).unwrap_or(&[])
     }
     pub fn len(&self) -> usize {
         self.targets.len()
@@ -341,6 +430,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 })),
             )
         };
+        if !display_only {
+            picks.bodies.push((face_base, b.face_refs.len() as u32, edge_base, part_index));
+        }
         let mut color = b.color;
         if opts.neutral_bodies && b.kind == BodyKind::Solid {
             // The overlap shows through nearly unchanged (live analysis/83).
@@ -993,11 +1085,12 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     let hov_color = theme::lin(theme::viewport::PREHIGHLIGHT);
     // Onshape outlines hovered and selected faces (their boundary edges
     // light orange / amber) instead of tinting a hovered face.
-    let mut boundary: Vec<(Reference, u32)> = Vec::new();
+    // Lit faces (pick id, flag): their boundary edges are found from their ids after the marks.
+    let mut lit_faces: Vec<(u32, u32)> = Vec::new();
     // Faces without edges (a mesh part's mesh face) get the part's
     // silhouette outline instead (live G35: light orange on hover, orange
     // around the selected part).
-    let mut silhouette: Vec<Reference> = Vec::new();
+    let mut silhouette: Vec<u32> = Vec::new();
 
     let mut mark = |r: &Reference, flag: u32, scene: &mut Scene| {
         // A sketch region is drawn from the display, also when its sketch
@@ -1088,13 +1181,7 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                         }
                     }
                 }
-                PickKind::Face if flag & (state::HOVER | state::SELECTED | state::ERROR) != 0 => {
-                    let edges = face_edges(display, r);
-                    if edges.is_empty() && display.bodies.iter().any(|b| !b.hidden && b.face_refs.contains(r)) {
-                        silhouette.push(r.clone());
-                    }
-                    boundary.extend(edges.into_iter().map(|e| (e, flag)));
-                }
+                PickKind::Face if flag & (state::HOVER | state::SELECTED | state::ERROR) != 0 => lit_faces.push((id, flag)),
                 _ => {}
             }
         }
@@ -1171,18 +1258,26 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             h => mark(h, state::HOVER, &mut scene),
         }
     }
+    let _t = noshape_render::perf::scope("s.wh_after_marks");
     // A face's boundary edges: a solid 2 device px line, not the band of an
     // edge highlighted itself (live EDGE-HIGHLIGHT-LOOK (d)).
-    for (e, flag) in boundary {
-        for &id in built.picks.ids_for(&e) {
-            let own = scene.states.get(id as usize).is_some_and(|s| s & (state::HOVER | state::SELECTED | state::ERROR) != 0);
-            scene.add_flag(id, if own { flag } else { flag | state::OUTLINE });
+    let mut tables: HashMap<usize, Arc<Vec<Vec<u32>>>> = HashMap::new();
+    let mut boundary: Vec<(u32, u32)> = Vec::new();
+    for (id, flag) in lit_faces {
+        let Some((bi, fi, edge_base)) = built.picks.face_at(id) else { continue };
+        let Some(b) = display.bodies.get(bi) else { continue };
+        let table = tables.entry(bi).or_insert_with(|| face_edge_table(&b.mesh));
+        match table.get(fi) {
+            Some(edges) if !edges.is_empty() => boundary.extend(edges.iter().map(|e| (edge_base + e + 1, flag))),
+            _ => silhouette.push(id),
         }
     }
-    for f in silhouette {
-        for &id in built.picks.ids_for(&f) {
-            scene.add_flag(id, state::OUTLINE);
-        }
+    for (id, flag) in boundary {
+        let own = scene.states.get(id as usize).is_some_and(|s| s & (state::HOVER | state::SELECTED | state::ERROR) != 0);
+        scene.add_flag(id, if own { flag } else { flag | state::OUTLINE });
+    }
+    for id in silhouette {
+        scene.add_flag(id, state::OUTLINE);
     }
     // Selected faces drawn again at SELECTION_OVER_PLANES over the planes in
     // front of them (live selection/04: under one plane (229,170,56), two
@@ -1339,7 +1434,7 @@ pub const QUERY_FACE_ALPHA: f32 = 0.5;
 /// the selection color (live "lp wall over" 2258: the seed of a failed
 /// Feature pattern behind the block).
 pub fn hidden_edges_dashed(display: &StudioDisplay, faces: &[Reference], up: &Uploader) -> Option<Instance> {
-    let edges: std::collections::HashSet<Reference> = faces.iter().flat_map(|f| face_edges(display, f)).collect();
+    let edges: std::collections::HashSet<Reference> = faces_edges(display, faces).into_iter().flatten().flatten().collect();
     let color = lin_to_u8(theme::lin(theme::viewport::SELECTION));
     let mut lines = LineData::default();
     for b in display.bodies.iter().filter(|b| !b.hidden) {
@@ -1651,17 +1746,77 @@ fn laminar_edges(m: &noshape_model::display::MeshBuffers) -> Vec<bool> {
 /// vertices of the face's triangles (the mesher shares edge points with the
 /// faces it bounds).
 pub fn face_edges(display: &StudioDisplay, r: &Reference) -> Vec<Reference> {
-    let Some((body, fi)) = display.bodies.iter().filter(|b| !b.hidden).find_map(|b| b.face_refs.iter().position(|f| f == r).map(|i| (b, i))) else { return Vec::new() };
-    let m = &body.mesh;
-    let Some(&(first, count)) = m.face_ranges.get(fi) else { return Vec::new() };
+    faces_edges(display, std::slice::from_ref(r)).into_iter().next().flatten().unwrap_or_default()
+}
+
+/// [`face_edges`] of several faces in one pass over the bodies (a selected feature lights hundreds of faces; looked
+/// up one by one, each searched every face and edge of its body). `None` for a face no shown body has.
+pub fn faces_edges(display: &StudioDisplay, faces: &[Reference]) -> Vec<Option<Vec<Reference>>> {
+    let mut out = vec![None; faces.len()];
+    if faces.is_empty() {
+        return out;
+    }
+    let mut wanted: HashMap<&Reference, Vec<usize>> = HashMap::new();
+    for (k, f) in faces.iter().enumerate() {
+        wanted.entry(f).or_default().push(k);
+    }
+    for b in display.bodies.iter().filter(|b| !b.hidden) {
+        let mut table: Option<Arc<Vec<Vec<u32>>>> = None;
+        for (fi, f) in b.face_refs.iter().enumerate() {
+            let Some(ks) = wanted.remove(f) else { continue };
+            let t = table.get_or_insert_with(|| face_edge_table(&b.mesh));
+            let edges: Vec<Reference> = t.get(fi).map(|es| es.iter().filter_map(|&e| b.edge_refs.get(e as usize).cloned()).collect()).unwrap_or_default();
+            for k in ks {
+                out[k] = Some(edges.clone());
+            }
+        }
+        if wanted.is_empty() {
+            break;
+        }
+    }
+    out
+}
+
+/// Per face of `mesh`, the edges bounding it ([`face_edges`]'s rule), worked out once per mesh.
+fn face_edge_table(mesh: &Arc<noshape_model::display::MeshBuffers>) -> Arc<Vec<Vec<u32>>> {
+    type Table = (std::sync::Weak<noshape_model::display::MeshBuffers>, Arc<Vec<Vec<u32>>>);
+    static CACHE: std::sync::Mutex<Vec<Table>> = std::sync::Mutex::new(Vec::new());
+    if let Some(t) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).iter().find(|(w, _)| std::ptr::eq(w.as_ptr(), Arc::as_ptr(mesh))).map(|(_, t)| t.clone()) {
+        return t;
+    }
+    let m = &**mesh;
     let q = |p: &[f32; 3]| [(p[0] * 1e5).round() as i64, (p[1] * 1e5).round() as i64, (p[2] * 1e5).round() as i64];
-    let verts: std::collections::HashSet<[i64; 3]> = m.indices.get(first as usize..(first + count) as usize).unwrap_or(&[]).iter().filter_map(|&i| m.positions.get(i as usize)).map(q).collect();
-    m.edges
-        .iter()
-        .zip(&body.edge_refs)
-        .filter(|(pl, _)| !pl.is_empty() && pl.iter().all(|p| verts.contains(&q(p))))
-        .map(|(_, e)| e.clone())
-        .collect()
+    let mut faces_at: HashMap<[i64; 3], Vec<u32>> = HashMap::new();
+    for (f, &(first, count)) in m.face_ranges.iter().enumerate() {
+        for &i in m.indices.get(first as usize..(first + count) as usize).unwrap_or(&[]) {
+            if let Some(p) = m.positions.get(i as usize) {
+                let e = faces_at.entry(q(p)).or_default();
+                if e.last() != Some(&(f as u32)) && !e.contains(&(f as u32)) {
+                    e.push(f as u32);
+                }
+            }
+        }
+    }
+    let mut table = vec![Vec::new(); m.face_ranges.len()];
+    for (ei, pl) in m.edges.iter().enumerate() {
+        let Some(first) = pl.first() else { continue };
+        let mut common = faces_at.get(&q(first)).cloned().unwrap_or_default();
+        for p in &pl[1..] {
+            if common.is_empty() {
+                break;
+            }
+            let at = faces_at.get(&q(p)).map(Vec::as_slice).unwrap_or(&[]);
+            common.retain(|f| at.contains(f));
+        }
+        for f in common {
+            table[f as usize].push(ei as u32);
+        }
+    }
+    let table = Arc::new(table);
+    let mut c = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    c.retain(|(w, _)| w.strong_count() > 0);
+    c.push((Arc::downgrade(mesh), table.clone()));
+    table
 }
 
 fn lin_to_u8(c: [f32; 4]) -> [u8; 4] {

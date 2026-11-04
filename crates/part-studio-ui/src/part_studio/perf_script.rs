@@ -5,6 +5,10 @@
 //! feature dialog's commit: every feature after it regenerates), then undoes
 //! and redoes. `NOSHAPE_PERF_SCRIPT_WAIT_MS=<ms>`: `edit-undo-redo` starts that long after the studio is shown
 //! (COMMIT-LATENCY: the runners' first frames after opening take 250–500 ms on the GPU and hold the UI thread).
+//! `ui-latency` times the UI thread's part of showing an action, from the action to the end of the paint of the
+//! first frame that draws it (its present to the screen excluded): a feature dialog opening (Edit on each of the last
+//! features in turn, cancelled after) and a feature row click (the list's and the graphics' highlight), 20 each, then
+//! logs `BENCH SUMMARY dialog-open` / `row-click`.
 
 use super::PartStudioView;
 use gpui_kit::*;
@@ -21,6 +25,9 @@ pub(super) enum Script {
     EditOpen,
     /// Shown, waiting `NOSHAPE_PERF_SCRIPT_WAIT_MS` before the edit.
     EditWaiting,
+    /// `ui-latency`: waiting for the opened studio, then running (`run_ui_latency`).
+    LatencyOpen,
+    Latency,
     /// The wait is over: edit now.
     EditNow,
     /// Extrude 1's depth committed then.
@@ -35,9 +42,13 @@ pub(super) fn from_env() -> Option<Script> {
     match std::env::var("NOSHAPE_PERF_SCRIPT").ok()?.as_str() {
         "delete-undo-last" => Some(Script::Open),
         "edit-undo-redo" => Some(Script::EditOpen),
+        "ui-latency" => Some(Script::LatencyOpen),
         _ => None,
     }
 }
+
+/// A window frame's stages on the UI thread (gpui's own timings).
+const FRAME_STAGES: [&str; 3] = ["gpui.request_layout", "gpui.prepaint", "gpui.paint"];
 
 impl PartStudioView {
     /// A stage of the step in progress (the regeneration scheduled, its result in, its display applied), logged
@@ -128,8 +139,80 @@ impl PartStudioView {
                 log::info!(target: "perf", "perf script: redo shown in {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
                 Script::Done
             }
+            Script::LatencyOpen => {
+                self.run_ui_latency(cx);
+                Script::Latency
+            }
+            Script::Latency => Script::Latency,
             Script::EditWaiting => Script::EditWaiting,
             Script::Done => Script::Done,
         });
+    }
+
+    /// `ui-latency`: the dialog-open and row-click samples, one at a time, 300 ms apart.
+    fn run_ui_latency(&mut self, cx: &mut Context<Self>) {
+        let Some(window) = cx.active_window().or_else(|| cx.windows().first().copied()) else { return };
+        let features: Vec<noshape_model::reference::FeatureId> = self.studio(cx).map(|s| s.features.iter().rev().filter(|f| f.type_id != "sketch").take(4).map(|f| f.id).collect()).unwrap_or_default();
+        if features.is_empty() {
+            log::info!(target: "perf", "perf script: no feature to open");
+            return;
+        }
+        log::info!(target: "perf", "perf script: ui-latency on {} features", features.len());
+        cx.spawn(async move |this, cx| {
+            let pause = || std::time::Duration::from_millis(300);
+            for (kind, n) in [("dialog-open", 20usize), ("row-click", 20)] {
+                let mut ms = Vec::new();
+                let (mut handler, mut wait, mut frame) = (Vec::new(), Vec::new(), Vec::new());
+                for k in 0..n {
+                    cx.background_executor().timer(pause()).await;
+                    let id = features[k % features.len()];
+                    let shown: std::sync::Arc<std::sync::Mutex<Option<[f32; 3]>>> = Default::default();
+                    let tx = shown.clone();
+                    let ok = cx.update_window(window, |_, w, cx| {
+                        for st in FRAME_STAGES {
+                            noshape_render::perf::series_start(st);
+                        }
+                        let t0 = Instant::now();
+                        let _ = this.update(cx, |this: &mut Self, cx| match kind {
+                            "dialog-open" => this.edit_feature(id, w, cx),
+                            _ => this.click_feature(id, false, cx),
+                        });
+                        let handler = t0.elapsed().as_secs_f32() * 1e3;
+                        // The first frame after the action draws it: its start, then its layout, prepaint and paint.
+                        w.on_next_frame(move |w, _| {
+                            let start = t0.elapsed().as_secs_f32() * 1e3;
+                            w.on_next_frame(move |_, _| {
+                                let draw: f32 = FRAME_STAGES.iter().map(|st| noshape_render::perf::series_take(st).first().copied().unwrap_or(0.0)).sum();
+                                *tx.lock().unwrap_or_else(|e| e.into_inner()) = Some([handler, start - handler, draw]);
+                            });
+                        });
+                    });
+                    if ok.is_err() {
+                        return;
+                    }
+                    for _ in 0..1000 {
+                        if let Some([h, w, f]) = *shown.lock().unwrap_or_else(|e| e.into_inner()) {
+                            ms.push(h + w + f);
+                            handler.push(h);
+                            wait.push(w);
+                            frame.push(f);
+                            break;
+                        }
+                        cx.background_executor().timer(std::time::Duration::from_millis(2)).await;
+                    }
+                    if kind == "dialog-open" {
+                        cx.background_executor().timer(pause()).await;
+                        let _ = cx.update_window(window, |_, w, cx| {
+                            let _ = this.update(cx, |this: &mut Self, cx| this.cancel_edit(w, cx));
+                        });
+                    }
+                }
+                let st = noshape_render::perf::Stats::of(&mut ms);
+                let (h, w, f) = (noshape_render::perf::Stats::of(&mut handler), noshape_render::perf::Stats::of(&mut wait), noshape_render::perf::Stats::of(&mut frame));
+                log::info!(target: "perf", "BENCH SUMMARY {kind}: {} samples | action to the end of the paint of the first frame showing it mean {:.1} p50 {:.1} p95 {:.1} max {:.1} ms | the action p50 {:.1} p95 {:.1}, waiting for the frame p50 {:.1} p95 {:.1}, the frame's layout + prepaint + paint p50 {:.1} p95 {:.1} ms", ms.len(), st.mean, st.p50, st.p95, st.max, h.p50, h.p95, w.p50, w.p95, f.p50, f.p95);
+            }
+            noshape_render::perf::flush();
+        })
+        .detach();
     }
 }
