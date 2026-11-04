@@ -242,6 +242,8 @@ fn load_prefs() -> Prefs {
 
 pub struct StartView {
     focus: FocusHandle,
+    /// Help ▸ Keyboard shortcuts: the studios' sheet, over the page (live psui/docs-help-3-shortcuts).
+    shortcut_sheet: Option<(Entity<crate::shortcut_sheet::ShortcutSheet>, Subscription)>,
     /// The Create button's keyboard focus: pressed, and back after its menu
     /// closes with Esc, it keeps live's focus look (dk-915).
     create_focus: FocusHandle,
@@ -344,6 +346,18 @@ impl Focusable for StartView {
 }
 
 impl StartView {
+    /// Help ▸ Keyboard shortcuts opens (or closes) the sheet, on its General tab.
+    fn toggle_shortcut_sheet(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.shortcut_sheet.take().is_some() {
+            window.focus(&self.focus, cx);
+        } else {
+            let sheet = crate::shortcut_sheet::ShortcutSheet::open(crate::shortcuts::Tab::General, window, cx);
+            let sub = cx.subscribe_in(&sheet, window, |this: &mut Self, _, _: &DismissEvent, window, cx| this.toggle_shortcut_sheet(window, cx));
+            self.shortcut_sheet = Some((sheet, sub));
+        }
+        cx.notify();
+    }
+
     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search documents"));
         let label_search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search labels"));
@@ -438,6 +452,7 @@ impl StartView {
         let source = prefs.source.clone().unwrap_or(if crate::doc_files::recent().is_empty() { Source::All } else { Source::Recent });
         let mut this = Self {
             focus: cx.focus_handle(),
+            shortcut_sheet: None,
             create_focus,
             create_press: false,
             body: None,
@@ -3483,6 +3498,7 @@ impl Render for StartView {
                 }
             }))
             .on_action(cx.listener(|this, _: &NewDocument, window, cx| this.new_document(window, cx)))
+            .on_action(cx.listener(|this, _: &crate::actions::ToggleShortcutHelp, window, cx| this.toggle_shortcut_sheet(window, cx)))
             .on_action(cx.listener(|this, _: &OpenDocument, window, cx| this.import_files(window, cx)))
             .on_action(cx.listener(|_, _: &CloseWindow, window, _| window.remove_window()))
             .on_action(cx.listener(|this, _: &OpenSelected, window, cx| {
@@ -3527,6 +3543,7 @@ impl Render for StartView {
             .child(self.render_title_bar(cx))
             .child(body.cached(StyleRefinement::default().w_full().flex_1().min_h_0()))
             .child(self.render_footer())
+            .children(self.shortcut_sheet.as_ref().map(|(s, _)| s.clone().into_any_element()))
             // Advanced search: under the search box, left-aligned with it (live documents/110).
             .when(self.adv_open, |d| {
                 let b = self.adv_anchor.get();
@@ -3604,8 +3621,10 @@ struct PropsEdit {
 /// Onshape's account button at the top-right (avatar, name, ▾). Its menu
 /// has the local items only: Preferences… (the account page: the name used
 /// as the author in Versions and history, keyboard shortcuts, …).
-/// Onshape's ? Help menu, in the documents page's navbar beside the account menu: its rows, then the app's
-/// (Install command line tool…, Connect to coding agents…, as a document's Help menu has them).
+/// Onshape's ? Help menu, in the documents page's navbar beside the account menu (live psui/docs-help-2-open: Help,
+/// Explore Onshape, FeatureScript documentation, Keyboard shortcuts | What's new, Forums, Report a bug | System check,
+/// About): its rows that work offline, Keyboard shortcuts and About, around the app's (Install command line tool…,
+/// Connect to coding agents…), as a document's Help menu has them.
 pub fn help_menu(cx: &App) -> AnyElement {
     let pal = p();
     let variant = ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).foreground(pal.text.into()).hover(pal.border.into()).active(pal.border.into()).shadow(false);
@@ -3615,7 +3634,10 @@ pub fn help_menu(cx: &App) -> AnyElement {
         .px(px(4.))
         .rounded(px(3.))
         .child(h_flex().gap(px(6.)).child(crate::assets::icon("help", 20., cx)).child(os::glyph(os::GLYPH_CARET, 8., pal.text)))
-        .os_dropdown_menu(HELP_MENU, false, |m, _, _| crate::start_hooks::help_items(m).separator().item(OsMenuItem::new("About noshape").disabled(true)))
+        .os_dropdown_menu(HELP_MENU, false, |m, _, _| {
+            let m = m.item(OsMenuItem::new("Keyboard shortcuts").on_click(|_, window, cx| window.dispatch_action(Box::new(crate::actions::ToggleShortcutHelp), cx))).separator();
+            crate::start_hooks::help_items(m).separator().item(OsMenuItem::new("About noshape").disabled(true))
+        })
         .debug_selector(|| HELP_MENU.into())
         .into_any_element()
 }

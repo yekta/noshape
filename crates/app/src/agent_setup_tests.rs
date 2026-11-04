@@ -111,4 +111,6 @@ fn the_start_windows_help_menu_lists_the_agent_items(cx: &mut TestAppContext) {
     for item in ["Install command line tool…", "Connect to coding agents…"] {
         assert!(rows.iter().any(|r| r == item), "{item} in {rows:?}");
     }
+    // Live's documents page (psui/docs-help-2-open): Keyboard shortcuts first, About last.
+    assert_eq!((rows.first().map(String::as_str), rows.last().map(String::as_str)), (Some("Keyboard shortcuts"), Some("About noshape")), "{rows:?}");
 }
