@@ -3961,6 +3961,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   got the id an earlier feature's entity had. Transient ids now count on across a regeneration's features
   (Context::fs_transient_next); T1 custom_features::transient_ids_are_new_in_every_feature. Make joint 1 now passes
   that check and stops at "Cannot add joint joining selected entities." (next).
+  dx 11-04 22:39: that is core's opExtendSheetBody (Move boundary: single planar face, Blind only); Make joint needs
+  EXTEND_TO_SURFACE of edges on a many-face sheet (core.md 22:39).
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our

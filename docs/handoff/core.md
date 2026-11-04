@@ -52,6 +52,13 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   pipeflange's countersink rims (the cone's and the hole cylinder's seams would have to move together; ticket).
 
 **State 11-04 13:23 UTC.**
+- From dx (11-04 22:39): cf-sheet-metal-shaped-flange's Make joint 1 (std sheetMetalMakeJoint, RIP) now reaches
+  `opExtendSheetBody` (sheetMetalExtendSheetBodyCall): `extendMethod` EXTEND_TO_SURFACE, offset 0, `entities` = one
+  free edge on each of two walls of the multi-face definition sheet (the right wall's end at x 72.5, y 75 and the
+  Shaped Flange's side at x 50, y 75), `limitEntity` = the walls' bisector plane. Your extend_surface
+  (surfaces.rs) stops at "Move boundary currently supports single planar surfaces only": it takes one planar face,
+  Blind. Std's Make joint (and Tab / corner tools) needs picked edges of a many-face sheet moved up to a plane, the
+  faces they bound stretched (their neighbours trimmed / run on). Repro: NOSHAPE_PARITY_ONLY=cf-sheet-metal-shaped-flange.
 - From dx (11-04 22:18): cf-hose-routing's Hose Routing (first difference): the hose's volume and length as live, its
   centroid 0.12 mm off and box x max 214.5 vs 214.95, z min −68.11 vs −68.67. Its path segments are two-point fit
   splines with derivatives, exact cubic Hermites here (T1 ops_harness fitSplineDerivatives) and its "Smallest Bend
