@@ -1272,7 +1272,10 @@ impl SketchEditor {
         self.offset_pending = None;
         self.offset_repeat = false;
         self.mirror_axis = None;
-        self.extend_from = None;
+        // Extend's pending pick goes with the tool (live: Esc, selection 0).
+        if self.extend_from.take().is_some() {
+            self.selection.clear();
+        }
         self.otf = None;
         self.otf_typing = false;
         self.woken.clear();
@@ -1838,18 +1841,30 @@ impl SketchEditor {
                 self.trim_at(data, p, hovered)
             }
             Tool::Extend | Tool::Split => {
-                let Some(id) = hovered.filter(|e| !is_point(&data.sketch, *e)).or_else(|| data.sketch.pick(p, self.world_per_px * 8.0).filter(|e| !is_point(&data.sketch, *e))) else {
+                // The curve under the click, even where an end point is nearer
+                // (live: Extend 2 mm from a line's end takes the line).
+                let r = self.world_per_px * 8.0;
+                let nearest_curve = || {
+                    let sk = &data.sketch;
+                    sk.entities().filter(|e| e.kind() != EntityKind::Point).filter_map(|e| sk.distance_to(e.id, p).filter(|d| *d <= r).map(|d| (d, e.id))).min_by(|a, b| a.0.total_cmp(&b.0)).map(|x| x.1)
+                };
+                let Some(id) = hovered.filter(|e| !is_point(&data.sketch, *e)).or_else(nearest_curve) else {
                     return EditOutcome::none();
                 };
                 let r = match self.tool {
                     // Live: the first pick is the curve to extend (it stays
                     // lit), the second the boundary.
                     Tool::Extend => match self.extend_from.take().filter(|c| *c != id && data.sketch.entity(*c).is_some()) {
+                        // It is selected too (live: selection 1, its length in the status bar).
                         None => {
                             self.extend_from = Some(id);
+                            self.selection = vec![id];
                             return EditOutcome::redraw();
                         }
-                        Some(curve) => data.sketch.extend(curve, id),
+                        Some(curve) => {
+                            self.selection.clear();
+                            data.sketch.extend(curve, id)
+                        }
                     },
                     _ => {
                         let at = data.sketch.curve(id).map(|c| c.closest(p).1).unwrap_or(p);
@@ -7630,14 +7645,20 @@ mod tests {
         let (mut ed, mut data) = editor(Tool::Extend);
         let l = data.sketch.add_line(v(0.01, 0.06), v(0.03, 0.06));
         data.sketch.add_line(v(0.05, 0.03), v(0.05, 0.05));
-        click(&mut ed, &mut data, v(0.025, 0.06));
+        // Near its end the click still takes the line (live: 2 mm from the end).
+        click(&mut ed, &mut data, v(0.03 - 2.0 * PX, 0.06));
         assert_eq!(ed.extend_from, Some(l));
+        assert_eq!(ed.selection, vec![l]);
         assert!((data.sketch.curve(l).unwrap().end_point() - v(0.03, 0.06)).length() < 1e-12);
         click(&mut ed, &mut data, v(0.05, 0.04));
         assert!((data.sketch.curve(l).unwrap().end_point() - v(0.05, 0.06)).length() < 1e-9);
         assert_eq!(ed.message, None);
         assert_eq!(ed.extend_from, None);
         assert_eq!(ed.tool, Tool::Extend);
+        click(&mut ed, &mut data, v(0.025, 0.06));
+        assert_eq!(ed.selection, vec![l]);
+        assert!(ed.cancel());
+        assert!(ed.selection.is_empty(), "Esc drops the pending pick");
     }
 
     #[test]
