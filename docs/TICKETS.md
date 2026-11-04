@@ -357,6 +357,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P0 BLEND-RUST-STRAIGHT-WRONG (core; regression of 4570b4e5 "rounds of straight edges between faces ruled along them
+  … are noshape's", not in v0.4.25) **a saved document's Fillet 2 removes 6× the volume and the parts after it go negative**:
+  /root/qa-scratch/tickets/slow1151-pre.noshape (also slow1151-before-extrude), bin/rbbisect.py (volume / faces after each
+  feature): through Chamfer 3 both builds 31595.777 / 48 faces; **Fillet 2: a6ff8389 31406.528 / 51 (removes 189.249 mm³),
+  4570b4e5 30390.573 / 49 (removes 1205.204)**; then Draft 4 "Select a neutral plane." and Linear pattern 2 "Select a
+  pattern direction." (their references gone), and at the end 7 parts of 207461.199 / 37 faces with two of **−1205.204
+  mm³** (was 8 × 40183.951 / 66). With NOSHAPE_BLEND_RUST=0 on 4570b4e5 every feature is a6ff8389's again. The other 43
+  ticket documents, the volume sweep, dx's cf corpus and the user's cases are unchanged on 4570b4e5. live: Fillet 2 rounds
+  the edges (OCCT's 189 mm³ is the plausible one: a negative part is never right); ours: wrong solid. (qa 2026-11-04 06:26,
+  build 4570b4e5)
 - [ ] P0 CRASH-3388 (core; OCCT shape check segfault) **a 21-step fuzz document segfaults the CLI on open and at its
   fillet, every time, in v0.4.23, v0.4.24 and main**: /root/qa-scratch/tickets/crash3388/fz3388.noshape (+ -wal; CLI fuzz
   seed 3388, `bin/clifuzz_time.py 3388 106`: step 21 is a fillet of 12 mm). The fuzz session dies at step 21 6 / 6 (v0.4.24
