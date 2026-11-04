@@ -361,7 +361,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   fillet, every time, in v0.4.23, v0.4.24 and main**: /root/qa-scratch/tickets/crash3388/fz3388.noshape (+ -wal; CLI fuzz
   seed 3388, `bin/clifuzz_time.py 3388 106`: step 21 is a fillet of 12 mm). The fuzz session dies at step 21 6 / 6 (v0.4.24
   3, green 56a0f49b 3), also v0.4.23 and NOSHAPE_BOOL_RUST=0 (not bool's); `python3 tickets/crash3388/open.py <cli>` dies 2 / 2
-  (exit 139). gdb (tickets/crash3388/gdb-56a0f49b.txt): SIGSEGV in a worker thread, BRepTopAdaptor_FClass2d::BRepTopAdaptor_
+  (exit 139); the v0.4.24 app opening it segfaults 1 / 2 (exit 139; the other ran to the 90 s timeout). gdb (tickets/crash3388/gdb-56a0f49b.txt): SIGSEGV in a worker thread, BRepTopAdaptor_FClass2d::BRepTopAdaptor_
   FClass2d ← BRepCheck_Face::ClassifyWires ← OrientationOfWires ← BRepCheck_ParallelAnalyzer (OSD_ThreadPool): the
   parallel BRepCheck of the fillet's result reads a face it can't classify (a null / freed pcurve?). Deterministic and
   fast: the easiest of the fuzz crashes to run under ASan. live: a failing fillet fails with a message; ours: the process
