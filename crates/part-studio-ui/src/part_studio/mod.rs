@@ -2247,6 +2247,7 @@ impl PartStudioView {
 
     fn open_dialog(&mut self, feature: Feature, index: usize, is_new: bool, window: &mut Window, cx: &mut Context<Self>) {
         let feature_id = feature.id;
+        self.ui.sub_dialog = None;
         // The edited row shows as being edited, not selected.
         self.selected_features.clear();
         let units = self.doc.read(cx).session.doc.settings.units;
@@ -2297,6 +2298,7 @@ impl PartStudioView {
                 this.refresh_scene(false, cx);
             }
             DialogEvent::Accept { repeat } => this.accept_edit(*repeat, window, cx),
+            DialogEvent::EditSubFeature(sub) => this.open_sub_editor(*sub, window, cx),
             // Live (behaviours "psui (10-27, PANEL-BLEED)"): an analysis panel
             // opened over the dialog closes on the first Esc, the dialog on
             // the second.
@@ -2441,6 +2443,7 @@ impl PartStudioView {
         self.leave_sketch(cx);
         self.restore_after_sketch(cx);
         let Some(e) = self.edit.take() else { return };
+        self.ui.sub_dialog = None;
         // Nothing stays selected after a feature is accepted (Onshape).
         self.selected_features.clear();
         self.ui.query_hover = None;
@@ -2487,6 +2490,7 @@ impl PartStudioView {
         self.leave_sketch(cx);
         self.restore_after_sketch(cx);
         self.ui.query_hover = None;
+        self.ui.sub_dialog = None;
         if self.edit.take().is_some() {
             self.sync_manipulator(cx);
             window.focus(&self.focus, cx);
@@ -5467,13 +5471,13 @@ impl PartStudioView {
             return None;
         }
         // Moved dialogs keep their place (Onshape lets you drag them).
-        let d = div().absolute().child(e.dialog.clone());
+        let (left, top) = self.ui.dialog_pos.map(|p| (p.x, p.y)).unwrap_or((px(0.), px(3.)));
         // Onshape: at the viewport's left edge, 3 px under the toolbar.
-        let d = match self.ui.dialog_pos {
-            Some(p) => d.left(p.x).top(p.y),
-            None => d.top(px(3.)).left(px(0.)),
-        };
-        Some(d.into_any_element())
+        let d = div().absolute().left(left).top(top).child(e.dialog.clone());
+        // An in-feature mate connector's editor sits right of it, level with it (live 1851: 467 vs the Hole's 246).
+        let nested = self.ui.sub_dialog.as_ref().map(|(n, _)| div().absolute().left(left + px(221.)).top(top).child(n.clone()));
+        // (A zero-size anchor: nothing between the dialogs covers the graphics.)
+        Some(div().absolute().top_0().left_0().size_0().child(d).children(nested).into_any_element())
     }
 
     /// What is drawn over the feature dialog.
@@ -6253,7 +6257,16 @@ impl Render for PartStudioView {
                 this.set_show_mass(false, cx);
                 cx.notify();
             }))
-            .on_action(cx.listener(|this, _: &MateConnectorTool, window, cx| this.start_feature("mateConnector", window, cx)))
+            .on_action(cx.listener(|this, _: &MateConnectorTool, window, cx| {
+                // In a dialog whose active field takes mate connectors, Ctrl+M toggles that field's button (its
+                // tooltip: "Select mate connectors (ctrl+m)"); elsewhere it starts a Mate connector.
+                if let Some(d) = this.edit.as_ref().map(|e| e.dialog.clone())
+                    && d.update(cx, |d, cx| d.toggle_mc_mode(cx))
+                {
+                    return;
+                }
+                this.start_feature("mateConnector", window, cx)
+            }))
             .on_action(cx.listener(|this, _: &ToggleMateConnectors, _, cx| this.toggle_mate_connectors(cx)))
             // Onshape: Shift+C Curve/surface analysis, Shift+D Dihedral analysis.
             .on_action(cx.listener(|this, _: &CurveSurfaceAnalysis, window, cx| this.toggle_analysis_tool(analysis_tools::ToolKind::CurveSurface, window, cx)))

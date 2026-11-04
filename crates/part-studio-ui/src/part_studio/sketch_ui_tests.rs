@@ -2130,6 +2130,13 @@ fn a_hole_placed_on_an_in_feature_mate_connector(cx: &mut TestAppContext) {
         (d.feature.sub_features.len(), chips)
     }).unwrap();
     assert_eq!((subs, chips), (1, serde_json::json!(["Mate connector"])));
+    // Its chip's icon opens its editor; a change there is the Hole's sub-feature's.
+    let sub = cx.update(|cx| dialog.read(cx).feature.sub_features[0].id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_sub_editor(sub, w, cx))).unwrap();
+    let nested = cx.update(|cx| view.read(cx).ui.sub_dialog.as_ref().map(|s| s.0.clone()).expect("the Mate connector editor"));
+    cx.update(|cx| nested.update(cx, |d, cx| d.set_value("realign", noshape_model::ParamValue::Bool(true), cx)));
+    draw(cx, window);
+    assert!(cx.update(|cx| dialog.read(cx).feature.sub_features[0].params.bool("realign")));
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
     wait_until(cx, window, |cx| !view.read(cx).ui_busy());
     let (features, hole_ok) = cx.update(|cx| {

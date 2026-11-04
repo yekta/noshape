@@ -189,7 +189,7 @@ impl FeatureDialog {
                     let refs = values.query(s.id).to_vec();
                     let items: Vec<String> = self.query_rows(s, &refs).into_iter().map(|r| r.0).collect();
                     // Missing picks are red; an empty field the feature's error blames isn't (live: a new Extrude's).
-                    let missing = refs.iter().any(|r| (self.missing)(r)) || (!refs.is_empty() && self.field_error(s.id).is_some());
+                    let missing = refs.iter().any(|r| self.ref_missing(r)) || (!refs.is_empty() && self.field_error(s.id).is_some());
                     fields.push(json!({ "label": label, "kind": "query", "items": items, "active": self.active_query.as_deref() == Some(s.id), "state": if missing { "error" } else { "ok" } }));
                 }
                 // A table (the Hole's type and size): one select per level, its name drawn beside it (live: no label).
