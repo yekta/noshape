@@ -638,16 +638,17 @@ impl<'a> Parser<'a> {
     }
 
     /// Binary operators by level: 0 `??`, 1 `||`, 2 `&&`, 3 `== !=`,
-    /// 4 `< > <= >=`, 5 `+ - ~`, 6 `* / %`, 7 `is as` (postfix: `p as
-    /// Vector * meter` is `(p as Vector) * meter`), then unary.
+    /// 4 `< > <= >=`, 5 `~` (below `+`: `"n " ~ i + 1` is `"n " ~ (i + 1)`),
+    /// 6 `+ -`, 7 `* / %`, 8 `is as` (postfix: `p as Vector * meter` is
+    /// `(p as Vector) * meter`), then unary.
     fn binary(&mut self, level: u8) -> PResult<Expr> {
-        if level == 8 {
+        if level == 9 {
             return self.unary();
         }
         let mut lhs = self.binary(level + 1)?;
         loop {
             let pos = lhs.pos;
-            if level == 7 {
+            if level == 8 {
                 if self.is_kw(Kw::Is) || self.is_kw(Kw::As) {
                     let is = self.is_kw(Kw::Is);
                     self.bump();
@@ -667,12 +668,12 @@ impl<'a> Parser<'a> {
                 (4, Tok::Op(Op::Gt)) => BinOp::Gt,
                 (4, Tok::Op(Op::Le)) => BinOp::Le,
                 (4, Tok::Op(Op::Ge)) => BinOp::Ge,
-                (5, Tok::Op(Op::Plus)) => BinOp::Add,
-                (5, Tok::Op(Op::Minus)) => BinOp::Sub,
                 (5, Tok::Op(Op::Tilde)) => BinOp::Cat,
-                (6, Tok::Op(Op::Star)) => BinOp::Mul,
-                (6, Tok::Op(Op::Slash)) => BinOp::Div,
-                (6, Tok::Op(Op::Percent)) => BinOp::Mod,
+                (6, Tok::Op(Op::Plus)) => BinOp::Add,
+                (6, Tok::Op(Op::Minus)) => BinOp::Sub,
+                (7, Tok::Op(Op::Star)) => BinOp::Mul,
+                (7, Tok::Op(Op::Slash)) => BinOp::Div,
+                (7, Tok::Op(Op::Percent)) => BinOp::Mod,
                 _ => return Ok(lhs),
             };
             self.bump();

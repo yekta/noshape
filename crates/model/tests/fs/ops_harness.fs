@@ -139,6 +139,53 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const a = evArea(context, { "entities" : sheet });
             check("opEdgeChange replaceFace", abs(a - 500 * mm ^ 2) < 1e-9 * meter ^ 2, a);
         });
+        step(context, id, "edgeChangeHoles", function(sub) {
+            // Every edge of a sheet with a hole moved out 1 mm (std's Fill pattern's border): 22 x 22 less a Ø8 hole.
+            fCuboid(context, sub + "b", { "corner1" : vector(0, 0, 800) * mm, "corner2" : vector(20, 20, 810) * mm });
+            opExtractSurface(context, sub + "x", { "faces" : qContainsPoint(qCreatedBy(sub + "b", EntityType.FACE), vector(1, 1, 810) * mm) });
+            const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, 810) * mm, vector(0, 0, 1)) });
+            skCircle(sk, "c", { "center" : vector(10, 10) * mm, "radius" : 5 * mm });
+            skSolve(sk);
+            opBoolean(context, sub + "cut", { "tools" : qCreatedBy(sub + "sk", EntityType.FACE), "targets" : qCreatedBy(sub + "x", EntityType.FACE), "operationType" : BooleanOperationType.SUBTRACTION, "localizedInFaces" : true, "allowSheets" : true });
+            const sheet = qCreatedBy(sub + "x", EntityType.FACE);
+            var options = [];
+            for (var edge in evaluateQuery(context, qAdjacent(sheet, AdjacencyType.EDGE, EntityType.EDGE)))
+                options = append(options, { "edge" : edge, "face" : sheet, "offset" : 1 * mm });
+            opEdgeChange(context, sub + "c", { "edgeChangeOptions" : options });
+            const a = evArea(context, { "entities" : qCreatedBy(sub + "x", EntityType.FACE) });
+            check("opEdgeChange holes", abs(a - (484 - 16 * PI) * mm ^ 2) < 1e-9 * meter ^ 2, a);
+            // qContainsPoint on it: the material and the hole's edge hold a point; the hole and past the border don't.
+            const holds = function(x, y) { return !isQueryEmpty(context, qContainsPoint(qCreatedBy(sub + "x", EntityType.FACE), vector(x, y, 810) * mm)); };
+            check("qContainsPoint on a face with a hole", holds(0.5, 0.5) && holds(-0.5, 20.5) && holds(14, 10) && !holds(10, 10) && !holds(13, 10) && !holds(21.5, 10) && holds(5, 5), [holds(0.5, 0.5), holds(-0.5, 20.5), holds(14, 10), holds(10, 10), holds(13, 10), holds(21.5, 10)]);
+        });
+        step(context, id, "patternSheetHoles", function(sub) {
+            // A sheet's hole edge patterned (std sheet metal's edge pattern): the hole cut again at each instance, in the sheet.
+            fCuboid(context, sub + "b", { "corner1" : vector(0, 0, 900) * mm, "corner2" : vector(20, 20, 910) * mm });
+            opExtractSurface(context, sub + "x", { "faces" : qContainsPoint(qCreatedBy(sub + "b", EntityType.FACE), vector(1, 1, 910) * mm) });
+            const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, 910) * mm, vector(0, 0, 1)) });
+            skCircle(sk, "c", { "center" : vector(5, 5) * mm, "radius" : 2 * mm });
+            skSolve(sk);
+            opBoolean(context, sub + "cut", { "tools" : qCreatedBy(sub + "sk", EntityType.FACE), "targets" : qCreatedBy(sub + "x", EntityType.FACE), "operationType" : BooleanOperationType.SUBTRACTION, "localizedInFaces" : true, "allowSheets" : true });
+            const hole = qGeometry(qCreatedBy(sub + "x", EntityType.EDGE), GeometryType.CIRCLE);
+            opPattern(context, sub + "p", { "entities" : hole, "transforms" : [transform(vector(10, 0, 0) * mm), transform(vector(0, 10, 0) * mm), transform(vector(10, 10, 0) * mm)], "instanceNames" : ["1", "2", "3"] });
+            const faces = evaluateQuery(context, qCreatedBy(sub + "x", EntityType.FACE));
+            const a = evArea(context, { "entities" : qCreatedBy(sub + "x", EntityType.FACE) });
+            const bodies = size(evaluateQuery(context, qOwnerBody(qCreatedBy(sub + "x", EntityType.FACE))));
+            check("opPattern of a sheet's hole", size(faces) == 1 && bodies == 1 && abs(a - (400 - 16 * PI) * mm ^ 2) < 1e-9 * meter ^ 2, [size(faces), bodies, a]);
+        });
+        step(context, id, "collisionWires", function(sub) {
+            // Wire bodies collide where their edges meet (std Fill pattern's border check).
+            fCuboid(context, sub + "a", { "corner1" : vector(0, 0, 950) * mm, "corner2" : vector(10, 10, 960) * mm });
+            fCuboid(context, sub + "b", { "corner1" : vector(5, 5, 950) * mm, "corner2" : vector(15, 15, 960) * mm });
+            fCuboid(context, sub + "c", { "corner1" : vector(30, 30, 950) * mm, "corner2" : vector(40, 40, 960) * mm });
+            const top = function(b, x) { return qAdjacent(qContainsPoint(qCreatedBy(sub + b, EntityType.FACE), vector(x, x, 960) * mm), AdjacencyType.EDGE, EntityType.EDGE); };
+            for (var b in [["a", 1], ["b", 14], ["c", 35]])
+                opExtractWires(context, sub + ("w" ~ b[0]), { "edges" : top(b[0], b[1]) });
+            const wires = function(b) { return qCreatedBy(sub + ("w" ~ b), EntityType.BODY); };
+            const crossing = size(evCollision(context, { "tools" : wires("a"), "targets" : wires("b") }));
+            const apart = size(evCollision(context, { "tools" : wires("a"), "targets" : wires("c") }));
+            check("evCollision of wire bodies", crossing > 0 && apart == 0, [crossing, apart]);
+        });
         step(context, id, "extrudeLoftSweep", function(sub) {
             const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, 400) * mm, vector(0, 0, 1)) });
             skCircle(sk, "c", { "center" : vector(0, 0) * mm, "radius" : 5 * mm });

@@ -702,7 +702,13 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         return Err(raise_error(i, "PATTERN_INPUT_TOO_MANY_INSTANCES", None));
     }
     let sketch_refs: Vec<crate::reference::FeatureId> = refs.iter().filter_map(|r| if let Reference::Sketch(f) = r { Some(*f) } else { None }).collect();
+    let only_edges = !refs.is_empty() && refs.iter().all(|r| matches!(r, Reference::Edge(_)));
     let (made, sketches) = run_op(i, &cx, &id, "PATTERN_BODY_FAILED", |ev| {
+        // A sheet's hole loops (std sheet metal's edge pattern: a Fill pattern of holes): the holes cut again
+        // where each instance puts them, in the sheet itself.
+        if only_edges && let Some(done) = pattern_sheet_holes(ev, &refs, &transforms)? {
+            return Ok(done);
+        }
         let bodies = ev.resolve_bodies(&refs);
         // Sketches too (std Form's flat sketches go with its tools).
         let sources: Vec<(Arc<crate::regen::context::SketchResult>, DMat4)> = sketch_refs.iter().filter_map(|f| ev.ctx.sketches.iter().find(|s| s.feature == *f).cloned()).flat_map(|s| transforms.iter().map(move |m| (s.clone(), *m))).collect();
@@ -747,6 +753,66 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         st.pattern_instances.entry((id.clone(), name)).or_default().push(inst);
     }
     Ok(Value::Undefined)
+}
+
+/// The instances of a sheet's hole loops (`edges`: closed loops within one of its planar faces): each cut out of
+/// the sheet where its transform puts it, all at once. Faces keep their names, edges theirs where they stay; the
+/// holes' edges are new. `None`: not a sheet's hole loops (copies of their bodies instead).
+type PatternMade = (Vec<(String, BodyId, BodyId)>, Vec<(crate::reference::FeatureId, crate::reference::FeatureId)>);
+fn pattern_sheet_holes(ev: &mut EvalCtx, refs: &[Reference], transforms: &[DMat4]) -> FResult<Option<PatternMade>> {
+    let edges = ev.resolve_edges(refs);
+    let Some(&(b, _)) = edges.first() else { return Ok(None) };
+    let body = ev.ctx.bodies[b].clone();
+    if body.kind != BodyKind::Surface || edges.iter().any(|(x, _)| *x != b) {
+        return Ok(None);
+    }
+    let all = body.shape.edges();
+    let picked: Vec<Shape> = edges.iter().filter_map(|(_, e)| all.get(*e).cloned()).collect();
+    let fe = |e: k::KernelError| FeatureError::new(e.to_string());
+    let loops = k::edges_to_wires(&Shape::compound(&picked), 1e-7).map_err(fe)?;
+    let faces = body.shape.faces();
+    // Each loop closed, and an inner loop of one planar face of the sheet.
+    let inner: Vec<Shape> = faces.iter().filter(|f| f.face_plane().is_ok_and(|p| p.is_some())).flat_map(|f| {
+        let ws = f.wires();
+        let outer = ws.iter().max_by(|x, y| x.bounding_box(false).map(|b| b.diagonal()).unwrap_or(0.0).total_cmp(&y.bounding_box(false).map(|b| b.diagonal()).unwrap_or(0.0))).cloned();
+        ws.into_iter().filter(move |w| outer.as_ref().is_none_or(|o| !o.is_same(w)))
+    }).collect();
+    let holds = |w: &Shape| w.is_closed().unwrap_or(false) && w.edges().iter().all(|e| inner.iter().any(|h| h.edges().iter().any(|x| x.is_same(e))));
+    if loops.is_empty() || !loops.iter().all(holds) {
+        return Ok(None);
+    }
+    let mut tools = Vec::with_capacity(loops.len() * transforms.len());
+    for w in &loops {
+        let hole = k::make_face_from_wire(w, true).map_err(fe)?;
+        for m in transforms {
+            tools.push(k::transform(&hole, &k::Transform::Matrix(*m), true).map_err(fe)?.shape);
+        }
+    }
+    let cut = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&body.shape), &tools, &k::BooleanOptions::default()).map_err(fe)?.shape;
+    // Faces by their planes (a cut leaves each face where it was), edges by where they lie.
+    let plane_of = |f: &Shape| f.face_plane().ok().flatten().map(|p| (p.normal.normalize(), p.origin.dot(p.normal.normalize())));
+    let old_planes: Vec<_> = faces.iter().map(plane_of).collect();
+    let mut used = vec![false; faces.len()];
+    let mut names = Vec::new();
+    for f in cut.faces() {
+        let pl = plane_of(&f);
+        let j = (0..faces.len()).find(|&j| !used[j] && match (pl, old_planes[j]) {
+            (Some((n, d)), Some((m, e))) => n.dot(m).abs() > 1.0 - 1e-9 && (d - e * n.dot(m).signum()).abs() < 1e-7,
+            _ => false,
+        });
+        let Some(j) = j else { return err("Could not pattern selected parts.") };
+        used[j] = true;
+        names.push(body.faces[j].clone());
+    }
+    let mid = |e: &Shape| e.edge_info().ok().and_then(|i| e.point_at((i.first_param + i.last_param) * 0.5).ok());
+    let old_mids: Vec<Option<DVec3>> = all.iter().map(mid).collect();
+    let edge_from: Vec<Option<usize>> = cut.edges().iter().map(|e| {
+        let m = mid(e)?;
+        old_mids.iter().position(|o| o.is_some_and(|o| o.distance(m) < 1e-7))
+    }).collect();
+    ev.replace_body(b, cut, names);
+    super::edge_change::keep_edge_names(ev, b, &body.edges, &edge_from);
+    Ok(Some((Vec::new(), Vec::new())))
 }
 
 fn op_delete_bodies(i: &mut Interp, a: Vec<Value>) -> R<Value> {

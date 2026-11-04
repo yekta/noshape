@@ -222,8 +222,6 @@ const MISSING: &[&str] = &[
     "evFaults",
     "evMaxTolerance",
     "evSheetMetalBendUp",
-    "evSheetMetalFormToolBodies",
-    "evSheetMetalHoleToolBodies",
     "evTolerances",
     "getHoleAttributes",
     "opBooleanedPattern",

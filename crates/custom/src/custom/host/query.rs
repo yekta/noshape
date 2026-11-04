@@ -1067,7 +1067,7 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
                 Ent::Body(b) => q.st.merged_creators.get(&q.st.ctx.bodies[*b].id).is_some_and(|cs| cs.iter().any(|c| has_prefix(c, &id))),
                 _ => false,
             };
-            let visible = filter(q.all(None).into_iter().filter(|e| q.created_by(e).is_some_and(|c| has_prefix(&c, &id)) || merged(e)).collect());
+            let visible: Vec<Ent> = q.all(entity_type).into_iter().filter(|e| q.created_by(e).is_some_and(|c| has_prefix(&c, &id)) || merged(e)).collect();
             if !visible.is_empty() {
                 visible
             } else {
@@ -1076,7 +1076,7 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
                 // to the definition, then finds the new joint by qCreatedBy).
                 // Not the definition body itself (std flange's merge checks that
                 // its boolean created no body).
-                filter(q.all_with(None, true).into_iter().filter(|e| !matches!(e, Ent::Body(_)) && q.created_by(e).is_some_and(|c| has_prefix(&c, &id))).collect())
+                q.all_with(entity_type, true).into_iter().filter(|e| !matches!(e, Ent::Body(_)) && q.created_by(e).is_some_and(|c| has_prefix(&c, &id))).collect()
             }
         }
         "SKETCH_REGION" => {
@@ -1407,18 +1407,22 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
         }
         "HISTORICAL" => Vec::new(),
         "ATTRIBUTE_FILTER" => {
-            let base = if query.get("subquery").is_undefined() { q.all_with(None, true) } else { sub(i, "subquery")? };
             let name = query.get("name").clone();
             let pattern = query.get("attributePattern").clone();
             let exact = query.get("valueToMatchExactly").clone();
-            base.into_iter()
-                .filter(|e| {
-                    let r = q.to_ref(e);
-                    q.st.attributes.iter().any(|(x, v)| {
-                        *x == r && (name.is_undefined() || *v.get("name") == name) && (exact.is_undefined() || *v.get("attribute") == exact) && attr_matches(v.get("attribute"), &pattern)
-                    })
-                })
-                .collect()
+            // The entities with a matching attribute, once (thousands of entities and attributes after a pattern).
+            let having: std::collections::HashSet<&Reference> = q
+                .st
+                .attributes
+                .iter()
+                .filter(|(_, v)| (name.is_undefined() || *v.get("name") == name) && (exact.is_undefined() || *v.get("attribute") == exact) && attr_matches(v.get("attribute"), &pattern))
+                .map(|(x, _)| x)
+                .collect();
+            if having.is_empty() {
+                return Ok(Vec::new());
+            }
+            let base = if query.get("subquery").is_undefined() { q.all_with(None, true) } else { sub(i, "subquery")? };
+            base.into_iter().filter(|e| having.contains(&q.to_ref(e))).collect()
         }
         "EDGE_CONVEXITY_FILTER" => {
             let want = enum_str(query.get("convexityType")).unwrap_or_default();
@@ -1695,10 +1699,77 @@ fn contains_point(q: &QueryCx, e: &Ent, p: DVec3) -> bool {
             if matches!(e, Ent::Datum(_) | Ent::Plane(_) | Ent::PlaneBody(_)) {
                 return q.plane(e).is_some_and(|pl| (p - pl.origin).dot(pl.normal).abs() < 1e-8);
             }
+            if matches!(e, Ent::Face(..))
+                && let Some(inside) = q.shape(e).and_then(|f| planar_face_contains(&f, p))
+            {
+                return inside;
+            }
             // OCCT entities carry ~1e-7 tolerances after booleans and blends.
             q.distance_to_point(e, p).is_some_and(|d| d < 1e-7)
         }
     }
+}
+
+/// Whether a planar face bounded by lines and circles holds `p` (within 1e-7 m of it, as the distance test), worked
+/// out in its plane: off the plane, near an edge, else by the crossings of a ray (std's Fill pattern asks this of
+/// thousands of grid points; BRepExtrema's distance to a face with many holes takes milliseconds each). `None`:
+/// another face (the distance decides).
+fn planar_face_contains(f: &Shape, p: DVec3) -> Option<bool> {
+    const TOL: f64 = 1e-7;
+    let pl = f.face_plane().ok()??;
+    let n = pl.normal.normalize();
+    if (p - pl.origin).dot(n).abs() > TOL {
+        return Some(false);
+    }
+    let x = pl.x_dir.normalize();
+    let y = n.cross(x);
+    let uv = |w: DVec3| glam::DVec2::new((w - pl.origin).dot(x), (w - pl.origin).dot(y));
+    let at = uv(p);
+    // An odd direction, so the ray misses the vertices.
+    let d = glam::DVec2::new(0.7548776662466927, 0.6558656180971502);
+    let mut crossings = 0usize;
+    for e in f.edges() {
+        let info = e.edge_info().ok()?;
+        let (a, b) = (uv(info.start), uv(info.end));
+        match info.curve {
+            k::Curve::Line { .. } => {
+                let ab = b - a;
+                let t = ((at - a).dot(ab) / ab.length_squared().max(1e-300)).clamp(0.0, 1.0);
+                if (a + ab * t).distance(at) < TOL {
+                    return Some(true);
+                }
+                let den = d.perp_dot(ab);
+                if den.abs() > 1e-300 {
+                    let (t, s) = ((a - at).perp_dot(ab) / den, (a - at).perp_dot(d) / den);
+                    if t > 0.0 && (0.0..1.0).contains(&s) {
+                        crossings += 1;
+                    }
+                }
+            }
+            k::Curve::Circle { center, axis, radius, .. } if axis.normalize().cross(n).length() < 1e-9 => {
+                let c = uv(center);
+                let mid = uv(e.point_at((info.first_param + info.last_param) * 0.5).ok()?);
+                let full = info.start.distance(info.end) < TOL;
+                let angle = |w: glam::DVec2| (w.y - c.y).atan2(w.x - c.x);
+                let turn = |from: f64, to: f64| (to - from).rem_euclid(std::f64::consts::TAU);
+                let (s0, m0, e0) = (angle(a), angle(mid), angle(b));
+                let ccw = turn(s0, m0) < turn(s0, e0);
+                let on_arc = |w: glam::DVec2| full || if ccw { turn(s0, angle(w)) <= turn(s0, e0) } else { turn(angle(w), s0) <= turn(e0, s0) };
+                if on_arc(at) && (at.distance(c) - radius).abs() < TOL || a.distance(at) < TOL || b.distance(at) < TOL {
+                    return Some(true);
+                }
+                let o = at - c;
+                let (bh, cc) = (o.dot(d), o.length_squared() - radius * radius);
+                let disc = bh * bh - cc;
+                if disc > 0.0 {
+                    let r = disc.sqrt();
+                    crossings += [-bh - r, -bh + r].iter().filter(|t| **t > 0.0 && on_arc(at + d * **t)).count();
+                }
+            }
+            _ => return None,
+        }
+    }
+    Some(crossings % 2 == 1)
 }
 
 fn intersects_plane(q: &QueryCx, e: &Ent, pl: &PlaneFrame) -> bool {

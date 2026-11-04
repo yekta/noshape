@@ -957,6 +957,12 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                         for (fi, f) in body.shape.faces().into_iter().enumerate() {
                             out.push((q.to_ref(&Ent::Face(b, fi)), Some(r.clone()), f, solid(b)));
                         }
+                        // A wire body: its edges (std Fill pattern finds the instances crossing the border so).
+                        if body.kind == crate::display::BodyKind::Wire {
+                            for (ei, e) in body.shape.edges().into_iter().enumerate() {
+                                out.push((q.to_ref(&Ent::Edge(b, ei)), Some(r.clone()), e, false));
+                            }
+                        }
                     }
                     _ => {
                         let owner = q.owner(&e);

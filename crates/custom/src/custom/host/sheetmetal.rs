@@ -33,6 +33,8 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("updateSheetMetalGeometry", update_sheet_metal_geometry),
     ("evSheetMetalFlatTransformation", ev_sheet_metal_flat_transformation),
     ("evCornerType", ev_corner_type),
+    ("evSheetMetalHoleToolBodies", ev_sheet_metal_hole_tool_bodies),
+    ("evSheetMetalFormToolBodies", ev_sheet_metal_form_tool_bodies),
 ];
 
 const TOL: f64 = 1e-7;
@@ -44,6 +46,31 @@ fn fe(m: impl Into<String>) -> FeatureError {
 /// The SM attribute (`SMAttribute`) of an entity with the given object type.
 pub(super) fn sm_attribute(st: &CtxState, r: &Reference, object_type: &str) -> Option<Value> {
     st.attributes.iter().find(|(x, v)| x == r && v.get("attribute").get("objectType").as_str().is_some_and(|t| &*t == object_type)).map(|(_, v)| v.get("attribute").clone())
+}
+
+/// Each entity's attributes, in order, for loops over many entities (a scan of them all per entity is quadratic:
+/// a Fill pattern leaves a thousand holes, each edge with its attributes).
+pub(super) struct AttrIndex<'a>(HashMap<&'a Reference, Vec<&'a Value>>);
+
+impl<'a> AttrIndex<'a> {
+    pub(super) fn of(st: &'a CtxState) -> Self {
+        let mut m: HashMap<&Reference, Vec<&Value>> = HashMap::new();
+        for (r, v) in &st.attributes {
+            m.entry(r).or_default().push(v);
+        }
+        AttrIndex(m)
+    }
+
+    /// [`sm_attribute`].
+    pub(super) fn sm(&self, r: &Reference, object_type: &str) -> Option<Value> {
+        self.0.get(r)?.iter().find(|v| v.get("attribute").get("objectType").as_str().is_some_and(|t| &*t == object_type)).map(|v| v.get("attribute").clone())
+    }
+
+    /// [`associations`].
+    pub(super) fn associations(&self, r: &Reference) -> Vec<Value> {
+        let tag = std_tag("sheetMetalAttribute.fs", "SMAssociationAttribute");
+        self.0.get(r).map(|vs| vs.iter().filter(|v| v.get("attribute").tag() == tag).map(|v| v.get("attribute").clone()).collect()).unwrap_or_default()
+    }
 }
 
 /// `{ value : <length> }` fields of SM attributes, in meters.
@@ -111,8 +138,9 @@ fn joints(st: &CtxState, q: &QueryCx, b: usize) -> Joints {
     let mut rolled = BTreeMap::new();
     let mut ids: JointIds = (BTreeMap::new(), BTreeMap::new());
     let id_of = |j: &Value| j.get("attributeId").as_str().map(|s| Arc::<str>::from(&*s));
+    let attrs = AttrIndex::of(st);
     for f in 0..st.ctx.bodies[b].faces.len() {
-        if let Some(j) = sm_attribute(st, &q.to_ref(&Ent::Face(b, f)), "JOINT")
+        if let Some(j) = attrs.sm(&q.to_ref(&Ent::Face(b, f)), "JOINT")
             && j.get("jointType").get("value").as_str().as_deref() == Some("BEND")
         {
             rolled.insert(f, length_field(&j, "radius"));
@@ -122,7 +150,7 @@ fn joints(st: &CtxState, q: &QueryCx, b: usize) -> Joints {
         }
     }
     for e in 0..st.ctx.bodies[b].edges.len() {
-        let Some(j) = sm_attribute(st, &q.to_ref(&Ent::Edge(b, e)), "JOINT") else { continue };
+        let Some(j) = attrs.sm(&q.to_ref(&Ent::Edge(b, e)), "JOINT") else { continue };
         if let Some(id) = id_of(&j) {
             ids.0.insert(e, id);
         }
@@ -240,11 +268,13 @@ impl BendRelief {
 
 /// Corner features' settings on a definition body's vertices.
 fn relief_overrides(st: &CtxState, q: &QueryCx, b: usize, model: &BendRelief) -> BTreeMap<usize, BendRelief> {
-    (0..st.ctx.bodies[b].vertices.len()).filter_map(|v| BendRelief::of_vertex(&sm_attribute(st, &q.to_ref(&Ent::Vertex(b, v)), "CORNER")?, model).map(|r| (v, r))).collect()
+    let attrs = AttrIndex::of(st);
+    (0..st.ctx.bodies[b].vertices.len()).filter_map(|v| BendRelief::of_vertex(&attrs.sm(&q.to_ref(&Ent::Vertex(b, v)), "CORNER")?, model).map(|r| (v, r))).collect()
 }
 
 fn corner_overrides(st: &CtxState, q: &QueryCx, b: usize, model: &CornerRelief) -> BTreeMap<usize, CornerRelief> {
-    (0..st.ctx.bodies[b].vertices.len()).filter_map(|v| sm_attribute(st, &q.to_ref(&Ent::Vertex(b, v)), "CORNER").map(|a| (v, CornerRelief::of_corner(&a, model)))).collect()
+    let attrs = AttrIndex::of(st);
+    (0..st.ctx.bodies[b].vertices.len()).filter_map(|v| attrs.sm(&q.to_ref(&Ent::Vertex(b, v)), "CORNER").map(|a| (v, CornerRelief::of_corner(&a, model)))).collect()
 }
 
 /// What one part entity comes from: a definition face, edge or vertex.
@@ -1514,21 +1544,27 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             Some(pf) => pf.clone(),
             None => k::make_face_from_wire(&k::make_polyline(&outline_points(pulled), true).map_err(|e| fe(e.to_string()))?, true).map_err(|e| fe(e.to_string()))?,
         };
-        // Its holes, through the thickness (and out of the flat).
-        for (hole, edges) in wall_holes(&topo.faces[fi], &topo)? {
-            if let Ok(r) = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&flat), std::slice::from_ref(&hole), &k::BooleanOptions::default()) {
+        // Its holes, through the thickness (and out of the flat), all in one cut (a Fill pattern makes thousands).
+        let holes = wall_holes(&topo.faces[fi], &topo)?;
+        if !holes.is_empty() {
+            let mut tools = Vec::with_capacity(holes.len());
+            for (hole, edges) in &holes {
+                let base = hole.translated(-n * (back + front + back)).map_err(|e| fe(e.to_string()))?;
+                let tool = k::extrude(&base, n * (front + back) * 3.0).map_err(|e| fe(e.to_string()))?.shape;
+                // Its sides come from the hole's definition edges.
+                for face in tool.faces() {
+                    let c = inner_point(&face).unwrap_or_default();
+                    let near = |e: &usize| k::make_vertex(c).ok().and_then(|v| k::distance(&v, &topo.edges[*e]).ok()).map_or(f64::INFINITY, |d| d.distance);
+                    let from = edges.iter().copied().min_by(|a, b| near(a).total_cmp(&near(b))).map_or(Def::Face(fi), Def::Edge);
+                    pieces.push(Piece { face, from });
+                }
+                tools.push(tool);
+            }
+            let faces: Vec<Shape> = holes.into_iter().map(|h| h.0).collect();
+            if let Ok(r) = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&flat), &faces, &k::BooleanOptions::default()) {
                 flat = r.shape;
             }
-            let base = hole.translated(-n * (back + front + back)).map_err(|e| fe(e.to_string()))?;
-            let tool = k::extrude(&base, n * (front + back) * 3.0).map_err(|e| fe(e.to_string()))?.shape;
-            slab = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&slab), std::slice::from_ref(&tool), &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal wall hole failed: {e}")))?.shape;
-            // Its sides come from the hole's definition edges.
-            for face in tool.faces() {
-                let c = inner_point(&face).unwrap_or_default();
-                let near = |e: &usize| k::make_vertex(c).ok().and_then(|v| k::distance(&v, &topo.edges[*e]).ok()).map_or(f64::INFINITY, |d| d.distance);
-                let from = edges.iter().copied().min_by(|a, b| near(a).total_cmp(&near(b))).map_or(Def::Face(fi), Def::Edge);
-                pieces.push(Piece { face, from });
-            }
+            slab = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&slab), &tools, &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal wall hole failed: {e}")))?.shape;
         }
         if !reliefs.is_empty() {
             let tools: Vec<Shape> = reliefs.iter().map(|r| r.0.clone()).collect();
@@ -1655,10 +1691,14 @@ fn keep_names(part: &Shape, names: &mut [crate::naming::Name], before: &Shape, b
     // projection: a hem's rebuild spent 2 s here, part_sources' rule).
     let boxed = |fs: &[Shape]| -> Vec<Option<k::BoundingBox>> { fs.iter().map(|f| f.bounding_box(false).ok()).collect() };
     let (new_boxes, old_boxes) = (boxed(&new), boxed(&old));
-    let in_box = |b: &Option<k::BoundingBox>, x: &Option<(DVec3, DVec3)>| x.is_some_and(|(p, _)| b.as_ref().is_none_or(|b| (b.min - DVec3::splat(1e-6)).cmple(p).all() && p.cmple(b.max + DVec3::splat(1e-6)).all()));
+    // Nor off a planar face's plane (a plate with a Fill pattern's thousand holes: every probe is in its box).
+    let (new_planes, old_planes) = (face_planes(&new), face_planes(&old));
+    let in_box = |b: &Option<k::BoundingBox>, pl: &Option<(DVec3, DVec3)>, x: &Option<(DVec3, DVec3)>| {
+        x.is_some_and(|(p, _)| b.as_ref().is_none_or(|b| (b.min - DVec3::splat(1e-6)).cmple(p).all() && p.cmple(b.max + DVec3::splat(1e-6)).all()) && pl.is_none_or(|(o, n)| (p - o).dot(n).abs() < 1e-6))
+    };
     let mut of: Vec<Vec<usize>> = vec![Vec::new(); old.len()];
     for (i, f) in new.iter().enumerate() {
-        let hit = (0..old.len()).find(|&j| (in_box(&old_boxes[j], &new_probes[i]) && new_probes[i].is_some_and(|x| on(&old[j], x))) || (in_box(&new_boxes[i], &old_probes[j]) && old_probes[j].is_some_and(|x| on(f, x))));
+        let hit = (0..old.len()).find(|&j| (in_box(&old_boxes[j], &old_planes[j], &new_probes[i]) && new_probes[i].is_some_and(|x| on(&old[j], x))) || (in_box(&new_boxes[i], &new_planes[i], &old_probes[j]) && old_probes[j].is_some_and(|x| on(f, x))));
         if let Some(j) = hit.filter(|&j| j < before_names.len()) {
             of[j].push(i);
         }
@@ -1676,12 +1716,18 @@ fn keep_names(part: &Shape, names: &mut [crate::naming::Name], before: &Shape, b
     }
 }
 
+/// Each planar face's plane (a point, its unit normal); `None` for the others.
+fn face_planes(faces: &[Shape]) -> Vec<Option<(DVec3, DVec3)>> {
+    faces.iter().map(|f| f.face_plane().ok().flatten().map(|p| (p.origin, p.normal.normalize()))).collect()
+}
+
 /// What each face, edge and vertex of the part comes from.
 fn part_sources(part: &Shape, pieces: &[Piece], topo: &Topo) -> (Vec<Def>, Vec<Def>, Vec<Def>) {
     // Each piece's box (a point outside it is not on it: most pieces are
     // skipped without projecting onto them).
     let boxes: Vec<Option<k::BoundingBox>> = pieces.iter().map(|x| x.face.bounding_box(false).ok()).collect();
-    let in_box = |i: usize, p: DVec3| boxes[i].is_none_or(|b| (b.min - DVec3::splat(1e-6)).cmple(p).all() && p.cmple(b.max + DVec3::splat(1e-6)).all());
+    let planes = face_planes(&pieces.iter().map(|x| x.face.clone()).collect::<Vec<_>>());
+    let in_box = |i: usize, p: DVec3| boxes[i].is_none_or(|b| (b.min - DVec3::splat(1e-6)).cmple(p).all() && p.cmple(b.max + DVec3::splat(1e-6)).all()) && planes[i].is_none_or(|(o, n)| (p - o).dot(n).abs() < 1e-6);
     let faces: Vec<Def> = part
         .faces()
         .iter()
@@ -1758,8 +1804,9 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let previous: Vec<BodyId> = st.ctx.bodies.iter().enumerate().filter(|(pb, p)| p.kind == BodyKind::Solid && !own.is_empty() && associations(&st, &q.to_ref(&Ent::Body(*pb))).iter().any(|x| own.contains(x))).map(|(_, p)| p.id.clone()).collect();
             let mut forms = Vec::new();
             let mut wall_ids = BTreeMap::new();
+            let attrs = AttrIndex::of(&st);
             for f in 0..body.faces.len() {
-                if let Some(wall) = sm_attribute(&st, &q.to_ref(&Ent::Face(b, f)), "WALL") {
+                if let Some(wall) = attrs.sm(&q.to_ref(&Ent::Face(b, f)), "WALL") {
                     forms.extend(form_tools(&st, &wall, f, &mut tool_ids));
                     if let Some(id) = wall.get("attributeId").as_str() {
                         wall_ids.insert(f, id.to_string());
@@ -1945,8 +1992,12 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         links.extend(faces.iter().enumerate().filter_map(|(f, d)| Some((Reference::Face((*part.faces[f]).clone()), def_ref(d)?))));
         links.extend(edges.iter().enumerate().filter_map(|(e, d)| Some((Reference::Edge((*part.edges.get(e)?.clone()).clone()), def_ref(d)?))));
         links.extend(vertices.iter().enumerate().filter_map(|(v, d)| Some((Reference::Vertex((*part.vertices.get(v)?.clone()).clone()), def_ref(d)?))));
-        for (to, from) in links {
-            for attr in associations(&st, &from) {
+        let assoc: Vec<Vec<Value>> = {
+            let attrs = AttrIndex::of(&st);
+            links.iter().map(|(_, from)| attrs.associations(from)).collect()
+        };
+        for ((to, _), attrs) in links.into_iter().zip(assoc) {
+            for attr in attrs {
                 st.push_attribute(to.clone(), Value::map_from([("attribute", attr)]));
             }
         }
@@ -2523,6 +2574,31 @@ fn place_from(def: &Definition, k_factor: f64, topo: &Topo, root: usize, walls: 
         }
     }
     Ok(())
+}
+
+/// `@evSheetMetalHoleToolBodies` (std's sheet metal face pattern): the tools of the sheet metal holes among the
+/// faces (those with a hole attribute). Without any, none; hole tools aren't tracked yet.
+fn ev_sheet_metal_hole_tool_bodies(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let arg = def_arg(i, &a, 1)?;
+    if !evaluate_refs(i, &cx, arg.get("sheetMetalHoleFaces"))?.is_empty() {
+        return Err(i.error("@evSheetMetalHoleToolBodies: the tools of sheet metal holes are not supported yet"));
+    }
+    let none = || Value::array(Vec::new());
+    Ok(Value::map_from([("sheetMetalHoleToolBodies", none()), ("sheetMetalHoleToolWalls", none()), ("sheetMetalHoleToolTransforms", none())]))
+}
+
+/// `@evSheetMetalFormToolBodies` (std's sheet metal face pattern): the tools of the forms among the faces, by wall.
+/// With no faces or no form on any wall, none (`{}`); form tools aren't returned yet.
+fn ev_sheet_metal_form_tool_bodies(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let arg = def_arg(i, &a, 1)?;
+    let faces = evaluate_refs(i, &cx, arg.get("sheetMetalFormFaces"))?;
+    let formed = cx.state.lock().attributes.iter().any(|(_, v)| v.get("attribute").get("formedToolBodyIds").as_array().is_some_and(|f| !f.is_empty()));
+    if !faces.is_empty() && formed {
+        return Err(i.error("@evSheetMetalFormToolBodies: the tools of sheet metal forms are not supported yet"));
+    }
+    Ok(Value::map_from(Vec::new()))
 }
 
 fn ev_sheet_metal_flat_transformation(i: &mut Interp, a: Vec<Value>) -> R<Value> {

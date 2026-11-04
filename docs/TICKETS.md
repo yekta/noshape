@@ -3239,6 +3239,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   learning-center-devon Sketch 3 on a top face (z 50.8): ours x (−1, 0, 0), live (1, 0, 0).
   Ours takes OCCT's plane x (eval.rs raw_plane, Reference::Face). parity_models now counts a sketch frame that isn't
   live's as a difference. /root/dx-scratch/frames.py lists them (CLI against the rebuilt documents). (dx 2026-11-03)
+- [ ] P2 SKETCH-PLANE-FRAME (core; dx's parity suite 11-04, cf-fill-pattern) a sketch on a construction plane takes
+  the plane's own frame (eval.rs raw_plane, FeaturePlane / ConstructionPlane); live's is std newSketch's for every plane
+  that isn't a mate connector: the world origin projected onto it, axes by alignCanonically (SKETCH-FACE-FRAME's rule).
+  cf-fill-pattern Sketch 1 on a Line-Angle plane through a sloped line on Front: ours origin (107.06, 0, 33.75) mm,
+  x (0.827, 0, 0.563); live (0, 0, 0), x (−1, 0, 0), both normal +Y. Details: handoff/core.md "From dx (11-04 06:35)".
+  (dx 2026-11-04)
 - [x] (skasm 11-03 17:44: a dependency that takes in a driving dimension makes that dimension redundant whichever row the rank analysis gives up, so it over-defines as s7's twice-dimensioned radius (not where a curve has collapsed: a height set to 0 still solves); the Slot around a chain no longer adds its offsets' two distances beside the end cap's Ø (they over-defined it). T1 constraints_more::a_dimension_the_tangencies_already_fix_over_defines) P3 SKETCH-REDUNDANT-SOLVES (skasm; dx's parity suite, models-dx live-hole-row, live 1862) a sketch whose
   constraints are redundant but consistent solves in ours (status Ok) where live can't solve it: two Horizontal lines
   (0, 0)–(30, 0) and (0, 10)–(30, 10) mm, a Ø10 circle at (15, 5) Tangent to both, and a 10 mm Distance between the
@@ -3475,6 +3481,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   fix): 12 fail `@opBoolean: BOOLEAN_NON_MANIFOLD_RESULT`, then `Type error: value BOOLEAN_NON_MANIFOLD_RESULT cannot be
   enum ErrorStringEnum` (error.fs 149, processError: the host's code isn't one of the served std's); the first one is
   31/78/49 faces / edges / vertices, live 31/77/48; and the document regenerates in 59 s, live 7.8 s (PARITY-SPEED).
+  dx 11-04 08:04, live's 1903 (REST feature lists with deterministic ids, sketch wire bodies): cf-fill-pattern's Fill
+  pattern (std 2581, a hex pattern of ~1,735 holes in a sheet metal plate) runs in our host: opEdgeChange offsets a
+  face with holes and arcs (each loop on its own), `~` binds looser than `+` (`"n " ~ size(x) + 1`: live reports
+  "Pattern contains …"), @evSheetMetalHoleToolBodies / @evSheetMetalFormToolBodies for faces with no hole or form
+  tools, opPattern of a sheet's hole edges cuts the holes in the sheet (it copied the whole sheet per instance: 1,802
+  sheet metal models), evCollision sees wire bodies (the border check), qContainsPoint on a planar face of lines and
+  arcs without BRepExtrema, qCreatedBy lists only its entity type, the sheet metal rebuild cuts a wall's holes in one
+  Boolean and indexes attributes by entity. T1 model custom_features::ops_and_evaluations_run_in_custom_features
+  (edgeChangeHoles, patternSheetHoles, collisionWires, qContainsPoint), featurescript tests::arithmetic_and_strings.
+  Its first Fill pattern still takes ~34 s (live's whole document 4.7 s): PARITY-SPEED. The two FeatureScript 392
+  pattern studios now translate whole and fail on checkInput (FS-OLD-STD-COMPAT), as counted.
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our

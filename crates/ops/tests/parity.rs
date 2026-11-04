@@ -1558,3 +1558,50 @@ fn a_sketch_frame_unlike_lives_is_a_difference() {
     assert!(r.first.as_deref().is_some_and(|f| f.contains("feature 0 \"Sketch 1\"") && f.contains("sketch frame")), "{:?}", r.first);
 }
 
+
+/// A later sketch's constraint to another sketch's line (live gives that line's id with the sketch's wire body):
+/// the line itself, not the part's edge of its length 5 mm beside it (exercise-chino's Sketch 1 to Side sketch).
+#[test]
+fn a_constraint_to_another_sketchs_line_takes_that_line() {
+    let line = |id: &str, a: [f64; 2], b: [f64; 2]| {
+        let l = ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2)).sqrt();
+        json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "startParam": 0.0, "endParam": l,
+            "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": a[0], "pntY": a[1], "dirX": (b[0] - a[0]) / l, "dirY": (b[1] - a[1]) / l } })
+    };
+    let top = json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }]);
+    let on_line = |p: &str| json!({ "btType": "BTMSketchConstraint-2", "constraintType": "COINCIDENT", "parameters": [
+        { "btType": "BTMParameterString-149", "parameterId": "localFirst", "value": p },
+        { "btType": "BTMParameterQueryList-148", "parameterId": "externalSecond", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JT"], "queryString": "" }] }] });
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1", "parameters": top, "constraints": [],
+          "entities": [line("b", [0.0, 0.0], [0.02, 0.0]), line("r", [0.02, 0.0], [0.02, 0.005]), line("t", [0.02, 0.005], [0.0, 0.005]), line("l", [0.0, 0.005], [0.0, 0.0])] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": "FS1", "queryString": "" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "10 mm" }] },
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS2", "name": "Sketch 2", "parameters": top, "constraints": [], "entities": [line("u", [0.0, 0.01], [0.02, 0.01])] },
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS3", "name": "Sketch 3", "parameters": top,
+          "entities": [line("s", [0.002, 0.01], [0.008, 0.01])], "constraints": [on_line("s.start"), on_line("s.end")] }
+    ] });
+    // Sketch 2's wire body: its line JT (20 mm, middle (10, 10, 0) mm); the part's edge at y = 5 mm is 20 mm too.
+    let live = vec![
+        json!({ "index": 0, "status": "OK", "parts": [] }),
+        json!({ "index": 1, "status": "OK", "parts": [] }),
+        json!({ "index": 2, "status": "OK", "parts": [], "bodies": [{ "type": "SKETCH", "ids": ["JS"], "vertices": [], "faces": [], "edges": [{ "id": "JT", "length": 0.02, "midPoint": [0.01, 0.01, 0.0] }] }] }),
+        json!({ "index": 3, "status": "OK", "parts": [] }),
+    ];
+    let mut ctx = Ctx::new();
+    let path = scratch("sketch-line-ref.noshape");
+    let mut t = Translator::open(&mut ctx, &path, &features, refs_from_bodies(&live)).unwrap();
+    for k in 0..3 {
+        let s = t.step(k);
+        assert!(s.ours.is_some(), "{k}: {:?}", s.problems);
+    }
+    let s = t.step(3);
+    assert!(s.problems.is_empty(), "{:?}", s.problems);
+    let g = t.call("sketch_get", json!({ "sketch": s.ours.unwrap() })).unwrap();
+    let k = if g["units"]["length"] == "mm" { 1e-3 } else { 1.0 };
+    let ys: Vec<f64> = g["entities"].as_array().unwrap().iter().filter(|e| e["type"] == "point").filter_map(|e| e["at"][1].as_f64()).map(|y| y * k).collect();
+    assert!(!ys.is_empty() && ys.iter().all(|y| (y - 0.01).abs() < 1e-9), "{ys:?} {g}");
+}

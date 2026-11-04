@@ -8,7 +8,7 @@
 //! corner); corners next to bends are not yet.
 
 use super::query::{Ent, QueryCx, evaluate_refs};
-use super::sheetmetal::{associations, sm_attribute};
+use super::sheetmetal::AttrIndex;
 use super::{context_arg, convert::*, run_op};
 use crate::naming::Name;
 use crate::reference::BodyId;
@@ -48,18 +48,19 @@ fn sheet_metal_apply_in_flat(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let corners: Vec<(BodyId, DVec3)> = {
         let st = cx.state.lock();
         let q = QueryCx::new(&st);
+        let attrs = AttrIndex::of(&st);
         let mut out = Vec::new();
         for r in &picks {
-            let mine = associations(&st, r);
+            let mine = attrs.associations(r);
             if mine.is_empty() {
                 continue;
             }
             for (b, body) in st.ctx.bodies.iter().enumerate() {
-                if sm_attribute(&st, &q.to_ref(&Ent::Body(b)), "MODEL").is_none() {
+                if attrs.sm(&q.to_ref(&Ent::Body(b)), "MODEL").is_none() {
                     continue;
                 }
                 for v in 0..body.vertices.len() {
-                    if associations(&st, &q.to_ref(&Ent::Vertex(b, v))).iter().any(|x| mine.contains(x))
+                    if attrs.associations(&q.to_ref(&Ent::Vertex(b, v))).iter().any(|x| mine.contains(x))
                         && let Ok(p) = body.shape.sub_shape(ShapeType::Vertex, v).and_then(|s| s.vertex_point())
                         && !out.iter().any(|(id, q): &(BodyId, DVec3)| id == &body.id && q.distance(p) < TOL)
                     {

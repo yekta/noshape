@@ -11,6 +11,19 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-04 08:04 UTC: live's 1903 integrated (sketch wire bodies, REST feature lists of the 29 cf-* documents)
+- Translator: refs of a sketch's wire body are `LiveRef.sketch`; a query whose ids are all such refs is read from its
+  text first (`query` → `query_with(use_ids)`), and a sketch line by id maps to our sketch's line there
+  (`sketch_line_at`: a part edge of its length beside it is not it; exercise-chino). `….mateConnectorOp` queries map
+  to the Mate connector feature's connector. T1 parity::a_constraint_to_another_sketchs_line_takes_that_line.
+- Host (cf-fill-pattern runs; TICKETS PARITY-CUSTOM-RUN-FAILURES dx 11-04 08:04): opEdgeChange of every edge of a face
+  with holes / arcs (`offset_face`), FeatureScript `~` below `+`, @evSheetMetalHole/FormToolBodies (none),
+  `pattern_sheet_holes` in opPattern, evCollision of wire bodies, `planar_face_contains` for qContainsPoint,
+  `AttrIndex` in the sheet metal rebuild. Its first Fill pattern still takes ~34 s (live 4.7 s): next for
+  PARITY-SPEED: the rebuild (12 s), std's separateEntitiesForFacePattern (7.8 s), qCreatedBy in the instance loop
+  (9.8 s; a cache by op sequence would do).
+- core: SKETCH-PLANE-FRAME (handoff/core.md 11-04 06:35).
+
 ## 11-02 23:35 UTC: model parity suite (lead 11-02 23:35, top item; docs/PARITY-SUITES.md §1)
 - Translator `crates/ops/src/parity.rs` (`Translator::open` / `step(k)`, through the ops registry): sketches
   (lines, arcs, circles, points at Onshape's solved positions, in Onshape's frame when `sketches` is given;

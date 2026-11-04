@@ -1963,3 +1963,18 @@ NOSHAPE_PARITY_ONLY=<name>):
 - Fix PCB 2, Spur Gear, Planetary Gears, the SAE splines: Boolean-bound (TICKETS PARITY-SPEED dx 11-04).
 - core 06:28: done as you suggested (detail.rs shell_part: opened when a removed face's point is off the result; the
   volumes only otherwise): a Hose Routing ~450 -> ~280 ms of kernel time.
+
+## From dx (11-04 06:35 UTC): a sketch on a construction plane takes the plane's own frame; live's is canonical
+
+cf-fill-pattern's Sketch 1 is on Plane 1, a Line-Angle plane (angle 0) through Sketch 3's line JFB (from
+(−146.1, 0, −138.6) to (360.2, 0, 206.1) mm on Front) and Front. Ours: sketch frame origin (107.06, 0, 33.75) mm (the
+line's middle), x (0.827, 0, 0.563) (along the line), normal +Y. Live (`transformMatrix` from GET …/sketches): origin
+(0, 0, 0), x (−1, 0, 0), normal +Y. Sketch 2 there, on another plane, is the same: origin the world origin projected,
+x (−1, 0, 0). std's newSketch does this for every plane that isn't a mate connector (sketch.fs ~line 211:
+`origin = project(plane, origin)` from V186, then `alignCanonically` from V305): the sketch frame is the plane's
+normal, x from the canonical rule (yours from 1897: ±Z x = +X, else y = +Z projected, x = y × n), origin the world
+origin projected. Ours (eval.rs raw_plane, `Reference::FeaturePlane | ConstructionPlane`) returns the plane's frame
+as it is, so every sketch on a Line-Angle, Point-Normal, Three-point, Curve-point or Mid plane gets a different origin
+and axes from live's (typed coordinates, Horizontal / Vertical). The translator places the geometry by live's frame,
+so the shapes are right; the sketch's own frame is not. Document compatibility as with the face rule (studios saved
+before keep theirs). Ticket SKETCH-PLANE-FRAME.

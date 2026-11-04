@@ -28,6 +28,9 @@ pub struct LiveRef {
     pub geometry: Option<String>,
     /// A body's box (min, max).
     pub bbox: Option<[[f64; 3]; 2]>,
+    /// Of a sketch's wire body or regions (live's `"type": "SKETCH"` bodies): a query's text, when there, places it
+    /// better (the sketch entity it names), so it goes first.
+    pub sketch: bool,
 }
 
 /// What became of one Onshape feature.
@@ -167,7 +170,7 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
     for line in text.lines().filter(|l| !l.trim().is_empty()) {
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
         let (Some(k), Some(id)) = (v["index"].as_u64(), v["id"].as_str()) else { continue };
-        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64(), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox: None };
+        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64(), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox: None, sketch: false };
         out.insert((k as usize, id.to_string()), r);
     }
     out
@@ -1087,7 +1090,22 @@ impl<'a> Translator<'a> {
     }
 
     /// Our reference ids for one Onshape query.
+    /// A query's entities of ours. Ids that only a sketch body places (live's sketch wire bodies and regions) go
+    /// after the query's text: the sketch entity it names places them better than the geometry (a revolve's axis
+    /// line, a region among its neighbours).
     fn query(&mut self, k: usize, q: &Value) -> Result<Vec<String>, String> {
+        let ids: Vec<&str> = q["deterministicIds"].as_array().into_iter().flatten().filter_map(Value::as_str).collect();
+        let sketch_only = !ids.is_empty() && ids.iter().all(|id| (0..=k).any(|j| self.refs.get(&(j, id.to_string())).is_some_and(|r| r.sketch)));
+        if sketch_only && !q["queryString"].as_str().unwrap_or("").is_empty()
+            && let Ok(found) = self.query_with(k, q, false)
+            && !found.is_empty()
+        {
+            return Ok(found);
+        }
+        self.query_with(k, q, true)
+    }
+
+    fn query_with(&mut self, k: usize, q: &Value, use_ids: bool) -> Result<Vec<String>, String> {
         // A mate connector by the feature that made it (a Hole's in-feature
         // one): its id may name a face too (prize-wheel-tim).
         if q["btType"].as_str().is_some_and(|t| t.starts_with("BTMIndividualCreatedByQuery"))
@@ -1145,7 +1163,7 @@ impl<'a> Translator<'a> {
         } else {
             k
         };
-        if !ids.is_empty() && ids.iter().all(|id| self.refs.contains_key(&(k, id.clone()))) {
+        if use_ids && !ids.is_empty() && ids.iter().all(|id| self.refs.contains_key(&(k, id.clone()))) {
             let found: Vec<String> = ids.iter().map(|id| self.by_geometry(k, id)).collect::<Result<_, _>>()?;
             // A swept edge a Boolean split: Onshape's query keeps every piece.
             let strings = packed_strings_of(text);
@@ -1219,6 +1237,12 @@ impl<'a> Translator<'a> {
             && let Some(ours) = self.feature_ids.get(&fid)
         {
             return Ok(vec![format!("fplane:{ours}")]);
+        }
+        // A Mate connector feature's connector (`dummyQuery(id+"F….mateConnectorOp", …)`), written or packed.
+        if let Some(fid) = text.split("id+\"").nth(1).and_then(|r| r.split(".mateConnectorOp\"").next()).filter(|f| !f.contains('"')).map(str::to_string).or_else(|| packed_strings_of(text).iter().find_map(|s| s.strip_suffix(".mateConnectorOp").map(str::to_string)))
+            && let Some(ours) = self.feature_ids.get(&fid)
+        {
+            return Ok(vec![format!("mc:{ours}.0")]);
         }
         if let Some(r) = self.region_from_query(text)? {
             return Ok(vec![r]);
@@ -1839,6 +1863,8 @@ impl<'a> Translator<'a> {
                 Ok(["plane:right", "plane:front", "plane:top"][axis].to_string())
             }
             "FACE" | "PLANE" => self.nearest("faces", &r).ok_or_else(|| format!("{id}: no face of ours at {:?} mm", mm(p))),
+            // A sketch's line: that line of ours (a part's edge of its length may lie beside it).
+            "EDGE" if r.sketch && let Some(line) = self.sketch_line_at(p, r.measure) => Ok(line),
             "EDGE" => self.nearest("edges", &r).ok_or_else(|| format!("{id}: no edge of ours at {:?} mm", mm(p))),
             "VERTEX" => {
                 // A part's vertex there, else a sketch's point (a sketch's
@@ -1888,6 +1914,32 @@ impl<'a> Translator<'a> {
                 let (Some(u), Some(v)) = (e["at"][0].as_f64(), e["at"][1].as_f64()) else { continue };
                 let w: Vec<f64> = (0..3).map(|i| (o[i] + u * x[i] + v * y[i]) * k).collect();
                 if (0..3).all(|i| (w[i] - p[i]).abs() < 1e-6) {
+                    return e["id"].as_str().map(str::to_string);
+                }
+            }
+        }
+        None
+    }
+
+    /// A line of one of our sketches with its midpoint at `mid` (model, m)
+    /// and live's length, within 1e-6 m.
+    fn sketch_line_at(&mut self, mid: [f64; 3], length: Option<f64>) -> Option<String> {
+        let sketches: Vec<String> = self.feature_ids.values().cloned().collect();
+        for s in sketches {
+            let Ok(g) = self.call("sketch_get", json!({ "sketch": s })) else { continue };
+            let k = per_unit(&g["units"]);
+            let (Some(o), Some(x), Some(y)) = (f3(&g["frame"]["origin"]), f3(&g["frame"]["x"]), f3(&g["frame"]["y"])) else { continue };
+            let entities = g["entities"].as_array().cloned().unwrap_or_default();
+            let at = |id: &Value| -> Option<[f64; 3]> {
+                let e = entities.iter().find(|e| e["id"] == *id)?;
+                let (u, v) = (e["at"][0].as_f64()?, e["at"][1].as_f64()?);
+                Some([0, 1, 2].map(|i| (o[i] + u * x[i] + v * y[i]) * k))
+            };
+            for e in entities.iter().filter(|e| e["type"] == "line") {
+                let (Some(a), Some(b)) = (at(&e["start_point"]), at(&e["end_point"])) else { continue };
+                let on = (0..3).all(|i| ((a[i] + b[i]) / 2.0 - mid[i]).abs() < 1e-6);
+                let long = length.is_none_or(|l| ((0..3).map(|i| (b[i] - a[i]).powi(2)).sum::<f64>().sqrt() - l).abs() < 1e-6);
+                if on && long {
                     return e["id"].as_str().map(str::to_string);
                 }
             }
@@ -2941,6 +2993,16 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
                 && lo[0].is_finite()
             {
                 out.insert((at, id.to_string()), LiveRef { kind: "BODY".into(), point: Some([(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, (lo[2] + hi[2]) / 2.0]), bbox: Some([lo, hi]), ..Default::default() });
+            }
+            // A sketch's wire body and regions (live's FeatureScript fetch).
+            if b["type"] == "SKETCH" {
+                for key in ["faces", "edges", "vertices"] {
+                    for e in b[key].as_array().into_iter().flatten() {
+                        if let Some(r) = e["id"].as_str().and_then(|id| out.get_mut(&(at, id.to_string()))) {
+                            r.sketch = true;
+                        }
+                    }
+                }
             }
         }
     }

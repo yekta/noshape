@@ -44,6 +44,8 @@ fn arithmetic_and_strings() {
     assert_eq!(run_str("function f() { return 1 + 2 * 3 ^ 2; }"), "19");
     assert_eq!(run_str("function f() { return -7 % 3; }"), "2");
     assert_eq!(run_str("function f() { return 'a' ~ 1 ~ true; }"), "a1true");
+    // `~` binds looser than `+` (live runs a Fill pattern's "Pattern contains " ~ size(names) + 1 ~ " instances.").
+    assert_eq!(run_str("function f() { return 'n ' ~ 2 + 1 ~ ' m'; }"), "n 3 m");
     assert_eq!(run_str("function f() { var x = undefined; return x ?? 5; }"), "5");
 }
 

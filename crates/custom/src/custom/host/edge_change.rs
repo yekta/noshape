@@ -89,7 +89,7 @@ fn op_edge_change(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 /// not (std tracks a moved edge by name: a partial flange's piece of an edge
 /// that sheds two step edges shifted the boundary edges' ordinals); new
 /// edges are named apart from them.
-fn keep_edge_names(ev: &mut crate::regen::eval::EvalCtx, b: usize, old: &[crate::naming::Name], edge_from: &[Option<usize>]) {
+pub(super) fn keep_edge_names(ev: &mut crate::regen::eval::EvalCtx, b: usize, old: &[crate::naming::Name], edge_from: &[Option<usize>]) {
     use crate::reference::TopoName;
     let nb = ev.ctx.bodies[b].clone();
     if nb.edges.len() != edge_from.len() {
@@ -154,6 +154,61 @@ fn face_loop(f: &Shape, moved: &[(Shape, Move)], all: &[Shape]) -> FResult<FaceL
     Ok((pts, sides, froms))
 }
 
+/// The one offset every one of a sheet's `n` edges moves by, if they all do.
+fn uniform_offset(offsets: &BTreeMap<usize, Move>, n: usize) -> Option<f64> {
+    if offsets.len() != n {
+        return None;
+    }
+    let mut all = offsets.values().map(|m| match m {
+        Move::Offset(o) => Some(*o),
+        Move::Onto(..) => None,
+    });
+    let first = all.next()??;
+    all.all(|o| o.is_some_and(|o| (o - first).abs() < TOL)).then_some(first)
+}
+
+/// A planar face with every edge moved by `o` (std's Fill pattern's border:
+/// a face with holes and arcs): its loops offset in its plane, sides kept
+/// straight to their corners. Its edges are named anew.
+fn offset_face(f: &Shape, o: f64) -> FResult<(Shape, Vec<usize>, Vec<Option<usize>>)> {
+    let pl = f.face_plane().map_err(fe)?.ok_or_else(|| fe("Only edges of planar faces can be changed yet"))?;
+    let size = |w: &Shape| w.bounding_box(false).map(|b| b.diagonal()).unwrap_or(0.0);
+    let mut wires = f.wires();
+    wires.sort_by(|a, b| size(b).total_cmp(&size(a)));
+    // Each loop on its own, the way that grows the face by o: the outer one out, the holes in.
+    let mut loops = Vec::new();
+    for (i, w) in wires.iter().enumerate() {
+        let grow = (i == 0) == (o > 0.0);
+        // A full circle: a circle of the radius it grows to (OCCT's offset of a lone circle inwards crashes).
+        if let [e] = w.edges().as_slice()
+            && let Ok(k::Curve::Circle { center, axis, x_dir, radius }) = e.edge_info().map(|i| i.curve)
+        {
+            let r = if grow { radius + o.abs() } else { radius - o.abs() };
+            if r <= TOL {
+                return err("The face's boundary could not be offset");
+            }
+            loops.push(k::make_wire_2d(&k::Plane::new(center, axis, x_dir), &[k::Segment2d::Circle { center: glam::DVec2::ZERO, radius: r }]).map_err(fe)?);
+            continue;
+        }
+        let mut moved = None;
+        for d in [o.abs(), -o.abs()] {
+            let Ok(m) = k::offset_wire_2d(w, d, k::JoinType::Intersection, false) else { continue };
+            if (size(&m) > size(w)) == grow {
+                moved = Some(m);
+                break;
+            }
+        }
+        loops.push(moved.ok_or_else(|| fe("The face's boundary could not be offset"))?);
+    }
+    let Some((outer, holes)) = loops.split_first() else { return err("The face has no boundary") };
+    let mut face = k::make_face(&pl, outer, holes).map_err(fe)?;
+    if normal(&face)?.dot(normal(f)?) < 0.0 {
+        face = face.reversed().map_err(fe)?;
+    }
+    let edges = face.edges().len();
+    Ok((face, vec![0], vec![None; edges]))
+}
+
 /// The sheet with the edges moved, for each of its faces the index of the
 /// face it was, and for each of its edges the edge it was (on that edge's
 /// line, moved with it).
@@ -161,6 +216,12 @@ fn change_edges(shape: &Shape, offsets: &BTreeMap<usize, Move>) -> FResult<(Shap
     let edges = shape.edges();
     let moved: Vec<(Shape, Move)> = offsets.iter().filter_map(|(e, d)| edges.get(*e).map(|s| (s.clone(), *d))).collect();
     let faces = shape.faces();
+    if let [f] = faces.as_slice()
+        && let Some(o) = uniform_offset(offsets, edges.len())
+        && (f.wires().len() > 1 || edges.iter().any(|e| e.edge_info().is_ok_and(|i| !matches!(i.curve, k::Curve::Line { .. }))))
+    {
+        return offset_face(f, o);
+    }
     let mut loops = Vec::new();
     for f in &faces {
         if f.face_plane().map_err(fe)?.is_none() {
