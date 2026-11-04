@@ -16,6 +16,20 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-04 15:56 UTC.**
+- Parity run 14:05 (main 74aba98a): 370/482 features, 36/56 documents. Since then cf-linear-pattern-with-seed-location
+  8 -> 12/12 and cf-circular-pattern 9 -> 13/13 (PATTERN-EDGE-DIRECTION: a region's edges run as drawn, ScopeRule 10;
+  a pattern instance's re-run features take that instance's faces, native and std's FeatureList), cf-curve-pattern-
+  normal 4 -> 5 (the runner takes a sheet's UI-fetch box as an outer bound).
+- Speed: cf-circular-pattern 1126 -> 177 ms (projections of boundary points onto elementary faces), motor-mount-jack's
+  Circular pattern 136 -> 110 ms (seam movers: domain areas, local checks; the rest is bool's Boolean), cf-spur-gear's
+  Extrude 2 100 -> ~1 ms (the touched-parts probe only for the dialog's new feature: RegenOptions::touch_probe, set by
+  part-studio-ui's schedule_regen and ops' dialog preview).
+- Handed on: cf-setback-fillet regressed under its pinned std 782 (fill finds no join; FS-SPLIT-FACE-CREATED, dx);
+  cf-drive-train-generator's sprockets and cf-spur-gear are fit-spline flanks (skasm); cf-sheet-metal-shaped-flange is
+  dx's sheet-metal host. cf-straight-spline's 50 features hang on live's Part 5 bottom face in 8 arcs (live artefact).
+- DISPLACEMENT-MAP: Replace face landed; dx landed @opCreateBSplineSurface (4ded8d56): the user's script is next.
+
 **State 11-04 14:04 UTC.**
 - Since 13:51: cf-spur-gear's Extrude 2 11.8 -> 0.1 s (the dialog's preselection probe no longer proves non-contact
   with a many-faced part by the exact distance; the merge scope stays exact); cf-o-ring-generator to the end (evAxis
