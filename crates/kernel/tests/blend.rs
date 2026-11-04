@@ -1252,3 +1252,34 @@ fn fin_end_rounds_between_two_cylinders_are_lives() {
     assert!((u.area().unwrap() / (MM * MM) - 5211.140462).abs() < 1e-4);
     eprintln!("fin end rounds: {ms:.1} ms");
 }
+
+/// knob-jason's Fillet 2 (live behaviours "knob-jason after Fillet 2": 81 / 152 / 72, 26947.696685 mm³, each lobe
+/// edge's R2.5 round between two sphere corners where it meets Fillet 1's tori): on Fillet 1's result, the 12
+/// vertical lobe edges and (tangent propagation) the 24 curves where Fillet 1's tori meet at them. noshape's blend
+/// takes it: each corner a sphere about the point on both tori's spines, the tori cut back to their meridians there.
+/// OCCT's took 236 ms with its own corner patches (105 faces); live 22.
+#[test]
+fn lobe_edge_rounds_meeting_earlier_rounds_end_in_spheres_as_live() {
+    setup();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/blend");
+    let s = read_brep(&dir.join("knob-lobe-edges.brep")).unwrap();
+    let all = s.edges();
+    let idx = [15, 17, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37, 41, 43, 44, 47, 48, 51, 52, 55, 56, 59, 60, 63, 68, 69, 71, 73, 75, 77, 79, 81, 83, 85, 87, 89];
+    let es: Vec<Shape> = idx.iter().map(|&i| all[i].clone()).collect();
+    set_rust_blend(Some(true));
+    let t = std::time::Instant::now();
+    let r = fillet_checked(&s, &es, &[2.5 * MM; 36]);
+    let ms = t.elapsed().as_secs_f64() * 1e3;
+    set_rust_blend(None);
+    let r = r.unwrap().shape;
+    assert_eq!(last_blend_decline(), "");
+    assert!(r.is_valid());
+    let u = unify_same_domain(&r).unwrap().shape;
+    let shown = u.shown_topology().unwrap();
+    let counts = (u.faces().len(), shown.edges.iter().filter(|&&x| x).count(), shown.vertices.iter().filter(|&&x| x).count());
+    assert_eq!(counts, (81, 152, 72));
+    assert_eq!(u.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Sphere { .. }))).count(), 24);
+    assert!((vol_mm3(&u) / 26947.696685 - 1.0).abs() < 1e-7, "{}", vol_mm3(&u));
+    assert!((u.area().unwrap() / (MM * MM) - 7596.222510).abs() < 1e-4);
+    eprintln!("lobe edge rounds: {ms:.1} ms");
+}

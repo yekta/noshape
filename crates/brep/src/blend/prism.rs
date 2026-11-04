@@ -90,13 +90,22 @@ fn foot(f: &Face, c: DVec3, d: DVec3) -> Option<DVec3> {
 }
 
 /// One round's end: the cap, the vertex, the edges along the round's two faces there, the ball's centre and the
-/// two tangent points.
+/// two tangent points; or (no cap) a corner of earlier rounds.
 struct End {
     cap: u32,
     v: u32,
     g: [u32; 2],
     c: DVec3,
     t: [DVec3; 2],
+    corner: Option<Corner>,
+}
+
+/// An end at two earlier rounds (tori, the round's radius) beside its faces: their meeting edge `m` (to vertex
+/// `p`, the sphere's pole) and the tori beside the end edges.
+struct Corner {
+    m: u32,
+    tori: [u32; 2],
+    p: u32,
 }
 
 /// One round: its edge, radius, two faces, convex (+1) or concave (−1), its two ends (the edge's order).
@@ -114,9 +123,15 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
     for e in edges {
         blended[e.edge as usize] = true;
     }
+    // (Curved edges given: earlier rounds' meeting curves, each taken by a corner.)
+    let mut absorbed = vec![false; body.edges.len()];
+    let mut taken_m = vec![false; body.edges.len()];
+    for e in edges {
+        absorbed[e.edge as usize] = body.edges[e.edge as usize].curve != Curve::Line;
+    }
     let mut taken_v = vec![false; body.vertices.len()];
     let mut plans: Vec<Plan> = Vec::new();
-    for be in edges {
+    for be in edges.iter().filter(|e| !absorbed[e.edge as usize]) {
         let Spec::Fillet { radius: r } = be.spec else { return no("a prism round not a fillet") };
         let e = &body.edges[be.edge as usize];
         if e.curve != Curve::Line {
@@ -133,19 +148,38 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
                 return no("two prism rounds at a vertex");
             }
             let p = body.vertices[v as usize];
-            let others: Vec<u32> = ve[v as usize].iter().copied().filter(|&o| o != be.edge).collect();
+            let mut others: Vec<u32> = ve[v as usize].iter().copied().filter(|&o| o != be.edge).collect();
+            let ms: Vec<u32> = others.iter().copied().filter(|&o| absorbed[o as usize]).collect();
+            others.retain(|&o| !absorbed[o as usize]);
             let [o1, o2] = others[..] else { return no("a prism round's end not at three edges") };
-            if blended[o1 as usize] || blended[o2 as usize] {
+            if blended[o1 as usize] || blended[o2 as usize] || ms.len() > 1 {
                 return no("a prism round's end at another blended edge");
             }
             let on = |o: u32, f: u32| uses[o as usize].iter().any(|x| x.0 == f);
             let g = if on(o1, fs[0]) && on(o2, fs[1]) { [o1, o2] } else if on(o2, fs[0]) && on(o1, fs[1]) { [o2, o1] } else { return no("a prism round's end edges not along its faces") };
-            let caps: Vec<u32> = uses[g[0] as usize].iter().map(|x| x.0).filter(|&f| f != fs[0] && on(g[1], f)).collect();
-            let [cap] = caps[..] else { return no("a prism round's end without one cap") };
-            let Surface::Plane { normal: nc, .. } = body.faces[cap as usize].surface else { return no("a prism round's cap not planar") };
-            if nc.cross(d).length() > 1e-9 {
-                return no("a prism round's cap not square to it");
-            }
+            let beside = |k: usize| uses[g[k] as usize].iter().map(|x| x.0).find(|&f| f != fs[k]);
+            let (cap, corner) = match ms[..] {
+                [] => {
+                    let caps: Vec<u32> = uses[g[0] as usize].iter().map(|x| x.0).filter(|&f| f != fs[0] && on(g[1], f)).collect();
+                    let [cap] = caps[..] else { return no("a prism round's end without one cap") };
+                    let Surface::Plane { normal: nc, .. } = body.faces[cap as usize].surface else { return no("a prism round's cap not planar") };
+                    if nc.cross(d).length() > 1e-9 {
+                        return no("a prism round's cap not square to it");
+                    }
+                    (cap, None)
+                }
+                [m] => {
+                    let (Some(t0), Some(t1)) = (beside(0), beside(1)) else { return no("a prism round's corner without its rounds") };
+                    let torus_r = |f: u32| matches!(body.faces[f as usize].surface, Surface::Torus { minor, .. } if (minor - r).abs() <= margin);
+                    if !torus_r(t0) || !torus_r(t1) || !on(m, t0) || !on(m, t1) || std::mem::replace(&mut taken_m[m as usize], true) {
+                        return no("a prism round's corner not between two rounds of its radius");
+                    }
+                    let me = &body.edges[m as usize];
+                    let p = if me.v[0] == v { me.v[1] } else { me.v[0] };
+                    (u32::MAX, Some(Corner { m, tori: [t0, t1], p }))
+                }
+                _ => unreachable!(),
+            };
             // The way along each end edge from the vertex (into its face).
             let away = |o: u32| -> Option<DVec3> {
                 let oe = &body.edges[o as usize];
@@ -200,13 +234,21 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
                     return no("a prism round past its end edges");
                 }
             }
-            ends.push(End { cap, v, g, c, t: [t0, t1] });
+            if let Some(cn) = &corner
+                && ((body.vertices[cn.p as usize] - c).length() - r).abs() > 100.0 * margin
+            {
+                return no("a prism round's corner not at its rounds' meeting point");
+            }
+            ends.push(End { cap, v, g, c, t: [t0, t1], corner });
         }
         let [a, b] = <[End; 2]>::try_from(ends).map_err(|_| Decline("a prism round without two ends"))?;
         if (b.c - a.c).cross(d).length() > margin {
             return no("a prism round's ends not on one axis");
         }
         plans.push(Plan { edge: be.edge, r, fs, sigma, ends: [a, b] });
+    }
+    if (0..body.edges.len()).any(|i| absorbed[i] && !taken_m[i]) {
+        return no("a curved edge not a prism round's corner");
     }
     build(body, plans)
 }
@@ -222,6 +264,7 @@ fn build(body: &Body, plans: Vec<Plan>) -> Result<Output, Decline> {
     let mut dead_e = vec![false; ne];
     let mut touched: Vec<u32> = Vec::new();
     let mut new_faces: Vec<(u32, Face)> = Vec::new();
+    let mut corner_faces: Vec<(u32, Face)> = Vec::new();
     let add_v = |b: &mut Body, p: DVec3, vo: &mut Vec<Origin>| {
         b.vertices.push(p);
         vo.push(Origin::New);
@@ -233,6 +276,7 @@ fn build(body: &Body, plans: Vec<Plan>) -> Result<Output, Decline> {
         // Per end: the tangent points' vertices, the end edges cut back to them, the cap's arc between.
         let mut tv = [[0u32; 2]; 2];
         let mut arcs = [0u32; 2];
+        let mut spheres = Vec::new();
         for (j, end) in ends.iter().enumerate() {
             dead_v[end.v as usize] = true;
             for (k, t) in tv[j].iter_mut().enumerate() {
@@ -242,6 +286,42 @@ fn build(body: &Body, plans: Vec<Plan>) -> Result<Output, Decline> {
                 b.edges[g].v[slot] = *t;
                 edge_origin[g] = Origin::Piece { arg: 0, index: g as u32 };
                 history.push(Record { kind: Kind::Edge, arg: 0, index: g as u32, relation: Relation::Modified, out_kind: Kind::Edge, out: g as u32 });
+            }
+            if let Some(cn) = &end.corner {
+                // The round's end arc (from the first tangent point to the second), each torus's meridian through
+                // its tangent point to the pole in place of the meeting edge, the pole a degenerate edge.
+                let toward = body.vertices[end.v as usize] - end.c;
+                let pa = end.t[0];
+                let normal = if d.dot((pa - end.c).cross(toward)) > 0.0 { d } else { -d };
+                b.edges.push(Edge { v: [tv[j][0], tv[j][1]], curve: Curve::Circle { center: end.c, normal, xdir: (pa - end.c).normalize(), radius: r } });
+                edge_origin.push(Origin::New);
+                arcs[j] = b.edges.len() as u32 - 1;
+                let pp = body.vertices[cn.p as usize];
+                let mut meridians = [0u32; 2];
+                for k in 0..2 {
+                    let tk = end.t[k];
+                    let n = (tk - end.c).cross(pp - end.c).normalize();
+                    b.edges.push(Edge { v: [tv[j][k], cn.p], curve: Curve::Circle { center: end.c, normal: n, xdir: (tk - end.c).normalize(), radius: r } });
+                    edge_origin.push(Origin::New);
+                    meridians[k] = b.edges.len() as u32 - 1;
+                    // The torus ran the meeting edge to or from the pole: the meridian the same way.
+                    let me = body.edges[cn.m as usize];
+                    for lp in &mut b.faces[cn.tori[k] as usize].loops {
+                        for x in lp.iter_mut() {
+                            if x.edge == cn.m {
+                                let to_p = (if x.reversed { me.v[0] } else { me.v[1] }) == cn.p;
+                                *x = Use { edge: meridians[k], reversed: !to_p };
+                            }
+                        }
+                    }
+                    touched.push(cn.tori[k]);
+                }
+                dead_e[cn.m as usize] = true;
+                history.push(Record { kind: Kind::Edge, arg: 0, index: cn.m, relation: Relation::Deleted, out_kind: Kind::Edge, out: u32::MAX });
+                b.edges.push(Edge { v: [cn.p, cn.p], curve: Curve::Degenerate });
+                edge_origin.push(Origin::New);
+                spheres.push((j, end.v, end.c, pp, pa, arcs[j], meridians, b.edges.len() as u32 - 1, cn.tori));
+                continue;
             }
             // The cap runs into the vertex along one end edge and out along the other: the arc between them its way.
             let cap = &body.faces[end.cap as usize];
@@ -287,9 +367,33 @@ fn build(body: &Body, plans: Vec<Plan>) -> Result<Output, Decline> {
         // The round: each of its four edges the other way from the face beside it.
         let use_in = |b: &Body, f: u32, o: u32| b.faces[f as usize].loops.iter().flatten().find(|x| x.edge == o).map(|x| x.reversed);
         let mut lp = Vec::new();
-        for (f, o) in [(fs[0], lines[0]), (fs[1], lines[1]), (ends[0].cap, arcs[0]), (ends[1].cap, arcs[1])] {
+        for (f, o) in [(fs[0], lines[0]), (fs[1], lines[1])] {
             let Some(rev) = use_in(&b, f, o) else { return no("a prism round's edge not in its face") };
             lp.push(Use { edge: o, reversed: !rev });
+        }
+        // (Its first line run from the first end to the second: on along the second end's arc from its first tangent
+        // point, back along the first's to it.)
+        let forward = !lp[0].reversed;
+        for j in 0..2 {
+            let reversed = if ends[j].corner.is_some() {
+                (j == 0) == forward
+            } else {
+                let Some(rev) = use_in(&b, ends[j].cap, arcs[j]) else { return no("a prism round's edge not in its face") };
+                !rev
+            };
+            lp.push(Use { edge: arcs[j], reversed });
+        }
+        // Each corner's sphere: its arcs the other way from the round's and the tori's, the pole.
+        for (j, v, c, pp, pa, arc, meridians, pole, tori) in spheres {
+            let mut sl = vec![Use { edge: arc, reversed: !lp[2 + j].reversed }];
+            for k in 0..2 {
+                let Some(rev) = use_in(&b, tori[k], meridians[k]) else { return no("a prism round's corner meridian not in its torus") };
+                sl.push(Use { edge: meridians[k], reversed: !rev });
+            }
+            sl.push(Use { edge: pole, reversed: false });
+            let zdir = (c - pp).normalize();
+            let xdir = (pa - c - zdir * (pa - c).dot(zdir)).normalize();
+            corner_faces.push((v, Face { surface: Surface::Sphere { origin: c, xdir, ydir: zdir.cross(xdir), zdir, radius: r }, reversed: sigma < 0.0, loops: vec![sl] }));
         }
         let c = ends[0].c;
         let xdir = (ends[0].t[0] - c).normalize();
@@ -309,6 +413,13 @@ fn build(body: &Body, plans: Vec<Plan>) -> Result<Output, Decline> {
         b.solids[0].shells[0].push(fi);
         history.push(Record { kind: Kind::Edge, arg: 0, index: e, relation: Relation::Generated, out_kind: Kind::Face, out: fi });
         history.push(Record { kind: Kind::Edge, arg: 0, index: e, relation: Relation::Deleted, out_kind: Kind::Edge, out: u32::MAX });
+    }
+    for (v, face) in corner_faces {
+        b.faces.push(face);
+        face_origin.push(Origin::New);
+        let fi = b.faces.len() as u32 - 1;
+        b.solids[0].shells[0].push(fi);
+        history.push(Record { kind: Kind::Vertex, arg: 0, index: v, relation: Relation::Generated, out_kind: Kind::Face, out: fi });
     }
     for (v, &dv) in dead_v.iter().enumerate() {
         if dv {

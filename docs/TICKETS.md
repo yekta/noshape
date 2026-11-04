@@ -3166,7 +3166,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   with the disc, → "Failed to extrude selections, check input." Live extrudes the same region (michael's Extrude 2,
   six regions incl. this one, OK, 1 part 10/24/16). Repro /root/dx-scratch/tickets/extrude-slit-region.noshape
   (Sketch 1; add the Extrude). (dx 2026-11-03)
-- [ ] P1 FILLET-31S-FAIL (core; dx's parity suite 11-03, knob-jason) knob-jason's Fillet 2 (12 edges, r 2.5 mm)
+- [x] P1 FILLET-31S-FAIL (core; dx's parity suite 11-03, knob-jason) knob-jason's Fillet 2 (12 edges, r 2.5 mm)
   regenerates in **31 s** and then fails "Failed to fillet selections" (Fillet 1 before it: 1.0 s); live: OK.
   Rebuilt document: /root/dx-scratch/tickets/knob-jason.noshape (CLI: document_open + feature_list, 32 s). The
   edges are the translator's picks from Onshape's packed queries (live's geometry lines for this document came back
@@ -3183,6 +3183,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   core 11-04 01:02: on Fillet 1's exact result, Fillet 2 builds now (OCCT's): its volume in live's band, area 7596.076
   against 7596.223 mm², but 105 / 224 / 120 faces / edges / vertices against live's 81 / 152 / 72 (its corners in
   OCCT's patches where live has one sphere each). 235 ms, live 22.
+  core 11-04 06:09: **fixed**: noshape's blend (blend/prism.rs) takes Fillet 2: each lobe edge's round ends where Fillet 1's
+  two tori meet it in a sphere about the point on both tori's spines (the meeting curves given by tangent propagation
+  go, the tori end at their meridians there): live's 81 / 152 / 72, 26947.696710 mm³ (live 26947.696685), area
+  7596.222510 as live's, 2.2 ms (OCCT 236). knob-jason 11/11 to the end, 60 ms (live 125). T1 kernel blend::
+  lobe_edge_rounds_meeting_earlier_rounds_end_in_spheres_as_live.
 - [x] (core 11-03 14:50: live 1897's rule, from the normal alone (±Z: x = +X; else y = +Z projected, x = y × n), for sketches and planes on faces (eval.rs raw_plane) and FeatureScript's evPlane (host query.rs); ScopeRule 8, studios saved with features before keep OCCT's (PartStudio::legacy_face_frames). exercise-martinl and learning-center-devon match live to the end; T1 model kernel_robustness::a_sketch_on_a_face_takes_onshapes_frame. Left: evPlane's origin is the face's box centre in live (ours the parameter box's middle), and sheet metal flanges (bracket00-ira's) untested) P2 SKETCH-FACE-FRAME (core; dx's parity suite 11-03) a sketch on a part face gets another x axis than live's in
   3 of the corpus's face sketches (the origin and normal agree; live's frames are features.json `sketches`
   transformMatrix): exercise-martinl Sketch 2 on a −X side face: ours x (0, 0, −1), y (0, −1, 0), live x (0, −1, 0),
