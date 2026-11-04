@@ -2011,13 +2011,6 @@ impl PartStudioView {
                 };
                 let dbl = target.as_ref().is_some_and(|t| self.edit.is_none() && self.is_double_click(&t.reference));
                 match target {
-                    // Double-clicking a sketch in the graphics area edits it.
-                    Some(t) if dbl && matches!(t.kind, PickKind::SketchCurve | PickKind::SketchPoint | PickKind::SketchRegion) => {
-                        if let Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } = t.reference {
-                            self.selection.clear();
-                            self.edit_feature(sketch, window, cx);
-                        }
-                    }
                     // Live ("psui (10-27, interaction 5.x)"): Mass and section
                     // properties on its Part tab takes the whole part on a
                     // face / edge / vertex click (the part shaded amber, its
@@ -3662,12 +3655,8 @@ impl PartStudioView {
                 .drag_over::<RollbackDrag>(|s, _, _, _| s.border_t_2().border_color(p().accent))
                 .on_drop(cx.listener(|this, _: &RollbackDrag, _, cx| this.set_rollback(None, cx)))
                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    // Clicking empty list space clears the feature selection
-                    // (and a new folder's highlight).
-                    if !this.selected_features.is_empty() || this.ui.selected_folder.is_some() || this.ui.fresh_folder.take().is_some() {
-                        this.selected_features.clear();
-                        this.ui.selected_folder = None;
-                        this.refresh_scene(false, cx);
+                    // Clicking empty list space keeps the selection (live 1990 6.29); a new folder's highlight goes.
+                    if this.ui.fresh_folder.take().is_some() {
                         cx.notify();
                     }
                 })),

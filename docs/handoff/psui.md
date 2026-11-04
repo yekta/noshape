@@ -868,6 +868,10 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- 11-04 11:06: live's 1990 answers (behaviours l.34565) put in part-studio.md: 22 rows match. Corrected: a
+  double-click on a sketch's line in the graphics no longer opens the sketch (3.18), a click on empty list space keeps
+  the selection (6.29). New P3 tickets MISSING-LATER-CHIP, DIALOG-UNDO-ON-CONTROL, FS-SEARCH-BAR. 9.15 inertia and
+  5.15's "Edit healthy moment" asked again (REQUESTS 11-04 11:06). Still waiting: 1991 (hole-* re-recordings).
 - 11-04 10:57: **MC-INFERENCE-HOVER** (lead): a field taking mate connectors (Mate connector's Origin entity, its
   nested editor, a field's mate connector button on) shows the hovered face / edge / region's inference points
   (skasm's `inference_candidates`, background task in part_studio/inference.rs) as white dots and the nearest as the

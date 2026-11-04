@@ -2148,6 +2148,32 @@ fn a_hole_placed_on_an_in_feature_mate_connector(cx: &mut TestAppContext) {
     assert!(hole_ok && !features.iter().any(|t| t == "mateConnector"), "{features:?}");
 }
 
+/// Live 1990 (3.18): a double-click on a shown sketch's line in the graphics doesn't open the sketch; the first click
+/// selects the line, the second deselects it.
+#[gpui::test]
+fn a_double_click_on_a_sketch_line_does_not_open_the_sketch(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "dblclick-sketch-line", Tool::Line);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 300.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).edit.is_none() && view.read(cx).display.sketches.first().is_some_and(|s| !s.curves.is_empty()));
+    let pick = cx.update(|cx| {
+        let v = view.read(cx);
+        let sk = v.display.sketches.first().unwrap();
+        let line = Reference::SketchEntity { sketch: sk.feature, entity: sk.curves[0].entity };
+        v.built.as_ref().and_then(|b| b.picks.ids_for(&line).first().copied())
+    });
+    assert!(pick.is_some(), "the line is pickable");
+    for _ in 0..2 {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::Click { pick, position: DVec2::new(575., 300.), modifiers: Modifiers::default() }, w, cx);
+        })).unwrap();
+        draw(cx, window);
+    }
+    assert!(cx.update(|cx| view.read(cx).edit.is_none() && view.read(cx).selection.is_empty()));
+}
+
 /// MC-INFERENCE-HOVER (live behaviours 1327, psui/hole-mc-1851/4): in a Mate connector's Origin entity, the hovered
 /// top face offers its inference points; with the pointer at a corner a click picks that corner, stored as live does
 /// (the face, POINT, the vertex), so the connector sits at the corner with its Z the face normal.

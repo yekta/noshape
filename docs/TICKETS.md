@@ -1810,6 +1810,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Shift+E. Live's recordings (extrude-remove-tab, boolean-union-two-parts, new-extrude-then-other-tool; /root/parity/ui/live):
   the Extrude 2 dialog opens with Undo **off**; it turns on at the first change in the dialog (the Remove tab). Ours (green
   7d35f2cb, qa-scratch/uip-score3/): Undo on as soon as the dialog opens. (qa 2026-11-03 08:04, build 7d35f2cb)
+- [ ] P3 MISSING-LATER-CHIP (psui, live 1990 5.15, live/skasm/sketch-audit-1969/90h-*) a selection whose creating
+  feature now comes after the edited feature (Fillet 1 dragged above Extrude 1) keeps its chip name ("Edge of Extrude
+  1") in light grey italic, and its right-click menu is "Clear all" + "Edit healthy moment" (Help Document__repairing:
+  opens the Repair panel at the feature's last healthy moment). Ours shows it as a normal chip, menu Clear all only.
+- [ ] P3 DIALOG-UNDO-ON-CONTROL (psui, live 1990 1.13) with the keyboard on a dialog control (a checkbox just
+  clicked), Ctrl+Z does nothing in live; ours steps the dialog's last edit (the Undo action reaches the document).
+- [ ] P3 FS-SEARCH-BAR (feature-studio-ui / psui, live 1990 1.28, 90j-ctrl-shift-f.png) Ctrl+Shift+F in a Part Studio
+  opens a Feature Studio search bar under the graphics: "Find text", Match case, Regex, a "Feature Studio name filter"
+  box, Find. Ours has no such bar outside the Feature Studio editor.
 - [x] fixed (psui 11-04: the hovered face / edge / sketch region shows the assembly's inference points (`inference_candidates`, computed off the UI thread) as white dots and the nearest one as the hovered connector glyph (scene `InferenceMarks`, constant pixel size), Shift keeps them; a click stores the point as live does (`ConnectorOrigin`: the face, POINT / MID_POINT / CENTER / LOOP_CENTER and the vertex or edge as secondaryOriginQuery), in the Mate connector's Origin entity, its nested editor and fields with the mate connector button on; T1 a_mate_connector_picked_at_a_hovered_faces_corner) P2 MC-INFERENCE-HOVER (psui, split from IN-FEATURE-MATE-CONNECTOR 11-04) a field taking mate connectors (its
   button on, or the Mate connector feature's Origin entity) shows, while a face is hovered, its inference points
   (face centre, edge midpoints, corners as white dots) and a triad preview at the pointer, and a click takes the
