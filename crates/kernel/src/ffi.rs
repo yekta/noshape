@@ -708,6 +708,7 @@ pub(crate) mod ffi {
         /// Cancel flag of this thread's booleans (an `AtomicBool` address, 0 = none).
         fn set_thread_cancel(flag: usize);
         fn op_unify(s: &OcShape) -> Result<OpOut>;
+        fn op_join_edges(s: &OcShape) -> Result<OpOut>;
         /// The flat body noshape's own Boolean would get for `s` (tests): "" or why it can't.
         fn brep_body_of(s: &OcShape, out: &mut BrepBody) -> String;
         /// During noshape's own Boolean: OCCT's sections of face `a_face` of argument `a_arg` and face `b_face`

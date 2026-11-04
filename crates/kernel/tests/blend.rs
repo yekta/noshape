@@ -1340,3 +1340,28 @@ fn a_fillet_corner_build_keeps_the_heap_whole() {
         assert!((vol_mm3(&r) - 42765.260729).abs() < 1e-3, "{}", vol_mm3(&r));
     }
 }
+
+/// stef-radijator's Chamfer 2: a double-D hole (a r 4√2 circle with flats at x = ±4) chamfered 1 mm at its bottom
+/// flats' edges. OCCT's chamfer leaves the flats' old corners as vertices on the bottom arcs, two arcs of one circle
+/// meeting alone; joined, each bottom arc is one edge as live's.
+#[test]
+fn a_chamfered_double_d_holes_bottom_arcs_are_whole() {
+    setup();
+    let block = bx([-15.0, -15.0, 0.0], [15.0, 15.0, 15.0]);
+    let frame = Plane { origin: DVec3::new(0.0, 0.0, -1.0) * MM, x_dir: DVec3::X, normal: DVec3::Z };
+    let cyl = make_cylinder(&frame, 32.0f64.sqrt() * MM, 17.0 * MM, std::f64::consts::TAU).unwrap();
+    let hole = common(&cyl, &bx([-4.0, -20.0, -2.0], [4.0, 20.0, 20.0])).unwrap().shape;
+    let b = cut(&block, &hole).unwrap().shape;
+    let flats = edges_where(&b, |i| matches!(i.curve, Curve::Line { .. }) && i.start.z.abs() < 1e-9 && i.end.z.abs() < 1e-9 && (i.start.x.abs() - 4.0 * MM).abs() < 1e-9 && (i.end.x.abs() - 4.0 * MM).abs() < 1e-9);
+    assert_eq!(flats.len(), 2);
+    let r = chamfer_checked(&b, &flats, ChamferSpec::Equal(MM), &[]).unwrap().shape;
+    let j = join_edges(&r).unwrap().shape;
+    assert!(j.is_valid());
+    assert!((vol_mm3(&j) - vol_mm3(&r)).abs() < 1e-9 * vol_mm3(&r));
+    let arcs = edges_where(&j, |i| matches!(i.curve, Curve::Circle { .. }) && i.start.z.abs() < 1e-9 && i.end.z.abs() < 1e-9 && (i.start.length() / MM - 32.0f64.sqrt()).abs() < 1e-6);
+    let lens: Vec<f64> = arcs.iter().map(|e| e.edge_info().unwrap().length / MM).collect();
+    assert_eq!(lens.len(), 2, "{lens:?}");
+    // (Round from (5, ∓2.6458) to (−5, ∓2.6458): 124.2° of the r √32 circle.)
+    let want = 32.0f64.sqrt() * (std::f64::consts::PI - 2.0 * (7.0f64.sqrt() / 32.0f64.sqrt()).asin());
+    assert!(lens.iter().all(|l| (l - want).abs() < 1e-6), "{lens:?} {want}");
+}

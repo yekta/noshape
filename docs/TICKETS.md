@@ -513,6 +513,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   where the flats met the circle (1.69 + 8.886 + 1.69 mm): the 4 extra edges and vertices. Probe:
   NOSHAPE_CHAMFER_FACES_CASE=vibe5 ~/core-stef2/chamfer-2 (blend::dumped_chamfer_faces_probe, NOSHAPE_CHAMFER_OUT
   writes the result).
+  core 11-04 08:09: joined (boolean.cpp join_loop_pieces also where two arcs of one circle meet alone; a fillet's
+  or chamfer's result gets only that join, op_join_edges, where nothing else unified): stef-radijator 6/6 to the end
+  (full parity 323/480, 31/55; nothing else moved). T1 kernel blend::a_chamfered_double_d_holes_bottom_arcs_are_whole.
 - [x] (core 11-03 09:00: pieces of one straight edge between the same two planes, a gap between them, are filleted as one cut along the whole line (features.cpp fillet_as_cut's spans, before OCCT): live's one face a corner, rounding off the 0.3 mm the groove leaves in the corner; bracket03-mattie's Fillet 1 exactly live's (22/60/40, 9351.620768 mm², 26334.635 mm³); T1 kernel blend::fillet_over_a_groove_is_one_face; the blend corpus as recorded. Its Chamfer 1 then 58/144/88 vs live 58/136/80: a blend's lines split where nothing ends are joined (features.cpp join_split_lines), 58/136/80 as live; bracket03-mattie matches live to the end; T1 kernel blend::chamfered_groove_edges_stay_whole) P2 FILLET-SPLIT-EDGE-FACES (core; dx's parity suite 11-03) a Fillet of edges a groove cut in two makes one face
   per piece and more: bracket03-mattie Fillet 1 (r 3 mm, tangent propagation, four 7 mm corner edges, each beside
   its other half across a 6 mm groove; Onshape's query keeps both halves): live 22/60/40 faces/edges/vertices, one

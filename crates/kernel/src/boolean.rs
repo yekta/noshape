@@ -344,6 +344,12 @@ pub fn unify_same_domain(shape: &Shape) -> Result<OpResult> {
     Ok(OpResult::from_ffi(ck(ffi::op_unify(shape.raw()))?))
 }
 
+/// Only the pieces of loops joined into whole edges (a vertex a seam or a blend left between two pieces of one curve,
+/// nothing else there), no faces merged; the shape as it is in a studio saved before (legacy topology).
+pub fn join_edges(shape: &Shape) -> Result<OpResult> {
+    Ok(OpResult::from_ffi(ck(ffi::op_join_edges(shape.raw()))?))
+}
+
 /// [`unify_same_domain`] over the whole shape, whatever is known of it (a
 /// shape an earlier unify found nothing in, a local Boolean's result:
 /// boolean.cpp `UnifyScope`): the reference the fast ways are checked

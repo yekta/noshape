@@ -431,7 +431,13 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
                 let merged = ev.name_result(&[&crate::regen::eval::names_for(&res.shape, face_names)], &un.history, &un.shape, &BTreeMap::new(), None);
                 (un.shape, merged)
             }
-            None => (res.shape, face_names),
+            None => match joined_edges(&res) {
+                Some(j) => {
+                    let named = ev.name_result(&[&crate::regen::eval::names_for(&res.shape, face_names)], &j.history, &j.shape, &BTreeMap::new(), None);
+                    (j.shape, named)
+                }
+                None => (res.shape, face_names),
+            },
         };
         let t2 = std::time::Instant::now();
         ev.replace_body(bi, shape, face_names);
@@ -492,6 +498,13 @@ fn rust_groups(shape: &k::Shape, edges: &[k::Shape], radii: &[f64]) -> Option<(E
 
 /// Blends that meet on one surface are one face, as Parasolid's (pulley02: a groove's two rounds, each half its
 /// height, meet on one torus): the result unified when only blend faces merge, every other face as it was.
+/// A blend's result with the pieces of its loops joined (stef-radijator's chamfered hole: its bottom arcs kept the
+/// flats' corners as vertices; live's are whole), where any were.
+fn joined_edges(res: &k::OpResult) -> Option<k::OpResult> {
+    let j = k::join_edges(&res.shape).ok()?;
+    (j.shape.count(k::ShapeType::Edge) < res.shape.count(k::ShapeType::Edge)).then_some(j)
+}
+
 fn merged_blends(res: &k::OpResult) -> Option<k::OpResult> {
     let faces = res.shape.faces();
     let blend: Vec<bool> = (0..faces.len())
@@ -669,7 +682,14 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
         let res = k::chamfer_checked(&body.shape, &shapes, spec, &reference).map_err(chamfer_failed)?;
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));
-        ev.replace_body(bi, res.shape, face_names);
+        let (shape, face_names) = match joined_edges(&res) {
+            Some(j) => {
+                let named = ev.name_result(&[&crate::regen::eval::names_for(&res.shape, face_names)], &j.history, &j.shape, &BTreeMap::new(), None);
+                (j.shape, named)
+            }
+            None => (res.shape, face_names),
+        };
+        ev.replace_body(bi, shape, face_names);
     }
     Ok(())
 }

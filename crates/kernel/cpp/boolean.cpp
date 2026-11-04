@@ -3190,8 +3190,26 @@ TopoDS_Shape unify_seams_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScop
 // there are none or the result isn't valid.
 // Whether some u-periodic face has a curved edge ending at u = 0 of its surface where the face has no seam: the only
 // place join_loop_pieces joins. Linear, no maps (most bodies have none: a hole's circle ends on its seam).
+// Edges `a` and `b` arcs of one circle (where a blend kept a vertex between them: stef-radijator's chamfered hole).
+bool one_circle(const TopoDS_Edge& a, const TopoDS_Edge& b)
+{
+  BRepAdaptor_Curve ca(a), cb(b);
+  if (ca.GetType() != GeomAbs_Circle || cb.GetType() != GeomAbs_Circle)
+    return false;
+  const gp_Circ x = ca.Circle(), y = cb.Circle();
+  const double  tol = std::max(BRep_Tool::Tolerance(a), BRep_Tool::Tolerance(b));
+  return x.Location().Distance(y.Location()) <= tol && std::abs(x.Radius() - y.Radius()) <= tol && x.Axis().Direction().IsParallel(y.Axis().Direction(), 1e-9);
+}
+
 bool loop_joint_candidates(const TopoDS_Shape& s)
 {
+  {
+    ShapeAncMap ve;
+    TopExp::MapShapesAndUniqueAncestors(s, TopAbs_VERTEX, TopAbs_EDGE, ve);
+    for (int i = 1; i <= ve.Extent(); ++i)
+      if (ve(i).Extent() == 2 && one_circle(TopoDS::Edge(ve(i).First()), TopoDS::Edge(ve(i).Last())))
+        return true;
+  }
   for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More(); fx.Next())
   {
     const TopoDS_Face&              f = TopoDS::Face(fx.Current());
@@ -3253,7 +3271,8 @@ TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist)
       continue;
     if (BRep_Tool::IsClosed(a, TopoDS::Face(fa->First())) || BRep_Tool::IsClosed(a, TopoDS::Face(fa->Last())) || BRep_Tool::IsClosed(b, TopoDS::Face(fa->First())) || BRep_Tool::IsClosed(b, TopoDS::Face(fa->Last())))
       continue;
-    // Only where a seam split the loop: at u = 0 (a whole period) of a periodic face's surface, OCCT's seams' place.
+    // Only where a seam split the loop (at u = 0, a whole period, of a periodic face's surface, OCCT's seams' place) or
+    // two arcs of one circle meet alone.
     bool at_seam = false;
     for (const TopoDS_Shape& fx : {fa->First(), fa->Last()})
     {
@@ -3264,7 +3283,7 @@ TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist)
       const gp_Pnt2d uv = BRep_Tool::Parameters(TopoDS::Vertex(ve.FindKey(i)), f);
       at_seam = at_seam || std::abs(std::remainder(uv.X(), g->UPeriod())) < 1e-7;
     }
-    if (at_seam)
+    if (at_seam || one_circle(a, b))
       joints.push_back(i);
   }
   if (joints.empty())
@@ -6479,6 +6498,16 @@ OpOut op_unify_whole(const OcShape& s)
   require_non_null(s.shape, "shape");
   HHist        hist;
   TopoDS_Shape res = unify(s.shape, hist);
+  return make_result({s.shape}, res, hist.get());
+}
+
+// Only the pieces of loops joined (join_loop_pieces: where a seam or a blend left a vertex between two pieces of one
+// curve), nothing unified; none in a studio saved before (legacy topology).
+OpOut op_join_edges(const OcShape& s)
+{
+  require_non_null(s.shape, "shape");
+  HHist              hist;
+  const TopoDS_Shape res = legacy_topology() ? s.shape : join_loop_pieces(s.shape, hist);
   return make_result({s.shape}, res, hist.get());
 }
 
