@@ -36,6 +36,13 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-04 23:05: new release check (lead: the user's Windows update bug).** Update from the previous release with a
+`noshape mcp` running from the install folder must end on the new version, the log saying what the helper closed. Windows:
+qa can't run it (request to the lead: check_update.py --with-mcp in the Release Check job). Linux (vibe3): the updater app
+(~/qa/updhome, Xvfb :64, now 0.4.28) has `noshape mcp` running beside it from the same install (pid in `pgrep -af updhome`,
+`sleep infinity |` holds its stdin); at the next release check: the app ends on the new version, what became of the mcp copy,
+and ~/qa/updhome/.config/noshape/updates/update-helper.log (once the lead's helper ships, it takes effect one update later).
+
 **11-04 23:04:** **SPLIT-FACE-SAME-ID (the user's Gyro) verified on 6c3decf4** (both matrices: only the picked body changes; the
 outer ring's chamfer still fails at its Y-Ribs rim, noted for core). The whole CLI smoke can run on vibe3 now:
 `ssh vibe3 'cd ~/qa; bash bin/qa-presmoke.sh /home/ngyekta/qa/bin/w-<sha>.sh g<sha>-p v0427'` (qa-presmoke.sh copied there with
@@ -1011,6 +1018,13 @@ go to REQUESTS (batch 1: part-studio 1.16). Done so far: part-studio §1–13 (l
   test (5.27); part_studio_toolbar.json `sketch_shortcut_tools` was set back to null.
 
 ## Requests to the lead (qa, updated 2026-11-04 14:02)
+- **(11-04 23:05) Windows update with `noshape.exe mcp` running (your update-helper fix):** qa can't run Windows. The Release
+  workflow's "Check Windows x86_64" already runs .github/release/check_update.py (installer update, relaunch) — but only when
+  `GITHUB_REF_TYPE -ne 'tag'`, so not on the release runs qa smokes. Please add a `--with-mcp` option to check_update.py (start
+  `<program> mcp` with its stdin held open before the update; then require the new version started, the mcp copy gone, and
+  update-helper.log naming what it closed) and run it in that Windows step (and on Linux / macOS alike, the same-app rule), plus
+  a way to see it run on a release candidate (a workflow_dispatch of Release on a branch?). qa then reads the job's log at
+  every release. On Linux qa runs the real case on vibe3 (below).
 - ~~(11-04 14:26) 4c9c1741 not on main~~ — resolved: it landed rebased as 477c41683, in green 477c4168 and later (qa 15:24).
 - **(11-04 14:02) A Windows / macOS title-bar check qa can run on a release** (the new same-on-every-platform rule, the lead's
   17:00 ask): qa can't run the Windows app here, and no workflow clicks the GUI except nav.yml's view navigation. Please
