@@ -824,3 +824,86 @@ fn bodies_after_feature() {
     }
     let _ = std::fs::remove_file(&tmp);
 }
+
+/// A document's Part Studios (NOSHAPE_DUMP_DOC): each feature with its type, status and its query parameters'
+/// references, then each part's volume and face count after the last feature and after each one named in
+/// NOSHAPE_DUMP_AFTER (comma-separated).
+#[test]
+#[ignore = "T2 tool: NOSHAPE_DUMP_DOC"]
+fn dump_document() {
+    let Ok(path) = std::env::var("NOSHAPE_DUMP_DOC") else { return };
+    let tmp = std::env::temp_dir().join(format!("noshape-dump-{}.noshape", std::process::id()));
+    std::fs::copy(&path, &tmp).unwrap();
+    for ext in ["-wal", "-shm"] {
+        let _ = std::fs::copy(format!("{path}{ext}"), format!("{}{ext}", tmp.display()));
+    }
+    let s = noshape_ops::session::Session::open(&tmp).unwrap();
+    let units = s.doc.settings.units;
+    let after: Vec<String> = std::env::var("NOSHAPE_DUMP_AFTER").map(|v| v.split(',').map(str::to_string).collect()).unwrap_or_default();
+    for tab in &s.doc.tabs {
+        let TabContent::PartStudio(ps) = &tab.content else { continue };
+        println!("tab {} (scope rule {:?})", tab.name, ps.scope_rule);
+        let opts = RegenOptions { custom_features: Some(noshape_model::custom::DocumentScripts::from_document(&s.doc)), ..Default::default() };
+        let r = Regenerator::new().regenerate(ps, &ConfigValues::default(), &units, &opts);
+        for (f, st) in ps.features.iter().zip(&r.display.features) {
+            println!("  {} [{}] {:?} {:?}", f.name, f.type_id, st.status, st.message);
+            for (k, v) in f.params.0.iter() {
+                if let ParamValue::Query(q) = v
+                    && !q.is_empty()
+                {
+                    println!("    {k}: {q:?}");
+                }
+            }
+        }
+        let parts = |r: &RegenResult| r.context.bodies.iter().map(|b| format!("{} {:.4} mm³ {} faces", b.name, b.shape.volume().unwrap_or(0.0) * 1e9, b.shape.faces().len())).collect::<Vec<_>>();
+        println!("  parts at the end: {:?}", parts(&r));
+        for name in &after {
+            let Some(k) = ps.features.iter().position(|f| &f.name == name) else { continue };
+            let mut p = ps.clone();
+            p.features.truncate(k + 1);
+            let r = Regenerator::new().regenerate(&p, &ConfigValues::default(), &units, &opts);
+            println!("  parts after {name}: {:?}", parts(&r));
+            for b in r.context.bodies.iter() {
+                for (i, n) in b.faces.iter().enumerate() {
+                    let c = b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok().and_then(|f| f.centroid().ok()).unwrap_or_default() * 1e3;
+                    println!("    {} face {i} at ({:.2}, {:.2}, {:.2}): {n:?}", b.name, c.x, c.y, c.z);
+                }
+            }
+        }
+    }
+    let _ = std::fs::remove_file(&tmp);
+}
+
+/// The user's Gyro (NOSHAPE_GYRO_DOC): what Split 1 made, then a Chamfer of the inner ring's top face (its smallest
+/// upward planar face) of NOSHAPE_GYRO_WIDTH (default 0.5 mm) and the parts after it.
+#[test]
+#[ignore = "T2 probe: NOSHAPE_GYRO_DOC"]
+fn gyro_chamfer_probe() {
+    use noshape_ops::{Ctx, registry};
+    use serde_json::json;
+    let Ok(path) = std::env::var("NOSHAPE_GYRO_DOC") else { return };
+    let tmp = std::env::temp_dir().join(format!("noshape-gyro-{}.noshape", std::process::id()));
+    std::fs::copy(&path, &tmp).unwrap();
+    let mut ctx = Ctx::new();
+    let mut call = |tool: &str, args: serde_json::Value| {
+        let op = registry::by_tool_name(tool).unwrap();
+        registry::run(&mut ctx, op, &args).map(|o| o.value).unwrap_or_else(|e| e.to_json())
+    };
+    call("document_open", json!({ "path": tmp.to_str().unwrap() }));
+    let made = call("query_entities", json!({ "kind": "faces", "created_by": "Split 1", "limit": 100 }));
+    println!("GYRO created_by Split 1: {}", made.to_string().chars().take(600).collect::<String>());
+    let tops = call("query_entities", json!({ "kind": "faces", "surface": "plane", "normal": [0, 0, 1], "limit": 100 }));
+    println!("GYRO upward planar faces: {}", tops.to_string().chars().take(1500).collect::<String>());
+    let before = call("query_parts", json!({}));
+    println!("GYRO parts before: {}", before.to_string().chars().take(1500).collect::<String>());
+    let faces = tops.get("faces").or_else(|| tops.get("entities")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    let area = |f: &serde_json::Value| f.get("area").and_then(|a| a.as_f64()).unwrap_or(f64::MAX);
+    let Some(inner) = faces.iter().min_by(|a, b| area(a).total_cmp(&area(b))) else { return };
+    let id = inner["id"].clone();
+    let width = std::env::var("NOSHAPE_GYRO_WIDTH").unwrap_or_else(|_| "0.5 mm".into());
+    let added = call("feature_add", json!({ "type": "chamfer", "params": { "entities": [id], "width": width, "tangentPropagation": true } }));
+    println!("GYRO chamfer of {}: {}", inner, added.to_string().chars().take(400).collect::<String>());
+    let after = call("query_parts", json!({}));
+    println!("GYRO parts after: {}", after.to_string().chars().take(1500).collect::<String>());
+    let _ = std::fs::remove_file(&tmp);
+}
