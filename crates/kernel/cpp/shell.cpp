@@ -4424,10 +4424,15 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
               gp_Pnt2d w2 = p == 0 ? sas->ValueOfUV(pts3[p], 1e3 * tol) : sas->NextValueOfUV(uv((int)p), pts3[p], 1e3 * tol);
               if (p > 0 && g->Value(w2.X(), w2.Y()).Distance(pts3[p]) >= 1e3 * tol)
                 w2 = sas->ValueOfUV(pts3[p], 1e3 * tol);
-              // (A free-form offset's points are marched to its projection's precision, a few µm.)
-              on = g->Value(w2.X(), w2.Y()).Distance(pts3[p]) < std::max(1e3 * tol, 1e-4 * size);
+              // (A free-form offset's points by a curl of its surface sit where its parametric offset folds, up to
+              // ~50 µm off it: Shell 4's ramp ends; the edge's tolerance says so.)
+              on = g->Value(w2.X(), w2.Y()).Distance(pts3[p]) < std::max(1e3 * tol, 1e-3 * size);
               if (!on)
+              {
+                if (dbg)
+                  std::fprintf(stderr, "quadrics: edge %d's marched point %zu of %zu %g off face %d (size %g, tol %g)\n", k, p, pts3.size(), g->Value(w2.X(), w2.Y()).Distance(pts3[p]), i, size, tol);
                 break;
+              }
               double u = w2.X(), v = w2.Y();
               if (p > 0 && g->IsUPeriodic())
                 u += std::round((uv((int)p).X() - u) / g->UPeriod()) * g->UPeriod();
