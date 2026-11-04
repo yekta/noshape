@@ -73,6 +73,11 @@ document's display mesh is under 0.5 s.
 
 ## Landed on main
 
+- 11-04 22:30 queued 1dc789e7 + 1d927467: a dialog's preview / close build the scene off the UI thread
+  (`apply_display_async`, scene caches behind a mutex, `display_seq` / `scene_gen` guards; UI-thread apply per dialog
+  open 57-72 → 1 + 14 ms); a drawing's Ctrl+S / Ctrl+M take the Control key only (drawing_keys::control_key).
+- 11-04 21:55 landed: shared shortcuts per OS (actions::ctrl_cmd: Ctrl and Cmd on macOS, Ctrl elsewhere; Redo Ctrl+Y
+  + Shift+Cmd+Z on macOS only); UI test binaries get their own settings dir (ui-test-support ctor; crates name it).
 - 11-04 20:48 a8c24d3b **P0 fix**: since d2eccf9f (18:16) the cached feature/part rows collapsed in any list taller
   than its panel (cf-straight-spline: all 59 rows drawn on one line): a cached view's content doesn't hold its size,
   so flex-shrink squeezed them to 0. `flex_none` on the rows' cached style; T1 cached_rows_stack_in_a_long_list (120
@@ -559,6 +564,18 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N00. (11-04 22:30) **Viewport Metal layer (orbit floor), in CI.** Branch `perf/psui-layer` = main + 459e3fdf
+    (local commit, not landed; `psui-layer-keep` branch points at it): NOSHAPE_VIEWPORT_LAYER=1 presents viewport
+    frames to a CAMetalLayer in an NSView under GPUI's view (gpui::UnderlayHole: GPUI draws a transparent hole;
+    gpui-pre-macos `underlay_layer` / `place_underlays`; gpui-pre-apple hole pipeline; app-core gpu.rs
+    LayerPresenter blits on the render thread; Viewport::attach_underlay). macOS code is type-checked from Linux:
+    `cargo check --target aarch64-apple-darwin -p gpui-pre-apple -p gpui-pre-macos` (CARGO_TARGET_DIR=
+    /root/target-psui-mac; touch `.../build/gpui-pre-apple-*/out/stitched_shaders.metal` first) and app-core's macOS
+    module through /root/psui-scratch/maccheck (a stub crate). Runs (jobs=bench, modes=texture, env
+    NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames): 41923148042 baseline, 41923165723 + NOSHAPE_VIEWPORT_LAYER=1;
+    compare the first orbit's presented fps / done_ms and look at texture-still.png / texture-orbit-*.png of the
+    layer run (the viewport must show through). If good: default on (macOS texture mode), land, then drop the hidden
+    NSViews of unregistered targets (one per viewport ever shown, hidden; small leak).
 N0. (11-04 21:00, lead's speed list) (a) Dialog open: the preview's `apply_display` (~30 ms each, scene build ~16)
     is UI-thread work; build the scene off the UI thread with the regen (`scene_builder::build` needs `&mut GpuCache` +
     the uploader: move the cache into the worker or split upload from build), or skip `build_preview_base` when the
