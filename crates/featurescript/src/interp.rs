@@ -163,6 +163,8 @@ pub struct Interp {
     base: usize,
     frames: Vec<TraceFrame>,
     module: Arc<str>,
+    /// The running function's module's `FeatureScript <version>;` ([`Interp::module_version`]).
+    module_version: Option<u32>,
     /// Position of the expression being evaluated (natives read it).
     pub pos: Pos,
     steps: u64,
@@ -205,12 +207,18 @@ impl Default for Interp {
 }
 
 impl Interp {
+    /// The `FeatureScript <version>;` of the module whose function is running (a native's caller).
+    pub fn module_version(&self) -> Option<u32> {
+        self.module_version
+    }
+
     pub fn new() -> Self {
         Interp {
             stack: Vec::with_capacity(1024),
             base: 0,
             frames: Vec::new(),
             module: "".into(),
+            module_version: None,
             pos: Pos::default(),
             steps: 0,
             deadline: None,
@@ -521,12 +529,14 @@ impl Interp {
         }
         let saved_base = std::mem::replace(&mut self.base, base);
         let saved_module = std::mem::replace(&mut self.module, f.module.clone());
+        let saved_version = std::mem::replace(&mut self.module_version, f.version);
         self.frames.push(TraceFrame { function: f.name.clone(), module: saved_module.clone(), pos: call_pos });
         let r = self.run_body(f);
         self.frames.pop();
         self.stack.truncate(base);
         self.base = saved_base;
         self.module = saved_module;
+        self.module_version = saved_version;
         self.pos = call_pos;
         r
     }
@@ -778,7 +788,7 @@ impl Interp {
                 }
                 let depth = self.frames.len();
                 let base = self.base;
-                let module = self.module.clone();
+                let (module, version) = (self.module.clone(), self.module_version);
                 let r = self.exec_block(body);
                 if *silent {
                     self.silent -= 1;
@@ -790,6 +800,7 @@ impl Interp {
                         self.frames.truncate(depth);
                         self.base = base;
                         self.module = module;
+                        self.module_version = version;
                         match catch {
                             Some((slot, stmts)) => {
                                 if let Some(sl) = slot {
@@ -1021,7 +1032,7 @@ impl Interp {
                     self.silent += 1;
                 }
                 let depth = self.frames.len();
-                let (base, module) = (self.base, self.module.clone());
+                let (base, module, version) = (self.base, self.module.clone(), self.module_version);
                 let r = self.eval(x);
                 if *silent {
                     self.silent -= 1;
@@ -1032,6 +1043,7 @@ impl Interp {
                         self.frames.truncate(depth);
                         self.base = base;
                         self.module = module;
+                        self.module_version = version;
                         Ok(Value::Undefined)
                     }
                 }

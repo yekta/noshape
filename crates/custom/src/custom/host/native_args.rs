@@ -234,17 +234,31 @@ const MISSING: &[&str] = &[
     "opSplitBySelfShadow",
 ];
 
-/// Natives std 1963 calls that are not implemented.
-const MISSING_1963: &[&str] = &[
+/// Natives older shipped std releases call that are not implemented (every one is called by some release).
+const MISSING_OLDER: &[&str] = &[
+    "endSheetMetalFeature",
     "evApproximateBSplineSurface",
+    "evEdgeCurvature",
+    "evFaceCurvatureDerivatives",
     "evFaults",
     "evMaxTolerance",
+    "evSheetMetalBendUp",
     "evTolerances",
+    "getHoleAttributes",
+    "opBendAtEdgeInternal",
     "opBooleanedPattern",
     "opCreateBSplineSurface",
+    "opDerip",
+    "opFlattenInternal",
+    "opFoldInternal",
     "opImportForeign",
+    "opMoveCurveBoundary",
+    "opOffsetCurveOnFace",
+    "opPrepareForBendingInternal",
+    "opRoll",
     "opSMFlatOperation",
     "opSplitBySelfShadow",
+    "startSheetMetalFeature",
 ];
 
 /// A probe value for an argument std passes as `expr` (`args`: the call's
@@ -345,14 +359,21 @@ fn natives_read_the_maps_std_passes() {
     check(noshape_featurescript::STD_SOURCES, MISSING);
 }
 
-/// The same for the older libraries Feature Studios pin.
+/// The same for the older libraries Feature Studios pin: their maps read, the natives they call either
+/// implemented or listed as not ([`MISSING_OLDER`], each called by some release).
 #[test]
 fn natives_read_the_maps_older_std_passes() {
-    for (version, sources) in noshape_featurescript::STD_VERSIONS {
-        let missing: &[&str] = match version {
-            1963 => MISSING_1963,
-            _ => &[],
-        };
-        check(sources, missing);
+    let listed: BTreeSet<String> = MISSING_OLDER.iter().map(|s| s.to_string()).collect();
+    let mut called = BTreeSet::new();
+    let mut report = Vec::new();
+    for version in noshape_featurescript::std_versions().into_iter().filter(|v| *v != noshape_featurescript::STD_VERSION) {
+        let (problems, missing, _) = unread_maps(noshape_featurescript::std_files(version).expect("shipped"));
+        let unlisted: Vec<&String> = missing.difference(&listed).collect();
+        if !problems.is_empty() || !unlisted.is_empty() {
+            report.push(format!("std {version}: {problems:?}; not implemented, not listed: {unlisted:?}"));
+        }
+        called.extend(missing);
     }
+    let stale: Vec<&String> = listed.difference(&called).collect();
+    assert!(report.is_empty() && stale.is_empty(), "{}\nlisted but no release calls them: {stale:?}", report.join("\n"));
 }

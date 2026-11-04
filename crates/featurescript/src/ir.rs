@@ -132,6 +132,8 @@ pub struct CompiledFn {
     /// Frame slots receiving the captured values (lambdas).
     pub capture_slots: Vec<u32>,
     pub module: Arc<str>,
+    /// Its module's `FeatureScript <version>;` (natives answer each library version in its own terms).
+    pub version: Option<u32>,
     pub pos: Pos,
 }
 

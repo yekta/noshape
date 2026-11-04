@@ -11,6 +11,16 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-04 12:54 UTC: std releases per pin (FS-OLD-STD-COMPAT, lead's decision)
+- `crates/featurescript/std-versions/<v>.zst`: each release's modules (`\0name\0len\0src`, sorted) packed by
+  zstd with the embedded 3095 blob as prefix; `tools/std-pack.py --all` packs every live/std-<v> (skips 3095), ~10 s
+  each. lib.rs `std_files(v)` unpacks on first use; `std_version_for(pin)` = newest shipped at or below.
+- Repack all if crates/featurescript/std changes (the unpack test fails until then). New releases from live: run the
+  packer, then `cargo test -p noshape-featurescript --lib` and `-p noshape-custom --lib` (TYPED_SINCE and the
+  older natives' list check them).
+- `Interp::module_version()`: the running function's module's FeatureScript version (natives that answer per
+  release: getCurrentVersion).
+
 ## 11-04 08:04 UTC: live's 1903 integrated (sketch wire bodies, REST feature lists of the 29 cf-* documents)
 - Translator: refs of a sketch's wire body are `LiveRef.sketch`; a query whose ids are all such refs is read from its
   text first (`query` → `query_with(use_ids)`), and a sketch line by id maps to our sketch's line there

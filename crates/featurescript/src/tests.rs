@@ -16,6 +16,49 @@ fn whole_standard_library_parses() {
     assert!(failures.is_empty(), "{} of {} modules failed:\n{}", failures.len(), crate::STD_SOURCES.len(), failures.join("\n"));
 }
 
+/// Every shipped release unpacks (its pack still matches the embedded std it was packed against: else
+/// tools/std-pack.py repacks it) and parses.
+#[test]
+fn every_shipped_standard_library_unpacks_and_parses() {
+    let mut failures = Vec::new();
+    for v in crate::std_versions() {
+        let files = crate::std_files(v).expect("shipped");
+        assert!(files.iter().any(|(n, _)| *n == "geometry.fs") && files.windows(2).all(|w| w[0].0 < w[1].0), "std {v}: {} modules", files.len());
+        for (name, src) in files {
+            if let Err(e) = crate::parser::parse(src) {
+                failures.push(format!("std {v} {name}:{e}"));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Every shipped release compiles (geometry.fs and what it imports: a release's modules import its own, whatever
+/// version their imports name: 3044's box.fs names math.fs at 3008).
+#[test]
+fn every_shipped_standard_library_compiles() {
+    let failures: Vec<String> = crate::std_versions()
+        .into_iter()
+        .filter_map(|v| crate::compile::std_module_at(v, "geometry.fs").err().map(|e| format!("std {v}: {}", e.iter().map(|e| e.to_string()).take(3).collect::<Vec<_>>().join("; "))))
+        .collect();
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// A pin gets the newest shipped release at or below it (Onshape: exactly its own); one older than all, the
+/// oldest; one newer, the embedded release.
+#[test]
+fn a_pin_gets_the_newest_release_at_or_below_it() {
+    let shipped = crate::std_versions();
+    let (oldest, newest) = (shipped[0], *shipped.last().unwrap());
+    assert_eq!(newest, crate::STD_VERSION);
+    for w in shipped.windows(2) {
+        assert_eq!(crate::std_version_for(w[0]), w[0]);
+        assert_eq!(crate::std_version_for(w[1] - 1), w[0]);
+    }
+    assert_eq!(crate::std_version_for(oldest.saturating_sub(1)), oldest);
+    assert_eq!(crate::std_version_for(newest + 100), newest);
+}
+
 /// A module path of its own per compile: tests run in parallel and modules
 /// register their operators / exported functions by path.
 fn unique_path() -> String {
@@ -106,7 +149,7 @@ fn enums_and_types() {
 #[test]
 fn old_modules_name_types_in_any_case() {
     let compile = |version: u32| {
-        let src = format!("FeatureScript {version};\nimport(path : \"onshape/std/common.fs\", version : \"{version}.0\");\nfunction f() {{ var v is vector = vector(1, 2); return v[1]; }}");
+        let src = format!("FeatureScript {version};\nimport(path : \"onshape/std/geometry.fs\", version : \"{version}.0\");\nfunction f() {{ var v is vector = vector(1, 2); return v[1]; }}");
         compile_module(&unique_path(), &src, &NoImports).map(|m| {
             let f = m.functions("f").expect("f");
             to_display(&Interp::new().call_set(&f, vec![]).expect("runs"))

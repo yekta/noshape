@@ -4809,6 +4809,7 @@ dependencies = [
  "parking_lot",
  "regex",
  "serde_json",
+ "zstd",
 ]
 
 [[package]]

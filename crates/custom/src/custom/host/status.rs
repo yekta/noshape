@@ -1,7 +1,7 @@
 //! Feature lifecycle and status, variables, attributes, debug output and
 //! the other context natives that do no modeling.
 
-use super::{FsContext, context_arg, convert::*, query};
+use super::{FsContext, FsId, context_arg, convert::*, query};
 use crate::reference::Reference;
 use noshape_featurescript::interp::{Interp, NativeFn, R};
 use noshape_featurescript::value::{Map, Value};
@@ -20,6 +20,18 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("abortFeature", abort_feature),
     ("functionReportFeatureStatus", report_status),
     ("functionGetFeatureStatus", get_status),
+    // Older std (before functionReportFeatureStatus): `{ message, customMessage, faultyParameters }`.
+    ("reportFeatureError", |i, a| report_old(i, a, "ERROR")),
+    ("reportFeatureWarning", |i, a| report_old(i, a, "WARNING")),
+    ("reportFeatureInfo", |i, a| report_old(i, a, "INFO")),
+    ("getFeatureError", |i, a| get_old(i, a, "ERROR")),
+    ("getFeatureWarning", |i, a| get_old(i, a, "WARNING")),
+    ("getFeatureInfo", |i, a| get_old(i, a, "INFO")),
+    ("getCurrentSubfeatureId", get_current_subfeature_id),
+    // std 1188's autodetectMatches (a server flag; on since, a version check from 1197).
+    ("detectSurfaceJoinEnabled", |_, _| Ok(Value::bool(true))),
+    // Older std's TransientId typecheck: a transient id is a string here.
+    ("isTransientId", |_, a| Ok(Value::bool(matches!(a.first(), Some(Value::Str(..)))))),
     ("clearFeatureStatus", clear_status),
     ("setFeatureComputedParameter", set_feature_computed_parameter),
     ("addManipulators", add_manipulators),
@@ -319,6 +331,36 @@ fn report_status(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     Ok(Value::Undefined)
 }
 
+/// Older std's `@reportFeatureError / Warning / Info(context, id, { message, customMessage, faultyParameters })`:
+/// the status `functionReportFeatureStatus` takes.
+fn report_old(i: &mut Interp, a: Vec<Value>, kind: &str) -> R<Value> {
+    let def = def_arg(i, &a, 2)?;
+    let mut entries = vec![("statusType", Value::str(kind)), ("statusEnum", def.get("message").clone())];
+    if let Value::Str(..) = def.get("customMessage") {
+        entries.push(("statusMsg", def.get("customMessage").clone()));
+    }
+    if let Value::Array(..) = def.get("faultyParameters") {
+        entries.push(("faultyParameters", def.get("faultyParameters").clone()));
+    }
+    report_status(i, vec![a[0].clone(), a[1].clone(), Value::map_from(entries)])
+}
+
+/// Older std's `@getFeatureError / Warning / Info(context, id)`: the message of a status of that kind, else undefined.
+fn get_old(i: &mut Interp, a: Vec<Value>, kind: &str) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let id = id_arg(i, &a, 1)?;
+    let st = cx.state.lock();
+    Ok(st.status.get(&id).filter(|s| s.get("statusType").as_str().is_some_and(|t| &*t == kind)).map(|s| s.get("statusEnum").clone()).unwrap_or_default())
+}
+
+/// Older std's `@getCurrentSubfeatureId(context)`: the id of the innermost `startFeature`, else the feature's.
+fn get_current_subfeature_id(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    let cx = context_arg(i, &a)?;
+    let st = cx.state.lock();
+    let id: FsId = st.started.last().map(|s| s.id.clone()).unwrap_or_else(|| vec![std::sync::Arc::from(st.feature.to_string())]);
+    Ok(id_value(&id))
+}
+
 fn get_status(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let id = id_arg(i, &a, 1)?;
@@ -385,8 +427,16 @@ fn is_at_version_or_later(_: &mut Interp, a: Vec<Value>) -> R<Value> {
     }
 }
 
-fn get_current_version(_: &mut Interp, _: Vec<Value>) -> R<Value> {
-    let tag = super::std_tag("featurescriptversionnumber.gen.fs", "FeatureScriptVersionNumber");
+/// The context's version: the newest one the calling library knows (a module of an older std casts it to its own
+/// FeatureScriptVersionNumber, which ends at its release).
+fn get_current_version(i: &mut Interp, _: Vec<Value>) -> R<Value> {
+    let tag = match i.module_version() {
+        Some(v) if noshape_featurescript::std_version_for(v) != noshape_featurescript::STD_VERSION => noshape_featurescript::compile::std_module_at(v, "featurescriptversionnumber.gen.fs")
+            .ok()
+            .and_then(|m| m.type_tag("FeatureScriptVersionNumber"))
+            .unwrap_or(noshape_featurescript::value::Tag::NONE),
+        _ => super::std_tag("featurescriptversionnumber.gen.fs", "FeatureScriptVersionNumber"),
+    };
     if tag.is_none() {
         return Ok(Value::Undefined);
     }

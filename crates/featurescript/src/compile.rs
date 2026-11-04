@@ -210,11 +210,7 @@ struct Pending {
 
 impl Pending {
     fn new(version: u32) -> Pending {
-        let mut files: Vec<(&'static str, &'static str)> = if version == crate::STD_VERSION {
-            crate::STD_SOURCES.to_vec()
-        } else {
-            crate::STD_VERSIONS.iter().find(|(v, _)| *v == version).map(|(_, f)| f.to_vec()).unwrap_or_default()
-        };
+        let mut files: Vec<(&'static str, &'static str)> = crate::std_files(version).map(<[_]>::to_vec).unwrap_or_default();
         files.sort_by_key(|(_, src)| std::cmp::Reverse(src.len()));
         let index = files.iter().enumerate().map(|(i, (n, _))| (*n, i)).collect();
         let claimed = files.iter().map(|_| std::sync::atomic::AtomicBool::new(false)).collect();
@@ -277,8 +273,9 @@ fn load_std(version: u32, name: &str, cache: &mut StdCache, pending: Option<&Pen
             let Some(n) = p.strip_prefix(STD_PREFIX) else {
                 return Err(vec![CompileError { module: path.clone(), pos: item.pos, message: format!("Unknown import {p}"), parse: false, level: Level::Error }]);
             };
-            // An older library imports its own version's modules.
-            let v = if version == crate::STD_VERSION { version } else { crate::std_version_for(import_version(v)) };
+            // A release's modules import its own modules, whatever version their import names (3044's box.fs
+            // names math.fs at 3008: two math.fs would clash); one it doesn't have, the release the import names.
+            let v = if crate::std_source_at(version, n).is_some() { version } else { crate::std_version_for(import_version(v)) };
             // (Another release's module: parsed on its own, the pending parse is this release's.)
             imports.push(Some(load_std(v, n, cache, pending.filter(|_| v == version))?));
         } else {
@@ -916,6 +913,7 @@ impl Cx<'_> {
             frame_size: f.nslots,
             capture_slots: f.captures.iter().map(|c| c.2).collect(),
             module: self.module.clone(),
+            version: self.version,
             pos: def.pos,
         };
         (compiled, outer)

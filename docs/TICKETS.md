@@ -3334,15 +3334,24 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Ship more std releases beside 1963 and 3095 (the corpus pins and every other release live can fetch), serve each
   pin the newest shipped release at or below it, no compatibility shims in 1963; the extra releases small in the
   bundle (compressed, loaded only when a studio pins one), the app's size and startup measured before and after.
-  dx 11-04 10:15, in progress (branch dx-std-wip, not landed until live's releases cover the pins): each release
-  packed with zstd against the embedded 3095 as prefix (`std-versions/<v>.zst`, 22-52 KB each; tools/std-pack.py),
-  unpacked the first time a studio pins it; 1963's raw 4.7 MB leave the binary. Older std's natives added (the
-  report/getFeature* pair, isTransientId, getCurrentSubfeatureId, detectSurfaceJoinEnabled) and getCurrentVersion
-  answers in the calling release's terms (the interpreter knows its function's module version). With 13 releases:
-  cf-sheet-metal-flange-plus 3/3 and the 392 pattern studios compile; studios pinned between shipped releases get
-  an older one meanwhile (cf-belt 1576 -> 1403 fails), so it waits for live (REQUESTS 1986 / 09:51: all releases,
-  3095 down to 46). Baseline before: app 343.88 MB stripped (dev profile), first window median 639 ms (15 launches,
-  Xvfb), CLI start median 42 ms.
+  dx 11-04 12:54, landed with 54 releases (the corpus's 29 pins, 1963, and live's latest down to 2615; more come
+  from live, REQUESTS 1986 / 09:51, and are added by `python3 tools/std-pack.py --all`): each release packed with
+  zstd against the embedded 3095 as prefix (`std-versions/<v>.zst`, 17-52 KB, 1.5 MB in all; 1963's raw 4.4 MB
+  left the binary), unpacked the first time a studio pins it; each pin gets the newest shipped release at or below
+  it; a release's modules import its own modules whatever version their imports name (3044's box.fs names math.fs at
+  3008). Older std's natives added (report/getFeature*, isTransientId, getCurrentSubfeatureId,
+  detectSurfaceJoinEnabled); getCurrentVersion answers in the calling release's terms (CompiledFn knows its module's
+  version); raw evaluation results only for releases before 2506 (2241's std converts them, 2506's doesn't; the
+  releases between aren't shipped yet: TYPED_SINCE, checked by a test against every shipped release). T1:
+  featurescript every_shipped_standard_library_unpacks_and_parses / _compiles / a_pin_gets_the_newest_release_at_or_
+  below_it, custom legacy releases_up_to_typed_since_convert_raw_results, native_args (older releases' natives
+  read or listed), model custom_features an_old_pinned_studio_gets_its_own_std. Run 67: 35/56, 369/482 (+11), custom
+  33/111 (+5), documents with failing custom features 7 -> 5 (cf-circular-pattern 5 -> 9, cf-linear-pattern-with-
+  seed-location 4 -> 8, cf-sheet-metal-flange-plus 1 -> 3, cf-sheet-metal-hem 1 -> 2). Size (dev profile,
+  stripped): app 343.88 -> 341.32 MB, CLI 229.77 -> 226.98 MB. Startup, interleaved under the same load (the box
+  at load 40): first window median 1155 ms (the newest green) vs 1149 ms (this), CLI 78 vs 67 ms: unchanged.
+  Left: cf-fix-pcb's Fix PCB 2 says "No components selected" on its own pin (2506; Fix PCB 1 before it may take
+  the components: next), cf-sheet-metal-hem's Hem 1 and cf-sheet-metal-model-plus's Up to Part (on their pins).
   Earlier notes, from when we served 1963 for every pin below 3095:
   cf-o-ring-generator (FeatureScript 369) `var … is vector = vector(…)` → "Type vector not found" (line 103: the
   lowercase type name, accepted at its pin); cf-straight-spline (455) an enum ending in a trailing comma

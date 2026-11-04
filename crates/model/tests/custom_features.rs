@@ -3196,3 +3196,32 @@ export const reopen = defineFeature(function(context is Context, id is Id, defin
     assert_eq!(r.context.bodies[0].kind, noshape_model::display::BodyKind::Solid);
     assert!((total_volume(&r) - 1e-6).abs() < 1e-12, "{}", total_volume(&r));
 }
+
+/// A Feature Studio pinned to an older std compiles against that release (Onshape: the std of its own pin), and the
+/// context's version reads in its terms: its FeatureScriptVersionNumber's newest (cf-sheet-metal-flange-plus's
+/// studios at 975 cast getCurrentVersion to their enum).
+#[test]
+fn an_old_pinned_studio_gets_its_own_std() {
+    let src = r#"FeatureScript 975;
+import(path : "onshape/std/geometry.fs", version : "975.0");
+
+annotation { "Feature Type Name" : "Old pin" }
+export const oldPin = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        println(getCurrentVersion(context));
+        println(isAtVersionOrLater(context, FeatureScriptVersionNumber.V975_BEND_LINE_EXTENTS));
+    });
+"#;
+    let fx = Fixture::new(src);
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("oldPin"), &fx.units).unwrap();
+    let fid = f.id;
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    assert_ok(&fx.regen(&mut reg, &ps));
+    let out = custom::run::output_of(fid).unwrap().output;
+    assert_eq!(out, "V975_BEND_LINE_EXTENTS\ntrue\n", "{out}");
+}

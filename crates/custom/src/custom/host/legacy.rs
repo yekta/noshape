@@ -9,8 +9,10 @@ use noshape_featurescript::interp::{Interp, NativeFn, R};
 use noshape_featurescript::value::{Map, Tag, Value, enum_name, tag_name};
 use std::sync::Arc;
 
-/// The library version whose evaluation builtins return std's types.
-const TYPED_SINCE: u32 = noshape_featurescript::STD_VERSION;
+/// The first library release whose evaluation builtins return std's types: 2241's evaluate.fs still converts
+/// (`lineFromBuiltin(@evAxis(…))`), 2506's doesn't; the releases between aren't shipped yet, and a pin there gets
+/// 2241 (the test `releases_up_to_typed_since_convert_raw_results` checks every shipped release against this).
+pub const TYPED_SINCE: u32 = 2506;
 
 /// The current native `name`, its result in the raw form.
 fn raw_call(name: &str, i: &mut Interp, a: Vec<Value>) -> R<Value> {
@@ -123,4 +125,21 @@ const RAW_RESULTS: &[(&str, NativeFn)] = legacy![
 
 pub fn register() {
     noshape_featurescript::interp::register_legacy_natives(TYPED_SINCE, RAW_RESULTS);
+}
+
+#[cfg(test)]
+mod tests {
+    /// A shipped release converts raw evaluation results itself (its evaluate.fs wraps `@evAxis` in
+    /// `lineFromBuiltin`) exactly when it is older than [`super::TYPED_SINCE`].
+    #[test]
+    fn releases_up_to_typed_since_convert_raw_results() {
+        let wrong: Vec<u32> = noshape_featurescript::std_versions()
+            .into_iter()
+            .filter(|&v| {
+                let converts = noshape_featurescript::std_source_at(v, "evaluate.fs").is_some_and(|s| s.contains("lineFromBuiltin(@evAxis"));
+                converts != (v < super::TYPED_SINCE)
+            })
+            .collect();
+        assert!(wrong.is_empty(), "releases on the wrong side of TYPED_SINCE ({}): {wrong:?}", super::TYPED_SINCE);
+    }
 }

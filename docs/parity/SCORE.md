@@ -15,6 +15,7 @@ causes of difference, each with its ticket.
 | 2026-11-04 | dx 08:50 (run 58: a mate connector on a sketch region, a written CAP_VERTEX, a part pattern of a sketch region (cf-transform-pattern 14 -> 20/21); opThicken joins a sheet's faces (cf-belt 3/3)) | 32/56 | 340/482 (custom 22/111) | – |
 | 2026-11-04 | dx 11:29 (run 63: attribute-based corner breaks, a localized Boolean's edges and vertices, attributes go with their entity (cf-sheet-metal-overcut-dogbone 2 -> 9/10, cf-fill-pattern 8/11); the qCreatedBy and name lookup caches) | 33/56 | 355/482 (custom 26/111) | – |
 | 2026-11-04 | dx 12:19 (run 65: opPattern of a solid's faces repeats them in the body; ties between equal faces go to live's part (cf-fill-pattern 11/11)) | 34/56 | 358/482 (custom 28/111) | – |
+| 2026-11-04 | dx 12:54 (run 67: each studio compiles against the std of its own pin (54 releases shipped, FS-OLD-STD-COMPAT)) | 35/56 | 369/482 (custom 33/111) | – |
 
 dx 11-03 18:15: three documents are left out of the model score (tests/parity-models/unscored.json, printed as "not
 scored" by `parity_models`): cf-ansi-washers, cf-socket-head-cap-screw-creator and cf-thread-creator. Their Feature
