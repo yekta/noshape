@@ -707,6 +707,9 @@ struct MacWindowState {
     accesskit_adapter: Option<accesskit_macos::SubclassingAdapter>,
     // The parent window if this window is a sheet (Dialog kind)
     sheet_parent: Option<id>,
+    /// NOSHAPE PATCH (agent psui): layers under the window's frame (`gpui::UnderlayHole`): key, its NSView (below
+    /// the GPUI view in the content view) and the view's `CAMetalLayer`.
+    underlays: Vec<(u64, Retained<Objc2NSView>, Retained<Objc2Object>)>,
 }
 
 impl MacWindowState {
@@ -1121,6 +1124,7 @@ impl MacWindow {
                 closed: Arc::new(AtomicBool::new(false)),
                 accesskit_adapter: None,
                 sheet_parent: None,
+                underlays: Vec::new(),
             }));
             let mut window = Self(state, marker);
 
@@ -2068,6 +2072,36 @@ impl PlatformWindow for MacWindow {
     fn draw(&self, scene: &gpui::Scene) {
         let mut this = self.0.lock();
         this.renderer.draw(scene);
+        if !this.underlays.is_empty() {
+            place_underlays(&this);
+        }
+    }
+
+    fn underlay_layer(&self, key: u64) -> Option<NonNull<c_void>> {
+        let mut this = self.0.lock();
+        if let Some((_, _, layer)) = this.underlays.iter().find(|u| u.0 == key) {
+            return NonNull::new(Retained::as_ptr(layer).cast_mut().cast());
+        }
+        let mtm = MainThreadMarker::new()?;
+        // SAFETY: AppKit / Core Animation calls on the main thread, on objects made here or owned by the window.
+        let (view, layer) = unsafe {
+            let layer: Retained<Objc2Object> = objc2::msg_send![objc2::class!(CAMetalLayer), new];
+            let () = objc2::msg_send![&*layer, setOpaque: true];
+            let view = Objc2NSView::initWithFrame(mtm.alloc(), Objc2NSRect::ZERO);
+            let () = objc2::msg_send![&*view, setLayer: &*layer];
+            view.setWantsLayer(true);
+            view.setHidden(true);
+            let content_view: *mut Objc2Object = msg_send![this.native_window, contentView];
+            let gpui_view = this.native_view.as_ptr().cast::<Objc2Object>();
+            // NSWindowBelow: under the GPUI view, which keeps every event.
+            let below: isize = -1;
+            let () = objc2::msg_send![&*content_view, addSubview: &*view, positioned: below, relativeTo: &*gpui_view];
+            (view, layer)
+        };
+        this.renderer.allow_underlays();
+        let ptr = NonNull::new(Retained::as_ptr(&layer).cast_mut().cast());
+        this.underlays.push((key, view, layer));
+        ptr
     }
 
     fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas> {
@@ -2372,6 +2406,33 @@ impl rwh::HasWindowHandle for MacWindow {
 impl rwh::HasDisplayHandle for MacWindow {
     fn display_handle(&self) -> Result<rwh::DisplayHandle<'_>, rwh::HandleError> {
         Ok(rwh::DisplayHandle::appkit())
+    }
+}
+
+/// NOSHAPE PATCH (agent psui): each underlay's NSView where the last draw put its hole, hidden in a frame without
+/// one. Core Animation's implicit animations are off: the layer jumps with the frame.
+fn place_underlays(state: &MacWindowState) {
+    let scale = get_scale_factor(state.native_window) as f64;
+    // SAFETY: main-thread AppKit / Core Animation calls on the window's own views.
+    unsafe {
+        let gpui_view = &*state.native_view.as_ptr().cast::<Objc2NSView>();
+        let view_frame = gpui_view.frame();
+        let () = objc2::msg_send![objc2::class!(CATransaction), begin];
+        let () = objc2::msg_send![objc2::class!(CATransaction), setDisableActions: true];
+        for (key, view, _) in &state.underlays {
+            match state.renderer.underlay_rects().iter().find(|r| r.0 == *key) {
+                Some((_, b)) if b.size.width.0 > 0. && b.size.height.0 > 0. => {
+                    let (x, top) = (b.origin.x.0 as f64 / scale, b.origin.y.0 as f64 / scale);
+                    let (w, h) = (b.size.width.0 as f64 / scale, b.size.height.0 as f64 / scale);
+                    // The content view is not flipped: y from its bottom.
+                    let origin = Objc2NSPoint::new(view_frame.origin.x + x, view_frame.origin.y + view_frame.size.height - top - h);
+                    view.setFrame(Objc2NSRect::new(origin, objc2_foundation::NSSize::new(w, h)));
+                    view.setHidden(false);
+                }
+                _ => view.setHidden(true),
+            }
+        }
+        let () = objc2::msg_send![objc2::class!(CATransaction), commit];
     }
 }
 

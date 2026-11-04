@@ -123,6 +123,12 @@ pub struct MetalRenderer {
     underlines_pipeline_state: metal::RenderPipelineState,
     monochrome_sprites_pipeline_state: metal::RenderPipelineState,
     polychrome_sprites_pipeline_state: metal::RenderPipelineState,
+    /// NOSHAPE PATCH (agent psui): `gpui::UnderlayHole` sprites: the polychrome shaders over a blank texture with
+    /// blending off, so the frame is transparent there.
+    underlay_holes_pipeline_state: metal::RenderPipelineState,
+    blank_texture: metal::Texture,
+    /// Where the last draw put each underlay's hole (device pixels, clipped): `Self::underlay_rects`.
+    underlay_rects: Vec<(u64, Bounds<ScaledPixels>)>,
     surfaces_pipeline_state: metal::RenderPipelineState,
     unit_vertices: metal::Buffer,
     #[allow(clippy::arc_with_non_send_sync)]
@@ -353,6 +359,18 @@ impl MetalRenderer {
             "polychrome_sprite_fragment",
             MTLPixelFormat::BGRA8Unorm,
         );
+        let underlay_holes_pipeline_state = build_hole_pipeline_state(&device, &library, MTLPixelFormat::BGRA8Unorm);
+        let blank_texture = {
+            let descriptor = metal::TextureDescriptor::new();
+            descriptor.set_width(1);
+            descriptor.set_height(1);
+            descriptor.set_pixel_format(MTLPixelFormat::BGRA8Unorm);
+            descriptor.set_usage(metal::MTLTextureUsage::ShaderRead);
+            let texture = device.new_texture(&descriptor);
+            let zero = [0u8; 4];
+            texture.replace_region(metal::MTLRegion::new_2d(0, 0, 1, 1), 0, zero.as_ptr().cast(), 4);
+            texture
+        };
         let surfaces_pipeline_state = build_pipeline_state(
             &device,
             &library,
@@ -400,6 +418,9 @@ impl MetalRenderer {
             underlines_pipeline_state,
             monochrome_sprites_pipeline_state,
             polychrome_sprites_pipeline_state,
+            underlay_holes_pipeline_state,
+            blank_texture,
+            underlay_rects: Vec::new(),
             surfaces_pipeline_state,
             unit_vertices,
             instance_buffer_pool,
@@ -477,6 +498,19 @@ impl MetalRenderer {
             self.path_intermediate_msaa_texture = Some(self.device.new_texture(&msaa_descriptor));
         } else {
             self.path_intermediate_msaa_texture = None;
+        }
+    }
+
+    /// NOSHAPE PATCH (agent psui): where the last draw put each `gpui::UnderlayHole` (key, device pixels clipped to
+    /// its content mask); the window places the underlay layers there.
+    pub fn underlay_rects(&self) -> &[(u64, Bounds<ScaledPixels>)] {
+        &self.underlay_rects
+    }
+
+    /// NOSHAPE PATCH (agent psui): the window's frame lets layers under it show through its holes.
+    pub fn allow_underlays(&mut self) {
+        if let Some(layer) = &self.layer {
+            layer.set_opaque(false);
         }
     }
 
@@ -738,6 +772,7 @@ impl MetalRenderer {
         let command_queue = self.command_queue.clone();
         let command_buffer = command_queue.new_command_buffer();
         let alpha = if self.opaque { 1. } else { 0. };
+        self.underlay_rects.clear();
 
         let mut command_encoder = new_command_encoder_for_texture(
             command_buffer,
@@ -795,14 +830,21 @@ impl MetalRenderer {
                         viewport_size,
                         command_encoder,
                     ),
-                PrimitiveBatch::PolychromeSprites { texture_id, range } => self
-                    .draw_polychrome_sprites(
+                PrimitiveBatch::PolychromeSprites { texture_id, range } => match gpui::underlay_hole_for_atlas_id(texture_id) {
+                    Some(key) => {
+                        for sprite in &scene.polychrome_sprites[range.clone()] {
+                            self.underlay_rects.push((key, sprite.bounds.intersect(&sprite.content_mask.bounds)));
+                        }
+                        self.draw_underlay_holes(range, instance_bindings, viewport_size, command_encoder)
+                    }
+                    None => self.draw_polychrome_sprites(
                         texture_id,
                         range,
                         instance_bindings,
                         viewport_size,
                         command_encoder,
                     ),
+                },
                 PrimitiveBatch::Surfaces(range) => self.draw_surfaces(
                     &scene.surfaces[range.clone()],
                     range.start,
@@ -1198,6 +1240,50 @@ impl MetalRenderer {
         );
     }
 
+    /// NOSHAPE PATCH (agent psui): `gpui::UnderlayHole` sprites, written as transparent pixels.
+    fn draw_underlay_holes(
+        &self,
+        sprites: Range<usize>,
+        instance_bindings: &InstanceBindings,
+        viewport_size: Size<DevicePixels>,
+        command_encoder: &metal::RenderCommandEncoderRef,
+    ) {
+        if sprites.is_empty() {
+            return;
+        }
+        let texture_size = size(DevicePixels(1), DevicePixels(1));
+        command_encoder.set_render_pipeline_state(&self.underlay_holes_pipeline_state);
+        command_encoder.set_vertex_buffer(SpriteInputIndex::Vertices as u64, Some(&self.unit_vertices), 0);
+        command_encoder.set_vertex_buffer(
+            SpriteInputIndex::Sprites as u64,
+            Some(&instance_bindings.polychrome_sprites.buffer),
+            instance_bindings.polychrome_sprites.offset as u64,
+        );
+        command_encoder.set_vertex_bytes(
+            SpriteInputIndex::ViewportSize as u64,
+            mem::size_of_val(&viewport_size) as u64,
+            &viewport_size as *const Size<DevicePixels> as *const _,
+        );
+        command_encoder.set_vertex_bytes(
+            SpriteInputIndex::AtlasTextureSize as u64,
+            mem::size_of_val(&texture_size) as u64,
+            &texture_size as *const Size<DevicePixels> as *const _,
+        );
+        command_encoder.set_fragment_buffer(
+            SpriteInputIndex::Sprites as u64,
+            Some(&instance_bindings.polychrome_sprites.buffer),
+            instance_bindings.polychrome_sprites.offset as u64,
+        );
+        command_encoder.set_fragment_texture(SpriteInputIndex::AtlasTexture as u64, Some(&self.blank_texture));
+        command_encoder.draw_primitives_instanced_base_instance(
+            metal::MTLPrimitiveType::Triangle,
+            0,
+            6,
+            sprites.len() as u64,
+            sprites.start as u64,
+        );
+    }
+
     fn draw_surfaces(
         &mut self,
         surfaces: &[PaintSurface],
@@ -1388,6 +1474,20 @@ fn build_pipeline_state(
     device
         .new_render_pipeline_state(&descriptor)
         .expect("could not create render pipeline state")
+}
+
+/// NOSHAPE PATCH (agent psui): the polychrome sprite shaders with blending off (`gpui::UnderlayHole`).
+fn build_hole_pipeline_state(device: &metal::DeviceRef, library: &metal::LibraryRef, pixel_format: metal::MTLPixelFormat) -> metal::RenderPipelineState {
+    let vertex_fn = library.get_function("polychrome_sprite_vertex", None).expect("error locating vertex function");
+    let fragment_fn = library.get_function("polychrome_sprite_fragment", None).expect("error locating fragment function");
+    let descriptor = metal::RenderPipelineDescriptor::new();
+    descriptor.set_label("underlay_holes");
+    descriptor.set_vertex_function(Some(vertex_fn.as_ref()));
+    descriptor.set_fragment_function(Some(fragment_fn.as_ref()));
+    let color_attachment = descriptor.color_attachments().object_at(0).unwrap();
+    color_attachment.set_pixel_format(pixel_format);
+    color_attachment.set_blending_enabled(false);
+    device.new_render_pipeline_state(&descriptor).expect("could not create render pipeline state")
 }
 
 fn build_path_sprite_pipeline_state(

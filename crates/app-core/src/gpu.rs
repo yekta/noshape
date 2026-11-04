@@ -39,6 +39,9 @@ struct Routes {
     submitted: HashMap<u64, VecDeque<(u64, Instant)>>,
     /// One-off offscreen renders (thumbnails): raw frame back to the caller.
     oneshots: HashMap<u64, async_channel::Sender<Result<Frame, String>>>,
+    /// Targets whose frames go straight to a layer under the window ([`Gpu::attach_layer`]).
+    #[cfg(target_os = "macos")]
+    layers: HashMap<u64, Arc<metal::LayerPresenter>>,
 }
 
 /// Size of document thumbnails (stored as PNG in the document metadata).
@@ -56,7 +59,7 @@ pub struct Gpu {
 
 impl Gpu {
     pub fn new() -> anyhow::Result<Self> {
-        let routes = Arc::new(Mutex::new(Routes { senders: HashMap::new(), viewport_senders: HashMap::new(), pick_senders: HashMap::new(), submitted: HashMap::new(), oneshots: HashMap::new() }));
+        let routes = Arc::new(Mutex::new(Routes { senders: HashMap::new(), viewport_senders: HashMap::new(), pick_senders: HashMap::new(), submitted: HashMap::new(), oneshots: HashMap::new(), #[cfg(target_os = "macos")] layers: HashMap::new() }));
         let on_done = route_frames(routes.clone());
         let cell: Arc<OnceLock<Result<(RenderWorker, Present), String>>> = Arc::new(OnceLock::new());
         let cell2 = cell.clone();
@@ -87,7 +90,7 @@ impl Gpu {
     /// (the render thread may not wake the test's deterministic scheduler).
     /// An error unless wgpu's `noop` feature is on (noshape-ui-test-support).
     pub fn headless() -> anyhow::Result<Self> {
-        let routes = Arc::new(Mutex::new(Routes { senders: HashMap::new(), viewport_senders: HashMap::new(), pick_senders: HashMap::new(), submitted: HashMap::new(), oneshots: HashMap::new() }));
+        let routes = Arc::new(Mutex::new(Routes { senders: HashMap::new(), viewport_senders: HashMap::new(), pick_senders: HashMap::new(), submitted: HashMap::new(), oneshots: HashMap::new(), #[cfg(target_os = "macos")] layers: HashMap::new() }));
         let renderer = noshape_render::Renderer::noop()?;
         let worker = RenderWorker::spawn_with(renderer, |_| {});
         Ok(Self { worker: Arc::new(OnceLock::from(Ok((worker, Present::Readback)))), routes, next_target: Arc::new(AtomicU64::new(1)) })
@@ -162,8 +165,40 @@ impl Gpu {
         self.worker().set_text_shading(shading);
     }
 
+    /// Whether viewport frames may go to a layer under the window instead of through GPUI's frame
+    /// ([`Gpu::attach_layer`]): macOS with frames on the GPU, while `NOSHAPE_VIEWPORT_LAYER=1` (off by default until
+    /// the runners measured it).
+    pub fn layers_enabled() -> bool {
+        static ON: OnceLock<bool> = OnceLock::new();
+        cfg!(target_os = "macos") && *ON.get_or_init(|| std::env::var("NOSHAPE_VIEWPORT_LAYER").is_ok_and(|v| v == "1"))
+    }
+
+    /// From now on `target`'s frames are presented to `layer` (a `CAMetalLayer` under the window,
+    /// `gpui::Window::underlay_layer`) on the render thread as they finish, starting with `current`: an orbit frame
+    /// then costs no window redraw. False where that isn't possible (the frame stays GPUI's to show).
+    pub fn attach_layer(&self, target: u64, layer: std::ptr::NonNull<std::ffi::c_void>, current: Option<&Arc<PresentTexture>>) -> bool {
+        #[cfg(target_os = "macos")]
+        {
+            let Ok((worker, Present::Texture)) = self.worker.wait() else { return false };
+            let Some(presenter) = metal::LayerPresenter::new(worker.uploader().device(), layer) else { return false };
+            let presenter = Arc::new(presenter);
+            if let Some(t) = current {
+                presenter.present(t);
+            }
+            self.routes.lock().layers.insert(target, presenter);
+            true
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (target, layer, current);
+            false
+        }
+    }
+
     pub fn unregister_target(&self, id: u64) {
         let mut r = self.routes.lock();
+        #[cfg(target_os = "macos")]
+        r.layers.remove(&id);
         r.senders.remove(&id);
         r.viewport_senders.remove(&id);
         r.pick_senders.remove(&id);
@@ -272,6 +307,15 @@ fn route_frames(r2: Arc<Mutex<Routes>>) -> impl Fn(Completed) + Send + 'static {
         let ms = started.map(|t| t.elapsed().as_secs_f32() * 1000.0).unwrap_or(0.0);
         noshape_render::perf::record_ms("g.submit_to_frame", ms);
         let viewport = r2.lock().viewport_senders.get(&target).cloned();
+        #[cfg(target_os = "macos")]
+        if let Ok(frame) = &result
+            && let Some(texture) = &frame.texture
+        {
+            let layer = r2.lock().layers.get(&target).cloned();
+            if let Some(layer) = layer {
+                layer.present(texture);
+            }
+        }
         if let Some(tx) = viewport {
             let result = result.map_err(|e| e.to_string()).and_then(|mut frame| {
                 let image = match frame.texture.take() {
@@ -380,7 +424,7 @@ mod metal {
     use noshape_render::{PresentTexture, wgpu};
     use objc2::Message as _;
     use objc2::rc::Retained;
-    use objc2::runtime::ProtocolObject;
+    use objc2::runtime::{AnyObject, ProtocolObject};
     use objc2_metal::{MTLDevice, MTLTexture};
     use std::ffi::c_void;
     use std::ptr::NonNull;
@@ -409,6 +453,88 @@ mod metal {
         // SAFETY: only reads the device's identity.
         let hal = unsafe { device.as_hal::<wgpu::hal::api::Metal>() }?;
         Some(hal.raw_device().registryID())
+    }
+
+    /// A `CAMetalLayer` under the window ([`super::Gpu::attach_layer`]) that frames are copied into and presented,
+    /// on the render device with its own command queue.
+    pub struct LayerPresenter {
+        layer: Retained<AnyObject>,
+        queue: Retained<AnyObject>,
+        state: parking_lot::Mutex<LayerState>,
+    }
+
+    #[derive(Default)]
+    struct LayerState {
+        size: (u32, u32),
+        /// Copies not finished yet, with the frames they read (kept until then).
+        in_flight: std::collections::VecDeque<(Retained<AnyObject>, Arc<PresentTexture>)>,
+    }
+
+    // SAFETY: Metal command queues, command buffers and CAMetalLayer's drawable API may be used from any thread;
+    // the state is behind a mutex.
+    unsafe impl Send for LayerPresenter {}
+    // SAFETY: see `Send`.
+    unsafe impl Sync for LayerPresenter {}
+
+    /// `MTLPixelFormatBGRA8Unorm`: [`noshape_render::renderer::PRESENT_FORMAT`], as GPUI's own layer.
+    const BGRA8_UNORM: usize = 80;
+    /// `MTLCommandBufferStatusCompleted` / `…Error`.
+    const DONE: [usize; 2] = [4, 5];
+
+    impl LayerPresenter {
+        pub fn new(device: &wgpu::Device, layer: NonNull<c_void>) -> Option<Self> {
+            // SAFETY: only reads the device's identity.
+            let hal = unsafe { device.as_hal::<wgpu::hal::api::Metal>() }?;
+            let raw_device = hal.raw_device().retain();
+            // SAFETY: `layer` is the window's live CAMetalLayer (`Window::underlay_layer`); configured once here,
+            // on the main thread, before frames are presented to it.
+            unsafe {
+                let layer = Retained::retain(layer.as_ptr().cast::<AnyObject>())?;
+                let () = objc2::msg_send![&*layer, setDevice: &*raw_device];
+                let () = objc2::msg_send![&*layer, setPixelFormat: BGRA8_UNORM];
+                let () = objc2::msg_send![&*layer, setFramebufferOnly: false];
+                let queue: Option<Retained<AnyObject>> = objc2::msg_send![&*raw_device, newCommandQueue];
+                Some(Self { layer, queue: queue?, state: Default::default() })
+            }
+        }
+
+        /// Copy `texture` into the layer's next drawable and present it.
+        pub fn present(&self, texture: &Arc<PresentTexture>) {
+            let _t = noshape_render::perf::scope("g.layer_present");
+            // SAFETY: the raw texture is read by the copy only, and kept alive until the copy has finished.
+            let Some(hal) = (unsafe { texture.texture.as_hal::<wgpu::hal::api::Metal>() }) else { return };
+            let source: Retained<ProtocolObject<dyn MTLTexture>> = hal.raw_handle().retain();
+            let mut st = self.state.lock();
+            st.in_flight.retain(|(cb, _)| {
+                // SAFETY: reads the command buffer's status.
+                let status: usize = unsafe { objc2::msg_send![&**cb, status] };
+                !DONE.contains(&status)
+            });
+            objc2::rc::autoreleasepool(|_| {
+                // SAFETY: Metal and Core Animation calls on objects this presenter owns; the drawable's texture has
+                // the source's size and format (set just before).
+                unsafe {
+                    if st.size != (texture.width, texture.height) {
+                        st.size = (texture.width, texture.height);
+                        let size = objc2_foundation::NSSize::new(texture.width as f64, texture.height as f64);
+                        let () = objc2::msg_send![&*self.layer, setDrawableSize: size];
+                    }
+                    let drawable: Option<Retained<AnyObject>> = objc2::msg_send![&*self.layer, nextDrawable];
+                    let Some(drawable) = drawable else { return };
+                    let target: Option<Retained<AnyObject>> = objc2::msg_send![&*drawable, texture];
+                    let Some(target) = target else { return };
+                    let cb: Option<Retained<AnyObject>> = objc2::msg_send![&*self.queue, commandBuffer];
+                    let Some(cb) = cb else { return };
+                    let encoder: Option<Retained<AnyObject>> = objc2::msg_send![&*cb, blitCommandEncoder];
+                    let Some(encoder) = encoder else { return };
+                    let () = objc2::msg_send![&*encoder, copyFromTexture: &*source, toTexture: &*target];
+                    let () = objc2::msg_send![&*encoder, endEncoding];
+                    let () = objc2::msg_send![&*cb, presentDrawable: &*drawable];
+                    let () = objc2::msg_send![&*cb, commit];
+                    st.in_flight.push_back((cb, texture.clone()));
+                }
+            });
+        }
     }
 
     /// The frame's `MTLTexture`, what gpui's Metal renderer samples.
