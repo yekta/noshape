@@ -49,7 +49,8 @@ fn op_edge_change(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         };
         options.push((edges, length_of(o.get("offset")).unwrap_or(0.0), replace));
     }
-    run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
+    let moves = run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
+        let mut moves: Vec<(Vec<DVec3>, Vec<DVec3>)> = Vec::new();
         let mut by_body: BTreeMap<usize, BTreeMap<usize, Move>> = BTreeMap::new();
         for (edges, offset, replace) in &options {
             if super::trace_ops() {
@@ -76,13 +77,29 @@ fn op_edge_change(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         for (b, offsets) in by_body {
             let body = ev.ctx.bodies[b].clone();
             let (shape, order, edge_from) = change_edges(&body.shape, &offsets)?;
+            // Where each moved edge went (tracking finds it there).
+            let (old, new) = (body.shape.edges(), shape.edges());
+            for (i, from) in edge_from.iter().enumerate() {
+                if let Some(j) = from.filter(|j| offsets.contains_key(j))
+                    && let (Some(a), Some(b)) = (old.get(j).and_then(edge_points), new.get(i).and_then(edge_points))
+                {
+                    moves.push((a, b));
+                }
+            }
             let names = order.iter().map(|j| body.faces[*j].clone()).collect();
             ev.replace_body(b, shape, names);
             keep_edge_names(ev, b, &body.edges, &edge_from);
         }
-        Ok(())
+        Ok(moves)
     })?;
+    cx.state.lock().edge_moves.extend(moves);
     Ok(Value::Undefined)
+}
+
+/// An edge's start, middle and end (as a tracking snapshot has them).
+pub(super) fn edge_points(e: &Shape) -> Option<Vec<DVec3>> {
+    let i = e.edge_info().ok()?;
+    [0.0, 0.5, 1.0].iter().map(|t| e.point_at(i.first_param + (i.last_param - i.first_param) * t).ok()).collect()
 }
 
 /// The changed body's edges keep the names of the edges they were, moved or

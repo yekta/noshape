@@ -276,6 +276,22 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const moved = size(evaluateQuery(context, qCreatedBy(sub + "split", EntityType.EDGE)));
             check("a split edge moves with its piece", moved == 2, moved);
         });
+        step(context, id, "trackMovedEdge", function(sub) {
+            // An edge opEdgeChange moved is still found by its tracking query, where it went (std's Fold tracks its
+            // split edges through its edge changes).
+            fCuboid(context, sub + "b", { "corner1" : vector(0, 0, 2300) * mm, "corner2" : vector(20, 10, 2305) * mm });
+            opExtractSurface(context, sub + "s", { "faces" : qContainsPoint(qCreatedBy(sub + "b", EntityType.FACE), vector(10, 5, 2305) * mm) });
+            const edge = qContainsPoint(qOwnedByBody(qCreatedBy(sub + "s", EntityType.BODY), EntityType.EDGE), vector(10, 0, 2305) * mm);
+            const tracked = startTracking(context, edge);
+            opEdgeChange(context, sub + "ch", { "edgeChangeOptions" : [{ "edge" : edge, "offset" : 2 * mm }] });
+            // A sheet meeting it there at an angle, joined: the edge, renamed, now between the two.
+            fCuboid(context, sub + "b2", { "corner1" : vector(0, -2, 2305) * mm, "corner2" : vector(20, 8, 2315) * mm });
+            opExtractSurface(context, sub + "s2", { "faces" : qContainsPoint(qCreatedBy(sub + "b2", EntityType.FACE), vector(10, -2, 2310) * mm) });
+            opBoolean(context, sub + "join", { "tools" : qUnion([qCreatedBy(sub + "s", EntityType.BODY), qCreatedBy(sub + "s2", EntityType.BODY)]), "operationType" : BooleanOperationType.UNION, "allowSheets" : true });
+            const found = evaluateQuery(context, qEdgeTopologyFilter(tracked, EdgeTopology.TWO_SIDED));
+            const at = size(found) == 1 ? evBox3d(context, { "topology" : found[0] }).minCorner[1] : undefined;
+            check("a tracked edge moved by opEdgeChange", size(found) == 1 && abs(at - -2 * mm) < 1e-9 * meter, [size(found), at]);
+        });
         step(context, id, "patternSolidFaces", function(sub) {
             // A solid's hole face patterned (std's FACE pattern, a Fill pattern of holes): the holes repeated in that
             // part, no copies of it.

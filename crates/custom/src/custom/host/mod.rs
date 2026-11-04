@@ -212,6 +212,9 @@ pub struct CtxState {
     /// operation number, in order: those edges are `qCreatedBy` it, whatever later operations rename them (an
     /// `opDeleteFace` leaving them open), also on a body touched since (a split sheet's piece got a new id).
     pub split_face_edges: Vec<(FsId, Vec<BodyId>, Vec<DVec3>, u32)>,
+    /// Edges `opEdgeChange` moved: their start, middle and end before and after, in order (a tracked edge is
+    /// found where it went).
+    pub edge_moves: Vec<(Vec<DVec3>, Vec<DVec3>)>,
     /// The same for the vertices an operation made where its new edges end (a localized opBoolean: the corner
     /// overcut's corner breaks go on `qCreatedBy(<its Boolean>, VERTEX)`), by their points.
     pub made_vertices: Vec<(FsId, Vec<BodyId>, Vec<DVec3>)>,
@@ -299,6 +302,7 @@ impl FsContext {
                 split_tools: Vec::new(),
                 split_face_pieces: HashMap::new(),
                 split_face_edges: Vec::new(),
+                edge_moves: Vec::new(),
                 made_vertices: Vec::new(),
                 attr_snapshots: HashMap::new(),
                 body_versions: HashMap::new(),

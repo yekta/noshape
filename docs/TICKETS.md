@@ -3809,6 +3809,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   tracking of the split's edges (edgeForTransform) loses them through the edge changes and the union (they moved,
   then the union renamed them). Next: tracking an edge through opEdgeChange and a sheet union. Run 74: 37/55,
   366/471 (custom 38/109), documents with custom features failing 5 -> 4.
+  dx 11-04 18:33: a tracked edge is found where opEdgeChange moved it (CtxState::edge_moves; T1 ops_harness
+  trackMovedEdge: moved, then joined to another sheet at an angle and renamed). Fold SM 1 now makes one part with its
+  bend, the box as live's; it differs in detail: 29/69/42 faces / edges / vertices (live 32/82/52), volume 9854.12
+  mm³ (live 9226.68), and it takes 220 ms (live 270 for the document): next.
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our

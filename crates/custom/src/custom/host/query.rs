@@ -639,6 +639,16 @@ impl<'a> QueryCx<'a> {
     /// become a sheet's (extracted surfaces).
     fn tracked(&self, snap: &Snapshot, to_sheets: bool) -> Vec<Ent> {
         const TOL: f64 = 1e-7;
+        // An edge opEdgeChange moved is looked for where it went too (and on through later moves).
+        let mut wheres: Vec<Vec<DVec3>> = vec![snap.points.clone()];
+        if snap.etype == EType::Edge {
+            let same = |a: &[DVec3], b: &[DVec3]| a.len() == b.len() && (a.iter().zip(b).all(|(p, q)| p.distance(*q) < TOL) || a.iter().zip(b.iter().rev()).all(|(p, q)| p.distance(*q) < TOL));
+            for (from, to) in &self.st.edge_moves {
+                if wheres.iter().any(|w| same(w, from)) {
+                    wheres.push(to.clone());
+                }
+            }
+        }
         // Hidden bodies too: std sheet metal tracks its (hidden) definition.
         self.all_with(Some(snap.etype), true)
             .into_iter()
@@ -649,7 +659,7 @@ impl<'a> QueryCx<'a> {
                 (t == "SOLID") == (snap.body_type == "SOLID") || (to_sheets && snap.body_type == "SOLID" && t == "SHEET")
             })
             .filter(|e| {
-                if self.shape(e).is_some_and(|s| all_on(&s, &snap.points, TOL)) {
+                if self.shape(e).is_some_and(|s| wheres.iter().any(|w| all_on(&s, w, TOL))) {
                     return true;
                 }
                 // A piece of a split face (std Jog clips its face away from the
