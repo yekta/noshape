@@ -1328,7 +1328,10 @@ impl<'a> Translator<'a> {
         }
         // qSketchRegion(id + "F…", filterInnerLoops): the sketch's regions;
         // with `true` none inside another's hole (its outer loop is a hole of
-        // another region; live: bearing-block-takumi's rings in the bore).
+        // another region; live: bearing-block-takumi's rings in the bore). The
+        // sketch's own curves decide: a piece of a ring that the face's edge
+        // split off is no inner loop (live motor-mount-jack's Extrude 3), a
+        // piece of an inner region is.
         if let Some((sk, rest)) = text.split("qSketchRegion(id + \"").nth(1).and_then(|r| r.split_once('"')) {
             let ours = self.feature_ids.get(sk).cloned().ok_or_else(|| format!("sketch {sk} was not built"))?;
             let g = self.call("sketch_get", json!({ "sketch": ours }))?;
@@ -1337,13 +1340,22 @@ impl<'a> Translator<'a> {
             let curves = |r: &Value| -> Vec<String> { r["boundary"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(str::to_string)).collect() };
             let outer_only = rest.trim_start_matches([',', ' ']).starts_with("true");
             let outer = |r: &Value| -> Vec<String> { r["outer"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(str::to_string)).collect() };
+            let own = |c: &String| c.rsplit(':').next().and_then(|n| n.parse::<u32>().ok()).is_some_and(|n| n < noshape_model::regen::features::sketch::IMPRINT_ENTITY);
+            let in_hole_of = |r: &Value, o: &Value, mine: &[String]| {
+                let theirs = outer(o);
+                let holes: Vec<String> = curves(o).into_iter().filter(|c| !theirs.contains(c)).collect();
+                o["id"] != r["id"] && !mine.is_empty() && mine.iter().all(|c| holes.contains(c))
+            };
+            let inner_by_own = |r: &Value| {
+                let mine: Vec<String> = outer(r).into_iter().filter(own).collect();
+                regions.iter().any(|o| in_hole_of(r, o, &mine))
+            };
             let inner = |r: &Value| {
                 let mine = outer(r);
-                regions.iter().any(|o| {
-                    let theirs = outer(o);
-                    let holes: Vec<String> = curves(o).into_iter().filter(|c| !theirs.contains(c)).collect();
-                    o["id"] != r["id"] && !mine.is_empty() && mine.iter().all(|c| holes.contains(c))
-                })
+                if mine.iter().any(own) {
+                    return inner_by_own(r);
+                }
+                regions.iter().any(|o| inner_by_own(o) && in_hole_of(r, o, &mine))
             };
             let found: Vec<String> = regions.iter().filter(|r| !outer_only || !inner(r)).filter_map(|r| r["id"].as_str().map(str::to_string)).collect();
             // Some of the sketch's regions named by id (one id each): which

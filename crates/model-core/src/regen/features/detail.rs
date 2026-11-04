@@ -946,30 +946,40 @@ fn full_round(ev: &mut EvalCtx) -> FResult<()> {
     }
     let r = w * 0.5;
     let cf = face(center[0].1)?;
-    let Some((cc, nc)) = plane_of(&cf) else { return err(UNSUPPORTED) };
-    if nc.dot(n1).abs() > 1e-6 {
-        return err(UNSUPPORTED);
-    }
-    let e = nc.cross(n1).normalize();
-    // Axis: mid-plane between the sides, R below the center face.
-    let mid = p1 - n1 * (w * 0.5);
-    let c_mid = cc - n1 * (cc - mid).dot(n1);
-    let axis = c_mid - nc * r;
-    // Extent along the axis: the center faces.
-    let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
-    for &(_, f) in &center {
-        for v in face(f)?.vertices() {
-            let d = (v.vertex_point()? - axis).dot(e);
-            lo = lo.min(d);
-            hi = hi.max(d);
+    let tool = match cf.face_surface() {
+        // A bore or boss between the sides: a half torus (live motor-mount-jack's Fillet 2).
+        Ok(k::Surface::Cylinder { origin, axis, x_dir, radius }) if axis.normalize().cross(n1).length() < 1e-9 => {
+            let faces: Vec<Shape> = center.iter().map(|c| face(c.1)).collect::<Result<_, _>>()?;
+            let Some(tool) = coaxial_round_tool(&faces, k::Plane::new(origin, axis.normalize(), x_dir), radius, [p1, p2], r) else { return err(UNSUPPORTED) };
+            tool
         }
-    }
-    let margin = w * 1e-3;
-    let ez = e.cross(n1);
-    let zr = if ez.dot(nc) > 0.0 { [0.0, 2.0 * r] } else { [-2.0 * r, 0.0] };
-    let block = oriented_box(axis, e, n1, [lo - margin, hi + margin], [-r - margin, r + margin], zr)?;
-    let cyl = k::make_cylinder(&k::Plane::new(axis + e * (lo - 2.0 * margin), e, n1), r, hi - lo + 4.0 * margin, std::f64::consts::TAU)?;
-    let tool = k::cut(&block, &cyl)?.shape;
+        _ => {
+            let Some((cc, nc)) = plane_of(&cf) else { return err(UNSUPPORTED) };
+            if nc.dot(n1).abs() > 1e-6 {
+                return err(UNSUPPORTED);
+            }
+            let e = nc.cross(n1).normalize();
+            // Axis: mid-plane between the sides, R below the center face.
+            let mid = p1 - n1 * (w * 0.5);
+            let c_mid = cc - n1 * (cc - mid).dot(n1);
+            let axis = c_mid - nc * r;
+            // Extent along the axis: the center faces.
+            let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+            for &(_, f) in &center {
+                for v in face(f)?.vertices() {
+                    let d = (v.vertex_point()? - axis).dot(e);
+                    lo = lo.min(d);
+                    hi = hi.max(d);
+                }
+            }
+            let margin = w * 1e-3;
+            let ez = e.cross(n1);
+            let zr = if ez.dot(nc) > 0.0 { [0.0, 2.0 * r] } else { [-2.0 * r, 0.0] };
+            let block = oriented_box(axis, e, n1, [lo - margin, hi + margin], [-r - margin, r + margin], zr)?;
+            let cyl = k::make_cylinder(&k::Plane::new(axis + e * (lo - 2.0 * margin), e, n1), r, hi - lo + 4.0 * margin, std::f64::consts::TAU)?;
+            k::cut(&block, &cyl)?.shape
+        }
+    };
     let feature = ev.feature;
     let key = body.faces[center[0].1].clone();
     let tool = tool_named(tool, |i| Arc::new(TopoName::face(feature, Role::Blend(Arc::new(TopoName::Split { parent: key.clone(), by: feature, ordinal: i as u16 })))));
@@ -979,6 +989,36 @@ fn full_round(ev: &mut EvalCtx) -> FResult<()> {
     let names = ev.name_result(&[&rn], &un.history, &un.shape, &BTreeMap::new(), None);
     ev.replace_body(bi, un.shape, names);
     Ok(())
+}
+
+/// The tool a full round of a whole cylinder (`faces`, on `cyl`'s axis, radius `rc`) between two planes through
+/// `sides` takes off: the ring from the cylinder to the torus' core circle, less the torus of radius `r`; outside the
+/// cylinder for a bore, inside for a boss. `None` where the faces don't go all the way round or the boss is too thin.
+fn coaxial_round_tool(faces: &[Shape], cyl: k::Plane, rc: f64, sides: [DVec3; 2], r: f64) -> Option<Shape> {
+    let turn: f64 = faces.iter().map(|f| f.uv_bounds().map_or(0.0, |b| b[1] - b[0])).sum();
+    if turn < std::f64::consts::TAU - 1e-6 {
+        return None;
+    }
+    let p = super::helpers_a::point_on_face(&faces[0])?;
+    let (q, n) = super::helpers_a::face_normal_near(&faces[0], p)?;
+    let radial = {
+        let d = q - cyl.origin;
+        d - cyl.normal * d.dot(cyl.normal)
+    };
+    let bore = n.dot(radial) < 0.0;
+    let core = if bore { rc + r } else { rc - r };
+    if core <= r * 1e-6 {
+        return None;
+    }
+    let [z1, z2] = sides.map(|s| (s - cyl.origin).dot(cyl.normal));
+    let (lo, hi) = (z1.min(z2), z1.max(z2));
+    let margin = r * 1e-3;
+    let at = |z: f64| k::Plane::new(cyl.origin + cyl.normal * z, cyl.normal, cyl.x_dir);
+    let (inner, outer) = if bore { (rc - margin, core) } else { (core, rc + margin) };
+    let h = hi - lo + 2.0 * margin;
+    let ring = k::cut(&k::make_cylinder(&at(lo - margin), outer, h, std::f64::consts::TAU).ok()?, &k::make_cylinder(&at(lo - 2.0 * margin), inner, h + 2.0 * margin, std::f64::consts::TAU).ok()?).ok()?.shape;
+    let torus = k::make_torus(&at(0.5 * (lo + hi)), core, r, std::f64::consts::TAU).ok()?;
+    k::cut(&ring, &torus).ok().map(|o| o.shape)
 }
 
 #[cfg(test)]

@@ -357,6 +357,22 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P1 PARITY-SPEED-MOTOR-MOUNT (core 11-04 09:05) motor-mount-jack matches live to the end now but regenerates in
+  ~440 ms against live's 53: Circular pattern 1 (a face pattern of two elliptic slot walls through the tube, ×4) 244 ms
+  (live 5), Extrude 3 86 ms (live 6), Fillet 2 (the bore's full round) 71 ms (live 3). Next for core.
+- [ ] P2 FULL-ROUND-BOSS-TWO-FACES (core 11-04 09:05) a full round of a boss's whole cylinder (a Ø16 × 3 mm puck's rim)
+  has the right volume, but its half torus is two faces: OCCT's torus has its v seam on the outer equator, which the
+  outer half crosses (the bore's inner half is one face, as live's). Live: one face (not checked live; Parasolid's
+  tori have no seams). T1 model kernel_robustness::a_full_round_of_a_bore_or_a_boss_is_a_half_torus asserts 4 faces.
+- [ ] P2 HOLE-RIM-PIECES (core 11-04 09:05) a Ø6 hole cut Through all from a Front-plane sketch through a tube's wall
+  (r14.35 / r12.1) leaves each rim in three pieces (at the hole cylinder's seam and at its ±x sides); Parasolid's are one
+  closed edge each. Seen in kernel_robustness::a_face_pattern_of_a_hole_through_a_tubes_wall (each pattern copy as the
+  original). motor-mount-jack's elliptic slots don't show it.
+- [ ] P2 REGION-UNION-ARC (core 11-04 09:05) sketch regions picked together are united when they share lines or a
+  whole loop (sketch regions::union_touching, eval.rs picked_regions), not when they share only an arc of a loop:
+  clamp-hms's Sketch 2 (a trapezoid whose top arc lies on a whole r8 circle, the r8–r5 ring inside) then made its
+  Extrude 5's bore three faces where Extrude 4's met it (29/71/46, live 25/63/40; the r5 profile was the same both
+  ways, the difference came in the kernel's seams). So those stay apart for now; live extrudes them as one face.
 - [x] verified 5363e4d8 (qa 11-04 08:36: bin/rbbisect.py on slow1151-pre identical to a6ff8389 feature by feature, Fillet 2 31406.528 / 51, no negative part) (core 11-04 06:40: the edge is convex: the rim's end edge runs the other way at its inner corner, and the straight-edge rounds read convexity off it; now off the face's inward direction across the edge, each tangent point must lie on its end edge, and no other face's box may meet the round's: the round off the 0.5 mm rim declines, OCCT's as before; the document 8 × 40183.951 mm³ / 66 faces again; T1 kernel blend::a_round_off_a_thin_rim_is_not_taken_the_wrong_way) P0 BLEND-RUST-STRAIGHT-WRONG (core; regression of 4570b4e5 "rounds of straight edges between faces ruled along them
   … are noshape's", not in v0.4.25) **a saved document's Fillet 2 removes 6× the volume and the parts after it go negative**:
   /root/qa-scratch/tickets/slow1151-pre.noshape (also slow1151-before-extrude), bin/rbbisect.py (volume / faces after each
@@ -3363,6 +3379,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   ellipse (major 22.5 mm) that a line along its major axis splits; live's hole wall is one face (the tube after it:
   6/8/0), ours two (7/12/4: the wall split at the line's ends). So: two regions extruded together are one, and a
   curve their union leaves split only where nothing else bounds it is one edge again.
+  core 11-04 09:05: **fixed**: regions of one sketch picked together that share a line, or a whole loop (a disc filling
+  a ring's hole, Extrude 3's flange split by the tube's imprinted edge), are united before their profile is made
+  (sketch regions::union_touching, slits of the united regions dropped too); the ellipse's halves are then one curve
+  again (region_profile's merge). Then Circular pattern 1 (Face, the two slot walls) built: its tool's caps where the
+  faces leave the tube lie on the tube's cylinders (kernel make_face_on), and move_seams_off_holes' volume guard is
+  1e-4 (its integration noise with the B-spline rims was 2e-5). The import's filterInnerLoops goes by the sketch's own
+  curves (an imprinted edge doesn't make a ring piece "inner"), and a full round of a whole cylinder (a bore or boss
+  between two planes) is a half torus. **motor-mount-jack matches live to the end (10/10, was 3/10)**. T1 sketch
+  regions::touching_regions_unite_without_their_shared_line, regions_unite_across_a_whole_loop_not_an_arc; model
+  kernel_robustness::two_halves_of_an_ellipse_extrude_as_one_wall, a_full_round_of_a_bore_or_a_boss_is_a_half_torus,
+  a_face_pattern_of_a_hole_through_a_tubes_wall. Left: PARITY-SPEED-MOTOR-MOUNT, REGION-UNION-ARC.
 - [x] (core 11-03 15:32: surface() takes every curve (bshared sketch_edge: splines and conics interpolated) and the solid's ends through sheet_extrude: blind, symmetric, up to a face / part / next / vertex, start offset, second direction, draft; the kernel's up-to extrude (op_prism_until) keeps a curve's sheet pieces along the start curves, and joins its end edge where the target's seam split it (Parasolid's cylinders have none). cf-curve-pattern-normal's Extrude 2 1/4/4 with live's vertices; the parity suite still reports its box: live's is the UI fetch's loose box round the B-spline sheet (y −85.09…105.58 where the sheet's ends, live's own edges JKF / JKJ, are at −70.88 / 91.37), so for dx's box compare of sheets. T1 model kernel_robustness::a_surface_extrude_of_a_spline_runs_up_to_a_part, kernel features::a_curve_up_to_a_cylinder_ends_in_one_edge_across_its_seam) P1 EXTRUDE-SURFACE-CURVES (core; dx's parity suite 11-03, cf-curve-pattern-normal) a surface Extrude of sketch
   curves (bodyType SURFACE, `surfaceEntities`) builds only lines, arcs and circles (extrude.rs `curve_to_segment`;
   a spline, ellipse or conic is skipped, and with nothing else selected it fails "Select sketch curves to extrude.")

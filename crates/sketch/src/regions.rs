@@ -1008,6 +1008,128 @@ pub fn find_region_in(regions: &[Region], id: &RegionId) -> Option<Region> {
     best.map(|b| regions[b.1].clone())
 }
 
+/// Regions picked together that share a line or a whole loop (a line splitting an ellipse, a disc filling a ring's
+/// hole): each group of touching regions as one, the shared pieces dropped, so the group extrudes as one face (live).
+/// (Not across an arc of a loop yet: clamp-hms's Extrude 5 then splits a bore its Extrude 4 made.) Per input region:
+/// the union
+/// at its group's first region, `None` at the others. A group whose remaining pieces don't chain into one outer
+/// loop plainly stays as it was.
+pub fn union_touching(regions: &[Region]) -> Vec<Option<Region>> {
+    let close = |a: DVec2, b: DVec2| (a - b).length() < 1e-9;
+    let loops = |r: &Region| -> Vec<ProfileLoop> { std::iter::once(r.outer.clone()).chain(r.holes.iter().cloned()).collect() };
+    let all: Vec<Vec<ProfileLoop>> = regions.iter().map(loops).collect();
+    let mut by_entity: std::collections::HashMap<EntityId, Vec<(usize, usize, usize)>> = std::collections::HashMap::new();
+    for (ri, ls) in all.iter().enumerate() {
+        for (li, lp) in ls.iter().enumerate() {
+            for (si, src) in lp.sources.iter().enumerate() {
+                by_entity.entry(src.entity).or_default().push((ri, li, si));
+            }
+        }
+    }
+    let mut parent: Vec<usize> = (0..regions.len()).collect();
+    fn root(parent: &mut [usize], mut i: usize) -> usize {
+        while parent[i] != i {
+            parent[i] = parent[parent[i]];
+            i = parent[i];
+        }
+        i
+    }
+    // Pieces two loops run along opposite ways.
+    let mut pairs = Vec::new();
+    let mut paired = std::collections::HashSet::new();
+    for list in by_entity.values() {
+        for (k, &(ra, la, sa)) in list.iter().enumerate() {
+            for &(rb, lb, sb) in &list[k + 1..] {
+                let (a, b) = (&all[ra][la], &all[rb][lb]);
+                let (ga, gb) = (&a.segments[sa], &b.segments[sb]);
+                if a.sources[sa].forward == b.sources[sb].forward || !close(ga.start(), gb.end()) || !close(ga.end(), gb.start()) || !close(ga.point_at(0.5), gb.point_at(0.5)) {
+                    continue;
+                }
+                if paired.contains(&(ra, la, sa)) || paired.contains(&(rb, lb, sb)) {
+                    continue;
+                }
+                paired.insert((ra, la, sa));
+                paired.insert((rb, lb, sb));
+                pairs.push(((ra, la, sa), (rb, lb, sb), matches!(ga, ProfileSegment::Line { .. })));
+            }
+        }
+    }
+    // Lines go; curves only as a whole loop that both run along (a ring filling another's hole), not an arc of one.
+    let shared = |ra: usize, la: usize, rb: usize, lb: usize| pairs.iter().filter(|(x, y, _)| (x.0, x.1, y.0, y.1) == (ra, la, rb, lb)).count();
+    let whole = |ra: usize, la: usize, rb: usize, lb: usize| {
+        let n = shared(ra, la, rb, lb) + shared(rb, lb, ra, la);
+        n == all[ra][la].segments.len() && n == all[rb][lb].segments.len()
+    };
+    let mut dropped = std::collections::HashSet::new();
+    for &((ra, la, sa), (rb, lb, sb), line) in &pairs {
+        if !line && !whole(ra, la, rb, lb) {
+            continue;
+        }
+        // (A slit, along and back in one region, goes too where its region is united.)
+        dropped.insert((ra, la, sa));
+        dropped.insert((rb, lb, sb));
+        if ra == rb {
+            continue;
+        }
+        let (x, y) = (root(&mut parent, ra), root(&mut parent, rb));
+        parent[x.max(y)] = x.min(y);
+    }
+    let mut out: Vec<Option<Region>> = regions.iter().cloned().map(Some).collect();
+    for g in 0..regions.len() {
+        let members: Vec<usize> = (0..regions.len()).filter(|&i| root(&mut parent, i) == g).collect();
+        if members.len() < 2 {
+            continue;
+        }
+        let mut segs: Vec<(ProfileSegment, SegmentSource)> = Vec::new();
+        for &ri in &members {
+            for (li, lp) in all[ri].iter().enumerate() {
+                for (si, (seg, src)) in lp.segments.iter().zip(&lp.sources).enumerate() {
+                    if !dropped.contains(&(ri, li, si)) {
+                        segs.push((seg.clone(), *src));
+                    }
+                }
+            }
+        }
+        let Some(merged) = chain_loops(&segs, close) else { continue };
+        let (outer, holes): (Vec<ProfileLoop>, Vec<ProfileLoop>) = merged.into_iter().partition(|l| l.signed_area() > 0.0);
+        let mut outer = outer.into_iter();
+        let (Some(outer), None) = (outer.next(), outer.next()) else { continue };
+        for &ri in &members {
+            out[ri] = None;
+        }
+        out[g] = Some(Region { id: regions[g].id.clone(), outer, holes });
+    }
+    out
+}
+
+/// Segments chained end to start into closed loops; `None` where a loop could continue more than one way or not at all.
+fn chain_loops(segs: &[(ProfileSegment, SegmentSource)], close: impl Fn(DVec2, DVec2) -> bool) -> Option<Vec<ProfileLoop>> {
+    let mut used = vec![false; segs.len()];
+    let mut loops = Vec::new();
+    for first in 0..segs.len() {
+        if used[first] {
+            continue;
+        }
+        used[first] = true;
+        let mut lp = ProfileLoop { segments: vec![segs[first].0.clone()], sources: vec![segs[first].1] };
+        let start = segs[first].0.start();
+        let mut end = segs[first].0.end();
+        while !close(end, start) {
+            let mut next = (0..segs.len()).filter(|&k| !used[k] && close(segs[k].0.start(), end));
+            let k = next.next()?;
+            if next.next().is_some() {
+                return None;
+            }
+            used[k] = true;
+            lp.segments.push(segs[k].0.clone());
+            lp.sources.push(segs[k].1);
+            end = segs[k].0.end();
+        }
+        loops.push(lp);
+    }
+    Some(loops)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

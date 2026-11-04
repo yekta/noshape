@@ -3,6 +3,7 @@
 // planar faces, primitives.
 #include "internal.hpp"
 
+#include <BRepBuilderAPI_Copy.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
@@ -18,6 +19,7 @@
 #include <BRepPrimAPI_MakeTorus.hxx>
 #include <BRepPrimAPI_MakeWedge.hxx>
 #include <BRep_Builder.hxx>
+#include <BRep_Tool.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <GProp_GProps.hxx>
 #include <Geom2d_Line.hxx>
@@ -375,6 +377,21 @@ std::unique_ptr<OcShape> make_face_from_wire(const OcShape& wire, bool only_plan
   if (signed_area(f) < 0)
     f.Reverse();
   return wrap(f);
+}
+
+// A face on `on`'s surface bounded by `wire` (a face pattern's cap where the faces leave a cylinder); the wire is
+// copied, so the edges it came from keep their curves.
+std::unique_ptr<OcShape> make_face_on(const OcShape& on, const OcShape& wire)
+{
+  const TopoDS_Face& base = as_face(on.shape, "face");
+  const TopoDS_Wire  w    = TopoDS::Wire(BRepBuilderAPI_Copy(as_wire(wire.shape, "wire")).Shape());
+  BRepBuilderAPI_MakeFace mk(BRep_Tool::Surface(base), w, true);
+  if (!mk.IsDone())
+    fail_op("could not build a face on the surface from the wire");
+  ShapeFix_Face fix(mk.Face());
+  fix.FixOrientation();
+  fix.Perform();
+  return wrap(fix.Face());
 }
 
 std::unique_ptr<OcShape> make_plane_face(const PlaneF& plane, double umin, double umax,

@@ -3495,3 +3495,95 @@ fn a_surface_extrude_of_a_spline_runs_up_to_a_part() {
         assert!((bb.max.z - 0.003).abs() < 1e-6 && (bb.min.z + 0.003).abs() < 1e-6, "{bb:?}");
     }
 }
+
+/// Shown faces / edges / vertices (Onshape's: no seams).
+fn shown(r: &RegenResult) -> (usize, usize, usize) {
+    let s = &r.context.bodies[0].shape;
+    let t = s.shown_topology().unwrap();
+    (s.count(noshape_kernel::ShapeType::Face), t.edges.iter().filter(|x| **x).count(), t.vertices.iter().filter(|x| **x).count())
+}
+
+/// Live motor-mount-jack's Extrude 2: both halves of an ellipse that a line along its major axis splits, extruded
+/// together, have one wall face (the regions united, the line between them gone).
+#[test]
+fn two_halves_of_an_ellipse_extrude_as_one_wall() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_ellipse(DVec2::ZERO, DVec2::new(20e-3, 0.0), 7.5e-3);
+    sk.add_line(DVec2::new(-20e-3, 0.0), DVec2::new(20e-3, 0.0));
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let r = t.regen();
+    let regions: Vec<Reference> = r.display.sketches.iter().find(|g| g.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+    assert_eq!(regions.len(), 2);
+    let x = t.add("extrude", &[("entities", q(regions)), ("depth", e("5 mm")), ("operationType", en("NEW"))]);
+    let r = t.ok(x);
+    assert_eq!(r.context.bodies.len(), 1);
+    assert_eq!(shown(&r), (3, 2, 0));
+    assert!((volume(&r) - std::f64::consts::PI * 20.0 * 7.5 * 5.0).abs() < 1e-6 * volume(&r), "{}", volume(&r));
+}
+
+/// Live motor-mount-jack's Fillet 2: a full round of a bore between a plate's top and bottom is a half torus (R 9.5
+/// for a Ø16 bore in a 3 mm plate); of a puck's rim one inside it. Volumes from Pappus.
+#[test]
+fn a_full_round_of_a_bore_or_a_boss_is_a_half_torus() {
+    use std::f64::consts::PI;
+    // The ring between the cylinder and the torus' core circle less the half disc, revolved: its area times 2π times
+    // its centroid's radius.
+    let taken = |core: f64, toward: f64| {
+        let r = 1.5;
+        let rect = (2.0 * r * r, core - toward * r / 2.0);
+        let half = (PI * r * r / 2.0, core - toward * 4.0 * r / (3.0 * PI));
+        2.0 * PI * (rect.0 * rect.1 - half.0 * half.1)
+    };
+    for bore in [true, false] {
+        let mut t = T::new();
+        let b = if bore {
+            t.block(40.0, 40.0, 3.0);
+            t.holes(&[((20.0, 20.0), 8.0)])
+        } else {
+            let (_, regions) = t.sketch(&[], &[((20.0, 20.0), 8.0)]);
+            t.add("extrude", &[("entities", q(regions)), ("depth", e("3 mm")), ("operationType", en("NEW"))])
+        };
+        let before = volume(&t.ok(b));
+        let top = t.faces_where(|c| c.z > 2.999);
+        let bottom = t.faces_where(|c| c.z < 1e-3);
+        let wall = t.faces_where(|c| (c.z - 1.5).abs() < 1e-6 && (c.x - 20.0).abs() < 1e-6 && (c.y - 20.0).abs() < 1e-6);
+        assert_eq!((top.len(), bottom.len(), wall.len()), (1, 1, 1), "bore {bore}");
+        let f = t.add("fillet", &[("filletType", en("FULL_ROUND")), ("side1Face", q(top)), ("side2Face", q(bottom)), ("centerFaces", q(wall))]);
+        let r = t.ok(f);
+        let want = before - if bore { taken(9.5, 1.0) } else { taken(6.5, -1.0) };
+        assert!((volume(&r) - want).abs() < 1e-6 * want, "bore {bore}: {} vs {want}", volume(&r));
+        assert!(r.context.bodies[0].shape.faces().iter().any(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Torus { .. }))), "bore {bore}");
+        // (The boss's outer half torus is two faces: OCCT's torus has its seam on the outer equator.)
+        assert_eq!(shown(&r).0, if bore { 7 } else { 4 }, "bore {bore}");
+    }
+}
+
+/// Live motor-mount-jack's Circular pattern 1: a face pattern of a hole's wall through a tube's wall (its boundary on
+/// the tube's cylinders, not planar) cuts the copies, each with the original's edges also where the tube's seam was.
+#[test]
+fn a_face_pattern_of_a_hole_through_a_tubes_wall() {
+    let mut t = T::new();
+    let (_, regions) = t.sketch(&[], &[((0.0, 0.0), 14.35)]);
+    let tube = t.add("extrude", &[("entities", q(regions)), ("depth", e("40 mm")), ("operationType", en("NEW"))]);
+    t.ok(tube);
+    let bore = t.holes(&[((0.0, 0.0), 12.1)]);
+    let solid = volume(&t.ok(bore));
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::new(0.0, 20e-3), 3e-3);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let r = t.regen();
+    let regions: Vec<Reference> = r.display.sketches.iter().find(|g| g.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+    let hole = t.add("extrude", &[("entities", q(regions)), ("endBound", en("THROUGH_ALL")), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true))]);
+    let r = t.ok(hole);
+    let one = solid - volume(&r);
+    assert!(one > 1.0, "{one}");
+    let rims = shown(&r).1 - 4;
+    let wall = t.faces_where(|c| c.x.hypot(c.y) > 11.0 && (c.z - 20.0).abs() < 1.0);
+    assert_eq!(wall.len(), 1);
+    let p = t.add("circularPattern", &[("patternType", en("FACE")), ("faces", q(wall)), ("axis", q(vec![Reference::Plane(DatumPlane::Top)])), ("instanceCount", e("4"))]);
+    let r = t.ok(p);
+    assert!((volume(&r) - (solid - 4.0 * one)).abs() < 1e-5 * solid, "{} vs {}", volume(&r), solid - 4.0 * one);
+    assert_eq!(shown(&r).0, 8);
+    assert_eq!(shown(&r).1, 4 + 4 * rims);
+}

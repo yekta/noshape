@@ -615,7 +615,14 @@ fn faces_tool(ev: &EvalCtx, body: &Body, faces: &[usize]) -> FResult<FaceTool> {
     let mut caps: Vec<Shape> = Vec::new();
     if !boundary.is_empty() {
         for w in k::edges_to_wires(&Shape::compound(&boundary), 1e-6)? {
-            let cap = k::make_face_from_wire(&w, true).map_err(|_| fe("Failed to create pattern, check input."))?;
+            // Where the faces leave a curved face (a slot through a tube's wall), the cap lies on that face's surface.
+            let beside = || {
+                let e = w.edges().into_iter().next()?;
+                let ei = body.shape.index_of(&e, ShapeType::Edge)?;
+                let fi = ef.get(ei)?.iter().find(|f| !sel.contains(f))?;
+                body.shape.sub_shape(ShapeType::Face, *fi as usize).ok()
+            };
+            let cap = k::make_face_from_wire(&w, true).or_else(|e| beside().map_or(Err(e), |f| k::make_face_on(&f, &w))).map_err(|_| fe("Failed to create pattern, check input."))?;
             caps.push(cap);
         }
     }

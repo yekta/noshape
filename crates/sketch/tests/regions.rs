@@ -196,3 +196,45 @@ fn wires_open_and_closed() {
         assert!((open.segments[k].end() - open.segments[k + 1].start()).length() < 1e-12);
     }
 }
+
+/// An ellipse split along its major axis, both halves picked: one region bounded by the two halves of the ellipse
+/// (live motor-mount-jack's slot: one wall face); a region beside them stays apart.
+#[test]
+fn touching_regions_unite_without_their_shared_line() {
+    let mut sk = Sketch::new();
+    sk.add_ellipse(v(0.0, 0.0), v(2.0, 0.0), 1.0);
+    sk.add_line(v(-2.0, 0.0), v(2.0, 0.0));
+    rect(&mut sk, 5.0, 0.0, 6.0, 1.0);
+    let regions = sk.regions();
+    assert_eq!(regions.len(), 3);
+    let total: f64 = regions.iter().map(|r| r.area()).sum();
+    let united = regions::union_touching(&regions);
+    assert_eq!(united.iter().filter(|u| u.is_some()).count(), 2);
+    let ellipse = united.iter().flatten().find(|r| r.area() > 2.0).unwrap();
+    assert_close(ellipse.area(), 2.0 * PI, 1e-9);
+    assert_eq!(ellipse.outer.segments.len(), 2);
+    assert!(ellipse.outer.segments.iter().all(|s| matches!(s, regions::ProfileSegment::EllipseArc { .. })));
+    assert!(ellipse.holes.is_empty());
+    assert_close(united.iter().flatten().map(|r| r.area()).sum(), total, 1e-9);
+}
+
+/// A disc filling a ring's hole unites with it (a whole loop shared); a lens and the crescents beside it, which share
+/// only arcs of their circles, stay apart.
+#[test]
+fn regions_unite_across_a_whole_loop_not_an_arc() {
+    let mut sk = Sketch::new();
+    sk.add_circle(v(0.0, 0.0), 1.0);
+    sk.add_circle(v(0.0, 0.0), 3.0);
+    let regions = sk.regions();
+    assert_eq!(regions.len(), 2);
+    let united: Vec<_> = regions::union_touching(&regions).into_iter().flatten().collect();
+    assert_eq!(united.len(), 1);
+    assert!(united[0].holes.is_empty());
+    assert_close(united[0].area(), 9.0 * PI, 1e-9);
+    let mut sk = Sketch::new();
+    sk.add_circle(v(0.0, 0.0), 2.0);
+    sk.add_circle(v(2.0, 0.0), 2.0);
+    let regions = sk.regions();
+    assert_eq!(regions.len(), 3);
+    assert!(regions::union_touching(&regions).iter().all(|u| u.is_some()));
+}

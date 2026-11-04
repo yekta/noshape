@@ -2151,8 +2151,9 @@ TopoDS_Shape move_seams_off_holes(const TopoDS_Shape& s, HHist& hist)
     GProp_GProps g0, g1;
     BRepGProp::VolumeProperties(s, g0);
     BRepGProp::VolumeProperties(out, g1);
-    // (The same faces bounded otherwise: only the integration's noise, 3e-6 of the volume with the loops' B-splines.)
-    if (std::abs(g1.Mass() - g0.Mass()) > 1e-5 * std::abs(g0.Mass()))
+    // (The same faces bounded otherwise: only the integration's noise, up to 2e-5 of the volume with the loops'
+    // B-splines (motor-mount-jack's slots); a hole flipped would be thousands of times that.)
+    if (std::abs(g1.Mass() - g0.Mass()) > 1e-4 * std::abs(g0.Mass()))
       continue;
     if (hist.IsNull())
       hist = new BRepTools_History();

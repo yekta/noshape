@@ -769,6 +769,42 @@ impl<'a> EvalCtx<'a> {
 
     // ------------------------------------------------------------ profiles
 
+    /// The sketch regions among `refs` (`None` elsewhere), regions of one sketch that share a line or a loop united at the
+    /// first of them (`None` at the others): live extrudes them as one face.
+    fn picked_regions(&self, refs: &[Reference]) -> FResult<Vec<Option<RegionOf>>> {
+        let mut out = Vec::with_capacity(refs.len());
+        let mut sketches: Vec<FeatureId> = Vec::new();
+        for r in refs {
+            let Reference::SketchRegion { sketch, key } = r else {
+                out.push(None);
+                continue;
+            };
+            let Some(found) = self.resolve_region(*sketch, key) else {
+                return err("A selected sketch region no longer exists");
+            };
+            out.push(Some(found));
+            if !sketches.contains(sketch) {
+                sketches.push(*sketch);
+            }
+        }
+        if noshape_kernel::legacy_topology() {
+            return Ok(out);
+        }
+        for sk in sketches {
+            let idx: Vec<usize> = (0..refs.len()).filter(|&i| matches!(&refs[i], Reference::SketchRegion { sketch, .. } if *sketch == sk)).collect();
+            let picked: Vec<_> = idx.iter().filter_map(|&i| out[i].clone()).collect();
+            if picked.len() < 2 {
+                continue;
+            }
+            let regions: Vec<_> = picked.iter().map(|(_, r)| r.clone()).collect();
+            let united = noshape_sketch::regions::union_touching(&regions);
+            for ((&i, (s, _)), u) in idx.iter().zip(picked).zip(united) {
+                out[i] = u.map(|r| (s, r));
+            }
+        }
+        Ok(out)
+    }
+
     /// Build profile faces from sketch regions and planar faces. Face
     /// profiles follow the pattern transform (sketch regions are already
     /// transformed through their sketch's frame).
@@ -776,13 +812,11 @@ impl<'a> EvalCtx<'a> {
         // Many sketch regions (a plate's 400 holes): their faces made in
         // parallel. Each region's face gets its own edges (region_profile
         // makes them from the segments), so they share nothing.
+        let picked = self.picked_regions(refs)?;
         if refs.len() >= 16 && refs.iter().all(|r| matches!(r, Reference::SketchRegion { .. })) {
             let mut regions = Vec::with_capacity(refs.len());
-            for r in refs {
-                let Reference::SketchRegion { sketch, key } = r else { unreachable!() };
-                let Some((s, region)) = self.resolve_region(*sketch, key) else {
-                    return err("A selected sketch region no longer exists");
-                };
+            for (r, p) in refs.iter().zip(picked) {
+                let (Reference::SketchRegion { sketch, key }, Some((s, region))) = (r, p) else { continue };
                 regions.push((s, region, Source::Region { sketch: *sketch, key: key.clone() }));
             }
             use rayon::prelude::*;
@@ -791,12 +825,10 @@ impl<'a> EvalCtx<'a> {
             return made.into_iter().collect();
         }
         let mut out = Vec::new();
-        for r in refs {
+        for (r, p) in refs.iter().zip(picked) {
             match r {
                 Reference::SketchRegion { sketch, key } => {
-                    let Some((s, region)) = self.resolve_region(*sketch, key) else {
-                        return err("A selected sketch region no longer exists");
-                    };
+                    let Some((s, region)) = p else { continue };
                     out.push(region_profile(&s, &region, Source::Region { sketch: *sketch, key: key.clone() })?);
                 }
                 Reference::Face(n) => {
@@ -1413,6 +1445,9 @@ fn unique_knots(knots: &[f64]) -> (Vec<f64>, Vec<u32>) {
     }
     (uk, m)
 }
+
+/// A sketch region with its sketch.
+type RegionOf = (Arc<SketchResult>, noshape_sketch::regions::Region);
 
 /// Kernel face for a sketch region, with each edge's sketch source.
 pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region, key: Source) -> FResult<Profile> {

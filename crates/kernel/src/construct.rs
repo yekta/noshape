@@ -183,6 +183,11 @@ pub fn make_face_from_wire(wire: &Shape, only_plane: bool) -> Result<Shape> {
     Shape::from_res(ffi::make_face_from_wire(wire.raw(), only_plane))
 }
 
+/// A face on `on`'s surface bounded by `wire` (edges lying on that surface).
+pub fn make_face_on(on: &Shape, wire: &Shape) -> Result<Shape> {
+    Shape::from_res(ffi::make_face_on(on.raw(), wire.raw()))
+}
+
 /// A rectangular planar face on `plane` covering `[umin, umax] x [vmin, vmax]`.
 pub fn make_plane_face(plane: &Plane, umin: f64, umax: f64, vmin: f64, vmax: f64) -> Result<Shape> {
     Shape::from_res(ffi::make_plane_face(&plane.ffi(), umin, umax, vmin, vmax))
