@@ -1572,6 +1572,9 @@ impl PartStudioView {
         if press && let Some(e) = &self.edit {
             e.dialog.update(cx, |d, _| d.keyboard_left = true);
         }
+        if press && let Some(sd) = &mut self.ui.section_dialog {
+            sd.keyboard_left = true;
+        }
         if let (ViewportEvent::ToolDown { .. } | ViewportEvent::ToolDrag { .. }, Some(e)) = (ev, &mut self.edit) {
             e.history.dragging = true;
         }

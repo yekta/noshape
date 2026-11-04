@@ -355,6 +355,8 @@ pub struct UiState {
     pub mass_variance: bool,
     /// The Mass and section properties panel as the ui-parity state reads it (kept only while the driver runs).
     pub mass_state: Option<serde_json::Value>,
+    /// The no-material notice is due (shown ≈ 1 s after measuring; the ui-parity driver waits for it).
+    pub material_notice_pending: bool,
     pub mass_variance_cache: Option<(Vec<BodyId>, usize, Option<noshape_model::regen::measure::MassProperties>)>,
     pub mass_face_variance_cache: Option<(Vec<Reference>, usize, Option<noshape_model::regen::measure::FaceVariance>)>,
     /// Mass Override changed in the open dialog (live ui-mass/10–15): the
@@ -686,6 +688,7 @@ impl UiState {
             mass_reference: None,
             mass_variance: false,
             mass_state: None,
+            material_notice_pending: false,
             mass_variance_cache: None,
             mass_face_variance_cache: None,
             mass_override_edit: None,

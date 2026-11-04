@@ -1256,10 +1256,16 @@ impl PartStudioView {
                 let edit = single.as_ref().and_then(|b| self.ui.mass_override_edit.as_ref().filter(|(eb, _)| eb == b)).map(|(_, m)| *m);
                 let computed = single.as_ref().and_then(|b| studio.part_properties.get(b)?.density).map(|d| d * mp.volume);
                 let shown = edit.unwrap_or(stored).or(computed).or(mp.mass);
+                // Without a material a typed mass is spread uniformly: the inertia (per unit density) times
+                // mass / volume (live 1959: Override on a part with no material fills the centre and the inertia).
                 let scale = match (shown, mp.mass) {
                     (Some(a), Some(b)) if b > 0.0 => a / b,
+                    (Some(a), None) if mp.volume > 0.0 => a / mp.volume,
                     _ => 1.0,
                 };
+                // Something has a mass: a material, or an overriding mass typed (a ticked Override's box is empty
+                // until then: 0).
+                let has_mass = mp.mass.is_some() || shown.is_some_and(|m| m > 0.0);
                 let i = mp.inertia * scale;
                 // Live: in the document's mass unit (Workspace units › Mass).
                 let (msym, mfac) = crate::properties_dialog::mass_unit(&units);
@@ -1287,15 +1293,15 @@ impl PartStudioView {
                 };
                 let ib = |r: usize, c: usize| var_i.map(|m| m.col(c)[r]);
                 mass_view = Some(MassView {
-                    override_part: single.filter(|_| mp.mass.is_some()).map(|b| (b, edit.unwrap_or(stored).is_some(), shown.unwrap_or(0.0))),
-                    changed: edit.is_some_and(|e| e != stored),
+                    override_part: single.map(|b| (b, edit.unwrap_or(stored).is_some(), shown.unwrap_or(0.0))),
+                    changed: edit.is_some_and(|e| e != stored && e.is_none_or(|v| v > 0.0)),
                     volume: with_pm(self.fmt(Quantity::new(mp.volume, len3), cx), var.as_ref().map(|b| b.volume / units.si_factor(len3))),
                     area: with_pm(self.fmt(Quantity::new(mp.surface_area, len2), cx), var.as_ref().map(|b| b.surface_area / units.si_factor(len2))),
-                    mass: mp.mass.and(shown).map(|m| with_pm(format!("{} {msym}", mass_number(m * mfac, m * mfac)), var.as_ref().and_then(|b| b.mass).filter(|_| !overridden).map(|b| b * mfac))),
+                    mass: shown.filter(|_| has_mass).map(|m| with_pm(format!("{} {msym}", mass_number(m * mfac, m * mfac)), var.as_ref().and_then(|b| b.mass).filter(|_| !overridden).map(|b| b * mfac))),
                     // Without a material Onshape leaves the center of mass empty.
-                    center: if mp.mass.is_some() { [with_pm(l(c.x), var_c.map(|b| b.x / len_f)), with_pm(l(c.y), var_c.map(|b| b.y / len_f)), with_pm(l(c.z), var_c.map(|b| b.z / len_f))] } else { Default::default() },
+                    center: if has_mass { [with_pm(l(c.x), var_c.map(|b| b.x / len_f)), with_pm(l(c.y), var_c.map(|b| b.y / len_f)), with_pm(l(c.z), var_c.map(|b| b.z / len_f))] } else { Default::default() },
                     inertia_unit: format!("{msym} {sym}²"),
-                    inertia: mp.mass.map(|_| [[cell(i.x_axis.x, ib(0, 0)), cell(i.y_axis.x, ib(0, 1)), cell(i.z_axis.x, ib(0, 2))], [cell(i.x_axis.y, ib(1, 0)), cell(i.y_axis.y, ib(1, 1)), cell(i.z_axis.y, ib(1, 2))], [cell(i.x_axis.z, ib(2, 0)), cell(i.y_axis.z, ib(2, 1)), cell(i.z_axis.z, ib(2, 2))]]),
+                    inertia: has_mass.then(|| [[cell(i.x_axis.x, ib(0, 0)), cell(i.y_axis.x, ib(0, 1)), cell(i.z_axis.x, ib(0, 2))], [cell(i.x_axis.y, ib(1, 0)), cell(i.y_axis.y, ib(1, 1)), cell(i.z_axis.y, ib(1, 2))], [cell(i.x_axis.z, ib(2, 0)), cell(i.y_axis.z, ib(2, 1)), cell(i.z_axis.z, ib(2, 2))]]),
                     parts: if bodies.is_empty() { Vec::new() } else { bodies.iter().filter_map(|b| self.display.body(b).map(|d| d.name.clone())).collect() },
                     reference,
                 });
@@ -2118,9 +2124,13 @@ impl PartStudioView {
             return;
         }
         NO_MATERIAL_SHOWN.store(true, std::sync::atomic::Ordering::Relaxed);
+        self.ui.material_notice_pending = true;
         cx.spawn(async move |this, cx| {
             cx.background_executor().timer(std::time::Duration::from_millis(1000)).await;
-            let _ = this.update(cx, |this, cx| this.flash_for(noshape_model::display::FeatureStatus::Warning, NO_MATERIAL.into(), std::time::Duration::from_millis(4400), cx));
+            let _ = this.update(cx, |this, cx| {
+                this.ui.material_notice_pending = false;
+                this.flash_for(noshape_model::display::FeatureStatus::Warning, NO_MATERIAL.into(), std::time::Duration::from_millis(4400), cx)
+            });
         })
         .detach();
     }

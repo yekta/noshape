@@ -26,6 +26,9 @@ pub fn studio_mass_properties(ctx: &Context, display: &StudioDisplay, ps: &PartS
     if let Some(m) = overrides {
         if let Some(old) = mp.mass.filter(|o| *o > 0.0) {
             mp.inertia *= m / old;
+        } else if mp.volume > 0.0 {
+            // No material: the inertia is per unit density, the mass spread uniformly (live 1959).
+            mp.inertia *= m / mp.volume;
         }
         mp.mass = Some(m);
     }

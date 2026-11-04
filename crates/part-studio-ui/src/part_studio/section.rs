@@ -60,6 +60,9 @@ pub struct SectionDialog {
     pub items: Vec<BodyId>,
     /// The "Items" field takes picks (else "Section planes").
     pub items_active: bool,
+    /// A press in the graphics took the keyboard from the panel (live ui-parity section-view-front: Front picked, no
+    /// focus); a click on one of its fields gives it back.
+    pub keyboard_left: bool,
     /// Plane the arrow drives.
     pub active: usize,
     /// State before the dialog opened (restored by Cancel).
@@ -131,7 +134,7 @@ impl PartStudioView {
         }
         let (include, items) = self.ui.section_parts.clone().unwrap_or((false, Vec::new()));
         let active = self.ui.section.len().saturating_sub(1);
-        self.ui.section_dialog = Some(SectionDialog { include, items, items_active: false, active, saved, popup: None, popup_plane: None });
+        self.ui.section_dialog = Some(SectionDialog { include, items, items_active: false, keyboard_left: false, active, saved, popup: None, popup_plane: None });
         self.apply_section(window, cx);
     }
 
@@ -418,6 +421,7 @@ impl PartStudioView {
             Action::ItemsActive(items) => {
                 if let Some(d) = &mut self.ui.section_dialog {
                     d.items_active = items;
+                    d.keyboard_left = false;
                 }
                 cx.notify();
             }

@@ -5882,6 +5882,28 @@ fn mass_properties_name_the_reference_connector_without_a_material() {
     assert_eq!(m["reference"], "Mate connector 1", "{m}");
 }
 
+/// Live 1959: a part with no material and a mass override of 2 kg has the volume's centroid and the inertia of that
+/// mass spread uniformly (the 40 × 30 × 10 block: Lxx 367.437 lb mm² = 166.667 kg mm², Lyy 283.333, Lzz 416.667).
+#[test]
+fn a_mass_override_without_a_material_spreads_the_mass_uniformly() {
+    let mut ctx = Ctx::new();
+    let path = scratch("mass-override-no-material.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+    let sketch = sk["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "tool": "corner_rectangle", "points": [[0, 0], [40, 30]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sketch }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+    call(&mut ctx, "part_set_properties", json!({ "part": "Part 1", "mass_override": 2.0 }));
+    let m = call(&mut ctx, "query_mass_properties", json!({ "parts": ["Part 1"] }));
+    assert_eq!(m["mass_kg"], 2.0, "{m}");
+    let c: Vec<f64> = m["center_of_mass"].as_array().unwrap().iter().map(|x| x.as_f64().unwrap()).collect();
+    assert!((c[0] - 20.0).abs() < 1e-6 && (c[1] - 15.0).abs() < 1e-6 && (c[2] - 5.0).abs() < 1e-6, "{m}");
+    let i = &m["inertia"];
+    let near = |v: &serde_json::Value, want: f64| (v.as_f64().unwrap() - want).abs() < 1e-3;
+    assert!(near(&i[0][0], 166.667) && near(&i[1][1], 283.333) && near(&i[2][2], 416.667) && near(&i[0][1], 0.0), "{m}");
+}
+
 /// This machine's setup through the API (Help › Install command line tool…
 /// and Connect to coding agents…): the agents listed with their state, the
 /// command line tool linked into a folder, bad agent ids named. No agent's
