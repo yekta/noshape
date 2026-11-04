@@ -384,11 +384,12 @@ fn squiggle_end(lines: &[&str], at: Position, message: &str) -> Position {
     token
 }
 
-/// **Compile hook** (agent fs plugs the FeatureScript parser / checker in
-/// here): the notices of a Feature Studio's source. Called on every save
-/// for the editor and on demand by the notices panel.
-pub fn studio_notices(tab: TabId, src: &str) -> Vec<Notice> {
-    noshape_model::custom::compile(tab, src)
+/// **Compile hook**: the notices of a Feature Studio's source, its imports of
+/// the document's other tabs resolved (`imports`: live's editor resolves them;
+/// FS-EDITOR-IMPORT-NOTICES). Called on every save for the editor and on
+/// demand by the notices panel.
+pub fn studio_notices(imports: &noshape_model::custom::DocImports, tab: TabId, src: &str) -> Vec<Notice> {
+    noshape_model::custom::compile_with_imports(imports, tab, src)
         .diagnostics
         .iter()
         .map(|d| Notice { line: d.line, column: d.column, message: d.message.clone(), error: d.severity == Severity::Error, info: d.severity == Severity::Info })
@@ -785,8 +786,9 @@ impl FeatureStudioView {
 
     fn recompile(&mut self, src: String, cx: &mut Context<Self>) {
         let tab = self.tab;
+        let imports = noshape_model::custom::doc_imports(&self.doc.read(cx).session.doc);
         self.compile_task = Some(cx.spawn(async move |this, cx| {
-            let notices = cx.background_spawn(async move { studio_notices(tab, &src) }).await;
+            let notices = cx.background_spawn(async move { studio_notices(&imports, tab, &src) }).await;
             let _ = this.update(cx, |this: &mut Self, cx| {
                 // Squiggles under the reported token (hover shows the message).
                 this.editor.update(cx, |e, cx| {
@@ -1958,5 +1960,24 @@ mod tests {
         assert_eq!(super::squiggle_len(line, 28), "undefinedThing".len());
         assert_eq!(super::squiggle_len(line, 10), 1);
         assert_eq!(super::squiggle_len("", 3), 1);
+    }
+}
+
+#[cfg(test)]
+mod import_notice_tests {
+    use super::studio_notices;
+    use noshape_model::custom::{FeatureStudio, doc_imports};
+    use noshape_model::{Document, TabContent};
+
+    /// FS-EDITOR-IMPORT-NOTICES: a studio importing another tab of the document compiles with it in the editor (live's
+    /// editor resolves imports); no "Imported element … not found".
+    #[::core::prelude::v1::test]
+    fn an_import_of_another_tab_resolves_in_the_editor() {
+        let mut doc = Document::new();
+        let common = doc.add_tab("common", TabContent::FeatureStudio(FeatureStudio::new("FeatureScript 2241;\nexport const SIZE = 3;\n")));
+        let user = doc.add_tab("user", TabContent::FeatureStudio(FeatureStudio::new("")));
+        let src = format!("FeatureScript 2241;\nimport(path : \"{common}\", version : \"0\");\nexport const TWICE = SIZE * 2;\n");
+        let notices = studio_notices(&doc_imports(&doc), user, &src);
+        assert!(notices.iter().all(|n| !n.error), "{:?}", notices.iter().map(|n| &n.message).collect::<Vec<_>>());
     }
 }

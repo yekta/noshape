@@ -57,13 +57,14 @@ pub fn set_monitored(doc: &Entity<DocModel>, tab: TabId, cx: &mut App) {
 
 /// Notices of every Feature Studio's committed source (the compile hook).
 pub fn document_notices(doc: &Entity<DocModel>, cx: &App) -> Vec<(TabId, String, Vec<Notice>)> {
+    let imports = noshape_model::custom::doc_imports(&doc.read(cx).session.doc);
     doc.read(cx)
         .session
         .doc
         .ordered_tabs()
         .iter()
         .filter_map(|t| match &t.content {
-            TabContent::FeatureStudio(f) => Some((t.id, t.name.clone(), studio_notices(t.id, &f.source))),
+            TabContent::FeatureStudio(f) => Some((t.id, t.name.clone(), studio_notices(&imports, t.id, &f.source))),
             _ => None,
         })
         .filter(|(_, _, n)| !n.is_empty())

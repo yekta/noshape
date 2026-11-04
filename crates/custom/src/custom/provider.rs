@@ -153,7 +153,21 @@ fn importables(doc: &Document) -> Importables {
 /// Studio `tab` with `source` (the editor's text) compiled as the editor
 /// does: its imports of the document's other tabs resolved.
 pub fn compile_in_document(doc: &Document, tab: TabId, source: &str) -> Arc<CompiledStudio> {
-    let (mut sources, others, deps) = importables(doc);
+    compile_with_imports(&doc_imports(doc), tab, source)
+}
+
+/// What a studio of a document can import: its Feature Studios' sources and the other importable tabs (cheap to take
+/// to a background compile, unlike the document).
+#[derive(Clone, Debug)]
+pub struct DocImports(Importables);
+
+pub fn doc_imports(doc: &Document) -> DocImports {
+    DocImports(importables(doc))
+}
+
+/// [`compile_in_document`] from a [`DocImports`] snapshot.
+pub fn compile_with_imports(imports: &DocImports, tab: TabId, source: &str) -> Arc<CompiledStudio> {
+    let (mut sources, others, deps) = imports.0.clone();
     if let Some(s) = sources.iter_mut().find(|s| s.0 == tab) {
         s.2 = source.to_string();
     }

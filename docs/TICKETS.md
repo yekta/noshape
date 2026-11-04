@@ -3268,7 +3268,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Feature / Part Pattern features fail "Error regenerating." where live's build.
   dx 12:46: cf-sheet-metal-model-plus (1403) uses `SMExtrudeSecondDirectionBoundingType` → "Type
   SMExtrudeSecondDirectionBoundingType not found" (gone from 1963). With icons stood in for, 23/34 studios compile.
-- [ ] P2 FS-EDITOR-IMPORT-NOTICES (psui) the Feature Studio editor's notices (feature-studio-ui studio_notices,
+- [x] fixed (psui 11-04: the editor's and the notices panel's compile take the document's imports, custom::doc_imports / compile_with_imports; T1 an_import_of_another_tab_resolves_in_the_editor) P2 FS-EDITOR-IMPORT-NOTICES (psui) the Feature Studio editor's notices (feature-studio-ui studio_notices,
   fs_notices document_notices) compile the source alone, so a studio importing another tab (`import(path : "<tab
   id>", …)`) shows "Imported element … not found" though its Part Studios regenerate with it; live's editor
   resolves imports. The agent API now compiles with the document's tabs (custom::compile_in_document(doc, tab,
