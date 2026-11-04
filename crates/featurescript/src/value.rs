@@ -92,6 +92,16 @@ pub fn same_declaration(a: Tag, b: Tag) -> bool {
     !a.is_none() && !b.is_none() && type_info(a).key == type_info(b).key
 }
 
+/// The tag of a type declaration (`onshape/std/units.fs#ValueWithUnits`) once a module declared it (not an enum's:
+/// those get one per member list).
+/// A ValueWithUnits' keys, made once (looked up and inserted per arithmetic operation).
+pub static VALUE_KEY: LazyLock<Value> = LazyLock::new(|| Value::str("value"));
+pub static UNIT_KEY: LazyLock<Value> = LazyLock::new(|| Value::str("unit"));
+
+pub fn tag_of_key(key: &str) -> Option<Tag> {
+    REGISTRY.read().by_key.get(key).and_then(|t| t.first().copied())
+}
+
 pub fn type_info(tag: Tag) -> Arc<TypeInfo> {
     REGISTRY.read().types[tag.0 as usize - 1].clone()
 }

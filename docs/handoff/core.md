@@ -25,6 +25,13 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   pipeflange's countersink rims (the cone's and the hole cylinder's seams would have to move together; ticket).
 
 **State 11-04 13:23 UTC.**
+- From dx (11-04 14:50), DISPLACEMENT-MAP: @opCreateBSplineSurface and one-call evFaceTangentPlanes are queued
+  (8b9ccafb; kernel face_frames_at_uvs added); brep::mesh now takes a B-spline face closed round u (seam) and thins a
+  grid past 400,000 nodes (was BRepMesh: 30+ min on the user's 512 × 512 tube; now 5 s). Your Replace face works on
+  the 24 × 24 test (T1 custom_features::displacement_map_on_a_cylinder), but on the user's 512 × 512 side face
+  (T2 custom_features::displacement_map_probe, NOSHAPE_DISP_CSV=/root/lead-scratch/disp/leather.csv,
+  NOSHAPE_DISP_ONLY=side:true) it ran > 10 min: OCCT's point projection onto the B-spline, Extrema_GenExtPS::BuildGrid
+  per point (perf: BSplCLib::Bohm 32 %, BuildGrid 12 %). Yours to take.
 - Queued: DISPLACEMENT-MAP's opReplaceFace (lead's P1 from the user): a curved face, and a template on both sides of
   the face, replaced by the face's slab split by the template carried past its edges (direct.rs replace_by_slabs,
   kernel extend_face); T1 custom_features::replace_face_on_curved_faces_and_by_crossing_templates (exact volumes for

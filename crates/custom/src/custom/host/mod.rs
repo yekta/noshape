@@ -982,14 +982,14 @@ fn raise_with(i: &mut Interp, enum_name: &str, custom: Option<&str>, faulty: &[&
 
 /// Tag of a standard library type (`std_tag("vector.fs", "Vector")`).
 pub fn std_tag(module: &str, name: &str) -> Tag {
-    static CACHE: std::sync::LazyLock<Mutex<HashMap<(String, String), Tag>>> = std::sync::LazyLock::new(Default::default);
-    let key = (module.to_string(), name.to_string());
-    if let Some(t) = CACHE.lock().get(&key) {
+    // By module, then name: found without an allocation (plane and point values ask it per coordinate).
+    static CACHE: std::sync::LazyLock<parking_lot::RwLock<HashMap<String, HashMap<String, Tag>>>> = std::sync::LazyLock::new(Default::default);
+    if let Some(t) = CACHE.read().get(module).and_then(|m| m.get(name)) {
         return *t;
     }
     let tag = noshape_featurescript::std_module(module).ok().and_then(|m| m.type_tag(name)).unwrap_or(Tag::NONE);
     if !tag.is_none() {
-        CACHE.lock().insert(key, tag);
+        CACHE.write().entry(module.to_string()).or_default().insert(name.to_string(), tag);
     }
     tag
 }

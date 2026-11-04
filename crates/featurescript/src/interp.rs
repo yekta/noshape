@@ -417,6 +417,9 @@ impl Interp {
     /// Call the best overload of `set` for `args`.
     pub fn call_set(&mut self, set: &Arc<OverloadSet>, args: Vec<Value>) -> R<Value> {
         let decl = self.resolve(set, &args)?;
+        if let Some(v) = crate::std_ops::native(&decl, &args) {
+            return Ok(v);
+        }
         let Some(c) = decl.compiled.get().cloned() else {
             return Err(self.error(format!("Function {} is not compiled", set.name)));
         };
@@ -1199,7 +1202,14 @@ impl Interp {
         if !set.fns.iter().any(|f| f.arity() == args.len() && Self::satisfies(&f.param_types, &args)) {
             return Ok(None);
         }
-        self.call_set(set, args).map(Some)
+        let decl = self.resolve(set, &args)?;
+        if let Some(v) = crate::std_ops::native(&decl, &args) {
+            return Ok(Some(v));
+        }
+        let Some(c) = decl.compiled.get().cloned() else {
+            return Err(self.error(format!("Function {} is not compiled", set.name)));
+        };
+        self.invoke(&c, args, &[], false).map(Some)
     }
 
     /// A binary operator, with operator overloads for tagged operands.

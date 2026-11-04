@@ -6,10 +6,28 @@ use super::std_tag;
 use crate::display::PlaneFrame;
 use glam::{DMat3, DMat4, DVec2, DVec3};
 use noshape_featurescript::interp::{Interp, R};
-use noshape_featurescript::value::{Map, Tag, Value};
+use noshape_featurescript::value::{Map, Tag, UNIT_KEY, VALUE_KEY, Value};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 fn unit_spec(entries: &[(&str, f64)]) -> Value {
+    // One unit to a power (a length, an angle): made once, shared.
+    static ONE: std::sync::LazyLock<parking_lot::RwLock<HashMap<String, HashMap<u64, Value>>>> = std::sync::LazyLock::new(Default::default);
+    if let [(name, power)] = entries
+        && let Some(v) = ONE.read().get(*name).and_then(|m| m.get(&power.to_bits()))
+    {
+        return v.clone();
+    }
+    let v = unit_map(entries);
+    if let [(name, power)] = entries
+        && !v.tag().is_none()
+    {
+        ONE.write().entry(name.to_string()).or_default().insert(power.to_bits(), v.clone());
+    }
+    v
+}
+
+fn unit_map(entries: &[(&str, f64)]) -> Value {
     let mut m = Map::new();
     for (k, v) in entries {
         m.insert(Value::str(*k), Value::num(*v));
@@ -19,8 +37,8 @@ fn unit_spec(entries: &[(&str, f64)]) -> Value {
 
 fn with_units(x: f64, unit: &[(&str, f64)]) -> Value {
     let mut m = Map::new();
-    m.insert(Value::str("unit"), unit_spec(unit));
-    m.insert(Value::str("value"), Value::num(x));
+    m.insert(UNIT_KEY.clone(), unit_spec(unit));
+    m.insert(VALUE_KEY.clone(), Value::num(x));
     Value::Map(Arc::new(m), std_tag("units.fs", "ValueWithUnits"))
 }
 

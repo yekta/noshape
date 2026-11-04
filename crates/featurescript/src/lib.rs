@@ -19,6 +19,7 @@ pub mod lexer;
 pub mod natives;
 pub mod parser;
 mod spline;
+mod std_ops;
 pub mod value;
 
 pub use compile::{CompileError, CompiledModule, Level, compile_module, std_module};

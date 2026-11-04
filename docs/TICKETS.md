@@ -29,6 +29,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   off, 29 s: ~24 s is our FeatureScript interpreter (units / vector operators run as std FeatureScript, ~5 µs a
   call: the points loop 22 s profiled, std's typechecks of 262,144 parameters and control points ~9 s), the face's
   mesh 5 s. Next (dx): the interpreter's calls and std's units / vector operators; then the times against live's.
+  dx 11-04 14:50: std's ValueWithUnits and Vector operators (units.fs, vector.fs) and isLength / isLengthVector /
+  is3dLengthVector / canBeControlPointMatrix answer natively from std 2506 (their texts are 3095's there; earlier
+  pins run the bodies), each falling back to the body wherever it would answer otherwise (units that differ, a NaN);
+  the host's std_tag and unit maps no longer allocate per value. The feature 24 -> 11.3 s, side with Replace off
+  29 -> 16 s (vibe5-built, here). T1 featurescript tests::std_unit_and_vector_operators_answer_as_their_bodies (each
+  case natively and by the body: the same values and errors). Parity run 68 unchanged (35/56, 369/482, custom
+  33/111); cf-spur-gear 16.8 -> 5.1 s, cf-straight-spline 23.8 -> 17.0 s. Left: the points loop (~5 s), the 262,144
+  plane values (~2.5 s), the face's display mesh (5 s); core: Replace face on the 512 × 512 side runs > 10 min in
+  OCCT's point projection onto the B-spline (Extrema_GenExtPS::BuildGrid per point; core.md).
 
 ## From the user, 2026-11-02 (v0.4.19, macOS)
 - [x] (psui 11-03 00:10, fixed by "psui: VAR-AUTOCOMPLETE-ENTER …": (1) an open feature dialog kept the variables of

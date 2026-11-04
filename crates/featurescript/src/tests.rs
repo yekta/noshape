@@ -383,3 +383,37 @@ fn lookup_table_expressions_evaluate() {
     assert_eq!(run_str("function f() { return toString(lookupTableEvaluate('1/4 in')); }"), "0.006350000000000001 meter");
 }
 
+
+/// std's ValueWithUnits and Vector operators and its length predicates answer here as their FeatureScript bodies do:
+/// the values, and where the bodies fail (units that differ, a NaN, a vector of another size), the same errors.
+#[test]
+fn std_unit_and_vector_operators_answer_as_their_bodies() {
+    let cases = [
+        "1 * meter + 2 * meter", "meter - inch", "-(3 * meter)", "2 * meter", "meter * 2", "meter * meter", "meter / meter",
+        "meter / second", "1 / meter", "meter / 2", "meter < inch", "meter < 0", "0 < meter", "inch > meter", "meter <= meter",
+        "meter < 1", "meter + second", "(0 * meter) / 0", "meter * meter / meter", "degree * 2", "radian / degree",
+        "vector(1, 2, 3) * meter", "meter * vector(1, 2, 3)", "vector(1, 2) * meter + vector(3, 4) * meter",
+        "vector(1, 2) * meter - vector(3, 4) * inch", "-(vector(1, 2) * meter)", "vector(1, 2) * meter / 2",
+        "vector(1, 2) / 2", "2 * vector(1, 2)", "vector(1, 2) + vector(1, 2, 3)", "vector(1, 2) * meter + vector(1, 2)",
+        "vector(1, 2) * vector(3, 4)", "vector(1, 2) * meter * meter", "vector(1, 2) * meter / meter", "meter ^ 2",
+        "squaredNorm(vector(3, 4) * meter)", "norm(vector(3, 4) * meter) == 5 * meter", "(vector(1, 2) as Vector) * (meter / second)",
+        "isLength(meter)", "isLength(inch)", "isLength(1)", "isLength(meter * meter)", "isLength(degree)",
+        "isLength({ 'value' : 1, 'unit' : { 'meter' : 1 } } as ValueWithUnits)", "isLength({ 'value' : 1, 'unit' : { 'meter' : 1 } })",
+        "isLengthVector(vector(1, 2) * meter)", "isLengthVector([meter, meter])", "isLengthVector(vector(1, 2))",
+        "is3dLengthVector(vector(1, 2, 3) * meter)", "is3dLengthVector(vector(1, 2) * meter)",
+        "canBeControlPointMatrix([[vector(1, 2, 3) * meter, vector(1, 2, 3) * inch], [vector(1, 2, 3) * meter, vector(0, 0, 0) * meter]])",
+        "canBeControlPointMatrix([[vector(1, 2, 3) * meter], [vector(1, 2, 3) * meter, vector(1, 2, 3) * meter]])",
+        "canBeControlPointMatrix([[vector(1, 2, 3) * meter], 5])", "canBeControlPointMatrix([])", "canBeControlPointMatrix(5)",
+        "canBeControlPointMatrix([[vector(1, 2) * meter]])",
+    ];
+    let message = |r: String| r.split(" at test").next().unwrap_or_default().to_string();
+    for c in cases {
+        let src = format!("function f() {{ return toString({c}); }}");
+        let native = run_str(&src);
+        crate::std_ops::OFF.with(|o| o.set(true));
+        let body = run_str(&src);
+        crate::std_ops::OFF.with(|o| o.set(false));
+        assert_eq!(message(native), message(body), "{c}");
+    }
+}
+
