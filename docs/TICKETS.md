@@ -567,6 +567,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   x = 30 one: our qIntersection / qAdjacent order is the reverse of live's here. Onshape's rule for the order of
   evaluateQuery's results isn't known: asked live (REQUESTS 12:21: the three lists in this document and on a plain
   block, with transient ids and tangents).
+  dx 11-04 20:14: live's answer (1995): ascending transient id, i.e. creation order. But its "definition face" JGC
+  at z = 0 is the sketch REGION (the Sheet metal model's `regions` query is JGC); ours orders that face's corner
+  edges as live (T1 custom_features::edge_order_at_a_corner_as_live). The real definition sheet (live 2015 and std's
+  convertRegion: the extrusion's START cap at z = thickness, normal −z) is what createSMOvercut gets (ours: wall
+  n (0, 0, −1), point (30, 40, 5)); worked through createSMOvercut, live's centre (27, 40) needs [y = 40, x = 30]
+  there, ours gives [x = 30, y = 40] (the face's loop order), so the circle lands at (30, 37). Live's ids there
+  follow the profile's sketch order (extrude caps copy the region's edges, the extract copies the cap's); ours are
+  `Boundary { face, ordinal }` with a geometric ordinal, the sketch link lost at the extract, and names can't change
+  (saved references). Next: a creation-order key for query results in the host (an entity born of an operation
+  inherits the order of the older entity it lies on: extract edge <- cap edge <- region edge <- sketch entity id),
+  used to sort evaluateQuery's results per body.
 - [ ] P2 STRAIGHT-SPLINE-CORNER-EDGES (core 11-04 09:31) cf-straight-spline's Feature 5 (live 31/85/56, ours 31/78/49;
   50 features after it): the faces are live's; live has eight 0.0106 mm edges at z = 101.595 where each slot's flat
   meets its run-out (the revolved profile's cone is tangent to the extruded flat along the profile line, so

@@ -3619,3 +3619,59 @@ export const keywayProbe = defineFeature(function(context is Context, id is Id, 
     let r = fx.regen(&mut reg, &ps);
     assert_ok(&r);
 }
+
+/// Live 1995 (behaviours.md "P1 FS-QUERY-EDGE-ORDER"): cf-sheet-metal-overcut-dogbone's sketch (a C-shaped region of 8
+/// lines) under its sheet metal model; at the corner (30, 40, 0) the region face's edges come in ascending transient id
+/// order, the sketch's: the y = 40 edge before the x = 30 one.
+#[test]
+fn edge_order_at_a_corner_as_live() {
+    use noshape_model::reference::DatumPlane;
+    custom::std_feature::set_std_sheet_metal(true);
+    let fx = Fixture::new(include_str!("fs/edge_order_probe.fs"));
+    let mut ps = PartStudio::new();
+    let mut reg = Regenerator::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let lines = [((0.0, 0.0), (50.0, 0.0)), ((0.0, 55.0), (50.0, 55.0)), ((0.0, 0.0), (0.0, 20.0)), ((50.0, 0.0), (50.0, 55.0)), ((0.0, 40.0), (30.0, 40.0)), ((0.0, 20.0), (30.0, 20.0)), ((30.0, 40.0), (30.0, 20.0)), ((0.0, 40.0), (0.0, 55.0))];
+    let mut points: Vec<((f64, f64), _)> = Vec::new();
+    for (a, b) in lines {
+        let mut point = |p: (f64, f64)| match points.iter().find(|(q, _)| *q == p) {
+            Some((_, id)) => *id,
+            None => {
+                let id = sk.add_point(glam::DVec2::new(p.0, p.1) * 1e-3);
+                points.push((p, id));
+                id
+            }
+        };
+        let (a, b) = (point(a), point(b));
+        sk.add_line_between(a, b).unwrap();
+    }
+    let mut f = ps.new_feature("sketch", &fx.units).unwrap();
+    let sketch = f.id;
+    f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    f.params.set("sketch", ParamValue::Sketch(Box::new(noshape_model::sketch_feature::SketchData { sketch: sk, ..Default::default() })));
+    ps.features.push(f);
+    let r = fx.regen(&mut reg, &ps);
+    let key = r.display.sketches.iter().find(|s| s.feature == sketch).unwrap().regions[0].key.clone();
+    let mut f = ps.new_feature("sheetMetalStart", &fx.units).unwrap();
+    f.params.set("process", ParamValue::Enum("THICKEN".into()));
+    f.params.set("regions", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+    f.params.set("thickness", expr("5 mm"));
+    f.params.set("radius", expr("5 mm"));
+    ps.features.push(f);
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
+    let mut f = ps.new_feature(&fx.ty("edgeOrderProbe"), &fx.units).unwrap();
+    f.params.set("x", expr("30 mm"));
+    f.params.set("y", expr("40 mm"));
+    f.params.set("z", expr("0 mm"));
+    let probe = f.id;
+    ps.features.push(f);
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
+    let out = custom::run::output_of(probe).expect("probe output").output;
+    // The sketch region's face (normal +z at z = 0): its edges at the corner, y = 40 then x = 30, as live's JGR, JGZ.
+    let region = out.lines().find(|l| l.contains(" n 0,0,1 | PT")).unwrap_or_else(|| panic!("{out}"));
+    let corner = region.split(" | C ").nth(1).unwrap_or_default();
+    let at = |p: &str| corner.find(p).unwrap_or_else(|| panic!("{p} in {corner}"));
+    assert!(corner.matches('{').count() == 2 && at("N[0,40,0 d 1,0,0 ; 30,40,0") < at("N[30,40,0 d 0,-1,0 ; 30,20,0"), "{region}");
+}
