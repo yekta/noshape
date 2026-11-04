@@ -327,7 +327,19 @@ impl Sketch {
         let steady = |u: EntityId| !cons.iter().any(|(c, us)| us.contains(&u) && unheld.contains(c));
         let low = |u: EntityId| self.anchor(u).and_then(|p| self.point(p)).unwrap_or(DVec2::splat(f64::MAX));
         let mut base: Vec<EntityId> = comp.iter().copied().filter(|u| steady(*u)).collect();
-        base.sort_by(|a, b| (low(*a).y, low(*a).x).partial_cmp(&(low(*b).y, low(*b).x)).unwrap_or(std::cmp::Ordering::Equal));
+        // Lowest first: each unit's lowest point; level ones (within 1e-9 m: a solve's noise) leftmost first
+        // (live s993: a chamfered rectangle's growing bottom keeps its left end).
+        let bottom = |u: EntityId| -> DVec2 {
+            let pts: Vec<DVec2> = match self.entity(u).map(|e| &e.geometry) {
+                Some(Geometry::Line { .. }) => self.entity(u).map(|e| e.point_refs().into_iter().filter_map(|p| self.point(p)).collect()).unwrap_or_default(),
+                _ => Vec::new(),
+            };
+            pts.into_iter().min_by(|a, b| if (a.y - b.y).abs() <= 1e-9 { a.x.total_cmp(&b.x) } else { a.y.total_cmp(&b.y) }).unwrap_or_else(|| low(u))
+        };
+        base.sort_by(|a, b| {
+            let (pa, pb) = (bottom(*a), bottom(*b));
+            if (pa.y - pb.y).abs() <= 1e-9 { pa.x.total_cmp(&pb.x) } else { pa.y.total_cmp(&pb.y) }
+        });
         let opts = SolveOptions { analyze: false, constructive: false, ..Default::default() };
         let mut held: BTreeSet<EntityId> = BTreeSet::new();
         let mut done = None;
