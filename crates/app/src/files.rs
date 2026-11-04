@@ -10,9 +10,9 @@ pub use noshape_app_core::file_dialogs::{documents_dir, native_dialogs_available
 pub use noshape_app_core::doc_files::{OpenDocs, add_recent, canonical, is_document_open, new_document_path, replace_recent, user_name_pref, watched_folders};
 
 /// App-level window lifecycle: keeps the open-document registry current and
-/// shows the start window when the last document window closes. Quits when
-/// the start window is the last window closed (macOS keeps running and
-/// reopens the start window from the dock).
+/// shows the start window when the last document window closes (every OS).
+/// Quits when the start window is the last window closed (macOS keeps running
+/// and reopens the start window from the dock).
 pub fn init(cx: &mut App) {
     cx.set_global(OpenDocs::default());
     // Author of new history entries: the Preferences name, else the OS name.
@@ -31,13 +31,12 @@ pub fn init(cx: &mut App) {
             crate::start_window::refresh(cx);
             return;
         }
-        if cfg!(target_os = "macos") {
-            return;
-        }
-        if was_start {
-            cx.quit();
-        } else {
+        // A document's last window shows the start window on every OS; closing that one quits, except that a
+        // macOS app keeps running without windows (the OS convention; the dock reopens the start window).
+        if !was_start {
             show_start_window(cx);
+        } else if !cfg!(target_os = "macos") {
+            cx.quit();
         }
     })
     .detach();
