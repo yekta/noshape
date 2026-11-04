@@ -5374,6 +5374,10 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
       fail_op("fillet failed: unfilleted edge overlapped by fillet");
     if (!past)
       throw;
+    // A fallback's blends finish as the others do: approximated faces made analytic, then a full round's two faces
+    // (one radius on one axis) one face (cf-spur-gear's FULL root fillet, OCCT failing on the exact full round).
+    analytic_blend_faces(in, past->first, past->second);
+    merge_full_rounds(in, past->first, past->second);
     tighten_new_tolerances(in, past->first, accurate(in));
     return make_result({in}, past->first, past->second.get());
   }

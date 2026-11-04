@@ -3357,6 +3357,74 @@ export const shift = defineFeature(function(context is Context, id is Id, defini
     assert!((v - 2.0 * drafted).abs() < 1e-6 * v, "two drafted bosses {}, got {v}", 2.0 * drafted);
 }
 
+/// FULL-ROUND-FILLET-ONE-FACE (cf-spur-gear's FULL root fillet): one gap of a 20-tooth module-2 gear (28°), its
+/// flanks fit splines through involute points, its root the dedendum circle; a circle solved tangent to the root and
+/// both flanks gives the radius of an opFillet on the two root edges: the root goes and both blends are one round
+/// face (live: the gear 186 faces; ours had two blend faces per gap, 226). T1.
+#[test]
+fn a_full_root_fillet_between_involutes_is_one_face() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Gear gap" }
+export const gearGap = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        const pitch = 40 * millimeter;
+        const pressure = 28 * degree;
+        const base = pitch * cos(pressure);
+        const inner = pitch / 2 - 2.5 * millimeter;
+        const outer = pitch / 2 + 2 * millimeter;
+        const alpha = sqrt(pitch ^ 2 - base ^ 2) / base * radian - pressure;
+        const beta = 360 / (4 * 20) * degree - alpha;
+        var flank1 = [];
+        var flank2 = [];
+        for (var t = 0; t <= 2; t += 1 / 50)
+        {
+            const a = t * radian;
+            var p1 = vector(base * 0.5 * (cos(a + beta) + t * sin(a + beta)), base * 0.5 * (sin(a + beta) - t * cos(a + beta)));
+            var p2 = vector(base * 0.5 * (cos(-beta - a) - t * sin(-beta - a)), base * 0.5 * (sin(-beta - a) + t * cos(-beta - a)));
+            if (t == 0)
+            {
+                p1 = inner * vector(cos(beta), sin(beta));
+                p2 = inner * vector(cos(-beta), sin(-beta));
+            }
+            flank1 = append(flank1, p1);
+            flank2 = append(flank2, p2);
+            if (norm(p1) >= outer)
+                break;
+        }
+        const sk = newSketchOnPlane(context, id + "sk", { "sketchPlane" : plane(vector(0, 0, 0) * meter, vector(0, 0, 1)) });
+        skFitSpline(sk, "spline1", { "points" : flank1 });
+        skFitSpline(sk, "spline2", { "points" : flank2 });
+        const mid = vector(pitch / 2 - 1.25 * millimeter, 0 * meter);
+        skCircle(sk, "addendum", { "center" : vector(0, 0) * meter, "radius" : outer });
+        skCircle(sk, "dedendum", { "center" : vector(0, 0) * meter, "radius" : inner });
+        skCircle(sk, "fillet", { "center" : mid, "radius" : 0.1 * millimeter, "construction" : true });
+        skConstraint(sk, "fix1", { "constraintType" : ConstraintType.FIX, "localFirst" : "dedendum" });
+        skConstraint(sk, "fix2", { "constraintType" : ConstraintType.FIX, "localFirst" : "spline1" });
+        skConstraint(sk, "fix3", { "constraintType" : ConstraintType.FIX, "localFirst" : "spline2" });
+        skConstraint(sk, "tangent1", { "constraintType" : ConstraintType.TANGENT, "localFirst" : "fillet", "localSecond" : "dedendum" });
+        skConstraint(sk, "tangent2", { "constraintType" : ConstraintType.TANGENT, "localFirst" : "fillet", "localSecond" : "spline1" });
+        skConstraint(sk, "tangent3", { "constraintType" : ConstraintType.TANGENT, "localFirst" : "fillet", "localSecond" : "spline2" });
+        skSolve(sk);
+        opExtrude(context, id + "gap", { "entities" : qContainsPoint(qCreatedBy(id + "sk", EntityType.FACE), vector(mid[0], mid[1], 0 * meter)),
+                "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : 8 * millimeter });
+        const r = evCurveDefinition(context, { "edge" : sketchEntityQuery(id + "sk", EntityType.EDGE, "fillet") }).radius;
+        opFillet(context, id + "fillet", { "entities" : qClosestTo(qNonCapEntity(id + "gap", EntityType.EDGE), vector(0, 0, 0) * meter), "radius" : r });
+        if (size(evaluateQuery(context, qGeometry(qOwnedByBody(qCreatedBy(id + "gap", EntityType.BODY), EntityType.FACE), GeometryType.CYLINDER))) != 2)
+            throw "two cylinders: the tip and one root round";
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    ps.features.push(ps.new_feature(&fx.ty("gearGap"), &fx.units).unwrap());
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+    let faces: Vec<usize> = r.context.bodies.iter().map(|b| b.shape.faces().len()).collect();
+    assert_eq!(faces, vec![6], "top, bottom, two flanks, tip and one root round");
+}
+
 /// PARITY-CUSTOM-RUN-FAILURES (cf-setback-fillet): the edges an opSplitFace made stay `qCreatedBy` it after
 /// opDeleteFace leaves the body open there (a solid becomes an open sheet, `leaveOpen`); an opFillSurface over them
 /// joined with `makeSolid` closes it again: the 10 mm cube back.

@@ -884,6 +884,14 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
 The lead moved P1 FULL-ROUND-FILLET-ONE-FACE (cf-spur-gear's full root fillet: two blend faces of one fillet that
 coincide stay two faces) to skasm. It will touch the fillet's result (merging coinciding blend faces of one
 opFillet, names kept); skasm tells you what it changes before landing. SPUR-GEAR-SPEED stays yours.
+23:46, done in your area (kernel features.cpp, op_fillet_unbudgeted's fallback return): a fallback's result now runs
+analytic_blend_faces then merge_full_rounds (the gear's FULL root fillet: OCCT fails on the exact full round, a
+fallback builds it, and its two blends stayed apart; history composed as merge_full_rounds does). Two things seen on
+the way, not changed: (1) in scaled_blend, merge_full_rounds runs before analytic_blend_faces, so two approximated
+(B-spline) blends of one full round there never merge; (2) analytic_blend_faces' rebuilt faces fail BRepCheck on
+the gear's THIRD root fillets (edges InvalidCurveOnSurface / InvalidSameParameterFlag: the edges keep their old
+same-parameter flag, so BRepLib::SameParameter(nf, fit) skips them; `forced = true` makes them valid and those root
+fillets cylinders, as FILLET-PRISMATIC-CYLINDER wants). Both left to you.
 
 ## From skasm (11-04 21:45, lead's request): TAB-RIPPED-CORNER taken by skasm
 The lead moved P1 TAB-RIPPED-CORNER (a Tab into a ripped flange corner fills nothing; T2 model sheetmetal_std::
