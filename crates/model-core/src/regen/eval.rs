@@ -222,8 +222,9 @@ fn is_sketch_ref(r: &Reference) -> bool {
 /// and the faces, edges and vertices of this studio's features that no body
 /// has there, and how many were left out; `None` when everything resolves.
 /// The solids among `bodies` that touch any of `tools` (their boxes overlap and a tool vertex is in or on the body, or
-/// they are no farther apart than 1e-9).
-pub fn touching(bodies: &[Arc<Body>], tools: &[Shape]) -> Vec<usize> {
+/// they are no farther apart than 1e-9). `exact: false` (the dialog's preselection probe): a part of many faces is
+/// only tested by the tool's points, not the whole distance (cf-spur-gear's 220-face gear: 1.7 s a tool).
+pub fn touching(bodies: &[Arc<Body>], tools: &[Shape], exact: bool) -> Vec<usize> {
     let tb: Vec<Option<k::BoundingBox>> = tools.iter().map(|t| t.bounding_box(false).ok()).collect();
     bodies
         .iter()
@@ -235,9 +236,13 @@ pub fn touching(bodies: &[Arc<Body>], tools: &[Shape]) -> Vec<usize> {
             // boss standing on the part: the classification is cheaper
             // than the distance, REGEN-SPEED).
             let Ok(bb) = b.shape.bounding_box(false) else { return false };
+            // (A point inside each of the tool's faces too: a boss on a gear's face touches it there, and the exact
+            // distance to the gear's hundreds of B-spline faces took 1.7 s, cf-spur-gear.)
+            let on = |p: DVec3| matches!(b.shape.classify_point(p, 1e-9), Ok(k::PointClass::Inside | k::PointClass::OnBoundary));
             let touches = |t: &Shape| {
-                t.vertices().iter().take(8).filter_map(|v| v.vertex_point().ok()).any(|p| matches!(b.shape.classify_point(p, 1e-9), Ok(k::PointClass::Inside | k::PointClass::OnBoundary)))
-                    || k::distance(&b.shape, t).map(|d| d.distance < 1e-9).unwrap_or(false)
+                t.vertices().iter().take(8).filter_map(|v| v.vertex_point().ok()).any(on)
+                    || t.faces().iter().take(16).filter_map(super::features::helpers_a::point_on_face).any(on)
+                    || ((exact || b.shape.count(ShapeType::Face) <= 64) && k::distance(&b.shape, t).map(|d| d.distance < 1e-9).unwrap_or(false))
             };
             tools.iter().zip(&tb).any(|(t, tbox)| tbox.as_ref().is_none_or(|x| overlaps(&bb, x)) && touches(t))
         })
@@ -927,7 +932,7 @@ impl<'a> EvalCtx<'a> {
         // The parts the tool touches, for the dialog's boolean heuristics
         // (booleanHeuristics.fs `autoSelectionForBooleanStep`).
         if kind == BodyKind::Solid && tools.len() <= 8 && !self.scratch {
-            let t = self.auto_scope(&tools);
+            let t = self.scope_of(&tools, false);
             self.touched = t.iter().map(|&i| self.ctx.bodies[i].id.clone()).collect();
         }
         match op {
@@ -1014,10 +1019,15 @@ impl<'a> EvalCtx<'a> {
     /// Bodies whose bounding boxes overlap any tool (auto merge scope). Noted as a probe: an evaluation is reused
     /// only while the same bodies touch its tools.
     pub fn auto_scope(&self, tools: &[NamedShape]) -> Vec<usize> {
+        self.scope_of(tools, true)
+    }
+
+    /// [`Self::auto_scope`], `exact: false` for the dialog's probe (see [`touching`]).
+    fn scope_of(&self, tools: &[NamedShape], exact: bool) -> Vec<usize> {
         let shapes: Vec<Shape> = tools.iter().map(|t| t.shape.clone()).collect();
         let bodies = self.ctx.bodies.untracked();
-        let found = touching(bodies, &shapes);
-        self.ctx.bodies.note_scope(shapes, found.iter().map(|&i| bodies[i].id.clone()).collect());
+        let found = touching(bodies, &shapes, exact);
+        self.ctx.bodies.note_scope(shapes, found.iter().map(|&i| bodies[i].id.clone()).collect(), exact);
         found
     }
 

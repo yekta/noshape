@@ -285,6 +285,10 @@ pub struct PointEntity {
     pub position: DVec3,
 }
 
+/// A merge scope an evaluation found: its tools, the bodies they touch, and whether exactly
+/// ([`crate::regen::eval::touching`]).
+pub type ScopeNote = (Vec<Shape>, Vec<BodyId>, bool);
+
 /// What a feature's evaluation read of its input's bodies (incremental regeneration: a cached evaluation is reused
 /// when the bodies it read are the very same and every name lookup comes out the same). Bodies by address; any
 /// access to the whole list (iteration, a slice) reads them all.
@@ -300,7 +304,7 @@ pub struct BodyReads {
     /// model): compared with the new input's.
     pub bounds: parking_lot::Mutex<Option<Option<(DVec3, DVec3)>>>,
     /// The solids found touching tools (`eval::touching`): the tools and the ids found, found again on a new input.
-    pub scopes: parking_lot::Mutex<Vec<(Vec<Shape>, Vec<BodyId>)>>,
+    pub scopes: parking_lot::Mutex<Vec<ScopeNote>>,
 }
 
 /// NOSHAPE_REUSE_TRACE: note where evaluations read all the bodies.
@@ -429,9 +433,9 @@ impl Bodies {
         }
     }
     /// Notes the solids found touching `tools` (found again when the evaluation is reused).
-    pub fn note_scope(&self, tools: Vec<Shape>, ids: Vec<BodyId>) {
+    pub fn note_scope(&self, tools: Vec<Shape>, ids: Vec<BodyId>, exact: bool) {
         if let Some(r) = &self.reads {
-            r.scopes.lock().push((tools, ids));
+            r.scopes.lock().push((tools, ids, exact));
         }
     }
     /// The bounds of all the bodies (noted, compared with a new input's when the evaluation is reused).

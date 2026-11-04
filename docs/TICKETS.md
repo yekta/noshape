@@ -3814,6 +3814,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Fill pattern makes 1,737 parts where live makes 2 (the first difference), so the runner's end-of-document measures
   (props_surface / props_volume over 1,737 parts, ~16 s) follow from that (dx). Left in the feature: Booleans 9.7 s
   (bool) and the host's own work.
+  core 11-04 13:50: cf-spur-gear's Extrude 2 (New, 11.8 s, live 5 ms) was the dialog's preselection probe
+  (apply_operation's `touched`, every solid feature's regeneration): the exact distance from the boss to the gear's
+  220 B-spline-faced part, 1.7 s a call, to prove they don't touch. The probe now tests a part of more than 64 faces by
+  the tool's vertices and a point inside each tool face only (in or on the part: touching); the merge scope of
+  surfaces stays exact. Extrude 2 0.1 s, the document 16.4 -> 4.8 s (live 2.1).
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
   nothing is created by the split: `qCreatedBy(id + "split", EntityType.EDGE)` and `(…, EntityType.FACE)` are both
   empty in ours, where Onshape's split edge (and the new face pieces) are the split's. The public Setback Fillet

@@ -165,7 +165,7 @@ struct ReadSet {
     bodies: Vec<usize>,
     lookups: Vec<(context::LookupKind, crate::reference::TopoName)>,
     bounds: Option<Option<(glam::DVec3, glam::DVec3)>>,
-    scopes: Vec<(Vec<noshape_kernel::Shape>, Vec<crate::reference::BodyId>)>,
+    scopes: Vec<context::ScopeNote>,
 }
 
 thread_local! {
@@ -214,8 +214,8 @@ fn reused(e: &CacheEntry, input: &Context) -> Result<Context, String> {
     if reads.bounds.is_some_and(|bb| bb != input.bodies.bounds_untracked()) {
         return Err("the bodies' bounds differ".into());
     }
-    for (tools, ids) in &reads.scopes {
-        if eval::touching(b, tools).into_iter().map(|j| &b[j].id).ne(ids.iter()) {
+    for (tools, ids, exact) in &reads.scopes {
+        if eval::touching(b, tools, *exact).into_iter().map(|j| &b[j].id).ne(ids.iter()) {
             return Err("other bodies touch its tools".into());
         }
     }
