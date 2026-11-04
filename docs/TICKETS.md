@@ -3330,6 +3330,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   a solid leaves an open sheet (it healed), and opBoolean UNION `makeSolid` makes a sheet that closes a volume a
   solid (std's surface joins). T1 custom_features::a_split_edge_left_open_is_filled_back_into_a_solid. Its next
   difference is the fill's shape (area +0.13 %, live's patch bulges 0.008 mm past the box): kernel fill (core).
+  dx 11-04 00:34, std 1024 and 392 from live (1942) tried, not landed: served as the nearest embedded std, the
+  sheet-metal studios compile at 1024 but fail at run time ("Sheet metal model cannot be built.": 1024's sheet metal
+  calls natives ours hasn't: opSMFlatOperation, opRoll, opNameEntity, queryContainsFlattenedSheetMetal, …; 392's
+  start/endSheetMetalFeature, opFoldInternal, opFlattenInternal, opBendAtEdgeInternal), 1188 / 1403 need AdjacencyType
+  (std 1260 asked of live), and the studios pinned 336–608 that run at 1963 (o-ring, metric keys, wave spring,
+  planetary gears, syncro rotator) break at 392: its status natives (@reportFeatureError / Warning / Info,
+  @getFeatureError …; easy, done and reverted) and further run-time differences (planetary 531/608, syncro 543:
+  "Error regenerating."). Net: 26/55, 311/480 against 27/55, 308/480 (pulley02's +5 is core's fillet). Worth it only
+  with (a) old std served only to studios that don't compile at 1963 and (b) the old sheet-metal natives: an
+  old-std compatibility project for the lead to weigh, not a quick fix.
   hasn't BOOLEAN_NON_MANIFOLD_RESULT (3095's has); the feature fails on the Boolean anyway (core), left.
   dx 11-03 20:23, cf-straight-spline (54 SAE Straight-Sided Spline features; compiles since dx's enum trailing-comma
   fix): 12 fail `@opBoolean: BOOLEAN_NON_MANIFOLD_RESULT`, then `Type error: value BOOLEAN_NON_MANIFOLD_RESULT cannot be
