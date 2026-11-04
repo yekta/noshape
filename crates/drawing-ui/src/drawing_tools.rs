@@ -1582,17 +1582,18 @@ impl DrawingEditor {
 
     pub fn on_key(&mut self, e: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let k = &e.keystroke;
-        // Ctrl+M: maximum / minimum dimension (Onshape).
-        if (k.modifiers.control || k.modifiers.platform) && !k.modifiers.shift && k.key == "m" && self.panel.is_none() {
-            self.set_tool(Tool::Dimension { kind: DimTool::MaxMin, picks: vec![] }, cx);
-            cx.stop_propagation();
-            return;
-        }
-        // Ctrl+S: Sheets panel (Onshape's "Display sheet menu").
-        if (k.modifiers.control || k.modifiers.platform) && !k.modifiers.shift && k.key == "s" {
-            self.toggle_sheets_panel(cx);
-            cx.stop_propagation();
-            return;
+        match crate::drawing_keys::control_key(&k.modifiers, &k.key) {
+            Some(crate::drawing_keys::ControlKey::MaxMin) if self.panel.is_none() => {
+                self.set_tool(Tool::Dimension { kind: DimTool::MaxMin, picks: vec![] }, cx);
+                cx.stop_propagation();
+                return;
+            }
+            Some(crate::drawing_keys::ControlKey::Sheets) => {
+                self.toggle_sheets_panel(cx);
+                cx.stop_propagation();
+                return;
+            }
+            _ => {}
         }
         // Typing in a dialog's text box (focus inside the editor, not on it)
         // never triggers drawing shortcuts.

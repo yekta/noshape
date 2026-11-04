@@ -8,6 +8,27 @@ use noshape_model::drawing::ViewId;
 use crate::theme::p;
 use gpui_kit::*;
 
+/// A drawing's Control-only shortcuts (live's key list, behaviours "Keys on macOS"): the Control key on every OS,
+/// a Mac's too; Cmd (Super / Windows key elsewhere) never.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ControlKey {
+    /// Ctrl+M: Max/min dimension.
+    MaxMin,
+    /// Ctrl+S: Display sheet menu (the Sheets panel).
+    Sheets,
+}
+
+pub fn control_key(m: &Modifiers, key: &str) -> Option<ControlKey> {
+    if !m.control || m.platform || m.shift || m.alt || m.function {
+        return None;
+    }
+    match key {
+        "m" => Some(ControlKey::MaxMin),
+        "s" => Some(ControlKey::Sheets),
+        _ => None,
+    }
+}
+
 impl DrawingEditor {
     /// `w` / Zoom to window: the next left drag draws the window.
     pub fn start_zoom_window(&mut self, cx: &mut Context<Self>) {
@@ -370,3 +391,23 @@ impl DrawingEditor {
         Some(div().absolute().left(px(self.dialog_left() + 4.)).bottom(px(34.)).min_w(px(200.)).p_2().bg(pal.dialog_bg).border_1().border_color(pal.border).shadow_md().text_color(pal.text).child(col).into_any_element())
     }
 }
+
+#[cfg(test)]
+mod control_key_tests {
+    use super::{ControlKey, control_key};
+    use gpui_kit::Modifiers;
+
+    /// Live: Control+S / Control+M only; Cmd+S / Cmd+M (Super / Windows elsewhere) and Shift or Alt chords do nothing.
+    #[test]
+    fn drawing_control_keys_take_the_control_key_only() {
+        let ctrl = Modifiers { control: true, ..Default::default() };
+        assert_eq!(control_key(&ctrl, "s"), Some(ControlKey::Sheets));
+        assert_eq!(control_key(&ctrl, "m"), Some(ControlKey::MaxMin));
+        assert_eq!(control_key(&ctrl, "q"), None);
+        for m in [Modifiers { platform: true, ..Default::default() }, Modifiers { control: true, platform: true, ..Default::default() }, Modifiers { control: true, shift: true, ..Default::default() }, Modifiers { control: true, alt: true, ..Default::default() }, Modifiers::default()] {
+            assert_eq!(control_key(&m, "s"), None, "{m:?}");
+            assert_eq!(control_key(&m, "m"), None, "{m:?}");
+        }
+    }
+}
+
