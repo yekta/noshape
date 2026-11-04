@@ -23,6 +23,7 @@ use crate::scene_builder::PickKind;
 use crate::theme::{p, with_alpha};
 use crate::viewport::{Viewport, ViewportEvent};
 use glam::{DVec2, DVec3};
+use std::rc::Rc;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputState};
@@ -114,6 +115,9 @@ pub use panels::*;
 
 /// Key in `expanded` that marks the "Mate features" folder as collapsed.
 const MATE_FEATURES_COLLAPSED: InstanceId = InstanceId(u64::MAX);
+
+/// One item of the instance list, built when it is on screen.
+type ListRowFn = Rc<dyn Fn(&mut AssemblyView, &mut Context<AssemblyView>) -> AnyElement>;
 /// Expanded-set keys under a subassembly's path: its pattern rows (open)
 /// and its Mate features folder (collapsed).
 const NESTED_PATTERN_BIT: u64 = 1 << 62;
@@ -4220,22 +4224,55 @@ impl AssemblyView {
         out
     }
 
+    /// The instance list (Onshape's "Instances" tree): only the rows on
+    /// screen are built (a gpui `list` over row builders; pins-assembly-1000
+    /// built all 1000 rows on every selection change).
     fn render_list(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let pal = p();
         let Some(asm) = self.assembly(cx).cloned() else { return div().into_any_element() };
         let result = self.result.clone();
         let filtering = !self.ui.filter.is_empty();
         // Live assembly/753: with ≡ off (the default) the matches stay in
         // their tree, under the top row, and a "…" row stands for the rest.
         let tree = filtering && !self.ui.filter_flat;
-        let mut rows: Vec<AnyElement> = Vec::new();
+        let mut rows: Vec<ListRowFn> = Vec::new();
         let mut selected_row: Option<usize> = None;
+        // Top-level nodes by instance (`AssemblyResult::node` searches them in turn).
+        let top: HashMap<InstanceId, &InstanceNode> = result.nodes.iter().filter_map(|n| Some((*n.path.first()?, n))).filter(|(_, n)| n.path.len() == 1).collect();
         if !filtering || tree {
-            rows.push(self.assembly_row(cx));
+            rows.push(Rc::new(|this: &mut Self, cx: &mut Context<Self>| this.assembly_row(cx)));
         }
         if !filtering {
-            rows.push(self.origin_row(cx));
+            rows.push(Rc::new(|this: &mut Self, cx: &mut Context<Self>| this.origin_row(cx)));
         }
+        // An instance's row and, when it is expanded, its children (one item).
+        let instance_rows = |rows: &mut Vec<ListRowFn>, id: InstanceId, depth: usize, children: bool| {
+            rows.push(Rc::new(move |this: &mut Self, cx: &mut Context<Self>| {
+                let inst = this.assembly(cx).and_then(|a| a.instance(id)).cloned();
+                let result = this.result.clone();
+                this.instance_row(result.node(&[id]), inst.as_ref(), vec![id], depth, cx)
+            }));
+            if children && top.get(&id).is_some_and(|n| self.expanded.contains(&n.path)) {
+                rows.push(Rc::new(move |this: &mut Self, cx: &mut Context<Self>| {
+                    let result = this.result.clone();
+                    let mut out = Vec::new();
+                    if let Some(n) = result.node(&[id]) {
+                        this.push_children(n, depth + 1, &mut out, cx);
+                    }
+                    v_flex().children(out).into_any_element()
+                }));
+            }
+        };
+        // Rows made eagerly by a helper (a pattern's): one item, rebuilt when shown.
+        let pattern_item = |rows: &mut Vec<ListRowFn>, pid: MateId| {
+            rows.push(Rc::new(move |this: &mut Self, cx: &mut Context<Self>| {
+                let (Some(asm), result) = (this.assembly(cx).cloned(), this.result.clone()) else { return div().into_any_element() };
+                let Some(p) = asm.pattern(pid) else { return div().into_any_element() };
+                let (mut out, mut sel) = (Vec::new(), None);
+                let filtering = !this.ui.filter.is_empty();
+                this.push_pattern_rows(p, &asm, &result, filtering, &mut out, &mut sel, cx);
+                v_flex().children(out).into_any_element()
+            }));
+        };
         let mut shown_folders: HashSet<MateId> = HashSet::new();
         // Live (behaviours "skb (10-24) section base snap + move to origin"
         // (3)): a pattern's row sits in the instance order, where its first
@@ -4244,34 +4281,45 @@ impl AssemblyView {
         // Instances or patterns the filter hides: the "…" row stands for them
         // (live: none when only the Origin and the mates folder go).
         let mut hidden = false;
+        // A pattern's rows are made once here for what they tell (hidden
+        // rows, the selection's row), then again when shown.
+        let pattern = |this: &Self, rows: &mut Vec<ListRowFn>, selected_row: &mut Option<usize>, p: &InstancePattern, cx: &mut Context<Self>| -> bool {
+            let (mut out, mut sel) = (Vec::new(), None);
+            let shown = this.push_pattern_rows(p, &asm, &result, filtering, &mut out, &mut sel, cx);
+            if sel.is_some() && selected_row.is_none() {
+                *selected_row = Some(rows.len());
+            }
+            pattern_item(rows, p.id);
+            shown
+        };
         for inst in &asm.instances {
             if let Some(p) = asm.generated_by(inst.id) {
                 if shown_patterns.insert(p.id) {
-                    hidden |= !self.push_pattern_rows(p, &asm, &result, filtering, &mut rows, &mut selected_row, cx);
+                    hidden |= !pattern(self, &mut rows, &mut selected_row, p, cx);
                 }
                 continue;
             }
             // Folders show at the place of their first member (not while filtering).
             if !filtering && let Some(folder) = asm.folder_of_instance(inst.id) {
                 if shown_folders.insert(folder.id) {
-                    rows.push(self.folder_row(folder, cx));
+                    let fid = folder.id;
+                    rows.push(Rc::new(move |this: &mut Self, cx: &mut Context<Self>| {
+                        let f = this.assembly(cx).and_then(|a| a.folders.iter().find(|f| f.id == fid).cloned());
+                        f.map(|f| this.folder_row(&f, cx)).unwrap_or_else(|| div().into_any_element())
+                    }));
                     if self.expanded.contains(&vec![InstanceId(folder.id.0)]) {
                         for m in &folder.instances {
                             let Some(mi) = asm.instance(*m) else { continue };
-                            let node = result.node(&[mi.id]);
                             if selected_row.is_none() && self.selected.first() == Some(&mi.id) {
                                 selected_row = Some(rows.len());
                             }
-                            rows.push(self.instance_row(node, Some(mi), vec![mi.id], 1, cx));
-                            if let Some(n) = node {
-                                self.push_children(n, 2, &mut rows, cx);
-                            }
+                            instance_rows(&mut rows, mi.id, 1, true);
                         }
                     }
                 }
                 continue;
             }
-            let node = result.node(&[inst.id]);
+            let node = top.get(&inst.id).copied();
             if !self.instance_passes(inst, node, cx) {
                 hidden = true;
                 continue;
@@ -4279,35 +4327,68 @@ impl AssemblyView {
             if selected_row.is_none() && self.selected.first() == Some(&inst.id) {
                 selected_row = Some(rows.len());
             }
-            rows.push(self.instance_row(node, Some(inst), vec![inst.id], 0, cx));
-            if let Some(n) = node
-                && !filtering
-            {
-                self.push_children(n, 1, &mut rows, cx);
-            }
+            instance_rows(&mut rows, inst.id, 0, !filtering);
         }
+        let folder_item = |rows: &mut Vec<ListRowFn>, fid: MateId| {
+            rows.push(Rc::new(move |this: &mut Self, cx: &mut Context<Self>| {
+                let f = this.assembly(cx).and_then(|a| a.folders.iter().find(|f| f.id == fid).cloned());
+                f.map(|f| this.folder_row(&f, cx)).unwrap_or_else(|| div().into_any_element())
+            }));
+        };
         if !filtering {
             // Empty instance folders.
             for folder in asm.folders.iter().filter(|f| f.instances.is_empty() && f.features.is_empty()) {
-                rows.push(self.folder_row(folder, cx));
+                folder_item(&mut rows, folder.id);
             }
         } else {
             // Filtered rows are flat; `:folder` lists the folders.
             for folder in asm.folders.iter().filter(|f| self.folder_passes(f)) {
-                rows.push(self.folder_row(folder, cx));
+                folder_item(&mut rows, folder.id);
             }
         }
         // Patterns not placed with their instances (none generated) go last.
         for p in asm.patterns.iter().filter(|p| !shown_patterns.contains(&p.id)) {
-            hidden |= !self.push_pattern_rows(p, &asm, &result, filtering, &mut rows, &mut selected_row, cx);
+            hidden |= !pattern(self, &mut rows, &mut selected_row, p, cx);
         }
-        rows.extend(self.pending_pattern_row(cx));
+        if self.pending_pattern_row(cx).is_some() {
+            rows.push(Rc::new(|this: &mut Self, cx: &mut Context<Self>| this.pending_pattern_row(cx).unwrap_or_else(|| div().into_any_element())));
+        }
+        // The mates folder and its rows (and the filter's "…"): one item.
+        rows.push(Rc::new(move |this: &mut Self, cx: &mut Context<Self>| v_flex().children(this.mates_section(hidden, cx)).into_any_element()));
+        // The list keeps its scroll position across rebuilds.
+        let state = self.ui.list_state.get_or_insert_with(|| ListState::new(0, ListAlignment::Top, px(300.))).clone();
+        if state.item_count() != rows.len() {
+            let top = state.logical_scroll_top();
+            state.reset(rows.len());
+            state.scroll_to(top);
+        } else {
+            state.remeasure();
+        }
         // Selecting in the graphics area scrolls the list to the row.
         if std::mem::take(&mut self.ui.scroll_to_selection)
             && let Some(ix) = selected_row
         {
-            self.ui.list_scroll.scroll_to_item(ix);
+            state.scroll_to_reveal_item(ix);
         }
+        let rows = Rc::new(rows);
+        let view = cx.entity();
+        list(state, move |ix, _, cx| {
+            let Some(f) = rows.get(ix).cloned() else { return div().into_any_element() };
+            view.update(cx, |this, cx| f(this, cx))
+        })
+        .size_full()
+        .into_any_element()
+    }
+
+    /// The instance list's mate features folder, its rows and the filter's
+    /// "…" (`hidden`: the instance rows had some hidden).
+    fn mates_section(&mut self, hidden: bool, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let pal = p();
+        let Some(asm) = self.assembly(cx).cloned() else { return Vec::new() };
+        let result = self.result.clone();
+        let filtering = !self.ui.filter.is_empty();
+        let tree = filtering && !self.ui.filter_flat;
+        let mut rows: Vec<AnyElement> = Vec::new();
         let labeler = self.labeler(cx);
         // Connectors, mates, relations and groups in creation order (their
         // ids count up; live request 1541: "Fastened 1 · Mate connector 1";
@@ -4449,7 +4530,7 @@ impl AssemblyView {
             // The "…" (live: text at x 28 of the list), past the rows shown.
             rows.push(h_flex().h(px(crate::ui::ROW_H)).flex_none().pl(px(28.)).text_size(px(crate::ui::ROW_TEXT)).text_color(pal.text).child("…").into_any_element());
         }
-        v_flex().id("instance-list").size_full().overflow_y_scroll().track_scroll(&self.ui.list_scroll).children(rows).into_any_element()
+        rows
     }
 
     /// The head of the instance list: the configurations box, the filter

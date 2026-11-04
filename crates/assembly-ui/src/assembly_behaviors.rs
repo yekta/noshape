@@ -284,7 +284,8 @@ pub struct AsmUi {
     /// Inline rename (Shift+N / Rename).
     pub rename: Option<(RenameRow, Entity<InputState>, Subscription)>,
     /// Instance list scrolling (selection in the graphics scrolls to the row).
-    pub list_scroll: ScrollHandle,
+    /// The instance list's rows (virtual: only those on screen are built).
+    pub list_state: Option<gpui_kit::ListState>,
     pub scroll_to_selection: bool,
     /// Mates expanded in the list (their implicit mate connectors shown).
     pub expanded_mates: HashSet<MateId>,
