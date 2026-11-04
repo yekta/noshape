@@ -868,6 +868,11 @@ N3. Completion residuals: Onshape's module order for equal-cost rows (BooleanOpe
 
 ## Requests to the lead
 
+- 11-04 06:03: **274/287 scenarios, 1798/1833 states** (full run on main). Left: 6 Hole (live's account remembers
+  M6x1.00), chamfer-two-distances (focus after an edit brings a field up: asked live by hand, REQUESTS 04:0x),
+  face-rclick-menu's highlighted row (menu placement), measure-fillet-face (stale label, re-record asked),
+  extrude-end-type-up-to-face (live's start), asm-fastened-undo-picks / revolve-dialog-axis / sketch-extend-to-line
+  (skasm).
 - 11-04 03:36: since 01:05 (landed or queued): Mass Override without a material (live 1959), Section view's keyboard after a
   graphics press, the no-material notice waited for by the driver, Rib's Parts empty until a profile, an existing
   feature keeps its direction on Remove, face double-click keeps its features lit, the point's menu, menus highlight
