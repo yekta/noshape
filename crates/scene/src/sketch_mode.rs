@@ -1281,7 +1281,7 @@ impl SketchEditor {
                 let ids: Vec<EntityId> = std::mem::take(&mut self.selection).into_iter().filter(|e| !is_point(&data.sketch, *e)).collect();
                 if !ids.is_empty() {
                     self.start_offset(&data.sketch, ids);
-                    self.message = Some("Set the offset distance (drag or click the arrow), then press Enter".into());
+                    self.selection = self.offset_pending.clone().unwrap_or_default();
                 }
                 EditOutcome::redraw()
             }
@@ -1334,6 +1334,7 @@ impl SketchEditor {
         }
         let had_box = self.otf.take().is_some();
         if self.offset_pending.take().is_some() {
+            self.selection.clear();
             self.set_tool(Tool::Select);
             return true;
         }
@@ -1870,10 +1871,15 @@ impl SketchEditor {
                     self.drag = Some(DragState::OffsetArrow { start: p, moved: false });
                     return EditOutcome::redraw();
                 }
-                let ids: Vec<EntityId> = if self.selection.is_empty() { hovered.into_iter().filter(|e| !is_point(&data.sketch, *e)).collect() } else { std::mem::take(&mut self.selection) };
+                // While previewing, the picked curves stay selected (live: orange) and a click picks under the pointer.
+                let ids: Vec<EntityId> = if self.selection.is_empty() || self.offset_pending.is_some() { hovered.into_iter().filter(|e| !is_point(&data.sketch, *e)).collect() } else { std::mem::take(&mut self.selection) };
                 if ids.is_empty() {
-                    // Clicking empty space accepts a pending offset.
-                    return if self.offset_pending.is_some() { self.commit_offset(data) } else { EditOutcome::none() };
+                    // Live (ui-parity sketch-offset): a click on empty space drops the preview; nothing is made.
+                    if self.offset_pending.take().is_some() {
+                        self.selection.clear();
+                        return EditOutcome::redraw();
+                    }
+                    return EditOutcome::none();
                 }
                 if self.offset_repeat && self.offset_pending.is_none() {
                     // Later clicks offset by the same distance right away.
@@ -1901,7 +1907,9 @@ impl SketchEditor {
                     }
                     None => self.start_offset(&data.sketch, ids),
                 }
-                self.message = Some("Set the offset distance (drag or click the arrow), then press Enter".into());
+                self.selection = self.offset_pending.clone().unwrap_or_default();
+                // Live shows no prompt for it.
+                self.message = None;
                 EditOutcome::redraw()
             }
             Tool::Mirror => {
@@ -2267,11 +2275,11 @@ impl SketchEditor {
     pub fn commit_offset(&mut self, data: &mut SketchData) -> EditOutcome {
         let d = self.offset_signed();
         let Some(ids) = self.offset_pending.take() else { return EditOutcome::none() };
+        self.selection.retain(|e| !ids.contains(e));
         match data.sketch.offset(&ids, d) {
             Ok(r) => {
                 self.offset_repeat = true;
                 self.finish_create(data, &r.created);
-                self.message = Some("Click more curves to offset them by the same distance".into());
                 // Live (qa4 OFF-BOX): Enter creates the offset and opens its
                 // distance's value box, the value pre-selected.
                 let dist = r.constraints_added.iter().copied().find(|c| matches!(data.sketch.constraint(*c).map(|c| &c.kind), Some(ConstraintKind::Distance { .. })));
@@ -8457,7 +8465,13 @@ mod tests {
         d.sketch.add_line(v(0.01, 0.03), v(0.03, 0.03));
         click(&mut ed, &mut d, v(0.02, 0.01));
         assert!(ed.offset_pending.is_some(), "picking a curve previews the offset");
+        assert_eq!(ed.selection, vec![l1], "the picked curve stays selected (live)");
         assert_eq!(count(&d, EntityKind::Line), 2, "nothing is created yet");
+        // Live (ui-parity sketch-offset): a click on empty space drops the preview.
+        click(&mut ed, &mut d, v(0.08, 0.08));
+        assert!(ed.offset_pending.is_none() && ed.selection.is_empty());
+        assert_eq!(count(&d, EntityKind::Line), 2);
+        click(&mut ed, &mut d, v(0.02, 0.01));
         let (base, tip) = ed.offset_arrow(&d.sketch).unwrap();
         // drag the arrow to the other side: 4 mm below the line
         ed.pointer_move(&mut d, tip, false, false);

@@ -723,6 +723,10 @@ impl PartStudioView {
                 let tool = self.sketch.as_ref().map(|s| s.tool);
                 let overlay_pressed = self.sketch.as_ref().is_some_and(|s| s.pressed_label.is_some() || s.pressed_glyph.is_some());
                 if !overlay_pressed && tool == Some(Tool::Use) {
+                    // The GPU hover may lag a quick click: the edge under the pointer then.
+                    if self.hover.is_none() {
+                        self.hover = self.model_edge_at(*position, cx);
+                    }
                     self.use_hovered(window, cx);
                     return true;
                 }
@@ -3557,10 +3561,10 @@ impl PartStudioView {
                         leader = true;
                         (x, y, -27.0 - 22.0 * kf, -26.0)
                     } else if let Some((nx, ny)) = line_side(g.entity) {
-                        // Shown only because its line is hovered (Show
-                        // constraints off): the row sits ~40 px on the other
-                        // side, above a horizontal line (live 1938).
-                        let hover_only = !show_all && ed.hover == Some(g.entity) && !ed.selection.contains(&g.entity) && !ed.selected_constraints.contains(&g.constraint);
+                        // Shown only because its line is (or just was)
+                        // hovered (Show constraints off): the row sits ~40 px
+                        // on the other side, above a horizontal line (live 1938).
+                        let hover_only = !show_all && !ed.selection.contains(&g.entity) && !ed.selected_constraints.contains(&g.constraint);
                         let off = if hover_only { -39.0 } else { 20.5 };
                         (x + nx * off, y + ny * off, -10.0 - 11.0 * (n - 1.0) + 22.0 * kf, -10.0)
                     } else if g.icon == "flow" {

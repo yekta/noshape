@@ -4021,19 +4021,12 @@ impl AssemblyView {
             lines.push("Limits".into());
         }
         if !m.limits.is_empty() {
-            let mut ls = Vec::new();
-            for (k, l) in &m.limits {
-                let label = match k.as_str() {
-                    "rz" => "Z angle",
-                    "x" => "X",
-                    "y" => "Y",
-                    "cone" => "Cone angle",
-                    _ => "Z",
-                };
-                let t = |e: &Option<ExprValue>| e.as_ref().map(|e| e.text.clone()).unwrap_or_else(|| "–".into());
-                ls.push(format!("{label} {} to {}", t(&l.min), t(&l.max)));
+            // Live (audit 1943 (3)): "Limits", then each set limit's value on
+            // its own row (the card draws the Z-min / Z-max icon before it).
+            lines.push("Limits".into());
+            for (_, l) in &m.limits {
+                lines.extend([&l.min, &l.max].into_iter().flatten().map(|e| e.text.clone()));
             }
-            lines.push(format!("Limits: {}", ls.join(", ")));
         }
         if t.has_simulation_connection() {
             lines.push("Simulation connection".into());

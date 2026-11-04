@@ -1,5 +1,24 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-04 01:02 UTC)
+Since 23:22 landed: Show constraints default off (6083a99f); live's two assembly recordings match (0e2eb1cf: the
+list's root "start <name> asm" row, Origin, "Mate features (n)"; the full mate dialog; a mate row is a FEATURE item
+that an instance click keeps; README "start" documents it); live's 38-row audit (behaviours "skasm (2026-11-03
+23:11, P3) assembly parity audit") applied (5da7fdaa: snap drag release keeps the place, no mate; triad handle
+right-click = its items + the instance menu, "Rotate 90 deg"; no cone apex inference; Origin row ignored by a mate
+dialog; Ball cone "No maximum"; no Fix for a subassembly; right-click joins the selection). parity_assemblies: 10/10
+documents as live, 13/13 mates (asm-dx + models/asm-*; data rsynced to vibe5:~/agents/skasm/parity-asm). Sketch:
+Mirror takes a lone preselected line as its line; the recorder reads the sketch prompt as `message`; the fillet /
+polygon / offset hints removed (live has none); Offset keeps its picks selected, an empty click drops the preview;
+a lingering hover badge sits at the hover offset (sketch-equal / sketch-offset match). Use falls back to the model edge under the pointer when the GPU hover lags (sketch-use-edges); the mate row tooltip
+lists a limit's values on their own rows (audit (3) card). Sketch recordings (live's newest, /root/parity/ui/live):
+78 of 81. Left: sketch-delete-line / -vertical-constraint (live selected nothing at a line's midpoint) and
+sketch-extend-to-line (a quick click selects nothing): live's 1937 rule ("a rested midpoint click selects nothing")
+was tried and reverted: 9 recordings, several made after live's runner started resting (22:02-22:15), select the
+line there, so live is inconsistent; ours selects the line. Asked of live 00:22: E1 vs audit (4) (two connectors
+on one instance), triad right-click without a prior click, snap drag of a top-level instance. The Line value box
+(1952) is answered: live = ours.
+
 ## Resume here (2026-11-03 23:22 UTC)
 Lead's 22:3x round: (1) SKETCH-SPLINE-END-DERIVATIVES closed (handles drawn, drag, a handle alone dimensions as its
 length). (2) Assembly speed measured (Speed targets below: every PLAN target met; a1000 insert 22 ms is the worst,
