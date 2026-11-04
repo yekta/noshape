@@ -154,6 +154,94 @@ fn face_loop(f: &Shape, moved: &[(Shape, Move)], all: &[Shape]) -> FResult<FaceL
     Ok((pts, sides, froms))
 }
 
+/// An old edge's index and its new segment (start, end).
+type Segment = (usize, DVec3, DVec3);
+
+/// A face with curved edges whose straight edges move: its other edges kept as they are, a moved edge's straight
+/// neighbours run to its new ends (a curved neighbour of a moved edge isn't supported). The face and each old
+/// straight edge's new segment.
+fn change_curved_face(f: &Shape, moved: &[(Shape, Move)], all: &[Shape]) -> FResult<(Shape, Vec<Segment>)> {
+    let wires = f.wires();
+    if wires.len() != 1 {
+        return err("Edges of faces with holes cannot be changed yet");
+    }
+    let n = normal(f)?;
+    // The loop's edges in order, each with its start and end along the loop.
+    let mut rest: Vec<(Shape, DVec3, DVec3)> = wires[0].edges().into_iter().map(|e| e.edge_info().map(|i| (e, i.start, i.end)).map_err(fe)).collect::<FResult<_>>()?;
+    let mut order: Vec<(Shape, DVec3, DVec3)> = vec![rest.swap_remove(0)];
+    while !rest.is_empty() {
+        let at = order[order.len() - 1].2;
+        let Some(k) = rest.iter().position(|(_, a, b)| a.distance(at) < TOL || b.distance(at) < TOL) else { return err("A face boundary is not closed") };
+        let (e, a, b) = rest.swap_remove(k);
+        order.push(if a.distance(at) < TOL { (e, a, b) } else { (e, b, a) });
+    }
+    let m = order.len();
+    let straight = |e: &Shape| e.edge_info().is_ok_and(|i| matches!(i.curve, k::Curve::Line { .. }));
+    let mv = |e: &Shape| moved.iter().find(|(x, _)| x.is_same(e)).map(|x| x.1);
+    let area: DVec3 = (0..m).map(|k| order[k].1.cross(order[(k + 1) % m].1)).sum();
+    let ccw = area.dot(n) > 0.0;
+    // An edge's line where it goes (as `change_edges`' straight faces).
+    let line = |k: usize| -> (DVec3, DVec3) {
+        let (_, p, q) = &order[k];
+        let d = (*q - *p).normalize();
+        let out = if ccw { d.cross(n) } else { n.cross(d) };
+        match mv(&order[k].0) {
+            None => (*p, d),
+            Some(Move::Offset(o)) => (*p + out * o, d),
+            Some(Move::Onto(o, pm)) => {
+                let den = out.dot(pm);
+                let t = if den.abs() < 1e-12 { 0.0 } else { (o - *p).dot(pm) / den };
+                (*p + out * t, d)
+            }
+        }
+    };
+    // The new corner at each edge's start where it or the one before moves.
+    let mut start: Vec<DVec3> = order.iter().map(|x| x.1).collect();
+    for k in 0..m {
+        let prev = (k + m - 1) % m;
+        if mv(&order[prev].0).is_none() && mv(&order[k].0).is_none() {
+            continue;
+        }
+        if !straight(&order[prev].0) || !straight(&order[k].0) {
+            return err("Only straight edges next to a changed edge can be changed yet");
+        }
+        let ((p0, d0), (p1, d1)) = (line(prev), line(k));
+        let c = d0.cross(d1);
+        if c.length_squared() < 1e-20 {
+            continue;
+        }
+        let t = (p1 - p0).cross(d1).dot(c) / c.length_squared();
+        start[k] = p0 + d0 * t;
+    }
+    let mut edges = Vec::with_capacity(m);
+    let mut segments = Vec::new();
+    for k in 0..m {
+        let (e, a, b) = &order[k];
+        let (s0, s1) = (start[k], start[(k + 1) % m]);
+        let from = all.iter().position(|x| x.is_same(e));
+        if s0.distance(*a) < TOL && s1.distance(*b) < TOL {
+            edges.push(e.clone());
+            if let (Some(j), true) = (from, straight(e)) {
+                segments.push((j, s0, s1));
+            }
+            continue;
+        }
+        if !straight(e) {
+            return err("Only straight edges next to a changed edge can be changed yet");
+        }
+        edges.push(k::make_line(s0, s1).map_err(fe)?);
+        if let Some(j) = from {
+            segments.push((j, s0, s1));
+        }
+    }
+    let wire = k::make_wire(&edges).map_err(fe)?;
+    let mut face = k::make_face_on(f, &wire).map_err(fe)?;
+    if normal(&face)?.dot(n) < 0.0 {
+        face = face.reversed().map_err(fe)?;
+    }
+    Ok((face, segments))
+}
+
 /// The one offset every one of a sheet's `n` edges moves by, if they all do.
 fn uniform_offset(offsets: &BTreeMap<usize, Move>, n: usize) -> Option<f64> {
     if offsets.len() != n {
@@ -222,16 +310,33 @@ fn change_edges(shape: &Shape, offsets: &BTreeMap<usize, Move>) -> FResult<(Shap
     {
         return offset_face(f, o);
     }
+    // Faces no edge of which moves stay as they are; a face with curved edges (a dogbone's arcs) is changed apart.
+    let touched = |f: &Shape| f.edges().iter().any(|e| moved.iter().any(|(m, _)| m.is_same(e)));
+    let curved = |f: &Shape| f.edges().iter().any(|e| e.edge_info().is_ok_and(|i| !matches!(i.curve, k::Curve::Line { .. })));
+    let mut kept: Vec<Option<Shape>> = Vec::with_capacity(faces.len());
+    let mut segments: Vec<(usize, DVec3, DVec3)> = Vec::new();
     let mut loops = Vec::new();
+    let mut loop_faces = Vec::new();
     for f in &faces {
         if f.face_plane().map_err(fe)?.is_none() {
             return err("Only edges of planar faces can be changed yet");
         }
+        if !touched(f) {
+            kept.push(Some(f.clone()));
+            continue;
+        }
+        if curved(f) {
+            let (face, segs) = change_curved_face(f, &moved, &edges)?;
+            segments.extend(segs);
+            kept.push(Some(face));
+            continue;
+        }
+        kept.push(None);
         let (pts, sides, froms) = face_loop(f, &moved, &edges)?;
         loops.push((normal(f)?, pts, sides, froms));
+        loop_faces.push(f.clone());
     }
-    // Each old edge's segment where it goes (moved by its offset).
-    let mut segments: Vec<(usize, DVec3, DVec3)> = Vec::new();
+    // Each old edge's segment where it goes (moved by its offset): `segments`, above.
     // New corners where a moved side meets its neighbours, per face; a side
     // moved off a collinear neighbour (a partial flange's piece of an edge,
     // live request 1599 (a)) steps across to it: two corners.
@@ -287,11 +392,11 @@ fn change_edges(shape: &Shape, offsets: &BTreeMap<usize, Move>) -> FResult<(Shap
         }
         corners.push(own);
     }
-    let mut built = Vec::new();
-    for (((n, pts, _, _), f), corners) in loops.iter().zip(&faces).zip(&corners) {
+    let mut rebuilt = Vec::new();
+    for (((n, pts, _, _), f), corners) in loops.iter().zip(&loop_faces).zip(&corners) {
         let new: Vec<DVec3> = pts.iter().flat_map(|p| corners.iter().find(|(o, _)| o.distance(*p) < TOL).map_or(vec![*p], |x| x.1.clone())).collect();
         if new.len() == pts.len() && new.iter().zip(pts).all(|(a, b)| a.distance(*b) < TOL) {
-            built.push(f.clone());
+            rebuilt.push(f.clone());
             continue;
         }
         let wire = k::make_polyline(&new, true).map_err(fe)?;
@@ -299,8 +404,11 @@ fn change_edges(shape: &Shape, offsets: &BTreeMap<usize, Move>) -> FResult<(Shap
         if normal(&face)?.dot(*n) < 0.0 {
             face = face.reversed().map_err(fe)?;
         }
-        built.push(face);
+        rebuilt.push(face);
     }
+    // In the faces' order.
+    let mut rebuilt = rebuilt.into_iter();
+    let mut built: Vec<Shape> = kept.into_iter().map(|k| k.or_else(|| rebuilt.next())).collect::<Option<Vec<_>>>().ok_or_else(|| fe("A changed face is missing"))?;
     // A new edge is the old edge it lies along (the one whose segment holds
     // its middle, else the nearest of those on its line).
     let edge_from = |result: &Shape| -> Vec<Option<usize>> {

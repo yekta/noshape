@@ -3800,6 +3800,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   follow their body through opTransform (they're found where they lie; T1 ops_harness splitSheet: a moved piece
   keeps its split edge). Fold SM 1 now fails at its opEdgeChange: the definition face has the dogbone's arcs, and our
   opEdgeChange rebuilds straight-sided faces only ("Only straight edges can be changed yet"): next.
+  dx 11-04 18:09: opEdgeChange keeps faces no moved edge is on, and changes a face with arcs (the dogbone's) by its
+  straight edges, the rest kept: Fold SM 1 runs (no custom feature of the document fails now; 274 ms, live 270 ms).
+  Its result is 2 parts (live 1): the sheets join, but the joined edge gets no BEND attribute, since the studio's
+  tracking of the split's edges (edgeForTransform) loses them through the edge changes and the union (they moved,
+  then the union renamed them). Next: tracking an edge through opEdgeChange and a sheet union. Run 74: 37/55,
+  366/471 (custom 38/109), documents with custom features failing 5 -> 4.
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our
@@ -3974,7 +3980,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (booleanStepEditLogic's evCollision) only in the dialog. Now only for RegenOptions::touch_probe, the new feature
   the app's or the agent API's dialog is open on (its cached result keyed apart); T1 model
   features_a::the_touched_parts_probe_runs_only_when_asked.
-  dx 11-04 18:01, cf-spur-gear (×2.5: 4.95 s, live 2.11 s), with NOSHAPE_FS_PROFILE=1 (each custom feature's slowest
+  dx 11-04 17:58, cf-spur-gear (×2.5: 4.95 s, live 2.11 s), with NOSHAPE_FS_PROFILE=1 (each custom feature's slowest
   FeatureScript lines on stderr; parity runner or CLI): the Spur Gear feature's 2.0 s is 1.7 s in one opBoolean (its
   "hobbed" subtraction of the 20 patterned teeth from the blank, studio line 348) and 0.3 s FeatureScript; with
   Boolean 2's 1.6 s, the document's time is the Booleans' (bool). Its first difference (3 parts, live 2) is that
