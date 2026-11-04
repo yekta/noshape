@@ -215,8 +215,8 @@ fn file_checks() -> Checker {
 /// Once, on the first launch of an installed (release) app: offer what isn't
 /// set up yet, if anything is (checked first: this isn't a click).
 pub fn first_launch(cx: &mut App) {
-    // "setup-offered" (before 11-04) was written even when nothing showed: everyone sees the status once more.
-    let flag = noshape_app_core::paths::config_dir().join("setup-shown");
+    // Once per install, ever (not per update); Help › Connect to coding agents… shows the same status any time.
+    let flag = noshape_app_core::paths::config_dir().join("setup-offered");
     let installed = option_env!("NOSHAPE_VERSION").is_some() && !cfg!(debug_assertions);
     let quiet = ["NOSHAPE_NO_SETUP_PROMPT", "NOSHAPE_NO_NATIVE_DIALOGS", "NOSHAPE_SMOKE"].iter().any(|k| std::env::var_os(k).is_some());
     if !installed || quiet || flag.exists() {
