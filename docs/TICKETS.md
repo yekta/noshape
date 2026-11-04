@@ -3616,7 +3616,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   dx 11-04 08:12: cf-fill-pattern's first Fill pattern now runs (it failed in 56 ms before) and takes ~34 s (37 s in
   run 56; live's whole document 4.7 s): our sheet metal rebuild of a plate with ~1,735 holes 12 s, std's
   separateEntitiesForFacePattern 7.8 s, the instance loop's qCreatedBy(targetFace) 9.8 s (every face's creator,
-  ~2 ms a call). dx's (FeatureScript host); handoff/dx.md 11-04 08:04. dx 08:50: face creators cached by name (cleared
+  ~2 ms a call). dx's (FeatureScript host); handoff/dx.md 11-04 08:04. dx 08:28: face creators cached by name (cleared
   when operations or adoptions change) and attributes indexed by entity in CtxState: the loop 7.9 -> 4.4 s, the
   document 37 -> 33 s; left: the rebuild 12 s, std's assignSMAttributesToNewOrSplitEntities 7.2 s (its own loops).
 - [ ] P2 FS-SPLIT-FACE-CREATED (core / custom; dx's FeatureScript corpus 11-03, cf-setback-fillet) after `opSplitFace`
