@@ -103,6 +103,26 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   15 faces, 23 edges, 0 vertices after it (live.jsonl): Parasolid's bore rim is one closed edge with no vertex, so
   splitting it at our seam would add an edge live doesn't have. Taking that cut means the circle crossing the face's
   seam in the parameter plane only (two curves there of one edge, no vertex); not done.
+- PARITY-SPEED by Boolean time (bool, 11-05 00:52; the whole suite with NOSHAPE_X_DECL + NOSHAPE_KERNEL_PROFILE on
+  vibe4, two regenerations each): cf-straight-spline 46 s (OCCT's, after our declines: the cutters' sub-micron
+  conflicts), cf-drive-train-generator 19.8 s (ours: all 14 cuts taken, 2.2x OCCT's; recorded exactly vibe4
+  ~/agents/bool-corpora/drive-train), cf-spur-gear 10 s (ours), cf-sheet-metal-model-plus 7 s (OCCT's: a glued fuse,
+  a262e1bb in ~/agents/bool-corpora/smplus, declines "a piece's point on another solid's face": end faces 26 um apart
+  at the tolerance of tolerant inputs). Landed for the gears: par_map on rayon's shared pool (a new thread per worker
+  per call was 9 % of a drive-train cut), an arc's quick box from its sweep (a big circle's short arc had its whole
+  circle's box: 136k section-boundary pairs not rejected), a face boundary's span boxes kept (distances to it). vibe3
+  A/B against main: drive-train -15 %, cf-spur-gear -6 %, corpus5 small -6 %, motor-mount-jack unchanged; corpora
+  and Shell's recordings the same (a7bdd15ba4f8613a's unified volume 3.4e-7 off OCCT's came with main, not this).
+  Next there: intervals_on's numeric crossings and distances on the gears' faces (OCCT-accurate mapped curves).
+- motor-mount-jack's Fillet 2 (bool, 11-05 00:12): stepped seams on branch bool-jog (8e4efc6b9, in bool-c), not
+  landed. A full cylinder's seam in two steps (rulings at two angles joined by arcs at one height: core's seam
+  movers) maps above and below the step from its own ruling (Surf::Cyl jog, Surf::at_height, GFace::surf_for; the
+  step arc's two copies; a vertex's place at either step's angles), a curve across the step declines, a section
+  circle at the step starts at the step's lower corner; rust_boolean.cpp places a new edge's curve in the turn of the
+  input face's seam ruling at its height. Fillet 2's cut then goes past its seam to the tool: a ring 1.5 um thick whose
+  two rim circles (r 9.5) both lie on the tube's end annulus (0:12, 0:13) within the tolerance, two edges on one
+  circle there ("no point inside a face piece", the grey band again). It declines at 34 ms instead of 10 (OCCT 72):
+  slower for the document, nothing else in the suite has stepped seams, so not landed.
 - Deadlines (bool, 11-04 22:38, lead P1: kernel_core::a_deadline_stops_a_long_operation failed on macOS, Ok(906)):
   with_deadline's watcher looks first at 50 ms, so a fast machine finished the 900-hole cut under a 10 ms deadline.
   Now with_deadline(0.0) is stopped from the start (the test uses it: deterministic on every platform). Our Boolean's

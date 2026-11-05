@@ -4,7 +4,7 @@
 
 use crate::nurbs::NurbsCurve;
 use glam::{DVec2, DVec3};
-use std::f64::consts::TAU;
+use std::f64::consts::{PI, TAU};
 use std::sync::{Arc, OnceLock};
 
 /// A segment from `a` to `b`, an arc of the circle (`c`, `r`) from angle `a0` through `sweep` (positive:
@@ -640,7 +640,14 @@ impl C2 {
         let hull = |q: &mut dyn Iterator<Item = DVec2>| q.fold((DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY)), |(l, h), x| (l.min(x), h.max(x)));
         match *self {
             C2::Seg { a, b } => Some((a.min(b), a.max(b))),
-            C2::Arc { c, r, .. } => Some((c - DVec2::splat(r), c + DVec2::splat(r))),
+            // (Its ends' and its quarter points' box: a short arc of a big circle isn't its circle's box.)
+            C2::Arc { c, r, a0, sweep } => Some(
+                [a0, a0 + sweep]
+                    .into_iter()
+                    .chain((0..4).map(|k| k as f64 * 0.5 * PI).filter(|&a| C2::arc_t(a0, sweep, a).is_some()))
+                    .map(|a| c + dir(a) * r)
+                    .fold((DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY)), |(l, h), x| (l.min(x), h.max(x))),
+            ),
             C2::Nurbs { ref c, t0, t1 } => Some(hull(&mut c.poles_of(t0, t1).iter().map(|p| p.truncate()))),
             C2::Mapped { ref c, t0, t1, m } => Some(mapped_box(c, t0, t1, &m)),
             C2::Trig { .. } | C2::Hyp { .. } | C2::Conic { .. } => None,
@@ -942,15 +949,20 @@ fn away(b: (DVec2, DVec2), p: DVec2) -> f64 {
 
 /// The distance from `p` to the nearest of `edges`.
 pub(crate) fn distance(p: DVec2, edges: &[C2]) -> f64 {
+    distance_with(p, edges, &[])
+}
+
+/// [`distance`], the curves' spans' boxes from `spans` (one per curve, by [`C2::span_boxes2`]; none: made each time).
+pub(crate) fn distance_with(p: DVec2, edges: &[C2], spans: &[SpanBoxes]) -> f64 {
     // Nearest box first; none whose box is farther than the nearest found yet.
-    let mut order: Vec<(f64, &C2)> = edges.iter().map(|e| (e.quick_box().map_or(0.0, |(lo, hi)| (lo - p).max(p - hi).max(DVec2::ZERO).length()), e)).collect();
+    let mut order: Vec<(f64, usize)> = edges.iter().enumerate().map(|(i, e)| (e.quick_box().map_or(0.0, |(lo, hi)| (lo - p).max(p - hi).max(DVec2::ZERO).length()), i)).collect();
     order.sort_by(|a, b| a.0.total_cmp(&b.0));
     let mut best = f64::INFINITY;
-    for (away, e) in order {
+    for (away, i) in order {
         if away >= best {
             break;
         }
-        best = best.min(e.distance(p));
+        best = best.min(edges[i].distance_by(p, spans.get(i)));
     }
     best
 }

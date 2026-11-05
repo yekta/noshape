@@ -15,7 +15,7 @@
 //! or parallel to it: then surfaces meet in lines along the axis or circles around it.
 
 use crate::arrange::{deeper, regions, Region};
-use crate::curve2::{distance as distance2, inside as inside2, Map, C2};
+use crate::curve2::{distance as distance2, distance_with, inside as inside2, Map, SpanBoxes, C2};
 use crate::freeform::FreeSurface;
 use crate::nurbs::NurbsCurve;
 use crate::pattern::Rigid;
@@ -243,6 +243,8 @@ struct GFace {
     loop_lens: Vec<usize>,
     /// The same in its parameter plane (a seam twice), made when first asked for ([`Ctx::bound`]).
     bound: std::sync::OnceLock<R<Vec<C2>>>,
+    /// Its curves' spans' boxes, made when first asked for ([`Ctx::bound_distance`]).
+    bound_spans: std::sync::OnceLock<Vec<SpanBoxes>>,
     /// Each of those curves' sample points, made when first asked for (curves crossing it: `intervals_on`).
     bound_pts: std::sync::OnceLock<Vec<std::sync::OnceLock<Vec<DVec2>>>>,
     /// A part of a cylinder or cone going round between rulings at th0 (a thread's helical face): the rulings on
@@ -1095,6 +1097,18 @@ impl Ctx<'_> {
         self.faces[f].bound.get_or_init(make).as_deref().map_err(|e| *e)
     }
 
+    /// The distance from `q` to face `f`'s boundary in its parameter plane.
+    fn bound_distance(&self, f: usize, q: DVec2) -> R<f64> {
+        let b = self.bound(f)?;
+        Ok(distance_with(q, b, self.bound_spans(f)?))
+    }
+
+    /// Face `f`'s boundary curves' spans' boxes ([`distance_with`]).
+    fn bound_spans(&self, f: usize) -> R<&[SpanBoxes]> {
+        let b = self.bound(f)?;
+        Ok(self.faces[f].bound_spans.get_or_init(|| b.iter().map(|c| c.span_boxes2()).collect()))
+    }
+
     fn seg_at(&self, s: &Seg, t: f64) -> DVec3 {
         match s.g {
             Geo::Line => self.p(s.v[0]).lerp(self.p(s.v[1]), t),
@@ -1216,10 +1230,11 @@ impl Ctx<'_> {
         // Where it meets the face's boundary.
         let mut cuts: Vec<(f64, End)> = vec![(t0, ends[0]), (t1, ends[1])];
         let bound = self.bound(f)?.to_vec();
+        let spans = self.bound_spans(f)?;
         // (OCCT's curve ending on the boundary, as it does at the face's parameter bounds: a point there.)
         if let Path::Nurbs { .. } = path {
             for (k, u) in [(0, 0.0), (1, 1.0)] {
-                if ends[k] == End::Open && distance2(c2.at(u), &bound) <= tol {
+                if ends[k] == End::Open && distance_with(c2.at(u), &bound, spans) <= tol {
                     cuts[k].1 = End::Point(path.at(cuts[k].0));
                 }
             }
@@ -1316,11 +1331,11 @@ impl Ctx<'_> {
             } else {
                 c2.at(((a.0 + b.0) * 0.5 - t0) / (t1 - t0))
             };
-            let dist = distance2(mid, &bound);
+            let dist = distance_with(mid, &bound, spans);
             if let (Path::Nurbs { .. }, true) = (path, dist > GREY * tol) {
                 // (The distance's local minima along it, each narrowed down.)
                 let margin = 3.0 * GREY * tol;
-                let d = |t: f64| distance2(c2.at((t - t0) / (t1 - t0)), &bound);
+                let d = |t: f64| distance_with(c2.at((t - t0) / (t1 - t0)), &bound, spans);
                 let ts: Vec<f64> = (0..=32).map(|k| a.0 + (b.0 - a.0) * k as f64 / 32.0).collect();
                 let ds: Vec<f64> = ts.iter().map(|&t| d(t)).collect();
                 for k in 1..32 {
@@ -1356,7 +1371,7 @@ impl Ctx<'_> {
             } else if dist <= GREY * tol {
                 // Judged where it is farthest from the boundary (a shallow helix rising from a rod's end, an arc
                 // nearly tangent to a face's edge), if that is clearly off it; else ambiguous.
-                let far = (1..8).map(|k| c2.at(((a.0 + (b.0 - a.0) * k as f64 / 8.0) - t0) / (t1 - t0))).map(|q| (distance2(q, &bound), q)).max_by(|x, y| x.0.total_cmp(&y.0));
+                let far = (1..8).map(|k| c2.at(((a.0 + (b.0 - a.0) * k as f64 / 8.0) - t0) / (t1 - t0))).map(|q| (distance_with(q, &bound, spans), q)).max_by(|x, y| x.0.total_cmp(&y.0));
                 // (OCCT's curve is within its tolerance of the faces' section: two of them off is clear.)
                 let clear = if let Path::Nurbs { .. } = path { 2.0 } else { 3.0 };
                 // (Within the grey band all along: on the boundary, as within the tolerance (OCCT's section within
@@ -3160,24 +3175,28 @@ pub(crate) fn par_map<T: Send>(n: usize, f: &(dyn Fn(usize) -> T + Sync)) -> R<V
         }
         out
     };
-    // (The calling thread works too: a budget's deadline on its CPU clock goes on running.)
-    let mut parts: Vec<Vec<(usize, T)>> = std::thread::scope(|sc| {
-        let hs: Vec<_> = (1..threads)
-            .map(|_| {
-                sc.spawn(|| {
-                    crate::set_thread_cancel(flag);
-                    let back = state.map(|(h, s)| (h, (h.enter)(s)));
-                    let out = work();
-                    if let Some((h, b)) = back {
-                        (h.leave)(b);
-                    }
-                    out
-                })
-            })
-            .collect();
+    // (On the shared pool's threads (new threads each time were 9 % of a gear's cut), each with the caller's
+    // cancel flag and the kernel's state, its own back after; the calling thread works too: a budget's deadline on
+    // its CPU clock goes on running.)
+    let found = std::sync::Mutex::new(Vec::with_capacity(threads));
+    rayon::in_place_scope(|sc| {
+        for _ in 1..threads {
+            sc.spawn(|_| {
+                let own = crate::thread_cancel();
+                crate::set_thread_cancel(flag);
+                let back = state.map(|(h, s)| (h, (h.enter)(s)));
+                let out = work();
+                if let Some((h, b)) = back {
+                    (h.leave)(b);
+                }
+                crate::set_thread_cancel(own);
+                found.lock().expect("a worker's part").push(out);
+            });
+        }
         let mine = work();
-        std::iter::once(mine).chain(hs.into_iter().map(|h| h.join().expect("a worker"))).collect()
+        found.lock().expect("a worker's part").push(mine);
     });
+    let mut parts = found.into_inner().expect("the parts");
     crate::check_cancel()?;
     let mut all: Vec<(usize, T)> = parts.drain(..).flatten().collect();
     all.sort_by_key(|x| x.0);
@@ -3498,7 +3517,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 Some(fs) => free::nurbs_surf(fs, uvbox, f.reversed),
                 None => s,
             };
-            cx.faces.push(GFace { arg: a, index: i as u32, t: body.face_tol.get(i).copied().unwrap_or(0.0), solid: usize::MAX, s, edges, loop_lens, bound: Default::default(), bound_pts: Default::default(), right: Vec::new(), wrap_eps: 0.0, lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default(), hulls: Default::default(), inner: body.face_inner_edges.iter().filter(|x| x[0] as usize == i).map(|x| first_edge[ai] + x[1] as usize).collect() });
+            cx.faces.push(GFace { arg: a, index: i as u32, t: body.face_tol.get(i).copied().unwrap_or(0.0), solid: usize::MAX, s, edges, loop_lens, bound: Default::default(), bound_spans: Default::default(), bound_pts: Default::default(), right: Vec::new(), wrap_eps: 0.0, lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default(), hulls: Default::default(), inner: body.face_inner_edges.iter().filter(|x| x[0] as usize == i).map(|x| first_edge[ai] + x[1] as usize).collect() });
         }
         for (i, s) in body.solids.iter().enumerate() {
             let si = cx.solids.len();
@@ -4722,7 +4741,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             if beyond(&r) {
                 continue;
             }
-            let mut dist = distance2(r.inside, cx.bound(f)?);
+            let mut dist = cx.bound_distance(f, r.inside)?;
             // (A piece a few tolerances across (two coplanar knurl tool caps' corners overlapping in 3 um): its
             // first point can be in the grey band of a side that is another face's boundary.)
             let (lo, hi) = r.outer.iter().flat_map(|&(sg, _)| lsegs[sg as usize].0).fold((DVec2::INFINITY, DVec2::NEG_INFINITY), |(lo, hi), w| (lo.min(pts[w as usize]), hi.max(pts[w as usize])));
@@ -4730,7 +4749,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             if dist <= GREY * tol || small {
                 // (A thin piece: a point farther in.)
                 r.inside = deeper(&lsegs, &r);
-                dist = distance2(r.inside, cx.bound(f)?);
+                dist = cx.bound_distance(f, r.inside)?;
             }
             if dist <= tol {
                 return Err(Decline("a piece's point near its face's boundary"));
@@ -4895,7 +4914,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                     continue;
                 }
                 let q = cx.faces[g].to2(pieces[pi].inside);
-                let d = distance2(q, cx.bound(g)?);
+                let d = cx.bound_distance(g, q)?;
                 let p = pieces[pi].inside;
                 let same = cx.normal_at(g, p).dot(cx.normal_at(f, p)) > 0.0;
                 let inside = if d <= GREY * tol {
