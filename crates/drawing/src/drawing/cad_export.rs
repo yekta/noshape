@@ -366,7 +366,43 @@ pub fn to_dxf_sheets(sheets: &[(String, SheetGeometry, [f64; 2])], insunits: u8,
     }
     let mut doc = cad_document_sheets(sheets, insunits, version)?;
     strip_layouts_r14(&mut doc, version);
+    live_line_types(&mut doc, version);
     DxfWriter::new(&doc).write_to_vec().map(caret_breaks).map_err(|e| e.to_string())
+}
+
+/// Live's line type table: ByBlock, ByLayer, Continuous and only the types a layer or an entity uses (DASHED with
+/// HIDDEN), in its order; Release 13 / 14 name the three (and $CELTYPE, $CMLSTYLE) in capitals, as their layers (live
+/// 1857's corpus drawings: CENTER alone; drw2-k-dxfR14 / -dxf2018: DASHED, HIDDEN, ONS_PHANTOM, CENTER).
+fn live_line_types(doc: &mut CadDocument, version: DxfVersion) {
+    let mut used: std::collections::HashSet<String> = doc.layers.iter().map(|l| l.line_type.clone()).collect();
+    used.extend(doc.entities().map(|e| e.common().linetype.clone()));
+    if used.contains("HIDDEN") {
+        used.insert("DASHED".into());
+    }
+    let upper = version <= DxfVersion::AC1014;
+    let mut kept = Vec::new();
+    for name in ["ByBlock", "ByLayer", "Continuous", "DASHED", "HIDDEN", "ONS_PHANTOM", "CENTER", "DOTTED"] {
+        let Some(mut lt) = doc.line_types.remove(name) else { continue };
+        if name.starts_with("By") || name == "Continuous" || used.contains(name) {
+            if upper {
+                lt.name = lt.name.to_uppercase();
+            }
+            kept.push(lt);
+        }
+    }
+    for lt in kept {
+        let _ = doc.line_types.add(lt);
+    }
+    if upper {
+        doc.header.current_linetype_name = doc.header.current_linetype_name.to_uppercase();
+        doc.header.multiline_style = doc.header.multiline_style.to_uppercase();
+        for l in doc.layers.iter_mut().filter(|l| l.line_type == "Continuous") {
+            l.line_type = "CONTINUOUS".into();
+        }
+        for e in doc.entities_mut().filter(|e| e.common().linetype == "Continuous") {
+            e.common_mut().linetype = "CONTINUOUS".into();
+        }
+    }
 }
 
 /// Release 13 / 14 DXF has no layouts (LAYOUT objects came with 2000): live
@@ -1405,6 +1441,7 @@ pub fn to_dwg_pages(pages: &[SheetGeometry], insunits: u8, version: DxfVersion) 
 pub fn to_dxf_version(g: &SheetGeometry, insunits: u8, version: DxfVersion) -> Result<Vec<u8>, String> {
     let mut doc = cad_document(g, insunits, version)?;
     strip_layouts_r14(&mut doc, version);
+    live_line_types(&mut doc, version);
     DxfWriter::new(&doc).write_to_vec().map(caret_breaks).map_err(|e| e.to_string())
 }
 
@@ -1511,6 +1548,39 @@ mod tests {
         assert_eq!(&dwt[..6], b"AC1027");
         let dxf = String::from_utf8(to_dxf_version(&g, 1, DxfVersion::AC1015).unwrap()).unwrap();
         assert!(dxf.contains("AC1015") && dxf.contains("HIDDEN") && dxf.contains("TEXT"));
+    }
+
+    /// Live's line type table: the three standard types and only those in use, Release 14's in capitals
+    /// (samples/dx-drawing-corpus/knob-tim.dxf: BYBLOCK, BYLAYER, CONTINUOUS, CENTER; DASHED and HIDDEN with hidden lines,
+    /// drw2-k-dxfR14; drw2-k-dxf2018 the 2018 names).
+    #[test]
+    fn line_types_as_live() {
+        let mut g = sample();
+        let m = g.mark();
+        g.line([10.0, 10.0], [20.0, 20.0], LineStyle::Centerline);
+        g.line([10.0, 20.0], [20.0, 10.0], LineStyle::Visible);
+        g.cad_since(m, CadLayer::Centermarks);
+        // The LTYPE table's names and the LAYER table's line types, in the file's order.
+        let tables = |version: DxfVersion| -> (Vec<String>, Vec<String>) {
+            let dxf = String::from_utf8(to_dxf_version(&g, 1, version).unwrap()).unwrap();
+            let lines: Vec<&str> = dxf.lines().map(str::trim).collect();
+            let pairs: Vec<(&str, &str)> = lines.chunks(2).filter_map(|c| Some((c[0], *c.get(1)?))).collect();
+            let (mut types, mut layers, mut entry) = (Vec::new(), Vec::new(), "");
+            for (code, v) in pairs {
+                match (code, entry) {
+                    ("0", _) => entry = if v == "LTYPE" || v == "LAYER" { v } else { "" },
+                    ("2", "LTYPE") => types.push(v.to_string()),
+                    ("6", "LAYER") => layers.push(v.to_string()),
+                    _ => {}
+                }
+            }
+            (types, layers)
+        };
+        let (types, layers) = tables(DxfVersion::AC1014);
+        assert_eq!(types, ["BYBLOCK", "BYLAYER", "CONTINUOUS", "DASHED", "HIDDEN", "CENTER"]);
+        assert!(layers.iter().all(|l| l == "CONTINUOUS" || l == "HIDDEN"), "{layers:?}");
+        let (types, _) = tables(DxfVersion::AC1032);
+        assert_eq!(types, ["ByBlock", "ByLayer", "Continuous", "DASHED", "HIDDEN", "CENTER"]);
     }
 
     /// Live (samples/drw2-asbu-aux.dxf): Onshape's layers with their line

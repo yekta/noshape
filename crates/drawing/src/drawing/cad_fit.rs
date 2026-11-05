@@ -64,7 +64,8 @@ fn least_squares(rows: &[Vec<f64>], y: &[f64]) -> Option<Vec<f64>> {
 /// An angle in [0, 2π), with round-off just below 0 (or 2π) giving 0.
 fn wrap(a: f64) -> f64 {
     let w = a.rem_euclid(TAU);
-    if TAU - w < 1e-12 { 0.0 } else { w }
+    // A fitted angle a hair short of a full turn is 0 (live writes 0, not 360: knob-tim's Front view arcs).
+    if TAU - w < 1e-6 { 0.0 } else { w }
 }
 
 /// The signed angle steps along the points about `c`, if they all turn the

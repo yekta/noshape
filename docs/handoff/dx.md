@@ -110,6 +110,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
     have edges of their own (model-core region_edges: each loop's segments, joined only across a lone seam, shared
     by the regions on either side), Reference::SketchRegionEdge. qCreatedBy(sketch, EDGE) gives both, as live: two
     harness tests that offset or probed it took the entity edges / the region vertex. Run 122 unchanged.
+- 13:05 (lead: drawings' parity pass): the corpus drawings (live 1857) rebuilt by /root/dx-scratch/drw/make.sh <doc>
+  (translate, Part 1's suggested views on ANSI_A_INCH, DXF / PDF), compared per layer (dxfcount.py) and entity by
+  entity within 1e-4 in (drw/match.py). knob-tim: every layer's types as live but the core ticket's tangent edge
+  (KNOB-TIM-TANGENT-EDGE-BSPLINE); centermarks and the views' places exact. Fixed: the LTYPE table as live's (the
+  three standard types and only those in use, DASHED with HIDDEN; R12-R14 in capitals, as $CELTYPE / $CMLSTYLE and the
+  layers' CONTINUOUS), arcs ending at 0 not 360. Left, representation only: the isometric silhouettes split where the
+  faces' seams lie (ours vs Parasolid's), ellipses with live's raw Parasolid parameters (beyond 2pi) and major axis
+  sign. pipeflange-steven: its Fillet 2 differs from live (core), so do its views.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
