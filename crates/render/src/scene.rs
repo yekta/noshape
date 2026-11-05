@@ -290,6 +290,9 @@ pub struct Instance {
     /// A see-through part of the Translucent display mode: only its front faces blend over the image (Onshape culls
     /// the back faces).
     pub front_only: bool,
+    /// The faces of a closed solid (consistently wound, outward): opaque and uncut, its back faces are always
+    /// behind its front faces, so the renderer culls them (they were rasterized only to fail the depth test).
+    pub closed: bool,
     /// Translucent meshes drawn through everything (no depth test or write,
     /// after the transparent meshes, before the lines): FeatureScript debug
     /// faces, which Onshape shows behind the model too.
@@ -412,6 +415,7 @@ impl Instance {
             over_transparent: false,
             over_lines: false,
             front_only: false,
+            closed: false,
             on_top: false,
             pick_only: false,
             pick_behind: false,
@@ -447,6 +451,11 @@ impl Instance {
     /// Draw a translucent mesh after the lines and points ([`Instance::over_lines`]).
     pub fn over_lines(mut self) -> Self {
         self.over_lines = true;
+        self
+    }
+    /// See [`Instance::closed`].
+    pub fn closed(mut self) -> Self {
+        self.closed = true;
         self
     }
     /// Only the front faces of this translucent mesh show ([`Instance::front_only`]).

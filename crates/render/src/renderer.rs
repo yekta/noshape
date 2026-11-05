@@ -627,6 +627,17 @@ pub(crate) fn record_pass_times() {
 #[cfg(not(target_vendor = "apple"))]
 pub(crate) fn record_pass_times() {}
 
+/// How a run of opaque faces is drawn (`Lists::opaque_runs`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum FaceKind {
+    /// Closed solids: the discard-free pipeline, back faces culled.
+    Closed,
+    /// The discard-free pipeline.
+    Solid,
+    /// The pipeline that may discard (hidden or dimmed faces, a section).
+    Discard,
+}
+
 /// Per-frame draw lists (reused to avoid per-frame allocation).
 #[derive(Default)]
 struct DrawLists {
@@ -650,10 +661,10 @@ struct DrawLists {
     /// Color pass: `opaque` split in runs drawn without (`true`) or with
     /// the face shader's `discard` (hidden faces, section clipping), as
     /// (end index in `opaque`, solid); see [`DrawLists::order_solid`].
-    opaque_runs: Vec<(usize, bool)>,
+    opaque_runs: Vec<(usize, FaceKind)>,
     /// Prefix counts of HIDDEN or DIM states by pick id (empty: none).
     masked_prefix: Vec<u32>,
-    solid_scratch: Vec<(i32, bool, usize)>,
+    solid_scratch: Vec<(i32, FaceKind, usize)>,
     on_top: Vec<usize>,
     lines: Vec<usize>,
     /// Color pass only: silhouette candidates (`GpuLines::silhouette`) and
@@ -836,12 +847,12 @@ impl DrawLists {
     /// Color pass: put the [`Self::solid`] opaque meshes first within each
     /// layer, so they are drawn by the discard-free face pipeline (tile-based
     /// GPUs only remove hidden surfaces before shading for shaders that never
-    /// discard), and record the runs in `opaque_runs`.
+    /// discard; closed solids' back faces culled), and record the runs in `opaque_runs`.
     fn order_solid(&mut self, scene: &Scene, pick: bool) {
         self.opaque_runs.clear();
         self.masked_prefix.clear();
         if pick || perf_overrides().no_solid {
-            self.opaque_runs.push((self.opaque.len(), false));
+            self.opaque_runs.push((self.opaque.len(), FaceKind::Discard));
             return;
         }
         let masked = crate::scene::state::HIDDEN | crate::scene::state::DIM;
@@ -855,13 +866,23 @@ impl DrawLists {
         }
         let mut keyed = std::mem::take(&mut self.solid_scratch);
         keyed.clear();
-        keyed.extend(self.opaque.iter().map(|&i| (scene.instances[i].layer, !self.solid(scene, &scene.instances[i]), i)));
-        keyed.sort_by_key(|&(layer, discard, _)| (layer, discard));
+        let cull = !perf_overrides().skip_back_cull;
+        keyed.extend(self.opaque.iter().map(|&i| {
+            let inst = &scene.instances[i];
+            let kind = match self.solid(scene, inst) {
+                false => FaceKind::Discard,
+                true if inst.closed && cull => FaceKind::Closed,
+                true => FaceKind::Solid,
+            };
+            (inst.layer, kind, i)
+        }));
+        // The order within each layer's discard-free faces stays the instances' (which wins a depth tie).
+        keyed.sort_by_key(|&(layer, kind, _)| (layer, kind == FaceKind::Discard));
         self.opaque.clear();
-        for &(_, discard, i) in &keyed {
+        for &(_, kind, i) in &keyed {
             match self.opaque_runs.last_mut() {
-                Some((end, solid)) if *solid == !discard => *end += 1,
-                _ => self.opaque_runs.push((self.opaque.len() + 1, !discard)),
+                Some((end, k)) if *k == kind => *end += 1,
+                _ => self.opaque_runs.push((self.opaque.len() + 1, kind)),
             }
             self.opaque.push(i);
         }
@@ -1269,8 +1290,13 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         // macOS runners, docs/handoff/viewport-performance.md).
         draw(pass, &lists.back_silhouettes, &pipelines.mesh_backsil);
         let mut start = 0;
-        for &(end, solid) in &lists.opaque_runs {
-            draw(pass, &lists.opaque[start..end], if solid { &pipelines.mesh_solid } else { &pipelines.mesh_opaque });
+        for &(end, kind) in &lists.opaque_runs {
+            let pipeline = match kind {
+                FaceKind::Closed => &pipelines.mesh_solid_closed,
+                FaceKind::Solid => &pipelines.mesh_solid,
+                FaceKind::Discard => &pipelines.mesh_opaque,
+            };
+            draw(pass, &lists.opaque[start..end], pipeline);
             start = end;
         }
         if let Some((group, planes)) = caps {
@@ -1356,6 +1382,8 @@ struct PerfOverrides {
     no_solid: bool,
     skip_silhouettes: bool,
     skip_ao: bool,
+    /// `backcull`: closed solids' back faces rasterized too ([`Instance::closed`] ignored).
+    skip_back_cull: bool,
 }
 
 /// `NOSHAPE_PERF_SKIP=instancing`: no instanced calls, and the scene builder
@@ -1379,6 +1407,7 @@ fn perf_overrides() -> &'static PerfOverrides {
             no_solid: skip.split([',', '+']).any(|t| t == "solid"),
             skip_silhouettes: skip.split([',', '+']).any(|t| t == "silhouettes"),
             skip_ao: skip.split([',', '+']).any(|t| t == "ao"),
+            skip_back_cull: skip.split([',', '+']).any(|t| t == "backcull"),
         }
     })
 }
@@ -1948,6 +1977,8 @@ struct Pipelines {
     mesh_backsil: wgpu::RenderPipeline,
     /// `mesh_opaque` without `discard` ([`DrawLists::solid`] meshes).
     mesh_solid: wgpu::RenderPipeline,
+    /// [`Self::mesh_solid`] culling back faces ([`Instance::closed`]).
+    mesh_solid_closed: wgpu::RenderPipeline,
     point_hidden: Lazy,
     mesh_pick: Lazy,
     mesh_pick_transparent: Lazy,
@@ -2579,10 +2610,11 @@ impl Renderer {
         // each): a fresh install compiles every shader (1.6 s on the macOS 14
         // runners one by one, 4.3 s on 15).
         let first = PipelineMaker { early: crate::worker::prewarm_early(), ..m.clone() };
-        let (background, mesh_opaque, mesh_solid, mesh_transparent, line, mesh_backsil, silhouette, point) = std::thread::scope(|s| {
+        let (background, mesh_opaque, mesh_solid, mesh_solid_closed, mesh_transparent, line, mesh_backsil, silhouette, point) = std::thread::scope(|s| {
             let background = s.spawn(|| first.make(LayoutKind::Main, P { label: "background", vs: "vs_background", fs: "fs_background", buffers: &[], format: COLOR_FORMAT, blend: None, depth: Some((false, wgpu::CompareFunction::Always)), bias: none, samples: msaa }, PLAIN));
             let mesh_opaque = s.spawn(|| first.make(LayoutKind::Main, P { label: "mesh", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }, PLAIN));
             let mesh_solid = s.spawn(|| first.make(LayoutKind::Main, P { label: "mesh-solid", vs: "vs_mesh", fs: "fs_mesh_solid", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: msaa }, PLAIN));
+            let mesh_solid_closed = s.spawn(|| first.make(LayoutKind::Main, P { label: "mesh-solid-closed", vs: "vs_mesh", fs: "fs_mesh_solid", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Back) }));
             // Strictly in front: a transparent plane coplanar with a sketch
             // image (drawn just before, without bias) doesn't veil it. Opaque
             // faces carry FACE_DEPTH_BIAS, so coplanar planes still tint them.
@@ -2596,7 +2628,7 @@ impl Renderer {
             let silhouette = s.spawn(|| first.make(LayoutKind::Main, P { label: "silhouette", vs: "vs_silhouette", fs: "fs_line", buffers: SILHOUETTE_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: EDGE_DEPTH_BIAS, samples: msaa }, PLAIN));
             let point = s.spawn(|| first.make(LayoutKind::Main, P { label: "point", vs: "vs_point", fs: "fs_point", buffers: POINT_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: POINT_DEPTH_BIAS, samples: msaa }, PLAIN));
             let join = |h: std::thread::ScopedJoinHandle<wgpu::RenderPipeline>| h.join().expect("pipeline compile thread");
-            (join(background), join(mesh_opaque), join(mesh_solid), join(mesh_transparent), join(line), join(mesh_backsil), join(silhouette), join(point))
+            (join(background), join(mesh_opaque), join(mesh_solid), join(mesh_solid_closed), join(mesh_transparent), join(line), join(mesh_backsil), join(silhouette), join(point))
         });
         // The others (picking, sections, outlines, previews, images, compare)
         // compile once the first frame is out (`Lazy`).
@@ -2641,6 +2673,7 @@ impl Renderer {
             background,
             mesh_opaque,
             mesh_solid,
+            mesh_solid_closed,
             mesh_outline,
             mesh_outline_depth,
             section_mask,
