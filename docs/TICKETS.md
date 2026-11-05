@@ -966,7 +966,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   thickness, the loop rebuilt with make_face_on) and fused with the section: the cut grows to 725.3 mm² but the x −13
   face splits in two (71 faces, live 70); the normal projection of the caps' edges (BRepOffsetAPI_NormalProjection)
   drops edges. Extrude 4 takes 1.2 s, live 0.34 s (std's sheet metal boolean: thicken, intersect, rebuild).
-- [ ] P2 SETBACK-FILL-PATCH (core; dx 11-05 08:24, run 113) cf-setback-fillet's Setback Fillet 1 (3/5): its corner
+- [ ] P2 SETBACK-FILL-PATCH (skasm, from core (lead 11-05 18:50); dx 11-05 08:24, run 113) cf-setback-fillet's Setback Fillet 1 (3/5): its corner
   patches are std `fill` with G1 to the faces round a six-edge hole (the feature splits the fillets and the flat faces
   at the setback, deletes the spherical corner, then fills): the boundary is live's, the patches' areas aren't
   (ours 27.85 / 38.00 mm², live 26.06 / 34.44 by facet sum); the kernel's G1 fill, as FILL-G1-DOME.

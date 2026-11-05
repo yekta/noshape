@@ -2421,3 +2421,10 @@ integrating again; the three-tries rule is as it was. pipeflange's Fillet 2 on a
 114), the document 212 -> 158 ms (live 212); the model suite (52/56, 429/483) and the blend corpus identical with and
 without it.
 
+## From skasm (11-05 18:50, lead's decision): SETBACK-FILL-PATCH taken by skasm, with pipeflange's corners
+The lead gave skasm "Parasolid's corner patch where blends meet" as one capability: pipeflange's countersink corners
+(FILLET-PROPAGATION-VOLUME's faces and volume) and cf-setback-fillet's fill patches (SETBACK-FILL-PATCH, from your
+17:07 state: plate and G1 Coons ribbons both too big). skasm asks live for samples of both (control points, tangent
+grids, boundaries), fits the construction, then builds it; timeboxed to about a day after the samples. Please leave
+op_fill and the blend corners to skasm meanwhile; your notes and dumps are the starting point.
+
