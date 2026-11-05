@@ -1356,6 +1356,29 @@ fn chamfers_and_rounds_over_a_narrow_face_are_lives() {
     set_rust_blend(None);
 }
 
+/// One round or chamfer wider than a face beside it (live FILLET-OVERSIZE-OK, one vertical edge (40,0) of the 40 x 20 x
+/// 10 block): it rolls over, the narrow face gone and the round crossing the face beyond (both ways past 40): noshape's
+/// own, live's faces and volumes.
+#[test]
+fn a_lone_round_wider_than_its_face_rolls_over() {
+    setup();
+    let part = bx([0.0; 3], [40.0, 20.0, 10.0]);
+    let es = edges_where(&part, |i| (i.start.x - 40.0 * MM).abs() < 1e-9 && i.start.y.abs() < 1e-9 && (i.start.z - i.end.z).abs() > 1e-9);
+    assert_eq!(es.len(), 1);
+    set_rust_blend(Some(true));
+    for (chamfer, d, want, faces) in [(false, 20.5, 7098.145945, 6), (false, 39.9, 4926.226525, 6), (false, 40.5, 4849.584982, 5), (true, 20.5, 5900.0, 6), (true, 39.9, 2020.0, 6), (true, 40.5, 1901.25, 5)] {
+        reset_blend_decline();
+        let r = if chamfer { chamfer_checked(&part, &es, ChamferSpec::Equal(d * MM), &[]) } else { fillet_checked(&part, &es, &[d * MM]) };
+        let why = last_blend_decline();
+        let r = r.unwrap().shape;
+        assert_eq!(why, "", "{d} (chamfer {chamfer}): noshape's own");
+        assert!(r.is_valid(), "{d} (chamfer {chamfer})");
+        assert_eq!(r.faces().len(), faces, "{d} (chamfer {chamfer})");
+        assert!((vol_mm3(&r) - want).abs() < 1e-5, "{d} (chamfer {chamfer}): {} vs live's {want}", vol_mm3(&r));
+    }
+    set_rust_blend(None);
+}
+
 /// cf-spur-gear's root fillets (PARITY-CUSTOM-RUN-FAILURES): R0.72 on both top edges of a 1.2 mm rib, so the rounds
 /// overlap and the rib's top face goes (OCCT fails): each round made alone, the part their common, as Parasolid's.
 #[test]

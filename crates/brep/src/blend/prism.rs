@@ -240,7 +240,64 @@ struct End {
     tpar: [Option<f64>; 2],
     /// The tangent point at its end edge's far end (a round as wide as the face it goes with).
     at_far: [bool; 2],
+    /// A round past a face it rolls over (`t` where it crosses the face beyond).
+    roll: [Option<Roll>; 2],
     corner: Option<Corner>,
+}
+
+/// A round wider than one of its faces (B, a rectangle): it crosses the face C beyond B's far edge `bc` (its far end
+/// `far` here) where its section meets C's cap edge `h`; B, its cap edges and `bc` go.
+#[derive(Clone, Copy)]
+struct Roll {
+    bc: u32,
+    face: u32,
+    h: u32,
+    far: u32,
+}
+
+/// A round's section in a cap: a circle about `c` of radius `r` from `from` to `to`, or a chamfer's line from `from`
+/// towards `to`.
+#[derive(Clone, Copy)]
+struct Section {
+    chamfer: bool,
+    c: DVec3,
+    r: f64,
+    from: DVec3,
+    to: DVec3,
+}
+
+/// Where a round's section crosses the line from `q` along `dir`: within (`margin`, `len` − `margin`) of `q`, on the
+/// section past `from` (`n` the cap's normal); the nearest such.
+fn section_meets_line(sec: &Section, (q, dir, len): (DVec3, DVec3, f64), margin: f64, n: DVec3) -> Option<DVec3> {
+    let Section { chamfer, c, r, from, to } = *sec;
+    let ss: Vec<f64> = if chamfer {
+        let dl = to - from;
+        let den = dl.cross(dir).dot(n);
+        if den.abs() < 1e-12 * dl.length() {
+            return None;
+        }
+        vec![(q - from).cross(dl).dot(n) / den]
+    } else {
+        let w = q - c;
+        let bq = dir.dot(w);
+        let disc = bq * bq - (w.length_squared() - r * r);
+        if disc < 0.0 {
+            return None;
+        }
+        let sq = disc.sqrt();
+        vec![-bq - sq, -bq + sq]
+    };
+    let on = |p: DVec3| {
+        if chamfer {
+            let dl = to - from;
+            let f = (p - from).dot(dl) / dl.length_squared();
+            return f > 0.0;
+        }
+        let (u0, u1, w) = (from - c, to - c, p - c);
+        let turn = u0.cross(u1).dot(n);
+        u0.cross(w).dot(n) * turn > 0.0 && w.cross(u1).dot(n) * turn > 0.0
+    };
+    ss.into_iter().filter(|&s| s > margin && s < len - margin).map(|s| (s, q + dir * s)).filter(|&(_, p)| on(p)).min_by(|a, b| a.0.total_cmp(&b.0)).map(|x| x.1)
 }
 
 /// An end at two earlier rounds (tori, the round's radius) beside its faces: their meeting edge `m` (to vertex
@@ -462,6 +519,8 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
             };
             let mut tpar = [None, None];
             let mut at_far = [false; 2];
+            let mut roll = [None, None];
+            let mut ts = [t0, t1];
             // Each tangent point on its end edge, short of its far end (no overflow; at it only where the face between
             // goes with another round's, checked with the pairs).
             for (k, t) in [t0, t1].into_iter().enumerate() {
@@ -496,7 +555,26 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
                     Curve::Nurbs { .. } => reach + (far - t).length(),
                     _ => 0.0,
                 };
-                if matches!(oe.curve, Curve::Line) && reach >= margin && (reach - room).abs() < margin {
+                // (Past it: as wide as a face that goes with another round's, or rolling over the face beyond.)
+                let fv = if oe.v[0] == v { oe.v[1] } else { oe.v[0] };
+                let bc = ve[fv as usize].iter().copied().find(|&o| o != g[k] && uses[o as usize].iter().any(|x| x.0 == fs[k]));
+                if pairs && matches!(oe.curve, Curve::Line) && reach >= margin && reach + margin >= room && corner.is_none() && sigma > 0.0 && bc.is_some_and(|o| !blended[o as usize]) {
+                    let bc = bc.unwrap_or(u32::MAX);
+                    let beyond = uses[bc as usize].iter().map(|x| x.0).find(|&f| f != fs[k]);
+                    let h = ve[fv as usize].iter().copied().find(|&o| o != g[k] && o != bc && uses[o as usize].iter().any(|x| x.0 == cap));
+                    let (Some(face), Some(h)) = (beyond, h) else { return no("a prism round past its end edges") };
+                    let he = &body.edges[h as usize];
+                    if !matches!(body.faces[face as usize].surface, Surface::Plane { .. }) || he.curve != Curve::Line || body.edges[bc as usize].curve != Curve::Line {
+                        return no("a prism round past its end edges onto a face not planar");
+                    }
+                    let hf = body.vertices[if he.v[0] == fv { he.v[1] } else { he.v[0] } as usize];
+                    let len = (hf - far).length();
+                    let Some(x) = section_meets_line(&Section { chamfer, c, r, from: ts[1 - k], to: t }, (far, (hf - far) / len, len), margin, d) else {
+                        return no("a prism round past its end edges");
+                    };
+                    ts[k] = x;
+                    roll[k] = Some(Roll { bc, face, h, far: fv });
+                } else if matches!(oe.curve, Curve::Line) && reach >= margin && (reach - room).abs() < margin {
                     at_far[k] = true;
                 } else if reach < margin || reach + margin >= room {
                     return no("a prism round past its end edges");
@@ -507,17 +585,31 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
             {
                 return no("a prism round's corner not at its rounds' meeting point");
             }
-            ends.push(End { cap, v, g, c, t: [t0, t1], tpar, at_far, corner });
+            ends.push(End { cap, v, g, c, t: ts, tpar, at_far, roll, corner });
         }
         let [a, b] = <[End; 2]>::try_from(ends).map_err(|_| Decline("a prism round without two ends"))?;
         if (b.c - a.c).cross(d).length() > margin {
             return no("a prism round's ends not on one axis");
+        }
+        // (Rolling over at both ends or neither, B the rectangle between the edge, its cap edges and the far edge.)
+        for (k, &f) in fs.iter().enumerate() {
+            match (a.roll[k], b.roll[k]) {
+                (None, None) => {}
+                (Some(x), Some(y)) if x.bc == y.bc => {
+                    let lp = &body.faces[f as usize].loops;
+                    if lp.len() != 1 || lp[0].len() != 4 || !lp[0].iter().all(|u| [be.edge, a.g[k], b.g[k], x.bc].contains(&u.edge)) {
+                        return no("a prism round past a face not a rectangle");
+                    }
+                }
+                _ => return no("a prism round past its end edges at one end"),
+            }
         }
         // Nothing else within the round: the box of what it takes or adds (between the edge and its arcs, a corner's
         // sphere too) meets no face but its own two, its caps and its corners' rounds (slow1151's Fillet 2: an R12 round
         // through a 0.5 mm wall cut the wall's other side away).
         let (mut lo, mut hi) = (DVec3::splat(f64::INFINITY), DVec3::splat(f64::NEG_INFINITY));
         let mut own = vec![fs[0], fs[1]];
+        own.extend(a.roll.iter().flatten().map(|x| x.face));
         for end in [&a, &b] {
             let mid = if chamfer { (end.t[0] + end.t[1]) * 0.5 } else { end.c + ((end.t[0] + end.t[1]) * 0.5 - end.c).normalize_or_zero() * r };
             let mut pts = vec![body.vertices[end.v as usize], end.t[0], end.t[1], mid];
@@ -548,6 +640,10 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
     }
     if (0..body.edges.len()).any(|i| absorbed[i] && !taken_m[i]) {
         return no("a curved edge not a prism round's corner");
+    }
+    let rolled: Vec<u32> = plans.iter().flat_map(|p| p.ends[0].roll.iter().flatten().map(|x| x.face)).collect();
+    if rolled.iter().enumerate().any(|(i, f)| rolled[..i].contains(f) || plans.iter().any(|p| p.fs.contains(f))) {
+        return no("a prism round rolling over onto another round's face");
     }
     // Two rounds on one face leave some of it between them, or use it up (the face the rectangle between their edges
     // and the caps' edges, it goes): exactly (a full round: their tangent points there one at each cap; one face,
@@ -655,6 +751,23 @@ fn build(body: &Body, plans: Vec<Plan>, fulls: &[Full]) -> Result<Output, Declin
         for (j, end) in ends.iter().enumerate() {
             dead_v[end.v as usize] = true;
             for (k, t) in tv[j].iter_mut().enumerate() {
+                // (Rolling over B: the crossing on C's cap edge, which is cut back to it; B's cap edge goes.)
+                if let Some(rl) = end.roll[k] {
+                    *t = add_v(&mut b, end.t[k], &mut vertex_origin);
+                    let slot = if b.edges[rl.h as usize].v[0] == rl.far { 0 } else { 1 };
+                    b.edges[rl.h as usize].v[slot] = *t;
+                    edge_origin[rl.h as usize] = Origin::Piece { arg: 0, index: rl.h };
+                    history.push(Record { kind: Kind::Edge, arg: 0, index: rl.h, relation: Relation::Modified, out_kind: Kind::Edge, out: rl.h });
+                    let g = end.g[k];
+                    dead_e[g as usize] = true;
+                    history.push(Record { kind: Kind::Edge, arg: 0, index: g, relation: Relation::Deleted, out_kind: Kind::Edge, out: u32::MAX });
+                    history.push(Record { kind: Kind::Edge, arg: 0, index: rl.h, relation: Relation::Generated, out_kind: Kind::Vertex, out: *t });
+                    for lp in &mut b.faces[end.cap as usize].loops {
+                        lp.retain(|u| u.edge != g);
+                    }
+                    dead_v[rl.far as usize] = true;
+                    continue;
+                }
                 // (A full round's face: one tangent vertex there for both rounds; the cap's edge along it goes.)
                 if let Some(f) = full_face(pi, k) {
                     *t = match shared_v.get(&(f, end.cap)) {
@@ -741,7 +854,8 @@ fn build(body: &Body, plans: Vec<Plan>, fulls: &[Full]) -> Result<Output, Declin
             b.edges.push(Edge { v: [tv[j][from], tv[j][to]], curve });
             edge_origin.push(Origin::New);
             arcs[j] = b.edges.len() as u32 - 1;
-            let cap_loop = b.faces[end.cap as usize].loops.iter().position(|lp| lp.iter().any(|x| x.edge == end.g[0])).unwrap_or(0);
+            let keys: Vec<u32> = end.g.iter().copied().chain(end.roll.iter().flatten().map(|x| x.h)).collect();
+            let cap_loop = b.faces[end.cap as usize].loops.iter().position(|lp| lp.iter().any(|x| keys.contains(&x.edge))).unwrap_or(0);
             b.faces[end.cap as usize].loops[cap_loop].push(Use { edge: arcs[j], reversed: false });
             touched.push(end.cap);
         }
@@ -750,6 +864,29 @@ fn build(body: &Body, plans: Vec<Plan>, fulls: &[Full]) -> Result<Output, Declin
         let mut lines = [0u32; 2];
         let mut flipped = [false; 2];
         for k in 0..2 {
+            // (Rolling over B: the line where it crosses C in place of B's far edge there, B gone.)
+            if let Some(rl) = ends[0].roll[k] {
+                b.edges.push(Edge { v: [tv[0][k], tv[1][k]], curve: Curve::Line });
+                edge_origin.push(Origin::New);
+                lines[k] = b.edges.len() as u32 - 1;
+                let same = body.edges[rl.bc as usize].v[0] == rl.far;
+                for lp in &mut b.faces[rl.face as usize].loops {
+                    for x in lp.iter_mut() {
+                        if x.edge == rl.bc {
+                            *x = Use { edge: lines[k], reversed: x.reversed != !same };
+                        }
+                    }
+                }
+                dead_e[rl.bc as usize] = true;
+                history.push(Record { kind: Kind::Edge, arg: 0, index: rl.bc, relation: Relation::Deleted, out_kind: Kind::Edge, out: u32::MAX });
+                // (B goes; the line where the round crosses C is C's, as OCCT's, its ends its cap edges'.)
+                if !std::mem::replace(&mut dead_f[fs[k] as usize], true) {
+                    history.push(Record { kind: Kind::Face, arg: 0, index: fs[k], relation: Relation::Deleted, out_kind: Kind::Face, out: u32::MAX });
+                }
+                history.push(Record { kind: Kind::Face, arg: 0, index: rl.face, relation: Relation::Generated, out_kind: Kind::Edge, out: lines[k] });
+                touched.push(rl.face);
+                continue;
+            }
             // (A full round's face: one line for both rounds, the second running it the other way if need be.)
             if let Some(f) = full_face(pi, k) {
                 match shared_line.get(&f) {
@@ -785,7 +922,9 @@ fn build(body: &Body, plans: Vec<Plan>, fulls: &[Full]) -> Result<Output, Declin
         let mut lp = Vec::new();
         for (k, (f, o)) in [(fs[0], lines[0]), (fs[1], lines[1])].into_iter().enumerate() {
             // (A full round's face is gone: the way it ran the old edge, the shared line's way against this round's.)
-            let rev = if full_face(pi, k).is_some() { body.faces[f as usize].loops.iter().flatten().find(|x| x.edge == edge).map(|x| x.reversed != flipped[k]) } else { use_in(&b, f, o) };
+            let rev = if let Some(rl) = ends[0].roll[k] {
+                use_in(&b, rl.face, o)
+            } else if full_face(pi, k).is_some() { body.faces[f as usize].loops.iter().flatten().find(|x| x.edge == edge).map(|x| x.reversed != flipped[k]) } else { use_in(&b, f, o) };
             let Some(rev) = rev else { return no("a prism round's edge not in its face") };
             lp.push(Use { edge: o, reversed: !rev });
         }
@@ -949,6 +1088,9 @@ fn build(body: &Body, plans: Vec<Plan>, fulls: &[Full]) -> Result<Output, Declin
     for h in &mut history {
         if h.relation != Relation::Deleted && h.out_kind == Kind::Edge {
             h.out = emap[h.out as usize];
+        }
+        if h.relation != Relation::Deleted && h.out_kind == Kind::Vertex {
+            h.out = vmap[h.out as usize];
         }
     }
     if !vs.iter().all(|p| p.is_finite()) {

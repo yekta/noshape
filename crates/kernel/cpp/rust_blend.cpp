@@ -1218,6 +1218,8 @@ bool rust_blend(const OcShape& s, const std::vector<TopoDS_Edge>& es, const std:
       to = &fo[oidx];
     else if (okind == 2 && oidx < eo.size())
       to = &eo[oidx];
+    else if (okind == 3 && oidx < vs.size())
+      to = &vs[oidx];
     if (rel == 0 && to != nullptr)
     {
       hist->AddModified(*in, *to);

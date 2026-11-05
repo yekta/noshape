@@ -149,8 +149,8 @@ impl Feature {
 /// ([`PartStudio::legacy_face_frames`]); 9, a sketch on a construction plane in std newSketch's frame
 /// ([`PartStudio::legacy_plane_sketch_frames`]); 10, a sketch region's edges along their sketch curves
 /// ([`PartStudio::legacy_edge_directions`]); 11, blends finished as live ([`PartStudio::legacy_blend_finish`]);
-/// 12, a rounded hole's seams off the rims it trims ([`PartStudio::legacy_rim_seams`]); 13, noshape's full rounds and
-/// ridges ([`PartStudio::legacy_blend_pairs`]); 0, older studios.
+/// 12, a rounded hole's seams off the rims it trims ([`PartStudio::legacy_rim_seams`]); 13, noshape's full rounds,
+/// ridges and rounds rolling over a narrow face ([`PartStudio::legacy_blend_pairs`]); 0, older studios.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScopeRule(pub u8);
 
@@ -374,8 +374,9 @@ pub struct PartStudio {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub legacy_rim_seams: bool,
     /// Saved with features before noshape's blends made two straight rounds or chamfers that use up the face between
-    /// them (ScopeRule < 13: OCCT's full round, its history every face modified; its overlapping rounds' common): its
-    /// fillets and chamfers keep that history, so later features find what they found.
+    /// them, or one rolling over a narrower face (ScopeRule < 13: OCCT's full round, its history every face modified;
+    /// its overlapping or rolling rounds' other history): its fillets and chamfers keep that history, so later features
+    /// find what they found.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub legacy_blend_pairs: bool,
     /// Rollback bar position: number of features evaluated (None = all).

@@ -411,7 +411,7 @@ impl Chain {
 }
 
 /// Blends `edges` of `body` (one solid), whose points are one within `tol`; `pairs`: two straight rounds or chamfers
-/// that use up the face between them (a full round, a ridge) too.
+/// that use up the face between them (a full round, a ridge), and one rolling over a face narrower than it, too.
 pub fn blend(body: &Body, edges: &[BlendEdge], tol: f64, pairs: bool) -> Result<Output, Decline> {
     if body.solids.len() != 1 || body.solids[0].shells.len() != 1 {
         return no("not one solid of one shell");

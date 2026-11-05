@@ -449,8 +449,8 @@ thread_local! {
     static LEGACY_BLEND_PAIRS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-/// noshape's blends leave two straight rounds or chamfers that use up the face between them to OCCT, as before 11-05,
-/// on this thread (a Part Studio saved before ScopeRule 13 regenerates as it did). Returns the thread's setting before.
+/// noshape's blends leave two straight rounds or chamfers that use up the face between them, and one rolling over a
+/// face narrower than it, to OCCT, as before 11-05, on this thread (a Part Studio saved before ScopeRule 13 regenerates as it did). Returns the thread's setting before.
 pub fn set_legacy_blend_pairs(on: bool) -> bool {
     LEGACY_BLEND_PAIRS.with(|c| c.replace(on))
 }
