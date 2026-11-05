@@ -590,6 +590,8 @@ fn part_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     }
     let tools: Vec<NamedShape> = copies.into_iter().filter(|c| c.2 == BodyKind::Solid).map(|c| c.3).collect();
     let scope = super::extrude::scope(ev);
+    // std (subfeatureToolsTargets): an Add with nothing in its merge scope unions the instances with the seed.
+    let scope = if op == "ADD" && scope.is_none() { Some(bodies.iter().copied().filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Solid).collect()) } else { scope };
     ev.apply_operation(tools, &op, scope, BodyKind::Solid)
 }
 

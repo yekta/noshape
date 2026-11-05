@@ -822,6 +822,12 @@ fn linear_part_pattern_new_add_and_skip() {
     let res = t.ok();
     assert_eq!(res.context.bodies.len(), 1);
     assert!(near(total_volume(&res.context), 0.02 * 0.01 * 0.01, 1e-6));
+    // Add with Merge with all off and nothing in the merge scope: the instances merge with the seed (std
+    // subfeatureToolsTargets; live cf-sheet-metal-hem's Derived source, Circular pattern 1).
+    t.set(lp, "defaultScope", ParamValue::Bool(false));
+    let res = t.ok();
+    assert_eq!(res.context.bodies.len(), 1);
+    assert!(near(total_volume(&res.context), 0.02 * 0.01 * 0.01, 1e-6));
 }
 
 #[test]
