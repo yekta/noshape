@@ -387,6 +387,21 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const b = expect("b", [vector(0, 0, 0), vector(1.52262, 0, 0), vector(10.83620, -3.44317, 0), vector(20, 8.18929, 0), vector(20, 10, 0)]);
             check("opFitSpline as live", a && b, [a, b, evCurveDefinition(context, { "edge" : qCreatedBy(sub + "a", EntityType.EDGE) })]);
         });
+        step(context, id, "edgeChangeJoinsRunOnEdges", function(sub) {
+            // An edge moved so that its face's side edge runs on along the next face's free edge: the two pieces
+            // between the same faces are one edge (live 2053: Shaped Flange's wall, its RIP edge over the full height).
+            fCuboid(context, sub + "b", { "corner1" : vector(0, 0, 4400) * mm, "corner2" : vector(10, 10, 4410) * mm });
+            const faces = qCreatedBy(sub + "b", EntityType.FACE);
+            opExtractSurface(context, sub + "x", { "faces" : qUnion([qContainsPoint(faces, vector(0, 5, 4405) * mm), qContainsPoint(faces, vector(5, 10, 4405) * mm)]) });
+            const sheetFaces = qOwnedByBody(qCreatedBy(sub + "x", EntityType.BODY), EntityType.FACE);
+            const wall = qContainsPoint(sheetFaces, vector(0, 5, 4401) * mm);
+            const top = function() returns Query { return qContainsPoint(qOwnedByBody(qCreatedBy(sub + "x", EntityType.BODY), EntityType.EDGE), vector(0, 5, 4400 + (isQueryEmpty(context, qContainsPoint(sheetFaces, vector(0, 5, 4408) * mm)) ? 5 : 10)) * mm); };
+            opEdgeChange(context, sub + "down", { "edgeChangeOptions" : [{ "edge" : top(), "face" : wall, "offset" : -5 * mm }] });
+            opEdgeChange(context, sub + "up", { "edgeChangeOptions" : [{ "edge" : top(), "face" : wall, "offset" : 5 * mm }] });
+            const common = evaluateQuery(context, qIntersection([qAdjacent(qContainsPoint(sheetFaces, vector(0, 5, 4401) * mm), AdjacencyType.EDGE, EntityType.EDGE), qAdjacent(qContainsPoint(sheetFaces, vector(5, 10, 4401) * mm), AdjacencyType.EDGE, EntityType.EDGE)]));
+            const length = size(common) == 1 ? evLength(context, { "entities" : common[0] }) : undefined;
+            check("an edge change's run-on edge one edge", length != undefined && abs(length - 10 * mm) < 1e-9 * mm, [size(common), length]);
+        });
         step(context, id, "trackMovedEdge", function(sub) {
             // An edge opEdgeChange moved is still found by its tracking query, where it went (std's Fold tracks its
             // split edges through its edge changes).

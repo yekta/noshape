@@ -64,7 +64,7 @@ fn op_edge_change(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         };
         options.push(EdgeOption { edges, offset: length_of(o.get("offset")).unwrap_or(0.0), replace, face, plane: None });
     }
-    change_edges_op(i, &cx, &id, options, false)
+    change_edges_op(i, &cx, &id, options, true)
 }
 
 /// `@opExtendSheetBody` up to a surface (std sheet metal: Make joint's walls to their bisector, a Flange's alignment,
@@ -153,7 +153,7 @@ fn op_derip(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 }
 
 /// `join`: a moved edge's neighbour that now runs on along another edge between the same faces becomes one edge with
-/// it (an extended wall's bend edge, live cf-sheet-metal-shaped-flange's Make joint).
+/// it (an extended wall's bend edge, live cf-sheet-metal-shaped-flange's Make joint; a raised wall's RIP edge, live 2053).
 fn change_edges_op(i: &mut Interp, cx: &super::FsContext, id: &[std::sync::Arc<str>], options: Vec<EdgeOption>, join: bool) -> R<Value> {
     // The attributes on the edges it moves (Parasolid's stay on a moved edge; the operation's attribute remap, by
     // where they were, would drop them).
