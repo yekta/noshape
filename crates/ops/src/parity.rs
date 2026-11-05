@@ -1279,6 +1279,9 @@ impl<'a> Translator<'a> {
         {
             return Ok(vec![format!("mc:{ours}.0")]);
         }
+        if let Some(r) = self.blended_face_from_query(text) {
+            return r.map(|e| vec![e]);
+        }
         if let Some(r) = self.region_from_query(text)? {
             return Ok(vec![r]);
         }
@@ -1573,6 +1576,52 @@ impl<'a> Translator<'a> {
     /// A sketch curve or point named by its Onshape id (packed
     /// `SKETCH_ENTITY` query of a sketch's own wire, not of a feature made
     /// from it).
+    /// The fillet face a packed query names `blendedFrom` an Extrude's swept edge at the corner of two sketch curves
+    /// (a Hole's in-feature mate connector placed at the CENTER of a rounded corner, clamp-hms): ours, the cylinder
+    /// whose axis runs along the extrude next to that corner. `None`: not such a query.
+    fn blended_face_from_query(&mut self, text: &str) -> Option<Result<String, String>> {
+        use noshape_model::custom::host::packed::Packed;
+        let packed = text.split("qCompressed(1.0,\"").nth(1)?.split('"').next()?;
+        let tree = noshape_model::custom::host::packed::unpack(packed).ok()?;
+        let Packed::Tagged(_, top) = &tree else { return None };
+        let Packed::Map(tm) = top.as_ref() else { return None };
+        let (_, from) = tm.iter().find(|(k, _)| matches!(k, Packed::Str(k) if k == "blendedFrom"))?;
+        let mut strings = Vec::new();
+        packed_strings(from, &mut strings);
+        if !strings.iter().any(|s| s == "SWEPT_EDGE") || !strings.iter().any(|s| s.ends_with(".opExtrude")) {
+            return None;
+        }
+        let sk = strings.iter().find_map(|s| s.strip_suffix(".wireOp"))?.to_string();
+        let ids: Vec<String> = strings.windows(2).filter(|w| w[0] == "sketchEntityId").map(|w| w[1].clone()).collect();
+        let curves: Vec<Vec<[f64; 2]>> = ids.iter().filter_map(|e| self.curve_of(&sk, e)).collect();
+        let [a, b] = curves.as_slice() else { return Some(Err(format!("blended edge of sketch {sk}: {} of its 2 curves translated", curves.len()))) };
+        let ends = |c: &Vec<[f64; 2]>| [c[0], c[c.len() - 1]];
+        let near = |p: [f64; 2], q: [f64; 2]| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-7;
+        let Some(corner) = ends(a).into_iter().find(|p| ends(b).into_iter().any(|q| near(*p, q))) else { return Some(Err(format!("blended edge of sketch {sk}: its curves don't meet"))) };
+        let Some([o, x, y]) = self.frames.get(&sk).copied() else { return Some(Err(format!("blended edge: sketch {sk}'s frame"))) };
+        let at: [f64; 3] = std::array::from_fn(|i| o[i] + x[i] * corner[0] + y[i] * corner[1]);
+        let n = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+        let found = match self.call("query_entities", json!({ "kind": "faces", "surface": "cylinder", "near": mm(at), "limit": 12 })) {
+            Ok(f) => f,
+            Err(e) => return Some(Err(e)),
+        };
+        // The cylinder along the extrude whose axis is nearest the corner line (a fillet's: r√2 from a right corner).
+        let unit = per_unit(&found["units"]);
+        let best = found["faces"].as_array().into_iter().flatten().filter_map(|f| {
+            let (Some(p), Some(d)) = (f3(&f["axis"]["origin"]), f3(&f["axis"]["direction"])) else { return None };
+            let along = d[0] * n[0] + d[1] * n[1] + d[2] * n[2];
+            if along.abs() < 1.0 - 1e-6 {
+                return None;
+            }
+            // Distance between the two parallel lines (the axis, in the document's units, and the corner line, in m).
+            let w: [f64; 3] = std::array::from_fn(|i| p[i] * unit - at[i]);
+            let t = w[0] * n[0] + w[1] * n[1] + w[2] * n[2];
+            let off: f64 = (0..3).map(|i| (w[i] - t * n[i]).powi(2)).sum::<f64>().sqrt();
+            Some((off, f["id"].as_str()?.to_string()))
+        }).min_by(|a, b| a.0.total_cmp(&b.0));
+        Some(best.map(|(_, id)| id).ok_or_else(|| format!("blended edge of sketch {sk}: no rounded corner of ours there")))
+    }
+
     fn sketch_entity_from_query(&self, text: &str) -> Option<String> {
         let packed = text.split("qCompressed(1.0,\"").nth(1)?.split('"').next()?;
         let tree = noshape_model::custom::host::packed::unpack(packed).ok()?;
@@ -1888,7 +1937,10 @@ impl<'a> Translator<'a> {
         };
         let found = self.call("query_entities", json!({ "kind": kind, "created_by": ours, "limit": 200 }))?;
         let k = per_unit(&found["units"]);
-        let cands: Vec<(String, [f64; 3])> = found[kind].as_array().into_iter().flatten().filter_map(|e| Some((e["id"].as_str()?.to_string(), f3(&e[key])?.map(|c| c * k)))).collect();
+        // A cap of a planar profile faces along the extrude (a side face a later feature grew up past the cap is not
+        // one: clamp-hms's y = 33 side under its hump).
+        let capped = |e: &Value| name != "CAP_FACE" || f3(&e["normal"]).is_some_and(|m| dot(m, n).abs() > 1.0 - 1e-6);
+        let cands: Vec<(String, [f64; 3])> = found[kind].as_array().into_iter().flatten().filter(|e| capped(e)).filter_map(|e| Some((e["id"].as_str()?.to_string(), f3(&e[key])?.map(|c| c * k)))).collect();
         // A whole circle's midpoint is its centre: it is over the sketch
         // curve when the curve's point is a radius from it.
         let rings: HashMap<String, f64> = found[kind].as_array().into_iter().flatten().filter(|e| e["closed"] == true).filter_map(|e| Some((e["id"].as_str()?.to_string(), e["radius"].as_f64()? * k))).collect();
