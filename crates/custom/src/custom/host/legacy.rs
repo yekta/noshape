@@ -14,6 +14,12 @@ use std::sync::Arc;
 /// every shipped release against this).
 pub const TYPED_SINCE: u32 = 2473;
 
+/// The first release whose `evaluateQuery` takes `@evaluateQuery`'s queries as they are: up to 2559 its query.fs wraps
+/// each transient id itself (`{ "queryType" : TRANSIENT, "transientId" : id }`), so it needs the ids (a std 2506 studio
+/// got queries of queries, which evaluate to nothing: cf-fix-pcb's "No components selected"). The test
+/// `releases_up_to_queries_since_wrap_transient_ids` checks every shipped release against this.
+pub const QUERIES_SINCE: u32 = 2581;
+
 /// The current native `name`, its result in the raw form.
 fn raw_call(name: &str, i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let Some(f) = noshape_featurescript::interp::native(name) else { return Err(i.error(format!("Builtin {name} not found"))) };
@@ -122,13 +128,16 @@ const RAW_RESULTS: &[(&str, NativeFn)] = legacy![
     "evSurfaceDefinition",
     "evVertexPoint",
     "evVolume",
-    "evaluateQuery",
     "getFullPatternTransform",
     "getRemainderPatternTransform",
 ];
 
+/// The query builtins older releases wrap themselves (see [`QUERIES_SINCE`]).
+const RAW_QUERY_RESULTS: &[(&str, NativeFn)] = legacy!["evaluateQuery"];
+
 pub fn register() {
     noshape_featurescript::interp::register_legacy_natives(TYPED_SINCE, RAW_RESULTS);
+    noshape_featurescript::interp::register_legacy_natives(QUERIES_SINCE, RAW_QUERY_RESULTS);
 }
 
 #[cfg(test)]
@@ -145,5 +154,20 @@ mod tests {
             })
             .collect();
         assert!(wrong.is_empty(), "releases on the wrong side of TYPED_SINCE ({}): {wrong:?}", super::TYPED_SINCE);
+    }
+
+    /// A shipped release (from 1431; older ones word it otherwise) wraps `@evaluateQuery`'s transient ids in queries itself
+    /// exactly when it is older than [`super::QUERIES_SINCE`].
+    #[test]
+    fn releases_up_to_queries_since_wrap_transient_ids() {
+        let wrong: Vec<u32> = noshape_featurescript::std_versions()
+            .into_iter()
+            .filter(|&v| v >= 1431)
+            .filter(|&v| {
+                let wraps = noshape_featurescript::std_source_at(v, "query.fs").is_some_and(|s| s.contains("for (var transientId in result)"));
+                wraps != (v < super::QUERIES_SINCE)
+            })
+            .collect();
+        assert!(wrong.is_empty(), "releases on the wrong side of QUERIES_SINCE ({}): {wrong:?}", super::QUERIES_SINCE);
     }
 }
