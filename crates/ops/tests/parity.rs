@@ -199,6 +199,14 @@ pub(crate) fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
         live.iter_mut().filter(|l| l.get("index").is_some()).for_each(|l| l["looseBoxes"] = json!(true));
     }
     let refs = std::fs::read_to_string(dir.join("refs.jsonl")).unwrap_or_default();
+    // The Part Studios its Derived features take parts from (derived/<element id>/, fetched like a document at the
+    // version they use): their features and states, for the translator to build first.
+    for d in std::fs::read_dir(dir.join("derived")).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.join("features.json").is_file()) {
+        let Some(element) = d.file_name().map(|n| n.to_string_lossy().to_string()) else { continue };
+        if let Some((doc, lines, refs)) = read_model(&d) {
+            features["derivedSources"][element.as_str()] = json!({ "doc": doc, "live": lines, "refs": refs });
+        }
+    }
     Some((features, live, refs))
 }
 
@@ -492,6 +500,25 @@ fn block_model() -> (Value, Vec<Value>, String) {
         json!({ "index": 2, "status": "OK", "parts": part(block - fillet_off, 8, 17, 10) }),
     ];
     (features, live, refs)
+}
+
+/// A Derived feature from a Part Studio fetched beside the document (derived/<element>/): that studio built in a
+/// tab of ours first, the feature taking our part for live's part id (cf-sheet-metal-hem's Derived 1).
+#[test]
+fn a_derived_feature_takes_its_part_from_its_source_built_in_a_tab() {
+    let (source, mut live, refs) = block_model();
+    live.last_mut().unwrap()["parts"][0]["partId"] = json!("JbD");
+    let derived = json!({ "btType": "BTMFeature-134", "featureType": "importDerived", "featureId": "FD1", "name": "Derived 1", "parameters": [
+        { "btType": "BTMParameterQueryList-148", "parameterId": "parts", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JbD"] }] },
+        { "btType": "BTMParameterDerived-864", "parameterId": "buildFunction", "namespace": "dother::vversion::e0c79ad99a48b2ad4f5e01a78::mmicro" }] });
+    let doc = json!({ "features": [derived], "derivedSources": { "0c79ad99a48b2ad4f5e01a78": { "doc": source, "live": live, "refs": refs } } });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("derived-source.noshape"), &doc, Default::default()).unwrap();
+    let s = t.step(0);
+    assert!(s.ours.is_some() && !s.problems.iter().any(|p| p.contains("not built")), "{:?}", s.problems);
+    let p = t.call("query_parts", json!({ "tab": "Part Studio 1" })).unwrap();
+    assert_eq!(p["parts"].as_array().map(Vec::len), Some(1), "{p}");
+    assert_eq!((p["parts"][0]["faces"].as_u64(), p["parts"][0]["edges"].as_u64()), (Some(8), Some(17)), "{p}");
 }
 
 #[test]

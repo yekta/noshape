@@ -96,6 +96,10 @@ pub struct Translator<'a> {
     /// The Part Studio tab translated into (`open_in`); calls that take a
     /// `tab` get it.
     tab: Option<String>,
+    /// Part Studios Derived features take parts from (features.json `derivedSources`: element id → `{ doc, live }`),
+    /// and those built: element id → (our tab id, live's part id → ours).
+    derived_sources: Map<String, Value>,
+    derived_built: HashMap<String, (String, HashMap<String, String>)>,
     first_move: Option<String>,
     /// Onshape Feature Studio element id → our Feature Studio tab id.
     studios: HashMap<String, String>,
@@ -273,7 +277,7 @@ impl<'a> Translator<'a> {
             .flatten()
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, placeholder: None, std_pins: Vec::new(), foreign })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -752,7 +756,7 @@ impl<'a> Translator<'a> {
 
     /// Feature `f` added after features 0 … k−1: its id, status and message.
     fn feature(&mut self, k: usize, f: &Value, problems: &mut Vec<String>) -> Result<(String, String, Option<String>), String> {
-        let (ty, mut params) = self.feature_params(k, f, problems)?;
+        let (ty, mut params) = if f["featureType"] == "importDerived" { self.derived_params(f, problems)? } else { self.feature_params(k, f, problems)? };
         // Its in-feature mate connectors, by their placeholders in its selections.
         for v in params.values_mut() {
             self.place_sub_features(v);
@@ -784,6 +788,87 @@ impl<'a> Translator<'a> {
         };
         let st = &r["feature_status"];
         Ok((r["feature"].as_str().unwrap_or("").to_string(), st["status"].as_str().unwrap_or("").to_string(), st["message"].as_str().map(str::to_string)))
+    }
+
+    /// A Derived feature's parameters: its source Part Studio (`buildFunction`'s element, fetched beside the
+    /// document) built in a tab of ours on first use, its parts ours of that tab's (live's part ids at the source's
+    /// end state).
+    fn derived_params(&mut self, f: &Value, problems: &mut Vec<String>) -> Result<(String, Map<String, Value>), String> {
+        let param = |id: &str| f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == id).cloned().unwrap_or(Value::Null);
+        let build = param("buildFunction");
+        let namespace = build["namespace"].as_str().unwrap_or("");
+        let element = namespace.split("::").find_map(|s| s.strip_prefix('e')).ok_or_else(|| format!("Derived: no source element in {namespace:?}"))?.to_string();
+        if !self.derived_built.contains_key(&element) {
+            let built = self.derived_source(&element, problems)?;
+            self.derived_built.insert(element.clone(), built);
+        }
+        let (tab, parts) = &self.derived_built[&element];
+        let mut ours = Vec::new();
+        for q in param("parts")["queries"].as_array().into_iter().flatten() {
+            for id in q["deterministicIds"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+                ours.push(parts.get(id).cloned().ok_or_else(|| format!("Derived: the source's part {id} not built"))?);
+            }
+        }
+        let mut params = Map::new();
+        params.insert("partStudio".into(), json!(tab));
+        params.insert("parts".into(), json!(ours));
+        Ok(("importDerived".into(), params))
+    }
+
+    /// The Derived source `element` translated into a new Part Studio tab of ours: its tab and live's part ids
+    /// (at its end) → ours.
+    fn derived_source(&mut self, element: &str, problems: &mut Vec<String>) -> Result<(String, HashMap<String, String>), String> {
+        let src = self.derived_sources.get(element).cloned().ok_or_else(|| format!("Derived: Part Studio {element} of another document not fetched"))?;
+        let lines: Vec<Value> = src["live"].as_array().cloned().unwrap_or_default();
+        // Ours stays in its own tab whatever tab the new one becomes.
+        if self.tab.is_none() {
+            let info = self.call("document_info", json!({}))?;
+            self.tab = info["tabs"].as_array().into_iter().flatten().find(|t| t["kind"] == "Part Studio").and_then(|t| t["id"].as_str()).map(str::to_string);
+        }
+        let name = src["doc"]["name"].as_str().map(str::to_string).unwrap_or_else(|| format!("Derived source {element}"));
+        // Its Feature Studios ours already has (the same element of the same document, e.g. at the version both use)
+        // are those tabs: a studio fetched alone may import others only the document has.
+        let mut doc = src["doc"].clone();
+        if let Some(studios) = doc["featureStudios"].as_object_mut() {
+            studios.retain(|e, _| !self.studios.keys().any(|k| k == e || k.starts_with(&format!("{e}@"))));
+        }
+        let parent_studios = self.studios.clone();
+        let mut refs = refs_from_bodies(&lines);
+        refs.extend(parse_refs(src["refs"].as_str().unwrap_or("")));
+        let mut t = Translator::open_in(&mut *self.ctx, &name, &doc, refs)?;
+        for (e, tab) in parent_studios {
+            t.studios.entry(e).or_insert(tab);
+        }
+        for k in 0..t.len() {
+            let step = t.step(k);
+            if step.ours.is_none() {
+                problems.push(format!("its source's {} not built: {}", step.name, step.problems.join("; ")));
+            } else {
+                problems.extend(step.problems.iter().map(|p| format!("its source's {}: {p}", step.name)));
+            }
+        }
+        let tab = t.tab.clone().ok_or("Derived: the source's tab")?;
+        let last = lines.iter().rfind(|l| l.get("index").is_some()).cloned().unwrap_or(Value::Null);
+        let mut parts = HashMap::new();
+        // By live's geometry for the part, else by its name (ours are named as Onshape's).
+        let named = t.call("query_parts", json!({}))?;
+        for p in last["parts"].as_array().into_iter().flatten() {
+            let Some(id) = p["partId"].as_str() else { continue };
+            let by_name = || named["parts"].as_array().into_iter().flatten().find(|o| o["name"] == p["name"]).and_then(|o| o["id"].as_str()).map(str::to_string);
+            match t.resolve(&json!({ "btType": "BTMIndividualQuery-138", "deterministicIds": [id] })).ok().as_deref() {
+                Some([one]) => {
+                    parts.insert(id.to_string(), one.clone());
+                }
+                _ => {
+                    if let Some(one) = by_name() {
+                        parts.insert(id.to_string(), one);
+                    }
+                }
+            }
+        }
+        problems.extend(t.notes.iter().map(|n| format!("its source: {n}")));
+        self.custom_failures.extend(t.custom_failures.iter().cloned());
+        Ok((tab, parts))
     }
 
     /// Sketch entity `e` of sketch `oid` moved to live's solved geometry
