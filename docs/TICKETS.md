@@ -2048,6 +2048,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   non-destructive, BREP round-tripped, op_boolean's exact OCCT call, pair intersections parallel. So some state of the
   budgeted shell thread (run_budgeted) changes OCCT's result there; not found yet (not the 30 s budget, no FP traps).
   The probes: dump the slabs at slabs' fuse (BRepTools::Write), fuse them in a kernel test.
+  core 11-05 08:40: not the budget either (op_shell_solid_unbudgeted directly: the same), nor OCCT's parallel mode. What
+  differs from the test that fuses them: there the first eight steps go through op_boolean (noshape's Boolean with the
+  inputs' cached bodies), here through quick_boolean's direct call; their union is the same volume, so look at its
+  topology (tolerances, a vertex or edge OCCT then trips on) before step 9.
 - [ ] P0 REGEN-SPEED (core 10-29 03:05: met in release on perf.yml run 40796942944 (main 34cbea98): live-30-features full regen 35 / 41 / 53 ms (macOS / Linux / Windows; budget 80, live 171), its Extrude 1 edit commit 34 / 38 / 60 ms (budget 200), big-plate regen 159 / 230 / 306 ms (live 617); qa, please re-measure the GUI commit on a release build, the 301–785 ms were a dev build at load ~30. Was 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left
