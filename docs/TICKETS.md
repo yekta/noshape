@@ -877,7 +877,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   time evaluate_refs on tracking queries (a per-op cache of a tracked snapshot's resolution), and the Common on an
   extruded surface (try the boolean on the face's surface as a cylinder or B-spline, or the section by the tool's
   faces).
-- [ ] P2 SM-CURVED-OUTLINE-SHADOW (dx 11-05 09:27) cf-sheet-metal-model-plus's Extrude 4 (a 5 mm blind cut whose end
+- [x] (dx 11-05 10:34: the caps offset back onto the rolled face, each loop the way round that holds the cap's foot, the widest when it holds the others; cf-sheet-metal-model-plus 14/14) P2 SM-CURVED-OUTLINE-SHADOW (dx 11-05 09:27) cf-sheet-metal-model-plus's Extrude 4 (a 5 mm blind cut whose end
   slants across the sloped wall and the rolled wall): std's sheet metal boolean outlines each tool on each definition
   face (opCreateOutline with the trimmed tool's cap faces as offsetFaces); Parasolid's outline is the tool's shadow
   across the thickness. The host now takes it on planar faces (the section plus the caps brought onto the plane: the

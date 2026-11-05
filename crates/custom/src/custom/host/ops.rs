@@ -2025,23 +2025,43 @@ fn oriented_like(cap: &Shape, face: &Shape) -> Option<Shape> {
     if a.dot(b) >= 0.0 { Some(cap.clone()) } else { cap.reversed().ok() }
 }
 
-/// A tool's outline on planar `face`: its section there with its cap faces (the thickened face's offsets it keeps)
-/// brought onto the plane, one region: a tool whose end slants across the sheet outlines its widest, as Parasolid's
-/// (cf-sheet-metal-model-plus's Extrude 4: 5 mm along the flat wall, not 4.58). None when the caps add nothing (a cut
-/// square to the sheet) or the face is curved (its section stays: SM-CURVED-OUTLINE-SHADOW).
+/// A tool's outline on `face`: its section there with its cap faces (the thickened face's offsets it keeps)
+/// brought onto the face along its normals, one region: a tool whose end slants across the sheet outlines its widest,
+/// as Parasolid's (cf-sheet-metal-model-plus's Extrude 4: 5 mm along the flat wall, not 4.58). None when the caps add
+/// nothing (a cut square to the sheet). On a curved face only a shadow holding the section and the others is taken
+/// (two regions on a rolled surface fuse with a seam left across them).
 fn outline_shadow(face: &Shape, section: &Shape, caps: &[Shape]) -> Option<Shape> {
-    face.face_plane().ok()??;
+    let plane = face.face_plane().ok()?;
     let area = section.area().ok()?;
     let mut shadows = Vec::new();
     for cap in caps {
         let p = super::sheetmetal::inner_point(cap)?;
-        let shadow = cap.translated(face.project_point(p).ok()?.point - p).ok()?;
+        let on = face.project_point(p).ok()?.point;
+        let shadow = match plane {
+            Some(_) => cap.translated(on - p).ok()?,
+            None => {
+                // Offset back along its normals (a normal projection, exactly), rebuilt on the face's own surface.
+                let d = (on - p).dot(cap.normal_at_point(p).ok()?.normalize_or_zero());
+                if d.abs() < 1e-9 {
+                    continue;
+                }
+                let back = k::offset_shape(cap, d, k::JoinType::Intersection).ok()?.shape;
+                let wire = back.faces().first()?.wires().into_iter().next()?;
+                // The loop's way round decides which side is the face's: the one holding the cap's foot.
+                [Some(wire.clone()), wire.reversed().ok()].into_iter().flatten().filter_map(|w| k::make_face_on(face, &w).ok()).find(|f| f.contains_point(on, 1e-7).unwrap_or(false))?
+            }
+        };
         if shadow.area().ok()? > area * (1.0 + 1e-9) {
             shadows.push(shadow);
         }
     }
     if shadows.is_empty() {
         return None;
+    }
+    if plane.is_none() {
+        let widest = shadows.iter().max_by(|a, b| a.area().unwrap_or(0.0).total_cmp(&b.area().unwrap_or(0.0)))?;
+        let holds = |f: &Shape| f.faces().iter().all(|g| g.vertices().iter().filter_map(|v| v.vertex_point().ok()).chain(super::sheetmetal::inner_point(g)).all(|p| widest.contains_point(p, 1e-6).unwrap_or(false)));
+        return (holds(section) && shadows.iter().all(holds)).then(|| oriented_like(widest, face)).flatten().map(|w| Shape::compound(&[w]));
     }
     let fused = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(section), &shadows, &k::BooleanOptions::default()).ok()?.shape;
     let fused = k::unify_edges(&k::unify_same_domain(&fused).ok()?.shape).ok()?.shape;

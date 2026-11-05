@@ -92,6 +92,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   - Debugging std (e.g. a println in sheetMetalFlange.fs): import string.fs there, and repack the pinned std
     versions the document's studios use (they are zstd deltas against crates/featurescript/std): unpack the shipped
     pack against the old std, then tools/std-pack.py <v> <dir>; never commit those.
+- 10:34 (lead: SM-BOOLEAN-SPEED, the drive train, SM-CURVED-OUTLINE-SHADOW):
+  - SM-BOOLEAN-SPEED: model-plus 2.5 -> 1.12-1.2 s (live 0.92): tracking queries (on-face tests by the classifier,
+    cached inner points and boxes, split pieces inside the old face's box), a curved outline from the tool's cap on
+    the face. Runs 116-119 no regressions; 7 of 56 documents slower than live (was 10). What is left is in the ticket.
+  - Drive train: live's tooth sketch and teeth match ours (REQUESTS 2056); ours is exactly blank − teeth, live's
+    Part 5 4.49 mm³ less: REQUESTS 09:59 asks for live's blank and gear volumes. SKETCH-REGION-EDGE-PIECES ticketed.
+  - SM-CURVED-OUTLINE-SHADOW closed: cf-sheet-metal-model-plus 14/14; run 119: 50/56, 426/483.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
