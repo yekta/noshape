@@ -1,5 +1,15 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## Resume here (2026-11-05 03:01 UTC)
+- Landed 11-05: ScopeRule 11 blend finish (b0595b8f; core.md), subassembly "Add to named positions…" + the
+  Lock/follow submenu as live (941e629a1), ellipse value boxes (b39029065). The mate dialog's undo pause (4200ad954)
+  was reverted by the watcher for cli_mode / coverage failures; re-applied on main, cli_mode 3/3 (`-p noshape --test
+  all cli_mode`) and coverage 9/9 pass, AGENT_API.md unchanged; re-queued (d52bf3b5).
+- Waiting on live: sm-model-thicken / sm-hem-edge / sm-edit-model-thickness re-records (account-remembered values),
+  Apply limit position on a UI-made Revolute (REQUESTS 01:42), which end a free line's length edit moves (19:21).
+- Open, no rule yet: Search tools order in a sketch (row 2.10, 8 live samples). Not mine: cf-sheet-metal-shaped-flange
+  Make joint 1 (dx's, waiting on core's opExtendSheetBody).
+
 ## Resume here (2026-11-04 22:28 UTC)
 - Sheet metal (lead 22:10): TAB-RIPPED-CORNER fixed with a native @opDerip (edge_change.rs; opEdgeChange takes an
   option's `face`); T1 a_bend_through_a_ripped_corner_is_refused pins live's B2. workflow-sheet-metal.md's status
