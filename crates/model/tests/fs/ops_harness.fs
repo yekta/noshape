@@ -345,10 +345,11 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             for (var e in evaluateQuery(context, qOwnedByBody(block, EntityType.EDGE)))
                 if (evCurveDefinition(context, { "edge" : e }) is Line)
                     lines += 1;
+            const length = evLength(context, { "entities" : qOwnedByBody(block, EntityType.EDGE) });
             const volume = evVolume(context, { "entities" : block });
             const bounds = evBox3d(context, { "topology" : block });
-            check("a block scaled non-uniformly", planes == 6 && lines == 12 && abs(volume - 1000 * mm ^ 3) < 1e-9 * mm ^ 3
-                    && norm(bounds.maxCorner - vector(20, 10, 3805) * mm) < 1e-9 * mm && norm(bounds.minCorner - vector(0, 0, 3800) * mm) < 1e-9 * mm, [planes, lines, volume, bounds]);
+            check("a block scaled non-uniformly", planes == 6 && lines == 12 && abs(length - 140 * mm) < 1e-9 * mm && abs(volume - 1000 * mm ^ 3) < 1e-9 * mm ^ 3
+                    && norm(bounds.maxCorner - vector(20, 10, 3805) * mm) < 1e-9 * mm && norm(bounds.minCorner - vector(0, 0, 3800) * mm) < 1e-9 * mm, [planes, lines, length, volume, bounds]);
         });
         step(context, id, "trackMovedEdge", function(sub) {
             // An edge opEdgeChange moved is still found by its tracking query, where it went (std's Fold tracks its

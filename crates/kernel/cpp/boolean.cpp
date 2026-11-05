@@ -6988,9 +6988,11 @@ public:
       myScale = std::max(myScale, gp_XYZ(a(1, c), a(2, c), a(3, c)).Modulus());
   }
 
+  // Solids only: a sheet stretched with planes (std Jog's clipped wall) loses the edges std then tracks through its
+  // split (TICKETS AFFINE-PLANAR-SHEETS).
   static bool applies(const TopoDS_Shape& s, const gp_GTrsf& g)
   {
-    if (g.VectorialPart().Determinant() <= 0.0)
+    if (g.VectorialPart().Determinant() <= 0.0 || !TopExp_Explorer(s, TopAbs_SOLID).More())
       return false;
     for (TopExp_Explorer x(s, TopAbs_FACE); x.More(); x.Next())
       if (plane_of(TopoDS::Face(x.Current())).IsNull())
