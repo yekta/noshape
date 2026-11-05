@@ -548,11 +548,111 @@ fn hulls_apart(a: &Hull, b: &Hull, gap: f64) -> bool {
     false
 }
 
+/// A Bézier patch of a NURBS surface: its homogeneous control points by row (along u) then column, its degrees.
+pub(super) struct Bez {
+    h: Vec<DVec4>,
+    p: usize,
+    q: usize,
+}
+
+impl Bez {
+    fn pt(&self, i: usize, j: usize) -> DVec3 {
+        let h = self.h[i * (self.q + 1) + j];
+        h.truncate() / h.w
+    }
+
+    fn hull(&self) -> Hull {
+        let pts: Vec<DVec3> = self.h.iter().map(|h| h.truncate() / h.w).collect();
+        let (lo, hi) = pts.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(lo, hi), &x| (lo.min(x), hi.max(x)));
+        let (du, dv) = (self.pt(self.p, self.q / 2) - self.pt(0, self.q / 2), self.pt(self.p / 2, self.q) - self.pt(self.p / 2, 0));
+        Hull { pts, lo, hi, du, dv, uv: [0.0; 4] }
+    }
+
+    /// Its halves along u or v (de Casteljau at the middle).
+    fn halves(&self, along_u: bool) -> (Bez, Bez) {
+        let (n, m) = if along_u { (self.p + 1, self.q + 1) } else { (self.q + 1, self.p + 1) };
+        let (mut l, mut r) = (self.h.clone(), self.h.clone());
+        for k in 0..m {
+            let idx = |t: usize| if along_u { t * (self.q + 1) + k } else { k * (self.q + 1) + t };
+            let mut c: Vec<DVec4> = (0..n).map(|t| self.h[idx(t)]).collect();
+            for s in 0..n {
+                l[idx(s)] = c[0];
+                r[idx(n - 1 - s)] = c[n - 1 - s];
+                for t in 0..n - 1 - s {
+                    c[t] = (c[t] + c[t + 1]) * 0.5;
+                }
+            }
+        }
+        (Bez { h: l, ..*self }, Bez { h: r, ..*self })
+    }
+}
+
+/// A NURBS surface's Bézier patches (its spans each way, by knot insertion), None where a weight isn't positive or
+/// its knots aren't clamped.
+fn bezier_patches(ns: &FreeSurface) -> Option<Vec<Bez>> {
+    let FreeSurface::Nurbs(s) = ns else { return None };
+    let (p, q) = (s.udegree, s.vdegree);
+    if s.weights.iter().any(|&w| w <= 0.0) || s.poles.len() != s.nu * s.nv {
+        return None;
+    }
+    let w = |k: usize| if s.weights.is_empty() { 1.0 } else { s.weights[k] };
+    let curve = |degree: usize, knots: &[f64], h: &[DVec4]| NurbsCurve { degree, knots: knots.to_vec(), poles: h.iter().map(|x| x.truncate() / x.w).collect(), weights: h.iter().map(|x| x.w).collect(), spans: Default::default() };
+    // Along u: each column (v index fixed) cut into its spans.
+    let cols: Vec<NurbsCurve> = (0..s.nv).map(|j| curve(p, &s.uknots, &(0..s.nu).map(|i| (s.poles[i * s.nv + j] * w(i * s.nv + j)).extend(w(i * s.nv + j))).collect::<Vec<_>>())).collect();
+    let nu = cols[0].spans().len();
+    if nu == 0 || cols.iter().any(|c| c.spans().len() != nu) {
+        return None;
+    }
+    let mut out = Vec::new();
+    for ku in 0..nu {
+        // Then each of that span's rows (u index fixed) along v.
+        let rows: Vec<NurbsCurve> = (0..=p).map(|i| curve(q, &s.vknots, &cols.iter().map(|c| c.spans()[ku].2[i]).collect::<Vec<_>>())).collect();
+        let nv = rows[0].spans().len();
+        if nv == 0 || rows.iter().any(|r| r.spans().len() != nv) {
+            return None;
+        }
+        for kv in 0..nv {
+            out.push(Bez { h: rows.iter().flat_map(|r| r.spans()[kv].2.iter().copied()).collect(), p, q });
+        }
+    }
+    Some(out)
+}
+
+/// Whether two Bézier patches are farther apart than `gap` by their control points' hulls, the larger one halved
+/// where they aren't, while `budget` (hull pairs) lasts.
+fn bez_apart(a: &Bez, b: &Bez, gap: f64, budget: &mut usize) -> bool {
+    if *budget == 0 {
+        return false;
+    }
+    *budget -= 1;
+    let (ha, hb) = (a.hull(), b.hull());
+    if hulls_apart(&ha, &hb, gap) {
+        return true;
+    }
+    let size = |h: &Hull| (h.hi - h.lo).length();
+    let (big, hbig, small) = if size(&ha) >= size(&hb) { (a, &ha, b) } else { (b, &hb, a) };
+    if size(hbig) <= gap {
+        return false;
+    }
+    let (l, r) = big.halves(hbig.du.length() >= hbig.dv.length());
+    bez_apart(&l, small, gap, budget) && bez_apart(&r, small, gap, budget)
+}
+
 /// Whether two faces, one or both free-form, are farther apart than `gap`, as their surfaces' control points tell
-/// (a Bézier surface against another or a plane; else false).
+/// (a Bézier surface against another or a plane; NURBS surfaces of several spans by their patches, halved while
+/// they meet (neighbouring helical gear flanks); else false).
 pub(super) fn apart(f: &GFace, g: &GFace, gap: f64) -> bool {
     fn pieces(x: &GFace) -> Option<&[Hull]> {
         x.hulls.get_or_init(|| x.ns.as_deref().and_then(hulls)).as_deref()
+    }
+    fn patches(x: &GFace) -> Option<&[Bez]> {
+        x.bez.get_or_init(|| x.ns.as_deref().and_then(bezier_patches)).as_deref()
+    }
+    if (pieces(f).is_none() || pieces(g).is_none())
+        && let (Some(a), Some(b)) = (patches(f), patches(g))
+    {
+        let mut budget = 20_000;
+        return a.iter().all(|x| b.iter().all(|y| bez_apart(x, y, gap, &mut budget)));
     }
     match (pieces(f), pieces(g)) {
         (Some(a), Some(b)) => a.iter().all(|x| b.iter().all(|y| hulls_apart(x, y, gap))),
@@ -579,6 +679,25 @@ pub(super) fn clearly_off(g: &GFace, p: DVec3, gap: f64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Two wavy strips of three spans each, one the other's mirror (their control points ±0.1 off a plane): apart by
+    /// their Bézier patches, halved while they meet, when 0.3 apart; not where they cross.
+    #[test]
+    fn b_spline_strips_apart_by_their_patches() {
+        let strip = |wave: f64, dz: f64| {
+            let poles = (0..5).flat_map(|i| (0..2).map(move |j| DVec3::new(i as f64, j as f64, if i % 2 == 0 { wave } else { -wave } + dz))).collect();
+            FreeSurface::Nurbs(crate::nurbs::NurbsSurface { udegree: 2, vdegree: 1, uknots: vec![0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 3.0, 3.0], vknots: vec![0.0, 0.0, 1.0, 1.0], nu: 5, nv: 2, poles, weights: Vec::new() })
+        };
+        let a = bezier_patches(&strip(0.1, 0.0)).expect("its patches");
+        assert_eq!(a.len(), 3);
+        let apart = |dz: f64| {
+            let b = bezier_patches(&strip(-0.1, dz)).expect("its patches");
+            let mut budget = 20_000;
+            a.iter().all(|x| b.iter().all(|y| bez_apart(x, y, 1e-3, &mut budget)))
+        };
+        assert!(apart(0.3));
+        assert!(!apart(0.0));
+    }
 
     /// A face's curves a period past its B-spline surface's own range (OCCT's on a periodic surface; fuzz seeds 979,
     /// 1036: RUST-BOOL-CLAMP-ABORT, f64::clamp with min 8.3 > max 2π): no box, so the face declines, not a panic.

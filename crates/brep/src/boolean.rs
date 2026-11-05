@@ -263,6 +263,8 @@ struct GFace {
     patches: std::sync::OnceLock<free::Patches>,
     /// A Bézier face's surface in pieces, each its control points (holding it).
     hulls: std::sync::OnceLock<Option<Vec<free::Hull>>>,
+    /// Its NURBS surface's Bézier patches, one per span each way (free::apart), made once.
+    bez: std::sync::OnceLock<Option<Vec<free::Bez>>>,
     /// Edges inside it (an input's INTERNAL edges): kept inside the piece they lie in, splitting nothing.
     inner: Vec<usize>,
 }
@@ -3550,7 +3552,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 Some(fs) => free::nurbs_surf(fs, uvbox, f.reversed),
                 None => s,
             };
-            cx.faces.push(GFace { arg: a, index: i as u32, t: body.face_tol.get(i).copied().unwrap_or(0.0), solid: usize::MAX, s, edges, loop_lens, bound: Default::default(), bound_spans: Default::default(), bound_pts: Default::default(), right: Vec::new(), wrap_eps: 0.0, lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default(), hulls: Default::default(), inner: body.face_inner_edges.iter().filter(|x| x[0] as usize == i).map(|x| first_edge[ai] + x[1] as usize).collect() });
+            cx.faces.push(GFace { arg: a, index: i as u32, t: body.face_tol.get(i).copied().unwrap_or(0.0), solid: usize::MAX, s, edges, loop_lens, bound: Default::default(), bound_spans: Default::default(), bound_pts: Default::default(), right: Vec::new(), wrap_eps: 0.0, lo: DVec3::INFINITY, hi: DVec3::NEG_INFINITY, ns, uvbox, pcurves, grid: Default::default(), patches: Default::default(), hulls: Default::default(), bez: Default::default(), inner: body.face_inner_edges.iter().filter(|x| x[0] as usize == i).map(|x| first_edge[ai] + x[1] as usize).collect() });
         }
         for (i, s) in body.solids.iter().enumerate() {
             let si = cx.solids.len();
