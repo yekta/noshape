@@ -36,6 +36,11 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-05 00:44:** vibe3 fuzz so far 0 deaths: CLI 120 seeds fallback-off / 140 on (greens f3010615, 87ea26b5; v0.4.26), GUI 141
+seeds (fz5101–5241, green f3010615). Now: CLI ~/qa/bin/v3nf3.sh (a1ec7849, 4241–4300), v3g3.sh (4301–4340), v3cf2.sh (v0.4.29,
+4341–4400); GUI fuzz on a1ec7849 (~/qa/noshape-green-new → it; repoint it per green). The watch also stops on GUIFUZZ (dead GUI
+seeds on vibe3 above qa-scratch/watch-gui.base). Greens since v0.4.29 checked on vibe3 (sweeps): afa47c8c, 15afff85, a1ec7849.
+
 **v0.4.29 (published 23:14, cut b71b0324 = 6c3decf4, the Gyro fix; Release run 41923108124 green) 23:19:** artifacts
 byte-identical to the run's, SHA256SUMS OK. **Updater with `noshape mcp` running (Linux, vibe3; v0.4.28's helper, before the
 lead's fix):** fetched 23:18:05 (~4 min after publish), staged; Restart → the app 0.4.29 (new pid), g34 reopened — the update
