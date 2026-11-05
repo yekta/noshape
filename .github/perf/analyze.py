@@ -2,6 +2,7 @@
 """Summarize viewport benchmark logs (bench.sh / bench.ps1) and apply the gates.
 
     analyze.py <output dir> <label> [--stills] [--gate-ui-cpu-p95 MS] [--gate-gpu-p95 MS]
+               [--gate-floor-gpu-p95 MS] [--target-gpu-mean MS [--gate-target]]
                [--gate-p95 MS] [--gate-mode MODE] [--baseline DIR --max-regression FRACTION]
                [--report-regressions]
 
@@ -11,6 +12,10 @@ Writes a Markdown table to $GITHUB_STEP_SUMMARY (and stdout) and
   --stills           `texture-still.png` must match `readback-still.png` and not be black;
   --gate-ui-cpu-p95  UI-thread CPU p95 per frame;
   --gate-gpu-p95     our GPU time p95 per frame (skipped for builds that don't report it);
+  --gate-floor-gpu-p95  PLAN 2.7's floor (60 fps on big models at Retina): every 2× row (orbit, pan, zoom: the
+                     `texture+retina` runs) has our GPU time p95 per frame <= MS;
+  --target-gpu-mean  PLAN 2.7's target for this document (NIST: 120 fps): the 2× orbit's GPU mean per frame <= MS,
+                     reported; with --gate-target a gate (on once met, so it can't regress);
   --gate-p95         frame-interval p95;
   --baseline         every run: fps, frame-interval p95, UI CPU p95 and GPU p95 at most
                      --max-regression worse than in DIR/summary.json, and worse by more
@@ -158,6 +163,9 @@ def main():
     ap.add_argument("--gate-p95", type=float)
     ap.add_argument("--gate-ui-cpu-p95", type=float)
     ap.add_argument("--gate-gpu-p95", type=float)
+    ap.add_argument("--gate-floor-gpu-p95", type=float)
+    ap.add_argument("--target-gpu-mean", type=float)
+    ap.add_argument("--gate-target", action="store_true")
     ap.add_argument("--gate-mode", default="texture")
     ap.add_argument("--baseline")
     ap.add_argument("--max-regression", type=float, default=0.10)
@@ -230,6 +238,30 @@ def main():
     gate("UI-thread CPU p95", "cpup95", args.gate_ui_cpu_p95)
     gate("GPU p95", "gpup95", args.gate_gpu_p95)
     gate("frame-interval p95", "p95", args.gate_p95)
+    # PLAN 2.7 (lead 11-05): the 60 fps floor on every 2× row; the document's own target on the 2× orbit.
+    retina = [r for r in measured if r["mode"] == "texture+retina"]
+    if args.gate_floor_gpu_p95 is not None:
+        if not retina:
+            failures.append("60 fps floor: no 2× run")
+            lines.append("Gate 60 fps floor: FAILED (no 2× run)")
+        for r in retina:
+            if r.get("gpup95") is None:
+                lines.append(f"Gate 60 fps floor (2× {r['kind']}): GPU time not reported by this build (skipped)")
+                continue
+            ok = r["gpup95"] <= args.gate_floor_gpu_p95
+            lines.append(f"Gate 60 fps floor (2× {r['kind']}) GPU p95 {r['gpup95']:.2f} <= {args.gate_floor_gpu_p95} ms: {'OK' if ok else 'FAILED'}")
+            if not ok:
+                failures.append(f"60 fps floor: 2× {r['kind']} GPU p95 {r['gpup95']:.2f} ms > {args.gate_floor_gpu_p95} ms")
+    if args.target_gpu_mean is not None:
+        r = next((x for x in retina if x.get("kind") == "orbit"), None)
+        if r is None or r.get("gpu") is None:
+            lines.append("Target 120 fps (2× orbit GPU mean): not measured")
+        else:
+            met = r["gpu"] <= args.target_gpu_mean
+            what = "Gate" if args.gate_target else "Target (reported)"
+            lines.append(f"{what} 120 fps (2× orbit) GPU mean {r['gpu']:.2f} <= {args.target_gpu_mean} ms: {'met' if met else 'not met'}")
+            if args.gate_target and not met:
+                failures.append(f"120 fps target: 2× orbit GPU mean {r['gpu']:.2f} ms > {args.target_gpu_mean} ms")
     base_path = os.path.join(args.baseline, "summary.json") if args.baseline else None
     # The benchmark document (perf.yml FIXTURE): a baseline of another one
     # (a run dispatched with `fixture`, e.g. live-30's 24 instances against
