@@ -22,7 +22,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   qAdjacent / qOwnedByBody / qEverything give a sheet's edges from a sketch region in that sketch's order (live's
   ascending transient ids); a cut-away corner's tracking finds nothing after a topology change. Run 92 with it:
   41/55 documents, 389/471 features, custom 46/109 (run 90: 38, 376, 40); cf-sheet-metal-overcut-dogbone 10/10.
-- Next: land it; 04:00 daily walk; then the corpus's remaining custom-feature differences.
+- Daily walk 11-05 03:17 on green c01eac48 (:105, own settings folder; /root/dx-scratch/walk6/s*.png): Part 1 ›
+  Export… opens on Parasolid / latest the first time; STEP, Y up, AP214 (AP242-only boxes hidden) exported -> an
+  AP214 file, and the dialog reopens on it; Parasolid in the same dialog shows its own latest version, Y up shared;
+  Cancel writes nothing; Assembly 1 › Export… opens on STEP, Y up; Export Drawing opens on PDF 1.5, exported in
+  Grayscale, reopens in Grayscale. No regressions.
+- Next: the corpus's remaining custom-feature differences (run 92: 46/109).
 
 ## 11-05 01:00 UTC: Export dialogs remember the user's choices (P1 from the user via lead, 00:3x)
 - Live's client code (behaviours "dx (2026-11-05 00:52, P1 export memory)"): one `exportSolidOptions` for part,
