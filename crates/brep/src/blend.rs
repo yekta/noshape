@@ -795,8 +795,11 @@ fn chain(
                 }
                 let far = if oe.v[0] == v { oe.v[1] } else { oe.v[0] };
                 let d = b.vertices[far as usize] - p;
-                if d.normalize().dot(w.normalize()) < 1.0 - 1e-9 || d.length() <= w.length() + margin {
-                    return no("a chain end's edge not along the blend's side or too short");
+                if d.normalize().dot(w.normalize()) < 1.0 - 1e-9 {
+                    return no("a chain end's edge not along the blend's side");
+                }
+                if d.length() <= w.length() + margin {
+                    return no("a chain end's edge shorter than the blend's side");
                 }
             }
             let ext = (w1 - q * d1).length().max((w2 - x.t * d2).length());
