@@ -191,7 +191,13 @@ pub(crate) fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
         }
     }
     // The states after each feature, and the last line's regeneration times.
-    let live = std::fs::read_to_string(dir.join("live.jsonl")).unwrap_or_default().lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).filter(|l| l.get("index").is_some() || l.get("full_regen_ms").is_some()).collect();
+    let mut live: Vec<Value> = std::fs::read_to_string(dir.join("live.jsonl")).unwrap_or_default().lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).filter(|l| l.get("index").is_some() || l.get("full_regen_ms").is_some()).collect();
+    // The UI fetch's boxes are the client's body bounds, loose around swept B-spline faces (live 2052): ours only has
+    // to lie inside them.
+    let source: Value = std::fs::read_to_string(dir.join("source.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+    if source["fetchedBy"]["live.jsonl"].as_str().is_some_and(|f| f.starts_with("UI")) {
+        live.iter_mut().filter(|l| l.get("index").is_some()).for_each(|l| l["looseBoxes"] = json!(true));
+    }
     let refs = std::fs::read_to_string(dir.join("refs.jsonl")).unwrap_or_default();
     Some((features, live, refs))
 }
@@ -636,6 +642,10 @@ fn a_zero_centroid_is_unknown() {
     assert_eq!(live_parts(&line([0.0; 3]))[0].centroid, None);
     assert_eq!(live_parts(&line([0.0027, 0.0, 0.002]))[0].centroid, Some([0.0027, 0.0, 0.002]));
     assert!(live_parts(&line([0.0; 3]))[0].bbox_outer && !live_parts(&line([0.0027, 0.0, 0.002]))[0].bbox_outer);
+    // The UI fetch's boxes (read_model's looseBoxes) are outer ones, a centroid or not.
+    let mut ui = line([0.0027, 0.0, 0.002]);
+    ui["looseBoxes"] = json!(true);
+    assert!(live_parts(&ui)[0].bbox_outer);
     // A sheet of the UI fetch has no centroid; its box is the client's loose one too.
     let sheet = json!({ "index": 0, "parts": [{ "name": "Surface 1", "bodyType": "sheet", "faces": 1, "centroid": null, "bbox": { "min": [-0.074, -0.085, -0.014], "max": [0.074, 0.105, 0.103] } }] });
     assert!(live_parts(&sheet)[0].bbox_outer);

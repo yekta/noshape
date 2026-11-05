@@ -3337,7 +3337,7 @@ pub fn live_parts(line: &Value) -> Vec<PartState> {
             // The UI fetch: its parts' centroids are massproperties' exact
             // [0, 0, 0] (no material), a sheet's none (its box the control
             // points' bounds: cf-curve-pattern-normal's B-spline surface).
-            bbox_outer: f3(&p["centroid"]).is_none_or(|c| c == [0.0; 3]),
+            bbox_outer: line["looseBoxes"].as_bool() == Some(true) || f3(&p["centroid"]).is_none_or(|c| c == [0.0; 3]),
             // massproperties gives exactly [0, 0, 0] for a part without a
             // material (live README; every part of the UI fetch): not known.
             centroid: f3(&p["centroid"]).filter(|c| *c != [0.0; 3]),
