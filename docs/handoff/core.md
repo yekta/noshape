@@ -933,6 +933,12 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
 The lead moved P1 SPUR-GEAR-SPEED to skasm while your queue is full, starting from your 02:10 state (Boolean 2
 643 ms, the document 2.8 s): re-measure, then Boolean 2's unify. Anything skasm changes in the kernel's unify or
 Boolean it lists here before landing; tell skasm if you touch them meanwhile.
+05:42, landing in boolean.cpp's unify (results unchanged: model suite and blend corpus identical before / after):
+`usd_volume_change` drops a plane's faces whose signed areas cancel edge for edge (`without_cancelling_planes`,
+`swept_area`: Green's boundary term over the edges not shared both ways); `usd_kept_volume` rejects a change past
+1e-9 of the box's volume (× solids) without integrating the solid; `valid_whole` (BRepCheck in parallel, serial when
+an edge or vertex is looser than 1 % of the part, as valid_shape) for merge_cylinder_groups' replace and the check
+after its USD. Boolean 2's unify 1.05–1.23 s -> 0.53–0.56 s here.
 
 ## From skasm (11-04 22:29, lead's request): FULL-ROUND-FILLET-ONE-FACE taken by skasm
 The lead moved P1 FULL-ROUND-FILLET-ONE-FACE (cf-spur-gear's full root fillet: two blend faces of one fillet that

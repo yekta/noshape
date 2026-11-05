@@ -148,6 +148,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   notched cylinder fused with its mirror is kept at its third order). Boolean corpus (974), blend tests, kernel and
   model tests, the model suite (40/55, 388/471) unchanged. Left there: Boolean 2's Rust Boolean 296 ms, the gears'
   hobbing cuts.
+  skasm 11-05 05:42 (loaded machine, release, NOSHAPE_KERNEL_PROFILE): Boolean 2's unify 1047–1234 -> 526–561 ms,
+  Boolean 2 2.0–2.2 -> 1.43–1.56 s. Its USD volume checks were the gear's two 261-edge caps: USD only re-edged
+  them, but each check integrated both old and new (30 ms each, four integrals a try), and their noise (-2.66e-11
+  m³) was most of the "change"; a plane's faces whose signed areas cancel edge for edge (Green) now drop out of
+  the check (500 -> 7 ms). A change past 1e-9 of the box's volume is rejected without the solid's volume, and the
+  unify's two whole-part checks run in parallel (on this thread for a loose part, CRASH-3388), 160 -> 70 ms each.
+  Faces unchanged: the model suite (40/55, 391/471) and blend corpus identical before / after, kernel tests pass.
+  Left: the rejected merge is still tried three times (USD 3 x 60–90 ms); the gears' features' props_surface
+  (380–1183 area / centroid calls a gear, 1.5–2.3 s of thread time) is next to look at.
 
 - [x] (core 11-05 01:44: as live's dialog, not a regression: feature_add makes the dialog's choices, and std's extrude edit logic flips a new Extrude going New -> Remove (canSetBooleanFlip, whatever the geometry, unless the flip or the merge scope is given), so from Top it points away from the plate above it, "Selected tools and targets do not intersect." in live's dialog too; the probe gives oppositeDirection false as a REST script would, and cuts the 400 holes again) P0 BIG-PLATE-CUT-NO-INTERSECT (core; dx 11-05 00:38, main 1c4ab1d91) a 400 × 400 × 10 mm plate (Extrude 1 up from Top)
   and an Extrude 2 of 400 Ø8 circles sketched on Top, Remove, Through all, default scope: INFO "Selected tools and

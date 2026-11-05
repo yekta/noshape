@@ -71,6 +71,7 @@
 #include <gp_Trsf.hxx>
 
 #include <BRepAdaptor_Curve.hxx>
+#include <TColStd_Array1OfReal.hxx>
 #include <BRepLib.hxx>
 #include <BOPTools_AlgoTools.hxx>
 #include <IntCurvesFace_ShapeIntersector.hxx>
@@ -1311,13 +1312,138 @@ FaceShare face_share(const TopoDS_Shape& f)
   return r;
 }
 
+// Twice the signed area edge `e` (forward) sweeps about `o` in the plane (x, y), the boundary term of Green's
+// theorem; null on a curve this doesn't integrate.
+std::optional<double> swept_area(const TopoDS_Edge& e, const gp_Pnt& o, const gp_Dir& x, const gp_Dir& y)
+{
+  const BRepAdaptor_Curve c(e);
+  const GeomAbs_CurveType t = c.GetType();
+  if (t != GeomAbs_Line && t != GeomAbs_Circle && t != GeomAbs_Ellipse && t != GeomAbs_BSplineCurve && t != GeomAbs_BezierCurve)
+    return std::nullopt;
+  const int n = c.NbIntervals(GeomAbs_CN);
+  TColStd_Array1OfReal knots(1, n + 1);
+  c.Intervals(knots, GeomAbs_CN);
+  math_Vector gp(1, 10), gw(1, 10);
+  math::GaussPoints(10, gp);
+  math::GaussWeights(10, gw);
+  double r = 0;
+  for (int i = 1; i <= n; ++i)
+  {
+    const double a = knots(i), b = knots(i + 1);
+    const int    pieces = (t == GeomAbs_Circle || t == GeomAbs_Ellipse) ? std::max(1, (int)std::ceil((b - a) / (M_PI / 4))) : 1;
+    for (int k = 0; k < pieces; ++k)
+    {
+      const double u0 = a + (b - a) * k / pieces, u1 = a + (b - a) * (k + 1) / pieces;
+      const double m = (u0 + u1) / 2, h = (u1 - u0) / 2;
+      for (int j = 1; j <= 10; ++j)
+      {
+        gp_Pnt p;
+        gp_Vec v;
+        c.D1(m + h * gp(j), p, v);
+        const gp_Vec d(o, p);
+        r += gw(j) * h * (d.Dot(gp_Vec(x)) * v.Dot(gp_Vec(y)) - d.Dot(gp_Vec(y)) * v.Dot(gp_Vec(x)));
+      }
+    }
+  }
+  return r;
+}
+
+// `fs` without the faces on one plane whose volume shares cancel. A plane face's share about the integrals' centre
+// is its plane's distance from it times its signed area over 3, and the area a sum over its edge uses (Green), in
+// which an edge's uses both ways cancel: a face USD only re-edged against its old self differs by its changed
+// edges only (cf-spur-gear's Boolean 2: the gear's caps, 261 edges, 30 ms an integral, four integrals a try).
+std::vector<TopoDS_Shape> without_cancelling_planes(const std::vector<TopoDS_Shape>& fs, double diag)
+{
+  struct Plane
+  {
+    const Standard_Transient* surface;
+    TopLoc_Location           loc;
+    std::vector<size_t>       faces;
+  };
+  std::vector<Plane> planes;
+  for (size_t i = 0; i < fs.size(); ++i)
+  {
+    TopLoc_Location                 l;
+    const occ::handle<Geom_Surface> g = BRep_Tool::Surface(TopoDS::Face(fs[i]), l);
+    if (g.IsNull() || g->DynamicType() != STANDARD_TYPE(Geom_Plane))
+      continue;
+    auto p = std::find_if(planes.begin(), planes.end(), [&](const Plane& q) { return q.surface == g.get() && q.loc.IsEqual(l); });
+    if (p == planes.end())
+      planes.push_back({g.get(), l, {i}});
+    else
+      p->faces.push_back(i);
+  }
+  std::vector<bool> drop(fs.size(), false);
+  for (const Plane& plane : planes)
+  {
+    if (plane.faces.size() < 2)
+      continue;
+    struct Use
+    {
+      const Standard_Transient* curve;
+      TopLoc_Location           loc;
+      double                    a, b;
+      int                       net;
+      TopoDS_Edge               edge;
+    };
+    std::vector<Use> uses;
+    bool             ok = true;
+    for (size_t i : plane.faces)
+      for (TopExp_Explorer x(fs[i], TopAbs_EDGE); ok && x.More(); x.Next())
+      {
+        const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+        if (BRep_Tool::Degenerated(e))
+          continue;
+        const int net = e.Orientation() == TopAbs_FORWARD ? 1 : e.Orientation() == TopAbs_REVERSED ? -1 : 0;
+        TopLoc_Location l;
+        double          a, b;
+        const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, l, a, b);
+        if (c.IsNull())
+        {
+          ok = false;
+          break;
+        }
+        auto u = std::find_if(uses.begin(), uses.end(), [&](const Use& q) { return q.curve == c.get() && q.a == a && q.b == b && q.loc.IsEqual(l); });
+        if (u == uses.end())
+          uses.push_back({c.get(), l, a, b, net, TopoDS::Edge(e.Oriented(TopAbs_FORWARD))});
+        else
+          u->net += net;
+      }
+    if (!ok)
+      continue;
+    const gp_Ax3    frame = BRepAdaptor_Surface(TopoDS::Face(fs[plane.faces[0]]), false).Plane().Position();
+    double          area  = 0;
+    for (const Use& u : uses)
+    {
+      if (u.net == 0)
+        continue;
+      const std::optional<double> a = swept_area(u.edge, frame.Location(), frame.XDirection(), frame.YDirection());
+      if (!a)
+      {
+        ok = false;
+        break;
+      }
+      area += u.net * *a;
+    }
+    if (!ok || std::abs(area) > 1e-13 * diag * diag)
+      continue;
+    for (size_t i : plane.faces)
+      drop[i] = true;
+  }
+  std::vector<TopoDS_Shape> r;
+  for (size_t i = 0; i < fs.size(); ++i)
+    if (!drop[i])
+      r.push_back(fs[i]);
+  return r;
+}
+
 // How much USD's result `out` changed the volume of `s`, on the faces it changed only (the knurl: 14 of its
 // 10,376 faces merged, two whole-solid integrals of B-spline faces were most of op_boolean's unify): the faces
 // of `s` whose images in its input it removed or changed, against the faces of `out` that took their place.
 // `image`: a face of `s` in USD's input as the input uses it (null: not found); `share`: its face_share before
 // USD ran. Null when a face of `s` has no image: the whole volumes then.
 std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, const std::vector<TopoDS_Shape>& image,
-                                        const std::vector<FaceShare>& share, const TopoDS_Shape& out)
+                                        const std::vector<FaceShare>& share, const TopoDS_Shape& out, double diag)
 {
   ShapeIMap outf;
   for (TopExp_Explorer x(out, TopAbs_FACE); x.More(); x.Next())
@@ -1339,7 +1465,7 @@ std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, con
       after.push_back(x.Current());
   for (const TopoDS_Shape& f : before)
     after.push_back(f.Reversed());
-  return faces_volume(after);
+  return faces_volume(without_cancelling_planes(after, diag));
 }
 
 TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
@@ -1350,7 +1476,20 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
   std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("usd.box");
   Bnd_Box                      box;
   BRepBndLib::Add(s, box, false);
-  const double bv = box.IsVoid() ? 0 : std::sqrt(box.SquareExtent()) * std::sqrt(box.SquareExtent()) * std::sqrt(box.SquareExtent());
+  const double diag = box.IsVoid() ? 0 : std::sqrt(box.SquareExtent());
+  const double bv   = diag * diag * diag;
+  // A bound on the solids' volume: a change past 1e-9 of it is past 1e-9 of theirs (cf-spur-gear's flat gear, its
+  // rejected merges: 6.7e-8 of its volume, 1.1e-10 of its box's diagonal cubed; the volume then cost 128 ms).
+  double most = std::numeric_limits<double>::infinity();
+  if (!box.IsVoid() && TopExp_Explorer(s, TopAbs_SOLID).More())
+  {
+    double x0, y0, z0, x1, y1, z1;
+    box.Get(x0, y0, z0, x1, y1, z1);
+    int solids = 0;
+    for (TopExp_Explorer x(s, TopAbs_SOLID); x.More(); x.Next())
+      ++solids;
+    most = solids * (x1 - x0) * (y1 - y0) * (z1 - z0);
+  }
   lap.reset();
   std::optional<double> v0;
   auto volume0 = [&] {
@@ -1400,6 +1539,8 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
         return false;
       if (std::abs(d) <= 1e-12 * bv)
         return true;
+      if (std::abs(d) > 1e-9 * most)
+        return false;
     }
     else
     {
@@ -1451,7 +1592,7 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     u.Build();
     fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.check");
-    const std::optional<double> change = usd_volume_change(sf, image, share, u.Shape());
+    const std::optional<double> change = usd_volume_change(sf, image, share, u.Shape(), diag);
     if (!keeps_volume(change, u.Shape()))
     {
       // (The same merge rejected three times running: the faces' order doesn't change it here, so neither will the
@@ -1519,7 +1660,7 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     std::vector<FaceShare>    share;
     images(cp, HHist(), in, image, share);
     u.Build();
-    if (!keeps_volume(usd_volume_change(sf, image, share, u.Shape()), u.Shape()))
+    if (!keeps_volume(usd_volume_change(sf, image, share, u.Shape(), diag), u.Shape()))
       continue;
     if (hist.IsNull())
       hist = new BRepTools_History();
@@ -2282,6 +2423,23 @@ TopoDS_Shape move_seams_off_holes(const TopoDS_Shape& s, HHist& hist)
   return s;
 }
 
+// BRepCheck's verdict on a whole part, in parallel (cf-spur-gear's Boolean 2: 160 ms a check, two of them in its
+// unify), but on this thread for a part with an edge or vertex looser than a hundredth of it: BRepCheck_Face's
+// classification of such a face segfaults on the pool's threads (CRASH-3388).
+bool valid_whole(const TopoDS_Shape& s)
+{
+  Bnd_Box box;
+  BRepBndLib::Add(s, box);
+  const double loose = box.IsVoid() ? 0 : 1e-2 * std::sqrt(box.SquareExtent());
+  bool         tight = loose > 0;
+  for (TopExp_Explorer x(s, TopAbs_EDGE); tight && x.More(); x.Next())
+    tight = BRep_Tool::Tolerance(TopoDS::Edge(x.Current())) <= loose;
+  for (TopExp_Explorer x(s, TopAbs_VERTEX); tight && x.More(); x.Next())
+    tight = BRep_Tool::Tolerance(TopoDS::Vertex(x.Current())) <= loose;
+  BudgetHold hold;
+  return BRepCheck_Analyzer(s, true, tight).IsValid();
+}
+
 // Faces on one cylinder whose frames differ (seams apart, either hand: a hole through a boss in a mirrored plate,
 // the plate's two half walls and the boss's), or any such faces with `any_frame` (after USD: those it left apart),
 // sharing edges, the group's edges used once two closed chains round it or one loop on a part of it: OCCT's unify
@@ -2453,7 +2611,7 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any
         for (size_t k = 1; k < g.size(); ++k)
           rs->Remove(fm(g[k]));
         const TopoDS_Shape out = rs->Apply(s);
-        if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+        if (out.IsNull() || !valid_whole(out))
           return false;
         // The volume kept: the new face's share of it against the group's faces' (one integral of each side; the
         // whole solid's integral is noisier than the change: 2.9e-7 of it on a part fused with its mirror, 11ed9bd7,
@@ -3928,7 +4086,7 @@ TopoDS_Shape unify_faces_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScop
       ShapeUpgrade_UnifySameDomain u(s4, true, false, false);
       u.Build();
       fail_if_cancelled();
-      if (!BRepCheck_Analyzer(u.Shape()).IsValid())
+      if (!valid_whole(u.Shape()))
         return s3;
       if (hist.IsNull())
         hist = new BRepTools_History();
