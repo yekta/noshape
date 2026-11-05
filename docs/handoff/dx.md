@@ -50,8 +50,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   12/12 (Fix PCB 2 4.2 -> 1.4 s). cf-hose-routing: ours is exact (closed-form tube centroid along live's Béziers),
   live.jsonl's centroid / box are approximate; asked live for the centroid band (REQUESTS 04:41) before changing
   the comparison.
-- Next: cf-sheet-metal-hem's Derived 1 (importDerived, REQUESTS 04:00); the remaining first differences in SCORE.md
-  run 101 (driveTrainGen volume, an extrude's counts, two fillets).
+- 05:37 queued 12875bcc (after 6559e85c failed on features_c::jog_preserve_material_off_and_errors: the planar
+  affine path now for solids only, TICKETS AFFINE-PLANAR-SHEETS): opExtendSheetBody up to a surface (std Make joint,
+  a Flange's alignment, Move face) as an edge change onto the limit, sewn, the common edge one edge again (kernel
+  unify_edges). Run 103: 44/55 documents, 399/471 features; cf-sheet-metal-shaped-flange 5 -> 9/10.
+- Next there: Shaped Flange 2 adds a wall region coplanar with Flange 1's −x wall; live's solid has one end face
+  (y 74, z 5..44), ours two (split at z 25, the old wall's top): whether live's definition sheet keeps that edge is a
+  question for live. Then cf-sheet-metal-hem's Derived 1 (REQUESTS 04:00), cf-straight-spline, cf-setback-fillet.
 
 ## 11-05 01:00 UTC: Export dialogs remember the user's choices (P1 from the user via lead, 00:3x)
 - Live's client code (behaviours "dx (2026-11-05 00:52, P1 export memory)"): one `exportSolidOptions` for part,
