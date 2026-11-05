@@ -810,6 +810,11 @@ impl C2 {
                     if ahi.x < blo.x || bhi.x < alo.x || ahi.y < blo.y || bhi.y < alo.y {
                         continue;
                     }
+                    // (The chords themselves farther apart than that: a segment's box (a diagonal side's) met chords far
+                    // off it; a gear's cut seeded 24 Newton runs a crossing.)
+                    if chord_gap(a0, a1, b0, b1) > grow + 4.0 * tol {
+                        continue;
+                    }
                     let (mut s, mut t) = ((i as f64 + 0.5) / na as f64, (j as f64 + 0.5) / nb as f64);
                     let mut ok = false;
                     for _ in 0..40 {
@@ -1067,6 +1072,25 @@ pub(crate) fn distance_with(p: DVec2, edges: &[C2], spans: &[SpanBoxes]) -> f64 
         best = best.min(edges[i].distance_by(p, spans.get(i)));
     }
     best
+}
+
+/// The distance between segments a0 a1 and b0 b1 (0 where they cross).
+fn chord_gap(a0: DVec2, a1: DVec2, b0: DVec2, b1: DVec2) -> f64 {
+    let (da, db) = (a1 - a0, b1 - b0);
+    let den = da.perp_dot(db);
+    if den.abs() > 1e-300 {
+        let w = b0 - a0;
+        let (s, t) = (w.perp_dot(db) / den, w.perp_dot(da) / den);
+        if (0.0..=1.0).contains(&s) && (0.0..=1.0).contains(&t) {
+            return 0.0;
+        }
+    }
+    let foot = |p: DVec2, q0: DVec2, d: DVec2| {
+        let l2 = d.length_squared();
+        let t = if l2 > 0.0 { ((p - q0).dot(d) / l2).clamp(0.0, 1.0) } else { 0.0 };
+        (q0 + d * t - p).length()
+    };
+    foot(a0, b0, db).min(foot(a1, b0, db)).min(foot(b0, a0, da)).min(foot(b1, a0, da))
 }
 
 #[cfg(test)]
