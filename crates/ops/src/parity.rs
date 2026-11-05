@@ -1699,7 +1699,8 @@ impl<'a> Translator<'a> {
             if let Some((_, v)) = tm.iter().find(|(k, _)| matches!(k, Packed::Str(k) if k == "operationId")) {
                 packed_strings(v, &mut op);
             }
-            if !op.iter().any(|o| o.ends_with(".opBoolean")) {
+            // (A sketch's imprint keeps it too, split: cf-transform-pattern's connector on a cap edge a sketch imprints.)
+            if !op.iter().any(|o| o.ends_with(".opBoolean") || o.ends_with(".imprint")) {
                 return None;
             }
         }
