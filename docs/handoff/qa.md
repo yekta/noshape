@@ -36,6 +36,14 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**v0.4.31 (published 11:11, cut d84287a1 = b3889906: greens through 7bb99058, not 8cc1b766) smoked 11:33: good, no new
+blocker.** Artifacts byte-identical, SHA256SUMS OK, 11 assets; CLI smoke = v0.4.30 (round trip, all fixed tickets, the user's
+cases incl. the Gyro); the 44 ticket documents = 7bb99058; GUI rows pixel-identical to v0.4.30; title bar: all five menus open
+(tickets/titlebar-menus-linux-v0431.png). **RELEASE-BUILD-FILLET-HANG still in the release** (the new smoke row: HANG, no answer in
+120 s; dev builds 6 s). Updater v0.4.30 → v0.4.31 on vibe3, the first by the lead's new helper, with `noshape mcp` running: ends on
+0.4.31, g34 reopened; the mcp copy left running on the old binary and no update-helper.log (filed P2 UPDATE-HELPER-LINUX-PARITY).
+qa-scratch/rel/k keeps v0.4.30 / v0.4.31 only.
+
 **11-05 10:51:** vibe3 ~/qa/rel pruned (25 → 4.4 GB: keep the greens in use, the last two release CLIs; prune again every few greens:
 v3sweep.sh copies an ~800 MB binary per green). Fuzz loops now on green 2572d7d9 (~/qa/bin/v3nf5.sh 4561–4620, v3g5.sh 4621–4660) and
 v0.4.30 (v3cf4.sh 4661–4720). Release-loop deaths so far, both filed: v0.4.30 seed 4539 (hang, RELEASE-BUILD-FILLET-HANG) and seed 4558
