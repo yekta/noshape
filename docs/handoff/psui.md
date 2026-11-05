@@ -564,6 +564,13 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N0000. (11-05 03:00) **Runner GPU per pass (run 41950133358, NIST 2388×1588 orbit, frames-driven, steady p50):**
+    color 5.4 / 4.7 ms (macOS 14 / 15), AO 0.6 / 0.4, overlay ~0, sil-cull ~0; submit→done 12.6 / 11.2 ms. The empty
+    frame (lines + meshes skipped): color 0.9 / 0.6, AO 0.3, but submit→done still 9.3 ms. So our GPU work per NIST
+    frame is ~6 ms (under 8.3); the ~9 ms floor is the paravirtualized runner GPU's submission → completion latency,
+    not our passes (the frames-driven bench waits for each frame, so it measures that latency). The real cost to cut
+    is the color pass's meshes + lines (~4.4 ms): ablation run 41957634951 (nolines, nomesh, nosil, nobacksil, each
+    with r.pass.color). On a real GPU frames pipeline (2 in flight) and the latency overlaps.
 N000. (11-05 01:50) **Per-pass GPU time on the runners**: `NOSHAPE_PERF_PASSES=1` (with NOSHAPE_PERF): the
     vendored wgpu-hal (metal::pass_timing) reads every labelled command buffer's GPUStartTime/GPUEndTime; wgpu-core
     records each render / compute pass in a command buffer of its own labelled with the pass (color, ao, sil-cull,
