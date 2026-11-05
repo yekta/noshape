@@ -198,9 +198,29 @@ fn nurbs_edge_nodes(c: &NurbsCurve, a: DVec3, b: DVec3, t0: f64, t1: f64, defl: 
             }
             h = h.max(span * 1e-9);
             let mut tries = 0;
+            let mut too_long = None;
             while !fits(u, u + dir * h) && tries < 40 {
+                too_long = Some(h);
                 h *= 0.7;
                 tries += 1;
+            }
+            // Back up towards the step that failed: the longest that fits, within a few percent (cut by 0.7 alone,
+            // steps were up to 30 % short: a thread's helical edges 18 % finer than BRepMesh's, and its faces as
+            // many triangles more).
+            if let Some(mut long) = too_long.filter(|_| std::env::var_os("TMP_NOBISECT").is_none()) {
+                for _ in 0..4 {
+                    let mid = 0.5 * (h + long);
+                    if fits(u, u + dir * mid) {
+                        h = mid;
+                    } else {
+                        long = mid;
+                    }
+                }
+                // No sliver left at the end of the span: the rest in two equal steps.
+                let left = (to - u).abs();
+                if left - h < 0.3 * h && left > h {
+                    h = 0.5 * left;
+                }
             }
             u = if (to - (u + dir * h)) * dir <= 1e-12 * span { to } else { u + dir * h };
             params.push(u);
@@ -1387,6 +1407,11 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
     let all: Vec<cdt::Pt> = uv.iter().chain(&interior).map(|q| scaled(*q)).map(|q| cdt::Pt { x: q.x, y: q.y }).collect();
     let inner: Vec<usize> = (nb..nb + interior.len()).collect();
     let triangles = cdt::triangulate_with(&all, &rings, &inner).ok_or("the triangulation failed")?;
+    if std::env::var_os("TMP_GRID").is_some() && triangles.len() > 4000 {
+        let gu: Vec<f64> = us.windows(2).map(|w| (w[1] - w[0]) * su).collect();
+        let gv: Vec<f64> = vs.windows(2).map(|w| (w[1] - w[0]) * sv).collect();
+        eprintln!("TMPGRID {} tris {} boundary {} interior {} grid {}x{} du {:.2e}..{:.2e} dv {:.2e}..{:.2e} box {:?}..{:?} ang {:.4} lin {:.2e}", s.name(), triangles.len(), nb, interior.len(), us.len(), vs.len(), gu.iter().cloned().fold(f64::MAX, f64::min), gu.iter().cloned().fold(0.0, f64::max), gv.iter().cloned().fold(f64::MAX, f64::min), gv.iter().cloned().fold(0.0, f64::max), lo, hi, defl.angular, defl.linear);
+    }
     if dbg {
         eprintln!("mesh grid: triangulated {:?}", dbg_t.elapsed());
     }
