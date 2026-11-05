@@ -372,6 +372,25 @@ pub(super) fn editor(t: &SketchTarget) -> SketchEditor {
     ed
 }
 
+/// The parity translator's constraint to model geometry live's sketch no longer finds (its external query empty):
+/// a reference-only external point where sketch point `entity` is, coincident with it, its reference resolving to
+/// nothing, so the sketch is Onshape's WARNING "Some external references are missing." (TICKETS
+/// PARITY-MISSING-EXTERNAL-REFS). `args`: `sketch`, `entity` and the optional `tab`.
+pub(crate) fn pin_to_missing_reference(ctx: &mut Ctx, args: &Value) -> Result<(), OpError> {
+    let op = crate::registry::by_tool_name("sketch_constrain").ok_or_else(|| OpError::invalid("no sketch_constrain"))?;
+    let a = Args { op, value: args };
+    let (od, tab) = studio_target(ctx, &a)?;
+    let mut t = target(od, tab, &a)?;
+    let id = parse_entity(a.get("entity").ok_or_else(|| OpError::param("entity", "required"))?, &mut t, false, false)?;
+    let p = t.data.sketch.point(id).ok_or_else(|| OpError::param("entity", "not a sketch point"))?;
+    let ext = t.data.sketch.use_external_point(p);
+    let _ = t.data.sketch.set_reference_only(ext, true);
+    let nothing = noshape_model::reference::TopoName::Vertex { faces: std::sync::Arc::from(Vec::new()), ordinal: u16::MAX };
+    t.data.external_refs.insert(ext.0, Reference::Vertex(nothing));
+    t.data.sketch.add_constraint(ConstraintKind::Coincident { a: id, b: ext }).map_err(|e| OpError::invalid(format!("{e}")))?;
+    commit(od, t)
+}
+
 /// Commit the edited sketch data ("Edit : Sketch 1").
 pub(super) fn commit(od: &mut OpenDoc, t: SketchTarget) -> Result<(), OpError> {
     let ps = doc::studio(od.doc(), t.tab)?;

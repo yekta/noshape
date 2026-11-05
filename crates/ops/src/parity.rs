@@ -2637,6 +2637,20 @@ impl<'a> Translator<'a> {
                 if ty == "COINCIDENT" {
                     self.pin_external_vertex(k, oid, c);
                 }
+                // An external reference live's sketch no longer finds (its query empty): ours to nothing too, at
+                // the local point, so the sketch warns as live's.
+                let gone = c["parameters"].as_array().into_iter().flatten().filter(|p| p["parameterId"].as_str().is_some_and(|n| n.starts_with("external"))).any(|p| {
+                    p["queries"].as_array().is_some_and(|qs| !qs.is_empty() && qs.iter().all(|q| q["queryString"].as_str().unwrap_or("").is_empty() && q["deterministicIds"].as_array().is_none_or(|ids| ids.iter().all(|i| i.as_str().is_none_or(str::is_empty)))))
+                });
+                if gone && let Some(point) = entities.first() {
+                    let mut args = json!({ "sketch": id, "entity": point });
+                    if let Some(tab) = &self.tab {
+                        args["tab"] = json!(tab);
+                    }
+                    if crate::ops::pin_to_missing_reference(self.ctx, &args).is_ok() {
+                        continue;
+                    }
+                }
                 *missed.entry(format!("{ty} to external geometry")).or_default() += 1;
                 continue;
             }

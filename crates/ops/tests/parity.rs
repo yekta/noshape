@@ -521,6 +521,23 @@ fn a_derived_feature_takes_its_part_from_its_source_built_in_a_tab() {
     assert_eq!((p["parts"][0]["faces"].as_u64(), p["parts"][0]["edges"].as_u64()), (Some(8), Some(17)), "{p}");
 }
 
+/// A sketch constraint to model geometry live no longer finds (its external query empty): ours points at nothing
+/// too, so the sketch is live's WARNING "Some external references are missing." (clamp-guillem's Boceto 6,
+/// train-joe's Sketch 2), its geometry where it was.
+#[test]
+fn a_missing_external_reference_warns_as_live() {
+    let (mut features, _, refs) = block_model();
+    let gone = json!({ "btType": "BTMSketchConstraint-2", "constraintType": "COINCIDENT", "parameters": [
+        { "btType": "BTMParameterString-149", "parameterId": "localFirst", "value": "r0.start" },
+        { "btType": "BTMParameterQueryList-148", "parameterId": "externalSecond", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": [""], "queryString": "" }] }] });
+    features["features"][0]["constraints"].as_array_mut().unwrap().push(gone);
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("missing-external.noshape"), &features, parse_refs(&refs)).unwrap();
+    let s = t.step(0);
+    assert_eq!((s.status.as_deref(), s.message.as_deref()), (Some("Warning"), Some("Some external references are missing.")), "{:?}", s.problems);
+    assert!(!s.problems.iter().any(|p| p.contains("external geometry")), "{:?}", s.problems);
+}
+
 #[test]
 fn translates_a_sketch_extrude_and_fillet() {
     let (features, mut live, refs) = block_model();

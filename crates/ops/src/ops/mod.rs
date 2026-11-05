@@ -30,6 +30,7 @@ mod select;
 mod release;
 mod sheetmetal;
 mod sketch;
+pub(crate) use sketch::pin_to_missing_reference;
 mod sketch_edit;
 mod ui;
 mod variables;
