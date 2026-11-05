@@ -27,7 +27,16 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   AP214 file, and the dialog reopens on it; Parasolid in the same dialog shows its own latest version, Y up shared;
   Cancel writes nothing; Assembly 1 › Export… opens on STEP, Y up; Export Drawing opens on PDF 1.5, exported in
   Grayscale, reopens in Grayscale. No regressions.
-- Next: the corpus's remaining custom-feature differences (run 92: 46/109).
+- Landed after the walk: the edge order (9041e021: cf-sheet-metal-overcut-dogbone matches live to the end); an edge
+  extruded up to a part ends in one edge per face it meets (769f4796, kernel option join_target_seam_splits
+  tangent_lines, core's area: Sheet Metal Up to Part has live's 50 faces / 112 edges, vertices 64 vs live's 76,
+  asked live); queued: std 1431-2559 get evaluateQuery's ids raw (QUERIES_SINCE 2581: cf-fix-pcb's Fix PCB 2 runs;
+  no custom feature in the corpus fails to run). Corpus run 95: 41/55 documents, 392/471 features, custom 47/109.
+- Handed on: cf-hose-routing's display meshes ~6 s / 0.9 GB (psui.md); the slowest custom-feature documents' kernel
+  time (core.md). Asked live: Up to Part's 76 vertices, cf-hose-routing's path inputs, Fix PCB 2's useAll bodies.
+- Next: Fix PCB 2 (TICKETS PARITY-CUSTOM-RUN-FAILURES 03:58, after live's answer); cf-transform-pattern's
+  Transform pattern 7 (the translator: an edge derived from a sketch line through an extrude's cap and an imprint);
+  cf-sheet-metal-hem's Derived 1 (translator); clamp-hms' Hole.
 
 ## 11-05 01:00 UTC: Export dialogs remember the user's choices (P1 from the user via lead, 00:3x)
 - Live's client code (behaviours "dx (2026-11-05 00:52, P1 export memory)"): one `exportSolidOptions` for part,
