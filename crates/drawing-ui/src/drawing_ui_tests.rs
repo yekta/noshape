@@ -79,6 +79,15 @@ fn pick(cx: &mut TestAppContext, window: AnyWindowHandle, id: &str, label: &str)
 fn export_drawing_opens_with_the_last_exports_choices(cx: &mut TestAppContext) {
     let (window, editor) = drawing(cx, "export-remember");
     cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    // One run's test binaries share the settings directory (tools/tiers): the remembered options go with the test,
+    // or later exports through the agent API would take them.
+    struct Forget(std::path::PathBuf);
+    impl Drop for Forget {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+    let _forget = Forget(noshape_scene::config_dir().join("export_drawing.json"));
     let _ = std::fs::remove_file(noshape_scene::config_dir().join("export_drawing.json"));
     let open = |cx: &mut TestAppContext| {
         cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_export_dialog(w, cx))).unwrap();
