@@ -548,6 +548,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   feature_rollback (bin/rbbisect.py) gives the 29954.56 result 4 / 4 — the full regeneration on open is what varies (parallel
   regeneration or a time budget deciding a Draft? no timeout text in the message). live: a document regenerates the same way
   every time. (qa 2026-11-05 03:08, builds v0.4.29 / v0.4.30 / a1ec7849)
+  core 11-05 06:45: not reproduced in ~90 opens, all D4 Error / D5 Error / D6 Ok / D7 Error, Part 1 29954.56 (the stepped
+  result): opens.py with green 86546441's app and v0.4.30's app and CLI (release tarballs), here idle, 4 loops at once
+  and pinned to 2 cores (taskset -c 0,1), and on vibe3 as ngyekta (v0.4.30 CLI, alone and 4 loops at once). qa: the
+  exact command, user / HOME and environment (any NOSHAPE_* set? a -wal / -shm beside the copy?) of a run that flips,
+  and NSCLI_ERR=<file> for its stderr; copies in vibe3:~/agents/core-dn (opens.py takes a cli path).
 - [x] (core 11-04 22:30) P1 DISPLACEMENT-MAP-WALL-MESH (lead 11-04 21:20) the top case's display mesh: our mesher declined
   the wall ("the triangulation failed") and the bumpy top, BRepMesh took 2.7 s (and turns some of the top's triangles
   against the surface: 921 of 5172 on a 256 x 256 top). brep::mesh, for psui: (1) cdt.rs checked(): a triangle turned
