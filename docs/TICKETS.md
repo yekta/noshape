@@ -539,6 +539,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P2 SAVED-MIRROR-REF-CHANGE (core) **a saved document's Mirror resolves differently on green 8cc1b766**: qa-scratch/tickets/
+  cli-suppress-stall.noshape (a fuzz document), Mirror 10: 7bb99058 "No merge scope selected." (Error, 6 parts) → 8cc1b766 "1
+  missing selection" (Warning) and a mirrored part more (7 parts: an extra 4984.2537 mm³ / 3 faces). Everything else in the 44
+  ticket documents, the volume sweep and the user's cases is unchanged; dx's cf-wave-spring 916.5953 → 916.6061 mm³ (live 916.53,
+  in band). Likely d6af88ae (a full round's end arcs one edge: renamed edges) or 4a7f7264; saved studios usually keep the old
+  behaviour by a ScopeRule — please check whether this one should. No live value (fuzz). (qa 2026-11-05 08:45, build 8cc1b766)
 - [ ] P1 DRAFT-NONDETERMINISTIC (core / bool) **the same saved document regenerates to different parts from one open to the
   next**: /root/qa-scratch/tickets/cli-draft-hang2.noshape (a fuzz document, 3 parts; `python3 tickets/draft-nondet/opens.py
   <cli> 8`). On v0.4.29, v0.4.30 and green a1ec7849 (vibe3, idle-ish): Part 1 is 29954.56 mm³ (16 faces) or **37305.64**, Part 2
