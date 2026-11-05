@@ -413,6 +413,8 @@ pub struct UiState {
     pub preview_task: Option<Task<()>>,
     /// A scene being built off the UI thread (`apply_display_async`).
     pub scene_task: Option<Task<()>>,
+    /// A cancel's check whether the document changed since the result it went back to (`restore_last_done`).
+    pub restore_check: Option<Task<()>>,
     /// Add / Remove / Intersect previews (live part-studio/234-237): the tool
     /// body (the feature regenerated as New) and the task computing it.
     pub preview_tool: Option<(Arc<StudioDisplay>, noshape_model::FeatureId)>,
@@ -724,6 +726,7 @@ impl UiState {
             std_manip_task: None,
             preview_task: None,
             scene_task: None,
+            restore_check: None,
             preview_tool: None,
             preview_tool_adds: false,
             preview_tone: false,

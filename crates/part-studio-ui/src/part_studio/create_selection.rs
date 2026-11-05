@@ -285,7 +285,9 @@ impl PartStudioView {
     }
 
     pub(super) fn render_create_selection(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        self.ui.create_selection.as_ref()?;
         let pal = p();
+        // After the check: the labeler names every feature (~5 % of a dialog open's UI thread, for a panel rarely open).
         let labeler = self.labeler(cx);
         let cs = self.ui.create_selection.as_ref()?;
         let edges = cs.edges;
