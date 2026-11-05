@@ -864,7 +864,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   full_regen_ms pending). Its result also differs: ours 36/83/46 faces/edges/vertices, 18314.95 mm³; live 36/79/40,
   18329.66 mm³ (after Extrude 3 already differs by split edges, CUT-CLOSED-EDGES-SPLIT). Our document:
   vibe5:~/tmp/noshape-parity-<pid>/pipeflange-steven.noshape (parity_models, NOSHAPE_PARITY_ONLY=pipeflange-steven).
-- [ ] P3 SKETCH-SPLINE-END-VERTICES (dx 11-05 11:42, live 2059 (c)) live's fit spline has its own start and end
+- [ ] P3 SKETCH-BODIES-PER-ENTITY (dx 11-05 12:20, live 2060) live's sketch is a body per entity: each curve a wire
+  body (a spline's with its 2 end vertices, a circle's with none), each point (interpolation points, centres) a
+  one-vertex body, the regions one sheet body (the Spur Gear's tooth sketch: 65 bodies); ours is one sketch body
+  (`qOwnerBody` of any of them, `qCreatedBy(sketch, BODY)` 1).
+- [x] (dx 11-05 12:20: Reference::SketchCurveEnd; live 2060's probe gives the same 67 vertices, adjacency and names on
+  ours) P3 SKETCH-SPLINE-END-VERTICES (dx 11-05 11:42, live 2059 (c)) live's fit spline has its own start and end
   vertices besides its interpolation points (ends included): the Spur Gear's tooth sketch 67 vertices, ours 63 (we
   give the ends once, as the first and last interpolation points).
 - [x] (dx 11-05 11:42: Reference::SketchRegionEdge; the FeatureScript host's region edges and vertices from

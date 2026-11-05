@@ -200,6 +200,9 @@ pub enum Reference {
     /// apart from the entities' whole edges): the `edge`th of region `region`'s face (the first region holding it);
     /// with `end`, that edge's start (0) or end (1) vertex.
     SketchRegionEdge { sketch: FeatureId, region: Vec<u32>, edge: u32, end: Option<u8> },
+    /// An open fit spline's start (0) or end (1) vertex (live 2060: its edge's own vertices, apart from the
+    /// interpolation points there; `spline.start` / `spline.end`).
+    SketchCurveEnd { sketch: FeatureId, entity: u32, end: u8 },
     /// A whole sketch.
     Sketch(FeatureId),
     /// Plane created by a Plane feature.
@@ -228,7 +231,7 @@ impl Reference {
             Reference::Origin | Reference::Plane(_) => None,
             Reference::Face(n) | Reference::Edge(n) | Reference::Vertex(n) => n.creator(),
             Reference::Body(b) => Some(b.feature),
-            Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } | Reference::SketchRegionEdge { sketch, .. } | Reference::Sketch(sketch) => Some(*sketch),
+            Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } | Reference::SketchRegionEdge { sketch, .. } | Reference::SketchCurveEnd { sketch, .. } | Reference::Sketch(sketch) => Some(*sketch),
             Reference::FeaturePlane(f) | Reference::Feature(f) => Some(*f),
             Reference::MateConnector { feature, .. } | Reference::ConstructionPlane { feature, .. } => Some(*feature),
             Reference::Implicit { on, .. } => on.depends_on(),
@@ -252,7 +255,7 @@ impl Reference {
             Reference::SketchEntity { .. } => "Sketch entity",
             Reference::SketchRegion { .. } => "Sketch region",
             Reference::SketchRegionEdge { end: None, .. } => "Sketch edge",
-            Reference::SketchRegionEdge { .. } => "Sketch vertex",
+            Reference::SketchRegionEdge { .. } | Reference::SketchCurveEnd { .. } => "Sketch vertex",
             Reference::Sketch(_) => "Sketch",
             Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => "Plane",
             Reference::MateConnector { .. } => "Mate connector",

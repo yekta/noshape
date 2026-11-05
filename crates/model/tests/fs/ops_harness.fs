@@ -896,5 +896,18 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const rim = qAdjacent(disc, AdjacencyType.EDGE, EntityType.EDGE);
             check("a lone circle's region edge is the whole circle", size(evaluateQuery(context, rim)) == 1 && abs(len(rim) - 10 * PI) < 1e-9 && size(evaluateQuery(context, qCreatedBy(sub + "sk2", EntityType.EDGE))) == 2, len(rim));
         });
+        step(context, id, "fitSplineEnds", function(sub) {
+            // Live 2060: an open fit spline's edge has end vertices of its own (spline.start / .end); its interpolation
+            // points, the ends' too, are vertices on no edge.
+            const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, 1020) * mm, vector(0, 0, 1)) });
+            skFitSpline(sk, "s", { "points" : [vector(0, 0) * mm, vector(5, 3) * mm, vector(10, 0) * mm] });
+            skSolve(sk);
+            const edge = sketchEntityQuery(sub + "sk", EntityType.EDGE, "s");
+            const ends = evaluateQuery(context, qAdjacent(edge, AdjacencyType.VERTEX, EntityType.VERTEX));
+            const start = evaluateQuery(context, sketchEntityQuery(sub + "sk", EntityType.VERTEX, "s.start"));
+            const all = evaluateQuery(context, qCreatedBy(sub + "sk", EntityType.VERTEX));
+            const loose = filter(all, function(v) { return isQueryEmpty(context, qAdjacent(v, AdjacencyType.VERTEX, EntityType.EDGE)); });
+            check("a fit spline's edge has its own end vertices", size(ends) == 2 && size(start) == 1 && isIn(start[0], ends) && size(all) == 5 && size(loose) == 3 && isQueryEmpty(context, sketchEntityQuery(sub + "sk", EntityType.VERTEX, "s")), [size(ends), size(start), size(all), size(loose)]);
+        });
         println("done");
     });

@@ -577,6 +577,11 @@ impl<'a> EvalCtx<'a> {
                 let p = s.sketch.point(noshape_sketch::EntityId(*entity))?;
                 Some(s.frame.to_world(p))
             }
+            Reference::SketchCurveEnd { sketch, entity, end } => {
+                let s = self.ctx.sketch(*sketch)?;
+                let (a, b) = s.sketch.endpoints(noshape_sketch::EntityId(*entity))?;
+                Some(s.frame.to_world(s.sketch.point(if *end == 0 { a } else { b })?))
+            }
             Reference::SketchRegionEdge { sketch, region, edge, end: Some(end) } => sketch_region_edge(self.ctx.sketch(*sketch)?, region, *edge, Some(*end))?.0.vertex_point().ok(),
             Reference::MateConnector { .. } | Reference::Implicit { .. } => self.raw_connector(r).map(|c| c.origin),
             Reference::QueryVariable(_) => self.raw_vertex_point(&self.qv_first(r)?),

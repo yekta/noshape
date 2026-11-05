@@ -104,6 +104,7 @@ pub fn to_id(r: &Reference) -> String {
                 None => format!("regionedge:{sketch}:{key}:{edge}"),
             }
         }
+        Reference::SketchCurveEnd { sketch, entity, end } => format!("curveend:{sketch}:{entity}:{end}"),
         Reference::Sketch(f) => format!("sketch:{f}"),
         Reference::FeaturePlane(f) => format!("fplane:{f}"),
         Reference::MateConnector { feature, index } => format!("mc:{feature}.{index}"),
@@ -160,6 +161,11 @@ pub fn parse_str(s: &str) -> Option<Reference> {
                 None => None,
             };
             Reference::SketchRegionEdge { sketch, region, edge, end }
+        }
+        "curveend" => {
+            let mut parts = rest.split(':');
+            let sketch = parse_feature_id(parts.next()?)?;
+            Reference::SketchCurveEnd { sketch, entity: parts.next()?.parse().ok()?, end: parts.next()?.parse().ok()? }
         }
         "sketch" => Reference::Sketch(parse_feature_id(rest)?),
         "fplane" => Reference::FeaturePlane(parse_feature_id(rest)?),

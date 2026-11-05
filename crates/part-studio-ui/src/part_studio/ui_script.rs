@@ -250,7 +250,7 @@ impl PartStudioView {
             Reference::SketchEntity { sketch, .. } => ("SKETCH_ENTITY", feature_name(*sketch)),
             Reference::SketchRegion { sketch, .. } => ("FACE", feature_name(*sketch)),
             Reference::SketchRegionEdge { sketch, end: None, .. } => ("EDGE", feature_name(*sketch)),
-            Reference::SketchRegionEdge { sketch, .. } => ("VERTEX", feature_name(*sketch)),
+            Reference::SketchRegionEdge { sketch, .. } | Reference::SketchCurveEnd { sketch, .. } => ("VERTEX", feature_name(*sketch)),
             Reference::Sketch(f) | Reference::Feature(f) => ("FEATURE", feature_name(*f)),
             Reference::FeaturePlane(f) | Reference::ConstructionPlane { feature: f, .. } => ("PLANE", feature_name(*f)),
             Reference::MateConnector { feature, .. } => ("MATE_CONNECTOR", feature_name(*feature)),

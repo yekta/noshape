@@ -56,6 +56,14 @@ pub enum Ent {
     /// apart from the entities' whole ones (live 2059).
     SketchRegionEdge(usize, u32),
     SketchRegionVertex(usize, u32),
+    /// An open fit spline's start (0) or end (1) vertex: its edge's own, apart from the interpolation points there
+    /// (live 2060).
+    SketchCurveEnd(usize, u32, u8),
+}
+
+/// Whether sketch entity `id` is an open fit spline (its edge has end vertices of its own, live 2060).
+pub fn open_fit_spline(sk: &noshape_sketch::Sketch, id: u32) -> bool {
+    sk.entity(noshape_sketch::EntityId(id)).is_some_and(|e| matches!(&e.geometry, noshape_sketch::Geometry::FitSpline { points, .. } if points.first() != points.last()))
 }
 
 /// A sketch's region edges: each region face's edges (as the regions extrude), one per piece the regions share, and
@@ -152,7 +160,7 @@ pub fn entity_type_of(e: &Ent) -> EType {
         Ent::Body(_) | Ent::SketchBody(_) | Ent::Connector(_) | Ent::PlaneBody(_) => EType::Body,
         Ent::Face(..) | Ent::Datum(_) | Ent::Plane(_) | Ent::SketchRegion(..) => EType::Face,
         Ent::Edge(..) | Ent::SketchEdge(..) | Ent::SketchRegionEdge(..) => EType::Edge,
-        Ent::Vertex(..) | Ent::Origin | Ent::Point(_) | Ent::SketchVertex(..) | Ent::SketchRegionVertex(..) => EType::Vertex,
+        Ent::Vertex(..) | Ent::Origin | Ent::Point(_) | Ent::SketchVertex(..) | Ent::SketchRegionVertex(..) | Ent::SketchCurveEnd(..) => EType::Vertex,
     }
 }
 
@@ -309,6 +317,7 @@ impl<'a> QueryCx<'a> {
                 out.extend((0..body.vertices.len()).map(|v| Ent::Vertex(b, v)));
             }
             for (s, sk) in ctx.sketches.iter().enumerate() {
+                out.extend(sk.sketch.entities().filter(|e| open_fit_spline(&sk.sketch, e.id.0)).flat_map(|e| [Ent::SketchCurveEnd(s, e.id.0, 0), Ent::SketchCurveEnd(s, e.id.0, 1)]));
                 out.extend(sk.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).map(|e| Ent::SketchVertex(s, e.id.0)));
                 out.extend((0..self.region_pieces(s).verts.len() as u32).map(|i| Ent::SketchRegionVertex(s, i)));
             }
@@ -349,6 +358,7 @@ impl<'a> QueryCx<'a> {
                     out.extend((0..self.region_pieces(*s).edges.len() as u32).map(|i| Ent::SketchRegionEdge(*s, i)));
                 }
                 if want(EType::Vertex) {
+                    out.extend(sk.sketch.entities().filter(|e| open_fit_spline(&sk.sketch, e.id.0)).flat_map(|e| [Ent::SketchCurveEnd(*s, e.id.0, 0), Ent::SketchCurveEnd(*s, e.id.0, 1)]));
                     out.extend(sk.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).map(|e| Ent::SketchVertex(*s, e.id.0)));
                     out.extend((0..self.region_pieces(*s).verts.len() as u32).map(|i| Ent::SketchRegionVertex(*s, i)));
                 }
@@ -369,7 +379,7 @@ impl<'a> QueryCx<'a> {
             Ent::Body(_) | Ent::SketchBody(_) | Ent::Connector(_) | Ent::PlaneBody(_) | Ent::Point(_) | Ent::Datum(_) | Ent::Origin => Some(e.clone()),
             Ent::Plane(i) => Some(Ent::PlaneBody(*i)),
             Ent::Face(b, _) | Ent::Edge(b, _) | Ent::Vertex(b, _) => Some(Ent::Body(*b)),
-            Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) | Ent::SketchRegionEdge(s, _) | Ent::SketchRegionVertex(s, _) => Some(Ent::SketchBody(*s)),
+            Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) | Ent::SketchRegionEdge(s, _) | Ent::SketchRegionVertex(s, _) | Ent::SketchCurveEnd(s, ..) => Some(Ent::SketchBody(*s)),
         }
     }
 
@@ -395,6 +405,7 @@ impl<'a> QueryCx<'a> {
                 let p = &pieces.edges[*i as usize];
                 Reference::SketchRegionEdge { sketch: ctx.sketches[*s].feature, region: p.region.clone(), edge: p.at, end: None }
             }
+            Ent::SketchCurveEnd(s, id, end) => Reference::SketchCurveEnd { sketch: ctx.sketches[*s].feature, entity: *id, end: *end },
             Ent::SketchRegionVertex(s, i) => {
                 let pieces = self.region_pieces(*s);
                 let (_, j, end) = pieces.verts[*i as usize];
@@ -454,6 +465,10 @@ impl<'a> QueryCx<'a> {
                     None => Vec::new(),
                 }
             }
+            Reference::SketchCurveEnd { sketch, entity, end } => {
+                let Some(s) = ctx.sketches.iter().position(|s| s.feature == *sketch) else { return Vec::new() };
+                if open_fit_spline(&ctx.sketches[s].sketch, *entity) { vec![Ent::SketchCurveEnd(s, *entity, *end)] } else { Vec::new() }
+            }
             Reference::SketchRegionEdge { sketch, region, edge, end } => {
                 let Some(s) = ctx.sketches.iter().position(|s| s.feature == *sketch) else { return Vec::new() };
                 let pieces = self.region_pieces(s);
@@ -506,6 +521,11 @@ impl<'a> QueryCx<'a> {
             }
             Ent::SketchRegionEdge(s, i) => self.region_pieces(*s).edges.get(*i as usize).map(|p| p.shape.clone()),
             Ent::SketchRegionVertex(s, i) => self.region_pieces(*s).verts.get(*i as usize).and_then(|(p, ..)| k::make_vertex(*p).ok()),
+            Ent::SketchCurveEnd(s, id, end) => {
+                let sk = &ctx.sketches[*s];
+                let (a, b) = sk.sketch.endpoints(noshape_sketch::EntityId(*id))?;
+                k::make_vertex(sk.frame.to_world(sk.sketch.point(if *end == 0 { a } else { b })?)).ok()
+            }
             Ent::SketchRegion(s, key) => {
                 let sk = &ctx.sketches[*s];
                 let region = sk.regions.iter().find(|r| encode_region_key(&r.id) == *key)?;
@@ -615,7 +635,7 @@ impl<'a> QueryCx<'a> {
     }
 
     pub fn is_sketch(&self, e: &Ent) -> bool {
-        matches!(e, Ent::SketchBody(_) | Ent::SketchRegion(..) | Ent::SketchEdge(..) | Ent::SketchVertex(..) | Ent::SketchRegionEdge(..) | Ent::SketchRegionVertex(..))
+        matches!(e, Ent::SketchBody(_) | Ent::SketchRegion(..) | Ent::SketchEdge(..) | Ent::SketchVertex(..) | Ent::SketchRegionEdge(..) | Ent::SketchRegionVertex(..) | Ent::SketchCurveEnd(..))
     }
 
     /// Sketch bodies too in a Part Studio loaded for a derive (std derive
@@ -655,7 +675,7 @@ impl<'a> QueryCx<'a> {
         // Sketch curves too: std tracks a sketch line onto the edge a
         // surface made from it (sheet metal flange's bend line).
         let shape = match e {
-            Ent::Face(..) | Ent::Edge(..) | Ent::Vertex(..) | Ent::SketchEdge(..) | Ent::SketchVertex(..) | Ent::SketchRegionEdge(..) | Ent::SketchRegionVertex(..) => self.shape(e)?,
+            Ent::Face(..) | Ent::Edge(..) | Ent::Vertex(..) | Ent::SketchEdge(..) | Ent::SketchVertex(..) | Ent::SketchRegionEdge(..) | Ent::SketchRegionVertex(..) | Ent::SketchCurveEnd(..) => self.shape(e)?,
             _ => return None,
         };
         let points = match etype {
@@ -932,7 +952,7 @@ impl<'a> QueryCx<'a> {
                 other => uncached(other).map(|x| x.1),
             }
             .or_else(|| self.created_by(&Ent::Body(*b))),
-            Ent::SketchBody(s) | Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) | Ent::SketchRegionEdge(s, _) | Ent::SketchRegionVertex(s, _) => feature_id(ctx.sketches[*s].feature),
+            Ent::SketchBody(s) | Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) | Ent::SketchRegionEdge(s, _) | Ent::SketchRegionVertex(s, _) | Ent::SketchCurveEnd(s, ..) => feature_id(ctx.sketches[*s].feature),
             Ent::Plane(_) | Ent::PlaneBody(_) => {
                 let r = self.to_ref(e);
                 self.st.plane_ops.get(&r).cloned().or_else(|| r.depends_on().and_then(feature_id))
@@ -1052,9 +1072,31 @@ impl<'a> QueryCx<'a> {
         }
         // A sketch curve's vertices are its ends; curves meet at shared ends (std Bridging curve infers a side's
         // vertex from a picked sketch edge).
+        // An open fit spline's edge has end vertices of its own; its interpolation points are on no edge (live 2060).
+        if let Ent::SketchCurveEnd(s, id, _) = e {
+            let mut out: Vec<Ent> = match t {
+                EType::Edge => vec![Ent::SketchEdge(*s, *id)],
+                EType::Vertex if by_vertex => vec![Ent::SketchCurveEnd(*s, *id, 0), Ent::SketchCurveEnd(*s, *id, 1)],
+                EType::Body => vec![Ent::SketchBody(*s)],
+                _ => Vec::new(),
+            };
+            out.retain(|x| x != e);
+            return out;
+        }
+        if let Ent::SketchEdge(s, id) = e
+            && open_fit_spline(&self.st.ctx.sketches[*s].sketch, *id)
+        {
+            let mut out: Vec<Ent> = match t {
+                EType::Vertex => vec![Ent::SketchCurveEnd(*s, *id, 0), Ent::SketchCurveEnd(*s, *id, 1)],
+                EType::Body => vec![Ent::SketchBody(*s)],
+                _ => Vec::new(),
+            };
+            out.retain(|x| x != e);
+            return out;
+        }
         if let Ent::SketchEdge(s, id) | Ent::SketchVertex(s, id) = e {
             let sk = &self.st.ctx.sketches[*s];
-            let ends = |c: u32| sk.sketch.endpoints(noshape_sketch::EntityId(c)).map(|(a, b)| [a.0, b.0]);
+            let ends = |c: u32| if open_fit_spline(&sk.sketch, c) { None } else { sk.sketch.endpoints(noshape_sketch::EntityId(c)).map(|(a, b)| [a.0, b.0]) };
             let verts: Vec<u32> = match e {
                 Ent::SketchEdge(..) => ends(*id).map(|v| v.to_vec()).unwrap_or_default(),
                 _ => vec![*id],
@@ -2056,6 +2098,15 @@ fn historical(q: &QueryCx, query: &Value) -> Vec<Ent> {
         "SKETCH_ENTITY" => {
             let Some(s) = q.st.ctx.sketches.iter().position(|x| x.feature == marker) else { return Vec::new() };
             let name = query.get("sketchEntityId").as_str().unwrap_or_default();
+            // An open fit spline's `.start` / `.end`: its edge's end vertices (live 2060).
+            for (suffix, end) in [(".start", 0u8), (".end", 1u8)] {
+                if let Some(base) = name.strip_suffix(suffix)
+                    && let Some(c) = super::sketch::sketch_entity(q.st, marker, base)
+                    && open_fit_spline(&q.st.ctx.sketches[s].sketch, c)
+                {
+                    return if t.is_none_or(|t| t == EType::Vertex) { vec![Ent::SketchCurveEnd(s, c, end)] } else { Vec::new() };
+                }
+            }
             let Some(e) = super::sketch::sketch_entity(q.st, marker, &name) else { return Vec::new() };
             let sk = &q.st.ctx.sketches[s].sketch;
             let is_point = sk.kind(noshape_sketch::EntityId(e)) == Some(noshape_sketch::EntityKind::Point);
@@ -2065,6 +2116,8 @@ fn historical(q: &QueryCx, query: &Value) -> Vec<Ent> {
                 Some(EType::Body) => vec![Ent::SketchBody(s)],
                 Some(EType::Edge) if !is_point => vec![me],
                 Some(EType::Vertex) if is_point => vec![me],
+                // (A fit spline's: nothing, live 2060.)
+                Some(EType::Vertex) if open_fit_spline(sk, e) => Vec::new(),
                 Some(EType::Vertex) => sk.entity(noshape_sketch::EntityId(e)).map(|x| x.point_refs().iter().map(|p| Ent::SketchVertex(s, p.0)).collect()).unwrap_or_default(),
                 Some(EType::Face) => q.st.ctx.sketches[s].regions.iter().filter(|r| r.id.entities().contains(&noshape_sketch::EntityId(e))).map(|r| Ent::SketchRegion(s, encode_region_key(&r.id))).collect(),
                 _ => Vec::new(),
@@ -2319,6 +2372,7 @@ fn edge_end_vertex(q: &QueryCx, e: &Ent, at_start: bool) -> Option<Ent> {
                 d(v1).total_cmp(&d(v2))
             })
         }
+        Ent::SketchEdge(s, id) if open_fit_spline(&q.st.ctx.sketches[*s].sketch, *id) => Some(Ent::SketchCurveEnd(*s, *id, if at_start { 0 } else { 1 })),
         Ent::SketchEdge(s, id) => {
             let sk = &q.st.ctx.sketches[*s].sketch;
             let (a, b) = sk.endpoints(noshape_sketch::EntityId(*id))?;
