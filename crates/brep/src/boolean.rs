@@ -221,6 +221,76 @@ struct NCurve {
 /// A free-form face's edges' curves on it: by (edge, a seam's second), the curve and its range.
 type PCurves = HashMap<(usize, bool), (Arc<NurbsCurve>, f64, f64)>;
 
+/// A face's edges' curves on its surface that goes round (a sphere, torus or revolved surface), OCCT's, each moved by
+/// whole turns to start where the one before it in its loop ends, then each loop by whole turns to start within the
+/// first; a degenerate edge's (`point(e)`: a sphere's pole) straight from the one before it to the one after (OCCT's
+/// quarter sphere's equator from 0 to π/2, its pole from π/2 to 2π the long way round, its meridian at 2π: a face of a
+/// whole turn otherwise). A face with a seam (an edge twice in its loops) is as it is.
+fn loops_in_one_turn(fs: &FreeSurface, edges: &[(usize, bool)], loop_lens: &[usize], vertices: impl Fn(usize) -> [u32; 2], point: impl Fn(usize) -> bool, pcurves: &mut PCurves) {
+    let [pu, pv] = fs.periodic();
+    if (!pu && !pv) || edges.iter().enumerate().any(|(i, x)| edges[i + 1..].iter().any(|y| y.0 == x.0)) {
+        return;
+    }
+    let turns = |d: DVec2| DVec2::new(if pu { TAU * (d.x / TAU).round() } else { 0.0 }, if pv { TAU * (d.y / TAU).round() } else { 0.0 });
+    let moved = |c: &NurbsCurve, by: DVec2| NurbsCurve { degree: c.degree, knots: c.knots.clone(), poles: c.poles.iter().map(|q| *q + by.extend(0.0)).collect(), weights: c.weights.clone(), spans: Default::default() };
+    let mut at = 0;
+    for &n in loop_lens {
+        // (In the loop's order: each edge from where the one before it ends (OCCT's list of them needn't be).)
+        let mut lp: Vec<(usize, bool)> = vec![edges[at]];
+        let mut left: Vec<(usize, bool)> = edges[at + 1..at + n].to_vec();
+        at += n;
+        let ends_of = |(e, rev): (usize, bool)| if rev { let [a, b] = vertices(e); [b, a] } else { vertices(e) };
+        while !left.is_empty() {
+            let w = ends_of(lp[lp.len() - 1])[1];
+            let Some(k) = left.iter().position(|&x| ends_of(x)[0] == w) else { return };
+            lp.push(left.remove(k));
+        }
+        // (Each edge's ends, as the loop goes, once moved.)
+        let mut ends: Vec<Option<[DVec2; 2]>> = Vec::with_capacity(n);
+        let mut shifts: Vec<DVec2> = Vec::with_capacity(n);
+        let mut prev: Option<DVec2> = None;
+        for &(e, rev) in &lp {
+            let Some((c, t0, t1)) = pcurves.get(&(e, false)) else { return };
+            let (a, b) = (c.at(*t0).truncate(), c.at(*t1).truncate());
+            let (start, end) = if rev { (b, a) } else { (a, b) };
+            if point(e) {
+                ends.push(None);
+                shifts.push(DVec2::ZERO);
+                continue;
+            }
+            let by = prev.map_or(DVec2::ZERO, |p| turns(p - start));
+            ends.push(Some([start + by, end + by]));
+            shifts.push(by);
+            prev = Some(end + by);
+        }
+        let moves = shifts.iter().any(|&x| x != DVec2::ZERO);
+        // (A loop moved: as a whole a turn on where its least angles are past a turn.)
+        let lo = lp.iter().zip(&shifts).filter_map(|(&(e, _), &by)| pcurves.get(&(e, false)).map(|x| x.0.poles.iter().fold(DVec2::INFINITY, |m, q| m.min(q.truncate() + by)))).fold(DVec2::INFINITY, DVec2::min);
+        let back = if moves { -turns(DVec2::new(if pu { lo.x - lo.x.rem_euclid(TAU) } else { 0.0 }, if pv { lo.y - lo.y.rem_euclid(TAU) } else { 0.0 })) } else { DVec2::ZERO };
+        for (k, &(e, rev)) in lp.iter().enumerate() {
+            let Some(x) = pcurves.get_mut(&(e, false)) else { continue };
+            if ends[k].is_none() {
+                // (Between the ends of its neighbours in the loop.)
+                let (Some(from), Some(to)) = ((1..n).map(|d| ends[(k + n - d) % n]).find_map(|x| x), (1..n).map(|d| ends[(k + d) % n]).find_map(|x| x)) else { continue };
+                let (mut p, mut q) = (from[1] + back, to[0] + back);
+                if !moves && (p - x.0.at(if rev { x.2 } else { x.1 }).truncate()).length() < 1e-9 && (q - x.0.at(if rev { x.1 } else { x.2 }).truncate()).length() < 1e-9 {
+                    continue;
+                }
+                if rev {
+                    (p, q) = (q, p);
+                }
+                let (t0, t1) = (x.1, x.2);
+                x.0 = Arc::new(NurbsCurve { degree: 1, knots: vec![t0, t0, t1, t1], poles: vec![p.extend(0.0), q.extend(0.0)], weights: Vec::new(), spans: Default::default() });
+                continue;
+            }
+            let by = shifts[k] + back;
+            if by != DVec2::ZERO {
+                x.0 = Arc::new(moved(&x.0, by));
+            }
+        }
+    }
+}
+
 
 /// A section's part or an edge lying on a face, its places there to be found.
 enum Pending {
@@ -3566,12 +3636,13 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             };
             let (ns, pcurves): (Option<Arc<FreeSurface>>, PCurves) = match free {
                 Some(fs) => {
-                    let pcurves = body
+                    let mut pcurves = body
                         .pcurves
                         .iter()
                         .filter(|p| p.face == i as u32)
                         .map(|p| ((first_edge[ai] + p.edge as usize, p.second), (Arc::new(body.nurbs_curves[p.curve as usize].clone()), p.t0, p.t1)))
                         .collect();
+                    loops_in_one_turn(&fs, &edges, &loop_lens, |e| cx.edges[e].v, |e| matches!(cx.edges[e].g, Geo::Apex { .. }), &mut pcurves);
                     (Some(Arc::new(fs)), pcurves)
                 }
                 None => (None, HashMap::default()),

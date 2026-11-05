@@ -151,17 +151,21 @@ impl FreeSurface {
     /// The parameters of the point of it nearest `p` within `uv` (u0, u1, v0, v1), from `seed` (Newton's method on
     /// the distance's gradient), and the distance.
     pub fn param_of(&self, p: DVec3, seed: DVec2, uv: [f64; 4]) -> (DVec2, f64) {
-        // (A sphere's or torus's: by its angles, a turn at a time toward the seed's (an angle round its axis at a
-        // pole or on the axis: the seed's); Newton's lost its way near a sphere's pole, an edge through it not found
+        // (A sphere's or torus's: by its angles, the turn within the box nearest the seed's (an angle round its axis at
+        // a pole or on the axis: the seed's); Newton's lost its way near a sphere's pole, an edge through it not found
         // on it (learning-center-michael's ball tools).)
-        let near = |a: f64, to: f64| a + TAU * ((to - a) / TAU).round();
+        let near = |a: f64, to: f64, lo: f64, hi: f64| {
+            let base = a + TAU * ((to - a) / TAU).round();
+            let off = |c: f64| (lo.min(hi) - c).max(c - lo.max(hi)).max(0.0);
+            [base - TAU, base, base + TAU].into_iter().min_by(|&c, &d| off(c).total_cmp(&off(d)).then((c - to).abs().total_cmp(&(d - to).abs()))).unwrap_or(base)
+        };
         let clamp = |q: DVec2| DVec2::new(q.x.clamp(uv[0].min(uv[1]), uv[0].max(uv[1])), q.y.clamp(uv[2].min(uv[3]), uv[2].max(uv[3])));
         match *self {
             FreeSurface::Sphere { o, x, y, z, .. } => {
                 let w = p - o;
                 let (wx, wy, wz) = (w.dot(x), w.dot(y), w.dot(z));
                 let rho = (wx * wx + wy * wy).sqrt();
-                let u = if rho > 1e-12 * w.length().max(1e-300) { near(wy.atan2(wx), seed.x) } else { seed.x };
+                let u = if rho > 1e-12 * w.length().max(1e-300) { near(wy.atan2(wx), seed.x, uv[0], uv[1]) } else { seed.x };
                 let q = clamp(DVec2::new(u, wz.atan2(rho)));
                 return (q, (self.at(q.x, q.y) - p).length());
             }
@@ -169,8 +173,8 @@ impl FreeSurface {
                 let w = p - o;
                 let (wx, wy, wz) = (w.dot(x), w.dot(y), w.dot(z));
                 let rho = (wx * wx + wy * wy).sqrt();
-                let u = if rho > 1e-12 * w.length().max(1e-300) { near(wy.atan2(wx), seed.x) } else { seed.x };
-                let v = near(wz.atan2(rho - major), seed.y);
+                let u = if rho > 1e-12 * w.length().max(1e-300) { near(wy.atan2(wx), seed.x, uv[0], uv[1]) } else { seed.x };
+                let v = near(wz.atan2(rho - major), seed.y, uv[2], uv[3]);
                 let q = clamp(DVec2::new(u, v));
                 return (q, (self.at(q.x, q.y) - p).length());
             }
