@@ -1,6 +1,6 @@
 {
  "scenario": "extrude-end-type-up-to-face",
- "recorded": "2026-11-03T14:10:57.362Z",
+ "recorded": "2026-11-05T20:25:50.511Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "69d69a3ef3d7b25189e1125f",
+  "element": "b1defef0f6bfa9df2cd2c026",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -25,8 +25,27 @@
    "items": []
   },
   "features": {
-   "rows": [],
-   "rollbackAfter": null
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
   },
   "parts": [
    "Part 1"
@@ -38,7 +57,8 @@
   },
   "message": null,
   "tooltip": null,
-  "sketch": null
+  "sketch": null,
+  "drawing": null
  },
  "steps": [
   {
@@ -301,9 +321,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 147926
+   "t": 40025
   },
   {
    "step": 2,
@@ -583,9 +604,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 153928
+   "t": 42293
   },
   {
    "step": 3,
@@ -839,9 +861,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 160711
+   "t": 45381
   }
  ]
 }

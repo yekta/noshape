@@ -1,6 +1,6 @@
 {
  "scenario": "revolve-dialog-axis",
- "recorded": "2026-11-04T00:45:30.272Z",
+ "recorded": "2026-11-05T20:29:38.919Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "75f800877942fe211f15f36d",
+  "element": "3d97d3690a8af6235a1ccafa",
   "start": "empty",
   "startElement": "16c3ef729d456774c1da81b8"
  },
@@ -36,7 +36,8 @@
   },
   "message": null,
   "tooltip": null,
-  "sketch": null
+  "sketch": null,
+  "drawing": null
  },
  "steps": [
   {
@@ -137,9 +138,10 @@
      "constraints": null,
      "dimensions": null,
      "error": "sketch model not reached"
-    }
+    },
+    "drawing": null
    },
-   "t": 30286
+   "t": 33837
   },
   {
    "step": 2,
@@ -243,9 +245,10 @@
      "constraints": null,
      "dimensions": null,
      "error": "sketch model not reached"
-    }
+    },
+    "drawing": null
    },
-   "t": 39428
+   "t": 39346
   },
   {
    "step": 3,
@@ -343,9 +346,10 @@
      "constraints": null,
      "dimensions": null,
      "error": "sketch model not reached"
-    }
+    },
+    "drawing": null
    },
-   "t": 44094
+   "t": 45557
   },
   {
    "step": 4,
@@ -454,9 +458,10 @@
      "entities": [],
      "constraints": [],
      "dimensions": []
-    }
+    },
+    "drawing": null
    },
-   "t": 52671
+   "t": 50515
   },
   {
    "step": 5,
@@ -472,8 +477,8 @@
    "ok": true,
    "hover": [],
    "at": [
-    1176,
-    506
+    1142,
+    477
    ],
    "state": {
     "focus": {
@@ -578,9 +583,10 @@
       "PERPENDICULAR"
      ],
      "dimensions": []
-    }
+    },
+    "drawing": null
    },
-   "t": 61994
+   "t": 57600
   },
   {
    "step": 6,
@@ -692,9 +698,10 @@
       "PERPENDICULAR"
      ],
      "dimensions": []
-    }
+    },
+    "drawing": null
    },
-   "t": 63975
+   "t": 59803
   },
   {
    "step": 7,
@@ -818,9 +825,10 @@
       "PERPENDICULAR"
      ],
      "dimensions": []
-    }
+    },
+    "drawing": null
    },
-   "t": 70516
+   "t": 63447
   },
   {
    "step": 8,
@@ -834,12 +842,10 @@
     }
    },
    "ok": true,
-   "hover": [
-    "JFI"
-   ],
+   "hover": [],
    "at": [
-    1117,
-    489
+    1083,
+    460
    ],
    "state": {
     "focus": {
@@ -939,17 +945,18 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
       "HORIZONTAL",
       "HORIZONTAL",
       "PARALLEL",
       "PARALLEL",
-      "PERPENDICULAR"
+      "PERPENDICULAR",
+      "VERTICAL"
      ],
      "dimensions": []
-    }
+    },
+    "drawing": null
    },
-   "t": 78244
+   "t": 70560
   },
   {
    "step": 9,
@@ -1056,17 +1063,18 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
       "HORIZONTAL",
       "HORIZONTAL",
       "PARALLEL",
       "PARALLEL",
-      "PERPENDICULAR"
+      "PERPENDICULAR",
+      "VERTICAL"
      ],
      "dimensions": []
-    }
+    },
+    "drawing": null
    },
-   "t": 81507
+   "t": 74146
   },
   {
    "step": 10,
@@ -1114,9 +1122,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 85910
+   "t": 81209
   },
   {
    "step": 11,
@@ -1158,9 +1167,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 90152
+   "t": 85689
   },
   {
    "step": 12,
@@ -1338,9 +1348,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 96438
+   "t": 89532
   }
  ]
 }

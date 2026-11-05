@@ -1,6 +1,6 @@
 {
  "scenario": "revolve-type-list",
- "recorded": "2026-11-04T00:51:36.527Z",
+ "recorded": "2026-11-05T20:32:36.611Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "6921e37a4fc4129b144336b9",
+  "element": "2b07f60c5b9efd0628f23291",
   "start": "empty",
   "startElement": "16c3ef729d456774c1da81b8"
  },
@@ -36,7 +36,8 @@
   },
   "message": null,
   "tooltip": null,
-  "sketch": null
+  "sketch": null,
+  "drawing": null
  },
  "steps": [
   {
@@ -137,9 +138,10 @@
      "constraints": null,
      "dimensions": null,
      "error": "sketch model not reached"
-    }
+    },
+    "drawing": null
    },
-   "t": 29942
+   "t": 28340
   },
   {
    "step": 2,
@@ -243,9 +245,10 @@
      "constraints": null,
      "dimensions": null,
      "error": "sketch model not reached"
-    }
+    },
+    "drawing": null
    },
-   "t": 39100
+   "t": 33391
   },
   {
    "step": 3,
@@ -343,9 +346,10 @@
      "constraints": null,
      "dimensions": null,
      "error": "sketch model not reached"
-    }
+    },
+    "drawing": null
    },
-   "t": 43160
+   "t": 35932
   },
   {
    "step": 4,
@@ -454,9 +458,10 @@
      "entities": [],
      "constraints": [],
      "dimensions": []
-    }
+    },
+    "drawing": null
    },
-   "t": 52184
+   "t": 40225
   },
   {
    "step": 5,
@@ -472,8 +477,8 @@
    "ok": true,
    "hover": [],
    "at": [
-    1176,
-    506
+    1142,
+    477
    ],
    "state": {
     "focus": {
@@ -578,9 +583,10 @@
       "PERPENDICULAR"
      ],
      "dimensions": []
-    }
+    },
+    "drawing": null
    },
-   "t": 61459
+   "t": 47176
   },
   {
    "step": 6,
@@ -628,9 +634,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 67323
+   "t": 50145
   },
   {
    "step": 7,
@@ -672,9 +679,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 71703
+   "t": 54644
   },
   {
    "step": 8,
@@ -852,9 +860,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 77675
+   "t": 58357
   },
   {
    "step": 9,
@@ -1100,9 +1109,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 82844
+   "t": 62122
   }
  ]
 }
