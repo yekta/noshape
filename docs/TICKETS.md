@@ -824,6 +824,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Parasolid's subtract leaves a sliver edge at each corner; ours ends the flat's line at the corner, at z = 101.607 on
   two of them), and ours splits the −x run-out edge at the shaft's seam (two 5.469 mm pieces, live one 10.935). The
   seam split is ours to fix; the sliver edges are Parasolid's tolerance artefact.
+  core 11-05 16:55 (live 2069, behaviours "core (P1, request 2069)"): live's eight extra edges are each a **0.010635 mm
+  CIRCLE** between the run-out cone and the shaft cylinder, running straight down in z from the slot corner (z 101.6)
+  to z 101.5894, where the cone / cylinder intersection (type OTHER) begins; the corner vertex keeps 3 edges, the new
+  one 2. No circle lies on the cylinder that way: it is how Parasolid starts that intersection curve, not geometry we
+  compute differently. Matching the counts means splitting our cone / cylinder edges 0.0106 mm from the corner (a made
+  edge, and 85 = 78 + 8 - 1 leaves one more of ours to find: our two corners at z 101.607). Not built: **lead**, take
+  this one as live's artefact (unscored.json) or say to imitate it.
 - [ ] P2 REGION-UNION-ARC (core 11-04 09:05) sketch regions picked together are united when they share lines or a
   whole loop (sketch regions::union_touching, eval.rs picked_regions), not when they share only an arc of a loop:
   clamp-hms's Sketch 2 (a trapezoid whose top arc lies on a whole r8 circle, the r8–r5 ring inside) then made its
@@ -996,6 +1003,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   circles, the rib stopping at them); the model's Fillet 2 / the split edges under it, not the drawing.
   What it changes beyond counts (dx 11-03): a click picks one piece where live picks the loop; a Fillet (r 1,
   tangent propagation on) of one piece still rounds the whole loop (−8.5 mm³) but as 3 faces (5 → 8 faces), live 1.
+  core 11-05 16:55, **proposal for bushing2's Extrude 4 (lead asked for it before building; live 2069 B)**: live's four
+  notched end arcs are each one edge (92.321956 / 52.359878 mm), no vertex on them (24 vertices, the arcs' only ones
+  their ends at the notch corners), a click picks the whole arc, and a Fillet r 1 of one arc is OK with one torus face
+  (19/43/26). Ours keeps OCCT's cylinder seam there (no angle is free of the slots and notch), so each arc is two
+  pieces meeting at the seam's vertex. Proposal: keep the B-rep as it is and show a **seam-split edge** as one: where
+  a vertex has only two non-seam edges, both between the same two faces and continuing each other (one underlying
+  curve, G1) and the rest are seam uses, (1) shown_topology hides that vertex and counts the two pieces as one edge
+  (parity counts, the edge / vertex filters), (2) the display draws them as one polyline and picking either piece
+  selects both (one pick id, one highlight), (3) a reference to it names the pair (a selection resolves to both
+  pieces; Measure and evLength give the sum), (4) a fillet / chamfer of it rounds both pieces, and the round's two
+  faces on one torus are merged by the unify (no seam needed on a partial torus) so it is one face as live's. Nothing
+  changes for parts without such vertices. Waiting for the lead's go.
   core 11-03 06:38 (tried, not kept): UnifySameDomain on edges only with B-splines concatenated, wherever a vertex joins
   just two curved edges between the same two faces, after the face unify: no change on the three models (their
   loops' vertices are where the cylinders' seam edges cross them, three edges each, so nothing to join; live's
