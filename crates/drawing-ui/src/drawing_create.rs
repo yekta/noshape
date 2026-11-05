@@ -561,10 +561,8 @@ impl Render for CreateDrawingDialog {
                 })
         };
         let suggested = self.suggested && has_source;
-        crate::ui_script::note_dialog(|| {
-            let name = self.name.read(cx).value().to_string();
-            serde_json::json!({ "title": format!("Create Drawing: {name}"), "kind": "other", "tabs": [{ "label": "Existing templates", "selected": !custom }, { "label": "Custom template", "selected": custom }], "fields": [{ "label": "Suggested views", "kind": "boolean", "checked": suggested }, { "label": "No views", "kind": "boolean", "checked": !suggested }], "error": null })
-        });
+        // Live's recorder (README "### Drawings"): the header's text (its name box's label), no label / value fields.
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "modal", "title": "Create Drawing: New drawing name", "fields": [], "buttons": ["OK", "Cancel"] }));
         let body = if custom { self.render_custom(cx) } else { self.render_existing(cx) };
         // Modal backdrop with the dialog centered.
         div()

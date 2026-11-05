@@ -241,16 +241,22 @@ impl DrawingEditor {
             Some(f) if f.family != DRAWING_DEFAULT_FONT => f.family.clone(),
             _ => "Noto Sans ( Note )".to_string(),
         };
-        let mut fonts: Vec<Entry> = vec![entry("Noto Sans ( Note )", None, st.font.as_ref().is_none_or(|f| f.family == DRAWING_DEFAULT_FONT), std::rc::Rc::new(|s: &mut NoteStyle| match &mut s.font {
-            Some(f) if f.bold || f.italic => f.family = DRAWING_DEFAULT_FONT.into(),
-            _ => s.font = None,
-        }))];
-        for fam in FONT_FAMILIES.iter().copied().filter(|f| *f != DRAWING_DEFAULT_FONT) {
+        // Live's list (2063): the families in order, the note style's own "Noto Sans ( Note )" in its place.
+        let mut fonts: Vec<Entry> = Vec::new();
+        for fam in FONT_FAMILIES.iter().copied() {
+            if fam == DRAWING_DEFAULT_FONT {
+                fonts.push(entry("Noto Sans ( Note )", None, st.font.as_ref().is_none_or(|f| f.family == DRAWING_DEFAULT_FONT), std::rc::Rc::new(|s: &mut NoteStyle| match &mut s.font {
+                    Some(f) if f.bold || f.italic => f.family = DRAWING_DEFAULT_FONT.into(),
+                    _ => s.font = None,
+                })));
+                continue;
+            }
             fonts.push(entry(fam, None, st.font.as_ref().is_some_and(|f| f.family == fam), std::rc::Rc::new(move |s: &mut NoteStyle| {
                 let (b, i) = s.font.as_ref().map(|f| (f.bold, f.italic)).filter(|_| !noshape_model::drawing::sheet::is_shx(fam)).unwrap_or((false, false));
                 s.font = Some(TextFont { family: fam.into(), bold: b, italic: i });
             })));
         }
+        let font_names: Vec<String> = fonts.iter().flatten().map(|e| e.0.clone()).collect();
         let field = |w: f32| div().w(px(w)).h(px(24.)).bg(crate::theme::light().panel).border_1().border_color(gpui_kit::rgb(0xd3d7d9)).rounded(px(2.));
         let font_box = field(238.)
             .id("note-font")
@@ -428,8 +434,23 @@ impl DrawingEditor {
         // Unflagged notes show the drawing's shape ("Flag (Drawing)").
         let shown_shape = if st.flags.is_empty() { default_shape } else { st.flag_shape };
         let shape_label = if shown_shape == default_shape { format!("{} (Drawing)", shown_shape.name()) } else { shown_shape.name().to_string() };
-        let shapes: Vec<Entry> = FlagShape::ALL.iter().map(|&k| entry(k.name(), None, st.flag_shape == k, std::rc::Rc::new(move |s: &mut NoteStyle| s.flag_shape = k))).collect();
+        // (Live 2063: the drawing's own shape reads "Flag (Drawing)" in the list too.)
+        let shape_name = |k: FlagShape| if k == default_shape { format!("{} (Drawing)", k.name()) } else { k.name().to_string() };
+        let shapes: Vec<Entry> = FlagShape::ALL.iter().map(|&k| entry(&shape_name(k), None, st.flag_shape == k, std::rc::Rc::new(move |s: &mut NoteStyle| s.flag_shape = k))).collect();
+        crate::ui_script::note_dialog(|| {
+            // Every text shown, in reading order, at most 30 (README "### Drawings"; live 2063).
+            let mut text: Vec<String> = vec!["Note".into()];
+            text.extend(font_names);
+            text.push("Flag notes".into());
+            text.extend(shapes.iter().flatten().map(|e| e.0.clone()));
+            text.extend(sizes_names(4));
+            text.truncate(30);
+            serde_json::json!({ "kind": "drawing-panel", "title": "Note", "text": text })
+        });
         let sizes: Vec<Entry> = (1..=4u8).map(|n| entry(&format!("{n} Character{}", if n > 1 { "s" } else { "" }), None, st.flag_chars == n, std::rc::Rc::new(move |s: &mut NoteStyle| s.flag_chars = n))).collect();
+        fn sizes_names(n: u8) -> Vec<String> {
+            (1..=n).map(|n| format!("{n} Character{}", if n > 1 { "s" } else { "" })).collect()
+        }
         let flag_select = |id: &'static str, w: f32, label: String| {
             div()
                 .id(id)

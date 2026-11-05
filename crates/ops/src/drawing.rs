@@ -440,7 +440,8 @@ impl CustomTemplate {
 /// The five View simplification choices, with Onshape-like default values.
 pub fn simplification_choices(cur: Simplification) -> [Simplification; 5] {
     let keep = |d: Simplification| if std::mem::discriminant(&d) == std::mem::discriminant(&cur) { cur } else { d };
-    [Simplification::None, Simplification::Auto, keep(Simplification::Absolute(0.001)), keep(Simplification::RatioToStudio(0.01)), keep(Simplification::RatioToPart(0.01))]
+    // Live's order (behaviours 1473, 2063): Auto last.
+    [Simplification::None, keep(Simplification::Absolute(0.001)), keep(Simplification::RatioToStudio(0.01)), keep(Simplification::RatioToPart(0.01)), Simplification::Auto]
 }
 
 /// The value field text of a simplification ("1 mm", "1 %").

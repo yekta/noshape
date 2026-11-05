@@ -277,6 +277,10 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             let mut s = state(cx);
             if s.is_object() {
                 s["tooltip"] = json!(noshape_app_core::ui_script::shown_tooltip());
+                // A modal of the window's (Create Drawing, Export Drawing) holds the focus (live 2063: "other").
+                if s["dialog"]["kind"] == "modal" && s["focus"]["kind"] == "none" {
+                    s["focus"] = json!({ "kind": "other" });
+                }
             }
             s
         };

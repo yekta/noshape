@@ -171,7 +171,13 @@ pub fn create_drawing(template: &DrawingTemplate, source: Option<&DrawingSource>
     let v = if third { 1.0 } else { -1.0 };
     sheet.views.push(projected(2, [0.0, v], [front_x, other_y]));
     sheet.views.push(projected(3, [v, 0.0], [other_x, front_y]));
-    sheet.views.push(base(4, ViewOrientation::Isometric, [other_x, other_y]));
+    // Third angle: the isometric is projected from Front, up and right (live 2063: its parent is Front; the fold gives
+    // the standard isometric frame). First angle keeps a base isometric (its diagonal fold is another view).
+    if third {
+        sheet.views.push(projected(4, [std::f64::consts::FRAC_1_SQRT_2, std::f64::consts::FRAC_1_SQRT_2], [other_x, other_y]));
+    } else {
+        sheet.views.push(base(4, ViewOrientation::Isometric, [other_x, other_y]));
+    }
     d
 }
 

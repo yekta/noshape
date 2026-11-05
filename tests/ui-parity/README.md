@@ -102,7 +102,16 @@ Its state adds `"drawing"` (`null` outside a drawing tab):
   from; `scale` as the view's properties show it. `annotations`: the sheet's, sorted by kind then text, `kind` one
   of `dimension`, `note`, `centermark`, `centerline`, `callout`, `datum`, `gdt`, `table`; automatic centermarks are
   left out. `selection`: `VIEW` / `EDGE` / `ANNOTATION` items with the view or the annotation's text as `owner`.
-- A drawing's dialogs and panels (Insert view, Section view, Export) are the top-level `dialog`, as a feature's.
+- A drawing's dialogs and panels are the top-level `dialog`, in live's recorder's forms (live 2063): a modal (Create
+  Drawing, Export Drawing) is `{"kind": "modal", "title", "fields": [{"label", "kind": "input" | "select" |
+  "checkbox", "value"}], "buttons"}`, its label the label row's text ("File name View export rules"); a drawing panel
+  (Insert view, Note, Section view) is `{"kind": "drawing-panel", "title", "text": [...]}`, every text it shows in
+  reading order (a list's options too, at most 30).
+- `selection` is what is drawn in selection colours: `VIEW` for a framed view (selected or hovered), `EDGE` for a view
+  whose edges are drawn picked (a tool's pick, the projection's parent). In a drawing the focus is `other` (live's
+  drawing is an iframe), `field` in a panel's text box.
+- Compared in a drawing state: `drawing` and the keys above but `selection` and `undo` (live's recorder reads the main
+  page's, which a drawing's iframe doesn't change: 0 and false throughout).
 
 ## Recording (both sides write this)
 

@@ -278,6 +278,24 @@ impl DrawingEditor {
                 .tooltip(crate::ui::tooltip(["Vertical cut line", "Horizontal cut line", "Angular cut line"][m as usize % 3]))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_section_mode(m, cx)))
         };
+        crate::ui_script::note_dialog(|| {
+            // Every text shown, in reading order (README "### Drawings"; live 2063).
+            let mut text = vec!["Section view", "Vertical", "Horizontal", "Angular"];
+            if mode == 2 && d.angle_input.is_some() {
+                text.push("Cut angle");
+            }
+            text.push("Show cut geometry only");
+            if of_section {
+                text.push("Cut from section");
+            }
+            if !jogged {
+                text.push("Section depth");
+            }
+            if assembly {
+                text.push("Exclude from cut");
+            }
+            serde_json::json!({ "kind": "drawing-panel", "title": "Section view", "text": text })
+        });
         Some(
             v_flex()
                 .id("dr-section-dlg")

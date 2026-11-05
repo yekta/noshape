@@ -383,7 +383,10 @@ impl DrawingEditor {
                         // 1st a client-only text-editing entry.
                         self.doc.update(cx, |d, cx| d.push_client_step(cx));
                     }
-                    self.tool = Tool::Select;
+                    // The Note tool stays for the next note (live 2063: Esc ends it).
+                    if !matches!(self.tool, Tool::Note) {
+                        self.tool = Tool::Select;
+                    }
                 }
             }
             Panel::TitleBlock { inputs } => {

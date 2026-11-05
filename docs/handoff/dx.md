@@ -153,6 +153,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   extents (20-210 mm) centred: as ours (text left out: live's DXF $EXTMAX 210.384 counts a text, ours 210). Hidden
   lines in the PDF as live's: the DXF's HIDDEN (1.27 / 0.635 mm) laid out AutoCAD's way (a 10 mm edge: 0.8725 ends),
   every line by its DXF line type now, the Views tab's dash scale multiplying it.
+- 16:35: drawing scenarios scored (live 2063 recorded all 8; `tools/ui-parity/run.py --scenarios <ours + live's 3 edits>
+  --live /root/parity/ui/live`, scratch /root/dx-scratch/uip-scen): 0/8, 2/45 -> 2/8, 37/45. The runner compares
+  `drawing` now and not selection / undo in a drawing (live's recorder reads the main page's); live's recorder forms
+  for modals / drawing panels adopted (README "### Drawings"). Fixed on the way, as live: Insert view's tool shown
+  with the empty panel, the chooser's search focused, a placed base view not selected (its edges as the projection
+  parent), a placed projected view selected, the Note tool kept after a note, a section view named "Section" with its
+  label a note, Simplification's order (Auto last), the note fonts in live's order, "Double circle", "<shape>
+  (Drawing)" in the flag list, the suggested isometric projected from Front (third angle; same frame). Waiting:
+  REQUESTS 16:12 (No views sheet scale), 16:27 (hover vs selection, a re-record).
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem

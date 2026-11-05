@@ -27,7 +27,9 @@ ROOT = Path(__file__).resolve().parents[2]
 CAUSES = {}
 KEYS = ["focus", "dialog", "list", "selection", "features", "parts", "message", "tooltip"]
 # Added later (README "undo", "sketch", "assembly"): compared once live's recording has them.
-LATER_KEYS = ["undo", "sketch", "assembly"]
+LATER_KEYS = ["undo", "sketch", "assembly", "drawing"]
+# Read from the main page, which a drawing's iframe leaves alone (README "### Drawings"): not compared there.
+NOT_IN_DRAWINGS = {"selection", "undo"}
 
 
 def run_one(app, scenario, out, display, timeout):
@@ -134,6 +136,10 @@ def normalize_live(state):
             if sk.get(k) is None:
                 sk.pop(k, None)
         sk.pop("error", None)
+    # Live's runner works in a copy of the start, its Part Studio "start <name> Copy 1" in a drawing panel.
+    d = (state or {}).get("dialog")
+    if isinstance(d, dict) and d.get("kind") == "drawing-panel":
+        d["text"] = [re.sub(r"^start \S+ Copy \d+ ", "Part Studio 1 ", t) if isinstance(t, str) else t for t in d.get("text") or []]
     lst = (state or {}).get("list")
     if isinstance(lst, dict):
         rows = lst.get("rows") or []
@@ -199,6 +205,8 @@ def compare(live, ours):
     for name, a, b in pairs:
         a = normalize_live(json.loads(json.dumps(a)))
         keys = KEYS + [k for k in LATER_KEYS if k in (a or {})]
+        if (a or {}).get("drawing"):
+            keys = [k for k in keys if k not in NOT_IN_DRAWINGS]
         a = {k: (a or {}).get(k) for k in keys}
         b = json.loads(json.dumps({k: (b or {}).get(k) for k in keys}))
         drawn_sizes(a, b)

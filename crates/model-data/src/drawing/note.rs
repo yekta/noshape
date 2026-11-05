@@ -116,7 +116,8 @@ impl FlagShape {
             FlagShape::None => "None",
             FlagShape::Circle => "Circle",
             FlagShape::Diamond => "Diamond",
-            FlagShape::DoubleCircle => "Double Circle",
+            // (Live 2063's Note panel list.)
+            FlagShape::DoubleCircle => "Double circle",
             FlagShape::Flag => "Flag",
             FlagShape::Hexagon => "Hexagon",
             FlagShape::Octagon => "Octagon",

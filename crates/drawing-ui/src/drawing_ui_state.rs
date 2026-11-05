@@ -58,7 +58,7 @@ impl DrawingEditor {
     }
 
     /// A view's name as its properties show it: its orientation (a projected view's: what it looks along), a
-    /// section's "Section A-A", a detail's "Detail A".
+    /// section's "Section" (live 2063), a detail's "Detail A".
     pub fn ui_view_name(&self, id: ViewId) -> String {
         let drawing = self.display();
         let Some(sheet) = drawing.sheets.get(self.sheet) else { return String::new() };
@@ -67,7 +67,8 @@ impl DrawingEditor {
         match &v.kind {
             ViewKind::Base { orientation, .. } => oriented(*orientation),
             ViewKind::Projected { .. } => views::standard_orientation(drawing, sheet, id).map(oriented).unwrap_or_else(|| "Isometric".into()),
-            ViewKind::Section { label, .. } => format!("Section {label}-{label}"),
+            // Live's export names it "Section", its "SECTION A - A" a note (2063).
+            ViewKind::Section { .. } => "Section".to_string(),
             ViewKind::Detail { label, .. } => format!("Detail {label}"),
             _ => v.label.clone().unwrap_or_else(|| self.ui_view_kind(id).to_string()),
         }
@@ -139,25 +140,73 @@ impl DrawingEditor {
             .collect();
         views.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
         let mut annotations: Vec<(&str, String)> = self.ui_annotations().into_iter().map(|(_, k, t)| (k, t)).collect();
+        // A view's label is a note in live's export ("SECTION A - A", 2063).
+        if let Some(b) = &self.built {
+            for v in &sheet.views {
+                let parts: Vec<&str> = b.geometry.texts.iter().filter(|t| matches!(b.picks.get(t.pick as usize), Some(PickTarget::ViewLabel(x)) if *x == v.id)).map(|t| t.text.as_str()).collect();
+                let text = parts.join(" ").split_whitespace().collect::<Vec<_>>().join(" ");
+                if !text.is_empty() {
+                    annotations.push(("note", text));
+                }
+            }
+        }
         annotations.sort();
-        let selection: Vec<Value> = self
-            .selection
-            .iter()
-            .filter_map(|s| match s {
-                Sel::View(id) => Some(json!({ "kind": "VIEW", "owner": self.ui_view_name(*id) })),
-                Sel::Annotation(id) => Some(json!({ "kind": "ANNOTATION", "owner": self.ui_annotations().into_iter().find(|a| a.0 == *id).map(|a| a.2) })),
-                _ => None,
-            })
-            .collect();
+        // What is drawn in selection colours (README "### Drawings"): selected views framed; edges drawn picked: a
+        // tool's picks, the Projected tool's parent before its first view, a selected section's cutting line.
+        let mut selection: Vec<(String, String)> = Vec::new();
+        let edge_of = |v: ViewId, out: &mut Vec<(String, String)>| out.push(("EDGE".into(), self.ui_view_name(v)));
+        for s in &self.selection {
+            match s {
+                Sel::View(id) => {
+                    if let Some(ViewKind::Section { parent, .. }) = sheet.view(*id).map(|v| &v.kind) {
+                        edge_of(*parent, &mut selection);
+                    }
+                    selection.push(("VIEW".into(), self.ui_view_name(*id)));
+                }
+                Sel::Annotation(id) => selection.push(("ANNOTATION".into(), self.ui_annotations().into_iter().find(|a| a.0 == *id).map(|a| a.2).unwrap_or_default())),
+                _ => {}
+            }
+        }
+        match &self.tool {
+            Tool::Projected { parent: Some(p) } if self.selection.is_empty() => edge_of(*p, &mut selection),
+            Tool::Section { parent: Some(p), p0: Some(_), .. } => edge_of(*p, &mut selection),
+            Tool::Dimension { picks, .. } => {
+                for pick in picks {
+                    let v = match pick {
+                        noshape_scene::drawing_tools::Pick::Point(a) | noshape_scene::drawing_tools::Pick::Line { a, .. } | noshape_scene::drawing_tools::Pick::Arc { a, .. } => a.view,
+                        noshape_scene::drawing_tools::Pick::Circle { view, .. } | noshape_scene::drawing_tools::Pick::CircleAt { view, .. } => *view,
+                    };
+                    edge_of(v, &mut selection);
+                }
+            }
+            _ => {}
+        }
+        selection.sort();
+        selection.dedup();
+        let selection: Vec<Value> = selection.into_iter().map(|(k, o)| json!({ "kind": k, "owner": o })).collect();
         json!({
             "tab": tab,
             "sheet": sheet.name,
             "sheets": sheets,
-            "tool": ui_tool_name(&self.tool),
+            // (The Insert view panel before a part is chosen is the Insert view tool's, as live's toolbar shows it.)
+            "tool": ui_tool_name(&self.tool).or_else(|| (matches!(self.tool, Tool::Select) && (self.insert.panel || self.insert.chooser.is_some())).then_some("Insert view")),
             "views": views,
             "annotations": annotations.into_iter().map(|(k, t)| json!({ "kind": k, "text": t })).collect::<Vec<_>>(),
             "selection": selection,
         })
+    }
+
+    /// Where the focus is, as live's recorder reads it (README "### Drawings"): the drawing (an iframe there) is
+    /// "other"; the Insert view chooser's search box and list a panel "field"; a menu of the window's (a document
+    /// tab's) takes it off the drawing.
+    fn ui_focus(&self, cx: &App) -> Value {
+        if ui_list(cx).is_some() {
+            return json!({ "kind": "none" });
+        }
+        if self.insert.chooser.is_some() {
+            return json!({ "kind": "field", "label": null });
+        }
+        json!({ "kind": "other" })
     }
 
     /// The state the ui-parity runner records after each step: the drawing's own key, the others empty but the
@@ -166,9 +215,9 @@ impl DrawingEditor {
         let undo = self.doc.read(cx).session.can_undo();
         let redo = self.doc.read(cx).session.can_redo();
         json!({
-            "focus": { "kind": "graphics" },
+            "focus": self.ui_focus(cx),
             "dialog": noshape_app_core::ui_script::open_dialog(),
-            "list": noshape_app_core::ui_script::open_list(),
+            "list": ui_list(cx),
             "selection": { "count": self.selection.len(), "items": [] },
             "features": { "rows": [], "rollbackAfter": null },
             "parts": [],
@@ -179,6 +228,11 @@ impl DrawingEditor {
             "drawing": self.ui_drawing_state(cx),
         })
     }
+}
+
+/// The open menu or list: a menu of the window's (a document tab's), else a list a control noted.
+fn ui_list(cx: &App) -> Option<Value> {
+    noshape_app_core::os_menu::ui_state(cx).or_else(noshape_app_core::ui_script::open_list)
 }
 
 /// The active drawing tool's tooltip name (the toolbar's, without its shortcut); `None` for Select.

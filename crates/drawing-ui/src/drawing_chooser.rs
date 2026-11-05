@@ -211,6 +211,10 @@ impl DrawingEditor {
             (true, false) => {
                 self.chooser.search = Some(cx.new(|cx| InputState::new(window, cx).placeholder("Search parts or sketches")));
                 self.chooser.url = Some(cx.new(|cx| InputState::new(window, cx).placeholder("Search or paste URL")));
+                // Live 2063: the search box takes the focus as the chooser opens.
+                if let Some(search) = self.chooser.search.clone() {
+                    window.defer(cx, move |window, cx| search.update(cx, |s, cx| s.focus(window, cx)));
+                }
             }
             (false, true) => {
                 self.chooser.search = None;
@@ -642,8 +646,9 @@ impl DrawingEditor {
     fn render_empty_insert_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         crate::ui_script::note_dialog(|| {
-            let field = |label: &str, text: &str| serde_json::json!({ "label": label, "kind": "enum", "text": text });
-            serde_json::json!({ "title": "Insert view", "kind": "other", "tabs": [], "fields": [field("View orientation", "Front"), field("View scale", ""), field("View simplification", "Auto"), { "label": "Show sketch appearances", "kind": "boolean", "checked": false }], "error": null })
+            // Every text shown, in reading order (README "### Drawings"; live 2063).
+            let text = ["Insert view", "Insert", "View orientation", "Top", "Left", "Right", "Front", "Back", "Bottom", "Isometric", "View scale", "View simplification", "None", "Absolute", "Ratio to studio", "Ratio to part", "Auto", "Show sketch appearances"];
+            serde_json::json!({ "kind": "drawing-panel", "title": "Insert view", "text": text })
         });
         // Live drawing/122: the fields greyed with grey ▼, View scale focused
         // (a 2 px blue underline, a dark ▼).

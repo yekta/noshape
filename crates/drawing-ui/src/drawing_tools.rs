@@ -761,9 +761,9 @@ impl DrawingEditor {
                     if self.out_of_date {
                         self.update_drawing(cx);
                     }
-                    // Onshape activates the projected view tool next.
+                    // Onshape activates the projected view tool next, the new view its parent, not selected (live 2063).
                     self.tool = Tool::Projected { parent: Some(id) };
-                    self.selection = vec![Sel::View(id)];
+                    self.selection.clear();
                 }
             }
             Tool::Projected { parent: None } => {
@@ -784,7 +784,10 @@ impl DrawingEditor {
                         v.cut_from_section = true;
                     }
                     let name = if matches!(self.tool, Tool::Auxiliary { .. }) { "Auxiliary view" } else { "Projected view" };
+                    let id = v.id;
                     self.edit_sheet(name, cx, |s| s.views.push(v));
+                    // The new view is selected (live 2063).
+                    self.selection = vec![Sel::View(id)];
                     if matches!(self.tool, Tool::Auxiliary { .. }) {
                         self.tool = Tool::Select;
                     }
