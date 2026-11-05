@@ -1,6 +1,6 @@
 {
  "name": "drw-hole-table",
- "about": "Hole table of the Top view: the tool, the Top view, its lower-left corner as the origin, ✓",
+ "about": "Hole table of the Top view: the tool, the Top view, its lower-left corner as the origin, ✓, then a click on the sheet to place the table (live's table follows the pointer after ✓)",
  "area": "dx",
  "ticket": "DRAWING-UI-PARITY",
  "source": "drawing scenarios, second batch (lead 11-05 20:3x)",
@@ -35,6 +35,15 @@
    "do": "click",
    "on": {
     "button": "ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     150,
+     120
+    ]
    }
   },
   {

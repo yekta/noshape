@@ -1,6 +1,6 @@
 {
  "name": "drw-broken-out-section",
- "about": "Broken-out section on the Front view around the hole: a closed spline of four points through Front (the profile's default Spline), Blind with its default depth, ✓",
+ "about": "Broken-out section on the Front view around the hole: a closed spline of four points through Front (the profile's default Spline), live's default Up to entity with the hole's edge in the Top view as the depth, ✓",
  "area": "dx",
  "ticket": "DRAWING-UI-PARITY",
  "source": "drawing scenarios, second batch (lead 11-05 20:3x)",
@@ -73,6 +73,19 @@
       -8,
       -20,
       5
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Top",
+     "at": [
+      5,
+      0,
+      20
      ]
     }
    }
