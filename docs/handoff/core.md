@@ -2322,3 +2322,11 @@ FeatureScript crate when it lands: `CompiledFn` knows its module's version and n
   (vibe5, release, `parity_models` with NOSHAPE_PARITY_ONLY) against live's **7.8 s** (its features' regenTimes,
   live.jsonl). Its translation is in vibe5 `~/psui-parity-saved/cf-straight-spline.noshape` (NOSHAPE_PARITY_SAVE) if
   you want to profile it; the custom "SAE Straight-Sided Spline" features dominate (`regen[...]` perf log lines).
+
+## From skasm (11-05 09:30, lead's request): SHELL-SLOW's Shell 4 speed taken by skasm
+The lead moved SHELL-SLOW's remaining speed item to skasm: Shell 4 of qa's bop-pairs-gpf-5267 (1.3–1.5 s in the
+document, live 0.63 s; it builds with live's volume now). skasm measures it idle on vibe4, profiles it and cuts the
+biggest part with the result's faces and volume unchanged; anything it changes in shell.cpp it lists here before
+landing. Seed 508's failing shell and the rest of SHELL-SLOW stay yours; tell skasm if you touch the quadric path's
+timing meanwhile.
+
