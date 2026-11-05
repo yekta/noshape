@@ -2817,6 +2817,9 @@ declines "a cylinder face without curved edges" (crates/brep/src/boolean.rs ~367
 the whole turn with fewer than two rulings), then OCCT's build takes 93 of the feature's ms (`op_boolean` 116). The
 pattern's own work (tool by sewing, caps, copies, names, the boxes) is ~20 ms, the unify 13. The case, recorded with
 NOSHAPE_RECORD_BOOLEANS / NOSHAPE_RECORD_EXACT: /root/skasm-scratch/for-bool/f09d7998ed9eb11b.(brep|bin|txt) (cut,
-3 tools, glue inside_checked, 12 faces out). Yours if you take it; skasm can look at the tool's cylinder if it turns
-out to be the pattern's sewing that makes it so.
+3 tools, glue inside_checked, 12 faces out). Each tool is a slot through the tube's wall: two extrusions of B-spline
+profiles and four cylinder patches (its caps on the tube's inner and outer cylinders, `faces_tool`'s caps "on the
+curved face all round"), each bounded by one closed B-spline edge (the extrusion's section with the cylinder): those
+patches are what declines. The tool is right as built (a cap on the cylinder is what the slot is), so this is a case
+for noshape's Boolean: a cylinder patch inside one closed B-spline loop. Yours if you take it.
 
