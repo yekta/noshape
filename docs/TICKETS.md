@@ -4050,6 +4050,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Part's part: live's volume and area, 52/118/68 against 50/112/76 faces/edges/vertices. 11-05 00:03: the 2 faces are one live face
   (KVeB, 88.046 mm², the rolled wall's side at the part's step) ours makes in 3 (13.29 + 18.632 + 56.124 mm²);
   unifying the trimmed sheet's edges doesn't merge them (the split is in the rolled wall's thickening or the fuse).
+  dx 11-05 03:22: the split is in the definition: the rolled wall's end along the Filling Part's step is three edges
+  (-25, 60.24, 29.82) -> (-22.51, 65.18, 28.08) -> (-22.51, 65.18, 34.70) -> (-25, 60.24, 57.69). The middle one is
+  where the wall's straight stretch (the plane y = 65.18, through the step cylinder's axis) meets the cylinder, along
+  its seam line: the same geometry as live's, but OCCT's intersection is three edges (curve, line, curve, tangent
+  at the joins) where Parasolid's is one curve (live: KSVB). Next: in the trim (ops.rs Bounds::trim), join a face's
+  consecutive boundary edges made against one tool face and tangent at their shared ends into one B-spline edge
+  (kernel: GeomConvert_CompCurveToBSplineCurve); the rebuild's three end faces are then live's one.
   dx 11-04 21:39: cf-sheet-metal-shaped-flange's Shaped Flange 1 (flange a separate part, 78,922 vs 92,510 mm³):
   the definition sheet joins (the flange shares its partial edge with the base), but `addEdge` (its transient
   query ∪ startTracking) resolves to two edges after flangeEdgeChange + flange_boolean: the moved joint edge (z 2.5,
