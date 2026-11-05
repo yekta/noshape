@@ -637,37 +637,6 @@ fn table_styles_from_drawing_properties() {
     assert!((data.content_height(&own) - 2.5).abs() < 1e-9 && (data.row_text_height(&own, 0) - 2.5).abs() < 1e-9);
 }
 
-/// The demo plate's holes (its Ø24 bore and two Ø9.6 holes, extruded cuts) as a Hole feature's, in view `view`'s
-/// source: live's hole tables list only Hole features' holes.
-fn plate_holes_as_hole_features(drawing: &Drawing, sources: &mut views::Sources, view: ViewId) {
-    let Some((key, _)) = views::view_source(&drawing.sheets[0], view) else { return };
-    let Some(src) = sources.get_mut(&key) else { return };
-    let mut ctx = (*src.context).clone();
-    let parts: Vec<crate::BodyId> = ctx.bodies.iter().map(|b| b.id.clone()).take(1).collect();
-    for (x, y, d) in [(0.0, 0.0, 0.024), (-0.038, -0.018, 0.0096), (0.038, 0.018, 0.0096)] {
-        ctx.holes.push(crate::regen::context::HoleRecord {
-            feature: crate::reference::FeatureId(1),
-            start: glam::DVec3::new(x, y, 0.012),
-            dir: glam::DVec3::new(0.0, 0.0, -1.0),
-            diameter: d,
-            depth: None,
-            through: true,
-            tap_drill: None,
-            tapped_depth: None,
-            thread: None,
-            thread_class: None,
-            cbore: None,
-            csink: None,
-            inch: false,
-            diameter_fit: None,
-            exits: true,
-            parts: parts.clone(),
-            tip_angle: None,
-        });
-    }
-    src.context = std::sync::Arc::new(ctx);
-}
-
 /// A hole table over two views of one part (live request 1744): the same
 /// holes seen again aren't listed twice; a hole only the second view shows
 /// joins its size's group or starts the next letter.
@@ -681,8 +650,7 @@ fn hole_table_over_two_views_lists_each_hole_once() {
     drawing.sheets[0].views.push(second);
     let more = vec![HoleView { view: ViewId(91), origin, origin_ref: None, flip_x: false, flip_y: false, exclude: Vec::new(), x_dir: None }];
     drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, bottom_to_top: false, exclude: Vec::new(), x_dir: None, more }, [410.0, 120.0]));
-    let mut sources = regenerate_sources(&doc, &drawing);
-    plate_holes_as_hole_features(&drawing, &mut sources, ViewId(2));
+    let sources = regenerate_sources(&doc, &drawing);
     let cache = ViewCache::new();
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let t = texts(&built);
@@ -704,8 +672,7 @@ fn bom_hole_table_and_linked_balloons() {
     // Hole table of the plate's top view on sheet 1.
     let origin = [-0.05, -0.03];
     drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, bottom_to_top: false, exclude: Vec::new(), x_dir: None, more: Vec::new() }, [410.0, 120.0]));
-    let mut sources = regenerate_sources(&doc, &drawing);
-    plate_holes_as_hole_features(&drawing, &mut sources, ViewId(2));
+    let sources = regenerate_sources(&doc, &drawing);
     let src = &sources[&SourceKey::studio(asm)];
     assert!(src.assembly);
     assert_eq!(src.bom.iter().map(|r| (r.item, r.quantity)).collect::<Vec<_>>(), [(1, 2), (2, 1)]);
@@ -737,11 +704,11 @@ fn bom_hole_table_and_linked_balloons() {
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let t = texts(&built);
     // 1 large hole (A1) and 2 small ones (B1, B2), located from the corner.
-    for want in ["HOLE TABLE", "A1", "B1", "B2", "⌀24 THRU", "⌀9.6 THRU", "50", "30", "12", "88", "48", "QTY"] {
+    for want in ["HOLE TABLE", "A1", "B1", "B2", "Ø24", "Ø9.6", "50", "30", "12", "88", "48", "QTY"] {
         assert!(t.iter().any(|x| x == want), "missing {want}: {t:?}");
     }
-    // Live 1983: a size's SIZE and QTY cells merged down its rows (B1, B2: one ⌀9.6 THRU, QTY 2).
-    assert_eq!(t.iter().filter(|x| *x == "⌀9.6 THRU").count(), 1, "{t:?}");
+    // Live 1983: a size's SIZE and QTY cells merged down its rows (B1, B2: one Ø9.6, QTY 2).
+    assert_eq!(t.iter().filter(|x| *x == "Ø9.6").count(), 1, "{t:?}");
     assert!(t.iter().any(|x| x == "2"), "{t:?}");
     // ☐ Show location data: no X / Y LOC; Order bottom to top keeps a size merged.
     if let TableKind::Hole { show_location, bottom_to_top, .. } = &mut drawing.sheets[0].tables[0].kind {
@@ -750,7 +717,7 @@ fn bom_hole_table_and_linked_balloons() {
     let built2 = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let t2 = texts(&built2);
     assert!(!t2.iter().any(|x| x == "X LOC") && t2.iter().any(|x| x == "QTY"), "{t2:?}");
-    assert_eq!(t2.iter().filter(|x| *x == "⌀9.6 THRU").count(), 1, "{t2:?}");
+    assert_eq!(t2.iter().filter(|x| *x == "Ø9.6").count(), 1, "{t2:?}");
     // Holes to exclude: the large hole (at the plate's center) leaves the
     // table and its tag goes; the small ones are re-tagged A1, A2.
     if let TableKind::Hole { exclude, .. } = &mut drawing.sheets[0].tables[0].kind {
@@ -3830,8 +3797,7 @@ fn cad_export_text_styles_per_kind_like_onshape() {
         TabContent::Drawing(d) => Some(d.clone()),
         _ => None,
     }).unwrap();
-    let mut sources = regenerate_sources(&doc, &drawing);
-    plate_holes_as_hole_features(&drawing, &mut sources, ViewId(2));
+    let sources = regenerate_sources(&doc, &drawing);
     let cache = ViewCache::new();
     // Every sheet (the hole table, BOM and free table are on different ones).
     let docs: Vec<_> = (0..drawing.sheets.len()).map(|si| {

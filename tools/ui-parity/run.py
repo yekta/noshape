@@ -29,7 +29,7 @@ KEYS = ["focus", "dialog", "list", "selection", "features", "parts", "message", 
 # Added later (README "undo", "sketch", "assembly"): compared once live's recording has them.
 LATER_KEYS = ["undo", "sketch", "assembly", "drawing"]
 # Read from the main page, which a drawing's iframe leaves alone (README "### Drawings"): not compared there.
-NOT_IN_DRAWINGS = {"selection", "undo", "assembly"}
+NOT_IN_DRAWINGS = {"selection", "undo"}
 
 
 def run_one(app, scenario, out, display, timeout):
@@ -226,15 +226,6 @@ def compare(live, ours):
             d = side.get("dialog")
             if isinstance(d, dict) and d.get("kind") == "drawing-panel":
                 d["text"] = [re.sub(r"^start \S+ asm( Copy \d+)?$", "start asm", t) if isinstance(t, str) else t for t in d.get("text") or []]
-            dr = side.get("drawing")
-            if isinstance(dr, dict) and isinstance(dr.get("tab"), str):
-                dr["tab"] = re.sub(r"^start \S+ asm( Copy \d+)? ", "start asm ", dr["tab"])
-        # Live's recorder can't read a table's cells (its text is null there).
-        anns = [((side.get("drawing") or {}).get("annotations") or []) for side in (a, b)]
-        if any(x.get("kind") == "table" and x.get("text") is None for x in anns[0]):
-            for x in anns[1]:
-                if x.get("kind") == "table":
-                    x["text"] = None
         drawn_sizes(a, b)
         placed_alike(a, b)
         cloud_menu(a, b)

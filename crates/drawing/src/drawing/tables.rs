@@ -298,18 +298,10 @@ pub struct HoleRow {
 /// B1... for the next; sorted top-to-bottom, left-to-right within a size.
 /// `exclude`: centers of holes left out (Holes to exclude); `x_dir`: the
 /// table's X direction (view coordinates; Y square to it), else the view's.
-/// Only the Hole features' holes of `ctx` (live: a table of extruded cuts is
-/// its header only, behaviours "no Hole features"); every bore without one.
-pub fn hole_rows(g: &ViewGeometry, ctx: Option<&Context>, origin: [f64; 2], exclude: &[[f64; 2]], x_dir: Option<[f64; 2]>) -> Vec<HoleRow> {
+pub fn hole_rows(g: &ViewGeometry, origin: [f64; 2], exclude: &[[f64; 2]], x_dir: Option<[f64; 2]>) -> Vec<HoleRow> {
     let (ux, uy) = hole_axes(x_dir);
     let mut bores = g.bores();
     bores.retain(|(c, ..)| !exclude.iter().any(|e| (e[0] - c[0]).hypot(e[1] - c[1]) < 1e-7));
-    if let Some(ctx) = ctx {
-        bores.retain(|(.., p)| {
-            let Some((c, Some(r))) = p.as_ref().and_then(|p| super::views::resolve_point3(ctx, p)) else { return false };
-            ctx.holes.iter().any(|h| h.matches_circle(c, r, r * 1e-3 + 1e-7))
-        });
-    }
     // Concentric bores of different size (e.g. counterbores): keep the
     // smallest per center as the hole size.
     bores.sort_by(|a, b| a.1.total_cmp(&b.1));
@@ -352,7 +344,7 @@ pub fn hole_extra_rows<'a>(t: &Table, geoms: &dyn Fn(super::ViewId) -> Option<&'
             _ => m.origin,
         };
         let (fx, fy) = (if m.flip_x != *flip_x { -1.0 } else { 1.0 }, if m.flip_y != *flip_y { -1.0 } else { 1.0 });
-        out.extend(hole_rows(g, source.map(|s| &*s.context), o, &m.exclude, m.x_dir).into_iter().map(|mut h| {
+        out.extend(hole_rows(g, o, &m.exclude, m.x_dir).into_iter().map(|mut h| {
             h.x *= fx;
             h.y *= fy;
             h
@@ -531,7 +523,7 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
             let f = DimFormat { precision: *precision, ..Default::default() };
             let u = length_units(drawing, &f);
             let num = |m: f64| format_number(m / u.meters(), f.precision, default_digits(u));
-            let holes = merge_hole_rows(view_geo.map(|g| hole_rows(g, source.map(|s| &*s.context), origin.unwrap_or(*stored), exclude, *x_dir)).unwrap_or_default(), extra);
+            let holes = merge_hole_rows(view_geo.map(|g| hole_rows(g, origin.unwrap_or(*stored), exclude, *x_dir)).unwrap_or_default(), extra);
             // Groups of one size: consecutive rows (hole_rows keeps a size together).
             let mut groups: Vec<(usize, usize)> = Vec::new();
             for (i, h) in holes.iter().enumerate() {
