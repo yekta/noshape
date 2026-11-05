@@ -1059,7 +1059,7 @@ fn convert_a_plate_with_defaults_makes_six_walls() {
 #[test]
 #[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn convert_rips_and_bends_like_onshape() {
-    let block = |bend: bool| {
+    let block_inward = |bend: bool, inward: bool| {
         let mut s = Studio::new();
         let mut sk = noshape_sketch::Sketch::new();
         polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 30.0), (0.0, 30.0)], true);
@@ -1083,9 +1083,11 @@ fn convert_rips_and_bends_like_onshape() {
             p.set("facesToExclude", ParamValue::Query(exclude));
             p.set("bends", ParamValue::Query(bends));
             set_model(p, "1 mm", "1 mm");
+            p.set("oppositeDirection", ParamValue::Bool(inward));
         });
         s
     };
+    let block = |bend: bool| block_inward(bend, false);
     let bbox = |r: &RegenResult, bi: usize| r.context.bodies[bi].shape.bounding_box(true).unwrap();
     let mm3 = |v: f64| v * 1e9;
     // Find the body whose box starts at x = 0 (the top wall) and the other.
@@ -1114,6 +1116,14 @@ fn convert_rips_and_bends_like_onshape() {
     });
     let (st, msg) = s.last_status();
     assert_eq!((st, msg.as_str()), (FeatureStatus::Error, "An internal edge cannot be used to create a joint."));
+
+    // Material inward (live c2-sm-corner-break's converted box): each wall stops short of the other's inner face by the
+    // clearance, the corner square left open.
+    let r = block_inward(false, true).ok();
+    let (top, side) = walls(&r);
+    assert!(near(mm3(volume(&r, top)), 1169.4, 1e-6) && near(mm3(volume(&r, side)), 569.4, 1e-6), "{} {}", mm3(volume(&r, top)), mm3(volume(&r, side)));
+    let (bt, bs) = (bbox(&r, top), bbox(&r, side));
+    assert!(near(bt.max.x, mm(38.98), 1e-6) && near(bs.max.z, mm(18.98), 1e-6), "{bt:?} {bs:?}");
 
     // The edge as a bend: one part (Onshape 1810.6858347057712, 14 faces).
     let mut s = block(true);

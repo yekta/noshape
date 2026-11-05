@@ -989,10 +989,17 @@ fn corner_reliefs(def: &Definition, topo: &Topo, outlines: &[Outline], bends: &B
                     prism(&mut cuts, p, &[v - (d1 + d2) * reach, v + d1 * (2.0 * reach) - d2 * reach, v - d1 * reach + d2 * (2.0 * reach)], vi)?;
                     continue;
                 }
-                extends.push((e1, v, def.clearance));
-                extends.push((e2, v, def.clearance));
-                wraps.push(WrappedCut { edge: e1, v, plate: p, ba: b1, shape: CutShape::Closed { plate_end: s2 + gap, flange_end: def.clearance, angle: angle(e1) } });
-                wraps.push(WrappedCut { edge: e2, v, plate: p, ba: b2, shape: CutShape::Closed { plate_end: s1 + gap, flange_end: def.clearance, angle: angle(e2) } });
+                // The flanges end where their walls do at the corner's (edge joint) rip.
+                let edge_rip = def.rips.iter().copied().find(|&r| r < topo.edge_ends.len() && [topo.edge_ends[r].0, topo.edge_ends[r].1].iter().any(|q| q.distance(topo.vertices[vi]) < TOL));
+                let flange_end = |e: usize| match (edge_rip, flange_of(e)) {
+                    (Some(r), Some(f)) => rip_offset(def, topo, r, f),
+                    _ => def.clearance,
+                };
+                let (fe1, fe2) = (flange_end(e1), flange_end(e2));
+                extends.push((e1, v, fe1));
+                extends.push((e2, v, fe2));
+                wraps.push(WrappedCut { edge: e1, v, plate: p, ba: b1, shape: CutShape::Closed { plate_end: s2 + gap, flange_end: fe1, angle: angle(e1) } });
+                wraps.push(WrappedCut { edge: e2, v, plate: p, ba: b2, shape: CutShape::Closed { plate_end: s1 + gap, flange_end: fe2, angle: angle(e2) } });
                 let reach = s1 + s2 + gap;
                 prism(&mut cuts, p, &[v - (d1 + d2) * reach, v + d1 * (2.0 * reach) - d2 * reach, v - d1 * reach + d2 * (2.0 * reach)], vi)?;
                 continue;
@@ -2521,8 +2528,12 @@ fn rip_offset(def: &Definition, topo: &Topo, e: usize, f: usize) -> f64 {
     // An edge joint: both walls stop short by the clearance over one less
     // the cosine between their directions in from the rip (toward it, alike) (live: 0.02 mm at
     // 90°, fs-smprobe3-{4,6}; 0.018071 mm at a loft's 96.1° seam, request 1612).
+    // Where the other wall's material reaches in before the rip (its thickness on this wall's side: a converted box's
+    // corner, material inward), the wall stops short of that material instead (live c2-sm-corner-break: both walls
+    // 0.02 mm short of the other's inner face, the corner square open).
     if !def.rip_styles.contains_key(&e) {
-        return def.clearance / (1.0 - uf.dot(uo)).max(1e-9);
+        let reach = span(other, uf).map_or(0.0, |(lo, _)| -lo.min(0.0));
+        return def.clearance / (1.0 - uf.dot(uo)).max(1e-9) + reach;
     }
     if through {
         span(other, uf).map_or(0.0, |(_, hi)| -hi.max(0.0))

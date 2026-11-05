@@ -173,6 +173,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   pin-block-asm-drawing (`"drawing": {"assembly": true}`). All run on ours, every step OK. The driver gained: the
   drawing toolbar's ▾ (caret:<tool>), the panels' ✓ / ✕ (button:ok / cancel), the tables in `annotations` (their drawn
   text), a view's broken-out count. Live asked to record them (REQUESTS).
+- 21:19: live's corpus2 (c2-*, 17 of 20): run 126 scored it with no regression in the old 55; 12 stop at their first
+  sketch reference because the UI-method fetch has empty queryStrings and no SKETCH bodies (REQUESTS: refetch all by
+  REST after the 06:00 unlock). Fixed in ours: an edge-joint rip where the other wall's material reaches in before the
+  rip (a converted box, material inward) stops each wall and its bend short of that material (c2-sm-corner-break's
+  Sheet metal model 1 as live: 2 -> 5/11; run 127: no other change). Next there: Flange 1 (16 parts, live 1).
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
