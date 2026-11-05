@@ -63,6 +63,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   instances with the seed (model-core, core's area; std subfeatureToolsTargets). cf-sheet-metal-hem 4 -> 5/6: its
   Transform 1's direction is a vertex of a derived part (SFBIB, an INTERSECT in the source's names) live's UI fetch
   gives no geometry for; next there: resolve such a query in the source's translation. Run 107: 45/56, 416/483.
+- 06:59: queued too: a bend relief starting back where a tapered wall's side crosses the bend's setback line
+  (cf-sheet-metal-shaped-flange 10/10, live 2053), missing external references pointing at nothing (train-joe 12/12,
+  clamp-guillem 24/25: next there its Redondeo 2, two split edges, core's CUT-CLOSED-EDGES-SPLIT kind). Run 109:
+  47/56 documents, 419/483 features, custom 55/109.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
