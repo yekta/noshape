@@ -4104,6 +4104,14 @@ fn drawing_table_menu_edits() {
     assert_eq!(last(&mut ctx), "BOM order");
     let t = table(&mut ctx, &bid);
     assert_eq!((t["structured"].clone(), t["bottom_to_top"].clone()), (json!(true), json!(true)), "{t}");
+    assert_eq!(t["bom_type"], json!("structured_multi_level"), "{t}");
+    // Structured - Top level (live: the dialog's third type), by the menu and by the properties.
+    call(&mut ctx, "drawing_table_edit", json!({ "drawing": tab, "table": bid, "action": "bom_type", "to": "structured_top_level" }));
+    assert_eq!(table(&mut ctx, &bid)["bom_type"], json!("structured_top_level"));
+    call(&mut ctx, "drawing_table_properties", json!({ "drawing": tab, "table": bid, "bom_type": "flattened" }));
+    assert_eq!(table(&mut ctx, &bid)["bom_type"], json!("flattened"));
+    let e = try_call(&mut ctx, "drawing_table_properties", json!({ "drawing": tab, "table": bid, "bom_type": "nested" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("bom_type"), "{e:?}");
     let e = try_call(&mut ctx, "drawing_table_edit", json!({ "drawing": tab, "table": bid, "action": "format_cell", "row": 0, "column": 0 })).unwrap_err();
     assert!(e.message.contains("BOM"), "{e:?}");
     let e = try_call(&mut ctx, "drawing_table_edit", json!({ "drawing": tab, "table": bid, "action": "split", "row": 1 })).unwrap_err();

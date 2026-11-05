@@ -409,6 +409,26 @@ impl DrawingEditor {
                 cx.notify();
             })))
         };
+        // The profile field's text (live 127, 600–604: per shape until the profile exists; editing: its chip).
+        let field_text = if editing && !matches!(self.tool, Tool::Detail { .. }) {
+            "Profile"
+        } else if placed {
+            "Profile created"
+        } else {
+            match shape {
+                1 => "Create rectangle",
+                2 => "Create closed profile",
+                3 => "Create closed polygon",
+                _ => "Create circle",
+            }
+        };
+        crate::ui_script::note_dialog(|| {
+            // Every text shown, in reading order (README "### Drawings"; live 2131).
+            let mut text = vec!["Detail view", field_text, "View scale", "View label", "Profile style"];
+            text.extend(STYLES);
+            text.extend(["Show detail view profile", "Clip border to geometry"]);
+            serde_json::json!({ "kind": "drawing-panel", "title": "Detail view", "text": text })
+        });
         Some(
             v_flex()
                 .id("dr-detail-dlg")
@@ -452,19 +472,7 @@ impl DrawingEditor {
                 // exists, then "Profile created" (`#dbf1fa`, 1 px `#1b5faa`,
                 // radius 2, 12 px `#616b73`).
                 // Live drawing/127: 5 px under the field to the View scale row.
-                .child(div().id("dd-profile-field").tooltip(crate::ui::tooltip("Create closed profile for detail view boundary")).mx(px(3.)).mt(px(1.)).mb(px(5.)).h(px(26.)).px(px(7.)).flex().items_center().bg(gpui_kit::rgb(0xdbf1fa)).border_1().border_color(gpui_kit::rgb(0x1b5faa)).rounded(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x616b73)).child(if editing && !matches!(self.tool, Tool::Detail { .. }) {
-                    // Edit detail (live asbv-5): the profile as a "Profile" chip.
-                    "Profile"
-                } else if placed {
-                    "Profile created"
-                } else {
-                    match shape {
-                        1 => "Create rectangle",
-                        2 => "Create closed profile",
-                        3 => "Create closed polygon",
-                        _ => "Create circle",
-                    }
-                }))
+                .child(div().id("dd-profile-field").tooltip(crate::ui::tooltip("Create closed profile for detail view boundary")).mx(px(3.)).mt(px(1.)).mb(px(5.)).h(px(26.)).px(px(7.)).flex().items_center().bg(gpui_kit::rgb(0xdbf1fa)).border_1().border_color(gpui_kit::rgb(0x1b5faa)).rounded(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x616b73)).child(field_text))
                 .child(div().px(px(3.)).child(row("View scale", field(106.).child(scale_btn).into_any_element())))
                 .child(div().px(px(3.)).child(row("View label", gpui_kit::base::input::input_frame(field(110.).child(Input::new(&d.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small()).into_any_element()).into_any_element())))
                 .child(div().px(px(3.)).child(row("Profile style", field(117.).child(style_btn).into_any_element())))

@@ -628,8 +628,9 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                 j["part_rows"] = json!(r);
             }
             match &t.kind {
-                noshape_model::drawing::TableKind::Bom { structured, bottom_to_top, default_template, .. } => {
+                noshape_model::drawing::TableKind::Bom { structured, top_level, bottom_to_top, default_template, .. } => {
                     j["structured"] = json!(structured);
+                    j["bom_type"] = json!(match (structured, top_level) { (false, _) => "flattened", (true, true) => "structured_top_level", (true, false) => "structured_multi_level" });
                     j["bottom_to_top"] = json!(bottom_to_top);
                     j["template"] = json!(if *default_template { "onshape_default" } else { "follow_assembly" });
                 }

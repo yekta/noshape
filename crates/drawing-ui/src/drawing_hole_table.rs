@@ -349,6 +349,24 @@ impl DrawingEditor {
         let field = |text: String, active: bool| {
             div().mx(px(8.)).my(px(2.)).px(px(6.)).h(px(24.)).flex().items_center().text_size(px(12.)).when(active, |d| d.bg(gpui_kit::rgb(0xdbf1fa))).child(text).into_any_element()
         };
+        crate::ui_script::note_dialog(|| {
+            // Every text shown, in reading order (README "### Drawings"; live 2131): the selects' options, a picked
+            // view's and origin's chips with their ×.
+            let mut text: Vec<String> = vec![if editing.is_some() { "Hole table properties" } else { "Hole table" }.into(), "Show location data".into(), "Location precision".into()];
+            text.extend(PRECISIONS.iter().map(|(l, _)| l.to_string()));
+            text.push("Views".into());
+            if let Some(name) = &view_name {
+                text.extend([name.clone(), "×".into(), "Origin".into()]);
+                if first_origin {
+                    text.extend(["Point".into(), "×".into()]);
+                }
+                text.extend(["X direction", "Y direction", "Holes to exclude", "X", "Y"].map(String::from));
+            }
+            text.push("Sheet".into());
+            text.extend(self.drawing.sheets.iter().map(|s| s.name.clone()));
+            text.extend(["Order", "Top to bottom", "Bottom to top", "Select fixed corner"].map(String::from));
+            serde_json::json!({ "kind": "drawing-panel", "title": text[0], "text": text })
+        });
         Some(
             v_flex()
                 .id("dr-hole-table-dlg")

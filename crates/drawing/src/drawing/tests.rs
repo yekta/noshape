@@ -668,7 +668,7 @@ fn bom_hole_table_and_linked_balloons() {
     // Sheet 2: the assembly with a BOM and a callout on the pin.
     let si = drawing.add_sheet(0);
     drawing.sheets[si].views.push(base_view(1, asm, ViewOrientation::Isometric, [150.0, 160.0]));
-    drawing.sheets[si].tables.push(Table::new(1, TableKind::Bom { view: ViewId(1), structured: false, bottom_to_top: false, overrides: Vec::new(), default_template: false, source: None }, [410.0, 287.0]));
+    drawing.sheets[si].tables.push(Table::new(1, TableKind::Bom { view: ViewId(1), structured: false, top_level: false, bottom_to_top: false, overrides: Vec::new(), default_template: false, source: None }, [410.0, 287.0]));
     // Hole table of the plate's top view on sheet 1.
     let origin = [-0.05, -0.03];
     drawing.sheets[0].tables.push(Table::new(1, TableKind::Hole { view: ViewId(2), origin, origin_ref: None, precision: None, flip_x: false, flip_y: false, show_location: true, bottom_to_top: false, exclude: Vec::new(), x_dir: None, more: Vec::new() }, [410.0, 120.0]));
@@ -1708,7 +1708,7 @@ fn bom_split_order_and_structured_rows() {
         t.rows = rows;
         tables::table_data(&drawing, &t, None, Some(src), None, &[], &|s| s.to_string())
     };
-    let bom = |structured, bottom_to_top| TableKind::Bom { view: ViewId(1), structured, bottom_to_top, overrides: Vec::new(), default_template: false, source: None };
+    let bom = |structured, bottom_to_top| TableKind::Bom { view: ViewId(1), structured, top_level: false, bottom_to_top, overrides: Vec::new(), default_template: false, source: None };
     let all = data(bom(false, false), None);
     assert!(all.rows.len() >= 2);
     // A split part shows its rows only.
@@ -1719,9 +1719,14 @@ fn bom_split_order_and_structured_rows() {
     assert!(rev.header_bottom && rev.rows.first() == all.rows.last());
     assert_eq!(rev.all_rows().last().map(|r| r[0].as_str()), Some("Item"));
     assert!(!data(bom(true, false), None).rows.is_empty());
+    // Structured - Top level: Multi level's rows less the nested ones ("3.1").
+    let multi = data(bom(true, false), None);
+    let top = data(TableKind::Bom { view: ViewId(1), structured: true, top_level: true, bottom_to_top: false, overrides: Vec::new(), default_template: false, source: None }, None);
+    assert!(!top.rows.is_empty() && top.rows.iter().all(|r| !r[0].contains('.')), "{:?}", top.rows);
+    assert_eq!(top.rows, multi.rows.iter().filter(|r| !r[0].contains('.')).cloned().collect::<Vec<_>>());
     // An override replaces the cell's value and is marked.
     let item = all.rows[0][0].clone();
-    let over = data(TableKind::Bom { view: ViewId(1), structured: false, bottom_to_top: false, overrides: vec![(item, 2, "BRACKET".into())], default_template: false, source: None }, None);
+    let over = data(TableKind::Bom { view: ViewId(1), structured: false, top_level: false, bottom_to_top: false, overrides: vec![(item, 2, "BRACKET".into())], default_template: false, source: None }, None);
     assert_eq!(over.rows[0][2], "BRACKET");
     assert_eq!(over.overridden, vec![(0, 2)]);
     // Template (live request 1627): Follow assembly takes a column added to
@@ -1733,7 +1738,7 @@ fn bom_split_order_and_structured_rows() {
     let sources = regenerate_sources(&doc, &drawing);
     let src = &sources[&SourceKey::studio(asm)];
     let data = |default_template| {
-        let t = Table::new(1, TableKind::Bom { view: ViewId(1), structured: false, bottom_to_top: false, overrides: Vec::new(), default_template, source: None }, [410.0, 287.0]);
+        let t = Table::new(1, TableKind::Bom { view: ViewId(1), structured: false, top_level: false, bottom_to_top: false, overrides: Vec::new(), default_template, source: None }, [410.0, 287.0]);
         tables::table_data(&drawing, &t, None, Some(src), None, &[], &|s| s.to_string())
     };
     let follow = data(false);
@@ -3048,7 +3053,7 @@ fn bom_table_reads_its_own_assembly() {
     let tab = doc.tabs[0].id;
     let mut drawing = Drawing::default();
     let source = Some(super::BomSource { tab, version: Some("ext:1|a|/x.noshape".into()), label: "Assembly 1 (x Main)".into() });
-    let t = Table::new(1, TableKind::Bom { view: ViewId(0), structured: false, bottom_to_top: false, overrides: Vec::new(), default_template: false, source }, [410.0, 287.0]);
+    let t = Table::new(1, TableKind::Bom { view: ViewId(0), structured: false, top_level: false, bottom_to_top: false, overrides: Vec::new(), default_template: false, source }, [410.0, 287.0]);
     drawing.sheets[0].tables.push(t.clone());
     let key = views::table_source(&drawing.sheets[0], &t).unwrap();
     assert_eq!((key.tab, key.version.as_deref()), (tab, Some("ext:1|a|/x.noshape")));

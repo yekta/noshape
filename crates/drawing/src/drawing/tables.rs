@@ -449,7 +449,7 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
             let col_align = vec![CellAlign::Left; cells.iter().map(|r| r.len()).max().unwrap_or(0)];
             TableData { title: title.as_ref().map(|t| expand(t)), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), col_align, header_bold: true, style: None, merges: Vec::new() }
         }
-        TableKind::Bom { structured, bottom_to_top, overrides, default_template, .. } => {
+        TableKind::Bom { structured, top_level, bottom_to_top, overrides, default_template, .. } => {
             // Onshape's BOM table columns (live drawing/189): Item, Quantity,
             // Part number, Description; no title row. "Follow assembly"
             // takes the assembly BOM's columns (live request 1627).
@@ -458,9 +458,11 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
             let description = |s: &SourceModel, body: Option<&crate::reference::BodyId>| body.and_then(|b| s.part(Some(b))).map(|p| p.description.clone()).unwrap_or_default();
             let mut rows: Vec<Vec<String>> = match source {
                 // Structured: nested rows ("3.1").
+                // (Structured - Top level: the sub-assemblies' own rows only.)
                 Some(s) if s.assembly && *structured => s
                     .bom_structured
                     .iter()
+                    .filter(|r| !*top_level || !r.item.contains('.'))
                     .map(|r| {
                         let body = s.bom.iter().find(|e| e.name == r.name && e.number == r.number).and_then(|e| e.bodies.first());
                         vec![r.item.clone(), r.quantity.to_string(), r.number.clone(), description(s, body)]

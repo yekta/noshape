@@ -221,6 +221,11 @@ def compare(live, ours):
             keys = [k for k in keys if k not in NOT_IN_DRAWINGS]
         a = {k: (a or {}).get(k) for k in keys}
         b = json.loads(json.dumps({k: (b or {}).get(k) for k in keys}))
+        # Both runners name the start's assembly after it ("start pin-block asm Copy 2" / "start pin-block-asm-drawing asm").
+        for side in (a, b):
+            d = side.get("dialog")
+            if isinstance(d, dict) and d.get("kind") == "drawing-panel":
+                d["text"] = [re.sub(r"^start \S+ asm( Copy \d+)?$", "start asm", t) if isinstance(t, str) else t for t in d.get("text") or []]
         drawn_sizes(a, b)
         placed_alike(a, b)
         cloud_menu(a, b)

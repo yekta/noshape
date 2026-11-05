@@ -46,7 +46,7 @@ pub fn ops() -> Vec<Op> {
         group: "drawing",
         verb: "table_edit",
         summary: "Edit a table from its menus: cells, merge, rows / columns, size, split, order, corner, text height",
-        description: "The table context menus, one edit each. Cells are (`row`, `column`) counted from 0 below the title (the header is row 0); a block of cells runs to (`to_row`, `to_column`).\n- `format_cell`: Format cell… (`scope` cell | row | column | table; `align` left | center | right, `bold`, `height` mm or null for the table's) (\"Format cells\").\n- `merge_right` / `merge_below` (\"Merge cells\"), `unmerge` (\"Unmerge cells\").\n- General tables, a block selected: `merge` (`mode` all | horizontal | vertical), `insert` (`at` column_left | column_right | row_above | row_below), `remove` / `duplicate` (`what` columns | rows); edit texts the menu's (\"All\", \"Column Left\", \"Rows\"…).\n- `columns_equally` / `rows_equally`: Size ▸ — of the block's columns / rows when a block is given (two or more), else the whole table.\n- `resize`: Resize… column `column`'s `width` and the row `height` (mm) (\"Resize cell\").\n- BOM, cut list, hole and custom tables: `split` below displayed row `row` (\"Split table\"; the reply's `table` is the new part), `unsplit` (\"Unsplit table\").\n- Hole tables: `flip_x`, `flip_y`, `precision` (`decimals` 0–4 or null for the drawing's).\n- `order` (`to` top_to_bottom | bottom_to_top; BOM, cut list and hole tables), `show_location` (`on`: a hole table's X LOC / Y LOC columns, Show location data), `bom_type` (`to` flattened | structured).\n- `fixed_corner` (`to` top_right | top_left | bottom_right | bottom_left; the table stays put), `text_height` (`to` 2.5 | 3 | 3.5 | 5 mm), `fit` (Fit to content).",
+        description: "The table context menus, one edit each. Cells are (`row`, `column`) counted from 0 below the title (the header is row 0); a block of cells runs to (`to_row`, `to_column`).\n- `format_cell`: Format cell… (`scope` cell | row | column | table; `align` left | center | right, `bold`, `height` mm or null for the table's) (\"Format cells\").\n- `merge_right` / `merge_below` (\"Merge cells\"), `unmerge` (\"Unmerge cells\").\n- General tables, a block selected: `merge` (`mode` all | horizontal | vertical), `insert` (`at` column_left | column_right | row_above | row_below), `remove` / `duplicate` (`what` columns | rows); edit texts the menu's (\"All\", \"Column Left\", \"Rows\"…).\n- `columns_equally` / `rows_equally`: Size ▸ — of the block's columns / rows when a block is given (two or more), else the whole table.\n- `resize`: Resize… column `column`'s `width` and the row `height` (mm) (\"Resize cell\").\n- BOM, cut list, hole and custom tables: `split` below displayed row `row` (\"Split table\"; the reply's `table` is the new part), `unsplit` (\"Unsplit table\").\n- Hole tables: `flip_x`, `flip_y`, `precision` (`decimals` 0–4 or null for the drawing's).\n- `order` (`to` top_to_bottom | bottom_to_top; BOM, cut list and hole tables), `show_location` (`on`: a hole table's X LOC / Y LOC columns, Show location data), `bom_type` (`to` flattened | structured_top_level | structured_multi_level; structured is Multi level).\n- `fixed_corner` (`to` top_right | top_left | bottom_right | bottom_left; the table stays put), `text_height` (`to` 2.5 | 3 | 3.5 | 5 mm), `fit` (Fit to content).",
         fields: vec![
             doc_field(),
             drawing_field(),
@@ -320,10 +320,10 @@ fn table_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             if !matches!(table.kind, TableKind::Bom { .. }) {
                 return refuse("BOM tables only");
             }
-            let s = choice(a, "to", &[("flattened", false), ("structured", true)])?;
+            let s = choice(a, "to", &[("flattened", (false, false)), ("structured", (true, false)), ("structured_top_level", (true, true)), ("structured_multi_level", (true, false))])?;
             edit(&mut t, &move |x| {
-                if let TableKind::Bom { structured, .. } = &mut x.kind {
-                    *structured = s;
+                if let TableKind::Bom { structured, top_level, .. } = &mut x.kind {
+                    (*structured, *top_level) = s;
                 }
             });
             "BOM type"

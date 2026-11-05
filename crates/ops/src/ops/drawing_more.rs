@@ -55,6 +55,7 @@ pub fn ops() -> Vec<Op> {
                     req("table", json!({ "type": "integer" }), "Table id (drawing_get)."),
                     opt("corner", json!({ "type": "string", "enum": CORNERS.iter().map(|c| c.0).collect::<Vec<_>>() }), "Fixed corner."),
                     opt("structured", json!({ "type": "boolean" }), "BOM: Structured (else Flattened)."),
+                    opt("bom_type", json!({ "type": "string", "enum": ["flattened", "structured_top_level", "structured_multi_level"] }), "BOM: BOM type (Flattened / Structured - Top level / Structured - Multi level; `structured` true is Multi level)."),
                     opt("template", json!({ "type": "string", "enum": ["follow_assembly", "onshape_default"] }), "BOM: Template (Follow assembly | Onshape Default BOM)."),
                     opt("bottom_to_top", json!({ "type": "boolean" }), "BOM, cut list, custom: rows bottom to top."),
                     opt("see_sheet1", json!({ "type": "boolean" }), "Revision: \"See sheet 1\" on the other sheets (else Linked)."),
@@ -176,13 +177,13 @@ fn table_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let sheet = t.sheet;
     let Some(old) = t.d.sheets[sheet].table(id).cloned() else { return Err(OpError::param("table", "no table with that id on the sheet (drawing_get)")) };
     let allowed: &[&str] = match old.kind {
-        TableKind::Bom { .. } => &["corner", "structured", "bottom_to_top", "template"],
+        TableKind::Bom { .. } => &["corner", "structured", "bom_type", "bottom_to_top", "template"],
         TableKind::CutList { .. } => &["corner", "bottom_to_top", "configuration"],
         TableKind::Custom { .. } => &["corner", "bottom_to_top"],
         TableKind::Revision { .. } => &["corner", "see_sheet1", "visible_rows", "newest_top", "hide_callouts"],
         _ => &["corner"],
     };
-    for k in ["corner", "structured", "bottom_to_top", "template", "see_sheet1", "visible_rows", "newest_top", "hide_callouts", "configuration"] {
+    for k in ["corner", "structured", "bom_type", "bottom_to_top", "template", "see_sheet1", "visible_rows", "newest_top", "hide_callouts", "configuration"] {
         if a.get(k).is_some() && !allowed.contains(&k) {
             return Err(OpError::param(k, &format!("this table's properties have no `{k}` (they have: {})", allowed.join(", "))));
         }
@@ -221,8 +222,12 @@ fn table_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let layout = t.m.built.as_ref().and_then(|b| b.table_layout(id)).cloned();
     let table = t.d.sheets[sheet].tables.iter_mut().find(|x| x.id == id).expect("found");
     let description = match &mut table.kind {
-        TableKind::Bom { structured, bottom_to_top, default_template, .. } => {
+        TableKind::Bom { structured, top_level, bottom_to_top, default_template, .. } => {
             *structured = a.bool_or("structured", *structured)?;
+            if a.get("structured").is_some() {
+                *top_level = false;
+            }
+            (*structured, *top_level) = enum_arg(a, "bom_type", &[("flattened", (false, false)), ("structured_top_level", (true, true)), ("structured_multi_level", (true, false))], (*structured, *top_level))?;
             *bottom_to_top = a.bool_or("bottom_to_top", *bottom_to_top)?;
             *default_template = enum_arg(a, "template", &[("follow_assembly", false), ("onshape_default", true)], *default_template)?;
             table.corner = corner;

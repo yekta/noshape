@@ -4784,7 +4784,7 @@ The table context menus, one edit each. Cells are (`row`, `column`) counted from
 - `resize`: Resize… column `column`'s `width` and the row `height` (mm) ("Resize cell").
 - BOM, cut list, hole and custom tables: `split` below displayed row `row` ("Split table"; the reply's `table` is the new part), `unsplit` ("Unsplit table").
 - Hole tables: `flip_x`, `flip_y`, `precision` (`decimals` 0–4 or null for the drawing's).
-- `order` (`to` top_to_bottom | bottom_to_top; BOM, cut list and hole tables), `show_location` (`on`: a hole table's X LOC / Y LOC columns, Show location data), `bom_type` (`to` flattened | structured).
+- `order` (`to` top_to_bottom | bottom_to_top; BOM, cut list and hole tables), `show_location` (`on`: a hole table's X LOC / Y LOC columns, Show location data), `bom_type` (`to` flattened | structured_top_level | structured_multi_level; structured is Multi level).
 - `fixed_corner` (`to` top_right | top_left | bottom_right | bottom_left; the table stays put), `text_height` (`to` 2.5 | 3 | 3.5 | 5 mm), `fit` (Fit to content).
 
 Examples:
@@ -4906,6 +4906,7 @@ Examples:
 | `table` | integer | required | Table id (drawing_get). |
 | `corner` | one of `top_left`, `top_right`, `bottom_left`, `bottom_right` |  | Fixed corner. |
 | `structured` | boolean |  | BOM: Structured (else Flattened). |
+| `bom_type` | one of `flattened`, `structured_top_level`, `structured_multi_level` |  | BOM: BOM type (Flattened / Structured - Top level / Structured - Multi level; `structured` true is Multi level). |
 | `template` | one of `follow_assembly`, `onshape_default` |  | BOM: Template (Follow assembly \| Onshape Default BOM). |
 | `bottom_to_top` | boolean |  | BOM, cut list, custom: rows bottom to top. |
 | `see_sheet1` | boolean |  | Revision: "See sheet 1" on the other sheets (else Linked). |

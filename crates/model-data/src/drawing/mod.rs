@@ -1485,12 +1485,15 @@ pub enum TableKind {
         header: bool,
     },
     /// Bill of materials of the assembly shown by `view`: Flattened or
-    /// Structured; Order "Bottom to top" puts the header at the bottom and
-    /// reverses the rows.
+    /// Structured (Multi level: sub-assemblies' rows nested, "3.1"; with
+    /// `top_level`, Structured - Top level: their rows only); Order "Bottom
+    /// to top" puts the header at the bottom and reverses the rows.
     Bom {
         view: ViewId,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         structured: bool,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        top_level: bool,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         bottom_to_top: bool,
         /// Overridden cells: (item number, column, value).
