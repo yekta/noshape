@@ -103,6 +103,22 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   15 faces, 23 edges, 0 vertices after it (live.jsonl): Parasolid's bore rim is one closed edge with no vertex, so
   splitting it at our seam would add an edge live doesn't have. Taking that cut means the circle crossing the face's
   seam in the parameter plane only (two curves there of one edge, no vertex); not done.
+- cf-spur-gear after Boolean 1 (bool, 11-05 11-05 09:40). Landed 2ebf05fb: a made cylinder face across its seam angle is kept
+  where its input face already ran across it (a gear flank over u 3.4 .. 9.1): the document's 14 Booleans all ours
+  (Boolean 1 and Gear 5's 12-tool cut went to OCCT after a late decline: 0.94 s -> 0.2 s for Boolean 1). vibe4,
+  the document then: 2.58 s (live 2.11 s), no feature x10 slower than live; per regeneration Gear 1 773 ms (its
+  fillet 411 ms: OCCT's fallbacks; its two cuts ours 311), Boolean 2 584 (ours 325 + unify 210), Gear 5 497 (the
+  helical cut, ours 373: OCCT's sections 127), Gear 4 290, Boolean 1 204, Gears 2-3 ~135. In our Booleans OCCT's
+  sections of free-form pairs are the biggest part (85-130 ms each): the straight gears' faces are extrusions along
+  the axis against planes across it, coaxial cylinders and parallel extrusions (2D work: the profile moved, rulings at
+  the profiles' crossings); the helical cut (8e99, 352 ms idle, OCCT 3.2 s) sends 84 distinct B-spline pairs to OCCT
+  (936 more reused as pattern copies), ~10 ms CPU each. Our own sections there need curves on the faces the C++ build
+  can use (it reads OCCT's by id): not started. The unify after Boolean 1 (40 ms) is whole: the gear target arrives
+  as a new shape object without the unify-clean flag (not from op_transform); not traced further.
+  cf-fix-pcb after dx's fix: the glued fuse 474a's inputs are the same, still "a non-manifold result": of its 17
+  letter trims one (63881743, an e-like glyph) keeps the board's top-face piece inside the letter's counter, coplanar
+  with the letter's bottom face but in its hole (debug: /root/bool-scratch/pcb-nm-debug.patch, corpus
+  vibe4 ~/agents/bool-corpora/pcbcut2).
 - Gears, motor-mount-jack (bool, 11-05 08:42). Landed a28b32ad (planar B-splines read as planes; made faces stay on
   the B-spline, as OCCT's: building them on a new plane broke a sheet metal jog's later split), ad679565 (parallel
   check), d072728e: chords' bulges measured (3x the middle's offset, once per curve; was a quarter of the chord:
