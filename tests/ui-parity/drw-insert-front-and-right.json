@@ -1,6 +1,6 @@
 {
  "name": "drw-insert-front-and-right",
- "about": "in an empty drawing, Insert view: place the Front view, then the projected Right view beside it, Escape",
+ "about": "in an empty drawing, Insert view \u203a Insert \u203a Part Studio 1 \u203a Part 1: place the Front view, then the projected Right view beside it, Escape",
  "area": "dx",
  "ticket": "DRAWING-UI-PARITY",
  "source": "everyday (lead 11-05)",
@@ -13,8 +13,22 @@
    }
   },
   {
-   "do": "wait",
-   "until": "dialog"
+   "do": "click",
+   "on": {
+    "button": "Insert"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "Part 1"
+   }
   },
   {
    "do": "click",

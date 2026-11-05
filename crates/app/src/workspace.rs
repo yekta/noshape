@@ -382,6 +382,14 @@ impl Workspace {
         }
     }
 
+    /// The active tab's drawing editor, if it is one (ui-parity driver).
+    pub(crate) fn active_drawing(&self) -> Option<Entity<crate::drawing_view::DrawingEditor>> {
+        match self.active.and_then(|t| self.views.get(&t)) {
+            Some(TabView::Drawing(v)) => Some(v.clone()),
+            _ => None,
+        }
+    }
+
     /// The active tab's Assembly view, if it is one (ui-parity driver).
     pub(crate) fn active_assembly(&self) -> Option<Entity<AssemblyView>> {
         match self.active.and_then(|t| self.views.get(&t)) {
@@ -1316,6 +1324,8 @@ impl Workspace {
                     .children(compare_dot.map(|dot| div().flex_none().ml(px(3.)).when(compare_off, |d| d.opacity(0.55)).child(dot)))
                     .when(active, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
                     .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+                    // The ui-parity driver's `{"doc_tab": name}`.
+                    .map(|d| noshape_app_core::ui_script::mark(d, || format!("doc_tab:{}", tab_name.clone())))
                     // Live (part-studio/17): an inactive tab shows its element's
                     // picture in a card above it.
                     .when(!active && matches!(kind, "partstudio" | "assembly" | "drawing"), |d| {

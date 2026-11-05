@@ -92,7 +92,7 @@ tab (live's name "Part 1 Drawing 1"). Targets in a drawing:
 
 Its state adds `"drawing"` (`null` outside a drawing tab):
 ```json
- "drawing": { "tab": "Part 1 Drawing 1", "sheet": "Sheet1", "sheets": ["Sheet1"], "tool": "Linear dimension",
+ "drawing": { "tab": "Part 1 Drawing 1", "sheet": "Sheet1", "sheets": ["Sheet1"], "tool": "Dimension",
               "views": [{"name": "Front", "kind": "projected", "parent": "Top", "scale": "1:1"}],
               "annotations": [{"kind": "dimension", "text": "1.575"}, {"kind": "note", "text": "CHECK SIZE"}],
               "selection": [{"kind": "VIEW", "owner": "Front"}] }

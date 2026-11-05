@@ -1,6 +1,6 @@
 {
- "name": "drw-export-pdf-dialog",
- "about": "right-click the drawing tab, Export\u2026, pick PDF: the dialog's fields; then cancel",
+ "name": "drw-export-dialog",
+ "about": "right-click the drawing tab, Export\u2026: the Export Drawing dialog's fields (its last-used format); then Cancel",
  "area": "dx",
  "ticket": "DRAWING-UI-PARITY",
  "source": "everyday (lead 11-05)",
@@ -21,13 +21,6 @@
   {
    "do": "wait",
    "until": "dialog"
-  },
-  {
-   "do": "click",
-   "on": {
-    "dropdown": "Format",
-    "pick": "PDF"
-   }
   },
   {
    "do": "click",

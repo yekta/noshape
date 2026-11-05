@@ -9,7 +9,7 @@
   {
    "do": "click",
    "on": {
-    "tool": "Linear dimension"
+    "tool": "Dimension"
    }
   },
   {

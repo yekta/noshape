@@ -141,7 +141,7 @@ impl PartStudioView {
         let message = message.map(|m| if self.canceled_edit.as_ref().is_some_and(|c| c.3 == m) { format!("{m} Restore") } else { m });
         json!({
             "focus": focus,
-            "dialog": dialog.map(|d| d.ui_state(window, cx)).or_else(|| self.isolate_panel_state()).or_else(|| self.show_mass.then(|| self.ui.mass_state.clone()).flatten()),
+            "dialog": dialog.map(|d| d.ui_state(window, cx)).or_else(|| self.isolate_panel_state()).or_else(|| self.show_mass.then(|| self.ui.mass_state.clone()).flatten()).or_else(crate::ui_script::open_dialog),
             "list": list,
             "selection": { "count": items.len(), "items": items },
             "features": { "rows": rows, "rollbackAfter": rollback_after },

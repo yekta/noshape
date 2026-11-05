@@ -69,6 +69,12 @@ impl TbTool {
     }
 
     fn render(self, ed: &Entity<DrawingEditor>, cx: &mut Context<DrawingEditor>) -> AnyElement {
+        // Named by its tooltip without the shortcut, for the ui-parity driver (tests/ui-parity: `{"tool": "Note"}`).
+        let tip = self.tip;
+        crate::ui_script::wrap(self.render_button(ed, cx), || format!("tool:{}", tip.split(" (").next().unwrap_or(tip)))
+    }
+
+    fn render_button(self, ed: &Entity<DrawingEditor>, cx: &mut Context<DrawingEditor>) -> AnyElement {
         if self.disabled {
             let b = match self.more {
                 None => crate::ui::tool_button(self.id, self.icon, false, cx).w(px(CELL)).h(px(CELL)).tooltip(self.tip).into_any_element(),

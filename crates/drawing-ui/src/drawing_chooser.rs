@@ -641,6 +641,10 @@ impl DrawingEditor {
     /// Insert, then the greyed fields.
     fn render_empty_insert_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
+        crate::ui_script::note_dialog(|| {
+            let field = |label: &str, text: &str| serde_json::json!({ "label": label, "kind": "enum", "text": text });
+            serde_json::json!({ "title": "Insert view", "kind": "other", "tabs": [], "fields": [field("View orientation", "Front"), field("View scale", ""), field("View simplification", "Auto"), { "label": "Show sketch appearances", "kind": "boolean", "checked": false }], "error": null })
+        });
         // Live drawing/122: the fields greyed with grey ▼, View scale focused
         // (a 2 px blue underline, a dark ▼).
         let row = |label: &'static str, value: &'static str, focused: bool| {
@@ -690,6 +694,7 @@ impl DrawingEditor {
                         .bg(crate::theme::light().panel)
                         .text_size(px(13.33))
                         .cursor_pointer()
+                        .map(|d| crate::ui_script::mark(d, || "button:Insert".into()))
                         .child(crate::assets::icon("insert", 16., cx))
                         .child("Insert")
                         .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_insert_chooser(cx))),
@@ -826,8 +831,10 @@ impl DrawingEditor {
             }
             any = true;
             let open = self.chooser.open.contains(&id) || !query.is_empty();
+            let studio = name.clone();
             list = list.child(
                 row_base(SharedString::from(format!("dr-ch-ps-{id}")), 0.)
+                    .map(|d| crate::ui_script::mark(d, || format!("list_row:{studio}")))
                     .child(crate::assets::icon(if open { "chevron-down" } else { "chevron-right" }, 14., cx))
                     .child(div().truncate().child(crate::ui::user_text(name)))
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
@@ -844,7 +851,8 @@ impl DrawingEditor {
             }
             for (i, (label, what, part, flat, sketch)) in shown.into_iter().enumerate() {
                 let pic = pic_of(id, what);
-                list = list.child(row_base(SharedString::from(format!("dr-ch-c-{id}-{i}")), 36.).min_h(px(38.)).child(thumb(pic)).child(div().truncate().child(label)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                let name = label.to_string();
+                list = list.child(row_base(SharedString::from(format!("dr-ch-c-{id}-{i}")), 36.).min_h(px(38.)).map(|d| crate::ui_script::mark(d, || format!("list_row:{name}"))).child(thumb(pic)).child(div().truncate().child(label)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     this.pick_tree(id, part.clone(), cx);
                     if flat {
                         this.insert.flat = true;

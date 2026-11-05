@@ -94,7 +94,9 @@ pub fn label_add_glyph(size: f32, color: impl Into<Hsla>) -> Div {
 /// Onshape's primary button: `#1651b0`, hover `#769fcc`, 34 px, radius 3,
 /// 14 px white text.
 pub fn primary_button(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Button {
-    Button::new(id).primary().child(div().text_size(px(14.)).child(label.into())).h(px(34.)).px(px(11.)).rounded(px(3.))
+    let label: SharedString = label.into();
+    let name = label.clone();
+    crate::ui_script::mark(Button::new(id).primary().child(div().text_size(px(14.)).child(label)).h(px(34.)).px(px(11.)).rounded(px(3.)), || format!("button:{name}"))
 }
 
 /// Onshape's danger button (Bootstrap `btn-danger`, live documents/70
@@ -114,13 +116,16 @@ pub fn danger_button(id: impl Into<ElementId>, label: impl Into<SharedString>, c
 /// Drawing, dk-999 Properties: `btn-secondary` rgb(215,215,215)).
 pub fn cancel_button(id: impl Into<ElementId>, label: impl Into<SharedString>, cx: &App) -> Button {
     let (fill, hover, text) = (gpui_kit::rgb_static(CANCEL_FILL), gpui_kit::rgb_static(CANCEL_HOVER), gpui_kit::rgb_static(0x333333));
-    Button::new(id)
+    let label: SharedString = label.into();
+    let name = label.clone();
+    let button = Button::new(id)
         .custom(ButtonCustomVariant::new(cx).color(fill.into()).foreground(text.into()).hover(hover.into()).active(fill.into()).shadow(false))
         .bg(fill)
-        .child(div().text_size(px(14.)).text_color(text).child(label.into()))
+        .child(div().text_size(px(14.)).text_color(text).child(label))
         .h(px(34.))
         .px(px(11.))
-        .rounded(px(3.))
+        .rounded(px(3.));
+    crate::ui_script::mark(button, || format!("button:{name}"))
 }
 
 /// Onshape's secondary button: white with a 1 px `#aaaaaa` outline, hover

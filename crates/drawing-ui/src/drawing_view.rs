@@ -12,6 +12,9 @@
 //! regenerated in the background; edits to them mark the drawing out of
 //! date until Update (Ctrl+Q), like Onshape.
 
+#[path = "drawing_ui_state.rs"]
+mod ui_state;
+
 use crate::actions::*;
 use crate::doc_model::{DocEvent, DocModel};
 use crate::drawing_scene::{self, Overlay};

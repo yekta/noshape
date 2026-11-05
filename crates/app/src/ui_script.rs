@@ -57,13 +57,17 @@ pub fn prepare() -> PathBuf {
     doc
 }
 
-/// The tab of the scenario start's assembly ("start <name> asm"), which it opens on.
-fn opens_on_assembly() -> Option<String> {
+/// The tab the scenario start opens on: its assembly ("start <name> asm") or its drawing ("<part> Drawing 1").
+fn opens_on_tab() -> Option<String> {
     let path = scenario_path();
     let scenario = read_json(&path).ok()?;
     let name = scenario["start"].as_str().unwrap_or("empty");
     let starts = std::env::var_os("NOSHAPE_UI_STARTS").map(PathBuf::from).unwrap_or_else(|| path.with_file_name("starts.json"));
-    read_json(&starts).ok()?[name].get("assembly").map(|_| format!("start {name} asm"))
+    let start = read_json(&starts).ok()?[name].clone();
+    if let Some(d) = start.get("drawing") {
+        return Some(format!("{} Drawing 1", d["part"].as_str().unwrap_or("Part 1")));
+    }
+    start.get("assembly").map(|_| format!("start {name} asm"))
 }
 
 /// A key name of the scenario format as a GPUI keystroke ("Enter", "mod+z", "shift+e", "#").
@@ -157,7 +161,7 @@ fn control_name(t: &Value) -> Option<String> {
     }
     // A face / edge / vertex point with an `instance` is geometry (in that part's coordinates), not the list row.
     let geometry = ["face", "edge", "vertex"].iter().any(|k| t.get(*k).is_some_and(Value::is_array));
-    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate"]
+    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate", "doc_tab"]
         .iter()
         .filter(|k| !(geometry && **k == "instance"))
         .find_map(|k| t.get(*k).and_then(Value::as_str).map(|v| format!("{k}:{v}")))
@@ -166,7 +170,7 @@ fn control_name(t: &Value) -> Option<String> {
 type Studio = Option<Entity<PartStudioView>>;
 
 /// Where target `t` shows now, in window coordinates.
-fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_view::AssemblyView>>, cx: &App) -> Result<Point<Pixels>, String> {
+fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_view::AssemblyView>>, drawing: &Option<Entity<crate::drawing_view::DrawingEditor>>, cx: &App) -> Result<Point<Pixels>, String> {
     if let Some(name) = control_name(t) {
         if let Some(b) = noshape_app_core::ui_script::bounds_of(&name) {
             // A row's top or bottom edge (where a dragged row drops above or below it).
@@ -202,7 +206,10 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
     if let Some(ps) = studio.as_ref() {
         return ps.read(cx).ui_target_point(t, cx).map(whole);
     }
-    let asm = assembly.as_ref().ok_or("not in a Part Studio or an Assembly")?;
+    if let Some(d) = drawing.as_ref() {
+        return d.read(cx).ui_target_point(t, cx).map(whole);
+    }
+    let asm = assembly.as_ref().ok_or("not in a Part Studio, an Assembly or a Drawing")?;
     asm.read(cx).ui_target_point(t, cx).map(whole)
 }
 
@@ -235,9 +242,11 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             let t = Instant::now();
             loop {
                 sleep(cx, 120).await;
-                let busy = match studio(cx) {
-                    Some(ps) => cx.update(|_, cx| ps.read(cx).ui_busy()).unwrap_or(false),
-                    None => ws.update(cx, |w, _| w.active_assembly()).ok().flatten().is_none(),
+                let drawing = ws.update(cx, |w, _| w.active_drawing()).ok().flatten();
+                let busy = match (studio(cx), drawing) {
+                    (Some(ps), _) => cx.update(|_, cx| ps.read(cx).ui_busy()).unwrap_or(false),
+                    (None, Some(d)) => cx.update(|_, cx| d.read(cx).computing).unwrap_or(false),
+                    (None, None) => ws.update(cx, |w, _| w.active_assembly()).ok().flatten().is_none(),
                 };
                 if !busy || t.elapsed() > Duration::from_secs(30) {
                     break;
@@ -251,14 +260,18 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             if let Some(ps) = studio(cx) {
                 return cx.update(|window, cx| ps.read(cx).ui_state(window, cx)).unwrap_or(Value::Null);
             }
+            if let Some(d) = ws.update(cx, |w, _| w.active_drawing()).ok().flatten() {
+                return cx.update(|_, cx| d.read(cx).ui_state(cx)).unwrap_or(Value::Null);
+            }
             match ws.update(cx, |w, _| w.active_assembly()).ok().flatten() {
                 Some(a) => cx.update(|_, cx| a.read(cx).ui_state(cx)).unwrap_or(Value::Null),
-                None => json!({ "error": "no Part Studio or Assembly shown" }),
+                None => json!({ "error": "no Part Studio, Assembly or Drawing shown" }),
             }
         };
         // The state with the tooltip drawn now (a redraw notes it).
         let read = async |cx: &mut AsyncWindowContext| -> Value {
             noshape_app_core::ui_script::clear_tooltip();
+            noshape_app_core::ui_script::clear_dialog();
             let _ = cx.update(|window, _| window.refresh());
             sleep(cx, 150).await;
             let mut s = state(cx);
@@ -280,6 +293,11 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                     a.update(cx, |a, cx| a.ui_redraw(cx));
                     window.refresh();
                 });
+            } else if let Some(d) = ws.update(cx, |w, _| w.active_drawing()).ok().flatten() {
+                let _ = cx.update(|window, cx| {
+                    d.update(cx, |d, cx| d.ui_redraw(cx));
+                    window.refresh();
+                });
             }
             sleep(cx, 150).await;
         };
@@ -297,7 +315,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             eprintln!("UI-SCRIPT warning: the window is not active, fields get no focus events");
         }
         // A start with an assembly opens on it (README "start").
-        if let Some(tab) = opens_on_assembly() {
+        if let Some(tab) = opens_on_tab() {
             let _ = ws.update_in(cx, |w, window, cx| w.activate_named(&tab, window, cx));
         }
         settle(cx).await;
@@ -314,8 +332,9 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             redraw(cx).await;
             let ps = studio(cx);
             let asm = ws.update(cx, |w, _| w.active_assembly()).ok().flatten();
+            let drw = ws.update(cx, |w, _| w.active_drawing()).ok().flatten();
             let result: Result<(), String> = match what {
-                "click" | "dblclick" | "rclick" | "hover" => match cx.update(|_, cx| locate(&target, &ps, &asm, cx)).unwrap_or_else(|e| Err(e.to_string())) {
+                "click" | "dblclick" | "rclick" | "hover" => match cx.update(|_, cx| locate(&target, &ps, &asm, &drw, cx)).unwrap_or_else(|e| Err(e.to_string())) {
                     Ok(at) => {
                         eprintln!("UI-SCRIPT step {} {what} at ({:.0}, {:.0})", i + 1, f32::from(at.x), f32::from(at.y));
                         let from = pointer.unwrap_or(at);
@@ -353,7 +372,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                                 sleep(cx, 300).await;
                                 redraw(cx).await;
                                 let row = json!({ row_key: pick });
-                                match cx.update(|_, cx| locate(&row, &ps, &asm, cx)).unwrap_or_else(|e| Err(e.to_string())) {
+                                match cx.update(|_, cx| locate(&row, &ps, &asm, &drw, cx)).unwrap_or_else(|e| Err(e.to_string())) {
                                     Ok(at) => {
                                         let _ = cx.update(|window, cx| {
                                             window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }), cx);
@@ -384,7 +403,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                     // view" is its "Section view…").
                     Err(e) if what == "click" && target.get("button").and_then(Value::as_str).is_some() => {
                         let name = target["button"].as_str().unwrap_or("").to_string();
-                        match cx.update(|_, cx| locate(&json!({ "button": "Camera and render options" }), &ps, &asm, cx)).unwrap_or_else(|e| Err(e.to_string())) {
+                        match cx.update(|_, cx| locate(&json!({ "button": "Camera and render options" }), &ps, &asm, &drw, cx)).unwrap_or_else(|e| Err(e.to_string())) {
                             Ok(at) => {
                                 let _ = cx.update(|window, cx| {
                                     window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }), cx);
@@ -392,7 +411,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                                 });
                                 sleep(cx, 300).await;
                                 redraw(cx).await;
-                                let row = cx.update(|_, cx| locate(&json!({ "menu": name }), &ps, &asm, cx).or_else(|_| locate(&json!({ "menu": format!("{name}…") }), &ps, &asm, cx))).unwrap_or_else(|e| Err(e.to_string()));
+                                let row = cx.update(|_, cx| locate(&json!({ "menu": name }), &ps, &asm, &drw, cx).or_else(|_| locate(&json!({ "menu": format!("{name}…") }), &ps, &asm, &drw, cx))).unwrap_or_else(|e| Err(e.to_string()));
                                 match row {
                                     Ok(at) => {
                                         let _ = cx.update(|window, cx| {
@@ -418,8 +437,8 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                 },
                 "drag" => {
                     let to = step.get("to").cloned().unwrap_or(Value::Null);
-                    let from = cx.update(|_, cx| locate(&target, &ps, &asm, cx)).unwrap_or_else(|e| Err(e.to_string()));
-                    let to = cx.update(|_, cx| locate(&to, &ps, &asm, cx)).unwrap_or_else(|e| Err(e.to_string()));
+                    let from = cx.update(|_, cx| locate(&target, &ps, &asm, &drw, cx)).unwrap_or_else(|e| Err(e.to_string()));
+                    let to = cx.update(|_, cx| locate(&to, &ps, &asm, &drw, cx)).unwrap_or_else(|e| Err(e.to_string()));
                     match (from, to) {
                         (Ok(a), Ok(b)) => {
                             // (As live's runner: three moves to the start, fifteen to the end.)

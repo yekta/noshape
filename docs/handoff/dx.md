@@ -118,6 +118,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   layers' CONTINUOUS), arcs ending at 0 not 360. Left, representation only: the isometric silhouettes split where the
   faces' seams lie (ours vs Parasolid's), ellipses with live's raw Parasolid parameters (beyond 2pi) and major axis
   sign. pipeflange-steven: its Fillet 2 differs from live (core), so do its views.
+- 13:43: drawing interaction scenarios (lead): 8 `tests/ui-parity/drw-*.json`, starts `block-drawing` /
+  `block-drawing-empty`, README "### Drawings" (targets sheet_point / view / view_point / view_edge / annotation /
+  doc_tab, state key `drawing`); live asked (REQUESTS 13:10). Our side: drawing-ui drawing_ui_state.rs (state,
+  targets), the toolbar's tools, chooser rows, document tabs and the modals' OK / Cancel marked; app-core
+  ui_script::note_dialog for modals (Create Drawing, Export Drawing, Insert view panel); ops build_start's `drawing`.
+  All 8 run on ours (recordings in /root/dx-scratch/uip); the 18 dialog-button scenarios score as green's (15/18).
+  Score once live records: `tools/ui-parity/run.py --app $CARGO_TARGET_DIR/debug/noshape --display :104 drw-…`.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem

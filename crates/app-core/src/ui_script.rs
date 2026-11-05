@@ -90,6 +90,33 @@ pub fn clear_tooltip() {
     }
 }
 
+fn dialog_slot() -> &'static Mutex<Option<serde_json::Value>> {
+    static D: OnceLock<Mutex<Option<serde_json::Value>>> = OnceLock::new();
+    D.get_or_init(Default::default)
+}
+
+/// A modal drawn now (`state.dialog`: its title and fields, as a feature dialog's); the driver clears it and
+/// redraws before reading, so a closed one is gone.
+pub fn note_dialog(dialog: impl FnOnce() -> serde_json::Value) {
+    if !active() {
+        return;
+    }
+    if let Ok(mut d) = dialog_slot().lock() {
+        *d = Some(dialog());
+    }
+}
+
+/// The modal drawn since the last [`clear_dialog`], if any.
+pub fn open_dialog() -> Option<serde_json::Value> {
+    dialog_slot().lock().ok()?.clone()
+}
+
+pub fn clear_dialog() {
+    if let Ok(mut d) = dialog_slot().lock() {
+        *d = None;
+    }
+}
+
 /// Forget every recorded control (before a frame that records what shows now).
 pub fn clear() {
     if let Ok(mut m) = bounds().lock() {

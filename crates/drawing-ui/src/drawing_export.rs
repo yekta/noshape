@@ -37,7 +37,10 @@ impl DrawingEditor {
         window.open_dialog(cx, move |dialog, _, cx| {
             let s = st.borrow().clone();
             let f = s.format;
+            // The fields shown, for the ui-parity state (tests/ui-parity README "dialog").
+            let shown: RefCell<Vec<serde_json::Value>> = RefCell::new(vec![serde_json::json!({ "label": "File name", "kind": "string", "text": file.read(cx).value().to_string() })]);
             let select = |id: &'static str, label: &'static str, opts: Vec<String>, cur: usize, set: fn(&mut ExportSettings, usize)| {
+                shown.borrow_mut().push(serde_json::json!({ "label": label, "kind": "enum", "text": opts.get(cur).cloned().unwrap_or_default() }));
                 let st = st.clone();
                 div().pt(px(8.)).child(crate::os_ui::field_label(label)).child(div().pt(px(6.)).child(crate::os_ui::select_field(id, opts, cur, move |i, w, _| {
                     set(&mut st.borrow_mut(), i);
@@ -45,6 +48,7 @@ impl DrawingEditor {
                 })))
             };
             let check = |id: &'static str, label: &'static str, on: bool, set: fn(&mut ExportSettings, bool)| {
+                shown.borrow_mut().push(serde_json::json!({ "label": label, "kind": "boolean", "checked": on }));
                 let st = st.clone();
                 crate::os_ui::checkbox(id, label, on).on_click(move |_, w, _| {
                     set(&mut st.borrow_mut(), !on);
@@ -115,6 +119,7 @@ impl DrawingEditor {
                 body = body.child(check("ex-offsheet", "Exclude off-sheet content", s.exclude_off_sheet, |s, v| s.exclude_off_sheet = v));
             }
             let (st2, file2, custom2, ed2) = (st.clone(), file.clone(), custom.clone(), ed.clone());
+            crate::ui_script::note_dialog(|| serde_json::json!({ "title": "Export Drawing", "kind": "other", "tabs": [], "fields": shown.take(), "error": null }));
             crate::os_ui::modal_help(dialog, "Export Drawing", 600.)
                 .child(body)
                 .footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Export"))).child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))))

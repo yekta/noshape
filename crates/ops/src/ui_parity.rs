@@ -94,6 +94,12 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
         let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("start");
         call(ctx, "tab_rename", json!({ "tab": "Assembly 1", "name": format!("start {stem} asm") }))?;
     }
+    // A drawing of a part (README "### Drawings"): Create Drawing of it, the run opening on its tab ("Part 1 Drawing 1").
+    if let Some(d) = start.get("drawing") {
+        let part = d["part"].as_str().unwrap_or("Part 1");
+        let made = call(ctx, "drawing_create", json!({ "source": "Part Studio 1", "part": part, "template": d["template"].as_str().unwrap_or("ANSI_A_INCH.dwt"), "suggested_views": d["views"].as_str() == Some("suggested") }));
+        made.map_err(|e| format!("start drawing: {e}"))?;
+    }
     Ok(())
 }
 
