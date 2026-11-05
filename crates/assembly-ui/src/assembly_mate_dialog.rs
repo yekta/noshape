@@ -360,11 +360,6 @@ impl MateDialog {
         true
     }
 
-    /// The picks in the dialog's four connector slots.
-    pub fn slots(&self) -> [Option<MateConnectorRef>; 4] {
-        [self.a.clone(), self.b.clone(), self.c.clone(), self.d.clone()]
-    }
-
     /// Whether Undo / Redo have a pick to act on.
     pub fn pick_history(&self) -> (bool, bool) {
         (!self.picks_undo.is_empty(), !self.picks_redo.is_empty())

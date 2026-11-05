@@ -1740,7 +1740,6 @@ impl AssemblyView {
     fn start_mate_inner(&mut self, t: MateType, window: &mut Window, cx: &mut Context<Self>) {
         self.close_mate(window, cx);
         self.insert_open = false;
-        self.ui.mate_spent = None;
         let Some(asm) = self.assembly(cx) else { return };
         let id = MateId(asm.next_id());
         let name = asm.next_feature_name(t.name());
@@ -1812,19 +1811,7 @@ impl AssemblyView {
     /// False when no mate dialog is open (the document's undo then).
     fn mate_undo(&mut self, redo: bool, cx: &mut Context<Self>) -> bool {
         let Some(d) = self.mate.as_ref().map(|m| m.dialog.clone()) else { return false };
-        let before = d.read(cx).slots();
         d.update(cx, |d, cx| d.undo_pick(redo, cx));
-        // Live 2023: the part a pick was undone on offers nothing (no inference, no pick) until the pointer leaves it.
-        if !redo {
-            let after = d.read(cx).slots();
-            let undone = before.iter().zip(&after).find_map(|(b, a)| b.as_ref().filter(|_| a.is_none()));
-            if let Some(c) = undone {
-                let occ = self.result.occurrences.iter().position(|o| o.path.iter().copied().eq(std::iter::once(c.instance).chain(c.path.iter().copied())));
-                self.ui.mate_spent = occ.map(|o| (o, self.pointer));
-                self.infer = None;
-                self.infer_choice = None;
-            }
-        }
         self.refresh_scene(false, cx);
         cx.notify();
         true
@@ -2237,16 +2224,6 @@ impl AssemblyView {
             self.infer_choice = None;
             return old.is_some();
         }
-        // The part a pick was just undone on: nothing until the pointer has left it (live 2023).
-        // (Left for another part here; for the background in the hover's own handler.)
-        if let (Some((spent, _)), Some(h)) = (self.ui.mate_spent, &self.hover) {
-            if h.occ == spent {
-                self.infer = None;
-                self.infer_choice = None;
-                return old.is_some();
-            }
-            self.ui.mate_spent = None;
-        }
         // Shift (lock mate inference) keeps the current entity's points while
         // the cursor moves elsewhere; the nearest one is chosen.
         let locked = self.infer_locked && self.infer.is_some();
@@ -2472,11 +2449,6 @@ impl AssemblyView {
                 let t = if overlay.is_some() { None } else { self.pick(*id) };
                 let changed = changed_overlay || t.as_ref().map(|t| (&t.path, &t.reference)) != self.hover.as_ref().map(|h| (&h.path, &h.reference));
                 self.hover = t;
-                // The pointer on the background (it moved since the undo: a rebuilt scene's empty pick isn't one)
-                // ends the undone part's pause (live 2023).
-                if self.hover.is_none() && overlay.is_none() && self.ui.mate_spent.is_some_and(|(_, at)| at != self.pointer) {
-                    self.ui.mate_spent = None;
-                }
                 self.update_capture(cx);
                 let inf = self.update_inference(cx);
                 if changed || inf {

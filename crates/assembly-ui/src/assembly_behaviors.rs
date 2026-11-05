@@ -273,9 +273,6 @@ pub struct AsmUi {
     /// The mate dialog's connectors box holds the page focus (live's DOM
     /// focus): from its opening until a click in the graphics area.
     pub mate_field_focus: bool,
-    /// The occurrence a mate dialog's pick was undone on, and the pointer then: it gives no connector inference
-    /// (and no pick) until the pointer leaves it (live 2023).
-    pub mate_spent: Option<(usize, glam::DVec2)>,
     /// The drawn inference marks and their key (the viewport resends only a new one).
     pub inference_marks: Option<(Vec<u64>, std::sync::Arc<crate::scene_builder::InferenceMarks>)>,
     /// Make transparent (Shift+T): instances drawn transparent.
