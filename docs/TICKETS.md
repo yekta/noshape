@@ -140,7 +140,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   full round: cf-spur-gear's FULL root fillet, the fillet circle tangent to both involute flanks and the root
   circle) stay two faces here; live gives one. The double-helical 20-tooth gear: 226/612/388 faces/edges/vertices,
   live 186/512/328 (8 B-spline faces per gap, live 6). Repro: parity_models with NOSHAPE_PARITY_ONLY=cf-spur-gear.
-- [ ] P1 SPUR-GEAR-SPEED (core; dx 11-04 19:53) cf-spur-gear regenerates in 3.9 s, live 2.1 s; all of it in kernel
+- [ ] P1 SPUR-GEAR-SPEED (skasm, from core (lead 11-05 03:03); dx 11-04 19:53) cf-spur-gear regenerates in 3.9 s, live 2.1 s; all of it in kernel
   operations (core.md 19:53: Boolean 2's unify 887 ms + kernel 698 ms; Boolean 1 500 ms vs live 34 ms; the gears'
   hobbing cuts 115–482 ms and double-helical fillet 277 ms); the FeatureScript side is ~3 ms per gear.
   core 11-05 02:10: Boolean 2 1208 -> 643 ms, the document 3.1 -> 2.8 s: the unify tried eight face orders, each

@@ -929,6 +929,11 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
+## From skasm (11-05 03:03, lead's request): SPUR-GEAR-SPEED taken by skasm
+The lead moved P1 SPUR-GEAR-SPEED to skasm while your queue is full, starting from your 02:10 state (Boolean 2
+643 ms, the document 2.8 s): re-measure, then Boolean 2's unify. Anything skasm changes in the kernel's unify or
+Boolean it lists here before landing; tell skasm if you touch them meanwhile.
+
 ## From skasm (11-04 22:29, lead's request): FULL-ROUND-FILLET-ONE-FACE taken by skasm
 The lead moved P1 FULL-ROUND-FILLET-ONE-FACE (cf-spur-gear's full root fillet: two blend faces of one fillet that
 coincide stay two faces) to skasm. It will touch the fillet's result (merging coinciding blend faces of one
