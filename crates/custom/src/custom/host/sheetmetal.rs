@@ -1679,7 +1679,23 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             }
             let Ok(hl) = wall_loop(hole, &topo) else { continue };
             let (_, hn) = face_normal(hole)?;
-            let pull: Vec<f64> = hl.side.iter().map(|e| -setbacks.get(e).copied().unwrap_or(0.0)).collect();
+            let mut pull: Vec<f64> = hl.side.iter().map(|e| -setbacks.get(e).copied().unwrap_or(0.0)).collect();
+            // A free side running on in line from a bend's side (the clearance pieces at a flange's ends) goes with it,
+            // no step (live: the slot's ends run on to the pulled-back line).
+            let m = hl.pts.len();
+            let dir = |k: usize| (hl.pts[(k + 1) % m] - hl.pts[k]).normalize_or_zero();
+            for _ in 0..m {
+                for k in 0..m {
+                    if pull[k] != 0.0 {
+                        continue;
+                    }
+                    for j in [(k + m - 1) % m, (k + 1) % m] {
+                        if pull[j] != 0.0 && dir(k).cross(dir(j)).length() < 1e-9 {
+                            pull[k] = pull[j];
+                        }
+                    }
+                }
+            }
             let pts = outline_points(&pulled_sides(&hl, hn, &pull));
             if let Ok(f) = k::make_polyline(&pts, true).and_then(|w| k::make_face_from_wire(&w, true)) {
                 *hole = f;

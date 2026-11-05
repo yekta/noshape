@@ -945,7 +945,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   1.0440 mm); ours gives the whole sketch entities (the circles 106.18 / 91.70 mm, the splines 2.4979 untrimmed).
   The FeatureScript host's sketch edges are one per entity; live's sketch body splits them where they cross. No
   corpus number depends on it yet (the gear's region area and its extrude match live).
-- [ ] P2 SM-LOUVER-FLANGE-PARTS (dx 11-05 21:21, corpus2) c2-sm-corner-break's Flange 1 (10 slot edges, 30°, INNER,
+- [x] P2 SM-LOUVER-FLANGE-PARTS (dx 11-05 21:21, corpus2) c2-sm-corner-break's Flange 1 (10 slot edges, 30°, INNER,
   oppositeDirection) makes 16 parts, live 1: the louver flaps (5 × wall, bend, end piece) stand where live's do (our total
   volume 5,289,925 mm³ against live's 5,274,851) but don't fuse with the slotted panel (2,095,640 mm³ as after Extrude 2).
   Every op of the flange is ok (NOSHAPE_FS_TRACE): the parts split in updateSheetMetalGeometry's fuse. The translator's
@@ -957,7 +957,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   area within 0.003 % (run 130: nothing else changed). Left: 202/508/308 faces/edges/vertices, live 182/428/248 (two
   faces more per flap): live's slot ends run on to the pulled-back line (y 551.36, 242.7 mm² each) and its bend ends
   are one 8.0 mm² face; ours end at the original edge (550.5, 240 mm²) and leave a 5.3 mm² bend end plus a sliver
-  (the enlarged hole moves its long side, but the slot's short sides in the solid stay). No T1/T2 repro yet: a plate, or a converted tray with every edge a rip, doesn't overlap. Sheet metal model 1 before it as live since run 127 (edge-joint rips, material inward).
+  (the enlarged hole moves its long side, but the slot's short sides in the solid stay). Closed 21:58: the slot's side was three edges (the
+  flange's 0.02 mm clearance pieces at its ends); those in line with the bend now go with its pull-back: Flange 1 as
+  live (182/428/248), c2-sm-corner-break 6/11 (run 131: nothing else changed); next there Corner break 1's vertex
+  (the UI fetch's, REQUESTS). No T1/T2 repro yet: a plate, or a converted tray with every edge a rip, doesn't overlap. Sheet metal model 1 before it as live since run 127 (edge-joint rips, material inward).
 - [ ] P1 SM-BOOLEAN-SPEED (dx 11-05 09:35, speed; 15:58: run 125 model-plus 870 ms, live 917 (Up to Part 197 ms / live 160, Flange 1 221 / 224, Extrude 4 489 / 339): face point queries by the classifier, a cap's foot, cached split-piece tests; left in Extrude 4: its Booleans ~146 ms, evCollisionDetection's distances ~26, inner points computed twice in keep_names / part_sources ~10; 10:23: model-plus 2.5 -> 1.12 s, live 0.92: landed 2134f521 tracking
   on-face tests by the face classifier and cached inner points, then tracking's split-piece search by box and plane
   with cached boxes, then the curved outline from the tool's cap on the face (opCreateOutline 158 -> 60 ms). Left
