@@ -839,6 +839,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   full_regen_ms pending). Its result also differs: ours 36/83/46 faces/edges/vertices, 18314.95 mm³; live 36/79/40,
   18329.66 mm³ (after Extrude 3 already differs by split edges, CUT-CLOSED-EDGES-SPLIT). Our document:
   vibe5:~/tmp/noshape-parity-<pid>/pipeflange-steven.noshape (parity_models, NOSHAPE_PARITY_ONLY=pipeflange-steven).
+- [ ] P2 SETBACK-FILL-PATCH (core; dx 11-05 08:24, run 113) cf-setback-fillet's Setback Fillet 1 (3/5): its corner
+  patches are std `fill` with G1 to the faces round a six-edge hole (the feature splits the fillets and the flat faces
+  at the setback, deletes the spherical corner, then fills): the boundary is live's, the patches' areas aren't
+  (ours 27.85 / 38.00 mm², live 26.06 / 34.44 by facet sum); the kernel's G1 fill, as FILL-G1-DOME.
 - [ ] P2 CUT-CLOSED-EDGES-SPLIT (core / bool; dx's parity suite 11-03) closed edges a cut makes come out in pieces
   dx 11-05 08:16: clamp-guillem's slot ends join now (core d6af88ae, the same fix dx had: the pieces' meeting measured in
   space, 2e-7 of u on a cylinder being 1.5e-9 m); clamp-guillem 25/25. bushing2-0-joshua's Extrude 4 is another kind:
