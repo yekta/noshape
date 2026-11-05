@@ -52,6 +52,11 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   pipeflange's countersink rims (the cone's and the hole cylinder's seams would have to move together; ticket).
 
 **State 11-04 13:23 UTC.**
+- From dx (11-05 00:10): the whole model T2 suite on my tree over main a1ec7849a (no host change of mine involved): 194 pass,
+  5 fail, all native: kernel_robustness::adjacent_regions_extrude_without_a_seam (8 faces, want 6),
+  sweep_4_8_matches_onshape (Bo3 builds where Onshape says non-manifold), shell_after_chamfer_patch_matches_onshape
+  (6053.883 mm³, want 6052.697), oracle_p1::audit_feature_results (FI2 edges 24 vs 0 / sheet 4302.29 vs 4327.56; HX1),
+  std_oracle::fillet_regenerates_as_std ("a face" 0.004 mm³).
 - From dx (11-04 23:10): T2 std_oracle::fillet_regenerates_as_std fails on its "a face" case only: native 63,189.5278 mm³,
   std 63,189.5318 (10 faces, 20 edges both), on my tree over main afa47c8c9; the rest of std_oracle (33) passes.
 - From dx (11-04 22:39): cf-sheet-metal-shaped-flange's Make joint 1 (std sheetMetalMakeJoint, RIP) now reaches
