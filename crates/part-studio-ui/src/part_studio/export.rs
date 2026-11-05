@@ -123,6 +123,17 @@ impl PartStudioView {
 }
 
 
+/// STEP AP242: only it has the derived tolerances and MBD text height
+/// boxes (live 2035: AP214 / AP203 hide both).
+fn step_ap242(s: &ExportSettings) -> bool {
+    s.format == PartFormat::Step && (s.latest || s.version == 0)
+}
+
+/// The annotations text height field is shown (its value checked).
+fn mbd_height_shown(s: &ExportSettings) -> bool {
+    step_ap242(s) && s.mbd_text_height
+}
+
 /// What Export does with the chosen settings and file name.
 pub type RunExport = Rc<dyn Fn(ExportSettings, String, &mut Window, &mut App)>;
 
@@ -247,9 +258,11 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
                 if s.custom_units {
                     rows.push(sel("ex-units", "Units", &units, s.units, false, |s, i| s.units = i));
                 }
-                rows.push(chk("ex-tol", "Include derived tolerances in export", s.derived_tolerances, |s, v| s.derived_tolerances = v));
-                rows.push(chk("ex-mbd", "Use custom annotation text height for MBD export", s.mbd_text_height, |s, v| s.mbd_text_height = v));
-                if s.mbd_text_height {
+                if step_ap242(&s) {
+                    rows.push(chk("ex-tol", "Include derived tolerances in export", s.derived_tolerances, |s, v| s.derived_tolerances = v));
+                    rows.push(chk("ex-mbd", "Use custom annotation text height for MBD export", s.mbd_text_height, |s, v| s.mbd_text_height = v));
+                }
+                if mbd_height_shown(&s) {
                     let error = mbd_bad.get().then_some("Valid annotations text height in range from 0.0001 to 50 is required.");
                     rows.push(Row::Number { label: "Annotations text height (millimeter)".into(), input: mbd_input.clone(), error });
                 }
@@ -378,11 +391,11 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
         let (st2, file2, run2, invalid2, mbd_bad2) = (st.clone(), file.clone(), run.clone(), invalid.clone(), mbd_bad.clone());
         crate::os_ui::modal(dialog, "Export", 600.)
             .child(body)
-            .footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Export").disabled(invalid.get() || (s.format == PartFormat::Step && s.mbd_text_height && mbd_bad.get())))).child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))))
+            .footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Export").disabled(invalid.get() || (mbd_height_shown(&s) && mbd_bad.get())))).child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))))
             .on_ok(move |_, window, cx| {
                 let s = st2.borrow().clone();
                 let name = file2.read(cx).value().trim().to_string();
-                if name.is_empty() || invalid2.get() || (s.format == PartFormat::Step && s.mbd_text_height && mbd_bad2.get()) {
+                if name.is_empty() || invalid2.get() || (mbd_height_shown(&s) && mbd_bad2.get()) {
                     return false;
                 }
                 let mut prefs = (*s.memory).clone();

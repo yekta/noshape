@@ -2630,6 +2630,10 @@ impl ExportDialog {
         draw(cx, self.window);
     }
 
+    fn bounds(&self, cx: &mut TestAppContext, id: &'static str) -> Option<Bounds<gpui_kit::Pixels>> {
+        gpui_kit::VisualTestContext::from_window(self.window, cx).debug_bounds(id)
+    }
+
     fn press(&self, cx: &mut TestAppContext, id: &'static str) {
         let mut vcx = gpui_kit::VisualTestContext::from_window(self.window, cx);
         let b = vcx.debug_bounds(id).unwrap_or_else(|| panic!("no {id}"));
@@ -2679,9 +2683,10 @@ fn export_dialog_opens_with_the_last_exports_choices(cx: &mut TestAppContext) {
 
     d.open(cx, false);
     d.pick(cx, "ex-format", "STEP");
+    d.press(cx, "ex-tol");
     d.press(cx, "ex-latest");
     d.pick(cx, "ex-version", "AP214");
-    d.press(cx, "ex-tol");
+    assert!(d.bounds(cx, "ex-tol").is_none(), "AP242 only (live 2035)");
     d.press(cx, "ex-yup");
     d.pick(cx, "ex-format", "PARASOLID");
     d.pick(cx, "ex-format", "STEP");

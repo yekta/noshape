@@ -26,7 +26,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   test: inert drawing hooks, dev-deps as assembly-ui). app-core: debug selectors on select fields, checkboxes,
   modal OK / Cancel and menu rows (`menu:<label>`) so UI tests click them by name; test windows that open lists
   must come from `os_menu::open_window`.
-- Request 2035 to live (a session check of the same) still open; adjust if it differs from the code.
+- Live's session check (2035, behaviours "dx (2026-11-05 01:10, P1)") confirmed all of it; its one extra finding,
+  STEP AP214 / AP203 hiding "Include derived tolerances" and the MBD text height box, is in (AP242 only).
 
 ## 11-04 20:43 UTC: natives, spur gear, hem (lead's 17:xx list)
 - Landed: bend centerline wires + @evSheetMetalBendUp (7fcc9f62), opEdgeChange keeps moved edges' attributes
