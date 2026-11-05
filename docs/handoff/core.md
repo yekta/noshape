@@ -16,6 +16,16 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-05 00:34 UTC.**
+- Since 22:30: Shell 4 0.46 s (live 0.63; the self-interference check skips the part's own pairs); cf-fix-pcb's
+  Extrude 5 as live (the translator kept letters' counters: glyph ids aren't imprints); Offset surface joins faces
+  sharing an edge (live 2034, cf-sheet-metal-hem 4/6); prize-wheel-tim 8/8 (seam to a slot corner). Parity 39/55,
+  378/471 on vibe5. Looked at, written up in TICKETS, not changed: pipeflange's corners (live's fill isn't a rolling
+  ball; ours is OCCT's radial-section blend, both 3-4 mm³ a corner off), learning-center-michael (stationary balls at
+  Fillet 1's mitres: days of noshape blend). Next: motor-mount-jack's Circular pattern (109 ms, live 5: a face
+  pattern whose supports the rotation leaves alone could rotate the slot's loops, pcurves by a u-shift, no Boolean),
+  cf-spur-gear's faces (8 B-spline faces a gap, live 6), cf-fix-pcb's +1.58 mm² of letter walls.
+
 **State 11-04 22:30 UTC.**
 - Since 20:28: P0 SPLIT-FACE-SAME-ID landed (Split and one-tool Booleans name their faces apart per part; qa verified);
   parity run 70's regressions fixed (profiles built in loop order again, Extrude reverses only the cap edges drawn the
