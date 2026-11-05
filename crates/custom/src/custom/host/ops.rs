@@ -1568,14 +1568,28 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         for bi in ev.resolve_bodies(&targets).into_iter().rev() {
             let body = ev.ctx.bodies[bi].clone();
             let mut res = k::split(std::slice::from_ref(&body.shape), &tools, &Default::default())?;
-            let old_edges = Shape::compound(&body.shape.edges());
+            // The old edges with their boxes: a middle is measured only against the edges whose box holds it (a
+            // distance to all of a 328-face board's edges at once took 0.9 s per split, cf-fix-pcb).
+            // An edge the split left whole keeps its middle: only the others are measured.
+            let mid = |e: &Shape| e.edge_info().ok().and_then(|info| e.point_at((info.first_param + info.last_param) * 0.5).ok());
+            let old: Vec<Shape> = body.shape.edges();
+            let old_mids: Vec<DVec3> = old.iter().filter_map(mid).collect();
+            let boxes = std::cell::OnceCell::new();
+            let on_old = |m: DVec3| {
+                if old_mids.iter().any(|p| p.distance(m) < 1e-9) {
+                    return true;
+                }
+                let Ok(v) = k::make_vertex(m) else { return false };
+                let boxes: &Vec<(&Shape, k::BoundingBox)> = boxes.get_or_init(|| old.iter().filter_map(|e| e.bounding_box(false).ok().map(|b| (e, b))).collect());
+                boxes.iter().any(|(e, b)| (0..3).all(|i| m[i] >= b.min[i] - 1e-7 && m[i] <= b.max[i] + 1e-7) && k::distance(&v, e).is_ok_and(|d| d.distance <= 1e-7))
+            };
             let made: Vec<bool> = res
                 .shape
                 .edges()
                 .iter()
                 .map(|edge| {
                     let Some(m) = edge.edge_info().ok().and_then(|info| edge.point_at((info.first_param + info.last_param) * 0.5).ok()) else { return false };
-                    let new = k::make_vertex(m).and_then(|v| k::distance(&v, &old_edges)).is_ok_and(|d| d.distance > 1e-7);
+                    let new = !on_old(m);
                     if new {
                         mids.push(m);
                     }
