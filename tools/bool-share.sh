@@ -10,4 +10,4 @@ cd "$(git rev-parse --show-toplevel)"
 want=${*:-parity56 bool-corpus corpus5 shfall sh-new2 shv shell6 kall 'k[0-9]*' 'kg-*' 'kh*' 'kt-*'}
 NOSHAPE_RB_HOST=${NOSHAPE_RB_HOST:-vibe4} exec tools/tiers/rb.sh nice -n 10 bash -c '
   dirs=$(cd ~/agents/bool-corpora && for w in '"$want"'; do [ -d "$w" ] && echo "$HOME/agents/bool-corpora/$w"; done | awk "!seen[\$0]++" | paste -sd:)
-  NOSHAPE_BOOL_CORPORA=$dirs NOSHAPE_BOOLEAN_MEMORY_MB=16000 cargo test --release -p noshape-kernel --test all -- brep_replay::brep_corpus_share --ignored --nocapture --test-threads=1 2>&1 | grep -oE "share .*|panicked.*|error.*|signal.*"'
+  NOSHAPE_BOOL_CORPORA=$dirs NOSHAPE_BOOLEAN_MEMORY_MB=16000 cargo test --release -p noshape-kernel --test all -- brep_replay::brep_corpus_share --ignored --nocapture --test-threads=1 2>&1 | sed -nE "s/.*(share .*)/\1/p; /panicked|error|signal/p"'

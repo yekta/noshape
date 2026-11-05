@@ -320,7 +320,8 @@ fn brep_corpus_replay() {
 
 /// How far noshape's own Boolean goes, over the corpora in NOSHAPE_BOOL_CORPORA (directories, `:`-separated; a case
 /// in several counted once, in the first): the share of cases it takes, and the share of OCCT's time (run here, each
-/// case once) those cases are. A case OCCT fails isn't counted. One row per corpus, then all of them.
+/// case once) those cases are. A case OCCT fails isn't counted. One row per corpus (and its five decline reasons that
+/// leave the most of OCCT's time), then all of them.
 /// `tools/bool-share.sh` runs it over the recorded corpora.
 #[test]
 #[ignore = "T2: the Boolean corpora (outside the repo, NOSHAPE_BOOL_CORPORA)"]
@@ -332,6 +333,8 @@ fn brep_corpus_share() {
     let mut all = (0usize, 0usize, 0.0f64, 0.0f64);
     for dir in dirs.split(':').filter(|d| !d.is_empty()).map(Path::new) {
         let mut row = (0usize, 0usize, 0.0f64, 0.0f64);
+        // (Its declines by reason: how many, OCCT's time.)
+        let mut declines: BTreeMap<String, (usize, f64)> = BTreeMap::new();
         for name in cases(dir) {
             if !seen.insert(name.clone()) {
                 continue;
@@ -344,6 +347,7 @@ fn brep_corpus_share() {
             set_rust_boolean_only(true);
             let ours = boolean(c.op, &c.objects, &c.tools, &c.opts);
             let taken = ours.is_ok() && last_boolean_path() == "rust";
+            let why = last_rust_decline();
             set_rust_boolean_only(false);
             // (OCCT the way the app ran it: op_boolean's, or OCCT's one Boolean of them all.)
             let direct = c.path.starts_with("direct");
@@ -366,10 +370,20 @@ fn brep_corpus_share() {
             if taken {
                 row.1 += 1;
                 row.3 += ms;
+            } else {
+                let x = declines.entry(if why.is_empty() { "(no reason)".into() } else { why }).or_insert((0, 0.0));
+                x.0 += 1;
+                x.1 += ms;
             }
         }
         if row.0 > 0 {
             eprint!("{}", share_row(&dir.file_name().unwrap_or_default().to_string_lossy(), row));
+        }
+        // (The five reasons that leave the most of OCCT's time.)
+        let mut by_time: Vec<(String, (usize, f64))> = declines.into_iter().collect();
+        by_time.sort_by(|a, b| b.1 .1.total_cmp(&a.1 .1));
+        for (why, (k, ms)) in by_time.iter().take(5) {
+            eprintln!("share   declined {k}, {ms:.0} ms of OCCT's: {why}");
         }
         all = (all.0 + row.0, all.1 + row.1, all.2 + row.2, all.3 + row.3);
     }
