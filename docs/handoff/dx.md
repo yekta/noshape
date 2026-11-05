@@ -71,6 +71,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   document 0.87 s vs live 0.62). Tried and ticketed, not kept: SM-CURVED-WALL-BEND-FILLET (model-plus's Flange 1,
   a curved wall's bend fillet failing beside a neighbour that runs on past it). The full corpus run's times swing
   with the build host's load (cf-hose-routing 0.69 / 1.15 s in two runs): one.sh <doc> gives the steady figure.
+- 08:13 (lead's list: AFFINE-PLANAR-SHEETS, SM-CURVED-WALL-BEND-FILLET's corner, then a core corpus item):
+  - Landed fa3f4b76: AFFINE-PLANAR-SHEETS closed (the split was right; a transient edge named by its two faces now
+    resolves by name after a topology change; sheets keep planes under affine maps).
+  - Landed 48f32c23: model-plus's Flange 1 is one valid part (3 parts vs live 2, +2.7 % volume); left: the flange's
+    pull-back at both ends where it meets neighbouring bends, the curved bend stopping at x −11 (TICKETS).
+  - Queued: CUT-CLOSED-EDGES-SPLIT (taken from core/bool in core.md): join_loop_pieces in space: clamp-guillem 25/25,
+    run 113: 48/56 documents, 420/483 features. bushing's case needs a seam vertex Parasolid lacks (TICKETS).
+  - For the lead: land slot 3 (/home/ngyekta/target-land-slot3) failed T0 twice on mold "undefined symbol anon.…"
+    (stale incremental artifacts, 07:05 and 08:01); both changes went in with later batches.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
