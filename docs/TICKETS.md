@@ -655,7 +655,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (saved references). Next: a creation-order key for query results in the host (an entity born of an operation
   inherits the order of the older entity it lies on: extract edge <- cap edge <- region edge <- sketch entity id),
   used to sort evaluateQuery's results per body.
-  dx 11-05 02:50: it is also what's left of Fold SM 1 (after opTransform keeps the moved piece's attributes: 29/69/42
+  dx 11-05 02:19: it is also what's left of Fold SM 1 (after opTransform keeps the moved piece's attributes: 29/69/42
   -> 34/84/52, live 32/82/52; its corner breaks were dropped with the vertices' snapshots). The dogbone on the
   x = 30 edge leaves an arc beside the bend's start on the fixed wall, so the bend's end is taken as slanted
   (fixed wall from x 32.58, moved wall from 30) and its strip runs on 20.75 mm into the cutout; the cut back (a lofted
