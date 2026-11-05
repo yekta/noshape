@@ -103,6 +103,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   and live added volume_high (evVolume HIGH) to 11 UI-method documents; the runner accepts it. Run 120: 51/56,
   427/483. The build host's corpus copy (vibe5:agents/dx/live-models) goes stale when live edits /root/parity/models:
   my one.sh / runNN.sh rsync it first now.
+- 11:20 (lead: SKETCH-REGION-EDGE-PIECES, then cf-hose-routing's Shell from core):
+  - Hose Shell: shell_part's checks by classifier and cheap inner points (core.md note): Hose Routing 178 -> 48 ms,
+    the document 718 -> 208 ms (live 491). Run 121 unchanged (51/56, 427/483); speed swings with vibe5's load.
+  - SKETCH-REGION-EDGE-PIECES: asked live how sketch edges split (REQUESTS 11:08) before changing the sketch body:
+    live's evCurveDefinition(sketchEntityQuery(spline1)) gave the whole spline while the region's edge is a piece.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem

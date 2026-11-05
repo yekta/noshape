@@ -960,6 +960,16 @@ User P1 (spinner and a leftover Surface 1 after cancelling a Displacement map; 7
   evaluated) instead of 17.4 s on a blank one. T1 regen::a_snapshot_regenerates_only_what_changed.
 Once your kernel steps stop on abort, the grace rarely expires; nothing else depends on them.
 
+## From dx (11-05 11:20, lead's request): Shell's checks on a swept hose (cf-hose-routing), in your detail.rs
+The lead gave dx cf-hose-routing's per-feature Shell (161 of 179 ms; live's whole feature 85-113 ms). The kernel shell
+was 21 ms of it: the rest was `shell_part`'s own checks. `shell_is_whole` and the opened test measured each face's
+`point_on_face` (centroid integration plus a BRepExtrema projection, 7-100 ms a B-spline face) against the result
+with `k::distance` (BRepExtrema to the whole solid, ~25 ms a point). They now take `helpers_a::inner_point` (uv
+samples classified, falling back to point_on_face) and `on_faces` (the result's faces whose box holds the point,
+classified). Same decisions, same results (corpus run 121 and the model tests unchanged); Hose Routing 178 -> 48 ms a
+feature, the document 718 -> 208 ms (live 491). point_on_face's 16 other callers are untouched; the same swap may pay
+wherever they run on free-form faces.
+
 ## From dx (11-05 07:50, lead's request): CUT-CLOSED-EDGES-SPLIT taken by dx
 - The corpus's remaining cases (bushing2-0-joshua Extrude 4, pipeflange-steven, clamp-guillem's Redondeo 2): dx
   works on them in the kernel (boolean.cpp's seam moves / loop joins), core's area; I'll note here what lands.

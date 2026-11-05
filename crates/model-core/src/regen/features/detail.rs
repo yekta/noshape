@@ -878,7 +878,7 @@ pub fn shell_part(part: &k::Shape, removed: &[k::Shape], t: f64, side: k::ShellS
     // hose, dx 11-04; they decide only where every removed face still lies on it, as a strip narrower than the wall.)
     let opened = || {
         removed.iter().any(|f| {
-            super::helpers_a::point_on_face(f).is_some_and(|p| k::make_vertex(p).and_then(|v| k::distance(&v, &res.shape)).is_ok_and(|d| d.distance > t * 1e-3))
+            super::helpers_a::inner_point(f).is_some_and(|p| !on_faces(&res.shape, p, t * 1e-3))
         })
     };
     let volume = |s: &k::Shape| k::volume_properties(s).map_or(0.0, |p| p.mass);
@@ -905,8 +905,16 @@ fn shell_is_whole(part: &k::Shape, removed: &[k::Shape], result: &k::Shape, t: f
         return false;
     }
     part.faces().iter().filter(|f| !removed.iter().any(|r| r.is_same(f))).all(|f| {
-        let Some(p) = super::helpers_a::point_on_face(f) else { return true };
-        k::make_vertex(p).and_then(|v| k::distance(&v, result)).is_ok_and(|d| d.distance <= t * 1e-3)
+        let Some(p) = super::helpers_a::inner_point(f) else { return true };
+        on_faces(result, p, t * 1e-3)
+    })
+}
+
+/// Whether `p` lies within `tol` of a face of `shape`: the faces whose box holds it, each classified (BRepExtrema's
+/// distance to the whole solid took ~25 ms a point on a swept hose: cf-hose-routing's Shell, 128 of its 160 ms).
+fn on_faces(shape: &k::Shape, p: glam::DVec3, tol: f64) -> bool {
+    shape.faces().iter().any(|f| {
+        f.bounding_box(false).is_ok_and(|b| (b.min - glam::DVec3::splat(tol)).cmple(p).all() && p.cmple(b.max + glam::DVec3::splat(tol)).all()) && f.contains_point(p, tol).unwrap_or(false)
     })
 }
 
