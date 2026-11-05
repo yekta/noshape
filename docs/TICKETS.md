@@ -155,8 +155,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the check (500 -> 7 ms). A change past 1e-9 of the box's volume is rejected without the solid's volume, and the
   unify's two whole-part checks run in parallel (on this thread for a loose part, CRASH-3388), 160 -> 70 ms each.
   Faces unchanged: the model suite (40/55, 391/471) and blend corpus identical before / after, kernel tests pass.
-  Left: the rejected merge is still tried three times (USD 3 x 60–90 ms); the gears' features' props_surface
-  (380–1183 area / centroid calls a gear, 1.5–2.3 s of thread time) is next to look at.
+  Left: the rejected merge is still tried three times (USD 3 x 60–90 ms). (The props_surface laps in the gear's
+  kernel profile are the parity runner's own area queries (ops query::parts), not its regeneration.)
 
 - [x] (core 11-05 01:44: as live's dialog, not a regression: feature_add makes the dialog's choices, and std's extrude edit logic flips a new Extrude going New -> Remove (canSetBooleanFlip, whatever the geometry, unless the flip or the merge scope is given), so from Top it points away from the plate above it, "Selected tools and targets do not intersect." in live's dialog too; the probe gives oppositeDirection false as a REST script would, and cuts the 400 holes again) P0 BIG-PLATE-CUT-NO-INTERSECT (core; dx 11-05 00:38, main 1c4ab1d91) a 400 × 400 × 10 mm plate (Extrude 1 up from Top)
   and an Extrude 2 of 400 Ø8 circles sketched on Top, Remove, Through all, default scope: INFO "Selected tools and
