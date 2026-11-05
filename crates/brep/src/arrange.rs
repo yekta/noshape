@@ -89,7 +89,10 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
         cycles.push(cyc);
     }
     let curves_of = |c: &[usize]| -> Vec<C2> { c.iter().map(|&h| curve(h)).collect() };
-    let areas: Vec<f64> = crate::boolean::par_map(cycles.len(), &|i| cycles[i].iter().map(|&h| curve(h).area_term()).sum())?;
+    // (Each curve's area term and length once, a half-edge's the way it runs: a B-spline's are sums over its spans.)
+    let terms: Vec<(f64, f64)> = crate::boolean::par_map(segs.len(), &|k| (segs[k].1.area_term(), segs[k].1.length()))?;
+    let area_of = |h: usize| if h.is_multiple_of(2) { terms[h / 2].0 } else { -terms[h / 2].0 };
+    let areas: Vec<f64> = cycles.iter().map(|c| c.iter().map(|&h| area_of(h)).sum()).collect();
     // Connected components (a hole is never inside a cycle of its own component).
     let mut comp: Vec<usize> = (0..pts.len()).collect();
     fn find(c: &mut [usize], mut i: usize) -> usize {
@@ -152,7 +155,7 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
         let hs: Vec<usize> = members[ri].iter().flat_map(|&ci| cycles[ci].iter().copied()).collect();
         let dangling: Vec<u32> = hs.iter().filter(|&&h| h % 2 == 0 && members[ri].contains(&cycle_of[h ^ 1])).map(|&h| (h / 2) as u32).collect();
         // (Longest first, each length found once.)
-        let mut by_length: Vec<(f64, usize)> = cycles[members[ri][0]].iter().map(|&h| (curve(h).length(), h)).collect();
+        let mut by_length: Vec<(f64, usize)> = cycles[members[ri][0]].iter().map(|&h| (terms[h / 2].1, h)).collect();
         by_length.sort_by(|a, b| b.0.total_cmp(&a.0));
         for &(len, h) in &by_length {
             let c = curve(h);

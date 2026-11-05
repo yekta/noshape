@@ -503,7 +503,7 @@ fn a_25_by_25_knurl() {
 }
 
 /// cf-straight-spline's cuts by a pattern of 8 spline cutters (recorded): noshape's Boolean declines the first late
-/// (a cutter cone's seam end merged off its line, after OCCT's sections), so in its feature type's scope the next
+/// (a piece of a cutter cone across its seam angle, once its result is built), so in its feature type's scope the next
 /// cut goes straight to OCCT's (a "two edges" cut, declined as late outside the scope); OCCT's results both.
 #[test]
 fn a_late_decline_sends_the_like_straight_to_occt() {
@@ -518,7 +518,7 @@ fn a_late_decline_sends_the_like_straight_to_occt() {
     };
     let memo = std::sync::Arc::new(k::DeclineMemo::default());
     memo.scope("spline", || {
-        assert_eq!(run(&a).1, "a seam off a ruling");
+        assert_eq!(run(&a).1, "a piece across its surface's seam angle");
         assert_eq!(run(&b).1, "not tried (an earlier path took it)");
     });
     // (Another feature type, or none: tried.)

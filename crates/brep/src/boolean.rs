@@ -951,7 +951,7 @@ impl Ctx<'_> {
                     0
                 } else if faces[1] == f {
                     1
-                } else if self.seg_length(s) <= 100.0 * self.tol {
+                } else if self.seg_within(s, 100.0 * self.tol) {
                     // (A piece a few tolerances long merged with another face's between the same vertices (three
                     // knurl faces' 0.32 um curves into one vertex): straight between its ends there.)
                     return Ok(C2::Seg { a: g.to2(self.p(s.v[0])), b: g.to2(self.p(s.v[1])) });
@@ -1148,6 +1148,11 @@ impl Ctx<'_> {
         }
     }
 
+    /// Whether `s` is at most `len` long: past it by its chord at once (a B-spline's length is a sum over its spans).
+    fn seg_within(&self, s: &Seg, len: f64) -> bool {
+        (self.seg_at(s, 1.0) - self.seg_at(s, 0.0)).length() <= len && self.seg_length(s) <= len
+    }
+
     fn seg_length(&self, s: &Seg) -> f64 {
         match s.g {
             Geo::Line => (self.p(s.v[1]) - self.p(s.v[0])).length(),
@@ -1337,8 +1342,13 @@ impl Ctx<'_> {
                 let margin = 3.0 * GREY * tol;
                 let d = |t: f64| distance_with(c2.at((t - t0) / (t1 - t0)), &bound, spans);
                 let ts: Vec<f64> = (0..=32).map(|k| a.0 + (b.0 - a.0) * k as f64 / 32.0).collect();
-                let ds: Vec<f64> = ts.iter().map(|&t| d(t)).collect();
-                for k in 1..32 {
+                // (A minimum is narrowed down over its two parts: where both parts' boxes are clearly farther than the
+                // band from every boundary curve's boxes, it can't come near; its distance only as a neighbour's.)
+                let u = |t: f64| (t - t0) / (t1 - t0);
+                let clear: Vec<bool> = ts.windows(2).map(|w| c2.part_box(u(w[0]), u(w[1])).is_some_and(|(lo, hi)| bound.iter().zip(spans).all(|(bc, sp)| bc.clear_of_box(lo, hi, GREY * tol, Some(sp))))).collect();
+                let near = |k: usize| (1..32).contains(&k) && !(clear[k - 1] && clear[k]);
+                let ds: Vec<f64> = (0..=32).map(|k| if near(k) || (k > 0 && near(k - 1)) || near(k + 1) { d(ts[k]) } else { f64::INFINITY }).collect();
+                for k in (1..32).filter(|&k| near(k)) {
                     if ds[k] > ds[k - 1] || ds[k] > ds[k + 1] {
                         continue;
                     }
@@ -1351,13 +1361,26 @@ impl Ctx<'_> {
                             continue;
                         }
                     }
+                    // (Golden section, one distance a step, down to a tenth of the tolerance along it: the
+                    // decision is the band's, the ends' margin's.)
                     let (mut lo, mut hi) = (ts[k - 1], ts[k + 1]);
-                    for _ in 0..50 {
-                        let (m1, m2) = (lo + (hi - lo) / 3.0, hi - (hi - lo) / 3.0);
-                        if d(m1) < d(m2) {
+                    let g = 0.618_033_988_749_894_9;
+                    let (mut m1, mut m2) = (hi - g * (hi - lo), lo + g * (hi - lo));
+                    let (mut d1, mut d2) = (d(m1), d(m2));
+                    for _ in 0..80 {
+                        if apart(lo.min(hi), lo.max(hi)) <= 0.1 * self.tol {
+                            break;
+                        }
+                        if d1 < d2 {
                             hi = m2;
+                            (m2, d2) = (m1, d1);
+                            m1 = hi - g * (hi - lo);
+                            d1 = d(m1);
                         } else {
                             lo = m1;
+                            (m1, d1) = (m2, d2);
+                            m2 = lo + g * (hi - lo);
+                            d2 = d(m2);
                         }
                     }
                     let t = 0.5 * (lo + hi);
@@ -4711,7 +4734,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 // (A piece a few tolerances long: straight between its vertices' places here, which its curve on
                 // the face can miss by more than its length (a knurl section's piece 0.4 um long whose curve on the
                 // flank is 1e-13 long).)
-                let c = if ends[0] != ends[1] && cx.seg_length(&s) <= 100.0 * tol { C2::Seg { a: pts[ends[0] as usize], b: pts[ends[1] as usize] } } else { c };
+                let c = if ends[0] != ends[1] && cx.seg_within(&s, 100.0 * tol) { C2::Seg { a: pts[ends[0] as usize], b: pts[ends[1] as usize] } } else { c };
                 lsegs.push((ends, c));
                 lsrc.push(si);
             }

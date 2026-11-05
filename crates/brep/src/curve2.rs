@@ -552,6 +552,25 @@ impl C2 {
         least.max(0.0)
     }
 
+    /// Whether it is clearly more than `gap` from the box (`lo`, `hi`): its boxes' (a NURBS part's spans' by
+    /// `boxes`, else its quick box) all are; false where none comes cheaply.
+    pub(crate) fn clear_of_box(&self, lo: DVec2, hi: DVec2, gap: f64, boxes: Option<&SpanBoxes>) -> bool {
+        let apart = |b: (DVec2, DVec2)| (b.0 - hi).max(lo - b.1).max_element() > gap;
+        match self.spans2() {
+            Some((c, t0, t1, m)) => {
+                let (a, z) = (t0.min(t1), t0.max(t1));
+                c.spans().iter().enumerate().filter(|(_, x)| x.1 >= a && x.0 <= z).all(|(k, _)| {
+                    let b = match boxes.and_then(|b| b.boxes.get(k)) {
+                        Some(b) => *b.get_or_init(|| span_box2(c, k, m)),
+                        None => span_box2(c, k, m),
+                    };
+                    apart(b)
+                })
+            }
+            None => self.quick_box().is_some_and(apart),
+        }
+    }
+
     /// The sample (of [`Self::samples`]' evenly along it) nearest `p`, the first of equals: its parameter and
     /// distance.
     fn nearest_sample(&self, p: DVec2, boxes: Option<&SpanBoxes>) -> (f64, f64) {
@@ -737,18 +756,21 @@ impl C2 {
         let scale = pa.iter().chain(pb).fold(0.0_f64, |m, p| m.max(p.abs().max_element())).max(1e-9);
         let mut out: Vec<(f64, f64)> = Vec::new();
         // Runs of 16 chords each, their boxes grown as the chords' below: only runs whose boxes meet are looked at.
+        // (A segment is its own chord: no bulge (its length grew every pair's box: a B-spline's 512 chords each
+        // seeded against one long side, 2 crossings).)
         const RUN: usize = 16;
-        let runs = |p: &[DVec2], n: usize, pad: f64| -> Vec<(DVec2, DVec2)> {
+        let (bulge_a, bulge_b) = (if matches!(self, C2::Seg { .. }) { 0.0 } else { 0.25 }, if matches!(o, C2::Seg { .. }) { 0.0 } else { 0.25 });
+        let runs = |p: &[DVec2], n: usize, pad: f64, bulge: f64| -> Vec<(DVec2, DVec2)> {
             (0..n.div_ceil(RUN))
                 .map(|r| {
                     let q = &p[r * RUN..=((r + 1) * RUN).min(n)];
                     let (lo, hi) = q.iter().fold((DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY)), |(l, h), &x| (l.min(x), h.max(x)));
                     let long = q.windows(2).fold(0.0_f64, |m, w| m.max((w[1] - w[0]).length()));
-                    (lo - DVec2::splat(0.25 * long + pad), hi + DVec2::splat(0.25 * long + pad))
+                    (lo - DVec2::splat(bulge * long + pad), hi + DVec2::splat(bulge * long + pad))
                 })
                 .collect()
         };
-        let (ra, rb) = (runs(pa, na, 4.0 * tol), runs(pb, nb, 0.0));
+        let (ra, rb) = (runs(pa, na, 4.0 * tol, bulge_a), runs(pb, nb, 0.0, bulge_b));
         let chords = |ia: std::ops::Range<usize>, ib: std::ops::Range<usize>, out: &mut Vec<(f64, f64)>| {
             for i in ia {
                 let (a0, a1) = (pa[i], pa[i + 1]);
@@ -756,7 +778,7 @@ impl C2 {
                 for j in ib.clone() {
                     let (b0, b1) = (pb[j], pb[j + 1]);
                     // (Chords bulge from their curve: seeds from any pair whose boxes, grown, meet.)
-                    let grow = 0.25 * ((a1 - a0).length() + (b1 - b0).length());
+                    let grow = bulge_a * (a1 - a0).length() + bulge_b * (b1 - b0).length();
                     let (blo, bhi) = (b0.min(b1) - DVec2::splat(grow), b0.max(b1) + DVec2::splat(grow));
                     if ahi.x < blo.x || bhi.x < alo.x || ahi.y < blo.y || bhi.y < alo.y {
                         continue;
@@ -806,7 +828,24 @@ impl C2 {
             }
         }
         out.sort_by(|x, y| x.0.total_cmp(&y.0).then(x.1.total_cmp(&y.1)));
-        out
+        // (Where they touch, Newton's roots scatter along the stretch they're within `tol`: one crossing there, where
+        // they're most nearly tangent, however many seeds landed.)
+        let sine = |&(s, t): &(f64, f64)| {
+            let (da, db) = (self.deriv1(s), o.deriv1(t));
+            (da.perp_dot(db) / (da.length() * db.length()).max(1e-300)).abs()
+        };
+        let mut kept: Vec<(f64, f64)> = Vec::with_capacity(out.len());
+        for x in out {
+            match kept.last_mut() {
+                Some(last) if o.distance(self.at(0.5 * (last.0 + x.0))) <= tol && (self.at(last.0) - self.at(x.0)).length() <= 1e3 * tol => {
+                    if sine(&x) < sine(last) {
+                        *last = x;
+                    }
+                }
+                _ => kept.push(x),
+            }
+        }
+        kept
     }
 
     /// Parameters (on `self`, on `o`) where the two cross, ends included; none where they run together
@@ -970,7 +1009,7 @@ pub(crate) fn distance_with(p: DVec2, edges: &[C2], spans: &[SpanBoxes]) -> f64 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::f64::consts::PI;
+    use std::f64::consts::{FRAC_PI_2, PI};
 
     #[test]
     fn a_disk_with_a_square_hole() {
@@ -1093,5 +1132,11 @@ mod tests {
         }
         assert!((wave.curvature() - 0.0).abs() < 1e-12);
         assert!((wave.tangent(0.25) - DVec2::X).length() < 1e-12);
+        // A line touching it at its top (within 1e-7 over ~2e-3 of it, Newton's roots all along that): one crossing,
+        // at the top.
+        let top = C2::Seg { a: DVec2::new(-1.0, 0.75), b: DVec2::new(3.0, 0.75) };
+        let touch: Vec<f64> = top.intersections(&wave, 1e-7).iter().map(|&(s, _)| top.at(s).x).collect();
+        assert_eq!(touch.len(), 1, "{touch:?}");
+        assert!((touch[0] - FRAC_PI_2).abs() < 1e-3, "{touch:?}");
     }
 }
