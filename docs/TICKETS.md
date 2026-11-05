@@ -3938,6 +3938,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   view's lower tangent edge, an ELLIPSE in live (centre (7.829, 6.0897) in, major 0.9843), is a 37-point SPLINE plus a
   0.017 in LINE in ours: that model edge is a B-spline in ours where Parasolid's is a circle. Our DXF writes model
   B-splines as SPLINE (as live does). Translated model: NOSHAPE_PARITY_SAVE + NOSHAPE_PARITY_ONLY=knob-tim.
+- [ ] P2 PARITY-MISSING-EXTERNAL-REFS (dx 11-05 06:10, run 105) live's sketches with an external reference that no
+  longer resolves (its query empty: deterministicIds [""], queryString "") are WARNING "Some external references are
+  missing."; the translator leaves those constraints to the solved geometry, so ours are OK: clamp-guillem's Boceto 6
+  (23/25) and train-joe's Sketch 2 (11/12, a COINCIDENT and a MIDPOINT). Our sketch warns for an external_refs entry
+  that resolves to nothing (model-core sketch.rs), but sketch_use projects only what exists: the translator needs a
+  way to add a dangling reference (a projected point keeping its solved place, its reference to nothing).
 - [ ] P1 PARITY-CUSTOM-RUN-FAILURES (dx, from core 11-03 22:30; dx's parity suite run 42, 11-03 19:33) the corpus's community features
   whose inputs translate whole but fail in our host, with the Monitor's first error (featurestudio_monitor on the
   translated documents: `NOSHAPE_PARITY_SAVE=<dir>` keeps them, NOSHAPE_PARITY_ONLY=<name>; copies of all in
