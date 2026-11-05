@@ -952,9 +952,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   10 edges are live's (midpoints y 550.5 … −475.5, z 20, one at z 16.8: checked by id). 21:40: a bend on a hole's side
   now pulls its wall back as on an outer side (the bend overlapped the wall by 0.86 mm and the glued fuse left them
   apart): 16 -> 11 parts, the five flaps whose slot edge has the panel's middle on its wall side join. Left: the five
-  with the middle across their slot: bend_geometry's planar `into` picks the wall side by the face's centroid, wrong
-  for those hole edges; flipping it alone made it worse (the bend's other uses follow that side). No T1/T2 repro yet:
-  a plate, or a converted tray with every edge a rip, doesn't overlap; c2's tray has bends on its bottom edges. Sheet metal model 1 before it as live since run 127 (edge-joint rips, material inward).
+  with the middle across their slot. 21:52: a planar wall's side of a bend edge by the face classifier (wall_side; the
+  centroid was wrong for those hole edges) in bend_geometry, the bend solids and the flat: one part, volume as live,
+  area within 0.003 % (run 130: nothing else changed). Left: 202/508/308 faces/edges/vertices, live 182/428/248 (two
+  faces more per flap). No T1/T2 repro yet: a plate, or a converted tray with every edge a rip, doesn't overlap. Sheet metal model 1 before it as live since run 127 (edge-joint rips, material inward).
 - [ ] P1 SM-BOOLEAN-SPEED (dx 11-05 09:35, speed; 15:58: run 125 model-plus 870 ms, live 917 (Up to Part 197 ms / live 160, Flange 1 221 / 224, Extrude 4 489 / 339): face point queries by the classifier, a cap's foot, cached split-piece tests; left in Extrude 4: its Booleans ~146 ms, evCollisionDetection's distances ~26, inner points computed twice in keep_names / part_sources ~10; 10:23: model-plus 2.5 -> 1.12 s, live 0.92: landed 2134f521 tracking
   on-face tests by the face classifier and cached inner points, then tracking's split-piece search by box and plane
   with cached boxes, then the curved outline from the tool's cap on the face (opCreateOutline 158 -> 60 ms). Left

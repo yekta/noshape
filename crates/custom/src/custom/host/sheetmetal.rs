@@ -517,6 +517,20 @@ struct Bend {
     def_radius: f64,
 }
 
+/// A planar wall's in-plane direction away from its edge along `dir` at `at` (`n` its normal, `c` its middle): the side
+/// a small step stays on the wall (an edge of a hole has the middle on its other side: a louver's flange on its slot),
+/// else towards the middle.
+fn wall_side(face: &Shape, n: DVec3, dir: DVec3, at: DVec3, c: DVec3) -> DVec3 {
+    let a = n.cross(dir).normalize();
+    let stays = |v: DVec3| face.contains_point(at + v * 1e-5, 1e-6).ok();
+    match (stays(a), stays(-a)) {
+        (Some(false), Some(true)) => -a,
+        (Some(true), Some(false)) => a,
+        _ if (c - at).dot(a) < 0.0 => -a,
+        _ => a,
+    }
+}
+
 /// Geometry of the bend at edge `e` between walls `fa` (seen from `a`) and `fb`.
 fn bend_geometry(topo: &Topo, e: usize, fa: usize, fb: usize, radius: f64, front: f64, back: f64) -> FResult<Bend> {
     let (s, t) = topo.edge_ends[e];
@@ -531,9 +545,7 @@ fn bend_geometry(topo: &Topo, e: usize, fa: usize, fb: usize, radius: f64, front
         let n = face.normal_at_point(joint).map(|n| n.normalize()).unwrap_or(n_mid);
         let mut a = n.cross(dir).normalize();
         if face.face_plane().ok().flatten().is_some() {
-            if (p - s).dot(a) < 0.0 {
-                a = -a;
-            }
+            a = wall_side(face, n, dir, joint, p);
         } else {
             // A curved wall's middle may lie behind the joint (rolled far round): inward is the side a small step
             // stays on the face.
@@ -1451,10 +1463,8 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         }
         // Wall a's thickness at the pull-back line, revolved onto wall b.
         let (pa, n1) = face_normal(&topo.faces[fa])?;
-        let mut a1 = n1.cross(b.dir).normalize();
-        if (pa - b.start).dot(a1) < 0.0 {
-            a1 = -a1;
-        }
+        let mid = b.start + b.dir * (b.len * 0.5);
+        let a1 = wall_side(&topo.faces[fa], n1, b.dir, mid, pa);
         let p1 = b.start + a1 * b.setback + b.dir * t0;
         let len = t1 - t0;
         // A closed corner's end is its cut alone: the solid starts a
@@ -1471,10 +1481,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         let face = k::make_face_from_wire(&wire, true).map_err(|e| fe(e.to_string()))?;
         // Turn towards wall b.
         let (pb, nb) = face_normal(&topo.faces[fb])?;
-        let mut a2 = nb.cross(b.dir).normalize();
-        if (pb - b.start).dot(a2) < 0.0 {
-            a2 = -a2;
-        }
+        let a2 = wall_side(&topo.faces[fb], nb, b.dir, mid, pb);
         let p2 = b.start + a2 * b.setback + b.dir * t0;
         let rotate = |ang: f64| {
             let r = p1 - b.axis_point;
@@ -2835,8 +2842,7 @@ fn place_from(def: &Definition, k_factor: f64, topo: &Topo, root: usize, walls: 
             // Directions from the edge into each wall.
             let into = |f: usize| -> FResult<DVec3> {
                 let (p, n) = face_normal(&topo.faces[f])?;
-                let a = n.cross(b.dir).normalize();
-                Ok(if (p - b.start).dot(a) < 0.0 { -a } else { a })
+                Ok(wall_side(&topo.faces[f], n, b.dir, b.start + b.dir * (b.len * 0.5), p))
             };
             let (a1, a2) = (into(w1)?, into(w2)?);
             let developed = b.angle * (radius + k_factor * thickness);
