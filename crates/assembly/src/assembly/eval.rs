@@ -1440,6 +1440,18 @@ fn eval_opt(e: &Option<ExprValue>, dim: Dim, units: &UnitPrefs) -> Option<f64> {
     eval_in(&e.text, dim, units).map(|q| q.value)
 }
 
+/// Apply limit position's item for a mate limit (`key`: "rz", "x", "y", "z"), as live's menu and its toast name it
+/// ("Min Z angle limit has been applied to Revolute 1").
+pub fn limit_label(key: &str, max: bool) -> String {
+    let end = if max { "Max" } else { "Min" };
+    match key {
+        "rz" => format!("{end} Z angle limit"),
+        "x" => format!("{end} X distance limit"),
+        "y" => format!("{end} Y distance limit"),
+        _ => format!("{end} Z distance limit"),
+    }
+}
+
 /// Limit key -> solver free value index.
 pub fn limit_index(key: &str) -> Option<usize> {
     match key {

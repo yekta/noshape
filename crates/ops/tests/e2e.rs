@@ -328,6 +328,25 @@ fn assembly_with_mates() {
     call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "reset": true }));
     let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
     assert_eq!(hist["history"][0]["description"], "Assembly 1 :: Reset : Revolute 1");
+    // Mate menu › Apply limit position › Min / Max Z angle limit: the pin turned to -30 / 45 deg, live's toast (2043).
+    let pin_rotation = |ctx: &mut Ctx| {
+        let list = call(ctx, "assembly_list", json!({}));
+        let q = list["instances"].as_array().unwrap().iter().find(|i| i["id"] == pin_i).unwrap()["rotation"].clone();
+        (0..4).map(|k| num(&q[k])).collect::<Vec<f64>>()
+    };
+    let r = call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "apply_limit": { "axis": "rz", "end": "min" } }));
+    assert_eq!(r["message"], "Min Z angle limit has been applied to Revolute 1", "{r}");
+    let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
+    assert_eq!(hist["history"][0]["description"], "Assembly 1 :: Apply limit position : Revolute 1");
+    let q_min = pin_rotation(&mut ctx);
+    let r = call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "apply_limit": { "end": "max" } }));
+    assert_eq!(r["message"], "Max Z angle limit has been applied to Revolute 1", "{r}");
+    let q_max = pin_rotation(&mut ctx);
+    let dot: f64 = q_min.iter().zip(&q_max).map(|(a, b)| a * b).sum();
+    let turned = 2.0 * dot.abs().min(1.0).acos();
+    assert!((turned - 75f64.to_radians()).abs() < 1e-6, "min to max turned {} deg", turned.to_degrees());
+    let err = try_call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "apply_limit": { "axis": "x", "end": "max" } })).unwrap_err();
+    assert_eq!(err.param.as_deref(), Some("apply_limit"), "{err:?}");
     assert_eq!(mj["type"], "revolute", "the type kept: {mj}");
     // Limits the mate type doesn't have are refused.
     let err = try_call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "limits": { "x": { "min": "0 mm" } } })).unwrap_err();

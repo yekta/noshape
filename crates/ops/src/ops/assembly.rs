@@ -113,6 +113,7 @@ pub fn ops() -> Vec<Op> {
                 opt("simulation_connection", json!({ "type": "boolean", "default": false }), "Simulation connection (stored; every mate but Pin slot, Parallel, Tangent and Width)."),
                 opt("solve_all", json!({ "type": "boolean" }), "Solve every mate (the dialog's Solve) instead of only moving this mate's first instance."),
                 opt("reset", json!({ "type": "boolean" }), "With `mate`: the mate menu's Reset, its degrees of freedom back to 0 (\"Reset : <mate>\"; not Fastened, Tangent or Width)."),
+                opt("apply_limit", json!({ "type": "object", "properties": { "axis": { "type": "string", "enum": ["rz", "x", "y", "z"] }, "end": { "type": "string", "enum": ["min", "max"] } } }), "With `mate`: the mate menu's Apply limit position ▸ Min / Max <axis> limit: the mate moved to that limit, the others as they are (\"Apply limit position : <mate>\"); `message` is live's toast (\"Min Z angle limit has been applied to Revolute 1\"). `axis` defaults to the mate's first limited one."),
             ],
             mutates: true,
             destructive: false,
@@ -769,6 +770,36 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         positions::commit_solved(od, tab, &format!("Reset : {}", m.name), before, solved, |_| {})?;
         let mut v = describe(od, tab)?;
         v["mate"] = json!(format!("mate:{}", id.0));
+        return Ok(v.into());
+    }
+    // Mate menu › Apply limit position › Min / Max: solved with that value held (as the view's apply_limit_position).
+    if let Some(al) = a.object("apply_limit")? {
+        let id = editing.ok_or_else(|| OpError::param("mate", "required with `apply_limit`"))?;
+        let m = asm.mates.iter().find(|m| m.id == id).cloned().expect("found");
+        let max = match al.get("end").and_then(|v| v.as_str()) {
+            Some("max") => true,
+            Some("min") => false,
+            _ => return Err(OpError::param("apply_limit", "`end` is \"min\" or \"max\"")),
+        };
+        let key = match al.get("axis").and_then(|v| v.as_str()) {
+            Some(k) => k.to_string(),
+            None => m.limits.iter().map(|(k, _)| k.clone()).find(|k| k != "cone").ok_or_else(|| OpError::param("apply_limit", "the mate has no limits"))?,
+        };
+        let (Some(ix), Some(l)) = (noshape_model::assembly::eval::limit_index(&key), m.limits.iter().find(|(k, _)| *k == key).map(|(_, l)| l.clone())) else {
+            return Err(OpError::param("apply_limit", &format!("the mate has no {key} limit")));
+        };
+        if before.mates.iter().any(|s| s.id == id && !s.ok) {
+            return Err(OpError::invalid("Mates with errors cannot be applied."));
+        }
+        let dim = if ix == 0 { noshape_units::Dim::ANGLE } else { noshape_units::Dim::LENGTH };
+        let Some(v) = (if max { l.max } else { l.min }).and_then(|e| noshape_units::evaluate_as(&e.text, dim, &units, &noshape_units::EmptyScope).ok()).map(|q| q.value) else {
+            return Err(OpError::invalid("Unable to apply limit"));
+        };
+        let solved = before.prepared.solve(&SolveOptions { hold_values: vec![(id, ix, v)], ..Default::default() });
+        positions::commit_solved(od, tab, &format!("Apply limit position : {}", m.name), before, solved, |_| {})?;
+        let mut v = describe(od, tab)?;
+        v["mate"] = json!(format!("mate:{}", id.0));
+        v["message"] = json!(format!("{} has been applied to {}", noshape_model::assembly::eval::limit_label(&key, max), m.name));
         return Ok(v.into());
     }
     let old = editing.and_then(|id| asm.mates.iter().find(|m| m.id == id).cloned());

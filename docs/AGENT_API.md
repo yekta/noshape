@@ -2365,6 +2365,7 @@ Examples:
 | `simulation_connection` | boolean |  | Simulation connection (stored; every mate but Pin slot, Parallel, Tangent and Width). |
 | `solve_all` | boolean |  | Solve every mate (the dialog's Solve) instead of only moving this mate's first instance. |
 | `reset` | boolean |  | With `mate`: the mate menu's Reset, its degrees of freedom back to 0 ("Reset : <mate>"; not Fastened, Tangent or Width). |
+| `apply_limit` | object |  | With `mate`: the mate menu's Apply limit position ▸ Min / Max <axis> limit: the mate moved to that limit, the others as they are ("Apply limit position : <mate>"); `message` is live's toast ("Min Z angle limit has been applied to Revolute 1"). `axis` defaults to the mate's first limited one. |
 
 #### assembly_snap
 

@@ -1001,13 +1001,7 @@ impl AssemblyView {
         let solved = self.result.prepared.solve(&SolveOptions { hold_values: vec![(id, ix, v)], ..Default::default() });
         self.apply_solved(solved, cx);
         self.edit(&format!("Apply limit position : {}", m.name), cx, |_| {});
-        let axis = match key {
-            "rz" => "Z",
-            "x" => "X",
-            "y" => "Y",
-            _ => "Z",
-        };
-        self.message = Some((false, format!("Moved mate to {} {axis} limit", if max { "max" } else { "min" })));
+        self.message = Some((false, format!("{} has been applied to {}", noshape_model::assembly::eval::limit_label(key, max), m.name)));
         cx.notify();
     }
 
@@ -2066,14 +2060,8 @@ impl AssemblyView {
             if !keys.is_empty() {
                 let mut children = Vec::new();
                 for k in keys {
-                    let axis = match k {
-                        "rz" => "Z angle",
-                        "x" => "X",
-                        "y" => "Y",
-                        _ => "Z",
-                    };
-                    children.push(item(format!("Min {axis} limit"), move |t, _, cx| t.apply_limit_position(id, k, false, cx)));
-                    children.push(item(format!("Max {axis} limit"), move |t, _, cx| t.apply_limit_position(id, k, true, cx)));
+                    children.push(item(noshape_model::assembly::eval::limit_label(k, false), move |t, _, cx| t.apply_limit_position(id, k, false, cx)));
+                    children.push(item(noshape_model::assembly::eval::limit_label(k, true), move |t, _, cx| t.apply_limit_position(id, k, true, cx)));
                 }
                 m.push(MenuEntry::Sub { label: "Apply limit position".into(), children });
             }
