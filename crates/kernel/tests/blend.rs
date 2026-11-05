@@ -1221,6 +1221,32 @@ fn a_tooth_root_fillet_is_one_face() {
     assert!((vol_mm3(&out) - 82.94049).abs() < 1e-4, "{}", vol_mm3(&out));
 }
 
+/// BLEND-RUST, the corpus's commonest decline (27 of 134 fillets in the parity documents: gear tooth roots): a round of
+/// a straight edge between a cylinder and a profile extruded along it is noshape's own (a cylinder rolling between
+/// the two, the profile cut back to its tangent point), live's volume, OCCT's to 1e-6 (its round on the flank is an
+/// approximation).
+#[test]
+fn a_tooth_root_round_is_noshapes() {
+    setup();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/blend");
+    let s = read_brep(&dir.join("planetary-tooth-roots.brep")).unwrap();
+    let all = s.edges();
+    let es = vec![all[1].clone(), all[7].clone()];
+    let r = [0.000_850_543_903_162_302_9; 2];
+    set_rust_blend(Some(true));
+    reset_blend_decline();
+    let ours = fillet_checked(&s, &es, &r).unwrap().shape;
+    let why = last_blend_decline();
+    set_rust_blend(Some(false));
+    let occt = fillet_checked(&s, &es, &r).unwrap().shape;
+    set_rust_blend(None);
+    assert_eq!(why, "", "noshape's own round");
+    assert!(ours.is_valid());
+    assert_eq!(ours.faces().len(), occt.faces().len());
+    assert!((vol_mm3(&ours) - 82.94049).abs() < 1e-4, "{}", vol_mm3(&ours));
+    assert!((vol_mm3(&ours) - vol_mm3(&occt)).abs() < 1e-6 * vol_mm3(&occt), "{} {}", vol_mm3(&ours), vol_mm3(&occt));
+}
+
 /// cf-spur-gear's root fillets (PARITY-CUSTOM-RUN-FAILURES): R0.72 on both top edges of a 1.2 mm rib, so the rounds
 /// overlap and the rib's top face goes (OCCT fails): each round made alone, the part their common, as Parasolid's.
 #[test]

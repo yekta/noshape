@@ -1,9 +1,11 @@
 //! Rounds of straight edges running between two faces ruled along them (planes along the edge, cylinders about
-//! axes along it), each edge ending on planar caps square to it at vertices of three edges (stef-radijator's fins
-//! round a hub, between the fin's end and the gaps' cylinders): each round is the section's 2D fillet swept between
-//! the caps, a cylinder touching both faces along a line; the caps' corners at its ends become its arcs.
+//! axes along it, profiles extruded along it), each edge ending on planar caps square to it at vertices of three
+//! edges (stef-radijator's fins round a hub, between the fin's end and the gaps' cylinders; a gear's tooth flanks at
+//! its root cylinder): each round is the section's 2D fillet swept between the caps, a cylinder touching both faces
+//! along a line; the caps' corners at its ends become its arcs.
 
 use super::{curve_point, no, BlendEdge, EdgeUses, Spec};
+use crate::nurbs::NurbsCurve;
 use crate::{Body, Curve, Decline, Edge, Face, Kind, Origin, Output, Record, Relation, Surface, Use};
 use glam::{DVec2, DVec3};
 
@@ -12,13 +14,63 @@ use glam::{DVec2, DVec3};
 enum Trace {
     Line { p: DVec2, n: DVec2 },
     Circle { c: DVec2, r: f64 },
+    /// An extruded profile's section: its curve's points offset by `s` along the face's outward normal.
+    Profile { x: Extruded, s: f64 },
+}
+
+/// A face extruded along the edge: its profile curve (in a plane square to the extrusion), the extrusion's unit
+/// direction, and the sign turning the surface's normal (curve tangent x direction) outward.
+#[derive(Clone, Copy)]
+struct Extruded {
+    curve: u32,
+    dir: DVec3,
+    sign: f64,
+}
+
+impl Extruded {
+    fn of(b: &Body, f: &Face, d: DVec3) -> Option<Self> {
+        let Surface::Extrusion { curve, dir } = f.surface else { return None };
+        let dir = dir.try_normalize()?;
+        if dir.cross(d).length() > 1e-9 {
+            return None;
+        }
+        // (Its profile in one plane square to the extrusion: a point's foot on it is the nearest point.)
+        let c = b.nurbs_curves.get(curve as usize)?;
+        let h0 = c.poles.first()?.dot(dir);
+        let size = c.poles.iter().fold(0.0f64, |m, p| m.max((*p - c.poles[0]).length())).max(1e-12);
+        if c.poles.iter().any(|p| (p.dot(dir) - h0).abs() > 1e-12 * size.max(1.0)) {
+            return None;
+        }
+        Some(Self { curve, dir, sign: if f.reversed { -1.0 } else { 1.0 } })
+    }
+    fn curve<'a>(&self, b: &'a Body) -> &'a NurbsCurve {
+        &b.nurbs_curves[self.curve as usize]
+    }
+    /// The profile's point at `t` moved along the extrusion to the plane through `o` square to it.
+    fn at(&self, b: &Body, t: f64, o: DVec3) -> DVec3 {
+        let q = self.curve(b).at(t);
+        q + self.dir * (o - q).dot(self.dir)
+    }
+    /// The face's outward normal at `t`.
+    fn normal(&self, b: &Body, t: f64) -> DVec3 {
+        (self.curve(b).derivs(t)[1].cross(self.dir) * self.sign).normalize_or_zero()
+    }
+    /// The parameter of the profile point nearest `p` (moved into the profile's plane).
+    fn param(&self, b: &Body, p: DVec3) -> f64 {
+        let c = self.curve(b);
+        let q0 = c.at(c.range().0);
+        c.param_of(p + self.dir * (q0 - p).dot(self.dir)).0
+    }
 }
 
 /// A face ruled along `d` (a plane along it, a cylinder about an axis along it) cut square to `d` at `o`, its
 /// outward side offset by `s`; None for any other face.
-fn trace(f: &Face, d: DVec3, o: DVec3, u: DVec3, w: DVec3, s: f64) -> Option<Trace> {
+fn trace(b: &Body, f: &Face, d: DVec3, o: DVec3, u: DVec3, w: DVec3, s: f64) -> Option<Trace> {
     let flat = |p: DVec3| DVec2::new((p - o).dot(u), (p - o).dot(w));
     let sign = if f.reversed { -1.0 } else { 1.0 };
+    if let Some(x) = Extruded::of(b, f, d) {
+        return Some(Trace::Profile { x, s });
+    }
     match f.surface {
         Surface::Plane { origin, normal } if normal.dot(d).abs() < 1e-9 => {
             let n = sign * DVec2::new(normal.dot(u), normal.dot(w)).normalize();
@@ -71,8 +123,60 @@ fn meet(a: &Trace, b: &Trace, near: DVec2) -> Option<DVec2> {
             let t = DVec2::new(-e.y, e.x) * h2.sqrt();
             vec![m + t, m - t]
         }
+        // (A profile's: meet_profile.)
+        _ => return None,
     };
     roots.into_iter().min_by(|x, y| (*x - near).length().total_cmp(&(*y - near).length()))
+}
+
+/// Where the offset profile `x` (by `s`) meets the other trace `other`, in the section plane through `o` (basis `u`,
+/// `w`, the frame): the root nearest `near` along the profile and its parameter. Sampled over the profile's range, each change of
+/// sign refined by bisection.
+fn meet_profile(b: &Body, x: &Extruded, s: f64, other: &Trace, (o, u, w): (DVec3, DVec3, DVec3), near: DVec2) -> Option<(DVec2, f64)> {
+    let flat = |p: DVec3| DVec2::new((p - o).dot(u), (p - o).dot(w));
+    let at = |t: f64| -> DVec2 {
+        let n = x.normal(b, t);
+        flat(x.at(b, t, o)) + DVec2::new(n.dot(u), n.dot(w)) * s
+    };
+    let g = |t: f64| -> f64 {
+        let q = at(t);
+        match other {
+            Trace::Line { p, n } => (q - *p).dot(*n),
+            Trace::Circle { c, r } => (q - *c).length() - r,
+            Trace::Profile { .. } => f64::NAN,
+        }
+    };
+    let (t0, t1) = x.curve(b).range();
+    let n = 400;
+    let mut best: Option<(DVec2, f64)> = None;
+    let mut prev = (t0, g(t0));
+    for k in 1..=n {
+        let t = t0 + (t1 - t0) * k as f64 / n as f64;
+        let gt = g(t);
+        if !gt.is_finite() || !prev.1.is_finite() {
+            return None;
+        }
+        if (prev.1 <= 0.0) != (gt <= 0.0) {
+            let (mut a, mut ga, mut z) = (prev.0, prev.1, t);
+            for _ in 0..80 {
+                let m = 0.5 * (a + z);
+                let gm = g(m);
+                if (ga <= 0.0) == (gm <= 0.0) {
+                    a = m;
+                    ga = gm;
+                } else {
+                    z = m;
+                }
+            }
+            let tm = 0.5 * (a + z);
+            let q = at(tm);
+            if best.is_none_or(|(bq, _)| (q - near).length() < (bq - near).length()) {
+                best = Some((q, tm));
+            }
+        }
+        prev = (t, gt);
+    }
+    best
 }
 
 /// The foot on face `f`'s trace of 3D point `c` in the section plane (the round's tangent point there).
@@ -117,7 +221,8 @@ fn face_box(b: &Body, f: &Face) -> (DVec3, DVec3) {
     match f.surface {
         Surface::Nurbs { index } => b.nurbs_surfaces[index as usize].poles.iter().for_each(|&p| add(p)),
         // (A sphere's or torus's patch: a blend's, within its arcs' boxes.)
-        Surface::Plane { .. } | Surface::Cylinder { .. } | Surface::Cone { .. } | Surface::Sphere { .. } | Surface::Torus { .. } => {}
+        // (An extrusion between its edges: their boxes hold it.)
+        Surface::Plane { .. } | Surface::Cylinder { .. } | Surface::Cone { .. } | Surface::Sphere { .. } | Surface::Torus { .. } | Surface::Extrusion { .. } => {}
         _ => return (DVec3::splat(f64::NEG_INFINITY), DVec3::splat(f64::INFINITY)),
     }
     (lo, hi)
@@ -131,6 +236,8 @@ struct End {
     g: [u32; 2],
     c: DVec3,
     t: [DVec3; 2],
+    /// A curved end edge's parameter at its tangent point (its new end).
+    tpar: [Option<f64>; 2],
     corner: Option<Corner>,
 }
 
@@ -224,6 +331,12 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
                         let t = normal.cross(p - center).normalize();
                         Some(if oe.v[0] == v { t } else { -t })
                     }
+                    // (A profile at the cap: its tangent at the vertex, the way to its other end.)
+                    Curve::Nurbs { index, t0, t1 } => {
+                        let at_v = if oe.v[0] == v { t0 } else { t1 };
+                        let tg = body.nurbs_curves[index as usize].derivs(at_v)[1] * (t1 - t0).signum();
+                        tg.try_normalize().map(|t| if oe.v[0] == v { t } else { -t })
+                    }
                     _ => None,
                 }
             };
@@ -231,39 +344,57 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
             if sigma == 0.0 {
                 // Into A across the edge: its outward normal across the edge's way as A's loop runs it (the face is on
                 // its left looking against the normal; at a face's reflex corner its end edge runs the other way).
-                let fa = &body.faces[fs[0] as usize];
-                let na = match fa.surface {
-                    Surface::Plane { normal, .. } => normal,
-                    Surface::Cylinder { origin, axis, .. } => {
-                        let a = axis.normalize();
-                        (p - origin - a * (p - origin).dot(a)).normalize()
+                // (A face's outward normal at the vertex: a profile's as it is, already outward.)
+                let outward = |f: &Face| -> Option<DVec3> {
+                    if let Some(x) = Extruded::of(body, f, d) {
+                        return Some(x.normal(body, x.param(body, p)));
                     }
-                    _ => return no("a prism round's face not ruled along it"),
-                } * if fa.reversed { -1.0 } else { 1.0 };
+                    let n = match f.surface {
+                        Surface::Plane { normal, .. } => normal,
+                        Surface::Cylinder { origin, axis, .. } => {
+                            let a = axis.normalize();
+                            (p - origin - a * (p - origin).dot(a)).normalize()
+                        }
+                        _ => return None,
+                    };
+                    Some(n * if f.reversed { -1.0 } else { 1.0 })
+                };
+                let fa = &body.faces[fs[0] as usize];
+                let Some(na) = outward(fa) else { return no("a prism round's face not ruled along it") };
                 let Some(rev) = uses[be.edge as usize].iter().find(|x| x.0 == fs[0]).map(|x| x.3) else { return no("a prism round's edge not in its face") };
                 let qa = na.cross(if rev { -d } else { d });
-                let fb = &body.faces[fs[1] as usize];
-                let nb = match fb.surface {
-                    Surface::Plane { normal, .. } => normal,
-                    Surface::Cylinder { origin, axis, .. } => {
-                        let a = axis.normalize();
-                        (p - origin - a * (p - origin).dot(a)).normalize()
-                    }
-                    _ => return no("a prism round's face not ruled along it"),
-                } * if fb.reversed { -1.0 } else { 1.0 };
+                let Some(nb) = outward(&body.faces[fs[1] as usize]) else { return no("a prism round's face not ruled along it") };
                 sigma = if qa.dot(nb) < 0.0 { 1.0 } else { -1.0 };
             }
             let u = d.any_orthonormal_vector();
             let w = d.cross(u);
-            let (Some(ta), Some(tb)) = (trace(&body.faces[fs[0] as usize], d, p, u, w, -sigma * r), trace(&body.faces[fs[1] as usize], d, p, u, w, -sigma * r)) else {
+            let (Some(ta), Some(tb)) = (trace(body, &body.faces[fs[0] as usize], d, p, u, w, -sigma * r), trace(body, &body.faces[fs[1] as usize], d, p, u, w, -sigma * r)) else {
                 return no("a prism round's face not ruled along it");
             };
-            let Some(c2) = meet(&ta, &tb, DVec2::ZERO) else { return no("a prism round's faces' offsets don't meet") };
+            // (A profile's: the root along it, its parameter the tangent point's.)
+            let mut on_profile = [None, None];
+            let c2 = match (&ta, &tb) {
+                (Trace::Profile { .. }, Trace::Profile { .. }) => return no("a prism round between two profiles"),
+                (Trace::Profile { x, s }, other) | (other, Trace::Profile { x, s }) => {
+                    let Some((q, t)) = meet_profile(body, x, *s, other, (p, u, w), DVec2::ZERO) else { return no("a prism round's faces' offsets don't meet") };
+                    on_profile[if matches!(ta, Trace::Profile { .. }) { 0 } else { 1 }] = Some((*x, t));
+                    q
+                }
+                _ => {
+                    let Some(q) = meet(&ta, &tb, DVec2::ZERO) else { return no("a prism round's faces' offsets don't meet") };
+                    q
+                }
+            };
             if c2.length() > 10.0 * r {
                 return no("a prism round's centre far from its edge");
             }
             let c = p + u * c2.x + w * c2.y;
-            let (Some(t0), Some(t1)) = (foot(&body.faces[fs[0] as usize], c, d), foot(&body.faces[fs[1] as usize], c, d)) else { return no("a prism round's tangent points") };
+            let foot_k = |k: usize| match on_profile[k] {
+                Some((x, t)) => Some(x.at(body, t, c)),
+                None => foot(&body.faces[fs[k] as usize], c, d),
+            };
+            let (Some(t0), Some(t1)) = (foot_k(0), foot_k(1)) else { return no("a prism round's tangent points") };
+            let mut tpar = [None, None];
             // Each tangent point on its end edge, short of its far end (no overflow).
             for (k, t) in [t0, t1].into_iter().enumerate() {
                 let along = [along_a, along_b][k];
@@ -272,6 +403,14 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
                     Curve::Line => (t - p).normalize_or_zero().dot(along) > 1.0 - 1e-9,
                     // (Along the arc's way from the vertex: its chord's turn from the tangent within a half turn.)
                     Curve::Circle { .. } => (t - p).normalize_or_zero().dot(along) > 0.0,
+                    // (A profile: the point on it, inside its range from the vertex's end.)
+                    Curve::Nurbs { index, t0: e0, t1: e1 } => {
+                        let (tp, dist) = body.nurbs_curves[index as usize].param_of(t);
+                        let (tv, tf) = if oe.v[0] == v { (e0, e1) } else { (e1, e0) };
+                        let frac = (tp - tv) / (tf - tv);
+                        tpar[k] = Some(tp);
+                        dist <= 10.0 * margin && frac > 0.0 && frac < 1.0
+                    }
                     _ => false,
                 };
                 if !on_edge {
@@ -285,6 +424,8 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
                         let (a, b) = ((p - center).normalize(), (far - center).normalize());
                         radius * a.dot(b).clamp(-1.0, 1.0).acos()
                     }
+                    // (A profile: room enough when the point is short of its far end by more than the margin.)
+                    Curve::Nurbs { .. } => reach + (far - t).length(),
                     _ => 0.0,
                 };
                 if reach < margin || reach + margin >= room {
@@ -296,7 +437,7 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
             {
                 return no("a prism round's corner not at its rounds' meeting point");
             }
-            ends.push(End { cap, v, g, c, t: [t0, t1], corner });
+            ends.push(End { cap, v, g, c, t: [t0, t1], tpar, corner });
         }
         let [a, b] = <[End; 2]>::try_from(ends).map_err(|_| Decline("a prism round without two ends"))?;
         if (b.c - a.c).cross(d).length() > margin {
@@ -338,6 +479,22 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
     if (0..body.edges.len()).any(|i| absorbed[i] && !taken_m[i]) {
         return no("a curved edge not a prism round's corner");
     }
+    // Two rounds on one face leave some of it between them: their tangent points there short of each other at each
+    // cap (a tip narrower than its two rounds is a full round, OCCT's).
+    for (i, a) in plans.iter().enumerate() {
+        for bp in &plans[i + 1..] {
+            for (ka, &f) in a.fs.iter().enumerate() {
+                let Some(kb) = bp.fs.iter().position(|&g| g == f) else { continue };
+                for ea in &a.ends {
+                    let Some(eb) = bp.ends.iter().find(|e| e.cap == ea.cap && e.cap != u32::MAX) else { continue };
+                    let (pa, pb) = (body.vertices[ea.v as usize], body.vertices[eb.v as usize]);
+                    if (ea.t[ka] - pa).length() + (eb.t[kb] - pb).length() >= (pa - pb).length() - 10.0 * margin {
+                        return no("two prism rounds meet across a face");
+                    }
+                }
+            }
+        }
+    }
     build(body, plans)
 }
 
@@ -372,6 +529,10 @@ fn build(body: &Body, plans: Vec<Plan>) -> Result<Output, Decline> {
                 let g = end.g[k] as usize;
                 let slot = if b.edges[g].v[0] == end.v { 0 } else { 1 };
                 b.edges[g].v[slot] = *t;
+                // (A profile cut back to the tangent point: its range ends there.)
+                if let (Curve::Nurbs { t0, t1, .. }, Some(tp)) = (&mut b.edges[g].curve, end.tpar[k]) {
+                    *(if slot == 0 { t0 } else { t1 }) = tp;
+                }
                 edge_origin[g] = Origin::Piece { arg: 0, index: g as u32 };
                 history.push(Record { kind: Kind::Edge, arg: 0, index: g as u32, relation: Relation::Modified, out_kind: Kind::Edge, out: g as u32 });
             }

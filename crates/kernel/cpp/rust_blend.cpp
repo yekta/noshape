@@ -29,6 +29,7 @@
 #include <Geom_Circle.hxx>
 #include <Geom_Ellipse.hxx>
 #include <Geom_BSplineCurve.hxx>
+#include <GeomLib_Tool.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <Geom_BSplineSurface.hxx>
@@ -411,6 +412,51 @@ bool uv_of(const GeomAdaptor_Surface& a, const TopLoc_Location& loc, const gp_Pn
     case GeomAbs_Sphere:
       ElSLib::Parameters(a.Sphere(), p, u, v);
       break;
+    case GeomAbs_SurfaceOfExtrusion:
+    {
+      // C(u) + v d: u where the point's offset from the profile is along d (the profile's nearest point, sampled
+      // then Newton on the offset across d against the tangent), v along d.
+      const occ::handle<Adaptor3d_Curve> c = a.BasisCurve();
+      const gp_Vec                       d(a.Direction());
+      const double                       f = c->FirstParameter(), l = c->LastParameter();
+      auto across = [&](double t, gp_Vec& tg) {
+        gp_Pnt q;
+        c->D1(t, q, tg);
+        gp_Vec w(q, p);
+        tg -= d * tg.Dot(d);
+        return w - d * w.Dot(d);
+      };
+      double best = f, dist = std::numeric_limits<double>::infinity();
+      for (int k = 0; k <= 64; ++k)
+      {
+        const double t = f + (l - f) * k / 64;
+        gp_Vec       tg;
+        const double m = across(t, tg).Magnitude();
+        if (m < dist)
+        {
+          dist = m;
+          best = t;
+        }
+      }
+      for (int it = 0; it < 30; ++it)
+      {
+        gp_Vec       tg;
+        const gp_Vec w = across(best, tg);
+        const double g = w.Dot(tg), h = tg.SquareMagnitude();
+        if (h < 1e-300)
+          break;
+        const double step = g / h;
+        best = std::clamp(best + step, f, l);
+        if (std::abs(step) <= 1e-15 * std::max(1.0, std::abs(l - f)))
+          break;
+      }
+      gp_Vec tg;
+      if (across(best, tg).Magnitude() > 1e-7 * std::max(1.0, p.XYZ().Modulus()))
+        return false;
+      u = best;
+      v = gp_Vec(c->Value(best), p).Dot(d);
+      break;
+    }
     default:
       return false;
   }
@@ -799,13 +845,20 @@ bool rust_blend(const OcShape& s, const std::vector<TopoDS_Edge>& es, const std:
         basis = tc->BasisCurve();
       const occ::handle<Geom_Line>   ln = occ::down_cast<Geom_Line>(basis);
       const occ::handle<Geom_Circle> ci = occ::down_cast<Geom_Circle>(basis);
+      double t0, t1;
       if (ln.IsNull() && ci.IsNull())
       {
-        brep_decline("a piece of an edge not a line or an arc");
-        return false;
+        // (A piece of another curve, a profile cut back to a round's tangent point: its ends' parameters on the
+        // source's curve, within its range and its way.)
+        const gp_Trsf to_local = loc.Transformation().Inverted();
+        if (!GeomLib_Tool::Parameter(c, p0.Transformed(to_local), 10 * tol, t0) || !GeomLib_Tool::Parameter(c, p1.Transformed(to_local), 10 * tol, t1) || t0 < f - 1e-9
+            || t1 > l + 1e-9 || !(t1 > t0))
+        {
+          brep_decline("a piece of a curve off its edge");
+          return false;
+        }
       }
-      double t0, t1;
-      if (!ln.IsNull())
+      else if (!ln.IsNull())
       {
         const gp_Lin g = ln->Lin().Transformed(loc.Transformation());
         t0             = ElCLib::Parameter(g, p0);

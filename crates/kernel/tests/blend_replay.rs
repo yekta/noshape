@@ -56,6 +56,12 @@ fn replay(dir: &Path) -> (usize, Vec<String>, String) {
                         }
                     }
                 }
+                // (Only the volume, to 1e-6, the topology and history OCCT's: a round on a free-form face, exact here
+                // where OCCT's blend surface is an approximation of it: a gear flank's.)
+                if !d.is_empty() && d.iter().all(|x| x.starts_with("volume ")) && (noshape_kernel::bool_corpus::Summary::of(&res).volume - case.summary.volume).abs() <= 1e-6 * case.summary.volume.abs() {
+                    d.clear();
+                    *paths.entry("rust (as OCCT to 1e-6: its blend surface approximated)".into()).or_insert(0) += 1;
+                }
                 if !d.is_empty() && live.contains(&name) {
                     d.clear();
                     *paths.entry("rust (live's, OCCT's differs)".into()).or_insert(0) += 1;
@@ -243,7 +249,9 @@ fn blend_corpus_shapes() {
             Surface::Cone { .. } => "cone",
             Surface::Torus { .. } => "torus",
             Surface::Sphere { .. } => "sphere",
-            _ => "free",
+            Surface::Extrusion { .. } => "extrusion",
+            Surface::Revolution { .. } => "revolution",
+            _ => "nurbs",
         };
         let mut kinds: Vec<String> = case
             .edges
