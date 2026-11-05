@@ -16,6 +16,13 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-05 15:13 UTC.**
+- The lead's order is done: Replace face at 1024² and its cancel (e3ba6871), SEAM-MOVER determinism (d293a184, earlier),
+  Shell 4's speed: 636 -> 475 ms on vibe5 for the document's body (~0.5 s vibe4; live 627): OCCT's offset is no longer
+  tried where a kept face is lower than the wall (e7b52c37, queued). The self-interference check (~270 ms, OCCT's
+  line / offset-surface pairs) is what's left of it; a basis-surface proof of clearance was slower.
+- Shell 3 of the same document (10 s, live fails in 0.36 s): for bool (shared-cases/shell3-slab-union, TICKETS).
+
 **State 11-05 14:57 UTC.**
 - P0 RELEASE-BUILD-FILLET-HANG landed (da234fac, OCCT patch 0022; lib sync asked): the hang was BRepMesh's Delaunay walk
   in CI's GCC 13 OCCT on a fuzz part's degenerate face, not the fillet. CI-like build: ~/agents/core-occt-ci on vibe4.
