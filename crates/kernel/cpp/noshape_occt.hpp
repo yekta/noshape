@@ -593,6 +593,8 @@ public:
   // shown_topology's flags (common.cpp), made once.
   mutable std::once_flag       myShownFlag;
   mutable std::vector<uint8_t> myShown;
+  // Per edge, the first edge of the pieces shown as one with it (shown_topology), itself if none.
+  mutable std::vector<uint32_t> myJoins;
 
   // What the unify knows of it (boolean.cpp): nothing to merge in it (a
   // unify found nothing); for a local Boolean's result on such a shape,
@@ -727,6 +729,7 @@ int64_t                      index_of(const OcShape& s, const OcShape& sub, uint
 Csr                          ancestor_map(const OcShape& s, uint8_t kind, uint8_t ancestor_kind);
 rust::Vec<uint32_t>          adjacent_faces(const OcShape& s, uint32_t face_index);
 rust::Vec<uint8_t>           shown_topology(const OcShape& s);
+rust::Vec<uint32_t>          edge_joins(const OcShape& s);
 std::unique_ptr<OcShapeList> children(const OcShape& s);
 std::unique_ptr<OcShape>     make_compound(const OcShapeList& l);
 std::unique_ptr<OcShape>     make_shell(const OcShapeList& l);

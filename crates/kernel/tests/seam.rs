@@ -8,7 +8,7 @@ use std::f64::consts::PI;
 
 fn counts(s: &Shape) -> (usize, usize, usize) {
     let t = s.shown_topology().unwrap();
-    (s.count(ShapeType::Face), t.edges.iter().filter(|&&e| e).count(), t.vertices.iter().filter(|&&v| v).count())
+    (s.count(ShapeType::Face), t.edge_count(), t.vertex_count())
 }
 
 #[test]
@@ -31,16 +31,17 @@ fn seams_poles_and_circle_vertices_are_not_topology() {
 /// bushing2-0-joshua's Extrude 4: a tube (Ø75 / Ø50 along y) with notches at one end and two windows through its
 /// wall. Each cylinder's seam splits its notched end's arc (live has no seam: 18 faces, 40 edges, 24 vertices). The
 /// bore's seam moves to a notch corner though a window lies nearer its end circle (a hole's loop isn't the loop round
-/// the axis); the outer wall's every corner lines up with a window, so its seam stays: 18 / 41 / 25.
+/// the axis); the outer wall's every corner lines up with a window, so its seam stays, its arc in two pieces shown as
+/// one edge with no vertex between (live 2069): live's 18 / 40 / 24 either way.
 #[test]
 fn a_seam_moves_to_the_loop_round_the_axis_past_a_window() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/seam/bushing-extrude4.brep");
     let s = read_brep(&path).unwrap();
-    assert_eq!(counts(&s), (18, 42, 26));
+    assert_eq!(counts(&s), (18, 40, 24));
     let u = unify_same_domain_whole(&s).unwrap().shape;
     assert!(u.is_valid());
     assert!((u.volume().unwrap() - s.volume().unwrap()).abs() < 1e-9 * s.volume().unwrap());
-    assert_eq!(counts(&u), (18, 41, 25));
+    assert_eq!(counts(&u), (18, 40, 24));
 }
 
 /// A face pattern of a hole through a tube's wall, stitched (Parasolid's face pattern copies the faces: motor-mount-jack's

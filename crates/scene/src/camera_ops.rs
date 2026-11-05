@@ -179,8 +179,9 @@ pub fn selection_bounds(display: &StudioDisplay, refs: &[Reference]) -> Option<(
                                 add(p3(*q));
                             }
                         }
-                    } else if let Some(ei) = b.edge_refs.iter().position(|x| x == r) {
-                        b.mesh.edges.get(ei).into_iter().flatten().for_each(|q| add(p3(*q)));
+                    } else if b.edge_refs.iter().any(|x| x == r) {
+                        // (Every piece: pieces shown as one edge share its reference.)
+                        b.edge_refs.iter().zip(&b.mesh.edges).filter(|(x, _)| *x == r).flat_map(|(_, pl)| pl).for_each(|q| add(p3(*q)));
                     } else if let Some(vi) = b.vertex_refs.iter().position(|x| x == r)
                         && let Some(q) = b.mesh.vertices.get(vi)
                     {

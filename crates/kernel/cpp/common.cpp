@@ -39,6 +39,7 @@ extern "C" char etext;
 #include <Geom2d_Curve.hxx>
 #include <Geom2d_TrimmedCurve.hxx>
 #include <Geom2d_BSplineCurve.hxx>
+#include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <Precision.hxx>
@@ -901,10 +902,98 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
       open[i] = shown && !a.IsSame(b);
       out.push_back(shown ? 1 : 0);
     }
+    // Pieces of one edge split only for a seam (OCCT's periodic face needs a vertex there; Parasolid's has no seam): a
+    // vertex with exactly two shown edges, both between the same two faces and going on from each other, and a seam
+    // through it, is no vertex, its two pieces one edge (live 2069: bushing2's notched end arcs).
+    std::vector<uint32_t>& joins = s.myJoins;
+    joins.resize((size_t)em.Extent());
+    for (int i = 0; i < em.Extent(); ++i)
+      joins[(size_t)i] = (uint32_t)i;
+    auto root = [&](uint32_t x) {
+      while (joins[x] != x)
+        x = joins[x] = joins[joins[x]];
+      return x;
+    };
+    std::vector<bool> joint(vm.Extent() + 1, false);
+    auto faces_of = [&](int j) {
+      std::vector<uint32_t> f(ef.second.begin() + ef.first[(size_t)j - 1], ef.second.begin() + ef.first[(size_t)j]);
+      std::sort(f.begin(), f.end());
+      f.erase(std::unique(f.begin(), f.end()), f.end());
+      return f;
+    };
+    for (int i = 1; i <= vm.Extent(); ++i)
+    {
+      const uint32_t e0 = ve.first[(size_t)i - 1], e1 = ve.first[(size_t)i];
+      std::vector<int> two;
+      int              seams = 0;
+      bool             other = false;
+      for (uint32_t k = e0; k < e1; ++k)
+      {
+        const int j = (int)ve.second[k] + 1;
+        if (std::find(two.begin(), two.end(), j) != two.end())
+          continue;
+        if (out[(size_t)j - 1] != 0)
+          two.push_back(j);
+        else if (BRep_Tool::Degenerated(TopoDS::Edge(em(j))))
+          other = true;
+        else
+          ++seams;
+      }
+      if (other || seams == 0 || two.size() != 2 || !open[two[0]] || !open[two[1]])
+        continue;
+      const std::vector<uint32_t> fa = faces_of(two[0]), fb = faces_of(two[1]);
+      if (fa.size() != 2 || fa != fb)
+        continue;
+      // Going on from each other: their directions away from the vertex opposite.
+      const TopoDS_Vertex& v = TopoDS::Vertex(vm(i));
+      auto away = [&](int j) {
+        const TopoDS_Edge& e = TopoDS::Edge(em(j));
+        BRepAdaptor_Curve  c(e);
+        const double       t = BRep_Tool::Parameter(v, e);
+        gp_Pnt             p;
+        gp_Vec             d;
+        c.D1(t, p, d);
+        return std::abs(t - c.FirstParameter()) < std::abs(t - c.LastParameter()) ? d : d.Reversed();
+      };
+      const gp_Vec a = away(two[0]), b = away(two[1]);
+      if (a.Magnitude() < 1e-12 || b.Magnitude() < 1e-12 || a.Normalized().Dot(b.Normalized()) > -1 + 1e-9)
+        continue;
+      // Pieces of one curve (OCCT splits an edge into pieces of its curve; a circle may be made again), not two curves
+      // meeting smoothly at a real vertex (a twisted vase's profile segments where its side's seam starts).
+      {
+        TopLoc_Location                 la, lb;
+        double                          f, l;
+        const occ::handle<Geom_Curve>   ca = BRep_Tool::Curve(TopoDS::Edge(em(two[0])), la, f, l);
+        const occ::handle<Geom_Curve>   cb = BRep_Tool::Curve(TopoDS::Edge(em(two[1])), lb, f, l);
+        bool                            one = !ca.IsNull() && ca == cb && la.IsEqual(lb);
+        if (!one)
+        {
+          BRepAdaptor_Curve xa(TopoDS::Edge(em(two[0]))), xb(TopoDS::Edge(em(two[1])));
+          if (xa.GetType() == GeomAbs_Circle && xb.GetType() == GeomAbs_Circle)
+          {
+            const gp_Circ p = xa.Circle(), q = xb.Circle();
+            const double  tol = 1e-9 * std::max(1.0, p.Radius());
+            one = p.Location().Distance(q.Location()) <= tol && std::abs(p.Radius() - q.Radius()) <= tol && p.Axis().Direction().IsParallel(q.Axis().Direction(), 1e-9);
+          }
+        }
+        if (!one)
+          continue;
+      }
+      joint[(size_t)i] = true;
+      const uint32_t ra = root((uint32_t)two[0] - 1), rb = root((uint32_t)two[1] - 1);
+      joins[std::max(ra, rb)] = std::min(ra, rb);
+    }
+    for (uint32_t& j : joins)
+      j = root(j);
     for (int i = 1; i <= vm.Extent(); ++i)
     {
       const uint32_t e0 = ve.first[(size_t)i - 1], e1 = ve.first[(size_t)i];
       bool           shown = e0 == e1, anyEdge = false;
+      if (joint[(size_t)i])
+      {
+        out.push_back(0);
+        continue;
+      }
       for (uint32_t k = e0; k < e1 && !shown; ++k)
       {
         const int j = (int)ve.second[k] + 1;
@@ -920,6 +1009,16 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
   rust::Vec<uint8_t> out;
   out.reserve(s.myShown.size());
   for (uint8_t v : s.myShown)
+    out.push_back(v);
+  return out;
+}
+
+rust::Vec<uint32_t> edge_joins(const OcShape& s)
+{
+  (void)shown_topology(s);
+  rust::Vec<uint32_t> out;
+  out.reserve(s.myJoins.size());
+  for (uint32_t v : s.myJoins)
     out.push_back(v);
   return out;
 }

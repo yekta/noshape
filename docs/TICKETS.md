@@ -1021,6 +1021,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   pieces; Measure and evLength give the sum), (4) a fillet / chamfer of it rounds both pieces, and the round's two
   faces on one torus are merged by the unify (no seam needed on a partial torus) so it is one face as live's. Nothing
   changes for parts without such vertices. Waiting for the lead's go.
+  core 11-05 17:55 (lead: build it, general): a vertex with only two shown edges, both between the same two faces,
+  pieces of one curve (one curve object, or equal circles) going on from each other, and a seam through it, is no
+  vertex; the pieces are one edge (kernel ShownTopology::joined / edge_count): one name (one reference, picked and
+  highlighted whole, resolved to both), listed once with their length (query_entities), measured as one (Diameter,
+  Center, Length summed), and a fillet of it is one round face. Studios saved before keep a name per piece. bushing2
+  6/6 as live (18/40/24); parity 53/56, 430/483, nothing else changed. T1 model kernel_robustness::
+  a_seam_split_arc_is_one_edge (pick, measure, fillet), kernel seam::a_seam_moves_to_the_loop_round_the_axis_past_a_window.
   core 11-03 06:38 (tried, not kept): UnifySameDomain on edges only with B-splines concatenated, wherever a vertex joins
   just two curved edges between the same two faces, after the face unify: no change on the three models (their
   loops' vertices are where the cylinders' seam edges cross them, three edges each, so nothing to join; live's

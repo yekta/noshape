@@ -70,7 +70,7 @@ impl Body {
         } else {
             let ef = shape.edge_faces().unwrap_or_default();
             let vf = shape.vertex_faces().unwrap_or_default();
-            (name_edges(&faces, &ef, &|i| edge_key(&shape, i)), name_vertices(&faces, &vf, &|i| vertex_key(&shape, i)))
+            (name_edges(&faces, &ef, &|i| edge_key(&shape, i), &joined_pieces(&shape)), name_vertices(&faces, &vf, &|i| vertex_key(&shape, i)))
         };
         Self {
             id,
@@ -161,8 +161,12 @@ impl Body {
 
     pub fn find_edges(&self, n: &TopoName) -> Vec<usize> {
         let map = Self::lookup(&self.edge_lookup, &self.edges);
-        if let Some(i) = map.get(n) {
-            return vec![*i];
+        if let Some(&i) = map.get(n) {
+            // (Pieces shown as one edge share its name, one Arc: all of them. Only when some name repeats.)
+            if map.len() == self.edges.len() {
+                return vec![i];
+            }
+            return (0..self.edges.len()).filter(|&j| j == i || Arc::ptr_eq(&self.edges[j], &self.edges[i])).collect();
         }
         // Fuzzy: an edge whose adjacent faces descend from the referenced
         // faces; else (faces split when the reference was made are whole
@@ -858,4 +862,13 @@ impl Context {
     pub fn bounds(&self) -> Option<(DVec3, DVec3)> {
         self.bodies.bounds()
     }
+}
+
+/// Per edge, the first of the pieces shown as one edge with it ([`noshape_kernel::ShownTopology::joined`]): they share
+/// its name. Not in a studio saved before (its references name the pieces).
+pub fn joined_pieces(shape: &Shape) -> Vec<usize> {
+    if noshape_kernel::legacy_topology() {
+        return Vec::new();
+    }
+    shape.shown_topology().map(|t| t.joined).unwrap_or_default()
 }

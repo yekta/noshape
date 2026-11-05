@@ -200,9 +200,15 @@ fn disambiguate(mut names: Vec<Name>, key: &dyn Fn(usize) -> GeoKey, feature: Fe
 /// Name edges from face adjacency: `edge_faces[e]` lists the face indices
 /// adjacent to edge `e` (1 for boundary edges, 2 normally, more for
 /// non-manifold). `edge_keys` orders multiple edges between the same faces.
-pub fn name_edges(face_names: &[Name], edge_faces: &[Vec<u32>], edge_key: &dyn Fn(usize) -> GeoKey) -> Vec<Name> {
+/// `joined[e]` (when given): the first of the pieces shown as one edge with `e`; the pieces share its name, so a
+/// selection of the edge is all of them (live shows one edge where OCCT's seam split it).
+pub fn name_edges(face_names: &[Name], edge_faces: &[Vec<u32>], edge_key: &dyn Fn(usize) -> GeoKey, joined: &[usize]) -> Vec<Name> {
+    let first = |e: usize| joined.get(e).copied().filter(|&r| r < edge_faces.len()).unwrap_or(e);
     let mut base: Vec<(Vec<Name>, usize)> = Vec::with_capacity(edge_faces.len());
     for (e, faces) in edge_faces.iter().enumerate() {
+        if first(e) != e {
+            continue;
+        }
         let mut fs: Vec<Name> = faces.iter().filter_map(|f| face_names.get(*f as usize).cloned()).collect();
         fs.sort();
         base.push((fs, e));
@@ -228,6 +234,11 @@ pub fn name_edges(face_names: &[Name], edge_faces: &[Vec<u32>], edge_key: &dyn F
                 _ => TopoName::Vertex { faces: fs.clone().into(), ordinal: ord },
             };
             out[e] = Some(Arc::new(name));
+        }
+    }
+    for e in 0..out.len() {
+        if out[e].is_none() {
+            out[e] = out[first(e)].clone();
         }
     }
     out.into_iter().map(|n| n.expect("all edges named")).collect()
@@ -315,7 +326,7 @@ mod tests {
         let faces = vec![a.clone(), b.clone()];
         let edge_faces = vec![vec![0, 1], vec![1, 0], vec![0]];
         let keys = [[1.0, 0.0, 0.0, 0.0], [0.0; 4], [0.0; 4]];
-        let names = name_edges(&faces, &edge_faces, &|i| keys[i]);
+        let names = name_edges(&faces, &edge_faces, &|i| keys[i], &[]);
         assert_eq!(*names[1], TopoName::edge(a.clone(), b.clone(), 0));
         assert_eq!(*names[0], TopoName::edge(a.clone(), b.clone(), 1));
         assert_eq!(*names[2], TopoName::Boundary { face: a, ordinal: 0 });

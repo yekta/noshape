@@ -3538,7 +3538,7 @@ fn a_surface_extrude_of_a_spline_runs_up_to_a_part() {
 fn shown(r: &RegenResult) -> (usize, usize, usize) {
     let s = &r.context.bodies[0].shape;
     let t = s.shown_topology().unwrap();
-    (s.count(noshape_kernel::ShapeType::Face), t.edges.iter().filter(|x| **x).count(), t.vertices.iter().filter(|x| **x).count())
+    (s.count(noshape_kernel::ShapeType::Face), t.edge_count(), t.vertices.iter().filter(|x| **x).count())
 }
 
 /// Live motor-mount-jack's Extrude 2: both halves of an ellipse that a line along its major axis splits, extruded
@@ -3693,4 +3693,66 @@ fn a_reapplied_draft_drafts_its_instances_boss() {
     assert_eq!(r.context.bodies.len(), 1);
     let v = volume(&r) - v_block;
     assert!((v - 2.0 * drafted).abs() < 1e-6 * v, "two drafted bosses {}, got {v}", 2.0 * drafted);
+}
+
+/// CUT-CLOSED-EDGES-SPLIT, live 2069 (B) (bushing2's notched ends): a tube whose top notch leaves end arcs, with
+/// windows in its wall under the notch's corners: the seam goes to a corner through a window and splits the window's
+/// arcs at vertices OCCT needs there. Live shows each such arc as one edge with no vertex (bushing2's notched end arcs:
+/// one edge, picked whole, Fillet r 1 OK with one round face): here each is shown, picked (one reference for both
+/// pieces), measured (their sum) and filleted (one round face) as one.
+#[test]
+fn a_seam_split_arc_is_one_edge() {
+    let mut t = T::new();
+    let (_, disc) = t.sketch(&[], &[((0.0, 0.0), 37.5)]);
+    t.add("extrude", &[("entities", q(disc)), ("depth", e("50 mm")), ("operationType", en("NEW"))]);
+    let bore = t.holes(&[((0.0, 0.0), 25.0)]);
+    t.ok(bore);
+    let front = |t: &mut T, rects: &[[f64; 4]]| {
+        let mut sk = noshape_sketch::Sketch::new();
+        for [x0, z0, x1, z1] in rects {
+            let p: Vec<_> = [(x0, z0), (x1, z0), (x1, z1), (x0, z1)].iter().map(|(x, z)| sk.add_point(DVec2::new(**x * 1e-3, **z * 1e-3))).collect();
+            for i in 0..4 {
+                sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
+            }
+        }
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let r = t.regen();
+        let regions: Vec<Reference> = r.display.sketches.iter().find(|g| g.feature == s).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+        let x = t.add("extrude", &[("entities", q(regions)), ("depth", e("100 mm")), ("symmetric", ParamValue::Bool(true)), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true))]);
+        t.ok(x)
+    };
+    // The notch across the top, and windows under its corners (x = ±12.5).
+    front(&mut t, &[[-12.5, 40.0, 12.5, 60.0]]);
+    let r = front(&mut t, &[[9.5, 10.0, 15.5, 30.0], [-15.5, 10.0, -9.5, 30.0]]);
+    let b = &r.context.bodies[0];
+    let shown = b.shape.shown_topology().unwrap();
+    // The window's lower arc on the outer wall that the seam crosses: two pieces, one run.
+    let info = |i: usize| b.shape.sub_shape(noshape_kernel::ShapeType::Edge, i).unwrap().edge_info().unwrap();
+    let runs: Vec<usize> = (0..b.edges.len()).filter(|&i| shown.joined[i] == i && shown.joined.iter().filter(|&&r| r == i).count() == 2).collect();
+    let low = runs.iter().copied().find(|&i| (info(i).start.z - 0.01).abs() < 1e-9).expect("a split arc at z 10");
+    let pieces: Vec<usize> = (0..b.edges.len()).filter(|&i| shown.joined[i] == low).collect();
+    assert_eq!(pieces.len(), 2);
+    // Counted once, no vertex between, one name (so one reference, picked from either piece).
+    assert_eq!(shown.edge_count() + runs.len(), shown.edges.iter().filter(|x| **x).count());
+    assert_eq!(b.edges[pieces[0]], b.edges[pieces[1]]);
+    let arc = Reference::Edge((*b.edges[low]).clone());
+    assert_eq!(r.display.bodies[0].edge_refs.iter().filter(|x| **x == arc).count(), 2, "both pieces pick as the one edge");
+    // Measured as one: the pieces the reference resolves to, their lengths summed (37.5 mm round from x -15.5 to -9.5).
+    let Reference::Edge(n) = &arc else { unreachable!() };
+    let found = b.find_edges(n);
+    assert_eq!(found, pieces);
+    let len: f64 = found.iter().map(|&i| info(i).length).sum::<f64>() * 1e3;
+    let want = 37.5 * ((-15.5f64 / 37.5).acos() - (-9.5f64 / 37.5).acos());
+    assert!((len - want).abs() < 1e-6, "{len} vs {want}");
+    // Measure shows it as the unsplit mirror arc in the other window (x 9.5 to 15.5): the same rows, its length.
+    let twin = (0..b.edges.len()).find(|&i| shown.joined.iter().filter(|&&r| r == i).count() == 1 && { let x = info(i); (x.start.z - 0.01).abs() < 1e-9 && (x.end.z - 0.01).abs() < 1e-9 && x.start.y > 0.0 && x.start.x > 0.0 && matches!(x.curve, noshape_kernel::Curve::Circle { radius, .. } if (radius - 0.0375).abs() < 1e-9) }).expect("the mirror arc");
+    let m = noshape_model::regen::measure::measure(&r.context, std::slice::from_ref(&arc));
+    let mt = noshape_model::regen::measure::measure(&r.context, &[Reference::Edge((*b.edges[twin]).clone())]);
+    assert_eq!(m.iter().map(|x| x.0.clone()).collect::<Vec<_>>(), mt.iter().map(|x| x.0.clone()).collect::<Vec<_>>(), "{m:?} / {mt:?}");
+    assert!(m.iter().any(|(l, x)| l == "Length" && matches!(x, noshape_model::regen::measure::Measurement::Length(v) if (v * 1e3 - want).abs() < 1e-6)), "{m:?}");
+    // Filleted as one: one round face.
+    let faces = b.shape.count(noshape_kernel::ShapeType::Face);
+    let f = t.fillet(vec![arc], "1 mm");
+    let r = t.ok(f);
+    assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), faces + 1, "one round face");
 }

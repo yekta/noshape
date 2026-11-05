@@ -395,7 +395,17 @@ pub fn quick_line(rows: &[(String, Measurement)], count: usize) -> Vec<(String, 
 pub fn measure_shapes(shapes: &[Vec<Shape>]) -> Vec<(String, Measurement)> {
     let mut out: Vec<(String, Measurement)> = Vec::new();
     let flat: Vec<&Shape> = shapes.iter().flatten().collect();
-    // Single entity.
+    // Single entity. An edge in pieces (one shown edge OCCT split for a seam: their reference is one): one edge, its
+    // length theirs together.
+    if shapes.len() == 1 && shapes[0].len() > 1 && shapes[0].iter().all(|s| s.shape_type() == ShapeType::Edge) {
+        let total: f64 = shapes[0].iter().filter_map(|s| s.length().ok()).sum();
+        if let Ok(k::Curve::Circle { center, radius, .. }) = shapes[0][0].edge_curve() {
+            out.push(("Diameter".into(), Measurement::Diameter(radius * 2.0)));
+            out.push(("Center".into(), Measurement::Point(center)));
+        }
+        out.push(("Length".into(), Measurement::Length(total)));
+        return out;
+    }
     if shapes.len() == 1 {
         for s in &shapes[0] {
             match s.shape_type() {

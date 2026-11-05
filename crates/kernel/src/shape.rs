@@ -309,8 +309,9 @@ impl Shape {
     /// is a cone's apex (a cylinder has 3 faces, 2 edges and no vertex).
     pub fn shown_topology(&self) -> Result<ShownTopology> {
         let flags = ck(ffi::shown_topology(self.raw()))?;
+        let joined = ck(ffi::edge_joins(self.raw()))?.into_iter().map(|j| j as usize).collect();
         let ne = self.count(ShapeType::Edge);
-        Ok(ShownTopology { edges: flags[..ne].iter().map(|&f| f != 0).collect(), vertices: flags[ne..].iter().map(|&f| f != 0).collect() })
+        Ok(ShownTopology { edges: flags[..ne].iter().map(|&f| f != 0).collect(), vertices: flags[ne..].iter().map(|&f| f != 0).collect(), joined })
     }
 
     /// Faces sharing at least one edge with face `face_index`.
@@ -389,6 +390,21 @@ impl Shape {
 pub struct ShownTopology {
     pub edges: Vec<bool>,
     pub vertices: Vec<bool>,
+    /// Per edge, the first of the pieces shown as one edge with it (OCCT split them only for a cylinder's seam; live
+    /// shows one edge and no vertex there), itself if none.
+    pub joined: Vec<usize>,
+}
+
+impl ShownTopology {
+    /// The edges Onshape shows: each run of joined pieces once.
+    pub fn edge_count(&self) -> usize {
+        self.edges.iter().enumerate().filter(|&(i, &e)| e && self.joined.get(i).is_none_or(|&r| r == i)).count()
+    }
+
+    /// The vertices Onshape shows.
+    pub fn vertex_count(&self) -> usize {
+        self.vertices.iter().filter(|&&v| v).count()
+    }
 }
 
 impl Default for Shape {

@@ -177,7 +177,7 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 "kind": format!("{:?}", b.kind),
                 "faces": b.shape.count(ShapeType::Face),
                 // Onshape's topology: no seams, no vertices on full circles.
-                "edges": shown.edges.iter().filter(|&&e| e).count(),
+                "edges": shown.edge_count(),
                 "vertices": shown.vertices.iter().filter(|&&v| v).count(),
                 "hidden": d.is_some_and(|d| d.hidden),
             });
@@ -311,6 +311,27 @@ fn edge_json(b: &Body, i: usize, k: f64, names: &dyn Fn(Option<noshape_model::re
     Some((v, mid, kind))
 }
 
+/// An edge shown as one with other pieces ([`noshape_kernel::ShownTopology::joined`]): its length theirs together, its
+/// ends the run's.
+fn joined_json(b: &Body, i: usize, shown: &noshape_kernel::ShownTopology, k: f64, v: &mut Value) {
+    let pieces: Vec<usize> = (0..shown.joined.len()).filter(|&j| shown.joined[j] == i).collect();
+    if pieces.len() < 2 {
+        return;
+    }
+    let infos: Vec<noshape_kernel::EdgeInfo> = pieces.iter().filter_map(|&j| b.shape.sub_shape(ShapeType::Edge, j).ok()?.edge_info().ok()).collect();
+    v["length"] = json!(r6(infos.iter().map(|e| e.length).sum::<f64>() * k));
+    // The run's ends: the end points no other piece has.
+    let tol = 1e-9 * infos.iter().map(|e| e.length).sum::<f64>().max(1e-9);
+    let ends: Vec<DVec3> = infos.iter().flat_map(|e| [e.start, e.end]).collect();
+    let free: Vec<DVec3> = ends.iter().copied().filter(|p| ends.iter().filter(|q| q.distance(*p) <= tol).count() == 1).collect();
+    if let [a, b] = free[..] {
+        v["start"] = pt(a, k);
+        v["end"] = pt(b, k);
+    } else if free.is_empty() {
+        v["closed"] = json!(true);
+    }
+}
+
 pub(crate) fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let units = od.doc().settings.units;
@@ -435,13 +456,15 @@ pub(crate) fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 // Onshape's edges only (no seams or degenerated edges).
                 let shown = b.shape.shown_topology().unwrap_or_default();
                 for i in 0..b.edges.len() {
-                    if !shown.edges.get(i).copied().unwrap_or(true) || !keep(i) {
+                    // (Pieces shown as one edge: listed once, as the first.)
+                    if !shown.edges.get(i).copied().unwrap_or(true) || shown.joined.get(i).is_some_and(|&r| r != i) || !keep(i) {
                         continue;
                     }
                     if created_by.is_some_and(|f| b.edges[i].creator() != Some(f) && !edge_touches(&b.edges[i], f)) {
                         continue;
                     }
-                    let Some((v, m, ck)) = edge_json(b, i, k, &names) else { continue };
+                    let Some((mut v, m, ck)) = edge_json(b, i, k, &names) else { continue };
+                    joined_json(b, i, &shown, k, &mut v);
                     if curve.is_some_and(|c| c != ck) {
                         continue;
                     }

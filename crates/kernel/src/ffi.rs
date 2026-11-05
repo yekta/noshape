@@ -479,6 +479,7 @@ pub(crate) mod ffi {
         fn ancestor_map(s: &OcShape, kind: u8, ancestor_kind: u8) -> Result<Csr>;
         fn adjacent_faces(s: &OcShape, face_index: u32) -> Result<Vec<u32>>;
         fn shown_topology(s: &OcShape) -> Result<Vec<u8>>;
+        fn edge_joins(s: &OcShape) -> Result<Vec<u32>>;
         fn children(s: &OcShape) -> Result<UniquePtr<OcShapeList>>;
         fn make_compound(l: &OcShapeList) -> Result<UniquePtr<OcShape>>;
         fn make_shell(l: &OcShapeList) -> Result<UniquePtr<OcShape>>;

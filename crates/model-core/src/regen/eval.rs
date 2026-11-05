@@ -1365,7 +1365,7 @@ fn unify_input_names(faces: Vec<Name>) -> ShapeNames {
 pub fn names_for(shape: &Shape, faces: Vec<Name>) -> ShapeNames {
     let ef = shape.edge_faces().unwrap_or_default();
     let vf = shape.vertex_faces().unwrap_or_default();
-    let edges = crate::naming::name_edges(&faces, &ef, &|i| super::context::edge_key(shape, i));
+    let edges = crate::naming::name_edges(&faces, &ef, &|i| super::context::edge_key(shape, i), &super::context::joined_pieces(shape));
     let vertices = crate::naming::name_vertices(&faces, &vf, &|i| super::context::vertex_key(shape, i));
     ShapeNames { faces, edges, vertices }
 }
