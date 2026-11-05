@@ -6693,6 +6693,11 @@ static std::vector<TopoDS_Shape> group_disjoint(const std::vector<TopoDS_Shape>&
   const int n = (int)t.size();
   if (n < 8)
     return t;
+  // (Sheets: their meshes' check misses two flat faces sharing an edge, which grouped stayed apart in the fuse, both
+  // kept, the edge twice: a parity document's 12 sheets, 47 edges where one fuse of them all gives 16.)
+  for (const TopoDS_Shape& s : t)
+    if (!TopExp_Explorer(s, TopAbs_SOLID).More())
+      return t;
   Bnd_Box all;
   for (const TopoDS_Shape& s : t)
     BRepBndLib::Add(s, all, false);

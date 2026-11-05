@@ -525,6 +525,33 @@ fn a_late_decline_sends_the_like_straight_to_occt() {
     memo.scope("another", || assert_eq!(run(&b).1, "two edges leave a vertex in one direction"));
 }
 
+/// Parity documents' fuses of flat sheets whose tools share edges (recorded): OCCT's route grouped the tools as apart
+/// (their meshes' check misses flat faces sharing an edge) and left them as they were against each other, 47 edges
+/// after merging faces where noshape's Boolean, one fuse of them all, gave 16. Now not grouped: either noshape's result
+/// is OCCT's or it declines.
+#[test]
+fn sheet_fuses_with_touching_tools_as_occts_or_declined() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    for name in ["ac1b1ab0f9cd1895", "342606d0dfa32eef"] {
+        let c = k::bool_corpus::load(&dir, name).expect("a case");
+        k::set_rust_boolean(Some(false));
+        let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's fuse");
+        k::set_rust_boolean_only(true);
+        let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+        let path = k::last_boolean_path();
+        k::set_rust_boolean_only(false);
+        k::set_rust_boolean(None);
+        if path != "rust" {
+            continue;
+        }
+        let r = r.expect("noshape's fuse");
+        let counts = |s: &k::Shape| [k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+        assert_eq!(counts(&r.shape), counts(&o.shape), "{name}: noshape's fuse took it, unlike OCCT's");
+        assert_eq!(k::bool_corpus::Summary::of(&r).history, k::bool_corpus::Summary::of(&o).history, "{name}: history unlike OCCT's");
+    }
+}
+
 /// cf-straight-spline's first cut by a pattern of 8 spline cutters (recorded): noshape's Boolean takes it (it declined
 /// as invalid: an edge's range a rounding past its curve on a face), OCCT's volume.
 #[test]
