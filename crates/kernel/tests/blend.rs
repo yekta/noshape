@@ -1297,6 +1297,32 @@ fn a_full_round_is_noshapes_one_face() {
     assert!(r.history.is_deleted(0, ShapeType::Face, end));
 }
 
+/// Rounds wider than the face between them (live 1516: R10.5, R12 and R20 on both vertical edges at x = 40 of a
+/// 40 x 20 x 10 block): noshape's own, two cylinders meeting along a ridge where their circles cross, the end face
+/// gone: live's 7 faces and volumes.
+#[test]
+fn rounds_wider_than_their_face_meet_in_a_ridge() {
+    setup();
+    let part = bx([0.0; 3], [40.0, 20.0, 10.0]);
+    let es = edges_where(&part, |i| (i.start.x - 40.0 * MM).abs() < 1e-9 && (i.end.x - 40.0 * MM).abs() < 1e-9 && (i.start.z - i.end.z).abs() > 1e-9);
+    assert_eq!(es.len(), 2);
+    for (r, want) in [(10.5, 7526.842646), (12.0, 7384.178285), (20.0, 6456.739397)] {
+        set_rust_blend(Some(true));
+        reset_blend_decline();
+        let res = fillet_checked(&part, &es, &[r * MM; 2]).unwrap();
+        let why = last_blend_decline();
+        set_rust_blend(None);
+        assert_eq!(why, "", "R{r}: noshape's own rounds");
+        assert!(res.shape.is_valid(), "R{r}");
+        assert_eq!(res.shape.faces().len(), 7, "R{r}");
+        assert!((vol_mm3(&res.shape) - want).abs() < 1e-6, "R{r}: {} vs live's {want}", vol_mm3(&res.shape));
+        let tip = res.shape.vertices().iter().filter_map(|v| v.vertex_point().ok()).fold(0.0f64, |m, p| m.max(p.x));
+        // (The ridge at y = 10: live's tips 39.988, 39.832, 37.321.)
+        let want_tip = 40.0 - r + (r * r - (r - 10.0) * (r - 10.0)).sqrt();
+        assert!((tip / MM - want_tip).abs() < 1e-6, "R{r}: tip {} vs {want_tip}", tip / MM);
+    }
+}
+
 /// cf-spur-gear's root fillets (PARITY-CUSTOM-RUN-FAILURES): R0.72 on both top edges of a 1.2 mm rib, so the rounds
 /// overlap and the rib's top face goes (OCCT fails): each round made alone, the part their common, as Parasolid's.
 #[test]

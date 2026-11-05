@@ -238,6 +238,8 @@ struct End {
     t: [DVec3; 2],
     /// A curved end edge's parameter at its tangent point (its new end).
     tpar: [Option<f64>; 2],
+    /// The tangent point at its end edge's far end (a round as wide as the face it goes with).
+    at_far: [bool; 2],
     corner: Option<Corner>,
 }
 
@@ -249,14 +251,37 @@ struct Corner {
     p: u32,
 }
 
-/// Two rounds that use up the face between them (a full round): plan `a`'s side `ka` and plan `b`'s side `kb` are
-/// that face.
+/// Two rounds that use up the face between them: plan `a`'s side `ka` and plan `b`'s side `kb` are that face; one
+/// cylinder (`one`, a full round) or two meeting along a ridge (wider than the face).
 struct Full {
     a: usize,
     ka: usize,
     b: usize,
     kb: usize,
     face: u32,
+    one: bool,
+}
+
+/// Where two convex rounds' circles in a cap cross (`n` the cap's normal): the crossing nearer the face between them,
+/// on each round's arc between its tangent points (`ka`, `kb` their sides on that face).
+fn crossing(ea: &End, ra: f64, ka: usize, eb: &End, rb: f64, kb: usize, n: DVec3) -> Option<DVec3> {
+    let v = eb.c - ea.c;
+    let l = v.length();
+    if l < 1e-12 || l > ra + rb || l < (ra - rb).abs() {
+        return None;
+    }
+    let along = (ra * ra - rb * rb + l * l) / (2.0 * l);
+    let h = (ra * ra - along * along).max(0.0).sqrt();
+    let base = ea.c + v / l * along;
+    let side = n.cross(v / l) * h;
+    let near = (ea.t[ka] + eb.t[kb]) * 0.5;
+    let p = if (base + side - near).length() <= (base - side - near).length() { base + side } else { base - side };
+    let on_arc = |e: &End, k: usize| {
+        let (u0, u1, w) = (e.t[1 - k] - e.c, e.t[k] - e.c, p - e.c);
+        let turn = u0.cross(u1).dot(n);
+        u0.cross(w).dot(n) * turn > 0.0 && w.cross(u1).dot(n) * turn > 0.0
+    };
+    (on_arc(ea, ka) && on_arc(eb, kb)).then_some(p)
 }
 
 /// One round: its edge, radius, two faces, convex (+1) or concave (−1), its two ends (the edge's order).
@@ -405,7 +430,9 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
             };
             let (Some(t0), Some(t1)) = (foot_k(0), foot_k(1)) else { return no("a prism round's tangent points") };
             let mut tpar = [None, None];
-            // Each tangent point on its end edge, short of its far end (no overflow).
+            let mut at_far = [false; 2];
+            // Each tangent point on its end edge, short of its far end (no overflow; at it only where the face between
+            // goes with another round's, checked with the pairs).
             for (k, t) in [t0, t1].into_iter().enumerate() {
                 let along = [along_a, along_b][k];
                 let oe = &body.edges[g[k] as usize];
@@ -438,7 +465,9 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
                     Curve::Nurbs { .. } => reach + (far - t).length(),
                     _ => 0.0,
                 };
-                if reach < margin || reach + margin >= room {
+                if matches!(oe.curve, Curve::Line) && reach >= margin && (reach - room).abs() < margin {
+                    at_far[k] = true;
+                } else if reach < margin || reach + margin >= room {
                     return no("a prism round past its end edges");
                 }
             }
@@ -447,7 +476,7 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
             {
                 return no("a prism round's corner not at its rounds' meeting point");
             }
-            ends.push(End { cap, v, g, c, t: [t0, t1], tpar, corner });
+            ends.push(End { cap, v, g, c, t: [t0, t1], tpar, at_far, corner });
         }
         let [a, b] = <[End; 2]>::try_from(ends).map_err(|_| Decline("a prism round without two ends"))?;
         if (b.c - a.c).cross(d).length() > margin {
@@ -489,32 +518,39 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
     if (0..body.edges.len()).any(|i| absorbed[i] && !taken_m[i]) {
         return no("a curved edge not a prism round's corner");
     }
-    // Two rounds on one face leave some of it between them, or use it up exactly (a full round: their tangent points
-    // there one at each cap, the face the rectangle between their edges and the caps' edges; it goes and the two
-    // rounds are one face, live's); a tip narrower than its two rounds is OCCT's.
+    // Two rounds on one face leave some of it between them, or use it up (the face the rectangle between their edges
+    // and the caps' edges, it goes): exactly (a full round: their tangent points there one at each cap; one face,
+    // live's), or wider than it (convex: two cylinders meeting along a ridge where their circles cross, live's).
     let mut fulls: Vec<Full> = Vec::new();
+    let mut ridges: Vec<(usize, usize, usize, DVec3)> = Vec::new();
     for (i, a) in plans.iter().enumerate() {
         for (jb, bp) in plans.iter().enumerate().skip(i + 1) {
             for (ka, &f) in a.fs.iter().enumerate() {
                 let Some(kb) = bp.fs.iter().position(|&g| g == f) else { continue };
                 let mut met = 0;
                 let mut caps = 0;
-                for ea in &a.ends {
-                    let Some(eb) = bp.ends.iter().find(|e| e.cap == ea.cap && e.cap != u32::MAX) else { continue };
+                let mut crossed = Vec::new();
+                let ae = body.edges[a.edge as usize];
+                let n = (body.vertices[ae.v[1] as usize] - body.vertices[ae.v[0] as usize]).normalize();
+                for (ia, ea) in a.ends.iter().enumerate() {
+                    let Some(ib) = bp.ends.iter().position(|e| e.cap == ea.cap && e.cap != u32::MAX) else { continue };
+                    let eb = &bp.ends[ib];
                     caps += 1;
                     let (pa, pb) = (body.vertices[ea.v as usize], body.vertices[eb.v as usize]);
                     if (ea.t[ka] - eb.t[kb]).length() <= 10.0 * margin && ea.g[ka] == eb.g[kb] {
                         met += 1;
                     } else if (ea.t[ka] - pa).length() + (eb.t[kb] - pb).length() >= (pa - pb).length() - 10.0 * margin {
-                        return no("two prism rounds meet across a face");
+                        let p = if a.sigma > 0.0 && bp.sigma > 0.0 && ea.g[ka] == eb.g[kb] { crossing(ea, a.r, ka, eb, bp.r, kb, n) } else { None };
+                        let Some(p) = p else { return no("two prism rounds meet across a face") };
+                        crossed.push((ia, ib, p));
                     }
                 }
-                if met == 0 {
+                if met == 0 && crossed.is_empty() {
                     continue;
                 }
                 // (Exactly the face's rectangle: its one loop the two edges and the two cap edges.)
                 let face = &body.faces[f as usize];
-                let rect = met == 2
+                let rect = (met == 2 || crossed.len() == 2)
                     && caps == 2
                     && face.loops.len() == 1
                     && face.loops[0].len() == 4
@@ -522,9 +558,20 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
                 if !rect {
                     return no("two prism rounds meet across a face");
                 }
-                fulls.push(Full { a: i, ka, b: jb, kb, face: f });
+                fulls.push(Full { a: i, ka, b: jb, kb, face: f, one: met == 2 });
+                for (ia, ib, p) in crossed {
+                    ridges.push((i, ia, ka, p));
+                    ridges.push((jb, ib, kb, p));
+                }
             }
         }
+    }
+    for (pi, j, k, p) in ridges {
+        plans[pi].ends[j].t[k] = p;
+        plans[pi].ends[j].at_far[k] = false;
+    }
+    if plans.iter().any(|p| p.ends.iter().any(|e| e.at_far.contains(&true))) {
+        return no("a prism round past its end edges");
     }
     build(body, plans, &fulls)
 }
@@ -731,7 +778,14 @@ fn build(body: &Body, plans: Vec<Plan>, fulls: &[Full]) -> Result<Output, Declin
     // two arcs stay, as after OCCT's merge_full_rounds; the shown topology joins them.)
     let mut merged_into: Vec<Option<usize>> = vec![None; new_faces.len()];
     dead_e.resize(b.edges.len(), false);
-    for x in fulls {
+    // (A ridge: generated by both rounds' edges.)
+    for x in fulls.iter().filter(|x| !x.one) {
+        let Some(&(line, _)) = shared_line.get(&x.face) else { return no("two rounds' ridge without its line") };
+        for e in [new_faces[x.a].0, new_faces[x.b].0] {
+            history.push(Record { kind: Kind::Edge, arg: 0, index: e, relation: Relation::Generated, out_kind: Kind::Edge, out: line });
+        }
+    }
+    for x in fulls.iter().filter(|x| x.one) {
         let Some(&(line, _)) = shared_line.get(&x.face) else { return no("a full round without its line") };
         let lp: Vec<Use> = new_faces[x.a].1.loops[0].iter().chain(&new_faces[x.b].1.loops[0]).filter(|u| u.edge != line).copied().collect();
         dead_e[line as usize] = true;
