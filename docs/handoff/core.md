@@ -16,6 +16,15 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-05 07:46 UTC.**
+- P1 DRAFT-NONDETERMINISTIC: not reproduced in ~90 opens (green 86546441, v0.4.30's app and CLI; here and vibe3, idle,
+  4 at once, 2 cores); qa asked for a flipping run's environment (TICKETS).
+- SHELL-SLOW seed 508: the slabs' union is the empty one (OCCT's 12-slab fuse, 2.2 s). One at a time they fuse from a
+  test thread (23155.2 mm³), but inside op_shell_solid slab 9 (OCCT's simple-offset slab of the diagonal R5 round)
+  fails every way tried: some state of the budgeted thread. Notes and probes on the ticket.
+- cf-fix-pcb's split speed: dx landed the same opSplitPart fix first (53b0d433; mine dropped): 1.6 -> 0.85 s, 12/12.
+- Parity on vibe5 (main + nothing of mine pending): 47/56 documents, 419/483 features.
+
 **State 11-05 06:01 UTC.**
 - Tonight's T2 failures of mine, fixed: kernel_robustness::adjacent_regions_extrude_without_a_seam (regions united
   into one face kept their sides split where the dropped line between them met them; Region::joined; now T1),
