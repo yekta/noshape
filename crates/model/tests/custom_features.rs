@@ -3767,6 +3767,38 @@ fn edge_order_at_a_corner_as_live() {
     let corner = region.split(" | C ").nth(1).unwrap_or_default();
     let at = |p: &str| corner.find(p).unwrap_or_else(|| panic!("{p} in {corner}"));
     assert!(corner.matches('{').count() == 2 && at("N[0,40,0 d 1,0,0 ; 30,40,0") < at("N[30,40,0 d 0,-1,0 ; 30,20,0"), "{region}");
+    // The sheet metal definition (the extrude's start cap extracted, at z = 5, normal -z: what std's dogbone gets):
+    // its edges as the sketch's lines were drawn (live's JGB … JGd), so y = 40 before x = 30 at that corner too.
+    let mut f = ps.new_feature(&fx.ty("edgeOrderProbe"), &fx.units).unwrap();
+    f.params.set("x", expr("30 mm"));
+    f.params.set("y", expr("40 mm"));
+    f.params.set("z", expr("5 mm"));
+    f.params.set("definition", ParamValue::Bool(true));
+    let probe = f.id;
+    ps.features.push(f);
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
+    let out = custom::run::output_of(probe).expect("probe output").output;
+    let sheet = out.lines().find(|l| l.contains(" SHEET n 0,0,-1 | PT")).unwrap_or_else(|| panic!("{out}"));
+    let corner = sheet.split(" | C ").nth(1).unwrap_or_default();
+    let y40 = corner.find(",40,5 d 1,0,0").or_else(|| corner.find(",40,5 d -1,0,0")).unwrap_or_else(|| panic!("the y = 40 edge in {corner}"));
+    let x30 = corner.find("30,20,5").unwrap_or_else(|| panic!("the x = 30 edge in {corner}"));
+    assert!(corner.matches('{').count() == 2 && y40 < x30, "{sheet}");
+    let all = sheet.split(" | A ").nth(1).and_then(|x| x.split(" | B ").next()).unwrap_or_default();
+    // Each edge's ends (its own N[start d … ; end d …]), as x,y in mm.
+    let ends: Vec<[String; 2]> = all
+        .split('{')
+        .skip(1)
+        .filter_map(|e| e.split(" N[").nth(1))
+        .map(|n| {
+            let point = |part: &str| part.split(" d ").next().unwrap_or_default().rsplit_once(',').map(|(xy, _)| xy.to_string()).unwrap_or_default();
+            let (a, b) = n.split_once(" ; ").unwrap_or_default();
+            [point(a), point(b)]
+        })
+        .collect();
+    let lines = [("0,0", "50,0"), ("0,55", "50,55"), ("0,0", "0,20"), ("50,0", "50,55"), ("0,40", "30,40"), ("0,20", "30,20"), ("30,40", "30,20"), ("0,40", "0,55")];
+    let order: Vec<Option<usize>> = ends.iter().map(|[a, b]| lines.iter().position(|(p, q)| (a == p && b == q) || (a == q && b == p))).collect();
+    assert!(order.len() == 8 && order.windows(2).all(|w| matches!(w, [Some(a), Some(b)] if a < b)), "the sheet's edges in the sketch's order: {ends:?}");
 }
 
 /// Transient ids never repeat across the features of a regeneration (Onshape's are unique in the Part Studio): std

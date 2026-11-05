@@ -139,6 +139,8 @@ pub struct CtxState {
     /// Each body's name hashes (QueryCx::from_ref's prefilter), by the body (held).
     pub name_index: ByBody<query::NameIndex>,
     pub topo_cache: ByBody<query::Topo>,
+    /// Each body's edges' sketch order keys ([`query::live_order`]), with the number of sketches they were found among.
+    pub sketch_order_cache: ByBody<query::SketchKeys>,
     pub created_cache: Mutex<CreatedCache>,
     /// The operation that made each construction plane (`ConstructionPlane` references; qCreatedBy).
     pub plane_ops: HashMap<Reference, FsId>,
@@ -195,6 +197,11 @@ pub struct CtxState {
     body_versions: HashMap<BodyId, u64>,
     /// The body version each transient id was last checked at.
     transient_versions: HashMap<Arc<str>, u64>,
+    /// Each body's topology version: bumped when an operation changes its entities' names (a transform or an edge
+    /// move keeps them), so an edge's or vertex's name, an ordinal among its neighbours', may then stand for another.
+    topo_versions: HashMap<BodyId, u64>,
+    /// The owner's topology version when each edge's or vertex's transient id was taken.
+    transient_topo: HashMap<Arc<str>, u64>,
     /// The edges each `opSplitEdges` split (`qSplitBy` finds their pieces).
     pub split_edges: HashMap<FsId, Vec<(BodyId, noshape_kernel::Shape)>>,
     /// The bodies each `opPattern` instance made, by (operation id, instance name) (`qPatternInstances`).
@@ -277,6 +284,7 @@ impl FsContext {
                 face_creators: Mutex::new(HashMap::new()),
                 created_cache: Mutex::new(HashMap::new()),
                 topo_cache: Mutex::new(HashMap::new()),
+                sketch_order_cache: Mutex::new(HashMap::new()),
                 name_index: Mutex::new(HashMap::new()),
                 plane_ops: HashMap::new(),
                 body_bits: BodyBits::default(),
@@ -312,6 +320,8 @@ impl FsContext {
                 attr_snapshots: HashMap::new(),
                 body_versions: HashMap::new(),
                 transient_versions: HashMap::new(),
+                topo_versions: HashMap::new(),
+                transient_topo: HashMap::new(),
             }),
         });
         // Where the attributed entities are now (for renames by this feature).
@@ -509,7 +519,23 @@ impl CtxState {
             q.from_ref(r).first().and_then(|e| q.owner(e)).and_then(|o| if let query::Ent::Body(b) = o { self.body_versions.get(&self.ctx.bodies[b].id).copied() } else { None }).unwrap_or(0)
         };
         self.transient_versions.insert(id.clone(), version);
+        if matches!(r, Reference::Edge(_) | Reference::Vertex(_)) {
+            let topo = self.topo_version_of(r);
+            self.transient_topo.insert(id.clone(), topo);
+        }
         id
+    }
+
+    /// The topology version of the body that `r` (an edge or a vertex) is on now.
+    fn topo_version_of(&self, r: &Reference) -> u64 {
+        let q = query::QueryCx::new(self);
+        q.from_ref(r).first().and_then(|e| q.owner(e)).and_then(|o| if let query::Ent::Body(b) = o { self.topo_versions.get(&self.ctx.bodies[b].id).copied() } else { None }).unwrap_or(0)
+    }
+
+    /// Whether transient id `id`'s edge or vertex name may still stand for what it did: its body's topology is the
+    /// one it was taken on.
+    pub fn same_topology(&self, id: &str, r: &Reference) -> bool {
+        self.transient_topo.get(id).is_none_or(|t| *t == self.topo_version_of(r))
     }
 
     /// Give an entity a transient id chosen by the host (queries made
@@ -886,6 +912,10 @@ pub fn run_op_with<T>(i: &mut Interp, cx: &FsContext, id: &[Arc<str>], failure: 
             st.ctx = ctx;
             for b in &changed {
                 *st.body_versions.entry(b.clone()).or_default() += 1;
+                let names = |c: &crate::regen::context::Context| c.bodies.iter().find(|x| &x.id == b).map(|x| (x.faces.clone(), x.edges.clone(), x.vertices.clone()));
+                if names(&snapshot) != names(&st.ctx) {
+                    *st.topo_versions.entry(b.clone()).or_default() += 1;
+                }
             }
             if !changed.is_empty() {
                 st.remap_attributes(&changed);

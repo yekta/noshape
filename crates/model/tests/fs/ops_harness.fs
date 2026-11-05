@@ -290,6 +290,31 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
                     holders = append(holders, evVertexPoint(context, { "vertex" : v }));
             check("an attribute moves with its body", size(holders) == 1 && norm(holders[0] - vector(20, 0, 3215) * mm) < 1e-9 * meter, holders);
         });
+        step(context, id, "trackingOfACutCorner", function(sub) {
+            // A sheet corner a cut takes away: its tracking finds nothing (Parasolid's), not a corner the cut made that
+            // took its name (std's assignSMAttributesToNewOrSplitEntities took such a corner for an original one and
+            // gave it no association: cf-sheet-metal-overcut-dogbone's Corner Overcut 3).
+            fCuboid(context, sub + "b", { "corner1" : vector(0, 0, 3400) * mm, "corner2" : vector(20, 10, 3405) * mm });
+            opExtractSurface(context, sub + "x", { "faces" : qContainsPoint(qCreatedBy(sub + "b", EntityType.FACE), vector(1, 1, 3405) * mm) });
+            const sheet = qCreatedBy(sub + "x", EntityType.BODY);
+            var tracked = [];
+            for (var v in evaluateQuery(context, qOwnedByBody(sheet, EntityType.VERTEX)))
+                tracked = append(tracked, startTracking(context, v));
+            const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, 3405) * mm, vector(0, 0, 1)) });
+            skRectangle(sk, "r", { "firstCorner" : vector(15, 5) * mm, "secondCorner" : vector(25, 15) * mm });
+            skSolve(sk);
+            opBoolean(context, sub + "cut", { "tools" : qCreatedBy(sub + "sk", EntityType.FACE), "targets" : qCreatedBy(sub + "x", EntityType.FACE), "operationType" : BooleanOperationType.SUBTRACTION, "localizedInFaces" : true, "allowSheets" : true });
+            // Each original corner's tracking: the corner itself, or nothing for the one cut away.
+            var found = [];
+            for (var t in tracked)
+                for (var v in evaluateQuery(context, t))
+                    found = append(found, evVertexPoint(context, { "vertex" : v }));
+            var inside = 0;
+            for (var p in found)
+                if (p[0] > 14.9 * mm && p[1] > 4.9 * mm)
+                    inside += 1;
+            check("a cut corner's tracking", size(found) == 3 && inside == 0, found);
+        });
         step(context, id, "trackMovedEdge", function(sub) {
             // An edge opEdgeChange moved is still found by its tracking query, where it went (std's Fold tracks its
             // split edges through its edge changes).

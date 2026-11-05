@@ -591,7 +591,11 @@ impl<'a> QueryCx<'a> {
         }
         let tracked = self.tracked(snap, false);
         if tracked.is_empty() {
-            return found;
+            // Nothing lies where it was: it moved, if its name still means it. An edge's or vertex's name is an
+            // ordinal among its neighbours' (`Boundary`, `Vertex`): after a topology change it may name another (a
+            // corner a cut took away named the new corner the cut made: std then took that one for an original).
+            let renamed = matches!(snap.etype, EType::Edge | EType::Vertex) && self.st.transient_ref(id).is_some_and(|r| !self.st.same_topology(id, r));
+            return if renamed { Vec::new() } else { found };
         }
         // A face's name lineage holds (only edges take each other's names):
         // its pieces by name, moved ones too (std Jog's rotated moving face),
@@ -955,6 +959,101 @@ pub fn sketch_edge_shape(sk: &crate::regen::context::SketchResult, id: u32) -> O
     k::make_edge_2d(&crate::regen::eval::kernel_plane(&sk.frame), &seg).ok()
 }
 
+impl QueryCx<'_> {
+    /// Each edge of body `b` that lies along a sketch curve: (the sketch's place among the context's sketches, the
+    /// curve's place in its sketch). The first sketch that has it; kept for the body (and as many sketches).
+    pub fn sketch_keys(&self, b: usize) -> Arc<SketchKeys> {
+        let body = self.st.ctx.bodies.untracked()[b].clone();
+        let key = Arc::as_ptr(&body) as usize;
+        let sketches = &self.st.ctx.sketches;
+        if let Some((_, k)) = self.st.sketch_order_cache.lock().get(&key).filter(|(_, k)| k.0 == sketches.len()) {
+            return k.clone();
+        }
+        // Sheets only: a solid's edges along a sketch curve (a part thickened from its definition) were made by
+        // its own operation, in an order not known here.
+        if body.kind != BodyKind::Surface {
+            let k = Arc::new((sketches.len(), vec![None; body.edges.len()]));
+            self.st.sketch_order_cache.lock().insert(key, (body, k.clone()));
+            return k;
+        }
+        const TOL: f64 = 1e-7;
+        // The sketches its faces were made from, and their curves (only theirs: a document's other sketches may be big).
+        let face_sketches: Vec<Option<crate::reference::FeatureId>> = body.faces.iter().map(profile_sketch).collect();
+        if face_sketches.iter().all(Option::is_none) {
+            let k = Arc::new((sketches.len(), vec![None; body.edges.len()]));
+            self.st.sketch_order_cache.lock().insert(key, (body, k.clone()));
+            return k;
+        }
+        let curves: Vec<Vec<(u32, noshape_sketch::geom::BBox, noshape_sketch::geom::Curve2)>> = sketches
+            .iter()
+            .map(|sk| {
+                if !face_sketches.contains(&Some(sk.feature)) {
+                    return Vec::new();
+                }
+                sk.sketch
+                    .entities()
+                    .enumerate()
+                    .filter(|(_, e)| e.kind().is_curve() && !e.construction)
+                    .filter_map(|(i, e)| sk.sketch.curve(e.id).map(|c| (i as u32, c.bbox(), c)))
+                    .collect()
+            })
+            .collect();
+        let edge_faces = body.shape.edge_faces().unwrap_or_default();
+        let keys = body
+            .shape
+            .edges()
+            .iter()
+            .enumerate()
+            .map(|(ei, e)| {
+                // Only the sketches its faces were made from (an extrude's cap, the sheet extracted from it): a flange's
+                // top edge over the plate's outline was made by the flange (in pick order).
+                let from: Vec<crate::reference::FeatureId> = edge_faces.get(ei).into_iter().flatten().filter_map(|f| face_sketches.get(*f as usize).copied().flatten()).collect();
+                if from.is_empty() {
+                    return None;
+                }
+                let info = e.edge_info().ok()?;
+                let mid = e.point_at((info.first_param + info.last_param) * 0.5).ok()?;
+                let pts = [info.start, mid, info.end];
+                sketches.iter().zip(&curves).enumerate().filter(|(_, (sk, _))| from.contains(&sk.feature)).find_map(|(si, (sk, cs))| {
+                    let f = &sk.frame;
+                    let h: Vec<f64> = pts.iter().map(|p| (*p - f.origin).dot(f.normal)).collect();
+                    if (h[0] - h[1]).abs() > TOL || (h[0] - h[2]).abs() > TOL {
+                        return None;
+                    }
+                    let flat: Vec<glam::DVec2> = pts.iter().map(|p| glam::DVec2::new((*p - f.origin).dot(f.x), (*p - f.origin).dot(f.y))).collect();
+                    if flat[0].distance(flat[2]) < TOL && flat[0].distance(flat[1]) < TOL {
+                        return None;
+                    }
+                    let inside = |bb: &noshape_sketch::geom::BBox, p: glam::DVec2| p.x >= bb.min.x - TOL && p.y >= bb.min.y - TOL && p.x <= bb.max.x + TOL && p.y <= bb.max.y + TOL;
+                    cs.iter().find(|(_, bb, c)| flat.iter().all(|p| inside(bb, *p) && c.closest(*p).2 < TOL)).map(|(i, _, _)| (si as u32, *i))
+                })
+            })
+            .collect();
+        let k = Arc::new((sketches.len(), keys));
+        self.st.sketch_order_cache.lock().insert(key, (body, k.clone()));
+        k
+    }
+}
+
+/// A body's edges' sketch order keys ([`QueryCx::sketch_keys`]): the number of sketches they were looked for among,
+/// and each edge's (sketch, curve) if it has one.
+pub type SketchKeys = (usize, Vec<Option<(u32, u32)>>);
+
+/// The sketch whose region a face was made from: an extrude's caps, a region's own face, and what was generated,
+/// offset or copied from them or split off them (a sheet metal definition: the cap extracted).
+fn profile_sketch(n: &crate::naming::Name) -> Option<crate::reference::FeatureId> {
+    use crate::reference::{Role, Source, TopoName};
+    match &**n {
+        TopoName::Face { role, .. } => match role {
+            Role::CapStart(Some(Source::Region { sketch, .. })) | Role::CapEnd(Some(Source::Region { sketch, .. })) | Role::Profile(Source::Region { sketch, .. }) => Some(*sketch),
+            Role::Generated(x) | Role::Offset(x) | Role::Copy { of: x, .. } => profile_sketch(x),
+            _ => None,
+        },
+        TopoName::Split { parent, .. } => profile_sketch(parent),
+        _ => None,
+    }
+}
+
 /// Whether an entity still lies on all of a snapshot's points.
 impl QueryCx<'_> {
     /// Where an attributed edge or vertex of a sheet (a sheet metal
@@ -1206,7 +1305,11 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
     };
     let r: Vec<Ent> = match &*kind {
         "NOTHING" => Vec::new(),
-        "EVERYTHING" => q.all(entity_type),
+        "EVERYTHING" => {
+            let mut all = q.all(entity_type);
+            live_order(q, &mut all);
+            all
+        }
         "TRANSIENT" => {
             let id = query.get("transientId").as_str().unwrap_or_default();
             q.resolve_transient(&id)
@@ -1331,6 +1434,7 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
                         out.extend(q.owned(&o, entity_type));
                     }
                 }
+                live_order(q, &mut out);
             } else {
                 let owners: Vec<Ent> = parts.iter().filter_map(|p| q.owner(p)).collect();
                 out = sub(i, "subquery")?.into_iter().filter(|e| q.owner(e).is_some_and(|o| owners.contains(&o))).collect();
@@ -1402,7 +1506,9 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
             for e in eval(i, q, query.get("query"))? {
                 out.extend(q.adjacent(&e, t, &*kind == "VERTEX_ADJACENT"));
             }
-            uniq(out)
+            let mut out = uniq(out);
+            live_order(q, &mut out);
+            out
         }
         "EDGE_VERTEX" => {
             let at_start = query.get("atStart").as_bool().unwrap_or(true);
@@ -2181,6 +2287,32 @@ pub fn evaluate_refs(i: &mut Interp, cx: &FsContext, query: &Value) -> R<Vec<Ref
     let q = QueryCx::new(&st);
     let ents = eval(i, &q, query)?;
     Ok(ents.iter().map(|e| q.to_ref(e)).collect())
+}
+
+/// Onshape's evaluateQuery order where we know it: ascending transient id, the order entities were made in (live
+/// 1995). A body's edges along a sketch's curves were made in that sketch's order: a region's boundary keeps it
+/// through the extrude and the extract that make a sheet metal definition (cf-sheet-metal-overcut-dogbone's
+/// definition sheet lists Sketch 1's eight lines as drawn; std's dogbone takes the first of a corner's two edges).
+/// Those edges of sheets are sorted among themselves, everything else keeps its place, in what a query works out
+/// (qEverything, qOwnedByBody, qAdjacent; qIntersection keeps its first list's order): a union keeps its subqueries'
+/// (a Flange's picked edges, in pick order: Butt joint - Direction 1 follows the first, live 1599).
+pub fn live_order(q: &QueryCx, ents: &mut [Ent]) {
+    let keyed: Vec<(usize, (u32, u32))> = ents
+        .iter()
+        .enumerate()
+        .filter_map(|(i, e)| match e {
+            Ent::Edge(b, ei) => q.sketch_keys(*b).1.get(*ei).copied().flatten().map(|k| (i, k)),
+            _ => None,
+        })
+        .collect();
+    if keyed.len() < 2 || keyed.windows(2).all(|w| w[0].1 <= w[1].1) {
+        return;
+    }
+    let mut sorted: Vec<((u32, u32), Ent)> = keyed.iter().map(|(i, k)| (*k, ents[*i].clone())).collect();
+    sorted.sort_by_key(|(k, _)| *k);
+    for ((at, _), (_, e)) in keyed.iter().zip(sorted) {
+        ents[*at] = e;
+    }
 }
 
 /// Evaluate to entities and run `f` with the query context.

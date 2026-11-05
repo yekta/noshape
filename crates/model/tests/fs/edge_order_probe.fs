@@ -1,5 +1,6 @@
 FeatureScript 3095;
 import(path : "onshape/std/geometry.fs", version : "3095.0");
+import(path : "onshape/std/sheetMetalAttribute.fs", version : "3095.0");
 
 function r6(x) { return roundToPrecision(x, 6); }
 function vs(v) { return r6(v[0] / millimeter) ~ "," ~ r6(v[1] / millimeter) ~ "," ~ r6(v[2] / millimeter); }
@@ -39,11 +40,19 @@ export const edgeOrderProbe = defineFeature(function(context is Context, id is I
         isLength(definition.y, LENGTH_BOUNDS);
         annotation { "Name" : "Z" }
         isLength(definition.z, LENGTH_BOUNDS);
+        annotation { "Name" : "Sheet metal definition" }
+        definition.definition is boolean;
     }
     {
         const p = vector(definition.x, definition.y, definition.z);
-        const walls = evaluateQuery(context, qContainsPoint(qEverything(EntityType.FACE), p));
-        const pts = evaluateQuery(context, qContainsPoint(qEverything(EntityType.VERTEX), p));
+        var walls = evaluateQuery(context, qContainsPoint(qEverything(EntityType.FACE), p));
+        var pts = evaluateQuery(context, qContainsPoint(qEverything(EntityType.VERTEX), p));
+        // The (hidden) sheet metal definition's entities there instead: what std sheet metal features work on.
+        if (definition.definition)
+        {
+            walls = evaluateQuery(context, qUnion(getSMDefinitionEntities(context, qUnion(walls), EntityType.FACE)));
+            pts = evaluateQuery(context, qUnion(getSMDefinitionEntities(context, qUnion(pts), EntityType.VERTEX)));
+        }
         var k = 0;
         for (var w in walls)
         {
