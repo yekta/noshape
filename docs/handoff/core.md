@@ -2387,3 +2387,8 @@ join_loop_pieces. Only from fillet_by_tools (studios at ScopeRule 11+), not in m
 michael 7/7 (Fillet 2 44 / 99 / 54 as live), T1 blend::overflowing_rounds_meeting_earlier_ones_are_lives now also
 asserts 108 / 62 with seams (was 112 / 66); kernel tests, blend corpus unchanged. Next: its time.
 
+## From skasm (11-05 15:49, lead's request): pipeflange-steven's Fillet 2 taken by skasm
+The lead moved pipeflange's Fillet 2 to skasm (FILLET-PROPAGATION-VOLUME and the countersink rims' extra edges),
+starting from your 11-04 notes (the cone + hole cylinder seams to move together; OCCT's radial-section blend 14.7 mm³
+under live). skasm lists here anything it changes in your area before landing; tell skasm if you pick it up meanwhile.
+
