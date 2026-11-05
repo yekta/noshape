@@ -879,7 +879,7 @@ pub fn body_draft(ev: &mut EvalCtx) -> FResult<()> {
                 .iter()
                 .filter(|f| {
                     let Some(p) = point_on_face(f) else { return false };
-                    faces.iter().any(|&o| k::make_vertex(p).and_then(|v| k::distance(&v, &all[o])).is_ok_and(|d| d.distance < 1e-7))
+                    faces.iter().any(|&o| all[o].contains_point(p, 1e-7).unwrap_or(false))
                         && face_normal_near(f, p).is_some_and(|(_, n)| n.normalize().dot(pull).abs() < 1.0 - 1e-9)
                 })
                 .cloned()

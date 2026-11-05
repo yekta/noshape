@@ -960,6 +960,14 @@ User P1 (spinner and a leftover Surface 1 after cancelling a Displacement map; 7
   evaluated) instead of 17.4 s on a blank one. T1 regen::a_snapshot_regenerates_only_what_changed.
 Once your kernel steps stop on abort, the grace rarely expires; nothing else depends on them.
 
+## From dx (11-05 12:03, lead's request): point_on_face on free-form faces, in your helpers_a.rs
+`helpers_a::point_on_face` keeps the projected centroid for planes, cylinders, cones, spheres and tori; a free-form
+face (B-spline, Bezier, extrusion, revolution, offset) now gets `inner_point` (uv samples classified, the centroid as
+the fallback): its 16 callers (draft, replace face, section blend, patterns, rib naming, shell) only need a point on
+the face for a normal or a side test. blend_section's and draft's "lies on that face" tests take the face
+classifier instead of BRepExtrema. Corpus runs 122 / 123: results identical; vibe5's load (5-6) swamps the timing
+(totals without cf-straight-spline 18.7 / 15.1 s, mostly noise).
+
 ## From dx (11-05 11:20, lead's request): Shell's checks on a swept hose (cf-hose-routing), in your detail.rs
 The lead gave dx cf-hose-routing's per-feature Shell (161 of 179 ms; live's whole feature 85-113 ms). The kernel shell
 was 21 ms of it: the rest was `shell_part`'s own checks. `shell_is_whole` and the opened test measured each face's

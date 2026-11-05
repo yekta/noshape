@@ -419,13 +419,23 @@ pub fn face_normal_near(face: &Shape, p: DVec3) -> Option<(DVec3, DVec3)> {
 }
 
 /// A point on a face (projection of its centroid).
+/// A point on `face`: an elementary face's centroid projected onto it; a free-form one's [`inner_point`] (the
+/// centroid's integration and projection took 7-100 ms on a swept hose's B-spline faces).
 pub fn point_on_face(face: &Shape) -> Option<DVec3> {
+    use noshape_kernel::Surface as S;
+    match face.face_surface() {
+        Ok(S::Plane(_) | S::Cylinder { .. } | S::Cone { .. } | S::Sphere { .. } | S::Torus { .. }) => centroid_on_face(face),
+        _ => inner_point(face),
+    }
+}
+
+fn centroid_on_face(face: &Shape) -> Option<DVec3> {
     let c = face.centroid().ok()?;
     face.project_point(c).ok().map(|p| p.point)
 }
 
-/// A point inside `face`, cheaply: its parameters' middle or a few others when on it, else [`point_on_face`] (the
-/// centroid's integration and projection took 7-100 ms on a swept hose's B-spline faces).
+/// A point inside `face`, cheaply: its parameters' middle or a few others when on it, else its centroid projected
+/// onto it.
 pub fn inner_point(face: &Shape) -> Option<DVec3> {
     if let Ok([u0, u1, v0, v1]) = face.uv_bounds() {
         let at = |a: f64, b: f64| face.point_at_uv(u0 + (u1 - u0) * a, v0 + (v1 - v0) * b).ok();
@@ -434,7 +444,7 @@ pub fn inner_point(face: &Shape) -> Option<DVec3> {
             return inside;
         }
     }
-    point_on_face(face)
+    centroid_on_face(face)
 }
 
 pub fn v2(x: f64, y: f64) -> DVec2 {

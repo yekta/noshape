@@ -537,7 +537,7 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
         let supports: Vec<&Shape> = chain.iter().flat_map(|c| ef.get(c.index).cloned().unwrap_or_default()).map(|f| &faces[f as usize]).collect();
         let on = |f: &Shape, s: &Shape| -> bool {
             let Some(q) = super::helpers_a::point_on_face(f) else { return false };
-            k::make_vertex(q).and_then(|v| k::distance(&v, s)).is_ok_and(|d| d.distance < scale * 1e-6)
+            s.contains_point(q, scale * 1e-6).unwrap_or(false)
         };
         let names: Vec<Name> = tool.shape.faces().iter().map(|f| if (f.is_planar() && secs.iter().any(|s| on(f, s))) || supports.iter().any(|s| on(f, s)) { generated.clone() } else { blend.clone() }).collect();
         let named = NamedShape::new(tool.shape, names);
