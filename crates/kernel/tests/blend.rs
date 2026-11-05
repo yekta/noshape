@@ -829,7 +829,8 @@ fn rust_blends_close_but_apart_are_occts() {
 
 /// Live "kern f2 W1": a 60 x 40 x 20 block with a 4 x 40 x 5 rib on top, R2 on both of the rib's top edges: a full
 /// round, one half-cylinder (48731.32741228718 mm³, 10 faces: 9 planes, 1 cylinder). OCCT's (a hair smaller, the
-/// rib top removed) is two cylinders on one axis, merged. R2.5 (past half the rib): two cylinders, as live.
+/// rib top removed) is two cylinders on one axis, merged. R2.5 (past half the rib): two cylinders, as live. Each end of
+/// the full round is one arc once its halves are joined (live clamp-guillem's Redondeo 2: a slot's full round, 95 edges).
 #[test]
 fn a_full_round_is_one_face_as_lives() {
     setup();
@@ -843,6 +844,9 @@ fn a_full_round_is_one_face_as_lives() {
         assert!(res.shape.is_valid(), "R{r}");
         assert!((vol_mm3(&res.shape) - want).abs() < 1e-3, "R{r}: {}", vol_mm3(&res.shape));
         assert_eq!((res.shape.faces().len(), cylinders(&res.shape)), (faces, cyl), "R{r}");
+        let joined = join_edges(&res.shape).unwrap().shape;
+        let arcs = joined.edges().iter().filter(|e| matches!(e.edge_curve(), Ok(Curve::Circle { .. }))).count();
+        assert_eq!(arcs, 2 * cyl, "R{r}");
     }
 }
 

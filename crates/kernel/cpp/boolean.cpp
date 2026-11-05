@@ -3468,7 +3468,9 @@ bool one_circle(const TopoDS_Edge& a, const TopoDS_Edge& b)
   if (ca.GetType() != GeomAbs_Circle || cb.GetType() != GeomAbs_Circle)
     return false;
   const gp_Circ x = ca.Circle(), y = cb.Circle();
-  const double  tol = std::max(BRep_Tool::Tolerance(a), BRep_Tool::Tolerance(b));
+  // (At least OCCT's confusion: a blend built at the working scale comes back with 1e-10 m edges, and a full round's
+  // two halves, a hair smaller, have centres 1.5e-9 m apart: clamp-guillem's slot.)
+  const double tol = std::max({BRep_Tool::Tolerance(a), BRep_Tool::Tolerance(b), Precision::Confusion()});
   return x.Location().Distance(y.Location()) <= tol && std::abs(x.Radius() - y.Radius()) <= tol && x.Axis().Direction().IsParallel(y.Axis().Direction(), 1e-9);
 }
 
@@ -3680,7 +3682,10 @@ TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist)
           const double ku = pu > 0 ? std::round((e0.X() - s0.X()) / pu) : 0, kv = pv > 0 ? std::round((e0.Y() - s0.Y()) / pv) : 0;
           if (ku != 0 || kv != 0)
             b2[k]->Translate(gp_Vec2d(ku * pu, kv * pv));
-          if (b2[k]->StartPoint().Distance(e0) > 1e-7)
+          // (Apart in the parameters but not in space: a full round's halves, a hair smaller, have centres 1.5e-9 m apart,
+          // 2e-7 rad on a 7.5 mm cylinder.)
+          const gp_Pnt2d s1 = b2[k]->StartPoint();
+          if (s1.Distance(e0) > 1e-7 && g->Value(s1.X(), s1.Y()).Distance(g->Value(e0.X(), e0.Y())) > std::max(tol, Precision::Confusion()))
             ok = false;
         }
       }
@@ -3719,7 +3724,7 @@ TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist)
         if (k == 0)
           circ = c;
         else
-          one = c.Location().Distance(circ.Location()) <= tol && std::abs(c.Radius() - circ.Radius()) <= tol && c.Axis().Direction().IsParallel(circ.Axis().Direction(), 1e-9);
+          one = c.Location().Distance(circ.Location()) <= std::max(tol, Precision::Confusion()) && std::abs(c.Radius() - circ.Radius()) <= std::max(tol, Precision::Confusion()) && c.Axis().Direction().IsParallel(circ.Axis().Direction(), 1e-9);
         len += GCPnts_AbscissaPoint::Length(ck);
       }
       if (one)
