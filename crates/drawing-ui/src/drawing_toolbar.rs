@@ -88,7 +88,10 @@ impl TbTool {
             None => crate::ui::tool_button(self.id, self.icon, self.active, cx).w(px(CELL)).h(px(CELL)).when(self.active, |b| b.bg(ACTIVE_BG)).tooltip(self.tip).on_click(click).into_any_element(),
             Some((caret, items)) => {
                 let ed = ed.clone();
-                split(SharedString::from(format!("drg-{}", self.id)), crate::ui::split_tool_button(self.id, self.icon, self.active, cx).when(self.active, |b| b.bg(ACTIVE_BG)).tooltip(self.tip).on_click(click), crate::ui::tool_caret_blue(caret, cx).tooltip(self.tip).on_click(move |e, w, cx| open_tool_menu(&items, &ed, e, w, cx))).into_any_element()
+                // The ▾ for the ui-parity driver (`{"tool": "Dimension", "menu": …}`).
+                let tip = self.tip;
+                let more = crate::ui_script::mark(crate::ui::tool_caret_blue(caret, cx).tooltip(self.tip).on_click(move |e, w, cx| open_tool_menu(&items, &ed, e, w, cx)), || format!("caret:{}", tip.split(" (").next().unwrap_or(tip)));
+                split(SharedString::from(format!("drg-{}", self.id)), crate::ui::split_tool_button(self.id, self.icon, self.active, cx).when(self.active, |b| b.bg(ACTIVE_BG)).tooltip(self.tip).on_click(click), more).into_any_element()
             }
         }
     }

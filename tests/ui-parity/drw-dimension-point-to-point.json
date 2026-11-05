@@ -1,0 +1,60 @@
+{
+ "name": "drw-dimension-point-to-point",
+ "about": "2 point linear dimension between two opposite corners of the Front view (Dimension ▾ › 2 point linear dimension), placed above it",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "drawing scenarios, second batch (lead 11-05 20:3x)",
+ "start": "hole-plate-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension",
+    "menu": "2 point linear dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      -20,
+      -20,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      20,
+      -20,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      0,
+      -20,
+      32
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

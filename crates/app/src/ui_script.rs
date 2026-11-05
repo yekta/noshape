@@ -65,7 +65,9 @@ fn opens_on_tab() -> Option<String> {
     let starts = std::env::var_os("NOSHAPE_UI_STARTS").map(PathBuf::from).unwrap_or_else(|| path.with_file_name("starts.json"));
     let start = read_json(&starts).ok()?[name].clone();
     if let Some(d) = start.get("drawing") {
-        return Some(format!("{} Drawing 1", d["part"].as_str().unwrap_or("Part 1")));
+        // (A drawing of the start's assembly is named after its tab.)
+        let of = if d["assembly"] == true { format!("start {name} asm") } else { d["part"].as_str().unwrap_or("Part 1").to_string() };
+        return Some(format!("{of} Drawing 1"));
     }
     start.get("assembly").map(|_| format!("start {name} asm"))
 }

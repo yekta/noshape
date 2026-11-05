@@ -391,7 +391,7 @@ impl DrawingEditor {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd3d7d9))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Weld symbol"))
-                        .child(div().id("weld-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().bg(gpui_kit::rgb(0x009500)).when(!can_accept, |d| d.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED))).child(crate::ui::glyph("check", 18., gpui_kit::white())).when(can_accept, |d| d.on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_weld_dlg(true, cx)))))
+                        .child(div().id("weld-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().bg(gpui_kit::rgb(0x009500)).when(!can_accept, |d| d.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED))).child(crate::drawing_chrome::ok_check(18.)).when(can_accept, |d| d.on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_weld_dlg(true, cx)))))
                         .child(div().id("weld-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_weld_dlg(false, cx)))),
                 )
                 .child(

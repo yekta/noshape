@@ -296,7 +296,7 @@ impl DrawingEditor {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd3d7d9))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Callout"))
-                        .child(div().id("callout-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().bg(gpui_kit::rgb(0x009500)).when(!editing, |d| d.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED))).child(crate::ui::glyph("check", 18., gpui_kit::white())).when(editing, |d| d.on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_callout_dlg(true, cx)))))
+                        .child(div().id("callout-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().bg(gpui_kit::rgb(0x009500)).when(!editing, |d| d.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED))).child(crate::drawing_chrome::ok_check(18.)).when(editing, |d| d.on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_callout_dlg(true, cx)))))
                         .child(div().id("callout-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_callout_dlg(false, cx)))),
                 )
                 .child(
@@ -511,7 +511,7 @@ impl DrawingEditor {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd3d7d9))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Stacked callouts"))
-                        .child(div().id("stack-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().bg(gpui_kit::rgb(0x009500)).child(crate::ui::glyph("check", 18., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_stack_dlg(true, cx))))
+                        .child(div().id("stack-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().bg(gpui_kit::rgb(0x009500)).child(crate::drawing_chrome::ok_check(18.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_stack_dlg(true, cx))))
                         .child(div().id("stack-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_stack_dlg(false, cx)))),
                 )
                 .child(h_flex().px(px(8.)).gap(px(10.)).child(div().text_size(px(11.)).child("Anchor:")).child(div().text_size(px(11.)).child(anchor.unwrap_or_default())))

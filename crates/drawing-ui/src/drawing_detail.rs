@@ -431,7 +431,7 @@ impl DrawingEditor {
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Detail view"))
                         // ✓ (live asbv-5: green rgb(0,149,0)): applies Edit detail;
                         // pale while creating (the click on the sheet places).
-                        .child(div().id("det-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().bg(gpui_kit::rgb(0x009500)).when(!editing, |d| d.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED))).child(crate::ui::glyph("check", 18., gpui_kit::white())).when(editing, |d| d.on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_detail_edit(true, cx)))))
+                        .child(div().id("det-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().bg(gpui_kit::rgb(0x009500)).when(!editing, |d| d.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED))).child(crate::drawing_chrome::ok_check(18.)).when(editing, |d| d.on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_detail_edit(true, cx)))))
                         .child(
                             div()
                                 .id("det-cancel")

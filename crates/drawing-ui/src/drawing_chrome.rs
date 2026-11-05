@@ -10,9 +10,14 @@ use gpui_kit::*;
 /// The disabled ✓ cell's fill.
 pub const OK_DISABLED: u32 = 0xcae8ca;
 
-/// The ✕ of a drawing tool dialog's header.
+/// The ✕ of a drawing tool dialog's header (`{"button": "cancel"}` for the ui-parity driver).
 pub fn cancel_x(cx: &App) -> AnyElement {
-    crate::assets::icon("drawing-cancel", 17., cx)
+    crate::ui_script::wrap(crate::assets::icon("drawing-cancel", 17., cx), || "button:cancel".into())
+}
+
+/// The ✓ of a drawing tool dialog's header, `size` px (`{"button": "ok"}` for the ui-parity driver).
+pub fn ok_check(size: f32) -> AnyElement {
+    crate::ui_script::wrap(crate::ui::glyph("check", size, gpui_kit::white()).into_any_element(), || "button:ok".into())
 }
 
 /// The drawing tool dialogs' shadow (live dom drawing-detail-dialog:

@@ -529,7 +529,7 @@ impl DrawingEditor {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd3d7d9))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Geometric tolerance"))
-                        .child(div().id("gdt-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009500)).when(!can_accept, |d| d.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED))).when(can_accept, |d| d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_gdt_dlg(true, cx)))).child(crate::ui::glyph("check", 18., gpui_kit::white())))
+                        .child(div().id("gdt-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009500)).when(!can_accept, |d| d.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED))).when(can_accept, |d| d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_gdt_dlg(true, cx)))).child(crate::drawing_chrome::ok_check(18.)))
                         .child(div().id("gdt-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_gdt_dlg(false, cx)))),
                 )
                 .child(

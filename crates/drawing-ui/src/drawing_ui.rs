@@ -147,7 +147,7 @@ impl DrawingEditor {
                         .gap_1()
                         .child(div().flex_1().font_weight(FontWeight::SEMIBOLD).child(title))
                         .when(checkmark, |h| {
-                            h.child(div().id("dr-panel-check").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_panel(cx))))
+                            h.child(div().id("dr-panel-check").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().child(crate::drawing_chrome::ok_check(16.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_panel(cx))))
                                 .child(div().id("dr-panel-x").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel_panel(cx))))
                         }),
                 )
@@ -204,7 +204,7 @@ impl DrawingEditor {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd3d7d9))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Note"))
-                        .child(div().id("note-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009500)).cursor_pointer().child(crate::ui::glyph("check", 18., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_panel(cx))))
+                        .child(div().id("note-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009500)).cursor_pointer().child(crate::drawing_chrome::ok_check(18.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_panel(cx))))
                         .child(div().id("note-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.discard_inplace(cx)))),
                 )
                 .child(v_flex().p(px(4.)).text_size(px(12.)).children(rows))

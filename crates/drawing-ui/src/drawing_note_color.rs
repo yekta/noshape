@@ -233,7 +233,7 @@ impl DrawingEditor {
                                 .justify_center()
                                 .bg(if changed { pal.accept } else { gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED) })
                                 .when(changed, |e| e.cursor_pointer())
-                                .child(crate::ui::glyph("check", 18., gpui_kit::white()))
+                                .child(crate::drawing_chrome::ok_check(18.))
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     if changed {
                                         this.close_note_color(true, cx)

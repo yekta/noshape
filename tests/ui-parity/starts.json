@@ -532,5 +532,198 @@
    "views": "none"
   },
   "about": "the 40 x 30 x 10 block and an empty drawing of it (Create Drawing of Part 1, ANSI_A_INCH.dwt, No views); opens on the drawing tab"
+ },
+ "hole-plate-drawing": {
+  "units": "mm",
+  "features": [
+   {
+    "type": "newSketch",
+    "name": "Sketch 1",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        -20,
+        -20
+       ],
+       [
+        20,
+        20
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 1",
+    "params": {
+     "entities": [
+      "Sketch 1 region 0"
+     ],
+     "endBound": "BLIND",
+     "depth": "20 mm",
+     "operationType": "NEW"
+    }
+   },
+   {
+    "type": "newSketch",
+    "name": "Sketch 2",
+    "plane": "Top",
+    "shapes": [
+     {
+      "circle": [
+       [
+        0,
+        0
+       ],
+       [
+        5,
+        0
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 2",
+    "params": {
+     "entities": [
+      "Sketch 2 region 0"
+     ],
+     "endBound": "THROUGH_ALL",
+     "operationType": "REMOVE",
+     "oppositeDirection": false
+    }
+   }
+  ],
+  "drawing": {
+   "part": "Part 1",
+   "template": "ANSI_A_INCH.dwt",
+   "views": "suggested"
+  },
+  "about": "a 40 x 40 x 20 mm plate centred on the origin (Sketch 1's square on Top, extruded 20 mm) with a 10 mm hole through it along z (Sketch 2's circle, Extrude 2 Remove Through all), and its drawing (Create Drawing of Part 1, ANSI_A_INCH.dwt, Suggested views); opens on the drawing tab"
+ },
+ "pin-block-asm-drawing": {
+  "units": "mm",
+  "features": [
+   {
+    "type": "newSketch",
+    "name": "Sketch 1",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        -20,
+        -20
+       ],
+       [
+        20,
+        20
+       ]
+      ]
+     },
+     {
+      "circle": [
+       [
+        0,
+        0
+       ],
+       [
+        5,
+        0
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 1",
+    "params": {
+     "entities": [
+      "Sketch 1 region 1"
+     ],
+     "endBound": "BLIND",
+     "depth": "20 mm",
+     "operationType": "NEW"
+    }
+   },
+   {
+    "type": "newSketch",
+    "name": "Sketch 2",
+    "plane": "Top",
+    "shapes": [
+     {
+      "circle": [
+       [
+        60,
+        0
+       ],
+       [
+        65,
+        0
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 2",
+    "params": {
+     "entities": [
+      "Sketch 2 region 0"
+     ],
+     "endBound": "BLIND",
+     "depth": "30 mm",
+     "operationType": "NEW"
+    }
+   }
+  ],
+  "assembly": {
+   "instances": [
+    {
+     "part": "Part 1",
+     "fixed": true
+    },
+    {
+     "part": "Part 2"
+    }
+   ],
+   "mates": [
+    {
+     "type": "Revolute",
+     "name": "Revolute 1",
+     "a": {
+      "instance": "Part 2 <1>",
+      "face": [
+       65,
+       0,
+       15
+      ],
+      "inference": "mid_axis"
+     },
+     "b": {
+      "instance": "Part 1 <1>",
+      "face": [
+       5,
+       0,
+       10
+      ],
+      "inference": "mid_axis"
+     }
+    }
+   ]
+  },
+  "drawing": {
+   "assembly": true,
+   "template": "ANSI_A_INCH.dwt",
+   "views": "suggested"
+  },
+  "about": "pin-block (Part 1 and Part 2, Revolute 1 in its assembly) and a drawing of the assembly (Create Drawing of it, ANSI_A_INCH.dwt, Suggested views); opens on the drawing tab"
  }
 }

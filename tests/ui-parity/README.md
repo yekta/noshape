@@ -82,7 +82,7 @@ A target a side can't find makes that step `"ok": false` with `"error"`; the run
 ### Drawings (dx, 11-05)
 A start may add `"drawing": {"part": "Part 1", "template": "ANSI_A_INCH.dwt", "views": "suggested" | "none"}`: Create
 Drawing of that part with that template (the dialog's Suggested views or No views), and the run opens on that drawing
-tab (live's name "Part 1 Drawing 1"). Targets in a drawing:
+tab (live's name "Part 1 Drawing 1"); `"assembly": true` instead of `"part"`: Create Drawing of the start's assembly. Targets in a drawing:
 - `{"sheet_point": [x, y]}`: a point of the sheet, mm from its lower-left corner (an ANSI A sheet is 279.4 × 215.9);
 - `{"view": "Front"}`: a view (its middle), by the name its properties show;
 - `{"view_point": {"view": "Top", "at": [x, y, z]}}`: model point (mm) where it shows in that view;

@@ -274,7 +274,7 @@ impl DrawingEditor {
                                 .justify_center()
                                 .bg(if pending { pal.accept } else { gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED) })
                                 .cursor_pointer()
-                                .child(crate::ui::glyph("check", 18., gpui_kit::white()))
+                                .child(crate::drawing_chrome::ok_check(18.))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_crop(cx))),
                         )
                         .child(div().id("crop-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel(cx)))),

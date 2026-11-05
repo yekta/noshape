@@ -135,13 +135,17 @@ impl DrawingEditor {
                     _ => None,
                 };
                 let scale = self.placement(v.id).map(|p| noshape_model::drawing::sheet::format_scale(p.scale));
-                json!({ "name": self.ui_view_name(v.id), "kind": self.ui_view_kind(v.id), "parent": parent, "scale": scale })
+                json!({ "name": self.ui_view_name(v.id), "kind": self.ui_view_kind(v.id), "parent": parent, "scale": scale, "brokenOut": v.broken_out.len() })
             })
             .collect();
         views.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
         let mut annotations: Vec<(&str, String)> = self.ui_annotations().into_iter().map(|(_, k, t)| (k, t)).collect();
-        // A view's label is a note in live's export ("SECTION A - A", 2063).
+        // A view's label is a note in live's export ("SECTION A - A", 2063); a table its drawn texts.
         if let Some(b) = &self.built {
+            for t in &sheet.tables {
+                let parts: Vec<&str> = b.geometry.texts.iter().filter(|x| matches!(b.picks.get(x.pick as usize), Some(PickTarget::Table(id)) if *id == t.id)).map(|x| x.text.as_str()).collect();
+                annotations.push(("table", parts.join(" ").split_whitespace().collect::<Vec<_>>().join(" ")));
+            }
             for v in &sheet.views {
                 let parts: Vec<&str> = b.geometry.texts.iter().filter(|t| matches!(b.picks.get(t.pick as usize), Some(PickTarget::ViewLabel(x)) if *x == v.id)).map(|t| t.text.as_str()).collect();
                 let text = parts.join(" ").split_whitespace().collect::<Vec<_>>().join(" ");
@@ -244,6 +248,10 @@ fn ui_tool_name(t: &Tool) -> Option<&'static str> {
         Tool::Gdt => "Geometric tolerance",
         Tool::SurfaceFinish => "Surface finish symbol",
         Tool::Weld => "Weld symbol",
-        _ => "other",
+        Tool::BrokenOut { .. } => "Broken-out section",
+        Tool::Balloon { .. } => "Callout",
+        Tool::EdgeCondition => "Edge condition symbol",
+        // The rest by the tool's own name (the table tools, Crop, Break… as their tooltips).
+        t => t.name(),
     })
 }

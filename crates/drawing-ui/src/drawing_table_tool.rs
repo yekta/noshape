@@ -166,7 +166,7 @@ impl DrawingEditor {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd3d7d9))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Table"))
-                        .child(div().id("tt-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(if placed { pal.accept } else { gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED) }).when(placed, |e| e.cursor_pointer()).child(crate::ui::glyph("check", 18., gpui_kit::white())).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        .child(div().id("tt-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(if placed { pal.accept } else { gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED) }).when(placed, |e| e.cursor_pointer()).child(crate::drawing_chrome::ok_check(18.)).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                             // ✓ stays disabled until the table is placed (live 530).
                             if placed {
                                 this.close_table_tool(true, window, cx)

@@ -1,0 +1,47 @@
+{
+ "name": "drw-dimension-radius",
+ "about": "Radial dimension of the hole in the Top view (Dimension ▾ › Radial dimension), placed up and left of it",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "drawing scenarios, second batch (lead 11-05 20:3x)",
+ "start": "hole-plate-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension",
+    "menu": "Radial dimension (shift+r)"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Top",
+     "at": [
+      -3.5355,
+      3.5355,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Top",
+     "at": [
+      -12,
+      14,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

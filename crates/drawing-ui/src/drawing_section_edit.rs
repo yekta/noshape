@@ -178,7 +178,7 @@ impl DrawingEditor {
                         .h(px(28.))
                         .pl(px(10.))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Section view"))
-                        .child(div().id("se-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_section_edit(true, cx))))
+                        .child(div().id("se-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().child(crate::drawing_chrome::ok_check(16.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_section_edit(true, cx))))
                         .child(div().id("se-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., pal.cancel)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_section_edit(false, cx)))),
                 )
                 .child(div().px(px(10.)).h(px(26.)).flex().items_center().text_size(px(12.)).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).child(label))

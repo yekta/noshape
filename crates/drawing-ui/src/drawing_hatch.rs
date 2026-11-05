@@ -606,7 +606,7 @@ impl DrawingEditor {
                                 .bg(gpui_kit::rgb(0x009500))
                                 .when(ok_disabled, |e| e.bg(gpui_kit::rgb(crate::drawing_chrome::OK_DISABLED)))
                                 .cursor_pointer()
-                                .child(crate::ui::glyph("check", 18., gpui_kit::white()))
+                                .child(crate::drawing_chrome::ok_check(18.))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_hatch(cx))),
                         )
                         .child(

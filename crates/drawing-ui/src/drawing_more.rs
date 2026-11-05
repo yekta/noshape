@@ -625,7 +625,7 @@ impl DrawingEditor {
                 h_flex()
                     .gap_1()
                     .child(div().flex_1().font_weight(FontWeight::SEMIBOLD).child("Broken-out section"))
-                    .child(div().w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).opacity(0.3).child(crate::ui::glyph("check", 16., gpui_kit::white())))
+                    .child(div().w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).opacity(0.3).child(crate::drawing_chrome::ok_check(16.)))
                     .child(div().id("dr-bo-start-x").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_tool(Tool::Select, cx)))),
             )
             .children(self.broken_out_profile_rows(false, cx))

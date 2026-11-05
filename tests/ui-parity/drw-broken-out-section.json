@@ -1,0 +1,91 @@
+{
+ "name": "drw-broken-out-section",
+ "about": "Broken-out section on the Front view around the hole: a closed spline of four points through Front (the profile's default Spline), Blind with its default depth, ✓",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "drawing scenarios, second batch (lead 11-05 20:3x)",
+ "start": "hole-plate-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Broken-out section"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      -8,
+      -20,
+      5
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      8,
+      -20,
+      5
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      8,
+      -20,
+      15
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      -8,
+      -20,
+      15
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      -8,
+      -20,
+      5
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

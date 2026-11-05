@@ -88,16 +88,23 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
             call(ctx, "feature_rename", json!({ "feature": made, "name": name })).map_err(what)?;
         }
     }
+    // Live's runner names an assembly after the start ("start pin-block asm").
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("start");
+    let asm_tab = format!("start {stem} asm");
     if let Some(asm) = start.get("assembly") {
         build_assembly(ctx, asm)?;
-        // Live's runner names it after the start ("start pin-block asm").
-        let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("start");
-        call(ctx, "tab_rename", json!({ "tab": "Assembly 1", "name": format!("start {stem} asm") }))?;
+        call(ctx, "tab_rename", json!({ "tab": "Assembly 1", "name": asm_tab }))?;
     }
     // A drawing of a part (README "### Drawings"): Create Drawing of it, the run opening on its tab ("Part 1 Drawing 1").
     if let Some(d) = start.get("drawing") {
-        let part = d["part"].as_str().unwrap_or("Part 1");
-        let made = call(ctx, "drawing_create", json!({ "source": "Part Studio 1", "part": part, "template": d["template"].as_str().unwrap_or("ANSI_A_INCH.dwt"), "suggested_views": d["views"].as_str() == Some("suggested") }));
+        let template = d["template"].as_str().unwrap_or("ANSI_A_INCH.dwt");
+        let suggested = d["views"].as_str() == Some("suggested");
+        // A part's drawing, or (`"assembly": true`) the start's assembly's.
+        let made = if d["assembly"] == true {
+            call(ctx, "drawing_create", json!({ "source": asm_tab, "template": template, "suggested_views": suggested }))
+        } else {
+            call(ctx, "drawing_create", json!({ "source": "Part Studio 1", "part": d["part"].as_str().unwrap_or("Part 1"), "template": template, "suggested_views": suggested }))
+        };
         made.map_err(|e| format!("start drawing: {e}"))?;
     }
     Ok(())

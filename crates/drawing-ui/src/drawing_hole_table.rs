@@ -379,7 +379,7 @@ impl DrawingEditor {
                                 .justify_center()
                                 .bg(pal.accept)
                                 .when(!origin, |d| d.opacity(0.3))
-                                .child(crate::ui::glyph("check", 16., gpui_kit::white()))
+                                .child(crate::drawing_chrome::ok_check(16.))
                                 .when(editing.is_some(), |d| d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_hole_table_props(true, cx))))
                                 // Inserting (live request 1682): ✓ places the table with its
                                 // fixed corner at the pointer's last spot on the sheet.

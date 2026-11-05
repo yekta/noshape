@@ -260,7 +260,7 @@ impl DrawingEditor {
                                 .justify_center()
                                 .bg(gpui_kit::rgb(if ready { 0x009500 } else { crate::drawing_chrome::OK_DISABLED }))
                                 .cursor_pointer()
-                                .child(crate::ui::glyph("check", 18., gpui_kit::white()))
+                                .child(crate::drawing_chrome::ok_check(18.))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_replicate(true, cx))),
                         )
                         .child(div().id("rr-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_replicate(false, cx)))),

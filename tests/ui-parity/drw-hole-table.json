@@ -1,0 +1,45 @@
+{
+ "name": "drw-hole-table",
+ "about": "Hole table of the Top view: the tool, the Top view, its lower-left corner as the origin, ✓",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "drawing scenarios, second batch (lead 11-05 20:3x)",
+ "start": "hole-plate-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole table"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Top",
+     "at": [
+      -20,
+      -20,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

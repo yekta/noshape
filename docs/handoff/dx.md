@@ -167,6 +167,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   selected, Insert view's placed view drawn as the parent (EDGE) until the next view. drw-*: 7/8, 42/45; left only
   Insert view's default scale (2067: 40 mm block 2:1, 80 mm 1:1 picking Part 1, against 1812's Part Studio picks
   rejecting 80 mm: REQUESTS asks for both ways).
+- 21:01: 8 more drawing scenarios (lead): drw-dimension-diameter / -radius / -point-to-point / -angular,
+  drw-detail-view, drw-broken-out-section, drw-hole-table, drw-bom-table; starts hole-plate-drawing (a 40 x 40 x 20
+  plate with a 10 mm hole, Remove Through all with oppositeDirection false: our Remove's default flips) and
+  pin-block-asm-drawing (`"drawing": {"assembly": true}`). All run on ours, every step OK. The driver gained: the
+  drawing toolbar's ▾ (caret:<tool>), the panels' ✓ / ✕ (button:ok / cancel), the tables in `annotations` (their drawn
+  text), a view's broken-out count. Live asked to record them (REQUESTS).
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem

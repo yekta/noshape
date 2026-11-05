@@ -2024,7 +2024,7 @@ impl DrawingEditor {
                     .border_b_1()
                     .border_color(rgb(0xd3d7d9))
                     .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Rename"))
-                    .child(div().id("row-rename-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(rgb(0x009500)).cursor_pointer().child(crate::ui::glyph("check", 18., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_row_rename(true, cx))))
+                    .child(div().id("row-rename-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(rgb(0x009500)).cursor_pointer().child(crate::drawing_chrome::ok_check(18.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_row_rename(true, cx))))
                     .child(div().id("row-rename-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_row_rename(false, cx)))),
             )
             .child(div().p(px(4.)).child(Input::new(st).small()));

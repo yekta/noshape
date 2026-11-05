@@ -317,7 +317,7 @@ impl DrawingEditor {
                                 .justify_center()
                                 .bg(gpui_kit::rgb(0x009500))
                                 .cursor_pointer()
-                                .child(crate::ui::glyph("check", 18., gpui_kit::white()))
+                                .child(crate::drawing_chrome::ok_check(18.))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_inspection(cx))),
                         ),
                 )

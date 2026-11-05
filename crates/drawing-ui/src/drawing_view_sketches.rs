@@ -71,7 +71,7 @@ impl DrawingEditor {
                 .items_center()
                 .justify_center()
                 .cursor_pointer()
-                .when(accept, |e| e.bg(gpui_kit::rgb(0x009500)).child(crate::ui::glyph("check", 18., gpui_kit::white())))
+                .when(accept, |e| e.bg(gpui_kit::rgb(0x009500)).child(crate::drawing_chrome::ok_check(18.)))
                 .when(!accept, |e| e.child(crate::drawing_chrome::cancel_x(cx)))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.close_view_sketches(accept, cx)))
         };

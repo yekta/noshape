@@ -1,0 +1,60 @@
+{
+ "name": "drw-dimension-angular",
+ "about": "Line to line angular dimension between the two top edges meeting at the near corner in the Isometric view, placed inside the top face (the corner's 120° on the sheet)",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "drawing scenarios, second batch (lead 11-05 20:3x)",
+ "start": "hole-plate-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension",
+    "menu": "Line to line angular dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Isometric",
+     "at": [
+      0,
+      -20,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Isometric",
+     "at": [
+      20,
+      0,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Isometric",
+     "at": [
+      12,
+      -12,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
