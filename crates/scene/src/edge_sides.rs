@@ -49,6 +49,8 @@ pub fn edge_facet_normals(m: &MeshBuffers) -> EdgeFacetNormals {
     m.edges
         .iter()
         .map(|pl| {
+            // Neighbouring segments have about the same clearance: each one's search starts at the last one's.
+            let mut guess = CLEARANCE_CODES;
             (0..pl.len().saturating_sub(1))
                 .map(|si| {
                     let (a, b) = (pl[si], pl[si + 1]);
@@ -57,8 +59,13 @@ pub fn edge_facet_normals(m: &MeshBuffers) -> EdgeFacetNormals {
                         return None;
                     }
                     let (normals, faces) = if f0 < f1 { ([n0, n1], [f0, f1]) } else { ([n1, n0], [f1, f0]) };
-                    query += 1;
-                    let mut clearance = grid.clearance(Vec3::from(a), Vec3::from(b), faces, &mut seen, query);
+                    let mut clear = |code: u32| {
+                        query += 1;
+                        grid.clear_within(Vec3::from(a), Vec3::from(b), faces, clearance_of(code), &mut seen, query)
+                    };
+                    let code = clearance_code_search(guess.min(grid.max_code), &mut clear);
+                    guess = code.max(1);
+                    let mut clearance = if code == 0 { 0.0 } else { clearance_of(code) };
                     let mut convex = false;
                     for n in normals {
                         if let Some(r) = convex_radius(pl, si, n) {
@@ -100,69 +107,100 @@ fn convex_radius(pl: &[[f32; 3]], si: usize, n: Vec3) -> Option<f32> {
     radius
 }
 
-/// A body's triangles in a uniform grid, for the distance from a segment to the nearest triangle of other faces.
+/// The renderer's clearance levels: code `c` (1 to this) is 2^(c - 17) model units (`LineSegment::with_face_normals`).
+const CLEARANCE_CODES: u32 = 15;
+
+fn clearance_of(code: u32) -> f32 {
+    2f32.powi(code as i32 - 17)
+}
+
+/// The highest clearance code whose distance is clear (`clear(code)`, monotone: clear at a code, clear at every lower
+/// one), searching up or down from `start`; 0 if none is.
+fn clearance_code_search(start: u32, clear: &mut impl FnMut(u32) -> bool) -> u32 {
+    let top = start.max(1);
+    if clear(top) {
+        let mut c = top;
+        while c < CLEARANCE_CODES && clear(c + 1) {
+            c += 1;
+        }
+        return c;
+    }
+    (1..top).rev().find(|&c| clear(c)).unwrap_or(0)
+}
+
+/// A body's triangles in a uniform grid (the ones spanning many cells in a list of their own), for whether a
+/// segment's surroundings hold a triangle of another face.
 struct TriGrid {
     tris: Vec<([Vec3; 3], u32)>,
+    boxes: Vec<(Vec3, Vec3)>,
     cells: HashMap<[i32; 3], Vec<u32>>,
+    big: Vec<u32>,
     lo: Vec3,
     cell: f32,
-    /// Distances past this say nothing more (the renderer's largest clearance code).
-    cap: f32,
+    /// No clearance in the body is more than its size: the highest code worth trying.
+    max_code: u32,
 }
 
 impl TriGrid {
     fn new(tris: Vec<([Vec3; 3], u32)>) -> Self {
-        let (mut lo, mut hi) = (Vec3::splat(f32::INFINITY), Vec3::splat(f32::NEG_INFINITY));
-        for (t, _) in &tris {
-            for p in t {
-                lo = lo.min(*p);
-                hi = hi.max(*p);
-            }
-        }
-        let diag = (hi - lo).length();
-        let cell = (diag / 48.0).max(1e-6);
+        let boxes: Vec<(Vec3, Vec3)> = tris.iter().map(|(t, _)| (t[0].min(t[1]).min(t[2]), t[0].max(t[1]).max(t[2]))).collect();
+        let (lo, hi) = boxes.iter().fold((Vec3::splat(f32::INFINITY), Vec3::splat(f32::NEG_INFINITY)), |(lo, hi), b| (lo.min(b.0), hi.max(b.1)));
+        let diag = (hi - lo).length().max(1e-6);
+        let cell = diag / 64.0;
         let mut cells: HashMap<[i32; 3], Vec<u32>> = HashMap::new();
+        let mut big = Vec::new();
         let ix = |p: Vec3| ((p - lo) / cell).floor().as_ivec3().to_array();
-        for (i, (t, _)) in tris.iter().enumerate() {
-            let (a, b) = (ix(t[0].min(t[1]).min(t[2])), ix(t[0].max(t[1]).max(t[2])));
-            for x in a[0]..=b[0] {
-                for y in a[1]..=b[1] {
-                    for z in a[2]..=b[2] {
-                        cells.entry([x, y, z]).or_default().push(i as u32);
+        for (i, b) in boxes.iter().enumerate() {
+            let (a, z) = (ix(b.0), ix(b.1));
+            if (z[0] - a[0] + 1) * (z[1] - a[1] + 1) * (z[2] - a[2] + 1) > 64 {
+                big.push(i as u32);
+                continue;
+            }
+            for x in a[0]..=z[0] {
+                for y in a[1]..=z[1] {
+                    for z2 in a[2]..=z[2] {
+                        cells.entry([x, y, z2]).or_default().push(i as u32);
                     }
                 }
             }
         }
-        Self { tris, cells, lo, cell, cap: 0.25f32.min(diag.max(1e-6)) }
+        let max_code = ((diag.log2() + 17.0).ceil().max(1.0) as u32).min(CLEARANCE_CODES);
+        Self { tris, boxes, cells, big, lo, cell, max_code }
     }
 
-    /// The distance from segment `a`–`b` to the nearest triangle of a face other than `faces`, up to the cap
-    /// (`seen[triangle] == query`: already measured in this query).
-    fn clearance(&self, a: Vec3, b: Vec3, faces: [u32; 2], seen: &mut [u32], query: u32) -> f32 {
-        let mut best = f32::INFINITY;
-        let mut reach = self.cell;
-        loop {
-            let ix = |p: Vec3| ((p - self.lo) / self.cell).floor().as_ivec3().to_array();
-            let (lo, hi) = (ix(a.min(b) - Vec3::splat(reach)), ix(a.max(b) + Vec3::splat(reach)));
-            for x in lo[0]..=hi[0] {
-                for y in lo[1]..=hi[1] {
-                    for z in lo[2]..=hi[2] {
-                        for &ti in self.cells.get(&[x, y, z]).map(Vec::as_slice).unwrap_or_default() {
-                            let (t, f) = &self.tris[ti as usize];
-                            if faces.contains(f) || seen[ti as usize] == query {
-                                continue;
-                            }
-                            seen[ti as usize] = query;
-                            best = best.min(segment_triangle_distance(a, b, t));
-                        }
+    /// Whether no triangle of a face other than `faces` comes within `d` of segment `a`–`b` (`seen[triangle] ==
+    /// query`: already looked at in this query).
+    fn clear_within(&self, a: Vec3, b: Vec3, faces: [u32; 2], d: f32, seen: &mut [u32], query: u32) -> bool {
+        let (lo, hi) = (a.min(b) - Vec3::splat(d), a.max(b) + Vec3::splat(d));
+        let mut near = |ti: u32| -> bool {
+            let i = ti as usize;
+            if seen[i] == query {
+                return false;
+            }
+            seen[i] = query;
+            let (bl, bh) = self.boxes[i];
+            let (t, f) = &self.tris[i];
+            !faces.contains(f) && bl.cmple(hi).all() && bh.cmpge(lo).all() && segment_triangle_distance(a, b, t) < d
+        };
+        if self.big.iter().any(|&ti| near(ti)) {
+            return false;
+        }
+        let ix = |p: Vec3| ((p - self.lo) / self.cell).floor().as_ivec3().to_array();
+        let (cl, ch) = (ix(lo), ix(hi));
+        let cells = (0..3).map(|k| (ch[k] - cl[k] + 1) as usize).product::<usize>();
+        if cells > self.tris.len() {
+            return !(0..self.tris.len() as u32).any(near);
+        }
+        for x in cl[0]..=ch[0] {
+            for y in cl[1]..=ch[1] {
+                for z in cl[2]..=ch[2] {
+                    if self.cells.get(&[x, y, z]).is_some_and(|c| c.iter().any(|&ti| near(ti))) {
+                        return false;
                     }
                 }
             }
-            if best <= reach || reach >= self.cap {
-                return best.min(self.cap);
-            }
-            reach *= 2.0;
         }
+        true
     }
 }
 

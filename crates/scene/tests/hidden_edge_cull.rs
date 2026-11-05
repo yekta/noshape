@@ -60,9 +60,24 @@ fn models() -> Vec<(&'static str, StudioDisplay)> {
 /// View directions (forward), off-axis so edges turn away at many angles.
 const VIEWS: [[f64; 3]; 4] = [[-1.0, 1.0, -1.0], [1.0, 0.4, -0.6], [0.3, -1.0, 0.8], [-0.2, 0.1, -1.0]];
 
-/// The camera of a view: `far` times farther than fitting the part.
-fn camera(display: &StudioDisplay, view: DVec3, projection: Projection, dpr: f32, far: f64) -> Camera {
-    let (w, h) = ((640.0 * dpr) as f64, (480.0 * dpr) as f64);
+/// A frame: its size in CSS pixels, its pixel ratio, and how many times farther than fitting the part the camera is
+/// (zoomed out, the part is small on screen and its edges are drawn at a coarser line level).
+#[derive(Clone, Copy, Debug)]
+struct Shot {
+    size: (u32, u32),
+    dpr: f32,
+    far: f64,
+}
+
+impl Shot {
+    fn device(self) -> (u32, u32) {
+        ((self.size.0 as f32 * self.dpr) as u32, (self.size.1 as f32 * self.dpr) as u32)
+    }
+}
+
+/// The camera of a view.
+fn camera(display: &StudioDisplay, view: DVec3, projection: Projection, shot: Shot) -> Camera {
+    let (w, h) = shot.device();
     let (lo, hi) = display.bodies[0].mesh.positions.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(lo, hi), p| {
         let p = DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64);
         (lo.min(p), hi.max(p))
@@ -72,28 +87,28 @@ fn camera(display: &StudioDisplay, view: DVec3, projection: Projection, dpr: f32
     let side = fwd.cross(DVec3::Z).normalize_or(DVec3::X);
     cam.rotation = Camera::look_rotation(fwd, side.cross(fwd));
     cam.projection = projection;
-    cam.fit_box(lo, hi, w / h);
-    // Zoomed out, the part is small on screen and its edges are drawn at a coarser line level.
-    cam.distance *= far;
+    cam.fit_box(lo, hi, w as f64 / h as f64);
+    cam.distance *= shot.far;
     cam
 }
 
 /// The frame with hidden edges kept or left out.
-fn render(r: &mut Renderer, display: &StudioDisplay, keep: bool, cam: &Camera, dpr: f32) -> Vec<u8> {
+fn render(r: &mut Renderer, display: &StudioDisplay, keep: bool, cam: &Camera, shot: Shot) -> Vec<u8> {
     let style = noshape_scene::png::viewport_style(&noshape_scene::GraphicsPrefs::default());
     let up = r.uploader();
     let mut cache = GpuCache::default();
     let opts = SceneOptions { keep_hidden_edges: keep, display_mode: DisplayMode::ShadedWithEdges, show_planes: false, show_origin: false, show_sketches: false, ..Default::default() };
     let built = builder::build(display, &opts, &mut cache, &up);
-    let (w, h) = ((640.0 * dpr) as u32, (480.0 * dpr) as u32);
+    let (w, h) = shot.device();
     let scene = builder::with_highlights(&built, display, &[], None, &[], Vec::new(), false, &up);
-    r.render(RenderParams { scene: &scene, camera: cam, width: w, height: h, device_pixel_ratio: dpr, style: &style, pick: false }).unwrap().bgra
+    r.render(RenderParams { scene: &scene, camera: cam, width: w, height: h, device_pixel_ratio: shot.dpr, style: &style, pick: false }).unwrap().bgra
 }
 
 /// How many of the finest edge segments the visible lines' pass leaves out (shaders.wgsl `behind_own_solid`, at a
 /// 1 px line), as the renderer decides.
-fn left_out(display: &StudioDisplay, cam: &Camera, dpr: f32) -> usize {
-    let viewport = glam::DVec2::new(640.0 * dpr as f64, 480.0 * dpr as f64);
+fn left_out(display: &StudioDisplay, cam: &Camera, shot: Shot) -> usize {
+    let (w, h) = shot.device();
+    let viewport = glam::DVec2::new(w as f64, h as f64);
     let mesh = &display.bodies[0].mesh;
     let normals = builder::edge_facet_normals(mesh);
     let px_across = |w: DVec3, t: f64| -> f64 {
@@ -118,7 +133,7 @@ fn left_out(display: &StudioDisplay, cam: &Camera, dpr: f32) -> usize {
             let d = side(c.a).min(side(c.b));
             let t = 2f64.powf((c.clearance as f64).log2().floor().min(-2.0));
             let px = ends.iter().map(|&w| px_across(w, t)).fold(f64::INFINITY, f64::min);
-            let width = 0.5 * dpr as f64 + 1.5;
+            let width = 0.5 * shot.dpr as f64 + 1.5;
             let thick = if c.convex { px * d * d * 0.5 >= width && px.min(2.0 * px * d) >= 8.0 } else { px * d >= width && px >= 8.0 };
             if d > 0.0 && thick {
                 n += 1;
@@ -128,7 +143,7 @@ fn left_out(display: &StudioDisplay, cam: &Camera, dpr: f32) -> usize {
     n
 }
 
-fn compare(views: &[[f64; 3]], dprs: &[f32]) {
+fn compare(views: &[[f64; 3]], shots: &[Shot]) {
     let mut r = match Renderer::new() {
         Ok(r) => r,
         Err(e) => {
@@ -145,20 +160,15 @@ fn compare(views: &[[f64; 3]], dprs: &[f32]) {
         for v in views {
             let view = DVec3::from_array(*v);
             for projection in [Projection::Orthographic, Projection::Perspective] {
-                for (dpr, far) in dprs.iter().map(|&d| (d, 1.0)).chain([(1.0, 8.0), (1.0, 30.0)]) {
-                    let cam = camera(&display, view, projection, dpr, far);
-                    let n = left_out(&display, &cam, dpr);
-                    eprintln!("{name} {v:?} {projection:?} {dpr}x far {far}: {n} segments left out");
-                    left += n;
-                    let kept = render(&mut r, &display, true, &cam, dpr);
-                    let culled = render(&mut r, &display, false, &cam, dpr);
-                    let differ = kept.chunks(4).zip(culled.chunks(4)).filter(|(a, b)| a != b).count();
-                    if differ > 0 {
-                        let w = (640.0 * dpr) as usize;
-                        let px: Vec<String> = kept.chunks(4).zip(culled.chunks(4)).enumerate().filter(|(_, (a, b))| a != b).map(|(i, (a, b))| format!("({},{}) kept {:?} culled {:?}", i % w, i / w, a, b)).take(8).collect();
-                        eprintln!("DIFF {name} {v:?} {projection:?} {dpr}: {px:?}");
-                    }
-                    assert_eq!(differ, 0, "{name}, view {v:?}, {projection:?}, {dpr}x, zoomed out {far}x: {differ} pixels differ");
+                for &shot in shots {
+                    let cam = camera(&display, view, projection, shot);
+                    left += left_out(&display, &cam, shot);
+                    let kept = render(&mut r, &display, true, &cam, shot);
+                    let culled = render(&mut r, &display, false, &cam, shot);
+                    let differ: Vec<usize> = kept.chunks(4).zip(culled.chunks(4)).enumerate().filter(|(_, (a, b))| a != b).map(|(i, _)| i).collect();
+                    let w = shot.device().0 as usize;
+                    let first = differ.first().map(|i| (i % w, i / w));
+                    assert!(differ.is_empty(), "{name}, view {v:?}, {projection:?}, {shot:?}: {} pixels differ, first at {first:?}", differ.len());
                 }
             }
         }
@@ -168,11 +178,13 @@ fn compare(views: &[[f64; 3]], dprs: &[f32]) {
 
 #[test]
 fn edges_behind_their_own_solid_change_no_pixel() {
-    compare(&VIEWS[..3], &[1.0]);
+    let small = |far| Shot { size: (320, 240), dpr: 1.0, far };
+    compare(&VIEWS[..1], &[small(1.0), small(8.0)]);
 }
 
 #[test]
-#[ignore = "T2: every view at 1× and 2× (~1 min on lavapipe)"]
+#[ignore = "T2: every view at 640 x 480, 1x and 2x, zoomed out 8x and 30x (~12 min on lavapipe)"]
 fn edges_behind_their_own_solid_change_no_pixel_everywhere() {
-    compare(&VIEWS, &[1.0, 2.0]);
+    let shot = |dpr, far| Shot { size: (640, 480), dpr, far };
+    compare(&VIEWS, &[shot(1.0, 1.0), shot(2.0, 1.0), shot(1.0, 8.0), shot(1.0, 30.0)]);
 }
