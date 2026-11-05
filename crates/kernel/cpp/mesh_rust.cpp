@@ -17,6 +17,10 @@
 #include <Geom_SphericalSurface.hxx>
 #include <Geom_ToroidalSurface.hxx>
 #include <Geom_TrimmedCurve.hxx>
+#include <Geom2d_BSplineCurve.hxx>
+#include <Geom2d_Line.hxx>
+#include <Geom2d_TrimmedCurve.hxx>
+#include <Geom2dConvert.hxx>
 #include <Poly_PolygonOnTriangulation.hxx>
 #include <OSD_Parallel.hxx>
 #include <Poly_Triangulation.hxx>
@@ -46,7 +50,7 @@ occ::handle<Geom_Curve> basis(occ::handle<Geom_Curve> c)
 // The input of `brep_mesh` (its slices).
 struct MeshIn
 {
-  std::vector<double>   vertices, curves, surfaces, nurbs;
+  std::vector<double>   vertices, curves, surfaces, nurbs, pcurves;
   std::vector<uint32_t> edges, face_loops, loop_uses, uses;
   double                linear = 0, angular = 0;
 };
@@ -104,6 +108,52 @@ double push_bspline(std::vector<double>& out, const occ::handle<Geom_BSplineCurv
     for (int i = 1; i <= c->NbPoles(); ++i)
       out.push_back(c->Weight(i));
   return at;
+}
+
+// An edge's curve on a B-spline face, at the edge's own parameters (its 3D curve's: same parameter and range), as a
+// B-spline; a B-spline's or a line's only (a circle's conversion would change its parameters). Null when none.
+occ::handle<Geom2d_BSplineCurve> pcurve_of(const TopoDS_Edge& e, const TopoDS_Face& f)
+{
+  if (!BRep_Tool::SameParameter(e) || !BRep_Tool::SameRange(e))
+    return {};
+  double                          a, b;
+  const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(e, f, a, b);
+  if (c.IsNull() || !(b > a))
+    return {};
+  occ::handle<Geom2d_Curve> basis = c;
+  while (const occ::handle<Geom2d_TrimmedCurve> t = occ::down_cast<Geom2d_TrimmedCurve>(basis))
+    basis = t->BasisCurve();
+  if (occ::down_cast<Geom2d_BSplineCurve>(basis).IsNull() && occ::down_cast<Geom2d_Line>(basis).IsNull())
+    return {};
+  try
+  {
+    return Geom2dConvert::CurveToBSplineCurve(new Geom2d_TrimmedCurve(c, a, b));
+  }
+  catch (const Standard_Failure&)
+  {
+    return {};
+  }
+}
+
+// A curve on a face's parameters as a 3D B-spline at z 0 (the mesher's curve layout), where in `out`.
+double push_pcurve(std::vector<double>& out, const occ::handle<Geom2d_BSplineCurve>& c)
+{
+  NCollection_Array1<gp_Pnt> poles(1, c->NbPoles());
+  NCollection_Array1<double> weights(1, c->NbPoles()), knots(1, c->NbKnots());
+  NCollection_Array1<int>    mults(1, c->NbKnots());
+  for (int i = 1; i <= c->NbPoles(); ++i)
+  {
+    poles(i)   = gp_Pnt(c->Pole(i).X(), c->Pole(i).Y(), 0);
+    weights(i) = c->Weight(i);
+  }
+  for (int i = 1; i <= c->NbKnots(); ++i)
+  {
+    knots(i) = c->Knot(i);
+    mults(i) = c->Multiplicity(i);
+  }
+  const occ::handle<Geom_BSplineCurve> c3 = c->IsRational() ? new Geom_BSplineCurve(poles, weights, knots, mults, c->Degree(), c->IsPeriodic())
+                                                            : new Geom_BSplineCurve(poles, knots, mults, c->Degree(), c->IsPeriodic());
+  return push_bspline(out, c3, TopLoc_Location());
 }
 
 double push_bspline_surface(std::vector<double>& out, const occ::handle<Geom_BSplineSurface>& s0, const TopLoc_Location& loc)
@@ -257,6 +307,8 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
   {
     std::array<double, 13> surface{};
     std::vector<uint32_t>  uses, loop_ends;
+    // A B-spline face's: each use's edge on it (BRepMesh's own fallback has its own).
+    std::vector<occ::handle<Geom2d_BSplineCurve>> pcurves;
   };
   std::vector<FaceIn> read(face_of.size());
   in_chunks((int)face_of.size(), parallel, [&](int j1) {
@@ -292,6 +344,7 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
           continue;
         }
         r.uses.push_back(static_cast<uint32_t>(2 * (k - 1) + (ei.Value().Orientation() == TopAbs_REVERSED ? 1 : 0)));
+        r.pcurves.push_back(bss.IsNull() ? occ::handle<Geom2d_BSplineCurve>() : pcurve_of(TopoDS::Edge(ei.Value()), f));
       }
       r.loop_ends.push_back(static_cast<uint32_t>(r.uses.size()));
     }
@@ -357,6 +410,8 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
   {
     const uint32_t u0 = (uint32_t)in.uses.size();
     in.uses.insert(in.uses.end(), r.uses.begin(), r.uses.end());
+    for (size_t k = 0; k < r.uses.size(); ++k)
+      in.pcurves.push_back(r.surface[0] == 5 && k < r.pcurves.size() && !r.pcurves[k].IsNull() ? push_pcurve(in.nurbs, r.pcurves[k]) : -1.0);
     for (const uint32_t e : r.loop_ends)
       in.loop_uses.push_back(u0 + e);
     in.surfaces.insert(in.surfaces.end(), r.surface.begin(), r.surface.end());
@@ -371,9 +426,11 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
   auto u32s = [](const std::vector<uint32_t>& v) { return rust::Slice<const uint32_t>(v.data(), v.size()); };
   if (unlocked)
     unlocked(true);
-  const bool meshed = brep_mesh(f64s(in.vertices), u32s(in.edges), f64s(in.curves), f64s(in.surfaces), f64s(in.nurbs), u32s(in.face_loops), u32s(in.loop_uses), u32s(in.uses), in.linear, in.angular, *out);
+  const bool meshed = brep_mesh(f64s(in.vertices), u32s(in.edges), f64s(in.curves), f64s(in.surfaces), f64s(in.nurbs), u32s(in.face_loops), u32s(in.loop_uses), u32s(in.uses), f64s(in.pcurves), in.linear, in.angular, *out);
   if (unlocked)
     unlocked(false);
+  // (Cancelled: its faces declined, not left to BRepMesh.)
+  fail_if_cancelled();
   if (!meshed)
     return 0;
   // The output through plain pointers (a rust::Vec's [] asks Rust for its data each time).

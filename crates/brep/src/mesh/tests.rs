@@ -287,7 +287,7 @@ fn a_bspline_face_is_meshed_within_the_deflection() {
     let e = vec![nurbs(0, 0, 1), nurbs(1, 1, 2), nurbs(2, 3, 2), nurbs(3, 0, 3)];
     let face = MeshFace { surface: MeshSurface::Nurbs { index: 0 }, loops: vec![vec![Use { edge: 0, reversed: false }, Use { edge: 1, reversed: false }, Use { edge: 2, reversed: true }, Use { edge: 3, reversed: true }]] };
     let defl = Deflection { linear: 1e-4, angular: 0.5 };
-    let out = mesh_body_with(&v, &e, std::slice::from_ref(&face), defl, MeshNurbs { curves: &curves, surfaces: &surfaces });
+    let out = mesh_body_with(&v, &e, std::slice::from_ref(&face), defl, MeshNurbs { curves: &curves, surfaces: &surfaces, face_pcurves: &[] });
     let m = out.faces[0].as_ref().expect("meshed");
     let boundary: usize = out.edges.iter().flatten().map(|n| n.points.len()).sum::<usize>() - 4;
     assert!(m.points.len() > boundary, "interior nodes: {} of {}", m.points.len(), boundary);
@@ -329,7 +329,7 @@ fn a_cylinder_piece_under_a_slanted_cut_is_meshed_as_a_grid() {
     };
     let defl = Deflection { linear: 1e-5, angular: 0.5 };
     let curves = [top];
-    let out = mesh_body_with(&v, &e, std::slice::from_ref(&face), defl, MeshNurbs { curves: &curves, surfaces: &[] });
+    let out = mesh_body_with(&v, &e, std::slice::from_ref(&face), defl, MeshNurbs { curves: &curves, surfaces: &[], face_pcurves: &[] });
     let m = out.faces[0].as_ref().expect("meshed");
     for t in &m.triangles {
         let (a, b, c) = (m.points[t[0] as usize], m.points[t[1] as usize], m.points[t[2] as usize]);
@@ -374,7 +374,7 @@ fn a_whole_cylinder_under_a_slanted_cut_is_meshed_across_its_seam() {
     };
     let defl = Deflection { linear: 1e-5, angular: 0.5 };
     let curves = [top];
-    let out = mesh_body_with(&v, &e, std::slice::from_ref(&face), defl, MeshNurbs { curves: &curves, surfaces: &[] });
+    let out = mesh_body_with(&v, &e, std::slice::from_ref(&face), defl, MeshNurbs { curves: &curves, surfaces: &[], face_pcurves: &[] });
     let m = out.faces[0].as_ref().expect("meshed");
     let mut area = 0.0;
     for t in &m.triangles {

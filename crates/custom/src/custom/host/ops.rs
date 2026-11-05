@@ -1880,6 +1880,11 @@ fn op_create_bspline_surface(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         if rows.iter().any(|r| r.len() != nv) || nu * nv == 0 {
             return err("Invalid B-spline surface");
         }
+        // Live's limit: 500 000 control points in all, whatever the degree and the rows (a displacement map's
+        // 1024 × 1024 fails so; live 2057).
+        if nu * nv > 500_000 {
+            return Err(super::code_error("BSPLINE_TOO_MANY_CONTROL_POINTS"));
+        }
         let shape = k::make_bspline_surface(&surface, &boundary, make_solid)?;
         let kind = if shape.solids().is_empty() { BodyKind::Surface } else { BodyKind::Solid };
         let names = crate::regen::features::bshared::new_face_names(ev, &shape);

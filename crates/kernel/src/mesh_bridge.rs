@@ -50,11 +50,11 @@ struct MeshIn<'a> {
 
 /// Meshes the faces noshape's mesher takes into `out`; false when the input is malformed.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], nurbs: &[f64], face_loops: &[u32], loop_uses: &[u32], uses: &[u32], linear: f64, angular: f64, out: &mut MeshOut) -> bool {
+pub(crate) fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], nurbs: &[f64], face_loops: &[u32], loop_uses: &[u32], uses: &[u32], pcurves: &[f64], linear: f64, angular: f64, out: &mut MeshOut) -> bool {
     // A panic here would abort the process (it can't cross the bridge): declined instead, BRepMesh meshes every face
     // (MESH-EMPTY-LOOP-PANIC hung the app on open).
     let mut made = MeshOut::default();
-    let ok = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| mesh_into(vertices, edges, curves, surfaces, nurbs, face_loops, loop_uses, uses, linear, angular, &mut made))).unwrap_or_else(|_| {
+    let ok = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| mesh_into(vertices, edges, curves, surfaces, nurbs, face_loops, loop_uses, uses, pcurves, linear, angular, &mut made))).unwrap_or_else(|_| {
         log::error!("noshape's mesher panicked: the body goes to BRepMesh");
         false
     });
@@ -65,7 +65,7 @@ pub(crate) fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surface
 }
 
 #[allow(clippy::too_many_arguments)]
-fn mesh_into(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], nurbs: &[f64], face_loops: &[u32], loop_uses: &[u32], uses: &[u32], linear: f64, angular: f64, out: &mut MeshOut) -> bool {
+fn mesh_into(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], nurbs: &[f64], face_loops: &[u32], loop_uses: &[u32], uses: &[u32], pcurves: &[f64], linear: f64, angular: f64, out: &mut MeshOut) -> bool {
     let t = std::time::Instant::now();
     let input = &MeshIn { vertices, edges, curves, surfaces, face_loops, loop_uses, uses, linear, angular };
     let vertices: Vec<DVec3> = input.vertices.as_chunks::<3>().0.iter().map(|c| DVec3::new(c[0], c[1], c[2])).collect();
@@ -106,6 +106,9 @@ fn mesh_into(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], 
             MeshEdge { curve, v: [input.edges[2 * i], input.edges[2 * i + 1]], t0: c[11], t1: c[12] }
         })
         .collect();
+    // Each use's curve on its face (a B-spline face's; at `pcurves`' place in `nurbs`, negative: none).
+    let pcurve_of = |u: usize| pcurves.get(u).copied().filter(|&at| at >= 0.0);
+    let mut face_pcurves: Vec<Vec<Vec<Option<u32>>>> = Vec::with_capacity(nf);
     let mut faces: Vec<MeshFace> = Vec::with_capacity(nf);
     for f in 0..nf {
         let s = &input.surfaces[13 * f..13 * f + 13];
@@ -123,6 +126,7 @@ fn mesh_into(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], 
             return false;
         }
         let mut loops = Vec::with_capacity(l1 - l0);
+        let mut loop_pcurves = Vec::with_capacity(l1 - l0);
         for l in l0..l1 {
             let (u0, u1) = (input.loop_uses[l] as usize, input.loop_uses[l + 1] as usize);
             if u1 < u0 || u1 > input.uses.len() {
@@ -132,14 +136,16 @@ fn mesh_into(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], 
             if uses.iter().any(|u| u.edge as usize >= ne) {
                 return false;
             }
+            loop_pcurves.push((u0..u1).map(|u| pcurve_of(u).and_then(|at| nurbs_at(at, false))).collect());
             loops.push(uses);
         }
+        face_pcurves.push(loop_pcurves);
         faces.push(MeshFace { surface, loops });
     }
     // Its steps in the kernel's profile (NOSHAPE_KERNEL_PROFILE).
     let note = |name: &str, d: std::time::Duration| crate::ffi::ffi::kernel_profile_note(name, d.as_secs_f64() * 1e3);
     note("mesh.rust.mesh.in", t.elapsed());
-    let m = mesh_body_with(&vertices, &edges, &faces, Deflection { linear: input.linear, angular: input.angular }, MeshNurbs { curves: &nurbs_curves, surfaces: &nurbs_surfaces });
+    let m = mesh_body_with(&vertices, &edges, &faces, Deflection { linear: input.linear, angular: input.angular }, MeshNurbs { curves: &nurbs_curves, surfaces: &nurbs_surfaces, face_pcurves: &face_pcurves });
     note("mesh.rust.mesh.edges", m.took[0]);
     note("mesh.rust.mesh.faces", m.took[1]);
     let t = std::time::Instant::now();

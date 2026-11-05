@@ -735,6 +735,10 @@ fn replace_with(ev: &mut EvalCtx, bi: usize, fi_name: &Name, template: &Shape, s
         ev.replace_body(bi, shape, names);
         return Ok(());
     }
+    // (Stopped, by a cancel or the deadline: not tried again by slabs.)
+    if k::thread_cancelled() {
+        return err("cancelled");
+    }
     // The template's offsets from the face along its normal, over the face.
     let [u0, u1, v0, v1] = face.uv_bounds()?;
     let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);

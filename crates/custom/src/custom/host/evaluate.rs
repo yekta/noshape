@@ -240,13 +240,22 @@ fn face_tangent_planes(s: &k::Shape, uvs: &[DVec2]) -> Option<Vec<crate::display
 fn ev_face_tangent_planes(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let params: Vec<DVec2> = field(&a, "parameters").as_array().map(|v| v.iter().filter_map(vec2_of).collect()).unwrap_or_default();
-    let planes = on_first(i, &cx, &a, "face", "NO_TANGENT_PLANE", |q, e| {
+    let frames = on_first(i, &cx, &a, "face", "NO_TANGENT_PLANE", |q, e| {
         if let Some(p) = matches!(e, Ent::Datum(_) | Ent::Plane(_) | Ent::SketchRegion(..)).then(|| q.plane(e)).flatten() {
-            return Some(params.iter().map(|_| plane_value(&p)).collect::<Vec<_>>());
+            return Some(vec![p; params.len()]);
         }
-        let s = q.shape(e)?;
-        Some(face_tangent_planes(&s, &params)?.iter().map(plane_value).collect())
+        face_tangent_planes(&q.shape(e)?, &params)
     })?;
+    // (A displacement map's million: stopped by a cancel or the deadline part-way.)
+    let mut planes = Vec::with_capacity(frames.len());
+    for chunk in frames.chunks(4096) {
+        if let Err(e) = i.check_deadline() {
+            // (Freed off this thread: 0.2-0.4 s for a million.)
+            std::thread::spawn(move || drop(planes));
+            return Err(e);
+        }
+        planes.extend(chunk.iter().map(plane_value));
+    }
     Ok(Value::array(planes))
 }
 

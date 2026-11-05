@@ -16,6 +16,13 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-05 12:18 UTC.**
+- P1 DISPLACEMENT-MAP-SCALE done (TICKETS): live refuses 1024² (500,000 control points at most; its error after 47 s,
+  ours in 7.6 s); up to the limit every step scales (704² feature 4.7 s, meshes 0.3-0.4 s); cancel stops within
+  ~100 ms (most points < 10 ms). T2 custom_features::displacement_map_scales and displacement_map_cancel_latency_probe.
+  Left: P2 DISPLACEMENT-TOP-VOLUME (20 s mass properties of the replaced top).
+- Next: learning-center-michael Fillet 2 (seam pieces 103/58 vs live 99/54; time; the tori cut is bool's).
+
 **State 11-05 07:46 UTC.**
 - P1 DRAFT-NONDETERMINISTIC: not reproduced in ~90 opens (green 86546441, v0.4.30's app and CLI; here and vibe3, idle,
   4 at once, 2 cores); qa asked for a flipping run's environment (TICKETS).

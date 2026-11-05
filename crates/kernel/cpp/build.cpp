@@ -574,8 +574,13 @@ std::unique_ptr<OcShape> replace_face_mapped(const OcShape& solid_in, const OcSh
     // (Four points a span of the template: the map bends within its first spans at each clamped side.)
     const int                                   n   = std::clamp(4 * (S->NbUKnots() + S->NbVKnots()) + 1, 129, 40001);
     occ::handle<NCollection_HArray1<gp_Pnt2d>> pts = new NCollection_HArray1<gp_Pnt2d>(1, n);
+    // (Each point's map a bisection on the template's knots: ~10 µs, 0.3 s an edge at 704².)
     for (int k = 0; k < n; ++k)
+    {
+      if ((k & 1023) == 0)
+        fail_if_cancelled();
       pts->SetValue(k + 1, apply(m, norm(c->Value(f + (l - f) * k / (n - 1)))));
+    }
     // A line of constant u or v (a rim or seam carried onto the template's own boundary): that iso line, exactly.
     const gp_Pnt2d p0 = pts->Value(1), p1 = pts->Value(n);
     bool           iso_u = true, iso_v = true;
@@ -674,6 +679,8 @@ std::unique_ptr<OcShape> replace_face_mapped(const OcShape& solid_in, const OcSh
           occ::handle<NCollection_HArray1<double>> ts = new NCollection_HArray1<double>(1, n);
           for (int k = 0; k < n; ++k)
           {
+            if ((k & 4095) == 0)
+              fail_if_cancelled();
             const double   t = f + (l - f) * k / (n - 1);
             const gp_Pnt2d w = c->Value(t);
             ps->SetValue(k + 1, S->Value(w.X(), w.Y()));
@@ -757,6 +764,8 @@ std::unique_ptr<OcShape> replace_face_mapped(const OcShape& solid_in, const OcSh
         gp_Pnt2d                                    last;
         for (int k = 0; k < n; ++k)
         {
+          if ((k & 1023) == 0)
+            fail_if_cancelled();
           const double t = f + (l - f) * k / (n - 1);
           const gp_Pnt q = local->Value(t);
           gp_Pnt2d     w = k == 0 ? sas.ValueOfUV(q, 1e-9) : sas.NextValueOfUV(last, q, 1e-9);
@@ -892,12 +901,21 @@ std::unique_ptr<OcShape> replace_face_mapped(const OcShape& solid_in, const OcSh
   }
   // Every new edge's curves agreeing parameter for parameter (a projection's needn't).
   for (NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher>::Iterator it(emap); it.More(); it.Next())
+  {
+    fail_if_cancelled();
     BRepLib::SameParameter(TopoDS::Edge(it.Value()), tol);
+  }
   for (const TopoDS_Shape& g : rebuilt)
+  {
+    fail_if_cancelled();
     BRepLib::SameParameter(TopoDS::Edge(g), tol);
+  }
+  fail_if_cancelled();
   const TopoDS_Shape out = rs->Apply(solid);
+  fail_if_cancelled();
   if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
     fail_op("the part with the face replaced isn't valid");
+  fail_if_cancelled();
   return wrap(out);
 }
 

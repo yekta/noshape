@@ -413,9 +413,10 @@ pub(crate) mod ffi {
         /// edge; per edge kind (0 line, 1 circle, 2 a degenerate one (an apex), else not meshed here), centre, normal, x direction, radius,
         /// its start and end parameters (13 numbers); per face kind (0 plane, 1 cylinder, 2 cone, 3 torus, 4 sphere, else not
         /// meshed here) and its geometry (13 numbers); per face its first loop (faces + 1), per loop its first
-        /// use (loops + 1), edge × 2 + reversed per use; the display's deflections.
+        /// use (loops + 1), edge × 2 + reversed per use; per use its curve on a B-spline face (its place in `nurbs`,
+        /// negative: none); the display's deflections.
         #[allow(clippy::too_many_arguments)]
-        fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], nurbs: &[f64], face_loops: &[u32], loop_uses: &[u32], uses: &[u32], linear: f64, angular: f64, out: &mut MeshOut) -> bool;
+        fn brep_mesh(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], nurbs: &[f64], face_loops: &[u32], loop_uses: &[u32], uses: &[u32], pcurves: &[f64], linear: f64, angular: f64, out: &mut MeshOut) -> bool;
         /// Whether this thread meshes with it (`set_rust_mesh`).
         fn brep_mesh_on() -> bool;
         /// noshape's own Boolean (op 0 fuse, 1 cut, 2 common) of `args` (the object first): false when it

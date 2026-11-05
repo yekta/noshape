@@ -481,6 +481,14 @@ fn new_feature_studio_template_compiles() {
 /// `face` ("side" or "top") with the pixel values `csv`: degree 5, black 0 mm, white 1 mm. The regeneration, its
 /// seconds.
 fn displacement_map(csv: &str, face: &str, replace: bool) -> (RegenResult, f64) {
+    let (ps, units, opts) = displacement_map_studio(csv, face, replace);
+    let t = std::time::Instant::now();
+    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &opts);
+    (r, t.elapsed().as_secs_f64())
+}
+
+/// The cylinder and the Displacement map ([`displacement_map`]), not regenerated yet.
+fn displacement_map_studio(csv: &str, face: &str, replace: bool) -> (PartStudio, UnitPrefs, RegenOptions) {
     let cylinder = studio(
         r#"
 annotation { "Feature Type Name" : "Test cylinder" }
@@ -526,14 +534,23 @@ export const testCylinder = defineFeature(function(context is Context, id is Id,
     f.params.set("whiteValue", expr("1 mm"));
     f.params.set("replaceFace", ParamValue::Bool(replace));
     ps.features.push(f);
-    let t = std::time::Instant::now();
-    let r = reg.regenerate(&ps, &ConfigValues::default(), &units, &opts);
-    (r, t.elapsed().as_secs_f64())
+    (ps, units, opts)
 }
 
 /// Pixel values 0-255 of a `n` × `n` image: a diagonal wave.
 fn wave_csv(n: usize) -> String {
     (0..n).map(|i| (0..n).map(|j| format!("{}", ((((i + 2 * j) as f64) * 0.7).sin() * 127.5 + 127.5).round() as i32)).collect::<Vec<_>>().join(",") + "\n").collect()
+}
+
+/// Pixel values 0-255 of a `n` × `n` image: noise, as a leather texture's (every sample its own).
+fn noise_csv(n: usize) -> String {
+    let px = |i: usize, j: usize| {
+        let mut h = (i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ (j as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F);
+        h ^= h >> 29;
+        h = h.wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        (h >> 56) as u8
+    };
+    (0..n).map(|i| (0..n).map(|j| px(i, j).to_string()).collect::<Vec<_>>().join(",") + "\n").collect()
 }
 
 /// The Displacement map (the last feature) regenerated with its info "<n> samples", as live.
@@ -567,6 +584,152 @@ fn displacement_map_on_a_cylinder() {
             _ => PI * 0.025f64.powi(2) * 0.061,
         };
         assert!(v > plain && v < grown, "{face}: volume {v} between {plain} and {grown}");
+    }
+}
+
+/// DISPLACEMENT-MAP at scale (lead 11-05: Replace face must scale): a noise map at 512² and 704² (live's limit is 500 000
+/// control points in all) on the cylinder's side and top, Replace face on. Each step (the feature, the part's check
+/// and volume, its preview and fine display meshes) about linear in the poles: 704²'s within 3× 512²'s (1.9× the
+/// poles); the preview mesh of 512²'s side took 650 s in BRepMesh before, 1024²'s top 48 s. At 1024² the feature fails
+/// as live's, "The B-spline definition has too many control points." (live 2057: after 47 s), the part as it was.
+#[test]
+#[ignore = "T2: timing, ~1 min"]
+fn displacement_map_scales() {
+    let mut rows: Vec<(usize, &str, [f64; 5])> = Vec::new();
+    // (NOSHAPE_DISP_ONE=<n>:<face>: that case alone, its part written to NOSHAPE_DISP_DUMP, the meshes left out.)
+    let one = std::env::var("NOSHAPE_DISP_ONE").ok();
+    for n in [512, 704] {
+        let csv = noise_csv(n);
+        for face in ["side", "top"] {
+            if let Some(o) = &one {
+                if *o != format!("{n}:{face}") {
+                    continue;
+                }
+                let (r, secs) = displacement_map(&csv, face, true);
+                eprintln!("DISP {n}² {face}: feature {secs:.2} s");
+                if let Ok(out) = std::env::var("NOSHAPE_DISP_DUMP") {
+                    noshape_kernel::write_brep(&r.context.bodies[0].shape, std::path::Path::new(&out)).unwrap();
+                }
+                let b = &r.context.bodies[0].shape;
+                for preview in [false, true] {
+                    let (lin, ang) = noshape_model::regen::display_deflection(b, 1.0, preview);
+                    eprintln!("DISP {n}² {face}: preview {preview}: deflections {lin:.3e} {ang:.3}");
+                }
+                return;
+            }
+            let (r, secs) = displacement_map(&csv, face, true);
+            assert_samples(&r, &format!("{} samples", n * n));
+            let b = &r.context.bodies[0].shape;
+            let t = std::time::Instant::now();
+            assert!(b.is_valid(), "{n}² {face}: a valid part");
+            let check = t.elapsed().as_secs_f64();
+            let t = std::time::Instant::now();
+            let v = b.volume().unwrap();
+            let volume = t.elapsed().as_secs_f64();
+            let mesh = |preview: bool| {
+                let (lin, ang) = noshape_model::regen::display_deflection(b, 1.0, preview);
+                let t = std::time::Instant::now();
+                let m = noshape_kernel::tessellate(b, lin, ang, true).unwrap();
+                assert!(!m.indices.is_empty());
+                t.elapsed().as_secs_f64()
+            };
+            let (preview, fine) = (mesh(true), mesh(false));
+            println!("DISP {n}² {face}: feature {secs:.2} s, check {check:.2} s, volume {volume:.2} s ({:.3} cm³), preview mesh {preview:.2} s, fine mesh {fine:.2} s", v * 1e6);
+            rows.push((n, face, [secs, check, volume, preview, fine]));
+        }
+    }
+    let names = ["feature", "check", "volume", "preview mesh", "fine mesh"];
+    for face in ["side", "top"] {
+        let at = |n: usize| rows.iter().find(|r| r.0 == n && r.1 == face).unwrap().2;
+        let (small, big) = (at(512), at(704));
+        for k in 0..5 {
+            // (A floor for steps too quick to time.)
+            assert!(big[k] <= 3.0 * small[k].max(0.1), "{face}: {} {:.2} s at 704², {:.2} s at 512²", names[k], big[k], small[k]);
+        }
+    }
+    let (r, secs) = displacement_map(&noise_csv(1024), "side", true);
+    let last = r.display.features.last().expect("the feature");
+    assert_eq!((last.status, last.message.as_deref()), (FeatureStatus::Error, Some("The B-spline definition has too many control points.")));
+    assert_eq!(r.context.bodies.len(), 1);
+    assert!((r.context.bodies[0].shape.volume().unwrap() - PI * 0.025f64.powi(2) * 0.06).abs() < 1e-12, "the part as it was");
+    println!("DISP 1024²: the error in {secs:.2} s (live 47 s)");
+}
+
+/// CANCEL-LATENCY on the Displacement map (lead 11-05: its cancel did nothing): a noise map of each side of
+/// NOSHAPE_DISP_N (default "704,1024") on the cylinder's side, Replace face on, its regeneration (the interpreter,
+/// opCreateBSplineSurface, Replace face's edge carry and checks, the display mesh) aborted after each of
+/// NOSHAPE_CANCEL_AT (seconds, default "0.5,1,2,3,4,5,6,8") and 0.1-0.6 s before its end; then the part's display mesh alone, under a cancel
+/// flag set after 20, 50 and 100 ms. Prints the time from the abort to the return; target 100 ms.
+#[test]
+#[ignore = "T2 tool: cancel latency on a dense Displacement map"]
+fn displacement_map_cancel_latency_probe() {
+    let sizes: Vec<usize> = std::env::var("NOSHAPE_DISP_N").unwrap_or("704,1024".into()).split(',').filter_map(|x| x.trim().parse().ok()).collect();
+    let at: Vec<f64> = std::env::var("NOSHAPE_CANCEL_AT").unwrap_or("0.5,1,2,3,4,5,6,8".into()).split(',').filter_map(|x| x.trim().parse().ok()).collect();
+    for n in sizes {
+        let (ps, units, opts) = displacement_map_studio(&noise_csv(n), "side", true);
+        let mut worst = 0.0f64;
+        // (Also near the end, where the display is meshed: the uncancelled run's time less 0.1-0.6 s.)
+        let whole = {
+            let t = std::time::Instant::now();
+            let _ = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &opts);
+            t.elapsed().as_secs_f64()
+        };
+        let tail: Vec<f64> = [0.6, 0.45, 0.3, 0.2, 0.1].iter().map(|d| whole - d).filter(|&t| t > 0.0).collect();
+        for &t in at.iter().filter(|&&t| t < whole).chain(&tail) {
+            let cancel = noshape_model::regen::RegenCancel::default();
+            let opts = RegenOptions { cancel: Some(cancel.clone()), ..opts.clone() };
+            let start = std::time::Instant::now();
+            let (latency, cancelled) = std::thread::scope(|s| {
+                let h = s.spawn(|| {
+                    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &opts);
+                    (std::time::Instant::now(), r.cancelled)
+                });
+                std::thread::sleep(std::time::Duration::from_secs_f64(t));
+                let aborted_at = std::time::Instant::now();
+                cancel.abort();
+                // (NOSHAPE_CANCEL_STACKS=<ms>: every thread's stack while the run still goes that long after the abort.)
+                if let Some(ms) = std::env::var("NOSHAPE_CANCEL_STACKS").ok().and_then(|v| v.parse::<u64>().ok()) {
+                    for _ in 0..3 {
+                        std::thread::sleep(std::time::Duration::from_millis(ms));
+                        if h.is_finished() {
+                            break;
+                        }
+                        eprintln!("--- {:.0} ms after the abort at {t} s:", aborted_at.elapsed().as_secs_f64() * 1e3);
+                        dump_stacks();
+                    }
+                }
+                let (done, cancelled) = h.join().unwrap();
+                (done.saturating_duration_since(aborted_at), cancelled)
+            });
+            let ms = latency.as_secs_f64() * 1e3;
+            if cancelled {
+                worst = worst.max(ms);
+            }
+            println!("DISP {n}² cancel at {t:.2} s of {whole:.2}: stopped {ms:.0} ms later (cancelled {cancelled}, total {:.2} s)", start.elapsed().as_secs_f64());
+        }
+        println!("DISP {n}² regeneration: worst {worst:.0} ms");
+        // The display mesh alone (the part made once).
+        let (r, _) = displacement_map(&noise_csv(n), "side", true);
+        let Some(b) = r.context.bodies.first().map(|b| b.shape.clone()).filter(|_| r.context.bodies.len() == 1 && n * n <= 500_000) else { continue };
+        for preview in [true, false] {
+            let (lin, ang) = noshape_model::regen::display_deflection(&b, 1.0, preview);
+            for after in [20u64, 50, 100] {
+                let flag = std::sync::atomic::AtomicBool::new(false);
+                let copy = b.transformed(&noshape_kernel::Transform::Translate(glam::DVec3::ZERO)).unwrap();
+                let (latency, ok) = std::thread::scope(|s| {
+                    let h = s.spawn(|| {
+                        let m = noshape_kernel::with_cancel(&flag, || noshape_kernel::tessellate(&copy, lin, ang, true));
+                        (std::time::Instant::now(), m.is_ok())
+                    });
+                    std::thread::sleep(std::time::Duration::from_millis(after));
+                    let aborted_at = std::time::Instant::now();
+                    flag.store(true, std::sync::atomic::Ordering::Relaxed);
+                    let (done, ok) = h.join().unwrap();
+                    (done.saturating_duration_since(aborted_at), ok)
+                });
+                println!("DISP {n}² {} mesh cancel at {after} ms: stopped {:.0} ms later (finished {ok})", if preview { "preview" } else { "fine" }, latency.as_secs_f64() * 1e3);
+            }
+        }
     }
 }
 

@@ -708,6 +708,16 @@ impl NurbsSurface {
         if near.1 < r.1 { near } else { r }
     }
 
+    /// The surface point nearest `p` within `spans` knot spans of `seed` each way (8 samples a span, refined): a
+    /// near point the iteration from `seed` missed for a dip beside it, without the whole surface's search.
+    pub fn param_near(&self, p: DVec3, seed: DVec2, spans: f64) -> (DVec2, f64) {
+        let ((u0, u1), (v0, v1)) = self.range();
+        let (su, sv) = ((u1 - u0) / (self.nu - self.udegree).max(1) as f64, (v1 - v0) / (self.nv - self.vdegree).max(1) as f64);
+        let full = (8 * (self.nu - self.udegree).max(1), 8 * (self.nv - self.vdegree).max(1));
+        let window = ((seed.x - spans * su, seed.x + spans * su), (seed.y - spans * sv, seed.y + spans * sv));
+        self.refine(p, self.nearest_sample(p, full, Some(window)))
+    }
+
     /// The nearest of an `mu` × `mv` grid of samples over the surface (or only those within `window`).
     fn nearest_sample(&self, p: DVec3, (mu, mv): (usize, usize), window: Option<((f64, f64), (f64, f64))>) -> DVec2 {
         let ((u0, u1), (v0, v1)) = self.range();
@@ -743,7 +753,10 @@ impl NurbsSurface {
                 break;
             }
             let step = DVec2::new((d * f - b * g) / det, (a * g - b * f) / det);
-            let next = DVec2::new((uv.x - step.x).clamp(u0.min(u1), u0.max(u1)), (uv.y - step.y).clamp(v0.min(v1), v0.max(v1)));
+            // (Round a closed surface's period rather than stopping at its seam: a rim's nodes beside it.)
+            let nu = uv.x - step.x;
+            let nu = if self.closed_in_u() && (nu < u0.min(u1) || nu > u0.max(u1)) { u0.min(u1) + (nu - u0.min(u1)).rem_euclid((u1 - u0).abs()) } else { nu.clamp(u0.min(u1), u0.max(u1)) };
+            let next = DVec2::new(nu, (uv.y - step.y).clamp(v0.min(v1), v0.max(v1)));
             let moved = (next - uv).abs();
             uv = next;
             if moved.x <= 1e-15 * (1.0 + uv.x.abs()) && moved.y <= 1e-15 * (1.0 + uv.y.abs()) {

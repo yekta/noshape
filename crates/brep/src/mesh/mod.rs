@@ -43,6 +43,9 @@ pub enum MeshSurface {
 pub struct MeshNurbs<'a> {
     pub curves: &'a [NurbsCurve],
     pub surfaces: &'a [NurbsSurface],
+    /// Per face, per loop, per use: its edge's curve on a B-spline face (in `curves`, (u, v, 0) at the edge's own
+    /// parameters), where the kernel gave one.
+    pub face_pcurves: &'a [Vec<Vec<Option<u32>>>],
 }
 
 /// An edge: its curve (`None`: one not meshed here) between vertices `v[0]` (at parameter `t0`) and `v[1]`
@@ -202,7 +205,9 @@ fn nurbs_edge_nodes(c: &NurbsCurve, a: DVec3, b: DVec3, t0: f64, t1: f64, defl: 
             u = if (to - (u + dir * h)) * dir <= 1e-12 * span { to } else { u + dir * h };
             params.push(u);
             points.push(c.at(u));
-            if params.len() > 100_000 {
+            // (A million: a displacement map's rim at 1024² wiggles past 100 000 nodes; an edge's grow with the map's
+            // side, not its area.)
+            if params.len() > 1_000_000 || (params.len() % 4096 == 0 && crate::cancelled()) {
                 return None;
             }
         }
@@ -322,7 +327,7 @@ pub fn mesh_body_with(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace]
             run.sort_by(|a, b| b.0.total_cmp(&a.0));
             run
         };
-        let mesh = |k: usize| mesh_face(vertices, edges, &faces[run[k].1], edge_nodes, defl, nurbs);
+        let mesh = |k: usize| mesh_face(vertices, edges, &faces[run[k].1], edge_nodes, defl, nurbs, nurbs.face_pcurves.get(run[k].1).map(|v| v.as_slice()));
         for (k, m) in in_parallel(run.len(), 1, mesh) {
             out.faces[run[k].1] = m;
         }
@@ -369,14 +374,25 @@ fn in_parallel<T: Send>(n: usize, run: usize, f: impl Fn(usize) -> T + Sync) -> 
         let mut got = Vec::new();
         loop {
             let a = next.fetch_add(run, std::sync::atomic::Ordering::Relaxed);
-            if a >= n {
+            if a >= n || crate::cancelled() {
                 return got;
             }
             got.extend((a..(a + run).min(n)).map(|i| (i, f(i))));
         }
     };
+    // (Each worker with the caller's cancel flag and the kernel's state, as the Boolean's.)
+    let (flag, state) = (crate::thread_cancel(), crate::thread_state());
+    let worker = || {
+        crate::set_thread_cancel(flag);
+        let back = state.map(|(h, s)| (h, (h.enter)(s)));
+        let got = work();
+        if let Some((h, b)) = back {
+            (h.leave)(b);
+        }
+        got
+    };
     std::thread::scope(|sc| {
-        let others: Vec<_> = (1..threads).map(|_| sc.spawn(work)).collect();
+        let others: Vec<_> = (1..threads).map(|_| sc.spawn(worker)).collect();
         let mut all = work();
         for h in others {
             all.extend(h.join().unwrap_or_default());
@@ -386,9 +402,9 @@ fn in_parallel<T: Send>(n: usize, run: usize, f: impl Fn(usize) -> T + Sync) -> 
 }
 
 /// One face, its edges' nodes from `nodes`.
-fn mesh_face(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, nodes: &[Option<EdgeNodes>], defl: Deflection, nurbs: MeshNurbs) -> Option<FaceMesh> {
+fn mesh_face(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, nodes: &[Option<EdgeNodes>], defl: Deflection, nurbs: MeshNurbs, pcurves: Option<&[Vec<Option<u32>>]>) -> Option<FaceMesh> {
     match face.surface {
-        MeshSurface::Nurbs { index } => mesh_grid(edges, face, nurbs.surfaces.get(index as usize)?, nodes, defl),
+        MeshSurface::Nurbs { index } => mesh_grid(edges, face, nurbs.surfaces.get(index as usize)?, nodes, defl, pcurves.map(|p| (p, nurbs.curves))),
         MeshSurface::Plane { origin, normal, xdir } => mesh_plane(vertices, edges, face, origin, normal, xdir, nodes),
         // A strip's rows, else (a piece bounded by other curves: a knurl's lands) a grid as a B-spline's.
         MeshSurface::Cylinder { origin, axis, xdir, direct, radius } => mesh_revolved(edges, face, &Revolved::new(origin, axis, xdir, direct, radius, 0.0, 0.0), nodes, defl),
@@ -403,7 +419,7 @@ fn mesh_face(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, nodes: &[O
 }
 
 fn mesh_revolved(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option<EdgeNodes>], defl: Deflection) -> Option<FaceMesh> {
-    mesh_strip(edges, face, s, nodes, defl).or_else(|| mesh_grid(edges, face, s, nodes, defl))
+    mesh_strip(edges, face, s, nodes, defl).or_else(|| mesh_grid(edges, face, s, nodes, defl, None))
 }
 
 /// A cylinder (`angle` 0), cone or torus (`minor` > 0, `radius` the major one; a sphere's 0) in OCCT's
@@ -821,8 +837,11 @@ fn mesh_plane(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, origin: D
 /// within the angular), then all triangulated by [`cdt::triangulate_with`] on the plane scaled by the surface's
 /// mean first derivatives (near isotropic). Declined: a seam (an edge twice in the face), a boundary node off the
 /// surface, a degenerate parameterisation.
-fn mesh_grid(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, nodes: &[Option<EdgeNodes>], defl: Deflection) -> Option<FaceMesh> {
-    let r = mesh_grid_why(edges, face, s, nodes, defl);
+/// A face's edges' curves on it (per loop, per use) and the curves they index.
+type FaceCurves<'a> = (&'a [Vec<Option<u32>>], &'a [NurbsCurve]);
+
+fn mesh_grid(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, nodes: &[Option<EdgeNodes>], defl: Deflection, pcurves: Option<FaceCurves>) -> Option<FaceMesh> {
+    let r = mesh_grid_why(edges, face, s, nodes, defl, pcurves);
     if let Err(why) = &r
         && std::env::var_os("NOSHAPE_MESH_DEBUG").is_some()
     {
@@ -884,10 +903,19 @@ impl GridSurface for NurbsSurface {
         // (Open too: on a bumpy surface the iteration from the last node can settle in a dip beside it, a displaced
         // top's rim.)
         let step = (p - NurbsSurface::at(self, s.x, s.y)).length();
-        if r.1 > (1e-9 * (1.0 + p.abs().max_element())).max(0.25 * step) {
-            let fresh = NurbsSurface::param_of(self, p, None);
-            if fresh.1 < r.1 {
-                r = fresh;
+        let off = (1e-9 * (1.0 + p.abs().max_element())).max(0.25 * step);
+        if r.1 > off {
+            // Near the seed first (a dip beside it: a few spans' samples, not the whole surface's, 14 ms a node on a
+            // million-pole displacement map), then the whole surface if that's off too.
+            let near = self.param_near(p, s, 2.0);
+            if near.1 < r.1 {
+                r = near;
+            }
+            if r.1 > off {
+                let fresh = NurbsSurface::param_of(self, p, None);
+                if fresh.1 < r.1 {
+                    r = fresh;
+                }
             }
         }
         if !self.closed_in_u() {
@@ -970,7 +998,45 @@ impl GridSurface for Revolved {
 }
 
 /// [`mesh_grid`], or why it declines.
-fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, nodes: &[Option<EdgeNodes>], defl: Deflection) -> Result<FaceMesh, &'static str> {
+/// The boundary nodes' parameters from their edges' curves on the face, each use's at its nodes' edge parameters: exact
+/// and without a search (a million-pole displacement map's 100 000 rim nodes took seconds to project, some into a dip
+/// of its bumps). None unless every use has one, every node lands in the surface's range and the ones checked on it.
+#[allow(clippy::too_many_arguments)]
+fn uv_from_curves(face: &MeshFace, edge_nodes: &[Vec<Vec<u32>>], nodes: &[Option<EdgeNodes>], (pc, curves): FaceCurves, s: &impl GridSurface, points: &[DVec3]) -> Option<Vec<DVec2>> {
+    let mut uv = vec![DVec2::NAN; points.len()];
+    for (l, uses) in face.loops.iter().enumerate() {
+        for (k, u) in uses.iter().enumerate() {
+            let c = curves.get((*pc.get(l)?.get(k)?)? as usize)?;
+            let n = nodes.get(u.edge as usize)?.as_ref()?;
+            let ids = edge_nodes.get(l)?.get(k)?;
+            if ids.len() != n.params.len() || ids.is_empty() {
+                return None;
+            }
+            // Each use's own nodes (its last along it is the next use's first).
+            let last = ids.len() - 1;
+            for (j, (&id, &t)) in ids.iter().zip(&n.params).enumerate() {
+                if if u.reversed { j > 0 } else { j < last } {
+                    let q = c.at(t);
+                    *uv.get_mut(id as usize)? = DVec2::new(q.x, q.y);
+                }
+            }
+        }
+    }
+    let ((u0, u1), (v0, v1)) = s.range();
+    let (eu, ev) = (1e-9 * (u1 - u0).abs().max(1.0), 1e-9 * (v1 - v0).abs().max(1.0));
+    if uv.iter().any(|q| !q.is_finite() || q.x < u0.min(u1) - eu || q.x > u0.max(u1) + eu || q.y < v0.min(v1) - ev || q.y > v0.max(v1) + ev) {
+        return None;
+    }
+    let every = (points.len() / 64).max(1);
+    for i in (0..points.len()).step_by(every) {
+        if (s.at(uv[i].x, uv[i].y) - points[i]).length() > 1e-5 * (1.0 + points[i].abs().max_element()) {
+            return None;
+        }
+    }
+    Some(uv)
+}
+
+fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, nodes: &[Option<EdgeNodes>], defl: Deflection, pcurves: Option<FaceCurves>) -> Result<FaceMesh, &'static str> {
     let mut seen = std::collections::HashSet::new();
     if !s.closed() && !face.loops.iter().flatten().all(|u| seen.insert(u.edge)) {
         return Err("a seam");
@@ -990,30 +1056,91 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
         points.extend(pts);
     }
     // The boundary on the parameter plane, each node from the last's parameters.
+    let dbg_t = std::time::Instant::now();
+    let dbg = std::env::var_os("NOSHAPE_MESH_DEBUG").is_some();
     let ((u0, u1), (v0, v1)) = s.range();
     let off = (defl.linear * 0.25).max(1e-7);
+    let from_curves = pcurves.and_then(|pc| uv_from_curves(face, &edge_nodes, nodes, pc, s, &points));
+    let from_curves_used = from_curves.is_some();
     let mut uv: Vec<DVec2> = Vec::with_capacity(points.len());
-    let mut seed = None;
-    for (k, p) in points.iter().enumerate() {
-        let (mut q, d) = s.param_of(*p, seed);
-        if d.is_nan() || d > off || !q.is_finite() {
-            return Err("a boundary node off the surface");
+    if let Some(u) = from_curves {
+        uv = u;
+    } else {
+        let mut seed = None;
+        for (k, p) in points.iter().enumerate() {
+            if k % 1024 == 1023 && crate::cancelled() {
+                return Err("cancelled");
+            }
+            let (mut q, mut d) = s.param_of(*p, seed);
+            // Also from the last step repeated (a rim's coarse nodes, a display preview's, are far apart: from the last
+            // node's parameters alone the iteration settled in a dip of a displacement map's bumps).
+            if k >= 2 && d > 1e-9 * (1.0 + p.abs().max_element()) {
+                let ahead = uv[k - 1] * 2.0 - uv[k - 2];
+                let (q2, d2) = s.param_of(*p, Some(ahead));
+                if d2 < d {
+                    (q, d) = (q2, d2);
+                }
+            }
+            if d.is_nan() || d > off || !q.is_finite() {
+                return Err("a boundary node off the surface");
+            }
+            // A closed surface's first node on its seam: on the side its next node goes on from (a rim running towards
+            // smaller u from u0 crossed the whole period: a Replace face's displaced tube).
+            if k == 0 && s.closed() && points.len() > 1 {
+                let ((a, b), _) = s.range();
+                let eps = 1e-9 * (b - a).abs().max(1.0);
+                if (q.x - a).abs() <= eps || (q.x - b).abs() <= eps {
+                    let other = DVec2::new(if (q.x - a).abs() <= eps { b } else { a }, q.y);
+                    let step = |c: DVec2| (s.param_of(points[1], Some(c)).0 - c).length();
+                    if step(other) < step(q) {
+                        q = other;
+                    }
+                }
+            }
+            // On a closed surface a node on its seam is at either end of the period: the end nearest the last node (the
+            // projection gave a seam node u 0 where the rim before ran up to u 1 at a displacement map's coarse preview,
+            // and the loop didn't close: BRepMesh took the face, 650 s at 512²).
+            if k > 0 && s.closed() {
+                let ((a, b), _) = s.range();
+                let (period, eps) = (b - a, 1e-9 * (b - a).abs().max(1.0));
+                let last = uv[k - 1].x;
+                for c in [q.x - period, q.x + period] {
+                    if c >= a - eps && c <= b + eps && (c - last).abs() < (q.x - last).abs() {
+                        q.x = c;
+                    }
+                }
+            }
+            uv.push(q);
+            seed = Some(q);
         }
-        // A closed surface's first node on its seam: on the side its next node goes on from (a rim running towards
-        // smaller u from u0 crossed the whole period: a Replace face's displaced tube).
-        if k == 0 && s.closed() && points.len() > 1 {
+        // A run of nodes on a closed surface's seam (up a seam edge) on the side of the node after it (or before): the side
+        // the loop goes on from.
+        if s.closed() {
             let ((a, b), _) = s.range();
             let eps = 1e-9 * (b - a).abs().max(1.0);
-            if (q.x - a).abs() <= eps || (q.x - b).abs() <= eps {
-                let other = DVec2::new(if (q.x - a).abs() <= eps { b } else { a }, q.y);
-                let step = |c: DVec2| (s.param_of(points[1], Some(c)).0 - c).length();
-                if step(other) < step(q) {
-                    q = other;
+            let on_seam = |u: f64| (u - a).abs() <= eps || (u - b).abs() <= eps;
+            for r in &rings {
+                let mut k = 0;
+                while k < r.len() {
+                    if !on_seam(uv[r[k]].x) {
+                        k += 1;
+                        continue;
+                    }
+                    let start = k;
+                    while k < r.len() && on_seam(uv[r[k]].x) {
+                        k += 1;
+                    }
+                    let next = if k < r.len() { Some(uv[r[k]].x) } else { None };
+                    let before = if start > 0 { Some(uv[r[start - 1]].x) } else { r.iter().rev().map(|&i| uv[i].x).find(|&u| !on_seam(u)) };
+                    if let Some(u) = next.or(before) {
+                        let side = if (u - b).abs() < (u - a).abs() { b } else { a };
+                        for &i in &r[start..k] {
+                            uv[i].x = side;
+                        }
+                    }
                 }
             }
         }
-        uv.push(q);
-        seed = Some(q);
     }
     // A closed surface: each loop by continuity across the seam (a step over half a period is one across it: a
     // swept hose's wall walked its seam at u0 and then its rim towards smaller u, so the rim came out on the other
@@ -1137,6 +1264,9 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
         Ok(out)
     };
     let (mut us, mut vs) = (steps(true)?, steps(false)?);
+    if dbg {
+        eprintln!("mesh grid: {} boundary nodes ({}) {:?}", points.len(), if from_curves_used { "their curves on the face" } else { "projected" }, dbg_t.elapsed());
+    }
     // Scale: the mean first derivatives over the box.
     let (mut su, mut sv, mut n) = (0.0, 0.0, 0.0);
     for i in 0..samples {
@@ -1223,8 +1353,14 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
         })
     };
     let mut interior = Vec::new();
+    if dbg {
+        eprintln!("mesh grid: grid {} x {}, {} boundary segments {:?}", us.len(), vs.len(), segs.len(), dbg_t.elapsed());
+    }
     let mut crossings: Vec<f64> = Vec::new();
     for (j, &v) in vs.iter().enumerate().skip(1).take(vs.len().saturating_sub(2)) {
+        if j % 64 == 0 && crate::cancelled() {
+            return Err("cancelled");
+        }
         if v <= v0 || v >= v1 {
             continue;
         }
@@ -1245,9 +1381,15 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
         }
     }
     let nb = uv.len();
+    if dbg {
+        eprintln!("mesh grid: {} interior nodes {:?}", interior.len(), dbg_t.elapsed());
+    }
     let all: Vec<cdt::Pt> = uv.iter().chain(&interior).map(|q| scaled(*q)).map(|q| cdt::Pt { x: q.x, y: q.y }).collect();
     let inner: Vec<usize> = (nb..nb + interior.len()).collect();
     let triangles = cdt::triangulate_with(&all, &rings, &inner).ok_or("the triangulation failed")?;
+    if dbg {
+        eprintln!("mesh grid: triangulated {:?}", dbg_t.elapsed());
+    }
     // Each node's point and derivatives once (a big face's on several threads); normals ∂u × ∂v (at a degenerate
     // point, its triangles').
     let nodes: Vec<DVec2> = uv.iter().chain(&interior).copied().collect();

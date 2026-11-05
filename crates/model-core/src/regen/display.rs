@@ -45,7 +45,8 @@ fn f3(p: DVec3) -> [f32; 3] {
 /// With `NOSHAPE_DISPLAY_MESH=chord` ([`angle_display_mesh`] off) bodies
 /// get the chord-based mesh from before live 459 (chord 8e-4 of the body's
 /// diagonal, 0.35 rad; previews 4x the chord, 1.8x the angle).
-fn display_deflection(shape: &noshape_kernel::Shape, quality: f64, preview: bool) -> (f64, f64) {
+/// The display mesh's linear and angular deflections for `shape` at `quality` (Auto 1), its preview's or its own.
+pub fn display_deflection(shape: &noshape_kernel::Shape, quality: f64, preview: bool) -> (f64, f64) {
     let diag = shape.bounding_box(false).ok().map(|x| x.diagonal()).unwrap_or(0.1).max(1e-4);
     if !angle_display_mesh() {
         let defaults = RegenOptions::default();
@@ -162,6 +163,10 @@ pub fn flat_view_display(flat: &crate::sheetmetal::FlatPattern, color: [f32; 4])
     Some(StudioDisplay { bodies: vec![body], ..Default::default() })
 }
 
+fn aborted(opts: &RegenOptions) -> bool {
+    opts.cancel.as_ref().is_some_and(super::RegenCancel::aborted)
+}
+
 fn tessellate_body(shape: &noshape_kernel::Shape, name: &str, quality: f64, opts: &RegenOptions) -> Arc<MeshBuffers> {
     // The shown vertices beside the mesh (the shape's topology classified once, ~12 ms on the 400-fin plate;
     // the kernel's mesh lock is let go before any wait here, so a stolen job can't wait on it).
@@ -169,7 +174,9 @@ fn tessellate_body(shape: &noshape_kernel::Shape, name: &str, quality: f64, opts
         || {
             let (lin, ang) = display_deflection(shape, quality, opts.preview_meshes);
             let tt = std::time::Instant::now();
-            (noshape_kernel::tessellate(shape, lin, ang, true), lin, ang, tt.elapsed())
+            // (Under the run's cancel: a newer edit stops a dense face's mesh within its polls.)
+            let mesh = || noshape_kernel::tessellate(shape, lin, ang, true);
+            (opts.cancel.as_ref().map_or_else(mesh, |c| c.scope(mesh)), lin, ang, tt.elapsed())
         },
         || shown_vertices(shape),
     );
@@ -192,7 +199,9 @@ fn tessellate_body(shape: &noshape_kernel::Shape, name: &str, quality: f64, opts
             .with_mesh_lines(shape),
         ),
         Err(e) => {
-            log::warn!("tessellation failed for {}: {e}", name);
+            if !aborted(opts) {
+                log::warn!("tessellation failed for {}: {e}", name);
+            }
             Arc::new(MeshBuffers::default())
         }
     }
@@ -333,7 +342,7 @@ fn mesh_in_parallel(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, par
         .flat_map_iter(|group| {
             group
                 .into_iter()
-                .filter(|_| !opts.cancel.as_ref().is_some_and(super::RegenCancel::aborted))
+                .filter(|_| !aborted(opts))
                 .flat_map(|j| {
                     let qualities: Vec<f64> = j.levels.iter().map(|l| l.1).collect();
                     let made = tessellate_levels(&j.shape, &j.name, &qualities, j.with_finest, opts);
@@ -342,6 +351,10 @@ fn mesh_in_parallel(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, par
                 .collect::<Vec<_>>()
         })
         .collect();
+    // (Cancelled: what was made may be a stopped mesh's nothing, not cached.)
+    if aborted(opts) {
+        return Default::default();
+    }
     let mut keys = std::collections::HashSet::new();
     for (key, nfaces, m) in made {
         keys.insert(key);
@@ -397,7 +410,7 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
     let meshed_here = mesh_in_parallel(ctx, studio, opts, &partners, meshes);
     for b in &ctx.bodies {
         // A newer edit made this run stale (meshes made so far stay cached).
-        if opts.cancel.as_ref().is_some_and(super::RegenCancel::aborted) {
+        if aborted(opts) {
             return (d, needs_refine);
         }
         // The body's display levels (coarsest first); each level is cached
@@ -429,6 +442,9 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
                 let missing: Vec<usize> = (first..lkeys.len()).filter(|&i| !have[i]).collect();
                 let shape = b.shape.unlocated().unwrap_or_else(|_| b.shape.clone());
                 let made = tessellate_levels(&shape, &b.name, &missing.iter().map(|&i| qualities[i]).collect::<Vec<_>>(), !have[lkeys.len() - 1], opts);
+                if aborted(opts) {
+                    return (Vec::new(), fresh);
+                }
                 for (&i, m) in missing.iter().zip(made) {
                     meshes.insert(lkeys[i], (nfaces, opts.preview_meshes, m));
                     fresh[i] = true;
@@ -437,6 +453,9 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
             let local: Vec<Arc<MeshBuffers>> = lkeys.iter().map(|k| meshes[k].2.clone()).collect();
             (local, fresh)
         });
+        if aborted(opts) {
+            return (d, needs_refine);
+        }
         let levels: Vec<Arc<MeshBuffers>> = if open_composite {
             vec![Arc::new(MeshBuffers::default())]
         } else {
@@ -455,6 +474,9 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
                     if let Some(first) = have.iter().position(|h| !h) {
                         let missing: Vec<usize> = (first..keys.len()).filter(|&i| !have[i]).collect();
                         let made = tessellate_levels(&b.shape, &b.name, &missing.iter().map(|&i| qualities[i]).collect::<Vec<_>>(), !have[keys.len() - 1], opts);
+                        if aborted(opts) {
+                            return (d, needs_refine);
+                        }
                         for (&i, m) in missing.iter().zip(made) {
                             meshes.insert(keys[i], (nfaces, opts.preview_meshes, m));
                         }

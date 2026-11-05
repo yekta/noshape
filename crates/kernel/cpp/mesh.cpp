@@ -931,8 +931,20 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
       const KernelTimer timer("mesh.brepmesh");
       const size_t      fallbacks = g_planar_fallbacks.load();
       const auto brep_t0 = std::chrono::steady_clock::now();
-      mesher.Perform(ctx);
+      // Stopped by a cancel and by a deadline, by the wall clock (its work is on the pool), unless a tighter one
+      // is set: a face it can't mesh in time (a displacement map's million-pole B-spline took it half an hour) fails
+      // rather than holding the display.
+      Deadline        wall;
+      Deadline* const outer = t_deadline;
+      wall.at               = deadline_now(wall) + 60;
+      if (outer == nullptr)
+        t_deadline = &wall;
+      mesher.Perform(ctx, new_cancel_indicator()->Start());
+      t_deadline = outer;
       slot.reset();
+      if (wall.hit.load() || (outer != nullptr && outer->hit.load()))
+        fail_op("the display mesh took too long");
+      fail_if_cancelled();
       if (std::getenv("NOSHAPE_MESH_DEBUG"))
         std::fprintf(stderr, "mesh: BRepMesh meshed %d faces in %.1f ms\n", meshed.ShapeType() == TopAbs_COMPOUND ? meshed.NbChildren() : m->faces.Extent(), std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - brep_t0).count());
       m->planar_fallbacks = g_planar_fallbacks.load() - fallbacks;

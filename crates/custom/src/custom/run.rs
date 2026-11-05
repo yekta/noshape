@@ -276,6 +276,10 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
                     let t = Instant::now();
                     let f = i.global(&cell);
                     let r = f.and_then(|f| i.call_value(&f, vec![ctx_value, host::id_value(&feature_id), definition]));
+                    let dead = i.take_stopped_frames();
+                    if !dead.is_empty() {
+                        std::thread::spawn(move || drop(dead));
+                    }
                     let mut lines: Vec<(Arc<str>, u32, std::time::Duration)> = i.profile.take().map(|p| p.times.into_iter().map(|((m, l), t)| (m, l, t)).collect()).unwrap_or_default();
                     if print {
                         lines.sort_by_key(|l| std::cmp::Reverse(l.2));

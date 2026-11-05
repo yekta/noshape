@@ -564,6 +564,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   release (it already does) and will add this document to the release smoke. live: opens it. (qa 2026-11-05 09:16)
   qa 09:32: one more release-loop death, not reproduced: v0.4.30 seed 4558 died at step 73 (a Shell, 7.4 s, no message); replays
   v0.4.30 2 / 2 and green dedfb1ae 1 / 1 ran to the end. Logged here in case it is the same release-build difference.
+- [ ] P2 DISPLACEMENT-TOP-VOLUME (core 11-05 12:18) a displacement map's replaced flat top (a 512² or 704² B-spline
+  trimmed by the cylinder's circle) takes 20 s for its volume (mass properties; the side face's 0.6-1 s): common.cpp
+  face_moments' boundary integral cuts the circle's curve on the face at every knot it crosses and runs an inner
+  integral along u from u0 for each Gauss point, capped (20,000 segments a piece), so the time is flat in the size
+  but large. Wants an area quadrature over the knot cells inside the trim instead, or inner integrals shared along
+  the boundary. Repro: T2 model custom_features::displacement_map_scales (its "volume" column).
 - [ ] P2 SAVED-MIRROR-REF-CHANGE (core) **a saved document's Mirror resolves differently on green 8cc1b766**: qa-scratch/tickets/
   cli-suppress-stall.noshape (a fuzz document), Mirror 10: 7bb99058 "No merge scope selected." (Error, 6 parts) → 8cc1b766 "1
   missing selection" (Warning) and a mirrored part more (7 parts: an extra 4984.2537 mm³ / 3 faces). Everything else in the 44
@@ -584,6 +590,22 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   and pinned to 2 cores (taskset -c 0,1), and on vibe3 as ngyekta (v0.4.30 CLI, alone and 4 loops at once). qa: the
   exact command, user / HOME and environment (any NOSHAPE_* set? a -wal / -shm beside the copy?) of a run that flips,
   and NSCLI_ERR=<file> for its stderr; copies in vibe3:~/agents/core-dn (opens.py takes a cli path).
+- [x] (core 11-05 12:18) P1 DISPLACEMENT-MAP-SCALE (lead 11-05, the user: 1024 × 1024, Replace face on, never finished;
+  then its cancel did nothing) Live refuses 1024²: opCreateBSplineSurface fails above 500,000 control points in all
+  ("The B-spline definition has too many control points.", live 2057, after 47 s); we now give the same error in 7.6 s,
+  the part as it was. Everything under the limit scales: the step that didn't was the display mesh (BRepMesh 650 s at
+  512², our mesher declining the bumpy face): brep::mesh now takes the face's boundary on the plane from the edges'
+  curves on the face (pcurves, ~50 ms), seeds its projections from the steps before, keeps a closed surface's seam
+  nodes on their side, and edges run to 1 M nodes. vibe5 release, noise map, side / top: 512² feature 2.7 / 3.1 s,
+  preview mesh 0.40 / 0.31 s, fine 0.27 / 0.25 s; 704² 4.7 / 5.2 s, 0.39 / 0.32 s, 0.36 / 0.30 s (T2
+  custom_features::displacement_map_scales: each step at 704² within 3× of 512²'s; the 1024² error). Cancel: the
+  display mesh runs under the regeneration's cancel (worker threads too; mesh_grid, CDT and edge marching poll it;
+  OCCT's mesher fallback has a 60 s wall deadline); Replace face's edge carry, its checks, the big B-spline projection
+  grid, opCreateBSplineSurface's steps and evFaceTangentPlanes' frames poll it; the interpreter frees the frames a
+  cancel unwinds off its thread (a million-point array took 0.3-0.8 s to free). T2
+  custom_features::displacement_map_cancel_latency_probe: 704² and 1024² stop within 2-14 ms of the cancel at most
+  points, worst 98 ms (was 0.4-1.8 s); the display mesh alone 3-41 ms. Left: the top face's volume (mass properties)
+  takes 20 s whatever the size (the boundary integral's inner integrals along u; P2 DISPLACEMENT-TOP-VOLUME).
 - [x] (core 11-04 22:30) P1 DISPLACEMENT-MAP-WALL-MESH (lead 11-04 21:20) the top case's display mesh: our mesher declined
   the wall ("the triangulation failed") and the bumpy top, BRepMesh took 2.7 s (and turns some of the top's triangles
   against the surface: 921 of 5172 on a 256 x 256 top). brep::mesh, for psui: (1) cdt.rs checked(): a triangle turned

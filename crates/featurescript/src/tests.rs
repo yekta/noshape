@@ -349,6 +349,23 @@ fn infinite_loops_hit_the_deadline() {
     assert_eq!(e.message(), "Regeneration timed out");
 }
 
+/// A cancelled run's frames (a big array in one) come back to be freed off the run's thread, not as the calls unwind.
+#[test]
+fn a_cancelled_run_hands_back_its_frames() {
+    let full = "FeatureScript 3095;\nfunction g(a) { var i = 0; while (true) { i += 1; } }\nfunction f() { var a = [1, 2, 3]; return g(a); }";
+    let m = compile_module("cancel", full, &NoImports).unwrap();
+    let f = m.functions("f").unwrap();
+    let mut i = Interp::new();
+    let start = std::time::Instant::now();
+    i.set_cancel(Some(Box::new(move || start.elapsed() > std::time::Duration::from_millis(50))));
+    let e = i.call_set(&f, vec![]).unwrap_err();
+    assert_eq!(e.message(), "Regeneration cancelled");
+    let frames = i.take_stopped_frames();
+    assert_eq!(frames.len(), 2, "g's frame and f's");
+    assert!(frames.iter().flatten().any(|v| v.as_array().is_some_and(|a| a.len() == 3)), "the array among them");
+    assert!(i.take_stopped_frames().is_empty());
+}
+
 /// Notices of a whole source as `[line:col] message` (Onshape's panel order).
 fn notices(src: &str) -> Vec<String> {
     match compile_module(&unique_path(), src, &NoImports) {

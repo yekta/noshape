@@ -186,6 +186,8 @@ pub struct Interp {
     failed_check: Option<(Pos, Arc<str>)>,
     /// Per-line timing (Feature Studio "Profile"), when enabled.
     pub profile: Option<LineProfile>,
+    /// Cancelled or timed out: the frames' values left as the calls unwind ([`Interp::take_stopped_frames`]).
+    stopped: Option<Vec<Vec<Value>>>,
 }
 
 /// Time spent running each source line (module, 1-based line), including
@@ -231,6 +233,7 @@ impl Interp {
             native_name: "".into(),
             failed_check: None,
             profile: None,
+            stopped: None,
         }
     }
 
@@ -248,9 +251,16 @@ impl Interp {
     fn cancelled(&mut self) -> R<()> {
         if self.cancel.as_ref().is_some_and(|c| c()) {
             self.cancel = None;
+            self.stopped.get_or_insert_default();
             return Err(self.error("Regeneration cancelled"));
         }
         Ok(())
+    }
+
+    /// The values of the frames a cancel or the deadline unwound, for the caller to free off its thread (a
+    /// displacement map's million-point arrays took 0.3-0.8 s to free after the cancel).
+    pub fn take_stopped_frames(&mut self) -> Vec<Vec<Value>> {
+        self.stopped.take().unwrap_or_default()
     }
 
     pub fn module(&self) -> &Arc<str> {
@@ -320,6 +330,7 @@ impl Interp {
             && Instant::now() > d
         {
             self.deadline = None;
+            self.stopped.get_or_insert_default();
             return Err(self.error("Regeneration timed out"));
         }
         Ok(())
@@ -335,6 +346,7 @@ impl Interp {
             && Instant::now() > d
         {
             self.deadline = None;
+            self.stopped.get_or_insert_default();
             return Err(self.error("Regeneration timed out"));
         }
         Ok(())
@@ -621,7 +633,14 @@ impl Interp {
         self.frames.push(TraceFrame { function: f.name.clone(), module: saved_module.clone(), pos: call_pos });
         let r = self.run_body(f);
         self.frames.pop();
-        self.stack.truncate(base);
+        // (Also a native's error after the cancel: a kernel operation stopped by it.)
+        if r.is_err() && self.stopped.is_none() && self.cancel.as_ref().is_some_and(|c| c()) {
+            self.stopped = Some(Vec::new());
+        }
+        match &mut self.stopped {
+            Some(dead) if r.is_err() => dead.push(self.stack.split_off(base)),
+            _ => self.stack.truncate(base),
+        }
         self.base = saved_base;
         self.module = saved_module;
         self.module_version = saved_version;

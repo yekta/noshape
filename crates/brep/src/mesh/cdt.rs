@@ -485,8 +485,8 @@ pub fn triangulate_with(pts: &[Pt], rings: &[Vec<usize>], interior: &[usize]) ->
     let mut m = Mesh { p, v: Vec::with_capacity(6 * nall + 12), tw: Vec::with_capacity(6 * nall + 12), vedge: vec![NONE; np + 3], fixed: Vec::with_capacity(6 * nall + 12), recovered: Vec::new(), st: Vec::new() };
     m.add_tri(np, np + 1, np + 2);
     let mut start = 0;
-    for &(_, i) in &order {
-        if !m.insert(i, &mut start) {
+    for (k, &(_, i)) in order.iter().enumerate() {
+        if !m.insert(i, &mut start) || (k % 4096 == 4095 && crate::cancelled()) {
             return None;
         }
     }

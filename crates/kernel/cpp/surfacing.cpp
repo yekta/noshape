@@ -929,6 +929,7 @@ std::unique_ptr<OcShape> bspline_surface_face(const BSplineSurfF& surface, rust:
 {
   const occ::handle<Geom_BSplineSurface> S = spline_surface(surface);
   TopoDS_Face                            F;
+  fail_if_cancelled();
   if (boundary.empty())
   {
     BRepBuilderAPI_MakeFace mf(S, Precision::Confusion());
@@ -955,18 +956,22 @@ std::unique_ptr<OcShape> bspline_surface_face(const BSplineSurfF& surface, rust:
     if (!mf.IsDone())
       fail_op("could not bound the spline surface");
     F = mf.Face();
+    fail_if_cancelled();
     BRepLib::BuildCurves3d(F);
+    fail_if_cancelled();
     ShapeFix_Face fix(F);
     fix.Perform();
     F = fix.Face();
   }
+  fail_if_cancelled();
   if (make_solid)
   {
     // The sheet joined to itself along its closed directions: a solid when
     // that closes it (a face closed both ways by its seams already is).
     BRepBuilderAPI_Sewing sew(Precision::Confusion());
     sew.Add(F);
-    sew.Perform();
+    sew.Perform(new_cancel_indicator()->Start());
+    fail_if_cancelled();
     std::vector<TopoDS_Shell> shells;
     for (TopExp_Explorer e(sew.SewedShape(), TopAbs_SHELL); e.More(); e.Next())
       shells.push_back(TopoDS::Shell(e.Current()));

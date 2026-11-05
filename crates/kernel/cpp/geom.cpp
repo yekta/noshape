@@ -578,11 +578,15 @@ static bool big_bspline_nearest(const TopoDS_Face& f, const gp_Pnt& P, ProjPoint
     const std::vector<double> us = params(bs->UKnots()), vs = params(bs->VKnots());
     n->pts.reserve(us.size() * vs.size());
     for (double u : us)
+    {
+      // (2.5 M points at 704²: a cancel stops it between rows.)
+      fail_if_cancelled();
       for (double v : vs)
       {
         const gp_Pnt q = bs->Value(u, v).Transformed(t);
         n->pts.push_back({q.X(), q.Y(), q.Z(), u, v});
       }
+    }
     grids.insert(grids.begin(), std::move(n));
     if (grids.size() > 2)
       grids.pop_back();
@@ -952,6 +956,8 @@ rust::Vec<double> face_frames_at_uvs(const OcShape& fs, rust::Slice<const double
   r.reserve(uvs.size() / 2 * 9);
   for (size_t k = 0; k + 1 < uvs.size(); k += 2)
   {
+    if ((k & 16383) == 0)
+      fail_if_cancelled();
     const double u = uvs[k], v = uvs[k + 1];
     gp_Pnt       p;
     gp_Vec       du, dv;
@@ -985,6 +991,8 @@ rust::Vec<double> face_d2_at_uvs(const OcShape& fs, rust::Slice<const double> uv
   r.reserve(uvs.size() / 2 * 18);
   for (size_t k = 0; k + 1 < uvs.size(); k += 2)
   {
+    if ((k & 16383) == 0)
+      fail_if_cancelled();
     const double u = uvs[k], v = uvs[k + 1];
     gp_Pnt       p;
     gp_Vec       du, dv, duu, dvv, duv;
