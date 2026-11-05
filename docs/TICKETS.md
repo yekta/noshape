@@ -806,6 +806,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Part 5, live 31/85/56, ours 31/78/49.
   prize-wheel-tim's knob isn't taken: its cylinder face's seam has both its vertices on the chain at z 19.8, the joint
   (0, 1.88) and the notch's corner (-1.2, 1.447), so it isn't a seam from an end circle; not looked into further.
+  core 11-05 00:33: prize-wheel-tim's knob as live (20/49/32; the document 8/8): the seam moves to a slot corner
+  whose short edge up the slot's wall runs on from the new seam (seam_to_vertex declined every corner having an edge
+  along the axis; that edge now goes on the seam's side the wire leaves or comes back to V by). T1 kernel
+  bool_patterns::a_pins_seam_moves_to_a_slot_corner_with_an_edge_along_it.
   core 11-04 07:52: stef-radijator's Chamfer 2 (now its first difference: 84/241/160, live 84/237/156): the hub's double-D
   hole (circle r 5.657, flats x = ±4) chamfered 1 mm at its bottom flats' edges. Every face and the chamfer's edges are
   live's (5.29 / 8 / 1.966 mm); live's two bottom arcs are one edge each (12.26 mm, (5, ∓2.65) round to (−5, ∓2.65))
@@ -3953,7 +3957,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   honoured), opExtrude of edges between UP_TO_SURFACE ends (was 0 long), startTracking of a sheet edge no longer
   lands on the sketch line it came from (the Hem's moved edge came back twice), a union of sheets sewn where they
   meet and faced the first sheet's way (Parasolid's; kernel faces_oriented_consistently); T1 ops_harness "hem".
-  Its next difference, Offset surface 1 (8 sheets, live 2 with 9/20/12), is core's native offsetSurface. Left
+  Its next difference, Offset surface 1 (8 sheets, live 2 with 9/20/12), is core's native offsetSurface (core
+  11-05 00:33: as live, 4/6: picked faces sharing an edge are one sheet, a sharp edge's offsets extended to meet, live
+  2034; L26's "adjacent faces give two" was a fillet between them; T1 model features_b::
+  offset_surface_joins_faces_sharing_edges; next Derived 1's translation). Left
   failing: cf-setback-fillet (opFillSurface "multiple loops"), cf-sheet-metal-model-plus (Up to Part: ERROR, live
   INFO), Fix PCB 2 ("No components selected").
   dx 11-04 21:09: cf-sheet-metal-model-plus's Sheet Metal Up to Part (std 1403 studio) extrudes 5 sketch edges at x = 0

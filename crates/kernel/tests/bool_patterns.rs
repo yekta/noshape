@@ -1111,6 +1111,33 @@ fn a_spline_shafts_run_out_across_its_seam_is_one_edge() {
     assert!((v / 38747.8297 - 1.0).abs() < 1e-6, "{v}");
 }
 
+/// prize-wheel-tim's knob (live 20 / 49 / 32): a Ø3.76 pin with a slot 2.4 wide and 0.2 deep across its top. Where
+/// the cylinder's seam is, it splits an arc of the top (one edge too many); it moves to a slot corner, whose short
+/// edge up the slot's wall runs on from the new seam, and the arc is whole. Either seam: 13 edges, 8 vertices shown.
+#[test]
+fn a_pins_seam_moves_to_a_slot_corner_with_an_edge_along_it() {
+    let mm = 1e-3;
+    for x_dir in [DVec3::X, DVec3::Y] {
+        let pin = k::make_cylinder(&k::Plane::new(DVec3::ZERO, DVec3::Z, x_dir), 1.88 * mm, 20.0 * mm, TAU).unwrap();
+        let slot = k::make_box_corners(DVec3::new(-1.2, -3.0, 19.8) * mm, DVec3::new(1.2, 3.0, 21.0) * mm).unwrap();
+        let cut = k::cut(&pin, &slot).unwrap().shape;
+        let u = k::unify_same_domain(&cut).unwrap().shape;
+        assert!(u.is_valid());
+        let shown = u.shown_topology().unwrap();
+        let counts = (u.count(k::ShapeType::Face), shown.edges.iter().filter(|e| **e).count(), shown.vertices.iter().filter(|v| **v).count());
+        assert_eq!(counts, (7, 13, 8), "seam along {x_dir}");
+        let v = u.volume().unwrap();
+        let want = std::f64::consts::PI * 1.88 * 1.88 * 20.0 * mm.powi(3) - cut_slot_volume(1.88, 1.2, 0.2) * mm.powi(3);
+        assert!((v / want - 1.0).abs() < 1e-6, "{v} vs {want}");
+    }
+}
+
+/// The volume a slot `2 w` wide and `d` deep takes off the top of a pin of radius `r` (the circle's chord strip).
+fn cut_slot_volume(r: f64, w: f64, d: f64) -> f64 {
+    let half = (r * r - w * w).sqrt();
+    2.0 * (w * half + r * r * (w / r).asin()) * d
+}
+
 /// The second shaft (live: Part 2 31 / 77 / 48, 52687.29 mm³): each slot's flat side and its run-out's cone touch
 /// along the profile edge, and OCCT's cut by all eight kept the cone's half inside the slot (an edge on three faces:
 /// "would result in non-manifold body", where live builds it): cut by the tools fused instead.

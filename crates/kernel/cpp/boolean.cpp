@@ -1857,11 +1857,23 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
   for (int i = 1; i <= seam_v.Extent(); ++i)
     if (chain_v.Contains(seam_v(i)) && !joint(TopoDS::Vertex(seam_v(i))))
       return {};
-  // (No chain edge runs at a candidate's angle between its ends: a line along the axis from it would sit on the seam,
-  // on one side of it or the other.)
-  auto clear_at = [&](double alpha) {
+  // An edge of the chain along the axis at angle `alpha` (all of it on that line).
+  auto along = [&](const TopoDS_Edge& e, double alpha) {
+    BRepAdaptor_Curve c(e);
+    for (int k = 0; k <= 8; ++k)
+      if (std::abs(std::remainder(uv(c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * k / 8.0)).X() - alpha, 2 * M_PI)) >= 1e-6)
+        return false;
+    return true;
+  };
+  // (No chain edge runs at a candidate's angle between its ends: it would sit on the seam, on one side of it or the
+  // other; but one along the axis from the candidate itself goes on from the seam, its side known below.)
+  auto clear_at = [&](double alpha, const TopoDS_Vertex& x) {
     for (const TopoDS_Edge& e : rest)
     {
+      TopoDS_Vertex e0, e1;
+      TopExp::Vertices(e, e0, e1);
+      if ((x.IsSame(e0) || x.IsSame(e1)) && along(e, alpha))
+        continue;
       BRepAdaptor_Curve c(e);
       for (int k = 1; k < 32; ++k)
         if (std::abs(std::remainder(uv(c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * k / 32.0)).X() - alpha, 2 * M_PI)) < 1e-6)
@@ -1875,7 +1887,7 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
   {
     const TopoDS_Vertex& x = TopoDS::Vertex(chain_v(i));
     const double         d = std::abs(uv(BRep_Tool::Pnt(x)).Y() - v_ring);
-    if (!seam_v.Contains(x) && d < best - 1e-12 && !joint(x) && clear_at(uv(BRep_Tool::Pnt(x)).X()))
+    if (!seam_v.Contains(x) && d < best - 1e-12 && !joint(x) && clear_at(uv(BRep_Tool::Pnt(x)).X(), x))
     {
       best = d;
       V    = x;
@@ -1978,6 +1990,21 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
   std::vector<TopoDS_Edge> chain;
   if (from_v == uses.size() || !loop_from(from_v, chain))
     return {};
+  // An edge along the axis from V on the new seam's line: leaving V the wire goes on up the seam's side at
+  // alpha + 2 pi, coming back to V it comes down the side at alpha.
+  for (const TopoDS_Edge* e : {&chain.front(), &chain.back()})
+  {
+    if (!along(*e, alpha))
+      continue;
+    double                    f2, l2;
+    occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(*e, F, f2, l2);
+    if (pc.IsNull())
+      return {};
+    const double want = e == &chain.front() ? alpha + 2 * M_PI : alpha;
+    pc = occ::down_cast<Geom2d_Curve>(pc->Translated(gp_Vec2d(want - pc->Value(0.5 * (f2 + l2)).X(), 0)));
+    B.UpdateEdge(*e, pc, F, BRep_Tool::Tolerance(*e));
+    B.Range(*e, F, f2, l2);
+  }
   TopoDS_Wire W;
   B.MakeWire(W);
   B.Add(W, up ? ring : TopoDS::Edge(ring.Reversed()));

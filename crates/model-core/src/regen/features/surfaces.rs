@@ -19,17 +19,29 @@ pub fn offset_surface(ev: &mut EvalCtx) -> FResult<()> {
     if refs.is_empty() {
         return crate::regen::eval::err_at(&["surfacesAndFaces"], "Select faces, surfaces, or sketch regions to offset from.");
     }
-    // (face, source name) per group: each picked face or region is its own
-    // surface (live L26: even two adjacent faces give two), a picked surface
-    // stays one.
+    // (face, source name) per group: picked faces of one body sharing edges are one surface, sharp edges' offsets
+    // extended to meet (live 2034: a block's top and back 2 / 7 / 6, a hem's end 9 faces), faces apart each their own
+    // (L26); each region is its own surface, a picked surface stays one.
+    // Faces that no longer resolve are left out (offsetSurface.fs).
+    let picked: Vec<(usize, usize)> = refs.iter().filter(|r| matches!(r, Reference::Face(_))).flat_map(|r| ev.resolve_faces(std::slice::from_ref(r))).collect();
+    let root = connected_groups(ev, &picked);
+    let mut group_of: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
     let mut groups: Vec<Vec<(Shape, Name)>> = Vec::new();
     for r in refs {
         let one = std::slice::from_ref(r);
         match r {
             Reference::Face(_) => {
-                // Faces that no longer resolve are left out (offsetSurface.fs).
                 for (bi, fi) in ev.resolve_faces(one) {
-                    groups.push(vec![(ev.face_shape(bi, fi)?, ev.ctx.bodies[bi].faces[fi].clone())]);
+                    let Some(k) = picked.iter().position(|&p| p == (bi, fi)) else { continue };
+                    let face = (ev.face_shape(bi, fi)?, ev.ctx.bodies[bi].faces[fi].clone());
+                    match group_of.get(&root[k]) {
+                        Some(&g) if !groups[g].iter().any(|(f, _)| f.is_same(&face.0)) => groups[g].push(face),
+                        Some(_) => {}
+                        None => {
+                            group_of.insert(root[k], groups.len());
+                            groups.push(vec![face]);
+                        }
+                    }
                 }
             }
             Reference::Body(_) => {
@@ -86,7 +98,8 @@ pub fn offset_surface(ev: &mut EvalCtx) -> FResult<()> {
                 return err("Could not offset selected faces as requested.");
             }
             // Live L25: e.g. a concave fillet offset by more than its radius.
-            let res = k::offset_shape(&base, d, k::JoinType::Arc).map_err(|_| FeatureError::new("Could not offset selected faces as requested."))?;
+            let join = if shapes.len() > 1 { k::JoinType::Intersection } else { k::JoinType::Arc };
+            let res = k::offset_shape(&base, d, join).map_err(|_| FeatureError::new("Could not offset selected faces as requested."))?;
             let mut names = names_from_sources(ev, &res.history, &res.shape, 0, &base_sources, |s| Role::Offset(s.clone()));
             // Without usable history, faces correspond in order when counts match.
             if res.history.records.is_empty() && res.shape.count(ShapeType::Face) == base_sources.len() {
@@ -97,6 +110,31 @@ pub fn offset_surface(ev: &mut EvalCtx) -> FResult<()> {
         tools.push(NamedShape::new(shape, names));
     }
     ev.apply_operation(tools, "NEW", None, BodyKind::Surface)
+}
+
+/// For each picked (body, face): the first picked face it is joined to through picked faces of its body sharing edges.
+fn connected_groups(ev: &EvalCtx, picked: &[(usize, usize)]) -> Vec<usize> {
+    let mut root: Vec<usize> = (0..picked.len()).collect();
+    fn find(root: &mut [usize], mut i: usize) -> usize {
+        while root[i] != i {
+            root[i] = root[root[i]];
+            i = root[i];
+        }
+        i
+    }
+    let mut bodies: Vec<usize> = picked.iter().map(|p| p.0).collect();
+    bodies.sort_unstable();
+    bodies.dedup();
+    for bi in bodies {
+        let Ok(edge_faces) = ev.ctx.bodies[bi].shape.edge_faces() else { continue };
+        for fs in &edge_faces {
+            let [fa, fb] = fs[..] else { continue };
+            let (Some(a), Some(b)) = (picked.iter().position(|&p| p == (bi, fa as usize)), picked.iter().position(|&p| p == (bi, fb as usize))) else { continue };
+            let (ra, rb) = (find(&mut root, a), find(&mut root, b));
+            root[ra.max(rb)] = ra.min(rb);
+        }
+    }
+    (0..picked.len()).map(|i| find(&mut root, i)).collect()
 }
 
 /// Whether offsetting `f` by `d` along its normal passes its cylinder's axis

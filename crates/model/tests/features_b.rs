@@ -375,6 +375,71 @@ fn offset_surface_area_and_position() {
     }
 }
 
+/// Offset surface: picked faces sharing an edge are one sheet, a sharp edge's offsets extended to meet; faces apart
+/// are two (live 2034: a 40 × 20 × 10 block, R3 on its top front edge; 2 mm).
+#[test]
+fn offset_surface_joins_faces_sharing_edges() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    rect(&mut sk, 0.0, 0.0, 0.04, 0.02);
+    let id = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    s.extrude_largest(id, "10 mm");
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let edge = b.shape.edges().iter().position(|e| {
+        let (a, c) = e.endpoints().unwrap();
+        a.y.abs() < 1e-9 && c.y.abs() < 1e-9 && near(a.z, 0.01, 1e-9) && near(c.z, 0.01, 1e-9)
+    });
+    let edge = Reference::Edge((*b.edges[edge.unwrap()]).clone());
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(vec![edge]));
+        p.set("radius", expr("3 mm"));
+        p.set("tangentPropagation", ParamValue::Bool(false));
+    });
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let face = |want: &dyn Fn(DVec3) -> bool| {
+        let fi = b.shape.faces().iter().position(|f| want(f.centroid().unwrap())).expect("face");
+        Reference::Face((*b.faces[fi]).clone())
+    };
+    let top = face(&|c| near(c.z, 0.01, 1e-9));
+    let round = face(&|c| c.y > 1e-6 && c.y < 0.003 && c.z > 0.007 && c.z < 0.01 - 1e-6);
+    let front = face(&|c| c.y.abs() < 1e-9);
+    let back = face(&|c| near(c.y, 0.02, 1e-9));
+    let left = face(&|c| c.x.abs() < 1e-9);
+    let right = face(&|c| near(c.x, 0.04, 1e-9));
+    let cases = [
+        ("top + back", vec![top.clone(), back.clone()], vec![(2, 7, 6)]),
+        ("top + front", vec![top.clone(), front.clone()], vec![(1, 4, 4), (1, 4, 4)]),
+        ("top + round + front", vec![top.clone(), round.clone(), front.clone()], vec![(3, 10, 8)]),
+        ("all but the bottom", vec![top, round, front, back, left, right], vec![(6, 15, 10)]),
+    ];
+    let ids: Vec<_> = cases
+        .iter()
+        .map(|(_, picks, _)| {
+            let picks = picks.clone();
+            s.add("offsetSurface", move |p| {
+                p.set("surfacesAndFaces", ParamValue::Query(picks));
+                p.set("offset", expr("2 mm"));
+            })
+        })
+        .collect();
+    let r = s.ok();
+    for ((name, _, want), f) in cases.into_iter().zip(ids) {
+        let sheets: Vec<(usize, usize, usize)> = r
+            .context
+            .bodies
+            .iter()
+            .filter(|b| b.id.feature == f && b.kind == BodyKind::Surface)
+            .map(|b| {
+                let shown = b.shape.shown_topology().unwrap();
+                (b.shape.faces().len(), shown.edges.iter().filter(|e| **e).count(), shown.vertices.iter().filter(|v| **v).count())
+            })
+            .collect();
+        assert_eq!(sheets, want, "{name}");
+    }
+}
+
 #[test]
 fn fill_closed_sketch_loop() {
     let mut s = Studio::new();
