@@ -1,5 +1,5 @@
 noshape third-party notices
-Generated from Cargo.lock by `UPDATE_NOTICES=1 cargo test -p noshape-ops --lib about::` (crates/ops/src/about.rs);
+Generated from Cargo.lock by `UPDATE_NOTICES=1 cargo test -p noshape-ops --test all notices::` (crates/ops/tests/notices.rs);
 do not edit by hand.
 
 ==============================================================================

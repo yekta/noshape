@@ -17,6 +17,7 @@ mod live;
 mod many_parts;
 mod mate_flip;
 mod mesh_pixels;
+mod notices;
 mod parity;
 mod regen_profile;
 mod sketch_open_perf;
