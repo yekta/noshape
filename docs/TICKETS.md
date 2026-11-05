@@ -979,6 +979,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   as its initial surface: the box within 0.006 mm of live's, the area 4121.30; points on that sphere as constraints:
   worse (4135, 4174). The plate minimises bending, Parasolid's fill comes out flatter: this needs another n-sided G1
   construction (a Gregory / Charrot-Gregory patch, or tangent ribbons along the edges), not a parameter.
+  core 11-05 17:07: the part's five fills (dumps: NOSHAPE_DUMP_OPS now writes fill-<n>, supports and boundary edges)
+  are three fillets and three planes round each setback corner; two (61.05 / 46.35 mm²) already agree with live
+  (the part's excess is exactly the other three's: 0.86 + 0.87 + 3.46 mm²). Tried tangent ribbons (a G1 Coons patch of
+  four sides, two opposite pairs of edges joined, ribbon length c x width, c 0.3-0.9, all three pairings): larger than
+  the plate on most corners (fill-1 28.2-42.4 against plate 26.93, live 26.07) and the two good ones grow too. Live's
+  patches are flatter than both the plate's (least bending) and a G1 Coons'; not found which construction that is.
 - [ ] P2 CUT-CLOSED-EDGES-SPLIT (core / bool; dx's parity suite 11-03) closed edges a cut makes come out in pieces
   dx 11-05 08:16: clamp-guillem's slot ends join now (core d6af88ae, the same fix dx had: the pieces' meeting measured in
   space, 2e-7 of u on a cylinder being 1.5e-9 m); clamp-guillem 25/25. bushing2-0-joshua's Extrude 4 is another kind:
