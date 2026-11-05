@@ -150,6 +150,7 @@ pub struct RegenResult {
     pub evaluated: Vec<FeatureId>,
 }
 
+#[derive(Clone)]
 struct CacheEntry {
     key: u64,
     ctx: Arc<Context>,
@@ -328,6 +329,13 @@ fn hash_bytes(prev: u64, data: &[u8]) -> u64 {
 impl Regenerator {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// A new Regenerator with this one's per-feature results and display meshes, shared (they are immutable
+    /// snapshots): it regenerates only what changed since. Not the whole runs' results (each holds a full display).
+    /// The app seeds a fresh Regenerator with it when cancelled work still holds this one.
+    pub fn snapshot(&self) -> Self {
+        Self { entries: self.entries.clone(), run: self.run, meshes: self.meshes.clone(), mesh_owners: self.mesh_owners.clone(), declines: self.declines.clone(), ..Default::default() }
     }
 
     /// How many features this Regenerator has evaluated rather than taken

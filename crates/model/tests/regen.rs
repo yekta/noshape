@@ -174,3 +174,30 @@ fn part_properties_round_trip_through_json() {
     let back: PartStudio = serde_json::from_str(&json).expect("deserializes");
     assert_eq!(back.part_properties.get(&id).and_then(|p| p.name.clone()).as_deref(), Some("Plate"));
 }
+
+/// A Regenerator seeded with another's results ([`Regenerator::snapshot`], the app's fresh one after a cancel)
+/// evaluates only the features after the edit, with the same result as the one it came from; the source keeps
+/// working.
+#[test]
+fn a_snapshot_regenerates_only_what_changed() {
+    let (mut ps, units) = studio_with_block();
+    let (config, opts) = (ConfigValues::default(), RegenOptions::default());
+    let mut reg = Regenerator::new();
+    let first = reg.regenerate(&ps, &config, &units, &opts);
+    assert_eq!(first.evaluated.len(), 2, "sketch and extrude");
+    let mut seeded = reg.snapshot();
+    let mut fillet = ps.new_feature("fillet", &units).unwrap();
+    let edge = first.context.bodies[0].edges.iter().find(|e| format!("{e:?}").contains("CapEnd")).expect("a top edge").clone();
+    fillet.params.set("entities", ParamValue::Query(vec![Reference::Edge((*edge).clone())]));
+    fillet.params.set("radius", ParamValue::Expr(ExprValue::new("2 mm")));
+    let fid = fillet.id;
+    ps.features.push(fillet);
+    let a = seeded.regenerate(&ps, &config, &units, &opts);
+    assert_eq!(a.evaluated, vec![fid], "the seeded Regenerator evaluated only the fillet");
+    let b = reg.regenerate(&ps, &config, &units, &opts);
+    assert_eq!(b.evaluated, vec![fid]);
+    let faces = |r: &noshape_model::regen::RegenResult| r.context.bodies.iter().map(|b| b.faces.len()).collect::<Vec<_>>();
+    assert_eq!(faces(&a), faces(&b), "the same part both ways");
+    assert_eq!(faces(&a), [8], "the block's 7 faces and the blend");
+    assert!((a.context.bodies[0].shape.volume().unwrap() - b.context.bodies[0].shape.volume().unwrap()).abs() < 1e-12);
+}
