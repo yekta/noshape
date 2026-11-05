@@ -258,6 +258,9 @@ pub struct DrawingEditor {
     canvas_hovered: bool,
     cursor_sync: crate::cursor::CursorSync,
     pub hover: Option<u32>,
+    /// The Projected view tool's parent is drawn picked: the view Insert view just placed (live 2068), until the tool
+    /// places a view or ends.
+    pub projection_parent_lit: bool,
     pub hover_snap: Option<[f64; 2]>,
     pub selection: Vec<Sel>,
     pub drag: Drag,
@@ -580,6 +583,7 @@ impl DrawingEditor {
             canvas_hovered: false,
             cursor_sync: Default::default(),
             hover: None,
+            projection_parent_lit: false,
             hover_snap: None,
             selection: Vec::new(),
             drag: Drag::None,

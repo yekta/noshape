@@ -173,11 +173,11 @@ impl DrawingEditor {
             v.exclude_from_cut = d.exclude.clone();
             v.cut_from_section = d.cut_from;
         }
-        let id = v.id;
         self.edit_sheet("Aligned section view", cx, |s| s.views.push(v));
         self.tool = Tool::Select;
         self.aligned_dlg = None;
-        self.selection = vec![Sel::View(id)];
+        // A newly placed view is not selected (live 2068).
+        self.selection.clear();
     }
 
     pub fn render_aligned_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {

@@ -151,35 +151,20 @@ impl DrawingEditor {
             }
         }
         annotations.sort();
-        // What is drawn in selection colours (README "### Drawings"): selected views framed; edges drawn picked: a
-        // tool's picks, the Projected tool's parent before its first view, a selected section's cutting line.
+        // What is drawn in selection colours (README "### Drawings"; live 2068): selected views; the Projected
+        // tool's parent drawn picked after Insert view placed it.
         let mut selection: Vec<(String, String)> = Vec::new();
-        let edge_of = |v: ViewId, out: &mut Vec<(String, String)>| out.push(("EDGE".into(), self.ui_view_name(v)));
         for s in &self.selection {
             match s {
-                Sel::View(id) => {
-                    if let Some(ViewKind::Section { parent, .. }) = sheet.view(*id).map(|v| &v.kind) {
-                        edge_of(*parent, &mut selection);
-                    }
-                    selection.push(("VIEW".into(), self.ui_view_name(*id)));
-                }
+                Sel::View(id) => selection.push(("VIEW".into(), self.ui_view_name(*id))),
                 Sel::Annotation(id) => selection.push(("ANNOTATION".into(), self.ui_annotations().into_iter().find(|a| a.0 == *id).map(|a| a.2).unwrap_or_default())),
                 _ => {}
             }
         }
-        match &self.tool {
-            Tool::Projected { parent: Some(p) } if self.selection.is_empty() => edge_of(*p, &mut selection),
-            Tool::Section { parent: Some(p), p0: Some(_), .. } => edge_of(*p, &mut selection),
-            Tool::Dimension { picks, .. } => {
-                for pick in picks {
-                    let v = match pick {
-                        noshape_scene::drawing_tools::Pick::Point(a) | noshape_scene::drawing_tools::Pick::Line { a, .. } | noshape_scene::drawing_tools::Pick::Arc { a, .. } => a.view,
-                        noshape_scene::drawing_tools::Pick::Circle { view, .. } | noshape_scene::drawing_tools::Pick::CircleAt { view, .. } => *view,
-                    };
-                    edge_of(v, &mut selection);
-                }
-            }
-            _ => {}
+        if let Tool::Projected { parent: Some(p) } = &self.tool
+            && self.projection_parent_lit
+        {
+            selection.push(("EDGE".into(), self.ui_view_name(*p)));
         }
         selection.sort();
         selection.dedup();

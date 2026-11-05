@@ -162,6 +162,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   label a note, Simplification's order (Auto last), the note fonts in live's order, "Double circle", "<shape>
   (Drawing)" in the flag list, the suggested isometric projected from Front (third angle; same frame). Waiting:
   REQUESTS 16:12 (No views sheet scale), 16:27 (hover vs selection, a re-record).
+- 20:43: live 2068 (a light frame is hover, not reported; a placed view isn't selected; Esc clears; six re-recorded)
+  applied: placed projected / section / detail / aligned section views not selected, a Projected tool's clicked parent
+  selected, Insert view's placed view drawn as the parent (EDGE) until the next view. drw-*: 7/8, 42/45; left only
+  Insert view's default scale (2067: 40 mm block 2:1, 80 mm 1:1 picking Part 1, against 1812's Part Studio picks
+  rejecting 80 mm: REQUESTS asks for both ways).
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem

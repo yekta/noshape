@@ -16,6 +16,7 @@ impl DrawingEditor {
     // ------------------------------------------------------------ tools
 
     pub fn set_tool(&mut self, tool: Tool, cx: &mut Context<Self>) {
+        self.projection_parent_lit = false;
         // A constraint key on a selection that completes it: applied at once.
         if let Tool::Constrain { kind, picks } = &tool
             && picks.is_empty()
@@ -84,6 +85,7 @@ impl DrawingEditor {
     }
 
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
+        self.projection_parent_lit = false;
         // Edit detail (not redrawing its profile): Esc discards it.
         if self.detail_dlg.as_ref().is_some_and(|d| d.edit.is_some()) && !matches!(self.tool, Tool::Detail { .. }) {
             self.close_detail_edit(false, cx);
@@ -761,9 +763,11 @@ impl DrawingEditor {
                     if self.out_of_date {
                         self.update_drawing(cx);
                     }
-                    // Onshape activates the projected view tool next, the new view its parent, not selected (live 2063).
+                    // Onshape activates the projected view tool next, the new view its parent drawn picked, not selected
+                    // (live 2068).
                     self.tool = Tool::Projected { parent: Some(id) };
                     self.selection.clear();
+                    self.projection_parent_lit = true;
                 }
             }
             Tool::Projected { parent: None } => {
@@ -774,6 +778,8 @@ impl DrawingEditor {
                     } else {
                         self.status = None;
                         self.tool = Tool::Projected { parent: Some(v) };
+                        // The clicked parent shows selected (live 2068).
+                        self.selection = vec![Sel::View(v)];
                     }
                 }
             }
@@ -784,10 +790,10 @@ impl DrawingEditor {
                         v.cut_from_section = true;
                     }
                     let name = if matches!(self.tool, Tool::Auxiliary { .. }) { "Auxiliary view" } else { "Projected view" };
-                    let id = v.id;
                     self.edit_sheet(name, cx, |s| s.views.push(v));
-                    // The new view is selected (live 2063).
-                    self.selection = vec![Sel::View(id)];
+                    // A newly placed view is not selected, and the parent no longer lit (live 2068).
+                    self.selection.clear();
+                    self.projection_parent_lit = false;
                     if matches!(self.tool, Tool::Auxiliary { .. }) {
                         self.tool = Tool::Select;
                     }
@@ -871,11 +877,11 @@ impl DrawingEditor {
                     if let (ViewKind::Section { label, .. }, Some(l)) = (&mut v.kind, self.section_label(cx)) {
                         *label = l;
                     }
-                    let id = v.id;
                     let name = if matches!(self.tool, Tool::Section { .. }) { "Section view" } else { "Detail view" };
                     self.edit_sheet(name, cx, |s| s.views.push(v));
                     self.tool = Tool::Select;
-                    self.selection = vec![Sel::View(id)];
+                    // A newly placed view is not selected (live 2068).
+                    self.selection.clear();
                 }
             }
             Tool::Detail { center: None, .. } => {

@@ -60,6 +60,7 @@ fillet / chamfer "error" titles (10, incl. new-fillet-then-dblclick-other, undo-
 (POINT vs EDGE), sketch-delete-line / -vertical-constraint / -extend-to-line (selection), revolve-dialog-axis, face-rclick-menu,
 mass-properties-part (Mass override enabled), section-view-front (focus), extrude-end-type-up-to-face (live's start).
 dx 11-05 16:35: the 8 drawing scenarios (drw-*) against live's recordings (2063, /root/parity/ui/live): **2/8 scenarios, 37/45 states** (first run 0/8, 2/45). Left: the Insert view's scale on a No views sheet (2:1 live, ours 1:1: REQUESTS 16:12), what the selection pixels mean (hover or selection: REQUESTS 16:27, 4 states), drw-create-of-part's step 4 recorded while live still created the drawing (re-record asked).
+dx 11-05 20:43: drw-* against live's re-recordings (2068): **7/8 scenarios, 42/45 states**; left: Insert view's default scale (drw-insert-front-and-right, REQUESTS).
 
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 
