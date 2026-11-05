@@ -25,6 +25,8 @@ mod device;
 mod library_from_metallib;
 // NOSHAPE PATCH (agent psui): libraries compiled ahead of time.
 pub mod precompiled;
+// NOSHAPE PATCH (agent psui): per-pass GPU times.
+pub mod pass_timing;
 mod surface;
 mod time;
 
@@ -549,6 +551,12 @@ impl crate::Queue for Queue {
         (signal_fence, signal_value): (&mut Fence, crate::FenceValue),
     ) -> Result<(), crate::DeviceError> {
         autoreleasepool(|_| {
+            // NOSHAPE PATCH (agent psui): before the last buffer is relabelled below.
+            if pass_timing::on() {
+                for cmd_buffer in command_buffers {
+                    pass_timing::watch(&cmd_buffer.raw);
+                }
+            }
             let extra_command_buffer = {
                 let completed_value = Arc::clone(&signal_fence.completed_value);
                 let block = block2::RcBlock::new(move |_cmd_buf| {
