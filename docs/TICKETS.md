@@ -144,7 +144,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   operations (core.md 19:53: Boolean 2's unify 887 ms + kernel 698 ms; Boolean 1 500 ms vs live 34 ms; the gears'
   hobbing cuts 115–482 ms and double-helical fillet 277 ms); the FeatureScript side is ~3 ms per gear.
 
-- [ ] P0 BIG-PLATE-CUT-NO-INTERSECT (core; dx 11-05 00:38, main 1c4ab1d91) a 400 × 400 × 10 mm plate (Extrude 1 up from Top)
+- [x] (core 11-05 01:44: as live's dialog, not a regression: feature_add makes the dialog's choices, and std's extrude edit logic flips a new Extrude going New -> Remove (canSetBooleanFlip, whatever the geometry, unless the flip or the merge scope is given), so from Top it points away from the plate above it, "Selected tools and targets do not intersect." in live's dialog too; the probe gives oppositeDirection false as a REST script would, and cuts the 400 holes again) P0 BIG-PLATE-CUT-NO-INTERSECT (core; dx 11-05 00:38, main 1c4ab1d91) a 400 × 400 × 10 mm plate (Extrude 1 up from Top)
   and an Extrude 2 of 400 Ø8 circles sketched on Top, Remove, Through all, default scope: INFO "Selected tools and
   targets do not intersect.", no holes (it cut them before: T2 ops big_plate_perf::big_plate_timing asserted Ok).
   Repro: `cargo test -p noshape-ops --test all -- --ignored big_plate_perf::big_plate_timing`.

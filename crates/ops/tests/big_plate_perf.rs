@@ -45,7 +45,9 @@ fn big_plate(ctx: &mut Ctx, path: &str) {
     eprintln!("400 circles: {:.0} ms", t.elapsed().as_secs_f64() * 1000.0);
     let regions: Vec<Value> = last["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
     eprintln!("regions: {}", regions.len());
-    let r = timed(ctx, "Extrude 2 (Remove, Through all)", "feature_add", json!({ "tab": tab, "type": "extrude", "params": { "entities": regions, "operationType": "REMOVE", "defaultScope": true, "endBound": "THROUGH_ALL" } }));
+    // (The side given: feature_add makes the dialog's choices, and a new Extrude going New -> Remove flips (std
+    // canSetBooleanFlip), away from a plate standing on its sketch's plane.)
+    let r = timed(ctx, "Extrude 2 (Remove, Through all)", "feature_add", json!({ "tab": tab, "type": "extrude", "params": { "entities": regions, "operationType": "REMOVE", "defaultScope": true, "endBound": "THROUGH_ALL", "oppositeDirection": false } }));
     assert_eq!(r["feature_status"]["status"], "Ok", "{r}");
 }
 
