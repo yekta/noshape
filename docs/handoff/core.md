@@ -2415,4 +2415,9 @@ fallback's finish (`rim_seams_off_joints`), and fillet_by_tools' call is under t
 pipeflange's countersink rims whole: 36 / 79 / 40 as live (T1 blend::a_fillet_trimming_countersinks_keeps_their_rims_
 whole, its input tests/data/blend/pipeflange-fillet2-input.brep); learning-center-michael still 7/7; kernel, model
 tests, blend corpus unchanged. Left on pipeflange: the corners' faces and the volume (OCCT's blend, your 11-04 notes).
+18:48, landing (boolean.cpp usd_kept_volume): a USD try whose changed faces are the last rejected try's (the same faces of the
+input, the same surfaces, edge counts and vertices to 1e-9 of the part) reuses its volume change instead of
+integrating again; the three-tries rule is as it was. pipeflange's Fillet 2 on an idle vibe5 158 -> 104 ms (live
+114), the document 212 -> 158 ms (live 212); the model suite (52/56, 429/483) and the blend corpus identical with and
+without it.
 

@@ -1442,8 +1442,19 @@ std::vector<TopoDS_Shape> without_cancelling_planes(const std::vector<TopoDS_Sha
 // of `s` whose images in its input it removed or changed, against the faces of `out` that took their place.
 // `image`: a face of `s` in USD's input as the input uses it (null: not found); `share`: its face_share before
 // USD ran. Null when a face of `s` has no image: the whole volumes then.
+// What a USD try changed, as a value: the faces of `s` it changed (their indices) and, for each face that took their
+// place, its surface, orientation, edge count and where its vertices are. Two tries of one key changed the volume
+// alike (cf-spur-gear's and pipeflange's rejected merges: the same merge from three wire starts).
+struct ChangeKey
+{
+  std::vector<size_t>      old;
+  std::vector<std::string> made;
+  bool operator==(const ChangeKey& o) const { return old == o.old && made == o.made; }
+};
+
 std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, const std::vector<TopoDS_Shape>& image,
-                                        const std::vector<FaceShare>& share, const TopoDS_Shape& out, double diag)
+                                        const std::vector<FaceShare>& share, const TopoDS_Shape& out, double diag,
+                                        std::optional<std::pair<ChangeKey, double>>* memo = nullptr)
 {
   ShapeIMap outf;
   for (TopExp_Explorer x(out, TopAbs_FACE); x.More(); x.Next())
@@ -1463,9 +1474,42 @@ std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, con
   for (TopExp_Explorer x(out, TopAbs_FACE); x.More(); x.Next())
     if (!kept.Contains(x.Current()))
       after.push_back(x.Current());
+  ChangeKey key;
+  if (memo != nullptr)
+  {
+    for (size_t i = 0; i < sf.size(); ++i)
+      if (!kept.Contains(image[i]))
+        key.old.push_back(i);
+    for (const TopoDS_Shape& f : after)
+    {
+      TopLoc_Location l;
+      char            buf[160];
+      double          sx = 0, sy = 0, sz = 0;
+      int             nv = 0, ne = 0;
+      for (TopExp_Explorer v(f, TopAbs_VERTEX); v.More(); v.Next(), ++nv)
+      {
+        const gp_Pnt p = BRep_Tool::Pnt(TopoDS::Vertex(v.Current()));
+        sx += p.X();
+        sy += p.Y();
+        sz += p.Z();
+      }
+      for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+        ++ne;
+      // (The vertices' sum to 1e-9 of the part: the tries' vertices differ in their last bits.)
+      const double q = std::max(1e-9 * diag, 1e-15);
+      std::snprintf(buf, sizeof buf, "%p %d %d %d %lld %lld %lld", (const void*)BRep_Tool::Surface(TopoDS::Face(f), l).get(), (int)f.Orientation(), ne, nv, std::llround(sx / q), std::llround(sy / q), std::llround(sz / q));
+      key.made.emplace_back(buf);
+    }
+    std::sort(key.made.begin(), key.made.end());
+    if (*memo && (*memo)->first == key)
+      return (*memo)->second;
+  }
   for (const TopoDS_Shape& f : before)
     after.push_back(f.Reversed());
-  return faces_volume(without_cancelling_planes(after, diag));
+  const double change = faces_volume(without_cancelling_planes(after, diag));
+  if (memo != nullptr)
+    *memo = std::make_pair(key, change);
+  return change;
 }
 
 TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
@@ -1554,6 +1598,7 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
   // fused with its mirror, qa OCCT-MIRROR-OVERCOUNT: one order of the same
   // faces merged to 4, the other gave 4/3 the volume from every start).
   std::optional<std::pair<int, double>> last_reject;
+  std::optional<std::pair<ChangeKey, double>> memo;
   int                                   repeats = 0;
   for (int k = 0; k < 16; ++k)
   {
@@ -1592,7 +1637,7 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     u.Build();
     fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.check");
-    const std::optional<double> change = usd_volume_change(sf, image, share, u.Shape(), diag);
+    const std::optional<double> change = usd_volume_change(sf, image, share, u.Shape(), diag, &memo);
     if (!keeps_volume(change, u.Shape()))
     {
       // (The same merge rejected three times running: the faces' order doesn't change it here, so neither will the
