@@ -3982,7 +3982,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   view's lower tangent edge, an ELLIPSE in live (centre (7.829, 6.0897) in, major 0.9843), is a 37-point SPLINE plus a
   0.017 in LINE in ours: that model edge is a B-spline in ours where Parasolid's is a circle. Our DXF writes model
   B-splines as SPLINE (as live does). Translated model: NOSHAPE_PARITY_SAVE + NOSHAPE_PARITY_ONLY=knob-tim.
-- [ ] P2 SM-CURVED-WALL-BEND-FILLET (dx 11-05 07:06, run 109) cf-sheet-metal-model-plus's Flange 1: 5 parts, live 2
+- [x] (dx 11-05 08:58: Flange 1 matches; cf-sheet-metal-model-plus 9 -> 11/14) P2 SM-CURVED-WALL-BEND-FILLET (dx 11-05 07:06, run 109) cf-sheet-metal-model-plus's Flange 1: 5 parts, live 2
   (the Up to Part part loses a wall: the planar wall beside the rolled face is thickened alone). The FeatureScript
   host's rebuild (host/sheetmetal.rs curved_wall_bends) fillets the curved wall with its flat neighbours along the
   bends; after Flange 1 the sloped neighbour runs on past the curved wall's end (its edge moved from x −10 to −8 by
@@ -4010,6 +4010,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   no stray 6.7 mm³ block (ours: Part 3, x −10 … −8, y 2.2 … 4.7: the flange's other end). Live pulls the flange back
   at both ends where it meets the neighbouring walls' bends (its faces y 7.77 … 77.74); ours runs it to the definition
   ends (y 3.67 … 78.55): corners of a flange against bends it doesn't share a vertex with. Next there.
+  dx 11-05 08:58 (closed): three causes, from live's definition data (behaviours.md "Flange 1: definition face vs
+  the part's flat flange", REQUESTS 2055): (1) the host's opEdgeChange gave the wall's new 2 mm side past the curved
+  bend the bend edge's name (both on its line), so std's getXYAtVertex saw a two-sided edge at the flange's top
+  vertex and skipped the 73.356° side bend's (t + r) tan(θ/2) = 2.2343 pull-back: an old edge's name now stays with
+  the new edge lying within its old segment; (2) a curved wall's fillet bend now stops where its flat wall's pulled
+  side does (x −11); (3) a free side lying wholly inside another side's pull-back is pulled with the bend it runs on
+  from (the stray block). Flange 1: 61/137/78 as live, volume and area in band. Debugging std: an edit to
+  crates/featurescript/std needs the pinned packs rebuilt (they are zstd deltas against it: unpack the shipped one
+  against the old std, `tools/std-pack.py <v> <dir>`), and sheetMetalFlange.fs has no `println` (import string.fs).
 - [x] (dx 11-05 06:59: the translator points such a constraint at nothing too, ops::pin_to_missing_reference; train-joe 12/12, clamp-guillem 24/25) P2 PARITY-MISSING-EXTERNAL-REFS (dx 11-05 06:10, run 105) live's sketches with an external reference that no
   longer resolves (its query empty: deterministicIds [""], queryString "") are WARNING "Some external references are
   missing."; the translator leaves those constraints to the solved geometry, so ours are OK: clamp-guillem's Boceto 6

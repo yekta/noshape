@@ -1727,8 +1727,8 @@ impl<'a> Translator<'a> {
     }
 
     /// A face, edge or part an Extrude made, by Onshape's name for it
-    /// (packed `CAP_FACE` / `SWEPT_FACE` / `CAP_EDGE` / `SWEPT_EDGE` of
-    /// `….opExtrude` from sketch curves, `SWEPT_BODY`): ours of the same
+    /// (packed `CAP_FACE` / `SWEPT_FACE` / `CAP_EDGE` / `SWEPT_EDGE` /
+    /// `CAP_VERTEX` of `….opExtrude` from sketch curves, `SWEPT_BODY`): ours of the same
     /// Extrude through the same sketch geometry. Used when live's geometry
     /// for the id is missing.
     fn extrude_name_from_query(&mut self, text: &str) -> Option<Result<String, String>> {
@@ -1773,7 +1773,7 @@ impl<'a> Translator<'a> {
                 _ => None,
             }
         }
-        let names = ["CAP_FACE", "SWEPT_FACE", "CAP_EDGE", "SWEPT_EDGE", "SWEPT_BODY"];
+        let names = ["CAP_FACE", "SWEPT_FACE", "CAP_EDGE", "SWEPT_EDGE", "CAP_VERTEX", "SWEPT_BODY"];
         // Nested in another operation's name: only a Boolean keeps the entity
         // itself (a pattern's or mirror's COPY is another entity).
         if let Packed::Tagged(_, top) = tree

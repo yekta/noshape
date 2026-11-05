@@ -1301,8 +1301,20 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         let mut offset: Vec<f64> = l.side.iter().map(|e| setbacks.get(e).copied().unwrap_or_else(|| if def.rips.contains(e) { rip_offset(def, &topo, *e, fi) } else { 0.0 })).collect();
         // A free side running on from a bend into a corner (the front
         // flange past its bend, beside a Hem): pulled back with the bend, no
-        // step (live qa5 Hem on G34, 9378.1835 mm³).
+        // step (live qa5 Hem on G34, 9378.1835 mm³); or lying in the
+        // pull-back of the bend one or two sides on round its other end, so
+        // nothing of it is left (live 2055: the sloped wall's 2 mm free ends
+        // between Flange 1's bend and the 135° bend).
         let m = l.pts.len();
+        let setback_of = offset.clone();
+        let eaten = |j: usize, k: usize| {
+            let (p, q) = (l.pts[j], l.pts[(j + 1) % m]);
+            let ahead = if (j + 1) % m == k { [(j + m - 1) % m, (j + m - 2) % m] } else { [(j + 1) % m, (j + 2) % m] };
+            ahead.into_iter().filter(|&s| s != k && def.bends.contains_key(&l.side[s]) && setback_of[s] > TOL && !l.curved[s]).any(|s| {
+                let u = inward(&l, n, s);
+                [p, q].iter().all(|x| (-TOL..setback_of[s] + TOL).contains(&(*x - l.pts[s]).dot(u)))
+            })
+        };
         for k in 0..m {
             let Some(&radius) = def.bends.get(&l.side[k]) else { continue };
             let dir = (l.pts[(k + 1) % m] - l.pts[k]).normalize();
@@ -1310,7 +1322,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
                 let e = l.side[j];
                 let free = !def.bends.contains_key(&e) && !def.rips.contains(&e);
                 let along = (l.pts[(j + 1) % m] - l.pts[j]).normalize();
-                if free && along.cross(dir).length() <= 1e-9 && joint_near(&topo, v, l.side[k], radius + front + back) {
+                if free && along.cross(dir).length() <= 1e-9 && (joint_near(&topo, v, l.side[k], radius + front + back) || eaten(j, k)) {
                     offset[j] = offset[k];
                 }
             }
@@ -1508,7 +1520,12 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             end_cuts,
         });
         let mut bend = match fillet_bends.get(&e) {
-            Some(f) => k::thicken(f, front, back).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape,
+            Some(f) => {
+                let bend = k::thicken(f, front, back).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
+                // A curved wall's bend also stops where its flat wall's pulled side does (live 2055: Flange 1's bend
+                // pulls the sloped wall back to x −11, and the curved bend stops there).
+                if t0 > TOL || t1 < b.len - TOL { span_cut(&bend, b.start + b.dir * t0, b.dir, t1 - t0)? } else { bend }
+            }
             None => k::revolve(&face, b.axis_point, b.dir * sign, b.angle).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape,
         };
         let (v0, v1) = (topo.nearest_vertex(b.start), topo.nearest_vertex(b.start + b.dir * b.len));
@@ -1807,15 +1824,19 @@ fn curved_wall_bends(topo: &Topo, bends: &[(usize, usize, usize, Bend)]) -> Curv
 fn span_of(topo: &Topo, e: usize, flat: usize) -> Option<Shape> {
     let (s, t) = topo.edge_ends[e];
     let len = s.distance(t);
-    let dir = (t - s) / len.max(1e-300);
-    let big = topo.faces[flat].bounding_box(false).ok()?.diagonal() * 2.0;
-    let end = k::make_plane_face(&k::Plane::new(s, dir, dir.any_orthonormal_vector()), -big, big, -big, big).ok()?;
-    let slab = k::extrude(&end, dir * len).ok()?.shape;
-    let cut = k::boolean(k::BooleanOp::Common, std::slice::from_ref(&topo.faces[flat]), &[slab], &k::BooleanOptions::default()).ok()?.shape;
+    let cut = span_cut(&topo.faces[flat], s, (t - s) / len.max(1e-300), len).ok()?;
     match cut.faces().as_slice() {
         [one] => Some(one.clone()),
         _ => None,
     }
+}
+
+/// Shape `s` between the planes square to `dir` at `from` and `len` further on.
+fn span_cut(s: &Shape, from: DVec3, dir: DVec3, len: f64) -> FResult<Shape> {
+    let big = s.bounding_box(false).map_err(|e| fe(e.to_string()))?.diagonal() * 2.0;
+    let end = k::make_plane_face(&k::Plane::new(from, dir, dir.any_orthonormal_vector()), -big, big, -big, big).map_err(|e| fe(e.to_string()))?;
+    let slab = k::extrude(&end, dir * len).map_err(|e| fe(e.to_string()))?.shape;
+    Ok(k::boolean(k::BooleanOp::Common, std::slice::from_ref(s), &[slab], &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape)
 }
 
 /// Fillet face `f` along `dir` as the exact cylinder of `radius` through its two straight tangent edges, facing

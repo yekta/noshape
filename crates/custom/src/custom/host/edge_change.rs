@@ -576,8 +576,10 @@ fn change_edges(shape: &Shape, offsets: &BTreeMap<(usize, Option<usize>), Move>,
     let mut built: Vec<Shape> = kept.into_iter().map(|k| k.or_else(|| rebuilt.next())).collect::<Option<Vec<_>>>().ok_or_else(|| fe("A changed face is missing"))?;
     // A new edge is the old edge it lies along (the one whose segment holds
     // its middle, else the nearest of those on its line).
+    // An edge past its old edge's ends (a side run on to a moved corner) is that edge only when none lies on it: the
+    // name stays with the edge that is still there (live 2055: Flange 1's wall grows a 2 mm edge on past its bend).
     let edge_from = |result: &Shape| -> Vec<Option<usize>> {
-        result
+        let found: Vec<Option<(usize, f64)>> = result
             .edges()
             .iter()
             .map(|e| {
@@ -588,9 +590,11 @@ fn change_edges(shape: &Shape, offsets: &BTreeMap<(usize, Option<usize>), Move>,
                     let t = (mid - p).dot(q - p) / (q - p).length_squared().max(1e-300);
                     (t.clamp(0.0, 1.0) - t).abs()
                 };
-                segments.iter().filter(|(_, p, q)| on_line(*p, *q, a) && on_line(*p, *q, b)).min_by(|x, y| along(x.1, x.2).total_cmp(&along(y.1, y.2))).map(|x| x.0)
+                segments.iter().filter(|(_, p, q)| on_line(*p, *q, a) && on_line(*p, *q, b)).map(|x| (x.0, along(x.1, x.2))).min_by(|x, y| x.1.total_cmp(&y.1))
             })
-            .collect()
+            .collect();
+        let inside = |j: usize| found.iter().flatten().any(|&(k, d)| k == j && d < 1e-9);
+        found.iter().map(|f| f.filter(|&(j, d)| d < 1e-9 || !inside(j)).map(|x| x.0)).collect()
     };
     if built.len() == 1 {
         let face = built.remove(0);
