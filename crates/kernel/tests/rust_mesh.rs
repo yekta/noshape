@@ -68,6 +68,11 @@ fn assert_watertight(m: &Tessellation) {
 /// theirs differ by side line); every triangle's vertex normals are within 7° of the face's normal at its middle
 /// (an apex's too: one axial normal there was 59° off a 31° cone's).
 fn assert_normals(s: &Shape, rust: &Tessellation, occt: &Tessellation) {
+    assert_normals_with(s, rust, occt, true);
+}
+
+/// [`assert_normals`], the triangles' part only if `triangles`.
+fn assert_normals_with(s: &Shape, rust: &Tessellation, occt: &Tessellation, triangles: bool) {
     let faces = s.faces();
     let nodes = |t: &Tessellation, i: usize| -> Vec<([u32; 3], DVec3, DVec3)> {
         let r = &t.faces[i];
@@ -87,6 +92,9 @@ fn assert_normals(s: &Shape, rust: &Tessellation, occt: &Tessellation) {
             if let Some(m) = at.get(b) {
                 assert!(n.dot(*m) > 1.0 - 1e-5, "face {i}: the normal at {q} is {:.3}° off BRepMesh's", n.angle_between(*m).to_degrees());
             }
+        }
+        if !triangles {
+            continue;
         }
         let r = &rust.faces[i];
         for c in rust.indices[r.first_index as usize..(r.first_index + r.index_count) as usize].chunks(3) {
@@ -407,6 +415,47 @@ fn a_bspline_tube_with_a_seam_meshes_here_within_brepmeshs_area() {
     let (a, b) = (faces(&rust)[0].0, faces(&occt)[0].0);
     assert!((a - b).abs() <= 2e-3 * b, "area {a} against BRepMesh's {b}");
     assert_normals(&s, &rust, &occt);
+}
+
+/// A hose as cf-hose-routing's: a Ø12 circle swept along a fit spline, solid or `hollow` (a Ø10 bore swept along the
+/// same path taken out).
+fn hose(hollow: bool) -> Shape {
+    let pts = [DVec3::new(0.0, 0.0, 0.0), DVec3::new(40.0, 10.0, 5.0), DVec3::new(80.0, -10.0, 30.0), DVec3::new(120.0, 20.0, 40.0), DVec3::new(160.0, 0.0, 20.0)].map(|q| q * MM);
+    let path = make_interpolated_spline(&pts, &[], false).unwrap();
+    let swept = |r: f64| sweep(&make_circle(pts[0], (pts[1] - pts[0]).normalize(), r * MM).unwrap(), &path, &SweepOptions { with_correction: true, ..Default::default() }).unwrap().shape;
+    let tube = swept(6.0);
+    if hollow { cut(&tube, &swept(5.0)).unwrap().shape } else { tube }
+}
+
+/// [`hose`] meshed here entirely, within BRepMesh's area per face, watertight, its nodes' normals the surface's.
+fn assert_hose_meshes_here(s: &Shape) {
+    let n = s.faces().len();
+    let rust = mesh(s, true);
+    let copy = transform(s, &Transform::Translate(DVec3::ZERO), true).unwrap().shape;
+    let occt = mesh(&copy, false);
+    assert_eq!(rust.rust_faces, n, "every face meshed here");
+    for (i, (a, b)) in faces(&rust).into_iter().zip(faces(&occt)).enumerate() {
+        assert!((a.0 - b.0).abs() <= 2e-3 * b.0, "face {i}: area {} against BRepMesh's {}", a.0, b.0);
+    }
+    assert_watertight(&rust);
+    // The nodes' normals (a triangle's middle can find its foot on the wall's far side: BRepMesh's own mesh is 92°
+    // off by that check).
+    assert_normals_with(s, &rust, &occt, false);
+}
+
+#[test]
+fn a_hose_swept_along_a_spline_meshes_here_within_brepmeshs_area() {
+    // cf-hose-routing's hoses (BRepMesh took 2-6 s each): the wall, a B-spline closed round u with a seam, walked its
+    // seam at one end of the u range and its rim on from there towards the other (the rim came out a period apart),
+    // its rim's first nodes all found at the seam, its seam split into nodes nanometres apart near a crease (the
+    // triangulation failed): now all meshed here.
+    assert_hose_meshes_here(&hose(false));
+}
+
+#[test]
+#[ignore = "T2: the hollow hose (~1 min in a debug build, BRepMesh's side)"]
+fn a_hollow_hose_meshes_here_within_brepmeshs_area() {
+    assert_hose_meshes_here(&hose(true));
 }
 
 /// A Ø50 × 60 cylinder's round top replaced by an `n` × `n` template over its parameters, moved 0..1 mm along its

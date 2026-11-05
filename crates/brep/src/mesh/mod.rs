@@ -895,6 +895,18 @@ impl GridSurface for NurbsSurface {
         }
         let ((u0, u1), _) = NurbsSurface::range(self);
         let eps = 1e-9 * (u1 - u0);
+        // Stopped on the seam but not on the surface there: the clamped iteration from a node on the seam can't
+        // step inside (a swept hose's rim, its first nodes from the seam's corner all at u1): from just inside
+        // either side.
+        if r.1 > 1e-9 * (1.0 + p.abs().max_element()) && ((r.0.x - u0).abs() <= eps || (r.0.x - u1).abs() <= eps) {
+            let h = 1e-3 * (u1 - u0);
+            for inside in [u1 - h, u0 + h] {
+                let t = NurbsSurface::param_of(self, p, Some(DVec2::new(inside, r.0.y)));
+                if t.1 < r.1 {
+                    r = t;
+                }
+            }
+        }
         let nearer_u1 = (s.x - u1).abs() < (s.x - u0).abs();
         if (r.0.x - u0).abs() <= eps && nearer_u1 {
             r.0.x = u1;
@@ -1003,14 +1015,70 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
         uv.push(q);
         seed = Some(q);
     }
+    // A closed surface: each loop by continuity across the seam (a step over half a period is one across it: a
+    // swept hose's wall walked its seam at u0 and then its rim towards smaller u, so the rim came out on the other
+    // side), then shifted by whole periods into the surface's range.
+    let periodic = s.closed() && u0.is_finite() && u1.is_finite() && u1 > u0;
+    if periodic {
+        let period = u1 - u0;
+        for r in &rings {
+            for k in 1..r.len() {
+                let d = uv[r[k]].x - uv[r[k - 1]].x;
+                uv[r[k]].x -= (d / period).round() * period;
+            }
+            // (A seam's nodes are a little either side of it: the nearest whole period.)
+            let min = r.iter().fold(f64::MAX, |m, &k| m.min(uv[k].x));
+            let shift = ((min - u0) / period).round() * period;
+            for &k in r {
+                uv[k].x -= shift;
+            }
+        }
+    }
     // Each loop closes on the parameter plane (none round a closed surface's period).
     for r in &rings {
-        let (q, _) = s.param_of(points[r[0]], Some(uv[r[r.len() - 1]]));
+        let last = uv[r[r.len() - 1]];
+        let (mut q, _) = s.param_of(points[r[0]], Some(last));
+        if periodic {
+            q.x -= ((q.x - last.x) / (u1 - u0)).round() * (u1 - u0);
+        }
         if (q - uv[r[0]]).length() > 1e-6 * (1.0 + q.length()) {
             return Err("a loop round the surface");
         }
+        if periodic && r.iter().any(|&k| uv[k].x > u1 + 1e-4 * (u1 - u0) || uv[k].x < u0 - 1e-4 * (u1 - u0)) {
+            return Err("a loop across the seam");
+        }
     }
-    let (lo, hi) = uv.iter().fold((DVec2::splat(f64::MAX), DVec2::splat(f64::MIN)), |(a, b), q| (a.min(*q), b.max(*q)));
+    // Boundary nodes closer than the triangulation tells apart (an edge split up to a slight crease in steps of
+    // nanometres: a swept hose's seam) stand for one: the one at the least point, so a seam's two uses keep the
+    // same.
+    let diag = points.iter().fold((DVec3::splat(f64::MAX), DVec3::splat(f64::MIN)), |(a, b), q| (a.min(*q), b.max(*q)));
+    let near = 1e-6 * (diag.1 - diag.0).length();
+    let least = |a: DVec3, b: DVec3| a.to_array().partial_cmp(&b.to_array()) == Some(std::cmp::Ordering::Less);
+    for r in rings.iter_mut() {
+        let n = r.len();
+        // Start after a gap, so no cluster wraps round the ring's start.
+        let Some(start) = (0..n).find(|&k| (points[r[k]] - points[r[(k + n - 1) % n]]).length() >= near) else { continue };
+        let walk: Vec<usize> = (0..n).map(|k| r[(start + k) % n]).collect();
+        let mut kept: Vec<usize> = Vec::with_capacity(n);
+        let mut cluster: Vec<usize> = Vec::new();
+        for (k, &i) in walk.iter().enumerate() {
+            cluster.push(i);
+            let next = walk.get(k + 1).copied();
+            if next.is_none_or(|j| (points[j] - points[i]).length() >= near) {
+                kept.push(*cluster.iter().reduce(|a, b| if least(points[*b], points[*a]) { b } else { a }).expect("one"));
+                cluster.clear();
+            }
+        }
+        if kept.len() >= 3 {
+            *r = kept;
+        }
+    }
+    let (mut lo, mut hi) = uv.iter().fold((DVec2::splat(f64::MAX), DVec2::splat(f64::MIN)), |(a, b), q| (a.min(*q), b.max(*q)));
+    // A seam's nodes a little past it don't widen the grid: a step of 1e-7 between them and the first knot made the
+    // other way's ten times that (a hose wall's 30000 rows).
+    if periodic {
+        (lo.x, hi.x) = (lo.x.max(u0), hi.x.min(u1));
+    }
     if !(hi.x > lo.x && hi.y > lo.y) {
         return Err("a flat parameter box");
     }

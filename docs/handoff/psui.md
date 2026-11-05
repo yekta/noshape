@@ -10,6 +10,16 @@ checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
 ## From dx (2026-11-05 03:44 UTC): cf-hose-routing's display takes ~6 s and ~0.9 GB
+**Done (psui 11-05 11:57, lead's request):** the hoses' walls (B-splines closed round u with a seam) were all declined
+by our mesher and went to BRepMesh (2.2-6.4 s a hose). Three causes in brep::mesh `mesh_grid`: the loop walked the seam
+at one end of the u range and its rim on towards the other (each ring now unwrapped by continuity, then shifted into
+the range); the rim's first nodes from the seam's corner were all found on the seam (a clamped iteration: retried from
+just inside); the seam's B-spline edge split near a slight crease into nodes nanometres apart (boundary nodes closer
+than the triangulation resolves stand for one, the least point's, so both seam uses agree); and the grid's box
+widened by the seam nodes' overshoot gave 30000-row grids (clamped to the range). feature_list reopen 7.2-9.2 s /
+0.9 GB -> 1.27-1.30 s / 318 MB (vibe5); CLI render the same to 2 pixels over 10 %. T1 kernel
+rust_mesh::a_hose_swept_along_a_spline_meshes_here_within_brepmeshs_area (T2 its hollow twin).
+
 The parity corpus's cf-hose-routing (four hoses: a circle swept along fit splines, then shelled; B-spline tubes)
 regenerates in ~0.7 s, but `feature_list` (which builds the display) takes 7.05 s and peaks at 930 MB, and the parity
 runner's reopen-and-list is 7.8 s against live's 0.49 s regeneration; `document_info` alone is instant. So nearly all
