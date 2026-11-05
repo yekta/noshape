@@ -2351,4 +2351,12 @@ against the faces near each point took 13 distances 100 -> 16 ms, Shell 4 950–
 cb1b7dfcb (face classifier, cheap inner points) landed the same cut first, so mine is dropped. Left there: the
 offset surface's evaluation (OCCT), or a quadrics-first order where the offset can't work (not found a test for it
 that keeps every corpus outcome).
+13:27, the lead's last try, an approximated B-spline for the ramp's offset (GeomConvert_ApproxSurface, C1, 1e-7, degree 8):
+over the base surface's extended bounds (what the quadric path's edges need) it doesn't converge (max error 541, the
+extension's offset is wild); over the face's own domain it converges (2.6e-8 claimed, 1.4–1.6 µm sampled, 26x170 or
+79x219 poles, 100–250 ms to build). Swapped into the self-interference check only (the wall's face 21 on it), the
+check took 3.7–4.1 s instead of 1.0 s (the T1's body, this machine) and found an interference that isn't there, so
+quadrics was refused and the shell changed. So no: Shell 4 goes back to you with these numbers (lead's call). On an
+idle vibe4: 1027–1037 ms (live 627), 950–957 with dx's whole check; the rest is OCCT evaluating that rational
+B-spline's offset (the failed offset path 224, quadrics' edges 117 / faces 152 / self-interference 384).
 
