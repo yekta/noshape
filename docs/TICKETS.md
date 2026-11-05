@@ -539,6 +539,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P0 RELEASE-BUILD-FILLET-HANG (core + lead: release-build only) **a saved document hangs every release build on open,
+  while green (dev) builds of the same code open it in 7–8 s**: /root/qa-scratch/tickets/hang4539/step98.noshape (+ -wal; CLI
+  fuzz seed 4539 on the v0.4.30 release; 74 features, the last Fillet 6, radius 0.5 mm). `qa-fstat.py <cli> <doc>` (open +
+  feature_list): **v0.4.26, v0.4.28, v0.4.29, v0.4.30 release CLIs: no answer in 150 s** (100 % CPU, one thread, no budget
+  stop; gdb on the stripped release only shows `??`); green a1ec7849 (= v0.4.30's source) and 8cc1b766: 7–8 s, Fillet 6 Ok.
+  The fuzz session itself: v0.4.30 hangs at step 99's fillet 3 / 3 (4000 s and twice 900 s), green 8cc1b766 runs to the end 2 / 2
+  (85 s), green a1ec7849 to the end. So the release's compile (profile, LTO, OCCT's flags, target CPU?) makes OCCT's fillet loop
+  where the dev build doesn't — qa tests greens, so release-only behaviour goes unseen: qa now also runs the fuzz loop on each
+  release (it already does) and will add this document to the release smoke. live: opens it. (qa 2026-11-05 09:16)
 - [ ] P2 SAVED-MIRROR-REF-CHANGE (core) **a saved document's Mirror resolves differently on green 8cc1b766**: qa-scratch/tickets/
   cli-suppress-stall.noshape (a fuzz document), Mirror 10: 7bb99058 "No merge scope selected." (Error, 6 parts) → 8cc1b766 "1
   missing selection" (Warning) and a mirrored part more (7 parts: an extra 4984.2537 mm³ / 3 faces). Everything else in the 44
