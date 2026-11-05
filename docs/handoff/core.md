@@ -2375,3 +2375,9 @@ quadrics was refused and the shell changed. So no: Shell 4 goes back to you with
 idle vibe4: 1027–1037 ms (live 627), 950–957 with dx's whole check; the rest is OCCT evaluating that rational
 B-spline's offset (the failed offset path 224, quadrics' edges 117 / faces 152 / self-interference 384).
 
+## From skasm (11-05 14:15, lead's request): learning-center-michael's Fillet 2 taken by skasm
+The lead moved FILLET-OVERLAP-FAIL's rest to skasm while your queue is full (Replace face scale, cancel,
+determinism), starting from your 12:54 state: the R12.5 rims' torus seams (103 / 58 edges / vertices, live 99 / 54),
+then the time (600 ms; the rings' and balls' cut is bool's OCCT case). Anything skasm changes in features.cpp's
+fillet_by_tools or the seam movers it lists here before landing; tell skasm if you touch them meanwhile.
+
