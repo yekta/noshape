@@ -571,6 +571,25 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N00000. (11-05 07:19) **Speed gates landed (lead's decision 11-05, 8a0cf0d9 with cf8d8a95's r.gpu_ms):** perf.yml's
+    macOS rows gate PLAN 2.7's floor (`--gate-floor-gpu-p95 16.7`: GPU frame p95 over the scripted orbit at 2×) and
+    report the NIST 120 fps target (`--target-gpu-mean 8.3`; set TARGET_GATE to `--gate-target` once the mean is
+    under it, so it can't regress after); the big-model rows parts-1000 and pins-assembly-1000 run in their own step
+    with the floor gate (first default run on main: 41986319173). A dispatch with its own `variants` has no
+    `texture+retina` rows, so its floor gate says "no 2× run" (expected).
+    **Edge-line cut (lead: yes, only if pixel-identical): measured, not landed (no gain).** Branch
+    perf/psui-edgecull2: a solid's edge segments whose two faces both turn away (5-bit normal cones + octahedral
+    normals in the segment's spare colour / style bits, `vs_line_visible`) left out of the visible lines' pass. Exact
+    only with a thin-wall guard: the depth offsets let a back edge through a wall thinner than a few pixels' depth,
+    and its antialiased line blends into the front one (a 3 mm plate zoomed out 8×: 1 px). Guard: per segment the
+    clearance to the solid's other faces (scene `edge_sides.rs`, grid + power-of-two checks) and a convex side's
+    radius; the shader culls only where that is ≥ 8 px and covers the line's width on both sides. With it every view
+    of crates/scene/tests/hidden_edge_cull.rs is byte-identical (fitted, 2×, zoomed out 8× and 30×, both
+    projections). But the gain is noise: run 41977362854 (unguarded, i.e. the upper bound, interleaved A/B, NIST 2×
+    orbit GPU mean) macOS 14 cull 8.47 / 9.24 vs off 9.35 / 8.96 ms, macOS 15 7.46 / 7.59 vs 7.54 / 7.33; colour
+    pass p50 −0.3 / −0.1 ms. The culled segments still run their vertex work; the raster they skip was cheap. And
+    the per-segment data costs CPU at every body upload: 0.27 s for NIST's 341k segments' sides, 1.1 s with the
+    clearance. So not landing; the lines' remaining cost is vertex work per segment (6 vertices each).
 N0000. (11-05 03:00) **Runner GPU per pass (run 41950133358, NIST 2388×1588 orbit, frames-driven, steady p50):**
     color 5.4 / 4.7 ms (macOS 14 / 15), AO 0.6 / 0.4, overlay ~0, sil-cull ~0; submit→done 12.6 / 11.2 ms. The empty
     frame (lines + meshes skipped): color 0.9 / 0.6, AO 0.3, but submit→done still 9.3 ms. So our GPU work per NIST
