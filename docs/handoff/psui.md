@@ -569,8 +569,14 @@ N0000. (11-05 03:00) **Runner GPU per pass (run 41950133358, NIST 2388×1588 orb
     frame (lines + meshes skipped): color 0.9 / 0.6, AO 0.3, but submit→done still 9.3 ms. So our GPU work per NIST
     frame is ~6 ms (under 8.3); the ~9 ms floor is the paravirtualized runner GPU's submission → completion latency,
     not our passes (the frames-driven bench waits for each frame, so it measures that latency). The real cost to cut
-    is the color pass's meshes + lines (~4.4 ms): ablation run 41957634951 (nolines, nomesh, nosil, nobacksil, each
-    with r.pass.color). On a real GPU frames pipeline (2 in flight) and the latency overlaps.
+    is the color pass's meshes + lines (~4.4 ms). **Ablation (run 41957634951, r.pass.color p50, macOS 14 / 15):**
+    full 5.7 / 5.4; no lines 4.3 / 3.9; no meshes 5.0 / 5.5; no edge silhouettes 6.1 / 5.8; no backface
+    silhouettes 5.0 / 5.3; lines + meshes off 0.9 / 0.6 (run 41950133358). So lines are ~1.5 ms, and the rest is the
+    ~670k triangles processed twice (backface-silhouette pass, then the faces): drop either and the other takes the
+    depth work. No parity-safe quick cut found: the vertex format is 16 bytes; drawing the backface pass after the
+    faces cost up to 37 % more on these runners (renderer.rs note). Options, each a look decision: the backface pass
+    on a coarser display level; line segments cheaper at 4× MSAA. On a real GPU frames pipeline (2 in flight) and
+    the runner's completion latency (the ~9 ms floor) isn't there.
 N000. (11-05 01:50) **Per-pass GPU time on the runners**: `NOSHAPE_PERF_PASSES=1` (with NOSHAPE_PERF): the
     vendored wgpu-hal (metal::pass_timing) reads every labelled command buffer's GPUStartTime/GPUEndTime; wgpu-core
     records each render / compute pass in a command buffer of its own labelled with the pass (color, ao, sil-cull,
