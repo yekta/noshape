@@ -16,6 +16,17 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-05 06:01 UTC.**
+- Tonight's T2 failures of mine, fixed: kernel_robustness::adjacent_regions_extrude_without_a_seam (regions united
+  into one face kept their sides split where the dropped line between them met them; Region::joined; now T1),
+  sweep_4_8_matches_onshape's Bo3 (the non-manifold check read the unified result, whose cylinder halves merged
+  across the edge; T1 a_cut_tangent_to_a_face_fails_as_non_manifold), std_oracle::fillet_regenerates_as_std (a
+  custom feature's thread now takes the studio's whole kernel setting: noshape's blends, topology; was the blend
+  finish only, so std's Fillet ran OCCT's), oracle_p1::audit_feature_results (AUDIT_KNOWN: FI2, SW6, LF4, LF5; live's
+  printed digits). Parity on vibe5 43/55, 394/471 (was 41, 392), no losses.
+- cf-sheet-metal-model-plus 2.4 -> 1.67 s (Shape::contains_point, the parked patch, landed).
+- Left for the lead: vibe2's T2 lacks the corpora (bool / blend / shell, ~/agents/profdocs) those benches read.
+
 **State 11-05 04:48 UTC.**
 - Since 02:12: Shell's quadric path makes Parasolid's flat rims (live 1752 in 5 ms), cf-hose-routing 1092 -> 697 ms,
   cf-fix-pcb 8 -> 11/12 (text height from the ascent). P1 SEAM-MOVER-UNIFY-VOLUME fixed (d293a184): the geometry was
