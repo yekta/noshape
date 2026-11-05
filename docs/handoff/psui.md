@@ -575,8 +575,16 @@ N00000. (11-05 07:19) **Speed gates landed (lead's decision 11-05, 8a0cf0d9 with
     macOS rows gate PLAN 2.7's floor (`--gate-floor-gpu-p95 16.7`: GPU frame p95 over the scripted orbit at 2×) and
     report the NIST 120 fps target (`--target-gpu-mean 8.3`; set TARGET_GATE to `--gate-target` once the mean is
     under it, so it can't regress after); the big-model rows parts-1000 and pins-assembly-1000 run in their own step
-    with the floor gate (first default run on main: 41986319173). A dispatch with its own `variants` has no
-    `texture+retina` rows, so its floor gate says "no 2× run" (expected).
+    with the floor gate. A dispatch with its own `variants` has no `texture+retina` rows, so its floor gate says
+    "no 2× run" (expected); a release before cf8d8a95 (v0.4.30) reports no GPU time, so the gate skips. **First
+    check on main (run 41989113805, main@0a8ec1d built from source), 2× GPU mean / p95 ms:** NIST orbit 8.54 / 8.94
+    (macOS 14), 8.26 / 9.51 (macOS 15), pan 7.4-7.75 / ≤ 9.71, zoom 6.3-6.6 / ≤ 7.85; parts-1000 orbit 7.19 / 9.14
+    and 6.81 / 7.64; pins-assembly-1000 orbit 6.27 / 7.25 and 5.17 / 5.7. Floor met on every row; the 120 fps
+    target met on macOS 15, 0.24 ms over on macOS 14. Its "regression" failures are the old baseline's (below).
+    **Baseline fix (a2014f5e):** perf.yml compared every run with the last successful run on main, which was a
+    frames-driven experiment branch (41933370375, perf/psui-layer2): every release run since failed on false
+    regressions. Now only a release measured with the default settings writes `default-settings` into its artifact
+    and only such a run is a baseline; none until the first such run succeeds.
     **Edge-line cut (lead: yes, only if pixel-identical): measured, not landed (no gain).** Branch
     perf/psui-edgecull2: a solid's edge segments whose two faces both turn away (5-bit normal cones + octahedral
     normals in the segment's spare colour / style bits, `vs_line_visible`) left out of the visible lines' pass. Exact
