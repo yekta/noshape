@@ -548,6 +548,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (85 s), green a1ec7849 to the end. So the release's compile (profile, LTO, OCCT's flags, target CPU?) makes OCCT's fillet loop
   where the dev build doesn't — qa tests greens, so release-only behaviour goes unseen: qa now also runs the fuzz loop on each
   release (it already does) and will add this document to the release smoke. live: opens it. (qa 2026-11-05 09:16)
+  qa 09:32: one more release-loop death, not reproduced: v0.4.30 seed 4558 died at step 73 (a Shell, 7.4 s, no message); replays
+  v0.4.30 2 / 2 and green dedfb1ae 1 / 1 ran to the end. Logged here in case it is the same release-build difference.
 - [ ] P2 SAVED-MIRROR-REF-CHANGE (core) **a saved document's Mirror resolves differently on green 8cc1b766**: qa-scratch/tickets/
   cli-suppress-stall.noshape (a fuzz document), Mirror 10: 7bb99058 "No merge scope selected." (Error, 6 parts) → 8cc1b766 "1
   missing selection" (Warning) and a mirrored part more (7 parts: an extra 4984.2537 mm³ / 3 faces). Everything else in the 44
