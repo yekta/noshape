@@ -130,6 +130,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   ellipse. Fixed: a model edge's SPLINE runs through the projected points (cad_fit::interpolating_poles, global cubic
   interpolation), not with them as its poles (an iso silhouette piece was 0.1 mm inside live's). pipeflange-steven:
   centermarks 36/36; what differs sits in Fillet 2's corners, its model (core).
+- 15:11: the PDFs against live's (300 dpi overlays, /root/dx-scratch/drw/pdfseg.py, border.py). Fixed, all as
+  live's PDF writer: the sheet's line extents centred on the page at 1:1 (the frame 0.019 in / 0.5 mm left of the
+  DXF's on every template; request 1917's "text 1.5 pt left of the anchor" was this), widths in whole 1/600 in
+  (0.40 mm 1.08 pt, 0.15 mm 0.48, 0.13 mm 0.36), CENTER lines (centre mark arms, centreline layers) with the DXF line
+  type x $LTSCALE laid out AutoCAD's way (whole periods, end dashes at least half a dash); the DXF's $EXTMIN /
+  $EXTMAX the line extents and $LIMMAX 12,9, as live's. knob-tim and pipeflange now differ from live only in the
+  title block's "1" zone labels (1.2 pt left: live centres that glyph otherwise) and the DRAWN name (the account).
+  Hidden lines keep our 3 / 1.5 mm pattern: no live PDF has any (asked, REQUESTS).
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem

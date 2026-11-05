@@ -81,6 +81,21 @@ fn adjusted_line_type(g: &SheetGeometry, li: usize) -> Option<(&'static str, f64
     })
 }
 
+/// The dash pattern (mm) live's PDF draws line `li` with where it was measured: the line's DXF line type, its
+/// elements × `$LTSCALE` 0.5 read as inches (behaviours "Adjust linestyle"): an Adjust linestyle pen's, CENTER on
+/// a centre mark's arms and the CENTER layers. `None`: the line's own pen.
+pub(crate) fn pdf_dashes(g: &SheetGeometry, li: usize) -> Option<Vec<f64>> {
+    if adjusted_line_type(g, li).is_some() {
+        return Some(g.line_pen(li).1);
+    }
+    let center = match g.cad_line_layer(li) {
+        CadLayer::Centermarks => g.lines[li].style == super::sheet::LineStyle::Centerline,
+        l => l.line_type() == "CENTER",
+    };
+    let (_, _, pattern) = LINE_TYPES.iter().find(|t| t.0 == "CENTER")?;
+    center.then(|| pattern.iter().map(|v| v.abs() * 0.5 * 25.4).collect())
+}
+
 /// The layer table's order (live drw2-k-dxf2018, asbu-aux: 0, Defpoints,
 /// then these as used; the sheet-metal and virtual sharp layers, absent
 /// from the drawing samples, last).
@@ -471,6 +486,12 @@ fn document_tables(pages: &[&SheetGeometry], insunits: u8, version: DxfVersion) 
     // Live (dx-linestyles.dxf): $LTSCALE 0.5 (its inch patterns at half size:
     // DASHED 0.5 in draws 6.35 mm dashes, as its PDF).
     doc.header.linetype_scale = 0.5;
+    // Live: the first sheet's extents, AutoCAD's default limits.
+    if let Some([lo, hi]) = pages.first().and_then(|g| super::export::line_extents(g)) {
+        doc.header.model_space_extents_min = Vector3::new(lo[0] * k, lo[1] * k, 0.0);
+        doc.header.model_space_extents_max = Vector3::new(hi[0] * k, hi[1] * k, 0.0);
+    }
+    doc.header.model_space_limits_max = Vector2::new(12.0, 9.0);
     for (name, description, pattern) in LINE_TYPES {
         let mut lt = LineType::new(name);
         lt.description = description.to_string();
@@ -1231,16 +1252,7 @@ pub fn to_dxf_r12(g: &SheetGeometry, insunits: u8) -> String {
         let _ = writeln!(s, "{code:>3}\n{v}");
     };
     let num = |x: f64| format!("{x}");
-    let (mut lo, mut hi) = ([f64::MAX; 2], [f64::MIN; 2]);
-    for p in g.lines.iter().flat_map(|l| l.points.iter()) {
-        for a in 0..2 {
-            lo[a] = lo[a].min(p[a] * k);
-            hi[a] = hi[a].max(p[a] * k);
-        }
-    }
-    if g.lines.is_empty() {
-        (lo, hi) = ([0.0; 2], [0.0; 2]);
-    }
+    let [lo, hi] = super::export::line_extents(&g).map(|e| e.map(|p| p.map(|v| v * k))).unwrap_or([[0.0; 2]; 2]);
     pair(&mut s, 0, "SECTION");
     pair(&mut s, 2, "HEADER");
     pair(&mut s, 9, "$ACADVER");

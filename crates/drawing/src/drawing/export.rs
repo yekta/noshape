@@ -607,6 +607,58 @@ fn path_point(out: &mut String, p: &[f64; 2], pt: f64, first: bool) {
     out.push_str(if first { " m\n" } else { " l\n" });
 }
 
+/// The extents [min, max] (sheet mm) of a sheet's lines, as live's DXF `$EXTMIN` / `$EXTMAX`; `None` on an empty
+/// sheet.
+pub(crate) fn line_extents(g: &SheetGeometry) -> Option<[[f64; 2]; 2]> {
+    let mut points = g.lines.iter().flat_map(|l| l.points.iter());
+    let first = *points.next()?;
+    Some(points.fold([first, first], |[lo, hi], p| [[lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]]))
+}
+
+/// Where live's PDF puts a sheet (pt): its extents centred on the page at 1:1, as a plot of the extents (live
+/// tpl-ANSI_A_INCH / ISO_A3: the frame 0.019 in / 0.5 mm left of the DXF's, the margins equal).
+fn pdf_page_shift(g: &SheetGeometry) -> [f64; 2] {
+    let Some([lo, hi]) = line_extents(g) else { return [0.0; 2] };
+    [(g.width - lo[0] - hi[0]) / 2.0, (g.height - lo[1] - hi[1]) / 2.0]
+}
+
+fn polyline_length(l: &Polyline2) -> f64 {
+    let close = l.closed.then(|| [*l.points.last().unwrap_or(&[0.0; 2]), *l.points.first().unwrap_or(&[0.0; 2])]);
+    l.points.windows(2).map(|w| [w[0], w[1]]).chain(close).map(|[a, b]| (b[0] - a[0]).hypot(b[1] - a[1])).sum()
+}
+
+/// A line type laid along a line of length `len` as live's PDF does (AutoCAD's rule): whole periods, the rest split
+/// between end dashes of at least half a dash (live 1857: a 25 mm centre mark arm ends in 6.21 mm dashes of a
+/// 5.715 mm pattern; dx-linestyles: a 40 mm Dashed edge in 4.125 of 6.35). The dash array from the line's start;
+/// `None` (solid) when one pattern doesn't fit.
+fn centered_dashes(len: f64, pattern: &[f64]) -> Option<Vec<f64>> {
+    let (&first, rest) = pattern.split_first()?;
+    let period: f64 = pattern.iter().sum();
+    let tail = period - first;
+    if period.is_nan() || len.is_nan() || period <= 0.0 || first <= 0.0 {
+        return None;
+    }
+    let k = ((len - tail - first) / period).floor();
+    if k < 0.0 {
+        return None;
+    }
+    let end = (len - tail - k * period) / 2.0;
+    let mut d = vec![end];
+    d.extend(rest);
+    for _ in 0..k as usize {
+        d.push(first);
+        d.extend(rest);
+    }
+    d.extend([end, len]);
+    Some(d)
+}
+
+/// A pen width (mm) as live's PDF writes it: in whole plot units of 1/600 in (live 1857: 0.40 mm 9 units, 0.15 mm
+/// 4, 0.13 mm 3).
+fn plot_width(mm: f64) -> f64 {
+    (mm / 25.4 * 600.0).round().max(1.0) * 25.4 / 600.0
+}
+
 fn pdf_content(g: &SheetGeometry, ocgs: &mut Vec<super::cad_layers::CadLayer>, fonts: &mut PdfFonts) -> String {
     let pt = 72.0 / 25.4;
     let mut content = String::new();
@@ -646,13 +698,17 @@ fn pdf_content(g: &SheetGeometry, ocgs: &mut Vec<super::cad_layers::CadLayer>, f
         layer(&mut content, Some(g.cad_line_layer(li)));
         let _ = writeln!(content, "{} RG", rgb(g.line_color(li)));
         let (width_mm, dash) = g.line_pen(li);
+        let (dash, phase) = match super::cad_export::pdf_dashes(g, li) {
+            Some(p) => (centered_dashes(polyline_length(l), &p).unwrap_or_default(), 0.0),
+            None => (dash, g.line_dash_phase(li)),
+        };
         if dash.is_empty() {
             content.push_str("[] 0 d\n");
         } else {
             let d: Vec<String> = dash.iter().map(|x| format!("{:.3}", x * pt)).collect();
-            let _ = writeln!(content, "[{}] {:.3} d", d.join(" "), g.line_dash_phase(li) * pt);
+            let _ = writeln!(content, "[{}] {:.3} d", d.join(" "), phase * pt);
         }
-        let _ = writeln!(content, "{:.3} w", width_mm * pt);
+        let _ = writeln!(content, "{:.3} w", plot_width(width_mm) * pt);
         for (i, p) in l.points.iter().enumerate() {
             path_point(&mut content, p, pt, i == 0);
         }
@@ -928,7 +984,8 @@ pub fn to_pdf_pages_version(pages: &[SheetGeometry], version: &str) -> Vec<u8> {
             let _ = writeln!(draw, "q {:.3} 0 0 {:.3} {:.3} {:.3} cm /Im{n} Do Q", im.size[0] * pt, im.size[1] * pt, im.pos[0] * pt, im.pos[1] * pt);
             images.push(flate_stream(&format!("/Type /XObject /Subtype /Image /Width {w} /Height {h} /ColorSpace /DeviceRGB /BitsPerComponent 8 "), rgb));
         }
-        let content = draw + contents[i].as_str();
+        let shift = pdf_page_shift(g);
+        let content = format!("1 0 0 1 {:.3} {:.3} cm\n", shift[0] * pt, shift[1] * pt) + &draw + contents[i].as_str();
         let (w, h) = (g.width * pt, g.height * pt);
         let xo = if xobjects.is_empty() { String::new() } else { format!(" /XObject <<{xobjects} >>") };
         let gs = pdf_overlay_states(g);
@@ -1253,6 +1310,41 @@ mod tests {
         let texts = pdf_texts(&p);
         assert!(texts.iter().any(|t| t == "100"), "{texts:?}");
         assert!(p.len() < 120_000, "a subset, not the whole font: {} B", p.len());
+    }
+
+    #[test]
+    fn line_types_are_laid_out_as_lives_pdf() {
+        let center = [5.715, 1.143, 1.143, 1.143];
+        let d = centered_dashes(25.0, &center).unwrap();
+        assert_eq!(d.len(), 10);
+        assert!((d[0] - 6.2135).abs() < 1e-3 && (d[8] - d[0]).abs() < 1e-9 && (d[4] - 5.715).abs() < 1e-9, "{d:?}");
+        let d = centered_dashes(40.0, &[6.35, 3.175]).unwrap();
+        assert!((d[0] - 4.125).abs() < 1e-9 && d.len() == 10, "{d:?}");
+        assert!(centered_dashes(8.0, &center).is_none());
+        assert!((plot_width(0.40) * 72.0 / 25.4 - 1.08).abs() < 1e-9 && (plot_width(0.15) * 72.0 / 25.4 - 0.48).abs() < 1e-9);
+    }
+
+    /// Live's exports of an empty ANSI A / ISO A3 template drawing (samples/tpl-*.dxf, .pdf): the DXF's extents are
+    /// the zone ticks' ends; the PDF centres them on the page (the frame 0.019 in / 0.5 mm left of the DXF's).
+    #[test]
+    fn exports_place_the_sheet_as_live() {
+        for (size, lo, hi, shift) in [
+            (crate::drawing::SheetSize::AnsiA, [0.9652, 0.4826], [279.4, 215.4174], "1 0 0 1 -1.368 0.000 cm\n"),
+            (crate::drawing::SheetSize::A3, [1.0, 0.5], [420.0, 296.5], "1 0 0 1 -1.417 0.000 cm\n"),
+        ] {
+            let sheet = Sheet { size, ..Default::default() };
+            let (w, h) = size.size_mm();
+            let mut g = SheetGeometry::new(w, h);
+            g.add_border_and_title(&sheet);
+            let [elo, ehi] = line_extents(&g).unwrap();
+            let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).abs() < 1e-3 && (a[1] - b[1]).abs() < 1e-3;
+            assert!(near(elo, lo) && near(ehi, hi), "{size:?}: {elo:?} {ehi:?}");
+            assert!(pdf_decoded(&to_pdf(&g)).contains(shift), "{size:?}");
+            let dxf = String::from_utf8(crate::drawing::cad_export::to_dxf_version(&g, 4, acadrust::DxfVersion::AC1032).unwrap()).unwrap();
+            let at = dxf.find("$EXTMIN").unwrap();
+            let v: Vec<f64> = dxf[at..].lines().skip(2).step_by(2).take(2).map(|l| l.trim().parse().unwrap()).collect();
+            assert!(near([v[0], v[1]], lo), "{size:?}: $EXTMIN {v:?}");
+        }
     }
 
     #[test]
