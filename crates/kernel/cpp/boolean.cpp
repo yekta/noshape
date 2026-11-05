@@ -88,6 +88,8 @@
 #include <GeomProjLib.hxx>
 #include <Geom_TrimmedCurve.hxx>
 #include <BRepTools_History.hxx>
+#include <BRepTools_Modification.hxx>
+#include <BRepTools_Modifier.hxx>
 #include <BRepTools.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
@@ -6971,6 +6973,156 @@ OpOut op_transform(const OcShape& s, rust::Slice<const double> m, bool copy)
   return make_result(args, tr.Shape(), hist.get());
 }
 
+namespace
+{
+// An affine map of a body bounded by planes and straight edges: planes stay planes and lines lines (Onshape's;
+// BRepBuilderAPI_GTransform converts everything to B-splines first).
+class AffinePlanar : public BRepTools_Modification
+{
+public:
+  explicit AffinePlanar(const gp_GTrsf& g)
+      : myG(g)
+  {
+    const gp_Mat& a = g.VectorialPart();
+    for (int c = 1; c <= 3; ++c)
+      myScale = std::max(myScale, gp_XYZ(a(1, c), a(2, c), a(3, c)).Modulus());
+  }
+
+  static bool applies(const TopoDS_Shape& s, const gp_GTrsf& g)
+  {
+    if (g.VectorialPart().Determinant() <= 0.0)
+      return false;
+    for (TopExp_Explorer x(s, TopAbs_FACE); x.More(); x.Next())
+      if (plane_of(TopoDS::Face(x.Current())).IsNull())
+        return false;
+    for (TopExp_Explorer x(s, TopAbs_EDGE); x.More(); x.Next())
+      if (line_of(TopoDS::Edge(x.Current())).IsNull())
+        return false;
+    return true;
+  }
+
+  bool NewSurface(const TopoDS_Face& F, occ::handle<Geom_Surface>& S, TopLoc_Location& L, double& Tol, bool& RevWires, bool& RevFace) override
+  {
+    S        = new Geom_Plane(new_plane(F));
+    L        = TopLoc_Location();
+    Tol      = BRep_Tool::Tolerance(F) * myScale;
+    RevWires = false;
+    RevFace  = false;
+    return true;
+  }
+
+  bool NewCurve(const TopoDS_Edge& E, occ::handle<Geom_Curve>& C, TopLoc_Location& L, double& Tol) override
+  {
+    const gp_Lin l = new_line(E);
+    C              = new Geom_Line(l);
+    L              = TopLoc_Location();
+    Tol            = BRep_Tool::Tolerance(E) * myScale;
+    return true;
+  }
+
+  bool NewPoint(const TopoDS_Vertex& V, gp_Pnt& P, double& Tol) override
+  {
+    gp_XYZ p = BRep_Tool::Pnt(V).XYZ();
+    myG.Transforms(p);
+    P   = gp_Pnt(p);
+    Tol = BRep_Tool::Tolerance(V) * myScale;
+    return true;
+  }
+
+  bool NewCurve2d(const TopoDS_Edge& E, const TopoDS_Face& F, const TopoDS_Edge&, const TopoDS_Face&, occ::handle<Geom2d_Curve>& C, double& Tol) override
+  {
+    const gp_Ax3 a = new_plane(F);
+    const gp_Lin l = new_line(E);
+    double       u, v;
+    ElSLib::Parameters(gp_Pln(a), l.Location(), u, v);
+    const gp_XYZ d = l.Direction().XYZ();
+    C              = new Geom2d_Line(gp_Pnt2d(u, v), gp_Dir2d(d.Dot(a.XDirection().XYZ()), d.Dot(a.YDirection().XYZ())));
+    Tol            = BRep_Tool::Tolerance(E) * myScale;
+    return true;
+  }
+
+  bool NewParameter(const TopoDS_Vertex& V, const TopoDS_Edge& E, double& P, double& Tol) override
+  {
+    P   = BRep_Tool::Parameter(V, E) * stretch(E);
+    Tol = BRep_Tool::Tolerance(V) * myScale;
+    return true;
+  }
+
+  GeomAbs_Shape Continuity(const TopoDS_Edge& E, const TopoDS_Face& F1, const TopoDS_Face& F2, const TopoDS_Edge&, const TopoDS_Face&, const TopoDS_Face&) override
+  {
+    return BRep_Tool::Continuity(E, F1, F2);
+  }
+
+private:
+  static occ::handle<Geom_Plane> plane_of(const TopoDS_Face& f)
+  {
+    TopLoc_Location           l;
+    occ::handle<Geom_Surface> s = BRep_Tool::Surface(f, l);
+    if (auto t = occ::down_cast<Geom_RectangularTrimmedSurface>(s))
+      s = t->BasisSurface();
+    return occ::down_cast<Geom_Plane>(s);
+  }
+
+  static occ::handle<Geom_Line> line_of(const TopoDS_Edge& e)
+  {
+    TopLoc_Location         l;
+    double                  f, g;
+    occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, l, f, g);
+    if (auto t = occ::down_cast<Geom_TrimmedCurve>(c))
+      c = t->BasisCurve();
+    return occ::down_cast<Geom_Line>(c);
+  }
+
+  gp_XYZ map_vector(const gp_XYZ& d) const
+  {
+    gp_XYZ v = d;
+    v.Multiply(myG.VectorialPart());
+    return v;
+  }
+
+  gp_XYZ map_point(const gp_XYZ& p) const
+  {
+    gp_XYZ q = p;
+    myG.Transforms(q);
+    return q;
+  }
+
+  // The face's plane mapped: its origin and axes the images of the original's (the same handedness).
+  gp_Ax3 new_plane(const TopoDS_Face& f) const
+  {
+    TopLoc_Location l;
+    BRep_Tool::Surface(f, l);
+    const gp_Ax3 a = plane_of(f)->Position().Transformed(l.Transformation());
+    const gp_XYZ x = map_vector(a.XDirection().XYZ()), y = map_vector(a.YDirection().XYZ());
+    gp_Ax3       n(gp_Pnt(map_point(a.Location().XYZ())), gp_Dir(x.Crossed(y)), gp_Dir(x));
+    if (!a.Direct())
+      n.ZReverse();
+    return n;
+  }
+
+  // The edge's line mapped, its parameter t at the image of the original's point at t / stretch.
+  gp_Lin new_line(const TopoDS_Edge& e) const
+  {
+    TopLoc_Location l;
+    double          f, g;
+    BRep_Tool::Curve(e, l, f, g);
+    const gp_Lin a = line_of(e)->Lin().Transformed(l.Transformation());
+    return gp_Lin(gp_Pnt(map_point(a.Location().XYZ())), gp_Dir(map_vector(a.Direction().XYZ())));
+  }
+
+  double stretch(const TopoDS_Edge& e) const
+  {
+    TopLoc_Location l;
+    double          f, g;
+    BRep_Tool::Curve(e, l, f, g);
+    return map_vector(line_of(e)->Lin().Transformed(l.Transformation()).Direction().XYZ()).Modulus();
+  }
+
+  gp_GTrsf myG;
+  double   myScale = 0.0;
+};
+} // namespace
+
 OpOut op_gtransform(const OcShape& s, rust::Slice<const double> m)
 {
   require_non_null(s.shape, "shape");
@@ -6989,6 +7141,26 @@ OpOut op_gtransform(const OcShape& s, rust::Slice<const double> m)
     HHist              hist = new BRepTools_History();
     const TopoDS_Shape r    = gtransform_mesh(s.shape, g, *hist);
     return make_result({s.shape}, r, hist.get());
+  }
+  if (AffinePlanar::applies(s.shape, g))
+  {
+    BRepTools_Modifier md(s.shape, new AffinePlanar(g));
+    if (md.IsDone())
+    {
+      HHist hist = new BRepTools_History();
+      for (TopAbs_ShapeEnum k : {TopAbs_SOLID, TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+      {
+        ShapeIMap m;
+        TopExp::MapShapes(s.shape, k, m);
+        for (int i = 1; i <= m.Extent(); ++i)
+        {
+          TopoDS_Shape r = md.ModifiedShape(m(i));
+          if (!r.IsNull() && !r.IsSame(m(i)) && r.ShapeType() == k)
+            hist->AddModified(m(i), r);
+        }
+      }
+      return make_result({s.shape}, md.ModifiedShape(s.shape), hist.get());
+    }
   }
   BRepBuilderAPI_GTransform tr(s.shape, g, true);
   if (!tr.IsDone())

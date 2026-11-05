@@ -327,6 +327,29 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const block = size(evaluateQuery(context, qIntersection([solids, qCreatedBy(sub + "b", EntityType.BODY)])));
             check("qBodyType of qEverything", solids.queryType == QueryType.EVERYTHING && sketches == 0 && block == 1, [solids, sketches, block]);
         });
+        step(context, id, "scaledBlockKeepsPlanes", function(sub) {
+            // A block patterned with a non-uniform scale keeps its planes and lines (cf-fix-pcb's components replaced
+            // by blocks: live 136 planes, 324 lines).
+            fCuboid(context, sub + "b", { "corner1" : vector(0, 0, 3800) * mm, "corner2" : vector(1, 1, 3801) * mm });
+            var m = identityMatrix(3);
+            m[0][0] = 20;
+            m[1][1] = 10;
+            m[2][2] = 5;
+            opPattern(context, sub + "p", { "entities" : qCreatedBy(sub + "b", EntityType.BODY), "transforms" : [transform(m, vector(0, 0, 3800 - 5 * 3800) * mm)], "instanceNames" : ["0"] });
+            const block = qCreatedBy(sub + "p", EntityType.BODY);
+            var planes = 0;
+            for (var f in evaluateQuery(context, qOwnedByBody(block, EntityType.FACE)))
+                if (evSurfaceDefinition(context, { "face" : f }) is Plane)
+                    planes += 1;
+            var lines = 0;
+            for (var e in evaluateQuery(context, qOwnedByBody(block, EntityType.EDGE)))
+                if (evCurveDefinition(context, { "edge" : e }) is Line)
+                    lines += 1;
+            const volume = evVolume(context, { "entities" : block });
+            const bounds = evBox3d(context, { "topology" : block });
+            check("a block scaled non-uniformly", planes == 6 && lines == 12 && abs(volume - 1000 * mm ^ 3) < 1e-9 * mm ^ 3
+                    && norm(bounds.maxCorner - vector(20, 10, 3805) * mm) < 1e-9 * mm && norm(bounds.minCorner - vector(0, 0, 3800) * mm) < 1e-9 * mm, [planes, lines, volume, bounds]);
+        });
         step(context, id, "trackMovedEdge", function(sub) {
             // An edge opEdgeChange moved is still found by its tracking query, where it went (std's Fold tracks its
             // split edges through its edge changes).
