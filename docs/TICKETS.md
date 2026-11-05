@@ -948,9 +948,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P2 SM-LOUVER-FLANGE-PARTS (dx 11-05 21:21, corpus2) c2-sm-corner-break's Flange 1 (10 slot edges, 30°, INNER,
   oppositeDirection) makes 16 parts, live 1: the louver flaps (5 × wall, bend, end piece) stand where live's do (our total
   volume 5,289,925 mm³ against live's 5,274,851) but don't fuse with the slotted panel (2,095,640 mm³ as after Extrude 2).
-  Every op of the flange is ok (NOSHAPE_FS_TRACE): the parts split in updateSheetMetalGeometry's fuse. Check first which
-  slot edge the translator gave (live's edge ids by geometry: a slot's top and bottom edges), then where the bend meets
-  the cut wall. Sheet metal model 1 before it as live since 21:5x (edge-joint rips, material inward).
+  Every op of the flange is ok (NOSHAPE_FS_TRACE): the parts split in updateSheetMetalGeometry's fuse. The translator's
+  10 edges are live's (midpoints y 550.5 … −475.5, z 20, one at z 16.8: checked by id). Next: where each bend meets the
+  slotted wall (the flaps' pieces run z 17.1–55.7 over their slot, not joined to it). Sheet metal model 1 before it as live since run 127 (edge-joint rips, material inward).
 - [ ] P1 SM-BOOLEAN-SPEED (dx 11-05 09:35, speed; 15:58: run 125 model-plus 870 ms, live 917 (Up to Part 197 ms / live 160, Flange 1 221 / 224, Extrude 4 489 / 339): face point queries by the classifier, a cap's foot, cached split-piece tests; left in Extrude 4: its Booleans ~146 ms, evCollisionDetection's distances ~26, inner points computed twice in keep_names / part_sources ~10; 10:23: model-plus 2.5 -> 1.12 s, live 0.92: landed 2134f521 tracking
   on-face tests by the face classifier and cached inner points, then tracking's split-piece search by box and plane
   with cached boxes, then the curved outline from the tool's cap on the face (opCreateOutline 158 -> 60 ms). Left
