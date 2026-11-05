@@ -1270,12 +1270,40 @@ fn op_thicken(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             if s.faces().len() > 1 {
                 res.shape = k::unify_same_domain(&res.shape)?.shape;
             }
-            let names = fresh_names(ev, &res.shape);
+            let names = thicken_names(ev, &s, &res.shape, t1, t2);
             tools.push(NamedShape::new(res.shape, names));
         }
         add_bodies(ev, tools, BodyKind::Solid)
     })?;
     Ok(Value::Undefined)
+}
+
+/// A thickened sheet's names: its caps (the faces `t1` along the sheet's normal and `t2` against it) as
+/// qCapEntity finds them (std's sheet metal boolean checks a cut through a rolled wall by them), the sides fresh.
+fn thicken_names(ev: &EvalCtx, sheet: &Shape, out: &Shape, t1: f64, t2: f64) -> Vec<Name> {
+    let sheet_faces = sheet.faces();
+    let mut roles = BTreeMap::new();
+    for (i, f) in out.faces().iter().enumerate() {
+        let Some(p) = super::sheetmetal::inner_point(f) else { continue };
+        let Ok(n) = f.normal_at_point(p) else { continue };
+        let near = sheet_faces.iter().filter_map(|sf| sf.project_point(p).ok().map(|pr| (sf, pr))).min_by(|a, b| a.1.distance.total_cmp(&b.1.distance));
+        let Some((sf, pr)) = near else { continue };
+        let Ok(m) = sf.normal_at_uv(pr.u, pr.v) else { continue };
+        let m = m.normalize_or_zero();
+        if n.normalize_or_zero().cross(m).length() > 1e-6 {
+            continue;
+        }
+        let along = (p - pr.point).dot(m);
+        let role = if (along - t1).abs() < 1e-7 {
+            Role::CapEnd(None)
+        } else if (along + t2).abs() < 1e-7 {
+            Role::CapStart(None)
+        } else {
+            continue;
+        };
+        roles.insert(i as u32, role);
+    }
+    ev.name_result(&[&ShapeNames::default()], &k::History::default(), out, &roles, None)
 }
 
 fn path_wire(ev: &EvalCtx, refs: &[Reference]) -> FResult<Shape> {
@@ -1940,20 +1968,30 @@ fn op_create_outline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (cx, id, def) = args(i, &a)?;
     let tools = evaluate_refs(i, &cx, def.get("tools"))?;
     let target = evaluate_refs(i, &cx, def.get("target"))?;
+    let offset_faces = evaluate_refs(i, &cx, def.get("offsetFaces"))?;
     run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
         let Some(&(b, f)) = ev.resolve_faces(&target).first() else { return err("Select a face to outline on.") };
+        let caps = ev.resolve_faces(&offset_faces);
         let face = ev.face_shape(b, f)?;
-        let Some(plane) = face.face_plane().map_err(|e| FeatureError::new(e.to_string()))? else { return err("Outlines on curved faces are not supported yet") };
+        let plane = face.face_plane().map_err(|e| FeatureError::new(e.to_string()))?;
         let mut made = Vec::new();
         for t in ev.resolve_bodies(&tools) {
             let tool = ev.ctx.bodies[t].shape.clone();
             let Ok(bb) = tool.bounding_box(false) else { continue };
-            // A square of the plane round the tool's shadow.
-            let (c, r) = (plane.to_local(bb.center()), bb.diagonal());
-            let corners: Vec<DVec3> = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)].iter().map(|(u, v)| plane.to_world(c + glam::DVec2::new(*u, *v) * r)).collect();
-            let wire = k::make_polyline(&corners, true).map_err(|e| FeatureError::new(e.to_string()))?;
-            let square = k::make_face_from_wire(&wire, true).map_err(|e| FeatureError::new(e.to_string()))?;
-            let inside = k::boolean(k::BooleanOp::Common, &[square], &[tool], &k::BooleanOptions::default()).map_err(|e| FeatureError::new(format!("Failed to outline the tool: {e}")))?.shape;
+            // A square of the plane round the tool's shadow; a curved face (a rolled wall: std's sheet metal boolean
+            // outlines its tools trimmed to the thickened face) itself.
+            let sheet = match &plane {
+                Some(plane) => {
+                    let (c, r) = (plane.to_local(bb.center()), bb.diagonal());
+                    let corners: Vec<DVec3> = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)].iter().map(|(u, v)| plane.to_world(c + glam::DVec2::new(*u, *v) * r)).collect();
+                    let wire = k::make_polyline(&corners, true).map_err(|e| FeatureError::new(e.to_string()))?;
+                    k::make_face_from_wire(&wire, true).map_err(|e| FeatureError::new(e.to_string()))?
+                }
+                None => face.clone(),
+            };
+            let inside = k::boolean(k::BooleanOp::Common, &[sheet], &[tool], &k::BooleanOptions::default()).map_err(|e| FeatureError::new(format!("Failed to outline the tool: {e}")))?.shape;
+            let own: Vec<Shape> = caps.iter().filter(|(cb, _)| *cb == t).filter_map(|&(cb, cf)| ev.face_shape(cb, cf).ok()).collect();
+            let inside = if inside.faces().is_empty() { inside } else { outline_shadow(&face, &inside, &own).unwrap_or(inside) };
             if !inside.faces().is_empty() {
                 let names = fresh_names(ev, &inside);
                 made.push(NamedShape { shape: inside, names: ShapeNames { faces: names, ..Default::default() } });
@@ -1965,6 +2003,30 @@ fn op_create_outline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         add_bodies(ev, made, BodyKind::Surface)
     })?;
     Ok(Value::Undefined)
+}
+
+/// A tool's outline on planar `face`: its section there with its cap faces (the thickened face's offsets it keeps)
+/// brought onto the plane, one region: a tool whose end slants across the sheet outlines its widest, as Parasolid's
+/// (cf-sheet-metal-model-plus's Extrude 4: 5 mm along the flat wall, not 4.58). None when the caps add nothing (a cut
+/// square to the sheet) or the face is curved (its section stays: SM-CURVED-OUTLINE-SHADOW).
+fn outline_shadow(face: &Shape, section: &Shape, caps: &[Shape]) -> Option<Shape> {
+    face.face_plane().ok()??;
+    let area = section.area().ok()?;
+    let mut shadows = Vec::new();
+    for cap in caps {
+        let p = super::sheetmetal::inner_point(cap)?;
+        let shadow = cap.translated(face.project_point(p).ok()?.point - p).ok()?;
+        if shadow.area().ok()? > area * (1.0 + 1e-9) {
+            shadows.push(shadow);
+        }
+    }
+    if shadows.is_empty() {
+        return None;
+    }
+    let fused = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(section), &shadows, &k::BooleanOptions::default()).ok()?.shape;
+    let fused = k::unify_edges(&k::unify_same_domain(&fused).ok()?.shape).ok()?.shape;
+    let clipped = k::boolean(k::BooleanOp::Common, &[fused], std::slice::from_ref(face), &k::BooleanOptions::default()).ok()?.shape;
+    (!clipped.faces().is_empty()).then_some(clipped)
 }
 
 /// opSplitFace: Split's face mode with every tool field (edges, faces,

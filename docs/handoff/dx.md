@@ -81,6 +81,17 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
     lacks; pipeflange's pieces meet a third edge (TICKETS).
   - For the lead: land slot 3 (/home/ngyekta/target-land-slot3) failed T0 twice on mold "undefined symbol anon.…"
     (stale incremental artifacts, 07:05 and 08:01); both changes went in with later batches.
+- 09:27 (lead's list, part 2):
+  - Landed 302ca1a2: model-plus's Flange 1 as live (SM-CURVED-WALL-BEND-FILLET closed; the causes are in TICKETS),
+    and packed CAP_VERTEX queries translated: cf-sheet-metal-model-plus 9 -> 13/14. Run 114 (before the CAP_VERTEX
+    fix): 47/56, 419/483; a broader first try of the free-side rule broke shaped-flange (7/10), narrowed and checked.
+  - cf-sheet-metal-hem 6/6: live's refs.jsonl (REQUESTS 2054) had not reached the build host's corpus copy
+    (vibe5:agents/dx/live-models; rsync /root/parity/models/ there after live adds a file).
+  - Run 115: 49/56 documents, 425/483 features, custom 56/109, no regressions. Queued: model-plus's Extrude 4 builds (it failed "Error regenerating."): opThicken names its caps,
+    opCreateOutline on curved faces, planar outlines as the tool's shadow. Left: SM-CURVED-OUTLINE-SHADOW (+9.2 mm²).
+  - Debugging std (e.g. a println in sheetMetalFlange.fs): import string.fs there, and repack the pinned std
+    versions the document's studios use (they are zstd deltas against crates/featurescript/std): unpack the shipped
+    pack against the old std, then tools/std-pack.py <v> <dir>; never commit those.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem

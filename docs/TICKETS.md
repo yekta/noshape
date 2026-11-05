@@ -857,6 +857,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   full_regen_ms pending). Its result also differs: ours 36/83/46 faces/edges/vertices, 18314.95 mm³; live 36/79/40,
   18329.66 mm³ (after Extrude 3 already differs by split edges, CUT-CLOSED-EDGES-SPLIT). Our document:
   vibe5:~/tmp/noshape-parity-<pid>/pipeflange-steven.noshape (parity_models, NOSHAPE_PARITY_ONLY=pipeflange-steven).
+- [ ] P2 SM-CURVED-OUTLINE-SHADOW (dx 11-05 09:27) cf-sheet-metal-model-plus's Extrude 4 (a 5 mm blind cut whose end
+  slants across the sloped wall and the rolled wall): std's sheet metal boolean outlines each tool on each definition
+  face (opCreateOutline with the trimmed tool's cap faces as offsetFaces); Parasolid's outline is the tool's shadow
+  across the thickness. The host now takes it on planar faces (the section plus the caps brought onto the plane: the
+  flat wall's cut 5.0 mm long as live, not 4.58) and the section alone on curved ones (before 09:27 a curved face
+  failed "Outlines on curved faces are not supported yet", and our opThicken had no cap faces for qCapEntity).
+  Left: the rolled wall's cut is short (its x −13 face 18.42 mm², live 20.55; the wall 726.7, live 722.1): part area
+  +9.2 mm², topology and volume as live. Tried: the caps offset back onto the rolled surface (offset_shape by the
+  thickness, the loop rebuilt with make_face_on) and fused with the section: the cut grows to 725.3 mm² but the x −13
+  face splits in two (71 faces, live 70); the normal projection of the caps' edges (BRepOffsetAPI_NormalProjection)
+  drops edges. Extrude 4 takes 1.2 s, live 0.34 s (std's sheet metal boolean: thicken, intersect, rebuild).
 - [ ] P2 SETBACK-FILL-PATCH (core; dx 11-05 08:24, run 113) cf-setback-fillet's Setback Fillet 1 (3/5): its corner
   patches are std `fill` with G1 to the faces round a six-edge hole (the feature splits the fillets and the flat faces
   at the setback, deletes the spherical corner, then fills): the boundary is live's, the patches' areas aren't
@@ -4000,7 +4011,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   view's lower tangent edge, an ELLIPSE in live (centre (7.829, 6.0897) in, major 0.9843), is a 37-point SPLINE plus a
   0.017 in LINE in ours: that model edge is a B-spline in ours where Parasolid's is a circle. Our DXF writes model
   B-splines as SPLINE (as live does). Translated model: NOSHAPE_PARITY_SAVE + NOSHAPE_PARITY_ONLY=knob-tim.
-- [x] (dx 11-05 08:58: Flange 1 matches; cf-sheet-metal-model-plus 9 -> 11/14) P2 SM-CURVED-WALL-BEND-FILLET (dx 11-05 07:06, run 109) cf-sheet-metal-model-plus's Flange 1: 5 parts, live 2
+- [x] (dx 11-05 08:58: Flange 1 matches; cf-sheet-metal-model-plus 9 -> 13/14 with the CAP_VERTEX translation) P2 SM-CURVED-WALL-BEND-FILLET (dx 11-05 07:06, run 109) cf-sheet-metal-model-plus's Flange 1: 5 parts, live 2
   (the Up to Part part loses a wall: the planar wall beside the rolled face is thickened alone). The FeatureScript
   host's rebuild (host/sheetmetal.rs curved_wall_bends) fillets the curved wall with its flat neighbours along the
   bends; after Flange 1 the sloped neighbour runs on past the curved wall's end (its edge moved from x −10 to −8 by
