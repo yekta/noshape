@@ -67,6 +67,7 @@
 #include <Geom_ConicalSurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_Line.hxx>
+#include <GeomLib_IsPlanarSurface.hxx>
 #include <Geom_Plane.hxx>
 #include <Geom_TrimmedCurve.hxx>
 #include <TopExp.hxx>
@@ -93,6 +94,35 @@ thread_local int t_lenient = 0;
 RustLenient::RustLenient() { ++t_lenient; }
 RustLenient::~RustLenient() { --t_lenient; }
 std::string rust_last_decline() { return std::string(brep_last_decline()); }
+
+occ::handle<Geom_Surface> as_plane(const occ::handle<Geom_Surface>& s)
+{
+  occ::handle<Geom_Surface> base = s;
+  while (const occ::handle<Geom_RectangularTrimmedSurface> tr = occ::down_cast<Geom_RectangularTrimmedSurface>(base))
+    base = tr->BasisSurface();
+  if (occ::down_cast<Geom_BSplineSurface>(base).IsNull() && occ::down_cast<Geom_BezierSurface>(base).IsNull() && occ::down_cast<Geom_SurfaceOfLinearExtrusion>(base).IsNull())
+    return s;
+  const GeomLib_IsPlanarSurface planar(base, Precision::Confusion());
+  if (!planar.IsPlanar())
+    return s;
+  // (Its normal the surface's own, so the face stays the same way round.)
+  double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+  base->Bounds(u0, u1, v0, v1);
+  const auto at = [](double a, double b, double k) { return Precision::IsInfinite(a) || Precision::IsInfinite(b) ? 0.0 : a + k * (b - a); };
+  for (const double k : {0.5, 0.25, 0.75})
+  {
+    gp_Pnt p;
+    gp_Vec du, dv;
+    base->D1(at(u0, u1, k), at(v0, v1, k), p, du, dv);
+    const gp_Vec n = du.Crossed(dv);
+    if (n.Magnitude() < 1e-12)
+      continue;
+    const gp_Ax3  a = planar.Plan().Position();
+    const gp_Dir  z = a.XDirection().Crossed(a.YDirection());
+    return new Geom_Plane(gp_Ax3(a.Location(), n.Dot(gp_Vec(z)) < 0 ? z.Reversed() : z, a.XDirection()));
+  }
+  return s;
+}
 
 namespace {
 
@@ -420,6 +450,7 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     // (A trimmed surface's own: the same parameters.)
     while (const occ::handle<Geom_RectangularTrimmedSurface> tr = occ::down_cast<Geom_RectangularTrimmedSurface>(surf))
       surf = tr->BasisSurface();
+    surf = as_plane(surf);
     // (An offset surface (Shell's slabs): the plane, cylinder, cone, ... OCCT keeps as its equivalent; else a
     // B-spline within 1e-7 of it over the face's parameters (the same parameters, so its curves on it stay).)
     if (const occ::handle<Geom_OffsetSurface> off = occ::down_cast<Geom_OffsetSurface>(surf))
@@ -1432,6 +1463,9 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     // On its input face's surface: the input's edges have their curves there already. (Never change an input
     // shape: other threads may be reading it.)
     const occ::handle<Geom_Surface>& s = s0;
+    // (A B-spline that is a plane, read as one (to_body): new edges' curves on it projected, as OCCT keeps its
+    // surface.)
+    const bool as_flat = as_plane(s0) != s0;
     const occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(s);
     const occ::handle<Geom_ConicalSurface>     cn = occ::down_cast<Geom_ConicalSurface>(s);
     const bool                                 round = !cs.IsNull() || !cn.IsNull();
@@ -1476,7 +1510,12 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           continue;
         }
         if (r.edge_origin[3 * k] != 1)
-          return "a new edge on a free-form face";
+        {
+          if (!as_flat)
+            return "a new edge on a free-form face";
+          BOPTools_AlgoTools2D::BuildPCurveForEdgeOnFace(es[k], TopoDS::Face(src.Oriented(TopAbs_FORWARD)));
+          continue;
+        }
         const TopoDS_Edge se = TopoDS::Edge(input(srcs, r.edge_origin[3 * k + 1], TopAbs_EDGE, r.edge_origin[3 * k + 2]).Oriented(TopAbs_FORWARD));
         const TopoDS_Face sf = TopoDS::Face(src.Oriented(TopAbs_FORWARD));
         double            a = 0, z = 0;

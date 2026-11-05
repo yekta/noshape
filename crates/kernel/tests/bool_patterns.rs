@@ -596,6 +596,14 @@ fn a_sphere_knob_fused_onto_a_wheel_as_occt() {
     as_recorded("b2a1c0a5aff95e9f");
 }
 
+/// cf-fix-pcb's fuse of imported boards (recorded, five of its 51 tools: two of them the same board): their flat faces
+/// are B-spline surfaces, read as the planes they are, so the boards' faces lying on each other are found as planes'
+/// (one face's piece on the other's was "a piece's point on another solid's face"; OCCT's tree of fuses, 4.3 s).
+#[test]
+fn boards_with_b_spline_faces_fused_as_occt() {
+    as_recorded("042819da42a6ddf5");
+}
+
 /// motor-mount-jack's Extrude 3 (recorded: a boss fused onto the tube with four elliptic slots through it): OCCT's
 /// result. Each slot is a hole in the tube's cylinders: the region bounded by its loop alone is outside the face, no
 /// point deep inside it sought (86 ms against OCCT's 31 before, with the slot walls' ray patches).

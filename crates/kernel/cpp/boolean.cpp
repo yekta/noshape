@@ -4304,6 +4304,8 @@ bool rust_fuse_trimmed(const std::vector<TopoDS_Shape>& a, const std::vector<Top
   std::vector<HHist>        cuts(n);
   // (In parallel, as fuse_trimmed's cuts: each thread's Boolean is its own.)
   std::vector<char>        failed(n, 0);
+  // (Each failed cut's reason: a thread's own, said again on the caller's.)
+  std::vector<std::string> whys(n);
   const std::atomic<bool>* flag = t_cancel;
   OSD_Parallel::For(0, static_cast<int>(n), [&](int i) {
     if (cancelled(flag))
@@ -4319,17 +4321,24 @@ bool rust_fuse_trimmed(const std::vector<TopoDS_Shape>& a, const std::vector<Top
       std::vector<std::unique_ptr<OcShape>> own;
       in.insert(in.end(), a.begin(), a.end());
       if (!rust_boolean(1, in, rs, own, trimmed[static_cast<size_t>(i)], cuts[static_cast<size_t>(i)], opts.fuzzy, false))
+      {
         failed[static_cast<size_t>(i)] = 1;
+        whys[static_cast<size_t>(i)]   = rust_last_decline();
+      }
     }
     catch (...)
     {
       failed[static_cast<size_t>(i)] = 1;
+      whys[static_cast<size_t>(i)]   = "a cut failed";
     }
   });
   fail_if_cancelled();
   for (size_t i = 0; i < n; ++i)
     if (failed[i])
+    {
+      rust_decline(whys[i].c_str());
       return false;
+    }
   std::vector<TopoDS_Shape> rest;
   for (size_t i = 0; i < n; ++i)
     if (TopExp_Explorer e(trimmed[i], TopAbs_SOLID); e.More())
