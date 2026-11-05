@@ -15,7 +15,7 @@ name: Viewport performance
 #                assembly, parts-1000, pins-assembly-1000): our GPU time per frame
 #                p95 <= FLOOR_GPU_P95_MS (macOS; Metal pass times on the runners);
 #   120 fps      the NIST 2× orbit's GPU mean per frame <= TARGET_GPU_MEAN_MS:
-#                reported; a gate once met (TARGET_GATE: --gate-target);
+#                a gate since it was met (TARGET_GATE: --gate-target, 11-05);
 #   regression   fps, frame-interval p95, UI CPU p95 and GPU p95 at most 10%
 #                worse than the last successful run of this workflow on main.
 #
@@ -73,7 +73,8 @@ env:
   # docs/PLAN.md 2.7 (lead 11-05): the 60 fps floor and the NIST assembly's 120 fps target.
   FLOOR_GPU_P95_MS: '16.7'
   TARGET_GPU_MEAN_MS: '8.3'
-  TARGET_GATE: ''
+  # Met on main 11-05 (perf 42036796248: 7.64 / 7.35 ms on macOS 14 / 15): a gate from now on.
+  TARGET_GATE: '--gate-target'
   MAX_REGRESSION: '0.10'
   CARGO_TERM_COLOR: always
   # A release's first launch offers to set up the command line tool and coding agents (crates/app agent_setup.rs).
