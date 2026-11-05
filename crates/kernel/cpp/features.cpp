@@ -4744,7 +4744,7 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
     enum Kind { Skip, Line, Arc, Ball };
     struct Tool
     {
-      Kind         kind = Skip;
+      Kind         kind{};   // Skip (MSVC finds no local enum's enumerator in a local struct's member initializer, C2065)
       TopoDS_Face  w1, w2;   // the edge's faces
       gp_Pnt       a, b;     // a line's ends as face 1 runs it
       gp_Vec       n1, n2;   // at a

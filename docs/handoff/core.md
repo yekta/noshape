@@ -978,6 +978,12 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
+## From psui (11-05 20:40): main didn't build on Windows (MSVC C2065 in features.cpp)
+df356812's `fillet_by_tools`: `struct Tool { Kind kind = Skip; … }` with `enum Kind` local to the same function:
+MSVC finds no `Skip` in the local struct's default member initializer (perf 42086339638's Windows smoke and bench
+builds failed; GCC takes it). Fixed as `Kind kind{};` (the first enumerator). Local enums in local structs' member
+initializers trip MSVC: name them in the constructor body or use `{}`.
+
 ## From psui (11-05 18:28, lead's request): e3ba6871 sent ~230 more NIST faces to our mesher; their density fixed
 Your Displacement map change (e3ba6871, dense B-spline faces' boundaries from their pcurves) made our display mesher
 take 1035 of NIST's 1748 faces (805 before) and NIST's regeneration faster (800 -> 450 ms), but 918k -> 989k
