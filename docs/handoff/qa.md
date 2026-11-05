@@ -36,6 +36,15 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-05 23:30: v0.4.32 is not published. Its Release run 42118667359 (tag 2d7411b38) built, signed and checked on all three
+OSs, but `publish`'s `gh release create` got HTTP 500 from api.github.com twice (attempt 1 at 23:21, attempt 2 at 23:25). No
+draft or partial release was left; v0.4.31 is still Latest. GitHub status: all operational; the notes are 1.4 kB. The lead needs
+to re-run the publish job.** Checked early on the run's Linux artifact (qa-scratch/rel/v432a): **P0 RELEASE-BUILD-FILLET-HANG
+verified** (the document opens in 15 s, against no answer in 150 s through v0.4.31; green 96880e21 opens it in ~10 s). Also
+verified: P3 ABOUT-DISABLED on green 96880e21 (vibe3 :65). Greens aa5ed3ea, 1a89a93a, 96880e21: sweeps unchanged; e6600518
+(BLEND-RUST roll-over) is next. vibe3 loops: v3cf6.sh (v0.4.31, seeds 4881–4940), v3nf7.sh (aa5ed3ea fallback off, 4941–5000).
+Once it is published: the full smoke, GUI rows, title bar and updater (with `noshape mcp` running), as listed at 18:41.
+
 **11-05 18:41:** no 17:00 Release run yet; the 16:14 list stands (no new blocker). Greens since, swept on vibe3 (full smoke on
 ae47fdff and 2e0ec154): 7e7fea7a, ae47fdff (face patterns stitched), de412157, f2b2dfd1 (countersink rims, ScopeRule 12), eb3c0e14
 (exact torus / sphere circles), 38f9abc5, 2e0ec154 (one edge per seam split) — no change anywhere. At the next release: the
