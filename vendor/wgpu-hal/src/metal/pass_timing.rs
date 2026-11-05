@@ -1,19 +1,27 @@
 //! NOSHAPE PATCH (agent psui): the GPU time of each labelled command buffer, from Metal's `GPUStartTime` /
 //! `GPUEndTime` (devices without timestamp queries, such as CI's paravirtualized Apple GPU, still report them).
 //! wgpu-core records every render and compute pass in a command buffer of its own, labelled with the pass's label,
-//! so these are per-pass times. On with `NOSHAPE_PERF_PASSES=1`; the application takes them with [`take`].
+//! so these are per-pass times. On with `NOSHAPE_PERF_PASSES=1` or [`enable`]; the application takes them with
+//! [`take`].
 
-use std::{string::{String, ToString}, sync::OnceLock, vec::Vec};
+use std::{string::{String, ToString}, sync::{OnceLock, atomic::{AtomicBool, Ordering}}, vec::Vec};
 
 use objc2::{rc::Retained, runtime::ProtocolObject};
 use objc2_metal::MTLCommandBuffer;
 
 static TIMES: parking_lot::Mutex<Vec<(String, f64)>> = parking_lot::Mutex::new(Vec::new());
 
+static ENABLED: AtomicBool = AtomicBool::new(false);
+
+/// Turn pass timing on (the application's performance logging on a device without timestamp queries).
+pub fn enable() {
+    ENABLED.store(true, Ordering::Relaxed);
+}
+
 /// Whether pass timing is on.
 pub fn on() -> bool {
-    static ON: OnceLock<bool> = OnceLock::new();
-    *ON.get_or_init(|| std::env::var("NOSHAPE_PERF_PASSES").is_ok_and(|v| v == "1"))
+    static ENV: OnceLock<bool> = OnceLock::new();
+    ENABLED.load(Ordering::Relaxed) || *ENV.get_or_init(|| std::env::var("NOSHAPE_PERF_PASSES").is_ok_and(|v| v == "1"))
 }
 
 /// Record `raw`'s GPU time when it completes, under its label (wgpu's own buffers are left out).
