@@ -3962,6 +3962,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   fragment. Pieces' sum 11 193 mm³, live's part 10 905. Next: step the pulled outline where a bend side meets a free
   side in line (as surfaces.rs move_polygon_edges does), or the relief live puts there (ask live for the faces at
   x −10 … −8, y 55 … 58 after Flange 1); and build_part could check its pieces' validity before fusing.
+  Live (live.jsonl, Flange 1's line): the curved wall's bend (cylinders 17.917 / 53.751 mm²) stops at x −11, where
+  Flange 1's bend zone starts (its cylinders 88.07 / 264.211 at x −11 … −8); the sloped wall's planes run x −25 … −11;
+  the corner is closed by small planes 5.113 (x −11), 2.0 (x −11 … −10, y 57.03 … 58.41), 6.273 and 0.582. Our
+  definition has the curved bend's edge to x −10 and the flange bend's at x −8, a 2 mm free side between them.
 - [x] (dx 11-05 06:59: the translator points such a constraint at nothing too, ops::pin_to_missing_reference; train-joe 12/12, clamp-guillem 24/25) P2 PARITY-MISSING-EXTERNAL-REFS (dx 11-05 06:10, run 105) live's sketches with an external reference that no
   longer resolves (its query empty: deterministicIds [""], queryString "") are WARNING "Some external references are
   missing."; the translator leaves those constraints to the solved geometry, so ours are OK: clamp-guillem's Boceto 6
