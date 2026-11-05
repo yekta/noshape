@@ -582,6 +582,34 @@ struct PendingRead {
     done_ns: Arc<std::sync::atomic::AtomicU64>,
 }
 
+/// `NOSHAPE_PERF_PASSES=1` (with `NOSHAPE_PERF`): the GPU time of every render and compute pass (wgpu records each in
+/// a command buffer of its own, labelled with the pass's label; the vendored wgpu-hal's `metal::pass_timing` reads
+/// their GPU start and end: the runners have no timestamp queries), logged as `r.pass.<label>`.
+#[cfg(target_vendor = "apple")]
+fn perf_passes() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| perf::enabled() && std::env::var("NOSHAPE_PERF_PASSES").is_ok_and(|v| v == "1"))
+}
+
+/// Log the pass times the GPU reported since the last call (`r.pass.<label>`, ms).
+pub(crate) fn record_pass_times() {
+    #[cfg(target_vendor = "apple")]
+    for (pass, ms) in perf_passes().then(wgpu::hal::metal::pass_timing::take).into_iter().flatten() {
+        // Perf stages are static names: one per distinct label, made once.
+        static NAMES: std::sync::Mutex<Vec<(String, &'static str)>> = std::sync::Mutex::new(Vec::new());
+        let mut names = NAMES.lock().unwrap_or_else(|e| e.into_inner());
+        let name = match names.iter().find(|(l, _)| *l == pass) {
+            Some((_, n)) => *n,
+            None => {
+                let n: &'static str = Box::leak(format!("r.pass.{pass}").into_boxed_str());
+                names.push((pass, n));
+                n
+            }
+        };
+        perf::record_ms(name, ms as f32);
+    }
+}
+
 /// Per-frame draw lists (reused to avoid per-frame allocation).
 #[derive(Default)]
 struct DrawLists {
@@ -3552,6 +3580,7 @@ impl Renderer {
         if let Some(t) = &mut self.timer {
             t.collect();
         }
+        record_pass_times();
         std::mem::take(&mut self.ready)
     }
 
