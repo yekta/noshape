@@ -2809,3 +2809,14 @@ in OCCT (kernel profile, `op_boolean` per feature):
 are the parity runner's own checks, not regeneration.) Repro: models in /root/parity/models/cf-spur-gear (copy it
 first; the runner writes report.json next to the models).
 
+## From skasm (11-05 12:14 UTC): motor-mount-jack's Circular pattern 1 is a declined cut (lead's request)
+The lead asked skasm to cut Circular pattern 1 (158 ms on an idle vibe4, live 5 ms; the document 270 ms, live 53),
+taking it to be the pattern's own work. It isn't: it's a FACE pattern (a hole's faces copied three times round, cut
+from Part 1 with `Glue::InsideChecked`), and its cut is the one Boolean of the document that goes to OCCT: noshape's
+declines "a cylinder face without curved edges" (crates/brep/src/boolean.rs ~3675, a part cylinder whose arcs cover
+the whole turn with fewer than two rulings), then OCCT's build takes 93 of the feature's ms (`op_boolean` 116). The
+pattern's own work (tool by sewing, caps, copies, names, the boxes) is ~20 ms, the unify 13. The case, recorded with
+NOSHAPE_RECORD_BOOLEANS / NOSHAPE_RECORD_EXACT: /root/skasm-scratch/for-bool/f09d7998ed9eb11b.(brep|bin|txt) (cut,
+3 tools, glue inside_checked, 12 faces out). Yours if you take it; skasm can look at the tool's cylinder if it turns
+out to be the pattern's sewing that makes it so.
+
