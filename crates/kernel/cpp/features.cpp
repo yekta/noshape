@@ -7232,6 +7232,20 @@ OpOut op_fill(const OcShapeList& edges, const OcShapeList& supports,
     fail_invalid("fill needs boundary edges");
   if (points.size() % 3 != 0)
     fail_invalid("fill points must be (x, y, z) triples");
+  if (std::getenv("NOSHAPE_DUMP_OPS"))
+  {
+    TopoDS_Compound c;
+    BRep_Builder    bb;
+    bb.MakeCompound(c);
+    for (const auto& f : supports.items)
+      if (!f.IsNull())
+        bb.Add(c, f);
+    std::ostringstream p;
+    p << "fill orders";
+    for (const int32_t o : orders)
+      p << " " << o;
+    dump_op("fill", c, edges.items, p.str());
+  }
   // Tangent as far as the corners allow (order 3 on every edge, 3 or 4 of them): a Coons patch tangent to each support
   // (GeomFill_ConstrainedFilling), for the fills OCCT's plate can't build: the plate is a displacement over a plane
   // fitted to the boundary, so it can't leave a boundary square to it (G1 to a box's four walls, live 1739 FI2).
