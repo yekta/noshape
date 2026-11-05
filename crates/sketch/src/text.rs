@@ -530,15 +530,30 @@ impl ttf_parser::OutlineBuilder for Outline {
     }
 }
 
-/// Lays out `text` (newlines start new lines) in box units.
-pub fn layout_text(text: &str, font: &str, bold: bool, italic: bool) -> TextLayout {
-    let (data, wght) = match sketch_face(font, bold, italic) {
+/// The face a sketch text in `font` is laid out with: its file and a variable font's weight.
+fn sketch_text_face(font: &str, bold: bool, italic: bool) -> (&'static [u8], Option<f32>) {
+    match sketch_face(font, bold, italic) {
         Some(SketchFace::File(i, w)) => (sketch_file(i), w),
         Some(SketchFace::Noto) => (font_data("Noto Sans", bold, italic), None),
         Some(SketchFace::OpenSans) => (open_sans(bold, italic), None),
         None => (font_data(font, bold, italic), None),
-    };
+    }
+}
+
+/// Lays out `text` (newlines start new lines) in box units.
+pub fn layout_text(text: &str, font: &str, bold: bool, italic: bool) -> TextLayout {
+    let (data, wght) = sketch_text_face(font, bold, italic);
     layout_face(text, data, wght, false, false)
+}
+
+/// The ascender line (a text box's height) per font size of the face [`layout_text`] uses (Open Sans 2189 / 2048).
+pub fn ascender_per_em(font: &str, bold: bool, italic: bool) -> Option<f64> {
+    let (data, wght) = sketch_text_face(font, bold, italic);
+    let mut face = ttf_parser::Face::parse(data, 0).ok()?;
+    if let Some(w) = wght {
+        face.set_variation(ttf_parser::Tag::from_bytes(b"wght"), w);
+    }
+    (face.ascender() > 0).then(|| face.ascender() as f64 / face.units_per_em() as f64)
 }
 
 /// Lays out drawing text (live's 22 families in the files Onshape's

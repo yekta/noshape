@@ -4068,6 +4068,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   stayed in (23 regions, live 17) and were filled; now only the imprint block below the first text box's glyphs
   (model-core sketch::is_imprint_entity; T1 ops parity::filter_inner_loops_leaves_out_a_letters_counter). Left: its
   area +1.58 mm² (live's band ±0.44), the letters' side walls (1.2 mm of outline over 15 glyphs); Fix PCB 2 runs next.
+  core 11-05 02:49: that area as live too (the document 8 -> 11/12): our glyphs were 0.22 % big. The translator sized
+  the text to lay out as wide as live's baseline vector, but that vector is the advances plus ~40 font units (live
+  2044's outline lengths; 39-40 units in cf-fix-pcb's and cf-straight-spline's three texts), while `ascent` is 0.72 of
+  the font size exactly: now the height from the ascent and the face's ascender per em (sketch
+  text::ascender_per_em). Next there: Fix PCB 2 "No components selected" (dx).
 - [x] (dx 11-03 22:26: the host's @valuesSortedById returned the map's key order (feature ids); std's is the order the features started: picked features in the feature list's order, subfeatures as startFeature saw them. cf-parameter-pattern 9/9 on three runs; T1 custom_features::feature_list_functions_rerun_the_picked_features runs both id orders, failing before the fix) P1 FS-FEATURE-LIST-NONDETERMINISTIC (dx, from core 11-03 22:30; dx's parity suite 11-03 18:45) cf-parameter-pattern's Parameter
   pattern (a FeatureList of Extrude 1 and Extrude 2, four variables of three values each) gives a different part set
   from run to run: 3 of the same translation (NOSHAPE_PARITY_TRACE=1 prints every feature_add; identical but for our
