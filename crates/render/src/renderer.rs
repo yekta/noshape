@@ -1356,6 +1356,9 @@ struct PerfOverrides {
     no_solid: bool,
     skip_silhouettes: bool,
     skip_ao: bool,
+    /// `depthstore`: the colour pass doesn't keep its (multisampled) depth for the AO pass (benchmarks only: the
+    /// AO then reads whatever is there; what storing it costs).
+    skip_depth_store: bool,
 }
 
 /// `NOSHAPE_PERF_SKIP=instancing`: no instanced calls, and the scene builder
@@ -1379,6 +1382,7 @@ fn perf_overrides() -> &'static PerfOverrides {
             no_solid: skip.split([',', '+']).any(|t| t == "solid"),
             skip_silhouettes: skip.split([',', '+']).any(|t| t == "silhouettes"),
             skip_ao: skip.split([',', '+']).any(|t| t == "ao"),
+            skip_depth_store: skip.split([',', '+']).any(|t| t == "depthstore"),
         }
     })
 }
@@ -3140,7 +3144,7 @@ impl Renderer {
                     view: &tex.depth,
                     // Kept for the ambient occlusion pass and a preview's
                     // highlights over the "with" layer.
-                    depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0.0), store: if ao_strength > 0.001 || post_frame.is_some() || hover_band { wgpu::StoreOp::Store } else { wgpu::StoreOp::Discard } }),
+                    depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0.0), store: if (ao_strength > 0.001 && !perf_overrides().skip_depth_store) || post_frame.is_some() || hover_band { wgpu::StoreOp::Store } else { wgpu::StoreOp::Discard } }),
                     stencil_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0), store: wgpu::StoreOp::Discard }),
                 }),
                 timestamp_writes: timer.as_ref().zip(timer_slot).and_then(|(t, i)| t.writes(i, cap_planes.is_none(), !ao_on)),
