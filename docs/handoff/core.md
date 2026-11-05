@@ -16,6 +16,16 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-05 04:48 UTC.**
+- Since 02:12: Shell's quadric path makes Parasolid's flat rims (live 1752 in 5 ms), cf-hose-routing 1092 -> 697 ms,
+  cf-fix-pcb 8 -> 11/12 (text height from the ascent). P1 SEAM-MOVER-UNIFY-VOLUME fixed (d293a184): the geometry was
+  equal, OCCT's 1e-7 volume integral misread a re-seamed cylinder wall; such solids integrate at 1e-12 (T1
+  bool_patterns::equal_results_unify_to_equal_volumes, bit for bit).
+- T2 on vibe2: bool_patterns::overlapping_free_form_parts_merge_like_onshape only lacked the STEP there (now a BREP in
+  tests/data/mirror); shell::fillets_then_chamfer_shell_like_onshape checks live's HIGH chamfer volume within its band.
+  The corpus tests (bool / blend / shell corpus, profdocs) need corpora vibe2 doesn't have (lead).
+- Parked: /root/core-scratch/contains-point.patch (Shape::contains_point; cf-sheet-metal-model-plus 2406 -> 1785 ms).
+
 **State 11-05 02:12 UTC.**
 - Since 00:34: the seam-to-corner change's land failed (engine's qa5 union 2.8e-7 off in the 1e-7 volume integral;
   the shape exact, and the axial edge's side now right for a ring above as below): fixed forward, landed. P0
