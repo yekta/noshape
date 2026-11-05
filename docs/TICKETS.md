@@ -241,6 +241,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-05 17:00 release (qa list 16:14, checked on green 994114cc; the latest release is v0.4.31)
+- **qa 16:14: no new blocker.** On green 994114cc (vibe3): CLI round trip 67643.716875 / 18 in all six formats; volume sweep = v0.4.25;
+  the 44 ticket documents and dx's cf corpus = the previous greens (8cc1b766's SAVED-MIRROR-REF-CHANGE included, P2); fixed
+  tickets hold; the user's cases pass (Gyro: only the picked body changes). Fuzz on vibe3 since the 05:00 list: CLI 360 + 540 seeds
+  in all, 0 new deaths after the two filed this morning (both on v0.4.30). **The open P0 RELEASE-BUILD-FILLET-HANG is in every
+  release through v0.4.31 and only shows on a release build:** its fix (core da234fac, OCCT patch 0022) is in this green — the
+  17:00 release is the first that can show it fixed; qa's smoke checks the document opens on the release itself. Also open, not
+  blockers: P1 DRAFT-NONDETERMINISTIC, P2 UPDATE-HELPER-LINUX-PARITY, P2 SAVED-MIRROR-REF-CHANGE, P3 ABOUT-DISABLED.
+
 ## Release blockers for the 2026-11-05 05:00 release (qa list 03:28, checked on green 0cbf4fa7; the latest release is v0.4.30)
 - **qa 04:09: still no blocker on green 769f4796** (bool's mirror-over-a-hole merge, core's flat Shell rims 9ea6b56f): sweeps, the 44 ticket documents, dx's cf corpus, the vase and the whole CLI smoke (mirror fixed tickets, the user's cases) = 0cbf4fa7.
 - **qa 03:28: no blocker.** On green 0cbf4fa7 (vibe3): CLI round trip 67643.716875 / 18 in all six formats; volume sweep = v0.4.25;
