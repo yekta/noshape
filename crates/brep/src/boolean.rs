@@ -3042,6 +3042,15 @@ impl Ctx<'_> {
                     }
                 }
                 let gb = if hits.is_empty() { &[][..] } else { self.bound(f)? };
+                // (On a face whose angles go round: a crossing a whole turn over too, where Newton's parameters fell
+                // the other side of its seam (a sphere's u 3e-5 below 0: the knob on prize-wheel's top, a sliver kept).)
+                let turns: Vec<DVec2> = match (&g.s, g.ns.as_deref()) {
+                    (Surf::Nurbs { su, sv, .. }, Some(ns)) => {
+                        let [pu, pv] = ns.periodic();
+                        [(pu, DVec2::new(TAU * su, 0.0)), (pv, DVec2::new(0.0, TAU * sv))].into_iter().filter(|x| x.0).map(|x| x.1).collect()
+                    }
+                    _ => Vec::new(),
+                };
                 for (t, at) in hits {
                     let q3 = p + r * t;
                     if t.abs() > GREY * tol && !boxes_meet(q3, q3, g.lo, g.hi, GREY * tol) {
@@ -3056,7 +3065,8 @@ impl Ctx<'_> {
                     if t < 0.0 {
                         continue;
                     }
-                    let q = at.unwrap_or_else(|| g.to2(p + r * t));
+                    let q0 = at.unwrap_or_else(|| g.to2(p + r * t));
+                    let q = std::iter::once(q0).chain(turns.iter().flat_map(|&d| [q0 + d, q0 - d])).find(|&q| inside2(q, gb)).unwrap_or(q0);
                     if distance2(q, gb) <= GREY * tol {
                         continue 'dirs;
                     }

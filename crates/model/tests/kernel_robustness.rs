@@ -3205,6 +3205,33 @@ fn part_mirror_of_a_notched_cylinder_is_the_cylinder() {
     }
 }
 
+/// qa RUST-MIRROR-SPLIT-FACES: a cylinder r10 at (-5, 5) x 10 with a through hole r3 at the origin (on the mirror
+/// plane), Part mirror across Right with Add: one part of 5 faces on both Boolean paths (the two walls, the caps,
+/// the hole), not the halves' pieces.
+#[test]
+fn part_mirror_over_a_through_hole_merges_the_halves() {
+    let mut volumes = Vec::new();
+    for rust in [false, true] {
+        noshape_kernel::set_rust_boolean(Some(rust));
+        let mut t = T::new();
+        let (_, regions) = t.sketch(&[], &[((-5.0, 5.0), 10.0)]);
+        t.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+        let (_, regions) = t.sketch(&[], &[((0.0, 0.0), 3.0)]);
+        let n = t.add("extrude", &[("entities", q(regions)), ("endBound", en("THROUGH_ALL")), ("operationType", en("REMOVE")), ("defaultScope", ParamValue::Bool(true))]);
+        let id = t.ok(n).context.bodies[0].id.clone();
+        let m = t.add("mirror", &[("patternType", en("PART")), ("operationType", en("ADD")), ("entities", q(vec![Reference::Body(id)])), ("mirrorPlane", q(vec![Reference::Plane(DatumPlane::Right)])), ("defaultScope", ParamValue::Bool(true))]);
+        let r = t.ok(m);
+        noshape_kernel::set_rust_boolean(None);
+        let b = &r.context.bodies[0].shape;
+        assert_eq!(r.context.bodies.len(), 1);
+        eprintln!("MIRSPLIT rust {rust}: {} faces, {} mm³", b.count(noshape_kernel::ShapeType::Face), volume(&r));
+        assert_eq!(b.count(noshape_kernel::ShapeType::Face), 5, "rust {rust}");
+        assert!(b.is_valid());
+        volumes.push(volume(&r));
+    }
+    assert!((volumes[0] - volumes[1]).abs() < 1e-6, "{volumes:?}");
+}
+
 /// qa OCCT-UNION-OFFSET-CYL: two cylinders r5 standing on Top with their axes
 /// 1 mm apart, Boolean Union: one part of 785.398 + 1570.796 - 685.565 mm³,
 /// 5 faces, on both Boolean paths (OCCT found no interaction with the bottoms

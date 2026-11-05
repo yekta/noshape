@@ -35,6 +35,16 @@ impl FreeSurface {
         }
     }
 
+    /// Whether its parameters go round along u and along v (a whole turn of 2π: a sphere's, a torus's, a revolution's
+    /// angles).
+    pub fn periodic(&self) -> [bool; 2] {
+        match self {
+            FreeSurface::Sphere { .. } | FreeSurface::Revolution { .. } => [true, false],
+            FreeSurface::Torus { .. } => [true, true],
+            FreeSurface::Nurbs(_) | FreeSurface::Extrusion { .. } => [false, false],
+        }
+    }
+
     /// Knot values along u (`along_u`) or v where it is less smooth (a NURBS surface's spans, a swept curve's).
     pub fn breaks(&self, along_u: bool) -> Vec<f64> {
         let k = |c: &NurbsCurve| c.knots[c.degree..=c.poles.len()].to_vec();

@@ -103,6 +103,12 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   15 faces, 23 edges, 0 vertices after it (live.jsonl): Parasolid's bore rim is one closed edge with no vertex, so
   splitting it at our seam would add an edge live doesn't have. Taking that cut means the circle crossing the face's
   seam in the parameter plane only (two curves there of one edge, no vertex); not done.
+- P1s (bool, 11-05 03:10): RUST-MIRROR-SPLIT-FACES fixed in the unify (face orders retried, TICKETS);
+  PVZ-RUST-BOOL passes in T2; BOOL-RUST-LATE-DECLINE's prize-wheel case taken (a periodic face's crossing a turn
+  over). bd401fd64 (core's seam move) makes 3 corpus cases unify to other volumes than OCCT's results do: TICKETS
+  SEAM-MOVER-UNIFY-VOLUME for core; Shell's set on main 3 differ, with this 2 (8b25831a matches now). a7bdd15b's
+  3.4e-7 (60 mm³: 2e-5 mm³) is inside live's bands. T2 bool_patterns::overlapping_free_form_parts_merge_like_onshape
+  (core's, fb008604) fails in the nightly: not looked at.
 - PARITY-SPEED by Boolean time (bool, 11-05 00:35; the whole suite with NOSHAPE_X_DECL + NOSHAPE_KERNEL_PROFILE on
   vibe4, two regenerations each): cf-straight-spline 46 s (OCCT's, after our declines: the cutters' sub-micron
   conflicts), cf-drive-train-generator 19.8 s (ours: all 14 cuts taken, 2.2x OCCT's; recorded exactly vibe4
