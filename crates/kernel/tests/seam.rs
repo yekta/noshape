@@ -27,3 +27,18 @@ fn seams_poles_and_circle_vertices_are_not_topology() {
     assert_eq!(counts(&make_box(&frame, 10.0, 20.0, 30.0).unwrap()), (6, 12, 8));
     assert_eq!(counts(&make_cone(&frame, 10.0, 0.0, 20.0, 2.0 * PI).unwrap()), (2, 1, 1));
 }
+
+/// bushing2-0-joshua's Extrude 4: a tube (Ø75 / Ø50 along y) with notches at one end and two windows through its
+/// wall. Each cylinder's seam splits its notched end's arc (live has no seam: 18 faces, 40 edges, 24 vertices). The
+/// bore's seam moves to a notch corner though a window lies nearer its end circle (a hole's loop isn't the loop round
+/// the axis); the outer wall's every corner lines up with a window, so its seam stays: 18 / 41 / 25.
+#[test]
+fn a_seam_moves_to_the_loop_round_the_axis_past_a_window() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/seam/bushing-extrude4.brep");
+    let s = read_brep(&path).unwrap();
+    assert_eq!(counts(&s), (18, 42, 26));
+    let u = unify_same_domain_whole(&s).unwrap().shape;
+    assert!(u.is_valid());
+    assert!((u.volume().unwrap() - s.volume().unwrap()).abs() < 1e-9 * s.volume().unwrap());
+    assert_eq!(counts(&u), (18, 41, 25));
+}

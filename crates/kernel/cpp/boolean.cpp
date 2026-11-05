@@ -2017,6 +2017,26 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
   for (int i = 1; i <= seam_v.Extent(); ++i)
     if (chain_v.Contains(seam_v(i)) && !joint(TopoDS::Vertex(seam_v(i))))
       return {};
+  // The loop round the axis: the chain edges joined to where the seam meets them (not a hole's loop, which the seam
+  // can't end on: bushing2-0-joshua's window through the wall lies nearer the circle than the notched end).
+  ShapeIMap round_v;
+  for (int i = 1; i <= seam_v.Extent(); ++i)
+    if (chain_v.Contains(seam_v(i)))
+      round_v.Add(seam_v(i));
+  for (bool grew = true; grew;)
+  {
+    grew = false;
+    for (const TopoDS_Edge& e : rest)
+    {
+      TopoDS_Vertex e0, e1;
+      TopExp::Vertices(e, e0, e1);
+      if (e0.IsNull() || e1.IsNull() || round_v.Contains(e0) == round_v.Contains(e1))
+        continue;
+      round_v.Add(e0);
+      round_v.Add(e1);
+      grew = true;
+    }
+  }
   // An edge of the chain along the axis at angle `alpha` (all of it on that line).
   auto along = [&](const TopoDS_Edge& e, double alpha) {
     BRepAdaptor_Curve c(e);
@@ -2041,13 +2061,33 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
     }
     return true;
   };
+  // Nothing of the chain between the circle and x at x's angle: no sample there, nor two samples either side of it
+  // (bushing2-0-joshua's window through the wall crosses it between samples).
+  auto open_to = [&](const TopoDS_Vertex& x) {
+    const gp_Pnt2d px = uv(BRep_Tool::Pnt(x));
+    for (const TopoDS_Edge& e : rest)
+    {
+      BRepAdaptor_Curve c(e);
+      double            du0 = 0;
+      for (int k = 0; k <= 32; ++k)
+      {
+        const gp_Pnt2d p  = uv(c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * k / 32.0));
+        const double   du = std::remainder(p.X() - px.X(), 2 * M_PI);
+        const bool     between = (p.Y() - v_ring) * (px.Y() - p.Y()) > 0;
+        if (between && ((k > 0 && k < 32 && std::abs(du) < 1e-3) || (k > 0 && std::abs(du) > 1e-9 && std::abs(du0) > 1e-9 && du * du0 < 0 && std::abs(du - du0) < M_PI)))
+          return false;
+        du0 = du;
+      }
+    }
+    return true;
+  };
   TopoDS_Vertex V;
   double        best = std::numeric_limits<double>::infinity();
   for (int i = 1; i <= chain_v.Extent(); ++i)
   {
     const TopoDS_Vertex& x = TopoDS::Vertex(chain_v(i));
     const double         d = std::abs(uv(BRep_Tool::Pnt(x)).Y() - v_ring);
-    if (!seam_v.Contains(x) && d < best - 1e-12 && !joint(x) && clear_at(uv(BRep_Tool::Pnt(x)).X(), x))
+    if (!seam_v.Contains(x) && round_v.Contains(x) && d < best - 1e-12 && !joint(x) && clear_at(uv(BRep_Tool::Pnt(x)).X(), x) && open_to(x))
     {
       best = d;
       V    = x;
@@ -2058,18 +2098,6 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
   const gp_Pnt2d pV    = uv(BRep_Tool::Pnt(V));
   const double   alpha = pV.X();
   const bool     up    = pV.Y() > v_ring;
-  // Nothing of the chain between the circle and V at that angle.
-  for (const TopoDS_Edge& e : rest)
-  {
-    BRepAdaptor_Curve c(e);
-    for (int k = 1; k < 32; ++k)
-    {
-      const gp_Pnt2d p  = uv(c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * k / 32.0));
-      const double   du = std::remainder(p.X() - alpha, 2 * M_PI);
-      if (std::abs(du) < 1e-3 && (p.Y() - v_ring) * (pV.Y() - p.Y()) > 0)
-        return {};
-    }
-  }
   const gp_Ax3& A = ca.Position();
   BRep_Builder  B;
   double        tol = std::max(BRep_Tool::Tolerance(a), BRep_Tool::Tolerance(end));
