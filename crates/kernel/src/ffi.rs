@@ -432,6 +432,8 @@ pub(crate) mod ffi {
         fn legacy_blend_finish() -> bool;
         /// [`crate::legacy_rim_seams`].
         fn legacy_rim_seams() -> bool;
+        /// [`crate::legacy_blend_pairs`].
+        fn legacy_blend_pairs() -> bool;
         fn brep_decline(reason: &str);
         /// Why this thread's last call of noshape's own Boolean declined ("" when it didn't).
         fn brep_last_decline() -> String;
@@ -862,7 +864,7 @@ pub(crate) mod ffi {
 }
 
 use crate::mesh_bridge::{brep_mesh, brep_mesh_on};
-use crate::ops::{legacy_blend_finish, legacy_rim_seams, legacy_topology};
+use crate::ops::{legacy_blend_finish, legacy_blend_pairs, legacy_rim_seams, legacy_topology};
 use crate::brep_bridge::{brep_blend, brep_blend_enabled, brep_boolean, brep_decline, brep_enabled, brep_last_decline, brep_no_fallback, brep_record_direct, brep_recording, brep_strict};
 
 // SAFETY: OcShape wraps an immutable TopoDS_Shape (handles with atomic

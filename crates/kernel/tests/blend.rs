@@ -1379,6 +1379,30 @@ fn a_lone_round_wider_than_its_face_rolls_over() {
     set_rust_blend(None);
 }
 
+/// FILLET-RIM-OVERFLOW (live F5, request 2124): a round on a Ø10 hole's top rim wider than the 5 mm walls beside it
+/// runs its torus through them: the part less the revolved corner, live's faces (the top in two, the sides notched)
+/// and volume (live's LOW-accuracy figures); R4.9 stays inside the walls (OCCT's, live's 8 faces).
+#[test]
+fn a_rim_round_past_its_walls_cuts_through_them() {
+    setup();
+    let block = bx([0.0; 3], [40.0, 20.0, 10.0]);
+    let pin = make_cylinder(&Plane::from_normal(DVec3::new(20.0, 10.0, -1.0) * MM, DVec3::Z), 5.0 * MM, 12.0 * MM, std::f64::consts::TAU).unwrap();
+    let part = boolean(BooleanOp::Cut, &[block], &[pin], &BooleanOptions::default()).unwrap().shape;
+    let rim = edges_where(&part, |i| matches!(i.curve, Curve::Circle { .. }) && i.start.z > 9.99 * MM);
+    assert_eq!(rim.len(), 1);
+    let index = part.edges().iter().position(|e| e.is_same(&rim[0])).unwrap() as u32;
+    for (r, want, faces, edges) in [(6.0, 6907.071682, 9, 20), (5.5, 6960.571688, 9, 20), (4.9, 7017.294265, 8, 15)] {
+        let res = fillet_checked(&part, &rim, &[r * MM]).unwrap();
+        assert!(res.shape.is_valid(), "R{r}");
+        let shown = res.shape.shown_topology().unwrap();
+        assert_eq!((res.shape.faces().len(), shown.edge_count()), (faces, edges), "R{r}: faces, shown edges");
+        // (Live's massproperties at LOW accuracy: R6's exact volume is 6907.069101, live's figure 0.0026 above.)
+        assert!((vol_mm3(&res.shape) - want).abs() < 5e-3, "R{r}: {} vs live's {want}", vol_mm3(&res.shape));
+        let made = res.history.generated(0, ShapeType::Edge, index);
+        assert_eq!(made.iter().filter(|g| g.0 == ShapeType::Face).count(), 1, "R{r}: one torus face from the rim: {made:?}");
+    }
+}
+
 /// cf-spur-gear's root fillets (PARITY-CUSTOM-RUN-FAILURES): R0.72 on both top edges of a 1.2 mm rib, so the rounds
 /// overlap and the rib's top face goes (OCCT fails): each round made alone, the part their common, as Parasolid's.
 #[test]

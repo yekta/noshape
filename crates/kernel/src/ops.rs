@@ -450,7 +450,8 @@ thread_local! {
 }
 
 /// noshape's blends leave two straight rounds or chamfers that use up the face between them, and one rolling over a
-/// face narrower than it, to OCCT, as before 11-05, on this thread (a Part Studio saved before ScopeRule 13 regenerates as it did). Returns the thread's setting before.
+/// face narrower than it, to OCCT, and a hole's or boss's rim round wider than the face around it as OCCT built it, as
+/// before 11-05, on this thread (a Part Studio saved before ScopeRule 13 regenerates as it did). Returns the thread's setting before.
 pub fn set_legacy_blend_pairs(on: bool) -> bool {
     LEGACY_BLEND_PAIRS.with(|c| c.replace(on))
 }

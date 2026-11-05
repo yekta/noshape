@@ -599,7 +599,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   document opens in 14.9 / 15.0 s (74 features, Fillet 6 Ok; earlier releases: no answer in 150 s), and step 99's fillet
   errors at once 3 / 3 (rep.py). Green 96880e21 opens it on the same machine in 9.6 / 10.2 s, so the release is ~1.5x
   slower here. That's core's GCC 13 OCCT difference: qa will check whether the smoke's timed rows show it too.
-- [ ] P2 FILLET-RIM-OVERFLOW (core 11-05 21:40, from blend corpus 333e2411; lead: bisect it) a hole rim's fillet wider than the
+- [x] (core 11-05 23:40: the part less the revolved corner where a lone convex rim's round leaves the face around it, behind ScopeRule 13: R6 9 faces / 20 edges, exact 6907.0691 mm³ (live's LOW figure 6907.0717); R5.5 the same; R4.9 OCCT's as before; T1 kernel blend::a_rim_round_past_its_walls_cuts_through_them; corpus 333e2411 listed live's) P2 FILLET-RIM-OVERFLOW (core 11-05 21:40, from blend corpus 333e2411; lead: bisect it) a hole rim's fillet wider than the
   wall beside it (live F5: 40 × 20 × 10 block, Ø10 hole through at (20,10), R6 on the top rim) is **6907.0716824606 mm³**
   in live (exact: the part minus the revolved corner region, 6907.0706 by integration; one TORUS R11 r6 cutting through the
   y = 0 / 20 sides, no extra faces), ours **6910.116798 mm³, 13 faces**: OCCT's torus in three pieces plus two B-spline
