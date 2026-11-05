@@ -31,6 +31,7 @@
 #include <ElCLib.hxx>
 #include <ElSLib.hxx>
 #include <Geom2d_Line.hxx>
+#include <Geom2dAPI_Interpolate.hxx>
 #include <gp_Ax2d.hxx>
 #include <IntRes2d_IntersectionPoint.hxx>
 #include <Geom2d_Circle.hxx>
@@ -2132,6 +2133,90 @@ IntTools_Curve ruling(const Extruded& e, double u, const occ::handle<Geom2d_Curv
 }
 } // namespace
 
+// A section given point by point (`at`: its parameter -> the point and its parameters on the two faces) from `t0` to
+// `t1`: cubics through n + 1 of them at their own parameters, its curves on the faces likewise (angles carried on by
+// turns), n doubled from `n0` until they are within 1e-8 of the points between (up to 1024); false where they
+// aren't.
+bool interpolated(const std::function<bool(double, gp_Pnt&, gp_Pnt2d&, gp_Pnt2d&)>& at, double t0, double t1, int n0, IntTools_Curve& out)
+{
+  auto near_turn = [](double x, double to) { return x + 2 * M_PI * std::round((to - x) / (2 * M_PI)); };
+  for (int n = n0; n <= 1024; n *= 2)
+  {
+    occ::handle<NCollection_HArray1<gp_Pnt>>   p3 = new NCollection_HArray1<gp_Pnt>(1, n + 1);
+    occ::handle<NCollection_HArray1<gp_Pnt2d>> pa = new NCollection_HArray1<gp_Pnt2d>(1, n + 1);
+    occ::handle<NCollection_HArray1<gp_Pnt2d>> pb = new NCollection_HArray1<gp_Pnt2d>(1, n + 1);
+    occ::handle<NCollection_HArray1<double>>   pr = new NCollection_HArray1<double>(1, n + 1);
+    for (int k = 0; k <= n; ++k)
+    {
+      const double t = t0 + (t1 - t0) * k / n;
+      gp_Pnt       x;
+      gp_Pnt2d     a, b;
+      if (!at(t, x, a, b))
+        return false;
+      if (k > 0)
+      {
+        a.SetX(near_turn(a.X(), pa->Value(k).X()));
+        b.SetX(near_turn(b.X(), pb->Value(k).X()));
+      }
+      p3->SetValue(k + 1, x);
+      pa->SetValue(k + 1, a);
+      pb->SetValue(k + 1, b);
+      pr->SetValue(k + 1, t);
+    }
+    GeomAPI_Interpolate   f3(p3, pr, false, 1e-12);
+    Geom2dAPI_Interpolate fa(pa, pr, false, 1e-12), fb(pb, pr, false, 1e-12);
+    f3.Perform();
+    fa.Perform();
+    fb.Perform();
+    if (!f3.IsDone() || !fa.IsDone() || !fb.IsDone())
+      return false;
+    double err = 0;
+    for (int k = 0; k < n; ++k)
+    {
+      const double t = t0 + (t1 - t0) * (k + 0.5) / n;
+      gp_Pnt       x;
+      gp_Pnt2d     a, b;
+      if (!at(t, x, a, b))
+        return false;
+      const gp_Pnt2d ca = fa.Curve()->Value(t), cb = fb.Curve()->Value(t);
+      err = std::max({err, x.Distance(f3.Curve()->Value(t)), gp_Pnt2d(near_turn(a.X(), ca.X()), a.Y()).Distance(ca), gp_Pnt2d(near_turn(b.X(), cb.X()), b.Y()).Distance(cb)});
+    }
+    if (err <= 1e-8)
+    {
+      out = IntTools_Curve(f3.Curve(), fa.Curve(), fb.Curve(), std::max(Precision::Confusion(), err));
+      return true;
+    }
+  }
+  return false;
+}
+
+// Where a surface generated along a cone's axis (an extrusion along it, a cylinder beside it) meets the cone: each
+// generator at the height where the cone's radius is its distance from the axis (`gen`: the parameter -> the
+// generator's point at height 0 of its own surface, its direction, its parameters there; `on_gen`: its curve on the
+// surface by the height along it), the generating face's parameters from `t0` to `t1`.
+bool lifted(const gp_Cone& K, const std::function<gp_Pnt(double)>& gen, const gp_Dir& d, const std::function<gp_Pnt2d(double, double)>& on_gen,
+            double t0, double t1, int n0, bool gen_first, IntTools_Curve& out)
+{
+  const gp_Dir A    = K.Axis().Direction();
+  const double tana = std::tan(K.SemiAngle()), up = d.Dot(A);
+  if (std::abs(tana) < 1e-9 || std::abs(std::abs(up) - 1) > 1e-12)
+    return false;
+  auto at = [&](double t, gp_Pnt& x, gp_Pnt2d& g, gp_Pnt2d& c) {
+    const gp_Pnt P = gen(t);
+    const gp_Vec w(K.Location(), P);
+    const double z0 = w.Dot(gp_Vec(A)), rho = (w - gp_Vec(A) * z0).Magnitude();
+    const double s  = ((rho - K.RefRadius()) / tana - z0) / up;
+    x               = P.Translated(gp_Vec(d) * s);
+    double u = 0, v = 0;
+    ElSLib::Parameters(K, x, u, v);
+    const gp_Pnt2d cg = on_gen(t, s), cc(u, v);
+    g = gen_first ? cg : cc;
+    c = gen_first ? cc : cg;
+    return true;
+  };
+  return interpolated(at, t0, t1, n0, out);
+}
+
 // noshape's own sections of faces `fa` and `fb`, as OCCT's IntTools_Curve gives them (the curve, its curves on `fa` and
 // `fb` in their own parameters (the same parameter), its tolerance): an extrusion against a plane across its
 // direction (the profile moved there), a cylinder along it or another extrusion along it (rulings where the profiles
@@ -2142,6 +2227,33 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
   if (off)
     return false;
   const std::optional<Extruded> xa = extruded(fa), xb = extruded(fb);
+  // A cone and a surface generated along its axis: that surface lifted onto it.
+  const occ::handle<Geom_ConicalSurface> ka = occ::down_cast<Geom_ConicalSurface>(BRep_Tool::Surface(fa)), kb = occ::down_cast<Geom_ConicalSurface>(BRep_Tool::Surface(fb));
+  if (!ka.IsNull() || !kb.IsNull())
+  {
+    const gp_Cone      K       = (!ka.IsNull() ? ka : kb)->Cone();
+    const bool         g_first = ka.IsNull();
+    const TopoDS_Face& g       = g_first ? fa : fb;
+    IntTools_Curve     ic;
+    if (const std::optional<Extruded>& x = g_first ? xa : xb)
+    {
+      if (!lifted(K, [&](double u) { return x->c->Value(u); }, x->d, [](double u, double s) { return gp_Pnt2d(u, s); }, x->u0, x->u1, std::max(32, 8 * (x->c->NbKnots() - 1)), g_first, ic))
+        return false;
+      out.push_back(ic);
+      return true;
+    }
+    if (const occ::handle<Geom_CylindricalSurface> cy = occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(g)))
+    {
+      const gp_Cylinder Y = cy->Cylinder();
+      double            a0 = 0, a1 = 0, h0 = 0, h1 = 0;
+      BRepTools::UVBounds(g, a0, a1, h0, h1);
+      if (!lifted(K, [&](double a) { return ElSLib::Value(a, 0, Y); }, Y.Axis().Direction(), [](double a, double s) { return gp_Pnt2d(a, s); }, a0, a1, 64, g_first, ic))
+        return false;
+      out.push_back(ic);
+      return true;
+    }
+    return false;
+  }
   if (!xa && !xb)
     return false;
   const bool                      e_first = xa.has_value();
