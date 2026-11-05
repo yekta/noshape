@@ -251,6 +251,13 @@ pub fn mate_connector(ev: &mut EvalCtx) -> FResult<()> {
     let inference = ev.enum_("entityInferenceType").to_string();
     let secondary = ev.query("secondaryOriginQuery");
     let mut cs = origin_csys(ev, &origin_ref, &inference, secondary)?;
+    // Live 2050: an edge's MID_POINT with a secondary edge sits at that edge's midpoint, the axes the origin edge's.
+    if inference == "MID_POINT"
+        && matches!(origin_ref, Reference::Edge(_) | Reference::SketchEntity { .. })
+        && let Some(e) = secondary.iter().find_map(|r| ev.resolve_edges(std::slice::from_ref(r)).first().and_then(|&(bi, ei)| ev.edge_shape(bi, ei).ok()))
+    {
+        cs.origin = edge_csys(&e, "MID_POINT")?.origin;
+    }
 
     if ev.is("originType", "BETWEEN_ENTITIES") {
         // Live L39: no second entity, no field marked.

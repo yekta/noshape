@@ -3315,3 +3315,28 @@ fn mate_connector_at_the_center_of_a_rounded_corner() {
     let c = s.ok().context.connectors[0].clone();
     assert!(c.origin.distance(DVec3::new(mm(35.0), mm(25.0), mm(10.0))) < 1e-9 && c.z.distance(DVec3::Z) < 1e-9, "{:?} z {:?}", c.origin, c.z);
 }
+
+/// Live 2050: a connector at the MID_POINT of an edge with a secondary edge sits at the secondary's midpoint, along
+/// the origin edge (a block's top front edge, the right top edge as the secondary).
+#[test]
+fn mate_connector_at_the_mid_point_of_a_secondary_edge() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 30.0), (0.0, 30.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = s.ok();
+    let front = edge_near(&r, 0, DVec3::new(mm(20.0), mm(0.0), mm(10.0)));
+    let right = edge_near(&r, 0, DVec3::new(mm(40.0), mm(15.0), mm(10.0)));
+    s.add("mateConnector", move |p| {
+        p.set("originQuery", ParamValue::Query(vec![front]));
+        p.set("entityInferenceType", en("MID_POINT"));
+        p.set("secondaryOriginQuery", ParamValue::Query(vec![right]));
+    });
+    let c = s.ok().context.connectors[0].clone();
+    assert!(c.origin.distance(DVec3::new(mm(40.0), mm(15.0), mm(10.0))) < 1e-9 && c.z.x.abs() > 1.0 - 1e-9, "{:?} z {:?}", c.origin, c.z);
+}
