@@ -43,6 +43,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Next: Fix PCB 2 (TICKETS PARITY-CUSTOM-RUN-FAILURES 03:58, after live's answer); Transform pattern 7's MID_POINT
   with a secondary; cf-sheet-metal-hem's Derived 1 (translator support for importDerived once live fetches the
   source, REQUESTS 04:00).
+- 05:05: landed de47a2aa (MID_POINT with a secondary edge = its midpoint, live 2050: cf-transform-pattern 21/21);
+  queued 6559e85c: qBodyType of qEverything keeps only those bodies (host: std folds it into EVERYTHING with
+  `bodyType`; Fix PCB 2 took the four sketches as components), an affine map of a planar body keeps its planes and
+  lines (kernel op_gtransform, core's area). Run 101: 44/55 documents, 395/471 features, custom 49/109; cf-fix-pcb
+  12/12 (Fix PCB 2 4.2 -> 1.4 s). cf-hose-routing: ours is exact (closed-form tube centroid along live's Béziers),
+  live.jsonl's centroid / box are approximate; asked live for the centroid band (REQUESTS 04:41) before changing
+  the comparison.
+- Next: cf-sheet-metal-hem's Derived 1 (importDerived, REQUESTS 04:00); the remaining first differences in SCORE.md
+  run 101 (driveTrainGen volume, an extrude's counts, two fillets).
 
 ## 11-05 01:00 UTC: Export dialogs remember the user's choices (P1 from the user via lead, 00:3x)
 - Live's client code (behaviours "dx (2026-11-05 00:52, P1 export memory)"): one `exportSolidOptions` for part,

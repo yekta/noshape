@@ -3935,6 +3935,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     COPY, no live ids). Next: map names under a pattern's COPY (the instance's transform of the original), then
     Fix PCB 1 runs on its board as live's. Live 2046: Up to Part's real topology is 50 / 112 / 64, ours; live.jsonl's
     76 is a UI-fetch artifact (asked live to correct the corpus).
+    dx 11-05 05:05 (run 101): cf-fix-pcb matches live to the end. Fix PCB 1 is suppressed in live and ours (not its
+    inputs). Fix PCB 2's four extra components were the four sketches: std folds qBodyType(qEverything(BODY), SOLID)
+    into one EVERYTHING query with `bodyType`, which the host ignored. Its blocks (a unit cuboid patterned with
+    non-uniform scales) were B-splines (BRepBuilderAPI_GTransform's NurbsConvert); an affine map of a body of planes
+    and lines now keeps them (kernel op_gtransform). Fix PCB 2 4.2 -> 1.4 s (live's document 0.6 s).
+    cf-transform-pattern matches to the end: MID_POINT with a secondary edge sits at that edge's midpoint (live 2050).
+    cf-hose-routing's hose: path, volume and area are exact (the tube's closed form along live's own Béziers: centroid
+    (71.55103, −1.23832, 13.68602) mm, ours within 0.2 µm); live.jsonl's centroid is 0.12 mm off and its box loose by
+    0.45 mm (massproperties' volume band ±18 %). Asked live for the centroid band and evBox3d tight (REQUESTS 04:41).
   - cf-sheet-metal-shaped-flange (Shaped Flange 1, 2): `opEdgeChange: only offset edge changes are supported`
     (std geomOperations.fs 531, from sheetMetalShapedFlange.fs 176 updateSheetMetalModelForCFlange).
   - cf-curve-pattern-normal (Curve Pattern Normal 1): `Call clusterPoints(array, number) does not match
