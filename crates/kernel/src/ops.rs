@@ -445,18 +445,40 @@ pub fn legacy_rim_seams() -> bool {
     LEGACY_RIM_SEAMS.with(|c| c.get())
 }
 
+thread_local! {
+    static LEGACY_BLEND_PAIRS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// noshape's blends leave two straight rounds or chamfers that use up the face between them to OCCT, as before 11-05,
+/// on this thread (a Part Studio saved before ScopeRule 13 regenerates as it did). Returns the thread's setting before.
+pub fn set_legacy_blend_pairs(on: bool) -> bool {
+    LEGACY_BLEND_PAIRS.with(|c| c.replace(on))
+}
+
+/// Whether [`set_legacy_blend_pairs`] is on for this thread.
+pub fn legacy_blend_pairs() -> bool {
+    LEGACY_BLEND_PAIRS.with(|c| c.get())
+}
+
 /// This thread's Part Studio settings ([`set_legacy_topology`], [`set_legacy_blend_finish`], [`set_legacy_rim_seams`],
-/// [`crate::set_rust_blend`]), to hand to another.
+/// [`set_legacy_blend_pairs`], [`crate::set_rust_blend`]), to hand to another.
 #[derive(Clone, Copy, Debug)]
 pub struct KernelLegacy {
     topology: bool,
     blend_finish: bool,
     rim_seams: bool,
+    blend_pairs: bool,
     rust_blend: Option<bool>,
 }
 
 pub fn kernel_legacy() -> KernelLegacy {
-    KernelLegacy { topology: legacy_topology(), blend_finish: legacy_blend_finish(), rim_seams: legacy_rim_seams(), rust_blend: crate::brep_bridge::rust_blend_mode() }
+    KernelLegacy {
+        topology: legacy_topology(),
+        blend_finish: legacy_blend_finish(),
+        rim_seams: legacy_rim_seams(),
+        blend_pairs: legacy_blend_pairs(),
+        rust_blend: crate::brep_bridge::rust_blend_mode(),
+    }
 }
 
 /// Sets this thread's settings to `l` and returns them as they were.
@@ -465,6 +487,7 @@ pub fn set_kernel_legacy(l: KernelLegacy) -> KernelLegacy {
         topology: set_legacy_topology(l.topology),
         blend_finish: set_legacy_blend_finish(l.blend_finish),
         rim_seams: set_legacy_rim_seams(l.rim_seams),
+        blend_pairs: set_legacy_blend_pairs(l.blend_pairs),
         rust_blend: crate::set_rust_blend(l.rust_blend),
     }
 }

@@ -502,7 +502,7 @@ pub(crate) fn brep_blend(body: &BrepBody, spec: &[f64], tol: f64, out: &mut Brep
         })
         .collect();
     // (A panic here would abort the process from inside the C++ call: a decline instead.)
-    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| blend(&body_of(body), &edges, tol))).unwrap_or(Err(Decline("noshape's blend panicked")));
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| blend(&body_of(body), &edges, tol, !crate::ops::legacy_blend_pairs()))).unwrap_or(Err(Decline("noshape's blend panicked")));
     LAST_BLEND.with(|c| *c.borrow_mut() = r.as_ref().err().map_or(String::new(), |d| d.0.to_string()));
     match r {
         Ok(r) => {

@@ -262,6 +262,20 @@ struct Full {
     one: bool,
 }
 
+/// Where two convex chamfers' lines in a cap cross, within each between its ends (`ka`, `kb` their sides on the face
+/// between them; `n` the cap's normal).
+fn chamfers_cross(ea: &End, ka: usize, eb: &End, kb: usize, n: DVec3) -> Option<DVec3> {
+    let (pa, da) = (ea.t[1 - ka], ea.t[ka] - ea.t[1 - ka]);
+    let (pb, db) = (eb.t[1 - kb], eb.t[kb] - eb.t[1 - kb]);
+    let den = da.cross(db).dot(n);
+    if den.abs() < 1e-12 * da.length() * db.length() {
+        return None;
+    }
+    let sa = (pb - pa).cross(db).dot(n) / den;
+    let sb = (pb - pa).cross(da).dot(n) / den;
+    (sa > 0.0 && sa < 1.0 && sb > 0.0 && sb < 1.0).then_some(pa + da * sa)
+}
+
 /// Where two convex rounds' circles in a cap cross (`n` the cap's normal): the crossing nearer the face between them,
 /// on each round's arc between its tangent points (`ka`, `kb` their sides on that face).
 fn crossing(ea: &End, ra: f64, ka: usize, eb: &End, rb: f64, kb: usize, n: DVec3) -> Option<DVec3> {
@@ -287,14 +301,16 @@ fn crossing(ea: &End, ra: f64, ka: usize, eb: &End, rb: f64, kb: usize, n: DVec3
 /// One round: its edge, radius, two faces, convex (+1) or concave (−1), its two ends (the edge's order).
 struct Plan {
     edge: u32,
+    /// The radius, or an equal chamfer's distance (`chamfer`: the round a plane, its sections lines).
     r: f64,
+    chamfer: bool,
     fs: [u32; 2],
     sigma: f64,
     ends: [End; 2],
 }
 
-/// The rounds of `edges` (fillets only), every one such an edge; a decline otherwise.
-pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec<u32>], margin: f64) -> Result<Output, Decline> {
+/// The rounds of `edges` (fillets and equal chamfers), every one such an edge; a decline otherwise.
+pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec<u32>], margin: f64, pairs: bool) -> Result<Output, Decline> {
     let mut blended = vec![false; body.edges.len()];
     for e in edges {
         blended[e.edge as usize] = true;
@@ -308,7 +324,11 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
     let mut taken_v = vec![false; body.vertices.len()];
     let mut plans: Vec<Plan> = Vec::new();
     for be in edges.iter().filter(|e| !absorbed[e.edge as usize]) {
-        let Spec::Fillet { radius: r } = be.spec else { return no("a prism round not a fillet") };
+        let (r, chamfer) = match be.spec {
+            Spec::Fillet { radius } => (radius, false),
+            Spec::Chamfer { d1, d2 } if (d1 - d2).abs() <= margin => (d1, true),
+            _ => return no("a prism round not a fillet or an equal chamfer"),
+        };
         let e = &body.edges[be.edge as usize];
         if e.curve != Curve::Line {
             return no("a prism round's edge not a line");
@@ -401,34 +421,45 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
                 let Some(nb) = outward(&body.faces[fs[1] as usize]) else { return no("a prism round's face not ruled along it") };
                 sigma = if qa.dot(nb) < 0.0 { 1.0 } else { -1.0 };
             }
-            let u = d.any_orthonormal_vector();
-            let w = d.cross(u);
-            let (Some(ta), Some(tb)) = (trace(body, &body.faces[fs[0] as usize], d, p, u, w, -sigma * r), trace(body, &body.faces[fs[1] as usize], d, p, u, w, -sigma * r)) else {
-                return no("a prism round's face not ruled along it");
-            };
-            // (A profile's: the root along it, its parameter the tangent point's.)
-            let mut on_profile = [None, None];
-            let c2 = match (&ta, &tb) {
-                (Trace::Profile { .. }, Trace::Profile { .. }) => return no("a prism round between two profiles"),
-                (Trace::Profile { x, s }, other) | (other, Trace::Profile { x, s }) => {
-                    let Some((q, t)) = meet_profile(body, x, *s, other, (p, u, w), DVec2::ZERO) else { return no("a prism round's faces' offsets don't meet") };
-                    on_profile[if matches!(ta, Trace::Profile { .. }) { 0 } else { 1 }] = Some((*x, t));
-                    q
+            // (An equal chamfer between planes: its distance along each face's end edge, from the vertex.)
+            let (c, t0, t1) = if chamfer {
+                let planar = |f: u32| matches!(body.faces[f as usize].surface, Surface::Plane { .. });
+                let line = |o: u32| body.edges[o as usize].curve == Curve::Line;
+                if corner.is_some() || !planar(fs[0]) || !planar(fs[1]) || !line(g[0]) || !line(g[1]) {
+                    return no("a prism chamfer not between planes ending on caps");
                 }
-                _ => {
-                    let Some(q) = meet(&ta, &tb, DVec2::ZERO) else { return no("a prism round's faces' offsets don't meet") };
-                    q
+                (p, p + along_a * r, p + along_b * r)
+            } else {
+                let u = d.any_orthonormal_vector();
+                let w = d.cross(u);
+                let (Some(ta), Some(tb)) = (trace(body, &body.faces[fs[0] as usize], d, p, u, w, -sigma * r), trace(body, &body.faces[fs[1] as usize], d, p, u, w, -sigma * r)) else {
+                    return no("a prism round's face not ruled along it");
+                };
+                // (A profile's: the root along it, its parameter the tangent point's.)
+                let mut on_profile = [None, None];
+                let c2 = match (&ta, &tb) {
+                    (Trace::Profile { .. }, Trace::Profile { .. }) => return no("a prism round between two profiles"),
+                    (Trace::Profile { x, s }, other) | (other, Trace::Profile { x, s }) => {
+                        let Some((q, t)) = meet_profile(body, x, *s, other, (p, u, w), DVec2::ZERO) else { return no("a prism round's faces' offsets don't meet") };
+                        on_profile[if matches!(ta, Trace::Profile { .. }) { 0 } else { 1 }] = Some((*x, t));
+                        q
+                    }
+                    _ => {
+                        let Some(q) = meet(&ta, &tb, DVec2::ZERO) else { return no("a prism round's faces' offsets don't meet") };
+                        q
+                    }
+                };
+                if c2.length() > 10.0 * r {
+                    return no("a prism round's centre far from its edge");
                 }
+                let c = p + u * c2.x + w * c2.y;
+                let foot_k = |k: usize| match on_profile[k] {
+                    Some((x, t)) => Some(x.at(body, t, c)),
+                    None => foot(&body.faces[fs[k] as usize], c, d),
+                };
+                let (Some(t0), Some(t1)) = (foot_k(0), foot_k(1)) else { return no("a prism round's tangent points") };
+                (c, t0, t1)
             };
-            if c2.length() > 10.0 * r {
-                return no("a prism round's centre far from its edge");
-            }
-            let c = p + u * c2.x + w * c2.y;
-            let foot_k = |k: usize| match on_profile[k] {
-                Some((x, t)) => Some(x.at(body, t, c)),
-                None => foot(&body.faces[fs[k] as usize], c, d),
-            };
-            let (Some(t0), Some(t1)) = (foot_k(0), foot_k(1)) else { return no("a prism round's tangent points") };
             let mut tpar = [None, None];
             let mut at_far = [false; 2];
             // Each tangent point on its end edge, short of its far end (no overflow; at it only where the face between
@@ -488,7 +519,7 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
         let (mut lo, mut hi) = (DVec3::splat(f64::INFINITY), DVec3::splat(f64::NEG_INFINITY));
         let mut own = vec![fs[0], fs[1]];
         for end in [&a, &b] {
-            let mid = end.c + ((end.t[0] + end.t[1]) * 0.5 - end.c).normalize_or_zero() * r;
+            let mid = if chamfer { (end.t[0] + end.t[1]) * 0.5 } else { end.c + ((end.t[0] + end.t[1]) * 0.5 - end.c).normalize_or_zero() * r };
             let mut pts = vec![body.vertices[end.v as usize], end.t[0], end.t[1], mid];
             match &end.corner {
                 Some(cn) => {
@@ -513,7 +544,7 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
                 return no("another face within a prism round");
             }
         }
-        plans.push(Plan { edge: be.edge, r, fs, sigma, ends: [a, b] });
+        plans.push(Plan { edge: be.edge, r, chamfer, fs, sigma, ends: [a, b] });
     }
     if (0..body.edges.len()).any(|i| absorbed[i] && !taken_m[i]) {
         return no("a curved edge not a prism round's corner");
@@ -527,6 +558,11 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
         for (jb, bp) in plans.iter().enumerate().skip(i + 1) {
             for (ka, &f) in a.fs.iter().enumerate() {
                 let Some(kb) = bp.fs.iter().position(|&g| g == f) else { continue };
+                let crosses = |ea: &End, eb: &End, n: DVec3| match (a.chamfer, bp.chamfer) {
+                    (false, false) => crossing(ea, a.r, ka, eb, bp.r, kb, n),
+                    (true, true) => chamfers_cross(ea, ka, eb, kb, n),
+                    _ => None,
+                };
                 let mut met = 0;
                 let mut caps = 0;
                 let mut crossed = Vec::new();
@@ -540,13 +576,16 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
                     if (ea.t[ka] - eb.t[kb]).length() <= 10.0 * margin && ea.g[ka] == eb.g[kb] {
                         met += 1;
                     } else if (ea.t[ka] - pa).length() + (eb.t[kb] - pb).length() >= (pa - pb).length() - 10.0 * margin {
-                        let p = if a.sigma > 0.0 && bp.sigma > 0.0 && ea.g[ka] == eb.g[kb] { crossing(ea, a.r, ka, eb, bp.r, kb, n) } else { None };
+                        let p = if a.sigma > 0.0 && bp.sigma > 0.0 && ea.g[ka] == eb.g[kb] { crosses(ea, eb, n) } else { None };
                         let Some(p) = p else { return no("two prism rounds meet across a face") };
                         crossed.push((ia, ib, p));
                     }
                 }
                 if met == 0 && crossed.is_empty() {
                     continue;
+                }
+                if !pairs {
+                    return no("two prism rounds meet across a face");
                 }
                 // (Exactly the face's rectangle: its one loop the two edges and the two cap edges.)
                 let face = &body.faces[f as usize];
@@ -558,7 +597,11 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
                 if !rect {
                     return no("two prism rounds meet across a face");
                 }
-                fulls.push(Full { a: i, ka, b: jb, kb, face: f, one: met == 2 });
+                // (Met exactly: one cylinder where they are rounds of one radius, else a ridge there.)
+                if met == 2 && (a.chamfer != bp.chamfer || (a.chamfer && a.sigma < 0.0)) {
+                    return no("two prism rounds meet across a face");
+                }
+                fulls.push(Full { a: i, ka, b: jb, kb, face: f, one: met == 2 && !a.chamfer && (a.r - bp.r).abs() <= margin });
                 for (ia, ib, p) in crossed {
                     ridges.push((i, ia, ka, p));
                     ridges.push((jb, ib, kb, p));
@@ -602,7 +645,7 @@ fn build(body: &Body, plans: Vec<Plan>, fulls: &[Full]) -> Result<Output, Declin
         dead_f[x.face as usize] = true;
         history.push(Record { kind: Kind::Face, arg: 0, index: x.face, relation: Relation::Deleted, out_kind: Kind::Face, out: u32::MAX });
     }
-    for (pi, Plan { edge, r, fs, sigma, ends }) in plans.into_iter().enumerate() {
+    for (pi, Plan { edge, r, chamfer, fs, sigma, ends }) in plans.into_iter().enumerate() {
         let e = body.edges[edge as usize];
         let d = (body.vertices[e.v[1] as usize] - body.vertices[e.v[0] as usize]).normalize();
         // Per end: the tangent points' vertices, the end edges cut back to them, the cap's arc between.
@@ -694,7 +737,8 @@ fn build(body: &Body, plans: Vec<Plan>, fulls: &[Full]) -> Result<Output, Declin
             let toward = if mid.length() > 1e-15 { mid } else { body.vertices[end.v as usize] - end.c };
             let normal = if d.dot((pa - end.c).cross(toward)) > 0.0 { d } else { -d };
             let xdir = (pa - end.c).normalize();
-            b.edges.push(Edge { v: [tv[j][from], tv[j][to]], curve: Curve::Circle { center: end.c, normal, xdir, radius: r } });
+            let curve = if chamfer { Curve::Line } else { Curve::Circle { center: end.c, normal, xdir, radius: r } };
+            b.edges.push(Edge { v: [tv[j][from], tv[j][to]], curve });
             edge_origin.push(Origin::New);
             arcs[j] = b.edges.len() as u32 - 1;
             let cap_loop = b.faces[end.cap as usize].loops.iter().position(|lp| lp.iter().any(|x| x.edge == end.g[0])).unwrap_or(0);
@@ -770,6 +814,13 @@ fn build(body: &Body, plans: Vec<Plan>, fulls: &[Full]) -> Result<Output, Declin
             corner_faces.push((v, Face { surface: Surface::Sphere { origin: c, xdir, ydir: zdir.cross(xdir), zdir, radius: r }, reversed: sigma < 0.0, loops: vec![sl] }));
         }
         let c = ends[0].c;
+        if chamfer {
+            // (Its normal towards the corner it cuts off, away from the one it fills.)
+            let n = (ends[0].t[1] - ends[0].t[0]).cross(d).normalize();
+            let normal = if n.dot(c - ends[0].t[0]) * sigma > 0.0 { n } else { -n };
+            new_faces.push((edge, Face { surface: Surface::Plane { origin: ends[0].t[0], normal }, reversed: false, loops: vec![lp] }));
+            continue;
+        }
         let xdir = (ends[0].t[0] - c).normalize();
         let axis = if d.cross(xdir).dot(ends[0].t[1] - c) >= 0.0 { d } else { -d };
         new_faces.push((edge, Face { surface: Surface::Cylinder { origin: c, axis, xdir, radius: r }, reversed: sigma < 0.0, loops: vec![lp] }));

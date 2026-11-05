@@ -1323,6 +1323,39 @@ fn rounds_wider_than_their_face_meet_in_a_ridge() {
     }
 }
 
+/// Chamfers and rounds that use up the faces between them (live 1516 / FILLET-OVERSIZE-OK, the 40 x 20 x 10 block's
+/// vertical edges): noshape's own, two chamfers meeting in a ridge (or at the face's middle), live's faces and volumes.
+#[test]
+fn chamfers_and_rounds_over_a_narrow_face_are_lives() {
+    setup();
+    let part = bx([0.0; 3], [40.0, 20.0, 10.0]);
+    let vertical = |pts: &[(f64, f64)]| edges_where(&part, |i| (i.start.z - i.end.z).abs() > 1e-9 && pts.iter().any(|&(x, y)| (i.start.x - x * MM).abs() < 1e-9 && (i.start.y - y * MM).abs() < 1e-9));
+    let two = vertical(&[(40.0, 0.0), (40.0, 20.0)]);
+    let three = vertical(&[(40.0, 0.0), (40.0, 20.0), (0.0, 20.0)]);
+    assert_eq!((two.len(), three.len()), (2, 3));
+    let ours = |what: &str, r: Result<OpResult>| {
+        let why = last_blend_decline();
+        let r = r.unwrap().shape;
+        assert_eq!(why, "", "{what}: noshape's own");
+        assert!(r.is_valid(), "{what}");
+        r
+    };
+    set_rust_blend(Some(true));
+    for (es, d, want, faces) in [(&two, 10.0, 7000.0, 7), (&two, 10.5, 6900.0, 7), (&two, 15.0, 6000.0, 7), (&two, 20.0, 5000.0, 7), (&three, 10.0, 6500.0, 8), (&three, 12.0, 5880.0, 8)] {
+        reset_blend_decline();
+        let r = ours(&format!("{} chamfers {d}", es.len()), chamfer_checked(&part, es, ChamferSpec::Equal(d * MM), &[]));
+        assert_eq!(r.faces().len(), faces, "{} chamfers {d}", es.len());
+        assert!((vol_mm3(&r) - want).abs() < 1e-6, "{} chamfers {d}: {} vs live's {want}", es.len(), vol_mm3(&r));
+    }
+    for (r, want, faces) in [(10.0, 7356.194490, 7), (12.0, 7075.151640, 8)] {
+        reset_blend_decline();
+        let s = ours(&format!("3 rounds R{r}"), fillet_checked(&part, &three, &[r * MM; 3]));
+        assert_eq!(s.faces().len(), faces, "3 rounds R{r}");
+        assert!((vol_mm3(&s) - want).abs() < 1e-6, "3 rounds R{r}: {} vs live's {want}", vol_mm3(&s));
+    }
+    set_rust_blend(None);
+}
+
 /// cf-spur-gear's root fillets (PARITY-CUSTOM-RUN-FAILURES): R0.72 on both top edges of a 1.2 mm rib, so the rounds
 /// overlap and the rib's top face goes (OCCT fails): each round made alone, the part their common, as Parasolid's.
 #[test]

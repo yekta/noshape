@@ -114,6 +114,22 @@ impl Drop for LegacyRimSeams {
     }
 }
 
+/// noshape's blends leave a full round's or a ridge's two rounds to OCCT, as before, for a studio saved before
+/// ([`crate::partstudio::PartStudio::legacy_blend_pairs`]) while it regenerates on this thread.
+pub struct LegacyBlendPairs(bool);
+
+impl LegacyBlendPairs {
+    pub fn set(on: bool) -> Self {
+        Self(noshape_kernel::set_legacy_blend_pairs(on))
+    }
+}
+
+impl Drop for LegacyBlendPairs {
+    fn drop(&mut self) {
+        noshape_kernel::set_legacy_blend_pairs(self.0);
+    }
+}
+
 thread_local! {
     /// Core features (Extrude, Fillet, ...) run natively; [`set_std_route`]
     /// makes std run them instead, the oracle the native ones are tested

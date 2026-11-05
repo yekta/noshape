@@ -410,8 +410,9 @@ impl Chain {
     }
 }
 
-/// Blends `edges` of `body` (one solid), whose points are one within `tol`.
-pub fn blend(body: &Body, edges: &[BlendEdge], tol: f64) -> Result<Output, Decline> {
+/// Blends `edges` of `body` (one solid), whose points are one within `tol`; `pairs`: two straight rounds or chamfers
+/// that use up the face between them (a full round, a ridge) too.
+pub fn blend(body: &Body, edges: &[BlendEdge], tol: f64, pairs: bool) -> Result<Output, Decline> {
     if body.solids.len() != 1 || body.solids[0].shells.len() != 1 {
         return no("not one solid of one shell");
     }
@@ -448,13 +449,13 @@ pub fn blend(body: &Body, edges: &[BlendEdge], tol: f64) -> Result<Output, Decli
     let chains = match chains(body, &uses, &ve, &spec_of, &corners, margin) {
         Ok(c) => c,
         // (Straight edges between faces ruled along them, ending on caps square to them: each its own round.)
-        Err(why) => return prism::blend(body, edges, &uses, &ve, margin).map_err(|_| why),
+        Err(why) => return prism::blend(body, edges, &uses, &ve, margin, pairs).map_err(|_| why),
     };
     let boxes: Vec<(DVec3, DVec3)> = body.edges.iter().map(|e| edge_box(body, e)).collect();
     for c in &chains {
         // (Blends that meet, a full round's: each straight edge its own round, if they are.)
         if let Err(why) = check_clearance(body, &ve, &boxes, c, &chains, &corners, margin) {
-            return prism::blend(body, edges, &uses, &ve, margin).map_err(|_| why);
+            return prism::blend(body, edges, &uses, &ve, margin, pairs).map_err(|_| why);
         }
     }
     build(body, &ve, &chains, &corners, margin)

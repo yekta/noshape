@@ -3598,7 +3598,7 @@ export const gearGap = defineFeature(function(context is Context, id is Id, defi
         let mut o = ps.clone();
         o.scope_rule = noshape_model::partstudio::ScopeRule(10);
         o.upgrade_saved_params();
-        assert!(o.legacy_blend_finish && o.legacy_rim_seams);
+        assert!(o.legacy_blend_finish && o.legacy_rim_seams && o.legacy_blend_pairs);
         o
     };
     let (fx, full) = gap(20, 2.0, 28.0, 40.0);
