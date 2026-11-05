@@ -474,6 +474,11 @@ pub fn set_rust_blend(on: Option<bool>) -> Option<bool> {
     BLEND_MODE.with(|m| m.replace(on))
 }
 
+/// This thread's [`set_rust_blend`] mode.
+pub(crate) fn rust_blend_mode() -> Option<bool> {
+    BLEND_MODE.with(|m| m.get())
+}
+
 pub(crate) fn brep_blend_enabled() -> bool {
     static ENV: OnceLock<bool> = OnceLock::new();
     BLEND_MODE.with(|m| m.get()).unwrap_or_else(|| *ENV.get_or_init(|| std::env::var("NOSHAPE_BLEND_RUST").as_deref() == Ok("1")))

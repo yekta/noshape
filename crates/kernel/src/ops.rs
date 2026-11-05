@@ -430,22 +430,29 @@ pub fn legacy_blend_finish() -> bool {
     LEGACY_BLEND_FINISH.with(|c| c.get())
 }
 
-/// This thread's legacy settings ([`set_legacy_topology`], [`set_legacy_blend_finish`]), to hand to another.
+/// This thread's Part Studio settings ([`set_legacy_topology`], [`set_legacy_blend_finish`], [`crate::set_rust_blend`]),
+/// to hand to another.
 #[derive(Clone, Copy, Debug)]
 pub struct KernelLegacy {
     topology: bool,
     blend_finish: bool,
+    rust_blend: Option<bool>,
 }
 
 pub fn kernel_legacy() -> KernelLegacy {
-    KernelLegacy { topology: legacy_topology(), blend_finish: legacy_blend_finish() }
+    KernelLegacy { topology: legacy_topology(), blend_finish: legacy_blend_finish(), rust_blend: crate::brep_bridge::rust_blend_mode() }
 }
 
-/// `f` with the legacy settings `l` (work handed to another thread), the thread's own back after.
+/// Sets this thread's settings to `l` and returns them as they were.
+pub fn set_kernel_legacy(l: KernelLegacy) -> KernelLegacy {
+    KernelLegacy { topology: set_legacy_topology(l.topology), blend_finish: set_legacy_blend_finish(l.blend_finish), rust_blend: crate::set_rust_blend(l.rust_blend) }
+}
+
+/// `f` with the settings `l` (work handed to another thread), the thread's own back after.
 pub fn with_kernel_legacy<T>(l: KernelLegacy, f: impl FnOnce() -> T) -> T {
-    let before = set_legacy_blend_finish(l.blend_finish);
-    let out = with_legacy_topology(l.topology, f);
-    set_legacy_blend_finish(before);
+    let before = set_kernel_legacy(l);
+    let out = f();
+    set_kernel_legacy(before);
     out
 }
 
