@@ -502,14 +502,14 @@ fn a_25_by_25_knurl() {
     knurl_as_recorded("ae71f76b6e894374", 1e-8);
 }
 
-/// cf-straight-spline's cuts by a pattern of 8 spline cutters (recorded): noshape's Boolean declines the first late
-/// (its result built and found invalid by OCCT's checker), so in its feature type's scope the next
-/// cut goes straight to OCCT's (a "two edges" cut, declined as late outside the scope); OCCT's results both.
+/// A document's cuts by a pattern of 8 cutters (recorded, parity): noshape's Boolean declines the first late (two edges
+/// leave a vertex one way, found while placing its pieces), so in its feature type's scope the next cut goes straight
+/// to OCCT's; OCCT's results both.
 #[test]
 fn a_late_decline_sends_the_like_straight_to_occt() {
     let _ = k::set_working_scale(1000.0);
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
-    let (a, b) = (k::bool_corpus::load(&dir, "171341672da7c4f9").expect("a case"), k::bool_corpus::load(&dir, "e424988cc95b8153").expect("a case"));
+    let (a, b) = (k::bool_corpus::load(&dir, "71dac1decbc5653c").expect("a case"), k::bool_corpus::load(&dir, "f901b748bdc19fac").expect("a case"));
     let run = |c: &k::bool_corpus::Case| {
         let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("the cut");
         let v = r.shape.volume().unwrap();
@@ -517,12 +517,25 @@ fn a_late_decline_sends_the_like_straight_to_occt() {
         (k::last_boolean_path(), k::last_rust_decline())
     };
     let memo = std::sync::Arc::new(k::DeclineMemo::default());
-    memo.scope("spline", || {
-        assert_eq!(run(&a).1, "an invalid result");
+    memo.scope("pattern", || {
+        assert_eq!(run(&a).1, "two edges leave a vertex in one direction");
         assert_eq!(run(&b).1, "not tried (an earlier path took it)");
     });
     // (Another feature type, or none: tried.)
     memo.scope("another", || assert_eq!(run(&b).1, "two edges leave a vertex in one direction"));
+}
+
+/// cf-straight-spline's first cut by a pattern of 8 spline cutters (recorded): noshape's Boolean takes it (it declined
+/// as invalid: an edge's range a rounding past its curve on a face), OCCT's volume.
+#[test]
+fn a_straight_spline_cut_taken() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "171341672da7c4f9").expect("a case");
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("the cut");
+    assert_eq!(k::last_boolean_path(), "rust", "declined: {}", k::last_rust_decline());
+    let v = r.shape.volume().unwrap();
+    assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-9 * c.summary.volume, "volume {v} against OCCT's {}", c.summary.volume);
 }
 
 /// cf-planetary-gears' cut of a gear's 42 tooth gaps (recorded, one tool of 254 faces): OCCT's result, and no slower

@@ -18,6 +18,7 @@
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <BRepTools_WireExplorer.hxx>
 #include <BRepLib.hxx>
 #include <BRepBndLib.hxx>
@@ -3054,6 +3055,36 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
     most_wires = std::max(most_wires, n);
   }
   const bool full_check = r.face_origin.size() / 3 <= 2000 && most_wires <= 256;
+  // (An edge's range a rounding past its curve on a face (a hyperbola's piece whose end went to its vertex, 1e-6 on,
+  // its curve on the cone OCCT's B-spline to the old end): narrowed to what its curves on its faces cover, as OCCT's
+  // (an invalid range otherwise). Where the result is checked.)
+  if (full_check)
+  {
+    TopTools_IndexedDataMapOfShapeListOfShape ef;
+    TopExp::MapShapesAndAncestors(out, TopAbs_EDGE, TopAbs_FACE, ef);
+    BRep_Builder fix;
+    for (int k = 1; k <= ef.Extent(); ++k)
+    {
+      const TopoDS_Edge e = TopoDS::Edge(ef.FindKey(k));
+      if (BRep_Tool::Degenerated(e))
+        continue;
+      double a = 0, z = 0;
+      BRep_Tool::Range(e, a, z);
+      double lo = a, hi = z;
+      for (const TopoDS_Shape& fc : ef.FindFromIndex(k))
+      {
+        double c0 = 0, c1 = 0;
+        const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(e, TopoDS::Face(fc), c0, c1);
+        if (c.IsNull() || c->IsPeriodic())
+          continue;
+        lo = std::max(lo, c->FirstParameter());
+        hi = std::min(hi, c->LastParameter());
+      }
+      const double slack = 1e-5 * (1 + std::abs(a) + std::abs(z));
+      if ((lo > a || hi < z) && lo - a <= slack && z - hi <= slack && lo < hi)
+        fix.Range(e, lo, hi);
+    }
+  }
   // (A big one's on all threads: a 300-face gear fuse's took 0.2 s on one, half the Boolean's time.)
   if (full_check && !BRepCheck_Analyzer(out, true, t_built.f.size() > 32).IsValid())
     return decline("an invalid result");

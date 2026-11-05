@@ -463,7 +463,19 @@ impl GFace {
                 match g {
                     Geo::Apex { .. } | Geo::Nurbs { .. } => unreachable!(),
                     Geo::Line => {
-                        let q1 = DVec2::new(q0.x, self.to2(p1).y);
+                        // (A short chord, round more than along (a 35 um edge merged with a circle's piece across the
+                        // seam), not a ruling: between its ends' places, on the side of the seam it lies.)
+                        let (qa, qb) = (self.to2(p0), self.to2(p1));
+                        let dx = qb.x - qa.x - TAU * r * ((qb.x - qa.x) / (TAU * r)).round();
+                        if (p1 - p0).length() < 0.1 * off(p0).min(off(p1)) && dx.abs() > near.max(1e-7) && dx.abs() > (qb.y - qa.y).abs() {
+                            let mut a0 = qa.x;
+                            let seam = (a0 - r * th0).abs() <= near || (a0 - r * (th0 + TAU)).abs() <= near;
+                            if seam {
+                                a0 = if dx < 0.0 { r * (th0 + TAU) } else { r * th0 };
+                            }
+                            return Ok(C2::Seg { a: DVec2::new(a0, qa.y), b: DVec2::new(a0 + dx, qb.y) });
+                        }
+                        let q1 = DVec2::new(q0.x, qb.y);
                         Ok(C2::Seg { a: q0, b: q1 })
                     }
                     Geo::Arc { k, sweep, .. } => {
@@ -1066,18 +1078,46 @@ impl Ctx<'_> {
                         let (t, _) = whole.param_of(g.to2(p));
                         pt0 + (pt1 - pt0) * t
                     };
+                    // (A piece of a closed circle (or a chord merged with one): by its ends' and middle's angles about
+                    // the circle, the way its middle lies, its curve on the face the edge's parameter (OCCT's same
+                    // parameter); its ends' places can't tell either side of the face's seam.)
+                    if let Geo::Arc { k: ke, a0: ea0, sweep: esw } = self.edges[e].g
+                        && self.edges[e].v[0] == self.edges[e].v[1]
+                        && esw > 0.0
+                    {
+                        let ang = |p: DVec3| (ke.angle(p) - ea0).rem_euclid(TAU);
+                        let (mut ra, rb, rm) = (ang(self.p(s.v[0])), ang(self.p(s.v[1])), ang(self.seg_at(s, 0.5)));
+                        let ahead = (rm - ra).rem_euclid(TAU) <= (rb - ra).rem_euclid(TAU);
+                        let edge = 1e-6;
+                        let rb = if ahead {
+                            if ra > TAU - edge {
+                                ra = 0.0;
+                            }
+                            ra + (rb - ra).rem_euclid(TAU)
+                        } else {
+                            if ra < edge {
+                                ra = TAU;
+                            }
+                            ra - (ra - rb).rem_euclid(TAU)
+                        };
+                        let sc = (pt1 - pt0) / esw;
+                        return Ok(C2::Nurbs { c, t0: pt0 + ra * sc, t1: pt0 + rb * sc });
+                    }
                     let (mut a, mut b) = (at(self.p(s.v[0])), at(self.p(s.v[1])));
                     // (A piece of a closed edge ending where it closes: that end at whichever of its curve's ends has
                     // the piece's middle between its two ends.)
+                    // (Or a period on, either end, within its curve's range: a vertex just past the seam of a face
+                    // going round found at the curve's far end; the pair with the middle between them, nearest.)
                     if self.edges[e].v[0] == self.edges[e].v[1] {
                         let m = at(self.seg_at(s, 0.5));
-                        let other = |x: f64| if (x - pt0).abs() <= 1e-9 * (1.0 + x.abs()) { *pt1 } else if (x - pt1).abs() <= 1e-9 * (1.0 + x.abs()) { *pt0 } else { x };
-                        let between = |a: f64, b: f64| (a.min(b)..=a.max(b)).contains(&m);
+                        let period = pt1 - pt0;
+                        let eps = 1e-9 * (1.0 + pt0.abs().max(pt1.abs()));
+                        let turns = |x: f64| [x - period, x, x + period].into_iter().filter(move |y| *y >= pt0.min(*pt1) - eps && *y <= pt0.max(*pt1) + eps);
+                        let between = |a: f64, b: f64| (a.min(b) - eps..=a.max(b) + eps).contains(&m);
                         if !between(a, b) {
-                            if between(other(a), b) {
-                                a = other(a);
-                            } else if between(a, other(b)) {
-                                b = other(b);
+                            let best = turns(a).flat_map(|x| turns(b).map(move |y| (x, y))).filter(|&(x, y)| between(x, y)).min_by(|p, q| (p.1 - p.0).abs().total_cmp(&(q.1 - q.0).abs()));
+                            if let Some((x, y)) = best {
+                                (a, b) = (x, y);
                             }
                         }
                     }
@@ -1602,6 +1642,7 @@ impl Ctx<'_> {
     /// Where both faces' intervals of a section overlap: its edges, in both faces.
     fn section_from(&mut self, fs: usize, ft: usize, path: Path, ia: Vec<Ival>, ib: Vec<Ival>) -> R<()> {
         let tol = self.tol;
+        let stol = if let Path::Nurbs { id, .. } = &path { self.ncurves[*id as usize].tol } else { 0.0 };
         // Whether the length along it between two parameters is within the tolerance (a B-spline's, the length
         // either way: clearly not where the chord is longer, clearly so where its control polygon there is
         // shorter).
@@ -1629,17 +1670,31 @@ impl Ctx<'_> {
             } else {
                 y.1
             };
+            // (A point within ten tolerances of a vertex of both faces' boundaries (OCCT's section passing 0.6 um from
+            // their corner, both faces' boundaries crossed short of it): that vertex, as OCCT's pave.)
+            let corner = |cx: &Ctx, p: DVec3| {
+                let reach = 10.0 * cx.tol.max(stol);
+                let of = |f: usize| cx.faces[f].edges.iter().flat_map(|&(e, _)| cx.edges[e].v).collect::<Vec<u32>>();
+                let (a, b) = (of(fs), of(ft));
+                a.into_iter().filter(|w| b.contains(w)).map(|w| (w, (cx.p(w) - p).length())).filter(|x| x.1 <= reach).min_by(|x, y| x.1.total_cmp(&y.1)).map(|x| x.0)
+            };
             let v = match end {
                 End::Open => return Ok(None),
                 End::Vertex(v) => v,
-                End::Point(p) => cx.pool.add(p)?,
+                End::Point(p) => match corner(cx, p) {
+                    Some(w) => w,
+                    None => cx.pool.add(p)?,
+                },
             };
             // Both faces end there: the same vertex.
             if near(earlier.0, later.0) {
                 for o in [x.1, y.1] {
                     let w = match o {
                         End::Vertex(w) => w,
-                        End::Point(p) => cx.pool.add(p)?,
+                        End::Point(p) => match corner(cx, p) {
+                            Some(w) => w,
+                            None => cx.pool.add(p)?,
+                        },
                         End::Open => continue,
                     };
                     if w != v {
@@ -4438,8 +4493,30 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     // 20 and 30 TPI non-manifold).)
     for (f, crossings) in all_crossings.into_iter().enumerate() {
         let segs = cx.face_segs[f].clone();
-        for (i, j, t, _) in crossings? {
+        let crossings = crossings?;
+        for &(i, j, t, u) in &crossings {
             let p = cx.seg_at(&segs[i], t);
+            // (Tangent there, found short of an end of one of them that lies on the other, within a thousand
+            // tolerances and 0.1 mm of it, and not past it too (a section grazing a tool's edge into its end, the
+            // crossing found 44 um before it): that end, already a vertex of both, as OCCT's pave.)
+            let dir = |s: &Seg, x: f64| (cx.seg_at(s, (x + 1e-4).min(1.0)) - cx.seg_at(s, (x - 1e-4).max(0.0))).normalize_or_zero();
+            let tangent = dir(&segs[i], t).cross(dir(&segs[j], u)).length() < 0.05;
+            let grazing = tangent && [(i, j), (j, i)].into_iter().any(|(a, b)| {
+                segs[a].v.iter().any(|&w| {
+                    let (q, d) = (cx.p(w), (cx.p(w) - p).length());
+                    // (Not a touch at the end found either side of it: a crossing past it too.)
+                    let other_side = || {
+                        crossings.iter().any(|&(i2, _, t2, _)| {
+                            let p2 = cx.seg_at(&segs[i2], t2);
+                            (p2 - q).length() <= 2.0 * d && (p2 - q).dot(p - q) < 0.0
+                        })
+                    };
+                    d <= (1000.0 * tol).min(1e-4) && cx.seg_param(&segs[b], q).1 <= tol.max(cx.pool.t[w as usize]) && !other_side()
+                })
+            });
+            if grazing {
+                continue;
+            }
             let reach = cx.seg_edge_tol[f][i].max(cx.seg_edge_tol[f][j]);
             if reach > tol {
                 match cx.pool.find_tol(p, reach)? {
@@ -4848,7 +4925,15 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                     // A vertex on a seam (or a cone's apex) is at two places in the parameter plane (any other at one,
                     // half a turn from the seam too).
                     let right = match cx.faces[f].s {
-                        Surf::Cyl { r, th0, .. } => ((q.x - r * th0).abs() <= tol || (q.x - r * (th0 + TAU)).abs() <= tol) && q.x > r * (th0 + PI),
+                        // (Within the grey band in space too, its angle off the seam by its distance from the axis (a
+                        // cone's vertex 0.6 um short of the seam, a seam edge ending at it on the left and a piece ending
+                        // at it on the right).)
+                        Surf::Cyl { r, th0, o, a, .. } => {
+                            let w3 = cx.p(w) - o;
+                            let rho = (w3 - a * w3.dot(a)).length();
+                            let tv = GREY * tol.max(cx.pool.t[w as usize]) * r / rho.max(1e-300);
+                            ((q.x - r * th0).abs() <= tol.max(tv) || (q.x - r * (th0 + TAU)).abs() <= tol.max(tv)) && q.x > r * (th0 + PI)
+                        }
                         Surf::Plane { .. } | Surf::Nurbs { .. } => false,
                     };
                     // (A part of a cone's apex: at both its rulings' angles.)
