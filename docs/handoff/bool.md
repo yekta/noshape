@@ -103,6 +103,17 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   15 faces, 23 edges, 0 vertices after it (live.jsonl): Parasolid's bore rim is one closed edge with no vertex, so
   splitting it at our seam would add an edge live doesn't have. Taking that cut means the circle crossing the face's
   seam in the parameter plane only (two curves there of one edge, no vertex); not done.
+- Placing sections, f09d's copies (bool, 11-05 11-05 15:46). Landed 0c29863f: across a clean crossing of a face's boundary
+  (one cut, a clear angle, no vertex) the next interval's side is the other, no ray; rays skip curves behind them and
+  the one past the fewest boxes goes first; "running together" asks a point's distance only where the other's chords
+  (with bulges) come near; a touch's tangents compare along the group's own parameters (one projection, not 64).
+  Idle vibe4, the 65-tool gear cut: placing 111-114 -> 86-89 ms, the Rust stage 204-214 -> 180-189 ms.
+  f09d by its copies: pattern::copy_of had no case for extrusion surfaces, so the three slot tools (90 deg copies) were
+  never copies (/root/bool-scratch/copy-of-extrusion.patch adds extrusions and revolutions). With them, 39 of 55 pairs
+  reuse a seed's sections, but nurbs_pair's clear_inside (each reused curve and its source checked against the
+  tube face's boundary, the other slots' outlines on it) costs ~128 ms a run: 300 ms against 98 without copies;
+  OCCT's 112. Taken without copies: 142 ms (128 with the tool face's own curves moved instead of projected, the check
+  then 30 ms, volume 1e-7 off). Left declined.
 - cf-fix-pcb, motor-mount-jack (bool, 11-05 11-05 13:37). Landed ba96d940 (crossings seeded only from chords within their
   bulges of each other: the spur gear cut's Newton runs -70 %) and c04768bb: a ray's crossing with a small free-form
   face where Newton's steps stall at rounding (a 3 mm letter's wall over u 0 .. 1: u moves 3e-14 a step, never
