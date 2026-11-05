@@ -582,33 +582,50 @@ struct PendingRead {
     done_ns: Arc<std::sync::atomic::AtomicU64>,
 }
 
-/// `NOSHAPE_PERF_PASSES=1` (with `NOSHAPE_PERF`): the GPU time of every render and compute pass (wgpu records each in
-/// a command buffer of its own, labelled with the pass's label; the vendored wgpu-hal's `metal::pass_timing` reads
-/// their GPU start and end: the runners have no timestamp queries), logged as `r.pass.<label>`.
+/// GPU time per pass on Metal without timestamp queries (CI's paravirtualized Apple GPU): wgpu records every render
+/// and compute pass in a command buffer of its own labelled with the pass, and the vendored wgpu-hal
+/// (`metal::pass_timing`, on with `NOSHAPE_PERF` there, or `NOSHAPE_PERF_PASSES=1`) reads their GPU start and end.
+/// Logged as `r.pass.<label>`, and each frame's passes summed as `r.gpu_ms` (as the timestamp queries give it
+/// elsewhere): a frame runs from its silhouette cull or color pass to the next one; picking is left out.
 #[cfg(target_vendor = "apple")]
-fn perf_passes() -> bool {
-    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| perf::enabled() && std::env::var("NOSHAPE_PERF_PASSES").is_ok_and(|v| v == "1"))
-}
-
-/// Log the pass times the GPU reported since the last call (`r.pass.<label>`, ms).
 pub(crate) fn record_pass_times() {
-    #[cfg(target_vendor = "apple")]
-    for (pass, ms) in perf_passes().then(wgpu::hal::metal::pass_timing::take).into_iter().flatten() {
-        // Perf stages are static names: one per distinct label, made once.
-        static NAMES: std::sync::Mutex<Vec<(String, &'static str)>> = std::sync::Mutex::new(Vec::new());
-        let mut names = NAMES.lock().unwrap_or_else(|e| e.into_inner());
-        let name = match names.iter().find(|(l, _)| *l == pass) {
-            Some((_, n)) => *n,
-            None => {
-                let n: &'static str = Box::leak(format!("r.pass.{pass}").into_boxed_str());
-                names.push((pass, n));
-                n
+    use std::sync::Mutex;
+    // Perf stages are static names: one per distinct label, made once.
+    static NAMES: Mutex<Vec<(String, &'static str)>> = Mutex::new(Vec::new());
+    // The current frame's GPU time so far, and whether its color pass came.
+    static FRAME: Mutex<(f64, bool)> = Mutex::new((0.0, false));
+    if !wgpu::hal::metal::pass_timing::on() {
+        return;
+    }
+    let mut frame = FRAME.lock().unwrap_or_else(|e| e.into_inner());
+    for (pass, ms) in wgpu::hal::metal::pass_timing::take() {
+        let name = {
+            let mut names = NAMES.lock().unwrap_or_else(|e| e.into_inner());
+            match names.iter().find(|(l, _)| *l == pass) {
+                Some((_, n)) => *n,
+                None => {
+                    let n: &'static str = Box::leak(format!("r.pass.{pass}").into_boxed_str());
+                    names.push((pass.clone(), n));
+                    n
+                }
             }
         };
         perf::record_ms(name, ms as f32);
+        if pass.starts_with("pick") || pass == "depth-samples" {
+            continue;
+        }
+        let starts = pass == "sil-cull" || pass == "color";
+        if starts && frame.1 {
+            perf::record_ms("r.gpu_ms", frame.0 as f32);
+            *frame = (0.0, false);
+        }
+        frame.0 += ms;
+        frame.1 |= pass == "color";
     }
 }
+
+#[cfg(not(target_vendor = "apple"))]
+pub(crate) fn record_pass_times() {}
 
 /// Per-frame draw lists (reused to avoid per-frame allocation).
 #[derive(Default)]
@@ -2443,6 +2460,11 @@ impl Renderer {
         });
 
         let timer = (perf::enabled() && device.features().contains(wgpu::Features::TIMESTAMP_QUERY)).then(|| GpuTimer::new(&device, &queue));
+        // Metal without timestamp queries: the GPU time of each pass instead (`record_pass_times`).
+        #[cfg(target_vendor = "apple")]
+        if perf::enabled() && timer.is_none() {
+            wgpu::hal::metal::pass_timing::enable();
+        }
         let slot_buffers = std::array::from_fn(|_| SlotBuffer::new(&device));
         let sil = SilCull::new_if_on(&device, &globals_layout, &inst_layout, &compare_layout, &shader);
         Self {
