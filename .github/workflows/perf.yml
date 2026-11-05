@@ -321,17 +321,29 @@ jobs:
         shell: pwsh
         run: .github/perf/bench.ps1 $env:BIN $env:FIXTURE "$env:RUNNER_TEMP\perf" ${{ inputs.modes || matrix.modes }}
 
-      - name: Baseline (last successful run on main)
+      # Only a release measured with the default settings (no ref, env, variants, modes, frames or cold) is a
+      # baseline: an experiment's numbers (a branch, frames-driven, a switch) aren't comparable.
+      - name: Mark the default settings
+        if: ${{ !inputs.ref && !inputs.env && !inputs.variants && !inputs.modes && !inputs.cold && !inputs.fixture && (!inputs.frames || inputs.frames == '300') }}
+        shell: bash
+        run: mkdir -p "$RUNNER_TEMP/perf" && echo "${{ github.run_id }}" > "$RUNNER_TEMP/perf/default-settings"
+
+      - name: Baseline (last successful run on main with the default settings)
         if: inputs.fixture == ''
         continue-on-error: true
         shell: bash
         run: |
-          id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow perf.yml --branch main --status success --limit 1 --json databaseId --jq '.[0].databaseId')
-          if [[ -n "$id" && "$id" != "${{ github.run_id }}" ]]; then
-            gh run download "$id" --repo "$GITHUB_REPOSITORY" --name "perf-${{ matrix.os }}" --dir "$RUNNER_TEMP/baseline" && echo "baseline: run $id"
-          else
-            echo "no baseline yet"
-          fi
+          for id in $(gh run list --repo "$GITHUB_REPOSITORY" --workflow perf.yml --branch main --status success --limit 20 --json databaseId --jq '.[].databaseId'); do
+            [[ "$id" == "${{ github.run_id }}" ]] && continue
+            rm -rf "$RUNNER_TEMP/baseline"
+            if gh run download "$id" --repo "$GITHUB_REPOSITORY" --name "perf-${{ matrix.os }}" --dir "$RUNNER_TEMP/baseline" 2>/dev/null \
+                && [[ -f "$RUNNER_TEMP/baseline/default-settings" ]]; then
+              echo "baseline: run $id"
+              exit 0
+            fi
+          done
+          rm -rf "$RUNNER_TEMP/baseline"
+          echo "no baseline yet (no successful run with the default settings)"
 
       - name: Summary and gates
         id: analyze
