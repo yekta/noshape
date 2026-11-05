@@ -593,6 +593,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (patch 0022, GCC 15) is in /root/occt/lib; please sync to /opt/occt; CI rebuilds OCCT from patches/occt.** Left: the
   CI-like build's open is 14 s against our 7.8 s (other GCC 13 differences, not a hang); the release smoke should open
   this document.
+- [ ] P2 FILLET-RIM-OVERFLOW (core 11-05 21:40, from blend corpus 333e2411; lead: bisect it) a hole rim's fillet wider than the
+  wall beside it (live F5: 40 × 20 × 10 block, Ø10 hole through at (20,10), R6 on the top rim) is **6907.0716824606 mm³**
+  in live (exact: the part minus the revolved corner region, 6907.0706 by integration; one TORUS R11 r6 cutting through the
+  y = 0 / 20 sides, no extra faces), ours **6910.116798 mm³, 13 faces**: OCCT's torus in three pieces plus two B-spline
+  overflow patches (52 mm² each) where it should cut the side faces (R5.5 the same, 6961.152; R4.9 live's 7017.294265, 8
+  faces). Bisected: 15 → 13 faces at core's b074c5a3 (FILLET-BLEND-SPLIT's tighter retry); the volume was as wrong before
+  (6910.1193). Live's face count asked (REQUESTS 11-05 20:27); expected 9 (the top in two). Fix: for a lone circular edge
+  whose blend overflows onto faces it isn't tangent to, cut the revolved corner region instead (as straight rounds rolling
+  over a face, BLEND-RUST 11-05). Corpus case stays as recorded until then.
 - [ ] P2 DISPLACEMENT-TOP-VOLUME (core 11-05 12:18) a displacement map's replaced flat top (a 512² or 704² B-spline
   trimmed by the cylinder's circle) takes 20 s for its volume (mass properties; the side face's 0.6-1 s): common.cpp
   face_moments' boundary integral cuts the circle's curve on the face at every knot it crosses and runs an inner
