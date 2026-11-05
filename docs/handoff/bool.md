@@ -103,7 +103,7 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   15 faces, 23 edges, 0 vertices after it (live.jsonl): Parasolid's bore rim is one closed edge with no vertex, so
   splitting it at our seam would add an edge live doesn't have. Taking that cut means the circle crossing the face's
   seam in the parameter plane only (two curves there of one edge, no vertex); not done.
-- Gears, motor-mount-jack (bool, 11-05 08:35). Landed a28b32ad (planar B-splines read as planes; made faces stay on
+- Gears, motor-mount-jack (bool, 11-05 08:42). Landed a28b32ad (planar B-splines read as planes; made faces stay on
   the B-spline, as OCCT's: building them on a new plane broke a sheet metal jog's later split), ad679565 (parallel
   check), d072728e: chords' bulges measured (3x the middle's offset, once per curve; was a quarter of the chord:
   cf-spur-gear's 396-face cut ran 187k Newton seeds, 1.1M steps, for 1.5k crossings; now -55 %), a touch's place by
