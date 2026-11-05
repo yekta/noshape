@@ -3922,6 +3922,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   whose inputs translate whole but fail in our host, with the Monitor's first error (featurestudio_monitor on the
   translated documents: `NOSHAPE_PARITY_SAVE=<dir>` keeps them, NOSHAPE_PARITY_ONLY=<name>; copies of all in
   /root/dx-scratch/pmsave/<name>.noshape), each with live building it:
+  - dx 11-05 03:58: cf-fix-pcb's Fix PCB 2 runs now (std 2506's evaluateQuery wraps raw ids itself: QUERIES_SINCE
+    2581): its Part 1 / Part 2 are live's Part 2 / Part 1 (names swapped), and the second is 138/330/220 faces /
+    edges / vertices, 3,266,000 mm³ against live's 136/324/216, 3,204,549 (+1.9 %), 48 parts against live's 3, and
+    it takes 6.3 s (live's whole document 0.6 s). Its useAll takes every other solid as a component, here 52 bodies:
+    three 328-face boards (pattern instances), their blocks, and four more (one of 1 face over x -584.2 ... 0, three
+    of 5 / 20 / 24 faces over -584.2 ... -76.2), each replaced by a block and fused. Next: what live's useAll gets
+    there (a probe in live's copy, REQUESTS), then the names and the time.
   - cf-sheet-metal-shaped-flange (Shaped Flange 1, 2): `opEdgeChange: only offset edge changes are supported`
     (std geomOperations.fs 531, from sheetMetalShapedFlange.fs 176 updateSheetMetalModelForCFlange).
   - cf-curve-pattern-normal (Curve Pattern Normal 1): `Call clusterPoints(array, number) does not match
