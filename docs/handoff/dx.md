@@ -34,9 +34,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   no custom feature in the corpus fails to run). Corpus run 95: 41/55 documents, 392/471 features, custom 47/109.
 - Handed on: cf-hose-routing's display meshes ~6 s / 0.9 GB (psui.md); the slowest custom-feature documents' kernel
   time (core.md). Asked live: Up to Part's 76 vertices, cf-hose-routing's path inputs, Fix PCB 2's useAll bodies.
-- Next: Fix PCB 2 (TICKETS PARITY-CUSTOM-RUN-FAILURES 03:58, after live's answer); cf-transform-pattern's
-  Transform pattern 7 (the translator: an edge derived from a sketch line through an extrude's cap and an imprint);
-  cf-sheet-metal-hem's Derived 1 (translator); clamp-hms' Hole.
+- 04:23 queued (cc5d6064): CENTER on a planar face with a round secondary face = its axis on the plane (model-core,
+  core's area; T1 features_c::mate_connector_at_the_center_of_a_rounded_corner), the translator's blended faces
+  and caps along the extrude: clamp-hms 15/15; run 97: 42/55 documents, 393/471 features (SCORE.md row).
+  Testing (run 98): the translator maps names nested under a sketch's imprint (cf-transform-pattern's Transform
+  pattern 7 translates whole now; its result still differs: our MID_POINT connector on an edge ignores the
+  secondary entity; what live does with it is next).
+- Next: Fix PCB 2 (TICKETS PARITY-CUSTOM-RUN-FAILURES 03:58, after live's answer); Transform pattern 7's MID_POINT
+  with a secondary; cf-sheet-metal-hem's Derived 1 (translator support for importDerived once live fetches the
+  source, REQUESTS 04:00).
 
 ## 11-05 01:00 UTC: Export dialogs remember the user's choices (P1 from the user via lead, 00:3x)
 - Live's client code (behaviours "dx (2026-11-05 00:52, P1 export memory)"): one `exportSolidOptions` for part,
