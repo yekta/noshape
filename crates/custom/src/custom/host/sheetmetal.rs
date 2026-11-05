@@ -704,7 +704,7 @@ fn outline_points(sides: &[(DVec3, DVec3)]) -> Vec<DVec3> {
 
 /// Bend relief cutters of one wall: at each end of a bend side that runs on
 /// along a free side, a slot into the wall on the free side (see [`BendRelief`]).
-fn relief_tools(def: &Definition, topo: &Topo, l: &Loop, n: DVec3, thickness: f64) -> FResult<Vec<(Shape, usize)>> {
+fn relief_tools(def: &Definition, topo: &Topo, fi: usize, l: &Loop, n: DVec3, thickness: f64) -> FResult<Vec<(Shape, usize)>> {
     let mut out = Vec::new();
     let m = l.pts.len();
     for k in 0..m {
@@ -755,6 +755,7 @@ fn relief_tools(def: &Definition, topo: &Topo, l: &Loop, n: DVec3, thickness: f6
             }
             let w = relief.width * thickness;
             let straight = relief.sized_depth.unwrap_or(relief.depth * radius) + moved_in;
+            let v = v + away * bend_side_back(def, topo, fi, l.side[k], bend_end, away, radius)?;
             let depth = if relief.style.ends_with("RECTANGLE") { straight + w * 0.5 } else { straight };
             // Through the whole thickness and a little more.
             let base = v - n * (def.back + thickness);
@@ -769,6 +770,37 @@ fn relief_tools(def: &Definition, topo: &Topo, l: &Loop, n: DVec3, thickness: f6
         }
     }
     Ok(out)
+}
+
+/// How far the relief at bend `bend`'s end `v` on wall `fi` starts back along the bend (`away`: out of the bend):
+/// where the other wall's free side, leaving `v` slanted back over the bend, crosses the bend's setback line, so the
+/// slot clears the bend's side (live 2053: Shaped Flange's tapered flange, its relief from y 48.14, not the bend's
+/// end at 48.5). 0 when that side runs square or outwards.
+fn bend_side_back(def: &Definition, topo: &Topo, fi: usize, bend: usize, v: DVec3, away: DVec3, radius: f64) -> FResult<f64> {
+    let Some(&other) = topo.edge_faces[bend].iter().find(|&&f| f as usize != fi) else { return Ok(0.0) };
+    let other = other as usize;
+    let side = (0..topo.edges.len()).find_map(|x| {
+        if x == bend || topo.edge_faces[x].as_slice() != [other as u32] {
+            return None;
+        }
+        let (a, b) = topo.edge_ends[x];
+        if a.distance(v) < TOL {
+            Some(b)
+        } else if b.distance(v) < TOL {
+            Some(a)
+        } else {
+            None
+        }
+    });
+    let Some(end) = side else { return Ok(0.0) };
+    let s = (end - v).normalize_or_zero();
+    let along = s.dot(away);
+    let across = s - away * along;
+    if along >= -1e-9 || across.length() < 1e-9 {
+        return Ok(0.0);
+    }
+    let g = bend_geometry(topo, bend, fi, other, radius, def.front, def.back)?;
+    Ok(g.setback / across.length() * along)
 }
 
 /// Whether a joint other than bend edge `bend` starts at `v` or within
@@ -1592,7 +1624,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         if exact.contains_key(&fi) {
             slab = k::unify_same_domain(&slab).map_err(|e| fe(format!("Sheet metal wall failed: {e}")))?.shape;
         }
-        let mut reliefs = relief_tools(def, &topo, l, n, front + back)?;
+        let mut reliefs = relief_tools(def, &topo, fi, l, n, front + back)?;
         reliefs.extend(cuts.remove(&fi).unwrap_or_default());
         // The wall in the flat: its outline on the definition plane, reliefs cut.
         let mut flat = match exact.get(&fi) {
