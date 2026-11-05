@@ -1,6 +1,7 @@
 //! A closed solid's back faces are culled in the color pass (`Instance::closed`), as live does (its solid faces are
-//! one-sided): they are behind its front faces, so that changes no pixel with edges or in hidden line, and in plain
-//! Shaded only the back-face pixels our depth offsets let through steep faces and outlines, which live never shows. The same scenes are rendered with the flag
+//! one-sided): they are behind its front faces, so that changes no pixel of the drawing with edges or in hidden line,
+//! and in plain Shaded only the back-face pixels our depth offsets let through steep faces and outlines, which live
+//! never shows; ambient occlusion, which reads the depth those back faces wrote, moves by at most 2 levels. The same scenes are rendered with the flag
 //! as the builder sets it and with it cleared, from several directions in both projections and three display modes,
 //! on a thin plate, a block with a hole and a cylinder.
 
@@ -60,8 +61,13 @@ fn models() -> Vec<(&'static str, StudioDisplay)> {
 /// View directions (forward), off-axis.
 const VIEWS: [[f64; 3]; 4] = [[-1.0, 1.0, -1.0], [1.0, 0.4, -0.6], [0.3, -1.0, 0.8], [-0.2, 0.1, -1.0]];
 
-fn render(r: &mut Renderer, display: &StudioDisplay, cull: bool, view: DVec3, projection: Projection, mode: DisplayMode, size: (u32, u32)) -> (Vec<u8>, usize) {
-    let style = noshape_scene::png::viewport_style(&noshape_scene::GraphicsPrefs::default());
+/// The frame of `look` (view direction, projection, display mode), back faces culled or not, ambient occlusion or not.
+fn render(r: &mut Renderer, display: &StudioDisplay, cull: bool, ao: bool, look: (DVec3, Projection, DisplayMode), size: (u32, u32)) -> (Vec<u8>, usize) {
+    let (view, projection, mode) = look;
+    let mut style = noshape_scene::png::viewport_style(&noshape_scene::GraphicsPrefs::default());
+    if !ao {
+        style.ambient_occlusion = 0.0;
+    }
     let up = r.uploader();
     let mut cache = GpuCache::default();
     let opts = SceneOptions { display_mode: mode, show_planes: false, show_origin: false, show_sketches: false, ..Default::default() };
@@ -90,33 +96,47 @@ fn compare(views: &[[f64; 3]], size: (u32, u32)) {
             return;
         }
     };
-    let mut bled = 0;
+    let (mut bled, mut ao_moved) = (0, 0);
     for (name, display) in models() {
         for v in views {
             let view = DVec3::from_array(*v);
             for projection in [Projection::Orthographic, Projection::Perspective] {
                 for mode in [DisplayMode::ShadedWithEdges, DisplayMode::HiddenLine, DisplayMode::Shaded] {
-                    let (culled, closed) = render(&mut r, &display, true, view, projection, mode, size);
-                    assert!(closed > 0, "{name}: its faces are a closed solid's");
-                    let (kept, _) = render(&mut r, &display, false, view, projection, mode, size);
-                    let differ: Vec<usize> = kept.chunks(4).zip(culled.chunks(4)).enumerate().filter(|(_, (a, b))| a != b).map(|(i, _)| i).collect();
-                    let first = differ.first().map(|i| (i % size.0 as usize, i / size.0 as usize));
+                    let pair = |r: &mut Renderer, ao: bool| {
+                        let (culled, closed) = render(r, &display, true, ao, (view, projection, mode), size);
+                        assert!(closed > 0, "{name}: its faces are a closed solid's");
+                        let (kept, _) = render(r, &display, false, ao, (view, projection, mode), size);
+                        let differ: Vec<(usize, i32)> = kept.chunks(4).zip(culled.chunks(4)).enumerate().filter(|(_, (a, b))| a != b).map(|(i, (a, b))| (i, a.iter().zip(b).map(|(x, y)| (*x as i32 - *y as i32).abs()).max().unwrap_or(0))).collect();
+                        (differ, kept.len() / 4)
+                    };
+                    let at = |i: usize| (i % size.0 as usize, i / size.0 as usize);
+                    let (differ, pixels) = pair(&mut r, false);
+                    let first = differ.first().map(|d| at(d.0));
                     // Plain Shaded: with its back faces drawn, the depth offsets let them through where a front face
                     // is steep or at an outline (a dashed dark line along a far edge, specks along a hole's walls; edges
                     // cover them in the other modes). Live never draws them (its solid faces are one-sided,
                     // `isTwoSided: false`), and neither do we now: those few pixels change, nothing else (a front
                     // face culled by a wrong winding would change a whole face).
                     if mode == DisplayMode::Shaded {
-                        assert!(differ.len() * 20 < kept.len() / 4, "{name}, view {v:?}, {projection:?}, Shaded: {} pixels differ (more than back faces bleeding through), first at {first:?}", differ.len());
+                        assert!(differ.len() * 20 < pixels, "{name}, view {v:?}, {projection:?}, Shaded: {} pixels differ (more than back faces bleeding through), first at {first:?}", differ.len());
                         bled += differ.len();
                         continue;
                     }
+                    // With edges and in hidden line: not one pixel of the drawing changes.
                     assert!(differ.is_empty(), "{name}, view {v:?}, {projection:?}, {mode:?}: {} pixels differ, first at {first:?}", differ.len());
+                    // Ambient occlusion reads the depth those bled-through back faces wrote (a few samples by a thin
+                    // wall's far edge): without them it shades by at most 2 levels of 255 otherwise there (Metal: one
+                    // pixel of the 3 mm plate, lavapipe: some under sub-pixel camera moves). Never more.
+                    let (differ, _) = pair(&mut r, true);
+                    if let Some(&(i, d)) = differ.iter().max_by_key(|d| d.1) {
+                        assert!(d <= 2, "{name}, view {v:?}, {projection:?}, {mode:?} with AO: a channel {d} levels apart at {:?} (more than back-face depth in the AO)", at(i));
+                    }
+                    ao_moved += differ.len();
                 }
             }
         }
     }
-    eprintln!("back-face pixels no longer bleeding through in plain Shaded: {bled} pixels");
+    eprintln!("back-face pixels no longer bleeding through in plain Shaded: {bled}; AO within 2 levels at {ao_moved}");
 }
 
 #[test]
@@ -129,3 +149,4 @@ fn culling_a_closed_solids_back_faces_changes_no_pixel() {
 fn culling_a_closed_solids_back_faces_changes_no_pixel_everywhere() {
     compare(&VIEWS, (640, 480));
 }
+
