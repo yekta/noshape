@@ -226,6 +226,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-05 05:00 release (qa list 03:28, checked on green 0cbf4fa7; the latest release is v0.4.30)
+- **qa 04:09: still no blocker on green 769f4796** (bool's mirror-over-a-hole merge, core's flat Shell rims 9ea6b56f): sweeps, the 44 ticket documents, dx's cf corpus, the vase and the whole CLI smoke (mirror fixed tickets, the user's cases) = 0cbf4fa7.
 - **qa 03:28: no blocker.** On green 0cbf4fa7 (vibe3): CLI round trip 67643.716875 / 18 in all six formats; volume sweep = v0.4.25;
   the 44 ticket documents = the previous greens; dx's cf corpus unchanged; fixed tickets hold (incl. SM-CLOSED-BUTT,
   RUST-MIRROR-NEGATIVE, CRASH-3151 / 3388 documents open); the user's cases pass, the Gyro matrices included (SPLIT-FACE-SAME-ID
