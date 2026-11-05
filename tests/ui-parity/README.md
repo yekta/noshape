@@ -79,6 +79,31 @@ list's rows (the assembly's own, Origin, instances, "Mate features (n)", its row
 
 A target a side can't find makes that step `"ok": false` with `"error"`; the run goes on.
 
+### Drawings (dx, 11-05)
+A start may add `"drawing": {"part": "Part 1", "template": "ANSI_A_INCH.dwt", "views": "suggested" | "none"}`: Create
+Drawing of that part with that template (the dialog's Suggested views or No views), and the run opens on that drawing
+tab (live's name "Part 1 Drawing 1"). Targets in a drawing:
+- `{"sheet_point": [x, y]}`: a point of the sheet, mm from its lower-left corner (an ANSI A sheet is 279.4 × 215.9);
+- `{"view": "Front"}`: a view (its middle), by the name its properties show;
+- `{"view_point": {"view": "Top", "at": [x, y, z]}}`: model point (mm) where it shows in that view;
+  `{"view_edge": {…}}` the same picking the model edge drawn there;
+- `{"annotation": "1.575"}`: an annotation by its shown text; `{"doc_tab": "Part 1 Drawing 1"}`: a document tab;
+- `{"tool": …}` the drawing toolbar's tools by tooltip, as in a Part Studio.
+
+Its state adds `"drawing"` (`null` outside a drawing tab):
+```json
+ "drawing": { "tab": "Part 1 Drawing 1", "sheet": "Sheet1", "sheets": ["Sheet1"], "tool": "Linear dimension",
+              "views": [{"name": "Front", "kind": "projected", "parent": "Top", "scale": "1:1"}],
+              "annotations": [{"kind": "dimension", "text": "1.575"}, {"kind": "note", "text": "CHECK SIZE"}],
+              "selection": [{"kind": "VIEW", "owner": "Front"}] }
+```
+- `tool`: the active drawing tool's tooltip name, `null` when none. `views`: sorted by name; `kind` one of `base`,
+  `projected`, `isometric`, `section`, `detail`, `auxiliary`, `broken-out`; `parent` the view it was projected or cut
+  from; `scale` as the view's properties show it. `annotations`: the sheet's, sorted by kind then text, `kind` one
+  of `dimension`, `note`, `centermark`, `centerline`, `callout`, `datum`, `gdt`, `table`; automatic centermarks are
+  left out. `selection`: `VIEW` / `EDGE` / `ANNOTATION` items with the view or the annotation's text as `owner`.
+- A drawing's dialogs and panels (Insert view, Section view, Export) are the top-level `dialog`, as a feature's.
+
 ## Recording (both sides write this)
 
 ```json

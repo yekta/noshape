@@ -1,0 +1,46 @@
+{
+ "name": "drw-dimension-edge",
+ "about": "Linear dimension of the Front view's top edge, placed above it",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "everyday (lead 11-05)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Linear dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      25
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

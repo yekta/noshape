@@ -1,0 +1,35 @@
+{
+ "name": "drw-projected-left",
+ "about": "Projected view from the Front view, placed to its left, Escape",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "everyday (lead 11-05)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Projected view"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view": "Front"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     20,
+     60
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

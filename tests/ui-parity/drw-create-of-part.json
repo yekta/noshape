@@ -1,0 +1,36 @@
+{
+ "name": "drw-create-of-part",
+ "about": "right-click the part, Create drawing of Part 1, OK with the dialog's defaults: what the new drawing tab shows (and the view on the cursor)",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "everyday (lead 11-05)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Create drawing of Part 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

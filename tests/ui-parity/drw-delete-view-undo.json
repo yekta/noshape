@@ -1,0 +1,24 @@
+{
+ "name": "drw-delete-view-undo",
+ "about": "select the Right view, Delete, then undo",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "everyday (lead 11-05)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "view": "Right"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Delete"
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  }
+ ]
+}

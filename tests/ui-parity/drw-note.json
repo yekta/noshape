@@ -1,0 +1,42 @@
+{
+ "name": "drw-note",
+ "about": "Note on the sheet: click its place, type, then click off it",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "everyday (lead 11-05)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Note"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     150,
+     40
+    ]
+   }
+  },
+  {
+   "do": "type",
+   "text": "CHECK SIZE"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     240,
+     190
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

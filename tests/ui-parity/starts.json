@@ -192,7 +192,7 @@
     "before": "Extrude 1"
    }
   ],
-  "about": "filmiss: Fillet 1 above Extrude 1, so it has a missing selection (red, ⚠)"
+  "about": "filmiss: Fillet 1 above Extrude 1, so it has a missing selection (red, \u26a0)"
  },
  "pin-block": {
   "units": "mm",
@@ -448,5 +448,89 @@
    }
   ],
   "about": "a 60 x 40 sheet metal plate on Top (Sheet metal model, Thicken 2 mm, bend radius 2 mm; z 0 to 2)"
+ },
+ "block-drawing": {
+  "units": "mm",
+  "features": [
+   {
+    "type": "newSketch",
+    "name": "Sketch 1",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        0,
+        0
+       ],
+       [
+        40,
+        30
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 1",
+    "params": {
+     "entities": [
+      "Sketch 1 region 0"
+     ],
+     "endBound": "BLIND",
+     "depth": "10 mm",
+     "operationType": "NEW"
+    }
+   }
+  ],
+  "drawing": {
+   "part": "Part 1",
+   "template": "ANSI_A_INCH.dwt",
+   "views": "suggested"
+  },
+  "about": "the 40 x 30 x 10 block and its drawing (Create Drawing of Part 1, ANSI_A_INCH.dwt, Suggested views: Top, Front, Right and Isometric at 1:1); opens on the drawing tab"
+ },
+ "block-drawing-empty": {
+  "units": "mm",
+  "features": [
+   {
+    "type": "newSketch",
+    "name": "Sketch 1",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        0,
+        0
+       ],
+       [
+        40,
+        30
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 1",
+    "params": {
+     "entities": [
+      "Sketch 1 region 0"
+     ],
+     "endBound": "BLIND",
+     "depth": "10 mm",
+     "operationType": "NEW"
+    }
+   }
+  ],
+  "drawing": {
+   "part": "Part 1",
+   "template": "ANSI_A_INCH.dwt",
+   "views": "none"
+  },
+  "about": "the 40 x 30 x 10 block and an empty drawing of it (Create Drawing of Part 1, ANSI_A_INCH.dwt, No views); opens on the drawing tab"
  }
 }
