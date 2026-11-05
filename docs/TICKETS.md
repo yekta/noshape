@@ -3929,6 +3929,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     three 328-face boards (pattern instances), their blocks, and four more (one of 1 face over x -584.2 ... 0, three
     of 5 / 20 / 24 faces over -584.2 ... -76.2), each replaced by a block and fused. Next: what live's useAll gets
     there (a probe in live's copy, REQUESTS), then the names and the time.
+    dx 11-05 04:30, live 2048: 48 solids there (3 boards, 42 blocks, 3 bodies of 10 faces), none of our four extra
+    (the 1-face one and the 5 / 20 / 24-face ones over the first board): Fix PCB 1 leaves them in ours, its inputs
+    being unmapped (PCBTopFace / PCBBottomFace / components: CAP_FACE / SWEPT_BODY names inside a pattern instance's
+    COPY, no live ids). Next: map names under a pattern's COPY (the instance's transform of the original), then
+    Fix PCB 1 runs on its board as live's. Live 2046: Up to Part's real topology is 50 / 112 / 64, ours; live.jsonl's
+    76 is a UI-fetch artifact (asked live to correct the corpus).
   - cf-sheet-metal-shaped-flange (Shaped Flange 1, 2): `opEdgeChange: only offset edge changes are supported`
     (std geomOperations.fs 531, from sheetMetalShapedFlange.fs 176 updateSheetMetalModelForCFlange).
   - cf-curve-pattern-normal (Curve Pattern Normal 1): `Call clusterPoints(array, number) does not match
